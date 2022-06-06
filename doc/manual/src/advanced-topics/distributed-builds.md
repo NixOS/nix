@@ -53,8 +53,8 @@ example, the following command allows you to build a derivation for
 $ uname
 Linux
 
-$ nix build \
-  '(with import <nixpkgs> { system = "x86_64-darwin"; }; runCommand "foo" {} "uname > $out")' \
+$ nix build --impure \
+  --expr '(with import <nixpkgs> { system = "x86_64-darwin"; }; runCommand "foo" {} "uname > $out")' \
   --builders 'ssh://mac x86_64-darwin'
 [1/0/1 built, 0.0 MiB DL] building foo on ssh://mac
 
@@ -110,7 +110,7 @@ default, set it to `-`.
 7.  A comma-separated list of *mandatory features*. A machine will only
     be used to build a derivation if all of the machine’s mandatory
     features appear in the derivation’s `requiredSystemFeatures`
-    attribute..
+    attribute.
 
 8.  The (base64-encoded) public host key of the remote machine. If omitted, SSH
     will use its regular known-hosts file. Specifically, the field is calculated

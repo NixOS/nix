@@ -15,6 +15,7 @@ R""(
   ```
 
 * Remove all packages:
+
   ```console
   # nix profile remove '.*'
   ```

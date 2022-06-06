@@ -37,7 +37,7 @@ testCutoffFor () {
 }
 
 testCutoff () {
-    # Don't directly build depenentCA, that way we'll make sure we dodn't rely on
+    # Don't directly build dependentCA, that way we'll make sure we don't rely on
     # dependent derivations always being already built.
     #testDerivation dependentCA
     testCutoffFor transitivelyDependentCA
@@ -59,9 +59,17 @@ testNixCommand () {
     nix build --experimental-features 'nix-command ca-derivations' --file ./content-addressed.nix --no-link
 }
 
+# Regression test for https://github.com/NixOS/nix/issues/4775
+testNormalization () {
+    clearStore
+    outPath=$(buildAttr rootCA 1)
+    test "$(stat -c %Y $outPath)" -eq 1
+}
+
 # Disabled until we have it properly working
 # testRemoteCache
 clearStore
+testNormalization
 testDeterministicCA
 clearStore
 testCutoff

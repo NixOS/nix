@@ -105,6 +105,11 @@ struct ValidPathInfo
     ValidPathInfo(const StorePath & path, Hash narHash) : path(path), narHash(narHash) { };
 
     virtual ~ValidPathInfo() { }
+
+    static ValidPathInfo read(Source & source, const Store & store, unsigned int format);
+    static ValidPathInfo read(Source & source, const Store & store, unsigned int format, StorePath && path);
+
+    void write(Sink & sink, const Store & store, unsigned int format, bool includePath = true) const;
 };
 
 typedef std::map<StorePath, ValidPathInfo> ValidPathInfos;

@@ -9,7 +9,7 @@ echo $path2
 if test "$path1" != "$path2"; then
     echo "nix-store --add and --add-fixed mismatch"
     exit 1
-fi    
+fi
 
 path3=$(nix-store --add-fixed sha256 ./dummy)
 echo $path3

@@ -10,11 +10,11 @@
 namespace nix {
 
 void printValueAsJSON(EvalState & state, bool strict,
-    Value & v, JSONPlaceholder & out, PathSet & context)
+    Value & v, const PosIdx pos, JSONPlaceholder & out, PathSet & context)
 {
     checkInterrupt();
 
-    if (strict) state.forceValue(v);
+    if (strict) state.forceValue(v, pos);
 
     switch (v.type()) {
 
@@ -40,7 +40,7 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
 
         case nAttrs: {
-            auto maybeString = state.tryAttrsToString(noPos, v, context, false, false);
+            auto maybeString = state.tryAttrsToString(pos, v, context, false, false);
             if (maybeString) {
                 out.write(*maybeString);
                 break;
@@ -50,22 +50,22 @@ void printValueAsJSON(EvalState & state, bool strict,
                 auto obj(out.object());
                 StringSet names;
                 for (auto & j : *v.attrs)
-                    names.insert(j.name);
+                    names.emplace(state.symbols[j.name]);
                 for (auto & j : names) {
                     Attr & a(*v.attrs->find(state.symbols.create(j)));
                     auto placeholder(obj.placeholder(j));
-                    printValueAsJSON(state, strict, *a.value, placeholder, context);
+                    printValueAsJSON(state, strict, *a.value, a.pos, placeholder, context);
                 }
             } else
-                printValueAsJSON(state, strict, *i->value, out, context);
+                printValueAsJSON(state, strict, *i->value, i->pos, out, context);
             break;
         }
 
         case nList: {
             auto list(out.list());
-            for (unsigned int n = 0; n < v.listSize(); ++n) {
+            for (auto elem : v.listItems()) {
                 auto placeholder(list.placeholder());
-                printValueAsJSON(state, strict, *v.listElems()[n], placeholder, context);
+                printValueAsJSON(state, strict, *elem, pos, placeholder, context);
             }
             break;
         }
@@ -79,24 +79,28 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
 
         case nThunk:
-            throw TypeError("cannot convert %1% to JSON", showType(v));
-
         case nFunction:
-            throw TypeError("cannot convert %1% to JSON", showType(v));
+            auto e = TypeError({
+                .msg = hintfmt("cannot convert %1% to JSON", showType(v)),
+                .errPos = state.positions[v.determinePos(pos)]
+            });
+            e.addTrace(state.positions[pos], hintfmt("message for the trace"));
+            state.debugThrowLastTrace(e);
+            throw e;
     }
 }
 
 void printValueAsJSON(EvalState & state, bool strict,
-    Value & v, std::ostream & str, PathSet & context)
+    Value & v, const PosIdx pos, std::ostream & str, PathSet & context)
 {
     JSONPlaceholder out(str);
-    printValueAsJSON(state, strict, v, out, context);
+    printValueAsJSON(state, strict, v, pos, out, context);
 }
 
 void ExternalValueBase::printValueAsJSON(EvalState & state, bool strict,
     JSONPlaceholder & out, PathSet & context) const
 {
-    throw TypeError("cannot convert %1% to JSON", showType());
+    state.debugThrowLastTrace(TypeError("cannot convert %1% to JSON", showType()));
 }
 
 

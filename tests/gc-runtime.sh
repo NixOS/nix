@@ -4,7 +4,7 @@ case $system in
     *linux*)
         ;;
     *)
-        exit 0;
+        exit 99;
 esac
 
 set -m # enable job control, needed for kill

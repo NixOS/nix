@@ -1,8 +1,8 @@
 #! /bin/sh
 # Configuration validation subroutine script.
-#   Copyright 1992-2020 Free Software Foundation, Inc.
+#   Copyright 1992-2021 Free Software Foundation, Inc.
 
-timestamp='2020-12-02'
+timestamp='2021-01-08'
 
 # This file is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by
@@ -67,7 +67,7 @@ Report bugs and patches to <config-patches@gnu.org>."
 version="\
 GNU config.sub ($timestamp)
 
-Copyright 1992-2020 Free Software Foundation, Inc.
+Copyright 1992-2021 Free Software Foundation, Inc.
 
 This is free software; see the source for copying conditions.  There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
@@ -1185,6 +1185,7 @@ case $cpu-$vendor in
 			| k1om \
 			| le32 | le64 \
 			| lm32 \
+			| loongarch32 | loongarch64 | loongarchx32 \
 			| m32c | m32r | m32rle \
 			| m5200 | m68000 | m680[012346]0 | m68360 | m683?2 | m68k \
 			| m6811 | m68hc11 | m6812 | m68hc12 | m68hcs12x \
@@ -1229,7 +1230,7 @@ case $cpu-$vendor in
 			| powerpc | powerpc64 | powerpc64le | powerpcle | powerpcspe \
 			| pru \
 			| pyramid \
-			| riscv | riscv32 | riscv64 \
+			| riscv | riscv32 | riscv32be | riscv64 | riscv64be \
 			| rl78 | romp | rs6000 | rx \
 			| s390 | s390x \
 			| score \
@@ -1682,11 +1683,14 @@ fi
 
 # Now, validate our (potentially fixed-up) OS.
 case $os in
-	# Sometimes we do "kernel-abi", so those need to count as OSes.
+	# Sometimes we do "kernel-libc", so those need to count as OSes.
 	musl* | newlib* | uclibc*)
 		;;
-	# Likewise for "kernel-libc"
-	eabi | eabihf | gnueabi | gnueabihf)
+	# Likewise for "kernel-abi"
+	eabi* | gnueabi*)
+		;;
+	# VxWorks passes extra cpu info in the 4th filed.
+	simlinux | simwindows | spe)
 		;;
 	# Now accept the basic system types.
 	# The portable systems comes first.
@@ -1749,6 +1753,8 @@ case $kernel-$os in
 		exit 1
 		;;
 	kfreebsd*-gnu* | kopensolaris*-gnu*)
+		;;
+	vxworks-simlinux | vxworks-simwindows | vxworks-spe)
 		;;
 	nto-qnx*)
 		;;

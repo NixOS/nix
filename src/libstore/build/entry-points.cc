@@ -1,4 +1,3 @@
-#include "machines.hh"
 #include "worker.hh"
 #include "substitution-goal.hh"
 #include "derivation-goal.hh"
@@ -6,16 +5,20 @@
 
 namespace nix {
 
-void Store::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode)
+void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMode, std::shared_ptr<Store> evalStore)
 {
-    Worker worker(*this);
+    Worker worker(*this, evalStore ? *evalStore : *this);
 
     Goals goals;
-    for (auto & path : drvPaths) {
-        if (path.path.isDerivation())
-            goals.insert(worker.makeDerivationGoal(path.path, path.outputs, buildMode));
-        else
-            goals.insert(worker.makePathSubstitutionGoal(path.path, buildMode == bmRepair ? Repair : NoRepair));
+    for (const auto & br : reqs) {
+        std::visit(overloaded {
+            [&](const DerivedPath::Built & bfd) {
+                goals.insert(worker.makeDerivationGoal(bfd.drvPath, bfd.outputs, buildMode));
+            },
+            [&](const DerivedPath::Opaque & bo) {
+                goals.insert(worker.makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair));
+            },
+        }, br.raw());
     }
 
     worker.run(goals);
@@ -44,43 +47,51 @@ void Store::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, Build
     }
 }
 
+std::vector<BuildResult> Store::buildPathsWithResults(
+    const std::vector<DerivedPath> & reqs,
+    BuildMode buildMode,
+    std::shared_ptr<Store> evalStore)
+{
+    Worker worker(*this, evalStore ? *evalStore : *this);
+
+    Goals goals;
+    for (const auto & br : reqs) {
+        std::visit(overloaded {
+            [&](const DerivedPath::Built & bfd) {
+                goals.insert(worker.makeDerivationGoal(bfd.drvPath, bfd.outputs, buildMode));
+            },
+            [&](const DerivedPath::Opaque & bo) {
+                goals.insert(worker.makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair));
+            },
+        }, br.raw());
+    }
+
+    worker.run(goals);
+
+    std::vector<BuildResult> results;
+
+    for (auto & i : goals)
+        results.push_back(i->buildResult);
+
+    return results;
+}
+
 BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
     BuildMode buildMode)
 {
-    Worker worker(*this);
+    Worker worker(*this, *this);
     auto goal = worker.makeBasicDerivationGoal(drvPath, drv, {}, buildMode);
-
-    BuildResult result;
 
     try {
         worker.run(Goals{goal});
-        result = goal->getResult();
+        return goal->buildResult;
     } catch (Error & e) {
-        result.status = BuildResult::MiscFailure;
-        result.errorMsg = e.msg();
-    }
-    // XXX: Should use `goal->queryPartialDerivationOutputMap()` once it's
-    // extended to return the full realisation for each output
-    auto staticDrvOutputs = drv.outputsAndOptPaths(*this);
-    auto outputHashes = staticOutputHashes(*this, drv);
-    for (auto & [outputName, staticOutput] : staticDrvOutputs) {
-        auto outputId = DrvOutput{outputHashes.at(outputName), outputName};
-        if (staticOutput.second)
-            result.builtOutputs.insert_or_assign(
-                    outputId,
-                    Realisation{ outputId, *staticOutput.second}
-                    );
-        if (settings.isExperimentalFeatureEnabled("ca-derivations") && !derivationHasKnownOutputPaths(drv.type())) {
-            auto realisation = this->queryRealisation(outputId);
-            if (realisation)
-                result.builtOutputs.insert_or_assign(
-                        outputId,
-                        *realisation
-                        );
-        }
-    }
-
-    return result;
+        return BuildResult {
+            .status = BuildResult::MiscFailure,
+            .errorMsg = e.msg(),
+            .path = DerivedPath::Built { .drvPath = drvPath },
+        };
+    };
 }
 
 
@@ -89,7 +100,7 @@ void Store::ensurePath(const StorePath & path)
     /* If the path is already valid, we're done. */
     if (isValidPath(path)) return;
 
-    Worker worker(*this);
+    Worker worker(*this, *this);
     GoalPtr goal = worker.makePathSubstitutionGoal(path);
     Goals goals = {goal};
 
@@ -107,7 +118,7 @@ void Store::ensurePath(const StorePath & path)
 
 void LocalStore::repairPath(const StorePath & path)
 {
-    Worker worker(*this);
+    Worker worker(*this, *this);
     GoalPtr goal = worker.makePathSubstitutionGoal(path, Repair);
     Goals goals = {goal};
 

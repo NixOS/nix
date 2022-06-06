@@ -2,6 +2,7 @@
 
 #include "realisation.hh"
 #include "path.hh"
+#include "derived-path.hh"
 #include "hash.hh"
 #include "content-address.hh"
 #include "serialise.hh"
@@ -9,8 +10,8 @@
 #include "sync.hh"
 #include "globals.hh"
 #include "config.hh"
-#include "derivations.hh"
 #include "path-info.hh"
+#include "repair-flag.hh"
 
 #include <atomic>
 #include <limits>
@@ -61,6 +62,8 @@ MakeError(BadStorePath, Error);
 
 MakeError(InvalidStoreURI, Error);
 
+struct BasicDerivation;
+struct Derivation;
 class FSAccessor;
 class NarInfoDiskCache;
 class Store;
@@ -75,109 +78,18 @@ enum AllowInvalidFlag : bool { DisallowInvalid = false, AllowInvalid = true };
 const uint32_t exportMagic = 0x4558494e;
 
 
-typedef std::unordered_map<StorePath, std::unordered_set<std::string>> Roots;
-
-
-struct GCOptions
-{
-    /* Garbage collector operation:
-
-       - `gcReturnLive': return the set of paths reachable from
-         (i.e. in the closure of) the roots.
-
-       - `gcReturnDead': return the set of paths not reachable from
-         the roots.
-
-       - `gcDeleteDead': actually delete the latter set.
-
-       - `gcDeleteSpecific': delete the paths listed in
-          `pathsToDelete', insofar as they are not reachable.
-    */
-    typedef enum {
-        gcReturnLive,
-        gcReturnDead,
-        gcDeleteDead,
-        gcDeleteSpecific,
-    } GCAction;
-
-    GCAction action{gcDeleteDead};
-
-    /* If `ignoreLiveness' is set, then reachability from the roots is
-       ignored (dangerous!).  However, the paths must still be
-       unreferenced *within* the store (i.e., there can be no other
-       store paths that depend on them). */
-    bool ignoreLiveness{false};
-
-    /* For `gcDeleteSpecific', the paths to delete. */
-    StorePathSet pathsToDelete;
-
-    /* Stop after at least `maxFreed' bytes have been freed. */
-    uint64_t maxFreed{std::numeric_limits<uint64_t>::max()};
-};
-
-
-struct GCResults
-{
-    /* Depending on the action, the GC roots, or the paths that would
-       be or have been deleted. */
-    PathSet paths;
-
-    /* For `gcReturnDead', `gcDeleteDead' and `gcDeleteSpecific', the
-       number of bytes that would be or was freed. */
-    uint64_t bytesFreed = 0;
-};
-
-
 enum BuildMode { bmNormal, bmRepair, bmCheck };
 
+struct BuildResult;
 
-struct BuildResult
-{
-    /* Note: don't remove status codes, and only add new status codes
-       at the end of the list, to prevent client/server
-       incompatibilities in the nix-store --serve protocol. */
-    enum Status {
-        Built = 0,
-        Substituted,
-        AlreadyValid,
-        PermanentFailure,
-        InputRejected,
-        OutputRejected,
-        TransientFailure, // possibly transient
-        CachedFailure, // no longer used
-        TimedOut,
-        MiscFailure,
-        DependencyFailed,
-        LogLimitExceeded,
-        NotDeterministic,
-    } status = MiscFailure;
-    std::string errorMsg;
-
-    /* How many times this build was performed. */
-    unsigned int timesBuilt = 0;
-
-    /* If timesBuilt > 1, whether some builds did not produce the same
-       result. (Note that 'isNonDeterministic = false' does not mean
-       the build is deterministic, just that we don't have evidence of
-       non-determinism.) */
-    bool isNonDeterministic = false;
-
-    DrvOutputs builtOutputs;
-
-    /* The start/stop times of the build (or one of the rounds, if it
-       was repeated). */
-    time_t startTime = 0, stopTime = 0;
-
-    bool success() {
-        return status == Built || status == Substituted || status == AlreadyValid;
-    }
-};
 
 struct StoreConfig : public Config
 {
     using Config::Config;
 
     StoreConfig() = delete;
+
+    StringSet getDefaultSystemFeatures();
 
     virtual ~StoreConfig() { }
 
@@ -195,7 +107,7 @@ struct StoreConfig : public Config
 
     Setting<bool> wantMassQuery{this, false, "want-mass-query", "whether this substituter can be queried efficiently for path validity"};
 
-    Setting<StringSet> systemFeatures{this, settings.systemFeatures,
+    Setting<StringSet> systemFeatures{this, getDefaultSystemFeatures(),
         "system-features",
         "Optional features that the system this store builds on implements (like \"kvm\")."};
 
@@ -229,7 +141,6 @@ protected:
 
     struct State
     {
-        // FIXME: fix key
         LRUCache<std::string, PathInfoCacheValue> pathInfoCache;
     };
 
@@ -261,11 +172,6 @@ public:
 
     PathSet printStorePathSet(const StorePathSet & path) const;
 
-    /* Split a string specifying a derivation and a set of outputs
-       (/nix/store/hash-foo!out1,out2,...) into the derivation path
-       and the outputs. */
-    StorePathWithOutputs parsePathWithOutputs(const string & s);
-
     /* Display a set of paths in human-readable form (i.e., between quotes
        and separated by commas). */
     std::string showPaths(const StorePathSet & paths);
@@ -288,8 +194,6 @@ public:
     /* Same as followLinksToStore(), but apply toStorePath() to the
        result. */
     StorePath followLinksToStorePath(std::string_view path) const;
-
-    StorePathWithOutputs followLinksToStorePathWithOutputs(std::string_view path) const;
 
     /* Constructs a unique store path name. */
     StorePath makeStorePath(std::string_view type,
@@ -333,7 +237,9 @@ public:
        simply yield a different store path, so other users wouldn't be
        affected), but it has some backwards compatibility issues (the
        hashing scheme changes), so I'm not doing that for now. */
-    StorePath computeStorePathForText(const string & name, const string & s,
+    StorePath computeStorePathForText(
+        std::string_view name,
+        std::string_view s,
         const StorePathSet & references) const;
 
     /* Check whether a path is valid. */
@@ -374,6 +280,14 @@ public:
     void queryPathInfo(const StorePath & path,
         Callback<ref<const ValidPathInfo>> callback) noexcept;
 
+    /* Query the information about a realisation. */
+    std::shared_ptr<const Realisation> queryRealisation(const DrvOutput &);
+
+    /* Asynchronous version of queryRealisation(). */
+    void queryRealisation(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept;
+
+
     /* Check whether the given valid path info is sufficiently attested, by
        either being signed by a trusted public key or content-addressed, in
        order to be included in the given store.
@@ -398,10 +312,10 @@ protected:
 
     virtual void queryPathInfoUncached(const StorePath & path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept = 0;
+    virtual void queryRealisationUncached(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept = 0;
 
 public:
-
-    virtual std::optional<const Realisation> queryRealisation(const DrvOutput &) = 0;
 
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */
@@ -434,9 +348,10 @@ public:
     virtual StorePathSet querySubstitutablePaths(const StorePathSet & paths) { return {}; };
 
     /* Query substitute info (i.e. references, derivers and download
-       sizes) of a map of paths to their optional ca values. If a path
-       does not have substitute info, it's omitted from the resulting
-       ‘infos’ map. */
+       sizes) of a map of paths to their optional ca values. The info
+       of the first succeeding substituter for each path will be
+       returned. If a path does not have substitute info, it's omitted
+       from the resulting ‘infos’ map. */
     virtual void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) { return; };
 
@@ -444,13 +359,24 @@ public:
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,
         RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs) = 0;
 
+    /* Import multiple paths into the store. */
+    virtual void addMultipleToStore(
+        Source & source,
+        RepairFlag repair = NoRepair,
+        CheckSigsFlag checkSigs = CheckSigs);
+
     /* Copy the contents of a path to the store and register the
        validity the resulting path.  The resulting path is returned.
        The function object `filter' can be used to exclude files (see
        libutil/archive.hh). */
-    virtual StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair);
+    virtual StorePath addToStore(
+        std::string_view name,
+        const Path & srcPath,
+        FileIngestionMethod method = FileIngestionMethod::Recursive,
+        HashType hashAlgo = htSHA256,
+        PathFilter & filter = defaultPathFilter,
+        RepairFlag repair = NoRepair,
+        const StorePathSet & references = StorePathSet());
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path, using a constant amount of
@@ -465,14 +391,18 @@ public:
        false).
        `dump` may be drained */
     // FIXME: remove?
-    virtual StorePath addToStoreFromDump(Source & dump, const string & name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair)
+    virtual StorePath addToStoreFromDump(Source & dump, std::string_view name,
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair,
+        const StorePathSet & references = StorePathSet())
     { unsupported("addToStoreFromDump"); }
 
     /* Like addToStore, but the contents written to the output path is
        a regular file containing the given string. */
-    virtual StorePath addTextToStore(const string & name, const string & s,
-        const StorePathSet & references, RepairFlag repair = NoRepair) = 0;
+    virtual StorePath addTextToStore(
+        std::string_view name,
+        std::string_view s,
+        const StorePathSet & references,
+        RepairFlag repair = NoRepair) = 0;
 
     /**
      * Add a mapping indicating that `deriver!outputName` maps to the output path
@@ -500,8 +430,19 @@ public:
        recursively building any sub-derivations. For inputs that are
        not derivations, substitute them. */
     virtual void buildPaths(
-        const std::vector<StorePathWithOutputs> & paths,
-        BuildMode buildMode = bmNormal);
+        const std::vector<DerivedPath> & paths,
+        BuildMode buildMode = bmNormal,
+        std::shared_ptr<Store> evalStore = nullptr);
+
+    /* Like `buildPaths()`, but return a vector of `BuildResult`s
+       corresponding to each element in `paths`. Note that in case of
+       a build/substitution error, this function won't throw an
+       exception, but return a `BuildResult` containing an error
+       message. */
+    virtual std::vector<BuildResult> buildPathsWithResults(
+        const std::vector<DerivedPath> & paths,
+        BuildMode buildMode = bmNormal,
+        std::shared_ptr<Store> evalStore = nullptr);
 
     /* Build a single non-materialized derivation (i.e. not from an
        on-disk .drv file).
@@ -547,52 +488,12 @@ public:
     /* Add a store path as a temporary root of the garbage collector.
        The root disappears as soon as we exit. */
     virtual void addTempRoot(const StorePath & path)
-    { warn("not creating temp root, store doesn't support GC"); }
-
-    /* Add an indirect root, which is merely a symlink to `path' from
-       /nix/var/nix/gcroots/auto/<hash of `path'>.  `path' is supposed
-       to be a symlink to a store path.  The garbage collector will
-       automatically remove the indirect root when it finds that
-       `path' has disappeared. */
-    virtual void addIndirectRoot(const Path & path)
-    { unsupported("addIndirectRoot"); }
-
-    /* Acquire the global GC lock, then immediately release it.  This
-       function must be called after registering a new permanent root,
-       but before exiting.  Otherwise, it is possible that a running
-       garbage collector doesn't see the new root and deletes the
-       stuff we've just built.  By acquiring the lock briefly, we
-       ensure that either:
-
-       - The collector is already running, and so we block until the
-         collector is finished.  The collector will know about our
-         *temporary* locks, which should include whatever it is we
-         want to register as a permanent lock.
-
-       - The collector isn't running, or it's just started but hasn't
-         acquired the GC lock yet.  In that case we get and release
-         the lock right away, then exit.  The collector scans the
-         permanent root and sees ours.
-
-       In either case the permanent root is seen by the collector. */
-    virtual void syncWithGC() { };
-
-    /* Find the roots of the garbage collector.  Each root is a pair
-       (link, storepath) where `link' is the path of the symlink
-       outside of the Nix store that point to `storePath'. If
-       'censor' is true, privacy-sensitive information about roots
-       found in /proc is censored. */
-    virtual Roots findRoots(bool censor)
-    { unsupported("findRoots"); }
-
-    /* Perform a garbage collection. */
-    virtual void collectGarbage(const GCOptions & options, GCResults & results)
-    { unsupported("collectGarbage"); }
+    { debug("not creating temporary root, store doesn't support GC"); }
 
     /* Return a string representing information about the path that
        can be loaded into the database using `nix-store --load-db' or
        `nix-store --register-validity'. */
-    string makeValidityRegistration(const StorePathSet & paths,
+    std::string makeValidityRegistration(const StorePathSet & paths,
         bool showDerivers, bool showHash);
 
     /* Write a JSON representation of store path metadata, such as the
@@ -662,7 +563,7 @@ public:
     /* Given a set of paths that are to be built, return the set of
        derivations that will be built, and the set of output paths
        that will be substituted. */
-    virtual void queryMissing(const std::vector<StorePathWithOutputs> & targets,
+    virtual void queryMissing(const std::vector<DerivedPath> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
         uint64_t & downloadSize, uint64_t & narSize);
 
@@ -701,10 +602,10 @@ public:
 
     const Stats & getStats();
 
-    /* Return the build log of the specified store path, if available,
-       or null otherwise. */
-    virtual std::shared_ptr<std::string> getBuildLog(const StorePath & path)
-    { return nullptr; }
+    /* Computes the full closure of of a set of store-paths for e.g.
+       derivations that need this information for `exportReferencesGraph`.
+     */
+    StorePathSet exportReferences(const StorePathSet & storePaths, const StorePathSet & inputPaths);
 
     /* Hack to allow long-running processes like hydra-queue-runner to
        occasionally flush their path info cache. */
@@ -736,6 +637,14 @@ public:
     virtual void createUser(const std::string & userName, uid_t userId)
     { }
 
+    /*
+     * Synchronises the options of the client with those of the daemon
+     * (a no-op when there’s no daemon)
+     */
+    virtual void setOptions() { }
+
+    virtual std::optional<std::string> getVersion() { return {}; }
+
 protected:
 
     Stats stats;
@@ -750,8 +659,12 @@ protected:
 
 
 /* Copy a path from one store to another. */
-void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
-    const StorePath & storePath, RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
+void copyStorePath(
+    Store & srcStore,
+    Store & dstStore,
+    const StorePath & storePath,
+    RepairFlag repair = NoRepair,
+    CheckSigsFlag checkSigs = CheckSigs);
 
 
 /* Copy store paths from one store to another. The paths may be copied
@@ -760,17 +673,34 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
    of store paths is not automatically closed; use copyClosure() for
    that. Returns a map of what each path was copied to the dstStore
    as. */
-std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore,
+std::map<StorePath, StorePath> copyPaths(
+    Store & srcStore, Store & dstStore,
     const RealisedPath::Set &,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
-std::map<StorePath, StorePath> copyPaths(ref<Store> srcStore, ref<Store> dstStore,
-    const StorePathSet& paths,
+
+std::map<StorePath, StorePath> copyPaths(
+    Store & srcStore, Store & dstStore,
+    const StorePathSet & paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
 
+/* Copy the closure of `paths` from `srcStore` to `dstStore`. */
+void copyClosure(
+    Store & srcStore, Store & dstStore,
+    const RealisedPath::Set & paths,
+    RepairFlag repair = NoRepair,
+    CheckSigsFlag checkSigs = CheckSigs,
+    SubstituteFlag substitute = NoSubstitute);
+
+void copyClosure(
+    Store & srcStore, Store & dstStore,
+    const StorePathSet & paths,
+    RepairFlag repair = NoRepair,
+    CheckSigsFlag checkSigs = CheckSigs,
+    SubstituteFlag substitute = NoSubstitute);
 
 /* Remove the temporary roots file for this process.  Any temporary
    root becomes garbage after this point unless it has been registered
@@ -857,7 +787,7 @@ struct RegisterStoreImplementation
 
 /* Display a set of paths in human-readable form (i.e., between quotes
    and separated by commas). */
-string showPaths(const PathSet & paths);
+std::string showPaths(const PathSet & paths);
 
 
 std::optional<ValidPathInfo> decodeValidPathInfo(
@@ -869,5 +799,10 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
 
 std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv);
+
+std::map<DrvOutput, StorePath> drvOutputReferences(
+    Store & store,
+    const Derivation & drv,
+    const StorePath & outputPath);
 
 }

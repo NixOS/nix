@@ -100,6 +100,12 @@ public:
     virtual nlohmann::json toJSON() = 0;
 
     /**
+     * Outputs all settings in a key-value pair format suitable to be used as
+     * `nix.conf`
+     */
+    virtual std::string toKeyValue() = 0;
+
+    /**
      * Converts settings to `Args` to be used on the command line interface
      * - args: args to write to
      * - category: category of the settings
@@ -169,6 +175,8 @@ public:
 
     nlohmann::json toJSON() override;
 
+    std::string toKeyValue() override;
+
     void convertToArgs(Args & args, const std::string & category) override;
 };
 
@@ -185,8 +193,6 @@ public:
     int created = 123;
 
     bool overridden = false;
-
-    void setDefault(const std::string & str);
 
 protected:
 
@@ -226,16 +232,19 @@ protected:
 
     T value;
     const T defaultValue;
+    const bool documentDefault;
 
 public:
 
     BaseSetting(const T & def,
+        const bool documentDefault,
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {})
         : AbstractSetting(name, description, aliases)
         , value(def)
         , defaultValue(def)
+        , documentDefault(documentDefault)
     { }
 
     operator const T &() const { return value; }
@@ -245,6 +254,7 @@ public:
     bool operator !=(const T & v2) const { return value != v2; }
     void operator =(const T & v) { assign(v); }
     virtual void assign(const T & v) { value = v; }
+    void setDefault(const T & v) { if (!overridden) value = v; }
 
     void set(const std::string & str, bool append = false) override;
 
@@ -281,8 +291,9 @@ public:
         const T & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : BaseSetting<T>(def, name, description, aliases)
+        const std::set<std::string> & aliases = {},
+        const bool documentDefault = true)
+        : BaseSetting<T>(def, documentDefault, name, description, aliases)
     {
         options->addSetting(this);
     }
@@ -304,7 +315,7 @@ public:
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {})
-        : BaseSetting<Path>(def, name, description, aliases)
+        : BaseSetting<Path>(def, true, name, description, aliases)
         , allowEmpty(allowEmpty)
     {
         options->addSetting(this);
@@ -329,6 +340,8 @@ struct GlobalConfig : public AbstractConfig
     void resetOverridden() override;
 
     nlohmann::json toJSON() override;
+
+    std::string toKeyValue() override;
 
     void convertToArgs(Args & args, const std::string & category) override;
 

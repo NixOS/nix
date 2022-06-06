@@ -3,6 +3,7 @@
 #include "types.hh"
 #include "hash.hh"
 #include "fetchers.hh"
+#include "path-with-outputs.hh"
 
 #include <variant>
 
@@ -62,15 +63,28 @@ struct FlakeRef
 std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);
 
 FlakeRef parseFlakeRef(
-    const std::string & url, const std::optional<Path> & baseDir = {}, bool allowMissing = false);
+    const std::string & url,
+    const std::optional<Path> & baseDir = {},
+    bool allowMissing = false,
+    bool isFlake = true);
 
 std::optional<FlakeRef> maybeParseFlake(
     const std::string & url, const std::optional<Path> & baseDir = {});
 
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
-    const std::string & url, const std::optional<Path> & baseDir = {}, bool allowMissing = false);
+    const std::string & url,
+    const std::optional<Path> & baseDir = {},
+    bool allowMissing = false,
+    bool isFlake = true);
 
 std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
     const std::string & url, const std::optional<Path> & baseDir = {});
+
+std::tuple<FlakeRef, std::string, OutputsSpec> parseFlakeRefWithFragmentAndOutputsSpec(
+    const std::string & url,
+    const std::optional<Path> & baseDir = {},
+    bool allowMissing = false,
+    bool isFlake = true);
+
 
 }

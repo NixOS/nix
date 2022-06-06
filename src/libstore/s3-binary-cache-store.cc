@@ -87,7 +87,11 @@ static void initAWS()
     });
 }
 
-S3Helper::S3Helper(const string & profile, const string & region, const string & scheme, const string & endpoint)
+S3Helper::S3Helper(
+    const std::string & profile,
+    const std::string & region,
+    const std::string & scheme,
+    const std::string & endpoint)
     : config(makeConfig(region, scheme, endpoint))
     , client(make_ref<Aws::S3::S3Client>(
             profile == ""
@@ -121,7 +125,10 @@ class RetryStrategy : public Aws::Client::DefaultRetryStrategy
     }
 };
 
-ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(const string & region, const string & scheme, const string & endpoint)
+ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(
+    const std::string & region,
+    const std::string & scheme,
+    const std::string & endpoint)
 {
     initAWS();
     auto res = make_ref<Aws::Client::ClientConfiguration>();
@@ -209,7 +216,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     S3Helper s3Helper;
 
     S3BinaryCacheStoreImpl(
-        const std::string & scheme,
+        const std::string & uriScheme,
         const std::string & bucketName,
         const Params & params)
         : StoreConfig(params)
@@ -232,8 +239,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     void init() override
     {
         if (auto cacheInfo = diskCache->cacheExists(getUri())) {
-            wantMassQuery.setDefault(cacheInfo->wantMassQuery ? "true" : "false");
-            priority.setDefault(fmt("%d", cacheInfo->priority));
+            wantMassQuery.setDefault(cacheInfo->wantMassQuery);
+            priority.setDefault(cacheInfo->priority);
         } else {
             BinaryCacheStore::init();
             diskCache->createCache(getUri(), storeDir, wantMassQuery, priority);
@@ -385,7 +392,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         auto compress = [&](std::string compression)
         {
             auto compressed = nix::compress(compression, StreamToSourceAdapter(istream).drain());
-            return std::make_shared<std::stringstream>(std::move(*compressed));
+            return std::make_shared<std::stringstream>(std::move(compressed));
         };
 
         if (narinfoCompression != "" && hasSuffix(path, ".narinfo"))

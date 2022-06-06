@@ -57,13 +57,49 @@ the Nix store. Here are the recognised types of installables:
   These have the form *flakeref*[`#`*attrpath*], where *flakeref* is a
   flake reference and *attrpath* is an optional attribute path. For
   more information on flakes, see [the `nix flake` manual
-  page](./nix3-flake.md). Flake references are most commonly a flake
-  identifier in the flake registry (e.g. `nixpkgs`) or a path
-  (e.g. `/path/to/my-flake` or `.`).
+  page](./nix3-flake.md).  Flake references are most commonly a flake
+  identifier in the flake registry (e.g. `nixpkgs`), or a raw path
+  (e.g. `/path/to/my-flake` or `.` or `../foo`), or a full URL
+  (e.g. `github:nixos/nixpkgs` or `path:.`)
+
+  When the flake reference is a raw path (a path without any URL
+  scheme), it is interpreted as a `path:` or `git+file:` url in the following
+  way:
+  
+  - If the path is within a Git repository, then the url will be of the form
+    `git+file://[GIT_REPO_ROOT]?dir=[RELATIVE_FLAKE_DIR_PATH]`
+    where `GIT_REPO_ROOT` is the path to the root of the git repository,
+    and `RELATIVE_FLAKE_DIR_PATH` is the path (relative to the directory
+    root) of the closest parent of the given path that contains a `flake.nix` within
+    the git repository.
+    If no such directory exists, then Nix will error-out.
+    
+    Note that the search will only include files indexed by git. In particular, files
+    which are matched by `.gitignore` or have never been `git add`-ed will not be
+    available in the flake. If this is undesirable, specify `path:<directory>` explicitly;
+    
+    For example, if `/foo/bar` is a git repository with the following structure:
+    ```
+    .
+    └── baz
+        ├── blah
+        │   └── file.txt
+        └── flake.nix
+    ```
+
+  Then `/foo/bar/baz/blah` will resolve to `git+file:///foo/bar?dir=baz`
+
+  - If the supplied path is not a git repository, then the url will have the form
+    `path:FLAKE_DIR_PATH` where `FLAKE_DIR_PATH` is the closest parent
+    of the supplied path that contains a `flake.nix` file (within the same file-system).
+    If no such directory exists, then Nix will error-out.
+    
+    For example, if `/foo/bar/flake.nix` exists, then `/foo/bar/baz/` will resolve to
+   `path:/foo/bar`
 
   If *attrpath* is omitted, Nix tries some default values; for most
-  subcommands, the default is `defaultPackage.`*system*
-  (e.g. `defaultPackage.x86_64-linux`), but some subcommands have
+  subcommands, the default is `packages.`*system*`.default`
+  (e.g. `packages.x86_64-linux.default`), but some subcommands have
   other defaults. If *attrpath* *is* specified, *attrpath* is
   interpreted as relative to one or more prefixes; for most
   subcommands, these are `packages.`*system*,
@@ -109,6 +145,51 @@ the Nix store. Here are the recognised types of installables:
 For most commands, if no installable is specified, the default is `.`,
 i.e. Nix will operate on the default flake output attribute of the
 flake in the current directory.
+
+## Derivation output selection
+
+Derivations can have multiple outputs, each corresponding to a
+different store path. For instance, a package can have a `bin` output
+that contains programs, and a `dev` output that provides development
+artifacts like C/C++ header files. The outputs on which `nix` commands
+operate are determined as follows:
+
+* You can explicitly specify the desired outputs using the syntax
+  *installable*`^`*output1*`,`*...*`,`*outputN*. For example, you can
+  obtain the `dev` and `static` outputs of the `glibc` package:
+
+  ```console
+  # nix build 'nixpkgs#glibc^dev,static'
+  # ls ./result-dev/include/ ./result-static/lib/
+  …
+  ```
+
+* You can also specify that *all* outputs should be used using the
+  syntax *installable*`^*`. For example, the following shows the size
+  of all outputs of the `glibc` package in the binary cache:
+
+  ```console
+  # nix path-info -S --eval-store auto --store https://cache.nixos.org 'nixpkgs#glibc^*'
+  /nix/store/g02b1lpbddhymmcjb923kf0l7s9nww58-glibc-2.33-123                 33208200
+  /nix/store/851dp95qqiisjifi639r0zzg5l465ny4-glibc-2.33-123-bin             36142896
+  /nix/store/kdgs3q6r7xdff1p7a9hnjr43xw2404z7-glibc-2.33-123-debug          155787312
+  /nix/store/n4xa8h6pbmqmwnq0mmsz08l38abb06zc-glibc-2.33-123-static          42488328
+  /nix/store/q6580lr01jpcsqs4r5arlh4ki2c1m9rv-glibc-2.33-123-dev             44200560
+  ```
+
+* If you didn't specify the desired outputs, but the derivation has an
+  attribute `meta.outputsToInstall`, Nix will use those outputs. For
+  example, since the package `nixpkgs#libxml2` has this attribute:
+
+  ```console
+  # nix eval 'nixpkgs#libxml2.meta.outputsToInstall'
+  [ "bin" "man" ]
+  ```
+
+  a command like `nix shell nixpkgs#libxml2` will provide only those
+  two outputs by default.
+
+* Otherwise, Nix will use all outputs of the derivation.
 
 # Nix stores
 

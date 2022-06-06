@@ -23,9 +23,9 @@ Path resolveCacheFile(Path lib)
     return cacheDir + "/" + lib;
 }
 
-std::set<string> readCacheFile(const Path & file)
+std::set<std::string> readCacheFile(const Path & file)
 {
-    return tokenizeString<set<string>>(readFile(file), "\n");
+    return tokenizeString<std::set<std::string>>(readFile(file), "\n");
 }
 
 std::set<std::string> runResolver(const Path & filename)
@@ -81,7 +81,7 @@ std::set<std::string> runResolver(const Path & filename)
     bool should_swap = magic == MH_CIGAM_64;
     ptrdiff_t cmd_offset = mach64_offset + sizeof(mach_header_64);
 
-    std::set<string> libs;
+    std::set<std::string> libs;
     for (uint32_t i = 0; i < DO_SWAP(should_swap, m_header->ncmds); i++) {
         load_command * cmd = (load_command *) (obj + cmd_offset);
         switch(DO_SWAP(should_swap, cmd->cmd)) {
@@ -107,12 +107,12 @@ Path resolveSymlink(const Path & path)
     auto target = readLink(path);
     return hasPrefix(target, "/")
         ? target
-        : dirOf(path) + "/" + target;
+        : concatStrings(dirOf(path), "/", target);
 }
 
-std::set<string> resolveTree(const Path & path, PathSet & deps)
+std::set<std::string> resolveTree(const Path & path, PathSet & deps)
 {
-    std::set<string> results;
+    std::set<std::string> results;
     if (!deps.insert(path).second) return {};
     for (auto & lib : runResolver(path)) {
         results.insert(lib);
@@ -123,7 +123,7 @@ std::set<string> resolveTree(const Path & path, PathSet & deps)
     return results;
 }
 
-std::set<string> getPath(const Path & path)
+std::set<std::string> getPath(const Path & path)
 {
     if (hasPrefix(path, "/dev")) return {};
 
@@ -131,7 +131,7 @@ std::set<string> getPath(const Path & path)
     if (pathExists(cacheFile))
         return readCacheFile(cacheFile);
 
-    std::set<string> deps, paths;
+    std::set<std::string> deps, paths;
     paths.insert(path);
 
     Path nextPath(path);
@@ -176,11 +176,11 @@ int main(int argc, char ** argv)
             impurePaths.insert(argv[2]);
         else {
             auto drv = store->derivationFromPath(store->parseStorePath(argv[1]));
-            impurePaths = tokenizeString<StringSet>(get(drv.env, "__impureHostDeps").value_or(""));
+            impurePaths = tokenizeString<StringSet>(getOr(drv.env, "__impureHostDeps", ""));
             impurePaths.insert("/usr/lib/libSystem.dylib");
         }
 
-        std::set<string> allPaths;
+        std::set<std::string> allPaths;
 
         for (auto & path : impurePaths)
             for (auto & p : getPath(path))

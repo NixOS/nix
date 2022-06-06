@@ -1,0 +1,61 @@
+#pragma once
+
+#include "comparator.hh"
+#include "error.hh"
+#include "nlohmann/json_fwd.hpp"
+#include "types.hh"
+
+namespace nix {
+
+/**
+ * The list of available experimental features.
+ *
+ * If you update this, don’t forget to also change the map defining their
+ * string representation in the corresponding `.cc` file.
+ **/
+enum struct ExperimentalFeature
+{
+    CaDerivations,
+    ImpureDerivations,
+    Flakes,
+    NixCommand,
+    RecursiveNix,
+    NoUrlLiterals,
+    FetchClosure,
+};
+
+/**
+ * Just because writing `ExperimentalFeature::CaDerivations` is way too long
+ */
+using Xp = ExperimentalFeature;
+
+const std::optional<ExperimentalFeature> parseExperimentalFeature(
+        const std::string_view & name);
+std::string_view showExperimentalFeature(const ExperimentalFeature);
+
+std::ostream & operator<<(
+        std::ostream & str,
+        const ExperimentalFeature & feature);
+
+/**
+ * Parse a set of strings to the corresponding set of experimental features,
+ * ignoring (but warning for) any unkwown feature.
+ */
+std::set<ExperimentalFeature> parseFeatures(const std::set<std::string> &);
+
+class MissingExperimentalFeature : public Error
+{
+public:
+    ExperimentalFeature missingFeature;
+
+    MissingExperimentalFeature(ExperimentalFeature);
+};
+
+/**
+ * Semi-magic conversion to and from json.
+ * See the nlohmann/json readme for more details.
+ */
+void to_json(nlohmann::json &, const ExperimentalFeature &);
+void from_json(const nlohmann::json &, ExperimentalFeature &);
+
+}

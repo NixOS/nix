@@ -5,27 +5,29 @@
 
 #include <map>
 #include <cstdlib>
+#include <mutex>
 
 
 namespace nix {
 
 
-static unsigned int refLength = 32; /* characters */
+static size_t refLength = 32; /* characters */
 
 
-static void search(const unsigned char * s, size_t len,
-    StringSet & hashes, StringSet & seen)
+static void search(
+    std::string_view s,
+    StringSet & hashes,
+    StringSet & seen)
 {
-    static bool initialised = false;
+    static std::once_flag initialised;
     static bool isBase32[256];
-    if (!initialised) {
+    std::call_once(initialised, [](){
         for (unsigned int i = 0; i < 256; ++i) isBase32[i] = false;
         for (unsigned int i = 0; i < base32Chars.size(); ++i)
             isBase32[(unsigned char) base32Chars[i]] = true;
-        initialised = true;
-    }
+    });
 
-    for (size_t i = 0; i + refLength <= len; ) {
+    for (size_t i = 0; i + refLength <= s.size(); ) {
         int j;
         bool match = true;
         for (j = refLength - 1; j >= 0; --j)
@@ -35,7 +37,7 @@ static void search(const unsigned char * s, size_t len,
                 break;
             }
         if (!match) continue;
-        string ref((const char *) s + i, refLength);
+        std::string ref(s.substr(i, refLength));
         if (hashes.erase(ref)) {
             debug(format("found reference to '%1%' at offset '%2%'")
                   % ref % i);
@@ -46,69 +48,60 @@ static void search(const unsigned char * s, size_t len,
 }
 
 
-struct RefScanSink : Sink
+void RefScanSink::operator () (std::string_view data)
 {
-    StringSet hashes;
-    StringSet seen;
+    /* It's possible that a reference spans the previous and current
+       fragment, so search in the concatenation of the tail of the
+       previous fragment and the start of the current fragment. */
+    auto s = tail;
+    auto tailLen = std::min(data.size(), refLength);
+    s.append(data.data(), tailLen);
+    search(s, hashes, seen);
 
-    string tail;
+    search(data, hashes, seen);
 
-    RefScanSink() { }
-
-    void operator () (std::string_view data) override
-    {
-        /* It's possible that a reference spans the previous and current
-           fragment, so search in the concatenation of the tail of the
-           previous fragment and the start of the current fragment. */
-        string s = tail + std::string(data, 0, refLength);
-        search((const unsigned char *) s.data(), s.size(), hashes, seen);
-
-        search((const unsigned char *) data.data(), data.size(), hashes, seen);
-
-        size_t tailLen = data.size() <= refLength ? data.size() : refLength;
-        tail = std::string(tail, tail.size() < refLength - tailLen ? 0 : tail.size() - (refLength - tailLen));
-        tail.append({data.data() + data.size() - tailLen, tailLen});
-    }
-};
+    auto rest = refLength - tailLen;
+    if (rest < tail.size())
+        tail = tail.substr(tail.size() - rest);
+    tail.append(data.data() + data.size() - tailLen, tailLen);
+}
 
 
-std::pair<PathSet, HashResult> scanForReferences(const string & path,
-    const PathSet & refs)
+std::pair<StorePathSet, HashResult> scanForReferences(
+    const std::string & path,
+    const StorePathSet & refs)
 {
     HashSink hashSink { htSHA256 };
     auto found = scanForReferences(hashSink, path, refs);
     auto hash = hashSink.finish();
-    return std::pair<PathSet, HashResult>(found, hash);
+    return std::pair<StorePathSet, HashResult>(found, hash);
 }
 
-PathSet scanForReferences(Sink & toTee,
-    const string & path, const PathSet & refs)
+StorePathSet scanForReferences(
+    Sink & toTee,
+    const Path & path,
+    const StorePathSet & refs)
 {
-    RefScanSink refsSink;
-    TeeSink sink { refsSink, toTee };
-    std::map<string, Path> backMap;
+    StringSet hashes;
+    std::map<std::string, StorePath> backMap;
 
     for (auto & i : refs) {
-        auto baseName = std::string(baseNameOf(i));
-        string::size_type pos = baseName.find('-');
-        if (pos == string::npos)
-            throw Error("bad reference '%1%'", i);
-        string s = string(baseName, 0, pos);
-        assert(s.size() == refLength);
-        assert(backMap.find(s) == backMap.end());
-        // parseHash(htSHA256, s);
-        refsSink.hashes.insert(s);
-        backMap[s] = i;
+        std::string hashPart(i.hashPart());
+        auto inserted = backMap.emplace(hashPart, i).second;
+        assert(inserted);
+        hashes.insert(hashPart);
     }
 
     /* Look for the hashes in the NAR dump of the path. */
+    RefScanSink refsSink(std::move(hashes));
+    TeeSink sink { refsSink, toTee };
     dumpPath(path, sink);
 
     /* Map the hashes found back to their store paths. */
-    PathSet found;
-    for (auto & i : refsSink.seen) {
-        std::map<string, Path>::iterator j;
-        if ((j = backMap.find(i)) == backMap.end()) abort();
+    StorePathSet found;
+    for (auto & i : refsSink.getResult()) {
+        auto j = backMap.find(i);
+        assert(j != backMap.end());
         found.insert(j->second);
     }
 
@@ -128,7 +121,7 @@ void RewritingSink::operator () (std::string_view data)
     s.append(data);
 
     size_t j = 0;
-    while ((j = s.find(from, j)) != string::npos) {
+    while ((j = s.find(from, j)) != std::string::npos) {
         matches.push_back(pos + j);
         s.replace(j, from.size(), to);
     }

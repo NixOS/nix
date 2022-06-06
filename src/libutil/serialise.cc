@@ -110,7 +110,7 @@ std::string Source::drain()
 {
     StringSink s;
     drainInto(s);
-    return *s.s;
+    return std::move(s.s);
 }
 
 
@@ -201,6 +201,62 @@ static DefaultStackAllocator defaultAllocatorSingleton;
 StackAllocator *StackAllocator::defaultAllocator = &defaultAllocatorSingleton;
 
 
+std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
+{
+    struct SourceToSink : FinishSink
+    {
+        typedef boost::coroutines2::coroutine<bool> coro_t;
+
+        std::function<void(Source &)> fun;
+        std::optional<coro_t::push_type> coro;
+
+        SourceToSink(std::function<void(Source &)> fun) : fun(fun)
+        {
+        }
+
+        std::string_view cur;
+
+        void operator () (std::string_view in) override
+        {
+            if (in.empty()) return;
+            cur = in;
+
+            if (!coro)
+                coro = coro_t::push_type(VirtualStackAllocator{}, [&](coro_t::pull_type & yield) {
+                    LambdaSource source([&](char *out, size_t out_len) {
+                        if (cur.empty()) {
+                            yield();
+                            if (yield.get()) {
+                                return (size_t)0;
+                            }
+                        }
+
+                        size_t n = std::min(cur.size(), out_len);
+                        memcpy(out, cur.data(), n);
+                        cur.remove_prefix(n);
+                        return n;
+                    });
+                    fun(source);
+                });
+
+            if (!*coro) { abort(); }
+
+            if (!cur.empty()) (*coro)(false);
+        }
+
+        void finish() override
+        {
+            if (!coro) return;
+            if (!*coro) abort();
+            (*coro)(true);
+            if (*coro) abort();
+        }
+    };
+
+    return std::make_unique<SourceToSink>(fun);
+}
+
+
 std::unique_ptr<Source> sinkToSource(
     std::function<void(Sink &)> fun,
     std::function<void()> eof)
@@ -212,7 +268,6 @@ std::unique_ptr<Source> sinkToSource(
         std::function<void(Sink &)> fun;
         std::function<void()> eof;
         std::optional<coro_t::pull_type> coro;
-        bool started = false;
 
         SinkToSource(std::function<void(Sink &)> fun, std::function<void()> eof)
             : fun(fun), eof(eof)
@@ -270,7 +325,7 @@ void writeString(std::string_view data, Sink & sink)
 }
 
 
-Sink & operator << (Sink & sink, const string & s)
+Sink & operator << (Sink & sink, std::string_view s)
 {
     writeString(s, sink);
     return sink;
@@ -302,7 +357,7 @@ Sink & operator << (Sink & sink, const Error & ex)
     sink
         << "Error"
         << info.level
-        << info.name
+        << "Error" // removed
         << info.msg.str()
         << 0 // FIXME: info.errPos
         << info.traces.size();
@@ -336,7 +391,7 @@ size_t readString(char * buf, size_t max, Source & source)
 }
 
 
-string readString(Source & source, size_t max)
+std::string readString(Source & source, size_t max)
 {
     auto len = readNum<size_t>(source);
     if (len > max) throw SerialisationError("string is too long");
@@ -346,7 +401,7 @@ string readString(Source & source, size_t max)
     return res;
 }
 
-Source & operator >> (Source & in, string & s)
+Source & operator >> (Source & in, std::string & s)
 {
     s = readString(in);
     return in;
@@ -371,11 +426,10 @@ Error readError(Source & source)
     auto type = readString(source);
     assert(type == "Error");
     auto level = (Verbosity) readInt(source);
-    auto name = readString(source);
+    auto name = readString(source); // removed
     auto msg = readString(source);
     ErrorInfo info {
         .level = level,
-        .name = name,
         .msg = hintformat(std::move(format("%s") % msg)),
     };
     auto havePos = readNum<size_t>(source);
@@ -395,11 +449,11 @@ Error readError(Source & source)
 void StringSink::operator () (std::string_view data)
 {
     static bool warned = false;
-    if (!warned && s->size() > threshold) {
+    if (!warned && s.size() > threshold) {
         warnLargeDump();
         warned = true;
     }
-    s->append(data);
+    s.append(data);
 }
 
 size_t ChainSource::read(char * data, size_t len)

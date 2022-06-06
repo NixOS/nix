@@ -4,6 +4,8 @@
 #include <limits.h>
 #include <gtest/gtest.h>
 
+#include <numeric>
+
 namespace nix {
 
 /* ----------- tests for util.hh ------------------------------------------------*/
@@ -282,6 +284,17 @@ namespace nix {
         ASSERT_EQ(decoded, s);
     }
 
+    TEST(base64Encode, encodeAndDecodeNonPrintable) {
+        char s[256];
+        std::iota(std::rbegin(s), std::rend(s), 0);
+
+        auto encoded = base64Encode(s);
+        auto decoded = base64Decode(encoded);
+
+        EXPECT_EQ(decoded.length(), 255);
+        ASSERT_EQ(decoded, s);
+    }
+
     /* ----------------------------------------------------------------------------
      * base64Decode
      * --------------------------------------------------------------------------*/
@@ -292,6 +305,10 @@ namespace nix {
 
     TEST(base64Decode, decodeAString) {
         ASSERT_EQ(base64Decode("cXVvZCBlcmF0IGRlbW9uc3RyYW5kdW0="), "quod erat demonstrandum");
+    }
+
+    TEST(base64Decode, decodeThrowsOnInvalidChar) {
+        ASSERT_THROW(base64Decode("cXVvZCBlcm_0IGRlbW9uc3RyYW5kdW0="), Error);
     }
 
     /* ----------------------------------------------------------------------------
@@ -531,7 +548,7 @@ namespace nix {
 
     TEST(get, emptyContainer) {
         StringMap s = { };
-        auto expected = std::nullopt;
+        auto expected = nullptr;
 
         ASSERT_EQ(get(s, "one"), expected);
     }
@@ -542,7 +559,23 @@ namespace nix {
         s["two"] = "er";
         auto expected = "yi";
 
-        ASSERT_EQ(get(s, "one"), expected);
+        ASSERT_EQ(*get(s, "one"), expected);
+    }
+
+    TEST(getOr, emptyContainer) {
+        StringMap s = { };
+        auto expected = "yi";
+
+        ASSERT_EQ(getOr(s, "one", "yi"), expected);
+    }
+
+    TEST(getOr, getFromContainer) {
+        StringMap s;
+        s["one"] = "yi";
+        s["two"] = "er";
+        auto expected = "yi";
+
+        ASSERT_EQ(getOr(s, "one", "nope"), expected);
     }
 
     /* ----------------------------------------------------------------------------

@@ -12,6 +12,8 @@ namespace nix {
 
 enum HashType : char;
 
+class MultiCommand;
+
 class Args
 {
 public:
@@ -89,6 +91,14 @@ protected:
               })
             , arity(1)
         { }
+
+        template<class I>
+        Handler(std::optional<I> * dest)
+            : fun([=](std::vector<std::string> ss) {
+                *dest = string2IntWithUnitPrefix<I>(ss[0]);
+            })
+            , arity(1)
+        { }
     };
 
     /* Options. */
@@ -148,7 +158,7 @@ public:
     }
 
     /* Expect a string argument. */
-    void expectArg(const std::string & label, string * dest, bool optional = false)
+    void expectArg(const std::string & label, std::string * dest, bool optional = false)
     {
         expectArgs({
             .label = label,
@@ -169,11 +179,13 @@ public:
     virtual nlohmann::json toJSON();
 
     friend class MultiCommand;
+
+    MultiCommand * parent = nullptr;
 };
 
 /* A command is an argument parser that can be executed by calling its
    run() method. */
-struct Command : virtual Args
+struct Command : virtual public Args
 {
     friend class MultiCommand;
 
@@ -193,7 +205,7 @@ typedef std::map<std::string, std::function<ref<Command>()>> Commands;
 
 /* An argument parser that supports multiple subcommands,
    i.e. ‘<command> <subcommand>’. */
-class MultiCommand : virtual Args
+class MultiCommand : virtual public Args
 {
 public:
     Commands commands;
@@ -225,7 +237,13 @@ public:
     void add(std::string completion, std::string description = "");
 };
 extern std::shared_ptr<Completions> completions;
-extern bool pathCompletions;
+
+enum CompletionType {
+    ctNormal,
+    ctFilenames,
+    ctAttrs
+};
+extern CompletionType completionType;
 
 std::optional<std::string> needsCompletion(std::string_view s);
 

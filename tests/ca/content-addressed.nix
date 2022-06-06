@@ -1,4 +1,11 @@
-with import ../config.nix;
+with import ./config.nix;
+
+let mkCADerivation = args: mkDerivation ({
+    __contentAddressed = true;
+    outputHashMode = "recursive";
+    outputHashAlgo = "sha256";
+} // args);
+in
 
 { seed ? 0 }:
 # A simple content-addressed derivation.
@@ -14,9 +21,9 @@ rec {
       echo "Hello World" > $out/hello
     '';
   };
-  rootCA = mkDerivation {
+  rootCA = mkCADerivation {
     name = "rootCA";
-    outputs = [ "out" "dev" "foo"];
+    outputs = [ "out" "dev" "foo" ];
     buildCommand = ''
       echo "building a CA derivation"
       echo "The seed is ${toString seed}"
@@ -27,11 +34,8 @@ rec {
       ln -s $out $dev
       ln -s $out $foo
     '';
-    __contentAddressed = true;
-    outputHashMode = "recursive";
-    outputHashAlgo = "sha256";
   };
-  dependentCA = mkDerivation {
+  dependentCA = mkCADerivation {
     name = "dependent";
     buildCommand = ''
       echo "building a dependent derivation"
@@ -39,20 +43,14 @@ rec {
       cat ${rootCA}/self/dep
       echo ${rootCA}/self/dep > $out/dep
     '';
-    __contentAddressed = true;
-    outputHashMode = "recursive";
-    outputHashAlgo = "sha256";
   };
-  transitivelyDependentCA = mkDerivation {
+  transitivelyDependentCA = mkCADerivation {
     name = "transitively-dependent";
     buildCommand = ''
       echo "building transitively-dependent"
       cat ${dependentCA}/dep
       echo ${dependentCA} > $out
     '';
-    __contentAddressed = true;
-    outputHashMode = "recursive";
-    outputHashAlgo = "sha256";
   };
   dependentNonCA = mkDerivation {
     name = "dependent-non-ca";
@@ -66,12 +64,19 @@ rec {
   dependentFixedOutput = mkDerivation {
     name = "dependent-fixed-output";
     outputHashMode = "recursive";
-    outputHashAlgo = "sha256";
-    outputHash = "sha256-QvtAMbUl/uvi+LCObmqOhvNOapHdA2raiI4xG5zI5pA=";
+    outputHash = "sha512-7aJcmSuEuYP5tGKcmGY8bRr/lrCjJlOxP2mIUjO/vMQeg6gx/65IbzRWES8EKiPDOs9z+wF30lEfcwxM/cT4pw==";
     buildCommand = ''
       cat ${dependentCA}/dep
       echo foo > $out
     '';
-
+  };
+  runnable = mkCADerivation rec {
+    name = "runnable-thing";
+    buildCommand = ''
+      mkdir -p $out/bin
+      echo ${rootCA} # Just to make it depend on it
+      echo "" > $out/bin/${name}
+      chmod +x $out/bin/${name}
+    '';
   };
 }

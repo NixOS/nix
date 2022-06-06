@@ -12,33 +12,51 @@ namespace nix {
     }
 
     TEST(compress, noneMethodDoesNothingToTheInput) {
-        ref<std::string> o = compress("none", "this-is-a-test");
+        auto o = compress("none", "this-is-a-test");
 
-        ASSERT_EQ(*o, "this-is-a-test");
+        ASSERT_EQ(o, "this-is-a-test");
+    }
+
+    TEST(decompress, decompressNoneCompressed) {
+        auto method = "none";
+        auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
+        auto o = decompress(method, str);
+
+        ASSERT_EQ(o, str);
+    }
+
+    TEST(decompress, decompressEmptyCompressed) {
+        // Empty-method decompression used e.g. by S3 store
+        // (Content-Encoding == "").
+        auto method = "";
+        auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
+        auto o = decompress(method, str);
+
+        ASSERT_EQ(o, str);
     }
 
     TEST(decompress, decompressXzCompressed) {
         auto method = "xz";
         auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-        ref<std::string> o = decompress(method, *compress(method, str));
+        auto o = decompress(method, compress(method, str));
 
-        ASSERT_EQ(*o, str);
+        ASSERT_EQ(o, str);
     }
 
     TEST(decompress, decompressBzip2Compressed) {
         auto method = "bzip2";
         auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-        ref<std::string> o = decompress(method, *compress(method, str));
+        auto o = decompress(method, compress(method, str));
 
-        ASSERT_EQ(*o, str);
+        ASSERT_EQ(o, str);
     }
 
     TEST(decompress, decompressBrCompressed) {
         auto method = "br";
         auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-        ref<std::string> o = decompress(method, *compress(method, str));
+        auto o = decompress(method, compress(method, str));
 
-        ASSERT_EQ(*o, str);
+        ASSERT_EQ(o, str);
     }
 
     TEST(decompress, decompressInvalidInputThrowsCompressionError) {
@@ -59,7 +77,7 @@ namespace nix {
         (*sink)(inputString);
         sink->finish();
 
-        ASSERT_STREQ((*strSink.s).c_str(), inputString);
+        ASSERT_STREQ(strSink.s.c_str(), inputString);
     }
 
     TEST(makeCompressionSink, compressAndDecompress) {
@@ -72,7 +90,7 @@ namespace nix {
         sink->finish();
         decompressionSink->finish();
 
-        ASSERT_STREQ((*strSink.s).c_str(), inputString);
+        ASSERT_STREQ(strSink.s.c_str(), inputString);
     }
 
 }

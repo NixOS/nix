@@ -29,6 +29,7 @@ R""(
 * Run a particular build phase directly:
 
   ```console
+  # nix develop --unpack
   # nix develop --configure
   # nix develop --build
   # nix develop --check
@@ -54,7 +55,7 @@ R""(
   # nix develop /tmp/my-build-env
   ```
 
-* Replace all occurences of the store path corresponding to
+* Replace all occurrences of the store path corresponding to
   `glibc.dev` with a writable directory:
 
   ```console
@@ -79,16 +80,25 @@ initialised by `stdenv` and exits. This build environment can be
 recorded into a profile using `--profile`.
 
 The prompt used by the `bash` shell can be customised by setting the
-`bash-prompt` and `bash-prompt-suffix` settings in `nix.conf` or in
-the flake's `nixConfig` attribute.
+`bash-prompt`, `bash-prompt-prefix`, and `bash-prompt-suffix` settings in
+`nix.conf` or in the flake's `nixConfig` attribute.
 
 # Flake output attributes
 
-If no flake output attribute is given, `nix run` tries the following
+If no flake output attribute is given, `nix develop` tries the following
 flake output attributes:
 
-* `devShell.<system>`
+* `devShells.<system>.default`
 
-* `defaultPackage.<system>`
+* `packages.<system>.default`
+
+If a flake output *name* is given, `nix develop` tries the following flake
+output attributes:
+
+* `devShells.<system>.<name>`
+
+* `packages.<system>.<name>`
+
+* `legacyPackages.<system>.<name>`
 
 )""

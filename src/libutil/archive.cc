@@ -37,12 +37,12 @@ static GlobalConfig::Register rArchiveSettings(&archiveSettings);
 
 const std::string narVersionMagic1 = "nix-archive-1";
 
-static string caseHackSuffix = "~nix~case~hack~";
+static std::string caseHackSuffix = "~nix~case~hack~";
 
 PathFilter defaultPathFilter = [](const Path &) { return true; };
 
 
-static void dumpContents(const Path & path, size_t size,
+static void dumpContents(const Path & path, off_t size,
     Sink & sink)
 {
     sink << "contents" << size;
@@ -64,11 +64,12 @@ static void dumpContents(const Path & path, size_t size,
 }
 
 
-static void dump(const Path & path, Sink & sink, PathFilter & filter)
+static time_t dump(const Path & path, Sink & sink, PathFilter & filter)
 {
     checkInterrupt();
 
     auto st = lstat(path);
+    time_t result = st.st_mtime;
 
     sink << "(";
 
@@ -76,7 +77,7 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
         sink << "type" << "regular";
         if (st.st_mode & S_IXUSR)
             sink << "executable" << "";
-        dumpContents(path, (size_t) st.st_size, sink);
+        dumpContents(path, st.st_size, sink);
     }
 
     else if (S_ISDIR(st.st_mode)) {
@@ -84,27 +85,29 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
 
         /* If we're on a case-insensitive system like macOS, undo
            the case hack applied by restorePath(). */
-        std::map<string, string> unhacked;
+        std::map<std::string, std::string> unhacked;
         for (auto & i : readDirectory(path))
             if (archiveSettings.useCaseHack) {
-                string name(i.name);
+                std::string name(i.name);
                 size_t pos = i.name.find(caseHackSuffix);
-                if (pos != string::npos) {
+                if (pos != std::string::npos) {
                     debug(format("removing case hack suffix from '%1%'") % (path + "/" + i.name));
                     name.erase(pos);
                 }
-                if (unhacked.find(name) != unhacked.end())
+                if (!unhacked.emplace(name, i.name).second)
                     throw Error("file name collision in between '%1%' and '%2%'",
                        (path + "/" + unhacked[name]),
                        (path + "/" + i.name));
-                unhacked[name] = i.name;
             } else
-                unhacked[i.name] = i.name;
+                unhacked.emplace(i.name, i.name);
 
         for (auto & i : unhacked)
             if (filter(path + "/" + i.first)) {
                 sink << "entry" << "(" << "name" << i.first << "node";
-                dump(path + "/" + i.second, sink, filter);
+                auto tmp_mtime = dump(path + "/" + i.second, sink, filter);
+                if (tmp_mtime > result) {
+                    result = tmp_mtime;
+                }
                 sink << ")";
             }
     }
@@ -115,23 +118,30 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
     else throw Error("file '%1%' has an unsupported type", path);
 
     sink << ")";
+
+    return result;
 }
 
+
+time_t dumpPathAndGetMtime(const Path & path, Sink & sink, PathFilter & filter)
+{
+    sink << narVersionMagic1;
+    return dump(path, sink, filter);
+}
 
 void dumpPath(const Path & path, Sink & sink, PathFilter & filter)
 {
-    sink << narVersionMagic1;
-    dump(path, sink, filter);
+    dumpPathAndGetMtime(path, sink, filter);
 }
 
 
-void dumpString(const std::string & s, Sink & sink)
+void dumpString(std::string_view s, Sink & sink)
 {
     sink << narVersionMagic1 << "(" << "type" << "regular" << "contents" << s << ")";
 }
 
 
-static SerialisationError badArchive(string s)
+static SerialisationError badArchive(const std::string & s)
 {
     return SerialisationError("bad archive: " + s);
 }
@@ -172,7 +182,7 @@ static void parseContents(ParseSink & sink, Source & source, const Path & path)
 
 struct CaseInsensitiveCompare
 {
-    bool operator() (const string & a, const string & b) const
+    bool operator() (const std::string & a, const std::string & b) const
     {
         return strcasecmp(a.c_str(), b.c_str()) < 0;
     }
@@ -181,7 +191,7 @@ struct CaseInsensitiveCompare
 
 static void parse(ParseSink & sink, Source & source, const Path & path)
 {
-    string s;
+    std::string s;
 
     s = readString(source);
     if (s != "(") throw badArchive("expected open tag");
@@ -202,7 +212,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
         else if (s == "type") {
             if (type != tpUnknown)
                 throw badArchive("multiple type fields");
-            string t = readString(source);
+            std::string t = readString(source);
 
             if (t == "regular") {
                 type = tpRegular;
@@ -233,7 +243,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
         }
 
         else if (s == "entry" && type == tpDirectory) {
-            string name, prevName;
+            std::string name, prevName;
 
             s = readString(source);
             if (s != "(") throw badArchive("expected open tag");
@@ -247,7 +257,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
                     break;
                 } else if (s == "name") {
                     name = readString(source);
-                    if (name.empty() || name == "." || name == ".." || name.find('/') != string::npos || name.find((char) 0) != string::npos)
+                    if (name.empty() || name == "." || name == ".." || name.find('/') != std::string::npos || name.find((char) 0) != std::string::npos)
                         throw Error("NAR contains invalid file name '%1%'", name);
                     if (name <= prevName)
                         throw Error("NAR directory is not sorted");
@@ -270,7 +280,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
         }
 
         else if (s == "target" && type == tpSymlink) {
-            string target = readString(source);
+            std::string target = readString(source);
             sink.createSymlink(path, target);
         }
 
@@ -282,7 +292,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
 
 void parseDump(ParseSink & sink, Source & source)
 {
-    string version;
+    std::string version;
     try {
         version = readString(source, narVersionMagic1.size());
     } catch (SerialisationError & e) {
@@ -346,7 +356,7 @@ struct RestoreSink : ParseSink
         writeFull(fd.get(), data);
     }
 
-    void createSymlink(const Path & path, const string & target) override
+    void createSymlink(const Path & path, const std::string & target) override
     {
         Path p = dstPath + path;
         nix::createSymlink(target, p);

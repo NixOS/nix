@@ -9,10 +9,12 @@ namespace nix {
 
 std::string renderMarkdownToTerminal(std::string_view markdown)
 {
+    int windowWidth = getWindowSize().second;
+
     struct lowdown_opts opts {
         .type = LOWDOWN_TERM,
         .maxdepth = 20,
-        .cols = std::min(getWindowSize().second, (unsigned short) 80),
+        .cols = (size_t) std::max(windowWidth - 5, 60),
         .hmargin = 0,
         .vmargin = 0,
         .feat = LOWDOWN_COMMONMARK | LOWDOWN_FENCED | LOWDOWN_DEFLIST | LOWDOWN_TABLES,
@@ -25,7 +27,7 @@ std::string renderMarkdownToTerminal(std::string_view markdown)
     Finally freeDoc([&]() { lowdown_doc_free(doc); });
 
     size_t maxn = 0;
-    auto node = lowdown_doc_parse(doc, &maxn, markdown.data(), markdown.size());
+    auto node = lowdown_doc_parse(doc, &maxn, markdown.data(), markdown.size(), nullptr);
     if (!node)
         throw Error("cannot parse Markdown document");
     Finally freeNode([&]() { lowdown_node_free(node); });
@@ -40,11 +42,11 @@ std::string renderMarkdownToTerminal(std::string_view markdown)
         throw Error("cannot allocate Markdown output buffer");
     Finally freeBuffer([&]() { lowdown_buf_free(buf); });
 
-    int rndr_res = lowdown_term_rndr(buf, nullptr, renderer, node);
+    int rndr_res = lowdown_term_rndr(buf, renderer, node);
     if (!rndr_res)
         throw Error("allocation error while rendering Markdown");
 
-    return std::string(buf->data, buf->size);
+    return filterANSIEscapes(std::string(buf->data, buf->size), !shouldANSI());
 }
 
 }

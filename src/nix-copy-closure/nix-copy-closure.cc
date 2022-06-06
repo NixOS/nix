@@ -54,10 +54,7 @@ static int main_nix_copy_closure(int argc, char ** argv)
         for (auto & path : storePaths)
             storePaths2.insert(from->followLinksToStorePath(path));
 
-        RealisedPath::Set closure;
-        RealisedPath::closure(*from, storePaths2, closure);
-
-        copyPaths(from, to, closure, NoRepair, NoCheckSigs, useSubstitutes);
+        copyClosure(*from, *to, storePaths2, NoRepair, NoCheckSigs, useSubstitutes);
 
         return 0;
     }

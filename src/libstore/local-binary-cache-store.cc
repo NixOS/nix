@@ -93,9 +93,10 @@ protected:
 void LocalBinaryCacheStore::init()
 {
     createDirs(binaryCacheDir + "/nar");
-    createDirs(binaryCacheDir + realisationsPrefix);
+    createDirs(binaryCacheDir + "/" + realisationsPrefix);
     if (writeDebugInfo)
         createDirs(binaryCacheDir + "/debuginfo");
+    createDirs(binaryCacheDir + "/log");
     BinaryCacheStore::init();
 }
 
@@ -106,7 +107,7 @@ bool LocalBinaryCacheStore::fileExists(const std::string & path)
 
 std::set<std::string> LocalBinaryCacheStore::uriSchemes()
 {
-    if (getEnv("_NIX_FORCE_HTTP_BINARY_CACHE_STORE") == "1")
+    if (getEnv("_NIX_FORCE_HTTP") == "1")
         return {};
     else
         return {"file"};

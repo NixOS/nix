@@ -12,6 +12,7 @@
 
 #include <nlohmann/json.hpp>
 #include <regex>
+#include <iomanip>
 
 using namespace nix;
 
@@ -21,13 +22,13 @@ struct ProfileElementSource
     // FIXME: record original attrpath.
     FlakeRef resolvedRef;
     std::string attrPath;
-    // FIXME: output names
+    OutputsSpec outputs;
 
     bool operator < (const ProfileElementSource & other) const
     {
         return
-            std::pair(originalRef.to_string(), attrPath) <
-            std::pair(other.originalRef.to_string(), other.attrPath);
+            std::tuple(originalRef.to_string(), attrPath, outputs) <
+            std::tuple(other.originalRef.to_string(), other.attrPath, other.outputs);
     }
 };
 
@@ -36,12 +37,12 @@ struct ProfileElement
     StorePathSet storePaths;
     std::optional<ProfileElementSource> source;
     bool active = true;
-    // FIXME: priority
+    int priority = 5;
 
     std::string describe() const
     {
         if (source)
-            return fmt("%s#%s", source->originalRef, source->attrPath);
+            return fmt("%s#%s%s", source->originalRef, source->attrPath, printOutputsSpec(source->outputs));
         StringSet names;
         for (auto & path : storePaths)
             names.insert(DrvName(path.name()).name);
@@ -60,6 +61,25 @@ struct ProfileElement
     {
         return std::tuple(describe(), storePaths) < std::tuple(other.describe(), other.storePaths);
     }
+
+    void updateStorePaths(
+        ref<Store> evalStore,
+        ref<Store> store,
+        const BuiltPaths & builtPaths)
+    {
+        storePaths.clear();
+        for (auto & buildable : builtPaths) {
+            std::visit(overloaded {
+                [&](const BuiltPath::Opaque & bo) {
+                    storePaths.insert(bo.path);
+                },
+                [&](const BuiltPath::Built & bfd) {
+                    for (auto & output : bfd.outputs)
+                        storePaths.insert(output.second);
+                },
+            }, buildable.raw());
+        }
+    }
 };
 
 struct ProfileManifest
@@ -76,19 +96,35 @@ struct ProfileManifest
             auto json = nlohmann::json::parse(readFile(manifestPath));
 
             auto version = json.value("version", 0);
-            if (version != 1)
-                throw Error("profile manifest '%s' has unsupported version %d", manifestPath, version);
+            std::string sUrl;
+            std::string sOriginalUrl;
+            switch (version) {
+                case 1:
+                    sUrl = "uri";
+                    sOriginalUrl = "originalUri";
+                    break;
+                case 2:
+                    sUrl = "url";
+                    sOriginalUrl = "originalUrl";
+                    break;
+                default:
+                    throw Error("profile manifest '%s' has unsupported version %d", manifestPath, version);
+            }
 
             for (auto & e : json["elements"]) {
                 ProfileElement element;
                 for (auto & p : e["storePaths"])
                     element.storePaths.insert(state.store->parseStorePath((std::string) p));
                 element.active = e["active"];
-                if (e.value("uri", "") != "") {
-                    element.source = ProfileElementSource{
-                        parseFlakeRef(e["originalUri"]),
-                        parseFlakeRef(e["uri"]),
-                        e["attrPath"]
+                if(e.contains("priority")) {
+                    element.priority = e["priority"];
+                }
+                if (e.value(sUrl, "") != "") {
+                    element.source = ProfileElementSource {
+                        parseFlakeRef(e[sOriginalUrl]),
+                        parseFlakeRef(e[sUrl]),
+                        e["attrPath"],
+                        e["outputs"].get<OutputsSpec>()
                     };
                 }
                 elements.emplace_back(std::move(element));
@@ -97,16 +133,14 @@ struct ProfileManifest
 
         else if (pathExists(profile + "/manifest.nix")) {
             // FIXME: needed because of pure mode; ugly.
-            if (state.allowedPaths) {
-                state.allowedPaths->insert(state.store->followLinksToStore(profile));
-                state.allowedPaths->insert(state.store->followLinksToStore(profile + "/manifest.nix"));
-            }
+            state.allowPath(state.store->followLinksToStore(profile));
+            state.allowPath(state.store->followLinksToStore(profile + "/manifest.nix"));
 
             auto drvInfos = queryInstalled(state, state.store->followLinksToStore(profile));
 
             for (auto & drvInfo : drvInfos) {
                 ProfileElement element;
-                element.storePaths = {state.store->parseStorePath(drvInfo.queryOutPath())};
+                element.storePaths = {drvInfo.queryOutPath()};
                 elements.emplace_back(std::move(element));
             }
         }
@@ -122,15 +156,17 @@ struct ProfileManifest
             nlohmann::json obj;
             obj["storePaths"] = paths;
             obj["active"] = element.active;
+            obj["priority"] = element.priority;
             if (element.source) {
-                obj["originalUri"] = element.source->originalRef.to_string();
-                obj["uri"] = element.source->resolvedRef.to_string();
+                obj["originalUrl"] = element.source->originalRef.to_string();
+                obj["url"] = element.source->resolvedRef.to_string();
                 obj["attrPath"] = element.source->attrPath;
+                obj["outputs"] = element.source->outputs;
             }
             array.push_back(obj);
         }
         nlohmann::json json;
-        json["version"] = 1;
+        json["version"] = 2;
         json["elements"] = array;
         return json.dump();
     }
@@ -145,7 +181,7 @@ struct ProfileManifest
         for (auto & element : elements) {
             for (auto & path : element.storePaths) {
                 if (element.active)
-                    pkgs.emplace_back(store->printStorePath(path), true, 5);
+                    pkgs.emplace_back(store->printStorePath(path), true, element.priority);
                 references.insert(path);
             }
         }
@@ -158,17 +194,17 @@ struct ProfileManifest
         StringSink sink;
         dumpPath(tempDir, sink);
 
-        auto narHash = hashString(htSHA256, *sink.s);
+        auto narHash = hashString(htSHA256, sink.s);
 
         ValidPathInfo info {
             store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, "profile", references),
             narHash,
         };
         info.references = std::move(references);
-        info.narSize = sink.s->size();
+        info.narSize = sink.s.size();
         info.ca = FixedOutputHash { .method = FileIngestionMethod::Recursive, .hash = info.narHash };
 
-        auto source = StringSource { *sink.s };
+        StringSource source(sink.s);
         store->addToStore(info, source);
 
         return std::move(info.path);
@@ -215,8 +251,29 @@ struct ProfileManifest
     }
 };
 
+static std::map<Installable *, BuiltPaths>
+builtPathsPerInstallable(
+    const std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> & builtPaths)
+{
+    std::map<Installable *, BuiltPaths> res;
+    for (auto & [installable, builtPath] : builtPaths)
+        res[installable.get()].push_back(builtPath);
+    return res;
+}
+
 struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 {
+    std::optional<int64_t> priority;
+
+    CmdProfileInstall() {
+        addFlag({
+            .longName = "priority",
+            .description = "The priority of the package to install.",
+            .labels = {"priority"},
+            .handler = {&priority},
+        });
+    };
+
     std::string description() override
     {
         return "install a package into a profile";
@@ -233,50 +290,38 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
     {
         ProfileManifest manifest(*getEvalState(), *profile);
 
-        std::vector<StorePathWithOutputs> pathsToBuild;
+        auto builtPaths = builtPathsPerInstallable(
+            Installable::build2(
+                getEvalStore(), store, Realise::Outputs, installables, bmNormal));
 
         for (auto & installable : installables) {
-            if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
-                auto [attrPath, resolvedRef, drv] = installable2->toDerivation();
+            ProfileElement element;
 
-                ProfileElement element;
-                if (!drv.outPath)
-                    throw UnimplementedError("CA derivations are not yet supported by 'nix profile'");
-                element.storePaths = {*drv.outPath}; // FIXME
-                element.source = ProfileElementSource{
+
+
+            if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
+                // FIXME: make build() return this?
+                auto [attrPath, resolvedRef, drv] = installable2->toDerivation();
+                element.source = ProfileElementSource {
                     installable2->flakeRef,
                     resolvedRef,
                     attrPath,
+                    installable2->outputsSpec
                 };
 
-                pathsToBuild.push_back({drv.drvPath, StringSet{drv.outputName}});
-
-                manifest.elements.emplace_back(std::move(element));
-            } else {
-                auto buildables = build(store, Realise::Outputs, {installable}, bmNormal);
-
-                for (auto & buildable : buildables) {
-                    ProfileElement element;
-
-                    std::visit(overloaded {
-                        [&](BuildableOpaque bo) {
-                            pathsToBuild.push_back({bo.path, {}});
-                            element.storePaths.insert(bo.path);
-                        },
-                        [&](BuildableFromDrv bfd) {
-                            for (auto & output : store->queryDerivationOutputMap(bfd.drvPath)) {
-                                pathsToBuild.push_back({bfd.drvPath, {output.first}});
-                                element.storePaths.insert(output.second);
-                            }
-                        },
-                    }, buildable);
-
-                    manifest.elements.emplace_back(std::move(element));
+                if(drv.priority) {
+                    element.priority = *drv.priority;
                 }
             }
-        }
 
-        store->buildPaths(pathsToBuild);
+            if(priority) { // if --priority was specified we want to override the priority of the installable
+                element.priority = *priority;
+            };
+
+            element.updateStorePaths(getEvalStore(), store, builtPaths[installable.get()]);
+
+            manifest.elements.push_back(std::move(element));
+        }
 
         updateProfile(manifest.build(store));
     }
@@ -293,7 +338,11 @@ public:
         expectArgs("elements", &_matchers);
     }
 
-    typedef std::variant<size_t, Path, std::regex> Matcher;
+    struct RegexPattern {
+        std::string pattern;
+        std::regex  reg;
+    };
+    typedef std::variant<size_t, Path, RegexPattern> Matcher;
 
     std::vector<Matcher> getMatchers(ref<Store> store)
     {
@@ -305,7 +354,7 @@ public:
             else if (store->isStorePath(s))
                 res.push_back(s);
             else
-                res.push_back(std::regex(s, std::regex::extended | std::regex::icase));
+                res.push_back(RegexPattern{s,std::regex(s, std::regex::extended | std::regex::icase)});
         }
 
         return res;
@@ -318,9 +367,9 @@ public:
                 if (*n == pos) return true;
             } else if (auto path = std::get_if<Path>(&matcher)) {
                 if (element.storePaths.count(store.parseStorePath(*path))) return true;
-            } else if (auto regex = std::get_if<std::regex>(&matcher)) {
+            } else if (auto regex = std::get_if<RegexPattern>(&matcher)) {
                 if (element.source
-                    && std::regex_match(element.source->attrPath, *regex))
+                    && std::regex_match(element.source->attrPath, regex->reg))
                     return true;
             }
         }
@@ -353,16 +402,30 @@ struct CmdProfileRemove : virtual EvalCommand, MixDefaultProfile, MixProfileElem
 
         for (size_t i = 0; i < oldManifest.elements.size(); ++i) {
             auto & element(oldManifest.elements[i]);
-            if (!matches(*store, element, i, matchers))
+            if (!matches(*store, element, i, matchers)) {
                 newManifest.elements.push_back(std::move(element));
+            } else {
+                notice("removing '%s'", element.describe());
+            }
         }
 
-        // FIXME: warn about unused matchers?
-
+        auto removedCount = oldManifest.elements.size() - newManifest.elements.size();
         printInfo("removed %d packages, kept %d packages",
-            oldManifest.elements.size() - newManifest.elements.size(),
+            removedCount,
             newManifest.elements.size());
 
+        if (removedCount == 0) {
+            for (auto matcher: matchers) {
+                if (const size_t * index = std::get_if<size_t>(&matcher)){
+                    warn("'%d' is not a valid index", *index);
+                } else if (const Path * path = std::get_if<Path>(&matcher)){
+                    warn("'%s' does not match any paths", *path);
+                } else if (const RegexPattern * regex = std::get_if<RegexPattern>(&matcher)){
+                    warn("'%s' does not match any packages", regex->pattern);
+                }
+            }
+            warn ("Use 'nix profile list' to see the current profile.");
+        }
         updateProfile(newManifest.build(store));
     }
 };
@@ -387,47 +450,73 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
 
         auto matchers = getMatchers(store);
 
-        // FIXME: code duplication
-        std::vector<StorePathWithOutputs> pathsToBuild;
+        std::vector<std::shared_ptr<Installable>> installables;
+        std::vector<size_t> indices;
+
+        auto upgradedCount = 0;
 
         for (size_t i = 0; i < manifest.elements.size(); ++i) {
             auto & element(manifest.elements[i]);
             if (element.source
-                && !element.source->originalRef.input.isImmutable()
+                && !element.source->originalRef.input.isLocked()
                 && matches(*store, element, i, matchers))
             {
+                upgradedCount++;
+
                 Activity act(*logger, lvlChatty, actUnknown,
                     fmt("checking '%s' for updates", element.source->attrPath));
 
-                InstallableFlake installable(
+                auto installable = std::make_shared<InstallableFlake>(
                     this,
                     getEvalState(),
                     FlakeRef(element.source->originalRef),
-                    {element.source->attrPath},
-                    {},
+                    "",
+                    element.source->outputs,
+                    Strings{element.source->attrPath},
+                    Strings{},
                     lockFlags);
 
-                auto [attrPath, resolvedRef, drv] = installable.toDerivation();
+                auto [attrPath, resolvedRef, drv] = installable->toDerivation();
 
                 if (element.source->resolvedRef == resolvedRef) continue;
 
                 printInfo("upgrading '%s' from flake '%s' to '%s'",
                     element.source->attrPath, element.source->resolvedRef, resolvedRef);
 
-                if (!drv.outPath)
-                    throw UnimplementedError("CA derivations are not yet supported by 'nix profile'");
-                element.storePaths = {*drv.outPath}; // FIXME
-                element.source = ProfileElementSource{
-                    installable.flakeRef,
+                element.source = ProfileElementSource {
+                    installable->flakeRef,
                     resolvedRef,
                     attrPath,
+                    installable->outputsSpec
                 };
 
-                pathsToBuild.push_back({drv.drvPath, StringSet{"out"}}); // FIXME
+                installables.push_back(installable);
+                indices.push_back(i);
             }
         }
 
-        store->buildPaths(pathsToBuild);
+        if (upgradedCount == 0) {
+            for (auto & matcher : matchers) {
+                if (const size_t * index = std::get_if<size_t>(&matcher)){
+                    warn("'%d' is not a valid index", *index);
+                } else if (const Path * path = std::get_if<Path>(&matcher)){
+                    warn("'%s' does not match any paths", *path);
+                } else if (const RegexPattern * regex = std::get_if<RegexPattern>(&matcher)){
+                    warn("'%s' does not match any packages", regex->pattern);
+                }
+            }
+            warn ("Use 'nix profile list' to see the current profile.");
+        }
+
+        auto builtPaths = builtPathsPerInstallable(
+            Installable::build2(
+                getEvalStore(), store, Realise::Outputs, installables, bmNormal));
+
+        for (size_t i = 0; i < installables.size(); ++i) {
+            auto & installable = installables.at(i);
+            auto & element = manifest.elements[indices.at(i)];
+            element.updateStorePaths(getEvalStore(), store, builtPaths[installable.get()]);
+        }
 
         updateProfile(manifest.build(store));
     }
@@ -454,8 +543,8 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
         for (size_t i = 0; i < manifest.elements.size(); ++i) {
             auto & element(manifest.elements[i]);
             logger->cout("%d %s %s %s", i,
-                element.source ? element.source->originalRef.to_string() + "#" + element.source->attrPath : "-",
-                element.source ? element.source->resolvedRef.to_string() + "#" + element.source->attrPath : "-",
+                element.source ? element.source->originalRef.to_string() + "#" + element.source->attrPath + printOutputsSpec(element.source->outputs) : "-",
+                element.source ? element.source->resolvedRef.to_string() + "#" + element.source->attrPath + printOutputsSpec(element.source->outputs) : "-",
                 concatStringsSep(" ", store->printStorePathSet(element.storePaths)));
         }
     }
@@ -525,10 +614,11 @@ struct CmdProfileHistory : virtual StoreCommand, EvalCommand, MixDefaultProfile
             if (!first) std::cout << "\n";
             first = false;
 
-            if (prevGen)
-                std::cout << fmt("Version %d -> %d:\n", prevGen->first.number, gen.number);
-            else
-                std::cout << fmt("Version %d:\n", gen.number);
+            std::cout << fmt("Version %s%d" ANSI_NORMAL " (%s)%s:\n",
+                gen.number == curGen ? ANSI_GREEN : ANSI_BOLD,
+                gen.number,
+                std::put_time(std::gmtime(&gen.creationTime), "%Y-%m-%d"),
+                prevGen ? fmt(" <- %d", prevGen->first.number) : "");
 
             ProfileManifest::printDiff(
                 prevGen ? prevGen->second : ProfileManifest(),
@@ -537,6 +627,76 @@ struct CmdProfileHistory : virtual StoreCommand, EvalCommand, MixDefaultProfile
 
             prevGen = {gen, std::move(manifest)};
         }
+    }
+};
+
+struct CmdProfileRollback : virtual StoreCommand, MixDefaultProfile, MixDryRun
+{
+    std::optional<GenerationNumber> version;
+
+    CmdProfileRollback()
+    {
+        addFlag({
+            .longName = "to",
+            .description = "The profile version to roll back to.",
+            .labels = {"version"},
+            .handler = {&version},
+        });
+    }
+
+    std::string description() override
+    {
+        return "roll back to the previous version or a specified version of a profile";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "profile-rollback.md"
+          ;
+    }
+
+    void run(ref<Store> store) override
+    {
+        switchGeneration(*profile, version, dryRun);
+    }
+};
+
+struct CmdProfileWipeHistory : virtual StoreCommand, MixDefaultProfile, MixDryRun
+{
+    std::optional<std::string> minAge;
+
+    CmdProfileWipeHistory()
+    {
+        addFlag({
+            .longName = "older-than",
+            .description =
+                "Delete versions older than the specified age. *age* "
+                "must be in the format *N*`d`, where *N* denotes a number "
+                "of days.",
+            .labels = {"age"},
+            .handler = {&minAge},
+        });
+    }
+
+    std::string description() override
+    {
+        return "delete non-current versions of a profile";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "profile-wipe-history.md"
+          ;
+    }
+
+    void run(ref<Store> store) override
+    {
+        if (minAge)
+            deleteGenerationsOlderThan(*profile, *minAge, dryRun);
+        else
+            deleteOldGenerations(*profile, dryRun);
     }
 };
 
@@ -550,6 +710,8 @@ struct CmdProfile : NixMultiCommand
               {"list", []() { return make_ref<CmdProfileList>(); }},
               {"diff-closures", []() { return make_ref<CmdProfileDiffClosures>(); }},
               {"history", []() { return make_ref<CmdProfileHistory>(); }},
+              {"rollback", []() { return make_ref<CmdProfileRollback>(); }},
+              {"wipe-history", []() { return make_ref<CmdProfileWipeHistory>(); }},
           })
     { }
 

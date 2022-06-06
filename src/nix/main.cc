@@ -10,16 +10,13 @@
 #include "filetransfer.hh"
 #include "finally.hh"
 #include "loggers.hh"
+#include "markdown.hh"
 
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
-
-#if __linux__
-#include <sys/resource.h>
-#endif
 
 #include <nlohmann/json.hpp>
 
@@ -62,7 +59,6 @@ struct HelpRequested { };
 
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
-    bool printBuildLogs = false;
     bool useNet = true;
     bool refresh = false;
     bool showVersion = false;
@@ -121,7 +117,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         {"hash-path", {"hash", "path"}},
         {"ls-nar", {"nar", "ls"}},
         {"ls-store", {"store", "ls"}},
-        {"make-content-addressable", {"store", "make-content-addressable"}},
+        {"make-content-addressable", {"store", "make-content-addressed"}},
         {"optimise-store", {"store", "optimise"}},
         {"ping-store", {"store", "ping"}},
         {"sign-paths", {"store", "sign"}},
@@ -167,9 +163,43 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     }
 };
 
-static void showHelp(std::vector<std::string> subcommand)
+/* Render the help for the specified subcommand to stdout using
+   lowdown. */
+static void showHelp(std::vector<std::string> subcommand, MultiCommand & toplevel)
 {
-    showManPage(subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand)));
+    auto mdName = subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand));
+
+    evalSettings.restrictEval = false;
+    evalSettings.pureEval = false;
+    EvalState state({}, openStore("dummy://"));
+
+    auto vGenerateManpage = state.allocValue();
+    state.eval(state.parseExprFromString(
+        #include "generate-manpage.nix.gen.hh"
+        , "/"), *vGenerateManpage);
+
+    auto vUtils = state.allocValue();
+    state.cacheFile(
+        "/utils.nix", "/utils.nix",
+        state.parseExprFromString(
+            #include "utils.nix.gen.hh"
+            , "/"),
+        *vUtils);
+
+    auto attrs = state.buildBindings(16);
+    attrs.alloc("command").mkString(toplevel.toJSON().dump());
+
+    auto vRes = state.allocValue();
+    state.callFunction(*vGenerateManpage, state.allocValue()->mkAttrs(attrs), *vRes, noPos);
+
+    auto attr = vRes->attrs->get(state.symbols.create(mdName + ".md"));
+    if (!attr)
+        throw UsageError("Nix has no subcommand '%s'", concatStringsSep("", subcommand));
+
+    auto markdown = state.forceString(*attr->value);
+
+    RunPager pager;
+    std::cout << renderMarkdownToTerminal(markdown) << "\n";
 }
 
 struct CmdHelp : Command
@@ -198,7 +228,10 @@ struct CmdHelp : Command
 
     void run() override
     {
-        showHelp(subcommand);
+        assert(parent);
+        MultiCommand * toplevel = parent;
+        while (toplevel->parent) toplevel = toplevel->parent;
+        showHelp(subcommand, *toplevel);
     }
 };
 
@@ -218,6 +251,18 @@ void mainWrapped(int argc, char * * argv)
     initNix();
     initGC();
 
+    #if __linux__
+    if (getuid() == 0) {
+        try {
+            saveMountNamespace();
+            if (unshare(CLONE_NEWNS) == -1)
+                throw SysError("setting up a private mount namespace");
+        } catch (Error & e) { }
+    }
+    #endif
+
+    Finally f([] { logger->stop(); });
+
     programPath = argv[0];
     auto programName = std::string(baseNameOf(programPath));
 
@@ -226,13 +271,15 @@ void mainWrapped(int argc, char * * argv)
         if (legacy) return legacy(argc, argv);
     }
 
-    verbosity = lvlNotice;
-    settings.verboseBuild = false;
     evalSettings.pureEval = true;
 
     setLogFormat("bar");
-
-    Finally f([] { logger->stop(); });
+    settings.verboseBuild = false;
+    if (isatty(STDERR_FILENO)) {
+        verbosity = lvlNotice;
+    } else {
+        verbosity = lvlInfo;
+    }
 
     NixArgs args;
 
@@ -242,6 +289,7 @@ void mainWrapped(int argc, char * * argv)
     }
 
     if (argc == 2 && std::string(argv[1]) == "__dump-builtins") {
+        settings.experimentalFeatures = {Xp::Flakes, Xp::FetchClosure};
         evalSettings.pureEval = false;
         EvalState state({}, openStore("dummy://"));
         auto res = nlohmann::json::object();
@@ -254,7 +302,7 @@ void mainWrapped(int argc, char * * argv)
             b["arity"] = primOp->arity;
             b["args"] = primOp->args;
             b["doc"] = trim(stripIndentation(primOp->doc));
-            res[(std::string) builtin.name] = std::move(b);
+            res[state.symbols[builtin.name]] = std::move(b);
         }
         std::cout << res.dump() << "\n";
         return;
@@ -263,7 +311,14 @@ void mainWrapped(int argc, char * * argv)
     Finally printCompletions([&]()
     {
         if (completions) {
-            std::cout << (pathCompletions ? "filenames\n" : "no-filenames\n");
+            switch (completionType) {
+            case ctNormal:
+                std::cout << "normal\n"; break;
+            case ctFilenames:
+                std::cout << "filenames\n"; break;
+            case ctAttrs:
+                std::cout << "attrs\n"; break;
+            }
             for (auto & s : *completions)
                 std::cout << s.completion << "\t" << s.description << "\n";
         }
@@ -281,7 +336,7 @@ void mainWrapped(int argc, char * * argv)
             } else
                 break;
         }
-        showHelp(subcommand);
+        showHelp(subcommand, args);
         return;
     } catch (UsageError &) {
         if (!completions) throw;
@@ -300,7 +355,7 @@ void mainWrapped(int argc, char * * argv)
     if (args.command->first != "repl"
         && args.command->first != "doctor"
         && args.command->first != "upgrade-nix")
-        settings.requireExperimentalFeature("nix-command");
+        settings.requireExperimentalFeature(Xp::NixCommand);
 
     if (args.useNet && !haveInternet()) {
         warn("you don't have Internet access; disabling some network-dependent features");
@@ -335,14 +390,7 @@ int main(int argc, char * * argv)
 {
     // Increase the default stack size for the evaluator and for
     // libstdc++'s std::regex.
-    #if __linux__
-    rlim_t stackSize = 64 * 1024 * 1024;
-    struct rlimit limit;
-    if (getrlimit(RLIMIT_STACK, &limit) == 0 && limit.rlim_cur < stackSize) {
-        limit.rlim_cur = stackSize;
-        setrlimit(RLIMIT_STACK, &limit);
-    }
-    #endif
+    nix::setStackSize(64 * 1024 * 1024);
 
     return nix::handleExceptions(argv[0], [&]() {
         nix::mainWrapped(argc, argv);

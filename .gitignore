@@ -15,6 +15,7 @@ perl/Makefile.config
 /doc/manual/*.1
 /doc/manual/*.5
 /doc/manual/*.8
+/doc/manual/generated/*
 /doc/manual/nix.json
 /doc/manual/conf-file.json
 /doc/manual/builtins.json
@@ -26,8 +27,6 @@ perl/Makefile.config
 # /scripts/
 /scripts/nix-profile.sh
 /scripts/nix-profile.fish
-/scripts/nix-reduce-build
-/scripts/nix-http-export.cgi
 /scripts/nix-profile-daemon.sh
 
 # /src/libexpr/
@@ -37,9 +36,11 @@ perl/Makefile.config
 /src/libexpr/parser-tab.hh
 /src/libexpr/parser-tab.output
 /src/libexpr/nix.tbl
+/src/libexpr/tests/libexpr-tests
 
 # /src/libstore/
 *.gen.*
+/src/libstore/tests/libstore-tests
 
 # /src/libutil/
 /src/libutil/tests/libutil-tests
@@ -56,9 +57,6 @@ perl/Makefile.config
 /src/nix-store/nix-store
 
 /src/nix-prefetch-url/nix-prefetch-url
-
-# /src/nix-daemon/
-/src/nix-daemon/nix-daemon
 
 /src/nix-collect-garbage/nix-collect-garbage
 
@@ -77,12 +75,13 @@ perl/Makefile.config
 # /tests/
 /tests/test-tmp
 /tests/common.sh
-/tests/dummy
 /tests/result*
 /tests/restricted-innocent
 /tests/shell
 /tests/shell.drv
 /tests/config.nix
+/tests/ca/config.nix
+/tests/repl-result-out
 
 # /tests/lang/
 /tests/lang/*.out
@@ -94,6 +93,7 @@ perl/Makefile.config
 
 /misc/systemd/nix-daemon.service
 /misc/systemd/nix-daemon.socket
+/misc/systemd/nix-daemon.conf
 /misc/upstart/nix-daemon.conf
 
 /src/resolve-system-dependencies/resolve-system-dependencies
@@ -124,3 +124,7 @@ GTAGS
 compile_commands.json
 
 nix-rust/target
+
+result
+
+.vscode/

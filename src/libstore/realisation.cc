@@ -1,5 +1,6 @@
 #include "realisation.hh"
 #include "store-api.hh"
+#include "closure.hh"
 #include <nlohmann/json.hpp>
 
 namespace nix {
@@ -21,11 +22,52 @@ std::string DrvOutput::to_string() const {
     return strHash() + "!" + outputName;
 }
 
+std::set<Realisation> Realisation::closure(Store & store, const std::set<Realisation> & startOutputs)
+{
+    std::set<Realisation> res;
+    Realisation::closure(store, startOutputs, res);
+    return res;
+}
+
+void Realisation::closure(Store & store, const std::set<Realisation> & startOutputs, std::set<Realisation> & res)
+{
+    auto getDeps = [&](const Realisation& current) -> std::set<Realisation> {
+        std::set<Realisation> res;
+        for (auto& [currentDep, _] : current.dependentRealisations) {
+            if (auto currentRealisation = store.queryRealisation(currentDep))
+                res.insert(*currentRealisation);
+            else
+                throw Error(
+                    "Unrealised derivation '%s'", currentDep.to_string());
+        }
+        return res;
+    };
+
+    computeClosure<Realisation>(
+        startOutputs, res,
+        [&](const Realisation& current,
+            std::function<void(std::promise<std::set<Realisation>>&)>
+                processEdges) {
+            std::promise<std::set<Realisation>> promise;
+            try {
+                auto res = getDeps(current);
+                promise.set_value(res);
+            } catch (...) {
+                promise.set_exception(std::current_exception());
+            }
+            return processEdges(promise);
+        });
+}
+
 nlohmann::json Realisation::toJSON() const {
+    auto jsonDependentRealisations = nlohmann::json::object();
+    for (auto & [depId, depOutPath] : dependentRealisations)
+        jsonDependentRealisations.emplace(depId.to_string(), depOutPath.to_string());
     return nlohmann::json{
         {"id", id.to_string()},
         {"outPath", outPath.to_string()},
         {"signatures", signatures},
+        {"dependentRealisations", jsonDependentRealisations},
     };
 }
 
@@ -36,7 +78,7 @@ Realisation Realisation::fromJSON(
         auto fieldIterator = json.find(fieldName);
         if (fieldIterator == json.end())
             return std::nullopt;
-        return *fieldIterator;
+        return {*fieldIterator};
     };
     auto getField = [&](std::string fieldName) -> std::string {
         if (auto field = getOptionalField(fieldName))
@@ -51,10 +93,16 @@ Realisation Realisation::fromJSON(
     if (auto signaturesIterator = json.find("signatures"); signaturesIterator != json.end())
         signatures.insert(signaturesIterator->begin(), signaturesIterator->end());
 
+    std::map <DrvOutput, StorePath> dependentRealisations;
+    if (auto jsonDependencies = json.find("dependentRealisations"); jsonDependencies != json.end())
+        for (auto & [jsonDepId, jsonDepOutPath] : jsonDependencies->get<std::map<std::string, std::string>>())
+            dependentRealisations.insert({DrvOutput::parse(jsonDepId), StorePath(jsonDepOutPath)});
+
     return Realisation{
         .id = DrvOutput::parse(getField("id")),
         .outPath = StorePath(getField("outPath")),
         .signatures = signatures,
+        .dependentRealisations = dependentRealisations,
     };
 }
 
@@ -90,6 +138,24 @@ size_t Realisation::checkSignatures(const PublicKeys & publicKeys) const
 
 StorePath RealisedPath::path() const {
     return std::visit([](auto && arg) { return arg.getPath(); }, raw);
+}
+
+bool Realisation::isCompatibleWith(const Realisation & other) const
+{
+    assert (id == other.id);
+    if (outPath == other.outPath) {
+        if (dependentRealisations.empty() != other.dependentRealisations.empty()) {
+            warn(
+                "Encountered a realisation for '%s' with an empty set of "
+                "dependencies. This is likely an artifact from an older Nix. "
+                "I’ll try to fix the realisation if I can",
+                id.to_string());
+            return true;
+        } else if (dependentRealisations == other.dependentRealisations) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void RealisedPath::closure(

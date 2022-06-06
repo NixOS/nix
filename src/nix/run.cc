@@ -1,3 +1,4 @@
+#include "run.hh"
 #include "command.hh"
 #include "common-args.hh"
 #include "shared.hh"
@@ -7,7 +8,6 @@
 #include "finally.hh"
 #include "fs-accessor.hh"
 #include "progress-bar.hh"
-#include "affinity.hh"
 #include "eval.hh"
 
 #if __linux__
@@ -20,47 +20,46 @@ using namespace nix;
 
 std::string chrootHelperName = "__run_in_chroot";
 
-struct RunCommon : virtual Command
+namespace nix {
+
+void runProgramInStore(ref<Store> store,
+    const std::string & program,
+    const Strings & args)
 {
+    stopProgressBar();
 
-    using Command::run;
+    restoreProcessContext();
 
-    void runProgram(ref<Store> store,
-        const std::string & program,
-        const Strings & args)
-    {
-        stopProgressBar();
+    /* If this is a diverted store (i.e. its "logical" location
+       (typically /nix/store) differs from its "physical" location
+       (e.g. /home/eelco/nix/store), then run the command in a
+       chroot. For non-root users, this requires running it in new
+       mount and user namespaces. Unfortunately,
+       unshare(CLONE_NEWUSER) doesn't work in a multithreaded program
+       (which "nix" is), so we exec() a single-threaded helper program
+       (chrootHelper() below) to do the work. */
+    auto store2 = store.dynamic_pointer_cast<LocalFSStore>();
 
-        restoreSignals();
+    if (!store2)
+        throw Error("store '%s' is not a local store so it does not support command execution", store->getUri());
 
-        restoreAffinity();
+    if (store->storeDir != store2->getRealStoreDir()) {
+        Strings helperArgs = { chrootHelperName, store->storeDir, store2->getRealStoreDir(), program };
+        for (auto & arg : args) helperArgs.push_back(arg);
 
-        /* If this is a diverted store (i.e. its "logical" location
-           (typically /nix/store) differs from its "physical" location
-           (e.g. /home/eelco/nix/store), then run the command in a
-           chroot. For non-root users, this requires running it in new
-           mount and user namespaces. Unfortunately,
-           unshare(CLONE_NEWUSER) doesn't work in a multithreaded
-           program (which "nix" is), so we exec() a single-threaded
-           helper program (chrootHelper() below) to do the work. */
-        auto store2 = store.dynamic_pointer_cast<LocalStore>();
+        execv(readLink("/proc/self/exe").c_str(), stringsToCharPtrs(helperArgs).data());
 
-        if (store2 && store->storeDir != store2->realStoreDir) {
-            Strings helperArgs = { chrootHelperName, store->storeDir, store2->realStoreDir, program };
-            for (auto & arg : args) helperArgs.push_back(arg);
-
-            execv(readLink("/proc/self/exe").c_str(), stringsToCharPtrs(helperArgs).data());
-
-            throw SysError("could not execute chroot helper");
-        }
-
-        execvp(program.c_str(), stringsToCharPtrs(args).data());
-
-        throw SysError("unable to execute '%s'", program);
+        throw SysError("could not execute chroot helper");
     }
-};
 
-struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
+    execvp(program.c_str(), stringsToCharPtrs(args).data());
+
+    throw SysError("unable to execute '%s'", program);
+}
+
+}
+
+struct CmdShell : InstallablesCommand, MixEnvironment
 {
 
     using InstallablesCommand::run;
@@ -95,7 +94,7 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
 
     void run(ref<Store> store) override
     {
-        auto outPaths = toStorePaths(store, Realise::Outputs, OperateOn::Output, installables);
+        auto outPaths = Installable::toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, installables);
 
         auto accessor = store->getFSAccessor();
 
@@ -127,13 +126,13 @@ struct CmdShell : InstallablesCommand, RunCommon, MixEnvironment
         Strings args;
         for (auto & arg : command) args.push_back(arg);
 
-        runProgram(store, *command.begin(), args);
+        runProgramInStore(store, *command.begin(), args);
     }
 };
 
 static auto rCmdShell = registerCommand<CmdShell>("shell");
 
-struct CmdRun : InstallableCommand, RunCommon
+struct CmdRun : InstallableCommand
 {
     using InstallableCommand::run;
 
@@ -162,7 +161,10 @@ struct CmdRun : InstallableCommand, RunCommon
 
     Strings getDefaultFlakeAttrPaths() override
     {
-        Strings res{"defaultApp." + settings.thisSystem.get()};
+        Strings res{
+            "apps." + settings.thisSystem.get() + ".default",
+            "defaultApp." + settings.thisSystem.get(),
+        };
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPaths())
             res.push_back(s);
         return res;
@@ -170,7 +172,7 @@ struct CmdRun : InstallableCommand, RunCommon
 
     Strings getDefaultFlakeAttrPathPrefixes() override
     {
-        Strings res{"apps." + settings.thisSystem.get() + ".", "packages"};
+        Strings res{"apps." + settings.thisSystem.get() + "."};
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPathPrefixes())
             res.push_back(s);
         return res;
@@ -180,14 +182,13 @@ struct CmdRun : InstallableCommand, RunCommon
     {
         auto state = getEvalState();
 
-        auto app = installable->toApp(*state);
-
-        state->store->buildPaths(app.context);
+        lockFlags.applyNixConfig = true;
+        auto app = installable->toApp(*state).resolve(getEvalStore(), store);
 
         Strings allArgs{app.program};
         for (auto & i : args) allArgs.push_back(i);
 
-        runProgram(store, app.program, allArgs);
+        runProgramInStore(store, app.program, allArgs);
     }
 };
 

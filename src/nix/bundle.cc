@@ -9,7 +9,7 @@ using namespace nix;
 
 struct CmdBundle : InstallableCommand
 {
-    std::string bundler = "github:matthewbauer/nix-bundle";
+    std::string bundler = "github:NixOS/bundlers";
     std::optional<Path> outLink;
 
     CmdBundle()
@@ -49,9 +49,13 @@ struct CmdBundle : InstallableCommand
 
     Category category() override { return catSecondary; }
 
+    // FIXME: cut&paste from CmdRun.
     Strings getDefaultFlakeAttrPaths() override
     {
-        Strings res{"defaultApp." + settings.thisSystem.get()};
+        Strings res{
+            "apps." + settings.thisSystem.get() + ".default",
+            "defaultApp." + settings.thisSystem.get()
+        };
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPaths())
             res.push_back(s);
         return res;
@@ -59,7 +63,7 @@ struct CmdBundle : InstallableCommand
 
     Strings getDefaultFlakeAttrPathPrefixes() override
     {
-        Strings res{"apps." + settings.thisSystem.get() + ".", "packages"};
+        Strings res{"apps." + settings.thisSystem.get() + "."};
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPathPrefixes())
             res.push_back(s);
         return res;
@@ -69,30 +73,21 @@ struct CmdBundle : InstallableCommand
     {
         auto evalState = getEvalState();
 
-        auto app = installable->toApp(*evalState);
-        store->buildPaths(app.context);
+        auto val = installable->toValue(*evalState).first;
 
-        auto [bundlerFlakeRef, bundlerName] = parseFlakeRefWithFragment(bundler, absPath("."));
+        auto [bundlerFlakeRef, bundlerName, outputsSpec] = parseFlakeRefWithFragmentAndOutputsSpec(bundler, absPath("."));
         const flake::LockFlags lockFlags{ .writeLockFile = false };
-        auto bundler = InstallableFlake(this,
-            evalState, std::move(bundlerFlakeRef),
-            Strings{bundlerName == "" ? "defaultBundler" : bundlerName},
-            Strings({"bundlers."}), lockFlags);
-
-        Value * arg = evalState->allocValue();
-        evalState->mkAttrs(*arg, 2);
-
-        PathSet context;
-        for (auto & i : app.context)
-            context.insert("=" + store->printStorePath(i.path));
-        mkString(*evalState->allocAttr(*arg, evalState->symbols.create("program")), app.program, context);
-
-        mkString(*evalState->allocAttr(*arg, evalState->symbols.create("system")), settings.thisSystem.get());
-
-        arg->attrs->sort();
+        InstallableFlake bundler{this,
+            evalState, std::move(bundlerFlakeRef), bundlerName, outputsSpec,
+            {"bundlers." + settings.thisSystem.get() + ".default",
+             "defaultBundler." + settings.thisSystem.get()
+            },
+            {"bundlers." + settings.thisSystem.get() + "."},
+            lockFlags
+        };
 
         auto vRes = evalState->allocValue();
-        evalState->callFunction(*bundler.toValue(*evalState).first, *arg, *vRes, noPos);
+        evalState->callFunction(*bundler.toValue(*evalState).first, *val, *vRes, noPos);
 
         if (!evalState->isDerivation(*vRes))
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
@@ -102,21 +97,26 @@ struct CmdBundle : InstallableCommand
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
         PathSet context2;
-        StorePath drvPath = store->parseStorePath(evalState->coerceToPath(*attr1->pos, *attr1->value, context2));
+        auto drvPath = evalState->coerceToStorePath(attr1->pos, *attr1->value, context2);
 
         auto attr2 = vRes->attrs->get(evalState->sOutPath);
         if (!attr2)
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
-        StorePath outPath = store->parseStorePath(evalState->coerceToPath(*attr2->pos, *attr2->value, context2));
+        auto outPath = evalState->coerceToStorePath(attr2->pos, *attr2->value, context2);
 
-        store->buildPaths({{drvPath}});
+        store->buildPaths({ DerivedPath::Built { drvPath } });
 
         auto outPathS = store->printStorePath(outPath);
 
-        if (!outLink)
-            outLink = baseNameOf(app.program);
+        if (!outLink) {
+            auto * attr = vRes->attrs->get(evalState->sName);
+            if (!attr)
+                throw Error("attribute 'name' missing");
+            outLink = evalState->forceStringNoCtx(*attr->value, attr->pos);
+        }
 
+        // TODO: will crash if not a localFSStore?
         store.dynamic_pointer_cast<LocalFSStore>()->addPermRoot(outPath, absPath(*outLink));
     }
 };

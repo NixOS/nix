@@ -40,7 +40,7 @@ struct CmdShowDerivation : InstallablesCommand
 
     void run(ref<Store> store) override
     {
-        auto drvPaths = toDerivations(store, installables, true);
+        auto drvPaths = Installable::toDerivations(store, installables, true);
 
         if (recursive) {
             StorePathSet closure;
@@ -65,19 +65,23 @@ struct CmdShowDerivation : InstallablesCommand
                     auto & outputName = _outputName; // work around clang bug
                     auto outputObj { outputsObj.object(outputName) };
                     std::visit(overloaded {
-                        [&](DerivationOutputInputAddressed doi) {
+                        [&](const DerivationOutput::InputAddressed & doi) {
                             outputObj.attr("path", store->printStorePath(doi.path));
                         },
-                        [&](DerivationOutputCAFixed dof) {
+                        [&](const DerivationOutput::CAFixed & dof) {
                             outputObj.attr("path", store->printStorePath(dof.path(*store, drv.name, outputName)));
                             outputObj.attr("hashAlgo", dof.hash.printMethodAlgo());
                             outputObj.attr("hash", dof.hash.hash.to_string(Base16, false));
                         },
-                        [&](DerivationOutputCAFloating dof) {
+                        [&](const DerivationOutput::CAFloating & dof) {
                             outputObj.attr("hashAlgo", makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType));
                         },
-                        [&](DerivationOutputDeferred) {},
-                    }, output.output);
+                        [&](const DerivationOutput::Deferred &) {},
+                        [&](const DerivationOutput::Impure & doi) {
+                            outputObj.attr("hashAlgo", makeFileIngestionPrefix(doi.method) + printHashType(doi.hashType));
+                            outputObj.attr("impure", true);
+                        },
+                    }, output.raw());
                 }
             }
 

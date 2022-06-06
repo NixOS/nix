@@ -157,7 +157,7 @@ struct CmdLsNar : Command, MixLs
 
     void run() override
     {
-        list(makeNarAccessor(make_ref<std::string>(readFile(narPath))));
+        list(makeNarAccessor(readFile(narPath)));
     }
 };
 

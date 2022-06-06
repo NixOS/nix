@@ -1,7 +1,7 @@
 create table if not exists ValidPaths (
     id               integer primary key autoincrement not null,
     path             text unique not null,
-    hash             text not null,
+    hash             text not null, -- base16 representation
     registrationTime integer not null,
     deriver          text,
     narSize          integer,

@@ -137,15 +137,6 @@ Currently the `type` attribute can be one of the following:
   *path* must be a directory in the file system containing a file
   named `flake.nix`.
 
-  If the directory or any of its parents is a Git repository, then
-  this is essentially equivalent to `git+file://<path>` (see below),
-  except that the `dir` parameter is derived automatically. For
-  example, if `/foo/bar` is a Git repository, then the flake reference
-  `/foo/bar/flake` is equivalent to `/foo/bar?dir=flake`.
-
-  If the directory is not inside a Git repository, then the flake
-  contents is the entire contents of *path*.
-
   *path* generally must be an absolute path. However, on the command
   line, it can be a relative path (e.g. `.` or `./foo`) which is
   interpreted as relative to the current directory. In this case, it
@@ -162,13 +153,18 @@ Currently the `type` attribute can be one of the following:
   git(+http|+https|+ssh|+git|+file|):(//<server>)?<path>(\?<params>)?
   ```
 
-  The `ref` attribute defaults to `master`.
+  The `ref` attribute defaults to resolving the `HEAD` reference.
 
   The `rev` attribute must denote a commit that exists in the branch
   or tag specified by the `ref` attribute, since Nix doesn't do a full
   clone of the remote repository by default (and the Git protocol
   doesn't allow fetching a `rev` without a known `ref`). The default
   is the commit currently pointed to by `ref`.
+
+  When `git+file` is used without specifying `ref` or `rev`, files are
+  fetched directly from the local `path` as long as they have been added
+  to the Git repository. If there are uncommitted changes, the reference
+  is treated as dirty and a warning is printed.
 
   For example, the following are valid Git flake references:
 
@@ -185,9 +181,17 @@ Currently the `type` attribute can be one of the following:
 * `tarball`: Tarballs. The location of the tarball is specified by the
   attribute `url`.
 
-  In URL form, the schema must be `http://`, `https://` or `file://`
-  URLs and the extension must be `.zip`, `.tar`, `.tar.gz`, `.tar.xz`
-  or `.tar.bz2`.
+  In URL form, the schema must be `tarball+http://`, `tarball+https://` or `tarball+file://`.
+  If the extension corresponds to a known archive format (`.zip`, `.tar`,
+  `.tgz`, `.tar.gz`, `.tar.xz`, `.tar.bz2` or `.tar.zst`), then the `tarball+`
+  can be dropped.
+
+* `file`: Plain files or directory tarballs, either over http(s) or from the local
+  disk.
+
+  In URL form, the schema must be `file+http://`, `file+https://` or `file+file://`.
+  If the extension doesn’t correspond to a known archive format (as defined by the
+  `tarball` fetcher), then the `file+` prefix can be dropped.
 
 * `github`: A more efficient way to fetch repositories from
   GitHub. The following attributes are required:
@@ -218,6 +222,38 @@ Currently the `type` attribute can be one of the following:
   * `github:edolstra/dwarffs/unstable`
   * `github:edolstra/dwarffs/d3f2baba8f425779026c6ec04021b2e927f61e31`
 
+* `sourcehut`: Similar to `github`, is a more efficient way to fetch
+  SourceHut repositories. The following attributes are required:
+
+  * `owner`: The owner of the repository (including leading `~`).
+
+  * `repo`: The name of the repository.
+
+  Like `github`, these are downloaded as tarball archives.
+
+  The URL syntax for `sourcehut` flakes is:
+
+  `sourcehut:<owner>/<repo>(/<rev-or-ref>)?(\?<params>)?`
+
+  `<rev-or-ref>` works the same as `github`. Either a branch or tag name
+  (`ref`), or a commit hash (`rev`) can be specified.
+
+  Since SourceHut allows for self-hosting, you can specify `host` as
+  a parameter, to point to any instances other than `git.sr.ht`.
+
+  Currently, `ref` name resolution only works for Git repositories.
+  You can refer to Mercurial repositories by simply changing `host` to
+  `hg.sr.ht` (or any other Mercurial instance). With the caveat
+  that you must explicitly specify a commit hash (`rev`).
+
+  Some examples:
+
+  * `sourcehut:~misterio/nix-colors`
+  * `sourcehut:~misterio/nix-colors/main`
+  * `sourcehut:~misterio/nix-colors?host=git.example.org`
+  * `sourcehut:~misterio/nix-colors/182b4b8709b8ffe4e9774a4c5d6877bf6bb9a21c`
+  * `sourcehut:~misterio/nix-colors/21c1a380a6915d890d408e9f22203436a35bb2de?host=hg.sr.ht`
+
 * `indirect`: Indirections through the flake registry. These have the
   form
 
@@ -225,7 +261,7 @@ Currently the `type` attribute can be one of the following:
   [flake:]<flake-id>(/<rev-or-ref>(/rev)?)?
   ```
 
-  These perform a lookup of `<flake-id>` in the flake registry. or
+  These perform a lookup of `<flake-id>` in the flake registry. For
   example, `nixpkgs` and `nixpkgs/release-20.09` are indirect flake
   references. The specified `rev` and/or `ref` are merged with the
   entry in the registry; see [nix registry](./nix3-registry.md) for
@@ -245,7 +281,7 @@ derivation):
 
   outputs = { self, nixpkgs }: {
 
-    defaultPackage.x86_64-linux =
+    packages.x86_64-linux.default =
       # Notice the reference to nixpkgs here.
       with import nixpkgs { system = "x86_64-linux"; };
       stdenv.mkDerivation {
@@ -300,6 +336,13 @@ The following attributes are supported in `flake.nix`:
   `nix` subcommands require specific attributes to have a specific
   value (e.g. `packages.x86_64-linux` must be an attribute set of
   derivations built for the `x86_64-linux` platform).
+
+* `nixConfig`: a set of `nix.conf` options to be set when evaluating any
+  part of a flake. In the interests of security, only a small set of
+  whitelisted options (currently `bash-prompt`, `bash-prompt-prefix`,
+  `bash-prompt-suffix`, and `flake-registry`) are allowed to be set without
+  confirmation so long as `accept-flake-config` is not set in the global
+  configuration.
 
 ## Flake inputs
 
@@ -395,7 +438,7 @@ the `nixpkgs` input of the top-level flake to be equal to the
 `nixpkgs` input of the `dwarffs` input of the top-level flake:
 
 ```nix
-inputs.nixops.follows = "dwarffs/nixpkgs";
+inputs.nixpkgs.follows = "dwarffs/nixpkgs";
 ```
 
 The value of the `follows` attribute is a `/`-separated sequence of

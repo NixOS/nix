@@ -3,10 +3,13 @@
 # Only run this if we have an older Nix available
 # XXX: This assumes that the `daemon` package is older than the `client` one
 if [[ -z "$NIX_DAEMON_PACKAGE" ]]; then
-    exit 0
+    exit 99
 fi
 
 source common.sh
+
+killDaemon
+unset NIX_REMOTE
 
 # Fill the db using the older Nix
 PATH_WITH_NEW_NIX="$PATH"

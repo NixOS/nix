@@ -14,10 +14,12 @@
 #include "pathlocks.hh"
 #include "globals.hh"
 #include "serialise.hh"
+#include "build-result.hh"
 #include "store-api.hh"
 #include "derivations.hh"
 #include "local-store.hh"
 #include "legacy.hh"
+#include "experimental-features.hh"
 
 using namespace nix;
 using std::cin;
@@ -31,7 +33,7 @@ std::string escapeUri(std::string uri)
     return uri;
 }
 
-static string currentLoad;
+static std::string currentLoad;
 
 static AutoCloseFD openSlotLock(const Machine & m, uint64_t slot)
 {
@@ -96,7 +98,7 @@ static int main_build_remote(int argc, char * * argv)
         }
 
         std::optional<StorePath> drvPath;
-        string storeUri;
+        std::string storeUri;
 
         while (true) {
 
@@ -130,11 +132,14 @@ static int main_build_remote(int argc, char * * argv)
                 for (auto & m : machines) {
                     debug("considering building on remote machine '%s'", m.storeUri);
 
-                    if (m.enabled && std::find(m.systemTypes.begin(),
-                            m.systemTypes.end(),
-                            neededSystem) != m.systemTypes.end() &&
+                    if (m.enabled
+                        && (neededSystem == "builtin"
+                            || std::find(m.systemTypes.begin(),
+                                m.systemTypes.end(),
+                                neededSystem) != m.systemTypes.end()) &&
                         m.allSupported(requiredFeatures) &&
-                        m.mandatoryMet(requiredFeatures)) {
+                        m.mandatoryMet(requiredFeatures))
+                    {
                         rightType = true;
                         AutoCloseFD free;
                         uint64_t load = 0;
@@ -179,7 +184,7 @@ static int main_build_remote(int argc, char * * argv)
                     else
                     {
                         // build the hint template.
-                        string errorText =
+                        std::string errorText =
                             "Failed to find a machine for remote build!\n"
                             "derivation: %s\nrequired (system, features): (%s, %s)";
                         errorText += "\n%s available machines:";
@@ -189,7 +194,7 @@ static int main_build_remote(int argc, char * * argv)
                             errorText += "\n(%s, %s, %s, %s)";
 
                         // add the template values.
-                        string drvstr;
+                        std::string drvstr;
                         if (drvPath.has_value())
                             drvstr = drvPath->to_string();
                         else
@@ -204,7 +209,7 @@ static int main_build_remote(int argc, char * * argv)
 
                         for (auto & m : machines)
                             error
-                                % concatStringsSep<vector<string>>(", ", m.systemTypes)
+                                % concatStringsSep<std::vector<std::string>>(", ", m.systemTypes)
                                 % m.maxJobs
                                 % concatStringsSep<StringSet>(", ", m.supportedFeatures)
                                 % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);
@@ -270,14 +275,23 @@ connected:
 
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri));
-            copyPaths(store, ref<Store>(sshStore), store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute);
+            copyPaths(*store, *sshStore, store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute);
         }
 
         uploadLock = -1;
 
         auto drv = store->readDerivation(*drvPath);
         auto outputHashes = staticOutputHashes(*store, drv);
-        drv.inputSrcs = store->parseStorePathSet(inputs);
+
+        // Hijack the inputs paths of the derivation to include all the paths
+        // that come from the `inputDrvs` set.
+        // We don’t do that for the derivations whose `inputDrvs` is empty
+        // because
+        // 1. It’s not needed
+        // 2. Changing the `inputSrcs` set changes the associated output ids,
+        //  which break CA derivations
+        if (!drv.inputDrvs.empty())
+            drv.inputSrcs = store->parseStorePathSet(inputs);
 
         auto result = sshStore->buildDerivation(*drvPath, drv);
 
@@ -286,7 +300,7 @@ connected:
 
         std::set<Realisation> missingRealisations;
         StorePathSet missingPaths;
-        if (settings.isExperimentalFeatureEnabled("ca-derivations") && !derivationHasKnownOutputPaths(drv.type())) {
+        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations) && !drv.type().hasKnownOutputPaths()) {
             for (auto & outputName : wantedOutputs) {
                 auto thisOutputHash = outputHashes.at(outputName);
                 auto thisOutputId = DrvOutput{ thisOutputHash, outputName };
@@ -312,13 +326,13 @@ connected:
             if (auto localStore = store.dynamic_pointer_cast<LocalStore>())
                 for (auto & path : missingPaths)
                     localStore->locksHeld.insert(store->printStorePath(path)); /* FIXME: ugly */
-            copyPaths(ref<Store>(sshStore), store, missingPaths, NoRepair, NoCheckSigs, NoSubstitute);
+            copyPaths(*sshStore, *store, missingPaths, NoRepair, NoCheckSigs, NoSubstitute);
         }
         // XXX: Should be done as part of `copyPaths`
         for (auto & realisation : missingRealisations) {
             // Should hold, because if the feature isn't enabled the set
             // of missing realisations should be empty
-            settings.requireExperimentalFeature("ca-derivations");
+            settings.requireExperimentalFeature(Xp::CaDerivations);
             store->registerDrvOutput(realisation);
         }
 

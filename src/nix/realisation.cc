@@ -28,7 +28,7 @@ struct CmdRealisation : virtual NixMultiCommand
 
 static auto rCmdRealisation = registerCommand<CmdRealisation>("realisation");
 
-struct CmdRealisationInfo : RealisedPathsCommand, MixJSON
+struct CmdRealisationInfo : BuiltPathsCommand, MixJSON
 {
     std::string description() override
     {
@@ -44,12 +44,19 @@ struct CmdRealisationInfo : RealisedPathsCommand, MixJSON
 
     Category category() override { return catSecondary; }
 
-    void run(ref<Store> store, std::vector<RealisedPath> paths) override
+    void run(ref<Store> store, BuiltPaths && paths) override
     {
-        settings.requireExperimentalFeature("ca-derivations");
+        settings.requireExperimentalFeature(Xp::CaDerivations);
+        RealisedPath::Set realisations;
+
+        for (auto & builtPath : paths) {
+            auto theseRealisations = builtPath.toRealisedPaths(*store);
+            realisations.insert(theseRealisations.begin(), theseRealisations.end());
+        }
+
         if (json) {
             nlohmann::json res = nlohmann::json::array();
-            for (auto & path : paths) {
+            for (auto & path : realisations) {
                 nlohmann::json currentPath;
                 if (auto realisation = std::get_if<Realisation>(&path.raw))
                     currentPath = realisation->toJSON();
@@ -61,7 +68,7 @@ struct CmdRealisationInfo : RealisedPathsCommand, MixJSON
             std::cout << res.dump();
         }
         else {
-            for (auto & path : paths) {
+            for (auto & path : realisations) {
                 if (auto realisation = std::get_if<Realisation>(&path.raw)) {
                     std::cout <<
                         realisation->id.to_string() << " " <<

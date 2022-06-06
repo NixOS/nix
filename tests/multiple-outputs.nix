@@ -80,4 +80,11 @@ rec {
       '';
   }).a;
 
+  e = mkDerivation {
+    name = "multiple-outputs-e";
+    outputs = [ "a" "b" "c" ];
+    meta.outputsToInstall = [ "a" "b" ];
+    buildCommand = "mkdir $a $b $c";
+  };
+
 }
