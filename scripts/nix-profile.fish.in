@@ -24,7 +24,12 @@ if test -n "$HOME"; and test -n "$USER"
         set -gx NIX_SSL_CERT_FILE "$NIX_LINK/etc/ca-bundle.crt"
     end
 
-    set -gxp MANPATH "$NIX_LINK/share/man"
+    # Only use MANPATH if it is already set. In general `man` will just simply
+    # pick up `.nix-profile/share/man` because is it close to `.nix-profile/bin`
+    # which is in the $PATH. For more info, run `manpath -d`.
+    if set -q MANPATH
+        set -gxp MANPATH "$NIX_LINK/share/man"
+    end
 
     fish_add_path --prepend --global "$NIX_LINK/bin"
     set -e NIX_LINK
