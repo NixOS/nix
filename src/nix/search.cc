@@ -18,16 +18,24 @@ using namespace nix;
 
 std::string wrap(std::string prefix, std::string s)
 {
-    return prefix + s + ANSI_NORMAL;
+    return concatStrings(prefix, s, ANSI_NORMAL);
 }
 
 struct CmdSearch : InstallableCommand, MixJSON
 {
     std::vector<std::string> res;
+    std::vector<std::string> excludeRes;
 
     CmdSearch()
     {
         expectArgs("regex", &res);
+        addFlag(Flag {
+            .longName = "exclude",
+            .shortName = 'e',
+            .description = "Hide packages whose attribute path, name or description contain *regex*.",
+            .labels = {"regex"},
+            .handler = Handler(&excludeRes),
+        });
     }
 
     std::string description() override
@@ -62,10 +70,15 @@ struct CmdSearch : InstallableCommand, MixJSON
             res.push_back("^");
 
         std::vector<std::regex> regexes;
+        std::vector<std::regex> excludeRegexes;
         regexes.reserve(res.size());
+        excludeRegexes.reserve(excludeRes.size());
 
         for (auto & re : res)
             regexes.push_back(std::regex(re, std::regex::extended | std::regex::icase));
+
+        for (auto & re : excludeRes)
+            excludeRegexes.emplace_back(re, std::regex::extended | std::regex::icase);
 
         auto state = getEvalState();
 
@@ -106,6 +119,14 @@ struct CmdSearch : InstallableCommand, MixJSON
                     std::vector<std::smatch> nameMatches;
                     bool found = false;
 
+                    for (auto & regex : excludeRegexes) {
+                        if (
+                            std::regex_search(attrPath2, regex)
+                            || std::regex_search(name.name, regex)
+                            || std::regex_search(description, regex))
+                            return;
+                    }
+
                     for (auto & regex : regexes) {
                         found = false;
                         auto addAll = [&found](std::sregex_iterator it, std::vector<std::smatch> & vec) {
@@ -133,15 +154,15 @@ struct CmdSearch : InstallableCommand, MixJSON
                             jsonElem.attr("version", name.version);
                             jsonElem.attr("description", description);
                         } else {
-                            auto name2 = hiliteMatches(name.name, std::move(nameMatches), ANSI_GREEN, "\e[0;2m");
+                            auto name2 = hiliteMatches(name.name, nameMatches, ANSI_GREEN, "\e[0;2m");
                             if (results > 1) logger->cout("");
                             logger->cout(
                                 "* %s%s",
-                                wrap("\e[0;1m", hiliteMatches(attrPath2, std::move(attrPathMatches), ANSI_GREEN, "\e[0;1m")),
+                                wrap("\e[0;1m", hiliteMatches(attrPath2, attrPathMatches, ANSI_GREEN, "\e[0;1m")),
                                 name.version != "" ? " (" + name.version + ")" : "");
                             if (description != "")
                                 logger->cout(
-                                    "  %s", hiliteMatches(description, std::move(descriptionMatches), ANSI_GREEN, ANSI_NORMAL));
+                                    "  %s", hiliteMatches(description, descriptionMatches, ANSI_GREEN, ANSI_NORMAL));
                         }
                     }
                 }
