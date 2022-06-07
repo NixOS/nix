@@ -1,7 +1,7 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-21.05-small";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.05-small";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
 
@@ -87,7 +87,6 @@
             "--with-sandbox-shell=${sh}/bin/busybox"
             "LDFLAGS=-fuse-ld=gold"
           ];
-
 
         nativeBuildDeps =
           [
@@ -370,10 +369,10 @@
                 ++ lib.optional (currentStdenv.isLinux || currentStdenv.isDarwin) libsodium
                 ++ lib.optional currentStdenv.isDarwin darwin.apple_sdk.frameworks.Security;
 
-              configureFlags = ''
-                --with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}
-                --with-dbd-sqlite=${perlPackages.DBDSQLite}/${pkgs.perl.libPrefix}
-              '';
+              configureFlags = [
+                "--with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}"
+                "--with-dbd-sqlite=${perlPackages.DBDSQLite}/${pkgs.perl.libPrefix}"
+              ];
 
               enableParallelBuilding = true;
 
@@ -610,7 +609,9 @@
               ln -s ${image} $image
               echo "file binary-dist $image" >> $out/nix-support/hydra-build-products
             '';
-      } // builtins.listToAttrs (map (crossSystem: {
+      }
+
+      // builtins.listToAttrs (map (crossSystem: {
         name = "nix-${crossSystem}";
         value = let
           nixpkgsCross = import nixpkgs {
@@ -649,7 +650,9 @@
           doInstallCheck = true;
           installCheckFlags = "sysconfdir=$(out)/etc";
         };
-      }) crossSystems)) // (builtins.listToAttrs (map (stdenvName:
+      }) (if system == "x86_64-linux" then crossSystems else [])))
+
+      // (builtins.listToAttrs (map (stdenvName:
         nixpkgsFor.${system}.lib.nameValuePair
           "nix-${stdenvName}"
           nixpkgsFor.${system}."${stdenvName}Packages".nix
