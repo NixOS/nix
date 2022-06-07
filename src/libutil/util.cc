@@ -1819,7 +1819,7 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
     if (chmod(path.c_str(), mode) == -1)
         throw SysError("changing permissions on '%1%'", path);
 
-    if (listen(fdSocket.get(), 5) == -1)
+    if (listen(fdSocket.get(), 100) == -1)
         throw SysError("cannot listen on socket '%1%'", path);
 
     return fdSocket;
