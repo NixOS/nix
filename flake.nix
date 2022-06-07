@@ -88,7 +88,6 @@
             "LDFLAGS=-fuse-ld=gold"
           ];
 
-
         nativeBuildDeps =
           [
             buildPackages.bison
@@ -370,10 +369,10 @@
                 ++ lib.optional (currentStdenv.isLinux || currentStdenv.isDarwin) libsodium
                 ++ lib.optional currentStdenv.isDarwin darwin.apple_sdk.frameworks.Security;
 
-              configureFlags = ''
-                --with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}
-                --with-dbd-sqlite=${perlPackages.DBDSQLite}/${pkgs.perl.libPrefix}
-              '';
+              configureFlags = [
+                "--with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}"
+                "--with-dbd-sqlite=${perlPackages.DBDSQLite}/${pkgs.perl.libPrefix}"
+              ];
 
               enableParallelBuilding = true;
 

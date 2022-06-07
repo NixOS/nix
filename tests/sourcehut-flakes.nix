@@ -106,7 +106,7 @@ makeTest (
           {
             virtualisation.writableStore = true;
             virtualisation.diskSize = 2048;
-            virtualisation.pathsInNixDB = [ pkgs.hello pkgs.fuse ];
+            virtualisation.additionalPaths = [ pkgs.hello pkgs.fuse ];
             virtualisation.memorySize = 4096;
             nix.binaryCaches = lib.mkForce [ ];
             nix.extraOptions = ''

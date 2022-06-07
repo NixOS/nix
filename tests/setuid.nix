@@ -10,12 +10,12 @@ with import (nixpkgs + "/nixos/lib/testing-python.nix") {
 makeTest {
   name = "setuid";
 
-  machine =
+  nodes.machine =
     { config, lib, pkgs, ... }:
     { virtualisation.writableStore = true;
       nix.binaryCaches = lib.mkForce [ ];
       nix.nixPath = [ "nixpkgs=${lib.cleanSource pkgs.path}" ];
-      virtualisation.pathsInNixDB = [ pkgs.stdenv pkgs.pkgsi686Linux.stdenv ];
+      virtualisation.additionalPaths = [ pkgs.stdenv pkgs.pkgsi686Linux.stdenv ];
     };
 
   testScript = { nodes }: ''

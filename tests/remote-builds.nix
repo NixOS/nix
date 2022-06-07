@@ -61,7 +61,7 @@ in
               }
             ];
           virtualisation.writableStore = true;
-          virtualisation.pathsInNixDB = [ config.system.build.extraUtils ];
+          virtualisation.additionalPaths = [ config.system.build.extraUtils ];
           nix.binaryCaches = lib.mkForce [ ];
           programs.ssh.extraConfig = "ConnectTimeout 30";
         };
