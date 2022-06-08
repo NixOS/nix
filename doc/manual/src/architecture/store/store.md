@@ -36,13 +36,13 @@ Nix makes no distinction if store objects are build inputs, build results, or bu
 
 Store objects are [immutable][immutable-object]: once created, they do not change until they are deleted.
 
-## Reference
+## Reference {#reference}
 
 A store object reference is an [opaque][opaque-data-type], [unique identifier][unique-identifier]:
 The only way to obtain references is by adding or building store objects.
 A reference will always point to exactly one store object.
 
-## Operations
+## Operations {#operations}
 
 A Nix store can *add*, *retrieve*, and *delete* store objects.
 
@@ -178,7 +178,7 @@ Examples:
 
 To make store objects accessible to processes, stores ultimately have to expose store objects through the file system.
 
-## A [Rosetta stone][rosetta-stone] for build system terminology
+## A [Rosetta stone][rosetta-stone] for build system terminology {#build-system-terminology}
 
 The Nix store's design is comparable to other build systems.
 Usage of terms is, for historic reasons, not entirely consistent within the Nix ecosystem, and still subject to slow change.
