@@ -36,7 +36,7 @@
           )
       );
 
-      forAllStdenvs = stdenvs: f: nixpkgs.lib.genAttrs stdenvs (stdenv: f stdenv);
+      forAllStdenvs = f: nixpkgs.lib.genAttrs stdenvs (stdenv: f stdenv);
 
       # Memoize nixpkgs for different platforms for efficiency.
       nixpkgsFor =
@@ -404,7 +404,7 @@
 
       # A Nixpkgs overlay that overrides the 'nix' and
       # 'nix.perl-bindings' packages.
-      overlay = overlayFor (p: p.stdenv);
+      overlays.default = overlayFor (p: p.stdenv);
 
       hydraJobs = {
 
@@ -429,7 +429,7 @@
           value = let
             nixpkgsCross = import nixpkgs {
               inherit system crossSystem;
-              overlays = [ self.overlay ];
+              overlays = [ self.overlays.default ];
             };
           in binaryTarball nixpkgsFor.${system} self.packages.${system}."nix-${crossSystem}" nixpkgsCross;
         }) crossSystems));
@@ -475,31 +475,31 @@
         tests.remoteBuilds = import ./tests/remote-builds.nix {
           system = "x86_64-linux";
           inherit nixpkgs;
-          inherit (self) overlay;
+          overlay = self.overlays.default;
         };
 
         tests.nix-copy-closure = import ./tests/nix-copy-closure.nix {
           system = "x86_64-linux";
           inherit nixpkgs;
-          inherit (self) overlay;
+          overlay = self.overlays.default;
         };
 
         tests.nssPreload = (import ./tests/nss-preload.nix rec {
           system = "x86_64-linux";
           inherit nixpkgs;
-          inherit (self) overlay;
+          overlay = self.overlays.default;
         });
 
         tests.githubFlakes = (import ./tests/github-flakes.nix rec {
           system = "x86_64-linux";
           inherit nixpkgs;
-          inherit (self) overlay;
+          overlay = self.overlays.default;
         });
 
         tests.sourcehutFlakes = (import ./tests/sourcehut-flakes.nix rec {
           system = "x86_64-linux";
           inherit nixpkgs;
-          inherit (self) overlay;
+          overlay = self.overlays.default;
         });
 
         tests.setuid = nixpkgs.lib.genAttrs
@@ -507,7 +507,7 @@
           (system:
             import ./tests/setuid.nix rec {
               inherit nixpkgs system;
-              inherit (self) overlay;
+              overlay = self.overlays.default;
             });
 
         # Make sure that nix-env still produces the exact same result
@@ -552,8 +552,9 @@
         dockerImage = self.hydraJobs.dockerImage.${system};
       });
 
-      packages = forAllSystems (system: {
+      packages = forAllSystems (system: rec {
         inherit (nixpkgsFor.${system}) nix;
+        default = nix;
       } // (nixpkgs.lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         nix-static = let
           nixpkgs = nixpkgsFor.${system}.pkgsStatic;
@@ -616,7 +617,7 @@
         value = let
           nixpkgsCross = import nixpkgs {
             inherit system crossSystem;
-            overlays = [ self.overlay ];
+            overlays = [ self.overlays.default ];
           };
         in with commonDeps nixpkgsCross; nixpkgsCross.stdenv.mkDerivation {
           name = "nix-${version}";
@@ -658,38 +659,37 @@
           nixpkgsFor.${system}."${stdenvName}Packages".nix
       ) stdenvs)));
 
-      defaultPackage = forAllSystems (system: self.packages.${system}.nix);
+      devShells = forAllSystems (system:
+        forAllStdenvs (stdenv:
+          with nixpkgsFor.${system};
+          with commonDeps pkgs;
+          nixpkgsFor.${system}.${stdenv}.mkDerivation {
+            name = "nix";
 
-      devShell = forAllSystems (system: self.devShells.${system}.stdenvPackages);
+            outputs = [ "out" "dev" "doc" ];
 
-      devShells = forAllSystemsAndStdenvs (system: stdenv:
-        with nixpkgsFor.${system};
-        with commonDeps pkgs;
+            nativeBuildInputs = nativeBuildDeps;
+            buildInputs = buildDeps ++ propagatedDeps ++ awsDeps;
 
-        nixpkgsFor.${system}.${stdenv}.mkDerivation {
-          name = "nix";
+            inherit configureFlags;
 
-          outputs = [ "out" "dev" "doc" ];
+            enableParallelBuilding = true;
 
-          nativeBuildInputs = nativeBuildDeps;
-          buildInputs = buildDeps ++ propagatedDeps ++ awsDeps;
+            installFlags = "sysconfdir=$(out)/etc";
 
-          inherit configureFlags;
+            shellHook =
+              ''
+                PATH=$prefix/bin:$PATH
+                unset PYTHONPATH
+                export MANPATH=$out/share/man:$MANPATH
 
-          enableParallelBuilding = true;
-
-          installFlags = "sysconfdir=$(out)/etc";
-
-          shellHook =
-            ''
-              PATH=$prefix/bin:$PATH
-              unset PYTHONPATH
-              export MANPATH=$out/share/man:$MANPATH
-
-              # Make bash completion work.
-              XDG_DATA_DIRS+=:$out/share
-            '';
-        });
+                # Make bash completion work.
+                XDG_DATA_DIRS+=:$out/share
+              '';
+          }
+        )
+        // { default = self.devShells.${system}.stdenv; }
+      );
 
   };
 }
