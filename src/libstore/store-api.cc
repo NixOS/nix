@@ -259,7 +259,7 @@ StorePath Store::addToStore(
 }
 
 void Store::addMultipleToStore(
-    std::vector<std::pair<ValidPathInfo, std::unique_ptr<Source>>> & pathsToCopy,
+    PathsSource & pathsToCopy,
     Activity & act,
     RepairFlag repair,
     CheckSigsFlag checkSigs)
@@ -1072,46 +1072,39 @@ std::map<StorePath, StorePath> copyPaths(
     for (auto & path : storePaths)
         if (!valid.count(path)) missing.insert(path);
 
+    Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
+
+    // In the general case, `addMultipleToStore` requires a sorted list of
+    // store paths to add, so sort them right now
+    auto sortedMissing = srcStore.topoSortPaths(missing);
+    std::reverse(sortedMissing.begin(), sortedMissing.end());
+
     std::map<StorePath, StorePath> pathsMap;
     for (auto & path : storePaths)
         pathsMap.insert_or_assign(path, path);
 
-    Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
+    Store::PathsSource pathsToCopy;
 
-    /* auto sorted = srcStore.topoSortPaths(missing); */
-    /* std::reverse(sorted.begin(), sorted.end()); */
-
-    /* auto source = sinkToSource([&](Sink & sink) { */
-    /*     sink << sorted.size(); */
-    /*     for (auto & storePath : sorted) { */
-    /*         auto srcUri = srcStore.getUri(); */
-    /*         auto dstUri = dstStore.getUri(); */
-    /*         auto storePathS = srcStore.printStorePath(storePath); */
-    /*         Activity act(*logger, lvlInfo, actCopyPath, */
-    /*             makeCopyPathMessage(srcUri, dstUri, storePathS), */
-    /*             {storePathS, srcUri, dstUri}); */
-    /*         PushActivity pact(act.id); */
-
-    /*         auto info = srcStore.queryPathInfo(storePath); */
-    /*         info->write(sink, srcStore, 16); */
-    /*         srcStore.narFromPath(storePath, sink); */
-    /*     } */
-    /* }); */
-
-    std::vector<std::pair<ValidPathInfo, std::unique_ptr<Source>>> pathsToCopy;
-
-    for (auto & missingPath : missing) {
+    for (auto & missingPath : sortedMissing) {
         auto info = srcStore.queryPathInfo(missingPath);
         auto source = sinkToSource([&](Sink & sink) {
+
+            // We can reasonably assume that the copy will happen whenever we
+            // read the path, so log something about that at that point
+            auto srcUri = srcStore.getUri();
+            auto dstUri = dstStore.getUri();
+            auto storePathS = srcStore.printStorePath(missingPath);
+            Activity act(*logger, lvlInfo, actCopyPath,
+                makeCopyPathMessage(srcUri, dstUri, storePathS),
+                {storePathS, srcUri, dstUri});
+            PushActivity pact(act.id);
+
             srcStore.narFromPath(missingPath, sink);
         });
         pathsToCopy.push_back(std::pair{*info, std::move(source)});
     }
 
     dstStore.addMultipleToStore(pathsToCopy, act, repair, checkSigs);
-
-    #if 0
-    #endif
 
     return pathsMap;
 }

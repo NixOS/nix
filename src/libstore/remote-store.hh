@@ -88,6 +88,14 @@ public:
         RepairFlag repair,
         CheckSigsFlag checkSigs) override;
 
+    void addMultipleToStore(
+    PathsSource & pathsToCopy,
+    Activity & act,
+    RepairFlag repair,
+    CheckSigsFlag checkSigs) override;
+
+
+
     StorePath addTextToStore(
         std::string_view name,
         std::string_view s,

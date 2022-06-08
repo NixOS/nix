@@ -360,13 +360,17 @@ public:
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,
         RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs) = 0;
 
+    // A list of paths infos along with a source providing the content of the
+    // associated store path
+    using PathsSource = std::vector<std::pair<ValidPathInfo, std::unique_ptr<Source>>>;
+
     /* Import multiple paths into the store. */
     virtual void addMultipleToStore(
         Source & source,
         RepairFlag repair = NoRepair,
         CheckSigsFlag checkSigs = CheckSigs);
     virtual void addMultipleToStore(
-        std::vector<std::pair<ValidPathInfo, std::unique_ptr<Source>>> & pathsToCopy,
+        PathsSource & pathsToCopy,
         Activity & act,
         RepairFlag repair = NoRepair,
         CheckSigsFlag checkSigs = CheckSigs
