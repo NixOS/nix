@@ -2,7 +2,7 @@
 
 A Nix store is a collection of *store objects*.
 
-## Store Object
+## Store Object {#store-object}
 
 A store object can hold
 
@@ -102,7 +102,7 @@ That allows processes to resolve references contained in files and thus access t
 
 Store objects are therefore implemented as the pair of
 
-  - a *file system object* for data
+  - a [file system object](fso.md) for data
   - a set of *store paths* for references.
 
 [unix-paradigm]: https://en.m.wikipedia.org/wiki/Everything_is_a_file
