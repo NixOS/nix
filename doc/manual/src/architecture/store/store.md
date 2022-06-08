@@ -55,12 +55,10 @@ It can *perform builds*, that is, create new store objects by transforming build
               [ reference ]
                     |
                     V
-    [ store ] --> build
-                       \
-                      (maybe) --> [ store' ]
-                         |
-                         V
-                   [ reference ]
+    [ store ] --> build --(maybe)--> [ store' ]
+                             |
+                             V
+                       [ reference ]
 
 
 As it keeps track of references, it can [garbage-collect][garbage-collection] unused store objects.
