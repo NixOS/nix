@@ -289,18 +289,6 @@ void Store::addMultipleToStore(
 
         [&](const StorePath & path) {
             auto & [info, source] = *infosMap.at(path);
-            /* auto storePathForDst = info.storePath; */
-            /* if (info->ca && info->references.empty()) { */
-            /*     storePathForDst = dstStore.makeFixedOutputPathFromCA(storePath.name(), *info->ca); */
-            /*     if (dstStore.storeDir == srcStore.storeDir) */
-            /*         assert(storePathForDst == storePath); */
-            /*     if (storePathForDst != storePath) */
-            /*         debug("replaced path '%s' to '%s' for substituter '%s'", */
-            /*             srcStore.printStorePath(storePath), */
-            /*             dstStore.printStorePath(storePathForDst), */
-            /*             dstStore.getUri()); */
-            /* } */
-            /* pathsMap.insert_or_assign(storePath, storePathForDst); */
 
             if (isValidPath(info.path)) {
                 nrDone++;
@@ -1085,10 +1073,32 @@ std::map<StorePath, StorePath> copyPaths(
 
     Store::PathsSource pathsToCopy;
 
+    auto computeStorePathForDst = [&](const ValidPathInfo & currentPathInfo) -> StorePath {
+        auto storePathForSrc = currentPathInfo.path;
+        auto storePathForDst = storePathForSrc;
+        if (currentPathInfo.ca && currentPathInfo.references.empty()) {
+            storePathForDst = dstStore.makeFixedOutputPathFromCA(storePathForSrc.name(), *currentPathInfo.ca);
+            if (dstStore.storeDir == srcStore.storeDir)
+                assert(storePathForDst == storePathForSrc);
+            if (storePathForDst != storePathForSrc)
+                debug("replaced path '%s' to '%s' for substituter '%s'",
+                        srcStore.printStorePath(storePathForSrc),
+                        dstStore.printStorePath(storePathForDst),
+                        dstStore.getUri());
+        }
+        return storePathForDst;
+    };
+
     for (auto & missingPath : sortedMissing) {
         auto info = srcStore.queryPathInfo(missingPath);
-        auto source = sinkToSource([&](Sink & sink) {
 
+        auto storePathForDst = computeStorePathForDst(*info);
+        pathsMap.insert_or_assign(missingPath, storePathForDst);
+
+        ValidPathInfo infoForDst = *info;
+        infoForDst.path = storePathForDst;
+
+        auto source = sinkToSource([&](Sink & sink) {
             // We can reasonably assume that the copy will happen whenever we
             // read the path, so log something about that at that point
             auto srcUri = srcStore.getUri();
@@ -1101,7 +1111,7 @@ std::map<StorePath, StorePath> copyPaths(
 
             srcStore.narFromPath(missingPath, sink);
         });
-        pathsToCopy.push_back(std::pair{*info, std::move(source)});
+        pathsToCopy.push_back(std::pair{infoForDst, std::move(source)});
     }
 
     dstStore.addMultipleToStore(pathsToCopy, act, repair, checkSigs);
