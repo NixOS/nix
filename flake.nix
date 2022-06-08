@@ -313,6 +313,7 @@
                   for LIB in $out/lib/*.dylib; do
                     chmod u+w $LIB
                     install_name_tool -id $LIB $LIB
+                    install_name_tool -delete_rpath ${boost}/lib/ $LIB || true
                   done
                   install_name_tool -change ${boost}/lib/libboost_system.dylib $out/lib/libboost_system.dylib $out/lib/libboost_thread.dylib
                 ''}
