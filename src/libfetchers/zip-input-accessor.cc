@@ -79,7 +79,7 @@ struct ZipInputAccessor : InputAccessor
     std::string readFile(const CanonPath & path) override
     {
         if (lstat(path).type != tRegular)
-            throw Error("file '%s' is not a regular file");
+            throw Error("file '%s' is not a regular file", path);
 
         return _readFile(path);
     }
