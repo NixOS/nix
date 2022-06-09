@@ -1,6 +1,7 @@
 # Store
 
-A Nix store is a collection of *store objects*.
+A Nix store is a collection of *store objects* with references between them.
+It supports operations to manipulate that collection.
 
 ## Store Object {#store-object}
 
