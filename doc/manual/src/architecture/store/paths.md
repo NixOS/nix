@@ -1,78 +1,103 @@
 # Store Path
 
-A store path is a pair of a 20-byte digest and a name.
+Nix implements [references](store.md#reference) to [store objects](store.md#store-object) as *store paths*.
 
-## String representation
+Store paths are pairs of
 
-A store path is rendered as the concatenation of
+- a 20-byte [digest](#digest) for identification
+- a symbolic name for people to read.
 
-  - a store directory
-
-  - a path-separator (`/`)
-
-  - the digest rendered as Base-32 (20 arbitrary bytes becomes 32 ASCII chars)
-
-  - a hyphen (`-`)
-
-  - the name
-
-Let's take the store path from the very beginning of this manual as an example:
-
-    /nix/store/b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z-firefox-33.1
-
-This parses like so:
-
-    /nix/store/b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z-firefox-33.1
-    ^^^^^^^^^^ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^
-    store dir  digest                           name
-
-We then can discard the store dir to recover the conceptual pair that is a store path:
+Example:
 
     {
       digest: "b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z",
       name:   "firefox-33.1",
     }
 
-### Where did the "store directory" come from?
+It is rendered to a file system path as the concatenation of
 
-If you notice, the above references a "store directory", but that is *not* part of the definition of a store path.
-We can discard it when parsing, but what about when printing?
-We need to get a store directory from *somewhere*.
+  - [store directory](#store-directory)
+  - path-separator (`/`)
+  - [digest](#digest) rendered in [base-32](https://en.m.wikipedia.org/wiki/Base32) (20 arbitrary bytes become 32 ASCII characters)
+  - hyphen (`-`)
+  - name
 
-The answer is, the store directory is a property of the store that contains the store path.
-The explanation for this is simple enough: a store is notionally mounted as a directory at some location, and the store object's root file system likewise mounted at this path within that directory.
+Example:
 
-This does, however, mean the string representation of a store path is not derived just from the store path itself, but is in fact "context dependent".
+      /nix/store/b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z-firefox-33.1
+      |--------| |------------------------------| |----------|
+    store directory            digest                 name
 
-## The digest
+## Store Directory {#store-directory}
 
-The calculation of the digest is quite complicated for historical reasons.
-The details of the algorithms will be discussed later once more concepts have been introduced.
-For now, we just concern ourselves with the *key properties* of those algorithms.
+Every [store](./store.md) has a store directory.
 
-::: {.note}
-**Historical note** The 20 byte restriction is because originally a digests were SHA-1 hashes.
-This is no longer true, but longer hashes and other information are still boiled down to 20 bytes.
-:::
+If the store has a [file system representation](./store.md#files-and-processes), this directory contains the store’s [file system objects](#file-system-object), which can be addressed by [store paths](#store-path).
 
-Store paths are either *content-addressed* or *input-addressed*.
+This means a store path is not just derived from the referenced store object itself, but depends on the store the store object is in.
 
 ::: {.note}
-The former is a standard term used elsewhere.
-The later is our own creation to evoke a contrast with content addressing.
+The store directory defaults to `/nix/store`, but is in principle arbitrary.
 :::
 
-Content addressing means that the store path digest ultimately derives from referred store object's contents, namely its file system objects and references.
-There is more than one *method* of content-addressing, however.
-Still, if one does know the content addressing schema that was used,
-(or guesses, there isn't that many yet!)
-one can recalculate the store path and thus verify the store object.
+It is important which store a given store object belongs to:
+Files in the store object can contain store paths, and processes may read these paths.
+Nix can only guarantee [referential integrity](store.md#closure) if store paths do not cross store boundaries.
 
-Input addressing means that the store path digest derives from how the store path was produced, namely the "inputs" and plan that it was built from.
-Store paths of this sort can *not* be validated from the content of the store object.
-Rather, the store object might come with the store path it expects to be referred to by, and a signature of that path, the contents of the store path, and other metadata.
-The signature indicates that someone is vouching for the store object really being the results of a plan with that digest.
+Therefore one can only copy store objects if
 
-While metadata is included in the digest calculation explaining which method it was calculated by, this only serves to thwart pre-image attacks.
-That metadata is scrambled with everything else so that it is difficult to tell how a given store path was produced short of a brute-force search.
-In the parlance of referencing schemes, this means that store paths are not "self-describing".
+- the source and target stores' directories match
+
+  or
+
+- the store object in question has no references, that is, contains no store paths.
+
+To move a store object to a store with a different store directory, it has to be rebuilt, together with all its dependencies.
+It is in general not enough to replace the store directory string in file contents, as this may break internal offsets or content hashes.
+
+# Digest {#digest}
+
+In a [store path](#store-path), the [digest][digest] is the output of a [cryptographic hash function][hash] of either all *inputs* involved in building the referenced store object or its actual *contents*.
+
+Store objects are therefore said to be either [input-addressed](#input-addressing) or [content-addressed](#content-addressing).
+
+::: {.note}
+**Historical note**: The 20 byte restriction is because originally digests were [SHA-1][sha-1] hashes.
+This is no longer true, but longer hashes and other information are still truncated to 20 bytes for compatibility.
+:::
+
+[digest]: https://en.m.wiktionary.org/wiki/digest#Noun
+[hash]: https://en.m.wikipedia.org/wiki/Cryptographic_hash_function
+[sha-1]: https://en.m.wikipedia.org/wiki/SHA-1
+
+
+### Reference scanning
+
+While references could be arbitrary paths, Nix requires them to be store paths to ensure correctness.
+Anything outside a given store is not under control of Nix, and therefore cannot be guaranteed to be present when needed.
+
+However, having references match store paths in files is not enforced by the data model:
+Store objects could have excess or incomplete references with respect to store paths found in their file contents.
+
+Scanning files therefore allows reliably capturing run time dependencies without declaring them explicitly.
+Doing it at build time and persisting references in the store object avoids repeating this time-consuming operation.
+
+## Input Addressing {#input-addressing}
+
+Input addressing means that the digest derives from how the store object was produced, namely its build inputs and build plan.
+
+To compute the hash of a store object one needs a deterministic serialisation, i.e., a binary string representation which only changes if the store object changes.
+
+Nix has a custom serialisation format called Nix Archive (NAR)
+
+Store object references of this sort can *not* be validated from the content of the store object.
+Rather, a cryptographic signature has to be used to indicate that someone is vouching for the store object really being produced from a build plan with that digest.
+
+## Content Addressing {#content-addressing}
+
+Content addressing means that the digest derives from the store object's contents, namely its file system objects and references.
+If one knows content addressing was used, one can recalculate the reference and thus verify the store object.
+
+Content addressing is currently only used for the special cases of source files and "fixed-output derivations", where the contents of a store object are known in advance.
+Content addressing of build results is still an [experimental feature subject to some restrictions](https://github.com/tweag/rfcs/blob/cas-rfc/rfcs/0062-content-addressed-paths.md).
+

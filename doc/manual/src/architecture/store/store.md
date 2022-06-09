@@ -67,18 +67,19 @@ As it keeps track of references, it can [garbage-collect][garbage-collection] un
     [ store ] --> collect garbage --> [ store' ]
 
 
-## Closure
+## Closure {#closure}
 
-Nix stores have the *closure property*: for each store object in the store, all the store objects it references must also be in the store.
+Nix stores ensure [referential integrity][referential-integrity]: for each store object in the store, all the store objects it references must also be in the store.
 
-Adding, building, copying and deleting store objects must be done in a way that obeys this property:
+The set of all store objects reachable by following references from a given initial set of store objects is called a *closure*.
+
+Adding, building, copying and deleting store objects must be done in a way that preserves referential integrity:
 
 - A newly added store object cannot have references, unless it is a build task.
 
 - Build results must only refer to store objects in the closure of the build inputs.
 
   Building a store object will add appropriate references, according to the build task.
-  These references can only come from declared build inputs.
 
 - Store objects being copied must refer to objects already in the destination store.
 
@@ -86,16 +87,15 @@ Adding, building, copying and deleting store objects must be done in a way that 
 
 - We can only safely delete store objects which are not reachable from any reference still in use.
 
-  Garbage collection will delete those store objects that cannot be reached from any reference in use.
-
   <!-- more details in section on garbage collection, link to it once it exists -->
 
+[referential-integrity]: https://en.m.wikipedia.org/wiki/Referential_integrity
 [garbage-collection]: https://en.m.wikipedia.org/wiki/Garbage_collection_(computer_science)
 [immutable-object]: https://en.m.wikipedia.org/wiki/Immutable_object
 [opaque-data-type]: https://en.m.wikipedia.org/wiki/Opaque_data_type
 [unique-identifier]: https://en.m.wikipedia.org/wiki/Unique_identifier
 
-## Files and Processes
+## Files and Processes {#files-and-processes}
 
 Nix maps between its store model and the [Unix paradigm][unix-paradigm] of [files and processes][file-descriptor], by encoding immutable store objects and opaque identifiers as file system primitives: files and directories, and paths.
 That allows processes to resolve references contained in files and thus access the contents of store objects.
@@ -103,10 +103,15 @@ That allows processes to resolve references contained in files and thus access t
 Store objects are therefore implemented as the pair of
 
   - a [file system object](fso.md) for data
-  - a set of *store paths* for references.
+  - a set of [store paths](paths.md) for references.
 
 [unix-paradigm]: https://en.m.wikipedia.org/wiki/Everything_is_a_file
 [file-descriptor]: https://en.m.wikipedia.org/wiki/File_descriptor
+
+The following diagram shows a radical simplification of how Nix interacts with the operating system:
+It uses files as build inputs, and build outputs are files again.
+On the operating system, files are either "dead" data, or "live" as processes, which in turn operate on files, or can bring them to life.
+A build function also amounts to an operating system process (not depicted).
 
 ```
 +-----------------------------------------------------------------+
