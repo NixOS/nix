@@ -7,22 +7,25 @@ The following concept map is a graphical outline of this chapter.
 Arrows indicate suggested reading order.
 
 ```
-                                   ,----------------------[ store ]
-                                   |                          |
-                                   v                          v
-                            [ store object ]            [ operations ]----------------------,
-                                   |                          |                             |
-                                   v                          v                             |
-                        [ files and processes ]           [ build ]--------->[ derivation ] |
-                            |           |                     |                    |        |
-                            v           v                     v                    v        |
-           [ file system object ] [ store path ]--->[ reference scanning ]--->[ closure ]   |
-                     |                  ^                                          |        |
-                     v                  |                                          v        v
-                [ digest ]--------------'                                   [ garbage collection ]
-                   /   \
-                  v     v
-[ input addressing ]   [ content addressing ]
+                      ,----------[ store ]---------,
+                      |                            |
+                      |                            v
+                      |                     [ operations ]
+                      |                      /          \
+                      v                     v            v
+               [ store object ] [ garbage collection ] [ build ]
+                      |                 ^                 ^ |
+                      v                 |                 | |
+           [ files and processes ]      | [ derivation ]--' |
+              /            \            |       ^           |
+             v              v           |       |           |
+[ file system object ]  [ store path ]  '--[ closure ]      |
+                  |         ^     \             |           |
+                  v         |      v            v           |
+             [ digest ]-----'  [ reference scanning ]<------'
+              /      \
+             v        v
+[ input addressing ] [ content addressing ]
 ```
 
 ## Store Object {#store-object}
