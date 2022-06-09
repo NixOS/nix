@@ -11,18 +11,18 @@ Arrows indicate suggested reading order.
                       |                            |
                       |                            v
                       |                     [ operations ]
-                      |                      /          \
-                      v                     v            v
-               [ store object ] [ garbage collection ] [ build ]
-                      |                 ^                 ^ |
-                      v                 |                 | |
-           [ files and processes ]      | [ derivation ]--' |
-              /            \            |       ^           |
-             v              v           |       |           |
-[ file system object ]  [ store path ]  '--[ closure ]      |
-                  |         ^     \             |           |
-                  v         |      v            v           |
-             [ digest ]-----'  [ reference scanning ]<------'
+                      |                       |        |
+                      v                       v        |
+               [ store object ] [ garbage collection ] |
+                      |                  ^             |
+                      v                  |             v
+           [ files and processes ]  [ closure ]    [ build ]
+               /          \             |   |        ^    |
+              v            v            |   v        |    |
+[ file system object ] [ store path ]   |  [ derivation ] |
+                  |        ^      |     |                 |
+                  v        |      v     v                 |
+             [ digest ]----'  [ reference scanning ] <----'
               /      \
              v        v
 [ input addressing ] [ content addressing ]
