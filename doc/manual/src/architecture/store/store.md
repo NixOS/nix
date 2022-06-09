@@ -14,12 +14,12 @@ Arrows indicate suggested reading order.
                       |               |   |      |        |        |
                       v               |   |      v        v        |
            [ files and processes ]    |   | [ garbage collection ] |
-               /          \           |   V                        v
-              v            v          | [ derivation ]--->[ building ]
-[ file system object ] [ store path ] |                         |
+               /          \           |   |                        |
+              v            v          |   v                        v
+[ file system object ] [ store path ] | [ derivation ]--->[ building ]
                   |        ^      |   |                         |
                   v        |      v   v                         |
-             [ digest ]----' [ reference scanning ] <-----------'
+             [ digest ]----' [ reference scanning ]<------------'
               /      \
              v        v
 [ input addressing ] [ content addressing ]
