@@ -3,6 +3,28 @@
 A Nix store is a collection of *store objects* with references between them.
 It supports operations to manipulate that collection.
 
+The following concept map is a graphical outline of this chapter.
+Arrows indicate suggested reading order.
+
+```
+                                   ,----------------------[ store ]
+                                   |                          |
+                                   v                          v
+                            [ store object ]            [ operations ]----------------------,
+                                   |                          |                             |
+                                   v                          v                             |
+                        [ files and processes ]           [ build ]--------->[ derivation ] |
+                            |           |                     |                    |        |
+                            v           v                     v                    v        |
+           [ file system object ] [ store path ]--->[ reference scanning ]--->[ closure ]   |
+                     |                  ^                                          |        |
+                     v                  |                                          v        v
+                [ digest ]--------------'                                   [ garbage collection ]
+                   /   \
+                  v     v
+[ input addressing ]   [ content addressing ]
+```
+
 ## Store Object {#store-object}
 
 A store object can hold
