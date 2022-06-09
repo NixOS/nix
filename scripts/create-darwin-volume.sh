@@ -442,8 +442,9 @@ add_nix_vol_fstab_line() {
     local escaped_mountpoint="${NIX_ROOT/ /'\\\'040}"
     shift
 
-    # wrap `ex` to work around a problem with vim plugins breaking exit codes
-    # (see github.com/NixOS/nix/issues/5468)
+    # wrap `ex` to work around problems w/ vim features breaking exit codes
+    # - plugins (see github.com/NixOS/nix/issues/5468): -u NONE
+    # - swap file: -n
     #
     # the first draft used `--noplugin`, but github.com/NixOS/nix/issues/6462
     # suggests we need the less-semantic `-u NONE`
@@ -456,7 +457,7 @@ add_nix_vol_fstab_line() {
     # minver 10.12.6 seems to have released with vim 7.4
     cat > "$SCRATCH/ex_cleanroom_wrapper" <<EOF
 #!/bin/sh
-/usr/bin/ex -u NONE "\$@"
+/usr/bin/ex -u NONE -n "\$@"
 EOF
     chmod 755 "$SCRATCH/ex_cleanroom_wrapper"
 
@@ -650,9 +651,9 @@ EOF
         task "Configuring /etc/synthetic.conf to make a mount-point at $NIX_ROOT" >&2
         # technically /etc/synthetic.d/nix is supported in Big Sur+
         # but handling both takes even more code...
-        # Note: `-u NONE` disables vim plugins/rc; see note on --clean earlier
+        # See earlier note; `-u NONE` disables vim plugins/rc, `-n` skips swapfile
         _sudo "to add Nix to /etc/synthetic.conf" \
-            /usr/bin/ex -u NONE /etc/synthetic.conf <<EOF
+            /usr/bin/ex -u NONE -n /etc/synthetic.conf <<EOF
 :a
 ${NIX_ROOT:1}
 .
@@ -820,8 +821,8 @@ setup_volume_daemon() {
     local volume_uuid="$2"
     if ! test_voldaemon; then
         task "Configuring LaunchDaemon to mount '$NIX_VOLUME_LABEL'" >&2
-        # Note: `-u NONE` disables vim plugins/rc; see note on --clean earlier
-        _sudo "to install the Nix volume mounter" /usr/bin/ex -u NONE "$NIX_VOLUME_MOUNTD_DEST" <<EOF
+        # See earlier note; `-u NONE` disables vim plugins/rc, `-n` skips swapfile
+        _sudo "to install the Nix volume mounter" /usr/bin/ex -u NONE -n "$NIX_VOLUME_MOUNTD_DEST" <<EOF
 :a
 $(generate_mount_daemon "$cmd_type" "$volume_uuid")
 .

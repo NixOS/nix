@@ -147,6 +147,20 @@ if test "x$GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC" = xyes; then
     LDFLAGS="-latomic $LDFLAGS"
 fi
 
+# LTO is currently broken with clang for unknown reasons; ld segfaults in the llvm plugin
+AC_ARG_ENABLE(lto, AS_HELP_STRING([--enable-lto],[Enable LTO (only supported with GCC) [default=no]]),
+  lto=$enableval, lto=no)
+if test "$lto" = yes; then
+    if $CXX --version | grep -q GCC; then
+        AC_SUBST(CXXLTO, [-flto=jobserver])
+    else
+        echo "error: LTO is only supported with GCC at the moment" >&2
+        exit 1
+    fi
+else
+    AC_SUBST(CXXLTO, [""])
+fi
+
 PKG_PROG_PKG_CONFIG
 
 AC_ARG_ENABLE(shared, AS_HELP_STRING([--enable-shared],[Build shared libraries for Nix [default=yes]]),
