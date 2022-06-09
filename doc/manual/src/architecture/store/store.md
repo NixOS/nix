@@ -7,22 +7,19 @@ The following concept map is a graphical outline of this chapter.
 Arrows indicate suggested reading order.
 
 ```
-                      ,----------[ store ]---------,
-                      |                            |
-                      |                            v
-                      |                     [ operations ]
-                      |                       |        |
-                      v                       v        |
-               [ store object ] [ garbage collection ] |
-                      |                  ^             |
-                      v                  |             v
-           [ files and processes ]  [ closure ]    [ build ]
-               /          \             |   |        ^    |
-              v            v            |   v        |    |
-[ file system object ] [ store path ]   |  [ derivation ] |
-                  |        ^      |     |                 |
-                  v        |      v     v                 |
-             [ digest ]----'  [ reference scanning ] <----'
+                      ,--------------[ store ]----------------,
+                      |                  |                    |
+                      v                  v                    v
+               [ store object ]     [ closure ]--,      [ operations ]
+                      |               |   |      |        |        |
+                      v               |   |      v        v        |
+           [ files and processes ]    |   | [ garbage collection ] |
+               /          \           |   V                        v
+              v            v          | [ derivation ]--->[ building ]
+[ file system object ] [ store path ] |                         |
+                  |        ^      |   |                         |
+                  v        |      v   v                         |
+             [ digest ]----' [ reference scanning ] <-----------'
               /      \
              v        v
 [ input addressing ] [ content addressing ]
