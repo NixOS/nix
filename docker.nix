@@ -125,7 +125,6 @@ let
     sandbox = "false";
     build-users-group = "nixbld";
     trusted-public-keys = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
-    ignored-acls = "security.csm";
   };
   nixConfContents = (lib.concatStringsSep "\n" (lib.mapAttrsFlatten (n: v: "${n} = ${v}") nixConf)) + "\n";
 
