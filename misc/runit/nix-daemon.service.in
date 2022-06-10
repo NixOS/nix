@@ -1,0 +1,3 @@
+#!bin/sh
+sv check nix >/dev/null || exit 1
+exec /nix/var/nix/profiles/default/bin/nix-daemon --daemon
