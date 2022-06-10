@@ -47,7 +47,8 @@ struct PatchingInputAccessor : InputAccessor
                             || hasPrefix(line, "@@")
                             || hasPrefix(line, "+")
                             || hasPrefix(line, "-")
-                            || hasPrefix(line, " ")))
+                            || hasPrefix(line, " ")
+                            || line.empty()))
                     {
                         flush();
                     }
