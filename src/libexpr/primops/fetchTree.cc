@@ -110,7 +110,6 @@ static void fetchTree(
 ) {
     fetchers::Input input;
     PathSet context;
-    std::vector<std::string> patches;
 
     state.forceValue(*args[0], pos);
 
@@ -136,19 +135,6 @@ static void fetchTree(
 
         for (auto & attr : *args[0]->attrs) {
             if (attr.name == state.sType) continue;
-
-            if (state.symbols[attr.name] == "patches") {
-                state.forceList(*attr.value, attr.pos);
-
-                for (auto elem : attr.value->listItems()) {
-                    // FIXME: use realisePath
-                    PathSet context;
-                    auto patchFile = state.coerceToPath(pos, *elem, context);
-                    patches.push_back(patchFile.readFile());
-                }
-
-                continue;
-            }
 
             state.forceValue(*attr.value, attr.pos);
 
@@ -200,9 +186,6 @@ static void fetchTree(
     if (params.returnPath) {
         auto [accessor, input2] = input.lazyFetch(state.store);
 
-        if (!patches.empty())
-            accessor = makePatchingInputAccessor(accessor, patches);
-
         emitTreeAttrs(
             state,
             { state.registerAccessor(accessor), CanonPath::root },
@@ -211,8 +194,6 @@ static void fetchTree(
             params.emptyRevFallback,
             false);
     } else {
-        assert(patches.empty());
-
         auto [tree, input2] = input.fetch(state.store);
 
         auto storePath = state.store->printStorePath(tree.storePath);

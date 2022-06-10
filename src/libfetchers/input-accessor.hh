@@ -9,7 +9,7 @@ namespace nix {
 
 MakeError(RestrictedPathError, Error);
 
-struct InputAccessor
+struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
 {
     const size_t number;
 
