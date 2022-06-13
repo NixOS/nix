@@ -70,17 +70,20 @@ This is no longer true, but longer hashes and other information are still trunca
 [hash]: https://en.m.wikipedia.org/wiki/Cryptographic_hash_function
 [sha-1]: https://en.m.wikipedia.org/wiki/SHA-1
 
-
 ### Reference scanning
 
-While references could be arbitrary paths, Nix requires them to be store paths to ensure correctness.
-Anything outside a given store is not under control of Nix, and therefore cannot be guaranteed to be present when needed.
+When a new store object is built, Nix scans its file contents for store paths to construct its set of references.
 
-However, having references match store paths in files is not enforced by the data model:
-Store objects could have excess or incomplete references with respect to store paths found in their file contents.
+The special format of a store path's [digest](#digest) allows reliably detecting it among arbitrary data.
+Nix uses the [closure](store.md#closure) of build inputs to derive the list of allowed store paths, to avoid false positives.
 
-Scanning files therefore allows reliably capturing run time dependencies without declaring them explicitly.
+This way, scanning files captures run time dependencies without the user having to declare them explicitly.
 Doing it at build time and persisting references in the store object avoids repeating this time-consuming operation.
+
+::: {.note}
+In practice, it is sometimes still necessary to declare certain dependencies explicitly, if they are to be preserved in the build result's closure.
+This depends on the specifics of the software to build and run.
+:::
 
 ## Input Addressing {#input-addressing}
 
