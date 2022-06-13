@@ -102,3 +102,10 @@ source <(nix print-dev-env -f "$shellDotNix" shellDrv)
 [[ ${arr2[1]} = $'\n' ]]
 [[ ${arr2[2]} = $'x\ny' ]]
 [[ $(fun) = blabla ]]
+
+# Test nix-shell with ellipsis and no `inNixShell` argument (for backwards compat with old nixpkgs)
+cat >$TEST_ROOT/shell-ellipsis.nix <<EOF
+{ system ? "x86_64-linux", ... }:
+(import $shellDotNix { }).shellDrv
+EOF
+nix-shell $TEST_ROOT/shell-ellipsis.nix --run "true"
