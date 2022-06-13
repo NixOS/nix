@@ -801,6 +801,8 @@ nix flake metadata $flakeFollowsA
 
 nix flake update $flakeFollowsA
 
+nix flake lock $flakeFollowsA
+
 oldLock="$(cat "$flakeFollowsA/flake.lock")"
 
 # Ensure that locking twice doesn't change anything
@@ -823,7 +825,6 @@ cat > $flakeFollowsA/flake.nix <<EOF
     inputs = {
         B = {
             url = "path:./flakeB";
-            inputs.nonFlake.follows = "D";
         };
         D.url = "path:./flakeD";
     };
@@ -859,3 +860,21 @@ nix store delete $(nix store add-path $badFlakeDir)
 
 [[ $(nix path-info      $(nix store add-path $flake1Dir)) =~ flake1 ]]
 [[ $(nix path-info path:$(nix store add-path $flake1Dir)) =~ simple ]]
+
+# Non-existant follows causes an error
+
+cat >$flakeFollowsA/flake.nix <<EOF
+{
+    description = "Flake A";
+    inputs.B = {
+        url = "path:./flakeB";
+        inputs.invalid.follows = "D";
+    };
+    inputs.D.url = "path:./flakeD";
+    outputs = { ... }: {};
+}
+EOF
+
+git -C $flakeFollowsA add flake.nix
+
+nix flake lock $flakeFollowsA 2>&1 | grep "error: B has a \`follows'-declaration for a non-existant input invalid!"

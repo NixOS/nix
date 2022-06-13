@@ -373,6 +373,29 @@ LockedFlake lockFlake(
         {
             debug("computing lock file node '%s'", printInputPath(inputPathPrefix));
 
+            auto overrides2 = overrides;
+            for (auto & [inputPath, inputOverride] : overrides2) {
+                auto inputPath2(inputPath);
+                auto follow = inputPath2.back();
+                inputPath2.pop_back();
+                if (inputPath2 == inputPathPrefix
+                    && flakeInputs.find(follow) == flakeInputs.end()
+                ) {
+                    std::string root;
+                    for (auto & element : inputPath2) {
+                        root.append(element);
+                        if (element != inputPath2.back()) {
+                            root.append(".inputs.");
+                        }
+                    }
+                    throw Error(
+                        "%s has a `follows'-declaration for a non-existant input %s!",
+                        root,
+                        follow
+                    );
+                }
+            }
+
             /* Get the overrides (i.e. attributes of the form
                'inputs.nixops.inputs.nixpkgs.url = ...'). */
             for (auto & [id, input] : flakeInputs) {
