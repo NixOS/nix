@@ -748,6 +748,7 @@ cat > $flakeFollowsB/flake.nix <<EOF
             url = "path:./flakeC";
             inputs.foobar.follows = "foobar";
         };
+	D.follows = "foobar/D";
     };
     outputs = { ... }: {};
 }
@@ -775,7 +776,9 @@ EOF
 cat > $flakeFollowsE/flake.nix <<EOF
 {
     description = "Flake E";
-    inputs = {};
+    inputs = {
+        D.url = "path:$flakeFollowsA/flakeD";
+    };
     outputs = { ... }: {};
 }
 EOF
@@ -800,6 +803,7 @@ diff <(echo "$newLock") <(echo "$oldLock")
 [[ $(jq -c .nodes.B.inputs.C $flakeFollowsA/flake.lock) = '"C"' ]]
 [[ $(jq -c .nodes.B.inputs.foobar $flakeFollowsA/flake.lock) = '["foobar"]' ]]
 [[ $(jq -c .nodes.C.inputs.foobar $flakeFollowsA/flake.lock) = '["B","foobar"]' ]]
+[[ $(jq -c .nodes.B.inputs.D $flakeFollowsA/flake.lock) = '["foobar","D"]' ]]
 
 # Ensure removing follows from flake.nix removes them from the lockfile
 
