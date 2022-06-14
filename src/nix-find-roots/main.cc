@@ -119,8 +119,12 @@ int main(int argc, char * * argv)
         struct sockaddr_un addr;
         addr.sun_family = AF_UNIX;
 
-        unlink(opts.socketPath.c_str());
-        strcpy(addr.sun_path, opts.socketPath.c_str());
+        auto socketDir = opts.socketPath.parent_path();
+        auto socketFilename = opts.socketPath.filename();
+        chdir(socketDir.c_str());
+
+        fs::remove(socketFilename);
+        strcpy(addr.sun_path, socketFilename.c_str());
         if (bind(mySock, (struct sockaddr*) &addr, sizeof(addr)) == -1) {
             throw Error("Cannot bind to socket");
         }
