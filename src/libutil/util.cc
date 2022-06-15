@@ -1817,19 +1817,32 @@ void connect(int fd, const std::string & path)
 
     if (path.size() + 1 >= sizeof(addr.sun_path)) {
         Pid pid = startProcess([&]() {
-            Path dir = dirOf(path);
-            if (chdir(dir.c_str()) == -1)
-                throw SysError("chdir to '%s' failed", dir);
-            std::string base(baseNameOf(path));
-            if (base.size() + 1 >= sizeof(addr.sun_path))
-                throw Error("socket path '%s' is too long", base);
-            memcpy(addr.sun_path, base.c_str(), base.size() + 1);
-            if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
-                throw SysError("cannot connect to socket at '%s'", path);
-            _exit(0);
+            try {
+                Path dir = dirOf(path);
+                if (chdir(dir.c_str()) == -1)
+                    throw SysError("chdir to '%s' failed", dir);
+                std::string base(baseNameOf(path));
+                if (base.size() + 1 >= sizeof(addr.sun_path))
+                    throw Error("socket path '%s' is too long", base);
+                memcpy(addr.sun_path, base.c_str(), base.size() + 1);
+                if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+                    throw SysError("cannot connect to socket at '%s'", path);
+                _exit(0);
+            } catch (SysError & e) {
+                // If this raised a `SysError`, we want to rethrow it in the
+                // parent process.
+                // For that, we need to transmit the associated error code,
+                // which we do by setting it as the return code for the process.
+                _exit(e.errNo);
+            } catch (std::exception &) {
+                _exit(-1);
+            }
         });
         int status = pid.wait();
-        if (status != 0)
+        if (status > 0) {
+            errno = status;
+            throw SysError("cannot connect to socket at '%s'", path);
+        } else if (status < 0)
             throw Error("cannot connect to socket at '%s'", path);
     } else {
         memcpy(addr.sun_path, path.c_str(), path.size() + 1);
