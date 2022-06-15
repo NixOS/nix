@@ -111,23 +111,20 @@ NixRepl::~NixRepl()
     write_history(historyFile.c_str());
 }
 
-std::string runNix(Path program, const Strings & args,
+void runNix(Path program, const Strings & args,
     const std::optional<std::string> & input = {})
 {
     auto subprocessEnv = getEnv();
     subprocessEnv["NIX_CONFIG"] = globalConfig.toKeyValue();
 
-    auto res = runProgram(RunOptions {
+    runProgram2(RunOptions {
         .program = settings.nixBinDir+ "/" + program,
         .args = args,
         .environment = subprocessEnv,
         .input = input,
     });
 
-    if (!statusOk(res.first))
-        throw ExecError(res.first, "program '%1%' %2%", program, statusToString(res.first));
-
-    return res.second;
+    return;
 }
 
 static NixRepl * curRepl; // ugly
