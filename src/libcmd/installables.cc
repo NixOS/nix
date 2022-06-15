@@ -146,7 +146,8 @@ SourceExprCommand::SourceExprCommand(bool supportReadOnlyMode)
         .shortName = 'f',
         .description =
             "Interpret installables as attribute paths relative to the Nix expression stored in *file*. "
-            "If *file* is the character -, then a Nix expression will be read from standard input.",
+            "If *file* is the character -, then a Nix expression will be read from standard input. "
+            "Implies `--impure`.",
         .category = installablesCategory,
         .labels = {"file"},
         .handler = {&file},

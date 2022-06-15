@@ -1066,6 +1066,11 @@ struct CmdRepl : InstallablesCommand
         return file.has_value() or expr.has_value();
     }
 
+    bool forceImpureByDefault() override
+    {
+        return true;
+    }
+
     std::string description() override
     {
         return "start an interactive environment for evaluating Nix expressions";

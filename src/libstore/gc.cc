@@ -135,6 +135,7 @@ void LocalStore::addTempRoot(const StorePath & path)
                     state->fdRootsSocket.close();
                     goto restart;
                 }
+                throw;
             }
         }
 
@@ -153,6 +154,7 @@ void LocalStore::addTempRoot(const StorePath & path)
                 state->fdRootsSocket.close();
                 goto restart;
             }
+            throw;
         } catch (EndOfFile & e) {
             debug("GC socket disconnected");
             state->fdRootsSocket.close();

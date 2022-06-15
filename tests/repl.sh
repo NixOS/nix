@@ -42,6 +42,11 @@ testRepl () {
     echo "$replOutput"
     echo "$replOutput" | grep -qs "while evaluating the file" \
       || fail "nix repl --show-trace doesn't show the trace"
+
+    nix repl "${nixArgs[@]}" --option pure-eval true 2>&1 <<< "builtins.currentSystem" \
+      | grep "attribute 'currentSystem' missing"
+    nix repl "${nixArgs[@]}" 2>&1 <<< "builtins.currentSystem" \
+      | grep "$(nix-instantiate --eval -E 'builtins.currentSystem')"
 }
 
 # Simple test, try building a drv
