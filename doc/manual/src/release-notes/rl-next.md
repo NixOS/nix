@@ -7,3 +7,5 @@
   with other commands that use `--file` and `--expr`. Primary breaking change
   is for the common usage of `nix repl '<nixpkgs>'` which can be recovered with
   `nix repl --file '<nixpkgs>'` or `nix repl --expr 'import <nixpkgs>{}'`
+  
+  This is currently guarded by the 'repl-flake' experimental feature
