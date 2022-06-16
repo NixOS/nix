@@ -5,7 +5,7 @@ define nix-daemon
     #:start (make-forkexec-constructor
               '("/nix/var/nix/profiles/default/bin/nix-daemon"))
     #:stop (make-kill-destructor)
-    #:respawn? #t))
+    #:respawn? #t)
 (register-services nix-daemon)
 
 (start nix-daemon)
