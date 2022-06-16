@@ -176,15 +176,17 @@ and `/etc/zshrc` which you may remove.
    This will remove the Nix Store volume and everything that was added to the
    store.
 
-   If this command indicates that it couldn't remove the volume, your Nix Store
-   volume may not be mounted. Run the following to double-check:
+   If this command indicates that it couldn't remove the volume, you should
+   make sure you don't have an _unmounted_ Nix Store volume. Look for a
+   "Nix Store" volume in the output of the following command:
 
    ```console
    diskutil list
    ```
 
-   If you see a Nix Store volume, re-run the diskutil deleteVolume command, but
-   replace `/nix` with the volume's `diskXsY` identifier.
+   If you _do_ see a "Nix Store" volume, delete it by re-running the diskutil
+   deleteVolume command, but replace `/nix` with the store volume's `diskXsY`
+   identifier.
 
 > **Note**
 > 
@@ -202,8 +204,7 @@ and `/etc/zshrc` which you may remove.
 <!-- Note: anchors above to catch permalinks to old explanations -->
 
 We believe we have ironed out how to cleanly support the read-only root
-on modern macOS. New installs will do this automatically, and you can
-also re-run a new installer to convert your existing setup.
+on modern macOS. New installs will do this automatically.
 
 This section previously detailed the situation, options, and trade-offs,
 but it now only outlines what the installer does. You don't need to know
