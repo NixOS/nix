@@ -148,7 +148,8 @@ and `/etc/zshrc` which you may remove.
    This will remove all the build users that no longer serve a purpose.
 
 4. Edit fstab using `sudo vifs` to remove the line mounting the Nix Store
-   volume on `/nix`, which looks like this,
+   volume on `/nix`, which looks like
+   `UUID=<unique uuid> /nix apfs rw,noauto,nobrowse,suid,owners` or
    `LABEL=Nix\040Store /nix apfs rw,nobrowse`. This will prevent automatic
    mounting of the Nix Store volume.
 
@@ -174,6 +175,16 @@ and `/etc/zshrc` which you may remove.
 
    This will remove the Nix Store volume and everything that was added to the
    store.
+
+   If this command indicates that it couldn't remove the volume, your Nix Store
+   volume may not be mounted. Run the following to double-check:
+
+   ```console
+   diskutil list
+   ```
+
+   If you see a Nix Store volume, re-run the diskutil deleteVolume command, but
+   replace `/nix` with the volume's `diskXsY` identifier.
 
 > **Note**
 > 
