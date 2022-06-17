@@ -1,5 +1,6 @@
 { pkgs ? import <nixpkgs> { }
 , lib ? pkgs.lib
+, nixpkgs ? builtins.getFlake (builtins.toString pkgs.path)
 , name ? "nix"
 , tag ? "latest"
 , channelName ? "nixpkgs"
@@ -130,14 +131,31 @@ let
   };
   nixConfContents = (lib.concatStringsSep "\n" (lib.mapAttrsFlatten (n: v: "${n} = ${v}") nixConf)) + "\n";
 
+  makeTarball = import "${nixpkgs}/pkgs/top-level/make-tarball.nix";
+
+  nixpkgsTarball = (makeTarball {
+    inherit nixpkgs pkgs;
+    officialRelease = true;
+    supportedSystems = [];
+  }).overrideAttrs (old: {
+    distPhase = ''
+      mkdir -p $out
+      cp -prd . $out
+    '';
+
+    finalPhase = "true";
+  });
+
+  nixpkgsTarballPath = builtins.path { path = "${nixpkgsTarball}"; name = "source"; };
+
   baseSystem =
     let
-      nixpkgs = pkgs.path;
-      channel = pkgs.runCommand "channel-nixos" { } ''
-        mkdir $out
-        ln -s ${nixpkgs} $out/nixpkgs
+      channel = pkgs.buildPackages.runCommand "nixpkgs-channel" { } ''
+        mkdir -p $out
+        ln -s ${nixpkgsTarballPath} $out/nixpkgs
         echo "[]" > $out/manifest.nix
       '';
+
       rootEnv = pkgs.buildPackages.buildEnv {
         name = "root-profile-env";
         paths = defaultPkgs;
@@ -168,6 +186,40 @@ let
         cp -a ${rootEnv}/* $out/
         ln -s ${manifest} $out/manifest.nix
       '';
+
+      registryTemplate = builtins.toJSON {
+        flakes = [
+          {
+            from = {
+              id = "nixpkgs";
+              type = "indirect";
+            };
+
+            to = {
+              lastModified = 0;
+              narHash = "@narHash@";
+              path = "@path@";
+              type = "path";
+            };
+          }
+        ];
+        version = 2;
+      };
+
+      registry = pkgs.buildPackages.runCommand "registry"
+        {
+          inherit registryTemplate;
+          passAsFile = [ "registryTemplate" ];
+          allowSubstitutes = false;
+          preferLocalBuild = true;
+        } ''
+        mkdir -p $out
+
+        narHash=$(${pkgs.nix}/bin/nix --extra-experimental-features nix-command hash path ${nixpkgsTarballPath})
+        substitute $registryTemplatePath "$out"/registry.json \
+          --replace @narHash@ $narHash \
+          --replace @path@ ${nixpkgsTarballPath}
+        '';
     in
     pkgs.runCommand "base-system"
       {
@@ -222,6 +274,9 @@ let
       mkdir -p $out/root/.nix-defexpr
       ln -s $out/nix/var/nix/profiles/per-user/root/channels $out/root/.nix-defexpr/channels
       echo "${channelURL} ${channelName}" > $out/root/.nix-channels
+
+      mkdir -p $out/root/.config/nix
+      ln -s ${registry}/registry.json $out/root/.config/nix/registry.json
 
       mkdir -p $out/bin $out/usr/bin
       ln -s ${pkgs.coreutils}/bin/env $out/usr/bin/env

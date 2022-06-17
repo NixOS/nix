@@ -612,7 +612,7 @@
         dockerImage =
           let
             pkgs = nixpkgsFor.${system};
-            image = import ./docker.nix { inherit pkgs; tag = version; };
+            image = import ./docker.nix { inherit pkgs nixpkgs; tag = version; };
           in
           pkgs.runCommand
             "docker-image-tarball-${version}"
