@@ -1039,6 +1039,11 @@ struct CmdRepl : StoreCommand, MixEvalArgs
         });
     }
 
+    bool forceImpureByDefault() override
+    {
+        return true;
+    }
+
     std::string description() override
     {
         return "start an interactive environment for evaluating Nix expressions";
@@ -1053,8 +1058,6 @@ struct CmdRepl : StoreCommand, MixEvalArgs
 
     void run(ref<Store> store) override
     {
-        evalSettings.pureEval = false;
-
         auto evalState = make_ref<EvalState>(searchPath, store);
 
         auto repl = std::make_unique<NixRepl>(evalState);

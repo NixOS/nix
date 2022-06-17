@@ -86,8 +86,8 @@ bool storeCachedHead(const std::string & actualUrl, const std::string & headRef)
 {
     Path cacheDir = getCachePath(actualUrl);
     try {
-        runProgram("git", true, { "-C", cacheDir, "symbolic-ref", "--", "HEAD", headRef });
-    } catch (ExecError & e) {
+        runProgram("git", true, { "-C", cacheDir, "--git-dir", ".", "symbolic-ref", "--", "HEAD", headRef });
+    } catch (ExecError &e) {
         if (!WIFEXITED(e.status)) throw;
         return false;
     }
@@ -373,7 +373,7 @@ struct GitInputScheme : InputScheme
                 if (repoInfo.hasHead) {
                     // Using git diff is preferrable over lower-level operations here,
                     // because it's conceptually simpler and we only need the exit code anyways.
-                    auto gitDiffOpts = Strings({ "-C", repoInfo.url, "diff", "HEAD", "--quiet"});
+                    auto gitDiffOpts = Strings({ "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "diff", "HEAD", "--quiet"});
                     if (!repoInfo.submodules) {
                         // Changes in submodules should only make the tree dirty
                         // when those submodules will be copied as well.
@@ -394,7 +394,7 @@ struct GitInputScheme : InputScheme
 
     std::set<CanonPath> listFiles(const RepoInfo & repoInfo)
     {
-        auto gitOpts = Strings({ "-C", repoInfo.url, "ls-files", "-z" });
+        auto gitOpts = Strings({ "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "ls-files", "-z" });
         if (repoInfo.submodules)
             gitOpts.emplace_back("--recurse-submodules");
 

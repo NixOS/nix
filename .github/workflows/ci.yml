@@ -88,7 +88,7 @@ jobs:
         fetch-depth: 0
     - uses: cachix/install-nix-action@v17
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
-    - run: echo NIX_VERSION="$(nix-instantiate --eval -E '(import ./default.nix).defaultPackage.${builtins.currentSystem}.version' | tr -d \")" >> $GITHUB_ENV
+    - run: echo NIX_VERSION="$(nix --experimental-features 'nix-command flakes' eval .\#default.version | tr -d \")" >> $GITHUB_ENV
     - uses: cachix/cachix-action@v10
       if: needs.check_cachix.outputs.secret == 'true'
       with:

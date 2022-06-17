@@ -494,18 +494,19 @@ LockedFlake lockFlake(
                         if (!lockFlags.allowUnlocked && !input.ref->input.isLocked() && !input.ref->input.isRelative())
                             throw Error("cannot update unlocked flake input '%s' in pure mode", inputPathS);
 
+                        /* Note: in case of an --override-input, we use
+                            the *original* ref (input2.ref) for the
+                            "original" field, rather than the
+                            override. This ensures that the override isn't
+                            nuked the next time we update the lock
+                            file. That is, overrides are sticky unless you
+                            use --no-write-lock-file. */
+                        auto ref = input2.ref ? *input2.ref : *input.ref;
+
                         if (input.isFlake) {
                             auto inputFlake = getInputFlake();
 
-                            /* Note: in case of an --override-input, we use
-                               the *original* ref (input2.ref) for the
-                               "original" field, rather than the
-                               override. This ensures that the override isn't
-                               nuked the next time we update the lock
-                               file. That is, overrides are sticky unless you
-                               use --no-write-lock-file. */
-                            auto childNode = std::make_shared<LockedNode>(
-                                inputFlake.lockedRef, input2.ref ? *input2.ref : *input.ref);
+                            auto childNode = std::make_shared<LockedNode>(inputFlake.lockedRef, ref);
 
                             node->inputs.insert_or_assign(id, childNode);
 
@@ -536,7 +537,7 @@ LockedFlake lockFlake(
                             auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
 
                             node->inputs.insert_or_assign(id,
-                                std::make_shared<LockedNode>(lockedRef, *input.ref, false));
+                                std::make_shared<LockedNode>(lockedRef, ref, false));
                         }
                     }
 

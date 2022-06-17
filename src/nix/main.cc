@@ -377,6 +377,9 @@ void mainWrapped(int argc, char * * argv)
         settings.ttlPositiveNarInfoCache = 0;
     }
 
+    if (args.command->second->forceImpureByDefault() && !evalSettings.pureEval.overridden) {
+        evalSettings.pureEval = false;
+    }
     args.command->second->prepare();
     args.command->second->run();
 }

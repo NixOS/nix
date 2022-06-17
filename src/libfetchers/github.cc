@@ -392,7 +392,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
 
         Headers headers = makeHeadersWithAuthTokens(host);
 
-        std::string ref_uri;
+        std::string refUri;
         if (ref == "HEAD") {
             auto file = store->toRealPath(
                 downloadFile(store, fmt("%s/HEAD", base_url), "source", false, headers).storePath);
@@ -404,10 +404,11 @@ struct SourceHutInputScheme : GitArchiveInputScheme
             if (!remoteLine) {
                 throw BadURL("in '%d', couldn't resolve HEAD ref '%d'", input.to_string(), ref);
             }
-            ref_uri = remoteLine->target;
+            refUri = remoteLine->target;
         } else {
-            ref_uri = fmt("refs/(heads|tags)/%s", ref);
+            refUri = fmt("refs/(heads|tags)/%s", ref);
         }
+        std::regex refRegex(refUri);
 
         auto file = store->toRealPath(
             downloadFile(store, fmt("%s/info/refs", base_url), "source", false, headers).storePath);
@@ -417,7 +418,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         std::optional<std::string> id;
         while(!id && getline(is, line)) {
             auto parsedLine = git::parseLsRemoteLine(line);
-            if (parsedLine && parsedLine->reference == ref_uri)
+            if (parsedLine && parsedLine->reference && std::regex_match(*parsedLine->reference, refRegex))
                 id = parsedLine->target;
         }
 

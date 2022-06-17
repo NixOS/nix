@@ -802,7 +802,7 @@ public:
         )"};
 
     Setting<StringSet> ignoredAcls{
-        this, {"security.selinux", "system.nfs4_acl"}, "ignored-acls",
+        this, {"security.selinux", "system.nfs4_acl", "security.csm"}, "ignored-acls",
         R"(
           A list of ACLs that should be ignored, normally Nix attempts to
           remove all ACLs from files and directories in the Nix store, but

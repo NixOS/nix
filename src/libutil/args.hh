@@ -25,6 +25,8 @@ public:
     /* Return a short one-line description of the command. */
     virtual std::string description() { return ""; }
 
+    virtual bool forceImpureByDefault() { return false; }
+
     /* Return documentation about this command, in Markdown format. */
     virtual std::string doc() { return ""; }
 
