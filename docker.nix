@@ -7,6 +7,7 @@
 , extraPkgs ? []
 , maxLayers ? 100
 , nixConf ? {}
+, sourceInfo ? null
 }:
 let
   defaultPkgs = with pkgs; [
@@ -138,11 +139,10 @@ let
 
   baseSystem =
     let
-      nixpkgs = pkgs.path;
+      nixpkgs = if builtins.isNull sourceInfo then pkgs.path else sourceInfo;
       channel = pkgs.runCommand "channel-nixos" { } ''
         mkdir $out
         ln -s ${nixpkgs} $out/nixpkgs
-        echo "[]" > $out/manifest.nix
       '';
       rootEnv = pkgs.buildPackages.buildEnv {
         name = "root-profile-env";
@@ -174,6 +174,28 @@ let
         cp -a ${rootEnv}/* $out/
         ln -s ${manifest} $out/manifest.nix
       '';
+
+      registry = if builtins.isNull sourceInfo
+        then builtins.toJSON { version = 2; }
+        else builtins.toJSON {
+          flakes = [
+            {
+              from = {
+                id = "nixpkgs";
+                type = "indirect";
+              };
+
+              to = {
+                inherit (sourceInfo) lastModified narHash rev;
+                owner = "NixOS";
+                repo = "nixpkgs";
+                type = "github";
+              };
+            }
+          ];
+          version = 2;
+        };
+
     in
     pkgs.runCommand "base-system"
       {
@@ -228,6 +250,9 @@ let
       mkdir -p $out/root/.nix-defexpr
       ln -s $out/nix/var/nix/profiles/per-user/root/channels $out/root/.nix-defexpr/channels
       echo "${channelURL} ${channelName}" > $out/root/.nix-channels
+
+      mkdir -p $out/root/.config/nix
+      echo '${registry}' > $out/root/.config/nix/registry.json
 
       mkdir -p $out/bin $out/usr/bin
       ln -s ${pkgs.coreutils}/bin/env $out/usr/bin/env
