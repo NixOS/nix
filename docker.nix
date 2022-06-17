@@ -4,6 +4,10 @@
 , tag ? "latest"
 , channelName ? "nixpkgs"
 , channelURL ? "https://nixos.org/channels/nixpkgs-unstable"
+, extraPkgs ? []
+, substituters ? []
+, trustedSubstituters ? []
+, extraEnv ? []
 }:
 let
   defaultPkgs = with pkgs; [
@@ -23,7 +27,7 @@ let
     iana-etc
     git
     openssh
-  ];
+  ] ++ extraPkgs;
 
   users = {
 
@@ -125,8 +129,12 @@ let
     sandbox = "false";
     build-users-group = "nixbld";
     trusted-public-keys = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
-  };
-  nixConfContents = (lib.concatStringsSep "\n" (lib.mapAttrsFlatten (n: v: "${n} = ${v}") nixConf)) + "\n";
+  } // (if substituters == [] then {} else {
+    substituters = substituters;
+  }) // (if trustedSubstituters == [] then {} else {
+    trusted-substituters = trustedSubstituters;
+  });
+  nixConfContents = (lib.concatStringsSep "\n" (lib.mapAttrsFlatten (n: v: "${n} = ${toString v}") nixConf)) + "\n";
 
   baseSystem =
     let
@@ -259,7 +267,7 @@ pkgs.dockerTools.buildLayeredImageWithNixDb {
       "GIT_SSL_CAINFO=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"
       "NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"
       "NIX_PATH=/nix/var/nix/profiles/per-user/root/channels:/root/.nix-defexpr/channels"
-    ];
+    ] ++ extraEnv;
   };
 
 }
