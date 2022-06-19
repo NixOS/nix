@@ -181,18 +181,16 @@ WorkdirInfo getWorkdirInfo(const Input & input, const Path & workdir)
 
     try {
         if (hasHead) {
-            // Using git diff is preferrable over lower-level operations here,
-            // because its conceptually simpler and we only need the exit code anyways.
-            auto gitDiffOpts = Strings({ "-C", workdir, "--git-dir", gitDir, "diff", "HEAD", "--quiet"});
+			// Use git status --short to list changed and untracked files.
+			// The output will be empty if there are none and the tree is clean
+            auto gitDiffOpts = Strings({ "-C", workdir, "--git-dir", gitDir, "status", "--short"});
             if (!submodules) {
                 // Changes in submodules should only make the tree dirty
                 // when those submodules will be copied as well.
                 gitDiffOpts.emplace_back("--ignore-submodules");
             }
             gitDiffOpts.emplace_back("--");
-            runProgram("git", true, gitDiffOpts);
-
-            clean = true;
+            clean = (chomp(runProgram("git", true, gitDiffOpts)) == "");
         }
     } catch (ExecError & e) {
         if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 1) throw;
@@ -212,9 +210,13 @@ std::pair<StorePath, Input> fetchFromWorkdir(ref<Store> store, Input & input, co
     if (fetchSettings.warnDirty)
         warn("Git tree '%s' is dirty", workdir);
 
-    auto gitOpts = Strings({ "-C", workdir, "--git-dir", gitDir, "ls-files", "-z" });
+    auto gitOpts = Strings({ "-C", workdir, "--git-dir", gitDir, "ls-files", "--cached", "-z" });
     if (submodules)
         gitOpts.emplace_back("--recurse-submodules");
+	else {
+        gitOpts.emplace_back("--others");
+        gitOpts.emplace_back("--exclude-standard");
+	}
 
     auto files = tokenizeString<std::set<std::string>>(
         runProgram("git", true, gitOpts), "\0"s);
