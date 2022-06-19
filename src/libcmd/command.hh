@@ -79,8 +79,10 @@ struct MixFlakeOptions : virtual Args, EvalCommand
 
     MixFlakeOptions();
 
-    virtual std::optional<FlakeRef> getFlakeRefForCompletion()
+    virtual std::vector<std::string> getFlakesForCompletion()
     { return {}; }
+
+    void completeFlakeInput(std::string_view prefix);
 };
 
 struct SourceExprCommand : virtual Args, MixFlakeOptions
@@ -119,7 +121,7 @@ struct InstallablesCommand : virtual Args, SourceExprCommand
 
     virtual bool useDefaultInstallables() { return true; }
 
-    std::optional<FlakeRef> getFlakeRefForCompletion() override;
+    std::vector<std::string> getFlakesForCompletion() override;
 
 private:
 
@@ -135,9 +137,9 @@ struct InstallableCommand : virtual Args, SourceExprCommand
 
     void prepare() override;
 
-    std::optional<FlakeRef> getFlakeRefForCompletion() override
+    std::vector<std::string> getFlakesForCompletion() override
     {
-        return parseFlakeRefWithFragment(_installable, absPath(".")).first;
+        return {_installable};
     }
 
 private:

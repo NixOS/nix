@@ -23,15 +23,16 @@
 
 namespace nix {
 
-void completeFlakeInputPath(
-    ref<EvalState> evalState,
-    const FlakeRef & flakeRef,
-    std::string_view prefix)
+void MixFlakeOptions::completeFlakeInput(std::string_view prefix)
 {
-    auto flake = flake::getFlake(*evalState, flakeRef, true);
-    for (auto & input : flake.inputs)
-        if (hasPrefix(input.first, prefix))
-            completions->add(input.first);
+    auto evalState = getEvalState();
+    for (auto & flakeRefS : getFlakesForCompletion()) {
+        auto flakeRef = parseFlakeRefWithFragment(expandTilde(flakeRefS), absPath(".")).first;
+        auto flake = flake::getFlake(*evalState, flakeRef, true);
+        for (auto & input : flake.inputs)
+            if (hasPrefix(input.first, prefix))
+                completions->add(input.first);
+    }
 }
 
 MixFlakeOptions::MixFlakeOptions()
@@ -86,8 +87,7 @@ MixFlakeOptions::MixFlakeOptions()
             lockFlags.inputUpdates.insert(flake::parseInputPath(s));
         }},
         .completer = {[&](size_t, std::string_view prefix) {
-            if (auto flakeRef = getFlakeRefForCompletion())
-                completeFlakeInputPath(getEvalState(), *flakeRef, prefix);
+            completeFlakeInput(prefix);
         }}
     });
 
@@ -103,12 +103,10 @@ MixFlakeOptions::MixFlakeOptions()
                 parseFlakeRef(flakeRef, absPath("."), true));
         }},
         .completer = {[&](size_t n, std::string_view prefix) {
-            if (n == 0) {
-                if (auto flakeRef = getFlakeRefForCompletion())
-                    completeFlakeInputPath(getEvalState(), *flakeRef, prefix);
-            } else if (n == 1) {
+            if (n == 0)
+                completeFlakeInput(prefix);
+            else if (n == 1)
                 completeFlakeRef(getEvalState()->store, prefix);
-            }
         }}
     });
 
@@ -1043,14 +1041,14 @@ void InstallablesCommand::prepare()
     installables = parseInstallables(getStore(), _installables);
 }
 
-std::optional<FlakeRef> InstallablesCommand::getFlakeRefForCompletion()
+std::vector<std::string> InstallablesCommand::getFlakesForCompletion()
 {
     if (_installables.empty()) {
         if (useDefaultInstallables())
-            return parseFlakeRefWithFragment(".", absPath(".")).first;
+            return {"."};
         return {};
     }
-    return parseFlakeRefWithFragment(_installables.front(), absPath(".")).first;
+    return _installables;
 }
 
 InstallableCommand::InstallableCommand(bool supportReadOnlyMode)
