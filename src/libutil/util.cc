@@ -574,6 +574,20 @@ Path getHome()
     static Path homeDir = []()
     {
         auto homeDir = getEnv("HOME");
+        if (homeDir) {
+            // Only use $HOME if doesn't exist or is owned by the current user.
+            struct stat st;
+            int result = stat(homeDir->c_str(), &st);
+            if (result != 0) {
+                if (errno != ENOENT) {
+                    warn("Couldn't stat $HOME ('%s') for reason other than not existing ('%d'), falling back to the one defined in the 'passwd' file", *homeDir, errno);
+                    homeDir.reset();
+                }
+            } else if (st.st_uid != geteuid()) {
+                warn("$HOME ('%s') is not owned by you, falling back to the one defined in the 'passwd' file", *homeDir);
+                homeDir.reset();
+            }
+        }
         if (!homeDir) {
             std::vector<char> buf(16384);
             struct passwd pwbuf;
