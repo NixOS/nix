@@ -77,12 +77,16 @@ struct MixFlakeOptions : virtual Args, EvalCommand
 {
     flake::LockFlags lockFlags;
 
+    std::optional<std::string> needsFlakeInputCompletion = {};
+
     MixFlakeOptions();
 
     virtual std::vector<std::string> getFlakesForCompletion()
     { return {}; }
 
     void completeFlakeInput(std::string_view prefix);
+
+    void completionHook() override;
 };
 
 struct SourceExprCommand : virtual Args, MixFlakeOptions

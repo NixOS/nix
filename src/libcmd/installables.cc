@@ -23,18 +23,6 @@
 
 namespace nix {
 
-void MixFlakeOptions::completeFlakeInput(std::string_view prefix)
-{
-    auto evalState = getEvalState();
-    for (auto & flakeRefS : getFlakesForCompletion()) {
-        auto flakeRef = parseFlakeRefWithFragment(expandTilde(flakeRefS), absPath(".")).first;
-        auto flake = flake::getFlake(*evalState, flakeRef, true);
-        for (auto & input : flake.inputs)
-            if (hasPrefix(input.first, prefix))
-                completions->add(input.first);
-    }
-}
-
 MixFlakeOptions::MixFlakeOptions()
 {
     auto category = "Common flake-related options";
@@ -87,7 +75,7 @@ MixFlakeOptions::MixFlakeOptions()
             lockFlags.inputUpdates.insert(flake::parseInputPath(s));
         }},
         .completer = {[&](size_t, std::string_view prefix) {
-            completeFlakeInput(prefix);
+            needsFlakeInputCompletion = {std::string(prefix)};
         }}
     });
 
@@ -104,7 +92,7 @@ MixFlakeOptions::MixFlakeOptions()
         }},
         .completer = {[&](size_t n, std::string_view prefix) {
             if (n == 0)
-                completeFlakeInput(prefix);
+                needsFlakeInputCompletion = {std::string(prefix)};
             else if (n == 1)
                 completeFlakeRef(getEvalState()->store, prefix);
         }}
@@ -135,6 +123,24 @@ MixFlakeOptions::MixFlakeOptions()
             completeFlakeRef(getEvalState()->store, prefix);
         }}
     });
+}
+
+void MixFlakeOptions::completeFlakeInput(std::string_view prefix)
+{
+    auto evalState = getEvalState();
+    for (auto & flakeRefS : getFlakesForCompletion()) {
+        auto flakeRef = parseFlakeRefWithFragment(expandTilde(flakeRefS), absPath(".")).first;
+        auto flake = flake::getFlake(*evalState, flakeRef, true);
+        for (auto & input : flake.inputs)
+            if (hasPrefix(input.first, prefix))
+                completions->add(input.first);
+    }
+}
+
+void MixFlakeOptions::completionHook()
+{
+    if (auto & prefix = needsFlakeInputCompletion)
+        completeFlakeInput(*prefix);
 }
 
 SourceExprCommand::SourceExprCommand(bool supportReadOnlyMode)
