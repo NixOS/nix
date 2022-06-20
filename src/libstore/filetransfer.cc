@@ -160,7 +160,7 @@ struct curlFileTransfer : public FileTransfer
                 result.bodySize += realSize;
 
                 if (!decompressionSink) {
-                    decompressionSink = makeDecompressionSink(encoding, finalSink);
+                    decompressionSink = makeDecompressionSink("", finalSink);
                     if (! successfulStatuses.count(getHTTPStatus())) {
                         // In this case we want to construct a TeeSink, to keep
                         // the response around (which we figure won't be big
