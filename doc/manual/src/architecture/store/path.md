@@ -42,7 +42,7 @@ It is important which store a given store object belongs to:
 Files in the store object can contain store paths, and processes may read these paths.
 Nix can only guarantee [referential integrity](store.md#closure) if store paths do not cross store boundaries.
 
-Therefore one can only copy store objects if
+Therefore one can only copy store objects to a different store if
 
 - the source and target stores' directories match
 
@@ -50,8 +50,9 @@ Therefore one can only copy store objects if
 
 - the store object in question has no references, that is, contains no store paths.
 
-To move a store object to a store with a different store directory, it has to be rebuilt, together with all its dependencies.
-It is in general not enough to replace the store directory string in file contents, as this may break internal offsets or content hashes.
+One cannot copy a store object to a store with a different store directory.
+Instead, it has to be rebuilt, together with all its dependencies.
+It is in general not enough to replace the store directory string in file contents, as this may render executables unusable by invalidating their internal offsets or checksums.
 
 # Digest {#digest}
 
