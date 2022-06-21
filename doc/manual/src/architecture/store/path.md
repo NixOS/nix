@@ -9,10 +9,8 @@ Store paths are pairs of
 
 Example:
 
-    {
-      digest: "b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z",
-      name:   "firefox-33.1",
-    }
+- digest: `b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z`
+- name:   `firefox-33.1`
 
 It is rendered to a file system path as the concatenation of
 
