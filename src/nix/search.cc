@@ -34,7 +34,9 @@ struct CmdSearch : InstallableCommand, MixJSON
             .shortName = 'e',
             .description = "Hide packages whose attribute path, name or description contain *regex*.",
             .labels = {"regex"},
-            .handler = Handler(&excludeRes),
+            .handler = {[this](std::string s) {
+                excludeRes.push_back(s);
+            }},
         });
     }
 
