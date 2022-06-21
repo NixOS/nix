@@ -740,7 +740,9 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 "If you've set '%s' to a string, try using a path instead.",
                 templateDir, templateDirAttr->getAttrPathStr());
 
-        std::vector<Path> files;
+        std::vector<Path> changedFiles;
+        std::vector<Path> conflictedFiles;
+        auto success = false;
 
         std::function<void(const Path & from, const Path & to)> copyDir;
         copyDir = [&](const Path & from, const Path & to)
@@ -757,22 +759,33 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                     auto contents = readFile(from2);
                     if (pathExists(to2)) {
                         auto contents2 = readFile(to2);
-                        if (contents != contents2)
-                            throw Error("refusing to overwrite existing file '%s' - please merge manually with '%s'", to2, from2);
+                        if (contents != contents2) {
+                            printError("refusing to overwrite existing file '%s'\n-> merge manually with '%s'", to2, from2);
+                            success = false;
+                            conflictedFiles.push_back(to2);
+                        } else {
+                            notice("skipping identical file: %s", from2);
+                        }
+                        continue;
                     } else
                         writeFile(to2, contents);
                 }
                 else if (S_ISLNK(st.st_mode)) {
                     auto target = readLink(from2);
                     if (pathExists(to2)) {
-                        if (readLink(to2) != target)
-                            throw Error("refusing to overwrite existing symlink '%s' - please merge manually with '%s'", to2, from2);
+                        if (readLink(to2) != target) {
+                            printError("refusing to overwrite existing file '%s' - please merge manually with '%s'", to2, from2);
+                            success = false;
+                            conflictedFiles.push_back(to2);
+                        } else {
+                            notice("skipping identical file: %s", from2);
+                        }
                     } else
                           createSymlink(target, to2);
                 }
                 else
                     throw Error("file '%s' has unsupported type", from2);
-                files.push_back(to2);
+                changedFiles.push_back(to2);
                 notice("wrote: %s", to2);
             }
         };
@@ -781,7 +794,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
         if (pathExists(flakeDir + "/.git")) {
             Strings args = { "-C", flakeDir, "add", "--intent-to-add", "--force", "--" };
-            for (auto & s : files) args.push_back(s);
+            for (auto & s : changedFiles) args.push_back(s);
             runProgram("git", true, args);
         }
         auto welcomeText = cursor->maybeGetAttr("welcomeText");
@@ -789,6 +802,9 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             notice("\n");
             notice(renderMarkdownToTerminal(welcomeText->getString()));
         }
+
+        if (!success)
+            throw Error("Encountered %d conflicts - please merge manually", conflictedFiles.size());
     }
 };
 
