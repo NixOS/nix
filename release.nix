@@ -25,7 +25,7 @@ let
 
         buildInputs = tarballDeps ++ buildDeps ++ propagatedDeps;
 
-        configureFlags = "--enable-gc";
+        configureFlags = [ "--enable-gc" ];
 
         postUnpack = ''
           (cd $sourceRoot && find . -type f) | cut -c3- > $sourceRoot/.dist-files
@@ -111,10 +111,10 @@ let
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
           ++ lib.optional stdenv.isDarwin darwin.apple_sdk.frameworks.Security;
 
-        configureFlags = ''
-          --with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}
-          --with-dbd-sqlite=${perlPackages.DBDSQLite}/${pkgs.perl.libPrefix}
-        '';
+        configureFlags = [
+          "--with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}"
+          "--with-dbd-sqlite=${perlPackages.DBDSQLite}/${pkgs.perl.libPrefix}"
+        ];
 
         enableParallelBuilding = true;
 
