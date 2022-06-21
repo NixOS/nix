@@ -110,7 +110,7 @@ Store objects are therefore implemented as the pair of
 
 The following diagram shows a radical simplification of how Nix interacts with the operating system:
 It uses files as build inputs, and build outputs are files again.
-On the operating system, files are either "dead" data, or "live" as processes, which in turn operate on files, or can bring them to life.
+On the operating system, files can be run as processes, which in turn operate on files.
 A build function also amounts to an operating system process (not depicted).
 
 ```
