@@ -105,7 +105,8 @@ source <(nix print-dev-env -f "$shellDotNix" shellDrv)
 
 # Test nix-shell with ellipsis and no `inNixShell` argument (for backwards compat with old nixpkgs)
 cat >$TEST_ROOT/shell-ellipsis.nix <<EOF
-{ system ? "x86_64-linux", ... }:
+{ system ? "x86_64-linux", ... }@args:
+assert (!(args ? inNixShell));
 (import $shellDotNix { }).shellDrv
 EOF
 nix-shell $TEST_ROOT/shell-ellipsis.nix --run "true"
