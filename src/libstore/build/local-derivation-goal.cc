@@ -1717,7 +1717,19 @@ void LocalDerivationGoal::runChild()
 
             for (auto & i : dirsInChroot) {
                 if (i.second.source == "/proc") continue; // backwards compatibility
-                doBind(i.second.source, chrootRootDir + i.first, i.second.optional);
+
+                #if HAVE_EMBEDDED_SANDBOX_SHELL
+                if (i.second.source == "__embedded_sandbox_shell__") {
+                    static unsigned char sh[] = {
+                        #include "embedded-sandbox-shell.gen.hh"
+                    };
+                    auto dst = chrootRootDir + i.first;
+                    createDirs(dirOf(dst));
+                    writeFile(dst, std::string_view((const char *) sh, sizeof(sh)));
+                    chmod_(dst, 0555);
+                } else
+                #endif
+                    doBind(i.second.source, chrootRootDir + i.first, i.second.optional);
             }
 
             /* Bind a new instance of procfs on /proc. */
