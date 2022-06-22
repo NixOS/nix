@@ -62,6 +62,9 @@ public:
     /* How often to purge expired entries from the cache. */
     const int purgeInterval = 24 * 3600;
 
+    /* How long to cache binary cache info (i.e. /nix-cache-info) */
+    const int cacheInfoTtl = 7 * 24 * 3600;
+
     struct Cache
     {
         int id;
@@ -98,7 +101,7 @@ public:
             "insert or replace into BinaryCaches(url, timestamp, storeDir, wantMassQuery, priority) values (?, ?, ?, ?, ?)");
 
         state->queryCache.create(state->db,
-            "select id, storeDir, wantMassQuery, priority from BinaryCaches where url = ?");
+            "select id, timestamp, storeDir, wantMassQuery, priority from BinaryCaches where url = ?");
 
         state->insertNAR.create(state->db,
             "insert or replace into NARs(cache, hashPart, namePart, url, compression, fileHash, fileSize, narHash, "
@@ -186,8 +189,11 @@ public:
                 auto queryCache(state->queryCache.use()(uri));
                 if (!queryCache.next())
                     return std::nullopt;
+                if (queryCache.getInt(1) + cacheInfoTtl < time(0))
+                    return std::nullopt;
+
                 state->caches.emplace(uri,
-                    Cache{(int) queryCache.getInt(0), queryCache.getStr(1), queryCache.getInt(2) != 0, (int) queryCache.getInt(3)});
+                    Cache{(int) queryCache.getInt(0), queryCache.getStr(2), queryCache.getInt(3) != 0, (int) queryCache.getInt(4)});
             }
 
             auto & cache(getCache(*state, uri));
