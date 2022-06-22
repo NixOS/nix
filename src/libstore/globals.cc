@@ -67,12 +67,13 @@ Settings::Settings()
     sandboxPaths = tokenizeString<StringSet>("/bin/sh=" SANDBOX_SHELL);
 #endif
 
-
-/* chroot-like behavior from Apple's sandbox */
+    /* chroot-like behavior from Apple's sandbox */
 #if __APPLE__
     sandboxPaths = tokenizeString<StringSet>("/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
     allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
 #endif
+
+    buildHook = getSelfExe().value_or("nix") + " __build-remote";
 }
 
 void loadConfFile()

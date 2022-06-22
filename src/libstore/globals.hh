@@ -195,7 +195,7 @@ public:
         )",
         {"build-timeout"}};
 
-    PathSetting buildHook{this, true, nixLibexecDir + "/nix/build-remote", "build-hook",
+    PathSetting buildHook{this, true, "", "build-hook",
         "The path of the helper program that executes builds to remote machines."};
 
     Setting<std::string> builders{

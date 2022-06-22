@@ -633,6 +633,20 @@ Path getDataDir()
 }
 
 
+std::optional<Path> getSelfExe()
+{
+    static std::optional<Path> cached = []()
+    {
+        #if __linux__
+        return readLink("/proc/self/exe");
+        #else
+        return std::nullopt;
+        #endif
+    }();
+    return cached;
+}
+
+
 Paths createDirs(const Path & path)
 {
     Paths created;
