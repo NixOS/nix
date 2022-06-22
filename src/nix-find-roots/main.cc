@@ -124,6 +124,8 @@ int main(int argc, char * * argv)
         chdir(socketDir.c_str());
 
         fs::remove(socketFilename);
+        if (socketFilename.string().size() + 1 >= sizeof(addr.sun_path))
+            throw Error("socket path '" + socketFilename.string() + "' is too long");
         strcpy(addr.sun_path, socketFilename.c_str());
         if (bind(mySock, (struct sockaddr*) &addr, sizeof(addr)) == -1) {
             throw Error("Cannot bind to socket");
