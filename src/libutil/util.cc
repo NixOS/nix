@@ -580,7 +580,7 @@ Path getHome()
             int result = stat(homeDir->c_str(), &st);
             if (result != 0) {
                 if (errno != ENOENT) {
-                    warn("Couldn't stat $HOME ('%s') for reason other than not existing ('%d'), falling back to the one defined in the 'passwd' file", *homeDir, errno);
+                    warn("couldn't stat $HOME ('%s') for reason other than not existing ('%d'), falling back to the one defined in the 'passwd' file", *homeDir, errno);
                     homeDir.reset();
                 }
             } else if (st.st_uid != geteuid()) {
