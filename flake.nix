@@ -112,7 +112,7 @@
             libarchive
             (libzip.overrideDerivation (old: {
               # Temporary workaround for https://github.com/NixOS/nixpkgs/pull/178755
-              cmakeFlags = old.cmakeFlags ++ [ "-DBUILD_REGRESS=0" ];
+              cmakeFlags = old.cmakeFlags or [] ++ [ "-DBUILD_REGRESS=0" ];
             }))
             boost
             lowdown-nix
