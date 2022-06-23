@@ -101,7 +101,7 @@ public:
             "insert or replace into BinaryCaches(url, timestamp, storeDir, wantMassQuery, priority) values (?, ?, ?, ?, ?)");
 
         state->queryCache.create(state->db,
-            "select id, timestamp, storeDir, wantMassQuery, priority from BinaryCaches where url = ?");
+            "select id, storeDir, wantMassQuery, priority from BinaryCaches where url = ? and timestamp > ?");
 
         state->insertNAR.create(state->db,
             "insert or replace into NARs(cache, hashPart, namePart, url, compression, fileHash, fileSize, narHash, "
@@ -186,14 +186,11 @@ public:
 
             auto i = state->caches.find(uri);
             if (i == state->caches.end()) {
-                auto queryCache(state->queryCache.use()(uri));
+                auto queryCache(state->queryCache.use()(uri)(time(0) - cacheInfoTtl));
                 if (!queryCache.next())
                     return std::nullopt;
-                if (queryCache.getInt(1) + cacheInfoTtl < time(0))
-                    return std::nullopt;
-
                 state->caches.emplace(uri,
-                    Cache{(int) queryCache.getInt(0), queryCache.getStr(2), queryCache.getInt(3) != 0, (int) queryCache.getInt(4)});
+                    Cache{(int) queryCache.getInt(0), queryCache.getStr(1), queryCache.getInt(2) != 0, (int) queryCache.getInt(3)});
             }
 
             auto & cache(getCache(*state, uri));
