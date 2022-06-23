@@ -1326,9 +1326,9 @@ std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Para
                store in ~/.local/share/nix/root. */
             auto chrootStore = getDataDir() + "/nix/root";
             if (!pathExists(chrootStore))
-                warn("'/nix' does not exists, so Nix will use '%s' as a chroot store", chrootStore);
+                warn("'/nix' does not exist, so Nix will use '%s' as a chroot store", chrootStore);
             else
-                debug("'/nix' does not exists, so Nix will use '%s' as a chroot store", chrootStore);
+                debug("'/nix' does not exist, so Nix will use '%s' as a chroot store", chrootStore);
             Store::Params params2;
             params2["root"] = chrootStore;
             return std::make_shared<LocalStore>(params2);
