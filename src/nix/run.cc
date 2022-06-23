@@ -47,7 +47,7 @@ void runProgramInStore(ref<Store> store,
         Strings helperArgs = { chrootHelperName, store->storeDir, store2->getRealStoreDir(), program };
         for (auto & arg : args) helperArgs.push_back(arg);
 
-        execv(readLink("/proc/self/exe").c_str(), stringsToCharPtrs(helperArgs).data());
+        execv(getSelfExe().value_or("nix").c_str(), stringsToCharPtrs(helperArgs).data());
 
         throw SysError("could not execute chroot helper");
     }

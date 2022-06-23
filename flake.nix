@@ -572,13 +572,22 @@
           nativeBuildInputs = nativeBuildDeps;
           buildInputs = buildDeps ++ propagatedDeps;
 
-          configureFlags = [ "--sysconfdir=/etc" ];
+          # Work around pkgsStatic disabling all tests.
+          preHook =
+            ''
+              doCheck=1
+              doInstallCheck=1
+            '';
+
+          configureFlags =
+            configureFlags ++
+            [ "--sysconfdir=/etc"
+              "--enable-embedded-sandbox-shell"
+            ];
 
           enableParallelBuilding = true;
 
           makeFlags = "profiledir=$(out)/etc/profile.d";
-
-          doCheck = true;
 
           installFlags = "sysconfdir=$(out)/etc";
 
@@ -589,7 +598,6 @@
             echo "file binary-dist $out/bin/nix" >> $out/nix-support/hydra-build-products
           '';
 
-          doInstallCheck = true;
           installCheckFlags = "sysconfdir=$(out)/etc";
 
           stripAllList = ["bin"];
@@ -598,6 +606,7 @@
 
           hardeningDisable = [ "pie" ];
         };
+
         dockerImage =
           let
             pkgs = nixpkgsFor.${system};

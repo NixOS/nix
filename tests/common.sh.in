@@ -50,6 +50,8 @@ export busybox="@sandbox_shell@"
 export version=@PACKAGE_VERSION@
 export system=@system@
 
+export BUILD_SHARED_LIBS=@BUILD_SHARED_LIBS@
+
 export IMPURE_VAR1=foo
 export IMPURE_VAR2=bar
 

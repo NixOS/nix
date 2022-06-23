@@ -39,13 +39,22 @@ libstore_CXXFLAGS += \
  -DNIX_STATE_DIR=\"$(localstatedir)/nix\" \
  -DNIX_LOG_DIR=\"$(localstatedir)/log/nix\" \
  -DNIX_CONF_DIR=\"$(sysconfdir)/nix\" \
- -DNIX_LIBEXEC_DIR=\"$(libexecdir)\" \
  -DNIX_BIN_DIR=\"$(bindir)\" \
  -DNIX_MAN_DIR=\"$(mandir)\" \
  -DLSOF=\"$(lsof)\"
 
+ifeq ($(embedded_sandbox_shell),yes)
+libstore_CXXFLAGS += -DSANDBOX_SHELL=\"__embedded_sandbox_shell__\"
+
+$(d)/build/local-derivation-goal.cc: $(d)/embedded-sandbox-shell.gen.hh
+
+$(d)/embedded-sandbox-shell.gen.hh: $(sandbox_shell)
+	$(trace-gen) hexdump -v -e '1/1 "0x%x," "\n"' < $< > $@.tmp
+	@mv $@.tmp $@
+else
 ifneq ($(sandbox_shell),)
 libstore_CXXFLAGS += -DSANDBOX_SHELL="\"$(sandbox_shell)\""
+endif
 endif
 
 $(d)/local-store.cc: $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh
