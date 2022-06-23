@@ -578,7 +578,11 @@
               doInstallCheck=1
             '';
 
-          configureFlags = [ "--sysconfdir=/etc" ];
+          configureFlags =
+            configureFlags ++
+            [ "--sysconfdir=/etc"
+              "--enable-embedded-sandbox-shell"
+            ];
 
           enableParallelBuilding = true;
 
