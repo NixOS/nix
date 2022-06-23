@@ -154,7 +154,7 @@ void PathSubstitutionGoal::tryNext()
        only after we've downloaded the path. */
     if (!sub->isTrusted && worker.store.pathInfoIsUntrusted(*info))
     {
-        warn("igoring substitute for '%s' from '%s', as it's not signed by any of the keys in 'trusted-public-keys'",
+        warn("ignoring substitute for '%s' from '%s', as it's not signed by any of the keys in 'trusted-public-keys'",
             worker.store.printStorePath(storePath), sub->getUri());
         tryNext();
         return;
