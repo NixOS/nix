@@ -1302,7 +1302,8 @@ std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri_
     return {uri, params};
 }
 
-static bool isNonUriPath(const std::string & spec) {
+static bool isNonUriPath(const std::string & spec)
+{
     return
         // is not a URL
         spec.find("://") == std::string::npos
@@ -1319,7 +1320,19 @@ std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Para
             return std::make_shared<LocalStore>(params);
         else if (pathExists(settings.nixDaemonSocketFile))
             return std::make_shared<UDSRemoteStore>(params);
-        else
+        else if (!pathExists(stateDir) && params.empty() && getuid() != 0) {
+            /* If /nix doesn't exist, there is no daemon socket, and
+               we're not root, then automatically set up a chroot
+               store in ~/.local/share/nix/root. */
+            auto chrootStore = getDataDir() + "/nix/root";
+            if (!pathExists(chrootStore))
+                warn("'/nix' does not exists, so Nix will use '%s' as a chroot store", chrootStore);
+            else
+                debug("'/nix' does not exists, so Nix will use '%s' as a chroot store", chrootStore);
+            Store::Params params2;
+            params2["root"] = chrootStore;
+            return std::make_shared<LocalStore>(params2);
+        } else
             return std::make_shared<LocalStore>(params);
     } else if (uri == "daemon") {
         return std::make_shared<UDSRemoteStore>(params);
