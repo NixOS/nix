@@ -29,6 +29,7 @@
 
 #ifdef __APPLE__
 #include <sys/syscall.h>
+#include <mach-o/dyld.h>
 #endif
 
 #ifdef __linux__
@@ -630,6 +631,27 @@ Path getDataDir()
 {
     auto dataDir = getEnv("XDG_DATA_HOME");
     return dataDir ? *dataDir : getHome() + "/.local/share";
+}
+
+
+std::optional<Path> getSelfExe()
+{
+    static auto cached = []() -> std::optional<Path>
+    {
+        #if __linux__
+        return readLink("/proc/self/exe");
+        #elif __APPLE__
+        char buf[1024];
+        uint32_t size = sizeof(buf);
+        if (_NSGetExecutablePath(buf, &size) == 0)
+            return buf;
+        else
+            return std::nullopt;
+        #else
+        return std::nullopt;
+        #endif
+    }();
+    return cached;
 }
 
 
