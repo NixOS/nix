@@ -12,10 +12,6 @@ InputAccessor::InputAccessor()
 { }
 
 // FIXME: merge with archive.cc.
-const std::string narVersionMagic1 = "nix-archive-1";
-
-static std::string caseHackSuffix = "~nix~case~hack~";
-
 void InputAccessor::dumpPath(
     const CanonPath & path,
     Sink & sink,

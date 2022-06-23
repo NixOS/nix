@@ -102,7 +102,9 @@ void copyNAR(Source & source, Sink & sink);
 void copyPath(const Path & from, const Path & to);
 
 
-extern const std::string narVersionMagic1;
+inline constexpr std::string_view narVersionMagic1 = "nix-archive-1";
+
+inline constexpr std::string_view caseHackSuffix = "~nix~case~hack~";
 
 
 }
