@@ -572,6 +572,7 @@
           buildInputs = buildDeps ++ propagatedDeps;
 
           # Work around pkgsStatic disabling all tests.
+          # Remove in NixOS 22.11, see https://github.com/NixOS/nixpkgs/pull/140271.
           preHook =
             ''
               doCheck=1
