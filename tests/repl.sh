@@ -87,12 +87,12 @@ $testDir/simple.nix
 testReplResponse '
 drvPath
 ' '".*-simple.drv"' \
---file $testDir/simple.nix --experimental-features ''
+--file $testDir/simple.nix --experimental-features 'ca-derivations'
 
 testReplResponse '
 drvPath
 ' '".*-simple.drv"' \
---file $testDir/simple.nix --extra-experimental-features 'repl-flake'
+--file $testDir/simple.nix --extra-experimental-features 'repl-flake ca-derivations'
 
 mkdir -p flake && cat <<EOF > flake/flake.nix
 {
