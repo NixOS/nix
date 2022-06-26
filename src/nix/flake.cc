@@ -777,6 +777,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                         } else {
                             notice("skipping identical file: %s", from2);
                         }
+                        continue;
                     } else
                           createSymlink(target, to2);
                 }
@@ -789,7 +790,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
         copyDir(templateDir, flakeDir);
 
-        if (pathExists(flakeDir + "/.git")) {
+        if (!changedFiles.empty() && pathExists(flakeDir + "/.git")) {
             Strings args = { "-C", flakeDir, "add", "--intent-to-add", "--force", "--" };
             for (auto & s : changedFiles) args.push_back(s);
             runProgram("git", true, args);
