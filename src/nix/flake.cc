@@ -760,7 +760,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                     if (pathExists(to2)) {
                         auto contents2 = readFile(to2);
                         if (contents != contents2) {
-                            printError("refusing to overwrite existing file '%s'\n-> merge manually with '%s'", to2, from2);
+                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2, from2);
                             success = false;
                             conflictedFiles.push_back(to2);
                         } else {
