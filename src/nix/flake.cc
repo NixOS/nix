@@ -774,7 +774,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                     auto target = readLink(from2);
                     if (pathExists(to2)) {
                         if (readLink(to2) != target) {
-                            printError("refusing to overwrite existing file '%s' - please merge manually with '%s'", to2, from2);
+                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2, from2);
                             success = false;
                             conflictedFiles.push_back(to2);
                         } else {
