@@ -3,7 +3,6 @@
 #include "globals.hh"
 #include "store-api.hh"
 #include "s3.hh"
-#include "compression.hh"
 #include "finally.hh"
 #include "callback.hh"
 
@@ -148,7 +147,6 @@ struct curlFileTransfer : public FileTransfer
         }
 
         LambdaSink finalSink;
-        std::shared_ptr<FinishSink> decompressionSink;
         std::optional<StringSink> errorSink;
 
         std::exception_ptr writeException;
@@ -159,8 +157,7 @@ struct curlFileTransfer : public FileTransfer
                 size_t realSize = size * nmemb;
                 result.bodySize += realSize;
 
-                if (!decompressionSink) {
-                    decompressionSink = makeDecompressionSink("", finalSink);
+                if (!errorSink) {
                     if (! successfulStatuses.count(getHTTPStatus())) {
                         // In this case we want to construct a TeeSink, to keep
                         // the response around (which we figure won't be big
@@ -172,7 +169,7 @@ struct curlFileTransfer : public FileTransfer
 
                 if (errorSink)
                     (*errorSink)({(char *) contents, realSize});
-                (*decompressionSink)({(char *) contents, realSize});
+                finalSink({(char *) contents, realSize});
 
                 return realSize;
             } catch (...) {
@@ -356,14 +353,6 @@ struct curlFileTransfer : public FileTransfer
 
             debug("finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes",
                 request.verb(), request.uri, code, httpStatus, result.bodySize);
-
-            if (decompressionSink) {
-                try {
-                    decompressionSink->finish();
-                } catch (...) {
-                    writeException = std::current_exception();
-                }
-            }
 
             if (code == CURLE_WRITE_ERROR && result.etag == request.expectedETag) {
                 code = CURLE_OK;
