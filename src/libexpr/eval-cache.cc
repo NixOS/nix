@@ -282,7 +282,7 @@ struct AttrDb
         auto queryAttribute(state->queryAttribute.use()(key.first)(symbols[key.second]));
         if (!queryAttribute.next()) return {};
 
-        auto rowId = (AttrType) queryAttribute.getInt(0);
+        auto rowId = (AttrId) queryAttribute.getInt(0);
         auto type = (AttrType) queryAttribute.getInt(1);
 
         switch (type) {

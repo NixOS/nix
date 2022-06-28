@@ -595,7 +595,7 @@ struct GitInputScheme : InputScheme
         bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "--git-dir", repoInfo.gitDir, "rev-parse", "--is-shallow-repository" })) == "true";
 
         if (isShallow && !repoInfo.shallow)
-            throw Error("'%s' is a shallow Git repository, but a non-shallow repository is needed", repoInfo.url);
+            throw Error("'%s' is a shallow Git repository, but shallow repositories are only allowed when `shallow = true;` is specified", repoInfo.url);
 
         // FIXME: check whether rev is an ancestor of ref.
 

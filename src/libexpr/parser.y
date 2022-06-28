@@ -517,6 +517,12 @@ path_start
     $$ = new ExprPath(std::move(path));
   }
   | HPATH {
+    if (evalSettings.pureEval) {
+        throw Error(
+            "the path '%s' can not be resolved in pure mode",
+            std::string_view($1.p, $1.l)
+        );
+    }
     Path path(getHome() + std::string($1.p + 1, $1.l - 1));
     $$ = new ExprPath(data->state.rootPath(path));
   }
