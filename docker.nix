@@ -4,6 +4,8 @@
 , tag ? "latest"
 , channelName ? "nixpkgs"
 , channelURL ? "https://nixos.org/channels/nixpkgs-unstable"
+, extraPkgs ? []
+, maxLayers ? 100
 }:
 let
   defaultPkgs = with pkgs; [
@@ -23,7 +25,7 @@ let
     iana-etc
     git
     openssh
-  ];
+  ] ++ extraPkgs;
 
   users = {
 
@@ -229,7 +231,7 @@ let
 in
 pkgs.dockerTools.buildLayeredImageWithNixDb {
 
-  inherit name tag;
+  inherit name tag maxLayers;
 
   contents = [ baseSystem ];
 
