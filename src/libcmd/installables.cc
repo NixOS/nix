@@ -146,7 +146,8 @@ SourceExprCommand::SourceExprCommand(bool supportReadOnlyMode)
         .shortName = 'f',
         .description =
             "Interpret installables as attribute paths relative to the Nix expression stored in *file*. "
-            "If *file* is the character -, then a Nix expression will be read from standard input.",
+            "If *file* is the character -, then a Nix expression will be read from standard input. "
+            "Implies `--impure`.",
         .category = installablesCategory,
         .labels = {"file"},
         .handler = {&file},
@@ -623,7 +624,14 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
     std::set<std::string> outputsToInstall;
     std::optional<NixInt> priority;
 
-    if (auto aMeta = attr->maybeGetAttr(state->sMeta)) {
+    if (auto aOutputSpecified = attr->maybeGetAttr(state->sOutputSpecified)) {
+        if (aOutputSpecified->getBool()) {
+            if (auto aOutputName = attr->maybeGetAttr("outputName"))
+                outputsToInstall = { aOutputName->getString() };
+        }
+    }
+
+    else if (auto aMeta = attr->maybeGetAttr(state->sMeta)) {
         if (auto aOutputsToInstall = aMeta->maybeGetAttr("outputsToInstall"))
             for (auto & s : aOutputsToInstall->getListOfStrings())
                 outputsToInstall.insert(s);
@@ -912,6 +920,9 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::bui
         break;
 
     case Realise::Outputs: {
+        if (settings.printMissing)
+          printMissing(store, pathsToBuild, lvlInfo);
+
         for (auto & buildResult : store->buildPathsWithResults(pathsToBuild, bMode, evalStore)) {
             if (!buildResult.success())
                 buildResult.rethrow();

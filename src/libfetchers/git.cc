@@ -26,11 +26,6 @@ namespace {
 // old version of git, which will ignore unrecognized `-c` options.
 const std::string gitInitialBranch = "__nix_dummy_branch";
 
-std::string getGitDir()
-{
-    return getEnv("GIT_DIR").value_or(".git");
-}
-
 bool isCacheFileWithinTtl(const time_t now, const struct stat & st)
 {
     return st.st_mtime + settings.tarballTtl > now;
@@ -90,8 +85,9 @@ std::optional<std::string> readHead(const Path & path)
 bool storeCachedHead(const std::string& actualUrl, const std::string& headRef)
 {
     Path cacheDir = getCachePath(actualUrl);
+    auto gitDir = ".";
     try {
-        runProgram("git", true, { "-C", cacheDir, "symbolic-ref", "--", "HEAD", headRef });
+        runProgram("git", true, { "-C", cacheDir, "--git-dir", gitDir, "symbolic-ref", "--", "HEAD", headRef });
     } catch (ExecError &e) {
         if (!WIFEXITED(e.status)) throw;
         return false;
@@ -152,7 +148,7 @@ struct WorkdirInfo
 WorkdirInfo getWorkdirInfo(const Input & input, const Path & workdir)
 {
     const bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
-    auto gitDir = getGitDir();
+    std::string gitDir(".git");
 
     auto env = getEnv();
     // Set LC_ALL to C: because we rely on the error messages from git rev-parse to determine what went wrong
@@ -187,7 +183,7 @@ WorkdirInfo getWorkdirInfo(const Input & input, const Path & workdir)
         if (hasHead) {
             // Using git diff is preferrable over lower-level operations here,
             // because its conceptually simpler and we only need the exit code anyways.
-            auto gitDiffOpts = Strings({ "-C", workdir, "diff", "HEAD", "--quiet"});
+            auto gitDiffOpts = Strings({ "-C", workdir, "--git-dir", gitDir, "diff", "HEAD", "--quiet"});
             if (!submodules) {
                 // Changes in submodules should only make the tree dirty
                 // when those submodules will be copied as well.
@@ -208,6 +204,7 @@ WorkdirInfo getWorkdirInfo(const Input & input, const Path & workdir)
 std::pair<StorePath, Input> fetchFromWorkdir(ref<Store> store, Input & input, const Path & workdir, const WorkdirInfo & workdirInfo)
 {
     const bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
+    auto gitDir = ".git";
 
     if (!fetchSettings.allowDirty)
         throw Error("Git tree '%s' is dirty", workdir);
@@ -215,7 +212,7 @@ std::pair<StorePath, Input> fetchFromWorkdir(ref<Store> store, Input & input, co
     if (fetchSettings.warnDirty)
         warn("Git tree '%s' is dirty", workdir);
 
-    auto gitOpts = Strings({ "-C", workdir, "ls-files", "-z" });
+    auto gitOpts = Strings({ "-C", workdir, "--git-dir", gitDir, "ls-files", "-z" });
     if (submodules)
         gitOpts.emplace_back("--recurse-submodules");
 
@@ -245,7 +242,7 @@ std::pair<StorePath, Input> fetchFromWorkdir(ref<Store> store, Input & input, co
     // modified dirty file?
     input.attrs.insert_or_assign(
         "lastModified",
-        workdirInfo.hasHead ? std::stoull(runProgram("git", true, { "-C", actualPath, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
+        workdirInfo.hasHead ? std::stoull(runProgram("git", true, { "-C", actualPath, "--git-dir", gitDir, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
     return {std::move(storePath), input};
 }
@@ -370,7 +367,7 @@ struct GitInputScheme : InputScheme
     {
         auto sourcePath = getSourcePath(input);
         assert(sourcePath);
-        auto gitDir = getGitDir();
+        auto gitDir = ".git";
 
         runProgram("git", true,
             { "-C", *sourcePath, "--git-dir", gitDir, "add", "--force", "--intent-to-add", "--", std::string(file) });
@@ -396,7 +393,7 @@ struct GitInputScheme : InputScheme
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
-        auto gitDir = getGitDir();
+        auto gitDir = ".git";
 
         std::string name = input.getName();
 
@@ -454,11 +451,10 @@ struct GitInputScheme : InputScheme
             }
         }
 
-        const Attrs unlockedAttrs({
+        Attrs unlockedAttrs({
             {"type", cacheType},
             {"name", name},
             {"url", actualUrl},
-            {"ref", *input.getRef()},
         });
 
         Path repoDir;
@@ -471,6 +467,7 @@ struct GitInputScheme : InputScheme
                     head = "master";
                 }
                 input.attrs.insert_or_assign("ref", *head);
+                unlockedAttrs.insert_or_assign("ref", *head);
             }
 
             if (!input.getRev())
@@ -487,6 +484,7 @@ struct GitInputScheme : InputScheme
                     head = "master";
                 }
                 input.attrs.insert_or_assign("ref", *head);
+                unlockedAttrs.insert_or_assign("ref", *head);
             }
 
             if (auto res = getCache()->lookup(store, unlockedAttrs)) {
@@ -576,7 +574,7 @@ struct GitInputScheme : InputScheme
         bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "rev-parse", "--is-shallow-repository" })) == "true";
 
         if (isShallow && !shallow)
-            throw Error("'%s' is a shallow Git repository, but a non-shallow repository is needed", actualUrl);
+            throw Error("'%s' is a shallow Git repository, but shallow repositories are only allowed when `shallow = true;` is specified.", actualUrl);
 
         // FIXME: check whether rev is an ancestor of ref.
 

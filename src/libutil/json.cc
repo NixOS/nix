@@ -1,6 +1,7 @@
 #include "json.hh"
 
 #include <iomanip>
+#include <cstdint>
 #include <cstring>
 
 namespace nix {

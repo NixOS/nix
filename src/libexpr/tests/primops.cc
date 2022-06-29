@@ -540,22 +540,22 @@ namespace nix {
         ASSERT_THAT(v, IsStringEq(output));
     }
 
-#define CASE(input, output) (std::make_tuple(std::string_view("builtins.toString " #input), std::string_view(output)))
+#define CASE(input, output) (std::make_tuple(std::string_view("builtins.toString " input), std::string_view(output)))
     INSTANTIATE_TEST_SUITE_P(
             toString,
             ToStringPrimOpTest,
             testing::Values(
-                CASE("foo", "foo"),
-                CASE(1, "1"),
-                CASE([1 2 3], "1 2 3"),
-                CASE(.123, "0.123000"),
-                CASE(true, "1"),
-                CASE(false, ""),
-                CASE(null, ""),
-                CASE({ v = "bar"; __toString = self: self.v; }, "bar"),
-                CASE({ v = "bar"; __toString = self: self.v; outPath = "foo"; }, "bar"),
-                CASE({ outPath = "foo"; }, "foo"),
-                CASE(./test, "/test")
+                CASE(R"("foo")", "foo"),
+                CASE(R"(1)", "1"),
+                CASE(R"([1 2 3])", "1 2 3"),
+                CASE(R"(.123)", "0.123000"),
+                CASE(R"(true)", "1"),
+                CASE(R"(false)", ""),
+                CASE(R"(null)", ""),
+                CASE(R"({ v = "bar"; __toString = self: self.v; })", "bar"),
+                CASE(R"({ v = "bar"; __toString = self: self.v; outPath = "foo"; })", "bar"),
+                CASE(R"({ outPath = "foo"; })", "foo"),
+                CASE(R"(./test)", "/test")
             )
     );
 #undef CASE

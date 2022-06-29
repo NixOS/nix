@@ -638,6 +638,17 @@ place_channel_configuration() {
     fi
 }
 
+check_selinux() {
+    if command -v getenforce > /dev/null 2>&1; then
+        if ! [ "$(getenforce)" = "Disabled" ]; then
+            failure <<EOF
+Nix does not work with selinux enabled yet!
+see https://github.com/NixOS/nix/issues/2374
+EOF
+        fi
+    fi
+}
+
 welcome_to_nix() {
     ok "Welcome to the Multi-User Nix Installation"
 
@@ -865,6 +876,8 @@ Please do not run this script with root privileges. I will call sudo
 when I need to.
 EOF
     fi
+
+    check_selinux
 
     if [ "$(uname -s)" = "Darwin" ]; then
         # shellcheck source=./install-darwin-multi-user.sh

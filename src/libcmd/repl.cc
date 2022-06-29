@@ -48,38 +48,42 @@ struct NixRepl
     #endif
 {
     std::string curDir;
-    std::unique_ptr<EvalState> state;
+    ref<EvalState> state;
     Bindings * autoArgs;
+
+    size_t debugTraceIndex;
 
     Strings loadedFiles;
 
     const static int envSize = 32768;
-    StaticEnv staticEnv;
+    std::shared_ptr<StaticEnv> staticEnv;
     Env * env;
     int displ;
     StringSet varNames;
 
     const Path historyFile;
 
-    NixRepl(const Strings & searchPath, nix::ref<Store> store);
+    NixRepl(ref<EvalState> state);
     ~NixRepl();
     void mainLoop(const std::vector<std::string> & files);
     StringSet completePrefix(const std::string & prefix);
-    bool getLine(std::string & input, const std::string &prompt);
+    bool getLine(std::string & input, const std::string & prompt);
     StorePath getDerivationPath(Value & v);
     bool processLine(std::string line);
     void loadFile(const Path & path);
     void loadFlake(const std::string & flakeRef);
     void initEnv();
+    void loadFiles();
     void reloadFiles();
     void addAttrsToScope(Value & attrs);
     void addVarToScope(const Symbol name, Value & v);
     Expr * parseString(std::string s);
     void evalString(std::string s, Value & v);
+    void loadDebugTraceEnv(DebugTrace & dt);
 
     typedef std::set<Value *> ValuesSeen;
-    std::ostream &  printValue(std::ostream & str, Value & v, unsigned int maxDepth);
-    std::ostream &  printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen);
+    std::ostream & printValue(std::ostream & str, Value & v, unsigned int maxDepth);
+    std::ostream & printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen);
 };
 
 
@@ -92,9 +96,10 @@ std::string removeWhitespace(std::string s)
 }
 
 
-NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store)
-    : state(std::make_unique<EvalState>(searchPath, store))
-    , staticEnv(false, &state->staticBaseEnv)
+NixRepl::NixRepl(ref<EvalState> state)
+    : state(state)
+    , debugTraceIndex(0)
+    , staticEnv(new StaticEnv(false, state->staticBaseEnv.get()))
     , historyFile(getDataDir() + "/nix/repl-history")
 {
     curDir = absPath(".");
@@ -198,15 +203,42 @@ namespace {
     }
 }
 
+static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positions, const DebugTrace & dt)
+{
+    if (dt.isError)
+        out << ANSI_RED "error: " << ANSI_NORMAL;
+    out << dt.hint.str() << "\n";
+
+    // prefer direct pos, but if noPos then try the expr.
+    auto pos = *dt.pos
+        ? *dt.pos
+        : positions[dt.expr.getPos() ? dt.expr.getPos() : noPos];
+
+    if (pos) {
+        printAtPos(pos, out);
+
+        auto loc = getCodeLines(pos);
+        if (loc.has_value()) {
+            out << "\n";
+            printCodeLines(out, "", pos, *loc);
+            out << "\n";
+        }
+    }
+
+    return out;
+}
+
 void NixRepl::mainLoop(const std::vector<std::string> & files)
 {
     std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
     notice("Welcome to Nix " + nixVersion + ". Type :? for help.\n");
 
-    for (auto & i : files)
-        loadedFiles.push_back(i);
+    if (!files.empty()) {
+        for (auto & i : files)
+            loadedFiles.push_back(i);
+    }
 
-    reloadFiles();
+    loadFiles();
     if (!loadedFiles.empty()) notice("");
 
     // Allow nix-repl specific settings in .inputrc
@@ -227,9 +259,12 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
     while (true) {
         // When continuing input from previous lines, don't print a prompt, just align to the same
         // number of chars as the prompt.
-        if (!getLine(input, input.empty() ? "nix-repl> " : "          "))
+        if (!getLine(input, input.empty() ? "nix-repl> " : "          ")) {
+            // ctrl-D should exit the debugger.
+            state->debugStop = false;
+            state->debugQuit = true;
             break;
-
+        }
         try {
             if (!removeWhitespace(input).empty() && !processLine(input)) return;
         } catch (ParseError & e) {
@@ -240,6 +275,14 @@ void NixRepl::mainLoop(const std::vector<std::string> & files)
             } else {
               printMsg(lvlError, e.msg());
             }
+        } catch (EvalError & e) {
+            // in debugger mode, an EvalError should trigger another repl session.
+            // when that session returns the exception will land here.  No need to show it again;
+            // show the error for this repl session instead.
+            if (state->debugRepl && !state->debugTraces.empty())
+                showDebugTrace(std::cout, state->positions, state->debugTraces.front());
+            else
+                printMsg(lvlError, e.msg());
         } catch (Error & e) {
             printMsg(lvlError, e.msg());
         } catch (Interrupted & e) {
@@ -394,6 +437,19 @@ StorePath NixRepl::getDerivationPath(Value & v) {
     return *drvPath;
 }
 
+void NixRepl::loadDebugTraceEnv(DebugTrace & dt)
+{
+    initEnv();
+
+    auto se = state->getStaticEnv(dt.expr);
+    if (se) {
+        auto vm = mapStaticEnvBindings(state->symbols, *se.get(), dt.env);
+
+        // add staticenv vars.
+        for (auto & [name, value] : *(vm.get()))
+            addVarToScope(state->symbols.create(name), *value);
+    }
+}
 
 bool NixRepl::processLine(std::string line)
 {
@@ -429,12 +485,72 @@ bool NixRepl::processLine(std::string line)
              << "  :p <expr>     Evaluate and print expression recursively\n"
              << "  :q            Exit nix-repl\n"
              << "  :r            Reload all files\n"
-             << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
+             << "  :sh <expr>    Build dependencies of derivation, then start nix-shell\n"
              << "  :t <expr>     Describe result of evaluation\n"
              << "  :u <expr>     Build derivation, then start nix-shell\n"
              << "  :doc <expr>   Show documentation of a builtin function\n"
              << "  :log <expr>   Show logs for a derivation\n"
-             << "  :st [bool]    Enable, disable or toggle showing traces for errors\n";
+             << "  :te [bool]    Enable, disable or toggle showing traces for errors\n"
+             ;
+        if (state->debugRepl) {
+             std::cout
+             << "\n"
+             << "        Debug mode commands\n"
+             << "  :env          Show env stack\n"
+             << "  :bt           Show trace stack\n"
+             << "  :st           Show current trace\n"
+             << "  :st <idx>     Change to another trace in the stack\n"
+             << "  :c            Go until end of program, exception, or builtins.break\n"
+             << "  :s            Go one step\n"
+             ;
+        }
+
+    }
+
+    else if (state->debugRepl && (command == ":bt" || command == ":backtrace")) {
+        for (const auto & [idx, i] : enumerate(state->debugTraces)) {
+            std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
+            showDebugTrace(std::cout, state->positions, i);
+        }
+    }
+
+    else if (state->debugRepl && (command == ":env")) {
+        for (const auto & [idx, i] : enumerate(state->debugTraces)) {
+            if (idx == debugTraceIndex) {
+                printEnvBindings(*state, i.expr, i.env);
+                break;
+            }
+        }
+    }
+
+    else if (state->debugRepl && (command == ":st")) {
+        try {
+            // change the DebugTrace index.
+            debugTraceIndex = stoi(arg);
+        } catch (...) { }
+
+        for (const auto & [idx, i] : enumerate(state->debugTraces)) {
+             if (idx == debugTraceIndex) {
+                 std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
+                 showDebugTrace(std::cout, state->positions, i);
+                 std::cout << std::endl;
+                 printEnvBindings(*state, i.expr, i.env);
+                 loadDebugTraceEnv(i);
+                 break;
+             }
+        }
+    }
+
+    else if (state->debugRepl && (command == ":s" || command == ":step")) {
+        // set flag to stop at next DebugTrace; exit repl.
+        state->debugStop = true;
+        return false;
+    }
+
+    else if (state->debugRepl && (command == ":c" || command == ":continue")) {
+        // set flag to run to next breakpoint or end of program; exit repl.
+        state->debugStop = false;
+        return false;
     }
 
     else if (command == ":a" || command == ":add") {
@@ -506,7 +622,7 @@ bool NixRepl::processLine(std::string line)
         runNix("nix-shell", {state->store->printStorePath(drvPath)});
     }
 
-    else if (command == ":b" || command == ":bl" || command == ":i" || command == ":s" || command == ":log") {
+    else if (command == ":b" || command == ":bl" || command == ":i" || command == ":sh" || command == ":log") {
         Value v;
         evalString(arg, v);
         StorePath drvPath = getDerivationPath(v);
@@ -567,8 +683,11 @@ bool NixRepl::processLine(std::string line)
         printValue(std::cout, v, 1000000000) << std::endl;
     }
 
-    else if (command == ":q" || command == ":quit")
+    else if (command == ":q" || command == ":quit") {
+        state->debugStop = false;
+        state->debugQuit = true;
         return false;
+    }
 
     else if (command == ":doc") {
         Value v;
@@ -593,7 +712,7 @@ bool NixRepl::processLine(std::string line)
             throw Error("value does not have documentation");
     }
 
-    else if (command == ":st" || command == ":show-trace") {
+    else if (command == ":te" || command == ":trace-enable") {
         if (arg == "false" || (arg == "" && loggerSettings.showTrace)) {
             std::cout << "not showing error traces\n";
             loggerSettings.showTrace = false;
@@ -669,10 +788,10 @@ void NixRepl::initEnv()
     env = &state->allocEnv(envSize);
     env->up = &state->baseEnv;
     displ = 0;
-    staticEnv.vars.clear();
+    staticEnv->vars.clear();
 
     varNames.clear();
-    for (auto & i : state->staticBaseEnv.vars)
+    for (auto & i : state->staticBaseEnv->vars)
         varNames.emplace(state->symbols[i.first]);
 }
 
@@ -681,6 +800,12 @@ void NixRepl::reloadFiles()
 {
     initEnv();
 
+    loadFiles();
+}
+
+
+void NixRepl::loadFiles()
+{
     Strings old = loadedFiles;
     loadedFiles.clear();
 
@@ -701,12 +826,12 @@ void NixRepl::addAttrsToScope(Value & attrs)
         throw Error("environment full; cannot add more variables");
 
     for (auto & i : *attrs.attrs) {
-        staticEnv.vars.emplace_back(i.name, displ);
+        staticEnv->vars.emplace_back(i.name, displ);
         env->values[displ++] = i.value;
         varNames.emplace(state->symbols[i.name]);
     }
-    staticEnv.sort();
-    staticEnv.deduplicate();
+    staticEnv->sort();
+    staticEnv->deduplicate();
     notice("Added %1% variables.", attrs.attrs->size());
 }
 
@@ -715,10 +840,10 @@ void NixRepl::addVarToScope(const Symbol name, Value & v)
 {
     if (displ >= envSize)
         throw Error("environment full; cannot add more variables");
-    if (auto oldVar = staticEnv.find(name); oldVar != staticEnv.vars.end())
-        staticEnv.vars.erase(oldVar);
-    staticEnv.vars.emplace_back(name, displ);
-    staticEnv.sort();
+    if (auto oldVar = staticEnv->find(name); oldVar != staticEnv->vars.end())
+        staticEnv->vars.erase(oldVar);
+    staticEnv->vars.emplace_back(name, displ);
+    staticEnv->sort();
     env->values[displ++] = &v;
     varNames.emplace(state->symbols[name]);
 }
@@ -886,6 +1011,21 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     return str;
 }
 
+void runRepl(
+    ref<EvalState>evalState,
+    const ValMap & extraEnv)
+{
+    auto repl = std::make_unique<NixRepl>(evalState);
+
+    repl->initEnv();
+
+    // add 'extra' vars.
+    for (auto & [name, value] : extraEnv)
+        repl->addVarToScope(repl->state->symbols.create(name), *value);
+
+    repl->mainLoop({});
+}
+
 struct CmdRepl : StoreCommand, MixEvalArgs
 {
     std::vector<std::string> files;
@@ -897,6 +1037,11 @@ struct CmdRepl : StoreCommand, MixEvalArgs
             .handler = {&files},
             .completer = completePath
         });
+    }
+
+    bool forceImpureByDefault() override
+    {
+        return true;
     }
 
     std::string description() override
@@ -913,9 +1058,11 @@ struct CmdRepl : StoreCommand, MixEvalArgs
 
     void run(ref<Store> store) override
     {
-        evalSettings.pureEval = false;
-        auto repl = std::make_unique<NixRepl>(searchPath, openStore());
+        auto evalState = make_ref<EvalState>(searchPath, store);
+
+        auto repl = std::make_unique<NixRepl>(evalState);
         repl->autoArgs = getAutoArgs(*repl->state);
+        repl->initEnv();
         repl->mainLoop(files);
     }
 };

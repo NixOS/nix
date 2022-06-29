@@ -69,6 +69,7 @@ protected:
         } catch (SysError & e) {
             if (e.errNo == ENOENT)
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache", path);
+            throw;
         }
     }
 
@@ -107,7 +108,7 @@ bool LocalBinaryCacheStore::fileExists(const std::string & path)
 
 std::set<std::string> LocalBinaryCacheStore::uriSchemes()
 {
-    if (getEnv("_NIX_FORCE_HTTP_BINARY_CACHE_STORE") == "1")
+    if (getEnv("_NIX_FORCE_HTTP") == "1")
         return {};
     else
         return {"file"};

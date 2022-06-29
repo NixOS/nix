@@ -1,2 +1,7 @@
 [output.html]
 additional-css = ["custom.css"]
+additional-js = ["redirects.js"]
+
+[preprocessor.anchors]
+renderers = ["html"]
+command = "jq --from-file doc/manual/anchors.jq"

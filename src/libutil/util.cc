@@ -29,6 +29,7 @@
 
 #ifdef __APPLE__
 #include <sys/syscall.h>
+#include <mach-o/dyld.h>
 #endif
 
 #ifdef __linux__
@@ -574,6 +575,20 @@ Path getHome()
     static Path homeDir = []()
     {
         auto homeDir = getEnv("HOME");
+        if (homeDir) {
+            // Only use $HOME if doesn't exist or is owned by the current user.
+            struct stat st;
+            int result = stat(homeDir->c_str(), &st);
+            if (result != 0) {
+                if (errno != ENOENT) {
+                    warn("couldn't stat $HOME ('%s') for reason other than not existing ('%d'), falling back to the one defined in the 'passwd' file", *homeDir, errno);
+                    homeDir.reset();
+                }
+            } else if (st.st_uid != geteuid()) {
+                warn("$HOME ('%s') is not owned by you, falling back to the one defined in the 'passwd' file", *homeDir);
+                homeDir.reset();
+            }
+        }
         if (!homeDir) {
             std::vector<char> buf(16384);
             struct passwd pwbuf;
@@ -616,6 +631,27 @@ Path getDataDir()
 {
     auto dataDir = getEnv("XDG_DATA_HOME");
     return dataDir ? *dataDir : getHome() + "/.local/share";
+}
+
+
+std::optional<Path> getSelfExe()
+{
+    static auto cached = []() -> std::optional<Path>
+    {
+        #if __linux__
+        return readLink("/proc/self/exe");
+        #elif __APPLE__
+        char buf[1024];
+        uint32_t size = sizeof(buf);
+        if (_NSGetExecutablePath(buf, &size) == 0)
+            return buf;
+        else
+            return std::nullopt;
+        #else
+        return std::nullopt;
+        #endif
+    }();
+    return cached;
 }
 
 
@@ -1818,7 +1854,7 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
     if (chmod(path.c_str(), mode) == -1)
         throw SysError("changing permissions on '%1%'", path);
 
-    if (listen(fdSocket.get(), 5) == -1)
+    if (listen(fdSocket.get(), 100) == -1)
         throw SysError("cannot listen on socket '%1%'", path);
 
     return fdSocket;

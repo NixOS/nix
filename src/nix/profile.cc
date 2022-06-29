@@ -263,7 +263,8 @@ builtPathsPerInstallable(
 
 struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 {
-    std::optional<int> priority;
+    std::optional<int64_t> priority;
+
     CmdProfileInstall() {
         addFlag({
             .longName = "priority",
