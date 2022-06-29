@@ -408,8 +408,10 @@ cat > $templatesDir/trivial/flake.nix <<EOF
   };
 }
 EOF
+echo a > $templatesDir/trivial/a
+echo b > $templatesDir/trivial/b
 
-git -C $templatesDir add flake.nix trivial/flake.nix
+git -C $templatesDir add flake.nix trivial/
 git -C $templatesDir commit -m 'Initial'
 
 nix flake check templates
@@ -423,6 +425,18 @@ nix flake check $flake7Dir
 nix flake show $flake7Dir
 nix flake show $flake7Dir --json | jq
 git -C $flake7Dir commit -a -m 'Initial'
+
+# Test 'nix flake init' with benign conflicts
+rm -rf $flake7Dir && mkdir $flake7Dir && git -C $flake7Dir init
+echo a > $flake7Dir/a
+(cd $flake7Dir && nix flake init) # check idempotence
+
+# Test 'nix flake init' with conflicts
+rm -rf $flake7Dir && mkdir $flake7Dir && git -C $flake7Dir init
+echo b > $flake7Dir/a
+pushd $flake7Dir
+(! nix flake init) |& grep "refusing to overwrite existing file '$flake7Dir/a'"
+popd
 
 # Test 'nix flake new'.
 rm -rf $flake6Dir
