@@ -4,8 +4,9 @@
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.05-small";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
+  inputs.flake-registry = { url = "github:NixOS/flake-registry"; flake = false; };
 
-  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src }:
+  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, flake-registry }:
 
     let
 
@@ -612,7 +613,10 @@
         dockerImage =
           let
             pkgs = nixpkgsFor.${system};
-            image = import ./docker.nix { inherit pkgs; tag = version; };
+            image = import ./docker.nix {
+              inherit pkgs flake-registry;
+              tag = version;
+            };
           in
           pkgs.runCommand
             "docker-image-tarball-${version}"

@@ -1,5 +1,21 @@
 {
   "nodes": {
+    "flake-registry": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1657791189,
+        "narHash": "sha256-Z2ckMWqybpJjIdGIPuHcYzTL7DPTbFKpBZJJgGfFUog=",
+        "owner": "NixOS",
+        "repo": "flake-registry",
+        "rev": "7a481cef7e86d6ceb4aec244d9bb085619360ba1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "flake-registry",
+        "type": "github"
+      }
+    },
     "lowdown-src": {
       "flake": false,
       "locked": {
@@ -50,6 +66,7 @@
     },
     "root": {
       "inputs": {
+        "flake-registry": "flake-registry",
         "lowdown-src": "lowdown-src",
         "nixpkgs": "nixpkgs",
         "nixpkgs-regression": "nixpkgs-regression"

@@ -1,4 +1,5 @@
-{ pkgs ? import <nixpkgs> { }
+{ flake-registry
+, pkgs ? import <nixpkgs> { }
 , lib ? pkgs.lib
 , name ? "nix"
 , tag ? "latest"
@@ -228,6 +229,14 @@ let
       mkdir -p $out/root/.nix-defexpr
       ln -s $out/nix/var/nix/profiles/per-user/root/channels $out/root/.nix-defexpr/channels
       echo "${channelURL} ${channelName}" > $out/root/.nix-channels
+
+      nixCacheDir="/root/.cache/nix"
+      mkdir -p $out$nixCacheDir
+      globalFlakeRegistryPath="$nixCacheDir/flake-registry.json"
+      ln -s ${flake-registry}/flake-registry.json $out$globalFlakeRegistryPath
+      mkdir -p $out/nix/var/nix/gcroots/auto
+      rootName=$(${pkgs.nix}/bin/nix --extra-experimental-features nix-command hash file --type sha1 --base32 <(echo -n $globalFlakeRegistryPath))
+      ln -s $globalFlakeRegistryPath $out/nix/var/nix/gcroots/auto/$rootName
 
       mkdir -p $out/bin $out/usr/bin
       ln -s ${pkgs.coreutils}/bin/env $out/usr/bin/env
