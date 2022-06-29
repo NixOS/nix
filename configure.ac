@@ -190,6 +190,16 @@ PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.6.19], [CXXFLAGS="$SQLITE3_CFLAGS $CX
 # Look for libcurl, a required dependency.
 PKG_CHECK_MODULES([LIBCURL], [libcurl], [CXXFLAGS="$LIBCURL_CFLAGS $CXXFLAGS"])
 
+# Check whether libcurl supports required features
+PKG_CHECK_VAR([LIBCURL_SUPPORTED_FEATURES], [libcurl], [supported_features], [
+  m4_foreach([LIBCURL_FEATURE], [brotli, zstd], [
+    AC_MSG_CHECKING([whether libcurl supports feature LIBCURL_FEATURE])
+    AS_CASE($LIBCURL_SUPPORTED_FEATURES, [*LIBCURL_FEATURE*], [AC_MSG_RESULT(yes)],
+      [AC_MSG_RESULT(no)
+       AC_MSG_ERROR([Nix requires libcurl to support feature LIBCURL_FEATURE])])
+  ])
+], [AC_MSG_ERROR([Nix requires libcurl to provide a list of supported features])])
+
 # Look for editline, a required dependency.
 # The the libeditline.pc file was added only in libeditline >= 1.15.2,
 # see https://github.com/troglobit/editline/commit/0a8f2ef4203c3a4a4726b9dd1336869cd0da8607,
