@@ -22,7 +22,7 @@
 
 extern std::string chrootHelperName;
 
-void chrootHelper(int argc, char * * argv);
+void chrootHelper(int argc, char ** argv);
 
 namespace nix {
 
@@ -37,14 +37,15 @@ static bool haveInternet()
     Finally free([&]() { freeifaddrs(addrs); });
 
     for (auto i = addrs; i; i = i->ifa_next) {
-        if (!i->ifa_addr) continue;
+        if (!i->ifa_addr)
+            continue;
         if (i->ifa_addr->sa_family == AF_INET) {
             if (ntohl(((sockaddr_in *) i->ifa_addr)->sin_addr.s_addr) != INADDR_LOOPBACK) {
                 return true;
             }
         } else if (i->ifa_addr->sa_family == AF_INET6) {
-            if (!IN6_IS_ADDR_LOOPBACK(&((sockaddr_in6 *) i->ifa_addr)->sin6_addr) &&
-                !IN6_IS_ADDR_LINKLOCAL(&((sockaddr_in6 *) i->ifa_addr)->sin6_addr))
+            if (!IN6_IS_ADDR_LOOPBACK(&((sockaddr_in6 *) i->ifa_addr)->sin6_addr)
+                && !IN6_IS_ADDR_LINKLOCAL(&((sockaddr_in6 *) i->ifa_addr)->sin6_addr))
                 return true;
         }
     }
@@ -53,9 +54,10 @@ static bool haveInternet()
 }
 
 std::string programPath;
-char * * savedArgv;
+char ** savedArgv;
 
-struct HelpRequested { };
+struct HelpRequested
+{};
 
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
@@ -63,7 +65,9 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     bool refresh = false;
     bool showVersion = false;
 
-    NixArgs() : MultiCommand(RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
+    NixArgs()
+        : MultiCommand(RegisterCommand::getCommandsFor({}))
+        , MixCommonArgs("nix")
     {
         categories.clear();
         categories[Command::catDefault] = "Main commands";
@@ -82,7 +86,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .shortName = 'L',
             .description = "Print full build logs on standard error.",
             .category = loggingCategory,
-            .handler = {[&]() {setLogFormat(LogFormat::barWithLogs); }},
+            .handler = {[&]() { setLogFormat(LogFormat::barWithLogs); }},
         });
 
         addFlag({
@@ -131,12 +135,13 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 
     Strings::iterator rewriteArgs(Strings & args, Strings::iterator pos) override
     {
-        if (aliasUsed || command || pos == args.end()) return pos;
+        if (aliasUsed || command || pos == args.end())
+            return pos;
         auto arg = *pos;
         auto i = aliases.find(arg);
-        if (i == aliases.end()) return pos;
-        warn("'%s' is a deprecated alias for '%s'",
-            arg, concatStringsSep(" ", i->second));
+        if (i == aliases.end())
+            return pos;
+        warn("'%s' is a deprecated alias for '%s'", arg, concatStringsSep(" ", i->second));
         pos = args.erase(pos);
         for (auto j = i->second.rbegin(); j != i->second.rend(); ++j)
             pos = args.insert(pos, *j);
@@ -152,8 +157,8 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     std::string doc() override
     {
         return
-          #include "nix.md"
-          ;
+#include "nix.md"
+            ;
     }
 
     // Plugins may add new subcommands.
@@ -174,15 +179,17 @@ static void showHelp(std::vector<std::string> subcommand, MultiCommand & topleve
     EvalState state({}, openStore("dummy://"));
 
     auto vGenerateManpage = state.allocValue();
-    state.eval(state.parseExprFromString(
-        #include "generate-manpage.nix.gen.hh"
-        , "/"), *vGenerateManpage);
+    state.eval(
+        state.parseExprFromString(
+#include "generate-manpage.nix.gen.hh"
+            , "/"),
+        *vGenerateManpage);
 
     auto vUtils = state.allocValue();
     state.cacheFile(
         "/utils.nix", "/utils.nix",
         state.parseExprFromString(
-            #include "utils.nix.gen.hh"
+#include "utils.nix.gen.hh"
             , "/"),
         *vUtils);
 
@@ -222,22 +229,23 @@ struct CmdHelp : Command
     std::string doc() override
     {
         return
-          #include "help.md"
-          ;
+#include "help.md"
+            ;
     }
 
     void run() override
     {
         assert(parent);
         MultiCommand * toplevel = parent;
-        while (toplevel->parent) toplevel = toplevel->parent;
+        while (toplevel->parent)
+            toplevel = toplevel->parent;
         showHelp(subcommand, *toplevel);
     }
 };
 
 static auto rCmdHelp = registerCommand<CmdHelp>("help");
 
-void mainWrapped(int argc, char * * argv)
+void mainWrapped(int argc, char ** argv)
 {
     savedArgv = argv;
 
@@ -251,15 +259,16 @@ void mainWrapped(int argc, char * * argv)
     initNix();
     initGC();
 
-    #if __linux__
+#if __linux__
     if (getuid() == 0) {
         try {
             saveMountNamespace();
             if (unshare(CLONE_NEWNS) == -1)
                 throw SysError("setting up a private mount namespace");
-        } catch (Error & e) { }
+        } catch (Error & e) {
+        }
     }
-    #endif
+#endif
 
     Finally f([] { logger->stop(); });
 
@@ -268,12 +277,14 @@ void mainWrapped(int argc, char * * argv)
 
     if (argc > 0 && std::string_view(argv[0]) == "__build-remote") {
         programName = "build-remote";
-        argv++; argc--;
+        argv++;
+        argc--;
     }
 
     {
         auto legacy = (*RegisterLegacyCommand::commands)[programName];
-        if (legacy) return legacy(argc, argv);
+        if (legacy)
+            return legacy(argc, argv);
     }
 
     evalSettings.pureEval = true;
@@ -301,9 +312,11 @@ void mainWrapped(int argc, char * * argv)
         auto builtins = state.baseEnv.values[0]->attrs;
         for (auto & builtin : *builtins) {
             auto b = nlohmann::json::object();
-            if (!builtin.value->isPrimOp()) continue;
+            if (!builtin.value->isPrimOp())
+                continue;
             auto primOp = builtin.value->primOp;
-            if (!primOp->doc) continue;
+            if (!primOp->doc)
+                continue;
             b["arity"] = primOp->arity;
             b["args"] = primOp->args;
             b["doc"] = trim(stripIndentation(primOp->doc));
@@ -313,16 +326,18 @@ void mainWrapped(int argc, char * * argv)
         return;
     }
 
-    Finally printCompletions([&]()
-    {
+    Finally printCompletions([&]() {
         if (completions) {
             switch (completionType) {
             case ctNormal:
-                std::cout << "normal\n"; break;
+                std::cout << "normal\n";
+                break;
             case ctFilenames:
-                std::cout << "filenames\n"; break;
+                std::cout << "filenames\n";
+                break;
             case ctAttrs:
-                std::cout << "attrs\n"; break;
+                std::cout << "attrs\n";
+                break;
             }
             for (auto & s : *completions)
                 std::cout << s.completion << "\t" << s.description << "\n";
@@ -344,10 +359,12 @@ void mainWrapped(int argc, char * * argv)
         showHelp(subcommand, args);
         return;
     } catch (UsageError &) {
-        if (!completions) throw;
+        if (!completions)
+            throw;
     }
 
-    if (completions) return;
+    if (completions)
+        return;
 
     if (args.showVersion) {
         printVersion(programName);
@@ -357,9 +374,7 @@ void mainWrapped(int argc, char * * argv)
     if (!args.command)
         throw UsageError("no subcommand specified");
 
-    if (args.command->first != "repl"
-        && args.command->first != "doctor"
-        && args.command->first != "upgrade-nix")
+    if (args.command->first != "repl" && args.command->first != "doctor" && args.command->first != "upgrade-nix")
         settings.requireExperimentalFeature(Xp::NixCommand);
 
     if (args.useNet && !haveInternet()) {
@@ -394,13 +409,11 @@ void mainWrapped(int argc, char * * argv)
 
 }
 
-int main(int argc, char * * argv)
+int main(int argc, char ** argv)
 {
     // Increase the default stack size for the evaluator and for
     // libstdc++'s std::regex.
     nix::setStackSize(64 * 1024 * 1024);
 
-    return nix::handleExceptions(argv[0], [&]() {
-        nix::mainWrapped(argc, argv);
-    });
+    return nix::handleExceptions(argv[0], [&]() { nix::mainWrapped(argc, argv); });
 }

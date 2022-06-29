@@ -19,7 +19,9 @@ struct Key
 
 protected:
     Key(std::string_view name, std::string && key)
-        : name(name), key(std::move(key)) { }
+        : name(name)
+        , key(std::move(key))
+    {}
 };
 
 struct PublicKey;
@@ -37,7 +39,8 @@ struct SecretKey : Key
 
 private:
     SecretKey(std::string_view name, std::string && key)
-        : Key(name, std::move(key)) { }
+        : Key(name, std::move(key))
+    {}
 };
 
 struct PublicKey : Key
@@ -46,7 +49,8 @@ struct PublicKey : Key
 
 private:
     PublicKey(std::string_view name, std::string && key)
-        : Key(name, std::move(key)) { }
+        : Key(name, std::move(key))
+    {}
     friend struct SecretKey;
 };
 
@@ -54,8 +58,7 @@ typedef std::map<std::string, PublicKey> PublicKeys;
 
 /* Return true iff ‘sig’ is a correct signature over ‘data’ using one
    of the given public keys. */
-bool verifyDetached(const std::string & data, const std::string & sig,
-    const PublicKeys & publicKeys);
+bool verifyDetached(const std::string & data, const std::string & sig, const PublicKeys & publicKeys);
 
 PublicKeys getDefaultPublicKeys();
 

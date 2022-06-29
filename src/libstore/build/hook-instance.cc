@@ -34,10 +34,10 @@ HookInstance::HookInstance()
 
     /* Fork the hook. */
     pid = startProcess([&]() {
-
         commonChildInit(fromHook);
 
-        if (chdir("/") == -1) throw SysError("changing into /");
+        if (chdir("/") == -1)
+            throw SysError("changing into /");
 
         /* Dup the communication pipes. */
         if (dup2(toHook.readSide.get(), STDIN_FILENO) == -1)
@@ -69,12 +69,12 @@ HookInstance::HookInstance()
     sink << 0;
 }
 
-
 HookInstance::~HookInstance()
 {
     try {
         toHook.writeSide = -1;
-        if (pid != -1) pid.kill();
+        if (pid != -1)
+            pid.kill();
     } catch (...) {
         ignoreException();
     }

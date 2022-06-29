@@ -8,7 +8,8 @@ struct PathInputScheme : InputScheme
 {
     std::optional<Input> inputFromURL(const ParsedURL & url) override
     {
-        if (url.scheme != "path") return {};
+        if (url.scheme != "path")
+            return {};
 
         if (url.authority && *url.authority != "")
             throw Error("path URL '%s' should not have an authority ('%s')", url.url, *url.authority);
@@ -25,8 +26,7 @@ struct PathInputScheme : InputScheme
                     input.attrs.insert_or_assign(name, *n);
                 else
                     throw Error("path URL '%s' has invalid parameter '%s'", url.to_string(), name);
-            }
-            else
+            } else
                 throw Error("path URL '%s' has unsupported parameter '%s'", url.to_string(), name);
 
         return input;
@@ -34,7 +34,8 @@ struct PathInputScheme : InputScheme
 
     std::optional<Input> inputFromAttrs(const Attrs & attrs) override
     {
-        if (maybeGetStrAttr(attrs, "type") != "path") return {};
+        if (maybeGetStrAttr(attrs, "type") != "path")
+            return {};
 
         getStrAttr(attrs, "path");
 
@@ -43,7 +44,8 @@ struct PathInputScheme : InputScheme
                attributes. This is useful for making a pinned tree
                work the same as the repository from which is exported
                (e.g. path:/nix/store/...-source?lastModified=1585388205&rev=b0c285...). */
-            if (name == "type" || name == "rev" || name == "revCount" || name == "lastModified" || name == "narHash" || name == "path")
+            if (name == "type" || name == "rev" || name == "revCount" || name == "lastModified" || name == "narHash"
+                || name == "path")
                 // checked in Input::fromAttrs
                 ;
             else
@@ -59,7 +61,7 @@ struct PathInputScheme : InputScheme
         auto query = attrsToQuery(input.attrs);
         query.erase("path");
         query.erase("type");
-        return ParsedURL {
+        return ParsedURL{
             .scheme = "path",
             .path = getStrAttr(input.attrs, "path"),
             .query = query,
@@ -100,7 +102,8 @@ struct PathInputScheme : InputScheme
             if (store->isInStore(parent)) {
                 auto storePath = store->printStorePath(store->toStorePath(parent).first);
                 if (!isDirOrInDir(absPath, storePath))
-                    throw BadStorePath("relative path '%s' points outside of its parent's store path '%s'", path, storePath);
+                    throw BadStorePath(
+                        "relative path '%s' points outside of its parent's store path '%s'", path, storePath);
             }
         } else
             absPath = path;
@@ -116,9 +119,8 @@ struct PathInputScheme : InputScheme
         time_t mtime = 0;
         if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath)) {
             // FIXME: try to substitute storePath.
-            auto src = sinkToSource([&](Sink & sink) {
-                mtime = dumpPathAndGetMtime(absPath, sink, defaultPathFilter);
-            });
+            auto src =
+                sinkToSource([&](Sink & sink) { mtime = dumpPathAndGetMtime(absPath, sink, defaultPathFilter); });
             storePath = store->addToStoreFromDump(*src, "source");
         }
         input.attrs.insert_or_assign("lastModified", uint64_t(mtime));

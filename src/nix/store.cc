@@ -4,15 +4,19 @@ using namespace nix;
 
 struct CmdStore : virtual NixMultiCommand
 {
-    CmdStore() : MultiCommand(RegisterCommand::getCommandsFor({"store"}))
-    { }
+    CmdStore()
+        : MultiCommand(RegisterCommand::getCommandsFor({"store"}))
+    {}
 
     std::string description() override
     {
         return "manipulate a Nix store";
     }
 
-    Category category() override { return catUtility; }
+    Category category() override
+    {
+        return catUtility;
+    }
 
     void run() override
     {

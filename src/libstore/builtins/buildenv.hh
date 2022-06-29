@@ -5,11 +5,16 @@
 
 namespace nix {
 
-struct Package {
+struct Package
+{
     Path path;
     bool active;
     int priority;
-    Package(const Path & path, bool active, int priority) : path{path}, active{active}, priority{priority} {}
+    Package(const Path & path, bool active, int priority)
+        : path{path}
+        , active{active}
+        , priority{priority}
+    {}
 };
 
 typedef std::vector<Package> Packages;

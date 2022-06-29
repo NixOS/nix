@@ -16,12 +16,16 @@ class Callback
 
 public:
 
-    Callback(std::function<void(std::future<T>)> fun) : fun(fun) { }
+    Callback(std::function<void(std::future<T>)> fun)
+        : fun(fun)
+    {}
 
-    Callback(Callback && callback) : fun(std::move(callback.fun))
+    Callback(Callback && callback)
+        : fun(std::move(callback.fun))
     {
         auto prev = callback.done.test_and_set();
-        if (prev) done.test_and_set();
+        if (prev)
+            done.test_and_set();
     }
 
     void operator()(T && t) noexcept

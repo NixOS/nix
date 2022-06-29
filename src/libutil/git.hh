@@ -23,11 +23,9 @@ namespace git {
 //      {target}	{reference}
 //
 //    where {target} is a commit id and {reference} is mandatory
-struct LsRemoteRefLine {
-    enum struct Kind {
-        Symbolic,
-        Object
-    };
+struct LsRemoteRefLine
+{
+    enum struct Kind { Symbolic, Object };
     Kind kind;
     std::string target;
     std::optional<std::string> reference;

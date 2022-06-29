@@ -14,8 +14,8 @@ struct CmdDumpPath : StorePathCommand
     std::string doc() override
     {
         return
-          #include "store-dump-path.md"
-          ;
+#include "store-dump-path.md"
+            ;
     }
 
     void run(ref<Store> store, const StorePath & storePath) override
@@ -34,11 +34,7 @@ struct CmdDumpPath2 : Command
 
     CmdDumpPath2()
     {
-        expectArgs({
-            .label = "path",
-            .handler = {&path},
-            .completer = completePath
-        });
+        expectArgs({.label = "path", .handler = {&path}, .completer = completePath});
     }
 
     std::string description() override
@@ -49,8 +45,8 @@ struct CmdDumpPath2 : Command
     std::string doc() override
     {
         return
-          #include "nar-dump-path.md"
-          ;
+#include "nar-dump-path.md"
+            ;
     }
 
     void run() override

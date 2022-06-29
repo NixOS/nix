@@ -45,8 +45,9 @@ struct FlakeRef
     bool operator==(const FlakeRef & other) const;
 
     FlakeRef(fetchers::Input && input, const Path & subdir)
-        : input(std::move(input)), subdir(subdir)
-    { }
+        : input(std::move(input))
+        , subdir(subdir)
+    {}
 
     // FIXME: change to operator <<.
     std::string to_string() const;
@@ -60,31 +61,20 @@ struct FlakeRef
     std::pair<fetchers::Tree, FlakeRef> fetchTree(ref<Store> store) const;
 };
 
-std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);
+std::ostream & operator<<(std::ostream & str, const FlakeRef & flakeRef);
 
 FlakeRef parseFlakeRef(
-    const std::string & url,
-    const std::optional<Path> & baseDir = {},
-    bool allowMissing = false,
-    bool isFlake = true);
+    const std::string & url, const std::optional<Path> & baseDir = {}, bool allowMissing = false, bool isFlake = true);
 
-std::optional<FlakeRef> maybeParseFlake(
-    const std::string & url, const std::optional<Path> & baseDir = {});
+std::optional<FlakeRef> maybeParseFlake(const std::string & url, const std::optional<Path> & baseDir = {});
 
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
-    const std::string & url,
-    const std::optional<Path> & baseDir = {},
-    bool allowMissing = false,
-    bool isFlake = true);
+    const std::string & url, const std::optional<Path> & baseDir = {}, bool allowMissing = false, bool isFlake = true);
 
-std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
-    const std::string & url, const std::optional<Path> & baseDir = {});
+std::optional<std::pair<FlakeRef, std::string>>
+maybeParseFlakeRefWithFragment(const std::string & url, const std::optional<Path> & baseDir = {});
 
 std::tuple<FlakeRef, std::string, OutputsSpec> parseFlakeRefWithFragmentAndOutputsSpec(
-    const std::string & url,
-    const std::optional<Path> & baseDir = {},
-    bool allowMissing = false,
-    bool isFlake = true);
-
+    const std::string & url, const std::optional<Path> & baseDir = {}, bool allowMissing = false, bool isFlake = true);
 
 }

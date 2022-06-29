@@ -5,7 +5,7 @@
 
 namespace nix {
 
-static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     state.forceAttrs(*args[0], pos);
 
@@ -35,68 +35,59 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
             fromStoreUrl = state.forceStringNoCtx(*attr.value, attr.pos);
 
         else
-            throw Error({
-                .msg = hintfmt("attribute '%s' isn't supported in call to 'fetchClosure'", attrName),
-                .errPos = state.positions[pos]
-            });
+            throw Error(
+                {.msg = hintfmt("attribute '%s' isn't supported in call to 'fetchClosure'", attrName),
+                 .errPos = state.positions[pos]});
     }
 
     if (!fromPath)
-        throw Error({
-            .msg = hintfmt("attribute '%s' is missing in call to 'fetchClosure'", "fromPath"),
-            .errPos = state.positions[pos]
-        });
+        throw Error(
+            {.msg = hintfmt("attribute '%s' is missing in call to 'fetchClosure'", "fromPath"),
+             .errPos = state.positions[pos]});
 
     if (!fromStoreUrl)
-        throw Error({
-            .msg = hintfmt("attribute '%s' is missing in call to 'fetchClosure'", "fromStore"),
-            .errPos = state.positions[pos]
-        });
+        throw Error(
+            {.msg = hintfmt("attribute '%s' is missing in call to 'fetchClosure'", "fromStore"),
+             .errPos = state.positions[pos]});
 
     auto parsedURL = parseURL(*fromStoreUrl);
 
-    if (parsedURL.scheme != "http" &&
-        parsedURL.scheme != "https" &&
-        !(getEnv("_NIX_IN_TEST").has_value() && parsedURL.scheme == "file"))
-        throw Error({
-            .msg = hintfmt("'fetchClosure' only supports http:// and https:// stores"),
-            .errPos = state.positions[pos]
-        });
+    if (parsedURL.scheme != "http" && parsedURL.scheme != "https"
+        && !(getEnv("_NIX_IN_TEST").has_value() && parsedURL.scheme == "file"))
+        throw Error(
+            {.msg = hintfmt("'fetchClosure' only supports http:// and https:// stores"),
+             .errPos = state.positions[pos]});
 
     if (!parsedURL.query.empty())
-        throw Error({
-            .msg = hintfmt("'fetchClosure' does not support URL query parameters (in '%s')", *fromStoreUrl),
-            .errPos = state.positions[pos]
-        });
+        throw Error(
+            {.msg = hintfmt("'fetchClosure' does not support URL query parameters (in '%s')", *fromStoreUrl),
+             .errPos = state.positions[pos]});
 
     auto fromStore = openStore(parsedURL.to_string());
 
     if (toCA) {
         if (!toPath || !state.store->isValidPath(*toPath)) {
-            auto remappings = makeContentAddressed(*fromStore, *state.store, { *fromPath });
+            auto remappings = makeContentAddressed(*fromStore, *state.store, {*fromPath});
             auto i = remappings.find(*fromPath);
             assert(i != remappings.end());
             if (toPath && *toPath != i->second)
-                throw Error({
-                    .msg = hintfmt("rewriting '%s' to content-addressed form yielded '%s', while '%s' was expected",
-                        state.store->printStorePath(*fromPath),
-                        state.store->printStorePath(i->second),
-                        state.store->printStorePath(*toPath)),
-                    .errPos = state.positions[pos]
-                });
+                throw Error(
+                    {.msg = hintfmt(
+                         "rewriting '%s' to content-addressed form yielded '%s', while '%s' was expected",
+                         state.store->printStorePath(*fromPath), state.store->printStorePath(i->second),
+                         state.store->printStorePath(*toPath)),
+                     .errPos = state.positions[pos]});
             if (!toPath)
-                throw Error({
-                    .msg = hintfmt(
-                        "rewriting '%s' to content-addressed form yielded '%s'; "
-                        "please set this in the 'toPath' attribute passed to 'fetchClosure'",
-                        state.store->printStorePath(*fromPath),
-                        state.store->printStorePath(i->second)),
-                    .errPos = state.positions[pos]
-                });
+                throw Error(
+                    {.msg = hintfmt(
+                         "rewriting '%s' to content-addressed form yielded '%s'; "
+                         "please set this in the 'toPath' attribute passed to 'fetchClosure'",
+                         state.store->printStorePath(*fromPath), state.store->printStorePath(i->second)),
+                     .errPos = state.positions[pos]});
         }
     } else {
         if (!state.store->isValidPath(*fromPath))
-            copyClosure(*fromStore, *state.store, RealisedPath::Set { *fromPath });
+            copyClosure(*fromStore, *state.store, RealisedPath::Set{*fromPath});
         toPath = fromPath;
     }
 
@@ -104,11 +95,11 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
     if (evalSettings.pureEval) {
         auto info = state.store->queryPathInfo(*toPath);
         if (!info->isContentAddressed(*state.store))
-            throw Error({
-                .msg = hintfmt("in pure mode, 'fetchClosure' requires a content-addressed path, which '%s' isn't",
-                    state.store->printStorePath(*toPath)),
-                .errPos = state.positions[pos]
-            });
+            throw Error(
+                {.msg = hintfmt(
+                     "in pure mode, 'fetchClosure' requires a content-addressed path, which '%s' isn't",
+                     state.store->printStorePath(*toPath)),
+                 .errPos = state.positions[pos]});
     }
 
     auto toPathS = state.store->printStorePath(*toPath);

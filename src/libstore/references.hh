@@ -18,13 +18,16 @@ class RefScanSink : public Sink
 
 public:
 
-    RefScanSink(StringSet && hashes) : hashes(hashes)
-    { }
+    RefScanSink(StringSet && hashes)
+        : hashes(hashes)
+    {}
 
     StringSet & getResult()
-    { return seen; }
+    {
+        return seen;
+    }
 
-    void operator () (std::string_view data) override;
+    void operator()(std::string_view data) override;
 };
 
 struct RewritingSink : Sink
@@ -37,7 +40,7 @@ struct RewritingSink : Sink
 
     RewritingSink(const std::string & from, const std::string & to, Sink & nextSink);
 
-    void operator () (std::string_view data) override;
+    void operator()(std::string_view data) override;
 
     void flush();
 };
@@ -49,7 +52,7 @@ struct HashModuloSink : AbstractHashSink
 
     HashModuloSink(HashType ht, const std::string & modulus);
 
-    void operator () (std::string_view data) override;
+    void operator()(std::string_view data) override;
 
     HashResult finish() override;
 };

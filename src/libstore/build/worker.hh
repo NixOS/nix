@@ -30,7 +30,6 @@ GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal);
 
 typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
 
-
 /* A mapping used to remember for each child process to what goal it
    belongs, and file descriptors for receiving log data and output
    path creation commands. */
@@ -140,19 +139,23 @@ public:
     /* derivation goal */
 private:
     std::shared_ptr<DerivationGoal> makeDerivationGoalCommon(
-        const StorePath & drvPath, const StringSet & wantedOutputs,
+        const StorePath & drvPath,
+        const StringSet & wantedOutputs,
         std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal);
 public:
-    std::shared_ptr<DerivationGoal> makeDerivationGoal(
-        const StorePath & drvPath,
-        const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
+    std::shared_ptr<DerivationGoal>
+    makeDerivationGoal(const StorePath & drvPath, const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
     std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(
-        const StorePath & drvPath, const BasicDerivation & drv,
-        const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
+        const StorePath & drvPath,
+        const BasicDerivation & drv,
+        const StringSet & wantedOutputs,
+        BuildMode buildMode = bmNormal);
 
     /* substitution goal */
-    std::shared_ptr<PathSubstitutionGoal> makePathSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
-    std::shared_ptr<DrvOutputSubstitutionGoal> makeDrvOutputSubstitutionGoal(const DrvOutput & id, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    std::shared_ptr<PathSubstitutionGoal> makePathSubstitutionGoal(
+        const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    std::shared_ptr<DrvOutputSubstitutionGoal> makeDrvOutputSubstitutionGoal(
+        const DrvOutput & id, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
 
     /* Remove a dead goal. */
     void removeGoal(GoalPtr goal);
@@ -167,8 +170,7 @@ public:
 
     /* Registers a running child process.  `inBuildSlot' means that
        the process counts towards the jobs limit. */
-    void childStarted(GoalPtr goal, const std::set<int> & fds,
-        bool inBuildSlot, bool respectTimeouts);
+    void childStarted(GoalPtr goal, const std::set<int> & fds, bool inBuildSlot, bool respectTimeouts);
 
     /* Unregisters a running child process.  `wakeSleepers' should be
        false if there is no sense in waking up goals that are sleeping
@@ -207,7 +209,8 @@ public:
     void updateProgress()
     {
         actDerivations.progress(doneBuilds, expectedBuilds + doneBuilds, runningBuilds, failedBuilds);
-        actSubstitutions.progress(doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions, failedSubstitutions);
+        actSubstitutions.progress(
+            doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions, failedSubstitutions);
         act.setExpected(actFileTransfer, expectedDownloadSize + doneDownloadSize);
         act.setExpected(actCopyPath, expectedNarSize + doneNarSize);
     }

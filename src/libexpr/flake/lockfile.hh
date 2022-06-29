@@ -24,7 +24,7 @@ struct Node : std::enable_shared_from_this<Node>
 
     std::map<FlakeId, Edge> inputs;
 
-    virtual ~Node() { }
+    virtual ~Node() {}
 };
 
 /* A non-root node in the lock file. */
@@ -33,12 +33,11 @@ struct LockedNode : Node
     FlakeRef lockedRef, originalRef;
     bool isFlake = true;
 
-    LockedNode(
-        const FlakeRef & lockedRef,
-        const FlakeRef & originalRef,
-        bool isFlake = true)
-        : lockedRef(lockedRef), originalRef(originalRef), isFlake(isFlake)
-    { }
+    LockedNode(const FlakeRef & lockedRef, const FlakeRef & originalRef, bool isFlake = true)
+        : lockedRef(lockedRef)
+        , originalRef(originalRef)
+        , isFlake(isFlake)
+    {}
 
     LockedNode(const nlohmann::json & json);
 
@@ -49,7 +48,7 @@ struct LockFile
 {
     std::shared_ptr<Node> root = std::make_shared<Node>();
 
-    LockFile() {};
+    LockFile(){};
     LockFile(const nlohmann::json & json, const Path & path);
 
     nlohmann::json toJSON() const;
@@ -62,7 +61,7 @@ struct LockFile
 
     bool isImmutable() const;
 
-    bool operator ==(const LockFile & other) const;
+    bool operator==(const LockFile & other) const;
 
     std::shared_ptr<Node> findInput(const InputPath & path);
 
@@ -74,7 +73,7 @@ struct LockFile
     void check();
 };
 
-std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile);
+std::ostream & operator<<(std::ostream & stream, const LockFile & lockFile);
 
 InputPath parseInputPath(std::string_view s);
 

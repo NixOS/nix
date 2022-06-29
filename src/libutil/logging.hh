@@ -61,19 +61,31 @@ public:
         enum { tInt = 0, tString = 1 } type;
         uint64_t i = 0;
         std::string s;
-        Field(const std::string & s) : type(tString), s(s) { }
-        Field(const char * s) : type(tString), s(s) { }
-        Field(const uint64_t & i) : type(tInt), i(i) { }
+        Field(const std::string & s)
+            : type(tString)
+            , s(s)
+        {}
+        Field(const char * s)
+            : type(tString)
+            , s(s)
+        {}
+        Field(const uint64_t & i)
+            : type(tInt)
+            , i(i)
+        {}
     };
 
     typedef std::vector<Field> Fields;
 
-    virtual ~Logger() { }
+    virtual ~Logger() {}
 
-    virtual void stop() { };
+    virtual void stop(){};
 
     // Whether the logger prints the whole build log
-    virtual bool isVerbose() { return false; }
+    virtual bool isVerbose()
+    {
+        return false;
+    }
 
     virtual void log(Verbosity lvl, const FormatOrString & fs) = 0;
 
@@ -82,7 +94,7 @@ public:
         log(lvlInfo, fs);
     }
 
-    virtual void logEI(const ErrorInfo &ei) = 0;
+    virtual void logEI(const ErrorInfo & ei) = 0;
 
     void logEI(Verbosity lvl, ErrorInfo ei)
     {
@@ -92,17 +104,22 @@ public:
 
     virtual void warn(const std::string & msg);
 
-    virtual void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
-        const std::string & s, const Fields & fields, ActivityId parent) { };
+    virtual void startActivity(
+        ActivityId act,
+        Verbosity lvl,
+        ActivityType type,
+        const std::string & s,
+        const Fields & fields,
+        ActivityId parent){};
 
-    virtual void stopActivity(ActivityId act) { };
+    virtual void stopActivity(ActivityId act){};
 
-    virtual void result(ActivityId act, ResultType type, const Fields & fields) { };
+    virtual void result(ActivityId act, ResultType type, const Fields & fields){};
 
     virtual void writeToStdout(std::string_view s);
 
     template<typename... Args>
-    inline void cout(const std::string & fs, const Args & ... args)
+    inline void cout(const std::string & fs, const Args &... args)
     {
         boost::format f(fs);
         formatHelper(f, args...);
@@ -110,7 +127,9 @@ public:
     }
 
     virtual std::optional<char> ask(std::string_view s)
-    { return {}; }
+    {
+        return {};
+    }
 };
 
 ActivityId getCurActivity();
@@ -122,25 +141,34 @@ struct Activity
 
     const ActivityId id;
 
-    Activity(Logger & logger, Verbosity lvl, ActivityType type, const std::string & s = "",
-        const Logger::Fields & fields = {}, ActivityId parent = getCurActivity());
+    Activity(
+        Logger & logger,
+        Verbosity lvl,
+        ActivityType type,
+        const std::string & s = "",
+        const Logger::Fields & fields = {},
+        ActivityId parent = getCurActivity());
 
-    Activity(Logger & logger, ActivityType type,
-        const Logger::Fields & fields = {}, ActivityId parent = getCurActivity())
-        : Activity(logger, lvlError, type, "", fields, parent) { };
+    Activity(
+        Logger & logger, ActivityType type, const Logger::Fields & fields = {}, ActivityId parent = getCurActivity())
+        : Activity(logger, lvlError, type, "", fields, parent){};
 
     Activity(const Activity & act) = delete;
 
     ~Activity();
 
     void progress(uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) const
-    { result(resProgress, done, expected, running, failed); }
+    {
+        result(resProgress, done, expected, running, failed);
+    }
 
     void setExpected(ActivityType type2, uint64_t expected) const
-    { result(resSetExpected, type2, expected); }
+    {
+        result(resSetExpected, type2, expected);
+    }
 
     template<typename... Args>
-    void result(ResultType type, const Args & ... args) const
+    void result(ResultType type, const Args &... args) const
     {
         Logger::Fields fields;
         nop{(fields.emplace_back(Logger::Field(args)), 1)...};
@@ -158,8 +186,15 @@ struct Activity
 struct PushActivity
 {
     const ActivityId prevAct;
-    PushActivity(ActivityId act) : prevAct(getCurActivity()) { setCurActivity(act); }
-    ~PushActivity() { setCurActivity(prevAct); }
+    PushActivity(ActivityId act)
+        : prevAct(getCurActivity())
+    {
+        setCurActivity(act);
+    }
+    ~PushActivity()
+    {
+        setCurActivity(prevAct);
+    }
 };
 
 extern Logger * logger;
@@ -170,13 +205,11 @@ Logger * makeJSONLogger(Logger & prevLogger);
 
 std::optional<nlohmann::json> parseJSONMessage(const std::string & msg);
 
-bool handleJSONLogMessage(nlohmann::json & json,
-    const Activity & act, std::map<ActivityId, Activity> & activities,
-    bool trusted);
+bool handleJSONLogMessage(
+    nlohmann::json & json, const Activity & act, std::map<ActivityId, Activity> & activities, bool trusted);
 
-bool handleJSONLogMessage(const std::string & msg,
-    const Activity & act, std::map<ActivityId, Activity> & activities,
-    bool trusted);
+bool handleJSONLogMessage(
+    const std::string & msg, const Activity & act, std::map<ActivityId, Activity> & activities, bool trusted);
 
 extern Verbosity verbosity; /* suppress msgs > this */
 
@@ -186,8 +219,8 @@ extern Verbosity verbosity; /* suppress msgs > this */
    lightweight status messages. */
 #define logErrorInfo(level, errorInfo...) \
     do { \
-        if ((level) <= nix::verbosity) {     \
-            logger->logEI((level), errorInfo);  \
+        if ((level) <= nix::verbosity) { \
+            logger->logEI((level), errorInfo); \
         } \
     } while (0)
 
@@ -215,7 +248,7 @@ extern Verbosity verbosity; /* suppress msgs > this */
 
 /* if verbosity >= lvlWarn, print a message with a yellow 'warning:' prefix. */
 template<typename... Args>
-inline void warn(const std::string & fs, const Args & ... args)
+inline void warn(const std::string & fs, const Args &... args)
 {
     boost::format f(fs);
     formatHelper(f, args...);

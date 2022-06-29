@@ -5,17 +5,17 @@
 
 namespace nix {
 
-static void prim_unsafeDiscardStringContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_unsafeDiscardStringContext(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     PathSet context;
     auto s = state.coerceToString(pos, *args[0], context);
     v.mkString(*s);
 }
 
-static RegisterPrimOp primop_unsafeDiscardStringContext("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
+static RegisterPrimOp
+    primop_unsafeDiscardStringContext("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
 
-
-static void prim_hasContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_hasContext(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     PathSet context;
     state.forceString(*args[0], context, pos);
@@ -24,14 +24,13 @@ static void prim_hasContext(EvalState & state, const PosIdx pos, Value * * args,
 
 static RegisterPrimOp primop_hasContext("__hasContext", 1, prim_hasContext);
 
-
 /* Sometimes we want to pass a derivation path (i.e. pkg.drvPath) to a
    builder without causing the derivation to be built (for instance,
    in the derivation that builds NARs in nix-push, when doing
    source-only deployment).  This primop marks the string context so
    that builtins.derivation adds the path to drv.inputSrcs rather than
    drv.inputDrvs. */
-static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     PathSet context;
     auto s = state.coerceToString(pos, *args[0], context);
@@ -43,8 +42,8 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx p
     v.mkString(*s, context2);
 }
 
-static RegisterPrimOp primop_unsafeDiscardOutputDependency("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
-
+static RegisterPrimOp
+    primop_unsafeDiscardOutputDependency("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
 
 /* Extract the context of a string as a structured Nix value.
 
@@ -65,9 +64,10 @@ static RegisterPrimOp primop_unsafeDiscardOutputDependency("__unsafeDiscardOutpu
    Note that for a given path any combination of the above attributes
    may be present.
 */
-static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_getContext(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    struct ContextInfo {
+    struct ContextInfo
+    {
         bool path = false;
         bool allOutputs = false;
         Strings outputs;
@@ -93,7 +93,8 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
 
         auto iter = contextInfos.find(*path);
         if (iter == contextInfos.end()) {
-            contextInfos.emplace(*path, ContextInfo{isPath, isAllOutputs, output.empty() ? Strings{} : Strings{std::move(output)}});
+            contextInfos.emplace(
+                *path, ContextInfo{isPath, isAllOutputs, output.empty() ? Strings{} : Strings{std::move(output)}});
         } else {
             if (isPath)
                 iter->second.path = true;
@@ -128,13 +129,12 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
 
 static RegisterPrimOp primop_getContext("__getContext", 1, prim_getContext);
 
-
 /* Append the given context to a given string.
 
    See the commentary above unsafeGetContext for details of the
    context representation.
 */
-static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_appendContext(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     PathSet context;
     auto orig = state.forceString(*args[0], context, pos);
@@ -146,10 +146,8 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
     for (auto & i : *args[1]->attrs) {
         const auto & name = state.symbols[i.name];
         if (!state.store->isStorePath(name))
-            throw EvalError({
-                .msg = hintfmt("Context key '%s' is not a store path", name),
-                .errPos = state.positions[i.pos]
-            });
+            throw EvalError(
+                {.msg = hintfmt("Context key '%s' is not a store path", name), .errPos = state.positions[i.pos]});
         if (!settings.readOnlyMode)
             state.store->ensurePath(state.store->parseStorePath(name));
         state.forceAttrs(*i.value, i.pos);
@@ -163,10 +161,10 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
         if (iter != i.value->attrs->end()) {
             if (state.forceBool(*iter->value, iter->pos)) {
                 if (!isDerivation(name)) {
-                    throw EvalError({
-                        .msg = hintfmt("Tried to add all-outputs context of %s, which is not a derivation, to a string", name),
-                        .errPos = state.positions[i.pos]
-                    });
+                    throw EvalError(
+                        {.msg = hintfmt(
+                             "Tried to add all-outputs context of %s, which is not a derivation, to a string", name),
+                         .errPos = state.positions[i.pos]});
                 }
                 context.insert(concatStrings("=", name));
             }
@@ -176,10 +174,10 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
         if (iter != i.value->attrs->end()) {
             state.forceList(*iter->value, iter->pos);
             if (iter->value->listSize() && !isDerivation(name)) {
-                throw EvalError({
-                    .msg = hintfmt("Tried to add derivation output context of %s, which is not a derivation, to a string", name),
-                    .errPos = state.positions[i.pos]
-                });
+                throw EvalError(
+                    {.msg = hintfmt(
+                         "Tried to add derivation output context of %s, which is not a derivation, to a string", name),
+                     .errPos = state.positions[i.pos]});
             }
             for (auto elem : iter->value->listItems()) {
                 auto outputName = state.forceStringNoCtx(*elem, iter->pos);

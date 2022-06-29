@@ -7,7 +7,7 @@
 
 namespace nix {
 
-static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     std::string url;
     std::optional<Hash> rev;
@@ -33,21 +33,16 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
                     rev = Hash::parseAny(value, htSHA1);
                 else
                     ref = value;
-            }
-            else if (n == "name")
+            } else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, attr.pos);
             else
-                throw EvalError({
-                    .msg = hintfmt("unsupported argument '%s' to 'fetchMercurial'", state.symbols[attr.name]),
-                    .errPos = state.positions[attr.pos]
-                });
+                throw EvalError(
+                    {.msg = hintfmt("unsupported argument '%s' to 'fetchMercurial'", state.symbols[attr.name]),
+                     .errPos = state.positions[attr.pos]});
         }
 
         if (url.empty())
-            throw EvalError({
-                .msg = hintfmt("'url' argument required"),
-                .errPos = state.positions[pos]
-            });
+            throw EvalError({.msg = hintfmt("'url' argument required"), .errPos = state.positions[pos]});
 
     } else
         url = state.coerceToString(pos, *args[0], context, false, false).toOwned();
@@ -63,8 +58,10 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     attrs.insert_or_assign("type", "hg");
     attrs.insert_or_assign("url", url.find("://") != std::string::npos ? url : "file://" + url);
     attrs.insert_or_assign("name", std::string(name));
-    if (ref) attrs.insert_or_assign("ref", *ref);
-    if (rev) attrs.insert_or_assign("rev", rev->gitRev());
+    if (ref)
+        attrs.insert_or_assign("ref", *ref);
+    if (rev)
+        attrs.insert_or_assign("rev", rev->gitRev());
     auto input = fetchers::Input::fromAttrs(std::move(attrs));
 
     // FIXME: use name

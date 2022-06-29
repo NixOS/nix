@@ -2,12 +2,9 @@
 
 #include "store-api.hh"
 
-
 namespace nix {
 
-
 typedef std::unordered_map<StorePath, std::unordered_set<std::string>> Roots;
-
 
 struct GCOptions
 {
@@ -46,7 +43,6 @@ struct GCOptions
     uint64_t maxFreed{std::numeric_limits<uint64_t>::max()};
 };
 
-
 struct GCResults
 {
     /* Depending on the action, the GC roots, or the paths that would
@@ -57,7 +53,6 @@ struct GCResults
        number of bytes that would be or was freed. */
     uint64_t bytesFreed = 0;
 };
-
 
 struct GcStore : public virtual Store
 {

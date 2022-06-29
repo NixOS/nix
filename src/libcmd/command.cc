@@ -7,7 +7,7 @@
 
 #include <nlohmann/json.hpp>
 
-extern char * * environ __attribute__((weak));
+extern char ** environ __attribute__((weak));
 
 namespace nix {
 
@@ -20,7 +20,8 @@ nix::Commands RegisterCommand::getCommandsFor(const std::vector<std::string> & p
         if (name.size() == prefix.size() + 1) {
             bool equal = true;
             for (size_t i = 0; i < prefix.size(); ++i)
-                if (name[i] != prefix[i]) equal = false;
+                if (name[i] != prefix[i])
+                    equal = false;
             if (equal)
                 res.insert_or_assign(name[prefix.size()], command);
         }
@@ -33,9 +34,7 @@ nlohmann::json NixMultiCommand::toJSON()
     return MultiCommand::toJSON();
 }
 
-StoreCommand::StoreCommand()
-{
-}
+StoreCommand::StoreCommand() {}
 
 ref<Store> StoreCommand::getStore()
 {
@@ -110,17 +109,15 @@ ref<EvalState> EvalCommand::getEvalState()
 {
     if (!evalState) {
         evalState =
-            #if HAVE_BOEHMGC
-            std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
-                searchPath, getEvalStore(), getStore())
-            #else
-            std::make_shared<EvalState>(
-                searchPath, getEvalStore(), getStore())
-            #endif
+#if HAVE_BOEHMGC
+            std::allocate_shared<EvalState>(traceable_allocator<EvalState>(), searchPath, getEvalStore(), getStore())
+#else
+            std::make_shared<EvalState>(searchPath, getEvalStore(), getStore())
+#endif
             ;
 
         if (startReplOnEvalErrors) {
-            evalState->debugRepl = &runRepl;        
+            evalState->debugRepl = &runRepl;
         };
     }
     return ref<EvalState>(evalState);
@@ -183,8 +180,7 @@ void BuiltPathsCommand::run(ref<Store> store)
 
 StorePathsCommand::StorePathsCommand(bool recursive)
     : BuiltPathsCommand(recursive)
-{
-}
+{}
 
 void StorePathsCommand::run(ref<Store> store, BuiltPaths && paths)
 {
@@ -211,11 +207,9 @@ Strings editorFor(const Path & file, uint32_t line)
 {
     auto editor = getEnv("EDITOR").value_or("cat");
     auto args = tokenizeString<Strings>(editor);
-    if (line > 0 && (
-        editor.find("emacs") != std::string::npos ||
-        editor.find("nano") != std::string::npos ||
-        editor.find("vim") != std::string::npos ||
-        editor.find("kak") != std::string::npos))
+    if (line > 0
+        && (editor.find("emacs") != std::string::npos || editor.find("nano") != std::string::npos
+            || editor.find("vim") != std::string::npos || editor.find("kak") != std::string::npos))
         args.push_back(fmt("+%d", line));
     args.push_back(file);
     return args;
@@ -223,48 +217,48 @@ Strings editorFor(const Path & file, uint32_t line)
 
 MixProfile::MixProfile()
 {
-    addFlag({
-        .longName = "profile",
-        .description = "The profile to update.",
-        .labels = {"path"},
-        .handler = {&profile},
-        .completer = completePath
-    });
+    addFlag(
+        {.longName = "profile",
+         .description = "The profile to update.",
+         .labels = {"path"},
+         .handler = {&profile},
+         .completer = completePath});
 }
 
 void MixProfile::updateProfile(const StorePath & storePath)
 {
-    if (!profile) return;
+    if (!profile)
+        return;
     auto store = getStore().dynamic_pointer_cast<LocalFSStore>();
-    if (!store) throw Error("'--profile' is not supported for this Nix store");
+    if (!store)
+        throw Error("'--profile' is not supported for this Nix store");
     auto profile2 = absPath(*profile);
-    switchLink(profile2,
-        createGeneration(
-            ref<LocalFSStore>(store),
-            profile2, storePath));
+    switchLink(profile2, createGeneration(ref<LocalFSStore>(store), profile2, storePath));
 }
 
 void MixProfile::updateProfile(const BuiltPaths & buildables)
 {
-    if (!profile) return;
+    if (!profile)
+        return;
 
     std::vector<StorePath> result;
 
     for (auto & buildable : buildables) {
-        std::visit(overloaded {
-            [&](const BuiltPath::Opaque & bo) {
-                result.push_back(bo.path);
+        std::visit(
+            overloaded{
+                [&](const BuiltPath::Opaque & bo) { result.push_back(bo.path); },
+                [&](const BuiltPath::Built & bfd) {
+                    for (auto & output : bfd.outputs) {
+                        result.push_back(output.second);
+                    }
+                },
             },
-            [&](const BuiltPath::Built & bfd) {
-                for (auto & output : bfd.outputs) {
-                    result.push_back(output.second);
-                }
-            },
-        }, buildable.raw());
+            buildable.raw());
     }
 
     if (result.size() != 1)
-        throw UsageError("'--profile' requires that the arguments produce a single store path, but there are %d", result.size());
+        throw UsageError(
+            "'--profile' requires that the arguments produce a single store path, but there are %d", result.size());
 
     updateProfile(result[0]);
 }
@@ -274,7 +268,8 @@ MixDefaultProfile::MixDefaultProfile()
     profile = getDefaultProfile();
 }
 
-MixEnvironment::MixEnvironment() : ignoreEnvironment(false)
+MixEnvironment::MixEnvironment()
+    : ignoreEnvironment(false)
 {
     addFlag({
         .longName = "ignore-environment",
@@ -300,14 +295,16 @@ MixEnvironment::MixEnvironment() : ignoreEnvironment(false)
     });
 }
 
-void MixEnvironment::setEnviron() {
+void MixEnvironment::setEnviron()
+{
     if (ignoreEnvironment) {
         if (!unset.empty())
             throw UsageError("--unset does not make sense with --ignore-environment");
 
         for (const auto & var : keep) {
             auto val = getenv(var.c_str());
-            if (val) stringsEnv.emplace_back(fmt("%s=%s", var.c_str(), val));
+            if (val)
+                stringsEnv.emplace_back(fmt("%s=%s", var.c_str(), val));
         }
 
         vectorEnv = stringsToCharPtrs(stringsEnv);

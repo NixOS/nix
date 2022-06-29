@@ -6,7 +6,8 @@ namespace nix {
 
 LogFormat defaultLogFormat = LogFormat::raw;
 
-LogFormat parseLogFormat(const std::string & logFormatStr) {
+LogFormat parseLogFormat(const std::string & logFormatStr)
+{
     if (logFormatStr == "raw" || getEnv("NIX_GET_COMPLETIONS"))
         return LogFormat::raw;
     else if (logFormatStr == "raw-with-logs")
@@ -20,7 +21,8 @@ LogFormat parseLogFormat(const std::string & logFormatStr) {
     throw Error("option 'log-format' has an invalid value '%s'", logFormatStr);
 }
 
-Logger * makeDefaultLogger() {
+Logger * makeDefaultLogger()
+{
     switch (defaultLogFormat) {
     case LogFormat::raw:
         return makeSimpleLogger(false);
@@ -37,16 +39,19 @@ Logger * makeDefaultLogger() {
     }
 }
 
-void setLogFormat(const std::string & logFormatStr) {
+void setLogFormat(const std::string & logFormatStr)
+{
     setLogFormat(parseLogFormat(logFormatStr));
 }
 
-void setLogFormat(const LogFormat & logFormat) {
+void setLogFormat(const LogFormat & logFormat)
+{
     defaultLogFormat = logFormat;
     createDefaultLogger();
 }
 
-void createDefaultLogger() {
+void createDefaultLogger()
+{
     logger = makeDefaultLogger();
 }
 

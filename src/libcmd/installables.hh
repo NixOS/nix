@@ -15,7 +15,10 @@ namespace nix {
 struct DrvInfo;
 struct SourceExprCommand;
 
-namespace eval_cache { class EvalCache; class AttrCursor; }
+namespace eval_cache {
+class EvalCache;
+class AttrCursor;
+}
 
 struct App
 {
@@ -53,7 +56,7 @@ enum class OperateOn {
 
 struct Installable
 {
-    virtual ~Installable() { }
+    virtual ~Installable() {}
 
     virtual std::string what() const = 0;
 
@@ -80,15 +83,13 @@ struct Installable
         return {};
     }
 
-    virtual std::vector<ref<eval_cache::AttrCursor>>
-    getCursors(EvalState & state);
+    virtual std::vector<ref<eval_cache::AttrCursor>> getCursors(EvalState & state);
 
-    virtual ref<eval_cache::AttrCursor>
-    getCursor(EvalState & state);
+    virtual ref<eval_cache::AttrCursor> getCursor(EvalState & state);
 
     virtual FlakeRef nixpkgsFlakeRef() const
     {
-        return FlakeRef::fromAttrs({{"type","indirect"}, {"id", "nixpkgs"}});
+        return FlakeRef::fromAttrs({{"type", "indirect"}, {"id", "nixpkgs"}});
     }
 
     static BuiltPaths build(
@@ -120,9 +121,7 @@ struct Installable
         std::shared_ptr<Installable> installable);
 
     static std::set<StorePath> toDerivations(
-        ref<Store> store,
-        const std::vector<std::shared_ptr<Installable>> & installables,
-        bool useDeriver = false);
+        ref<Store> store, const std::vector<std::shared_ptr<Installable>> & installables, bool useDeriver = false);
 
     static BuiltPaths toBuiltPaths(
         ref<Store> evalStore,
@@ -136,7 +135,9 @@ struct InstallableValue : Installable
 {
     ref<EvalState> state;
 
-    InstallableValue(ref<EvalState> state) : state(state) {}
+    InstallableValue(ref<EvalState> state)
+        : state(state)
+    {}
 
     struct DerivationInfo
     {
@@ -171,7 +172,10 @@ struct InstallableFlake : InstallableValue
         Strings prefixes,
         const flake::LockFlags & lockFlags);
 
-    std::string what() const override { return flakeRef.to_string() + "#" + *attrPaths.begin(); }
+    std::string what() const override
+    {
+        return flakeRef.to_string() + "#" + *attrPaths.begin();
+    }
 
     std::vector<std::string> getActualAttrPaths();
 
@@ -185,8 +189,7 @@ struct InstallableFlake : InstallableValue
 
     /* Get a cursor to every attrpath in getActualAttrPaths() that
        exists. */
-    std::vector<ref<eval_cache::AttrCursor>>
-    getCursors(EvalState & state) override;
+    std::vector<ref<eval_cache::AttrCursor>> getCursors(EvalState & state) override;
 
     /* Get a cursor to the first attrpath in getActualAttrPaths() that
        exists, or throw an exception with suggestions if none exists. */
@@ -197,8 +200,6 @@ struct InstallableFlake : InstallableValue
     FlakeRef nixpkgsFlakeRef() const override;
 };
 
-ref<eval_cache::EvalCache> openEvalCache(
-    EvalState & state,
-    std::shared_ptr<flake::LockedFlake> lockedFlake);
+ref<eval_cache::EvalCache> openEvalCache(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake);
 
 }

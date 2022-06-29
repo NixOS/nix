@@ -17,7 +17,8 @@ struct CmdHashBase : Command
     std::vector<std::string> paths;
     std::optional<std::string> modulus;
 
-    CmdHashBase(FileIngestionMethod mode) : mode(mode)
+    CmdHashBase(FileIngestionMethod mode)
+        : mode(mode)
     {
         addFlag({
             .longName = "sri",
@@ -45,27 +46,23 @@ struct CmdHashBase : Command
 
         addFlag(Flag::mkHashTypeFlag("type", &ht));
 
-        #if 0
+#if 0
         addFlag({
             .longName = "modulo",
             .description = "Compute the hash modulo the specified string.",
             .labels = {"modulus"},
             .handler = {&modulus},
         });
-        #endif\
+#endif
 
-        expectArgs({
-            .label = "paths",
-            .handler = {&paths},
-            .completer = completePath
-        });
+        expectArgs({.label = "paths", .handler = {&paths}, .completer = completePath});
     }
 
     std::string description() override
     {
         switch (mode) {
         case FileIngestionMethod::Flat:
-            return  "print cryptographic hash of a regular file";
+            return "print cryptographic hash of a regular file";
         case FileIngestionMethod::Recursive:
             return "print cryptographic hash of the NAR serialisation of a path";
         default:
@@ -93,7 +90,8 @@ struct CmdHashBase : Command
             }
 
             Hash h = hashSink->finish().first;
-            if (truncate && h.hashSize > 20) h = compressHash(h, 20);
+            if (truncate && h.hashSize > 20)
+                h = compressHash(h, 20);
             logger->cout(h.to_string(base, base == SRI));
         }
     }
@@ -105,7 +103,8 @@ struct CmdToBase : Command
     std::optional<HashType> ht;
     std::vector<std::string> args;
 
-    CmdToBase(Base base) : base(base)
+    CmdToBase(Base base)
+        : base(base)
     {
         addFlag(Flag::mkHashTypeOptFlag("type", &ht));
         expectArgs("strings", &args);
@@ -113,11 +112,11 @@ struct CmdToBase : Command
 
     std::string description() override
     {
-        return fmt("convert a hash to %s representation",
-            base == Base16 ? "base-16" :
-            base == Base32 ? "base-32" :
-            base == Base64 ? "base-64" :
-            "SRI");
+        return fmt(
+            "convert a hash to %s representation", base == Base16   ? "base-16"
+                                                   : base == Base32 ? "base-32"
+                                                   : base == Base64 ? "base-64"
+                                                                    : "SRI");
     }
 
     void run() override
@@ -131,21 +130,28 @@ struct CmdHash : NixMultiCommand
 {
     CmdHash()
         : MultiCommand({
-                {"file", []() { return make_ref<CmdHashBase>(FileIngestionMethod::Flat);; }},
-                {"path", []() { return make_ref<CmdHashBase>(FileIngestionMethod::Recursive); }},
-                {"to-base16", []() { return make_ref<CmdToBase>(Base16); }},
-                {"to-base32", []() { return make_ref<CmdToBase>(Base32); }},
-                {"to-base64", []() { return make_ref<CmdToBase>(Base64); }},
-                {"to-sri", []() { return make_ref<CmdToBase>(SRI); }},
-          })
-    { }
+            {"file",
+             []() {
+                 return make_ref<CmdHashBase>(FileIngestionMethod::Flat);
+                 ;
+             }},
+            {"path", []() { return make_ref<CmdHashBase>(FileIngestionMethod::Recursive); }},
+            {"to-base16", []() { return make_ref<CmdToBase>(Base16); }},
+            {"to-base32", []() { return make_ref<CmdToBase>(Base32); }},
+            {"to-base64", []() { return make_ref<CmdToBase>(Base64); }},
+            {"to-sri", []() { return make_ref<CmdToBase>(SRI); }},
+        })
+    {}
 
     std::string description() override
     {
         return "compute and convert cryptographic hashes";
     }
 
-    Category category() override { return catUtility; }
+    Category category() override
+    {
+        return catUtility;
+    }
 
     void run() override
     {
@@ -159,7 +165,7 @@ struct CmdHash : NixMultiCommand
 static auto rCmdHash = registerCommand<CmdHash>("hash");
 
 /* Legacy nix-hash command. */
-static int compatNixHash(int argc, char * * argv)
+static int compatNixHash(int argc, char ** argv)
 {
     HashType ht = htMD5;
     bool flat = false;
@@ -173,15 +179,19 @@ static int compatNixHash(int argc, char * * argv)
             showManPage("nix-hash");
         else if (*arg == "--version")
             printVersion("nix-hash");
-        else if (*arg == "--flat") flat = true;
-        else if (*arg == "--base32") base32 = true;
-        else if (*arg == "--truncate") truncate = true;
+        else if (*arg == "--flat")
+            flat = true;
+        else if (*arg == "--base32")
+            base32 = true;
+        else if (*arg == "--truncate")
+            truncate = true;
         else if (*arg == "--type") {
             std::string s = getArg(*arg, arg, end);
             ht = parseHashType(s);
-        }
-        else if (*arg == "--to-base16") op = opTo16;
-        else if (*arg == "--to-base32") op = opTo32;
+        } else if (*arg == "--to-base16")
+            op = opTo16;
+        else if (*arg == "--to-base32")
+            op = opTo32;
         else if (*arg != "" && arg->at(0) == '-')
             return false;
         else

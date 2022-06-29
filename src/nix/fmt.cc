@@ -3,28 +3,41 @@
 
 using namespace nix;
 
-struct CmdFmt : SourceExprCommand {
+struct CmdFmt : SourceExprCommand
+{
     std::vector<std::string> args;
 
-    CmdFmt() { expectArgs({.label = "args", .handler = {&args}}); }
+    CmdFmt()
+    {
+        expectArgs({.label = "args", .handler = {&args}});
+    }
 
-    std::string description() override {
+    std::string description() override
+    {
         return "reformat your code in the standard style";
     }
 
-    std::string doc() override {
+    std::string doc() override
+    {
         return
-          #include "fmt.md"
-          ;
+#include "fmt.md"
+            ;
     }
 
-    Category category() override { return catSecondary; }
+    Category category() override
+    {
+        return catSecondary;
+    }
 
-    Strings getDefaultFlakeAttrPaths() override {
+    Strings getDefaultFlakeAttrPaths() override
+    {
         return Strings{"formatter." + settings.thisSystem.get()};
     }
 
-    Strings getDefaultFlakeAttrPathPrefixes() override { return Strings{}; }
+    Strings getDefaultFlakeAttrPathPrefixes() override
+    {
+        return Strings{};
+    }
 
     void run(ref<Store> store) override
     {
@@ -42,7 +55,7 @@ struct CmdFmt : SourceExprCommand {
             programArgs.push_back(".");
         } else {
             // User wants more power, let them decide which paths to include/exclude
-            for (auto &i : args) {
+            for (auto & i : args) {
                 programArgs.push_back(i);
             }
         }

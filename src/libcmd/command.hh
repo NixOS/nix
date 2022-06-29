@@ -12,7 +12,7 @@ namespace nix {
 
 extern std::string programPath;
 
-extern char * * savedArgv;
+extern char ** savedArgv;
 
 class EvalState;
 struct Pos;
@@ -80,7 +80,9 @@ struct MixFlakeOptions : virtual Args, EvalCommand
     MixFlakeOptions();
 
     virtual std::optional<FlakeRef> getFlakeRefForCompletion()
-    { return {}; }
+    {
+        return {};
+    }
 };
 
 struct SourceExprCommand : virtual Args, MixFlakeOptions
@@ -94,11 +96,9 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
 
     SourceExprCommand(bool supportReadOnlyMode = false);
 
-    std::vector<std::shared_ptr<Installable>> parseInstallables(
-        ref<Store> store, std::vector<std::string> ss);
+    std::vector<std::shared_ptr<Installable>> parseInstallables(ref<Store> store, std::vector<std::string> ss);
 
-    std::shared_ptr<Installable> parseInstallable(
-        ref<Store> store, const std::string & installable);
+    std::shared_ptr<Installable> parseInstallable(ref<Store> store, const std::string & installable);
 
     virtual Strings getDefaultFlakeAttrPaths();
 
@@ -117,7 +117,10 @@ struct InstallablesCommand : virtual Args, SourceExprCommand
 
     void prepare() override;
 
-    virtual bool useDefaultInstallables() { return true; }
+    virtual bool useDefaultInstallables()
+    {
+        return true;
+    }
 
     std::optional<FlakeRef> getFlakeRefForCompletion() override;
 
@@ -167,7 +170,10 @@ public:
 
     void run(ref<Store> store) override;
 
-    bool useDefaultInstallables() override { return !all; }
+    bool useDefaultInstallables() override
+    {
+        return !all;
+    }
 };
 
 struct StorePathsCommand : public BuiltPathsCommand
@@ -197,10 +203,10 @@ struct RegisterCommand
     typedef std::map<std::vector<std::string>, std::function<ref<Command>()>> Commands;
     static Commands * commands;
 
-    RegisterCommand(std::vector<std::string> && name,
-        std::function<ref<Command>()> command)
+    RegisterCommand(std::vector<std::string> && name, std::function<ref<Command>()> command)
     {
-        if (!commands) commands = new Commands;
+        if (!commands)
+            commands = new Commands;
         commands->emplace(name, command);
     }
 
@@ -210,13 +216,13 @@ struct RegisterCommand
 template<class T>
 static RegisterCommand registerCommand(const std::string & name)
 {
-    return RegisterCommand({name}, [](){ return make_ref<T>(); });
+    return RegisterCommand({name}, []() { return make_ref<T>(); });
 }
 
 template<class T>
 static RegisterCommand registerCommand2(std::vector<std::string> && name)
 {
-    return RegisterCommand(std::move(name), [](){ return make_ref<T>(); });
+    return RegisterCommand(std::move(name), []() { return make_ref<T>(); });
 }
 
 /* Helper function to generate args that invoke $EDITOR on
@@ -242,16 +248,18 @@ struct MixDefaultProfile : MixProfile
     MixDefaultProfile();
 };
 
-struct MixEnvironment : virtual Args {
+struct MixEnvironment : virtual Args
+{
 
     StringSet keep, unset;
     Strings stringsEnv;
-    std::vector<char*> vectorEnv;
+    std::vector<char *> vectorEnv;
     bool ignoreEnvironment;
 
     MixEnvironment();
 
-    /* Modify global environ based on ignoreEnvironment, keep, and unset. It's expected that exec will be called before this class goes out of scope, otherwise environ will become invalid. */
+    /* Modify global environ based on ignoreEnvironment, keep, and unset. It's expected that exec will be called before
+     * this class goes out of scope, otherwise environ will become invalid. */
     void setEnviron();
 };
 
@@ -267,13 +275,7 @@ void completeFlakeRefWithFragment(
 std::string showVersions(const std::set<std::string> & versions);
 
 void printClosureDiff(
-    ref<Store> store,
-    const StorePath & beforePath,
-    const StorePath & afterPath,
-    std::string_view indent);
+    ref<Store> store, const StorePath & beforePath, const StorePath & afterPath, std::string_view indent);
 
-
-void runRepl(
-    ref<EvalState> evalState,
-    const ValMap & extraEnv);
+void runRepl(ref<EvalState> evalState, const ValMap & extraEnv);
 }

@@ -27,7 +27,8 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 
     void run(ref<Store> store) override
     {
-        if (!namePart) namePart = baseNameOf(path);
+        if (!namePart)
+            namePart = baseNameOf(path);
 
         StringSink sink;
         dumpPath(path, sink);
@@ -41,15 +42,15 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             hash = hsink.finish().first;
         }
 
-        ValidPathInfo info {
+        ValidPathInfo info{
             store->makeFixedOutputPath(ingestionMethod, hash, *namePart),
             narHash,
         };
         info.narSize = sink.s.size();
-        info.ca = std::optional { FixedOutputHash {
+        info.ca = std::optional{FixedOutputHash{
             .method = ingestionMethod,
             .hash = hash,
-        } };
+        }};
 
         if (!dryRun) {
             auto source = StringSource(sink.s);
@@ -75,8 +76,8 @@ struct CmdAddFile : CmdAddToStore
     std::string doc() override
     {
         return
-          #include "add-file.md"
-          ;
+#include "add-file.md"
+            ;
     }
 };
 
@@ -95,8 +96,8 @@ struct CmdAddPath : CmdAddToStore
     std::string doc() override
     {
         return
-          #include "add-path.md"
-          ;
+#include "add-path.md"
+            ;
     }
 };
 

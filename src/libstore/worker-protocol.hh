@@ -5,19 +5,17 @@
 
 namespace nix {
 
-
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
 #define PROTOCOL_VERSION (1 << 8 | 34)
-#define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
-#define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
-
+#define GET_PROTOCOL_MAJOR(x) ((x) &0xff00)
+#define GET_PROTOCOL_MINOR(x) ((x) &0x00ff)
 
 typedef enum {
     wopIsValidPath = 1,
     wopHasSubstitutes = 3,
-    wopQueryPathHash = 4, // obsolete
+    wopQueryPathHash = 4,   // obsolete
     wopQueryReferences = 5, // obsolete
     wopQueryReferrers = 6,
     wopAddToStore = 7,
@@ -28,7 +26,7 @@ typedef enum {
     wopAddIndirectRoot = 12,
     wopSyncWithGC = 13,
     wopFindRoots = 14,
-    wopExportPath = 16, // obsolete
+    wopExportPath = 16,   // obsolete
     wopQueryDeriver = 18, // obsolete
     wopSetOptions = 19,
     wopCollectGarbage = 20,
@@ -38,7 +36,7 @@ typedef enum {
     wopQueryFailedPaths = 24,
     wopClearFailedPaths = 25,
     wopQueryPathInfo = 26,
-    wopImportPaths = 27, // obsolete
+    wopImportPaths = 27,                // obsolete
     wopQueryDerivationOutputNames = 28, // obsolete
     wopQueryPathFromHashPart = 29,
     wopQuerySubstitutablePathInfos = 30,
@@ -60,30 +58,28 @@ typedef enum {
     wopBuildPathsWithResults = 46,
 } WorkerOp;
 
-
-#define STDERR_NEXT  0x6f6c6d67
-#define STDERR_READ  0x64617461 // data needed from source
+#define STDERR_NEXT 0x6f6c6d67
+#define STDERR_READ 0x64617461  // data needed from source
 #define STDERR_WRITE 0x64617416 // data for sink
-#define STDERR_LAST  0x616c7473
+#define STDERR_LAST 0x616c7473
 #define STDERR_ERROR 0x63787470
 #define STDERR_START_ACTIVITY 0x53545254
-#define STDERR_STOP_ACTIVITY  0x53544f50
-#define STDERR_RESULT         0x52534c54
-
+#define STDERR_STOP_ACTIVITY 0x53544f50
+#define STDERR_RESULT 0x52534c54
 
 class Store;
 struct Source;
 
 /* To guide overloading */
 template<typename T>
-struct Phantom {};
-
+struct Phantom
+{};
 
 namespace worker_proto {
 /* FIXME maybe move more stuff inside here */
 
 #define MAKE_WORKER_PROTO(TEMPLATE, T) \
-    TEMPLATE T read(const Store & store, Source & from, Phantom< T > _); \
+    TEMPLATE T read(const Store & store, Source & from, Phantom<T> _); \
     TEMPLATE void write(const Store & store, Sink & out, const T & str)
 
 MAKE_WORKER_PROTO(, std::string);
@@ -125,7 +121,7 @@ std::vector<T> read(const Store & store, Source & from, Phantom<std::vector<T>> 
     std::vector<T> resSet;
     auto size = readNum<size_t>(from);
     while (size--) {
-        resSet.push_back(read(store, from, Phantom<T> {}));
+        resSet.push_back(read(store, from, Phantom<T>{}));
     }
     return resSet;
 }
@@ -145,7 +141,7 @@ std::set<T> read(const Store & store, Source & from, Phantom<std::set<T>> _)
     std::set<T> resSet;
     auto size = readNum<size_t>(from);
     while (size--) {
-        resSet.insert(read(store, from, Phantom<T> {}));
+        resSet.insert(read(store, from, Phantom<T>{}));
     }
     return resSet;
 }
@@ -165,8 +161,8 @@ std::map<K, V> read(const Store & store, Source & from, Phantom<std::map<K, V>> 
     std::map<K, V> resMap;
     auto size = readNum<size_t>(from);
     while (size--) {
-        auto k = read(store, from, Phantom<K> {});
-        auto v = read(store, from, Phantom<V> {});
+        auto k = read(store, from, Phantom<K>{});
+        auto v = read(store, from, Phantom<V>{});
         resMap.insert_or_assign(std::move(k), std::move(v));
     }
     return resMap;

@@ -12,7 +12,6 @@ namespace nix {
 
 class BindingsBuilder;
 
-
 typedef enum {
     tInt = 1,
     tBool,
@@ -36,19 +35,7 @@ typedef enum {
 // This type abstracts over all actual value types in the language,
 // grouping together implementation details like tList*, different function
 // types, and types in non-normal form (so thunks and co.)
-typedef enum {
-    nThunk,
-    nInt,
-    nFloat,
-    nBool,
-    nString,
-    nPath,
-    nNull,
-    nAttrs,
-    nList,
-    nFunction,
-    nExternal
-} ValueType;
+typedef enum { nThunk, nInt, nFloat, nBool, nString, nPath, nNull, nAttrs, nList, nFunction, nExternal } ValueType;
 
 class Bindings;
 struct Env;
@@ -64,7 +51,6 @@ class EvalState;
 class XMLWriter;
 class JSONPlaceholder;
 
-
 typedef int64_t NixInt;
 typedef double NixFloat;
 typedef std::pair<StorePath, std::string> NixStringContextElem;
@@ -75,12 +61,12 @@ typedef std::vector<NixStringContextElem> NixStringContext;
  */
 class ExternalValueBase
 {
-    friend std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
-    protected:
+    friend std::ostream & operator<<(std::ostream & str, const ExternalValueBase & v);
+protected:
     /* Print out the value */
     virtual std::ostream & print(std::ostream & str) const = 0;
 
-    public:
+public:
     /* Return a simple string describing the type */
     virtual std::string showType() const = 0;
 
@@ -95,24 +81,25 @@ class ExternalValueBase
     /* Compare to another value of the same type. Defaults to uncomparable,
      * i.e. always false.
      */
-    virtual bool operator ==(const ExternalValueBase & b) const;
+    virtual bool operator==(const ExternalValueBase & b) const;
 
     /* Print the value as JSON. Defaults to unconvertable, i.e. throws an error */
-    virtual void printValueAsJSON(EvalState & state, bool strict,
-        JSONPlaceholder & out, PathSet & context) const;
+    virtual void printValueAsJSON(EvalState & state, bool strict, JSONPlaceholder & out, PathSet & context) const;
 
     /* Print the value as XML. Defaults to unevaluated */
-    virtual void printValueAsXML(EvalState & state, bool strict, bool location,
-        XMLWriter & doc, PathSet & context, PathSet & drvsSeen,
+    virtual void printValueAsXML(
+        EvalState & state,
+        bool strict,
+        bool location,
+        XMLWriter & doc,
+        PathSet & context,
+        PathSet & drvsSeen,
         const PosIdx pos) const;
 
-    virtual ~ExternalValueBase()
-    {
-    };
+    virtual ~ExternalValueBase(){};
 };
 
-std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
-
+std::ostream & operator<<(std::ostream & str, const ExternalValueBase & v);
 
 struct Value
 {
@@ -132,14 +119,32 @@ public:
     // needed by callers into methods of this type
 
     // type() == nThunk
-    inline bool isThunk() const { return internalType == tThunk; };
-    inline bool isApp() const { return internalType == tApp; };
-    inline bool isBlackhole() const { return internalType == tBlackhole; };
+    inline bool isThunk() const
+    {
+        return internalType == tThunk;
+    };
+    inline bool isApp() const
+    {
+        return internalType == tApp;
+    };
+    inline bool isBlackhole() const
+    {
+        return internalType == tBlackhole;
+    };
 
     // type() == nFunction
-    inline bool isLambda() const { return internalType == tLambda; };
-    inline bool isPrimOp() const { return internalType == tPrimOp; };
-    inline bool isPrimOpApp() const { return internalType == tPrimOpApp; };
+    inline bool isLambda() const
+    {
+        return internalType == tLambda;
+    };
+    inline bool isPrimOp() const
+    {
+        return internalType == tPrimOp;
+    };
+    inline bool isPrimOpApp() const
+    {
+        return internalType == tPrimOpApp;
+    };
 
     union
     {
@@ -166,32 +171,38 @@ public:
            the inputSrcs of the derivations.
 
            For canonicity, the store paths should be in sorted order. */
-        struct {
+        struct
+        {
             const char * s;
-            const char * * context; // must be in sorted order
+            const char ** context; // must be in sorted order
         } string;
 
         const char * path;
         Bindings * attrs;
-        struct {
+        struct
+        {
             size_t size;
-            Value * * elems;
+            Value ** elems;
         } bigList;
         Value * smallList[2];
-        struct {
+        struct
+        {
             Env * env;
             Expr * expr;
         } thunk;
-        struct {
-            Value * left, * right;
+        struct
+        {
+            Value *left, *right;
         } app;
-        struct {
+        struct
+        {
             Env * env;
             ExprLambda * fun;
         } lambda;
         PrimOp * primOp;
-        struct {
-            Value * left, * right;
+        struct
+        {
+            Value *left, *right;
         } primOpApp;
         ExternalValueBase * external;
         NixFloat fpoint;
@@ -202,17 +213,34 @@ public:
     inline ValueType type() const
     {
         switch (internalType) {
-            case tInt: return nInt;
-            case tBool: return nBool;
-            case tString: return nString;
-            case tPath: return nPath;
-            case tNull: return nNull;
-            case tAttrs: return nAttrs;
-            case tList1: case tList2: case tListN: return nList;
-            case tLambda: case tPrimOp: case tPrimOpApp: return nFunction;
-            case tExternal: return nExternal;
-            case tFloat: return nFloat;
-            case tThunk: case tApp: case tBlackhole: return nThunk;
+        case tInt:
+            return nInt;
+        case tBool:
+            return nBool;
+        case tString:
+            return nString;
+        case tPath:
+            return nPath;
+        case tNull:
+            return nNull;
+        case tAttrs:
+            return nAttrs;
+        case tList1:
+        case tList2:
+        case tListN:
+            return nList;
+        case tLambda:
+        case tPrimOp:
+        case tPrimOpApp:
+            return nFunction;
+        case tExternal:
+            return nExternal;
+        case tFloat:
+            return nFloat;
+        case tThunk:
+        case tApp:
+        case tBlackhole:
+            return nThunk;
         }
         abort();
     }
@@ -238,7 +266,7 @@ public:
         boolean = b;
     }
 
-    inline void mkString(const char * s, const char * * context = 0)
+    inline void mkString(const char * s, const char ** context = 0)
     {
         internalType = tString;
         string.s = s;
@@ -322,7 +350,6 @@ public:
         primOp = p;
     }
 
-
     inline void mkPrimOpApp(Value * l, Value * r)
     {
         internalType = tPrimOpApp;
@@ -349,7 +376,7 @@ public:
         return internalType == tList1 || internalType == tList2 || internalType == tListN;
     }
 
-    Value * * listElems()
+    Value ** listElems()
     {
         return internalType == tList1 || internalType == tList2 ? smallList : bigList.elems;
     }
@@ -379,12 +406,18 @@ public:
         {
             typedef Value * const * iterator;
             iterator _begin, _end;
-            iterator begin() const { return _begin; }
-            iterator end() const { return _end; }
+            iterator begin() const
+            {
+                return _begin;
+            }
+            iterator end() const
+            {
+                return _end;
+            }
         };
         assert(isList());
         auto begin = listElems();
-        return ListIterable { begin, begin + listSize() };
+        return ListIterable{begin, begin + listSize()};
     }
 
     auto listItems() const
@@ -393,26 +426,31 @@ public:
         {
             typedef const Value * const * iterator;
             iterator _begin, _end;
-            iterator begin() const { return _begin; }
-            iterator end() const { return _end; }
+            iterator begin() const
+            {
+                return _begin;
+            }
+            iterator end() const
+            {
+                return _end;
+            }
         };
         assert(isList());
         auto begin = listElems();
-        return ConstListIterable { begin, begin + listSize() };
+        return ConstListIterable{begin, begin + listSize()};
     }
 };
-
 
 #if HAVE_BOEHMGC
 typedef std::vector<Value *, traceable_allocator<Value *>> ValueVector;
 typedef std::map<Symbol, Value *, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, Value *>>> ValueMap;
-typedef std::map<Symbol, ValueVector, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, ValueVector>>> ValueVectorMap;
+typedef std::map<Symbol, ValueVector, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, ValueVector>>>
+    ValueVectorMap;
 #else
 typedef std::vector<Value *> ValueVector;
 typedef std::map<Symbol, Value *> ValueMap;
 typedef std::map<Symbol, ValueVector> ValueVectorMap;
 #endif
-
 
 /* A value allocated in traceable memory. */
 typedef std::shared_ptr<Value *> RootValue;

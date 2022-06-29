@@ -10,9 +10,7 @@
 #include <map>
 #include <variant>
 
-
 namespace nix {
-
 
 /* Abstract syntax of derivations. */
 
@@ -43,7 +41,8 @@ struct DerivationOutputCAFloating
 /* Input-addressed output which depends on a (CA) derivation whose hash isn't
  * known yet.
  */
-struct DerivationOutputDeferred {};
+struct DerivationOutputDeferred
+{};
 
 /* Impure output which is moved to a content-addressed location (like
    CAFloating) but isn't registered as a realization.
@@ -60,8 +59,8 @@ typedef std::variant<
     DerivationOutputCAFixed,
     DerivationOutputCAFloating,
     DerivationOutputDeferred,
-    DerivationOutputImpure
-> _DerivationOutputRaw;
+    DerivationOutputImpure>
+    _DerivationOutputRaw;
 
 struct DerivationOutput : _DerivationOutputRaw
 {
@@ -79,7 +78,8 @@ struct DerivationOutput : _DerivationOutputRaw
        interface provided by BasicDerivation::outputsAndOptPaths */
     std::optional<StorePath> path(const Store & store, std::string_view drvName, std::string_view outputName) const;
 
-    inline const Raw & raw() const {
+    inline const Raw & raw() const
+    {
         return static_cast<const Raw &>(*this);
     }
 };
@@ -90,32 +90,31 @@ typedef std::map<std::string, DerivationOutput> DerivationOutputs;
    also contains, for each output, the (optional) store path in which it would
    be written. To calculate values of these types, see the corresponding
    functions in BasicDerivation */
-typedef std::map<std::string, std::pair<DerivationOutput, std::optional<StorePath>>>
-  DerivationOutputsAndOptPaths;
+typedef std::map<std::string, std::pair<DerivationOutput, std::optional<StorePath>>> DerivationOutputsAndOptPaths;
 
 /* For inputs that are sub-derivations, we specify exactly which
    output IDs we are interested in. */
 typedef std::map<StorePath, StringSet> DerivationInputs;
 
-struct DerivationType_InputAddressed {
+struct DerivationType_InputAddressed
+{
     bool deferred;
 };
 
-struct DerivationType_ContentAddressed {
+struct DerivationType_ContentAddressed
+{
     bool sandboxed;
     bool fixed;
 };
 
-struct DerivationType_Impure {
-};
+struct DerivationType_Impure
+{};
 
-typedef std::variant<
-    DerivationType_InputAddressed,
-    DerivationType_ContentAddressed,
-    DerivationType_Impure
-> _DerivationTypeRaw;
+typedef std::variant<DerivationType_InputAddressed, DerivationType_ContentAddressed, DerivationType_Impure>
+    _DerivationTypeRaw;
 
-struct DerivationType : _DerivationTypeRaw {
+struct DerivationType : _DerivationTypeRaw
+{
     using Raw = _DerivationTypeRaw;
     using Raw::Raw;
     using InputAddressed = DerivationType_InputAddressed;
@@ -149,7 +148,8 @@ struct DerivationType : _DerivationTypeRaw {
      */
     bool hasKnownOutputPaths() const;
 
-    inline const Raw & raw() const {
+    inline const Raw & raw() const
+    {
         return static_cast<const Raw &>(*this);
     }
 };
@@ -157,7 +157,7 @@ struct DerivationType : _DerivationTypeRaw {
 struct BasicDerivation
 {
     DerivationOutputs outputs; /* keyed on symbolic IDs */
-    StorePathSet inputSrcs; /* inputs that are sources */
+    StorePathSet inputSrcs;    /* inputs that are sources */
     std::string platform;
     Path builder;
     Strings args;
@@ -165,7 +165,7 @@ struct BasicDerivation
     std::string name;
 
     BasicDerivation() = default;
-    virtual ~BasicDerivation() { };
+    virtual ~BasicDerivation(){};
 
     bool isBuiltin() const;
 
@@ -188,8 +188,8 @@ struct Derivation : BasicDerivation
     DerivationInputs inputDrvs; /* inputs that are sub-derivations */
 
     /* Print a derivation. */
-    std::string unparse(const Store & store, bool maskOutputs,
-        std::map<std::string, StringSet> * actualInputs = nullptr) const;
+    std::string
+    unparse(const Store & store, bool maskOutputs, std::map<std::string, StringSet> * actualInputs = nullptr) const;
 
     /* Return the underlying basic derivation but with these changes:
 
@@ -202,23 +202,22 @@ struct Derivation : BasicDerivation
     /* Like the above, but instead of querying the Nix database for
        realisations, uses a given mapping from input derivation paths
        + output names to actual output store paths. */
-    std::optional<BasicDerivation> tryResolve(
-        Store & store,
-        const std::map<std::pair<StorePath, std::string>, StorePath> & inputDrvOutputs) const;
+    std::optional<BasicDerivation>
+    tryResolve(Store & store, const std::map<std::pair<StorePath, std::string>, StorePath> & inputDrvOutputs) const;
 
     Derivation() = default;
-    Derivation(const BasicDerivation & bd) : BasicDerivation(bd) { }
-    Derivation(BasicDerivation && bd) : BasicDerivation(std::move(bd)) { }
+    Derivation(const BasicDerivation & bd)
+        : BasicDerivation(bd)
+    {}
+    Derivation(BasicDerivation && bd)
+        : BasicDerivation(std::move(bd))
+    {}
 };
-
 
 class Store;
 
 /* Write a derivation to the Nix store, and return its path. */
-StorePath writeDerivation(Store & store,
-    const Derivation & drv,
-    RepairFlag repair = NoRepair,
-    bool readOnly = false);
+StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repair = NoRepair, bool readOnly = false);
 
 /* Read a derivation from a file. */
 Derivation parseDerivation(const Store & store, std::string && s, std::string_view name);
@@ -233,13 +232,13 @@ bool isDerivation(const std::string & fileName);
    the output name is "out". */
 std::string outputPathName(std::string_view drvName, std::string_view outputName);
 
-
 // The hashes modulo of a derivation.
 //
 // Each output is given a hash, although in practice only the content-addressed
 // derivations (fixed-output or not) will have a different hash for each
 // output.
-struct DrvHash {
+struct DrvHash
+{
     std::map<std::string, Hash> hashes;
 
     enum struct Kind : bool {
@@ -253,7 +252,7 @@ struct DrvHash {
     Kind kind;
 };
 
-void operator |= (DrvHash::Kind & self, const DrvHash::Kind & other) noexcept;
+void operator|=(DrvHash::Kind & self, const DrvHash::Kind & other) noexcept;
 
 /* Returns hashes with the details of fixed-output subderivations
    expunged.

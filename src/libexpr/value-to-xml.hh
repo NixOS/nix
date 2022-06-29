@@ -8,7 +8,7 @@
 
 namespace nix {
 
-void printValueAsXML(EvalState & state, bool strict, bool location,
-    Value & v, std::ostream & out, PathSet & context, const PosIdx pos);
+void printValueAsXML(
+    EvalState & state, bool strict, bool location, Value & v, std::ostream & out, PathSet & context, const PosIdx pos);
 
 }

@@ -27,8 +27,7 @@ private:
 
 typedef std::list<DrvName> DrvNames;
 
-std::string_view nextComponent(std::string_view::const_iterator & p,
-    const std::string_view::const_iterator end);
+std::string_view nextComponent(std::string_view::const_iterator & p, const std::string_view::const_iterator end);
 int compareVersions(const std::string_view v1, const std::string_view v2);
 DrvNames drvNamesFromArgs(const Strings & opArgs);
 

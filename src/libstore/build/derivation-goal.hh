@@ -12,7 +12,7 @@ using std::map;
 
 struct HookInstance;
 
-typedef enum {rpAccept, rpDecline, rpPostpone} HookReply;
+typedef enum { rpAccept, rpDecline, rpPostpone } HookReply;
 
 /* Unless we are repairing, we don't both to test validity and just assume it,
    so the choices are `Absent` or `Valid`. */
@@ -22,21 +22,24 @@ enum struct PathStatus {
     Valid,
 };
 
-struct InitialOutputStatus {
+struct InitialOutputStatus
+{
     StorePath path;
     PathStatus status;
     /* Valid in the store, and additionally non-corrupt if we are repairing */
-    bool isValid() const {
+    bool isValid() const
+    {
         return status == PathStatus::Valid;
     }
     /* Merely present, allowed to be corrupt */
-    bool isPresent() const {
-        return status == PathStatus::Corrupt
-            || status == PathStatus::Valid;
+    bool isPresent() const
+    {
+        return status == PathStatus::Corrupt || status == PathStatus::Valid;
     }
 };
 
-struct InitialOutput {
+struct InitialOutput
+{
     bool wanted;
     Hash outputHash;
     std::optional<InitialOutputStatus> known;
@@ -132,11 +135,13 @@ struct DerivationGoal : public Goal
     /* The remote machine on which we're building. */
     std::string machineName;
 
-    DerivationGoal(const StorePath & drvPath,
-        const StringSet & wantedOutputs, Worker & worker,
-        BuildMode buildMode = bmNormal);
-    DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
-        const StringSet & wantedOutputs, Worker & worker,
+    DerivationGoal(
+        const StorePath & drvPath, const StringSet & wantedOutputs, Worker & worker, BuildMode buildMode = bmNormal);
+    DerivationGoal(
+        const StorePath & drvPath,
+        const BasicDerivation & drv,
+        const StringSet & wantedOutputs,
+        Worker & worker,
         BuildMode buildMode = bmNormal);
     virtual ~DerivationGoal();
 
@@ -176,7 +181,7 @@ struct DerivationGoal : public Goal
     Path openLogFile();
 
     /* Sign the newly built realisation if the store allows it */
-    virtual void signRealisation(Realisation&) {}
+    virtual void signRealisation(Realisation &) {}
 
     /* Close the log file. */
     void closeLogFile();
@@ -224,10 +229,7 @@ struct DerivationGoal : public Goal
 
     void started();
 
-    void done(
-        BuildResult::Status status,
-        DrvOutputs builtOutputs = {},
-        std::optional<Error> ex = {});
+    void done(BuildResult::Status status, DrvOutputs builtOutputs = {}, std::optional<Error> ex = {});
 
     void waiteeDone(GoalPtr waitee, ExitCode result) override;
 

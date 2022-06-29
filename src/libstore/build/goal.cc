@@ -3,13 +3,12 @@
 
 namespace nix {
 
-
-bool CompareGoalPtrs::operator() (const GoalPtr & a, const GoalPtr & b) const {
+bool CompareGoalPtrs::operator()(const GoalPtr & a, const GoalPtr & b) const
+{
     std::string s1 = a->key();
     std::string s2 = b->key();
     return s1 < s2;
 }
-
 
 void addToWeakGoals(WeakGoals & goals, GoalPtr p)
 {
@@ -18,13 +17,11 @@ void addToWeakGoals(WeakGoals & goals, GoalPtr p)
     goals.insert(p);
 }
 
-
 void Goal::addWaitee(GoalPtr waitee)
 {
     waitees.insert(waitee);
     addToWeakGoals(waitee->waiters, shared_from_this());
 }
-
 
 void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
 {
@@ -33,11 +30,14 @@ void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
 
     trace(fmt("waitee '%s' done; %d left", waitee->name, waitees.size()));
 
-    if (result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure) ++nrFailed;
+    if (result == ecFailed || result == ecNoSubstituters || result == ecIncompleteClosure)
+        ++nrFailed;
 
-    if (result == ecNoSubstituters) ++nrNoSubstituters;
+    if (result == ecNoSubstituters)
+        ++nrNoSubstituters;
 
-    if (result == ecIncompleteClosure) ++nrIncompleteClosure;
+    if (result == ecIncompleteClosure)
+        ++nrIncompleteClosure;
 
     if (waitees.empty() || (result == ecFailed && !settings.keepGoing)) {
 
@@ -51,7 +51,6 @@ void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
         worker.wakeUp(shared_from_this());
     }
 }
-
 
 void Goal::amDone(ExitCode result, std::optional<Error> ex)
 {
@@ -69,14 +68,14 @@ void Goal::amDone(ExitCode result, std::optional<Error> ex)
 
     for (auto & i : waiters) {
         GoalPtr goal = i.lock();
-        if (goal) goal->waiteeDone(shared_from_this(), result);
+        if (goal)
+            goal->waiteeDone(shared_from_this(), result);
     }
     waiters.clear();
     worker.removeGoal(shared_from_this());
 
     cleanup();
 }
-
 
 void Goal::trace(const FormatOrString & fs)
 {

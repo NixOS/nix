@@ -5,11 +5,9 @@
 
 #include <iostream>
 
-
 using std::cout;
 
 namespace nix {
-
 
 static inline std::string_view xmlQuote(std::string_view s)
 {
@@ -18,19 +16,15 @@ static inline std::string_view xmlQuote(std::string_view s)
     return s;
 }
 
-
 static std::string symbolicName(std::string_view p)
 {
     return std::string(p.substr(0, p.find('-') + 1));
 }
 
-
 static std::string makeEdge(std::string_view src, std::string_view dst)
 {
-    return fmt("  <edge source=\"%1%\" target=\"%2%\"/>\n",
-        xmlQuote(src), xmlQuote(dst));
+    return fmt("  <edge source=\"%1%\" target=\"%2%\"/>\n", xmlQuote(src), xmlQuote(dst));
 }
-
 
 static std::string makeNode(const ValidPathInfo & info)
 {
@@ -40,12 +34,9 @@ static std::string makeNode(const ValidPathInfo & info)
         "    <data key=\"name\">%3%</data>\n"
         "    <data key=\"type\">%4%</data>\n"
         "  </node>\n",
-        info.path.to_string(),
-        info.narSize,
-        symbolicName(std::string(info.path.name())),
+        info.path.to_string(), info.narSize, symbolicName(std::string(info.path.name())),
         (info.path.isDerivation() ? "derivation" : "output-path"));
 }
-
 
 void printGraphML(ref<Store> store, StorePathSet && roots)
 {
@@ -66,7 +57,8 @@ void printGraphML(ref<Store> store, StorePathSet && roots)
         auto path = std::move(workList.extract(workList.begin()).value());
 
         ret = doneSet.insert(path);
-        if (ret.second == false) continue;
+        if (ret.second == false)
+            continue;
 
         auto info = store->queryPathInfo(path);
         cout << makeNode(*info);
@@ -77,12 +69,10 @@ void printGraphML(ref<Store> store, StorePathSet && roots)
                 cout << makeEdge(path.to_string(), p.to_string());
             }
         }
-
     }
 
     cout << "</graph>\n";
     cout << "</graphml>\n";
 }
-
 
 }

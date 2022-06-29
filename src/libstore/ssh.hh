@@ -30,7 +30,13 @@ private:
 
 public:
 
-    SSHMaster(const std::string & host, const std::string & keyFile, const std::string & sshPublicHostKey, bool useMaster, bool compress, int logFD = -1);
+    SSHMaster(
+        const std::string & host,
+        const std::string & keyFile,
+        const std::string & sshPublicHostKey,
+        bool useMaster,
+        bool compress,
+        int logFD = -1);
 
     struct Connection
     {

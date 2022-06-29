@@ -16,27 +16,34 @@ void toJSON(std::ostream & str, const char * start, const char * end)
         str.write(buf, bufPos);
         bufPos = 0;
     };
-    const auto put = [&] (char c) {
-        buf[bufPos++] = c;
-    };
+    const auto put = [&](char c) { buf[bufPos++] = c; };
 
     put('"');
     for (auto i = start; i != end; i++) {
-        if (bufPos >= BUF_SIZE) flush();
-        if (*i == '\"' || *i == '\\') { put('\\'); put(*i); }
-        else if (*i == '\n') { put('\\'); put('n'); }
-        else if (*i == '\r') { put('\\'); put('r'); }
-        else if (*i == '\t') { put('\\'); put('t'); }
-        else if (*i >= 0 && *i < 32) {
+        if (bufPos >= BUF_SIZE)
+            flush();
+        if (*i == '\"' || *i == '\\') {
+            put('\\');
+            put(*i);
+        } else if (*i == '\n') {
+            put('\\');
+            put('n');
+        } else if (*i == '\r') {
+            put('\\');
+            put('r');
+        } else if (*i == '\t') {
+            put('\\');
+            put('t');
+        } else if (*i >= 0 && *i < 32) {
             const char hex[17] = "0123456789abcdef";
             put('\\');
             put('u');
             put(hex[(uint16_t(*i) >> 12) & 0xf]);
-            put(hex[(uint16_t(*i) >>  8) & 0xf]);
-            put(hex[(uint16_t(*i) >>  4) & 0xf]);
-            put(hex[(uint16_t(*i) >>  0) & 0xf]);
-        }
-        else put(*i);
+            put(hex[(uint16_t(*i) >> 8) & 0xf]);
+            put(hex[(uint16_t(*i) >> 4) & 0xf]);
+            put(hex[(uint16_t(*i) >> 0) & 0xf]);
+        } else
+            put(*i);
     }
     put('"');
     flush();
@@ -44,29 +51,67 @@ void toJSON(std::ostream & str, const char * start, const char * end)
 
 void toJSON(std::ostream & str, const char * s)
 {
-    if (!s) str << "null"; else toJSON(str, s, s + strlen(s));
+    if (!s)
+        str << "null";
+    else
+        toJSON(str, s, s + strlen(s));
 }
 
-template<> void toJSON<int>(std::ostream & str, const int & n) { str << n; }
-template<> void toJSON<unsigned int>(std::ostream & str, const unsigned int & n) { str << n; }
-template<> void toJSON<long>(std::ostream & str, const long & n) { str << n; }
-template<> void toJSON<unsigned long>(std::ostream & str, const unsigned long & n) { str << n; }
-template<> void toJSON<long long>(std::ostream & str, const long long & n) { str << n; }
-template<> void toJSON<unsigned long long>(std::ostream & str, const unsigned long long & n) { str << n; }
-template<> void toJSON<float>(std::ostream & str, const float & n) { str << n; }
-template<> void toJSON<double>(std::ostream & str, const double & n) { str << n; }
+template<>
+void toJSON<int>(std::ostream & str, const int & n)
+{
+    str << n;
+}
+template<>
+void toJSON<unsigned int>(std::ostream & str, const unsigned int & n)
+{
+    str << n;
+}
+template<>
+void toJSON<long>(std::ostream & str, const long & n)
+{
+    str << n;
+}
+template<>
+void toJSON<unsigned long>(std::ostream & str, const unsigned long & n)
+{
+    str << n;
+}
+template<>
+void toJSON<long long>(std::ostream & str, const long long & n)
+{
+    str << n;
+}
+template<>
+void toJSON<unsigned long long>(std::ostream & str, const unsigned long long & n)
+{
+    str << n;
+}
+template<>
+void toJSON<float>(std::ostream & str, const float & n)
+{
+    str << n;
+}
+template<>
+void toJSON<double>(std::ostream & str, const double & n)
+{
+    str << n;
+}
 
-template<> void toJSON<std::string>(std::ostream & str, const std::string & s)
+template<>
+void toJSON<std::string>(std::ostream & str, const std::string & s)
 {
     toJSON(str, s.c_str(), s.c_str() + s.size());
 }
 
-template<> void toJSON<bool>(std::ostream & str, const bool & b)
+template<>
+void toJSON<bool>(std::ostream & str, const bool & b)
 {
     str << (b ? "true" : "false");
 }
 
-template<> void toJSON<std::nullptr_t>(std::ostream & str, const std::nullptr_t & b)
+template<>
+void toJSON<std::nullptr_t>(std::ostream & str, const std::nullptr_t & b)
 {
     str << "null";
 }
@@ -88,7 +133,8 @@ JSONWriter::~JSONWriter()
     if (state) {
         assertActive();
         state->stack--;
-        if (state->stack == 0) delete state;
+        if (state->stack == 0)
+            delete state;
     }
 }
 
@@ -100,7 +146,8 @@ void JSONWriter::comma()
     } else {
         state->str << ',';
     }
-    if (state->indent) indent();
+    if (state->indent)
+        indent();
 }
 
 void JSONWriter::indent()
@@ -117,7 +164,8 @@ void JSONList::open()
 JSONList::~JSONList()
 {
     state->depth--;
-    if (state->indent && !first) indent();
+    if (state->indent && !first)
+        indent();
     state->str << "]";
 }
 
@@ -149,7 +197,8 @@ JSONObject::~JSONObject()
 {
     if (state) {
         state->depth--;
-        if (state->indent && !first) indent();
+        if (state->indent && !first)
+            indent();
         state->str << "}";
     }
 }
@@ -159,7 +208,8 @@ void JSONObject::attr(const std::string & s)
     comma();
     toJSON(state->str, s);
     state->str << ':';
-    if (state->indent) state->str << ' ';
+    if (state->indent)
+        state->str << ' ';
 }
 
 JSONList JSONObject::list(const std::string & name)

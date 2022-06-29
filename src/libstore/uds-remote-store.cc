@@ -10,7 +10,6 @@
 
 #include <cstring>
 
-
 namespace nix {
 
 UDSRemoteStore::UDSRemoteStore(const Params & params)
@@ -21,19 +20,13 @@ UDSRemoteStore::UDSRemoteStore(const Params & params)
     , Store(params)
     , LocalFSStore(params)
     , RemoteStore(params)
-{
-}
+{}
 
-
-UDSRemoteStore::UDSRemoteStore(
-        const std::string scheme,
-        std::string socket_path,
-        const Params & params)
+UDSRemoteStore::UDSRemoteStore(const std::string scheme, std::string socket_path, const Params & params)
     : UDSRemoteStore(params)
 {
     path.emplace(socket_path);
 }
-
 
 std::string UDSRemoteStore::getUri()
 {
@@ -44,12 +37,10 @@ std::string UDSRemoteStore::getUri()
     }
 }
 
-
 void UDSRemoteStore::Connection::closeWrite()
 {
     shutdown(fd.get(), SHUT_WR);
 }
-
 
 ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
 {
@@ -67,7 +58,6 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
 
     return conn;
 }
-
 
 static RegisterStoreImplementation<UDSRemoteStore, UDSRemoteStoreConfig> regUDSRemoteStore;
 

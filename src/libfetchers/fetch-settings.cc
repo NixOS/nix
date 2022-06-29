@@ -2,9 +2,7 @@
 
 namespace nix {
 
-FetchSettings::FetchSettings()
-{
-}
+FetchSettings::FetchSettings() {}
 
 FetchSettings fetchSettings;
 

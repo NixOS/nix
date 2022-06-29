@@ -10,7 +10,10 @@ struct LocalBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 {
     using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
 
-    const std::string name() override { return "Local Binary Cache Store"; }
+    const std::string name() override
+    {
+        return "Local Binary Cache Store";
+    }
 };
 
 class LocalBinaryCacheStore : public virtual LocalBinaryCacheStoreConfig, public virtual BinaryCacheStore
@@ -21,18 +24,14 @@ private:
 
 public:
 
-    LocalBinaryCacheStore(
-        const std::string scheme,
-        const Path & binaryCacheDir,
-        const Params & params)
+    LocalBinaryCacheStore(const std::string scheme, const Path & binaryCacheDir, const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
         , LocalBinaryCacheStoreConfig(params)
         , Store(params)
         , BinaryCacheStore(params)
         , binaryCacheDir(binaryCacheDir)
-    {
-    }
+    {}
 
     void init() override;
 
@@ -47,7 +46,8 @@ protected:
 
     bool fileExists(const std::string & path) override;
 
-    void upsertFile(const std::string & path,
+    void upsertFile(
+        const std::string & path,
         std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType) override
     {
@@ -78,17 +78,14 @@ protected:
         StorePathSet paths;
 
         for (auto & entry : readDirectory(binaryCacheDir)) {
-            if (entry.name.size() != 40 ||
-                !hasSuffix(entry.name, ".narinfo"))
+            if (entry.name.size() != 40 || !hasSuffix(entry.name, ".narinfo"))
                 continue;
-            paths.insert(parseStorePath(
-                    storeDir + "/" + entry.name.substr(0, entry.name.size() - 8)
-                    + "-" + MissingName));
+            paths.insert(
+                parseStorePath(storeDir + "/" + entry.name.substr(0, entry.name.size() - 8) + "-" + MissingName));
         }
 
         return paths;
     }
-
 };
 
 void LocalBinaryCacheStore::init()

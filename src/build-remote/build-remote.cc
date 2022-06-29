@@ -24,8 +24,7 @@
 using namespace nix;
 using std::cin;
 
-static void handleAlarm(int sig) {
-}
+static void handleAlarm(int sig) {}
 
 std::string escapeUri(std::string uri)
 {
@@ -40,13 +39,15 @@ static AutoCloseFD openSlotLock(const Machine & m, uint64_t slot)
     return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(m.storeUri), slot), true);
 }
 
-static bool allSupportedLocally(Store & store, const std::set<std::string>& requiredFeatures) {
+static bool allSupportedLocally(Store & store, const std::set<std::string> & requiredFeatures)
+{
     for (auto & feature : requiredFeatures)
-        if (!store.systemFeatures.get().count(feature)) return false;
+        if (!store.systemFeatures.get().count(feature))
+            return false;
     return true;
 }
 
-static int main_build_remote(int argc, char * * argv)
+static int main_build_remote(int argc, char ** argv)
 {
     {
         logger = makeJSONLogger(*logger);
@@ -82,7 +83,7 @@ static int main_build_remote(int argc, char * * argv)
            that gets cleared on reboot, but it wouldn't work on macOS. */
         auto currentLoadName = "/current-load";
         if (auto localStore = store.dynamic_pointer_cast<LocalFSStore>())
-            currentLoad = std::string { localStore->stateDir } + currentLoadName;
+            currentLoad = std::string{localStore->stateDir} + currentLoadName;
         else
             currentLoad = settings.nixStateDir + currentLoadName;
 
@@ -104,18 +105,21 @@ static int main_build_remote(int argc, char * * argv)
 
             try {
                 auto s = readString(source);
-                if (s != "try") return 0;
-            } catch (EndOfFile &) { return 0; }
+                if (s != "try")
+                    return 0;
+            } catch (EndOfFile &) {
+                return 0;
+            }
 
             auto amWilling = readInt(source);
             auto neededSystem = readString(source);
             drvPath = store->parseStorePath(readString(source));
             auto requiredFeatures = readStrings<std::set<std::string>>(source);
 
-            auto canBuildLocally = amWilling
-                 &&  (  neededSystem == settings.thisSystem
-                     || settings.extraPlatforms.get().count(neededSystem) > 0)
-                 &&  allSupportedLocally(*store, requiredFeatures);
+            auto canBuildLocally =
+                amWilling
+                && (neededSystem == settings.thisSystem || settings.extraPlatforms.get().count(neededSystem) > 0)
+                && allSupportedLocally(*store, requiredFeatures);
 
             /* Error ignored here, will be caught later */
             mkdir(currentLoad.c_str(), 0777);
@@ -134,12 +138,9 @@ static int main_build_remote(int argc, char * * argv)
 
                     if (m.enabled
                         && (neededSystem == "builtin"
-                            || std::find(m.systemTypes.begin(),
-                                m.systemTypes.end(),
-                                neededSystem) != m.systemTypes.end()) &&
-                        m.allSupported(requiredFeatures) &&
-                        m.mandatoryMet(requiredFeatures))
-                    {
+                            || std::find(m.systemTypes.begin(), m.systemTypes.end(), neededSystem)
+                                   != m.systemTypes.end())
+                        && m.allSupported(requiredFeatures) && m.mandatoryMet(requiredFeatures)) {
                         rightType = true;
                         AutoCloseFD free;
                         uint64_t load = 0;
@@ -181,8 +182,7 @@ static int main_build_remote(int argc, char * * argv)
                 if (!bestSlotLock) {
                     if (rightType && !canBuildLocally)
                         std::cerr << "# postpone\n";
-                    else
-                    {
+                    else {
                         // build the hint template.
                         std::string errorText =
                             "Failed to find a machine for remote build!\n"
@@ -201,16 +201,11 @@ static int main_build_remote(int argc, char * * argv)
                             drvstr = "<unknown>";
 
                         auto error = hintformat(errorText);
-                        error
-                            % drvstr
-                            % neededSystem
-                            % concatStringsSep<StringSet>(", ", requiredFeatures)
+                        error % drvstr % neededSystem % concatStringsSep<StringSet>(", ", requiredFeatures)
                             % machines.size();
 
                         for (auto & m : machines)
-                            error
-                                % concatStringsSep<std::vector<std::string>>(", ", m.systemTypes)
-                                % m.maxJobs
+                            error % concatStringsSep<std::vector<std::string>>(", ", m.systemTypes) % m.maxJobs
                                 % concatStringsSep<StringSet>(", ", m.supportedFeatures)
                                 % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);
 
@@ -239,9 +234,8 @@ static int main_build_remote(int argc, char * * argv)
 
                 } catch (std::exception & e) {
                     auto msg = chomp(drainFD(5, false));
-                    printError("cannot build on '%s': %s%s",
-                        bestMachine->storeUri, e.what(),
-                        msg.empty() ? "" : ": " + msg);
+                    printError(
+                        "cannot build on '%s': %s%s", bestMachine->storeUri, e.what(), msg.empty() ? "" : ": " + msg);
                     bestMachine->enabled = false;
                     continue;
                 }
@@ -250,7 +244,7 @@ static int main_build_remote(int argc, char * * argv)
             }
         }
 
-connected:
+    connected:
         close(5);
 
         std::cerr << "# accept\n" << storeUri << "\n";
@@ -303,7 +297,7 @@ connected:
         if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations) && !drv.type().hasKnownOutputPaths()) {
             for (auto & outputName : wantedOutputs) {
                 auto thisOutputHash = outputHashes.at(outputName);
-                auto thisOutputId = DrvOutput{ thisOutputHash, outputName };
+                auto thisOutputId = DrvOutput{thisOutputHash, outputName};
                 if (!store->queryRealisation(thisOutputId)) {
                     debug("missing output %s", outputName);
                     assert(result.builtOutputs.count(thisOutputId));

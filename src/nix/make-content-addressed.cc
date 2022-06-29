@@ -21,16 +21,16 @@ struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand,
     std::string doc() override
     {
         return
-          #include "make-content-addressed.md"
-          ;
+#include "make-content-addressed.md"
+            ;
     }
 
     void run(ref<Store> srcStore, StorePaths && storePaths) override
     {
         auto dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
 
-        auto remappings = makeContentAddressed(*srcStore, *dstStore,
-            StorePathSet(storePaths.begin(), storePaths.end()));
+        auto remappings =
+            makeContentAddressed(*srcStore, *dstStore, StorePathSet(storePaths.begin(), storePaths.end()));
 
         if (json) {
             JSONObject jsonRoot(std::cout);
@@ -44,9 +44,7 @@ struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand,
             for (auto & path : storePaths) {
                 auto i = remappings.find(path);
                 assert(i != remappings.end());
-                notice("rewrote '%s' to '%s'",
-                    srcStore->printStorePath(path),
-                    srcStore->printStorePath(i->second));
+                notice("rewrote '%s' to '%s'", srcStore->printStorePath(path), srcStore->printStorePath(i->second));
             }
         }
     }

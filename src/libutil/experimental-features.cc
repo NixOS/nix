@@ -6,21 +6,20 @@
 namespace nix {
 
 std::map<ExperimentalFeature, std::string> stringifiedXpFeatures = {
-    { Xp::CaDerivations, "ca-derivations" },
-    { Xp::ImpureDerivations, "impure-derivations" },
-    { Xp::Flakes, "flakes" },
-    { Xp::NixCommand, "nix-command" },
-    { Xp::RecursiveNix, "recursive-nix" },
-    { Xp::NoUrlLiterals, "no-url-literals" },
-    { Xp::FetchClosure, "fetch-closure" },
+    {Xp::CaDerivations, "ca-derivations"},
+    {Xp::ImpureDerivations, "impure-derivations"},
+    {Xp::Flakes, "flakes"},
+    {Xp::NixCommand, "nix-command"},
+    {Xp::RecursiveNix, "recursive-nix"},
+    {Xp::NoUrlLiterals, "no-url-literals"},
+    {Xp::FetchClosure, "fetch-closure"},
 };
 
 const std::optional<ExperimentalFeature> parseExperimentalFeature(const std::string_view & name)
 {
     using ReverseXpMap = std::map<std::string_view, ExperimentalFeature>;
 
-    static auto reverseXpMap = []()
-    {
+    static auto reverseXpMap = []() {
         auto reverseXpMap = std::make_unique<ReverseXpMap>();
         for (auto & [feature, name] : stringifiedXpFeatures)
             (*reverseXpMap)[name] = feature;
@@ -51,11 +50,13 @@ std::set<ExperimentalFeature> parseFeatures(const std::set<std::string> & rawFea
 }
 
 MissingExperimentalFeature::MissingExperimentalFeature(ExperimentalFeature feature)
-    : Error("experimental Nix feature '%1%' is disabled; use '--extra-experimental-features %1%' to override", showExperimentalFeature(feature))
+    : Error(
+        "experimental Nix feature '%1%' is disabled; use '--extra-experimental-features %1%' to override",
+        showExperimentalFeature(feature))
     , missingFeature(feature)
 {}
 
-std::ostream & operator <<(std::ostream & str, const ExperimentalFeature & feature)
+std::ostream & operator<<(std::ostream & str, const ExperimentalFeature & feature)
 {
     return str << showExperimentalFeature(feature);
 }

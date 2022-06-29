@@ -25,11 +25,8 @@ private:
 
 public:
     PathLocks();
-    PathLocks(const PathSet & paths,
-        const std::string & waitMsg = "");
-    bool lockPaths(const PathSet & _paths,
-        const std::string & waitMsg = "",
-        bool wait = true);
+    PathLocks(const PathSet & paths, const std::string & waitMsg = "");
+    bool lockPaths(const PathSet & _paths, const std::string & waitMsg = "", bool wait = true);
     ~PathLocks();
     void unlock();
     void setDeletion(bool deletePaths);

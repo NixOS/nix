@@ -11,10 +11,8 @@ static void checkName(std::string_view path, std::string_view name)
     if (name.size() > 211)
         throw BadStorePath("store path '%s' has a name longer than 211 characters", path);
     for (auto c : name)
-        if (!((c >= '0' && c <= '9')
-                || (c >= 'a' && c <= 'z')
-                || (c >= 'A' && c <= 'Z')
-                || c == '+' || c == '-' || c == '.' || c == '_' || c == '?' || c == '='))
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '+' || c == '-'
+              || c == '.' || c == '_' || c == '?' || c == '='))
             throw BadStorePath("store path '%s' contains illegal character '%s'", path, c);
 }
 
@@ -24,8 +22,7 @@ StorePath::StorePath(std::string_view _baseName)
     if (baseName.size() < HashLen + 1)
         throw BadStorePath("'%s' is too short to be a valid store path", baseName);
     for (auto c : hashPart())
-        if (c == 'e' || c == 'o' || c == 'u' || c == 't'
-            || !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z')))
+        if (c == 'e' || c == 'o' || c == 'u' || c == 't' || !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z')))
             throw BadStorePath("store path '%s' contains illegal base-32 character '%s'", baseName, c);
     checkName(baseName, name());
 }
@@ -75,7 +72,8 @@ bool Store::isStorePath(std::string_view path) const
 StorePathSet Store::parseStorePathSet(const PathSet & paths) const
 {
     StorePathSet res;
-    for (auto & i : paths) res.insert(parseStorePath(i));
+    for (auto & i : paths)
+        res.insert(parseStorePath(i));
     return res;
 }
 
@@ -87,7 +85,8 @@ std::string Store::printStorePath(const StorePath & path) const
 PathSet Store::printStorePathSet(const StorePathSet & paths) const
 {
     PathSet res;
-    for (auto & i : paths) res.insert(printStorePath(i));
+    for (auto & i : paths)
+        res.insert(printStorePath(i));
     return res;
 }
 

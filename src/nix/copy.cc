@@ -39,11 +39,14 @@ struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand
     std::string doc() override
     {
         return
-          #include "copy.md"
-          ;
+#include "copy.md"
+            ;
     }
 
-    Category category() override { return catSecondary; }
+    Category category() override
+    {
+        return catSecondary;
+    }
 
     void run(ref<Store> srcStore, BuiltPaths && paths) override
     {
@@ -56,8 +59,7 @@ struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand
             stuffToCopy.insert(theseRealisations.begin(), theseRealisations.end());
         }
 
-        copyPaths(
-            *srcStore, *dstStore, stuffToCopy, NoRepair, checkSigs, substitute);
+        copyPaths(*srcStore, *dstStore, stuffToCopy, NoRepair, checkSigs, substitute);
     }
 };
 

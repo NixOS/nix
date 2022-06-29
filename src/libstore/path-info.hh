@@ -10,20 +10,17 @@
 
 namespace nix {
 
-
 class Store;
-
 
 struct SubstitutablePathInfo
 {
     std::optional<StorePath> deriver;
     StorePathSet references;
     uint64_t downloadSize; /* 0 = unknown or inapplicable */
-    uint64_t narSize; /* 0 = unknown */
+    uint64_t narSize;      /* 0 = unknown */
 };
 
 typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
-
 
 struct ValidPathInfo
 {
@@ -34,7 +31,7 @@ struct ValidPathInfo
     StorePathSet references;
     time_t registrationTime = 0;
     uint64_t narSize = 0; // 0 = unknown
-    uint64_t id; // internal use only
+    uint64_t id;          // internal use only
 
     /* Whether the path is ultimately trusted, that is, it's a
        derivation output that was built locally. */
@@ -60,12 +57,9 @@ struct ValidPathInfo
     */
     std::optional<ContentAddress> ca;
 
-    bool operator == (const ValidPathInfo & i) const
+    bool operator==(const ValidPathInfo & i) const
     {
-        return
-            path == i.path
-            && narHash == i.narHash
-            && references == i.references;
+        return path == i.path && narHash == i.narHash && references == i.references;
     }
 
     /* Return a fingerprint of the store path to be used in binary
@@ -101,10 +95,14 @@ struct ValidPathInfo
 
     ValidPathInfo(const ValidPathInfo & other) = default;
 
-    ValidPathInfo(StorePath && path, Hash narHash) : path(std::move(path)), narHash(narHash) { };
-    ValidPathInfo(const StorePath & path, Hash narHash) : path(path), narHash(narHash) { };
+    ValidPathInfo(StorePath && path, Hash narHash)
+        : path(std::move(path))
+        , narHash(narHash){};
+    ValidPathInfo(const StorePath & path, Hash narHash)
+        : path(path)
+        , narHash(narHash){};
 
-    virtual ~ValidPathInfo() { }
+    virtual ~ValidPathInfo() {}
 
     static ValidPathInfo read(Source & source, const Store & store, unsigned int format);
     static ValidPathInfo read(Source & source, const Store & store, unsigned int format, StorePath && path);

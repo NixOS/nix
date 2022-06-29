@@ -30,13 +30,13 @@ fetchers::Attrs FlakeRef::toAttrs() const
     return attrs;
 }
 
-std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef)
+std::ostream & operator<<(std::ostream & str, const FlakeRef & flakeRef)
 {
     str << flakeRef.to_string();
     return str;
 }
 
-bool FlakeRef::operator ==(const FlakeRef & other) const
+bool FlakeRef::operator==(const FlakeRef & other) const
 {
     return input == other.input && subdir == other.subdir;
 }
@@ -47,11 +47,7 @@ FlakeRef FlakeRef::resolve(ref<Store> store) const
     return FlakeRef(std::move(input2), fetchers::maybeGetStrAttr(extraAttrs, "dir").value_or(subdir));
 }
 
-FlakeRef parseFlakeRef(
-    const std::string & url,
-    const std::optional<Path> & baseDir,
-    bool allowMissing,
-    bool isFlake)
+FlakeRef parseFlakeRef(const std::string & url, const std::optional<Path> & baseDir, bool allowMissing, bool isFlake)
 {
     auto [flakeRef, fragment] = parseFlakeRefWithFragment(url, baseDir, allowMissing, isFlake);
     if (fragment != "")
@@ -59,8 +55,7 @@ FlakeRef parseFlakeRef(
     return flakeRef;
 }
 
-std::optional<FlakeRef> maybeParseFlakeRef(
-    const std::string & url, const std::optional<Path> & baseDir)
+std::optional<FlakeRef> maybeParseFlakeRef(const std::string & url, const std::optional<Path> & baseDir)
 {
     try {
         return parseFlakeRef(url, baseDir);
@@ -69,25 +64,19 @@ std::optional<FlakeRef> maybeParseFlakeRef(
     }
 }
 
-std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
-    const std::string & url,
-    const std::optional<Path> & baseDir,
-    bool allowMissing,
-    bool isFlake)
+std::pair<FlakeRef, std::string>
+parseFlakeRefWithFragment(const std::string & url, const std::optional<Path> & baseDir, bool allowMissing, bool isFlake)
 {
     using namespace fetchers;
 
     static std::string fnRegex = "[0-9a-zA-Z-._~!$&'\"()*+,;=]+";
 
     static std::regex pathUrlRegex(
-        "(/?" + fnRegex + "(?:/" + fnRegex + ")*/?)"
-        + "(?:\\?(" + queryRegex + "))?"
-        + "(?:#(" + queryRegex + "))?",
+        "(/?" + fnRegex + "(?:/" + fnRegex + ")*/?)" + "(?:\\?(" + queryRegex + "))?" + "(?:#(" + queryRegex + "))?",
         std::regex::ECMAScript);
 
     static std::regex flakeRegex(
-        "((" + flakeIdRegexS + ")(?:/(?:" + refAndOrRevRegex + "))?)"
-        + "(?:#(" + queryRegex + "))?",
+        "((" + flakeIdRegexS + ")(?:/(?:" + refAndOrRevRegex + "))?)" + "(?:#(" + queryRegex + "))?",
         std::regex::ECMAScript);
 
     std::smatch match;
@@ -104,9 +93,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
             .path = match[1],
         };
 
-        return std::make_pair(
-            FlakeRef(Input::fromURL(parsedURL), ""),
-            percentDecode(match.str(6)));
+        return std::make_pair(FlakeRef(Input::fromURL(parsedURL), ""), percentDecode(match.str(6)));
     }
 
     else if (std::regex_match(url, match, pathUrlRegex)) {
@@ -122,8 +109,8 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
 
             if (isFlake) {
 
-                if (!allowMissing && !pathExists(path + "/flake.nix")){
-                    notice("path '%s' does not contain a 'flake.nix', searching up",path);
+                if (!allowMissing && !pathExists(path + "/flake.nix")) {
+                    notice("path '%s' does not contain a 'flake.nix', searching up", path);
 
                     // Save device to detect filesystem boundary
                     dev_t device = lstat(path).st_dev;
@@ -133,10 +120,13 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                             found = true;
                             break;
                         } else if (pathExists(path + "/.git"))
-                            throw Error("path '%s' is not part of a flake (neither it nor its parent directories contain a 'flake.nix' file)", path);
+                            throw Error(
+                                "path '%s' is not part of a flake (neither it nor its parent directories contain a 'flake.nix' file)",
+                                path);
                         else {
                             if (lstat(path).st_dev != device)
-                                throw Error("unable to find a flake before encountering filesystem boundary at '%s'", path);
+                                throw Error(
+                                    "unable to find a flake before encountering filesystem boundary at '%s'", path);
                         }
                         path = dirOf(path);
                     }
@@ -176,8 +166,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                             parsedURL.query.insert_or_assign("shallow", "1");
 
                         return std::make_pair(
-                            FlakeRef(Input::fromURL(parsedURL), getOr(parsedURL.query, "dir", "")),
-                            fragment);
+                            FlakeRef(Input::fromURL(parsedURL), getOr(parsedURL.query, "dir", "")), fragment);
                     }
 
                     subdir = std::string(baseNameOf(flakeRoot)) + (subdir.empty() ? "" : "/" + subdir);
@@ -207,14 +196,12 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         auto input = Input::fromURL(parsedURL);
         input.parent = baseDir;
 
-        return std::make_pair(
-            FlakeRef(std::move(input), getOr(parsedURL.query, "dir", "")),
-            fragment);
+        return std::make_pair(FlakeRef(std::move(input), getOr(parsedURL.query, "dir", "")), fragment);
     }
 }
 
-std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
-    const std::string & url, const std::optional<Path> & baseDir)
+std::optional<std::pair<FlakeRef, std::string>>
+maybeParseFlakeRefWithFragment(const std::string & url, const std::optional<Path> & baseDir)
 {
     try {
         return parseFlakeRefWithFragment(url, baseDir);
@@ -228,8 +215,7 @@ FlakeRef FlakeRef::fromAttrs(const fetchers::Attrs & attrs)
     auto attrs2(attrs);
     attrs2.erase("dir");
     return FlakeRef(
-        fetchers::Input::fromAttrs(std::move(attrs2)),
-        fetchers::maybeGetStrAttr(attrs, "dir").value_or(""));
+        fetchers::Input::fromAttrs(std::move(attrs2)), fetchers::maybeGetStrAttr(attrs, "dir").value_or(""));
 }
 
 std::pair<fetchers::Tree, FlakeRef> FlakeRef::fetchTree(ref<Store> store) const
@@ -239,10 +225,7 @@ std::pair<fetchers::Tree, FlakeRef> FlakeRef::fetchTree(ref<Store> store) const
 }
 
 std::tuple<FlakeRef, std::string, OutputsSpec> parseFlakeRefWithFragmentAndOutputsSpec(
-    const std::string & url,
-    const std::optional<Path> & baseDir,
-    bool allowMissing,
-    bool isFlake)
+    const std::string & url, const std::optional<Path> & baseDir, bool allowMissing, bool isFlake)
 {
     auto [prefix, outputsSpec] = parseOutputsSpec(url);
     auto [flakeRef, fragment] = parseFlakeRefWithFragment(prefix, baseDir, allowMissing, isFlake);

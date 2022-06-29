@@ -3,9 +3,7 @@
 #include "types.hh"
 #include "serialise.hh"
 
-
 namespace nix {
-
 
 /* dumpPath creates a Nix archive of the specified path.  The format
    is as follows:
@@ -44,27 +42,24 @@ namespace nix {
 
      `+' denotes string concatenation. */
 
-
-void dumpPath(const Path & path, Sink & sink,
-    PathFilter & filter = defaultPathFilter);
+void dumpPath(const Path & path, Sink & sink, PathFilter & filter = defaultPathFilter);
 
 /* Same as `void dumpPath()`, but returns the last modified date of the path */
-time_t dumpPathAndGetMtime(const Path & path, Sink & sink,
-    PathFilter & filter = defaultPathFilter);
+time_t dumpPathAndGetMtime(const Path & path, Sink & sink, PathFilter & filter = defaultPathFilter);
 
 void dumpString(std::string_view s, Sink & sink);
 
 /* FIXME: fix this API, it sucks. */
 struct ParseSink
 {
-    virtual void createDirectory(const Path & path) { };
+    virtual void createDirectory(const Path & path){};
 
-    virtual void createRegularFile(const Path & path) { };
-    virtual void isExecutable() { };
-    virtual void preallocateContents(uint64_t size) { };
-    virtual void receiveContents(std::string_view data) { };
+    virtual void createRegularFile(const Path & path){};
+    virtual void isExecutable(){};
+    virtual void preallocateContents(uint64_t size){};
+    virtual void receiveContents(std::string_view data){};
 
-    virtual void createSymlink(const Path & path, const std::string & target) { };
+    virtual void createSymlink(const Path & path, const std::string & target){};
 };
 
 /* If the NAR archive contains a single file at top-level, then save
@@ -74,7 +69,9 @@ struct RetrieveRegularNARSink : ParseSink
     bool regular = true;
     Sink & sink;
 
-    RetrieveRegularNARSink(Sink & sink) : sink(sink) { }
+    RetrieveRegularNARSink(Sink & sink)
+        : sink(sink)
+    {}
 
     void createDirectory(const Path & path) override
     {
@@ -101,8 +98,6 @@ void copyNAR(Source & source, Sink & sink);
 
 void copyPath(const Path & from, const Path & to);
 
-
 extern const std::string narVersionMagic1;
-
 
 }

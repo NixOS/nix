@@ -11,14 +11,16 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
 
     Goals goals;
     for (const auto & br : reqs) {
-        std::visit(overloaded {
-            [&](const DerivedPath::Built & bfd) {
-                goals.insert(worker.makeDerivationGoal(bfd.drvPath, bfd.outputs, buildMode));
+        std::visit(
+            overloaded{
+                [&](const DerivedPath::Built & bfd) {
+                    goals.insert(worker.makeDerivationGoal(bfd.drvPath, bfd.outputs, buildMode));
+                },
+                [&](const DerivedPath::Opaque & bo) {
+                    goals.insert(worker.makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair));
+                },
             },
-            [&](const DerivedPath::Opaque & bo) {
-                goals.insert(worker.makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair));
-            },
-        }, br.raw());
+            br.raw());
     }
 
     worker.run(goals);
@@ -33,8 +35,10 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
                 ex = i->ex;
         }
         if (i->exitCode != Goal::ecSuccess) {
-            if (auto i2 = dynamic_cast<DerivationGoal *>(i.get())) failed.insert(i2->drvPath);
-            else if (auto i2 = dynamic_cast<PathSubstitutionGoal *>(i.get())) failed.insert(i2->storePath);
+            if (auto i2 = dynamic_cast<DerivationGoal *>(i.get()))
+                failed.insert(i2->drvPath);
+            else if (auto i2 = dynamic_cast<PathSubstitutionGoal *>(i.get()))
+                failed.insert(i2->storePath);
         }
     }
 
@@ -42,28 +46,29 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
         ex->status = worker.exitStatus();
         throw *ex;
     } else if (!failed.empty()) {
-        if (ex) logError(ex->info());
+        if (ex)
+            logError(ex->info());
         throw Error(worker.exitStatus(), "build of %s failed", showPaths(failed));
     }
 }
 
 std::vector<BuildResult> Store::buildPathsWithResults(
-    const std::vector<DerivedPath> & reqs,
-    BuildMode buildMode,
-    std::shared_ptr<Store> evalStore)
+    const std::vector<DerivedPath> & reqs, BuildMode buildMode, std::shared_ptr<Store> evalStore)
 {
     Worker worker(*this, evalStore ? *evalStore : *this);
 
     Goals goals;
     for (const auto & br : reqs) {
-        std::visit(overloaded {
-            [&](const DerivedPath::Built & bfd) {
-                goals.insert(worker.makeDerivationGoal(bfd.drvPath, bfd.outputs, buildMode));
+        std::visit(
+            overloaded{
+                [&](const DerivedPath::Built & bfd) {
+                    goals.insert(worker.makeDerivationGoal(bfd.drvPath, bfd.outputs, buildMode));
+                },
+                [&](const DerivedPath::Opaque & bo) {
+                    goals.insert(worker.makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair));
+                },
             },
-            [&](const DerivedPath::Opaque & bo) {
-                goals.insert(worker.makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair));
-            },
-        }, br.raw());
+            br.raw());
     }
 
     worker.run(goals);
@@ -76,8 +81,7 @@ std::vector<BuildResult> Store::buildPathsWithResults(
     return results;
 }
 
-BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
-    BuildMode buildMode)
+BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode)
 {
     Worker worker(*this, *this);
     auto goal = worker.makeBasicDerivationGoal(drvPath, drv, {}, buildMode);
@@ -86,19 +90,19 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
         worker.run(Goals{goal});
         return goal->buildResult;
     } catch (Error & e) {
-        return BuildResult {
+        return BuildResult{
             .status = BuildResult::MiscFailure,
             .errorMsg = e.msg(),
-            .path = DerivedPath::Built { .drvPath = drvPath },
+            .path = DerivedPath::Built{.drvPath = drvPath},
         };
     };
 }
 
-
 void Store::ensurePath(const StorePath & path)
 {
     /* If the path is already valid, we're done. */
-    if (isValidPath(path)) return;
+    if (isValidPath(path))
+        return;
 
     Worker worker(*this, *this);
     GoalPtr goal = worker.makePathSubstitutionGoal(path);
@@ -114,7 +118,6 @@ void Store::ensurePath(const StorePath & path)
             throw Error(worker.exitStatus(), "path '%s' does not exist and cannot be created", printStorePath(path));
     }
 }
-
 
 void LocalStore::repairPath(const StorePath & path)
 {

@@ -14,7 +14,7 @@
 
 namespace nix::daemon {
 
-Sink & operator << (Sink & sink, const Logger::Fields & fields)
+Sink & operator<<(Sink & sink, const Logger::Fields & fields)
 {
     sink << fields.size();
     for (auto & f : fields) {
@@ -23,7 +23,8 @@ Sink & operator << (Sink & sink, const Logger::Fields & fields)
             sink << f.i;
         else if (f.type == Logger::Field::tString)
             sink << f.s;
-        else abort();
+        else
+            abort();
     }
     return sink;
 }
@@ -46,7 +47,9 @@ struct TunnelLogger : public Logger
     unsigned int clientVersion;
 
     TunnelLogger(FdSink & to, unsigned int clientVersion)
-        : to(to), clientVersion(clientVersion) { }
+        : to(to)
+        , clientVersion(clientVersion)
+    {}
 
     void enqueueMsg(const std::string & s)
     {
@@ -69,7 +72,8 @@ struct TunnelLogger : public Logger
 
     void log(Verbosity lvl, const FormatOrString & fs) override
     {
-        if (lvl > verbosity) return;
+        if (lvl > verbosity)
+            return;
 
         StringSink buf;
         buf << STDERR_NEXT << (fs.s + "\n");
@@ -78,7 +82,8 @@ struct TunnelLogger : public Logger
 
     void logEI(const ErrorInfo & ei) override
     {
-        if (ei.level > verbosity) return;
+        if (ei.level > verbosity)
+            return;
 
         std::stringstream oss;
         showErrorInfo(oss, ei, false);
@@ -122,8 +127,13 @@ struct TunnelLogger : public Logger
         }
     }
 
-    void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
-        const std::string & s, const Fields & fields, ActivityId parent) override
+    void startActivity(
+        ActivityId act,
+        Verbosity lvl,
+        ActivityType type,
+        const std::string & s,
+        const Fields & fields,
+        ActivityId parent) override
     {
         if (GET_PROTOCOL_MINOR(clientVersion) < 20) {
             if (!s.empty())
@@ -138,7 +148,8 @@ struct TunnelLogger : public Logger
 
     void stopActivity(ActivityId act) override
     {
-        if (GET_PROTOCOL_MINOR(clientVersion) < 20) return;
+        if (GET_PROTOCOL_MINOR(clientVersion) < 20)
+            return;
         StringSink buf;
         buf << STDERR_STOP_ACTIVITY << act;
         enqueueMsg(buf.s);
@@ -146,7 +157,8 @@ struct TunnelLogger : public Logger
 
     void result(ActivityId act, ResultType type, const Fields & fields) override
     {
-        if (GET_PROTOCOL_MINOR(clientVersion) < 20) return;
+        if (GET_PROTOCOL_MINOR(clientVersion) < 20)
+            return;
         StringSink buf;
         buf << STDERR_RESULT << act << type << fields;
         enqueueMsg(buf.s);
@@ -156,8 +168,10 @@ struct TunnelLogger : public Logger
 struct TunnelSink : Sink
 {
     Sink & to;
-    TunnelSink(Sink & to) : to(to) { }
-    void operator () (std::string_view data)
+    TunnelSink(Sink & to)
+        : to(to)
+    {}
+    void operator()(std::string_view data)
     {
         to << STDERR_WRITE;
         writeString(data, to);
@@ -168,13 +182,17 @@ struct TunnelSource : BufferedSource
 {
     Source & from;
     BufferedSink & to;
-    TunnelSource(Source & from, BufferedSink & to) : from(from), to(to) { }
+    TunnelSource(Source & from, BufferedSink & to)
+        : from(from)
+        , to(to)
+    {}
     size_t readUnbuffered(char * data, size_t len) override
     {
         to << STDERR_READ << len;
         to.flush();
         size_t n = readString(data, len, from);
-        if (n == 0) throw EndOfFile("unexpected end-of-file");
+        if (n == 0)
+            throw EndOfFile("unexpected end-of-file");
         return n;
     }
 };
@@ -235,17 +253,16 @@ struct ClientSettings
                     // the daemon, as that could cause some pretty weird stuff
                     if (parseFeatures(tokenizeString<StringSet>(value)) != settings.experimentalFeatures.get())
                         debug("Ignoring the client-specified experimental features");
-                }
-                else if (trusted
-                    || name == settings.buildTimeout.name
-                    || name == settings.buildRepeat.name
-                    || name == "connect-timeout"
-                    || (name == "builders" && value == ""))
+                } else if (
+                    trusted || name == settings.buildTimeout.name || name == settings.buildRepeat.name
+                    || name == "connect-timeout" || (name == "builders" && value == ""))
                     settings.set(name, value);
                 else if (setSubstituters(settings.substituters))
                     ;
                 else
-                    debug("ignoring the client-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
+                    debug(
+                        "ignoring the client-specified setting '%s', because it is a restricted setting and you are not a trusted user",
+                        name);
             } catch (UsageError & e) {
                 warn(e.what());
             }
@@ -257,7 +274,7 @@ static std::vector<DerivedPath> readDerivedPaths(Store & store, unsigned int cli
 {
     std::vector<DerivedPath> reqs;
     if (GET_PROTOCOL_MINOR(clientVersion) >= 30) {
-        reqs = worker_proto::read(store, from, Phantom<std::vector<DerivedPath>> {});
+        reqs = worker_proto::read(store, from, Phantom<std::vector<DerivedPath>>{});
     } else {
         for (auto & s : readStrings<Strings>(from))
             reqs.push_back(parsePathWithOutputs(store, s).toDerivedPath());
@@ -265,9 +282,15 @@ static std::vector<DerivedPath> readDerivedPaths(Store & store, unsigned int cli
     return reqs;
 }
 
-static void performOp(TunnelLogger * logger, ref<Store> store,
-    TrustedFlag trusted, RecursiveFlag recursive, unsigned int clientVersion,
-    Source & from, BufferedSink & to, unsigned int op)
+static void performOp(
+    TunnelLogger * logger,
+    ref<Store> store,
+    TrustedFlag trusted,
+    RecursiveFlag recursive,
+    unsigned int clientVersion,
+    Source & from,
+    BufferedSink & to,
+    unsigned int op)
 {
     switch (op) {
 
@@ -281,7 +304,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopQueryValidPaths: {
-        auto paths = worker_proto::read(*store, from, Phantom<StorePathSet> {});
+        auto paths = worker_proto::read(*store, from, Phantom<StorePathSet>{});
 
         SubstituteFlag substitute = NoSubstitute;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 27) {
@@ -310,7 +333,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopQuerySubstitutablePaths: {
-        auto paths = worker_proto::read(*store, from, Phantom<StorePathSet> {});
+        auto paths = worker_proto::read(*store, from, Phantom<StorePathSet>{});
         logger->startWork();
         auto res = store->querySubstitutablePaths(paths);
         logger->stopWork();
@@ -341,7 +364,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             store->queryReferrers(path, paths);
         else if (op == wopQueryValidDerivers)
             paths = store->queryValidDerivers(path);
-        else paths = store->queryDerivationOutputs(path);
+        else
+            paths = store->queryDerivationOutputs(path);
         logger->stopWork();
         worker_proto::write(*store, to, paths);
         break;
@@ -387,7 +411,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (GET_PROTOCOL_MINOR(clientVersion) >= 25) {
             auto name = readString(from);
             auto camStr = readString(from);
-            auto refs = worker_proto::read(*store, from, Phantom<StorePathSet> {});
+            auto refs = worker_proto::read(*store, from, Phantom<StorePathSet>{});
             bool repairBool;
             from >> repairBool;
             auto repair = RepairFlag{repairBool};
@@ -398,18 +422,21 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 ContentAddressMethod contentAddressMethod = parseContentAddressMethod(camStr);
                 FramedSource source(from);
                 // TODO this is essentially RemoteStore::addCAToStore. Move it up to Store.
-                return std::visit(overloaded {
-                    [&](TextHashMethod &) {
-                        // We could stream this by changing Store
-                        std::string contents = source.drain();
-                        auto path = store->addTextToStore(name, contents, refs, repair);
-                        return store->queryPathInfo(path);
+                return std::visit(
+                    overloaded{
+                        [&](TextHashMethod &) {
+                            // We could stream this by changing Store
+                            std::string contents = source.drain();
+                            auto path = store->addTextToStore(name, contents, refs, repair);
+                            return store->queryPathInfo(path);
+                        },
+                        [&](FixedOutputHashMethod & fohm) {
+                            auto path = store->addToStoreFromDump(
+                                source, name, fohm.fileIngestionMethod, fohm.hashType, repair, refs);
+                            return store->queryPathInfo(path);
+                        },
                     },
-                    [&](FixedOutputHashMethod & fohm) {
-                        auto path = store->addToStoreFromDump(source, name, fohm.fileIngestionMethod, fohm.hashType, repair, refs);
-                        return store->queryPathInfo(path);
-                    },
-                }, contentAddressMethod);
+                    contentAddressMethod);
             }();
             logger->stopWork();
 
@@ -424,8 +451,10 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 std::string hashAlgoRaw;
                 from >> baseName >> fixed /* obsolete */ >> recursive >> hashAlgoRaw;
                 if (recursive > (uint8_t) FileIngestionMethod::Recursive)
-                    throw Error("unsupported FileIngestionMethod with value of %i; you may need to upgrade nix-daemon", recursive);
-                method = FileIngestionMethod { recursive };
+                    throw Error(
+                        "unsupported FileIngestionMethod with value of %i; you may need to upgrade nix-daemon",
+                        recursive);
+                method = FileIngestionMethod{recursive};
                 /* Compatibility hack. */
                 if (!fixed) {
                     hashAlgoRaw = "sha256";
@@ -451,9 +480,10 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                     /* Incrementally parse the NAR file, stripping the
                        metadata, and streaming the sole file we expect into
                        `saved`. */
-                    RetrieveRegularNARSink savedRegular { saved };
+                    RetrieveRegularNARSink savedRegular{saved};
                     parseDump(savedRegular, from);
-                    if (!savedRegular.regular) throw Error("regular file expected");
+                    if (!savedRegular.regular)
+                        throw Error("regular file expected");
                 }
             });
             logger->startWork();
@@ -474,9 +504,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         {
             FramedSource source(from);
-            store->addMultipleToStore(source,
-                RepairFlag{repair},
-                dontCheckSigs ? NoCheckSigs : CheckSigs);
+            store->addMultipleToStore(source, RepairFlag{repair}, dontCheckSigs ? NoCheckSigs : CheckSigs);
         }
         logger->stopWork();
         break;
@@ -485,7 +513,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopAddTextToStore: {
         std::string suffix = readString(from);
         std::string s = readString(from);
-        auto refs = worker_proto::read(*store, from, Phantom<StorePathSet> {});
+        auto refs = worker_proto::read(*store, from, Phantom<StorePathSet>{});
         logger->startWork();
         auto path = store->addTextToStore(suffix, s, refs, NoRepair);
         logger->stopWork();
@@ -507,11 +535,11 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopImportPaths: {
         logger->startWork();
         TunnelSource source(from, to);
-        auto paths = store->importPaths(source,
-            trusted ? NoCheckSigs : CheckSigs);
+        auto paths = store->importPaths(source, trusted ? NoCheckSigs : CheckSigs);
         logger->stopWork();
         Strings paths2;
-        for (auto & i : paths) paths2.push_back(store->printStorePath(i));
+        for (auto & i : paths)
+            paths2.push_back(store->printStorePath(i));
         to << paths2;
         break;
     }
@@ -612,7 +640,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
             Derivation drv2;
             static_cast<BasicDerivation &>(drv2) = drv;
-            drvPath = writeDerivation(*store, Derivation { drv2 });
+            drvPath = writeDerivation(*store, Derivation{drv2});
         }
 
         auto res = store->buildDerivation(drvPath, drv, buildMode);
@@ -687,7 +715,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopCollectGarbage: {
         GCOptions options;
         options.action = (GCOptions::GCAction) readInt(from);
-        options.pathsToDelete = worker_proto::read(*store, from, Phantom<StorePathSet> {});
+        options.pathsToDelete = worker_proto::read(*store, from, Phantom<StorePathSet>{});
         from >> options.ignoreLiveness >> options.maxFreed;
         // obsolete fields
         readInt(from);
@@ -755,11 +783,9 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (i == infos.end())
             to << 0;
         else {
-            to << 1
-               << (i->second.deriver ? store->printStorePath(*i->second.deriver) : "");
+            to << 1 << (i->second.deriver ? store->printStorePath(*i->second.deriver) : "");
             worker_proto::write(*store, to, i->second.references);
-            to << i->second.downloadSize
-               << i->second.narSize;
+            to << i->second.downloadSize << i->second.narSize;
         }
         break;
     }
@@ -768,18 +794,17 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         SubstitutablePathInfos infos;
         StorePathCAMap pathsMap = {};
         if (GET_PROTOCOL_MINOR(clientVersion) < 22) {
-            auto paths = worker_proto::read(*store, from, Phantom<StorePathSet> {});
+            auto paths = worker_proto::read(*store, from, Phantom<StorePathSet>{});
             for (auto & path : paths)
                 pathsMap.emplace(path, std::nullopt);
         } else
-            pathsMap = worker_proto::read(*store, from, Phantom<StorePathCAMap> {});
+            pathsMap = worker_proto::read(*store, from, Phantom<StorePathCAMap>{});
         logger->startWork();
         store->querySubstitutablePathInfos(pathsMap, infos);
         logger->stopWork();
         to << infos.size();
         for (auto & i : infos) {
-            to << store->printStorePath(i.first)
-               << (i.second.deriver ? store->printStorePath(*i.second.deriver) : "");
+            to << store->printStorePath(i.first) << (i.second.deriver ? store->printStorePath(*i.second.deriver) : "");
             worker_proto::write(*store, to, i.second.references);
             to << i.second.downloadSize << i.second.narSize;
         }
@@ -801,7 +826,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         try {
             info = store->queryPathInfo(path);
         } catch (InvalidPath &) {
-            if (GET_PROTOCOL_MINOR(clientVersion) < 17) throw;
+            if (GET_PROTOCOL_MINOR(clientVersion) < 17)
+                throw;
         }
         logger->stopWork();
         if (info) {
@@ -859,10 +885,10 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto path = store->parseStorePath(readString(from));
         auto deriver = readString(from);
         auto narHash = Hash::parseAny(readString(from), htSHA256);
-        ValidPathInfo info { path, narHash };
+        ValidPathInfo info{path, narHash};
         if (deriver != "")
             info.deriver = store->parseStorePath(deriver);
-        info.references = worker_proto::read(*store, from, Phantom<StorePathSet> {});
+        info.references = worker_proto::read(*store, from, Phantom<StorePathSet>{});
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
         info.ca = parseContentAddressOpt(readString(from));
@@ -876,8 +902,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             logger->startWork();
             {
                 FramedSource source(from);
-                store->addToStore(info, source, (RepairFlag) repair,
-                    dontCheckSigs ? NoCheckSigs : CheckSigs);
+                store->addToStore(info, source, (RepairFlag) repair, dontCheckSigs ? NoCheckSigs : CheckSigs);
             }
             logger->stopWork();
         }
@@ -888,7 +913,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             if (GET_PROTOCOL_MINOR(clientVersion) >= 21)
                 source = std::make_unique<TunnelSource>(from, to);
             else {
-                TeeSource tee { from, saved };
+                TeeSource tee{from, saved};
                 ParseSink ether;
                 parseDump(ether, tee);
                 source = std::make_unique<StringSource>(saved.s);
@@ -897,8 +922,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             logger->startWork();
 
             // FIXME: race if addToStore doesn't read source?
-            store->addToStore(info, *source, (RepairFlag) repair,
-                dontCheckSigs ? NoCheckSigs : CheckSigs);
+            store->addToStore(info, *source, (RepairFlag) repair, dontCheckSigs ? NoCheckSigs : CheckSigs);
 
             logger->stopWork();
         }
@@ -925,8 +949,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (GET_PROTOCOL_MINOR(clientVersion) < 31) {
             auto outputId = DrvOutput::parse(readString(from));
             auto outputPath = StorePath(readString(from));
-            store->registerDrvOutput(Realisation{
-                .id = outputId, .outPath = outputPath});
+            store->registerDrvOutput(Realisation{.id = outputId, .outPath = outputPath});
         } else {
             auto realisation = worker_proto::read(*store, from, Phantom<Realisation>());
             store->registerDrvOutput(realisation);
@@ -942,11 +965,13 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->stopWork();
         if (GET_PROTOCOL_MINOR(clientVersion) < 31) {
             std::set<StorePath> outPaths;
-            if (info) outPaths.insert(info->outPath);
+            if (info)
+                outPaths.insert(info->outPath);
             worker_proto::write(*store, to, outPaths);
         } else {
             std::set<Realisation> realisations;
-            if (info) realisations.insert(*info);
+            if (info)
+                realisations.insert(*info);
             worker_proto::write(*store, to, realisations);
         }
         break;
@@ -986,7 +1011,8 @@ void processConnection(
 
     /* Exchange the greeting. */
     unsigned int magic = readInt(from);
-    if (magic != WORKER_MAGIC_1) throw Error("protocol mismatch");
+    if (magic != WORKER_MAGIC_1)
+        throw Error("protocol mismatch");
     to << WORKER_MAGIC_2 << PROTOCOL_VERSION;
     to.flush();
     unsigned int clientVersion = readInt(from);
@@ -1024,7 +1050,7 @@ void processConnection(
     try {
 
         /* If we can't accept clientVersion, then throw an error
-           *here* (not above). */
+         *here* (not above). */
         authHook(*store);
 
         tunnelLogger->stopWork();
@@ -1055,7 +1081,8 @@ void processConnection(
                    happens, just send the error message and exit. */
                 bool errorAllowed = tunnelLogger->state_.lock()->canSendStderr;
                 tunnelLogger->stopWork(&e);
-                if (!errorAllowed) throw;
+                if (!errorAllowed)
+                    throw;
             } catch (std::bad_alloc & e) {
                 auto ex = Error("Nix daemon out of memory");
                 tunnelLogger->stopWork(&ex);

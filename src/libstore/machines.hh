@@ -6,7 +6,8 @@ namespace nix {
 
 class Store;
 
-struct Machine {
+struct Machine
+{
 
     const std::string storeUri;
     const std::vector<std::string> systemTypes;
@@ -22,7 +23,8 @@ struct Machine {
 
     bool mandatoryMet(const std::set<std::string> & features) const;
 
-    Machine(decltype(storeUri) storeUri,
+    Machine(
+        decltype(storeUri) storeUri,
         decltype(systemTypes) systemTypes,
         decltype(sshKey) sshKey,
         decltype(maxJobs) maxJobs,

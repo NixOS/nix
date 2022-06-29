@@ -19,12 +19,7 @@ static RunOptions hgOptions(const Strings & args)
     // Set HGPLAIN: this means we get consistent output from hg and avoids leakage from a user or system .hgrc.
     env["HGPLAIN"] = "";
 
-    return {
-        .program = "hg",
-        .searchPath = true,
-        .args = args,
-        .environment = env
-    };
+    return {.program = "hg", .searchPath = true, .args = args, .environment = env};
 }
 
 // runProgram wrapper that uses hgOptions instead of stock RunOptions.
@@ -45,10 +40,8 @@ struct MercurialInputScheme : InputScheme
 {
     std::optional<Input> inputFromURL(const ParsedURL & url) override
     {
-        if (url.scheme != "hg+http" &&
-            url.scheme != "hg+https" &&
-            url.scheme != "hg+ssh" &&
-            url.scheme != "hg+file") return {};
+        if (url.scheme != "hg+http" && url.scheme != "hg+https" && url.scheme != "hg+ssh" && url.scheme != "hg+file")
+            return {};
 
         auto url2(url);
         url2.scheme = std::string(url2.scheme, 3);
@@ -57,7 +50,7 @@ struct MercurialInputScheme : InputScheme
         Attrs attrs;
         attrs.emplace("type", "hg");
 
-        for (auto &[name, value] : url.query) {
+        for (auto & [name, value] : url.query) {
             if (name == "rev" || name == "ref")
                 attrs.emplace(name, value);
             else
@@ -71,10 +64,12 @@ struct MercurialInputScheme : InputScheme
 
     std::optional<Input> inputFromAttrs(const Attrs & attrs) override
     {
-        if (maybeGetStrAttr(attrs, "type") != "hg") return {};
+        if (maybeGetStrAttr(attrs, "type") != "hg")
+            return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "revCount" && name != "narHash" && name != "name")
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "revCount"
+                && name != "narHash" && name != "name")
                 throw Error("unsupported Mercurial input attribute '%s'", name);
 
         parseURL(getStrAttr(attrs, "url"));
@@ -93,8 +88,10 @@ struct MercurialInputScheme : InputScheme
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         url.scheme = "hg+" + url.scheme;
-        if (auto rev = input.getRev()) url.query.insert_or_assign("rev", rev->gitRev());
-        if (auto ref = input.getRef()) url.query.insert_or_assign("ref", *ref);
+        if (auto rev = input.getRev())
+            url.query.insert_or_assign("rev", rev->gitRev());
+        if (auto ref = input.getRef())
+            url.query.insert_or_assign("ref", *ref);
         return url;
     }
 
@@ -105,14 +102,13 @@ struct MercurialInputScheme : InputScheme
         return input.getRef() == "default" || maybeGetIntAttr(input.attrs, "revCount");
     }
 
-    Input applyOverrides(
-        const Input & input,
-        std::optional<std::string> ref,
-        std::optional<Hash> rev) override
+    Input applyOverrides(const Input & input, std::optional<std::string> ref, std::optional<Hash> rev) override
     {
         auto res(input);
-        if (rev) res.attrs.insert_or_assign("rev", rev->gitRev());
-        if (ref) res.attrs.insert_or_assign("ref", *ref);
+        if (rev)
+            res.attrs.insert_or_assign("rev", rev->gitRev());
+        if (ref)
+            res.attrs.insert_or_assign("ref", *ref);
         return res;
     }
 
@@ -130,12 +126,10 @@ struct MercurialInputScheme : InputScheme
         assert(sourcePath);
 
         // FIXME: shut up if file is already tracked.
-        runHg(
-            { "add", *sourcePath + "/" + std::string(file) });
+        runHg({"add", *sourcePath + "/" + std::string(file)});
 
         if (commitMsg)
-            runHg(
-                { "commit", *sourcePath + "/" + std::string(file), "-m", *commitMsg });
+            runHg({"commit", *sourcePath + "/" + std::string(file), "-m", *commitMsg});
     }
 
     std::pair<bool, std::string> getActualUrl(const Input & input) const
@@ -160,7 +154,7 @@ struct MercurialInputScheme : InputScheme
 
         if (!input.getRef() && !input.getRev() && isLocal && pathExists(actualUrl + "/.hg")) {
 
-            bool clean = runHg({ "status", "-R", actualUrl, "--modified", "--added", "--removed" }) == "";
+            bool clean = runHg({"status", "-R", actualUrl, "--modified", "--added", "--removed"}) == "";
 
             if (!clean) {
 
@@ -173,10 +167,11 @@ struct MercurialInputScheme : InputScheme
                 if (fetchSettings.warnDirty)
                     warn("Mercurial tree '%s' is unclean", actualUrl);
 
-                input.attrs.insert_or_assign("ref", chomp(runHg({ "branch", "-R", actualUrl })));
+                input.attrs.insert_or_assign("ref", chomp(runHg({"branch", "-R", actualUrl})));
 
                 auto files = tokenizeString<std::set<std::string>>(
-                    runHg({ "status", "-R", actualUrl, "--clean", "--modified", "--added", "--no-status", "--print0" }), "\0"s);
+                    runHg({"status", "-R", actualUrl, "--clean", "--modified", "--added", "--no-status", "--print0"}),
+                    "\0"s);
 
                 Path actualPath(absPath(actualUrl));
 
@@ -195,23 +190,23 @@ struct MercurialInputScheme : InputScheme
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore(input.getName(), actualPath, FileIngestionMethod::Recursive, htSHA256, filter);
+                auto storePath =
+                    store->addToStore(input.getName(), actualPath, FileIngestionMethod::Recursive, htSHA256, filter);
 
                 return {std::move(storePath), input};
             }
         }
 
-        if (!input.getRef()) input.attrs.insert_or_assign("ref", "default");
+        if (!input.getRef())
+            input.attrs.insert_or_assign("ref", "default");
 
-        auto checkHashType = [&](const std::optional<Hash> & hash)
-        {
+        auto checkHashType = [&](const std::optional<Hash> & hash) {
             if (hash.has_value() && hash->type != htSHA1)
-                throw Error("Hash '%s' is not supported by Mercurial. Only sha1 is supported.", hash->to_string(Base16, true));
+                throw Error(
+                    "Hash '%s' is not supported by Mercurial. Only sha1 is supported.", hash->to_string(Base16, true));
         };
 
-
-        auto getLockedAttrs = [&]()
-        {
+        auto getLockedAttrs = [&]() {
             checkHashType(input.getRev());
 
             return Attrs({
@@ -221,9 +216,7 @@ struct MercurialInputScheme : InputScheme
             });
         };
 
-        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
-            -> std::pair<StorePath, Input>
-        {
+        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath) -> std::pair<StorePath, Input> {
             assert(input.getRev());
             assert(!_input.getRev() || _input.getRev() == input.getRev());
             input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
@@ -256,34 +249,33 @@ struct MercurialInputScheme : InputScheme
 
         /* If this is a commit hash that we already have, we don't
            have to pull again. */
-        if (!(input.getRev()
-                && pathExists(cacheDir)
-                && runProgram(hgOptions({ "log", "-R", cacheDir, "-r", input.getRev()->gitRev(), "--template", "1" })).second == "1"))
-        {
+        if (!(input.getRev() && pathExists(cacheDir)
+              && runProgram(hgOptions({"log", "-R", cacheDir, "-r", input.getRev()->gitRev(), "--template", "1"}))
+                         .second
+                     == "1")) {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Mercurial repository '%s'", actualUrl));
 
             if (pathExists(cacheDir)) {
                 try {
-                    runHg({ "pull", "-R", cacheDir, "--", actualUrl });
-                }
-                catch (ExecError & e) {
+                    runHg({"pull", "-R", cacheDir, "--", actualUrl});
+                } catch (ExecError & e) {
                     auto transJournal = cacheDir + "/.hg/store/journal";
                     /* hg throws "abandoned transaction" error only if this file exists */
                     if (pathExists(transJournal)) {
-                        runHg({ "recover", "-R", cacheDir });
-                        runHg({ "pull", "-R", cacheDir, "--", actualUrl });
+                        runHg({"recover", "-R", cacheDir});
+                        runHg({"pull", "-R", cacheDir, "--", actualUrl});
                     } else {
                         throw ExecError(e.status, "'hg pull' %s", statusToString(e.status));
                     }
                 }
             } else {
                 createDirs(dirOf(cacheDir));
-                runHg({ "clone", "--noupdate", "--", actualUrl, cacheDir });
+                runHg({"clone", "--noupdate", "--", actualUrl, cacheDir});
             }
         }
 
         auto tokens = tokenizeString<std::vector<std::string>>(
-            runHg({ "log", "-R", cacheDir, "-r", revOrRef, "--template", "{node} {rev} {branch}" }));
+            runHg({"log", "-R", cacheDir, "-r", revOrRef, "--template", "{node} {rev} {branch}"}));
         assert(tokens.size() == 3);
 
         input.attrs.insert_or_assign("rev", Hash::parseAny(tokens[0], htSHA1).gitRev());
@@ -296,7 +288,7 @@ struct MercurialInputScheme : InputScheme
         Path tmpDir = createTempDir();
         AutoDelete delTmpDir(tmpDir, true);
 
-        runHg({ "archive", "-R", cacheDir, "-r", input.getRev()->gitRev(), tmpDir });
+        runHg({"archive", "-R", cacheDir, "-r", input.getRev()->gitRev(), tmpDir});
 
         deletePath(tmpDir + "/.hg_archival.txt");
 
@@ -308,19 +300,9 @@ struct MercurialInputScheme : InputScheme
         });
 
         if (!_input.getRev())
-            getCache()->add(
-                store,
-                unlockedAttrs,
-                infoAttrs,
-                storePath,
-                false);
+            getCache()->add(store, unlockedAttrs, infoAttrs, storePath, false);
 
-        getCache()->add(
-            store,
-            getLockedAttrs(),
-            infoAttrs,
-            storePath,
-            true);
+        getCache()->add(store, getLockedAttrs(), infoAttrs, storePath, true);
 
         return makeResult(infoAttrs, std::move(storePath));
     }

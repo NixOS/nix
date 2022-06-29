@@ -10,14 +10,15 @@ namespace nix {
 
 LocalFSStore::LocalFSStore(const Params & params)
     : Store(params)
-{
-}
+{}
 
 struct LocalStoreAccessor : public FSAccessor
 {
     ref<LocalFSStore> store;
 
-    LocalStoreAccessor(ref<LocalFSStore> store) : store(store) { }
+    LocalStoreAccessor(ref<LocalFSStore> store)
+        : store(store)
+    {}
 
     Path toRealPath(const Path & path, bool requireValidPath = true)
     {
@@ -33,7 +34,8 @@ struct LocalStoreAccessor : public FSAccessor
 
         struct stat st;
         if (lstat(realPath.c_str(), &st)) {
-            if (errno == ENOENT || errno == ENOTDIR) return {Type::tMissing, 0, false};
+            if (errno == ENOENT || errno == ENOTDIR)
+                return {Type::tMissing, 0, false};
             throw SysError("getting status of '%1%'", path);
         }
 
@@ -41,11 +43,10 @@ struct LocalStoreAccessor : public FSAccessor
             throw Error("file '%1%' has unsupported type", path);
 
         return {
-            S_ISREG(st.st_mode) ? Type::tRegular :
-            S_ISLNK(st.st_mode) ? Type::tSymlink :
-            Type::tDirectory,
-            S_ISREG(st.st_mode) ? (uint64_t) st.st_size : 0,
-            S_ISREG(st.st_mode) && st.st_mode & S_IXUSR};
+            S_ISREG(st.st_mode)   ? Type::tRegular
+            : S_ISLNK(st.st_mode) ? Type::tSymlink
+                                  : Type::tDirectory,
+            S_ISREG(st.st_mode) ? (uint64_t) st.st_size : 0, S_ISREG(st.st_mode) && st.st_mode & S_IXUSR};
     }
 
     StringSet readDirectory(const Path & path) override
@@ -74,8 +75,7 @@ struct LocalStoreAccessor : public FSAccessor
 
 ref<FSAccessor> LocalFSStore::getFSAccessor()
 {
-    return make_ref<LocalStoreAccessor>(ref<LocalFSStore>(
-            std::dynamic_pointer_cast<LocalFSStore>(shared_from_this())));
+    return make_ref<LocalStoreAccessor>(ref<LocalFSStore>(std::dynamic_pointer_cast<LocalFSStore>(shared_from_this())));
 }
 
 void LocalFSStore::narFromPath(const StorePath & path, Sink & sink)
@@ -94,7 +94,8 @@ std::optional<std::string> LocalFSStore::getBuildLog(const StorePath & path_)
     if (!path.isDerivation()) {
         try {
             auto info = queryPathInfo(path);
-            if (!info->deriver) return std::nullopt;
+            if (!info->deriver)
+                return std::nullopt;
             path = *info->deriver;
         } catch (InvalidPath &) {
             return std::nullopt;
@@ -105,10 +106,8 @@ std::optional<std::string> LocalFSStore::getBuildLog(const StorePath & path_)
 
     for (int j = 0; j < 2; j++) {
 
-        Path logPath =
-            j == 0
-            ? fmt("%s/%s/%s/%s", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2))
-            : fmt("%s/%s/%s", logDir, drvsLogDir, baseName);
+        Path logPath = j == 0 ? fmt("%s/%s/%s/%s", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2))
+                              : fmt("%s/%s/%s", logDir, drvsLogDir, baseName);
         Path logBz2Path = logPath + ".bz2";
 
         if (pathExists(logPath))
@@ -117,9 +116,9 @@ std::optional<std::string> LocalFSStore::getBuildLog(const StorePath & path_)
         else if (pathExists(logBz2Path)) {
             try {
                 return decompress("bzip2", readFile(logBz2Path));
-            } catch (Error &) { }
+            } catch (Error &) {
+            }
         }
-
     }
 
     return std::nullopt;

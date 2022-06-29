@@ -14,7 +14,10 @@ struct CmdDescribeStores : Command, MixJSON
         return "show registered store types and their available options";
     }
 
-    Category category() override { return catUtility; }
+    Category category() override
+    {
+        return catUtility;
+    }
 
     void run() override
     {
@@ -32,7 +35,7 @@ struct CmdDescribeStores : Command, MixJSON
                 for (auto & [optionName, optionDesc] : storeConfig.items()) {
                     std::cout << "### " << optionName << std::endl << std::endl;
                     std::cout << optionDesc["description"].get<std::string>() << std::endl;
-                    std::cout << "default: " << optionDesc["defaultValue"] << std::endl <<std::endl;
+                    std::cout << "default: " << optionDesc["defaultValue"] << std::endl << std::endl;
                     if (!optionDesc["aliases"].empty())
                         std::cout << "aliases: " << optionDesc["aliases"] << std::endl << std::endl;
                 }

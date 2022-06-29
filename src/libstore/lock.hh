@@ -23,15 +23,31 @@ public:
 
     void kill();
 
-    std::string getUser() { return user; }
-    uid_t getUID() { assert(uid); return uid; }
-    uid_t getGID() { assert(gid); return gid; }
-    std::vector<gid_t> getSupplementaryGIDs() { return supplementaryGIDs; }
+    std::string getUser()
+    {
+        return user;
+    }
+    uid_t getUID()
+    {
+        assert(uid);
+        return uid;
+    }
+    uid_t getGID()
+    {
+        assert(gid);
+        return gid;
+    }
+    std::vector<gid_t> getSupplementaryGIDs()
+    {
+        return supplementaryGIDs;
+    }
 
     bool findFreeUser();
 
-    bool enabled() { return isEnabled; }
-
+    bool enabled()
+    {
+        return isEnabled;
+    }
 };
 
 }

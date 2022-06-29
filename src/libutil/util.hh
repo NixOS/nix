@@ -31,10 +31,8 @@ namespace nix {
 struct Sink;
 struct Source;
 
-
 /* The system for which Nix is compiled. */
 extern const std::string nativeSystem;
-
 
 /* Return an environment variable. */
 std::optional<std::string> getEnv(const std::string & key);
@@ -48,9 +46,7 @@ void clearEnv();
 /* Return an absolutized path, resolving paths relative to the
    specified directory, or the current directory otherwise.  The path
    is also canonicalised. */
-Path absPath(Path path,
-    std::optional<PathView> dir = {},
-    bool resolveSymlinks = false);
+Path absPath(Path path, std::optional<PathView> dir = {}, bool resolveSymlinks = false);
 
 /* Canonicalise a path by removing all `.' or `..' components and
    double or trailing slashes.  Optionally resolves all symlink
@@ -100,7 +96,10 @@ struct DirEntry
     ino_t ino;
     unsigned char type; // one of DT_*
     DirEntry(std::string name, ino_t ino, unsigned char type)
-        : name(std::move(name)), ino(ino), type(type) { }
+        : name(std::move(name))
+        , ino(ino)
+        , type(type)
+    {}
 };
 
 typedef std::vector<DirEntry> DirEntries;
@@ -161,13 +160,10 @@ inline Paths createDirs(PathView path)
 }
 
 /* Create a symlink. */
-void createSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime = {});
+void createSymlink(const Path & target, const Path & link, std::optional<time_t> mtime = {});
 
 /* Atomically create or replace a symlink. */
-void replaceSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime = {});
-
+void replaceSymlink(const Path & target, const Path & link, std::optional<time_t> mtime = {});
 
 /* Wrappers arount read()/write() that read/write exactly the
    requested number of bytes. */
@@ -176,15 +172,12 @@ void writeFull(int fd, std::string_view s, bool allowInterrupts = true);
 
 MakeError(EndOfFile, Error);
 
-
 /* Read a file descriptor until EOF occurs. */
-std::string drainFD(int fd, bool block = true, const size_t reserveSize=0);
+std::string drainFD(int fd, bool block = true, const size_t reserveSize = 0);
 
 void drainFD(int fd, Sink & sink, bool block = true);
 
-
 /* Automatic cleanup of resources. */
-
 
 class AutoDelete
 {
@@ -197,10 +190,15 @@ public:
     ~AutoDelete();
     void cancel();
     void reset(const Path & p, bool recursive = true);
-    operator Path() const { return path; }
-    operator PathView() const { return path; }
+    operator Path() const
+    {
+        return path;
+    }
+    operator PathView() const
+    {
+        return path;
+    }
 };
-
 
 class AutoCloseFD
 {
@@ -209,24 +207,26 @@ public:
     AutoCloseFD();
     AutoCloseFD(int fd);
     AutoCloseFD(const AutoCloseFD & fd) = delete;
-    AutoCloseFD(AutoCloseFD&& fd);
+    AutoCloseFD(AutoCloseFD && fd);
     ~AutoCloseFD();
-    AutoCloseFD& operator =(const AutoCloseFD & fd) = delete;
-    AutoCloseFD& operator =(AutoCloseFD&& fd);
+    AutoCloseFD & operator=(const AutoCloseFD & fd) = delete;
+    AutoCloseFD & operator=(AutoCloseFD && fd);
     int get() const;
     explicit operator bool() const;
     int release();
     void close();
 };
 
-
 /* Create a temporary directory. */
-Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix",
-    bool includePid = true, bool useGlobalCounter = true, mode_t mode = 0755);
+Path createTempDir(
+    const Path & tmpRoot = "",
+    const Path & prefix = "nix",
+    bool includePid = true,
+    bool useGlobalCounter = true,
+    mode_t mode = 0755);
 
 /* Create a temporary file, returning a file handle and its path. */
 std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix = "nix");
-
 
 class Pipe
 {
@@ -236,16 +236,15 @@ public:
     void close();
 };
 
-
 struct DIRDeleter
 {
-    void operator()(DIR * dir) const {
+    void operator()(DIR * dir) const
+    {
         closedir(dir);
     }
 };
 
 typedef std::unique_ptr<DIR, DIRDeleter> AutoCloseDir;
-
 
 class Pid
 {
@@ -256,7 +255,7 @@ public:
     Pid();
     Pid(pid_t pid);
     ~Pid();
-    void operator =(pid_t pid);
+    void operator=(pid_t pid);
     operator pid_t();
     int kill();
     int wait();
@@ -266,11 +265,9 @@ public:
     pid_t release();
 };
 
-
 /* Kill all processes running under the specified uid by sending them
    a SIGKILL. */
 void killUser(uid_t uid);
-
 
 /* Fork a process that runs the given function, and return the child
    pid to the caller. */
@@ -284,10 +281,11 @@ struct ProcessOptions
 
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
 
-
 /* Run a program and return its stdout in a string (i.e., like the
    shell backtick operator). */
-std::string runProgram(Path program, bool searchPath = false,
+std::string runProgram(
+    Path program,
+    bool searchPath = false,
     const Strings & args = Strings(),
     const std::optional<std::string> & input = {});
 
@@ -310,10 +308,8 @@ std::pair<int, std::string> runProgram(RunOptions && options);
 
 void runProgram2(const RunOptions & options);
 
-
 /* Change the stack size. */
 void setStackSize(size_t stackSize);
-
 
 /* Restore the original inherited Unix process context (such as signal
    masks, stack size). */
@@ -332,16 +328,16 @@ void restoreMountNamespace();
    fail. */
 void unshareFilesystem();
 
-
 class ExecError : public Error
 {
 public:
     int status;
 
     template<typename... Args>
-    ExecError(int status, const Args & ... args)
-        : Error(args...), status(status)
-    { }
+    ExecError(int status, const Args &... args)
+        : Error(args...)
+        , status(status)
+    {}
 };
 
 /* Convert a list of strings to a null-terminated vector of char
@@ -355,7 +351,6 @@ void closeMostFDs(const std::set<int> & exceptions);
 
 /* Set the close-on-exec flag for the given file descriptor. */
 void closeOnExec(int fd);
-
 
 /* User interruption. */
 
@@ -375,13 +370,11 @@ void inline checkInterrupt()
 
 MakeError(Interrupted, BaseError);
 
-
 MakeError(FormatError, Error);
 
-
 /* String tokenizer. */
-template<class C> C tokenizeString(std::string_view s, std::string_view separators = " \t\n\r");
-
+template<class C>
+C tokenizeString(std::string_view s, std::string_view separators = " \t\n\r");
 
 /* Concatenate the given strings with a separator between the
    elements. */
@@ -390,27 +383,29 @@ std::string concatStringsSep(const std::string_view sep, const C & ss)
 {
     size_t size = 0;
     // need a cast to string_view since this is also called with Symbols
-    for (const auto & s : ss) size += sep.size() + std::string_view(s).size();
+    for (const auto & s : ss)
+        size += sep.size() + std::string_view(s).size();
     std::string s;
     s.reserve(size);
     for (auto & i : ss) {
-        if (s.size() != 0) s += sep;
+        if (s.size() != 0)
+            s += sep;
         s += i;
     }
     return s;
 }
 
-template<class ... Parts>
-auto concatStrings(Parts && ... parts)
+template<class... Parts>
+auto concatStrings(Parts &&... parts)
     -> std::enable_if_t<(... && std::is_convertible_v<Parts, std::string_view>), std::string>
 {
-    std::string_view views[sizeof...(parts)] = { parts... };
+    std::string_view views[sizeof...(parts)] = {parts...};
     return concatStringsSep({}, views);
 }
 
-
 /* Add quotes around a collection of strings. */
-template<class C> Strings quoteStrings(const C & c)
+template<class C>
+Strings quoteStrings(const C & c)
 {
     Strings res;
     for (auto & s : c)
@@ -418,32 +413,23 @@ template<class C> Strings quoteStrings(const C & c)
     return res;
 }
 
-
 /* Remove trailing whitespace from a string. FIXME: return
    std::string_view. */
 std::string chomp(std::string_view s);
 
-
 /* Remove whitespace from the start and end of a string. */
 std::string trim(std::string_view s, std::string_view whitespace = " \n\r\t");
 
-
 /* Replace all occurrences of a string inside another string. */
-std::string replaceStrings(
-    std::string s,
-    std::string_view from,
-    std::string_view to);
-
+std::string replaceStrings(std::string s, std::string_view from, std::string_view to);
 
 std::string rewriteStrings(std::string s, const StringMap & rewrites);
-
 
 /* Convert the exit status of a child as returned by wait() into an
    error string. */
 std::string statusToString(int status);
 
 bool statusOk(int status);
-
 
 /* Parse a string into an integer. */
 template<class N>
@@ -467,11 +453,16 @@ N string2IntWithUnitPrefix(std::string_view s)
     if (!s.empty()) {
         char u = std::toupper(*s.rbegin());
         if (std::isalpha(u)) {
-            if (u == 'K') multiplier = 1ULL << 10;
-            else if (u == 'M') multiplier = 1ULL << 20;
-            else if (u == 'G') multiplier = 1ULL << 30;
-            else if (u == 'T') multiplier = 1ULL << 40;
-            else throw UsageError("invalid unit specifier '%1%'", u);
+            if (u == 'K')
+                multiplier = 1ULL << 10;
+            else if (u == 'M')
+                multiplier = 1ULL << 20;
+            else if (u == 'G')
+                multiplier = 1ULL << 30;
+            else if (u == 'T')
+                multiplier = 1ULL << 40;
+            else
+                throw UsageError("invalid unit specifier '%1%'", u);
             s.remove_suffix(1);
         }
     }
@@ -491,28 +482,21 @@ std::optional<N> string2Float(const std::string_view s)
     }
 }
 
-
 /* Return true iff `s' starts with `prefix'. */
 bool hasPrefix(std::string_view s, std::string_view prefix);
-
 
 /* Return true iff `s' ends in `suffix'. */
 bool hasSuffix(std::string_view s, std::string_view suffix);
 
-
 /* Convert a string to lower case. */
 std::string toLower(const std::string & s);
-
 
 /* Escape a string as a shell word. */
 std::string shellEscape(const std::string_view s);
 
-
 /* Exception handling in destructors: print an error message, then
    ignore the exception. */
 void ignoreException();
-
-
 
 /* Tree formatting. */
 constexpr char treeConn[] = "├───";
@@ -529,76 +513,73 @@ bool shouldANSI();
    some escape sequences (such as colour setting) are copied but not
    included in the character count. Also, tabs are expanded to
    spaces. */
-std::string filterANSIEscapes(const std::string & s,
-    bool filterAll = false,
-    unsigned int width = std::numeric_limits<unsigned int>::max());
-
+std::string filterANSIEscapes(
+    const std::string & s, bool filterAll = false, unsigned int width = std::numeric_limits<unsigned int>::max());
 
 /* Base64 encoding/decoding. */
 std::string base64Encode(std::string_view s);
 std::string base64Decode(std::string_view s);
-
 
 /* Remove common leading whitespace from the lines in the string
    's'. For example, if every line is indented by at least 3 spaces,
    then we remove 3 spaces from the start of every line. */
 std::string stripIndentation(std::string_view s);
 
-
 /* Get a value for the specified key from an associate container. */
-template <class T>
+template<class T>
 const typename T::mapped_type * get(const T & map, const typename T::key_type & key)
 {
     auto i = map.find(key);
-    if (i == map.end()) return nullptr;
+    if (i == map.end())
+        return nullptr;
     return &i->second;
 }
 
-template <class T>
+template<class T>
 typename T::mapped_type * get(T & map, const typename T::key_type & key)
 {
     auto i = map.find(key);
-    if (i == map.end()) return nullptr;
+    if (i == map.end())
+        return nullptr;
     return &i->second;
 }
 
 /* Get a value for the specified key from an associate container, or a default value if the key isn't present. */
-template <class T>
-const typename T::mapped_type & getOr(T & map,
-    const typename T::key_type & key,
-    const typename T::mapped_type & defaultValue)
+template<class T>
+const typename T::mapped_type &
+getOr(T & map, const typename T::key_type & key, const typename T::mapped_type & defaultValue)
 {
     auto i = map.find(key);
-    if (i == map.end()) return defaultValue;
+    if (i == map.end())
+        return defaultValue;
     return i->second;
 }
 
 /* Remove and return the first item from a container. */
-template <class T>
+template<class T>
 std::optional<typename T::value_type> remove_begin(T & c)
 {
     auto i = c.begin();
-    if (i == c.end()) return {};
+    if (i == c.end())
+        return {};
     auto v = std::move(*i);
     c.erase(i);
     return v;
 }
 
-
 /* Remove and return the first item from a container. */
-template <class T>
+template<class T>
 std::optional<typename T::value_type> pop(T & c)
 {
-    if (c.empty()) return {};
+    if (c.empty())
+        return {};
     auto v = std::move(c.front());
     c.pop();
     return v;
 }
 
-
 template<typename T>
 class Callback;
-
 
 /* Start a thread that handles various signals. Also block those signals
    on the current thread (and thus any threads created by it). */
@@ -606,13 +587,12 @@ void startSignalHandlerThread();
 
 struct InterruptCallback
 {
-    virtual ~InterruptCallback() { };
+    virtual ~InterruptCallback(){};
 };
 
 /* Register a function that gets called on SIGINT (in a non-signal
    context). */
-std::unique_ptr<InterruptCallback> createInterruptCallback(
-    std::function<void()> callback);
+std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()> callback);
 
 void triggerInterrupt();
 
@@ -627,10 +607,8 @@ struct ReceiveInterrupts
     ReceiveInterrupts()
         : target(pthread_self())
         , callback(createInterruptCallback([&]() { pthread_kill(target, SIGUSR1); }))
-    { }
+    {}
 };
-
-
 
 /* A RAII helper that increments a counter on construction and
    decrements it on destruction. */
@@ -639,14 +617,20 @@ struct MaintainCount
 {
     T & counter;
     long delta;
-    MaintainCount(T & counter, long delta = 1) : counter(counter), delta(delta) { counter += delta; }
-    ~MaintainCount() { counter -= delta; }
+    MaintainCount(T & counter, long delta = 1)
+        : counter(counter)
+        , delta(delta)
+    {
+        counter += delta;
+    }
+    ~MaintainCount()
+    {
+        counter -= delta;
+    }
 };
-
 
 /* Return the number of rows and columns of the terminal. */
 std::pair<unsigned short, unsigned short> getWindowSize();
-
 
 /* Used in various places. */
 typedef std::function<bool(const Path & path)> PathFilter;
@@ -668,52 +652,70 @@ void bind(int fd, const std::string & path);
 /* Connect to a Unix domain socket. */
 void connect(int fd, const std::string & path);
 
-
 // A Rust/Python-like enumerate() iterator adapter.
 // Borrowed from http://reedbeta.com/blog/python-like-enumerate-in-cpp17.
-template <typename T,
-          typename TIter = decltype(std::begin(std::declval<T>())),
-          typename = decltype(std::end(std::declval<T>()))>
+template<
+    typename T,
+    typename TIter = decltype(std::begin(std::declval<T>())),
+    typename = decltype(std::end(std::declval<T>()))>
 constexpr auto enumerate(T && iterable)
 {
     struct iterator
     {
         size_t i;
         TIter iter;
-        bool operator != (const iterator & other) const { return iter != other.iter; }
-        void operator ++ () { ++i; ++iter; }
-        auto operator * () const { return std::tie(i, *iter); }
+        bool operator!=(const iterator & other) const
+        {
+            return iter != other.iter;
+        }
+        void operator++()
+        {
+            ++i;
+            ++iter;
+        }
+        auto operator*() const
+        {
+            return std::tie(i, *iter);
+        }
     };
 
     struct iterable_wrapper
     {
         T iterable;
-        auto begin() { return iterator{ 0, std::begin(iterable) }; }
-        auto end() { return iterator{ 0, std::end(iterable) }; }
+        auto begin()
+        {
+            return iterator{0, std::begin(iterable)};
+        }
+        auto end()
+        {
+            return iterator{0, std::end(iterable)};
+        }
     };
 
-    return iterable_wrapper{ std::forward<T>(iterable) };
+    return iterable_wrapper{std::forward<T>(iterable)};
 }
 
-
 // C++17 std::visit boilerplate
-template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
-
+template<class... Ts>
+struct overloaded : Ts...
+{
+    using Ts::operator()...;
+};
+template<class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
 
 std::string showBytes(uint64_t bytes);
 
-
 /* Provide an addition operator between strings and string_views
    inexplicably omitted from the standard library. */
-inline std::string operator + (const std::string & s1, std::string_view s2)
+inline std::string operator+(const std::string & s1, std::string_view s2)
 {
     auto s = s1;
     s.append(s2);
     return s;
 }
 
-inline std::string operator + (std::string && s, std::string_view s2)
+inline std::string operator+(std::string && s, std::string_view s2)
 {
     s.append(s2);
     return std::move(s);

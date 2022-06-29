@@ -44,8 +44,8 @@ struct PathSubstitutionGoal : public Goal
        storePath when doing a repair. */
     Path destPath;
 
-    std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions,
-        maintainRunningSubstitutions, maintainExpectedNar, maintainExpectedDownload;
+    std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions, maintainRunningSubstitutions,
+        maintainExpectedNar, maintainExpectedDownload;
 
     typedef void (PathSubstitutionGoal::*GoalState)();
     GoalState state;
@@ -53,16 +53,20 @@ struct PathSubstitutionGoal : public Goal
     /* Content address for recomputing store path */
     std::optional<ContentAddress> ca;
 
-    void done(
-        ExitCode result,
-        BuildResult::Status status,
-        std::optional<std::string> errorMsg = {});
+    void done(ExitCode result, BuildResult::Status status, std::optional<std::string> errorMsg = {});
 
 public:
-    PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    PathSubstitutionGoal(
+        const StorePath & storePath,
+        Worker & worker,
+        RepairFlag repair = NoRepair,
+        std::optional<ContentAddress> ca = std::nullopt);
     ~PathSubstitutionGoal();
 
-    void timedOut(Error && ex) override { abort(); };
+    void timedOut(Error && ex) override
+    {
+        abort();
+    };
 
     std::string key() override
     {

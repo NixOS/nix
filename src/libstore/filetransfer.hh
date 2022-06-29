@@ -11,14 +11,15 @@ namespace nix {
 
 struct FileTransferSettings : Config
 {
-    Setting<bool> enableHttp2{this, true, "http2",
-        "Whether to enable HTTP/2 support."};
+    Setting<bool> enableHttp2{this, true, "http2", "Whether to enable HTTP/2 support."};
 
-    Setting<std::string> userAgentSuffix{this, "", "user-agent-suffix",
-        "String appended to the user agent in HTTP requests."};
+    Setting<std::string> userAgentSuffix{
+        this, "", "user-agent-suffix", "String appended to the user agent in HTTP requests."};
 
     Setting<size_t> httpConnections{
-        this, 25, "http-connections",
+        this,
+        25,
+        "http-connections",
         R"(
           The maximum number of parallel TCP connections used to fetch
           files from binary caches and by other downloads. It defaults
@@ -42,8 +43,8 @@ struct FileTransferSettings : Config
           timeout's duration.
         )"};
 
-    Setting<unsigned int> tries{this, 5, "download-attempts",
-        "How often Nix will attempt to download a file before giving up."};
+    Setting<unsigned int> tries{
+        this, 5, "download-attempts", "How often Nix will attempt to download a file before giving up."};
 };
 
 extern FileTransferSettings fileTransferSettings;
@@ -64,7 +65,9 @@ struct FileTransferRequest
     std::function<void(std::string_view data)> dataCallback;
 
     FileTransferRequest(std::string_view uri)
-        : uri(uri), parentAct(getCurActivity()) { }
+        : uri(uri)
+        , parentAct(getCurActivity())
+    {}
 
     std::string verb()
     {
@@ -85,13 +88,12 @@ class Store;
 
 struct FileTransfer
 {
-    virtual ~FileTransfer() { }
+    virtual ~FileTransfer() {}
 
     /* Enqueue a data transfer request, returning a future to the result of
        the download. The future may throw a FileTransferError
        exception. */
-    virtual void enqueueFileTransfer(const FileTransferRequest & request,
-        Callback<FileTransferResult> callback) = 0;
+    virtual void enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) = 0;
 
     std::future<FileTransferResult> enqueueFileTransfer(const FileTransferRequest & request);
 
@@ -122,7 +124,7 @@ public:
     std::optional<std::string> response; // intentionally optional
 
     template<typename... Args>
-    FileTransferError(FileTransfer::Error error, std::optional<std::string> response, const Args & ... args);
+    FileTransferError(FileTransfer::Error error, std::optional<std::string> response, const Args &... args);
 };
 
 bool isUri(std::string_view s);

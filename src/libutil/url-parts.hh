@@ -29,7 +29,8 @@ extern std::regex refRegex;
 // Instead of defining what a good Git Ref is, we define what a bad Git Ref is
 // This is because of the definition of a ref in refs.c in https://github.com/git/git
 // See tests/fetchGitRefs.sh for the full definition
-const static std::string badGitRefRegexS = "//|^[./]|/\\.|\\.\\.|[[:cntrl:][:space:]:?^~\[]|\\\\|\\*|\\.lock$|\\.lock/|@\\{|[/.]$|^@$|^$";
+const static std::string badGitRefRegexS =
+    "//|^[./]|/\\.|\\.\\.|[[:cntrl:][:space:]:?^~\[]|\\\\|\\*|\\.lock$|\\.lock/|@\\{|[/.]$|^@$|^$";
 extern std::regex badGitRefRegex;
 
 // A Git revision (a SHA-1 commit hash).

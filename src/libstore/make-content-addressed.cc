@@ -3,10 +3,7 @@
 
 namespace nix {
 
-std::map<StorePath, StorePath> makeContentAddressed(
-    Store & srcStore,
-    Store & dstStore,
-    const StorePathSet & storePaths)
+std::map<StorePath, StorePath> makeContentAddressed(Store & srcStore, Store & dstStore, const StorePathSet & storePaths)
 {
     StorePathSet closure;
     srcStore.computeFSClosure(storePaths, closure);
@@ -59,11 +56,12 @@ std::map<StorePath, StorePath> makeContentAddressed(
         rsink2(sink.s);
         rsink2.flush();
 
-        ValidPathInfo info { dstPath, hashString(htSHA256, sink2.s) };
+        ValidPathInfo info{dstPath, hashString(htSHA256, sink2.s)};
         info.references = std::move(references);
-        if (hasSelfReference) info.references.insert(info.path);
+        if (hasSelfReference)
+            info.references.insert(info.path);
         info.narSize = sink.s.size();
-        info.ca = FixedOutputHash {
+        info.ca = FixedOutputHash{
             .method = FileIngestionMethod::Recursive,
             .hash = narModuloHash,
         };

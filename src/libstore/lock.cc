@@ -16,26 +16,26 @@ UserLock::UserLock()
     createDirs(settings.nixStateDir + "/userpool");
 }
 
-bool UserLock::findFreeUser() {
-    if (enabled()) return true;
+bool UserLock::findFreeUser()
+{
+    if (enabled())
+        return true;
 
     /* Get the members of the build-users-group. */
     struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
     if (!gr)
-        throw Error("the group '%1%' specified in 'build-users-group' does not exist",
-            settings.buildUsersGroup);
+        throw Error("the group '%1%' specified in 'build-users-group' does not exist", settings.buildUsersGroup);
     gid = gr->gr_gid;
 
     /* Copy the result of getgrnam. */
     Strings users;
-    for (char * * p = gr->gr_mem; *p; ++p) {
+    for (char ** p = gr->gr_mem; *p; ++p) {
         debug("found build user '%1%'", *p);
         users.push_back(*p);
     }
 
     if (users.empty())
-        throw Error("the build users group '%1%' has no members",
-            settings.buildUsersGroup);
+        throw Error("the build users group '%1%' has no members", settings.buildUsersGroup);
 
     /* Find a user account that isn't currently in use for another
        build. */
@@ -44,9 +44,7 @@ bool UserLock::findFreeUser() {
 
         struct passwd * pw = getpwnam(i.c_str());
         if (!pw)
-            throw Error("the user '%1%' in the group '%2%' does not exist",
-                i, settings.buildUsersGroup);
-
+            throw Error("the user '%1%' in the group '%2%' does not exist", i, settings.buildUsersGroup);
 
         fnUserLock = (format("%1%/userpool/%2%") % settings.nixStateDir % pw->pw_uid).str();
 
@@ -61,8 +59,7 @@ bool UserLock::findFreeUser() {
 
             /* Sanity check... */
             if (uid == getuid() || uid == geteuid())
-                throw Error("the Nix user should not be a member of '%1%'",
-                    settings.buildUsersGroup);
+                throw Error("the Nix user should not be a member of '%1%'", settings.buildUsersGroup);
 
 #if __linux__
             /* Get the list of supplementary groups of this build user.  This
@@ -70,21 +67,18 @@ bool UserLock::findFreeUser() {
             int ngroups = 32; // arbitrary initial guess
             supplementaryGIDs.resize(ngroups);
 
-            int err = getgrouplist(pw->pw_name, pw->pw_gid, supplementaryGIDs.data(),
-                                 &ngroups);
+            int err = getgrouplist(pw->pw_name, pw->pw_gid, supplementaryGIDs.data(), &ngroups);
 
             // Our initial size of 32 wasn't sufficient, the correct size has
             // been stored in ngroups, so we try again.
             if (err == -1) {
                 supplementaryGIDs.resize(ngroups);
-                err = getgrouplist(pw->pw_name, pw->pw_gid, supplementaryGIDs.data(),
-                                   &ngroups);
+                err = getgrouplist(pw->pw_name, pw->pw_gid, supplementaryGIDs.data(), &ngroups);
             }
 
             // If it failed once more, then something must be broken.
             if (err == -1)
-                throw Error("failed to get list of supplementary groups for '%1%'",
-                            pw->pw_name);
+                throw Error("failed to get list of supplementary groups for '%1%'", pw->pw_name);
 
             // Finally, trim back the GID list to its real size
             supplementaryGIDs.resize(ngroups);

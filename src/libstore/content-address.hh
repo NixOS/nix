@@ -5,17 +5,16 @@
 
 namespace nix {
 
-enum struct FileIngestionMethod : uint8_t {
-    Flat = false,
-    Recursive = true
-};
+enum struct FileIngestionMethod : uint8_t { Flat = false, Recursive = true };
 
-struct TextHash {
+struct TextHash
+{
     Hash hash;
 };
 
 /// Pair of a hash, and how the file system was ingested
-struct FixedOutputHash {
+struct FixedOutputHash
+{
     FileIngestionMethod method;
     Hash hash;
     std::string printMethodAlgo() const;
@@ -33,9 +32,10 @@ struct FixedOutputHash {
     makeFixedOutputPath() / addToStore().
 */
 typedef std::variant<
-    TextHash, // for paths computed by makeTextPath() / addTextToStore
+    TextHash,       // for paths computed by makeTextPath() / addTextToStore
     FixedOutputHash // for path computed by makeFixedOutputPath
-> ContentAddress;
+    >
+    ContentAddress;
 
 /* Compute the prefix to the hash algorithm which indicates how the files were
    ingested. */
@@ -59,16 +59,15 @@ Hash getContentAddressHash(const ContentAddress & ca);
   We only have one way to hash text with references, so this is single-value
   type is only useful in std::variant.
 */
-struct TextHashMethod { };
-struct FixedOutputHashMethod {
-  FileIngestionMethod fileIngestionMethod;
-  HashType hashType;
+struct TextHashMethod
+{};
+struct FixedOutputHashMethod
+{
+    FileIngestionMethod fileIngestionMethod;
+    HashType hashType;
 };
 
-typedef std::variant<
-    TextHashMethod,
-    FixedOutputHashMethod
-  > ContentAddressMethod;
+typedef std::variant<TextHashMethod, FixedOutputHashMethod> ContentAddressMethod;
 
 ContentAddressMethod parseContentAddressMethod(std::string_view rawCaMethod);
 

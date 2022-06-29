@@ -14,7 +14,10 @@ struct CmdShowConfig : Command, MixJSON
         return "show the Nix configuration";
     }
 
-    Category category() override { return catUtility; }
+    Category category() override
+    {
+        return catUtility;
+    }
 
     void run() override
     {

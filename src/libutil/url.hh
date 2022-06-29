@@ -16,7 +16,7 @@ struct ParsedURL
 
     std::string to_string() const;
 
-    bool operator ==(const ParsedURL & other) const;
+    bool operator==(const ParsedURL & other) const;
 };
 
 MakeError(BadURL, Error);
@@ -35,7 +35,8 @@ ParsedURL parseURL(const std::string & url);
  * For example git uses `git+https` to designate remotes using a Git
  * protocol over http.
  */
-struct ParsedUrlScheme {
+struct ParsedUrlScheme
+{
     std::optional<std::string_view> application;
     std::string_view transport;
 };

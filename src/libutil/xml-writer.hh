@@ -5,12 +5,9 @@
 #include <list>
 #include <map>
 
-
 namespace nix {
 
-
 typedef std::map<std::string, std::string> XMLAttrs;
-
 
 class XMLWriter
 {
@@ -30,12 +27,10 @@ public:
 
     void close();
 
-    void openElement(std::string_view name,
-        const XMLAttrs & attrs = XMLAttrs());
+    void openElement(std::string_view name, const XMLAttrs & attrs = XMLAttrs());
     void closeElement();
 
-    void writeEmptyElement(std::string_view name,
-        const XMLAttrs & attrs = XMLAttrs());
+    void writeEmptyElement(std::string_view name, const XMLAttrs & attrs = XMLAttrs());
 
 private:
     void writeAttrs(const XMLAttrs & attrs);
@@ -43,14 +38,12 @@ private:
     void indent_(size_t depth);
 };
 
-
 class XMLOpenElement
 {
 private:
     XMLWriter & writer;
 public:
-    XMLOpenElement(XMLWriter & writer, std::string_view name,
-        const XMLAttrs & attrs = XMLAttrs())
+    XMLOpenElement(XMLWriter & writer, std::string_view name, const XMLAttrs & attrs = XMLAttrs())
         : writer(writer)
     {
         writer.openElement(name, attrs);
@@ -60,6 +53,5 @@ public:
         writer.closeElement();
     }
 };
-
 
 }

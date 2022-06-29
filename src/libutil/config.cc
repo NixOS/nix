@@ -45,8 +45,7 @@ void Config::addSetting(AbstractSetting * setting)
         auto i = unknownSettings.find(alias);
         if (i != unknownSettings.end()) {
             if (set)
-                warn("setting '%s' is set, but it's an alias of '%s' which is also set",
-                    alias, setting->name);
+                warn("setting '%s' is set, but it's an alias of '%s' which is also set", alias, setting->name);
             else {
                 setting->set(i->second);
                 setting->overridden = true;
@@ -77,7 +76,8 @@ void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overridd
             res.emplace(opt.first, SettingInfo{opt.second.setting->to_string(), opt.second.setting->description});
 }
 
-void AbstractConfig::applyConfig(const std::string & contents, const std::string & path) {
+void AbstractConfig::applyConfig(const std::string & contents, const std::string & path)
+{
     unsigned int pos = 0;
 
     while (pos < contents.size()) {
@@ -91,7 +91,8 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
             line = std::string(line, 0, hash);
 
         auto tokens = tokenizeString<std::vector<std::string>>(line);
-        if (tokens.empty()) continue;
+        if (tokens.empty())
+            continue;
 
         if (tokens.size() < 2)
             throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
@@ -134,7 +135,8 @@ void AbstractConfig::applyConfigFile(const Path & path)
     try {
         std::string contents = readFile(path);
         applyConfig(contents, path);
-    } catch (SysError &) { }
+    } catch (SysError &) {
+    }
 }
 
 void Config::resetOverridden()
@@ -171,12 +173,11 @@ void Config::convertToArgs(Args & args, const std::string & category)
 }
 
 AbstractSetting::AbstractSetting(
-    const std::string & name,
-    const std::string & description,
-    const std::set<std::string> & aliases)
-    : name(name), description(stripIndentation(description)), aliases(aliases)
-{
-}
+    const std::string & name, const std::string & description, const std::set<std::string> & aliases)
+    : name(name)
+    , description(stripIndentation(description))
+    , aliases(aliases)
+{}
 
 nlohmann::json AbstractSetting::toJSON()
 {
@@ -191,9 +192,7 @@ std::map<std::string, nlohmann::json> AbstractSetting::toJSONObject()
     return obj;
 }
 
-void AbstractSetting::convertToArg(Args & args, const std::string & category)
-{
-}
+void AbstractSetting::convertToArg(Args & args, const std::string & category) {}
 
 template<typename T>
 bool BaseSetting<T>::isAppendable()
@@ -209,7 +208,10 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
         .description = fmt("Set the `%s` setting.", name),
         .category = category,
         .labels = {"value"},
-        .handler = {[=](std::string s) { overridden = true; set(s); }},
+        .handler = {[=](std::string s) {
+            overridden = true;
+            set(s);
+        }},
     });
 
     if (isAppendable())
@@ -218,16 +220,21 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
             .description = fmt("Append to the `%s` setting.", name),
             .category = category,
             .labels = {"value"},
-            .handler = {[=](std::string s) { overridden = true; set(s, true); }},
+            .handler = {[=](std::string s) {
+                overridden = true;
+                set(s, true);
+            }},
         });
 }
 
-template<> void BaseSetting<std::string>::set(const std::string & str, bool append)
+template<>
+void BaseSetting<std::string>::set(const std::string & str, bool append)
 {
     value = str;
 }
 
-template<> std::string BaseSetting<std::string>::to_string() const
+template<>
+std::string BaseSetting<std::string>::to_string() const
 {
     return value;
 }
@@ -249,7 +256,8 @@ std::string BaseSetting<T>::to_string() const
     return std::to_string(value);
 }
 
-template<> void BaseSetting<bool>::set(const std::string & str, bool append)
+template<>
+void BaseSetting<bool>::set(const std::string & str, bool append)
 {
     if (str == "true" || str == "yes" || str == "1")
         value = true;
@@ -259,64 +267,75 @@ template<> void BaseSetting<bool>::set(const std::string & str, bool append)
         throw UsageError("Boolean setting '%s' has invalid value '%s'", name, str);
 }
 
-template<> std::string BaseSetting<bool>::to_string() const
+template<>
+std::string BaseSetting<bool>::to_string() const
 {
     return value ? "true" : "false";
 }
 
-template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string & category)
+template<>
+void BaseSetting<bool>::convertToArg(Args & args, const std::string & category)
 {
-    args.addFlag({
-        .longName = name,
-        .description = fmt("Enable the `%s` setting.", name),
-        .category = category,
-        .handler = {[=]() { override(true); }}
-    });
-    args.addFlag({
-        .longName = "no-" + name,
-        .description = fmt("Disable the `%s` setting.", name),
-        .category = category,
-        .handler = {[=]() { override(false); }}
-    });
+    args.addFlag(
+        {.longName = name,
+         .description = fmt("Enable the `%s` setting.", name),
+         .category = category,
+         .handler = {[=]() { override(true); }}});
+    args.addFlag(
+        {.longName = "no-" + name,
+         .description = fmt("Disable the `%s` setting.", name),
+         .category = category,
+         .handler = {[=]() { override(false); }}});
 }
 
-template<> void BaseSetting<Strings>::set(const std::string & str, bool append)
+template<>
+void BaseSetting<Strings>::set(const std::string & str, bool append)
 {
     auto ss = tokenizeString<Strings>(str);
-    if (!append) value.clear();
-    for (auto & s : ss) value.push_back(std::move(s));
+    if (!append)
+        value.clear();
+    for (auto & s : ss)
+        value.push_back(std::move(s));
 }
 
-template<> bool BaseSetting<Strings>::isAppendable()
+template<>
+bool BaseSetting<Strings>::isAppendable()
 {
     return true;
 }
 
-template<> std::string BaseSetting<Strings>::to_string() const
+template<>
+std::string BaseSetting<Strings>::to_string() const
 {
     return concatStringsSep(" ", value);
 }
 
-template<> void BaseSetting<StringSet>::set(const std::string & str, bool append)
+template<>
+void BaseSetting<StringSet>::set(const std::string & str, bool append)
 {
-    if (!append) value.clear();
+    if (!append)
+        value.clear();
     for (auto & s : tokenizeString<StringSet>(str))
         value.insert(s);
 }
 
-template<> bool BaseSetting<StringSet>::isAppendable()
+template<>
+bool BaseSetting<StringSet>::isAppendable()
 {
     return true;
 }
 
-template<> std::string BaseSetting<StringSet>::to_string() const
+template<>
+std::string BaseSetting<StringSet>::to_string() const
 {
     return concatStringsSep(" ", value);
 }
 
-template<> void BaseSetting<std::set<ExperimentalFeature>>::set(const std::string & str, bool append)
+template<>
+void BaseSetting<std::set<ExperimentalFeature>>::set(const std::string & str, bool append)
 {
-    if (!append) value.clear();
+    if (!append)
+        value.clear();
     for (auto & s : tokenizeString<StringSet>(str)) {
         auto thisXpFeature = parseExperimentalFeature(s);
         if (thisXpFeature)
@@ -326,12 +345,14 @@ template<> void BaseSetting<std::set<ExperimentalFeature>>::set(const std::strin
     }
 }
 
-template<> bool BaseSetting<std::set<ExperimentalFeature>>::isAppendable()
+template<>
+bool BaseSetting<std::set<ExperimentalFeature>>::isAppendable()
 {
     return true;
 }
 
-template<> std::string BaseSetting<std::set<ExperimentalFeature>>::to_string() const
+template<>
+std::string BaseSetting<std::set<ExperimentalFeature>>::to_string() const
 {
     StringSet stringifiedXpFeatures;
     for (auto & feature : value)
@@ -339,9 +360,11 @@ template<> std::string BaseSetting<std::set<ExperimentalFeature>>::to_string() c
     return concatStringsSep(" ", stringifiedXpFeatures);
 }
 
-template<> void BaseSetting<StringMap>::set(const std::string & str, bool append)
+template<>
+void BaseSetting<StringMap>::set(const std::string & str, bool append)
 {
-    if (!append) value.clear();
+    if (!append)
+        value.clear();
     for (auto & s : tokenizeString<Strings>(str)) {
         auto eq = s.find_first_of('=');
         if (std::string::npos != eq)
@@ -350,16 +373,19 @@ template<> void BaseSetting<StringMap>::set(const std::string & str, bool append
     }
 }
 
-template<> bool BaseSetting<StringMap>::isAppendable()
+template<>
+bool BaseSetting<StringMap>::isAppendable()
 {
     return true;
 }
 
-template<> std::string BaseSetting<StringMap>::to_string() const
+template<>
+std::string BaseSetting<StringMap>::to_string() const
 {
     Strings kvstrs;
-    std::transform(value.begin(), value.end(), back_inserter(kvstrs),
-        [&](auto kvpair){ return kvpair.first + "=" + kvpair.second; });
+    std::transform(value.begin(), value.end(), back_inserter(kvstrs), [&](auto kvpair) {
+        return kvpair.first + "=" + kvpair.second;
+    });
     return concatStringsSep(" ", kvstrs);
 }
 
@@ -390,7 +416,8 @@ void PathSetting::set(const std::string & str, bool append)
 bool GlobalConfig::set(const std::string & name, const std::string & value)
 {
     for (auto & config : *configRegistrations)
-        if (config->set(name, value)) return true;
+        if (config->set(name, value))
+            return true;
 
     unknownSettings.emplace(name, value);
 

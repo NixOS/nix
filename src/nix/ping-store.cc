@@ -14,8 +14,8 @@ struct CmdPingStore : StoreCommand
     std::string doc() override
     {
         return
-          #include "ping-store.md"
-          ;
+#include "ping-store.md"
+            ;
     }
 
     void run(ref<Store> store) override

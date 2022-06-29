@@ -13,8 +13,7 @@ namespace nix {
  * If you update this, don’t forget to also change the map defining their
  * string representation in the corresponding `.cc` file.
  **/
-enum struct ExperimentalFeature
-{
+enum struct ExperimentalFeature {
     CaDerivations,
     ImpureDerivations,
     Flakes,
@@ -29,13 +28,10 @@ enum struct ExperimentalFeature
  */
 using Xp = ExperimentalFeature;
 
-const std::optional<ExperimentalFeature> parseExperimentalFeature(
-        const std::string_view & name);
+const std::optional<ExperimentalFeature> parseExperimentalFeature(const std::string_view & name);
 std::string_view showExperimentalFeature(const ExperimentalFeature);
 
-std::ostream & operator<<(
-        std::ostream & str,
-        const ExperimentalFeature & feature);
+std::ostream & operator<<(std::ostream & str, const ExperimentalFeature & feature);
 
 /**
  * Parse a set of strings to the corresponding set of experimental features,

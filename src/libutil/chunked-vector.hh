@@ -15,14 +15,14 @@ namespace nix {
    eliminates copies within the vector during resizing, and provides stable
    references to its elements. */
 template<typename T, size_t ChunkSize>
-class ChunkedVector {
+class ChunkedVector
+{
 private:
     uint32_t size_ = 0;
     std::vector<std::vector<T>> chunks;
 
     /* keep this out of the ::add hot path */
-    [[gnu::noinline]]
-    auto & addChunk()
+    [[gnu::noinline]] auto & addChunk()
     {
         if (size_ >= std::numeric_limits<uint32_t>::max() - ChunkSize)
             abort();
@@ -38,16 +38,21 @@ public:
         addChunk();
     }
 
-    uint32_t size() const { return size_; }
+    uint32_t size() const
+    {
+        return size_;
+    }
 
     std::pair<T &, uint32_t> add(T value)
     {
         const auto idx = size_++;
-        auto & chunk = [&] () -> auto & {
+        auto & chunk = [&]() -> auto &
+        {
             if (auto & back = chunks.back(); back.size() < ChunkSize)
                 return back;
             return addChunk();
-        }();
+        }
+        ();
         auto & result = chunk.emplace_back(std::move(value));
         return {result, idx};
     }

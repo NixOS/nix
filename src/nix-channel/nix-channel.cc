@@ -19,7 +19,8 @@ static Path channelsList;
 // Reads the list of channels.
 static void readChannels()
 {
-    if (!pathExists(channelsList)) return;
+    if (!pathExists(channelsList))
+        return;
     auto channelsFile = readFile(channelsList);
 
     for (const auto & line : tokenizeString<std::vector<std::string>>(channelsFile, "\n")) {
@@ -64,7 +65,7 @@ static void removeChannel(const std::string & name)
     channels.erase(name);
     writeChannels();
 
-    runProgram(settings.nixBinDir + "/nix-env", true, { "--profile", profile, "--uninstall", name });
+    runProgram(settings.nixBinDir + "/nix-env", true, {"--profile", profile, "--uninstall", name});
 }
 
 static Path nixDefExpr;
@@ -77,9 +78,10 @@ static void update(const StringSet & channelNames)
     auto store = openStore();
 
     auto [fd, unpackChannelPath] = createTempFile();
-    writeFull(fd.get(),
-        #include "unpack-channel.nix.gen.hh"
-        );
+    writeFull(
+        fd.get(),
+#include "unpack-channel.nix.gen.hh"
+    );
     fd = -1;
     AutoDelete del(unpackChannelPath, false);
 
@@ -104,7 +106,10 @@ static void update(const StringSet & channelNames)
             // no need to update this channel, reuse the existing store path
             Path symlink = profile + "/" + name;
             Path storepath = dirOf(readLink(symlink));
-            exprs.push_back("f: rec { name = \"" + cname + "\"; type = \"derivation\"; outputs = [\"out\"]; system = \"builtin\"; outPath = builtins.storePath \"" + storepath + "\"; out = { inherit outPath; };}");
+            exprs.push_back(
+                "f: rec { name = \"" + cname
+                + "\"; type = \"derivation\"; outputs = [\"out\"]; system = \"builtin\"; outPath = builtins.storePath \""
+                + storepath + "\"; out = { inherit outPath; };}");
         } else {
             // We want to download the url to a file to see if it's a tarball while also checking if we
             // got redirected in the process, so that we can grab the various parts of a nix channel
@@ -115,28 +120,36 @@ static void update(const StringSet & channelNames)
 
             bool unpacked = false;
             if (std::regex_search(filename, std::regex("\\.tar\\.(gz|bz2|xz)$"))) {
-                runProgram(settings.nixBinDir + "/nix-build", false, { "--no-out-link", "--expr", "import " + unpackChannelPath +
-                            "{ name = \"" + cname + "\"; channelName = \"" + name + "\"; src = builtins.storePath \"" + filename + "\"; }" });
+                runProgram(
+                    settings.nixBinDir + "/nix-build", false,
+                    {"--no-out-link", "--expr",
+                     "import " + unpackChannelPath + "{ name = \"" + cname + "\"; channelName = \"" + name
+                         + "\"; src = builtins.storePath \"" + filename + "\"; }"});
                 unpacked = true;
             }
 
             if (!unpacked) {
                 // Download the channel tarball.
                 try {
-                    filename = store->toRealPath(fetchers::downloadFile(store, url + "/nixexprs.tar.xz", "nixexprs.tar.xz", false).storePath);
+                    filename = store->toRealPath(
+                        fetchers::downloadFile(store, url + "/nixexprs.tar.xz", "nixexprs.tar.xz", false).storePath);
                 } catch (FileTransferError & e) {
-                    filename = store->toRealPath(fetchers::downloadFile(store, url + "/nixexprs.tar.bz2", "nixexprs.tar.bz2", false).storePath);
+                    filename = store->toRealPath(
+                        fetchers::downloadFile(store, url + "/nixexprs.tar.bz2", "nixexprs.tar.bz2", false).storePath);
                 }
             }
             // Regardless of where it came from, add the expression representing this channel to accumulated expression
-            exprs.push_back("f: f { name = \"" + cname + "\"; channelName = \"" + name + "\"; src = builtins.storePath \"" + filename + "\"; " + extraAttrs + " }");
+            exprs.push_back(
+                "f: f { name = \"" + cname + "\"; channelName = \"" + name + "\"; src = builtins.storePath \""
+                + filename + "\"; " + extraAttrs + " }");
         }
     }
 
     // Unpack the channel tarballs into the Nix store and install them
     // into the channels profile.
     std::cerr << "unpacking channels...\n";
-    Strings envArgs{ "--profile", profile, "--file", unpackChannelPath, "--install", "--remove-all", "--from-expression" };
+    Strings envArgs{"--profile", profile,        "--file",           unpackChannelPath,
+                    "--install", "--remove-all", "--from-expression"};
     for (auto & expr : exprs)
         envArgs.push_back(std::move(expr));
     envArgs.push_back("--quiet");
@@ -168,14 +181,7 @@ static int main_nix_channel(int argc, char ** argv)
         // Figure out the name of the channels profile.
         profile = fmt("%s/profiles/per-user/%s/channels", settings.nixStateDir, getUserName());
 
-        enum {
-            cNone,
-            cAdd,
-            cRemove,
-            cList,
-            cUpdate,
-            cRollback
-        } cmd = cNone;
+        enum { cNone, cAdd, cRemove, cList, cUpdate, cRollback } cmd = cNone;
         std::vector<std::string> args;
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help") {
@@ -201,12 +207,12 @@ static int main_nix_channel(int argc, char ** argv)
         });
 
         switch (cmd) {
-            case cNone:
-                throw UsageError("no command specified");
-            case cAdd:
-                if (args.size() < 1 || args.size() > 2)
-                    throw UsageError("'--add' requires one or two arguments");
-                {
+        case cNone:
+            throw UsageError("no command specified");
+        case cAdd:
+            if (args.size() < 1 || args.size() > 2)
+                throw UsageError("'--add' requires one or two arguments");
+            {
                 auto url = args[0];
                 std::string name;
                 if (args.size() == 2) {
@@ -217,35 +223,35 @@ static int main_nix_channel(int argc, char ** argv)
                     name = std::regex_replace(name, std::regex("-stable$"), "");
                 }
                 addChannel(url, name);
-                }
-                break;
-            case cRemove:
-                if (args.size() != 1)
-                    throw UsageError("'--remove' requires one argument");
-                removeChannel(args[0]);
-                break;
-            case cList:
-                if (!args.empty())
-                    throw UsageError("'--list' expects no arguments");
-                readChannels();
-                for (const auto & channel : channels)
-                    std::cout << channel.first << ' ' << channel.second << '\n';
-                break;
-            case cUpdate:
-                update(StringSet(args.begin(), args.end()));
-                break;
-            case cRollback:
-                if (args.size() > 1)
-                    throw UsageError("'--rollback' has at most one argument");
-                Strings envArgs{"--profile", profile};
-                if (args.size() == 1) {
-                    envArgs.push_back("--switch-generation");
-                    envArgs.push_back(args[0]);
-                } else {
-                    envArgs.push_back("--rollback");
-                }
-                runProgram(settings.nixBinDir + "/nix-env", false, envArgs);
-                break;
+            }
+            break;
+        case cRemove:
+            if (args.size() != 1)
+                throw UsageError("'--remove' requires one argument");
+            removeChannel(args[0]);
+            break;
+        case cList:
+            if (!args.empty())
+                throw UsageError("'--list' expects no arguments");
+            readChannels();
+            for (const auto & channel : channels)
+                std::cout << channel.first << ' ' << channel.second << '\n';
+            break;
+        case cUpdate:
+            update(StringSet(args.begin(), args.end()));
+            break;
+        case cRollback:
+            if (args.size() > 1)
+                throw UsageError("'--rollback' has at most one argument");
+            Strings envArgs{"--profile", profile};
+            if (args.size() == 1) {
+                envArgs.push_back("--switch-generation");
+                envArgs.push_back(args[0]);
+            } else {
+                envArgs.push_back("--rollback");
+            }
+            runProgram(settings.nixBinDir + "/nix-env", false, envArgs);
+            break;
         }
 
         return 0;

@@ -46,11 +46,9 @@ struct MixLs : virtual Args, MixJSON
         auto showFile = [&](const Path & curPath, const std::string & relPath) {
             if (verbose) {
                 auto st = accessor->stat(curPath);
-                std::string tp =
-                    st.type == FSAccessor::Type::tRegular ?
-                        (st.isExecutable ? "-r-xr-xr-x" : "-r--r--r--") :
-                    st.type == FSAccessor::Type::tSymlink ? "lrwxrwxrwx" :
-                    "dr-xr-xr-x";
+                std::string tp = st.type == FSAccessor::Type::tRegular ? (st.isExecutable ? "-r-xr-xr-x" : "-r--r--r--")
+                                 : st.type == FSAccessor::Type::tSymlink ? "lrwxrwxrwx"
+                                                                         : "dr-xr-xr-x";
                 auto line = fmt("%s %20d %s", tp, st.fileSize, relPath);
                 if (st.type == FSAccessor::Type::tSymlink)
                     line += " -> " + accessor->readLink(curPath);
@@ -67,9 +65,8 @@ struct MixLs : virtual Args, MixJSON
             }
         };
 
-        doPath = [&](const FSAccessor::Stat & st, const Path & curPath,
-            const std::string & relPath, bool showDirectory)
-        {
+        doPath = [&](const FSAccessor::Stat & st, const Path & curPath, const std::string & relPath,
+                     bool showDirectory) {
             if (st.type == FSAccessor::Type::tDirectory && !showDirectory) {
                 auto names = accessor->readDirectory(curPath);
                 for (auto & name : names)
@@ -81,14 +78,13 @@ struct MixLs : virtual Args, MixJSON
         auto st = accessor->stat(path);
         if (st.type == FSAccessor::Type::tMissing)
             throw Error("path '%1%' does not exist", path);
-        doPath(st, path,
-            st.type == FSAccessor::Type::tDirectory ? "." : std::string(baseNameOf(path)),
-            showDirectory);
+        doPath(st, path, st.type == FSAccessor::Type::tDirectory ? "." : std::string(baseNameOf(path)), showDirectory);
     }
 
     void list(ref<FSAccessor> accessor)
     {
-        if (path == "/") path = "";
+        if (path == "/")
+            path = "";
 
         if (json) {
             JSONPlaceholder jsonRoot(std::cout);
@@ -104,11 +100,7 @@ struct CmdLsStore : StoreCommand, MixLs
 {
     CmdLsStore()
     {
-        expectArgs({
-            .label = "path",
-            .handler = {&path},
-            .completer = completePath
-        });
+        expectArgs({.label = "path", .handler = {&path}, .completer = completePath});
     }
 
     std::string description() override
@@ -119,8 +111,8 @@ struct CmdLsStore : StoreCommand, MixLs
     std::string doc() override
     {
         return
-          #include "store-ls.md"
-          ;
+#include "store-ls.md"
+            ;
     }
 
     void run(ref<Store> store) override
@@ -135,19 +127,15 @@ struct CmdLsNar : Command, MixLs
 
     CmdLsNar()
     {
-        expectArgs({
-            .label = "nar",
-            .handler = {&narPath},
-            .completer = completePath
-        });
+        expectArgs({.label = "nar", .handler = {&narPath}, .completer = completePath});
         expectArg("path", &path);
     }
 
     std::string doc() override
     {
         return
-          #include "nar-ls.md"
-          ;
+#include "nar-ls.md"
+            ;
     }
 
     std::string description() override

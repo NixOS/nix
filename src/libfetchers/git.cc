@@ -31,21 +31,20 @@ bool isCacheFileWithinTtl(const time_t now, const struct stat & st)
     return st.st_mtime + settings.tarballTtl > now;
 }
 
-bool touchCacheFile(const Path& path, const time_t& touch_time)
+bool touchCacheFile(const Path & path, const time_t & touch_time)
 {
-  struct timeval times[2];
-  times[0].tv_sec = touch_time;
-  times[0].tv_usec = 0;
-  times[1].tv_sec = touch_time;
-  times[1].tv_usec = 0;
+    struct timeval times[2];
+    times[0].tv_sec = touch_time;
+    times[0].tv_usec = 0;
+    times[1].tv_sec = touch_time;
+    times[1].tv_usec = 0;
 
-  return lutimes(path.c_str(), times) == 0;
+    return lutimes(path.c_str(), times) == 0;
 }
 
 Path getCachePath(std::string key)
 {
-    return getCacheDir() + "/nix/gitv3/" +
-        hashString(htSHA256, key).to_string(Base32, false);
+    return getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, key).to_string(Base32, false);
 }
 
 // Returns the name of the HEAD branch.
@@ -57,7 +56,7 @@ Path getCachePath(std::string key)
 //   ...
 std::optional<std::string> readHead(const Path & path)
 {
-    auto [exit_code, output] = runProgram(RunOptions {
+    auto [exit_code, output] = runProgram(RunOptions{
         .program = "git",
         .args = {"ls-remote", "--symref", path},
     });
@@ -69,12 +68,12 @@ std::optional<std::string> readHead(const Path & path)
     line = line.substr(0, line.find("\n"));
     if (const auto parseResult = git::parseLsRemoteLine(line)) {
         switch (parseResult->kind) {
-            case git::LsRemoteRefLine::Kind::Symbolic:
-                debug("resolved HEAD ref '%s' for repo '%s'", parseResult->target, path);
-                break;
-            case git::LsRemoteRefLine::Kind::Object:
-                debug("resolved HEAD rev '%s' for repo '%s'", parseResult->target, path);
-                break;
+        case git::LsRemoteRefLine::Kind::Symbolic:
+            debug("resolved HEAD ref '%s' for repo '%s'", parseResult->target, path);
+            break;
+        case git::LsRemoteRefLine::Kind::Object:
+            debug("resolved HEAD rev '%s' for repo '%s'", parseResult->target, path);
+            break;
         }
         return parseResult->target;
     }
@@ -82,21 +81,22 @@ std::optional<std::string> readHead(const Path & path)
 }
 
 // Persist the HEAD ref from the remote repo in the local cached repo.
-bool storeCachedHead(const std::string& actualUrl, const std::string& headRef)
+bool storeCachedHead(const std::string & actualUrl, const std::string & headRef)
 {
     Path cacheDir = getCachePath(actualUrl);
     auto gitDir = ".";
     try {
-        runProgram("git", true, { "-C", cacheDir, "--git-dir", gitDir, "symbolic-ref", "--", "HEAD", headRef });
-    } catch (ExecError &e) {
-        if (!WIFEXITED(e.status)) throw;
+        runProgram("git", true, {"-C", cacheDir, "--git-dir", gitDir, "symbolic-ref", "--", "HEAD", headRef});
+    } catch (ExecError & e) {
+        if (!WIFEXITED(e.status))
+            throw;
         return false;
     }
     /* No need to touch refs/HEAD, because `git symbolic-ref` updates the mtime. */
     return true;
 }
 
-std::optional<std::string> readHeadCached(const std::string& actualUrl)
+std::optional<std::string> readHeadCached(const std::string & actualUrl)
 {
     // Create a cache path to store the branch of the HEAD ref. Append something
     // in front of the URL to prevent collision with the repository itself.
@@ -108,9 +108,7 @@ std::optional<std::string> readHeadCached(const std::string& actualUrl)
     std::optional<std::string> cachedRef;
     if (stat(headRefFile.c_str(), &st) == 0) {
         cachedRef = readHead(cacheDir);
-        if (cachedRef != std::nullopt &&
-            *cachedRef != gitInitialBranch &&
-            isCacheFileWithinTtl(now, st)) {
+        if (cachedRef != std::nullopt && *cachedRef != gitInitialBranch && isCacheFileWithinTtl(now, st)) {
             debug("using cached HEAD ref '%s' for repo '%s'", *cachedRef, actualUrl);
             return cachedRef;
         }
@@ -157,12 +155,11 @@ WorkdirInfo getWorkdirInfo(const Input & input, const Path & workdir)
 
     /* Check whether HEAD points to something that looks like a commit,
        since that is the refrence we want to use later on. */
-    auto result = runProgram(RunOptions {
+    auto result = runProgram(RunOptions{
         .program = "git",
-        .args = { "-C", workdir, "--git-dir", gitDir, "rev-parse", "--verify", "--no-revs", "HEAD^{commit}" },
+        .args = {"-C", workdir, "--git-dir", gitDir, "rev-parse", "--verify", "--no-revs", "HEAD^{commit}"},
         .environment = env,
-        .mergeStderrToStdout = true
-    });
+        .mergeStderrToStdout = true});
     auto exitCode = WEXITSTATUS(result.first);
     auto errorMessage = result.second;
 
@@ -173,7 +170,8 @@ WorkdirInfo getWorkdirInfo(const Input & input, const Path & workdir)
         // we want to proceed and will consider it dirty later
     } else if (exitCode != 0) {
         // any other errors should lead to a failure
-        throw Error("getting the HEAD of the Git tree '%s' failed with exit code %d:\n%s", workdir, exitCode, errorMessage);
+        throw Error(
+            "getting the HEAD of the Git tree '%s' failed with exit code %d:\n%s", workdir, exitCode, errorMessage);
     }
 
     bool clean = false;
@@ -183,7 +181,7 @@ WorkdirInfo getWorkdirInfo(const Input & input, const Path & workdir)
         if (hasHead) {
             // Using git diff is preferrable over lower-level operations here,
             // because its conceptually simpler and we only need the exit code anyways.
-            auto gitDiffOpts = Strings({ "-C", workdir, "--git-dir", gitDir, "diff", "HEAD", "--quiet"});
+            auto gitDiffOpts = Strings({"-C", workdir, "--git-dir", gitDir, "diff", "HEAD", "--quiet"});
             if (!submodules) {
                 // Changes in submodules should only make the tree dirty
                 // when those submodules will be copied as well.
@@ -195,13 +193,15 @@ WorkdirInfo getWorkdirInfo(const Input & input, const Path & workdir)
             clean = true;
         }
     } catch (ExecError & e) {
-        if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 1) throw;
+        if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 1)
+            throw;
     }
 
-    return WorkdirInfo { .clean = clean, .hasHead = hasHead };
+    return WorkdirInfo{.clean = clean, .hasHead = hasHead};
 }
 
-std::pair<StorePath, Input> fetchFromWorkdir(ref<Store> store, Input & input, const Path & workdir, const WorkdirInfo & workdirInfo)
+std::pair<StorePath, Input>
+fetchFromWorkdir(ref<Store> store, Input & input, const Path & workdir, const WorkdirInfo & workdirInfo)
 {
     const bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
     auto gitDir = ".git";
@@ -212,12 +212,11 @@ std::pair<StorePath, Input> fetchFromWorkdir(ref<Store> store, Input & input, co
     if (fetchSettings.warnDirty)
         warn("Git tree '%s' is dirty", workdir);
 
-    auto gitOpts = Strings({ "-C", workdir, "--git-dir", gitDir, "ls-files", "-z" });
+    auto gitOpts = Strings({"-C", workdir, "--git-dir", gitDir, "ls-files", "-z"});
     if (submodules)
         gitOpts.emplace_back("--recurse-submodules");
 
-    auto files = tokenizeString<std::set<std::string>>(
-        runProgram("git", true, gitOpts), "\0"s);
+    auto files = tokenizeString<std::set<std::string>>(runProgram("git", true, gitOpts), "\0"s);
 
     Path actualPath(absPath(workdir));
 
@@ -242,34 +241,36 @@ std::pair<StorePath, Input> fetchFromWorkdir(ref<Store> store, Input & input, co
     // modified dirty file?
     input.attrs.insert_or_assign(
         "lastModified",
-        workdirInfo.hasHead ? std::stoull(runProgram("git", true, { "-C", actualPath, "--git-dir", gitDir, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
+        workdirInfo.hasHead ? std::stoull(runProgram(
+            "git", true,
+            {"-C", actualPath, "--git-dir", gitDir, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD"}))
+                            : 0);
 
     return {std::move(storePath), input};
 }
-}  // end namespace
+} // end namespace
 
 struct GitInputScheme : InputScheme
 {
     std::optional<Input> inputFromURL(const ParsedURL & url) override
     {
-        if (url.scheme != "git" &&
-            url.scheme != "git+http" &&
-            url.scheme != "git+https" &&
-            url.scheme != "git+ssh" &&
-            url.scheme != "git+file") return {};
+        if (url.scheme != "git" && url.scheme != "git+http" && url.scheme != "git+https" && url.scheme != "git+ssh"
+            && url.scheme != "git+file")
+            return {};
 
         auto url2(url);
-        if (hasPrefix(url2.scheme, "git+")) url2.scheme = std::string(url2.scheme, 4);
+        if (hasPrefix(url2.scheme, "git+"))
+            url2.scheme = std::string(url2.scheme, 4);
         url2.query.clear();
 
         Attrs attrs;
         attrs.emplace("type", "git");
 
-        for (auto &[name, value] : url.query) {
+        for (auto & [name, value] : url.query) {
             if (name == "rev" || name == "ref")
                 attrs.emplace(name, value);
             else if (name == "shallow" || name == "submodules")
-                attrs.emplace(name, Explicit<bool> { value == "1" });
+                attrs.emplace(name, Explicit<bool>{value == "1"});
             else
                 url2.query.emplace(name, value);
         }
@@ -281,10 +282,13 @@ struct GitInputScheme : InputScheme
 
     std::optional<Input> inputFromAttrs(const Attrs & attrs) override
     {
-        if (maybeGetStrAttr(attrs, "type") != "git") return {};
+        if (maybeGetStrAttr(attrs, "type") != "git")
+            return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name")
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow"
+                && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash"
+                && name != "allRefs" && name != "name")
                 throw Error("unsupported Git input attribute '%s'", name);
 
         parseURL(getStrAttr(attrs, "url"));
@@ -305,9 +309,12 @@ struct GitInputScheme : InputScheme
     ParsedURL toURL(const Input & input) override
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
-        if (url.scheme != "git") url.scheme = "git+" + url.scheme;
-        if (auto rev = input.getRev()) url.query.insert_or_assign("rev", rev->gitRev());
-        if (auto ref = input.getRef()) url.query.insert_or_assign("ref", *ref);
+        if (url.scheme != "git")
+            url.scheme = "git+" + url.scheme;
+        if (auto rev = input.getRev())
+            url.query.insert_or_assign("rev", rev->gitRev());
+        if (auto ref = input.getRef())
+            url.query.insert_or_assign("ref", *ref);
         if (maybeGetBoolAttr(input.attrs, "shallow").value_or(false))
             url.query.insert_or_assign("shallow", "1");
         return url;
@@ -317,19 +324,17 @@ struct GitInputScheme : InputScheme
     {
         bool maybeDirty = !input.getRef();
         bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
-        return
-            maybeGetIntAttr(input.attrs, "lastModified")
-            && (shallow || maybeDirty || maybeGetIntAttr(input.attrs, "revCount"));
+        return maybeGetIntAttr(input.attrs, "lastModified")
+               && (shallow || maybeDirty || maybeGetIntAttr(input.attrs, "revCount"));
     }
 
-    Input applyOverrides(
-        const Input & input,
-        std::optional<std::string> ref,
-        std::optional<Hash> rev) override
+    Input applyOverrides(const Input & input, std::optional<std::string> ref, std::optional<Hash> rev) override
     {
         auto res(input);
-        if (rev) res.attrs.insert_or_assign("rev", rev->gitRev());
-        if (ref) res.attrs.insert_or_assign("ref", *ref);
+        if (rev)
+            res.attrs.insert_or_assign("rev", rev->gitRev());
+        if (ref)
+            res.attrs.insert_or_assign("ref", *ref);
         if (!res.getRef() && res.getRev())
             throw Error("Git input '%s' has a commit hash but no branch/tag name", res.to_string());
         return res;
@@ -348,7 +353,8 @@ struct GitInputScheme : InputScheme
             args.push_back(*ref);
         }
 
-        if (input.getRev()) throw UnimplementedError("cloning a specific revision is not implemented");
+        if (input.getRev())
+            throw UnimplementedError("cloning a specific revision is not implemented");
 
         args.push_back(destDir);
 
@@ -369,12 +375,13 @@ struct GitInputScheme : InputScheme
         assert(sourcePath);
         auto gitDir = ".git";
 
-        runProgram("git", true,
-            { "-C", *sourcePath, "--git-dir", gitDir, "add", "--force", "--intent-to-add", "--", std::string(file) });
+        runProgram(
+            "git", true,
+            {"-C", *sourcePath, "--git-dir", gitDir, "add", "--force", "--intent-to-add", "--", std::string(file)});
 
         if (commitMsg)
-            runProgram("git", true,
-                { "-C", *sourcePath, "--git-dir", gitDir, "commit", std::string(file), "-m", *commitMsg });
+            runProgram(
+                "git", true, {"-C", *sourcePath, "--git-dir", gitDir, "commit", std::string(file), "-m", *commitMsg});
     }
 
     std::pair<bool, std::string> getActualUrl(const Input & input) const
@@ -402,18 +409,21 @@ struct GitInputScheme : InputScheme
         bool allRefs = maybeGetBoolAttr(input.attrs, "allRefs").value_or(false);
 
         std::string cacheType = "git";
-        if (shallow) cacheType += "-shallow";
-        if (submodules) cacheType += "-submodules";
-        if (allRefs) cacheType += "-all-refs";
+        if (shallow)
+            cacheType += "-shallow";
+        if (submodules)
+            cacheType += "-submodules";
+        if (allRefs)
+            cacheType += "-all-refs";
 
-        auto checkHashType = [&](const std::optional<Hash> & hash)
-        {
+        auto checkHashType = [&](const std::optional<Hash> & hash) {
             if (hash.has_value() && !(hash->type == htSHA1 || hash->type == htSHA256))
-                throw Error("Hash '%s' is not supported by Git. Supported types are sha1 and sha256.", hash->to_string(Base16, true));
+                throw Error(
+                    "Hash '%s' is not supported by Git. Supported types are sha1 and sha256.",
+                    hash->to_string(Base16, true));
         };
 
-        auto getLockedAttrs = [&]()
-        {
+        auto getLockedAttrs = [&]() {
             checkHashType(input.getRev());
 
             return Attrs({
@@ -423,9 +433,7 @@ struct GitInputScheme : InputScheme
             });
         };
 
-        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
-            -> std::pair<StorePath, Input>
-        {
+        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath) -> std::pair<StorePath, Input> {
             assert(input.getRev());
             assert(!_input.getRev() || _input.getRev() == input.getRev());
             if (!shallow)
@@ -471,8 +479,12 @@ struct GitInputScheme : InputScheme
             }
 
             if (!input.getRev())
-                input.attrs.insert_or_assign("rev",
-                    Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "--git-dir", gitDir, "rev-parse", *input.getRef() })), htSHA1).gitRev());
+                input.attrs.insert_or_assign(
+                    "rev", Hash::parseAny(
+                               chomp(runProgram(
+                                   "git", true, {"-C", actualUrl, "--git-dir", gitDir, "rev-parse", *input.getRef()})),
+                               htSHA1)
+                               .gitRev());
 
             repoDir = actualUrl;
         } else {
@@ -503,13 +515,12 @@ struct GitInputScheme : InputScheme
             PathLocks cacheDirLock({cacheDir + ".lock"});
 
             if (!pathExists(cacheDir)) {
-                runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", "--bare", repoDir });
+                runProgram("git", true, {"-c", "init.defaultBranch=" + gitInitialBranch, "init", "--bare", repoDir});
             }
 
-            Path localRefFile =
-                input.getRef()->compare(0, 5, "refs/") == 0
-                ? cacheDir + "/" + *input.getRef()
-                : cacheDir + "/refs/heads/" + *input.getRef();
+            Path localRefFile = input.getRef()->compare(0, 5, "refs/") == 0
+                                    ? cacheDir + "/" + *input.getRef()
+                                    : cacheDir + "/refs/heads/" + *input.getRef();
 
             bool doFetch;
             time_t now = time(0);
@@ -518,7 +529,8 @@ struct GitInputScheme : InputScheme
                repo. */
             if (input.getRev()) {
                 try {
-                    runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "cat-file", "-e", input.getRev()->gitRev() });
+                    runProgram(
+                        "git", true, {"-C", repoDir, "--git-dir", gitDir, "cat-file", "-e", input.getRev()->gitRev()});
                     doFetch = false;
                 } catch (ExecError & e) {
                     if (WIFEXITED(e.status)) {
@@ -534,8 +546,7 @@ struct GitInputScheme : InputScheme
                     /* If the local ref is older than ‘tarball-ttl’ seconds, do a
                        git fetch to update the local ref to the remote ref. */
                     struct stat st;
-                    doFetch = stat(localRefFile.c_str(), &st) != 0 ||
-                        !isCacheFileWithinTtl(now, st);
+                    doFetch = stat(localRefFile.c_str(), &st) != 0 || !isCacheFileWithinTtl(now, st);
                 }
             }
 
@@ -546,17 +557,20 @@ struct GitInputScheme : InputScheme
                 // we're using --quiet for now. Should process its stderr.
                 try {
                     auto ref = input.getRef();
-                    auto fetchRef = allRefs
-                        ? "refs/*"
-                        : ref->compare(0, 5, "refs/") == 0
-                            ? *ref
-                            : ref == "HEAD"
-                                ? *ref
-                                : "refs/heads/" + *ref;
-                    runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", fetchRef, fetchRef) });
+                    auto fetchRef = allRefs                            ? "refs/*"
+                                    : ref->compare(0, 5, "refs/") == 0 ? *ref
+                                    : ref == "HEAD"                    ? *ref
+                                                                       : "refs/heads/" + *ref;
+                    runProgram(
+                        "git", true,
+                        {"-C", repoDir, "--git-dir", gitDir, "fetch", "--quiet", "--force", "--", actualUrl,
+                         fmt("%s:%s", fetchRef, fetchRef)});
                 } catch (Error & e) {
-                    if (!pathExists(localRefFile)) throw;
-                    warn("could not update local clone of Git repository '%s'; continuing with the most recent version", actualUrl);
+                    if (!pathExists(localRefFile))
+                        throw;
+                    warn(
+                        "could not update local clone of Git repository '%s'; continuing with the most recent version",
+                        actualUrl);
                 }
 
                 if (!touchCacheFile(localRefFile, now))
@@ -568,13 +582,18 @@ struct GitInputScheme : InputScheme
             if (!input.getRev())
                 input.attrs.insert_or_assign("rev", Hash::parseAny(chomp(readFile(localRefFile)), htSHA1).gitRev());
 
-            // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
+            // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in
+            // the remainder
         }
 
-        bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "rev-parse", "--is-shallow-repository" })) == "true";
+        bool isShallow =
+            chomp(runProgram("git", true, {"-C", repoDir, "--git-dir", gitDir, "rev-parse", "--is-shallow-repository"}))
+            == "true";
 
         if (isShallow && !shallow)
-            throw Error("'%s' is a shallow Git repository, but shallow repositories are only allowed when `shallow = true;` is specified.", actualUrl);
+            throw Error(
+                "'%s' is a shallow Git repository, but shallow repositories are only allowed when `shallow = true;` is specified.",
+                actualUrl);
 
         // FIXME: check whether rev is an ancestor of ref.
 
@@ -589,50 +608,46 @@ struct GitInputScheme : InputScheme
         AutoDelete delTmpDir(tmpDir, true);
         PathFilter filter = defaultPathFilter;
 
-        auto result = runProgram(RunOptions {
+        auto result = runProgram(RunOptions{
             .program = "git",
-            .args = { "-C", repoDir, "--git-dir", gitDir, "cat-file", "commit", input.getRev()->gitRev() },
-            .mergeStderrToStdout = true
-        });
-        if (WEXITSTATUS(result.first) == 128
-            && result.second.find("bad file") != std::string::npos)
-        {
+            .args = {"-C", repoDir, "--git-dir", gitDir, "cat-file", "commit", input.getRev()->gitRev()},
+            .mergeStderrToStdout = true});
+        if (WEXITSTATUS(result.first) == 128 && result.second.find("bad file") != std::string::npos) {
             throw Error(
                 "Cannot find Git revision '%s' in ref '%s' of repository '%s'! "
-                    "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the "
-                    ANSI_BOLD "ref" ANSI_NORMAL " you've specified or add " ANSI_BOLD
-                    "allRefs = true;" ANSI_NORMAL " to " ANSI_BOLD "fetchGit" ANSI_NORMAL ".",
-                input.getRev()->gitRev(),
-                *input.getRef(),
-                actualUrl
-            );
+                "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the " ANSI_BOLD "ref" ANSI_NORMAL
+                " you've specified or add " ANSI_BOLD "allRefs = true;" ANSI_NORMAL " to " ANSI_BOLD
+                "fetchGit" ANSI_NORMAL ".",
+                input.getRev()->gitRev(), *input.getRef(), actualUrl);
         }
 
         if (submodules) {
             Path tmpGitDir = createTempDir();
             AutoDelete delTmpGitDir(tmpGitDir, true);
 
-            runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", tmpDir, "--separate-git-dir", tmpGitDir });
+            runProgram(
+                "git", true,
+                {"-c", "init.defaultBranch=" + gitInitialBranch, "init", tmpDir, "--separate-git-dir", tmpGitDir});
             // TODO: repoDir might lack the ref (it only checks if rev
             // exists, see FIXME above) so use a big hammer and fetch
             // everything to ensure we get the rev.
-            runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
-                                      "--update-head-ok", "--", repoDir, "refs/*:refs/*" });
+            runProgram(
+                "git", true,
+                {"-C", tmpDir, "fetch", "--quiet", "--force", "--update-head-ok", "--", repoDir, "refs/*:refs/*"});
 
-            runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", input.getRev()->gitRev() });
-            runProgram("git", true, { "-C", tmpDir, "remote", "add", "origin", actualUrl });
-            runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
+            runProgram("git", true, {"-C", tmpDir, "checkout", "--quiet", input.getRev()->gitRev()});
+            runProgram("git", true, {"-C", tmpDir, "remote", "add", "origin", actualUrl});
+            runProgram("git", true, {"-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive"});
 
             filter = isNotDotGitDirectory;
         } else {
             // FIXME: should pipe this, or find some better way to extract a
             // revision.
             auto source = sinkToSource([&](Sink & sink) {
-                runProgram2({
-                    .program = "git",
-                    .args = { "-C", repoDir, "--git-dir", gitDir, "archive", input.getRev()->gitRev() },
-                    .standardOut = &sink
-                });
+                runProgram2(
+                    {.program = "git",
+                     .args = {"-C", repoDir, "--git-dir", gitDir, "archive", input.getRev()->gitRev()},
+                     .standardOut = &sink});
             });
 
             unpackTarfile(*source, tmpDir);
@@ -640,7 +655,10 @@ struct GitInputScheme : InputScheme
 
         auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
 
-        auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "log", "-1", "--format=%ct", "--no-show-signature", input.getRev()->gitRev() }));
+        auto lastModified = std::stoull(runProgram(
+            "git", true,
+            {"-C", repoDir, "--git-dir", gitDir, "log", "-1", "--format=%ct", "--no-show-signature",
+             input.getRev()->gitRev()}));
 
         Attrs infoAttrs({
             {"rev", input.getRev()->gitRev()},
@@ -648,23 +666,16 @@ struct GitInputScheme : InputScheme
         });
 
         if (!shallow)
-            infoAttrs.insert_or_assign("revCount",
-                std::stoull(runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "rev-list", "--count", input.getRev()->gitRev() })));
+            infoAttrs.insert_or_assign(
+                "revCount",
+                std::stoull(runProgram(
+                    "git", true,
+                    {"-C", repoDir, "--git-dir", gitDir, "rev-list", "--count", input.getRev()->gitRev()})));
 
         if (!_input.getRev())
-            getCache()->add(
-                store,
-                unlockedAttrs,
-                infoAttrs,
-                storePath,
-                false);
+            getCache()->add(store, unlockedAttrs, infoAttrs, storePath, false);
 
-        getCache()->add(
-            store,
-            getLockedAttrs(),
-            infoAttrs,
-            storePath,
-            true);
+        getCache()->add(store, getLockedAttrs(), infoAttrs, storePath, true);
 
         return makeResult(infoAttrs, std::move(storePath));
     }

@@ -11,8 +11,7 @@
 
 namespace nix::fetchers {
 
-std::shared_ptr<Registry> Registry::read(
-    const Path & path, RegistryType type)
+std::shared_ptr<Registry> Registry::read(const Path & path, RegistryType type)
 {
     auto registry = std::make_shared<Registry>(type);
 
@@ -35,13 +34,11 @@ std::shared_ptr<Registry> Registry::read(
                     toAttrs.erase(j);
                 }
                 auto exact = i.find("exact");
-                registry->entries.push_back(
-                    Entry {
-                        .from = Input::fromAttrs(jsonToAttrs(i["from"])),
-                        .to = Input::fromAttrs(std::move(toAttrs)),
-                        .extraAttrs = extraAttrs,
-                        .exact = exact != i.end() && exact.value()
-                    });
+                registry->entries.push_back(Entry{
+                    .from = Input::fromAttrs(jsonToAttrs(i["from"])),
+                    .to = Input::fromAttrs(std::move(toAttrs)),
+                    .extraAttrs = extraAttrs,
+                    .exact = exact != i.end() && exact.value()});
             }
         }
 
@@ -79,23 +76,15 @@ void Registry::write(const Path & path)
     writeFile(path, json.dump(2));
 }
 
-void Registry::add(
-    const Input & from,
-    const Input & to,
-    const Attrs & extraAttrs)
+void Registry::add(const Input & from, const Input & to, const Attrs & extraAttrs)
 {
-    entries.emplace_back(
-        Entry {
-            .from = from,
-            .to = to,
-            .extraAttrs = extraAttrs
-        });
+    entries.emplace_back(Entry{.from = from, .to = to, .extraAttrs = extraAttrs});
 }
 
 void Registry::remove(const Input & input)
 {
     // FIXME: use C++20 std::erase.
-    for (auto i = entries.begin(); i != entries.end(); )
+    for (auto i = entries.begin(); i != entries.end();)
         if (i->from == input)
             i = entries.erase(i);
         else
@@ -109,8 +98,7 @@ static Path getSystemRegistryPath()
 
 static std::shared_ptr<Registry> getSystemRegistry()
 {
-    static auto systemRegistry =
-        Registry::read(getSystemRegistryPath(), Registry::System);
+    static auto systemRegistry = Registry::read(getSystemRegistryPath(), Registry::System);
     return systemRegistry;
 }
 
@@ -121,30 +109,24 @@ Path getUserRegistryPath()
 
 std::shared_ptr<Registry> getUserRegistry()
 {
-    static auto userRegistry =
-        Registry::read(getUserRegistryPath(), Registry::User);
+    static auto userRegistry = Registry::read(getUserRegistryPath(), Registry::User);
     return userRegistry;
 }
 
 std::shared_ptr<Registry> getCustomRegistry(const Path & p)
 {
-    static auto customRegistry =
-        Registry::read(p, Registry::Custom);
+    static auto customRegistry = Registry::read(p, Registry::Custom);
     return customRegistry;
 }
 
-static std::shared_ptr<Registry> flagRegistry =
-    std::make_shared<Registry>(Registry::Flag);
+static std::shared_ptr<Registry> flagRegistry = std::make_shared<Registry>(Registry::Flag);
 
 std::shared_ptr<Registry> getFlagRegistry()
 {
     return flagRegistry;
 }
 
-void overrideRegistry(
-    const Input & from,
-    const Input & to,
-    const Attrs & extraAttrs)
+void overrideRegistry(const Input & from, const Input & to, const Attrs & extraAttrs)
 {
     flagRegistry->add(from, to, extraAttrs);
 }
@@ -177,18 +159,17 @@ Registries getRegistries(ref<Store> store)
     return registries;
 }
 
-std::pair<Input, Attrs> lookupInRegistries(
-    ref<Store> store,
-    const Input & _input)
+std::pair<Input, Attrs> lookupInRegistries(ref<Store> store, const Input & _input)
 {
     Attrs extraAttrs;
     int n = 0;
     Input input(_input);
 
- restart:
+restart:
 
     n++;
-    if (n > 100) throw Error("cycle detected in flake registry for '%s'", input.to_string());
+    if (n > 100)
+        throw Error("cycle detected in flake registry for '%s'", input.to_string());
 
     for (auto & registry : getRegistries(store)) {
         // FIXME: O(n)

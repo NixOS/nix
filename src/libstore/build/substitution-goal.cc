@@ -5,8 +5,9 @@
 
 namespace nix {
 
-PathSubstitutionGoal::PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
-    : Goal(worker, DerivedPath::Opaque { storePath })
+PathSubstitutionGoal::PathSubstitutionGoal(
+    const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
+    : Goal(worker, DerivedPath::Opaque{storePath})
     , storePath(storePath)
     , repair(repair)
     , ca(ca)
@@ -17,17 +18,12 @@ PathSubstitutionGoal::PathSubstitutionGoal(const StorePath & storePath, Worker &
     maintainExpectedSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.expectedSubstitutions);
 }
 
-
 PathSubstitutionGoal::~PathSubstitutionGoal()
 {
     cleanup();
 }
 
-
-void PathSubstitutionGoal::done(
-    ExitCode result,
-    BuildResult::Status status,
-    std::optional<std::string> errorMsg)
+void PathSubstitutionGoal::done(ExitCode result, BuildResult::Status status, std::optional<std::string> errorMsg)
 {
     buildResult.status = status;
     if (errorMsg) {
@@ -37,12 +33,10 @@ void PathSubstitutionGoal::done(
     amDone(result);
 }
 
-
 void PathSubstitutionGoal::work()
 {
     (this->*state)();
 }
-
 
 void PathSubstitutionGoal::init()
 {
@@ -57,13 +51,13 @@ void PathSubstitutionGoal::init()
     }
 
     if (settings.readOnlyMode)
-        throw Error("cannot substitute path '%s' - no write access to the Nix store", worker.store.printStorePath(storePath));
+        throw Error(
+            "cannot substitute path '%s' - no write access to the Nix store", worker.store.printStorePath(storePath));
 
     subs = settings.useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>();
 
     tryNext();
 }
-
 
 void PathSubstitutionGoal::tryNext()
 {
@@ -79,9 +73,9 @@ void PathSubstitutionGoal::tryNext()
            In that case the calling derivation should just do a
            build. */
         done(
-            substituterFailed ? ecFailed : ecNoSubstituters,
-            BuildResult::NoSubstituters,
-            fmt("path '%s' is required, but there is no substituter that can build it", worker.store.printStorePath(storePath)));
+            substituterFailed ? ecFailed : ecNoSubstituters, BuildResult::NoSubstituters,
+            fmt("path '%s' is required, but there is no substituter that can build it",
+                worker.store.printStorePath(storePath)));
 
         if (substituterFailed) {
             worker.failedSubstitutions++;
@@ -130,8 +124,9 @@ void PathSubstitutionGoal::tryNext()
             info2->path = storePath;
             info = info2;
         } else {
-            printError("asked '%s' for '%s' but got '%s'",
-                sub->getUri(), worker.store.printStorePath(storePath), sub->printStorePath(info->path));
+            printError(
+                "asked '%s' for '%s' but got '%s'", sub->getUri(), worker.store.printStorePath(storePath),
+                sub->printStorePath(info->path));
             tryNext();
             return;
         }
@@ -144,17 +139,17 @@ void PathSubstitutionGoal::tryNext()
 
     maintainExpectedDownload =
         narInfo && narInfo->fileSize
-        ? std::make_unique<MaintainCount<uint64_t>>(worker.expectedDownloadSize, narInfo->fileSize)
-        : nullptr;
+            ? std::make_unique<MaintainCount<uint64_t>>(worker.expectedDownloadSize, narInfo->fileSize)
+            : nullptr;
 
     worker.updateProgress();
 
     /* Bail out early if this substituter lacks a valid
        signature. LocalStore::addToStore() also checks for this, but
        only after we've downloaded the path. */
-    if (!sub->isTrusted && worker.store.pathInfoIsUntrusted(*info))
-    {
-        warn("ignoring substitute for '%s' from '%s', as it's not signed by any of the keys in 'trusted-public-keys'",
+    if (!sub->isTrusted && worker.store.pathInfoIsUntrusted(*info)) {
+        warn(
+            "ignoring substitute for '%s' from '%s', as it's not signed by any of the keys in 'trusted-public-keys'",
             worker.store.printStorePath(storePath), sub->getUri());
         tryNext();
         return;
@@ -171,7 +166,6 @@ void PathSubstitutionGoal::tryNext()
     else
         state = &PathSubstitutionGoal::referencesValid;
 }
-
 
 void PathSubstitutionGoal::referencesValid()
 {
@@ -192,7 +186,6 @@ void PathSubstitutionGoal::referencesValid()
     state = &PathSubstitutionGoal::tryToRun;
     worker.wakeUp(shared_from_this());
 }
-
 
 void PathSubstitutionGoal::tryToRun()
 {
@@ -222,8 +215,8 @@ void PathSubstitutionGoal::tryToRun()
             Activity act(*logger, actSubstitute, Logger::Fields{worker.store.printStorePath(storePath), sub->getUri()});
             PushActivity pact(act.id);
 
-            copyStorePath(*sub, worker.store,
-                subPath ? *subPath : storePath, repair, sub->isTrusted ? NoCheckSigs : CheckSigs);
+            copyStorePath(
+                *sub, worker.store, subPath ? *subPath : storePath, repair, sub->isTrusted ? NoCheckSigs : CheckSigs);
 
             promise.set_value();
         } catch (...) {
@@ -235,7 +228,6 @@ void PathSubstitutionGoal::tryToRun()
 
     state = &PathSubstitutionGoal::finished;
 }
-
 
 void PathSubstitutionGoal::finished()
 {
@@ -289,17 +281,13 @@ void PathSubstitutionGoal::finished()
     done(ecSuccess, BuildResult::Substituted);
 }
 
-
-void PathSubstitutionGoal::handleChildOutput(int fd, std::string_view data)
-{
-}
-
+void PathSubstitutionGoal::handleChildOutput(int fd, std::string_view data) {}
 
 void PathSubstitutionGoal::handleEOF(int fd)
 {
-    if (fd == outPipe.readSide.get()) worker.wakeUp(shared_from_this());
+    if (fd == outPipe.readSide.get())
+        worker.wakeUp(shared_from_this());
 }
-
 
 void PathSubstitutionGoal::cleanup()
 {
@@ -315,6 +303,5 @@ void PathSubstitutionGoal::cleanup()
         ignoreException();
     }
 }
-
 
 }

@@ -8,10 +8,7 @@
 
 namespace nix::flake {
 
-FlakeRef getFlakeRef(
-    const nlohmann::json & json,
-    const char * attr,
-    const char * info)
+FlakeRef getFlakeRef(const nlohmann::json & json, const char * attr, const char * info)
 {
     auto i = json.find(attr);
     if (i != json.end()) {
@@ -36,8 +33,7 @@ LockedNode::LockedNode(const nlohmann::json & json)
     , isFlake(json.find("flake") != json.end() ? (bool) json["flake"] : true)
 {
     if (!lockedRef.input.isLocked())
-        throw Error("lockfile contains mutable lock '%s'",
-            fetchers::attrsToJSON(lockedRef.input.toAttrs()));
+        throw Error("lockfile contains mutable lock '%s'", fetchers::attrsToJSON(lockedRef.input.toAttrs()));
 }
 
 StorePath LockedNode::computeStorePath(Store & store) const
@@ -49,7 +45,8 @@ std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
 {
     auto pos = root;
 
-    if (!pos) return {};
+    if (!pos)
+        return {};
 
     for (auto & elem : path) {
         if (auto i = get(pos->inputs, elem)) {
@@ -57,7 +54,8 @@ std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
                 pos = *node;
             else if (auto follows = std::get_if<1>(&*i)) {
                 pos = findInput(*follows);
-                if (!pos) return {};
+                if (!pos)
+                    return {};
             }
         } else
             return {};
@@ -76,9 +74,9 @@ LockFile::LockFile(const nlohmann::json & json, const Path & path)
 
     std::function<void(Node & node, const nlohmann::json & jsonNode)> getInputs;
 
-    getInputs = [&](Node & node, const nlohmann::json & jsonNode)
-    {
-        if (jsonNode.find("inputs") == jsonNode.end()) return;
+    getInputs = [&](Node & node, const nlohmann::json & jsonNode) {
+        if (jsonNode.find("inputs") == jsonNode.end())
+            return;
         for (auto & i : jsonNode["inputs"].items()) {
             if (i.value().is_array()) { // FIXME: remove, obsolete
                 InputPath path;
@@ -124,14 +122,13 @@ nlohmann::json LockFile::toJSON() const
 
     std::function<std::string(const std::string & key, std::shared_ptr<const Node> node)> dumpNode;
 
-    dumpNode = [&](std::string key, std::shared_ptr<const Node> node) -> std::string
-    {
+    dumpNode = [&](std::string key, std::shared_ptr<const Node> node) -> std::string {
         auto k = nodeKeys.find(node);
         if (k != nodeKeys.end())
             return k->second;
 
         if (!keys.insert(key).second) {
-            for (int n = 2; ; ++n) {
+            for (int n = 2;; ++n) {
                 auto k = fmt("%s_%d", key, n);
                 if (keys.insert(k).second) {
                     key = k;
@@ -162,7 +159,8 @@ nlohmann::json LockFile::toJSON() const
         if (auto lockedNode = std::dynamic_pointer_cast<const LockedNode>(node)) {
             n["original"] = fetchers::attrsToJSON(lockedNode->originalRef.toAttrs());
             n["locked"] = fetchers::attrsToJSON(lockedNode->lockedRef.toAttrs());
-            if (!lockedNode->isFlake) n["flake"] = false;
+            if (!lockedNode->isFlake)
+                n["flake"] = false;
         }
 
         nodes[key] = std::move(n);
@@ -185,11 +183,12 @@ std::string LockFile::to_string() const
 
 LockFile LockFile::read(const Path & path)
 {
-    if (!pathExists(path)) return LockFile();
+    if (!pathExists(path))
+        return LockFile();
     return LockFile(nlohmann::json::parse(readFile(path)), path);
 }
 
-std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile)
+std::ostream & operator<<(std::ostream & stream, const LockFile & lockFile)
 {
     stream << lockFile.toJSON().dump(2);
     return stream;
@@ -207,9 +206,9 @@ bool LockFile::isImmutable() const
 
     std::function<void(std::shared_ptr<const Node> node)> visit;
 
-    visit = [&](std::shared_ptr<const Node> node)
-    {
-        if (!nodes.insert(node).second) return;
+    visit = [&](std::shared_ptr<const Node> node) {
+        if (!nodes.insert(node).second)
+            return;
         for (auto & i : node->inputs)
             if (auto child = std::get_if<0>(&i.second))
                 visit(*child);
@@ -218,15 +217,17 @@ bool LockFile::isImmutable() const
     visit(root);
 
     for (auto & i : nodes) {
-        if (i == root) continue;
+        if (i == root)
+            continue;
         auto lockedNode = std::dynamic_pointer_cast<const LockedNode>(i);
-        if (lockedNode && !lockedNode->lockedRef.input.isLocked()) return false;
+        if (lockedNode && !lockedNode->lockedRef.input.isLocked())
+            return false;
     }
 
     return true;
 }
 
-bool LockFile::operator ==(const LockFile & other) const
+bool LockFile::operator==(const LockFile & other) const
 {
     // FIXME: slow
     return toJSON() == other.toJSON();
@@ -252,11 +253,11 @@ std::map<InputPath, Node::Edge> LockFile::getAllInputs() const
 
     std::function<void(const InputPath & prefix, std::shared_ptr<Node> node)> recurse;
 
-    recurse = [&](const InputPath & prefix, std::shared_ptr<Node> node)
-    {
-        if (!done.insert(node).second) return;
+    recurse = [&](const InputPath & prefix, std::shared_ptr<Node> node) {
+        if (!done.insert(node).second)
+            return;
 
-        for (auto &[id, input] : node->inputs) {
+        for (auto & [id, input] : node->inputs) {
             auto inputPath(prefix);
             inputPath.push_back(id);
             res.emplace(inputPath, input);
@@ -280,7 +281,7 @@ static std::string describe(const FlakeRef & flakeRef)
     return s;
 }
 
-std::ostream & operator <<(std::ostream & stream, const Node::Edge & edge)
+std::ostream & operator<<(std::ostream & stream, const Node::Edge & edge)
 {
     if (auto node = std::get_if<0>(&edge))
         stream << describe((*node)->lockedRef);
@@ -311,18 +312,17 @@ std::string LockFile::diff(const LockFile & oldLocks, const LockFile & newLocks)
 
     while (i != oldFlat.end() || j != newFlat.end()) {
         if (j != newFlat.end() && (i == oldFlat.end() || i->first > j->first)) {
-            res += fmt("• " ANSI_GREEN "Added input '%s':" ANSI_NORMAL "\n    %s\n",
-                printInputPath(j->first), j->second);
+            res +=
+                fmt("• " ANSI_GREEN "Added input '%s':" ANSI_NORMAL "\n    %s\n", printInputPath(j->first), j->second);
             ++j;
         } else if (i != oldFlat.end() && (j == newFlat.end() || i->first < j->first)) {
             res += fmt("• " ANSI_RED "Removed input '%s'" ANSI_NORMAL "\n", printInputPath(i->first));
             ++i;
         } else {
             if (!equals(i->second, j->second)) {
-                res += fmt("• " ANSI_BOLD "Updated input '%s':" ANSI_NORMAL "\n    %s\n  → %s\n",
-                    printInputPath(i->first),
-                    i->second,
-                    j->second);
+                res +=
+                    fmt("• " ANSI_BOLD "Updated input '%s':" ANSI_NORMAL "\n    %s\n  → %s\n", printInputPath(i->first),
+                        i->second, j->second);
             }
             ++i;
             ++j;
@@ -339,8 +339,8 @@ void LockFile::check()
     for (auto & [inputPath, input] : inputs) {
         if (auto follows = std::get_if<1>(&input)) {
             if (!follows->empty() && !get(inputs, *follows))
-                throw Error("input '%s' follows a non-existent input '%s'",
-                    printInputPath(inputPath),
+                throw Error(
+                    "input '%s' follows a non-existent input '%s'", printInputPath(inputPath),
                     printInputPath(*follows));
         }
     }

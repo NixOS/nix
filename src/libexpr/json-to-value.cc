@@ -9,8 +9,10 @@ namespace nix {
 
 // for more information, refer to
 // https://github.com/nlohmann/json/blob/master/include/nlohmann/detail/input/json_sax.hpp
-class JSONSax : nlohmann::json_sax<json> {
-    class JSONState {
+class JSONSax : nlohmann::json_sax<json>
+{
+    class JSONState
+    {
     protected:
         std::unique_ptr<JSONState> parent;
         RootValue v;
@@ -19,8 +21,12 @@ class JSONSax : nlohmann::json_sax<json> {
         {
             throw std::logic_error("tried to close toplevel json parser state");
         }
-        explicit JSONState(std::unique_ptr<JSONState> && p) : parent(std::move(p)) {}
-        explicit JSONState(Value * v) : v(allocRootValue(v)) {}
+        explicit JSONState(std::unique_ptr<JSONState> && p)
+            : parent(std::move(p))
+        {}
+        explicit JSONState(Value * v)
+            : v(allocRootValue(v))
+        {}
         JSONState(JSONState & p) = delete;
         Value & value(EvalState & state)
         {
@@ -32,7 +38,8 @@ class JSONSax : nlohmann::json_sax<json> {
         virtual void add() {}
     };
 
-    class JSONObjectState : public JSONState {
+    class JSONObjectState : public JSONState
+    {
         using JSONState::JSONState;
         ValueMap attrs;
         std::unique_ptr<JSONState> resolve(EvalState & state) override
@@ -43,7 +50,10 @@ class JSONSax : nlohmann::json_sax<json> {
             parent->value(state).mkAttrs(attrs2.alreadySorted());
             return std::move(parent);
         }
-        void add() override { v = nullptr; }
+        void add() override
+        {
+            v = nullptr;
+        }
     public:
         void key(string_t & name, EvalState & state)
         {
@@ -51,7 +61,8 @@ class JSONSax : nlohmann::json_sax<json> {
         }
     };
 
-    class JSONListState : public JSONState {
+    class JSONListState : public JSONState
+    {
         ValueVector values;
         std::unique_ptr<JSONState> resolve(EvalState & state) override
         {
@@ -62,12 +73,14 @@ class JSONSax : nlohmann::json_sax<json> {
             }
             return std::move(parent);
         }
-        void add() override {
+        void add() override
+        {
             values.push_back(*v);
             v = nullptr;
         }
     public:
-        JSONListState(std::unique_ptr<JSONState> && p, std::size_t reserve) : JSONState(std::move(p))
+        JSONListState(std::unique_ptr<JSONState> && p, std::size_t reserve)
+            : JSONState(std::move(p))
         {
             values.reserve(reserve);
         }
@@ -77,7 +90,9 @@ class JSONSax : nlohmann::json_sax<json> {
     std::unique_ptr<JSONState> rs;
 
 public:
-    JSONSax(EvalState & state, Value & v) : state(state), rs(new JSONState(&v)) {};
+    JSONSax(EvalState & state, Value & v)
+        : state(state)
+        , rs(new JSONState(&v)){};
 
     bool null()
     {
@@ -122,7 +137,7 @@ public:
     }
 
 #if NLOHMANN_JSON_VERSION_MAJOR >= 3 && NLOHMANN_JSON_VERSION_MINOR >= 8
-    bool binary(binary_t&)
+    bool binary(binary_t &)
     {
         // This function ought to be unreachable
         assert(false);
@@ -138,27 +153,30 @@ public:
 
     bool key(string_t & name)
     {
-        dynamic_cast<JSONObjectState*>(rs.get())->key(name, state);
+        dynamic_cast<JSONObjectState *>(rs.get())->key(name, state);
         return true;
     }
 
-    bool end_object() {
+    bool end_object()
+    {
         rs = rs->resolve(state);
         rs->add();
         return true;
     }
 
-    bool end_array() {
+    bool end_array()
+    {
         return end_object();
     }
 
-    bool start_array(size_t len) {
-        rs = std::make_unique<JSONListState>(std::move(rs),
-            len != std::numeric_limits<size_t>::max() ? len : 128);
+    bool start_array(size_t len)
+    {
+        rs = std::make_unique<JSONListState>(std::move(rs), len != std::numeric_limits<size_t>::max() ? len : 128);
         return true;
     }
 
-    bool parse_error(std::size_t, const std::string&, const nlohmann::detail::exception& ex) {
+    bool parse_error(std::size_t, const std::string &, const nlohmann::detail::exception & ex)
+    {
         throw JSONParseError(ex.what());
     }
 };

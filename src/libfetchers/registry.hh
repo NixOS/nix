@@ -3,7 +3,9 @@
 #include "types.hh"
 #include "fetchers.hh"
 
-namespace nix { class Store; }
+namespace nix {
+class Store;
+}
 
 namespace nix::fetchers {
 
@@ -30,17 +32,13 @@ struct Registry
 
     Registry(RegistryType type)
         : type(type)
-    { }
+    {}
 
-    static std::shared_ptr<Registry> read(
-        const Path & path, RegistryType type);
+    static std::shared_ptr<Registry> read(const Path & path, RegistryType type);
 
     void write(const Path & path);
 
-    void add(
-        const Input & from,
-        const Input & to,
-        const Attrs & extraAttrs);
+    void add(const Input & from, const Input & to, const Attrs & extraAttrs);
 
     void remove(const Input & input);
 };
@@ -55,13 +53,8 @@ Path getUserRegistryPath();
 
 Registries getRegistries(ref<Store> store);
 
-void overrideRegistry(
-    const Input & from,
-    const Input & to,
-    const Attrs & extraAttrs);
+void overrideRegistry(const Input & from, const Input & to, const Attrs & extraAttrs);
 
-std::pair<Input, Attrs> lookupInRegistries(
-    ref<Store> store,
-    const Input & input);
+std::pair<Input, Attrs> lookupInRegistries(ref<Store> store, const Input & input);
 
 }

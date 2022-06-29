@@ -43,33 +43,22 @@ namespace nix {
 
  */
 
-typedef enum {
-    lvlError = 0,
-    lvlWarn,
-    lvlNotice,
-    lvlInfo,
-    lvlTalkative,
-    lvlChatty,
-    lvlDebug,
-    lvlVomit
-} Verbosity;
+typedef enum { lvlError = 0, lvlWarn, lvlNotice, lvlInfo, lvlTalkative, lvlChatty, lvlDebug, lvlVomit } Verbosity;
 
 /* adjust Pos::origin bit width when adding stuff here */
-typedef enum {
-    foFile,
-    foStdin,
-    foString
-} FileOrigin;
+typedef enum { foFile, foStdin, foString } FileOrigin;
 
 // the lines of code surrounding an error.
-struct LinesOfCode {
+struct LinesOfCode
+{
     std::optional<std::string> prevLineOfCode;
     std::optional<std::string> errLineOfCode;
     std::optional<std::string> nextLineOfCode;
 };
 
 // ErrPos indicates the location of an error in a nix file.
-struct ErrPos {
+struct ErrPos
+{
     int line = 0;
     int column = 0;
     std::string file;
@@ -81,7 +70,7 @@ struct ErrPos {
     }
 
     // convert from the Pos struct, found in libexpr.
-    template <class P>
+    template<class P>
     ErrPos & operator=(const P & pos)
     {
         origin = pos.origin;
@@ -91,7 +80,7 @@ struct ErrPos {
         return *this;
     }
 
-    template <class P>
+    template<class P>
     ErrPos(const P & p)
     {
         *this = p;
@@ -100,19 +89,18 @@ struct ErrPos {
 
 std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos);
 
-void printCodeLines(std::ostream & out,
-    const std::string & prefix,
-    const ErrPos & errPos,
-    const LinesOfCode & loc);
+void printCodeLines(std::ostream & out, const std::string & prefix, const ErrPos & errPos, const LinesOfCode & loc);
 
 void printAtPos(const ErrPos & pos, std::ostream & out);
 
-struct Trace {
+struct Trace
+{
     std::optional<ErrPos> pos;
     hintformat hint;
 };
 
-struct ErrorInfo {
+struct ErrorInfo
+{
     Verbosity level;
     hintformat msg;
     std::optional<ErrPos> errPos;
@@ -139,59 +127,75 @@ public:
     unsigned int status = 1; // exit status
 
     template<typename... Args>
-    BaseError(unsigned int status, const Args & ... args)
-        : err { .level = lvlError, .msg = hintfmt(args...) }
+    BaseError(unsigned int status, const Args &... args)
+        : err{.level = lvlError, .msg = hintfmt(args...)}
         , status(status)
-    { }
+    {}
 
     template<typename... Args>
-    explicit BaseError(const std::string & fs, const Args & ... args)
-        : err { .level = lvlError, .msg = hintfmt(fs, args...) }
-    { }
+    explicit BaseError(const std::string & fs, const Args &... args)
+        : err{.level = lvlError, .msg = hintfmt(fs, args...)}
+    {}
 
     template<typename... Args>
-    BaseError(const Suggestions & sug, const Args & ... args)
-        : err { .level = lvlError, .msg = hintfmt(args...), .suggestions = sug }
-    { }
+    BaseError(const Suggestions & sug, const Args &... args)
+        : err{.level = lvlError, .msg = hintfmt(args...), .suggestions = sug}
+    {}
 
     BaseError(hintformat hint)
-        : err { .level = lvlError, .msg = hint }
-    { }
+        : err{.level = lvlError, .msg = hint}
+    {}
 
     BaseError(ErrorInfo && e)
         : err(std::move(e))
-    { }
+    {}
 
     BaseError(const ErrorInfo & e)
         : err(e)
-    { }
+    {}
 
 #ifdef EXCEPTION_NEEDS_THROW_SPEC
-    ~BaseError() throw () { };
-    const char * what() const throw () { return calcWhat().c_str(); }
+    ~BaseError() throw(){};
+    const char * what() const throw()
+    {
+        return calcWhat().c_str();
+    }
 #else
-    const char * what() const noexcept override { return calcWhat().c_str(); }
+    const char * what() const noexcept override
+    {
+        return calcWhat().c_str();
+    }
 #endif
 
-    const std::string & msg() const { return calcWhat(); }
-    const ErrorInfo & info() const { calcWhat(); return err; }
+    const std::string & msg() const
+    {
+        return calcWhat();
+    }
+    const ErrorInfo & info() const
+    {
+        calcWhat();
+        return err;
+    }
 
     template<typename... Args>
-    void addTrace(std::optional<ErrPos> e, const std::string & fs, const Args & ... args)
+    void addTrace(std::optional<ErrPos> e, const std::string & fs, const Args &... args)
     {
         addTrace(e, hintfmt(fs, args...));
     }
 
     void addTrace(std::optional<ErrPos> e, hintformat hint);
 
-    bool hasTrace() const { return !err.traces.empty(); }
+    bool hasTrace() const
+    {
+        return !err.traces.empty();
+    }
 };
 
 #define MakeError(newClass, superClass) \
-    class newClass : public superClass                  \
-    {                                                   \
-    public:                                             \
-        using superClass::superClass;                   \
+    class newClass : public superClass \
+    { \
+    public: \
+        using superClass::superClass; \
     }
 
 MakeError(Error, BaseError);
@@ -204,7 +208,7 @@ public:
     int errNo;
 
     template<typename... Args>
-    SysError(const Args & ... args)
+    SysError(const Args &... args)
         : Error("")
     {
         errNo = errno;

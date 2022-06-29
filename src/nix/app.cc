@@ -16,11 +16,12 @@ struct InstallableDerivedPath : Installable
     InstallableDerivedPath(ref<Store> store, const DerivedPath & derivedPath)
         : store(store)
         , derivedPath(derivedPath)
+    {}
+
+    std::string what() const override
     {
+        return derivedPath.to_string(*store);
     }
-
-
-    std::string what() const override { return derivedPath.to_string(*store); }
 
     DerivedPaths toDerivedPaths() override
     {
@@ -42,11 +43,9 @@ StringPairs resolveRewrites(Store & store, const BuiltPaths dependencies)
     StringPairs res;
     for (auto & dep : dependencies)
         if (auto drvDep = std::get_if<BuiltPathBuilt>(&dep))
-            for (auto & [ outputName, outputPath ] : drvDep->outputs)
+            for (auto & [outputName, outputPath] : drvDep->outputs)
                 res.emplace(
-                    downstreamPlaceholder(store, drvDep->drvPath, outputName),
-                    store.printStorePath(outputPath)
-                );
+                    downstreamPlaceholder(store, drvDep->drvPath, outputName), store.printStorePath(outputPath));
     return res;
 }
 
@@ -77,7 +76,7 @@ UnresolvedApp Installable::toApp(EvalState & state)
         for (auto & [path, name] : context)
             context2.push_back({path, {name}});
 
-        return UnresolvedApp{App {
+        return UnresolvedApp{App{
             .context = std::move(context2),
             .program = program,
         }};
@@ -91,15 +90,10 @@ UnresolvedApp Installable::toApp(EvalState & state)
         auto aPname = cursor->maybeGetAttr("pname");
         auto aMeta = cursor->maybeGetAttr(state.sMeta);
         auto aMainProgram = aMeta ? aMeta->maybeGetAttr("mainProgram") : nullptr;
-        auto mainProgram =
-            aMainProgram
-            ? aMainProgram->getString()
-            : aPname
-            ? aPname->getString()
-            : DrvName(name).name;
+        auto mainProgram = aMainProgram ? aMainProgram->getString() : aPname ? aPname->getString() : DrvName(name).name;
         auto program = outPath + "/bin/" + mainProgram;
-        return UnresolvedApp { App {
-            .context = { { drvPath, {outputName} } },
+        return UnresolvedApp{App{
+            .context = {{drvPath, {outputName}}},
             .program = program,
         }};
     }
@@ -116,8 +110,7 @@ App UnresolvedApp::resolve(ref<Store> evalStore, ref<Store> store)
     std::vector<std::shared_ptr<Installable>> installableContext;
 
     for (auto & ctxElt : unresolved.context)
-        installableContext.push_back(
-            std::make_shared<InstallableDerivedPath>(store, ctxElt.toDerivedPath()));
+        installableContext.push_back(std::make_shared<InstallableDerivedPath>(store, ctxElt.toDerivedPath()));
 
     auto builtContext = Installable::build(evalStore, store, Realise::Outputs, installableContext);
     res.program = resolveString(*store, unresolved.program, builtContext);

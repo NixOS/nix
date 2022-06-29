@@ -22,7 +22,10 @@ protected:
         bool indent;
         size_t depth = 0;
         size_t stack = 0;
-        JSONState(std::ostream & str, bool indent) : str(str), indent(indent) { }
+        JSONState(std::ostream & str, bool indent)
+            : str(str)
+            , indent(indent)
+        {}
         ~JSONState()
         {
             assert(stack == 0);
@@ -152,8 +155,7 @@ private:
 
     JSONPlaceholder(JSONState * state)
         : JSONWriter(state)
-    {
-    }
+    {}
 
     void assertValid()
     {
@@ -165,8 +167,7 @@ public:
 
     JSONPlaceholder(std::ostream & str, bool indent = false)
         : JSONWriter(str, indent)
-    {
-    }
+    {}
 
     ~JSONPlaceholder();
 

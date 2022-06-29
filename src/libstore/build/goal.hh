@@ -14,8 +14,9 @@ class Worker;
 typedef std::shared_ptr<Goal> GoalPtr;
 typedef std::weak_ptr<Goal> WeakGoalPtr;
 
-struct CompareGoalPtrs {
-    bool operator() (const GoalPtr & a, const GoalPtr & b) const;
+struct CompareGoalPtrs
+{
+    bool operator()(const GoalPtr & a, const GoalPtr & b) const;
 };
 
 /* Set of goals. */
@@ -27,7 +28,7 @@ typedef std::map<StorePath, WeakGoalPtr> WeakGoalMap;
 
 struct Goal : public std::enable_shared_from_this<Goal>
 {
-    typedef enum {ecBusy, ecSuccess, ecFailed, ecNoSubstituters, ecIncompleteClosure} ExitCode;
+    typedef enum { ecBusy, ecSuccess, ecFailed, ecNoSubstituters, ecIncompleteClosure } ExitCode;
 
     /* Backlink to the worker. */
     Worker & worker;
@@ -64,8 +65,8 @@ struct Goal : public std::enable_shared_from_this<Goal>
 
     Goal(Worker & worker, DerivedPath path)
         : worker(worker)
-        , buildResult { .path = std::move(path) }
-    { }
+        , buildResult{.path = std::move(path)}
+    {}
 
     virtual ~Goal()
     {
@@ -104,7 +105,7 @@ struct Goal : public std::enable_shared_from_this<Goal>
 
     void amDone(ExitCode result, std::optional<Error> ex = {});
 
-    virtual void cleanup() { }
+    virtual void cleanup() {}
 };
 
 void addToWeakGoals(WeakGoals & goals, GoalPtr p);

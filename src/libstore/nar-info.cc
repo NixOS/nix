@@ -7,9 +7,7 @@ namespace nix {
 NarInfo::NarInfo(const Store & store, const std::string & s, const std::string & whence)
     : ValidPathInfo(StorePath(StorePath::dummy), Hash(Hash::dummy)) // FIXME: hack
 {
-    auto corrupt = [&]() {
-        return Error("NAR info file '%1%' is corrupt", whence);
-    };
+    auto corrupt = [&]() { return Error("NAR info file '%1%' is corrupt", whence); };
 
     auto parseHashField = [&](const std::string & s) {
         try {
@@ -26,20 +24,21 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
     while (pos < s.size()) {
 
         size_t colon = s.find(':', pos);
-        if (colon == std::string::npos) throw corrupt();
+        if (colon == std::string::npos)
+            throw corrupt();
 
         std::string name(s, pos, colon - pos);
 
         size_t eol = s.find('\n', colon + 2);
-        if (eol == std::string::npos) throw corrupt();
+        if (eol == std::string::npos)
+            throw corrupt();
 
         std::string value(s, colon + 2, eol - colon - 2);
 
         if (name == "StorePath") {
             path = store.parseStorePath(value);
             havePath = true;
-        }
-        else if (name == "URL")
+        } else if (name == "URL")
             url = value;
         else if (name == "Compression")
             compression = value;
@@ -47,32 +46,31 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
             fileHash = parseHashField(value);
         else if (name == "FileSize") {
             auto n = string2Int<decltype(fileSize)>(value);
-            if (!n) throw corrupt();
+            if (!n)
+                throw corrupt();
             fileSize = *n;
-        }
-        else if (name == "NarHash") {
+        } else if (name == "NarHash") {
             narHash = parseHashField(value);
             haveNarHash = true;
-        }
-        else if (name == "NarSize") {
+        } else if (name == "NarSize") {
             auto n = string2Int<decltype(narSize)>(value);
-            if (!n) throw corrupt();
+            if (!n)
+                throw corrupt();
             narSize = *n;
-        }
-        else if (name == "References") {
+        } else if (name == "References") {
             auto refs = tokenizeString<Strings>(value, " ");
-            if (!references.empty()) throw corrupt();
+            if (!references.empty())
+                throw corrupt();
             for (auto & r : refs)
                 references.insert(StorePath(r));
-        }
-        else if (name == "Deriver") {
+        } else if (name == "Deriver") {
             if (value != "unknown-deriver")
                 deriver = StorePath(value);
-        }
-        else if (name == "Sig")
+        } else if (name == "Sig")
             sigs.insert(value);
         else if (name == "CA") {
-            if (ca) throw corrupt();
+            if (ca)
+                throw corrupt();
             // FIXME: allow blank ca or require skipping field?
             ca = parseContentAddressOpt(value);
         }
@@ -80,9 +78,11 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
         pos = eol + 1;
     }
 
-    if (compression == "") compression = "bzip2";
+    if (compression == "")
+        compression = "bzip2";
 
-    if (!havePath || !haveNarHash || url.empty() || narSize == 0) throw corrupt();
+    if (!havePath || !haveNarHash || url.empty() || narSize == 0)
+        throw corrupt();
 }
 
 std::string NarInfo::to_string(const Store & store) const

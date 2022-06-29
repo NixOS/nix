@@ -18,11 +18,13 @@ using namespace nix;
    mirrors defined in Nixpkgs. */
 std::string resolveMirrorUrl(EvalState & state, const std::string & url)
 {
-    if (url.substr(0, 9) != "mirror://") return url;
+    if (url.substr(0, 9) != "mirror://")
+        return url;
 
     std::string s(url, 9);
     auto p = s.find('/');
-    if (p == std::string::npos) throw Error("invalid mirror URL '%s'", url);
+    if (p == std::string::npos)
+        throw Error("invalid mirror URL '%s'", url);
     std::string mirrorName(s, 0, p);
 
     Value vMirrors;
@@ -86,7 +88,8 @@ std::tuple<StorePath, Hash> prefetchFile(
                 mode = 0700;
 
             AutoCloseFD fd = open(tmpFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, mode);
-            if (!fd) throw SysError("creating temporary file '%s'", tmpFile);
+            if (!fd)
+                throw SysError("creating temporary file '%s'", tmpFile);
 
             FdSink sink(fd.get());
 
@@ -97,8 +100,7 @@ std::tuple<StorePath, Hash> prefetchFile(
 
         /* Optionally unpack the file. */
         if (unpack) {
-            Activity act(*logger, lvlChatty, actUnknown,
-                fmt("unpacking '%s'", url));
+            Activity act(*logger, lvlChatty, actUnknown, fmt("unpacking '%s'", url));
             Path unpacked = (Path) tmpDir + "/unpacked";
             createDirs(unpacked);
             unpackTarfile(tmpFile, unpacked);
@@ -112,8 +114,7 @@ std::tuple<StorePath, Hash> prefetchFile(
                 tmpFile = unpacked;
         }
 
-        Activity act(*logger, lvlChatty, actUnknown,
-            fmt("adding '%s' to the store", url));
+        Activity act(*logger, lvlChatty, actUnknown, fmt("adding '%s' to the store", url));
 
         auto info = store->addToStoreSlow(*name, tmpFile, ingestionMethod, hashType, expectedHash);
         storePath = info.path;
@@ -124,7 +125,7 @@ std::tuple<StorePath, Hash> prefetchFile(
     return {storePath.value(), hash.value()};
 }
 
-static int main_nix_prefetch_url(int argc, char * * argv)
+static int main_nix_prefetch_url(int argc, char ** argv)
 {
     {
         HashType ht = htSHA256;
@@ -149,14 +150,12 @@ static int main_nix_prefetch_url(int argc, char * * argv)
             else if (*arg == "--type") {
                 auto s = getArg(*arg, arg, end);
                 ht = parseHashType(s);
-            }
-            else if (*arg == "--print-path")
+            } else if (*arg == "--print-path")
                 printPath = true;
             else if (*arg == "--attr" || *arg == "-A") {
                 fromExpr = true;
                 attrPath = getArg(*arg, arg, end);
-            }
-            else if (*arg == "--unpack")
+            } else if (*arg == "--unpack")
                 unpack = true;
             else if (*arg == "--executable")
                 executable = true;
@@ -177,7 +176,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
         Finally f([]() { stopProgressBar(); });
 
         if (isatty(STDERR_FILENO))
-          startProgressBar();
+            startProgressBar();
 
         auto store = openStore();
         auto state = std::make_unique<EvalState>(myArgs.searchPath, store);
@@ -226,8 +225,8 @@ static int main_nix_prefetch_url(int argc, char * * argv)
         if (args.size() == 2)
             expectedHash = Hash::parseAny(args[1], ht);
 
-        auto [storePath, hash] = prefetchFile(
-            store, resolveMirrorUrl(*state, url), name, ht, expectedHash, unpack, executable);
+        auto [storePath, hash] =
+            prefetchFile(store, resolveMirrorUrl(*state, url), name, ht, expectedHash, unpack, executable);
 
         stopProgressBar();
 
@@ -254,29 +253,25 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
 
     CmdStorePrefetchFile()
     {
-        addFlag({
-            .longName = "name",
-            .description = "Override the name component of the resulting store path. It defaults to the base name of *url*.",
-            .labels = {"name"},
-            .handler = {&name}
-        });
+        addFlag(
+            {.longName = "name",
+             .description =
+                 "Override the name component of the resulting store path. It defaults to the base name of *url*.",
+             .labels = {"name"},
+             .handler = {&name}});
 
-        addFlag({
-            .longName = "expected-hash",
-            .description = "The expected hash of the file.",
-            .labels = {"hash"},
-            .handler = {[&](std::string s) {
-                expectedHash = Hash::parseAny(s, hashType);
-            }}
-        });
+        addFlag(
+            {.longName = "expected-hash",
+             .description = "The expected hash of the file.",
+             .labels = {"hash"},
+             .handler = {[&](std::string s) { expectedHash = Hash::parseAny(s, hashType); }}});
 
         addFlag(Flag::mkHashTypeFlag("hash-type", &hashType));
 
         addFlag({
             .longName = "executable",
-            .description =
-                "Make the resulting file executable. Note that this causes the "
-                "resulting hash to be a NAR hash rather than a flat file hash.",
+            .description = "Make the resulting file executable. Note that this causes the "
+                           "resulting hash to be a NAR hash rather than a flat file hash.",
             .handler = {&executable, true},
         });
 
@@ -291,8 +286,8 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
     std::string doc() override
     {
         return
-          #include "store-prefetch-file.md"
-          ;
+#include "store-prefetch-file.md"
+            ;
     }
     void run(ref<Store> store) override
     {
@@ -304,9 +299,8 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
             res["hash"] = hash.to_string(SRI, true);
             logger->cout(res.dump());
         } else {
-            notice("Downloaded '%s' to '%s' (hash '%s').",
-                url,
-                store->printStorePath(storePath),
+            notice(
+                "Downloaded '%s' to '%s' (hash '%s').", url, store->printStorePath(storePath),
                 hash.to_string(SRI, true));
         }
     }

@@ -8,6 +8,11 @@ private:
     Fn fun;
 
 public:
-    Finally(Fn fun) : fun(std::move(fun)) { }
-    ~Finally() { fun(); }
+    Finally(Fn fun)
+        : fun(std::move(fun))
+    {}
+    ~Finally()
+    {
+        fun();
+    }
 };

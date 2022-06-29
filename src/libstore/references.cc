@@ -7,27 +7,22 @@
 #include <cstdlib>
 #include <mutex>
 
-
 namespace nix {
-
 
 static size_t refLength = 32; /* characters */
 
-
-static void search(
-    std::string_view s,
-    StringSet & hashes,
-    StringSet & seen)
+static void search(std::string_view s, StringSet & hashes, StringSet & seen)
 {
     static std::once_flag initialised;
     static bool isBase32[256];
-    std::call_once(initialised, [](){
-        for (unsigned int i = 0; i < 256; ++i) isBase32[i] = false;
+    std::call_once(initialised, []() {
+        for (unsigned int i = 0; i < 256; ++i)
+            isBase32[i] = false;
         for (unsigned int i = 0; i < base32Chars.size(); ++i)
             isBase32[(unsigned char) base32Chars[i]] = true;
     });
 
-    for (size_t i = 0; i + refLength <= s.size(); ) {
+    for (size_t i = 0; i + refLength <= s.size();) {
         int j;
         bool match = true;
         for (j = refLength - 1; j >= 0; --j)
@@ -36,19 +31,18 @@ static void search(
                 match = false;
                 break;
             }
-        if (!match) continue;
+        if (!match)
+            continue;
         std::string ref(s.substr(i, refLength));
         if (hashes.erase(ref)) {
-            debug(format("found reference to '%1%' at offset '%2%'")
-                  % ref % i);
+            debug(format("found reference to '%1%' at offset '%2%'") % ref % i);
             seen.insert(ref);
         }
         ++i;
     }
 }
 
-
-void RefScanSink::operator () (std::string_view data)
+void RefScanSink::operator()(std::string_view data)
 {
     /* It's possible that a reference spans the previous and current
        fragment, so search in the concatenation of the tail of the
@@ -66,21 +60,15 @@ void RefScanSink::operator () (std::string_view data)
     tail.append(data.data() + data.size() - tailLen, tailLen);
 }
 
-
-std::pair<StorePathSet, HashResult> scanForReferences(
-    const std::string & path,
-    const StorePathSet & refs)
+std::pair<StorePathSet, HashResult> scanForReferences(const std::string & path, const StorePathSet & refs)
 {
-    HashSink hashSink { htSHA256 };
+    HashSink hashSink{htSHA256};
     auto found = scanForReferences(hashSink, path, refs);
     auto hash = hashSink.finish();
     return std::pair<StorePathSet, HashResult>(found, hash);
 }
 
-StorePathSet scanForReferences(
-    Sink & toTee,
-    const Path & path,
-    const StorePathSet & refs)
+StorePathSet scanForReferences(Sink & toTee, const Path & path, const StorePathSet & refs)
 {
     StringSet hashes;
     std::map<std::string, StorePath> backMap;
@@ -94,7 +82,7 @@ StorePathSet scanForReferences(
 
     /* Look for the hashes in the NAR dump of the path. */
     RefScanSink refsSink(std::move(hashes));
-    TeeSink sink { refsSink, toTee };
+    TeeSink sink{refsSink, toTee};
     dumpPath(path, sink);
 
     /* Map the hashes found back to their store paths. */
@@ -108,14 +96,15 @@ StorePathSet scanForReferences(
     return found;
 }
 
-
 RewritingSink::RewritingSink(const std::string & from, const std::string & to, Sink & nextSink)
-    : from(from), to(to), nextSink(nextSink)
+    : from(from)
+    , to(to)
+    , nextSink(nextSink)
 {
     assert(from.size() == to.size());
 }
 
-void RewritingSink::operator () (std::string_view data)
+void RewritingSink::operator()(std::string_view data)
 {
     std::string s(prev);
     s.append(data);
@@ -132,12 +121,14 @@ void RewritingSink::operator () (std::string_view data)
 
     pos += consumed;
 
-    if (consumed) nextSink(s.substr(0, consumed));
+    if (consumed)
+        nextSink(s.substr(0, consumed));
 }
 
 void RewritingSink::flush()
 {
-    if (prev.empty()) return;
+    if (prev.empty())
+        return;
     pos += prev.size();
     nextSink(prev);
     prev.clear();
@@ -146,10 +137,9 @@ void RewritingSink::flush()
 HashModuloSink::HashModuloSink(HashType ht, const std::string & modulus)
     : hashSink(ht)
     , rewritingSink(modulus, std::string(modulus.size(), 0), hashSink)
-{
-}
+{}
 
-void HashModuloSink::operator () (std::string_view data)
+void HashModuloSink::operator()(std::string_view data)
 {
     rewritingSink(data);
 }

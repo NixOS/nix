@@ -8,13 +8,14 @@
 
 namespace nix {
 
-SQLiteError::SQLiteError(const char *path, int errNo, int extendedErrNo, hintformat && hf)
-  : Error(""), path(path), errNo(errNo), extendedErrNo(extendedErrNo)
+SQLiteError::SQLiteError(const char * path, int errNo, int extendedErrNo, hintformat && hf)
+    : Error("")
+    , path(path)
+    , errNo(errNo)
+    , extendedErrNo(extendedErrNo)
 {
-    err.msg = hintfmt("%s: %s (in '%s')",
-        normaltxt(hf.str()),
-        sqlite3_errstr(extendedErrNo),
-        path ? path : "(in-memory)");
+    err.msg =
+        hintfmt("%s: %s (in '%s')", normaltxt(hf.str()), sqlite3_errstr(extendedErrNo), path ? path : "(in-memory)");
 }
 
 [[noreturn]] void SQLiteError::throw_(sqlite3 * db, hintformat && hf)
@@ -27,9 +28,7 @@ SQLiteError::SQLiteError(const char *path, int errNo, int extendedErrNo, hintfor
     if (err == SQLITE_BUSY || err == SQLITE_PROTOCOL) {
         auto exp = SQLiteBusy(path, err, exterr, std::move(hf));
         exp.err.msg = hintfmt(
-            err == SQLITE_PROTOCOL
-                ? "SQLite database '%s' is busy (SQLITE_PROTOCOL)"
-                : "SQLite database '%s' is busy",
+            err == SQLITE_PROTOCOL ? "SQLite database '%s' is busy (SQLITE_PROTOCOL)" : "SQLite database '%s' is busy",
             path ? path : "(in-memory)");
         throw exp;
     } else
@@ -41,9 +40,8 @@ SQLite::SQLite(const Path & path, bool create)
     // useSQLiteWAL also indicates what virtual file system we need.  Using
     // `unix-dotfile` is needed on NFS file systems and on Windows' Subsystem
     // for Linux (WSL) where useSQLiteWAL should be false by default.
-    const char *vfs = settings.useSQLiteWAL ? 0 : "unix-dotfile";
-    if (sqlite3_open_v2(path.c_str(), &db,
-            SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0), vfs) != SQLITE_OK)
+    const char * vfs = settings.useSQLiteWAL ? 0 : "unix-dotfile";
+    if (sqlite3_open_v2(path.c_str(), &db, SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0), vfs) != SQLITE_OK)
         throw Error("cannot open SQLite database '%s'", path);
 
     if (sqlite3_busy_timeout(db, 60 * 60 * 1000) != SQLITE_OK)
@@ -115,7 +113,7 @@ SQLiteStmt::Use::~Use()
     sqlite3_reset(stmt);
 }
 
-SQLiteStmt::Use & SQLiteStmt::Use::operator () (std::string_view value, bool notNull)
+SQLiteStmt::Use & SQLiteStmt::Use::operator()(std::string_view value, bool notNull)
 {
     if (notNull) {
         if (sqlite3_bind_text(stmt, curArg++, value.data(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
@@ -125,7 +123,7 @@ SQLiteStmt::Use & SQLiteStmt::Use::operator () (std::string_view value, bool not
     return *this;
 }
 
-SQLiteStmt::Use & SQLiteStmt::Use::operator () (const unsigned char * data, size_t len, bool notNull)
+SQLiteStmt::Use & SQLiteStmt::Use::operator()(const unsigned char * data, size_t len, bool notNull)
 {
     if (notNull) {
         if (sqlite3_bind_blob(stmt, curArg++, data, len, SQLITE_TRANSIENT) != SQLITE_OK)
@@ -135,7 +133,7 @@ SQLiteStmt::Use & SQLiteStmt::Use::operator () (const unsigned char * data, size
     return *this;
 }
 
-SQLiteStmt::Use & SQLiteStmt::Use::operator () (int64_t value, bool notNull)
+SQLiteStmt::Use & SQLiteStmt::Use::operator()(int64_t value, bool notNull)
 {
     if (notNull) {
         if (sqlite3_bind_int64(stmt, curArg++, value) != SQLITE_OK)
@@ -224,9 +222,7 @@ void handleSQLiteBusy(const SQLiteBusy & e)
 
     if (now > lastWarned + 10) {
         lastWarned = now;
-        logWarning({
-            .msg = hintfmt(e.what())
-        });
+        logWarning({.msg = hintfmt(e.what())});
     }
 
     /* Sleep for a while since retrying the transaction right away

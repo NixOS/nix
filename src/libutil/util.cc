@@ -37,19 +37,17 @@
 #include <sys/resource.h>
 #endif
 
-
-extern char * * environ __attribute__((weak));
-
+extern char ** environ __attribute__((weak));
 
 namespace nix {
 
 std::optional<std::string> getEnv(const std::string & key)
 {
     char * value = getenv(key.c_str());
-    if (!value) return {};
+    if (!value)
+        return {};
     return std::string(value);
 }
-
 
 std::map<std::string, std::string> getEnv()
 {
@@ -65,7 +63,6 @@ std::map<std::string, std::string> getEnv()
     return env;
 }
 
-
 void clearEnv()
 {
     for (auto & name : getEnv())
@@ -79,7 +76,6 @@ void replaceEnv(const std::map<std::string, std::string> & newEnv)
         setenv(newEnvVar.first.c_str(), newEnvVar.second.c_str(), 1);
 }
 
-
 Path absPath(Path path, std::optional<PathView> dir, bool resolveSymlinks)
 {
     if (path[0] != '/') {
@@ -87,7 +83,7 @@ Path absPath(Path path, std::optional<PathView> dir, bool resolveSymlinks)
 #ifdef __GNU__
             /* GNU (aka. GNU/Hurd) doesn't have any limitation on path
                lengths and doesn't define `PATH_MAX'.  */
-            char *buf = getcwd(NULL, 0);
+            char * buf = getcwd(NULL, 0);
             if (buf == NULL)
 #else
             char buf[PATH_MAX];
@@ -103,7 +99,6 @@ Path absPath(Path path, std::optional<PathView> dir, bool resolveSymlinks)
     }
     return canonPath(path, resolveSymlinks);
 }
-
 
 Path canonPath(PathView path, bool resolveSymlinks)
 {
@@ -124,17 +119,19 @@ Path canonPath(PathView path, bool resolveSymlinks)
     while (1) {
 
         /* Skip slashes. */
-        while (!path.empty() && path[0] == '/') path.remove_prefix(1);
-        if (path.empty()) break;
+        while (!path.empty() && path[0] == '/')
+            path.remove_prefix(1);
+        if (path.empty())
+            break;
 
         /* Ignore `.'. */
         if (path == "." || path.substr(0, 2) == "./")
             path.remove_prefix(1);
 
         /* If `..', delete the last component. */
-        else if (path == ".." || path.substr(0, 3) == "../")
-        {
-            if (!s.empty()) s.erase(s.rfind('/'));
+        else if (path == ".." || path.substr(0, 3) == "../") {
+            if (!s.empty())
+                s.erase(s.rfind('/'));
             path.remove_prefix(2);
         }
 
@@ -156,10 +153,10 @@ Path canonPath(PathView path, bool resolveSymlinks)
                 temp = concatStrings(readLink(s), path);
                 path = temp;
                 if (!temp.empty() && temp[0] == '/') {
-                    s.clear();  /* restart for symlinks pointing to absolute path */
+                    s.clear(); /* restart for symlinks pointing to absolute path */
                 } else {
                     s = dirOf(s);
-                    if (s == "/") {  // we don’t want trailing slashes here, which dirOf only produces if s = /
+                    if (s == "/") { // we don’t want trailing slashes here, which dirOf only produces if s = /
                         s.clear();
                     }
                 }
@@ -170,7 +167,6 @@ Path canonPath(PathView path, bool resolveSymlinks)
     return s.empty() ? "/" : std::move(s);
 }
 
-
 Path dirOf(const PathView path)
 {
     Path::size_type pos = path.rfind('/');
@@ -178,7 +174,6 @@ Path dirOf(const PathView path)
         return ".";
     return pos == 0 ? "/" : Path(path, 0, pos);
 }
-
 
 std::string_view baseNameOf(std::string_view path)
 {
@@ -198,7 +193,6 @@ std::string_view baseNameOf(std::string_view path)
     return path.substr(pos, last - pos + 1);
 }
 
-
 std::string expandTilde(std::string_view path)
 {
     // TODO: expand ~user ?
@@ -209,21 +203,16 @@ std::string expandTilde(std::string_view path)
         return std::string(path);
 }
 
-
 bool isInDir(std::string_view path, std::string_view dir)
 {
-    return path.substr(0, 1) == "/"
-        && path.substr(0, dir.size()) == dir
-        && path.size() >= dir.size() + 2
-        && path[dir.size()] == '/';
+    return path.substr(0, 1) == "/" && path.substr(0, dir.size()) == dir && path.size() >= dir.size() + 2
+           && path[dir.size()] == '/';
 }
-
 
 bool isDirOrInDir(std::string_view path, std::string_view dir)
 {
     return path == dir || isInDir(path, dir);
 }
-
 
 struct stat stat(const Path & path)
 {
@@ -233,7 +222,6 @@ struct stat stat(const Path & path)
     return st;
 }
 
-
 struct stat lstat(const Path & path)
 {
     struct stat st;
@@ -242,24 +230,23 @@ struct stat lstat(const Path & path)
     return st;
 }
 
-
 bool pathExists(const Path & path)
 {
     int res;
     struct stat st;
     res = lstat(path.c_str(), &st);
-    if (!res) return true;
+    if (!res)
+        return true;
     if (errno != ENOENT && errno != ENOTDIR)
         throw SysError("getting status of %1%", path);
     return false;
 }
 
-
 Path readLink(const Path & path)
 {
     checkInterrupt();
     std::vector<char> buf;
-    for (ssize_t bufSize = PATH_MAX/4; true; bufSize += bufSize/2) {
+    for (ssize_t bufSize = PATH_MAX / 4; true; bufSize += bufSize / 2) {
         buf.resize(bufSize);
         ssize_t rlSize = readlink(path.c_str(), buf.data(), bufSize);
         if (rlSize == -1)
@@ -272,15 +259,13 @@ Path readLink(const Path & path)
     }
 }
 
-
 bool isLink(const Path & path)
 {
     struct stat st = lstat(path);
     return S_ISLNK(st.st_mode);
 }
 
-
-DirEntries readDirectory(DIR *dir, const Path & path)
+DirEntries readDirectory(DIR * dir, const Path & path)
 {
     DirEntries entries;
     entries.reserve(64);
@@ -289,8 +274,10 @@ DirEntries readDirectory(DIR *dir, const Path & path)
     while (errno = 0, dirent = readdir(dir)) { /* sic */
         checkInterrupt();
         std::string name = dirent->d_name;
-        if (name == "." || name == "..") continue;
-        entries.emplace_back(name, dirent->d_ino,
+        if (name == "." || name == "..")
+            continue;
+        entries.emplace_back(
+            name, dirent->d_ino,
 #ifdef HAVE_STRUCT_DIRENT_D_TYPE
             dirent->d_type
 #else
@@ -298,7 +285,8 @@ DirEntries readDirectory(DIR *dir, const Path & path)
 #endif
         );
     }
-    if (errno) throw SysError("reading directory '%1%'", path);
+    if (errno)
+        throw SysError("reading directory '%1%'", path);
 
     return entries;
 }
@@ -306,21 +294,23 @@ DirEntries readDirectory(DIR *dir, const Path & path)
 DirEntries readDirectory(const Path & path)
 {
     AutoCloseDir dir(opendir(path.c_str()));
-    if (!dir) throw SysError("opening directory '%1%'", path);
+    if (!dir)
+        throw SysError("opening directory '%1%'", path);
 
     return readDirectory(dir.get(), path);
 }
 
-
 unsigned char getFileType(const Path & path)
 {
     struct stat st = lstat(path);
-    if (S_ISDIR(st.st_mode)) return DT_DIR;
-    if (S_ISLNK(st.st_mode)) return DT_LNK;
-    if (S_ISREG(st.st_mode)) return DT_REG;
+    if (S_ISDIR(st.st_mode))
+        return DT_DIR;
+    if (S_ISLNK(st.st_mode))
+        return DT_LNK;
+    if (S_ISREG(st.st_mode))
+        return DT_REG;
     return DT_UNKNOWN;
 }
-
 
 std::string readFile(int fd)
 {
@@ -331,7 +321,6 @@ std::string readFile(int fd)
     return drainFD(fd, true, st.st_size);
 }
 
-
 std::string readFile(const Path & path)
 {
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
@@ -340,7 +329,6 @@ std::string readFile(const Path & path)
     return readFile(fd.get());
 }
 
-
 void readFile(const Path & path, Sink & sink)
 {
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
@@ -348,7 +336,6 @@ void readFile(const Path & path, Sink & sink)
         throw SysError("opening file '%s'", path);
     drainFD(fd.get(), sink);
 }
-
 
 void writeFile(const Path & path, std::string_view s, mode_t mode)
 {
@@ -363,7 +350,6 @@ void writeFile(const Path & path, std::string_view s, mode_t mode)
     }
 }
 
-
 void writeFile(const Path & path, Source & source, mode_t mode)
 {
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
@@ -377,7 +363,9 @@ void writeFile(const Path & path, Source & source, mode_t mode)
             try {
                 auto n = source.read(buf.data(), buf.size());
                 writeFull(fd.get(), {buf.data(), n});
-            } catch (EndOfFile &) { break; }
+            } catch (EndOfFile &) {
+                break;
+            }
         }
     } catch (Error & e) {
         e.addTrace({}, "writing file '%1%'", path);
@@ -399,19 +387,18 @@ std::string readLine(int fd)
         } else if (rd == 0)
             throw EndOfFile("unexpected EOF reading a line");
         else {
-            if (ch == '\n') return s;
+            if (ch == '\n')
+                return s;
             s += ch;
         }
     }
 }
-
 
 void writeLine(int fd, std::string s)
 {
     s += '\n';
     writeFull(fd, s);
 }
-
 
 static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
 {
@@ -421,7 +408,8 @@ static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
 
     struct stat st;
     if (fstatat(parentfd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) == -1) {
-        if (errno == ENOENT) return;
+        if (errno == ENOENT)
+            return;
         throw SysError("getting status of '%1%'", path);
     }
 
@@ -429,23 +417,23 @@ static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
         /* We are about to delete a file. Will it likely free space? */
 
         switch (st.st_nlink) {
-            /* Yes: last link. */
-            case 1:
-                bytesFreed += st.st_size;
-                break;
-            /* Maybe: yes, if 'auto-optimise-store' or manual optimisation
-               was performed. Instead of checking for real let's assume
-               it's an optimised file and space will be freed.
+        /* Yes: last link. */
+        case 1:
+            bytesFreed += st.st_size;
+            break;
+        /* Maybe: yes, if 'auto-optimise-store' or manual optimisation
+           was performed. Instead of checking for real let's assume
+           it's an optimised file and space will be freed.
 
-               In worst case we will double count on freed space for files
-               with exactly two hardlinks for unoptimised packages.
-             */
-            case 2:
-                bytesFreed += st.st_size;
-                break;
-            /* No: 3+ links. */
-            default:
-                break;
+           In worst case we will double count on freed space for files
+           with exactly two hardlinks for unoptimised packages.
+         */
+        case 2:
+            bytesFreed += st.st_size;
+            break;
+        /* No: 3+ links. */
+        default:
+            break;
         }
     }
 
@@ -469,7 +457,8 @@ static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
 
     int flags = S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0;
     if (unlinkat(parentfd, name.c_str(), flags) == -1) {
-        if (errno == ENOENT) return;
+        if (errno == ENOENT)
+            return;
         throw SysError("cannot unlink '%1%'", path);
     }
 }
@@ -482,13 +471,13 @@ static void _deletePath(const Path & path, uint64_t & bytesFreed)
 
     AutoCloseFD dirfd{open(dir.c_str(), O_RDONLY)};
     if (!dirfd) {
-        if (errno == ENOENT) return;
+        if (errno == ENOENT)
+            return;
         throw SysError("opening directory '%1%'", path);
     }
 
     _deletePath(dirfd.get(), path, bytesFreed);
 }
-
 
 void deletePath(const Path & path)
 {
@@ -496,17 +485,14 @@ void deletePath(const Path & path)
     deletePath(path, dummy);
 }
 
-
 void deletePath(const Path & path, uint64_t & bytesFreed)
 {
-    //Activity act(*logger, lvlDebug, format("recursively deleting path '%1%'") % path);
+    // Activity act(*logger, lvlDebug, format("recursively deleting path '%1%'") % path);
     bytesFreed = 0;
     _deletePath(path, bytesFreed);
 }
 
-
-static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
-    int & counter)
+static Path tempName(Path tmpRoot, const Path & prefix, bool includePid, int & counter)
 {
     tmpRoot = canonPath(tmpRoot.empty() ? getEnv("TMPDIR").value_or("/tmp") : tmpRoot, true);
     if (includePid)
@@ -515,9 +501,7 @@ static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
         return (format("%1%/%2%-%3%") % tmpRoot % prefix % counter++).str();
 }
 
-
-Path createTempDir(const Path & tmpRoot, const Path & prefix,
-    bool includePid, bool useGlobalCounter, mode_t mode)
+Path createTempDir(const Path & tmpRoot, const Path & prefix, bool includePid, bool useGlobalCounter, mode_t mode)
 {
     static int globalCounter = 0;
     int localCounter = 0;
@@ -546,7 +530,6 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
     }
 }
 
-
 std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
 {
     Path tmpl(getEnv("TMPDIR").value_or("/tmp") + "/" + prefix + ".XXXXXX");
@@ -559,7 +542,6 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
     return {std::move(fd), tmpl};
 }
 
-
 std::string getUserName()
 {
     auto pw = getpwuid(geteuid());
@@ -569,11 +551,9 @@ std::string getUserName()
     return name;
 }
 
-
 Path getHome()
 {
-    static Path homeDir = []()
-    {
+    static Path homeDir = []() {
         auto homeDir = getEnv("HOME");
         if (homeDir) {
             // Only use $HOME if doesn't exist or is owned by the current user.
@@ -581,11 +561,14 @@ Path getHome()
             int result = stat(homeDir->c_str(), &st);
             if (result != 0) {
                 if (errno != ENOENT) {
-                    warn("couldn't stat $HOME ('%s') for reason other than not existing ('%d'), falling back to the one defined in the 'passwd' file", *homeDir, errno);
+                    warn(
+                        "couldn't stat $HOME ('%s') for reason other than not existing ('%d'), falling back to the one defined in the 'passwd' file",
+                        *homeDir, errno);
                     homeDir.reset();
                 }
             } else if (st.st_uid != geteuid()) {
-                warn("$HOME ('%s') is not owned by you, falling back to the one defined in the 'passwd' file", *homeDir);
+                warn(
+                    "$HOME ('%s') is not owned by you, falling back to the one defined in the 'passwd' file", *homeDir);
                 homeDir.reset();
             }
         }
@@ -593,8 +576,7 @@ Path getHome()
             std::vector<char> buf(16384);
             struct passwd pwbuf;
             struct passwd * pw;
-            if (getpwuid_r(geteuid(), &pwbuf, buf.data(), buf.size(), &pw) != 0
-                || !pw || !pw->pw_dir || !pw->pw_dir[0])
+            if (getpwuid_r(geteuid(), &pwbuf, buf.data(), buf.size(), &pw) != 0 || !pw || !pw->pw_dir || !pw->pw_dir[0])
                 throw Error("cannot determine user's home directory");
             homeDir = pw->pw_dir;
         }
@@ -603,13 +585,11 @@ Path getHome()
     return homeDir;
 }
 
-
 Path getCacheDir()
 {
     auto cacheDir = getEnv("XDG_CACHE_HOME");
     return cacheDir ? *cacheDir : getHome() + "/.cache";
 }
-
 
 Path getConfigDir()
 {
@@ -626,39 +606,36 @@ std::vector<Path> getConfigDirs()
     return result;
 }
 
-
 Path getDataDir()
 {
     auto dataDir = getEnv("XDG_DATA_HOME");
     return dataDir ? *dataDir : getHome() + "/.local/share";
 }
 
-
 std::optional<Path> getSelfExe()
 {
-    static auto cached = []() -> std::optional<Path>
-    {
-        #if __linux__
+    static auto cached = []() -> std::optional<Path> {
+#if __linux__
         return readLink("/proc/self/exe");
-        #elif __APPLE__
+#elif __APPLE__
         char buf[1024];
         uint32_t size = sizeof(buf);
         if (_NSGetExecutablePath(buf, &size) == 0)
             return buf;
         else
             return std::nullopt;
-        #else
+#else
         return std::nullopt;
-        #endif
+#endif
     }();
     return cached;
 }
 
-
 Paths createDirs(const Path & path)
 {
     Paths created;
-    if (path == "/") return created;
+    if (path == "/")
+        return created;
 
     struct stat st;
     if (lstat(path.c_str(), &st) == -1) {
@@ -672,14 +649,13 @@ Paths createDirs(const Path & path)
     if (S_ISLNK(st.st_mode) && stat(path.c_str(), &st) == -1)
         throw SysError("statting symlink '%1%'", path);
 
-    if (!S_ISDIR(st.st_mode)) throw Error("'%1%' is not a directory", path);
+    if (!S_ISDIR(st.st_mode))
+        throw Error("'%1%' is not a directory", path);
 
     return created;
 }
 
-
-void createSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime)
+void createSymlink(const Path & target, const Path & link, std::optional<time_t> mtime)
 {
     if (symlink(target.c_str(), link.c_str()))
         throw SysError("creating symlink from '%1%' to '%2%'", link, target);
@@ -694,9 +670,7 @@ void createSymlink(const Path & target, const Path & link,
     }
 }
 
-
-void replaceSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime)
+void replaceSymlink(const Path & target, const Path & link, std::optional<time_t> mtime)
 {
     for (unsigned int n = 0; true; n++) {
         Path tmp = canonPath(fmt("%s/.%d_%s", dirOf(link), n, baseNameOf(link)));
@@ -704,7 +678,8 @@ void replaceSymlink(const Path & target, const Path & link,
         try {
             createSymlink(target, tmp, mtime);
         } catch (SysError & e) {
-            if (e.errNo == EEXIST) continue;
+            if (e.errNo == EEXIST)
+                continue;
             throw;
         }
 
@@ -715,27 +690,28 @@ void replaceSymlink(const Path & target, const Path & link,
     }
 }
 
-
 void readFull(int fd, char * buf, size_t count)
 {
     while (count) {
         checkInterrupt();
         ssize_t res = read(fd, buf, count);
         if (res == -1) {
-            if (errno == EINTR) continue;
+            if (errno == EINTR)
+                continue;
             throw SysError("reading from file");
         }
-        if (res == 0) throw EndOfFile("unexpected end-of-file");
+        if (res == 0)
+            throw EndOfFile("unexpected end-of-file");
         count -= res;
         buf += res;
     }
 }
 
-
 void writeFull(int fd, std::string_view s, bool allowInterrupts)
 {
     while (!s.empty()) {
-        if (allowInterrupts) checkInterrupt();
+        if (allowInterrupts)
+            checkInterrupt();
         ssize_t res = write(fd, s.data(), s.size());
         if (res == -1 && errno != EINTR)
             throw SysError("writing to file");
@@ -743,7 +719,6 @@ void writeFull(int fd, std::string_view s, bool allowInterrupts)
             s.remove_prefix(res);
     }
 }
-
 
 std::string drainFD(int fd, bool block, const size_t reserveSize)
 {
@@ -753,7 +728,6 @@ std::string drainFD(int fd, bool block, const size_t reserveSize)
     drainFD(fd, sink, block);
     return std::move(sink.s);
 }
-
 
 void drainFD(int fd, Sink & sink, bool block)
 {
@@ -782,20 +756,21 @@ void drainFD(int fd, Sink & sink, bool block)
                 break;
             if (errno != EINTR)
                 throw SysError("reading from file");
-        }
-        else if (rd == 0) break;
-        else sink({(char *) buf.data(), (size_t) rd});
+        } else if (rd == 0)
+            break;
+        else
+            sink({(char *) buf.data(), (size_t) rd});
     }
 }
 
-
-
 //////////////////////////////////////////////////////////////////////
 
+AutoDelete::AutoDelete()
+    : del{false}
+{}
 
-AutoDelete::AutoDelete() : del{false} {}
-
-AutoDelete::AutoDelete(const std::string & p, bool recursive) : path(p)
+AutoDelete::AutoDelete(const std::string & p, bool recursive)
+    : path(p)
 {
     del = true;
     this->recursive = recursive;
@@ -822,37 +797,36 @@ void AutoDelete::cancel()
     del = false;
 }
 
-void AutoDelete::reset(const Path & p, bool recursive) {
+void AutoDelete::reset(const Path & p, bool recursive)
+{
     path = p;
     this->recursive = recursive;
     del = true;
 }
 
-
-
 //////////////////////////////////////////////////////////////////////
 
+AutoCloseFD::AutoCloseFD()
+    : fd{-1}
+{}
 
-AutoCloseFD::AutoCloseFD() : fd{-1} {}
+AutoCloseFD::AutoCloseFD(int fd)
+    : fd{fd}
+{}
 
-
-AutoCloseFD::AutoCloseFD(int fd) : fd{fd} {}
-
-
-AutoCloseFD::AutoCloseFD(AutoCloseFD && that) : fd{that.fd}
+AutoCloseFD::AutoCloseFD(AutoCloseFD && that)
+    : fd{that.fd}
 {
     that.fd = -1;
 }
 
-
-AutoCloseFD & AutoCloseFD::operator =(AutoCloseFD && that)
+AutoCloseFD & AutoCloseFD::operator=(AutoCloseFD && that)
 {
     close();
     fd = that.fd;
     that.fd = -1;
     return *this;
 }
-
 
 AutoCloseFD::~AutoCloseFD()
 {
@@ -863,12 +837,10 @@ AutoCloseFD::~AutoCloseFD()
     }
 }
 
-
 int AutoCloseFD::get() const
 {
     return fd;
 }
-
 
 void AutoCloseFD::close()
 {
@@ -880,12 +852,10 @@ void AutoCloseFD::close()
     }
 }
 
-
 AutoCloseFD::operator bool() const
 {
     return fd != -1;
 }
-
 
 int AutoCloseFD::release()
 {
@@ -894,14 +864,15 @@ int AutoCloseFD::release()
     return oldFD;
 }
 
-
 void Pipe::create()
 {
     int fds[2];
 #if HAVE_PIPE2
-    if (pipe2(fds, O_CLOEXEC) != 0) throw SysError("creating pipe");
+    if (pipe2(fds, O_CLOEXEC) != 0)
+        throw SysError("creating pipe");
 #else
-    if (pipe(fds) != 0) throw SysError("creating pipe");
+    if (pipe(fds) != 0)
+        throw SysError("creating pipe");
     closeOnExec(fds[0]);
     closeOnExec(fds[1]);
 #endif
@@ -909,47 +880,38 @@ void Pipe::create()
     writeSide = fds[1];
 }
 
-
 void Pipe::close()
 {
     readSide.close();
     writeSide.close();
 }
 
-
 //////////////////////////////////////////////////////////////////////
 
-
-Pid::Pid()
-{
-}
-
+Pid::Pid() {}
 
 Pid::Pid(pid_t pid)
     : pid(pid)
-{
-}
-
+{}
 
 Pid::~Pid()
 {
-    if (pid != -1) kill();
+    if (pid != -1)
+        kill();
 }
 
-
-void Pid::operator =(pid_t pid)
+void Pid::operator=(pid_t pid)
 {
-    if (this->pid != -1 && this->pid != pid) kill();
+    if (this->pid != -1 && this->pid != pid)
+        kill();
     this->pid = pid;
     killSignal = SIGKILL; // reset signal to default
 }
-
 
 Pid::operator pid_t()
 {
     return pid;
 }
-
 
 int Pid::kill()
 {
@@ -973,7 +935,6 @@ int Pid::kill()
     return wait();
 }
 
-
 int Pid::wait()
 {
     assert(pid != -1);
@@ -990,18 +951,15 @@ int Pid::wait()
     }
 }
 
-
 void Pid::setSeparatePG(bool separatePG)
 {
     this->separatePG = separatePG;
 }
 
-
 void Pid::setKillSignal(int signal)
 {
     this->killSignal = signal;
 }
-
 
 pid_t Pid::release()
 {
@@ -1009,7 +967,6 @@ pid_t Pid::release()
     pid = -1;
     return p;
 }
-
 
 void killUser(uid_t uid)
 {
@@ -1022,7 +979,6 @@ void killUser(uid_t uid)
        fork a process, switch to uid, and send a mass kill. */
 
     Pid pid = startProcess([&]() {
-
         if (setuid(uid) == -1)
             throw SysError("setting uid");
 
@@ -1033,11 +989,14 @@ void killUser(uid_t uid)
                calling process. In the OSX libc, it's set to true,
                which means "follow POSIX", which we don't want here
                  */
-            if (syscall(SYS_kill, -1, SIGKILL, false) == 0) break;
+            if (syscall(SYS_kill, -1, SIGKILL, false) == 0)
+                break;
 #else
-            if (kill(-1, SIGKILL) == 0) break;
+            if (kill(-1, SIGKILL) == 0)
+                break;
 #endif
-            if (errno == ESRCH || errno == EPERM) break; /* no more processes */
+            if (errno == ESRCH || errno == EPERM)
+                break; /* no more processes */
             if (errno != EINTR)
                 throw SysError("cannot kill processes for uid '%1%'", uid);
         }
@@ -1055,9 +1014,7 @@ void killUser(uid_t uid)
        uid | grep -q $uid'. */
 }
 
-
 //////////////////////////////////////////////////////////////////////
-
 
 /* Wrapper around vfork to prevent the child process from clobbering
    the caller's stack frame in the parent. */
@@ -1069,11 +1026,11 @@ static pid_t doFork(bool allowVfork, std::function<void()> fun)
 #else
     pid_t pid = fork();
 #endif
-    if (pid != 0) return pid;
+    if (pid != 0)
+        return pid;
     fun();
     abort();
 }
-
 
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 {
@@ -1089,8 +1046,10 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
         } catch (std::exception & e) {
             try {
                 std::cerr << options.errorPrefix << e.what() << "\n";
-            } catch (...) { }
-        } catch (...) { }
+            } catch (...) {
+            }
+        } catch (...) {
+        }
         if (options.runExitHandlers)
             exit(1);
         else
@@ -1098,24 +1057,24 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
     };
 
     pid_t pid = doFork(options.allowVfork, wrapper);
-    if (pid == -1) throw SysError("unable to fork");
+    if (pid == -1)
+        throw SysError("unable to fork");
 
     return pid;
 }
 
-
 std::vector<char *> stringsToCharPtrs(const Strings & ss)
 {
     std::vector<char *> res;
-    for (auto & s : ss) res.push_back((char *) s.c_str());
+    for (auto & s : ss)
+        res.push_back((char *) s.c_str());
     res.push_back(0);
     return res;
 }
 
-std::string runProgram(Path program, bool searchPath, const Strings & args,
-    const std::optional<std::string> & input)
+std::string runProgram(Path program, bool searchPath, const Strings & args, const std::optional<std::string> & input)
 {
-    auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input});
+    auto res = runProgram(RunOptions{.program = program, .searchPath = searchPath, .args = args, .input = input});
 
     if (!statusOk(res.first))
         throw ExecError(res.first, "program '%1%' %2%", program, statusToString(res.first));
@@ -1156,8 +1115,10 @@ void runProgram2(const RunOptions & options)
 
     /* Create a pipe. */
     Pipe out, in;
-    if (options.standardOut) out.create();
-    if (source) in.create();
+    if (options.standardOut)
+        out.create();
+    if (source)
+        in.create();
 
     ProcessOptions processOptions;
     // vfork implies that the environment of the main process and the fork will
@@ -1166,41 +1127,43 @@ void runProgram2(const RunOptions & options)
     processOptions.allowVfork = !options.environment;
 
     /* Fork. */
-    Pid pid = startProcess([&]() {
-        if (options.environment)
-            replaceEnv(*options.environment);
-        if (options.standardOut && dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
-            throw SysError("dupping stdout");
-        if (options.mergeStderrToStdout)
-            if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
-                throw SysError("cannot dup stdout into stderr");
-        if (source && dup2(in.readSide.get(), STDIN_FILENO) == -1)
-            throw SysError("dupping stdin");
+    Pid pid = startProcess(
+        [&]() {
+            if (options.environment)
+                replaceEnv(*options.environment);
+            if (options.standardOut && dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
+                throw SysError("dupping stdout");
+            if (options.mergeStderrToStdout)
+                if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
+                    throw SysError("cannot dup stdout into stderr");
+            if (source && dup2(in.readSide.get(), STDIN_FILENO) == -1)
+                throw SysError("dupping stdin");
 
-        if (options.chdir && chdir((*options.chdir).c_str()) == -1)
-            throw SysError("chdir failed");
-        if (options.gid && setgid(*options.gid) == -1)
-            throw SysError("setgid failed");
-        /* Drop all other groups if we're setgid. */
-        if (options.gid && setgroups(0, 0) == -1)
-            throw SysError("setgroups failed");
-        if (options.uid && setuid(*options.uid) == -1)
-            throw SysError("setuid failed");
+            if (options.chdir && chdir((*options.chdir).c_str()) == -1)
+                throw SysError("chdir failed");
+            if (options.gid && setgid(*options.gid) == -1)
+                throw SysError("setgid failed");
+            /* Drop all other groups if we're setgid. */
+            if (options.gid && setgroups(0, 0) == -1)
+                throw SysError("setgroups failed");
+            if (options.uid && setuid(*options.uid) == -1)
+                throw SysError("setuid failed");
 
-        Strings args_(options.args);
-        args_.push_front(options.program);
+            Strings args_(options.args);
+            args_.push_front(options.program);
 
-        restoreProcessContext();
+            restoreProcessContext();
 
-        if (options.searchPath)
-            execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
+            if (options.searchPath)
+                execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
             // This allows you to refer to a program with a pathname relative
             // to the PATH variable.
-        else
-            execv(options.program.c_str(), stringsToCharPtrs(args_).data());
+            else
+                execv(options.program.c_str(), stringsToCharPtrs(args_).data());
 
-        throw SysError("executing '%1%'", options.program);
-    }, processOptions);
+            throw SysError("executing '%1%'", options.program);
+        },
+        processOptions);
 
     out.writeSide.close();
 
@@ -1212,7 +1175,6 @@ void runProgram2(const RunOptions & options)
         if (writerThread.joinable())
             writerThread.join();
     });
-
 
     if (source) {
         in.readSide.close();
@@ -1243,12 +1205,12 @@ void runProgram2(const RunOptions & options)
     int status = pid.wait();
 
     /* Wait for the writer thread to finish. */
-    if (source) promise.get_future().get();
+    if (source)
+        promise.get_future().get();
 
     if (status)
         throw ExecError(status, "program '%1%' %2%", options.program, statusToString(status));
 }
-
 
 void closeMostFDs(const std::set<int> & exceptions)
 {
@@ -1273,18 +1235,14 @@ void closeMostFDs(const std::set<int> & exceptions)
             close(fd); /* ignore result */
 }
 
-
 void closeOnExec(int fd)
 {
     int prev;
-    if ((prev = fcntl(fd, F_GETFD, 0)) == -1 ||
-        fcntl(fd, F_SETFD, prev | FD_CLOEXEC) == -1)
+    if ((prev = fcntl(fd, F_GETFD, 0)) == -1 || fcntl(fd, F_SETFD, prev | FD_CLOEXEC) == -1)
         throw SysError("setting close-on-exec flag");
 }
 
-
 //////////////////////////////////////////////////////////////////////
-
 
 std::atomic<bool> _isInterrupted = false;
 
@@ -1307,17 +1265,17 @@ void _interrupted()
     }
 }
 
-
 //////////////////////////////////////////////////////////////////////
 
-
-template<class C> C tokenizeString(std::string_view s, std::string_view separators)
+template<class C>
+C tokenizeString(std::string_view s, std::string_view separators)
 {
     C result;
     auto pos = s.find_first_not_of(separators, 0);
     while (pos != std::string_view::npos) {
         auto end = s.find_first_of(separators, pos + 1);
-        if (end == std::string_view::npos) end = s.size();
+        if (end == std::string_view::npos)
+            end = s.size();
         result.insert(result.end(), std::string(s, pos, end - pos));
         pos = s.find_first_not_of(separators, end);
     }
@@ -1328,29 +1286,25 @@ template Strings tokenizeString(std::string_view s, std::string_view separators)
 template StringSet tokenizeString(std::string_view s, std::string_view separators);
 template std::vector<std::string> tokenizeString(std::string_view s, std::string_view separators);
 
-
 std::string chomp(std::string_view s)
 {
     size_t i = s.find_last_not_of(" \n\r\t");
     return i == std::string_view::npos ? "" : std::string(s, 0, i + 1);
 }
 
-
 std::string trim(std::string_view s, std::string_view whitespace)
 {
     auto i = s.find_first_not_of(whitespace);
-    if (i == s.npos) return "";
+    if (i == s.npos)
+        return "";
     auto j = s.find_last_not_of(whitespace);
     return std::string(s, i, j == s.npos ? j : j - i + 1);
 }
 
-
-std::string replaceStrings(
-    std::string res,
-    std::string_view from,
-    std::string_view to)
+std::string replaceStrings(std::string res, std::string_view from, std::string_view to)
 {
-    if (from.empty()) return res;
+    if (from.empty())
+        return res;
     size_t pos = 0;
     while ((pos = res.find(from, pos)) != std::string::npos) {
         res.replace(pos, from.size(), to);
@@ -1359,18 +1313,17 @@ std::string replaceStrings(
     return res;
 }
 
-
 std::string rewriteStrings(std::string s, const StringMap & rewrites)
 {
     for (auto & i : rewrites) {
-        if (i.first == i.second) continue;
+        if (i.first == i.second)
+            continue;
         size_t j = 0;
         while ((j = s.find(i.first, j)) != std::string::npos)
             s.replace(j, i.first.size(), i.second);
     }
     return s;
 }
-
 
 std::string statusToString(int status)
 {
@@ -1385,31 +1338,26 @@ std::string statusToString(int status)
 #else
             return (format("failed due to signal %1%") % sig).str();
 #endif
-        }
-        else
+        } else
             return "died abnormally";
-    } else return "succeeded";
+    } else
+        return "succeeded";
 }
-
 
 bool statusOk(int status)
 {
     return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
 
-
 bool hasPrefix(std::string_view s, std::string_view prefix)
 {
     return s.compare(0, prefix.size(), prefix) == 0;
 }
 
-
 bool hasSuffix(std::string_view s, std::string_view suffix)
 {
-    return s.size() >= suffix.size()
-        && s.substr(s.size() - suffix.size()) == suffix;
+    return s.size() >= suffix.size() && s.substr(s.size() - suffix.size()) == suffix;
 }
-
 
 std::string toLower(const std::string & s)
 {
@@ -1419,18 +1367,19 @@ std::string toLower(const std::string & s)
     return r;
 }
 
-
 std::string shellEscape(const std::string_view s)
 {
     std::string r;
     r.reserve(s.size() + 2);
     r += "'";
     for (auto & i : s)
-        if (i == '\'') r += "'\\''"; else r += i;
+        if (i == '\'')
+            r += "'\\''";
+        else
+            r += i;
     r += '\'';
     return r;
 }
-
 
 void ignoreException()
 {
@@ -1442,14 +1391,13 @@ void ignoreException()
         } catch (std::exception & e) {
             printError("error (ignored): %1%", e.what());
         }
-    } catch (...) { }
+    } catch (...) {
+    }
 }
 
 bool shouldANSI()
 {
-    return isatty(STDERR_FILENO)
-        && getEnv("TERM").value_or("dumb") != "dumb"
-        && !getEnv("NO_COLOR").has_value();
+    return isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb" && !getEnv("NO_COLOR").has_value();
 }
 
 std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned int width)
@@ -1468,13 +1416,17 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
             if (i != s.end() && *i == '[') {
                 e += *i++;
                 // eat parameter bytes
-                while (i != s.end() && *i >= 0x30 && *i <= 0x3f) e += *i++;
+                while (i != s.end() && *i >= 0x30 && *i <= 0x3f)
+                    e += *i++;
                 // eat intermediate bytes
-                while (i != s.end() && *i >= 0x20 && *i <= 0x2f) e += *i++;
+                while (i != s.end() && *i >= 0x20 && *i <= 0x2f)
+                    e += *i++;
                 // eat final byte
-                if (i != s.end() && *i >= 0x40 && *i <= 0x7e) e += last = *i++;
+                if (i != s.end() && *i >= 0x40 && *i <= 0x7e)
+                    e += last = *i++;
             } else {
-                if (i != s.end() && *i >= 0x40 && *i <= 0x5f) e += *i++;
+                if (i != s.end() && *i >= 0x40 && *i <= 0x5f)
+                    e += *i++;
             }
 
             if (!filterAll && last == 'm')
@@ -1482,9 +1434,12 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
         }
 
         else if (*i == '\t') {
-            i++; t += ' '; w++;
+            i++;
+            t += ' ';
+            w++;
             while (w < (size_t) width && w % 8) {
-                t += ' '; w++;
+                t += ' ';
+                w++;
             }
         }
 
@@ -1497,12 +1452,14 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
             // Copy one UTF-8 character.
             if ((*i & 0xe0) == 0xc0) {
                 t += *i++;
-                if (i != s.end() && ((*i & 0xc0) == 0x80)) t += *i++;
+                if (i != s.end() && ((*i & 0xc0) == 0x80))
+                    t += *i++;
             } else if ((*i & 0xf0) == 0xe0) {
                 t += *i++;
                 if (i != s.end() && ((*i & 0xc0) == 0x80)) {
                     t += *i++;
-                    if (i != s.end() && ((*i & 0xc0) == 0x80)) t += *i++;
+                    if (i != s.end() && ((*i & 0xc0) == 0x80))
+                        t += *i++;
                 }
             } else if ((*i & 0xf8) == 0xf0) {
                 t += *i++;
@@ -1510,7 +1467,8 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
                     t += *i++;
                     if (i != s.end() && ((*i & 0xc0) == 0x80)) {
                         t += *i++;
-                        if (i != s.end() && ((*i & 0xc0) == 0x80)) t += *i++;
+                        if (i != s.end() && ((*i & 0xc0) == 0x80))
+                            t += *i++;
                     }
                 }
             } else
@@ -1520,7 +1478,6 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
 
     return t;
 }
-
 
 constexpr char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -1539,19 +1496,20 @@ std::string base64Encode(std::string_view s)
         }
     }
 
-    if (nbits) res.push_back(base64Chars[data << (6 - nbits) & 0x3f]);
-    while (res.size() % 4) res.push_back('=');
+    if (nbits)
+        res.push_back(base64Chars[data << (6 - nbits) & 0x3f]);
+    while (res.size() % 4)
+        res.push_back('=');
 
     return res;
 }
-
 
 std::string base64Decode(std::string_view s)
 {
     constexpr char npos = -1;
     constexpr std::array<char, 256> base64DecodeChars = [&]() {
-        std::array<char, 256>  result{};
-        for (auto& c : result)
+        std::array<char, 256> result{};
+        for (auto & c : result)
             c = npos;
         for (int i = 0; i < 64; i++)
             result[base64Chars[i]] = i;
@@ -1565,8 +1523,10 @@ std::string base64Decode(std::string_view s)
     unsigned int d = 0, bits = 0;
 
     for (char c : s) {
-        if (c == '=') break;
-        if (c == '\n') continue;
+        if (c == '=')
+            break;
+        if (c == '\n')
+            continue;
 
         char digit = base64DecodeChars[(unsigned char) c];
         if (digit == npos)
@@ -1582,7 +1542,6 @@ std::string base64Decode(std::string_view s)
 
     return res;
 }
-
 
 std::string stripIndentation(std::string_view s)
 {
@@ -1611,7 +1570,8 @@ std::string stripIndentation(std::string_view s)
     size_t pos = 0;
     while (pos < s.size()) {
         auto eol = s.find('\n', pos);
-        if (eol == s.npos) eol = s.size();
+        if (eol == s.npos)
+            eol = s.size();
         if (eol - pos > minIndent)
             res.append(s.substr(pos + minIndent, eol - pos - minIndent));
         res.push_back('\n');
@@ -1621,11 +1581,9 @@ std::string stripIndentation(std::string_view s)
     return res;
 }
 
-
 //////////////////////////////////////////////////////////////////////
 
 static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
-
 
 static void updateWindowSize()
 {
@@ -1637,18 +1595,17 @@ static void updateWindowSize()
     }
 }
 
-
 std::pair<unsigned short, unsigned short> getWindowSize()
 {
     return *windowSize.lock();
 }
 
-
 /* We keep track of interrupt callbacks using integer tokens, so we can iterate
    safely without having to lock the data structure while executing arbitrary
    functions.
  */
-struct InterruptCallbacks {
+struct InterruptCallbacks
+{
     typedef int64_t Token;
 
     /* We use unique tokens so that we can't accidentally delete the wrong
@@ -1737,14 +1694,14 @@ rlim_t savedStackSize = 0;
 
 void setStackSize(size_t stackSize)
 {
-    #if __linux__
+#if __linux__
     struct rlimit limit;
     if (getrlimit(RLIMIT_STACK, &limit) == 0 && limit.rlim_cur < stackSize) {
         savedStackSize = limit.rlim_cur;
         limit.rlim_cur = stackSize;
         setrlimit(RLIMIT_STACK, &limit);
     }
-    #endif
+#endif
 }
 
 #if __linux__
@@ -1796,7 +1753,7 @@ void restoreProcessContext(bool restoreMounts)
         restoreMountNamespace();
     }
 
-    #if __linux__
+#if __linux__
     if (savedStackSize) {
         struct rlimit limit;
         if (getrlimit(RLIMIT_STACK, &limit) == 0) {
@@ -1804,7 +1761,7 @@ void restoreProcessContext(bool restoreMounts)
             setrlimit(RLIMIT_STACK, &limit);
         }
     }
-    #endif
+#endif
 }
 
 /* RAII helper to automatically deregister a callback. */
@@ -1830,20 +1787,21 @@ std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()>
     return std::unique_ptr<InterruptCallback>(res.release());
 }
 
-
 AutoCloseFD createUnixDomainSocket()
 {
-    AutoCloseFD fdSocket = socket(PF_UNIX, SOCK_STREAM
-        #ifdef SOCK_CLOEXEC
-        | SOCK_CLOEXEC
-        #endif
-        , 0);
+    AutoCloseFD fdSocket = socket(
+        PF_UNIX,
+        SOCK_STREAM
+#ifdef SOCK_CLOEXEC
+            | SOCK_CLOEXEC
+#endif
+        ,
+        0);
     if (!fdSocket)
         throw SysError("cannot create Unix domain socket");
     closeOnExec(fdSocket.get());
     return fdSocket;
 }
-
 
 AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
 {
@@ -1859,7 +1817,6 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
 
     return fdSocket;
 }
-
 
 void bind(int fd, const std::string & path)
 {
@@ -1891,7 +1848,6 @@ void bind(int fd, const std::string & path)
     }
 }
 
-
 void connect(int fd, const std::string & path)
 {
     struct sockaddr_un addr;
@@ -1920,12 +1876,10 @@ void connect(int fd, const std::string & path)
     }
 }
 
-
 std::string showBytes(uint64_t bytes)
 {
     return fmt("%.2f MiB", bytes / (1024.0 * 1024.0));
 }
-
 
 // FIXME: move to libstore/build
 void commonChildInit(Pipe & logPipe)

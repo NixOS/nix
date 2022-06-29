@@ -54,11 +54,14 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
     std::string doc() override
     {
         return
-          #include "path-info.md"
-          ;
+#include "path-info.md"
+            ;
     }
 
-    Category category() override { return catSecondary; }
+    Category category() override
+    {
+        return catSecondary;
+    }
 
     void printSize(uint64_t value)
     {
@@ -67,9 +70,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             return;
         }
 
-        static const std::array<char, 9> idents{{
-            ' ', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'
-        }};
+        static const std::array<char, 9> idents{{' ', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'}};
         size_t power = 0;
         double res = value;
         while (res > 1024 && power < idents.size()) {
@@ -87,10 +88,10 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
 
         if (json) {
             JSONPlaceholder jsonRoot(std::cout);
-            store->pathInfoToJSON(jsonRoot,
+            store->pathInfoToJSON(
+                jsonRoot,
                 // FIXME: preserve order?
-                StorePathSet(storePaths.begin(), storePaths.end()),
-                true, showClosureSize, SRI, AllowInvalid);
+                StorePathSet(storePaths.begin(), storePaths.end()), true, showClosureSize, SRI, AllowInvalid);
         }
 
         else {
@@ -113,15 +114,17 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
                 if (showSigs) {
                     std::cout << '\t';
                     Strings ss;
-                    if (info->ultimate) ss.push_back("ultimate");
-                    if (info->ca) ss.push_back("ca:" + renderContentAddress(*info->ca));
-                    for (auto & sig : info->sigs) ss.push_back(sig);
+                    if (info->ultimate)
+                        ss.push_back("ultimate");
+                    if (info->ca)
+                        ss.push_back("ca:" + renderContentAddress(*info->ca));
+                    for (auto & sig : info->sigs)
+                        ss.push_back(sig);
                     std::cout << concatStringsSep(" ", ss);
                 }
 
                 std::cout << std::endl;
             }
-
         }
     }
 };

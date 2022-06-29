@@ -15,14 +15,21 @@ namespace nix {
 struct LegacySSHStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
-    const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections", "maximum number of concurrent SSH connections"};
-    const Setting<Path> sshKey{(StoreConfig*) this, "", "ssh-key", "path to an SSH private key"};
-    const Setting<std::string> sshPublicHostKey{(StoreConfig*) this, "", "base64-ssh-public-host-key", "The public half of the host's SSH key"};
-    const Setting<bool> compress{(StoreConfig*) this, false, "compress", "whether to compress the connection"};
-    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-store", "remote-program", "path to the nix-store executable on the remote system"};
-    const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
+    const Setting<int> maxConnections{
+        (StoreConfig *) this, 1, "max-connections", "maximum number of concurrent SSH connections"};
+    const Setting<Path> sshKey{(StoreConfig *) this, "", "ssh-key", "path to an SSH private key"};
+    const Setting<std::string> sshPublicHostKey{
+        (StoreConfig *) this, "", "base64-ssh-public-host-key", "The public half of the host's SSH key"};
+    const Setting<bool> compress{(StoreConfig *) this, false, "compress", "whether to compress the connection"};
+    const Setting<Path> remoteProgram{
+        (StoreConfig *) this, "nix-store", "remote-program", "path to the nix-store executable on the remote system"};
+    const Setting<std::string> remoteStore{
+        (StoreConfig *) this, "", "remote-store", "URI of the store on the remote system"};
 
-    const std::string name() override { return "Legacy SSH Store"; }
+    const std::string name() override
+    {
+        return "Legacy SSH Store";
+    }
 };
 
 struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Store
@@ -30,7 +37,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     // Hack for getting remote build log output.
     // Intentionally not in `LegacySSHStoreConfig` so that it doesn't appear in
     // the documentation
-    const Setting<int> logFD{(StoreConfig*) this, -1, "log-fd", "file descriptor to which SSH's stderr is connected"};
+    const Setting<int> logFD{(StoreConfig *) this, -1, "log-fd", "file descriptor to which SSH's stderr is connected"};
 
     struct Connection
     {
@@ -47,7 +54,10 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
     SSHMaster master;
 
-    static std::set<std::string> uriSchemes() { return {"ssh"}; }
+    static std::set<std::string> uriSchemes()
+    {
+        return {"ssh"};
+    }
 
     LegacySSHStore(const std::string & scheme, const std::string & host, const Params & params)
         : StoreConfig(params)
@@ -55,20 +65,18 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         , Store(params)
         , host(host)
         , connections(make_ref<Pool<Connection>>(
-            std::max(1, (int) maxConnections),
-            [this]() { return openConnection(); },
-            [](const ref<Connection> & r) { return r->good; }
-            ))
+              std::max(1, (int) maxConnections),
+              [this]() { return openConnection(); },
+              [](const ref<Connection> & r) { return r->good; }))
         , master(
-            host,
-            sshKey,
-            sshPublicHostKey,
-            // Use SSH master only if using more than 1 connection.
-            connections->capacity() > 1,
-            compress,
-            logFD)
-    {
-    }
+              host,
+              sshKey,
+              sshPublicHostKey,
+              // Use SSH master only if using more than 1 connection.
+              connections->capacity() > 1,
+              compress,
+              logFD)
+    {}
 
     ref<Connection> openConnection()
     {
@@ -94,8 +102,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
                    close it. */
                 conn->sshConn->in.close();
                 auto msg = conn->from.drain();
-                throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'",
-                    host, chomp(saved.s + msg));
+                throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'", host, chomp(saved.s + msg));
             }
             conn->remoteVersion = readInt(conn->from);
             if (GET_PROTOCOL_MAJOR(conn->remoteVersion) != 0x200)
@@ -113,8 +120,8 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         return *uriSchemes().begin() + "://" + host;
     }
 
-    void queryPathInfoUncached(const StorePath & path,
-        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
+    void queryPathInfoUncached(
+        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
     {
         try {
             auto conn(connections->get());
@@ -128,7 +135,8 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             conn->to.flush();
 
             auto p = readString(conn->from);
-            if (p.empty()) return callback(nullptr);
+            if (p.empty())
+                return callback(nullptr);
             auto path2 = parseStorePath(p);
             assert(path == path2);
             /* Hash will be set below. FIXME construct ValidPathInfo at end. */
@@ -138,7 +146,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info->deriver = parseStorePath(deriver);
-            info->references = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+            info->references = worker_proto::read(*this, conn->from, Phantom<StorePathSet>{});
             readLongLong(conn->from); // download size
             info->narSize = readLongLong(conn->from);
 
@@ -155,11 +163,12 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             assert(s == "");
 
             callback(std::move(info));
-        } catch (...) { callback.rethrow(); }
+        } catch (...) {
+            callback.rethrow();
+        }
     }
 
-    void addToStore(const ValidPathInfo & info, Source & source,
-        RepairFlag repair, CheckSigsFlag checkSigs) override
+    void addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override
     {
         debug("adding path '%s' to remote host '%s'", printStorePath(info.path), host);
 
@@ -167,18 +176,11 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 5) {
 
-            conn->to
-                << cmdAddToStoreNar
-                << printStorePath(info.path)
-                << (info.deriver ? printStorePath(*info.deriver) : "")
-                << info.narHash.to_string(Base16, false);
+            conn->to << cmdAddToStoreNar << printStorePath(info.path)
+                     << (info.deriver ? printStorePath(*info.deriver) : "") << info.narHash.to_string(Base16, false);
             worker_proto::write(*this, conn->to, info.references);
-            conn->to
-                << info.registrationTime
-                << info.narSize
-                << info.ultimate
-                << info.sigs
-                << renderContentAddress(info.ca);
+            conn->to << info.registrationTime << info.narSize << info.ultimate << info.sigs
+                     << renderContentAddress(info.ca);
             try {
                 copyNAR(source, conn->to);
             } catch (...) {
@@ -189,25 +191,17 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
         } else {
 
-            conn->to
-                << cmdImportPaths
-                << 1;
+            conn->to << cmdImportPaths << 1;
             try {
                 copyNAR(source, conn->to);
             } catch (...) {
                 conn->good = false;
                 throw;
             }
-            conn->to
-                << exportMagic
-                << printStorePath(info.path);
+            conn->to << exportMagic << printStorePath(info.path);
             worker_proto::write(*this, conn->to, info.references);
-            conn->to
-                << (info.deriver ? printStorePath(*info.deriver) : "")
-                << 0
-                << 0;
+            conn->to << (info.deriver ? printStorePath(*info.deriver) : "") << 0 << 0;
             conn->to.flush();
-
         }
 
         if (readInt(conn->from) != 1)
@@ -224,7 +218,9 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     }
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
-    { unsupported("queryPathFromHashPart"); }
+    {
+        unsupported("queryPathFromHashPart");
+    }
 
     StorePath addToStore(
         std::string_view name,
@@ -234,29 +230,25 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         PathFilter & filter,
         RepairFlag repair,
         const StorePathSet & references) override
-    { unsupported("addToStore"); }
+    {
+        unsupported("addToStore");
+    }
 
     StorePath addTextToStore(
-        std::string_view name,
-        std::string_view s,
-        const StorePathSet & references,
-        RepairFlag repair) override
-    { unsupported("addTextToStore"); }
+        std::string_view name, std::string_view s, const StorePathSet & references, RepairFlag repair) override
+    {
+        unsupported("addTextToStore");
+    }
 
 private:
 
     void putBuildSettings(Connection & conn)
     {
-        conn.to
-            << settings.maxSilentTime
-            << settings.buildTimeout;
+        conn.to << settings.maxSilentTime << settings.buildTimeout;
         if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 2)
-            conn.to
-                << settings.maxLogSize;
+            conn.to << settings.maxLogSize;
         if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 3)
-            conn.to
-                << settings.buildRepeat
-                << settings.enforceDeterminism;
+            conn.to << settings.buildRepeat << settings.enforceDeterminism;
 
         if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 7) {
             conn.to << ((int) settings.keepFailed);
@@ -265,33 +257,31 @@ private:
 
 public:
 
-    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
-        BuildMode buildMode) override
+    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode) override
     {
         auto conn(connections->get());
 
-        conn->to
-            << cmdBuildDerivation
-            << printStorePath(drvPath);
+        conn->to << cmdBuildDerivation << printStorePath(drvPath);
         writeDerivation(conn->to, *this, drv);
 
         putBuildSettings(*conn);
 
         conn->to.flush();
 
-        BuildResult status { .path = DerivedPath::Built { .drvPath = drvPath } };
+        BuildResult status{.path = DerivedPath::Built{.drvPath = drvPath}};
         status.status = (BuildResult::Status) readInt(conn->from);
         conn->from >> status.errorMsg;
 
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
             conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 6) {
-            status.builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
+            status.builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs>{});
         }
         return status;
     }
 
-    void buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override
+    void buildPaths(
+        const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override
     {
         if (evalStore && evalStore.get() != this)
             throw Error("building on an SSH store is incompatible with '--eval-store'");
@@ -302,14 +292,16 @@ public:
         Strings ss;
         for (auto & p : drvPaths) {
             auto sOrDrvPath = StorePathWithOutputs::tryFromDerivedPath(p);
-            std::visit(overloaded {
-                [&](const StorePathWithOutputs & s) {
-                    ss.push_back(s.to_string(*this));
+            std::visit(
+                overloaded{
+                    [&](const StorePathWithOutputs & s) { ss.push_back(s.to_string(*this)); },
+                    [&](const StorePath & drvPath) {
+                        throw Error(
+                            "wanted to fetch '%s' but the legacy ssh protocol doesn't support merely substituting drv files via the build paths command. It would build them instead. Try using ssh-ng://",
+                            printStorePath(drvPath));
+                    },
                 },
-                [&](const StorePath & drvPath) {
-                    throw Error("wanted to fetch '%s' but the legacy ssh protocol doesn't support merely substituting drv files via the build paths command. It would build them instead. Try using ssh-ng://", printStorePath(drvPath));
-                },
-            }, sOrDrvPath);
+                sOrDrvPath);
         }
         conn->to << ss;
 
@@ -317,7 +309,7 @@ public:
 
         conn->to.flush();
 
-        BuildResult result { .path = DerivedPath::Opaque { StorePath::dummy } };
+        BuildResult result{.path = DerivedPath::Opaque{StorePath::dummy}};
         result.status = (BuildResult::Status) readInt(conn->from);
 
         if (!result.success()) {
@@ -327,11 +319,16 @@ public:
     }
 
     void ensurePath(const StorePath & path) override
-    { unsupported("ensurePath"); }
+    {
+        unsupported("ensurePath");
+    }
 
-    void computeFSClosure(const StorePathSet & paths,
-        StorePathSet & out, bool flipDirection = false,
-        bool includeOutputs = false, bool includeDerivers = false) override
+    void computeFSClosure(
+        const StorePathSet & paths,
+        StorePathSet & out,
+        bool flipDirection = false,
+        bool includeOutputs = false,
+        bool includeDerivers = false) override
     {
         if (flipDirection || includeDerivers) {
             Store::computeFSClosure(paths, out, flipDirection, includeOutputs, includeDerivers);
@@ -340,29 +337,24 @@ public:
 
         auto conn(connections->get());
 
-        conn->to
-            << cmdQueryClosure
-            << includeOutputs;
+        conn->to << cmdQueryClosure << includeOutputs;
         worker_proto::write(*this, conn->to, paths);
         conn->to.flush();
 
-        for (auto & i : worker_proto::read(*this, conn->from, Phantom<StorePathSet> {}))
+        for (auto & i : worker_proto::read(*this, conn->from, Phantom<StorePathSet>{}))
             out.insert(i);
     }
 
-    StorePathSet queryValidPaths(const StorePathSet & paths,
-        SubstituteFlag maybeSubstitute = NoSubstitute) override
+    StorePathSet queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute = NoSubstitute) override
     {
         auto conn(connections->get());
 
-        conn->to
-            << cmdQueryValidPaths
-            << false // lock
-            << maybeSubstitute;
+        conn->to << cmdQueryValidPaths << false // lock
+                 << maybeSubstitute;
         worker_proto::write(*this, conn->to, paths);
         conn->to.flush();
 
-        return worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+        return worker_proto::read(*this, conn->from, Phantom<StorePathSet>{});
     }
 
     void connect() override
@@ -376,10 +368,12 @@ public:
         return conn->remoteVersion;
     }
 
-    void queryRealisationUncached(const DrvOutput &,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept override
+    void
+    queryRealisationUncached(const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept override
     // TODO: Implement
-    { unsupported("queryRealisation"); }
+    {
+        unsupported("queryRealisation");
+    }
 };
 
 static RegisterStoreImplementation<LegacySSHStore, LegacySSHStoreConfig> regLegacySSHStore;

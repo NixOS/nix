@@ -25,25 +25,27 @@ class SymbolStr
 private:
     const std::string * s;
 
-    explicit SymbolStr(const std::string & symbol): s(&symbol) {}
+    explicit SymbolStr(const std::string & symbol)
+        : s(&symbol)
+    {}
 
 public:
-    bool operator == (std::string_view s2) const
+    bool operator==(std::string_view s2) const
     {
         return *s == s2;
     }
 
-    operator const std::string & () const
+    operator const std::string &() const
     {
         return *s;
     }
 
-    operator const std::string_view () const
+    operator const std::string_view() const
     {
         return *s;
     }
 
-    friend std::ostream & operator <<(std::ostream & os, const SymbolStr & symbol);
+    friend std::ostream & operator<<(std::ostream & os, const SymbolStr & symbol);
 };
 
 class Symbol
@@ -53,16 +55,32 @@ class Symbol
 private:
     uint32_t id;
 
-    explicit Symbol(uint32_t id): id(id) {}
+    explicit Symbol(uint32_t id)
+        : id(id)
+    {}
 
 public:
-    Symbol() : id(0) {}
+    Symbol()
+        : id(0)
+    {}
 
-    explicit operator bool() const { return id > 0; }
+    explicit operator bool() const
+    {
+        return id > 0;
+    }
 
-    bool operator<(const Symbol other) const { return id < other.id; }
-    bool operator==(const Symbol other) const { return id == other.id; }
-    bool operator!=(const Symbol other) const { return id != other.id; }
+    bool operator<(const Symbol other) const
+    {
+        return id < other.id;
+    }
+    bool operator==(const Symbol other) const
+    {
+        return id == other.id;
+    }
+    bool operator!=(const Symbol other) const
+    {
+        return id != other.id;
+    }
 };
 
 class SymbolTable
@@ -81,7 +99,8 @@ public:
         // on the original implementation using unordered_set
         // FIXME: make this thread-safe.
         auto it = symbols.find(s);
-        if (it != symbols.end()) return Symbol(it->second.second + 1);
+        if (it != symbols.end())
+            return Symbol(it->second.second + 1);
 
         const auto & [rawSym, idx] = store.add(std::string(s));
         symbols.emplace(rawSym, std::make_pair(&rawSym, idx));

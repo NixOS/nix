@@ -28,11 +28,13 @@ struct GitArchiveInputScheme : InputScheme
 {
     virtual std::string type() = 0;
 
-    virtual std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const = 0;
+    virtual std::optional<std::pair<std::string, std::string>>
+    accessHeaderFromToken(const std::string & token) const = 0;
 
     std::optional<Input> inputFromURL(const ParsedURL & url) override
     {
-        if (url.scheme != type()) return {};
+        if (url.scheme != type())
+            return {};
 
         auto path = tokenizeString<std::vector<std::string>>(url.path, "/");
 
@@ -65,20 +67,18 @@ struct GitArchiveInputScheme : InputScheme
         } else if (size < 2)
             throw BadURL("URL '%s' is invalid", url.url);
 
-        for (auto &[name, value] : url.query) {
+        for (auto & [name, value] : url.query) {
             if (name == "rev") {
                 if (rev)
                     throw BadURL("URL '%s' contains multiple commit hashes", url.url);
                 rev = Hash::parseAny(value, htSHA1);
-            }
-            else if (name == "ref") {
+            } else if (name == "ref") {
                 if (!std::regex_match(value, refRegex))
                     throw BadURL("URL '%s' contains an invalid branch/tag name", url.url);
                 if (ref)
                     throw BadURL("URL '%s' contains multiple branch/tag names", url.url);
                 ref = value;
-            }
-            else if (name == "host") {
+            } else if (name == "host") {
                 if (!std::regex_match(value, hostRegex))
                     throw BadURL("URL '%s' contains an invalid instance host", url.url);
                 host_url = value;
@@ -87,25 +87,31 @@ struct GitArchiveInputScheme : InputScheme
         }
 
         if (ref && rev)
-            throw BadURL("URL '%s' contains both a commit hash and a branch/tag name %s %s", url.url, *ref, rev->gitRev());
+            throw BadURL(
+                "URL '%s' contains both a commit hash and a branch/tag name %s %s", url.url, *ref, rev->gitRev());
 
         Input input;
         input.attrs.insert_or_assign("type", type());
         input.attrs.insert_or_assign("owner", path[0]);
         input.attrs.insert_or_assign("repo", path[1]);
-        if (rev) input.attrs.insert_or_assign("rev", rev->gitRev());
-        if (ref) input.attrs.insert_or_assign("ref", *ref);
-        if (host_url) input.attrs.insert_or_assign("host", *host_url);
+        if (rev)
+            input.attrs.insert_or_assign("rev", rev->gitRev());
+        if (ref)
+            input.attrs.insert_or_assign("ref", *ref);
+        if (host_url)
+            input.attrs.insert_or_assign("host", *host_url);
 
         return input;
     }
 
     std::optional<Input> inputFromAttrs(const Attrs & attrs) override
     {
-        if (maybeGetStrAttr(attrs, "type") != type()) return {};
+        if (maybeGetStrAttr(attrs, "type") != type())
+            return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "owner" && name != "repo" && name != "ref" && name != "rev" && name != "narHash" && name != "lastModified" && name != "host")
+            if (name != "type" && name != "owner" && name != "repo" && name != "ref" && name != "rev"
+                && name != "narHash" && name != "lastModified" && name != "host")
                 throw Error("unsupported input attribute '%s'", name);
 
         getStrAttr(attrs, "owner");
@@ -124,9 +130,11 @@ struct GitArchiveInputScheme : InputScheme
         auto rev = input.getRev();
         auto path = owner + "/" + repo;
         assert(!(ref && rev));
-        if (ref) path += "/" + *ref;
-        if (rev) path += "/" + rev->to_string(Base16, false);
-        return ParsedURL {
+        if (ref)
+            path += "/" + *ref;
+        if (rev)
+            path += "/" + rev->to_string(Base16, false);
+        return ParsedURL{
             .scheme = type(),
             .path = path,
         };
@@ -137,15 +145,13 @@ struct GitArchiveInputScheme : InputScheme
         return input.getRev() && maybeGetIntAttr(input.attrs, "lastModified");
     }
 
-    Input applyOverrides(
-        const Input & _input,
-        std::optional<std::string> ref,
-        std::optional<Hash> rev) override
+    Input applyOverrides(const Input & _input, std::optional<std::string> ref, std::optional<Hash> rev) override
     {
         auto input(_input);
         if (rev && ref)
-            throw BadURL("cannot apply both a commit hash (%s) and a branch/tag name ('%s') to input '%s'",
-                rev->gitRev(), *ref, input.to_string());
+            throw BadURL(
+                "cannot apply both a commit hash (%s) and a branch/tag name ('%s') to input '%s'", rev->gitRev(), *ref,
+                input.to_string());
         if (rev) {
             input.attrs.insert_or_assign("rev", rev->gitRev());
             input.attrs.erase("ref");
@@ -187,10 +193,12 @@ struct GitArchiveInputScheme : InputScheme
     {
         Input input(_input);
 
-        if (!maybeGetStrAttr(input.attrs, "ref")) input.attrs.insert_or_assign("ref", "HEAD");
+        if (!maybeGetStrAttr(input.attrs, "ref"))
+            input.attrs.insert_or_assign("ref", "HEAD");
 
         auto rev = input.getRev();
-        if (!rev) rev = getRevFromRef(store, input);
+        if (!rev)
+            rev = getRevFromRef(store, input);
 
         input.attrs.erase("ref");
         input.attrs.insert_or_assign("rev", rev->gitRev());
@@ -212,13 +220,7 @@ struct GitArchiveInputScheme : InputScheme
         input.attrs.insert_or_assign("lastModified", uint64_t(lastModified));
 
         getCache()->add(
-            store,
-            lockedAttrs,
-            {
-                {"rev", rev->gitRev()},
-                {"lastModified", uint64_t(lastModified)}
-            },
-            tree.storePath,
+            store, lockedAttrs, {{"rev", rev->gitRev()}, {"lastModified", uint64_t(lastModified)}}, tree.storePath,
             true);
 
         return {std::move(tree.storePath), input};
@@ -227,7 +229,10 @@ struct GitArchiveInputScheme : InputScheme
 
 struct GitHubInputScheme : GitArchiveInputScheme
 {
-    std::string type() override { return "github"; }
+    std::string type() override
+    {
+        return "github";
+    }
 
     std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
     {
@@ -244,18 +249,14 @@ struct GitHubInputScheme : GitArchiveInputScheme
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
         auto url = fmt(
-            host == "github.com"
-            ? "https://api.%s/repos/%s/%s/commits/%s"
-            : "https://%s/api/v3/repos/%s/%s/commits/%s",
+            host == "github.com" ? "https://api.%s/repos/%s/%s/commits/%s" : "https://%s/api/v3/repos/%s/%s/commits/%s",
             host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
 
         Headers headers = makeHeadersWithAuthTokens(host);
 
         auto json = nlohmann::json::parse(
-            readFile(
-                store->toRealPath(
-                    downloadFile(store, url, "source", false, headers).storePath)));
-        auto rev = Hash::parseAny(std::string { json["sha"] }, htSHA1);
+            readFile(store->toRealPath(downloadFile(store, url, "source", false, headers).storePath)));
+        auto rev = Hash::parseAny(std::string{json["sha"]}, htSHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
     }
@@ -266,21 +267,19 @@ struct GitHubInputScheme : GitArchiveInputScheme
         // might have stricter rate limits.
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
         auto url = fmt(
-            host == "github.com"
-            ? "https://api.%s/repos/%s/%s/tarball/%s"
-            : "https://%s/api/v3/repos/%s/%s/tarball/%s",
+            host == "github.com" ? "https://api.%s/repos/%s/%s/tarball/%s" : "https://%s/api/v3/repos/%s/%s/tarball/%s",
             host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(Base16, false));
 
         Headers headers = makeHeadersWithAuthTokens(host);
-        return DownloadUrl { url, headers };
+        return DownloadUrl{url, headers};
     }
 
     void clone(const Input & input, const Path & destDir) override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
-        Input::fromURL(fmt("git+https://%s/%s/%s.git",
-                host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
+        Input::fromURL(
+            fmt("git+https://%s/%s/%s.git", host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
             .applyOverrides(input.getRef(), input.getRev())
             .clone(destDir);
     }
@@ -288,7 +287,10 @@ struct GitHubInputScheme : GitArchiveInputScheme
 
 struct GitLabInputScheme : GitArchiveInputScheme
 {
-    std::string type() override { return "gitlab"; }
+    std::string type() override
+    {
+        return "gitlab";
+    }
 
     std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
     {
@@ -302,26 +304,25 @@ struct GitLabInputScheme : GitArchiveInputScheme
         auto fldsplit = token.find_first_of(':');
         // n.b. C++20 would allow: if (token.starts_with("OAuth2:")) ...
         if ("OAuth2" == token.substr(0, fldsplit))
-            return std::make_pair("Authorization", fmt("Bearer %s", token.substr(fldsplit+1)));
+            return std::make_pair("Authorization", fmt("Bearer %s", token.substr(fldsplit + 1)));
         if ("PAT" == token.substr(0, fldsplit))
-            return std::make_pair("Private-token", token.substr(fldsplit+1));
-        warn("Unrecognized GitLab token type %s",  token.substr(0, fldsplit));
-        return std::make_pair(token.substr(0,fldsplit), token.substr(fldsplit+1));
+            return std::make_pair("Private-token", token.substr(fldsplit + 1));
+        warn("Unrecognized GitLab token type %s", token.substr(0, fldsplit));
+        return std::make_pair(token.substr(0, fldsplit), token.substr(fldsplit + 1));
     }
 
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
         // See rate limiting note below
-        auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/commits?ref_name=%s",
-            host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
+        auto url =
+            fmt("https://%s/api/v4/projects/%s%%2F%s/repository/commits?ref_name=%s", host,
+                getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
 
         Headers headers = makeHeadersWithAuthTokens(host);
 
         auto json = nlohmann::json::parse(
-            readFile(
-                store->toRealPath(
-                    downloadFile(store, url, "source", false, headers).storePath)));
+            readFile(store->toRealPath(downloadFile(store, url, "source", false, headers).storePath)));
         auto rev = Hash::parseAny(std::string(json[0]["id"]), htSHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
@@ -335,20 +336,21 @@ struct GitLabInputScheme : GitArchiveInputScheme
         // is 10 reqs/sec/ip-addr.  See
         // https://docs.gitlab.com/ee/user/gitlab_com/index.html#gitlabcom-specific-rate-limits
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
-        auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/archive.tar.gz?sha=%s",
-            host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
-            input.getRev()->to_string(Base16, false));
+        auto url =
+            fmt("https://%s/api/v4/projects/%s%%2F%s/repository/archive.tar.gz?sha=%s", host,
+                getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
+                input.getRev()->to_string(Base16, false));
 
         Headers headers = makeHeadersWithAuthTokens(host);
-        return DownloadUrl { url, headers };
+        return DownloadUrl{url, headers};
     }
 
     void clone(const Input & input, const Path & destDir) override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
         // FIXME: get username somewhere
-        Input::fromURL(fmt("git+https://%s/%s/%s.git",
-                host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
+        Input::fromURL(
+            fmt("git+https://%s/%s/%s.git", host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
             .applyOverrides(input.getRef(), input.getRev())
             .clone(destDir);
     }
@@ -356,7 +358,10 @@ struct GitLabInputScheme : GitArchiveInputScheme
 
 struct SourceHutInputScheme : GitArchiveInputScheme
 {
-    std::string type() override { return "sourcehut"; }
+    std::string type() override
+    {
+        return "sourcehut";
+    }
 
     std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
     {
@@ -376,15 +381,15 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         auto ref = *input.getRef();
 
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("git.sr.ht");
-        auto base_url = fmt("https://%s/%s/%s",
-            host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"));
+        auto base_url =
+            fmt("https://%s/%s/%s", host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"));
 
         Headers headers = makeHeadersWithAuthTokens(host);
 
         std::string refUri;
         if (ref == "HEAD") {
-            auto file = store->toRealPath(
-                downloadFile(store, fmt("%s/HEAD", base_url), "source", false, headers).storePath);
+            auto file =
+                store->toRealPath(downloadFile(store, fmt("%s/HEAD", base_url), "source", false, headers).storePath);
             std::ifstream is(file);
             std::string line;
             getline(is, line);
@@ -399,19 +404,19 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         }
         std::regex refRegex(refUri);
 
-        auto file = store->toRealPath(
-            downloadFile(store, fmt("%s/info/refs", base_url), "source", false, headers).storePath);
+        auto file =
+            store->toRealPath(downloadFile(store, fmt("%s/info/refs", base_url), "source", false, headers).storePath);
         std::ifstream is(file);
 
         std::string line;
         std::optional<std::string> id;
-        while(!id && getline(is, line)) {
+        while (!id && getline(is, line)) {
             auto parsedLine = git::parseLsRemoteLine(line);
             if (parsedLine && parsedLine->reference && std::regex_match(*parsedLine->reference, refRegex))
                 id = parsedLine->target;
         }
 
-        if(!id)
+        if (!id)
             throw BadURL("in '%d', couldn't find ref '%d'", input.to_string(), ref);
 
         auto rev = Hash::parseAny(*id, htSHA1);
@@ -422,19 +427,19 @@ struct SourceHutInputScheme : GitArchiveInputScheme
     DownloadUrl getDownloadUrl(const Input & input) const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("git.sr.ht");
-        auto url = fmt("https://%s/%s/%s/archive/%s.tar.gz",
-            host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
-            input.getRev()->to_string(Base16, false));
+        auto url =
+            fmt("https://%s/%s/%s/archive/%s.tar.gz", host, getStrAttr(input.attrs, "owner"),
+                getStrAttr(input.attrs, "repo"), input.getRev()->to_string(Base16, false));
 
         Headers headers = makeHeadersWithAuthTokens(host);
-        return DownloadUrl { url, headers };
+        return DownloadUrl{url, headers};
     }
 
     void clone(const Input & input, const Path & destDir) override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("git.sr.ht");
-        Input::fromURL(fmt("git+https://%s/%s/%s",
-                host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
+        Input::fromURL(
+            fmt("git+https://%s/%s/%s", host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
             .applyOverrides(input.getRef(), input.getRev())
             .clone(destDir);
     }

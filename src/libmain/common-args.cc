@@ -29,28 +29,27 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
         .handler = {[]() { verbosity = lvlDebug; }},
     });
 
-    addFlag({
-        .longName = "option",
-        .description = "Set the Nix configuration setting *name* to *value* (overriding `nix.conf`).",
-        .labels = {"name", "value"},
-        .handler = {[](std::string name, std::string value) {
-            try {
-                globalConfig.set(name, value);
-            } catch (UsageError & e) {
-                if (!completions)
-                    warn(e.what());
-            }
-        }},
-        .completer = [](size_t index, std::string_view prefix) {
-            if (index == 0) {
-                std::map<std::string, Config::SettingInfo> settings;
-                globalConfig.getSettings(settings);
-                for (auto & s : settings)
-                    if (hasPrefix(s.first, prefix))
-                        completions->add(s.first, fmt("Set the `%s` setting.", s.first));
-            }
-        }
-    });
+    addFlag(
+        {.longName = "option",
+         .description = "Set the Nix configuration setting *name* to *value* (overriding `nix.conf`).",
+         .labels = {"name", "value"},
+         .handler = {[](std::string name, std::string value) {
+             try {
+                 globalConfig.set(name, value);
+             } catch (UsageError & e) {
+                 if (!completions)
+                     warn(e.what());
+             }
+         }},
+         .completer = [](size_t index, std::string_view prefix) {
+             if (index == 0) {
+                 std::map<std::string, Config::SettingInfo> settings;
+                 globalConfig.getSettings(settings);
+                 for (auto & s : settings)
+                     if (hasPrefix(s.first, prefix))
+                         completions->add(s.first, fmt("Set the `%s` setting.", s.first));
+             }
+         }});
 
     addFlag({
         .longName = "log-format",
@@ -60,21 +59,19 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
         .handler = {[](std::string format) { setLogFormat(format); }},
     });
 
-    addFlag({
-        .longName = "max-jobs",
-        .shortName = 'j',
-        .description = "The maximum number of parallel builds.",
-        .labels = Strings{"jobs"},
-        .handler = {[=](std::string s) {
-            settings.set("max-jobs", s);
-        }}
-    });
+    addFlag(
+        {.longName = "max-jobs",
+         .shortName = 'j',
+         .description = "The maximum number of parallel builds.",
+         .labels = Strings{"jobs"},
+         .handler = {[=](std::string s) { settings.set("max-jobs", s); }}});
 
     std::string cat = "Options to override configuration settings";
     globalConfig.convertToArgs(*this, cat);
 
     // Backward compatibility hack: nix-env already had a --system flag.
-    if (programName == "nix-env") longFlags.erase("system");
+    if (programName == "nix-env")
+        longFlags.erase("system");
 
     hiddenCategories.insert(cat);
 }
@@ -84,6 +81,5 @@ void MixCommonArgs::initialFlagsProcessed()
     initPlugins();
     pluginsInited();
 }
-
 
 }

@@ -16,7 +16,8 @@ typedef enum { smEnabled, smRelaxed, smDisabled } SandboxMode;
 
 struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
 {
-    MaxBuildJobsSetting(Config * options,
+    MaxBuildJobsSetting(
+        Config * options,
         unsigned int def,
         const std::string & name,
         const std::string & description,
@@ -33,7 +34,8 @@ struct PluginFilesSetting : public BaseSetting<Paths>
 {
     bool pluginsLoaded = false;
 
-    PluginFilesSetting(Config * options,
+    PluginFilesSetting(
+        Config * options,
         const Paths & def,
         const std::string & name,
         const std::string & description,
@@ -46,7 +48,8 @@ struct PluginFilesSetting : public BaseSetting<Paths>
     void set(const std::string & str, bool append = false) override;
 };
 
-class Settings : public Config {
+class Settings : public Config
+{
 
     unsigned int getDefaultCores();
 
@@ -88,17 +91,18 @@ public:
     /* File name of the socket the daemon listens to.  */
     Path nixDaemonSocketFile;
 
-    Setting<std::string> storeUri{this, getEnv("NIX_REMOTE").value_or("auto"), "store",
-        "The default Nix store to use."};
+    Setting<std::string> storeUri{
+        this, getEnv("NIX_REMOTE").value_or("auto"), "store", "The default Nix store to use."};
 
-    Setting<bool> keepFailed{this, false, "keep-failed",
-        "Whether to keep temporary directories of failed builds."};
+    Setting<bool> keepFailed{this, false, "keep-failed", "Whether to keep temporary directories of failed builds."};
 
-    Setting<bool> keepGoing{this, false, "keep-going",
-        "Whether to keep building derivations when another build fails."};
+    Setting<bool> keepGoing{
+        this, false, "keep-going", "Whether to keep building derivations when another build fails."};
 
     Setting<bool> tryFallback{
-        this, false, "fallback",
+        this,
+        false,
+        "fallback",
         R"(
           If set to `true`, Nix will fall back to building from source if a
           binary substitute fails. This is equivalent to the `--fallback`
@@ -109,12 +113,15 @@ public:
     /* Whether to show build log output in real time. */
     bool verboseBuild = true;
 
-    Setting<size_t> logLines{this, 10, "log-lines",
+    Setting<size_t> logLines{
+        this, 10, "log-lines",
         "The number of lines of the tail of "
         "the log to show if a build fails."};
 
     MaxBuildJobsSetting maxBuildJobs{
-        this, 1, "max-jobs",
+        this,
+        1,
+        "max-jobs",
         R"(
           This option defines the maximum number of jobs that Nix will try to
           build in parallel. The default is `1`. The special value `auto`
@@ -126,11 +133,8 @@ public:
         )",
         {"build-max-jobs"}};
 
-    Setting<unsigned int> buildCores{
-        this,
-        getDefaultCores(),
-        "cores",
-        R"(
+    Setting<unsigned int> buildCores{this, getDefaultCores(), "cores",
+                                     R"(
           Sets the value of the `NIX_BUILD_CORES` environment variable in the
           invocation of builders. Builders can use this variable at their
           discretion to control the maximum amount of parallelism. For
@@ -139,8 +143,7 @@ public:
           `-jN` flag to GNU Make. It can be overridden using the `--cores`
           command line switch and defaults to `1`. The value `0` means that
           the builder should use all available CPU cores in the system.
-        )",
-        {"build-cores"}, false};
+        )",  {"build-cores"},   false};
 
     /* Read-only mode.  Don't copy stuff to the store, don't change
        the database. */
@@ -164,7 +167,9 @@ public:
         )"};
 
     Setting<time_t> maxSilentTime{
-        this, 0, "max-silent-time",
+        this,
+        0,
+        "max-silent-time",
         R"(
           This option defines the maximum number of seconds that a builder can
           go without producing any data on standard output or standard error.
@@ -179,7 +184,9 @@ public:
         {"build-max-silent-time"}};
 
     Setting<time_t> buildTimeout{
-        this, 0, "timeout",
+        this,
+        0,
+        "timeout",
         R"(
           This option defines the maximum number of seconds that a builder can
           run. This is useful (for instance in an automated build system) to
@@ -192,8 +199,8 @@ public:
         )",
         {"build-timeout"}};
 
-    PathSetting buildHook{this, true, "", "build-hook",
-        "The path of the helper program that executes builds to remote machines."};
+    PathSetting buildHook{
+        this, true, "", "build-hook", "The path of the helper program that executes builds to remote machines."};
 
     Setting<std::string> builders{
         this, "@" + nixConfDir + "/machines", "builders",
@@ -214,8 +221,8 @@ public:
           this computer and the remote build host is slow.
         )"};
 
-    Setting<off_t> reservedSize{this, 8 * 1024 * 1024, "gc-reserved-space",
-        "Amount of reserved disk space for the garbage collector."};
+    Setting<off_t> reservedSize{
+        this, 8 * 1024 * 1024, "gc-reserved-space", "Amount of reserved disk space for the garbage collector."};
 
     Setting<bool> fsyncMetadata{
         this, true, "fsync-metadata",
@@ -226,14 +233,15 @@ public:
           default is `true`.
         )"};
 
-    Setting<bool> useSQLiteWAL{this, !isWSL1(), "use-sqlite-wal",
-        "Whether SQLite should use WAL mode."};
+    Setting<bool> useSQLiteWAL{this, !isWSL1(), "use-sqlite-wal", "Whether SQLite should use WAL mode."};
 
-    Setting<bool> syncBeforeRegistering{this, false, "sync-before-registering",
-        "Whether to call `sync()` before registering a path as valid."};
+    Setting<bool> syncBeforeRegistering{
+        this, false, "sync-before-registering", "Whether to call `sync()` before registering a path as valid."};
 
     Setting<bool> useSubstitutes{
-        this, true, "substitute",
+        this,
+        true,
+        "substitute",
         R"(
           If set to `true` (default), Nix will use binary substitutes if
           available. This option can be disabled to force building from
@@ -275,12 +283,17 @@ public:
           multi-user settings with untrusted users.
         )"};
 
-    Setting<bool> impersonateLinux26{this, false, "impersonate-linux-26",
+    Setting<bool> impersonateLinux26{
+        this,
+        false,
+        "impersonate-linux-26",
         "Whether to impersonate a Linux 2.6 machine on newer kernels.",
         {"build-impersonate-linux-26"}};
 
     Setting<bool> keepLog{
-        this, true, "keep-build-log",
+        this,
+        true,
+        "keep-build-log",
         R"(
           If set to `true` (the default), Nix will write the build log of a
           derivation (i.e. the standard output and error of its builder) to
@@ -290,7 +303,9 @@ public:
         {"build-keep-log"}};
 
     Setting<bool> compressLog{
-        this, true, "compress-build-log",
+        this,
+        true,
+        "compress-build-log",
         R"(
           If set to `true` (the default), build logs written to
           `/nix/var/log/nix/drvs` will be compressed on the fly using bzip2.
@@ -299,7 +314,9 @@ public:
         {"build-compress-log"}};
 
     Setting<unsigned long> maxLogSize{
-        this, 0, "max-build-log-size",
+        this,
+        0,
+        "max-build-log-size",
         R"(
           This option defines the maximum number of bytes that a builder can
           write to its stdout/stderr. If the builder exceeds this limit, it’s
@@ -312,11 +329,12 @@ public:
        stderr. Hack to prevent Hydra logs from being polluted. */
     bool printRepeatedBuilds = true;
 
-    Setting<unsigned int> pollInterval{this, 5, "build-poll-interval",
-        "How often (in seconds) to poll for locks."};
+    Setting<unsigned int> pollInterval{this, 5, "build-poll-interval", "How often (in seconds) to poll for locks."};
 
     Setting<bool> gcKeepOutputs{
-        this, false, "keep-outputs",
+        this,
+        false,
+        "keep-outputs",
         R"(
           If `true`, the garbage collector will keep the outputs of
           non-garbage derivations. If `false` (default), outputs will be
@@ -332,7 +350,9 @@ public:
         {"gc-keep-outputs"}};
 
     Setting<bool> gcKeepDerivations{
-        this, true, "keep-derivations",
+        this,
+        true,
+        "keep-derivations",
         R"(
           If `true` (default), the garbage collector will keep the derivations
           from which non-garbage store paths were built. If `false`, they will
@@ -358,7 +378,9 @@ public:
         )"};
 
     Setting<bool> envKeepDerivations{
-        this, false, "keep-env-derivations",
+        this,
+        false,
+        "keep-env-derivations",
         R"(
           If `false` (default), derivations are not stored in Nix user
           environments. That is, the derivations of any build-time-only
@@ -381,15 +403,17 @@ public:
     /* Whether to lock the Nix client and worker to the same CPU. */
     bool lockCPU;
 
-    Setting<SandboxMode> sandboxMode{
+    Setting<SandboxMode> sandboxMode
+    {
         this,
-        #if __linux__
-          smEnabled
-        #else
-          smDisabled
-        #endif
-        , "sandbox",
-        R"(
+#if __linux__
+            smEnabled
+#else
+            smDisabled
+#endif
+            ,
+            "sandbox",
+            R"(
           If set to `true`, builds will be performed in a *sandboxed
           environment*, i.e., they’re isolated from the normal file system
           hierarchy and will only see their dependencies in the Nix store,
@@ -414,10 +438,15 @@ public:
 
           The default is `true` on Linux and `false` on all other platforms.
         )",
-        {"build-use-chroot", "build-use-sandbox"}};
+        {
+            "build-use-chroot", "build-use-sandbox"
+        }
+    };
 
     Setting<PathSet> sandboxPaths{
-        this, {}, "sandbox-paths",
+        this,
+        {},
+        "sandbox-paths",
         R"(
           A list of paths bind-mounted into Nix sandbox environments. You can
           use the syntax `target=source` to mount a path in a different
@@ -432,11 +461,13 @@ public:
         )",
         {"build-chroot-dirs", "build-sandbox-paths"}};
 
-    Setting<bool> sandboxFallback{this, true, "sandbox-fallback",
-        "Whether to disable sandboxing when the kernel doesn't allow it."};
+    Setting<bool> sandboxFallback{
+        this, true, "sandbox-fallback", "Whether to disable sandboxing when the kernel doesn't allow it."};
 
     Setting<size_t> buildRepeat{
-        this, 0, "repeat",
+        this,
+        0,
+        "repeat",
         R"(
           How many times to repeat builds to check whether they are
           deterministic. The default value is 0. If the value is non-zero,
@@ -458,15 +489,18 @@ public:
           is `50%`.
         )"};
 
-    Setting<Path> sandboxBuildDir{this, "/build", "sandbox-build-dir",
-        "The build directory inside the sandbox."};
+    Setting<Path> sandboxBuildDir{this, "/build", "sandbox-build-dir", "The build directory inside the sandbox."};
 #endif
 
-    Setting<PathSet> allowedImpureHostPrefixes{this, {}, "allowed-impure-host-deps",
+    Setting<PathSet> allowedImpureHostPrefixes{
+        this,
+        {},
+        "allowed-impure-host-deps",
         "Which prefixes to allow derivations to ask for access to (primarily for Darwin)."};
 
 #if __APPLE__
-    Setting<bool> darwinLogSandboxViolations{this, false, "darwin-log-sandbox-violations",
+    Setting<bool> darwinLogSandboxViolations{
+        this, false, "darwin-log-sandbox-violations",
         "Whether to log Darwin sandbox access violations to the system log."};
 #endif
 
@@ -529,7 +563,9 @@ public:
         {"binary-cache-public-keys"}};
 
     Setting<Strings> secretKeyFiles{
-        this, {}, "secret-key-files",
+        this,
+        {},
+        "secret-key-files",
         R"(
           A whitespace-separated list of files containing secret (private)
           keys. These are used to sign locally-built paths. They can be
@@ -582,7 +618,9 @@ public:
           platform and generate incompatible code, so you may wish to
           cross-check the results of using this option against proper
           natively-built versions of your derivations.
-        )", {}, false};
+        )",
+        {},
+        false};
 
     Setting<StringSet> systemFeatures{
         this,
@@ -602,7 +640,9 @@ public:
           This setting by default includes `kvm` if `/dev/kvm` is accessible,
           and the pseudo-features `nixos-test`, `benchmark` and `big-parallel`
           that are used in Nixpkgs to route builds to specific machines.
-        )", {}, false};
+        )",
+        {},
+        false};
 
     Setting<Strings> substituters{
         this,
@@ -617,7 +657,9 @@ public:
         {"binary-caches"}};
 
     Setting<StringSet> trustedSubstituters{
-        this, {}, "trusted-substituters",
+        this,
+        {},
+        "trusted-substituters",
         R"(
           A list of URLs of substituters, separated by whitespace. These are
           not used by default, but can be enabled by users of the Nix daemon
@@ -628,7 +670,9 @@ public:
         {"trusted-binary-caches"}};
 
     Setting<Strings> trustedUsers{
-        this, {"root"}, "trusted-users",
+        this,
+        {"root"},
+        "trusted-users",
         R"(
           A list of names of users (separated by whitespace) that have
           additional rights when connecting to the Nix daemon, such as the
@@ -669,7 +713,9 @@ public:
 
     /* ?Who we trust to use the daemon in safe ways */
     Setting<Strings> allowedUsers{
-        this, {"*"}, "allowed-users",
+        this,
+        {"*"},
+        "allowed-users",
         R"(
           A list of names of users (separated by whitespace) that are allowed
           to connect to the Nix daemon. As with the `trusted-users` option,
@@ -679,8 +725,8 @@ public:
           Note that trusted users are always allowed to connect.
         )"};
 
-    Setting<bool> printMissing{this, true, "print-missing",
-        "Whether to print what paths need to be built or downloaded."};
+    Setting<bool> printMissing{
+        this, true, "print-missing", "Whether to print what paths need to be built or downloaded."};
 
     Setting<std::string> preBuildHook{
         this, "", "pre-build-hook",
@@ -799,7 +845,9 @@ public:
         )"};
 
     Setting<StringSet> ignoredAcls{
-        this, {"security.selinux", "system.nfs4_acl", "security.csm"}, "ignored-acls",
+        this,
+        {"security.selinux", "system.nfs4_acl", "security.csm"},
+        "ignored-acls",
         R"(
           A list of ACLs that should be ignored, normally Nix attempts to
           remove all ACLs from files and directories in the Nix store, but
@@ -809,7 +857,9 @@ public:
 #endif
 
     Setting<Strings> hashedMirrors{
-        this, {}, "hashed-mirrors",
+        this,
+        {},
+        "hashed-mirrors",
         R"(
           A list of web servers used by `builtins.fetchurl` to obtain files by
           hash. The default is `http://tarballs.nixos.org/`. Given a hash type
@@ -848,11 +898,13 @@ public:
           infinity (i.e. delete all garbage).
         )"};
 
-    Setting<uint64_t> minFreeCheckInterval{this, 5, "min-free-check-interval",
-        "Number of seconds between checking free disk space."};
+    Setting<uint64_t> minFreeCheckInterval{
+        this, 5, "min-free-check-interval", "Number of seconds between checking free disk space."};
 
     PluginFilesSetting pluginFiles{
-        this, {}, "plugin-files",
+        this,
+        {},
+        "plugin-files",
         R"(
           A list of plugin files to be loaded by Nix. Each of these files will
           be dlopened by Nix, allowing them to affect execution through static
@@ -877,15 +929,15 @@ public:
           are loaded as plugins (non-recursively).
         )"};
 
-    Setting<std::set<ExperimentalFeature>> experimentalFeatures{this, {}, "experimental-features",
-        "Experimental Nix features to enable."};
+    Setting<std::set<ExperimentalFeature>> experimentalFeatures{
+        this, {}, "experimental-features", "Experimental Nix features to enable."};
 
     bool isExperimentalFeatureEnabled(const ExperimentalFeature &);
 
     void requireExperimentalFeature(const ExperimentalFeature &);
 
-    Setting<size_t> narBufferSize{this, 32 * 1024 * 1024, "nar-buffer-size",
-        "Maximum size of NARs before spilling them to disk."};
+    Setting<size_t> narBufferSize{
+        this, 32 * 1024 * 1024, "nar-buffer-size", "Maximum size of NARs before spilling them to disk."};
 
     Setting<bool> allowSymlinkedStore{
         this, false, "allow-symlinked-store",
@@ -900,7 +952,6 @@ public:
           can enable this setting if you are sure you're not going to do that.
         )"};
 };
-
 
 // FIXME: don't use a global variable.
 extern Settings settings;

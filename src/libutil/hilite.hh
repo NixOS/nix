@@ -11,10 +11,7 @@ namespace nix {
 
    If some matches overlap, then their union will be wrapped rather
    than the individual matches. */
-std::string hiliteMatches(
-    std::string_view s,
-    std::vector<std::smatch> matches,
-    std::string_view prefix,
-    std::string_view postfix);
+std::string
+hiliteMatches(std::string_view s, std::vector<std::smatch> matches, std::string_view prefix, std::string_view postfix);
 
 }

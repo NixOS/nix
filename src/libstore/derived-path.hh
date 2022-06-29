@@ -19,15 +19,18 @@ class Store;
  * cannot be simplified further. Since they are opaque, they cannot be
  * built, but they can fetched.
  */
-struct DerivedPathOpaque {
+struct DerivedPathOpaque
+{
     StorePath path;
 
     nlohmann::json toJSON(ref<Store> store) const;
     std::string to_string(const Store & store) const;
     static DerivedPathOpaque parse(const Store & store, std::string_view);
 
-    bool operator < (const DerivedPathOpaque & b) const
-    { return path < b.path; }
+    bool operator<(const DerivedPathOpaque & b) const
+    {
+        return path < b.path;
+    }
 };
 
 /**
@@ -42,7 +45,8 @@ struct DerivedPathOpaque {
  * evaluate to single values. Perhaps this should have just a single
  * output name.
  */
-struct DerivedPathBuilt {
+struct DerivedPathBuilt
+{
     StorePath drvPath;
     std::set<std::string> outputs;
 
@@ -50,14 +54,13 @@ struct DerivedPathBuilt {
     static DerivedPathBuilt parse(const Store & store, std::string_view);
     nlohmann::json toJSON(ref<Store> store) const;
 
-    bool operator < (const DerivedPathBuilt & b) const
-    { return std::make_pair(drvPath, outputs) < std::make_pair(b.drvPath, b.outputs); }
+    bool operator<(const DerivedPathBuilt & b) const
+    {
+        return std::make_pair(drvPath, outputs) < std::make_pair(b.drvPath, b.outputs);
+    }
 };
 
-using _DerivedPathRaw = std::variant<
-    DerivedPathOpaque,
-    DerivedPathBuilt
->;
+using _DerivedPathRaw = std::variant<DerivedPathOpaque, DerivedPathBuilt>;
 
 /**
  * A "derived path" is a very simple sort of expression that evaluates
@@ -69,14 +72,16 @@ using _DerivedPathRaw = std::variant<
  * - built, in which case it is a pair of a derivation path and an
  *   output name.
  */
-struct DerivedPath : _DerivedPathRaw {
+struct DerivedPath : _DerivedPathRaw
+{
     using Raw = _DerivedPathRaw;
     using Raw::Raw;
 
     using Opaque = DerivedPathOpaque;
     using Built = DerivedPathBuilt;
 
-    inline const Raw & raw() const {
+    inline const Raw & raw() const
+    {
         return static_cast<const Raw &>(*this);
     }
 
@@ -89,7 +94,8 @@ struct DerivedPath : _DerivedPathRaw {
  *
  * See 'BuiltPath' for more an explanation.
  */
-struct BuiltPathBuilt {
+struct BuiltPathBuilt
+{
     StorePath drvPath;
     std::map<std::string, StorePath> outputs;
 
@@ -97,35 +103,33 @@ struct BuiltPathBuilt {
     static BuiltPathBuilt parse(const Store & store, std::string_view);
 };
 
-using _BuiltPathRaw = std::variant<
-    DerivedPath::Opaque,
-    BuiltPathBuilt
->;
+using _BuiltPathRaw = std::variant<DerivedPath::Opaque, BuiltPathBuilt>;
 
 /**
  * A built path. Similar to a `DerivedPath`, but enriched with the corresponding
  * output path(s).
  */
-struct BuiltPath : _BuiltPathRaw {
+struct BuiltPath : _BuiltPathRaw
+{
     using Raw = _BuiltPathRaw;
     using Raw::Raw;
 
     using Opaque = DerivedPathOpaque;
     using Built = BuiltPathBuilt;
 
-    inline const Raw & raw() const {
+    inline const Raw & raw() const
+    {
         return static_cast<const Raw &>(*this);
     }
 
     StorePathSet outPaths() const;
     RealisedPath::Set toRealisedPaths(Store & store) const;
-
 };
 
 typedef std::vector<DerivedPath> DerivedPaths;
 typedef std::vector<BuiltPath> BuiltPaths;
 
 nlohmann::json derivedPathsWithHintsToJSON(const BuiltPaths & buildables, ref<Store> store);
-nlohmann::json derivedPathsToJSON(const DerivedPaths & , ref<Store> store);
+nlohmann::json derivedPathsToJSON(const DerivedPaths &, ref<Store> store);
 
 }

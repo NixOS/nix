@@ -12,13 +12,19 @@ struct SSHStoreConfig : virtual RemoteStoreConfig
 {
     using RemoteStoreConfig::RemoteStoreConfig;
 
-    const Setting<Path> sshKey{(StoreConfig*) this, "", "ssh-key", "path to an SSH private key"};
-    const Setting<std::string> sshPublicHostKey{(StoreConfig*) this, "", "base64-ssh-public-host-key", "The public half of the host's SSH key"};
-    const Setting<bool> compress{(StoreConfig*) this, false, "compress", "whether to compress the connection"};
-    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-daemon", "remote-program", "path to the nix-daemon executable on the remote system"};
-    const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
+    const Setting<Path> sshKey{(StoreConfig *) this, "", "ssh-key", "path to an SSH private key"};
+    const Setting<std::string> sshPublicHostKey{
+        (StoreConfig *) this, "", "base64-ssh-public-host-key", "The public half of the host's SSH key"};
+    const Setting<bool> compress{(StoreConfig *) this, false, "compress", "whether to compress the connection"};
+    const Setting<Path> remoteProgram{
+        (StoreConfig *) this, "nix-daemon", "remote-program", "path to the nix-daemon executable on the remote system"};
+    const Setting<std::string> remoteStore{
+        (StoreConfig *) this, "", "remote-store", "URI of the store on the remote system"};
 
-    const std::string name() override { return "SSH Store"; }
+    const std::string name() override
+    {
+        return "SSH Store";
+    }
 };
 
 class SSHStore : public virtual SSHStoreConfig, public virtual RemoteStore
@@ -33,16 +39,18 @@ public:
         , RemoteStore(params)
         , host(host)
         , master(
-            host,
-            sshKey,
-            sshPublicHostKey,
-            // Use SSH master only if using more than 1 connection.
-            connections->capacity() > 1,
-            compress)
-    {
-    }
+              host,
+              sshKey,
+              sshPublicHostKey,
+              // Use SSH master only if using more than 1 connection.
+              connections->capacity() > 1,
+              compress)
+    {}
 
-    static std::set<std::string> uriSchemes() { return {"ssh-ng"}; }
+    static std::set<std::string> uriSchemes()
+    {
+        return {"ssh-ng"};
+    }
 
     std::string getUri() override
     {
@@ -50,11 +58,15 @@ public:
     }
 
     bool sameMachine() override
-    { return false; }
+    {
+        return false;
+    }
 
     // FIXME extend daemon protocol, move implementation to RemoteStore
     std::optional<std::string> getBuildLog(const StorePath & path) override
-    { unsupported("getBuildLog"); }
+    {
+        unsupported("getBuildLog");
+    }
 
 private:
 
@@ -74,8 +86,7 @@ private:
 
     SSHMaster master;
 
-    void setOptions(RemoteStore::Connection & conn) override
-    {
+    void setOptions(RemoteStore::Connection & conn) override{
         /* TODO Add a way to explicitly ask for some options to be
            forwarded. One option: A way to query the daemon for its
            settings, and then a series of params to SSHStore like

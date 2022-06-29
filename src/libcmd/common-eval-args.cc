@@ -15,13 +15,12 @@ MixEvalArgs::MixEvalArgs()
 {
     auto category = "Common evaluation options";
 
-    addFlag({
-        .longName = "arg",
-        .description = "Pass the value *expr* as the argument *name* to Nix functions.",
-        .category = category,
-        .labels = {"name", "expr"},
-        .handler = {[&](std::string name, std::string expr) { autoArgs[name] = 'E' + expr; }}
-    });
+    addFlag(
+        {.longName = "arg",
+         .description = "Pass the value *expr* as the argument *name* to Nix functions.",
+         .category = category,
+         .labels = {"name", "expr"},
+         .handler = {[&](std::string name, std::string expr) { autoArgs[name] = 'E' + expr; }}});
 
     addFlag({
         .longName = "argstr",
@@ -31,40 +30,35 @@ MixEvalArgs::MixEvalArgs()
         .handler = {[&](std::string name, std::string s) { autoArgs[name] = 'S' + s; }},
     });
 
-    addFlag({
-        .longName = "include",
-        .shortName = 'I',
-        .description = "Add *path* to the list of locations used to look up `<...>` file names.",
-        .category = category,
-        .labels = {"path"},
-        .handler = {[&](std::string s) { searchPath.push_back(s); }}
-    });
+    addFlag(
+        {.longName = "include",
+         .shortName = 'I',
+         .description = "Add *path* to the list of locations used to look up `<...>` file names.",
+         .category = category,
+         .labels = {"path"},
+         .handler = {[&](std::string s) { searchPath.push_back(s); }}});
 
     addFlag({
         .longName = "impure",
         .description = "Allow access to mutable paths and repositories.",
         .category = category,
-        .handler = {[&]() {
-            evalSettings.pureEval = false;
-        }},
+        .handler = {[&]() { evalSettings.pureEval = false; }},
     });
 
-    addFlag({
-        .longName = "override-flake",
-        .description = "Override the flake registries, redirecting *original-ref* to *resolved-ref*.",
-        .category = category,
-        .labels = {"original-ref", "resolved-ref"},
-        .handler = {[&](std::string _from, std::string _to) {
-            auto from = parseFlakeRef(_from, absPath("."));
-            auto to = parseFlakeRef(_to, absPath("."));
-            fetchers::Attrs extraAttrs;
-            if (to.subdir != "") extraAttrs["dir"] = to.subdir;
-            fetchers::overrideRegistry(from.input, to.input, extraAttrs);
-        }},
-        .completer = {[&](size_t, std::string_view prefix) {
-            completeFlakeRef(openStore(), prefix);
-        }}
-    });
+    addFlag(
+        {.longName = "override-flake",
+         .description = "Override the flake registries, redirecting *original-ref* to *resolved-ref*.",
+         .category = category,
+         .labels = {"original-ref", "resolved-ref"},
+         .handler = {[&](std::string _from, std::string _to) {
+             auto from = parseFlakeRef(_from, absPath("."));
+             auto to = parseFlakeRef(_to, absPath("."));
+             fetchers::Attrs extraAttrs;
+             if (to.subdir != "")
+                 extraAttrs["dir"] = to.subdir;
+             fetchers::overrideRegistry(from.input, to.input, extraAttrs);
+         }},
+         .completer = {[&](size_t, std::string_view prefix) { completeFlakeRef(openStore(), prefix); }}});
 
     addFlag({
         .longName = "eval-store",
@@ -93,8 +87,7 @@ Path lookupFileArg(EvalState & state, std::string_view s)
 {
     if (isUri(s)) {
         return state.store->toRealPath(
-            fetchers::downloadTarball(
-                state.store, resolveUri(s), "source", false).first.storePath);
+            fetchers::downloadTarball(state.store, resolveUri(s), "source", false).first.storePath);
     } else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
         Path p(s.substr(1, s.size() - 2));
         return state.findFile(p);

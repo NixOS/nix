@@ -52,7 +52,7 @@ protected:
 
     AbstractConfig(const StringMap & initials = {})
         : unknownSettings(initials)
-    { }
+    {}
 
 public:
 
@@ -149,8 +149,9 @@ public:
         bool isAlias;
         AbstractSetting * setting;
         SettingData(bool isAlias, AbstractSetting * setting)
-            : isAlias(isAlias), setting(setting)
-        { }
+            : isAlias(isAlias)
+            , setting(setting)
+        {}
     };
 
     typedef std::map<std::string, SettingData> Settings;
@@ -163,7 +164,7 @@ public:
 
     Config(const StringMap & initials = {})
         : AbstractConfig(initials)
-    { }
+    {}
 
     bool set(const std::string & name, const std::string & value) override;
 
@@ -196,10 +197,7 @@ public:
 
 protected:
 
-    AbstractSetting(
-        const std::string & name,
-        const std::string & description,
-        const std::set<std::string> & aliases);
+    AbstractSetting(const std::string & name, const std::string & description, const std::set<std::string> & aliases);
 
     virtual ~AbstractSetting()
     {
@@ -211,7 +209,9 @@ protected:
     virtual void set(const std::string & value, bool append = false) = 0;
 
     virtual bool isAppendable()
-    { return false; }
+    {
+        return false;
+    }
 
     virtual std::string to_string() const = 0;
 
@@ -221,7 +221,10 @@ protected:
 
     virtual void convertToArg(Args & args, const std::string & category);
 
-    bool isOverridden() const { return overridden; }
+    bool isOverridden() const
+    {
+        return overridden;
+    }
 };
 
 /* A setting of type T. */
@@ -236,7 +239,8 @@ protected:
 
 public:
 
-    BaseSetting(const T & def,
+    BaseSetting(
+        const T & def,
         const bool documentDefault,
         const std::string & name,
         const std::string & description,
@@ -245,16 +249,41 @@ public:
         , value(def)
         , defaultValue(def)
         , documentDefault(documentDefault)
-    { }
+    {}
 
-    operator const T &() const { return value; }
-    operator T &() { return value; }
-    const T & get() const { return value; }
-    bool operator ==(const T & v2) const { return value == v2; }
-    bool operator !=(const T & v2) const { return value != v2; }
-    void operator =(const T & v) { assign(v); }
-    virtual void assign(const T & v) { value = v; }
-    void setDefault(const T & v) { if (!overridden) value = v; }
+    operator const T &() const
+    {
+        return value;
+    }
+    operator T &()
+    {
+        return value;
+    }
+    const T & get() const
+    {
+        return value;
+    }
+    bool operator==(const T & v2) const
+    {
+        return value == v2;
+    }
+    bool operator!=(const T & v2) const
+    {
+        return value != v2;
+    }
+    void operator=(const T & v)
+    {
+        assign(v);
+    }
+    virtual void assign(const T & v)
+    {
+        value = v;
+    }
+    void setDefault(const T & v)
+    {
+        if (!overridden)
+            value = v;
+    }
 
     void set(const std::string & str, bool append = false) override;
 
@@ -274,20 +303,24 @@ public:
 };
 
 template<typename T>
-std::ostream & operator <<(std::ostream & str, const BaseSetting<T> & opt)
+std::ostream & operator<<(std::ostream & str, const BaseSetting<T> & opt)
 {
     str << (const T &) opt;
     return str;
 }
 
 template<typename T>
-bool operator ==(const T & v1, const BaseSetting<T> & v2) { return v1 == (const T &) v2; }
+bool operator==(const T & v1, const BaseSetting<T> & v2)
+{
+    return v1 == (const T &) v2;
+}
 
 template<typename T>
 class Setting : public BaseSetting<T>
 {
 public:
-    Setting(Config * options,
+    Setting(
+        Config * options,
         const T & def,
         const std::string & name,
         const std::string & description,
@@ -298,7 +331,10 @@ public:
         options->addSetting(this);
     }
 
-    void operator =(const T & v) { this->assign(v); }
+    void operator=(const T & v)
+    {
+        this->assign(v);
+    }
 };
 
 /* A special setting for Paths. These are automatically canonicalised
@@ -309,7 +345,8 @@ class PathSetting : public BaseSetting<Path>
 
 public:
 
-    PathSetting(Config * options,
+    PathSetting(
+        Config * options,
         bool allowEmpty,
         const Path & def,
         const std::string & name,
@@ -323,14 +360,20 @@ public:
 
     void set(const std::string & str, bool append = false) override;
 
-    Path operator +(const char * p) const { return value + p; }
+    Path operator+(const char * p) const
+    {
+        return value + p;
+    }
 
-    void operator =(const Path & v) { this->assign(v); }
+    void operator=(const Path & v)
+    {
+        this->assign(v);
+    }
 };
 
 struct GlobalConfig : public AbstractConfig
 {
-    typedef std::vector<Config*> ConfigRegistrations;
+    typedef std::vector<Config *> ConfigRegistrations;
     static ConfigRegistrations * configRegistrations;
 
     bool set(const std::string & name, const std::string & value) override;

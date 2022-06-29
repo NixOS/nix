@@ -18,7 +18,8 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
 
     auto getAttr = [&](const std::string & name) {
         auto i = drv.env.find(name);
-        if (i == drv.env.end()) throw Error("attribute '%s' missing", name);
+        if (i == drv.env.end())
+            throw Error("attribute '%s' missing", name);
         return i->second;
     };
 
@@ -31,17 +32,14 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
     auto fileTransfer = makeFileTransfer();
 
     auto fetch = [&](const std::string & url) {
-
         auto source = sinkToSource([&](Sink & sink) {
-
             /* No need to do TLS verification, because we check the hash of
                the result anyway. */
             FileTransferRequest request(url);
             request.verifyTLS = false;
             request.decompress = false;
 
-            auto decompressor = makeDecompressionSink(
-                unpack && hasSuffix(mainUrl, ".xz") ? "xz" : "none", sink);
+            auto decompressor = makeDecompressionSink(unpack && hasSuffix(mainUrl, ".xz") ? "xz" : "none", sink);
             fileTransfer->download(std::move(request), *decompressor);
             decompressor->finish();
         });
@@ -62,7 +60,8 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
     if (getAttr("outputHashMode") == "flat")
         for (auto hashedMirror : settings.hashedMirrors.get())
             try {
-                if (!hasSuffix(hashedMirror, "/")) hashedMirror += '/';
+                if (!hasSuffix(hashedMirror, "/"))
+                    hashedMirror += '/';
                 std::optional<HashType> ht = parseHashTypeOpt(getAttr("outputHashAlgo"));
                 Hash h = newHashAllowEmpty(getAttr("outputHash"), ht);
                 fetch(hashedMirror + printHashType(h.type) + "/" + h.to_string(Base16, false));

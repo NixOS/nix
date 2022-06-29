@@ -10,9 +10,7 @@
 #include <sys/stat.h>
 #include <sys/file.h>
 
-
 namespace nix {
-
 
 AutoCloseFD openLockFile(const Path & path, bool create)
 {
@@ -24,7 +22,6 @@ AutoCloseFD openLockFile(const Path & path, bool create)
 
     return fd;
 }
-
 
 void deleteLockFile(const Path & path, int fd)
 {
@@ -38,14 +35,17 @@ void deleteLockFile(const Path & path, int fd)
        file is an optimisation, not a necessity. */
 }
 
-
 bool lockFile(int fd, LockType lockType, bool wait)
 {
     int type;
-    if (lockType == ltRead) type = LOCK_SH;
-    else if (lockType == ltWrite) type = LOCK_EX;
-    else if (lockType == ltNone) type = LOCK_UN;
-    else abort();
+    if (lockType == ltRead)
+        type = LOCK_SH;
+    else if (lockType == ltWrite)
+        type = LOCK_EX;
+    else if (lockType == ltNone)
+        type = LOCK_UN;
+    else
+        abort();
 
     if (wait) {
         while (flock(fd, type) != 0) {
@@ -58,7 +58,8 @@ bool lockFile(int fd, LockType lockType, bool wait)
     } else {
         while (flock(fd, type | LOCK_NB) != 0) {
             checkInterrupt();
-            if (errno == EWOULDBLOCK) return false;
+            if (errno == EWOULDBLOCK)
+                return false;
             if (errno != EINTR)
                 throw SysError("acquiring/releasing lock");
         }
@@ -67,12 +68,9 @@ bool lockFile(int fd, LockType lockType, bool wait)
     return true;
 }
 
-
 PathLocks::PathLocks()
     : deletePaths(false)
-{
-}
-
+{}
 
 PathLocks::PathLocks(const PathSet & paths, const std::string & waitMsg)
     : deletePaths(false)
@@ -80,9 +78,7 @@ PathLocks::PathLocks(const PathSet & paths, const std::string & waitMsg)
     lockPaths(paths, waitMsg);
 }
 
-
-bool PathLocks::lockPaths(const PathSet & paths,
-    const std::string & waitMsg, bool wait)
+bool PathLocks::lockPaths(const PathSet & paths, const std::string & waitMsg, bool wait)
 {
     assert(fds.empty());
 
@@ -108,7 +104,8 @@ bool PathLocks::lockPaths(const PathSet & paths,
             /* Acquire an exclusive lock. */
             if (!lockFile(fd.get(), ltWrite, false)) {
                 if (wait) {
-                    if (waitMsg != "") printError(waitMsg);
+                    if (waitMsg != "")
+                        printError(waitMsg);
                     lockFile(fd.get(), ltWrite, true);
                 } else {
                     /* Failed to lock this path; release all other
@@ -142,7 +139,6 @@ bool PathLocks::lockPaths(const PathSet & paths,
     return true;
 }
 
-
 PathLocks::~PathLocks()
 {
     try {
@@ -152,16 +148,14 @@ PathLocks::~PathLocks()
     }
 }
 
-
 void PathLocks::unlock()
 {
     for (auto & i : fds) {
-        if (deletePaths) deleteLockFile(i.second, i.first);
+        if (deletePaths)
+            deleteLockFile(i.second, i.first);
 
         if (close(i.first) == -1)
-            printError(
-                "error (ignored): cannot close lock file on '%1%'",
-                i.second);
+            printError("error (ignored): cannot close lock file on '%1%'", i.second);
 
         debug(format("lock released on '%1%'") % i.second);
     }
@@ -169,12 +163,10 @@ void PathLocks::unlock()
     fds.clear();
 }
 
-
 void PathLocks::setDeletion(bool deletePaths)
 {
     this->deletePaths = deletePaths;
 }
-
 
 FdLock::FdLock(int fd, LockType lockType, bool wait, std::string_view waitMsg)
     : fd(fd)
@@ -187,6 +179,5 @@ FdLock::FdLock(int fd, LockType lockType, bool wait, std::string_view waitMsg)
     } else
         acquired = lockFile(fd, lockType, false);
 }
-
 
 }

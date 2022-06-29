@@ -8,7 +8,6 @@
 
 namespace nix {
 
-
 class EvalState;
 struct Value;
 
@@ -23,15 +22,18 @@ struct Attr
     PosIdx pos;
     Value * value;
     Attr(Symbol name, Value * value, PosIdx pos = noPos)
-        : name(name), pos(pos), value(value) { };
-    Attr() { };
-    bool operator < (const Attr & a) const
+        : name(name)
+        , pos(pos)
+        , value(value){};
+    Attr(){};
+    bool operator<(const Attr & a) const
     {
         return name < a.name;
     }
 };
 
-static_assert(sizeof(Attr) == 2 * sizeof(uint32_t) + sizeof(Value *),
+static_assert(
+    sizeof(Attr) == 2 * sizeof(uint32_t) + sizeof(Value *),
     "performance of the evaluator is highly sensitive to the size of Attr. "
     "avoid introducing any padding into Attr if at all possible, and do not "
     "introduce new fields that need not be present for almost every instance.");
@@ -50,13 +52,22 @@ private:
     size_t size_, capacity_;
     Attr attrs[0];
 
-    Bindings(size_t capacity) : size_(0), capacity_(capacity) { }
+    Bindings(size_t capacity)
+        : size_(0)
+        , capacity_(capacity)
+    {}
     Bindings(const Bindings & bindings) = delete;
 
 public:
-    size_t size() const { return size_; }
+    size_t size() const
+    {
+        return size_;
+    }
 
-    bool empty() const { return !size_; }
+    bool empty() const
+    {
+        return !size_;
+    }
 
     typedef Attr * iterator;
 
@@ -70,7 +81,8 @@ public:
     {
         Attr key(name, 0);
         iterator i = std::lower_bound(begin(), end(), key);
-        if (i != end() && i->name == name) return i;
+        if (i != end() && i->name == name)
+            return i;
         return end();
     }
 
@@ -78,12 +90,19 @@ public:
     {
         Attr key(name, 0);
         iterator i = std::lower_bound(begin(), end(), key);
-        if (i != end() && i->name == name) return &*i;
+        if (i != end() && i->name == name)
+            return &*i;
         return nullptr;
     }
 
-    iterator begin() { return &attrs[0]; }
-    iterator end() { return &attrs[size_]; }
+    iterator begin()
+    {
+        return &attrs[0];
+    }
+    iterator end()
+    {
+        return &attrs[size_];
+    }
 
     Attr & operator[](size_t pos)
     {
@@ -92,7 +111,10 @@ public:
 
     void sort();
 
-    size_t capacity() { return capacity_; }
+    size_t capacity()
+    {
+        return capacity_;
+    }
 
     /* Returns the attributes in lexicographically sorted order. */
     std::vector<const Attr *> lexicographicOrder(const SymbolTable & symbols) const
@@ -125,8 +147,9 @@ public:
     EvalState & state;
 
     BindingsBuilder(EvalState & state, Bindings * bindings)
-        : bindings(bindings), state(state)
-    { }
+        : bindings(bindings)
+        , state(state)
+    {}
 
     void insert(Symbol name, Value * value, PosIdx pos = noPos)
     {

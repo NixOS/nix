@@ -20,11 +20,14 @@ struct CmdCopyLog : virtual CopyCommand, virtual InstallablesCommand
     std::string doc() override
     {
         return
-          #include "store-copy-log.md"
-          ;
+#include "store-copy-log.md"
+            ;
     }
 
-    Category category() override { return catUtility; }
+    Category category() override
+    {
+        return catUtility;
+    }
 
     void run(ref<Store> srcStore) override
     {

@@ -7,7 +7,8 @@ void builtinUnpackChannel(const BasicDerivation & drv)
 {
     auto getAttr = [&](const std::string & name) {
         auto i = drv.env.find(name);
-        if (i == drv.env.end()) throw Error("attribute '%s' missing", name);
+        if (i == drv.env.end())
+            throw Error("attribute '%s' missing", name);
         return i->second;
     };
 

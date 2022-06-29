@@ -11,10 +11,12 @@ struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreCon
         : StoreConfig(params)
         , LocalFSStoreConfig(params)
         , RemoteStoreConfig(params)
-    {
-    }
+    {}
 
-    const std::string name() override { return "Local Daemon Store"; }
+    const std::string name() override
+    {
+        return "Local Daemon Store";
+    }
 };
 
 class UDSRemoteStore : public virtual UDSRemoteStoreConfig, public virtual LocalFSStore, public virtual RemoteStore
@@ -27,16 +29,24 @@ public:
     std::string getUri() override;
 
     static std::set<std::string> uriSchemes()
-    { return {"unix"}; }
+    {
+        return {"unix"};
+    }
 
     bool sameMachine() override
-    { return true; }
+    {
+        return true;
+    }
 
     ref<FSAccessor> getFSAccessor() override
-    { return LocalFSStore::getFSAccessor(); }
+    {
+        return LocalFSStore::getFSAccessor();
+    }
 
     void narFromPath(const StorePath & path, Sink & sink) override
-    { LocalFSStore::narFromPath(path, sink); }
+    {
+        LocalFSStore::narFromPath(path, sink);
+    }
 
 private:
 

@@ -9,7 +9,6 @@
 
 namespace nix {
 
-
 static void sigsegvHandler(int signo, siginfo_t * info, void * ctx)
 {
     /* Detect stack overflows by comparing the faulting address with
@@ -27,7 +26,8 @@ static void sigsegvHandler(int signo, siginfo_t * info, void * ctx)
 
     if (haveSP) {
         ptrdiff_t diff = (char *) info->si_addr - sp;
-        if (diff < 0) diff = -diff;
+        if (diff < 0)
+            diff = -diff;
         if (diff < 4096) {
             char msg[] = "error: stack overflow (possible infinite recursion)\n";
             [[gnu::unused]] auto res = write(2, msg, strlen(msg));
@@ -40,13 +40,13 @@ static void sigsegvHandler(int signo, siginfo_t * info, void * ctx)
     sigfillset(&act.sa_mask);
     act.sa_handler = SIG_DFL;
     act.sa_flags = 0;
-    if (sigaction(SIGSEGV, &act, 0)) abort();
+    if (sigaction(SIGSEGV, &act, 0))
+        abort();
 }
-
 
 void detectStackOverflow()
 {
-#if defined(SA_SIGINFO) && defined (SA_ONSTACK)
+#if defined(SA_SIGINFO) && defined(SA_ONSTACK)
     /* Install a SIGSEGV handler to detect stack overflows.  This
        requires an alternative stack, otherwise the signal cannot be
        delivered when we're out of stack space. */
@@ -54,9 +54,11 @@ void detectStackOverflow()
     stack.ss_size = 4096 * 4 + MINSIGSTKSZ;
     static auto stackBuf = std::make_unique<std::vector<char>>(stack.ss_size);
     stack.ss_sp = stackBuf->data();
-    if (!stack.ss_sp) throw Error("cannot allocate alternative stack");
+    if (!stack.ss_sp)
+        throw Error("cannot allocate alternative stack");
     stack.ss_flags = 0;
-    if (sigaltstack(&stack, 0) == -1) throw SysError("cannot set alternative stack");
+    if (sigaltstack(&stack, 0) == -1)
+        throw SysError("cannot set alternative stack");
 
     struct sigaction act;
     sigfillset(&act.sa_mask);
@@ -66,6 +68,5 @@ void detectStackOverflow()
         throw SysError("resetting SIGSEGV");
 #endif
 }
-
 
 }

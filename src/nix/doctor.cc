@@ -23,12 +23,14 @@ std::string formatProtocol(unsigned int proto)
     return "unknown";
 }
 
-bool checkPass(const std::string & msg) {
+bool checkPass(const std::string & msg)
+{
     notice(ANSI_GREEN "[PASS] " ANSI_NORMAL + msg);
     return true;
 }
 
-bool checkFail(const std::string & msg) {
+bool checkFail(const std::string & msg)
+{
     notice(ANSI_RED "[FAIL] " ANSI_NORMAL + msg);
     return false;
 }
@@ -44,7 +46,10 @@ struct CmdDoctor : StoreCommand
         return "check your system for potential problems and print a PASS or FAIL for each check";
     }
 
-    Category category() override { return catNixInstallation; }
+    Category category() override
+    {
+        return catNixInstallation;
+    }
 
     void run(ref<Store> store) override
     {
@@ -95,7 +100,8 @@ struct CmdDoctor : StoreCommand
                     if (profileDir.find("/profiles/") == std::string::npos)
                         dirs.insert(dir);
                 }
-            } catch (SysError &) {}
+            } catch (SysError &) {
+            }
         }
 
         if (!dirs.empty()) {
@@ -115,8 +121,8 @@ struct CmdDoctor : StoreCommand
     bool checkStoreProtocol(unsigned int storeProto)
     {
         unsigned int clientProto = GET_PROTOCOL_MAJOR(SERVE_PROTOCOL_VERSION) == GET_PROTOCOL_MAJOR(storeProto)
-            ? SERVE_PROTOCOL_VERSION
-            : PROTOCOL_VERSION;
+                                       ? SERVE_PROTOCOL_VERSION
+                                       : PROTOCOL_VERSION;
 
         if (clientProto != storeProto) {
             std::stringstream ss;

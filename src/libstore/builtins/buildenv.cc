@@ -53,13 +53,9 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
          * Python package brings its own
          * `$out/lib/pythonX.Y/site-packages/easy-install.pth'.)
          */
-        if (hasSuffix(srcFile, "/propagated-build-inputs") ||
-            hasSuffix(srcFile, "/nix-support") ||
-            hasSuffix(srcFile, "/perllocal.pod") ||
-            hasSuffix(srcFile, "/info/dir") ||
-            hasSuffix(srcFile, "/log") ||
-            hasSuffix(srcFile, "/manifest.nix") ||
-            hasSuffix(srcFile, "/manifest.json"))
+        if (hasSuffix(srcFile, "/propagated-build-inputs") || hasSuffix(srcFile, "/nix-support")
+            || hasSuffix(srcFile, "/perllocal.pod") || hasSuffix(srcFile, "/info/dir") || hasSuffix(srcFile, "/log")
+            || hasSuffix(srcFile, "/manifest.nix") || hasSuffix(srcFile, "/manifest.json"))
             continue;
 
         else if (S_ISDIR(srcSt.st_mode)) {
@@ -93,12 +89,12 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                     auto prevPriority = state.priorities[dstFile];
                     if (prevPriority == priority)
                         throw Error(
-                                "files '%1%' and '%2%' have the same priority %3%; "
-                                "use 'nix-env --set-flag priority NUMBER INSTALLED_PKGNAME' "
-                                "or type 'nix profile install --help' if using 'nix profile' to find out how"
-                                "to change the priority of one of the conflicting packages"
-                                " (0 being the highest priority)",
-                                srcFile, readLink(dstFile), priority);
+                            "files '%1%' and '%2%' have the same priority %3%; "
+                            "use 'nix-env --set-flag priority NUMBER INSTALLED_PKGNAME' "
+                            "or type 'nix profile install --help' if using 'nix profile' to find out how"
+                            "to change the priority of one of the conflicting packages"
+                            " (0 being the highest priority)",
+                            srcFile, readLink(dstFile), priority);
                     if (prevPriority < priority)
                         continue;
                     if (unlink(dstFile.c_str()) == -1)
@@ -122,16 +118,18 @@ void buildProfile(const Path & out, Packages && pkgs)
     std::set<Path> done, postponed;
 
     auto addPkg = [&](const Path & pkgDir, int priority) {
-        if (!done.insert(pkgDir).second) return;
+        if (!done.insert(pkgDir).second)
+            return;
         createLinks(state, pkgDir, out, priority);
 
         try {
             for (const auto & p : tokenizeString<std::vector<std::string>>(
-                    readFile(pkgDir + "/nix-support/propagated-user-env-packages"), " \n"))
+                     readFile(pkgDir + "/nix-support/propagated-user-env-packages"), " \n"))
                 if (!done.count(p))
                     postponed.insert(p);
         } catch (SysError & e) {
-            if (e.errNo != ENOENT && e.errNo != ENOTDIR) throw;
+            if (e.errNo != ENOENT && e.errNo != ENOTDIR)
+                throw;
         }
     };
 
@@ -166,7 +164,8 @@ void builtinBuildenv(const BasicDerivation & drv)
 {
     auto getAttr = [&](const std::string & name) {
         auto i = drv.env.find(name);
-        if (i == drv.env.end()) throw Error("attribute '%s' missing", name);
+        if (i == drv.env.end())
+            throw Error("attribute '%s' missing", name);
         return i->second;
     };
 
@@ -179,11 +178,15 @@ void builtinBuildenv(const BasicDerivation & drv)
     auto derivations = tokenizeString<Strings>(getAttr("derivations"));
     while (!derivations.empty()) {
         /* !!! We're trusting the caller to structure derivations env var correctly */
-        auto active = derivations.front(); derivations.pop_front();
-        auto priority = stoi(derivations.front()); derivations.pop_front();
-        auto outputs = stoi(derivations.front()); derivations.pop_front();
+        auto active = derivations.front();
+        derivations.pop_front();
+        auto priority = stoi(derivations.front());
+        derivations.pop_front();
+        auto outputs = stoi(derivations.front());
+        derivations.pop_front();
         for (auto n = 0; n < outputs; n++) {
-            auto path = derivations.front(); derivations.pop_front();
+            auto path = derivations.front();
+            derivations.pop_front();
             pkgs.emplace_back(path, active != "false", priority);
         }
     }

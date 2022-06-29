@@ -34,8 +34,7 @@ void emitTreeAttrs(
     attrs.alloc("narHash").mkString(narHash->to_string(SRI, true));
 
     if (input.getType() == "git")
-        attrs.alloc("submodules").mkBool(
-            fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
+        attrs.alloc("submodules").mkBool(fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
 
     if (!forceDirty) {
 
@@ -53,13 +52,11 @@ void emitTreeAttrs(
             attrs.alloc("revCount").mkInt(*revCount);
         else if (emptyRevFallback)
             attrs.alloc("revCount").mkInt(0);
-
     }
 
     if (auto lastModified = input.getLastModified()) {
         attrs.alloc("lastModified").mkInt(*lastModified);
-        attrs.alloc("lastModifiedDate").mkString(
-            fmt("%s", std::put_time(std::gmtime(&*lastModified), "%Y%m%d%H%M%S")));
+        attrs.alloc("lastModifiedDate").mkString(fmt("%s", std::put_time(std::gmtime(&*lastModified), "%Y%m%d%H%M%S")));
     }
 
     v.mkAttrs(attrs);
@@ -83,7 +80,8 @@ std::string fixURIForGit(std::string uri, EvalState & state)
         return fixURI(uri, state);
 }
 
-struct FetchTreeParams {
+struct FetchTreeParams
+{
     bool emptyRevFallback = false;
     bool allowNameArgument = false;
 };
@@ -91,11 +89,11 @@ struct FetchTreeParams {
 static void fetchTree(
     EvalState & state,
     const PosIdx pos,
-    Value * * args,
+    Value ** args,
     Value & v,
     std::optional<std::string> type,
-    const FetchTreeParams & params = FetchTreeParams{}
-) {
+    const FetchTreeParams & params = FetchTreeParams{})
+{
     fetchers::Input input;
     PathSet context;
 
@@ -108,46 +106,40 @@ static void fetchTree(
 
         if (auto aType = args[0]->attrs->get(state.sType)) {
             if (type)
-                state.debugThrowLastTrace(EvalError({
-                    .msg = hintfmt("unexpected attribute 'type'"),
-                    .errPos = state.positions[pos]
-                }));
+                state.debugThrowLastTrace(
+                    EvalError({.msg = hintfmt("unexpected attribute 'type'"), .errPos = state.positions[pos]}));
             type = state.forceStringNoCtx(*aType->value, aType->pos);
         } else if (!type)
-            state.debugThrowLastTrace(EvalError({
-                .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
-                .errPos = state.positions[pos]
-            }));
+            state.debugThrowLastTrace(EvalError(
+                {.msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
+                 .errPos = state.positions[pos]}));
 
         attrs.emplace("type", type.value());
 
         for (auto & attr : *args[0]->attrs) {
-            if (attr.name == state.sType) continue;
+            if (attr.name == state.sType)
+                continue;
             state.forceValue(*attr.value, attr.pos);
             if (attr.value->type() == nPath || attr.value->type() == nString) {
                 auto s = state.coerceToString(attr.pos, *attr.value, context, false, false).toOwned();
-                attrs.emplace(state.symbols[attr.name],
-                    state.symbols[attr.name] == "url"
-                    ? type == "git"
-                      ? fixURIForGit(s, state)
-                      : fixURI(s, state)
-                    : s);
-            }
-            else if (attr.value->type() == nBool)
+                attrs.emplace(
+                    state.symbols[attr.name],
+                    state.symbols[attr.name] == "url" ? type == "git" ? fixURIForGit(s, state) : fixURI(s, state) : s);
+            } else if (attr.value->type() == nBool)
                 attrs.emplace(state.symbols[attr.name], Explicit<bool>{attr.value->boolean});
             else if (attr.value->type() == nInt)
                 attrs.emplace(state.symbols[attr.name], uint64_t(attr.value->integer));
             else
-                state.debugThrowLastTrace(TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
+                state.debugThrowLastTrace(TypeError(
+                    "fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
                     state.symbols[attr.name], showType(*attr.value)));
         }
 
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
-                state.debugThrowLastTrace(EvalError({
-                    .msg = hintfmt("attribute 'name' isn’t supported in call to 'fetchTree'"),
-                    .errPos = state.positions[pos]
-                }));
+                state.debugThrowLastTrace(EvalError(
+                    {.msg = hintfmt("attribute 'name' isn’t supported in call to 'fetchTree'"),
+                     .errPos = state.positions[pos]}));
 
         input = fetchers::Input::fromAttrs(std::move(attrs));
     } else {
@@ -167,7 +159,8 @@ static void fetchTree(
         input = lookupInRegistries(state.store, input).first;
 
     if (evalSettings.pureEval && !input.isLocked())
-        state.debugThrowLastTrace(EvalError("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", state.positions[pos]));
+        state.debugThrowLastTrace(
+            EvalError("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", state.positions[pos]));
 
     auto [tree, input2] = input.fetch(state.store);
 
@@ -176,17 +169,23 @@ static void fetchTree(
     emitTreeAttrs(state, tree, input2, v, params.emptyRevFallback, false);
 }
 
-static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_fetchTree(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     settings.requireExperimentalFeature(Xp::Flakes);
-    fetchTree(state, pos, args, v, std::nullopt, FetchTreeParams { .allowNameArgument = false });
+    fetchTree(state, pos, args, v, std::nullopt, FetchTreeParams{.allowNameArgument = false});
 }
 
 // FIXME: document
 static RegisterPrimOp primop_fetchTree("fetchTree", 1, prim_fetchTree);
 
-static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v,
-    const std::string & who, bool unpack, std::string name)
+static void fetch(
+    EvalState & state,
+    const PosIdx pos,
+    Value ** args,
+    Value & v,
+    const std::string & who,
+    bool unpack,
+    std::string name)
 {
     std::optional<std::string> url;
     std::optional<Hash> expectedHash;
@@ -206,17 +205,14 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
             else if (n == "name")
                 name = state.forceStringNoCtx(*attr.value, attr.pos);
             else
-                state.debugThrowLastTrace(EvalError({
-                    .msg = hintfmt("unsupported argument '%s' to '%s'", n, who),
-                    .errPos = state.positions[attr.pos]
-                }));
+                state.debugThrowLastTrace(EvalError(
+                    {.msg = hintfmt("unsupported argument '%s' to '%s'", n, who),
+                     .errPos = state.positions[attr.pos]}));
         }
 
         if (!url)
-            state.debugThrowLastTrace(EvalError({
-                .msg = hintfmt("'url' argument required"),
-                .errPos = state.positions[pos]
-            }));
+            state.debugThrowLastTrace(
+                EvalError({.msg = hintfmt("'url' argument required"), .errPos = state.positions[pos]}));
     } else
         url = state.forceStringNoCtx(*args[0], pos);
 
@@ -233,9 +229,8 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
     // early exit if pinned and already in the store
     if (expectedHash && expectedHash->type == htSHA256) {
         auto expectedPath =
-            unpack
-            ? state.store->makeFixedOutputPath(FileIngestionMethod::Recursive, *expectedHash, name, {})
-            : state.store->makeFixedOutputPath(FileIngestionMethod::Flat, *expectedHash, name, {});
+            unpack ? state.store->makeFixedOutputPath(FileIngestionMethod::Recursive, *expectedHash, name, {})
+                   : state.store->makeFixedOutputPath(FileIngestionMethod::Flat, *expectedHash, name, {});
 
         if (state.store->isValidPath(expectedPath)) {
             state.allowAndSetStorePathString(expectedPath, v);
@@ -245,24 +240,22 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
 
     // TODO: fetching may fail, yet the path may be substitutable.
     //       https://github.com/NixOS/nix/issues/4313
-    auto storePath =
-        unpack
-        ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
-        : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
+    auto storePath = unpack ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
+                            : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
     if (expectedHash) {
-        auto hash = unpack
-            ? state.store->queryPathInfo(storePath)->narHash
-            : hashFile(htSHA256, state.store->toRealPath(storePath));
+        auto hash = unpack ? state.store->queryPathInfo(storePath)->narHash
+                           : hashFile(htSHA256, state.store->toRealPath(storePath));
         if (hash != *expectedHash)
-            state.debugThrowLastTrace(EvalError((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
+            state.debugThrowLastTrace(EvalError(
+                (unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
                 *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true)));
     }
 
     state.allowAndSetStorePathString(storePath, v);
 }
 
-static void prim_fetchurl(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_fetchurl(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     fetch(state, pos, args, v, "fetchurl", false, "");
 }
@@ -278,7 +271,7 @@ static RegisterPrimOp primop_fetchurl({
     .fun = prim_fetchurl,
 });
 
-static void prim_fetchTarball(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_fetchTarball(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     fetch(state, pos, args, v, "fetchTarball", true, "source");
 }
@@ -329,9 +322,9 @@ static RegisterPrimOp primop_fetchTarball({
     .fun = prim_fetchTarball,
 });
 
-static void prim_fetchGit(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_fetchGit(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    fetchTree(state, pos, args, v, "git", FetchTreeParams { .emptyRevFallback = true, .allowNameArgument = true });
+    fetchTree(state, pos, args, v, "git", FetchTreeParams{.emptyRevFallback = true, .allowNameArgument = true});
 }
 
 static RegisterPrimOp primop_fetchGit({

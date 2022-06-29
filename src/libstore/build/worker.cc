@@ -25,7 +25,6 @@ Worker::Worker(Store & store, Store & evalStore)
     checkMismatch = false;
 }
 
-
 Worker::~Worker()
 {
     /* Explicitly get rid of all strong pointers now.  After this all
@@ -38,7 +37,6 @@ Worker::~Worker()
     assert(expectedDownloadSize == 0);
     assert(expectedNarSize == 0);
 }
-
 
 std::shared_ptr<DerivationGoal> Worker::makeDerivationGoalCommon(
     const StorePath & drvPath,
@@ -57,30 +55,28 @@ std::shared_ptr<DerivationGoal> Worker::makeDerivationGoalCommon(
     return goal;
 }
 
-
-std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(const StorePath & drvPath,
-    const StringSet & wantedOutputs, BuildMode buildMode)
+std::shared_ptr<DerivationGoal>
+Worker::makeDerivationGoal(const StorePath & drvPath, const StringSet & wantedOutputs, BuildMode buildMode)
 {
     return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
         return !dynamic_cast<LocalStore *>(&store)
-            ? std::make_shared</* */DerivationGoal>(drvPath, wantedOutputs, *this, buildMode)
-            : std::make_shared<LocalDerivationGoal>(drvPath, wantedOutputs, *this, buildMode);
+                   ? std::make_shared</* */ DerivationGoal>(drvPath, wantedOutputs, *this, buildMode)
+                   : std::make_shared<LocalDerivationGoal>(drvPath, wantedOutputs, *this, buildMode);
     });
 }
 
-
-std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath & drvPath,
-    const BasicDerivation & drv, const StringSet & wantedOutputs, BuildMode buildMode)
+std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(
+    const StorePath & drvPath, const BasicDerivation & drv, const StringSet & wantedOutputs, BuildMode buildMode)
 {
     return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
         return !dynamic_cast<LocalStore *>(&store)
-            ? std::make_shared</* */DerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode)
-            : std::make_shared<LocalDerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
+                   ? std::make_shared</* */ DerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode)
+                   : std::make_shared<LocalDerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
     });
 }
 
-
-std::shared_ptr<PathSubstitutionGoal> Worker::makePathSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
+std::shared_ptr<PathSubstitutionGoal>
+Worker::makePathSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
 {
     std::weak_ptr<PathSubstitutionGoal> & goal_weak = substitutionGoals[path];
     auto goal = goal_weak.lock(); // FIXME
@@ -92,7 +88,8 @@ std::shared_ptr<PathSubstitutionGoal> Worker::makePathSubstitutionGoal(const Sto
     return goal;
 }
 
-std::shared_ptr<DrvOutputSubstitutionGoal> Worker::makeDrvOutputSubstitutionGoal(const DrvOutput& id, RepairFlag repair, std::optional<ContentAddress> ca)
+std::shared_ptr<DrvOutputSubstitutionGoal>
+Worker::makeDrvOutputSubstitutionGoal(const DrvOutput & id, RepairFlag repair, std::optional<ContentAddress> ca)
 {
     std::weak_ptr<DrvOutputSubstitutionGoal> & goal_weak = drvOutputSubstitutionGoals[id];
     auto goal = goal_weak.lock(); // FIXME
@@ -108,16 +105,15 @@ template<typename K, typename G>
 static void removeGoal(std::shared_ptr<G> goal, std::map<K, std::weak_ptr<G>> & goalMap)
 {
     /* !!! inefficient */
-    for (auto i = goalMap.begin();
-         i != goalMap.end(); )
+    for (auto i = goalMap.begin(); i != goalMap.end();)
         if (i->second.lock() == goal) {
-            auto j = i; ++j;
+            auto j = i;
+            ++j;
             goalMap.erase(i);
             i = j;
-        }
-        else ++i;
+        } else
+            ++i;
 }
-
 
 void Worker::removeGoal(GoalPtr goal)
 {
@@ -141,12 +137,12 @@ void Worker::removeGoal(GoalPtr goal)
     /* Wake up goals waiting for any goal to finish. */
     for (auto & i : waitingForAnyGoal) {
         GoalPtr goal = i.lock();
-        if (goal) wakeUp(goal);
+        if (goal)
+            wakeUp(goal);
     }
 
     waitingForAnyGoal.clear();
 }
-
 
 void Worker::wakeUp(GoalPtr goal)
 {
@@ -154,15 +150,12 @@ void Worker::wakeUp(GoalPtr goal)
     addToWeakGoals(awake, goal);
 }
 
-
 unsigned Worker::getNrLocalBuilds()
 {
     return nrLocalBuilds;
 }
 
-
-void Worker::childStarted(GoalPtr goal, const std::set<int> & fds,
-    bool inBuildSlot, bool respectTimeouts)
+void Worker::childStarted(GoalPtr goal, const std::set<int> & fds, bool inBuildSlot, bool respectTimeouts)
 {
     Child child;
     child.goal = goal;
@@ -172,15 +165,15 @@ void Worker::childStarted(GoalPtr goal, const std::set<int> & fds,
     child.inBuildSlot = inBuildSlot;
     child.respectTimeouts = respectTimeouts;
     children.emplace_back(child);
-    if (inBuildSlot) nrLocalBuilds++;
+    if (inBuildSlot)
+        nrLocalBuilds++;
 }
-
 
 void Worker::childTerminated(Goal * goal, bool wakeSleepers)
 {
-    auto i = std::find_if(children.begin(), children.end(),
-        [&](const Child & child) { return child.goal2 == goal; });
-    if (i == children.end()) return;
+    auto i = std::find_if(children.begin(), children.end(), [&](const Child & child) { return child.goal2 == goal; });
+    if (i == children.end())
+        return;
 
     if (i->inBuildSlot) {
         assert(nrLocalBuilds > 0);
@@ -194,13 +187,13 @@ void Worker::childTerminated(Goal * goal, bool wakeSleepers)
         /* Wake up goals waiting for a build slot. */
         for (auto & j : wantingToBuild) {
             GoalPtr goal = j.lock();
-            if (goal) wakeUp(goal);
+            if (goal)
+                wakeUp(goal);
         }
 
         wantingToBuild.clear();
     }
 }
-
 
 void Worker::waitForBuildSlot(GoalPtr goal)
 {
@@ -211,20 +204,17 @@ void Worker::waitForBuildSlot(GoalPtr goal)
         addToWeakGoals(wantingToBuild, goal);
 }
 
-
 void Worker::waitForAnyGoal(GoalPtr goal)
 {
     debug("wait for any goal");
     addToWeakGoals(waitingForAnyGoal, goal);
 }
 
-
 void Worker::waitForAWhile(GoalPtr goal)
 {
     debug("wait for a while");
     addToWeakGoals(waitingForAWhile, goal);
 }
-
 
 void Worker::run(const Goals & _topGoals)
 {
@@ -260,33 +250,36 @@ void Worker::run(const Goals & _topGoals)
             Goals awake2;
             for (auto & i : awake) {
                 GoalPtr goal = i.lock();
-                if (goal) awake2.insert(goal);
+                if (goal)
+                    awake2.insert(goal);
             }
             awake.clear();
             for (auto & goal : awake2) {
                 checkInterrupt();
                 goal->work();
-                if (topGoals.empty()) break; // stuff may have been cancelled
+                if (topGoals.empty())
+                    break; // stuff may have been cancelled
             }
         }
 
-        if (topGoals.empty()) break;
+        if (topGoals.empty())
+            break;
 
         /* Wait for input. */
         if (!children.empty() || !waitingForAWhile.empty())
             waitForInput();
         else {
-            if (awake.empty() && 0 == settings.maxBuildJobs)
-            {
+            if (awake.empty() && 0 == settings.maxBuildJobs) {
                 if (getMachines().empty())
-                   throw Error("unable to start any build; either increase '--max-jobs' "
-                            "or enable remote builds."
-                            "\nhttps://nixos.org/manual/nix/stable/advanced-topics/distributed-builds.html");
+                    throw Error(
+                        "unable to start any build; either increase '--max-jobs' "
+                        "or enable remote builds."
+                        "\nhttps://nixos.org/manual/nix/stable/advanced-topics/distributed-builds.html");
                 else
-                   throw Error("unable to start any build; remote machines may not have "
-                            "all required system features."
-                            "\nhttps://nixos.org/manual/nix/stable/advanced-topics/distributed-builds.html");
-
+                    throw Error(
+                        "unable to start any build; remote machines may not have "
+                        "all required system features."
+                        "\nhttps://nixos.org/manual/nix/stable/advanced-topics/distributed-builds.html");
             }
             assert(!awake.empty());
         }
@@ -322,7 +315,8 @@ void Worker::waitForInput()
         // Periodicallty wake up to see if we need to run the garbage collector.
         nearest = before + std::chrono::seconds(10);
     for (auto & i : children) {
-        if (!i.respectTimeouts) continue;
+        if (!i.respectTimeouts)
+            continue;
         if (0 != settings.maxSilentTime)
             nearest = std::min(nearest, i.lastOutput + std::chrono::seconds(settings.maxSilentTime));
         if (0 != settings.buildTimeout)
@@ -337,11 +331,14 @@ void Worker::waitForInput()
        up after a few seconds at most. */
     if (!waitingForAWhile.empty()) {
         useTimeout = true;
-        if (lastWokenUp == steady_time_point::min() || lastWokenUp > before) lastWokenUp = before;
-        timeout = std::max(1L,
-            (long) std::chrono::duration_cast<std::chrono::seconds>(
-                lastWokenUp + std::chrono::seconds(settings.pollInterval) - before).count());
-    } else lastWokenUp = steady_time_point::min();
+        if (lastWokenUp == steady_time_point::min() || lastWokenUp > before)
+            lastWokenUp = before;
+        timeout = std::max(
+            1L, (long) std::chrono::duration_cast<std::chrono::seconds>(
+                    lastWokenUp + std::chrono::seconds(settings.pollInterval) - before)
+                    .count());
+    } else
+        lastWokenUp = steady_time_point::min();
 
     if (useTimeout)
         vomit("sleeping %d seconds", timeout);
@@ -353,14 +350,14 @@ void Worker::waitForInput()
     std::map<int, size_t> fdToPollStatus;
     for (auto & i : children) {
         for (auto & j : i.fds) {
-            pollStatus.push_back((struct pollfd) { .fd = j, .events = POLLIN });
+            pollStatus.push_back((struct pollfd){.fd = j, .events = POLLIN});
             fdToPollStatus[j] = pollStatus.size() - 1;
         }
     }
 
-    if (poll(pollStatus.data(), pollStatus.size(),
-            useTimeout ? timeout * 1000 : -1) == -1) {
-        if (errno == EINTR) return;
+    if (poll(pollStatus.data(), pollStatus.size(), useTimeout ? timeout * 1000 : -1) == -1) {
+        if (errno == EINTR)
+            return;
         throw SysError("waiting for input");
     }
 
@@ -395,8 +392,7 @@ void Worker::waitForInput()
                     if (errno != EINTR)
                         throw SysError("%s: read failed", goal->getName());
                 } else {
-                    printMsg(lvlVomit, "%1%: read %2% bytes",
-                        goal->getName(), rd);
+                    printMsg(lvlVomit, "%1%: read %2% bytes", goal->getName(), rd);
                     std::string data((char *) buffer.data(), rd);
                     j->lastOutput = after;
                     goal->handleChildOutput(k, data);
@@ -404,24 +400,16 @@ void Worker::waitForInput()
             }
         }
 
-        if (goal->exitCode == Goal::ecBusy &&
-            0 != settings.maxSilentTime &&
-            j->respectTimeouts &&
-            after - j->lastOutput >= std::chrono::seconds(settings.maxSilentTime))
-        {
-            goal->timedOut(Error(
-                    "%1% timed out after %2% seconds of silence",
-                    goal->getName(), settings.maxSilentTime));
+        if (goal->exitCode == Goal::ecBusy && 0 != settings.maxSilentTime && j->respectTimeouts
+            && after - j->lastOutput >= std::chrono::seconds(settings.maxSilentTime)) {
+            goal->timedOut(
+                Error("%1% timed out after %2% seconds of silence", goal->getName(), settings.maxSilentTime));
         }
 
-        else if (goal->exitCode == Goal::ecBusy &&
-            0 != settings.buildTimeout &&
-            j->respectTimeouts &&
-            after - j->timeStarted >= std::chrono::seconds(settings.buildTimeout))
-        {
-            goal->timedOut(Error(
-                    "%1% timed out after %2% seconds",
-                    goal->getName(), settings.buildTimeout));
+        else if (
+            goal->exitCode == Goal::ecBusy && 0 != settings.buildTimeout && j->respectTimeouts
+            && after - j->timeStarted >= std::chrono::seconds(settings.buildTimeout)) {
+            goal->timedOut(Error("%1% timed out after %2% seconds", goal->getName(), settings.buildTimeout));
         }
     }
 
@@ -429,12 +417,12 @@ void Worker::waitForInput()
         lastWokenUp = after;
         for (auto & i : waitingForAWhile) {
             GoalPtr goal = i.lock();
-            if (goal) wakeUp(goal);
+            if (goal)
+                wakeUp(goal);
         }
         waitingForAWhile.clear();
     }
 }
-
 
 unsigned int Worker::exitStatus()
 {
@@ -449,13 +437,13 @@ unsigned int Worker::exitStatus()
     unsigned int mask = 0;
     bool buildFailure = permanentFailure || timedOut || hashMismatch;
     if (buildFailure)
-        mask |= 0x04;  // 100
+        mask |= 0x04; // 100
     if (timedOut)
-        mask |= 0x01;  // 101
+        mask |= 0x01; // 101
     if (hashMismatch)
-        mask |= 0x02;  // 102
+        mask |= 0x02; // 102
     if (checkMismatch) {
-        mask |= 0x08;  // 104
+        mask |= 0x08; // 104
     }
 
     if (mask)
@@ -463,11 +451,11 @@ unsigned int Worker::exitStatus()
     return mask ? mask : 1;
 }
 
-
 bool Worker::pathContentsGood(const StorePath & path)
 {
     auto i = pathContentsGoodCache.find(path);
-    if (i != pathContentsGoodCache.end()) return i->second;
+    if (i != pathContentsGoodCache.end())
+        return i->second;
     printInfo("checking path '%s'...", store.printStorePath(path));
     auto info = store.queryPathInfo(path);
     bool res;
@@ -484,17 +472,17 @@ bool Worker::pathContentsGood(const StorePath & path)
     return res;
 }
 
-
 void Worker::markContentsGood(const StorePath & path)
 {
     pathContentsGoodCache.insert_or_assign(path, true);
 }
 
-
-GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal) {
+GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal)
+{
     return subGoal;
 }
-GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal) {
+GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal)
+{
     return subGoal;
 }
 

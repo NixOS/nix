@@ -24,8 +24,7 @@ class RemoteFSAccessor : public FSAccessor
 
 public:
 
-    RemoteFSAccessor(ref<Store> store,
-        const /* FIXME: use std::optional */ Path & cacheDir = "");
+    RemoteFSAccessor(ref<Store> store, const /* FIXME: use std::optional */ Path & cacheDir = "");
 
     Stat stat(const Path & path) override;
 

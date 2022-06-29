@@ -14,14 +14,14 @@ using namespace nix;
 std::string deleteOlderThan;
 bool dryRun = false;
 
-
 /* If `-d' was specified, remove all old generations of all profiles.
  * Of course, this makes rollbacks to before this point in time
  * impossible. */
 
 void removeOldGenerations(std::string dir)
 {
-    if (access(dir.c_str(), R_OK) != 0) return;
+    if (access(dir.c_str(), R_OK) != 0)
+        return;
 
     bool canWrite = access(dir.c_str(), W_OK) == 0;
 
@@ -36,7 +36,8 @@ void removeOldGenerations(std::string dir)
             try {
                 link = readLink(path);
             } catch (SysError & e) {
-                if (e.errNo == ENOENT) continue;
+                if (e.errNo == ENOENT)
+                    continue;
                 throw;
             }
             if (link.find("link") != std::string::npos) {
@@ -52,7 +53,7 @@ void removeOldGenerations(std::string dir)
     }
 }
 
-static int main_nix_collect_garbage(int argc, char * * argv)
+static int main_nix_collect_garbage(int argc, char ** argv)
 {
     {
         bool removeOld = false;
@@ -64,12 +65,13 @@ static int main_nix_collect_garbage(int argc, char * * argv)
                 showManPage("nix-collect-garbage");
             else if (*arg == "--version")
                 printVersion("nix-collect-garbage");
-            else if (*arg == "--delete-old" || *arg == "-d") removeOld = true;
+            else if (*arg == "--delete-old" || *arg == "-d")
+                removeOld = true;
             else if (*arg == "--delete-older-than") {
                 removeOld = true;
                 deleteOlderThan = getArg(*arg, arg, end);
-            }
-            else if (*arg == "--dry-run") dryRun = true;
+            } else if (*arg == "--dry-run")
+                dryRun = true;
             else if (*arg == "--max-freed")
                 options.maxFreed = std::max(getIntArg<int64_t>(*arg, arg, end, true), (int64_t) 0);
             else
@@ -78,7 +80,8 @@ static int main_nix_collect_garbage(int argc, char * * argv)
         });
 
         auto profilesDir = settings.nixStateDir + "/profiles";
-        if (removeOld) removeOldGenerations(profilesDir);
+        if (removeOld)
+            removeOldGenerations(profilesDir);
 
         // Run the actual garbage collector.
         if (!dryRun) {

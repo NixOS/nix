@@ -5,8 +5,7 @@
 namespace nix {
 
 /* Note: Various places expect the allocated memory to be zeroed. */
-[[gnu::always_inline]]
-inline void * allocBytes(size_t n)
+[[gnu::always_inline]] inline void * allocBytes(size_t n)
 {
     void * p;
 #if HAVE_BOEHMGC
@@ -14,13 +13,12 @@ inline void * allocBytes(size_t n)
 #else
     p = calloc(n, 1);
 #endif
-    if (!p) throw std::bad_alloc();
+    if (!p)
+        throw std::bad_alloc();
     return p;
 }
 
-
-[[gnu::always_inline]]
-Value * EvalState::allocValue()
+[[gnu::always_inline]] Value * EvalState::allocValue()
 {
 #if HAVE_BOEHMGC
     /* We use the boehm batch allocator to speed up allocations of Values (of which there are many).
@@ -29,7 +27,8 @@ Value * EvalState::allocValue()
        have to explicitly clear the first word of every object we take. */
     if (!*valueAllocCache) {
         *valueAllocCache = GC_malloc_many(sizeof(Value));
-        if (!*valueAllocCache) throw std::bad_alloc();
+        if (!*valueAllocCache)
+            throw std::bad_alloc();
     }
 
     /* GC_NEXT is a convenience macro for accessing the first word of an object.
@@ -45,9 +44,7 @@ Value * EvalState::allocValue()
     return (Value *) p;
 }
 
-
-[[gnu::always_inline]]
-Env & EvalState::allocEnv(size_t size)
+[[gnu::always_inline]] Env & EvalState::allocEnv(size_t size)
 {
     nrEnvs++;
     nrValuesInEnvs += size;
@@ -59,7 +56,8 @@ Env & EvalState::allocEnv(size_t size)
         /* see allocValue for explanations. */
         if (!*env1AllocCache) {
             *env1AllocCache = GC_malloc_many(sizeof(Env) + sizeof(Value *));
-            if (!*env1AllocCache) throw std::bad_alloc();
+            if (!*env1AllocCache)
+                throw std::bad_alloc();
         }
 
         void * p = *env1AllocCache;
@@ -77,13 +75,10 @@ Env & EvalState::allocEnv(size_t size)
     return *env;
 }
 
-
-[[gnu::always_inline]]
-void EvalState::forceValue(Value & v, const PosIdx pos)
+[[gnu::always_inline]] void EvalState::forceValue(Value & v, const PosIdx pos)
 {
     forceValue(v, [&]() { return pos; });
 }
-
 
 template<typename Callable>
 void EvalState::forceValue(Value & v, Callable getPos)
@@ -93,44 +88,36 @@ void EvalState::forceValue(Value & v, Callable getPos)
         Expr * expr = v.thunk.expr;
         try {
             v.mkBlackhole();
-            //checkInterrupt();
+            // checkInterrupt();
             expr->eval(*this, *env, v);
         } catch (...) {
             v.mkThunk(env, expr);
             throw;
         }
-    }
-    else if (v.isApp())
+    } else if (v.isApp())
         callFunction(*v.app.left, *v.app.right, v, noPos);
     else if (v.isBlackhole())
         throwEvalError(getPos(), "infinite recursion encountered");
 }
 
-
-[[gnu::always_inline]]
-inline void EvalState::forceAttrs(Value & v, const PosIdx pos)
+[[gnu::always_inline]] inline void EvalState::forceAttrs(Value & v, const PosIdx pos)
 {
     forceAttrs(v, [&]() { return pos; });
 }
 
-
-template <typename Callable>
-[[gnu::always_inline]]
-inline void EvalState::forceAttrs(Value & v, Callable getPos)
+template<typename Callable>
+[[gnu::always_inline]] inline void EvalState::forceAttrs(Value & v, Callable getPos)
 {
     forceValue(v, getPos);
     if (v.type() != nAttrs)
         throwTypeError(getPos(), "value is %1% while a set was expected", v);
 }
 
-
-[[gnu::always_inline]]
-inline void EvalState::forceList(Value & v, const PosIdx pos)
+[[gnu::always_inline]] inline void EvalState::forceList(Value & v, const PosIdx pos)
 {
     forceValue(v, pos);
     if (!v.isList())
         throwTypeError(pos, "value is %1% while a list was expected", v);
 }
-
 
 }

@@ -15,7 +15,8 @@ class Worker;
 // 1. Fetch the output info from a substituter
 // 2. Substitute the corresponding output path
 // 3. Register the output info
-class DrvOutputSubstitutionGoal : public Goal {
+class DrvOutputSubstitutionGoal : public Goal
+{
 private:
     // The drv output we're trying to substitue
     DrvOutput id;
@@ -38,7 +39,11 @@ private:
     bool substituterFailed = false;
 
 public:
-    DrvOutputSubstitutionGoal(const DrvOutput& id, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    DrvOutputSubstitutionGoal(
+        const DrvOutput & id,
+        Worker & worker,
+        RepairFlag repair = NoRepair,
+        std::optional<ContentAddress> ca = std::nullopt);
 
     typedef void (DrvOutputSubstitutionGoal::*GoalState)();
     GoalState state;
@@ -49,7 +54,10 @@ public:
     void outPathValid();
     void finished();
 
-    void timedOut(Error && ex) override { abort(); };
+    void timedOut(Error && ex) override
+    {
+        abort();
+    };
 
     std::string key() override;
 

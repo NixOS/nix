@@ -28,10 +28,7 @@ class EvalCache : public std::enable_shared_from_this<EvalCache>
 
 public:
 
-    EvalCache(
-        std::optional<std::reference_wrapper<const Hash>> useCache,
-        EvalState & state,
-        RootLoader rootLoader);
+    EvalCache(std::optional<std::reference_wrapper<const Hash>> useCache, EvalState & state, RootLoader rootLoader);
 
     ref<AttrCursor> getRoot();
 };
@@ -48,11 +45,18 @@ enum AttrType {
     Int = 8,
 };
 
-struct placeholder_t {};
-struct missing_t {};
-struct misc_t {};
-struct failed_t {};
-struct int_t { NixInt x; };
+struct placeholder_t
+{};
+struct missing_t
+{};
+struct misc_t
+{};
+struct failed_t
+{};
+struct int_t
+{
+    NixInt x;
+};
 typedef uint64_t AttrId;
 typedef std::pair<AttrId, Symbol> AttrKey;
 typedef std::pair<std::string, NixStringContext> string_t;
@@ -66,8 +70,8 @@ typedef std::variant<
     failed_t,
     bool,
     int_t,
-    std::vector<std::string>
-    > AttrValue;
+    std::vector<std::string>>
+    AttrValue;
 
 class AttrCursor : public std::enable_shared_from_this<AttrCursor>
 {

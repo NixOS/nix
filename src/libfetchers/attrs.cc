@@ -15,7 +15,7 @@ Attrs jsonToAttrs(const nlohmann::json & json)
         else if (i.value().is_string())
             attrs.emplace(i.key(), i.value().get<std::string>());
         else if (i.value().is_boolean())
-            attrs.emplace(i.key(), Explicit<bool> { i.value().get<bool>() });
+            attrs.emplace(i.key(), Explicit<bool>{i.value().get<bool>()});
         else
             throw Error("unsupported input attribute type in lock file");
     }
@@ -33,7 +33,8 @@ nlohmann::json attrsToJSON(const Attrs & attrs)
             json[attr.first] = *v;
         } else if (auto v = std::get_if<Explicit<bool>>(&attr.second)) {
             json[attr.first] = v->t;
-        } else abort();
+        } else
+            abort();
     }
     return json;
 }
@@ -41,7 +42,8 @@ nlohmann::json attrsToJSON(const Attrs & attrs)
 std::optional<std::string> maybeGetStrAttr(const Attrs & attrs, const std::string & name)
 {
     auto i = attrs.find(name);
-    if (i == attrs.end()) return {};
+    if (i == attrs.end())
+        return {};
     if (auto v = std::get_if<std::string>(&i->second))
         return *v;
     throw Error("input attribute '%s' is not a string %s", name, attrsToJSON(attrs).dump());
@@ -58,7 +60,8 @@ std::string getStrAttr(const Attrs & attrs, const std::string & name)
 std::optional<uint64_t> maybeGetIntAttr(const Attrs & attrs, const std::string & name)
 {
     auto i = attrs.find(name);
-    if (i == attrs.end()) return {};
+    if (i == attrs.end())
+        return {};
     if (auto v = std::get_if<uint64_t>(&i->second))
         return *v;
     throw Error("input attribute '%s' is not an integer", name);
@@ -75,7 +78,8 @@ uint64_t getIntAttr(const Attrs & attrs, const std::string & name)
 std::optional<bool> maybeGetBoolAttr(const Attrs & attrs, const std::string & name)
 {
     auto i = attrs.find(name);
-    if (i == attrs.end()) return {};
+    if (i == attrs.end())
+        return {};
     if (auto v = std::get_if<Explicit<bool>>(&i->second))
         return v->t;
     throw Error("input attribute '%s' is not a Boolean", name);
@@ -99,7 +103,8 @@ std::map<std::string, std::string> attrsToQuery(const Attrs & attrs)
             query.insert_or_assign(attr.first, *v);
         } else if (auto v = std::get_if<Explicit<bool>>(&attr.second)) {
             query.insert_or_assign(attr.first, v->t ? "1" : "0");
-        } else abort();
+        } else
+            abort();
     }
     return query;
 }

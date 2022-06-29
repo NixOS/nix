@@ -2,9 +2,7 @@
 #include "eval-inline.hh"
 #include "util.hh"
 
-
 namespace nix {
-
 
 static Strings parseAttrPath(std::string_view s)
 {
@@ -20,17 +18,18 @@ static Strings parseAttrPath(std::string_view s)
             while (1) {
                 if (i == s.end())
                     throw ParseError("missing closing quote in selection path '%1%'", s);
-                if (*i == '"') break;
+                if (*i == '"')
+                    break;
                 cur.push_back(*i++);
             }
         } else
             cur.push_back(*i);
         ++i;
     }
-    if (!cur.empty()) res.push_back(cur);
+    if (!cur.empty())
+        res.push_back(cur);
     return res;
 }
-
 
 std::vector<Symbol> parseAttrPath(EvalState & state, std::string_view s)
 {
@@ -40,9 +39,8 @@ std::vector<Symbol> parseAttrPath(EvalState & state, std::string_view s)
     return res;
 }
 
-
-std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::string & attrPath,
-    Bindings & autoArgs, Value & vIn)
+std::pair<Value *, PosIdx>
+findAlongAttrPath(EvalState & state, const std::string & attrPath, Bindings & autoArgs, Value & vIn)
 {
     Strings tokens = parseAttrPath(attrPath);
 
@@ -67,8 +65,7 @@ std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::strin
 
             if (v->type() != nAttrs)
                 throw TypeError(
-                    "the expression selected by the selection path '%1%' should be a set but is %2%",
-                    attrPath,
+                    "the expression selected by the selection path '%1%' should be a set but is %2%", attrPath,
                     showType(*v));
             if (attr.empty())
                 throw Error("empty attribute name in selection path '%1%'", attrPath);
@@ -80,7 +77,8 @@ std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::strin
                     attrNames.insert(state.symbols[attr.name]);
 
                 auto suggestions = Suggestions::bestMatches(attrNames, attr);
-                throw AttrPathNotFound(suggestions, "attribute '%1%' in selection path '%2%' not found", attr, attrPath);
+                throw AttrPathNotFound(
+                    suggestions, "attribute '%1%' in selection path '%2%' not found", attr, attrPath);
             }
             v = &*a->value;
             pos = a->pos;
@@ -90,8 +88,7 @@ std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::strin
 
             if (!v->isList())
                 throw TypeError(
-                    "the expression selected by the selection path '%1%' should be a list but is %2%",
-                    attrPath,
+                    "the expression selected by the selection path '%1%' should be a list but is %2%", attrPath,
                     showType(*v));
             if (*attrIndex >= v->listSize())
                 throw AttrPathNotFound("list index %1% in selection path '%2%' is out of range", *attrIndex, attrPath);
@@ -99,12 +96,10 @@ std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::strin
             v = v->listElems()[*attrIndex];
             pos = noPos;
         }
-
     }
 
     return {v, pos};
 }
-
 
 std::pair<std::string, uint32_t> findPackageFilename(EvalState & state, Value & v, std::string what)
 {
@@ -132,8 +127,7 @@ std::pair<std::string, uint32_t> findPackageFilename(EvalState & state, Value & 
         throw ParseError("cannot parse line number '%s'", pos);
     }
 
-    return { std::move(filename), lineno };
+    return {std::move(filename), lineno};
 }
-
 
 }

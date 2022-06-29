@@ -7,7 +7,8 @@
 namespace nix {
 
 ParsedDerivation::ParsedDerivation(const StorePath & drvPath, BasicDerivation & drv)
-    : drvPath(drvPath), drv(drv)
+    : drvPath(drvPath)
+    , drv(drv)
 {
     /* Parse the __json attribute, if any. */
     auto jsonAttr = drv.env.find("__json");
@@ -20,7 +21,7 @@ ParsedDerivation::ParsedDerivation(const StorePath & drvPath, BasicDerivation & 
     }
 }
 
-ParsedDerivation::~ParsedDerivation() { }
+ParsedDerivation::~ParsedDerivation() {}
 
 std::optional<std::string> ParsedDerivation::getStringAttr(const std::string & name) const
 {
@@ -74,7 +75,8 @@ std::optional<Strings> ParsedDerivation::getStringsAttr(const std::string & name
             Strings res;
             for (auto j = i->begin(); j != i->end(); ++j) {
                 if (!j->is_string())
-                    throw Error("attribute '%s' of derivation '%s' must be a list of strings", name, drvPath.to_string());
+                    throw Error(
+                        "attribute '%s' of derivation '%s' must be a list of strings", name, drvPath.to_string());
                 res.push_back(j->get<std::string>());
             }
             return res;
@@ -100,17 +102,16 @@ StringSet ParsedDerivation::getRequiredSystemFeatures() const
 
 bool ParsedDerivation::canBuildLocally(Store & localStore) const
 {
-    if (drv.platform != settings.thisSystem.get()
-        && !settings.extraPlatforms.get().count(drv.platform)
+    if (drv.platform != settings.thisSystem.get() && !settings.extraPlatforms.get().count(drv.platform)
         && !drv.isBuiltin())
         return false;
 
-    if (settings.maxBuildJobs.get() == 0
-        && !drv.isBuiltin())
+    if (settings.maxBuildJobs.get() == 0 && !drv.isBuiltin())
         return false;
 
     for (auto & feature : getRequiredSystemFeatures())
-        if (!localStore.systemFeatures.get().count(feature)) return false;
+        if (!localStore.systemFeatures.get().count(feature))
+            return false;
 
     return true;
 }
@@ -130,7 +131,8 @@ static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
 std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths)
 {
     auto structuredAttrs = getStructuredAttrs();
-    if (!structuredAttrs) return std::nullopt;
+    if (!structuredAttrs)
+        return std::nullopt;
 
     auto json = *structuredAttrs;
 
@@ -150,8 +152,7 @@ std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & s
                 StorePathSet storePaths;
                 for (auto & p : *i)
                     storePaths.insert(store.parseStorePath(p.get<std::string>()));
-                store.pathInfoToJSON(jsonRoot,
-                    store.exportReferences(storePaths, inputPaths), false, true);
+                store.pathInfoToJSON(jsonRoot, store.exportReferences(storePaths, inputPaths), false, true);
             }
             json[i.key()] = nlohmann::json::parse(str.str()); // urgh
         }
@@ -191,7 +192,8 @@ std::string writeStructuredAttrsShell(const nlohmann::json & json)
 
     for (auto & [key, value] : json.items()) {
 
-        if (!std::regex_match(key, shVarName)) continue;
+        if (!std::regex_match(key, shVarName))
+            continue;
 
         auto s = handleSimpleType(value);
         if (s)
@@ -203,8 +205,12 @@ std::string writeStructuredAttrsShell(const nlohmann::json & json)
 
             for (auto & value2 : value) {
                 auto s3 = handleSimpleType(value2);
-                if (!s3) { good = false; break; }
-                s2 += *s3; s2 += ' ';
+                if (!s3) {
+                    good = false;
+                    break;
+                }
+                s2 += *s3;
+                s2 += ' ';
             }
 
             if (good)
@@ -217,7 +223,10 @@ std::string writeStructuredAttrsShell(const nlohmann::json & json)
 
             for (auto & [key2, value2] : value.items()) {
                 auto s3 = handleSimpleType(value2);
-                if (!s3) { good = false; break; }
+                if (!s3) {
+                    good = false;
+                    break;
+                }
                 s2 += fmt("[%s]=%s ", shellEscape(key2), *s3);
             }
 

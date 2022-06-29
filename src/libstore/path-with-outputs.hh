@@ -35,12 +35,20 @@ StorePathWithOutputs followLinksToStorePathWithOutputs(const Store & store, std:
 
 typedef std::set<std::string> OutputNames;
 
-struct AllOutputs {
-    bool operator < (const AllOutputs & _) const { return false; }
+struct AllOutputs
+{
+    bool operator<(const AllOutputs & _) const
+    {
+        return false;
+    }
 };
 
-struct DefaultOutputs {
-    bool operator < (const DefaultOutputs & _) const { return false; }
+struct DefaultOutputs
+{
+    bool operator<(const DefaultOutputs & _) const
+    {
+        return false;
+    }
 };
 
 typedef std::variant<DefaultOutputs, AllOutputs, OutputNames> OutputsSpec;

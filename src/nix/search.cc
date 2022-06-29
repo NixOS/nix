@@ -29,14 +29,12 @@ struct CmdSearch : InstallableCommand, MixJSON
     CmdSearch()
     {
         expectArgs("regex", &res);
-        addFlag(Flag {
+        addFlag(Flag{
             .longName = "exclude",
             .shortName = 'e',
             .description = "Hide packages whose attribute path, name or description contain *regex*.",
             .labels = {"regex"},
-            .handler = {[this](std::string s) {
-                excludeRes.push_back(s);
-            }},
+            .handler = {[this](std::string s) { excludeRes.push_back(s); }},
         });
     }
 
@@ -48,16 +46,13 @@ struct CmdSearch : InstallableCommand, MixJSON
     std::string doc() override
     {
         return
-          #include "search.md"
-          ;
+#include "search.md"
+            ;
     }
 
     Strings getDefaultFlakeAttrPaths() override
     {
-        return {
-            "packages." + settings.thisSystem.get() + ".",
-            "legacyPackages." + settings.thisSystem.get() + "."
-        };
+        return {"packages." + settings.thisSystem.get() + ".", "legacyPackages." + settings.thisSystem.get() + "."};
     }
 
     void run(ref<Store> store) override
@@ -88,17 +83,15 @@ struct CmdSearch : InstallableCommand, MixJSON
 
         uint64_t results = 0;
 
-        std::function<void(eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)> visit;
+        std::function<void(eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)>
+            visit;
 
-        visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse)
-        {
+        visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse) {
             auto attrPathS = state->symbols.resolve(attrPath);
 
-            Activity act(*logger, lvlInfo, actUnknown,
-                fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
+            Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
             try {
-                auto recurse = [&]()
-                {
+                auto recurse = [&]() {
                     for (const auto & attr : cursor.getAttrs()) {
                         auto cursor2 = cursor.getAttr(state->symbols[attr]);
                         auto attrPath2(attrPath);
@@ -122,9 +115,7 @@ struct CmdSearch : InstallableCommand, MixJSON
                     bool found = false;
 
                     for (auto & regex : excludeRegexes) {
-                        if (
-                            std::regex_search(attrPath2, regex)
-                            || std::regex_search(name.name, regex)
+                        if (std::regex_search(attrPath2, regex) || std::regex_search(name.name, regex)
                             || std::regex_search(description, regex))
                             return;
                     }
@@ -147,8 +138,7 @@ struct CmdSearch : InstallableCommand, MixJSON
                             break;
                     }
 
-                    if (found)
-                    {
+                    if (found) {
                         results++;
                         if (json) {
                             auto jsonElem = jsonOut->object(attrPath2);
@@ -157,7 +147,8 @@ struct CmdSearch : InstallableCommand, MixJSON
                             jsonElem.attr("description", description);
                         } else {
                             auto name2 = hiliteMatches(name.name, nameMatches, ANSI_GREEN, "\e[0;2m");
-                            if (results > 1) logger->cout("");
+                            if (results > 1)
+                                logger->cout("");
                             logger->cout(
                                 "* %s%s",
                                 wrap("\e[0;1m", hiliteMatches(attrPath2, attrPathMatches, ANSI_GREEN, "\e[0;1m")),
@@ -170,8 +161,7 @@ struct CmdSearch : InstallableCommand, MixJSON
                 }
 
                 else if (
-                    attrPath.size() == 0
-                    || (attrPathS[0] == "legacyPackages" && attrPath.size() <= 2)
+                    attrPath.size() == 0 || (attrPathS[0] == "legacyPackages" && attrPath.size() <= 2)
                     || (attrPathS[0] == "packages" && attrPath.size() <= 2))
                     recurse();
 

@@ -5,11 +5,11 @@
 namespace nix {
 
 enum class LogFormat {
-  raw,
-  rawWithLogs,
-  internalJSON,
-  bar,
-  barWithLogs,
+    raw,
+    rawWithLogs,
+    internalJSON,
+    bar,
+    barWithLogs,
 };
 
 void setLogFormat(const std::string & logFormatStr);

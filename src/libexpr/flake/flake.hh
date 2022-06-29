@@ -9,7 +9,9 @@ namespace nix {
 
 class EvalState;
 
-namespace fetchers { struct Tree; }
+namespace fetchers {
+struct Tree;
+}
 
 namespace flake {
 
@@ -41,7 +43,7 @@ typedef std::map<FlakeId, FlakeInput> FlakeInputs;
 struct FlakeInput
 {
     std::optional<FlakeRef> ref;
-    bool isFlake = true;  // true = process flake to get outputs, false = (fetched) static source path
+    bool isFlake = true; // true = process flake to get outputs, false = (fetched) static source path
     std::optional<InputPath> follows;
     FlakeInputs overrides;
 };
@@ -58,9 +60,9 @@ struct ConfigFile
 /* The contents of a flake.nix file. */
 struct Flake
 {
-    FlakeRef originalRef; // the original flake specification (by the user)
-    FlakeRef resolvedRef; // registry references and caching resolved to the specific underlying flake
-    FlakeRef lockedRef; // the specific local store result of invoking the fetcher
+    FlakeRef originalRef;    // the original flake specification (by the user)
+    FlakeRef resolvedRef;    // registry references and caching resolved to the specific underlying flake
+    FlakeRef lockedRef;      // the specific local store result of invoking the fetcher
     bool forceDirty = false; // pretend that 'lockedRef' is dirty
     std::optional<std::string> description;
     std::shared_ptr<const fetchers::Tree> sourceInfo;
@@ -125,15 +127,9 @@ struct LockFlags
     std::set<InputPath> inputUpdates;
 };
 
-LockedFlake lockFlake(
-    EvalState & state,
-    const FlakeRef & flakeRef,
-    const LockFlags & lockFlags);
+LockedFlake lockFlake(EvalState & state, const FlakeRef & flakeRef, const LockFlags & lockFlags);
 
-void callFlake(
-    EvalState & state,
-    const LockedFlake & lockedFlake,
-    Value & v);
+void callFlake(EvalState & state, const LockedFlake & lockedFlake, Value & v);
 
 }
 

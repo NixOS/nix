@@ -9,25 +9,23 @@
 #include <errno.h>
 #include <stdio.h>
 
-
 namespace nix {
-
 
 /* Parse a generation name of the format
    `<profilename>-<number>-link'. */
 static std::optional<GenerationNumber> parseName(const std::string & profileName, const std::string & name)
 {
-    if (name.substr(0, profileName.size() + 1) != profileName + "-") return {};
+    if (name.substr(0, profileName.size() + 1) != profileName + "-")
+        return {};
     auto s = name.substr(profileName.size() + 1);
     auto p = s.find("-link");
-    if (p == std::string::npos) return {};
+    if (p == std::string::npos)
+        return {};
     if (auto n = string2Int<unsigned int>(s.substr(0, p)))
         return *n;
     else
         return {};
 }
-
-
 
 std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path profile)
 {
@@ -39,35 +37,20 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path pro
     for (auto & i : readDirectory(profileDir)) {
         if (auto n = parseName(profileName, i.name)) {
             auto path = profileDir + "/" + i.name;
-            gens.push_back({
-                .number = *n,
-                .path = path,
-                .creationTime = lstat(path).st_mtime
-            });
+            gens.push_back({.number = *n, .path = path, .creationTime = lstat(path).st_mtime});
         }
     }
 
-    gens.sort([](const Generation & a, const Generation & b)
-    {
-        return a.number < b.number;
-    });
+    gens.sort([](const Generation & a, const Generation & b) { return a.number < b.number; });
 
-    return {
-        gens,
-        pathExists(profile)
-        ? parseName(profileName, readLink(profile))
-        : std::nullopt
-    };
+    return {gens, pathExists(profile) ? parseName(profileName, readLink(profile)) : std::nullopt};
 }
 
-
-static void makeName(const Path & profile, GenerationNumber num,
-    Path & outLink)
+static void makeName(const Path & profile, GenerationNumber num, Path & outLink)
 {
     Path prefix = (format("%1%-%2%") % profile % num).str();
     outLink = prefix + "-link";
 }
-
 
 Path createGeneration(ref<LocalFSStore> store, Path profile, StorePath outPath)
 {
@@ -107,13 +90,11 @@ Path createGeneration(ref<LocalFSStore> store, Path profile, StorePath outPath)
     return generation;
 }
 
-
 static void removeFile(const Path & path)
 {
     if (remove(path.c_str()) == -1)
         throw SysError("cannot unlink '%1%'", path);
 }
-
 
 void deleteGeneration(const Path & profile, GenerationNumber gen)
 {
@@ -121,7 +102,6 @@ void deleteGeneration(const Path & profile, GenerationNumber gen)
     makeName(profile, gen, generation);
     removeFile(generation);
 }
-
 
 static void deleteGeneration2(const Path & profile, GenerationNumber gen, bool dryRun)
 {
@@ -132,7 +112,6 @@ static void deleteGeneration2(const Path & profile, GenerationNumber gen, bool d
         deleteGeneration(profile, gen);
     }
 }
-
 
 void deleteGenerations(const Path & profile, const std::set<GenerationNumber> & gensToDelete, bool dryRun)
 {
@@ -145,7 +124,8 @@ void deleteGenerations(const Path & profile, const std::set<GenerationNumber> & 
         throw Error("cannot delete current version of profile %1%'", profile);
 
     for (auto & i : gens) {
-        if (!gensToDelete.count(i.number)) continue;
+        if (!gensToDelete.count(i.number))
+            continue;
         deleteGeneration2(profile, i.number, dryRun);
     }
 }
@@ -185,7 +165,6 @@ void deleteOldGenerations(const Path & profile, bool dryRun)
             deleteGeneration2(profile, i.number, dryRun);
 }
 
-
 void deleteGenerationsOlderThan(const Path & profile, time_t t, bool dryRun)
 {
     PathLocks lock;
@@ -208,7 +187,6 @@ void deleteGenerationsOlderThan(const Path & profile, time_t t, bool dryRun)
         }
 }
 
-
 void deleteGenerationsOlderThan(const Path & profile, std::string_view timeSpec, bool dryRun)
 {
     if (timeSpec.empty() || timeSpec[timeSpec.size() - 1] != 'd')
@@ -226,20 +204,16 @@ void deleteGenerationsOlderThan(const Path & profile, std::string_view timeSpec,
     deleteGenerationsOlderThan(profile, oldTime, dryRun);
 }
 
-
 void switchLink(Path link, Path target)
 {
     /* Hacky. */
-    if (dirOf(target) == dirOf(link)) target = baseNameOf(target);
+    if (dirOf(target) == dirOf(link))
+        target = baseNameOf(target);
 
     replaceSymlink(target, link);
 }
 
-
-void switchGeneration(
-    const Path & profile,
-    std::optional<GenerationNumber> dstGen,
-    bool dryRun)
+void switchGeneration(const Path & profile, std::optional<GenerationNumber> dstGen, bool dryRun)
 {
     PathLocks lock;
     lockProfile(lock, profile);
@@ -248,8 +222,7 @@ void switchGeneration(
 
     std::optional<Generation> dst;
     for (auto & i : gens)
-        if ((!dstGen && i.number < curGen) ||
-            (dstGen && i.number == *dstGen))
+        if ((!dstGen && i.number < curGen) || (dstGen && i.number == *dstGen))
             dst = i;
 
     if (!dst) {
@@ -261,11 +234,11 @@ void switchGeneration(
 
     notice("switching profile from version %d to %d", curGen.value_or(0), dst->number);
 
-    if (dryRun) return;
+    if (dryRun)
+        return;
 
     switchLink(profile, dst->path);
 }
-
 
 void lockProfile(PathLocks & lock, const Path & profile)
 {
@@ -273,12 +246,10 @@ void lockProfile(PathLocks & lock, const Path & profile)
     lock.setDeletion(true);
 }
 
-
 std::string optimisticLockProfile(const Path & profile)
 {
     return pathExists(profile) ? readLink(profile) : "";
 }
-
 
 Path getDefaultProfile()
 {
@@ -286,9 +257,8 @@ Path getDefaultProfile()
     try {
         if (!pathExists(profileLink)) {
             replaceSymlink(
-                getuid() == 0
-                ? settings.nixStateDir + "/profiles/default"
-                : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName()),
+                getuid() == 0 ? settings.nixStateDir + "/profiles/default"
+                              : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName()),
                 profileLink);
         }
         return absPath(readLink(profileLink), dirOf(profileLink));
@@ -296,6 +266,5 @@ Path getDefaultProfile()
         return profileLink;
     }
 }
-
 
 }

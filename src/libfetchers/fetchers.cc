@@ -9,7 +9,8 @@ std::unique_ptr<std::vector<std::shared_ptr<InputScheme>>> inputSchemes = nullpt
 
 void registerInputScheme(std::shared_ptr<InputScheme> && inputScheme)
 {
-    if (!inputSchemes) inputSchemes = std::make_unique<std::vector<std::shared_ptr<InputScheme>>>();
+    if (!inputSchemes)
+        inputSchemes = std::make_unique<std::vector<std::shared_ptr<InputScheme>>>();
     inputSchemes->push_back(std::move(inputScheme));
 }
 
@@ -92,18 +93,20 @@ bool Input::hasAllInfo() const
     return getNarHash() && scheme && scheme->hasAllInfo(*this);
 }
 
-bool Input::operator ==(const Input & other) const
+bool Input::operator==(const Input & other) const
 {
     return attrs == other.attrs;
 }
 
 bool Input::contains(const Input & other) const
 {
-    if (*this == other) return true;
+    if (*this == other)
+        return true;
     auto other2(other);
     other2.attrs.erase("ref");
     other2.attrs.erase("rev");
-    if (*this == other2) return true;
+    if (*this == other2)
+        return true;
     return false;
 }
 
@@ -121,10 +124,9 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
 
             store->ensurePath(storePath);
 
-            debug("using substituted/cached input '%s' in '%s'",
-                to_string(), store->printStorePath(storePath));
+            debug("using substituted/cached input '%s' in '%s'", to_string(), store->printStorePath(storePath));
 
-            return {Tree { .actualPath = store->toRealPath(storePath), .storePath = std::move(storePath) }, *this};
+            return {Tree{.actualPath = store->toRealPath(storePath), .storePath = std::move(storePath)}, *this};
         } catch (Error & e) {
             debug("substitution of input '%s' failed: %s", to_string(), e.what());
         }
@@ -139,7 +141,7 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
         }
     }();
 
-    Tree tree {
+    Tree tree{
         .actualPath = store->toRealPath(storePath),
         .storePath = storePath,
     };
@@ -149,20 +151,20 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
 
     if (auto prevNarHash = getNarHash()) {
         if (narHash != *prevNarHash)
-            throw Error((unsigned int) 102, "NAR hash mismatch in input '%s' (%s), expected '%s', got '%s'",
-                to_string(), tree.actualPath, prevNarHash->to_string(SRI, true), narHash.to_string(SRI, true));
+            throw Error(
+                (unsigned int) 102, "NAR hash mismatch in input '%s' (%s), expected '%s', got '%s'", to_string(),
+                tree.actualPath, prevNarHash->to_string(SRI, true), narHash.to_string(SRI, true));
     }
 
     if (auto prevLastModified = getLastModified()) {
         if (input.getLastModified() != prevLastModified)
-            throw Error("'lastModified' attribute mismatch in input '%s', expected %d",
-                input.to_string(), *prevLastModified);
+            throw Error(
+                "'lastModified' attribute mismatch in input '%s', expected %d", input.to_string(), *prevLastModified);
     }
 
     if (auto prevRevCount = getRevCount()) {
         if (input.getRevCount() != prevRevCount)
-            throw Error("'revCount' attribute mismatch in input '%s', expected %d",
-                input.to_string(), *prevRevCount);
+            throw Error("'revCount' attribute mismatch in input '%s', expected %d", input.to_string(), *prevRevCount);
     }
 
     input.locked = true;
@@ -172,11 +174,10 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
     return {std::move(tree), input};
 }
 
-Input Input::applyOverrides(
-    std::optional<std::string> ref,
-    std::optional<Hash> rev) const
+Input Input::applyOverrides(std::optional<std::string> ref, std::optional<Hash> rev) const
 {
-    if (!scheme) return *this;
+    if (!scheme)
+        return *this;
     return scheme->applyOverrides(*this, ref, rev);
 }
 
@@ -192,9 +193,7 @@ std::optional<Path> Input::getSourcePath() const
     return scheme->getSourcePath(*this);
 }
 
-void Input::markChangedFile(
-    std::string_view file,
-    std::optional<std::string> commitMsg) const
+void Input::markChangedFile(std::string_view file, std::optional<std::string> commitMsg) const
 {
     assert(scheme);
     return scheme->markChangedFile(*this, file, commitMsg);
@@ -243,7 +242,7 @@ std::optional<Hash> Input::getRev() const
     if (auto s = maybeGetStrAttr(attrs, "rev")) {
         try {
             hash = Hash::parseAnyPrefixed(*s);
-        } catch (BadHash &e) {
+        } catch (BadHash & e) {
             // Default to sha1 for backwards compatibility with existing flakes
             hash = Hash::parseAny(*s, htSHA1);
         }
@@ -271,10 +270,7 @@ ParsedURL InputScheme::toURL(const Input & input)
     throw Error("don't know how to convert input '%s' to a URL", attrsToJSON(input.attrs));
 }
 
-Input InputScheme::applyOverrides(
-    const Input & input,
-    std::optional<std::string> ref,
-    std::optional<Hash> rev)
+Input InputScheme::applyOverrides(const Input & input, std::optional<std::string> ref, std::optional<Hash> rev)
 {
     if (ref)
         throw Error("don't know how to set branch/tag name of input '%s' to '%s'", input.to_string(), *ref);

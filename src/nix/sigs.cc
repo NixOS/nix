@@ -42,10 +42,10 @@ struct CmdCopySigs : StorePathsCommand
         std::string doneLabel = "done";
         std::atomic<size_t> added{0};
 
-        //logger->setExpected(doneLabel, storePaths.size());
+        // logger->setExpected(doneLabel, storePaths.size());
 
         auto doPath = [&](const Path & storePathS) {
-            //Activity act(*logger, lvlInfo, format("getting signatures for '%s'") % storePath);
+            // Activity act(*logger, lvlInfo, format("getting signatures for '%s'") % storePath);
 
             checkInterrupt();
 
@@ -61,9 +61,8 @@ struct CmdCopySigs : StorePathsCommand
 
                     /* Don't import signatures that don't match this
                        binary. */
-                    if (info->narHash != info2->narHash ||
-                        info->narSize != info2->narSize ||
-                        info->references != info2->references)
+                    if (info->narHash != info2->narHash || info->narSize != info2->narSize
+                        || info->references != info2->references)
                         continue;
 
                     for (auto & sig : info2->sigs)
@@ -78,7 +77,7 @@ struct CmdCopySigs : StorePathsCommand
                 added += newSigs.size();
             }
 
-            //logger->incProgress(doneLabel);
+            // logger->incProgress(doneLabel);
         };
 
         for (auto & storePath : storePaths)
@@ -98,14 +97,13 @@ struct CmdSign : StorePathsCommand
 
     CmdSign()
     {
-        addFlag({
-            .longName = "key-file",
-            .shortName = 'k',
-            .description = "File containing the secret signing key.",
-            .labels = {"file"},
-            .handler = {&secretKeyFile},
-            .completer = completePath
-        });
+        addFlag(
+            {.longName = "key-file",
+             .shortName = 'k',
+             .description = "File containing the secret signing key.",
+             .labels = {"file"},
+             .handler = {&secretKeyFile},
+             .completer = completePath});
     }
 
     std::string description() override
@@ -164,8 +162,8 @@ struct CmdKeyGenerateSecret : Command
     std::string doc() override
     {
         return
-          #include "key-generate-secret.md"
-          ;
+#include "key-generate-secret.md"
+            ;
     }
 
     void run() override
@@ -187,8 +185,8 @@ struct CmdKeyConvertSecretToPublic : Command
     std::string doc() override
     {
         return
-          #include "key-convert-secret-to-public.md"
-          ;
+#include "key-convert-secret-to-public.md"
+            ;
     }
 
     void run() override
@@ -202,18 +200,20 @@ struct CmdKey : NixMultiCommand
 {
     CmdKey()
         : MultiCommand({
-                {"generate-secret", []() { return make_ref<CmdKeyGenerateSecret>(); }},
-                {"convert-secret-to-public", []() { return make_ref<CmdKeyConvertSecretToPublic>(); }},
-            })
-    {
-    }
+            {"generate-secret", []() { return make_ref<CmdKeyGenerateSecret>(); }},
+            {"convert-secret-to-public", []() { return make_ref<CmdKeyConvertSecretToPublic>(); }},
+        })
+    {}
 
     std::string description() override
     {
         return "generate and convert Nix signing keys";
     }
 
-    Category category() override { return catUtility; }
+    Category category() override
+    {
+        return catUtility;
+    }
 
     void run() override
     {

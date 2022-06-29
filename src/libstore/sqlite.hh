@@ -14,13 +14,21 @@ namespace nix {
 struct SQLite
 {
     sqlite3 * db = 0;
-    SQLite() { }
+    SQLite() {}
     SQLite(const Path & path, bool create = true);
     SQLite(const SQLite & from) = delete;
-    SQLite& operator = (const SQLite & from) = delete;
-    SQLite& operator = (SQLite && from) { db = from.db; from.db = 0; return *this; }
+    SQLite & operator=(const SQLite & from) = delete;
+    SQLite & operator=(SQLite && from)
+    {
+        db = from.db;
+        from.db = 0;
+        return *this;
+    }
     ~SQLite();
-    operator sqlite3 * () { return db; }
+    operator sqlite3 *()
+    {
+        return db;
+    }
 
     /* Disable synchronous mode, set truncate journal mode. */
     void isCache();
@@ -36,11 +44,17 @@ struct SQLiteStmt
     sqlite3 * db = 0;
     sqlite3_stmt * stmt = 0;
     std::string sql;
-    SQLiteStmt() { }
-    SQLiteStmt(sqlite3 * db, const std::string & sql) { create(db, sql); }
+    SQLiteStmt() {}
+    SQLiteStmt(sqlite3 * db, const std::string & sql)
+    {
+        create(db, sql);
+    }
     void create(sqlite3 * db, const std::string & s);
     ~SQLiteStmt();
-    operator sqlite3_stmt * () { return stmt; }
+    operator sqlite3_stmt *()
+    {
+        return stmt;
+    }
 
     /* Helper for binding / executing statements. */
     class Use
@@ -56,9 +70,9 @@ struct SQLiteStmt
         ~Use();
 
         /* Bind the next parameter. */
-        Use & operator () (std::string_view value, bool notNull = true);
-        Use & operator () (const unsigned char * data, size_t len, bool notNull = true);
-        Use & operator () (int64_t value, bool notNull = true);
+        Use & operator()(std::string_view value, bool notNull = true);
+        Use & operator()(const unsigned char * data, size_t len, bool notNull = true);
+        Use & operator()(int64_t value, bool notNull = true);
         Use & bind(); // null
 
         int step();
@@ -95,28 +109,27 @@ struct SQLiteTxn
     ~SQLiteTxn();
 };
 
-
 struct SQLiteError : Error
 {
-    const char *path;
+    const char * path;
     int errNo, extendedErrNo;
 
     template<typename... Args>
-    [[noreturn]] static void throw_(sqlite3 * db, const std::string & fs, const Args & ... args) {
+    [[noreturn]] static void throw_(sqlite3 * db, const std::string & fs, const Args &... args)
+    {
         throw_(db, hintfmt(fs, args...));
     }
 
-    SQLiteError(const char *path, int errNo, int extendedErrNo, hintformat && hf);
+    SQLiteError(const char * path, int errNo, int extendedErrNo, hintformat && hf);
 
 protected:
 
     template<typename... Args>
-    SQLiteError(const char *path, int errNo, int extendedErrNo, const std::string & fs, const Args & ... args)
-      : SQLiteError(path, errNo, extendedErrNo, hintfmt(fs, args...))
-    { }
+    SQLiteError(const char * path, int errNo, int extendedErrNo, const std::string & fs, const Args &... args)
+        : SQLiteError(path, errNo, extendedErrNo, hintfmt(fs, args...))
+    {}
 
     [[noreturn]] static void throw_(sqlite3 * db, hintformat && hf);
-
 };
 
 MakeError(SQLiteBusy, SQLiteError);

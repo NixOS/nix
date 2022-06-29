@@ -16,7 +16,8 @@ struct CmdEval : MixJSON, InstallableCommand
     std::optional<std::string> apply;
     std::optional<Path> writeTo;
 
-    CmdEval() : InstallableCommand(true /* supportReadOnlyMode */)
+    CmdEval()
+        : InstallableCommand(true /* supportReadOnlyMode */)
     {
         addFlag({
             .longName = "raw",
@@ -47,11 +48,14 @@ struct CmdEval : MixJSON, InstallableCommand
     std::string doc() override
     {
         return
-          #include "eval.md"
-          ;
+#include "eval.md"
+            ;
     }
 
-    Category category() override { return catSecondary; }
+    Category category() override
+    {
+        return catSecondary;
+    }
 
     void run(ref<Store> store) override
     {
@@ -79,8 +83,7 @@ struct CmdEval : MixJSON, InstallableCommand
 
             std::function<void(Value & v, const PosIdx pos, const Path & path)> recurse;
 
-            recurse = [&](Value & v, const PosIdx pos, const Path & path)
-            {
+            recurse = [&](Value & v, const PosIdx pos, const Path & path) {
                 state->forceValue(v, pos);
                 if (v.type() == nString)
                     // FIXME: disallow strings with contexts?
@@ -96,13 +99,11 @@ struct CmdEval : MixJSON, InstallableCommand
                             recurse(*attr.value, attr.pos, concatStrings(path, "/", name));
                         } catch (Error & e) {
                             e.addTrace(
-                                state->positions[attr.pos],
-                                hintfmt("while evaluating the attribute '%s'", name));
+                                state->positions[attr.pos], hintfmt("while evaluating the attribute '%s'", name));
                             throw;
                         }
                     }
-                }
-                else
+                } else
                     throw TypeError("value at '%s' is not a string or an attribute set", state->positions[pos]);
             };
 

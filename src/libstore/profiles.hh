@@ -5,11 +5,9 @@
 
 #include <time.h>
 
-
 namespace nix {
 
 class StorePath;
-
 
 typedef uint64_t GenerationNumber;
 
@@ -21,7 +19,6 @@ struct Generation
 };
 
 typedef std::list<Generation> Generations;
-
 
 /* Returns the list of currently present generations for the specified
    profile, sorted by generation number. Also returns the number of
@@ -48,10 +45,7 @@ void switchLink(Path link, Path target);
 
 /* Roll back a profile to the specified generation, or to the most
    recent one older than the current. */
-void switchGeneration(
-    const Path & profile,
-    std::optional<GenerationNumber> dstGen,
-    bool dryRun);
+void switchGeneration(const Path & profile, std::optional<GenerationNumber> dstGen, bool dryRun);
 
 /* Ensure exclusive access to a profile.  Any command that modifies
    the profile first acquires this lock. */

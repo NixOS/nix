@@ -14,16 +14,13 @@
 #include <string>
 #include <unordered_set>
 
-
 namespace nix {
-
 
 /* Nix store and database schema version.  Version 1 (or 0) was Nix <=
    0.7.  Version 2 was Nix 0.8 and 0.9.  Version 3 is Nix 0.10.
    Version 4 is Nix 0.11.  Version 5 is Nix 0.12-0.16.  Version 6 is
    Nix 1.0.  Version 7 is Nix 1.3. Version 10 is 2.0. */
 const int nixSchemaVersion = 10;
-
 
 struct OptimiseStats
 {
@@ -36,13 +33,15 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
 {
     using LocalFSStoreConfig::LocalFSStoreConfig;
 
-    Setting<bool> requireSigs{(StoreConfig*) this,
-        settings.requireSigs,
-        "require-sigs", "whether store paths should have a trusted signature on import"};
+    Setting<bool> requireSigs{
+        (StoreConfig *) this, settings.requireSigs, "require-sigs",
+        "whether store paths should have a trusted signature on import"};
 
-    const std::string name() override { return "Local Store"; }
+    const std::string name() override
+    {
+        return "Local Store";
+    }
 };
-
 
 class LocalStore : public virtual LocalStoreConfig, public virtual LocalFSStore, public virtual GcStore
 {
@@ -118,13 +117,12 @@ public:
 
     bool isValidPathUncached(const StorePath & path) override;
 
-    StorePathSet queryValidPaths(const StorePathSet & paths,
-        SubstituteFlag maybeSubstitute = NoSubstitute) override;
+    StorePathSet queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
     StorePathSet queryAllValidPaths() override;
 
-    void queryPathInfoUncached(const StorePath & path,
-        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
+    void queryPathInfoUncached(
+        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override;
 
@@ -136,23 +134,23 @@ public:
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
 
-    void querySubstitutablePathInfos(const StorePathCAMap & paths,
-        SubstitutablePathInfos & infos) override;
+    void querySubstitutablePathInfos(const StorePathCAMap & paths, SubstitutablePathInfos & infos) override;
 
     bool pathInfoIsUntrusted(const ValidPathInfo &) override;
-    bool realisationIsUntrusted(const Realisation & ) override;
+    bool realisationIsUntrusted(const Realisation &) override;
 
-    void addToStore(const ValidPathInfo & info, Source & source,
-        RepairFlag repair, CheckSigsFlag checkSigs) override;
+    void addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override;
 
-    StorePath addToStoreFromDump(Source & dump, std::string_view name,
-        FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references) override;
+    StorePath addToStoreFromDump(
+        Source & dump,
+        std::string_view name,
+        FileIngestionMethod method,
+        HashType hashAlgo,
+        RepairFlag repair,
+        const StorePathSet & references) override;
 
     StorePath addTextToStore(
-        std::string_view name,
-        std::string_view s,
-        const StorePathSet & references,
-        RepairFlag repair) override;
+        std::string_view name, std::string_view s, const StorePathSet & references, RepairFlag repair) override;
 
     void addTempRoot(const StorePath & path) override;
 
@@ -209,15 +207,12 @@ public:
     void registerDrvOutput(const Realisation & info) override;
     void registerDrvOutput(const Realisation & info, CheckSigsFlag checkSigs) override;
     void cacheDrvOutputMapping(
-        State & state,
-        const uint64_t deriver,
-        const std::string & outputName,
-        const StorePath & output);
+        State & state, const uint64_t deriver, const std::string & outputName, const StorePath & output);
 
     std::optional<const Realisation> queryRealisation_(State & state, const DrvOutput & id);
     std::optional<std::pair<int64_t, Realisation>> queryRealisationCore_(State & state, const DrvOutput & id);
-    void queryRealisationUncached(const DrvOutput&,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
+    void queryRealisationUncached(
+        const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
     std::optional<std::string> getVersion() override;
 
@@ -238,8 +233,13 @@ private:
     /* Delete a path from the Nix store. */
     void invalidatePathChecked(const StorePath & path);
 
-    void verifyPath(const Path & path, const StringSet & store,
-        PathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
+    void verifyPath(
+        const Path & path,
+        const StringSet & store,
+        PathSet & done,
+        StorePathSet & validPaths,
+        RepairFlag repair,
+        bool & errors);
 
     std::shared_ptr<const ValidPathInfo> queryPathInfoInternal(State & state, const StorePath & path);
 
@@ -264,7 +264,8 @@ private:
 
     InodeHash loadInodeHash();
     Strings readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash);
-    void optimisePath_(Activity * act, OptimiseStats & stats, const Path & path, InodeHash & inodeHash, RepairFlag repair);
+    void
+    optimisePath_(Activity * act, OptimiseStats & stats, const Path & path, InodeHash & inodeHash, RepairFlag repair);
 
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(State & state, const StorePath & path);
@@ -278,17 +279,13 @@ private:
     void createUser(const std::string & userName, uid_t userId) override;
 
     // XXX: Make a generic `Store` method
-    FixedOutputHash hashCAPath(
-        const FileIngestionMethod & method,
-        const HashType & hashType,
-        const StorePath & path);
+    FixedOutputHash hashCAPath(const FileIngestionMethod & method, const HashType & hashType, const StorePath & path);
 
     FixedOutputHash hashCAPath(
         const FileIngestionMethod & method,
         const HashType & hashType,
         const Path & path,
-        const std::string_view pathHash
-    );
+        const std::string_view pathHash);
 
     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
@@ -298,10 +295,8 @@ private:
     friend struct DerivationGoal;
 };
 
-
 typedef std::pair<dev_t, ino_t> Inode;
 typedef std::set<Inode> InodesSeen;
-
 
 /* "Fix", or canonicalise, the meta-data of the files in a store path
    after it has been built.  In particular:

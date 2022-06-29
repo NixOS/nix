@@ -40,44 +40,33 @@ struct CacheImpl : Cache
         state->db.isCache();
         state->db.exec(schema);
 
-        state->add.create(state->db,
-            "insert or replace into Cache(input, info, path, immutable, timestamp) values (?, ?, ?, ?, ?)");
+        state->add.create(
+            state->db, "insert or replace into Cache(input, info, path, immutable, timestamp) values (?, ?, ?, ?, ?)");
 
-        state->lookup.create(state->db,
-            "select info, path, immutable, timestamp from Cache where input = ?");
+        state->lookup.create(state->db, "select info, path, immutable, timestamp from Cache where input = ?");
     }
 
-    void add(
-        ref<Store> store,
-        const Attrs & inAttrs,
-        const Attrs & infoAttrs,
-        const StorePath & storePath,
-        bool locked) override
+    void add(ref<Store> store, const Attrs & inAttrs, const Attrs & infoAttrs, const StorePath & storePath, bool locked)
+        override
     {
-        _state.lock()->add.use()
-            (attrsToJSON(inAttrs).dump())
-            (attrsToJSON(infoAttrs).dump())
-            (store->printStorePath(storePath))
-            (locked)
-            (time(0)).exec();
+        _state.lock()
+            ->add
+            .use()(attrsToJSON(inAttrs).dump())(attrsToJSON(infoAttrs).dump())(store->printStorePath(storePath))(
+                locked) (time(0))
+            .exec();
     }
 
-    std::optional<std::pair<Attrs, StorePath>> lookup(
-        ref<Store> store,
-        const Attrs & inAttrs) override
+    std::optional<std::pair<Attrs, StorePath>> lookup(ref<Store> store, const Attrs & inAttrs) override
     {
         if (auto res = lookupExpired(store, inAttrs)) {
             if (!res->expired)
                 return std::make_pair(std::move(res->infoAttrs), std::move(res->storePath));
-            debug("ignoring expired cache entry '%s'",
-                attrsToJSON(inAttrs).dump());
+            debug("ignoring expired cache entry '%s'", attrsToJSON(inAttrs).dump());
         }
         return {};
     }
 
-    std::optional<Result> lookupExpired(
-        ref<Store> store,
-        const Attrs & inAttrs) override
+    std::optional<Result> lookupExpired(ref<Store> store, const Attrs & inAttrs) override
     {
         auto state(_state.lock());
 
@@ -101,14 +90,12 @@ struct CacheImpl : Cache
             return {};
         }
 
-        debug("using cache entry '%s' -> '%s', '%s'",
-            inAttrsJSON, infoJSON, store->printStorePath(storePath));
+        debug("using cache entry '%s' -> '%s', '%s'", inAttrsJSON, infoJSON, store->printStorePath(storePath));
 
-        return Result {
+        return Result{
             .expired = !locked && (settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0)),
             .infoAttrs = jsonToAttrs(nlohmann::json::parse(infoJSON)),
-            .storePath = std::move(storePath)
-        };
+            .storePath = std::move(storePath)};
     }
 };
 

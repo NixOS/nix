@@ -46,13 +46,15 @@ struct NarAccessor : public FSAccessor
         uint64_t pos = 0;
 
         NarIndexer(NarAccessor & acc, Source & source)
-            : acc(acc), source(source)
-        { }
+            : acc(acc)
+            , source(source)
+        {}
 
         void createMember(const Path & path, NarMember member)
         {
             size_t level = std::count(path.begin(), path.end(), '/');
-            while (parents.size() > level) parents.pop();
+            while (parents.size() > level)
+                parents.pop();
 
             if (parents.empty()) {
                 acc.root = std::move(member);
@@ -87,13 +89,11 @@ struct NarAccessor : public FSAccessor
             parents.top()->start = pos;
         }
 
-        void receiveContents(std::string_view data) override
-        { }
+        void receiveContents(std::string_view data) override {}
 
         void createSymlink(const Path & path, const std::string & target) override
         {
-            createMember(path,
-                NarMember{FSAccessor::Type::tSymlink, false, 0, 0, target});
+            createMember(path, NarMember{FSAccessor::Type::tSymlink, false, 0, 0, target});
         }
 
         size_t read(char * data, size_t len) override
@@ -104,7 +104,8 @@ struct NarAccessor : public FSAccessor
         }
     };
 
-    NarAccessor(std::string && _nar) : nar(_nar)
+    NarAccessor(std::string && _nar)
+        : nar(_nar)
     {
         StringSource source(*nar);
         NarIndexer indexer(*this, source);
@@ -141,7 +142,8 @@ struct NarAccessor : public FSAccessor
             } else if (type == "symlink") {
                 member.type = FSAccessor::Type::tSymlink;
                 member.target = v.value("target", "");
-            } else return;
+            } else
+                return;
         };
 
         json v = json::parse(listing);
@@ -153,10 +155,11 @@ struct NarAccessor : public FSAccessor
         Path canon = path == "" ? "" : canonPath(path);
         NarMember * current = &root;
         auto end = path.end();
-        for (auto it = path.begin(); it != end; ) {
+        for (auto it = path.begin(); it != end;) {
             // because it != end, the remaining component is non-empty so we need
             // a directory
-            if (current->type != FSAccessor::Type::tDirectory) return nullptr;
+            if (current->type != FSAccessor::Type::tDirectory)
+                return nullptr;
 
             // skip slash (canonPath above ensures that this is always a slash)
             assert(*it == '/');
@@ -165,7 +168,8 @@ struct NarAccessor : public FSAccessor
             // lookup current component
             auto next = std::find(it, end, '/');
             auto child = current->children.find(std::string(it, next));
-            if (child == current->children.end()) return nullptr;
+            if (child == current->children.end())
+                return nullptr;
             current = &child->second;
 
             it = next;
@@ -174,7 +178,8 @@ struct NarAccessor : public FSAccessor
         return current;
     }
 
-    NarMember & get(const Path & path) {
+    NarMember & get(const Path & path)
+    {
         auto result = find(path);
         if (result == nullptr)
             throw Error("NAR file does not contain path '%1%'", path);
@@ -209,7 +214,8 @@ struct NarAccessor : public FSAccessor
         if (i.type != FSAccessor::Type::tRegular)
             throw Error("path '%1%' inside NAR file is not a regular file", path);
 
-        if (getNarBytes) return getNarBytes(i.start, i.size);
+        if (getNarBytes)
+            return getNarBytes(i.start, i.size);
 
         assert(nar);
         return std::string(*nar, i.start, i.size);
@@ -234,14 +240,12 @@ ref<FSAccessor> makeNarAccessor(Source & source)
     return make_ref<NarAccessor>(source);
 }
 
-ref<FSAccessor> makeLazyNarAccessor(const std::string & listing,
-    GetNarBytes getNarBytes)
+ref<FSAccessor> makeLazyNarAccessor(const std::string & listing, GetNarBytes getNarBytes)
 {
     return make_ref<NarAccessor>(listing, getNarBytes);
 }
 
-void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor,
-    const Path & path, bool recurse)
+void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor, const Path & path, bool recurse)
 {
     auto st = accessor->stat(path);
 

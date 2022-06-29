@@ -4,28 +4,31 @@
 #include <string>
 #include "ansicolor.hh"
 
-
 namespace nix {
-
 
 /* Inherit some names from other namespaces for convenience. */
 using boost::format;
 
-
 /* A variadic template that does nothing. Useful to call a function
    for all variadic arguments but ignoring the result. */
-struct nop { template<typename... T> nop(T...) {} };
-
+struct nop
+{
+    template<typename... T>
+    nop(T...)
+    {}
+};
 
 struct FormatOrString
 {
     std::string s;
-    FormatOrString(std::string s) : s(std::move(s)) { };
+    FormatOrString(std::string s)
+        : s(std::move(s)){};
     template<class F>
-    FormatOrString(const F & f) : s(f.str()) { };
-    FormatOrString(const char * s) : s(s) { };
+    FormatOrString(const F & f)
+        : s(f.str()){};
+    FormatOrString(const char * s)
+        : s(s){};
 };
-
 
 /* A helper for formatting strings. ‘fmt(format, a_0, ..., a_n)’ is
    equivalent to ‘boost::format(format) % a_0 % ... %
@@ -34,11 +37,10 @@ struct FormatOrString
 
 template<class F>
 inline void formatHelper(F & f)
-{
-}
+{}
 
 template<class F, typename T, typename... Args>
-inline void formatHelper(F & f, const T & x, const Args & ... args)
+inline void formatHelper(F & f, const T & x, const Args &... args)
 {
     formatHelper(f % x, args...);
 }
@@ -59,7 +61,7 @@ inline std::string fmt(const FormatOrString & fs)
 }
 
 template<typename... Args>
-inline std::string fmt(const std::string & fs, const Args & ... args)
+inline std::string fmt(const std::string & fs, const Args &... args)
 {
     boost::format f(fs);
     f.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit);
@@ -71,27 +73,31 @@ inline std::string fmt(const std::string & fs, const Args & ... args)
 // format function for hints in errors.  same as fmt, except templated values
 // are always in yellow.
 
-template <class T>
+template<class T>
 struct yellowtxt
 {
-    yellowtxt(const T &s) : value(s) {}
+    yellowtxt(const T & s)
+        : value(s)
+    {}
     const T & value;
 };
 
-template <class T>
+template<class T>
 std::ostream & operator<<(std::ostream & out, const yellowtxt<T> & y)
 {
     return out << ANSI_WARNING << y.value << ANSI_NORMAL;
 }
 
-template <class T>
+template<class T>
 struct normaltxt
 {
-    normaltxt(const T & s) : value(s) {}
+    normaltxt(const T & s)
+        : value(s)
+    {}
     const T & value;
 };
 
-template <class T>
+template<class T>
 std::ostream & operator<<(std::ostream & out, const normaltxt<T> & y)
 {
     return out << ANSI_NORMAL << y.value;
@@ -100,20 +106,19 @@ std::ostream & operator<<(std::ostream & out, const normaltxt<T> & y)
 class hintformat
 {
 public:
-    hintformat(const std::string & format) : fmt(format)
+    hintformat(const std::string & format)
+        : fmt(format)
     {
-        fmt.exceptions(boost::io::all_error_bits ^
-                       boost::io::too_many_args_bit ^
-                       boost::io::too_few_args_bit);
+        fmt.exceptions(boost::io::all_error_bits ^ boost::io::too_many_args_bit ^ boost::io::too_few_args_bit);
     }
 
     hintformat(const hintformat & hf)
         : fmt(hf.fmt)
-    { }
+    {}
 
     hintformat(format && fmt)
         : fmt(std::move(fmt))
-    { }
+    {}
 
     template<class T>
     hintformat & operator%(const T & value)
@@ -141,7 +146,7 @@ private:
 std::ostream & operator<<(std::ostream & os, const hintformat & hf);
 
 template<typename... Args>
-inline hintformat hintfmt(const std::string & fs, const Args & ... args)
+inline hintformat hintfmt(const std::string & fs, const Args &... args)
 {
     hintformat f(fs);
     formatHelper(f, args...);

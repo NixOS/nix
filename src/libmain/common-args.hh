@@ -4,7 +4,7 @@
 
 namespace nix {
 
-//static constexpr auto commonArgsCategory = "Miscellaneous common options";
+// static constexpr auto commonArgsCategory = "Miscellaneous common options";
 static constexpr auto loggingCategory = "Logging-related options";
 
 class MixCommonArgs : public virtual Args

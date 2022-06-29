@@ -12,7 +12,10 @@ struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 {
     using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
 
-    const std::string name() override { return "Http Binary Cache Store"; }
+    const std::string name() override
+    {
+        return "Http Binary Cache Store";
+    }
 };
 
 class HttpBinaryCacheStore : public virtual HttpBinaryCacheStoreConfig, public virtual BinaryCacheStore
@@ -31,10 +34,7 @@ private:
 
 public:
 
-    HttpBinaryCacheStore(
-        const std::string & scheme,
-        const Path & _cacheUri,
-        const Params & params)
+    HttpBinaryCacheStore(const std::string & scheme, const Path & _cacheUri, const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
         , HttpBinaryCacheStoreConfig(params)
@@ -73,7 +73,8 @@ public:
     {
         static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1";
         auto ret = std::set<std::string>({"http", "https"});
-        if (forceHttp) ret.insert("file");
+        if (forceHttp)
+            ret.insert("file");
         return ret;
     }
 
@@ -93,7 +94,8 @@ protected:
     void checkEnabled()
     {
         auto state(_state.lock());
-        if (state->enabled) return;
+        if (state->enabled)
+            return;
         if (std::chrono::steady_clock::now() > state->disabledUntil) {
             state->enabled = true;
             debug("re-enabling binary cache '%s'", getUri());
@@ -121,7 +123,8 @@ protected:
         }
     }
 
-    void upsertFile(const std::string & path,
+    void upsertFile(
+        const std::string & path,
         std::shared_ptr<std::basic_iostream<char>> istream,
         const std::string & mimeType) override
     {
@@ -139,9 +142,8 @@ protected:
     {
         return FileTransferRequest(
             hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
-            ? path
-            : cacheUri + "/" + path);
-
+                ? path
+                : cacheUri + "/" + path);
     }
 
     void getFile(const std::string & path, Sink & sink) override
@@ -158,8 +160,7 @@ protected:
         }
     }
 
-    void getFile(const std::string & path,
-        Callback<std::optional<std::string>> callback) noexcept override
+    void getFile(const std::string & path, Callback<std::optional<std::string>> callback) noexcept override
     {
         try {
             checkEnabled();
@@ -172,21 +173,20 @@ protected:
 
         auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
-        getFileTransfer()->enqueueFileTransfer(request,
-            {[callbackPtr, this](std::future<FileTransferResult> result) {
-                try {
-                    (*callbackPtr)(std::move(result.get().data));
-                } catch (FileTransferError & e) {
-                    if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
-                        return (*callbackPtr)({});
-                    maybeDisable();
-                    callbackPtr->rethrow();
-                } catch (...) {
-                    callbackPtr->rethrow();
-                }
-            }});
+        getFileTransfer()->enqueueFileTransfer(request, {[callbackPtr, this](std::future<FileTransferResult> result) {
+                                                   try {
+                                                       (*callbackPtr)(std::move(result.get().data));
+                                                   } catch (FileTransferError & e) {
+                                                       if (e.error == FileTransfer::NotFound
+                                                           || e.error == FileTransfer::Forbidden)
+                                                           return (*callbackPtr)({});
+                                                       maybeDisable();
+                                                       callbackPtr->rethrow();
+                                                   } catch (...) {
+                                                       callbackPtr->rethrow();
+                                                   }
+                                               }});
     }
-
 };
 
 static RegisterStoreImplementation<HttpBinaryCacheStore, HttpBinaryCacheStoreConfig> regHttpBinaryCacheStore;

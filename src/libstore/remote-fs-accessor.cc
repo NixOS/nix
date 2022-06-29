@@ -60,7 +60,8 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_, boo
         throw InvalidPath("path '%1%' is not a valid store path", store->printStorePath(storePath));
 
     auto i = nars.find(std::string(storePath.hashPart()));
-    if (i != nars.end()) return {i->second, restPath};
+    if (i != nars.end())
+        return {i->second, restPath};
 
     std::string listing;
     Path cacheFile;
@@ -70,32 +71,32 @@ std::pair<ref<FSAccessor>, Path> RemoteFSAccessor::fetch(const Path & path_, boo
         try {
             listing = nix::readFile(makeCacheFile(storePath.hashPart(), "ls"));
 
-            auto narAccessor = makeLazyNarAccessor(listing,
-                [cacheFile](uint64_t offset, uint64_t length) {
+            auto narAccessor = makeLazyNarAccessor(listing, [cacheFile](uint64_t offset, uint64_t length) {
+                AutoCloseFD fd = open(cacheFile.c_str(), O_RDONLY | O_CLOEXEC);
+                if (!fd)
+                    throw SysError("opening NAR cache file '%s'", cacheFile);
 
-                    AutoCloseFD fd = open(cacheFile.c_str(), O_RDONLY | O_CLOEXEC);
-                    if (!fd)
-                        throw SysError("opening NAR cache file '%s'", cacheFile);
+                if (lseek(fd.get(), offset, SEEK_SET) != (off_t) offset)
+                    throw SysError("seeking in '%s'", cacheFile);
 
-                    if (lseek(fd.get(), offset, SEEK_SET) != (off_t) offset)
-                        throw SysError("seeking in '%s'", cacheFile);
+                std::string buf(length, 0);
+                readFull(fd.get(), buf.data(), length);
 
-                    std::string buf(length, 0);
-                    readFull(fd.get(), buf.data(), length);
-
-                    return buf;
-                });
+                return buf;
+            });
 
             nars.emplace(storePath.hashPart(), narAccessor);
             return {narAccessor, restPath};
 
-        } catch (SysError &) { }
+        } catch (SysError &) {
+        }
 
         try {
             auto narAccessor = makeNarAccessor(nix::readFile(cacheFile));
             nars.emplace(storePath.hashPart(), narAccessor);
             return {narAccessor, restPath};
-        } catch (SysError &) { }
+        } catch (SysError &) {
+        }
     }
 
     StringSink sink;

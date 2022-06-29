@@ -13,9 +13,7 @@
 
 #include <nlohmann/json.hpp>
 
-
 namespace nix {
-
 
 /* The default location of the daemon socket, relative to nixStateDir.
    The socket is in a directory to allow you to control access to the
@@ -46,7 +44,8 @@ Settings::Settings()
 
     caFile = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
     if (caFile == "") {
-        for (auto & fn : {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
+        for (auto & fn :
+             {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
             if (pathExists(fn)) {
                 caFile = fn;
                 break;
@@ -68,7 +67,8 @@ Settings::Settings()
 
     /* chroot-like behavior from Apple's sandbox */
 #if __APPLE__
-    sandboxPaths = tokenizeString<StringSet>("/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
+    sandboxPaths = tokenizeString<StringSet>(
+        "/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
     allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
 #endif
 
@@ -92,7 +92,6 @@ void loadConfFile()
     if (nixConfEnv.has_value()) {
         globalConfig.applyConfig(nixConfEnv.value(), "NIX_CONFIG");
     }
-
 }
 
 std::vector<Path> getUserConfigFiles()
@@ -124,10 +123,10 @@ StringSet Settings::getDefaultSystemFeatures()
        actually require anything special on the machines. */
     StringSet features{"nixos-test", "benchmark", "big-parallel"};
 
-    #if __linux__
+#if __linux__
     if (access("/dev/kvm", R_OK | W_OK) == 0)
         features.insert("kvm");
-    #endif
+#endif
 
     return features;
 }
@@ -148,8 +147,8 @@ StringSet Settings::getDefaultExtraPlatforms()
     // machines. Note that we can’t force processes from executing
     // x86_64 in aarch64 environments or vice versa since they can
     // always exec with their own binary preferences.
-    if (pathExists("/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist") ||
-        pathExists("/System/Library/LaunchDaemons/com.apple.oahd.plist")) {
+    if (pathExists("/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist")
+        || pathExists("/System/Library/LaunchDaemons/com.apple.oahd.plist")) {
         if (std::string{SYSTEM} == "x86_64-darwin")
             extraPlatforms.insert("aarch64-darwin");
         else if (std::string{SYSTEM} == "aarch64-darwin")
@@ -183,58 +182,67 @@ bool Settings::isWSL1()
 
 const std::string nixVersion = PACKAGE_VERSION;
 
-NLOHMANN_JSON_SERIALIZE_ENUM(SandboxMode, {
-    {SandboxMode::smEnabled, true},
-    {SandboxMode::smRelaxed, "relaxed"},
-    {SandboxMode::smDisabled, false},
-});
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    SandboxMode,
+    {
+        {SandboxMode::smEnabled, true},
+        {SandboxMode::smRelaxed, "relaxed"},
+        {SandboxMode::smDisabled, false},
+    });
 
-template<> void BaseSetting<SandboxMode>::set(const std::string & str, bool append)
+template<>
+void BaseSetting<SandboxMode>::set(const std::string & str, bool append)
 {
-    if (str == "true") value = smEnabled;
-    else if (str == "relaxed") value = smRelaxed;
-    else if (str == "false") value = smDisabled;
-    else throw UsageError("option '%s' has invalid value '%s'", name, str);
+    if (str == "true")
+        value = smEnabled;
+    else if (str == "relaxed")
+        value = smRelaxed;
+    else if (str == "false")
+        value = smDisabled;
+    else
+        throw UsageError("option '%s' has invalid value '%s'", name, str);
 }
 
-template<> bool BaseSetting<SandboxMode>::isAppendable()
+template<>
+bool BaseSetting<SandboxMode>::isAppendable()
 {
     return false;
 }
 
-template<> std::string BaseSetting<SandboxMode>::to_string() const
+template<>
+std::string BaseSetting<SandboxMode>::to_string() const
 {
-    if (value == smEnabled) return "true";
-    else if (value == smRelaxed) return "relaxed";
-    else if (value == smDisabled) return "false";
-    else abort();
+    if (value == smEnabled)
+        return "true";
+    else if (value == smRelaxed)
+        return "relaxed";
+    else if (value == smDisabled)
+        return "false";
+    else
+        abort();
 }
 
-template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)
+template<>
+void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)
 {
-    args.addFlag({
-        .longName = name,
-        .description = "Enable sandboxing.",
-        .category = category,
-        .handler = {[=]() { override(smEnabled); }}
-    });
-    args.addFlag({
-        .longName = "no-" + name,
-        .description = "Disable sandboxing.",
-        .category = category,
-        .handler = {[=]() { override(smDisabled); }}
-    });
-    args.addFlag({
-        .longName = "relaxed-" + name,
-        .description = "Enable sandboxing, but allow builds to disable it.",
-        .category = category,
-        .handler = {[=]() { override(smRelaxed); }}
-    });
+    args.addFlag({.longName = name, .description = "Enable sandboxing.", .category = category, .handler = {[=]() {
+                                                                                                   override(smEnabled);
+                                                                                               }}});
+    args.addFlag(
+        {.longName = "no-" + name, .description = "Disable sandboxing.", .category = category, .handler = {[=]() {
+                                                                                                   override(smDisabled);
+                                                                                               }}});
+    args.addFlag(
+        {.longName = "relaxed-" + name,
+         .description = "Enable sandboxing, but allow builds to disable it.",
+         .category = category,
+         .handler = {[=]() { override(smRelaxed); }}});
 }
 
 void MaxBuildJobsSetting::set(const std::string & str, bool append)
 {
-    if (str == "auto") value = std::max(1U, std::thread::hardware_concurrency());
+    if (str == "auto")
+        value = std::max(1U, std::thread::hardware_concurrency());
     else {
         if (auto n = string2Int<decltype(value)>(str))
             value = *n;
@@ -243,14 +251,13 @@ void MaxBuildJobsSetting::set(const std::string & str, bool append)
     }
 }
 
-
 void PluginFilesSetting::set(const std::string & str, bool append)
 {
     if (pluginsLoaded)
-        throw UsageError("plugin-files set after plugins were loaded, you may need to move the flag before the subcommand");
+        throw UsageError(
+            "plugin-files set after plugins were loaded, you may need to move the flag before the subcommand");
     BaseSetting<Paths>::set(str, append);
 }
-
 
 void initPlugins()
 {
@@ -269,8 +276,7 @@ void initPlugins()
         for (const auto & file : pluginFiles) {
             /* handle is purposefully leaked as there may be state in the
                DSO needed by the action of the plugin. */
-            void *handle =
-                dlopen(file.c_str(), RTLD_LAZY | RTLD_LOCAL);
+            void * handle = dlopen(file.c_str(), RTLD_LAZY | RTLD_LOCAL);
             if (!handle)
                 throw Error("could not dynamically open plugin file '%s': %s", file, dlerror());
         }

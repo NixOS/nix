@@ -48,12 +48,14 @@ struct LocalDerivationGoal : public DerivationGoal
     bool privateNetwork = false;
 
     /* Stuff we need to pass to initChild(). */
-    struct ChrootPath {
+    struct ChrootPath
+    {
         Path source;
         bool optional;
         ChrootPath(Path source = "", bool optional = false)
-            : source(source), optional(optional)
-        { }
+            : source(source)
+            , optional(optional)
+        {}
     };
     typedef map<Path, ChrootPath> DirsInChroot; // maps target path to source path
     DirsInChroot dirsInChroot;
@@ -92,8 +94,14 @@ struct LocalDerivationGoal : public DerivationGoal
        result. */
     std::map<Path, ValidPathInfo> prevInfos;
 
-    uid_t sandboxUid() { return usingUserNamespace ? 1000 : buildUser->getUID(); }
-    gid_t sandboxGid() { return usingUserNamespace ?  100 : buildUser->getGID(); }
+    uid_t sandboxUid()
+    {
+        return usingUserNamespace ? 1000 : buildUser->getUID();
+    }
+    gid_t sandboxGid()
+    {
+        return usingUserNamespace ? 100 : buildUser->getGID();
+    }
 
     const static Path homeDir;
 

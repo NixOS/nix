@@ -10,9 +10,7 @@
 #include "eval-inline.hh"
 #include "profiles.hh"
 
-
 namespace nix {
-
 
 DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
 {
@@ -29,10 +27,8 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
     return elems;
 }
 
-
-bool createUserEnv(EvalState & state, DrvInfos & elems,
-    const Path & profile, bool keepDerivations,
-    const std::string & lockToken)
+bool createUserEnv(
+    EvalState & state, DrvInfos & elems, const Path & profile, bool keepDerivations, const std::string & lockToken)
 {
     /* Build the components in the user environment, if they don't
        exist already. */
@@ -42,9 +38,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
             drvsToBuild.push_back({*drvPath});
 
     debug(format("building user environment dependencies"));
-    state.store->buildPaths(
-        toDerivedPaths(drvsToBuild),
-        state.repair ? bmRepair : bmNormal);
+    state.store->buildPaths(toDerivedPaths(drvsToBuild), state.repair ? bmRepair : bmNormal);
 
     /* Construct the whole top level derivation. */
     StorePathSet references;
@@ -91,7 +85,8 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         auto meta = state.buildBindings(metaNames.size());
         for (auto & j : metaNames) {
             Value * v = i.queryMeta(j);
-            if (!v) continue;
+            if (!v)
+                continue;
             meta.insert(state.symbols.create(j), v);
         }
 
@@ -99,7 +94,8 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
         (manifest.listElems()[n++] = state.allocValue())->mkAttrs(attrs);
 
-        if (drvPath) references.insert(*drvPath);
+        if (drvPath)
+            references.insert(*drvPath);
     }
 
     /* Also write a copy of the list of user environment elements to
@@ -107,21 +103,21 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
        environment. */
     std::ostringstream str;
     manifest.print(state.symbols, str, true);
-    auto manifestFile = state.store->addTextToStore("env-manifest.nix",
-        str.str(), references);
+    auto manifestFile = state.store->addTextToStore("env-manifest.nix", str.str(), references);
 
     /* Get the environment builder expression. */
     Value envBuilder;
-    state.eval(state.parseExprFromString(
-        #include "buildenv.nix.gen.hh"
-            , "/"), envBuilder);
+    state.eval(
+        state.parseExprFromString(
+#include "buildenv.nix.gen.hh"
+            , "/"),
+        envBuilder);
 
     /* Construct a Nix expression that calls the user environment
        builder with the manifest as argument. */
     auto attrs = state.buildBindings(3);
-    attrs.alloc("manifest").mkString(
-        state.store->printStorePath(manifestFile),
-        {state.store->printStorePath(manifestFile)});
+    attrs.alloc("manifest")
+        .mkString(state.store->printStorePath(manifestFile), {state.store->printStorePath(manifestFile)});
     attrs.insert(state.symbols.create("derivations"), &manifest);
     Value args;
     args.mkAttrs(attrs);
@@ -142,9 +138,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     debug("building user environment");
     std::vector<StorePathWithOutputs> topLevelDrvs;
     topLevelDrvs.push_back({topLevelDrv});
-    state.store->buildPaths(
-        toDerivedPaths(topLevelDrvs),
-        state.repair ? bmRepair : bmNormal);
+    state.store->buildPaths(toDerivedPaths(topLevelDrvs), state.repair ? bmRepair : bmNormal);
 
     /* Switch the current user environment to the output path. */
     auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();
@@ -166,6 +160,5 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
     return true;
 }
-
 
 }

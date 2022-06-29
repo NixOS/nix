@@ -18,11 +18,14 @@ struct CmdEdit : InstallableCommand
     std::string doc() override
     {
         return
-          #include "edit.md"
-          ;
+#include "edit.md"
+            ;
     }
 
-    Category category() override { return catSecondary; }
+    Category category() override
+    {
+        return catSecondary;
+    }
 
     void run(ref<Store> store) override
     {
@@ -47,7 +50,8 @@ struct CmdEdit : InstallableCommand
         execvp(args.front().c_str(), stringsToCharPtrs(args).data());
 
         std::string command;
-        for (const auto &arg : args) command += " '" + arg + "'";
+        for (const auto & arg : args)
+            command += " '" + arg + "'";
         throw SysError("cannot run command%s", command);
     }
 };

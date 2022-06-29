@@ -13,8 +13,8 @@ struct CmdStoreRepair : StorePathsCommand
     std::string doc() override
     {
         return
-          #include "store-repair.md"
-          ;
+#include "store-repair.md"
+            ;
     }
 
     void run(ref<Store> store, std::vector<StorePath> && storePaths) override

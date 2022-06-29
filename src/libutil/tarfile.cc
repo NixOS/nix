@@ -11,7 +11,7 @@ static int callback_open(struct archive *, void * self)
     return ARCHIVE_OK;
 }
 
-static ssize_t callback_read(struct archive * archive, void * _self, const void * * buffer)
+static ssize_t callback_read(struct archive * archive, void * _self, const void ** buffer)
 {
     auto self = (TarArchive *) _self;
     *buffer = self->buffer.data();
@@ -39,7 +39,8 @@ void TarArchive::check(int err, const std::string & reason)
         throw Error(reason, archive_error_string(this->archive));
 }
 
-TarArchive::TarArchive(Source & source, bool raw) : buffer(4096)
+TarArchive::TarArchive(Source & source, bool raw)
+    : buffer(4096)
 {
     this->archive = archive_read_new();
     this->source = &source;
@@ -52,9 +53,10 @@ TarArchive::TarArchive(Source & source, bool raw) : buffer(4096)
         archive_read_support_format_raw(archive);
         archive_read_support_format_empty(archive);
     }
-    check(archive_read_open(archive, (void *)this, callback_open, callback_read, callback_close), "Failed to open archive (%s)");
+    check(
+        archive_read_open(archive, (void *) this, callback_open, callback_read, callback_close),
+        "Failed to open archive (%s)");
 }
-
 
 TarArchive::TarArchive(const Path & path)
 {
@@ -72,21 +74,20 @@ void TarArchive::close()
 
 TarArchive::~TarArchive()
 {
-    if (this->archive) archive_read_free(this->archive);
+    if (this->archive)
+        archive_read_free(this->archive);
 }
 
 static void extract_archive(TarArchive & archive, const Path & destDir)
 {
-    int flags = ARCHIVE_EXTRACT_FFLAGS
-        | ARCHIVE_EXTRACT_PERM
-        | ARCHIVE_EXTRACT_TIME
-        | ARCHIVE_EXTRACT_SECURE_SYMLINKS
-        | ARCHIVE_EXTRACT_SECURE_NODOTDOT;
+    int flags = ARCHIVE_EXTRACT_FFLAGS | ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_TIME | ARCHIVE_EXTRACT_SECURE_SYMLINKS
+                | ARCHIVE_EXTRACT_SECURE_NODOTDOT;
 
     for (;;) {
         struct archive_entry * entry;
         int r = archive_read_next_header(archive.archive, &entry);
-        if (r == ARCHIVE_EOF) break;
+        if (r == ARCHIVE_EOF)
+            break;
         auto name = archive_entry_pathname(entry);
         if (!name)
             throw Error("cannot get archive member name: %s", archive_error_string(archive.archive));
@@ -95,14 +96,12 @@ static void extract_archive(TarArchive & archive, const Path & destDir)
         else
             archive.check(r);
 
-        archive_entry_copy_pathname(entry,
-            (destDir + "/" + name).c_str());
+        archive_entry_copy_pathname(entry, (destDir + "/" + name).c_str());
 
         // Patch hardlink path
-        const char *original_hardlink = archive_entry_hardlink(entry);
+        const char * original_hardlink = archive_entry_hardlink(entry);
         if (original_hardlink) {
-            archive_entry_copy_hardlink(entry,
-                (destDir + "/" + original_hardlink).c_str());
+            archive_entry_copy_hardlink(entry, (destDir + "/" + original_hardlink).c_str());
         }
 
         archive.check(archive_read_extract(archive.archive, entry, flags));

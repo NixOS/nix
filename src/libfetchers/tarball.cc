@@ -10,12 +10,8 @@
 
 namespace nix::fetchers {
 
-DownloadFileResult downloadFile(
-    ref<Store> store,
-    const std::string & url,
-    const std::string & name,
-    bool locked,
-    const Headers & headers)
+DownloadFileResult
+downloadFile(ref<Store> store, const std::string & url, const std::string & name, bool locked, const Headers & headers)
 {
     // FIXME: check store
 
@@ -27,13 +23,11 @@ DownloadFileResult downloadFile(
 
     auto cached = getCache()->lookupExpired(store, inAttrs);
 
-    auto useCached = [&]() -> DownloadFileResult
-    {
+    auto useCached = [&]() -> DownloadFileResult {
         return {
             .storePath = std::move(cached->storePath),
             .etag = getStrAttr(cached->infoAttrs, "etag"),
-            .effectiveUrl = getStrAttr(cached->infoAttrs, "url")
-        };
+            .effectiveUrl = getStrAttr(cached->infoAttrs, "url")};
     };
 
     if (cached && !cached->expired)
@@ -70,12 +64,12 @@ DownloadFileResult downloadFile(
         StringSink sink;
         dumpString(res.data, sink);
         auto hash = hashString(htSHA256, res.data);
-        ValidPathInfo info {
+        ValidPathInfo info{
             store->makeFixedOutputPath(FileIngestionMethod::Flat, hash, name),
             hashString(htSHA256, sink.s),
         };
         info.narSize = sink.s.size();
-        info.ca = FixedOutputHash {
+        info.ca = FixedOutputHash{
             .method = FileIngestionMethod::Flat,
             .hash = hash,
         };
@@ -84,12 +78,7 @@ DownloadFileResult downloadFile(
         storePath = std::move(info.path);
     }
 
-    getCache()->add(
-        store,
-        inAttrs,
-        infoAttrs,
-        *storePath,
-        locked);
+    getCache()->add(store, inAttrs, infoAttrs, *storePath, locked);
 
     if (url != res.effectiveUri)
         getCache()->add(
@@ -99,9 +88,7 @@ DownloadFileResult downloadFile(
                 {"url", res.effectiveUri},
                 {"name", name},
             },
-            infoAttrs,
-            *storePath,
-            locked);
+            infoAttrs, *storePath, locked);
 
     return {
         .storePath = std::move(*storePath),
@@ -111,11 +98,7 @@ DownloadFileResult downloadFile(
 }
 
 std::pair<Tree, time_t> downloadTarball(
-    ref<Store> store,
-    const std::string & url,
-    const std::string & name,
-    bool locked,
-    const Headers & headers)
+    ref<Store> store, const std::string & url, const std::string & name, bool locked, const Headers & headers)
 {
     Attrs inAttrs({
         {"type", "tarball"},
@@ -127,9 +110,8 @@ std::pair<Tree, time_t> downloadTarball(
 
     if (cached && !cached->expired)
         return {
-            Tree { .actualPath = store->toRealPath(cached->storePath), .storePath = std::move(cached->storePath) },
-            getIntAttr(cached->infoAttrs, "lastModified")
-        };
+            Tree{.actualPath = store->toRealPath(cached->storePath), .storePath = std::move(cached->storePath)},
+            getIntAttr(cached->infoAttrs, "lastModified")};
 
     auto res = downloadFile(store, url, name, locked, headers);
 
@@ -148,7 +130,8 @@ std::pair<Tree, time_t> downloadTarball(
             throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
         auto topDir = tmpDir + "/" + members.begin()->name;
         lastModified = lstat(topDir).st_mtime;
-        unpackedStorePath = store->addToStore(name, topDir, FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, NoRepair);
+        unpackedStorePath =
+            store->addToStore(name, topDir, FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, NoRepair);
     }
 
     Attrs infoAttrs({
@@ -156,15 +139,10 @@ std::pair<Tree, time_t> downloadTarball(
         {"etag", res.etag},
     });
 
-    getCache()->add(
-        store,
-        inAttrs,
-        infoAttrs,
-        *unpackedStorePath,
-        locked);
+    getCache()->add(store, inAttrs, infoAttrs, *unpackedStorePath, locked);
 
     return {
-        Tree { .actualPath = store->toRealPath(*unpackedStorePath), .storePath = std::move(*unpackedStorePath) },
+        Tree{.actualPath = store->toRealPath(*unpackedStorePath), .storePath = std::move(*unpackedStorePath)},
         lastModified,
     };
 }
@@ -177,10 +155,9 @@ struct CurlInputScheme : InputScheme
 
     const bool hasTarballExtension(std::string_view path) const
     {
-        return hasSuffix(path, ".zip") || hasSuffix(path, ".tar")
-            || hasSuffix(path, ".tgz") || hasSuffix(path, ".tar.gz")
-            || hasSuffix(path, ".tar.xz") || hasSuffix(path, ".tar.bz2")
-            || hasSuffix(path, ".tar.zst");
+        return hasSuffix(path, ".zip") || hasSuffix(path, ".tar") || hasSuffix(path, ".tgz")
+               || hasSuffix(path, ".tar.gz") || hasSuffix(path, ".tar.xz") || hasSuffix(path, ".tar.bz2")
+               || hasSuffix(path, ".tar.zst");
     }
 
     virtual bool isValidURL(const ParsedURL & url) const = 0;
@@ -206,7 +183,8 @@ struct CurlInputScheme : InputScheme
     std::optional<Input> inputFromAttrs(const Attrs & attrs) override
     {
         auto type = maybeGetStrAttr(attrs, "type");
-        if (type != inputType()) return {};
+        if (type != inputType())
+            return {};
 
         std::set<std::string> allowedNames = {"type", "url", "narHash", "name", "unpack"};
         for (auto & [name, value] : attrs)
@@ -216,14 +194,15 @@ struct CurlInputScheme : InputScheme
         Input input;
         input.attrs = attrs;
 
-        //input.locked = (bool) maybeGetStrAttr(input.attrs, "hash");
+        // input.locked = (bool) maybeGetStrAttr(input.attrs, "hash");
         return input;
     }
 
     ParsedURL toURL(const Input & input) override
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
-        // NAR hashes are preferred over file hashes since tar/zip files        // don't have a canonical representation.
+        // NAR hashes are preferred over file hashes since tar/zip files        // don't have a canonical
+        // representation.
         if (auto narHash = input.getNarHash())
             url.query.insert_or_assign("narHash", narHash->to_string(SRI, true));
         return url;
@@ -233,20 +212,21 @@ struct CurlInputScheme : InputScheme
     {
         return true;
     }
-
 };
 
 struct FileInputScheme : CurlInputScheme
 {
-    const std::string inputType() const override { return "file"; }
+    const std::string inputType() const override
+    {
+        return "file";
+    }
 
     bool isValidURL(const ParsedURL & url) const override
     {
         auto parsedUrlScheme = parseUrlScheme(url.scheme);
         return transportUrlSchemes.count(std::string(parsedUrlScheme.transport))
-            && (parsedUrlScheme.application
-                    ? parsedUrlScheme.application.value() == inputType()
-                    : !hasTarballExtension(url.path));
+               && (parsedUrlScheme.application ? parsedUrlScheme.application.value() == inputType()
+                                               : !hasTarballExtension(url.path));
     }
 
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
@@ -258,16 +238,18 @@ struct FileInputScheme : CurlInputScheme
 
 struct TarballInputScheme : CurlInputScheme
 {
-    const std::string inputType() const override { return "tarball"; }
+    const std::string inputType() const override
+    {
+        return "tarball";
+    }
 
     bool isValidURL(const ParsedURL & url) const override
     {
         auto parsedUrlScheme = parseUrlScheme(url.scheme);
 
         return transportUrlSchemes.count(std::string(parsedUrlScheme.transport))
-            && (parsedUrlScheme.application
-                    ? parsedUrlScheme.application.value() == inputType()
-                    : hasTarballExtension(url.path));
+               && (parsedUrlScheme.application ? parsedUrlScheme.application.value() == inputType()
+                                               : hasTarballExtension(url.path));
     }
 
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override

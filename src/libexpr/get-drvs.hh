@@ -6,9 +6,7 @@
 #include <string>
 #include <map>
 
-
 namespace nix {
-
 
 struct DrvInfo
 {
@@ -27,7 +25,7 @@ private:
 
     bool failed = false; // set if we get an AssertionError
 
-    Bindings * attrs = nullptr, * meta = nullptr;
+    Bindings *attrs = nullptr, *meta = nullptr;
 
     Bindings * getMeta();
 
@@ -36,7 +34,8 @@ private:
 public:
     std::string attrPath; /* path towards the derivation */
 
-    DrvInfo(EvalState & state) : state(&state) { };
+    DrvInfo(EvalState & state)
+        : state(&state){};
     DrvInfo(EvalState & state, std::string attrPath, Bindings * attrs);
     DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs);
 
@@ -63,14 +62,28 @@ public:
     MetaValue queryMetaInfo(EvalState & state, const string & name) const;
     */
 
-    void setName(const std::string & s) { name = s; }
-    void setDrvPath(StorePath path) { drvPath = {{std::move(path)}}; }
-    void setOutPath(StorePath path) { outPath = {{std::move(path)}}; }
+    void setName(const std::string & s)
+    {
+        name = s;
+    }
+    void setDrvPath(StorePath path)
+    {
+        drvPath = {{std::move(path)}};
+    }
+    void setOutPath(StorePath path)
+    {
+        outPath = {{std::move(path)}};
+    }
 
-    void setFailed() { failed = true; };
-    bool hasFailed() { return failed; };
+    void setFailed()
+    {
+        failed = true;
+    };
+    bool hasFailed()
+    {
+        return failed;
+    };
 };
-
 
 #if HAVE_BOEHMGC
 typedef std::list<DrvInfo, traceable_allocator<DrvInfo>> DrvInfos;
@@ -78,15 +91,16 @@ typedef std::list<DrvInfo, traceable_allocator<DrvInfo>> DrvInfos;
 typedef std::list<DrvInfo> DrvInfos;
 #endif
 
-
 /* If value `v' denotes a derivation, return a DrvInfo object
    describing it. Otherwise return nothing. */
-std::optional<DrvInfo> getDerivation(EvalState & state,
-    Value & v, bool ignoreAssertionFailures);
+std::optional<DrvInfo> getDerivation(EvalState & state, Value & v, bool ignoreAssertionFailures);
 
-void getDerivations(EvalState & state, Value & v, const std::string & pathPrefix,
-    Bindings & autoArgs, DrvInfos & drvs,
+void getDerivations(
+    EvalState & state,
+    Value & v,
+    const std::string & pathPrefix,
+    Bindings & autoArgs,
+    DrvInfos & drvs,
     bool ignoreAssertionFailures);
-
 
 }

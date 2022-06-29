@@ -9,7 +9,8 @@ struct IndirectInputScheme : InputScheme
 {
     std::optional<Input> inputFromURL(const ParsedURL & url) override
     {
-        if (url.scheme != "flake") return {};
+        if (url.scheme != "flake")
+            return {};
 
         auto path = tokenizeString<std::vector<std::string>>(url.path, "/");
 
@@ -44,15 +45,18 @@ struct IndirectInputScheme : InputScheme
         input.direct = false;
         input.attrs.insert_or_assign("type", "indirect");
         input.attrs.insert_or_assign("id", id);
-        if (rev) input.attrs.insert_or_assign("rev", rev->gitRev());
-        if (ref) input.attrs.insert_or_assign("ref", *ref);
+        if (rev)
+            input.attrs.insert_or_assign("rev", rev->gitRev());
+        if (ref)
+            input.attrs.insert_or_assign("ref", *ref);
 
         return input;
     }
 
     std::optional<Input> inputFromAttrs(const Attrs & attrs) override
     {
-        if (maybeGetStrAttr(attrs, "type") != "indirect") return {};
+        if (maybeGetStrAttr(attrs, "type") != "indirect")
+            return {};
 
         for (auto & [name, value] : attrs)
             if (name != "type" && name != "id" && name != "ref" && name != "rev" && name != "narHash")
@@ -73,8 +77,14 @@ struct IndirectInputScheme : InputScheme
         ParsedURL url;
         url.scheme = "flake";
         url.path = getStrAttr(input.attrs, "id");
-        if (auto ref = input.getRef()) { url.path += '/'; url.path += *ref; };
-        if (auto rev = input.getRev()) { url.path += '/'; url.path += rev->gitRev(); };
+        if (auto ref = input.getRef()) {
+            url.path += '/';
+            url.path += *ref;
+        };
+        if (auto rev = input.getRev()) {
+            url.path += '/';
+            url.path += rev->gitRev();
+        };
         return url;
     }
 
@@ -83,14 +93,13 @@ struct IndirectInputScheme : InputScheme
         return false;
     }
 
-    Input applyOverrides(
-        const Input & _input,
-        std::optional<std::string> ref,
-        std::optional<Hash> rev) override
+    Input applyOverrides(const Input & _input, std::optional<std::string> ref, std::optional<Hash> rev) override
     {
         auto input(_input);
-        if (rev) input.attrs.insert_or_assign("rev", rev->gitRev());
-        if (ref) input.attrs.insert_or_assign("ref", *ref);
+        if (rev)
+            input.attrs.insert_or_assign("rev", rev->gitRev());
+        if (ref)
+            input.attrs.insert_or_assign("ref", *ref);
         return input;
     }
 

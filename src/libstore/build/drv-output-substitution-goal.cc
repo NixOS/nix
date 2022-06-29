@@ -7,18 +7,14 @@
 namespace nix {
 
 DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(
-    const DrvOutput & id,
-    Worker & worker,
-    RepairFlag repair,
-    std::optional<ContentAddress> ca)
-    : Goal(worker, DerivedPath::Opaque { StorePath::dummy })
+    const DrvOutput & id, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
+    : Goal(worker, DerivedPath::Opaque{StorePath::dummy})
     , id(id)
 {
     state = &DrvOutputSubstitutionGoal::init;
     name = fmt("substitution of '%s'", id.to_string());
     trace("created");
 }
-
 
 void DrvOutputSubstitutionGoal::init()
 {
@@ -64,15 +60,14 @@ void DrvOutputSubstitutionGoal::tryNext()
     outPipe.create();
     promise = decltype(promise)();
 
-    sub->queryRealisation(
-        id, { [&](std::future<std::shared_ptr<const Realisation>> res) {
-            try {
-                Finally updateStats([this]() { outPipe.writeSide.close(); });
-                promise.set_value(res.get());
-            } catch (...) {
-                promise.set_exception(std::current_exception());
-            }
-        } });
+    sub->queryRealisation(id, {[&](std::future<std::shared_ptr<const Realisation>> res) {
+                              try {
+                                  Finally updateStats([this]() { outPipe.writeSide.close(); });
+                                  promise.set_value(res.get());
+                              } catch (...) {
+                                  promise.set_exception(std::current_exception());
+                              }
+                          }});
 
     worker.childStarted(shared_from_this(), {outPipe.readSide.get()}, true, false);
 
@@ -102,11 +97,8 @@ void DrvOutputSubstitutionGoal::realisationFetched()
                     "substituter '%s' has an incompatible realisation for '%s', ignoring.\n"
                     "Local:  %s\n"
                     "Remote: %s",
-                    sub->getUri(),
-                    depId.to_string(),
-                    worker.store.printStorePath(localOutputInfo->outPath),
-                    worker.store.printStorePath(depPath)
-                );
+                    sub->getUri(), depId.to_string(), worker.store.printStorePath(localOutputInfo->outPath),
+                    worker.store.printStorePath(depPath));
                 tryNext();
                 return;
             }
@@ -116,8 +108,10 @@ void DrvOutputSubstitutionGoal::realisationFetched()
 
     addWaitee(worker.makePathSubstitutionGoal(outputInfo->outPath));
 
-    if (waitees.empty()) outPathValid();
-    else state = &DrvOutputSubstitutionGoal::outPathValid;
+    if (waitees.empty())
+        outPathValid();
+    else
+        state = &DrvOutputSubstitutionGoal::outPathValid;
 }
 
 void DrvOutputSubstitutionGoal::outPathValid()
@@ -155,8 +149,8 @@ void DrvOutputSubstitutionGoal::work()
 
 void DrvOutputSubstitutionGoal::handleEOF(int fd)
 {
-    if (fd == outPipe.readSide.get()) worker.wakeUp(shared_from_this());
+    if (fd == outPipe.readSide.get())
+        worker.wakeUp(shared_from_this());
 }
-
 
 }

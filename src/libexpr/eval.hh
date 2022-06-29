@@ -15,14 +15,12 @@
 
 namespace nix {
 
-
 class Store;
 class EvalState;
 class StorePath;
 enum RepairFlag : bool;
 
-
-typedef void (* PrimOpFun) (EvalState & state, const PosIdx pos, Value * * args, Value & v);
+typedef void (*PrimOpFun)(EvalState & state, const PosIdx pos, Value ** args, Value & v);
 
 struct PrimOp
 {
@@ -34,9 +32,11 @@ struct PrimOp
 };
 
 #if HAVE_BOEHMGC
-    typedef std::map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *> > > ValMap;
+typedef std::
+    map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *>>>
+        ValMap;
 #else
-    typedef std::map<std::string, Value *> ValMap;
+typedef std::map<std::string, Value *> ValMap;
 #endif
 
 struct Env
@@ -47,37 +47,33 @@ struct Env
     Value * values[0];
 };
 
-void printEnvBindings(const EvalState &es, const Expr & expr, const Env & env);
+void printEnvBindings(const EvalState & es, const Expr & expr, const Env & env);
 void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, int lvl = 0);
 
 std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env);
 
 void copyContext(const Value & v, PathSet & context);
 
-
 /* Cache for calls to addToStore(); maps source paths to the store
    paths. */
 typedef std::map<Path, StorePath> SrcToStore;
 
-
 std::ostream & printValue(const EvalState & state, std::ostream & str, const Value & v);
 std::string printValue(const EvalState & state, const Value & v);
-std::ostream & operator << (std::ostream & os, const ValueType t);
-
+std::ostream & operator<<(std::ostream & os, const ValueType t);
 
 typedef std::pair<std::string, std::string> SearchPathElem;
 typedef std::list<SearchPathElem> SearchPath;
 
-
 /* Initialise the Boehm GC, if applicable. */
 void initGC();
-
 
 struct RegexCache;
 
 std::shared_ptr<RegexCache> makeRegexCache();
 
-struct DebugTrace {
+struct DebugTrace
+{
     std::optional<ErrPos> pos;
     const Expr & expr;
     const Env & env;
@@ -95,16 +91,10 @@ public:
 
     static inline std::string derivationNixPath = "//builtin/derivation.nix";
 
-    const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
-        sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
-        sFile, sLine, sColumn, sFunctor, sToString,
-        sRight, sWrong, sStructuredAttrs, sBuilder, sArgs,
-        sContentAddressed, sImpure,
-        sOutputHash, sOutputHashAlgo, sOutputHashMode,
-        sRecurseForDerivations,
-        sDescription, sSelf, sEpsilon, sStartSet, sOperator, sKey, sPath,
-        sPrefix,
-        sOutputSpecified;
+    const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue, sSystem, sOverrides, sOutputs, sOutputName,
+        sIgnoreNulls, sFile, sLine, sColumn, sFunctor, sToString, sRight, sWrong, sStructuredAttrs, sBuilder, sArgs,
+        sContentAddressed, sImpure, sOutputHash, sOutputHashAlgo, sOutputHashMode, sRecurseForDerivations, sDescription,
+        sSelf, sEpsilon, sStartSet, sOperator, sKey, sPath, sPrefix, sOutputSpecified;
     Symbol sDerivationNix;
 
     /* If set, force copying files to the Nix store even if they
@@ -127,25 +117,25 @@ public:
     RootValue vImportedDrvToDerivation = nullptr;
 
     /* Debugger */
-    void (* debugRepl)(ref<EvalState> es, const ValMap & extraEnv);
+    void (*debugRepl)(ref<EvalState> es, const ValMap & extraEnv);
     bool debugStop;
     bool debugQuit;
     std::list<DebugTrace> debugTraces;
-    std::map<const Expr*, const std::shared_ptr<const StaticEnv>> exprEnvs;
+    std::map<const Expr *, const std::shared_ptr<const StaticEnv>> exprEnvs;
     const std::shared_ptr<const StaticEnv> getStaticEnv(const Expr & expr) const
     {
         auto i = exprEnvs.find(&expr);
         if (i != exprEnvs.end())
             return i->second;
         else
-            return std::shared_ptr<const StaticEnv>();;
+            return std::shared_ptr<const StaticEnv>();
+        ;
     }
 
     void runDebugRepl(const Error * error, const Env & env, const Expr & expr);
 
     template<class E>
-    [[gnu::noinline, gnu::noreturn]]
-    void debugThrow(E && error, const Env & env, const Expr & expr)
+    [[gnu::noinline, gnu::noreturn]] void debugThrow(E && error, const Env & env, const Expr & expr)
     {
         if (debugRepl)
             runDebugRepl(&error, env, expr);
@@ -154,8 +144,7 @@ public:
     }
 
     template<class E>
-    [[gnu::noinline, gnu::noreturn]]
-    void debugThrowLastTrace(E && e)
+    [[gnu::noinline, gnu::noreturn]] void debugThrowLastTrace(E && e)
     {
         // Call this in the situation where Expr and Env are inaccessible.
         // The debugger will start in the last context that's in the
@@ -208,15 +197,15 @@ private:
 
 public:
 
-    EvalState(
-        const Strings & _searchPath,
-        ref<Store> store,
-        std::shared_ptr<Store> buildStore = nullptr);
+    EvalState(const Strings & _searchPath, ref<Store> store, std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
 
     void addToSearchPath(const std::string & s);
 
-    SearchPath getSearchPath() { return searchPath; }
+    SearchPath getSearchPath()
+    {
+        return searchPath;
+    }
 
     /* Allow access to a path. */
     void allowPath(const Path & path);
@@ -259,12 +248,7 @@ public:
     void evalFile(const Path & path, Value & v, bool mustBeTrivial = false);
 
     /* Like `evalFile`, but with an already parsed expression. */
-    void cacheFile(
-        const Path & path,
-        const Path & resolvedPath,
-        Expr * e,
-        Value & v,
-        bool mustBeTrivial = false);
+    void cacheFile(const Path & path, const Path & resolvedPath, Expr * e, Value & v, bool mustBeTrivial = false);
 
     void resetFileCache();
 
@@ -291,7 +275,7 @@ public:
        result.  Otherwise, this is a no-op. */
     inline void forceValue(Value & v, const PosIdx pos);
 
-    template <typename Callable>
+    template<typename Callable>
     inline void forceValue(Value & v, Callable getPos);
 
     /* Force a value, then recursively force list elements and
@@ -305,7 +289,7 @@ public:
 
     void forceAttrs(Value & v, const PosIdx pos);
 
-    template <typename Callable>
+    template<typename Callable>
     inline void forceAttrs(Value & v, Callable getPos);
 
     inline void forceList(Value & v, const PosIdx pos);
@@ -314,89 +298,79 @@ public:
     std::string_view forceString(Value & v, PathSet & context, const PosIdx pos = noPos);
     std::string_view forceStringNoCtx(Value & v, const PosIdx pos = noPos);
 
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const char * s);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const char * s,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const char * s, const std::string & s2);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const char * s, const std::string & s2,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const char * s, const std::string & s2, const std::string & s3,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2, const std::string & s3,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2, const std::string & s3);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const char * s, const std::string & s2, const std::string & s3);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx pos, const Suggestions & suggestions, const char * s, const std::string & s2,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2,
-        Env & env, Expr & expr);
+    [[gnu::noinline, gnu::noreturn]] void throwEvalError(const PosIdx pos, const char * s);
+    [[gnu::noinline, gnu::noreturn]] void throwEvalError(const PosIdx pos, const char * s, Env & env, Expr & expr);
+    [[gnu::noinline, gnu::noreturn]] void throwEvalError(const char * s, const std::string & s2);
+    [[gnu::noinline, gnu::noreturn]] void throwEvalError(const PosIdx pos, const char * s, const std::string & s2);
+    [[gnu::noinline, gnu::noreturn]] void
+    throwEvalError(const char * s, const std::string & s2, Env & env, Expr & expr);
+    [[gnu::noinline, gnu::noreturn]] void
+    throwEvalError(const PosIdx pos, const char * s, const std::string & s2, Env & env, Expr & expr);
+    [[gnu::noinline, gnu::noreturn]] void
+    throwEvalError(const char * s, const std::string & s2, const std::string & s3, Env & env, Expr & expr);
+    [[gnu::noinline, gnu::noreturn]] void throwEvalError(
+        const PosIdx pos, const char * s, const std::string & s2, const std::string & s3, Env & env, Expr & expr);
+    [[gnu::noinline, gnu::noreturn]] void
+    throwEvalError(const PosIdx pos, const char * s, const std::string & s2, const std::string & s3);
+    [[gnu::noinline, gnu::noreturn]] void
+    throwEvalError(const char * s, const std::string & s2, const std::string & s3);
+    [[gnu::noinline, gnu::noreturn]] void throwEvalError(
+        const PosIdx pos,
+        const Suggestions & suggestions,
+        const char * s,
+        const std::string & s2,
+        Env & env,
+        Expr & expr);
+    [[gnu::noinline, gnu::noreturn]] void
+    throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2, Env & env, Expr & expr);
 
-    [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const char * s, const Value & v);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const char * s, const Value & v,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const char * s);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const char * s,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const char * s, const ExprLambda & fun, const Symbol s2,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const PosIdx pos, const Suggestions & suggestions, const char * s, const ExprLambda & fun, const Symbol s2,
-        Env & env, Expr & expr);
-    [[gnu::noinline, gnu::noreturn]]
-    void throwTypeError(const char * s, const Value & v,
-        Env & env, Expr & expr);
+    [[gnu::noinline, gnu::noreturn]] void throwTypeError(const PosIdx pos, const char * s, const Value & v);
+    [[gnu::noinline, gnu::noreturn]] void
+    throwTypeError(const PosIdx pos, const char * s, const Value & v, Env & env, Expr & expr);
+    [[gnu::noinline, gnu::noreturn]] void throwTypeError(const PosIdx pos, const char * s);
+    [[gnu::noinline, gnu::noreturn]] void throwTypeError(const PosIdx pos, const char * s, Env & env, Expr & expr);
+    [[gnu::noinline, gnu::noreturn]] void
+    throwTypeError(const PosIdx pos, const char * s, const ExprLambda & fun, const Symbol s2, Env & env, Expr & expr);
+    [[gnu::noinline, gnu::noreturn]] void throwTypeError(
+        const PosIdx pos,
+        const Suggestions & suggestions,
+        const char * s,
+        const ExprLambda & fun,
+        const Symbol s2,
+        Env & env,
+        Expr & expr);
+    [[gnu::noinline, gnu::noreturn]] void throwTypeError(const char * s, const Value & v, Env & env, Expr & expr);
 
-    [[gnu::noinline, gnu::noreturn]]
-    void throwAssertionError(const PosIdx pos, const char * s, const std::string & s1,
-        Env & env, Expr & expr);
+    [[gnu::noinline, gnu::noreturn]] void
+    throwAssertionError(const PosIdx pos, const char * s, const std::string & s1, Env & env, Expr & expr);
 
-    [[gnu::noinline, gnu::noreturn]]
-    void throwUndefinedVarError(const PosIdx pos, const char * s, const std::string & s1,
-        Env & env, Expr & expr);
+    [[gnu::noinline, gnu::noreturn]] void
+    throwUndefinedVarError(const PosIdx pos, const char * s, const std::string & s1, Env & env, Expr & expr);
 
-    [[gnu::noinline, gnu::noreturn]]
-    void throwMissingArgumentError(const PosIdx pos, const char * s, const std::string & s1,
-        Env & env, Expr & expr);
+    [[gnu::noinline, gnu::noreturn]] void
+    throwMissingArgumentError(const PosIdx pos, const char * s, const std::string & s1, Env & env, Expr & expr);
 
-    [[gnu::noinline]]
-    void addErrorTrace(Error & e, const char * s, const std::string & s2) const;
-    [[gnu::noinline]]
-    void addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2) const;
+    [[gnu::noinline]] void addErrorTrace(Error & e, const char * s, const std::string & s2) const;
+    [[gnu::noinline]] void addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2) const;
 
 public:
     /* Return true iff the value `v' denotes a derivation (i.e. a
        set with attribute `type = "derivation"'). */
     bool isDerivation(Value & v);
 
-    std::optional<std::string> tryAttrsToString(const PosIdx pos, Value & v,
-        PathSet & context, bool coerceMore = false, bool copyToStore = true);
+    std::optional<std::string>
+    tryAttrsToString(const PosIdx pos, Value & v, PathSet & context, bool coerceMore = false, bool copyToStore = true);
 
     /* String coercion.  Converts strings, paths and derivations to a
        string.  If `coerceMore' is set, also converts nulls, integers,
        booleans and lists to a string.  If `copyToStore' is set,
        referenced paths are copied to the Nix store as a side effect. */
-    BackedStringView coerceToString(const PosIdx pos, Value & v, PathSet & context,
-        bool coerceMore = false, bool copyToStore = true,
+    BackedStringView coerceToString(
+        const PosIdx pos,
+        Value & v,
+        PathSet & context,
+        bool coerceMore = false,
+        bool copyToStore = true,
         bool canonicalizePath = true);
 
     std::string copyPathToStore(PathSet & context, const Path & path);
@@ -428,8 +402,7 @@ private:
 
     void addConstant(const std::string & name, Value * v);
 
-    Value * addPrimOp(const std::string & name,
-        size_t arity, PrimOpFun primOp);
+    Value * addPrimOp(const std::string & name, size_t arity, PrimOpFun primOp);
 
     Value * addPrimOp(PrimOp && primOp);
 
@@ -456,8 +429,13 @@ private:
     friend struct ExprAttrs;
     friend struct ExprLet;
 
-    Expr * parse(char * text, size_t length, FileOrigin origin, const PathView path,
-        const PathView basePath, std::shared_ptr<StaticEnv> & staticEnv);
+    Expr * parse(
+        char * text,
+        size_t length,
+        FileOrigin origin,
+        const PathView path,
+        const PathView basePath,
+        std::shared_ptr<StaticEnv> & staticEnv);
 
 public:
 
@@ -468,7 +446,7 @@ public:
     bool isFunctor(Value & fun);
 
     // FIXME: use std::span
-    void callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const PosIdx pos);
+    void callFunction(Value & fun, size_t nrArgs, Value ** args, Value & vRes, const PosIdx pos);
 
     void callFunction(Value & fun, Value & arg, Value & vRes, const PosIdx pos)
     {
@@ -498,7 +476,7 @@ public:
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, PosIdx pos);
 
-    void concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos);
+    void concatLists(Value & v, size_t nrLists, Value ** lists, const PosIdx pos);
 
     /* Print statistics. */
     void printStats();
@@ -545,14 +523,15 @@ private:
     friend struct ExprFloat;
     friend struct ExprPath;
     friend struct ExprSelect;
-    friend void prim_getAttr(EvalState & state, const PosIdx pos, Value * * args, Value & v);
-    friend void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v);
-    friend void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v);
+    friend void prim_getAttr(EvalState & state, const PosIdx pos, Value ** args, Value & v);
+    friend void prim_match(EvalState & state, const PosIdx pos, Value ** args, Value & v);
+    friend void prim_split(EvalState & state, const PosIdx pos, Value ** args, Value & v);
 
     friend struct Value;
 };
 
-struct DebugTraceStacker {
+struct DebugTraceStacker
+{
     DebugTraceStacker(EvalState & evalState, DebugTrace t);
     ~DebugTraceStacker()
     {
@@ -579,7 +558,7 @@ struct InvalidPathError : EvalError
     Path path;
     InvalidPathError(const Path & path);
 #ifdef EXCEPTION_NEEDS_THROW_SPEC
-    ~InvalidPathError() throw () { };
+    ~InvalidPathError() throw(){};
 #endif
 };
 
@@ -589,12 +568,12 @@ struct EvalSettings : Config
 
     static Strings getDefaultNixPath();
 
-    Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
+    Setting<bool> enableNativeCode{
+        this, false, "allow-unsafe-native-code-during-evaluation",
         "Whether builtin functions that allow executing native code should be enabled."};
 
     Setting<Strings> nixPath{
-        this, getDefaultNixPath(), "nix-path",
-        "List of directories to be searched for `<...>` file references."};
+        this, getDefaultNixPath(), "nix-path", "List of directories to be searched for `<...>` file references."};
 
     Setting<bool> restrictEval{
         this, false, "restrict-eval",
@@ -605,7 +584,8 @@ struct EvalSettings : Config
           `allowed-uri`. The default is `false`.
         )"};
 
-    Setting<bool> pureEval{this, false, "pure-eval",
+    Setting<bool> pureEval{
+        this, false, "pure-eval",
         "Whether to restrict file system and network access to files specified by cryptographic hash."};
 
     Setting<bool> enableImportFromDerivation{
@@ -618,7 +598,10 @@ struct EvalSettings : Config
           builds to take place.
         )"};
 
-    Setting<Strings> allowedUris{this, {}, "allowed-uris",
+    Setting<Strings> allowedUris{
+        this,
+        {},
+        "allowed-uris",
         R"(
           A list of URI prefixes to which access is allowed in restricted
           evaluation mode. For example, when set to
@@ -626,7 +609,8 @@ struct EvalSettings : Config
           allowed to access `https://github.com/NixOS/patchelf.git`.
         )"};
 
-    Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",
+    Setting<bool> traceFunctionCalls{
+        this, false, "trace-function-calls",
         R"(
           If set to `true`, the Nix evaluator will trace every function call.
           Nix will print a log message at the "vomit" level for every function
@@ -644,8 +628,7 @@ struct EvalSettings : Config
           `flamegraph.pl`.
         )"};
 
-    Setting<bool> useEvalCache{this, true, "eval-cache",
-        "Whether to use the flake evaluation cache."};
+    Setting<bool> useEvalCache{this, true, "eval-cache", "Whether to use the flake evaluation cache."};
 };
 
 extern EvalSettings evalSettings;

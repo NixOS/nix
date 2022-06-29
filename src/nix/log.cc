@@ -17,11 +17,14 @@ struct CmdLog : InstallableCommand
     std::string doc() override
     {
         return
-          #include "log.md"
-          ;
+#include "log.md"
+            ;
     }
 
-    Category category() override { return catSecondary; }
+    Category category() override
+    {
+        return catSecondary;
+    }
 
     void run(ref<Store> store) override
     {
@@ -42,15 +45,14 @@ struct CmdLog : InstallableCommand
             }
             auto & logSub = *logSubP;
 
-            auto log = std::visit(overloaded {
-                [&](const DerivedPath::Opaque & bo) {
-                    return logSub.getBuildLog(bo.path);
+            auto log = std::visit(
+                overloaded{
+                    [&](const DerivedPath::Opaque & bo) { return logSub.getBuildLog(bo.path); },
+                    [&](const DerivedPath::Built & bfd) { return logSub.getBuildLog(bfd.drvPath); },
                 },
-                [&](const DerivedPath::Built & bfd) {
-                    return logSub.getBuildLog(bfd.drvPath);
-                },
-            }, b.raw());
-            if (!log) continue;
+                b.raw());
+            if (!log)
+                continue;
             stopProgressBar();
             printInfo("got build log for '%s' from '%s'", installable->what(), logSub.getUri());
             std::cout << *log;

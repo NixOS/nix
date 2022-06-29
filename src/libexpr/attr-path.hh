@@ -10,11 +10,8 @@ namespace nix {
 MakeError(AttrPathNotFound, Error);
 MakeError(NoPositionInfo, Error);
 
-std::pair<Value *, PosIdx> findAlongAttrPath(
-    EvalState & state,
-    const std::string & attrPath,
-    Bindings & autoArgs,
-    Value & vIn);
+std::pair<Value *, PosIdx>
+findAlongAttrPath(EvalState & state, const std::string & attrPath, Bindings & autoArgs, Value & vIn);
 
 /* Heuristic to find the filename and lineno or a nix value. */
 std::pair<std::string, uint32_t> findPackageFilename(EvalState & state, Value & v, std::string what);

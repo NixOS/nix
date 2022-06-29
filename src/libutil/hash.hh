@@ -3,15 +3,11 @@
 #include "types.hh"
 #include "serialise.hh"
 
-
 namespace nix {
-
 
 MakeError(BadHash, Error);
 
-
 enum HashType : char { htMD5 = 42, htSHA1, htSHA256, htSHA512 };
-
 
 const int md5HashSize = 16;
 const int sha1HashSize = 20;
@@ -23,7 +19,6 @@ extern std::set<std::string> hashTypes;
 extern const std::string base32Chars;
 
 enum Base : int { Base64, Base32, Base16, SRI };
-
 
 struct Hash
 {
@@ -60,13 +55,13 @@ private:
 
 public:
     /* Check whether two hash are equal. */
-    bool operator == (const Hash & h2) const;
+    bool operator==(const Hash & h2) const;
 
     /* Check whether two hash are not equal. */
-    bool operator != (const Hash & h2) const;
+    bool operator!=(const Hash & h2) const;
 
     /* For sorting. */
-    bool operator < (const Hash & h) const;
+    bool operator<(const Hash & h) const;
 
     /* Returns the length of a base-16 representation of this hash. */
     size_t base16Len() const
@@ -119,8 +114,7 @@ Hash hashFile(HashType ht, const Path & path);
 /* Compute the hash of the given path.  The hash is defined as
    (essentially) hashString(ht, dumpPath(path)). */
 typedef std::pair<Hash, uint64_t> HashResult;
-HashResult hashPath(HashType ht, const Path & path,
-    PathFilter & filter = defaultPathFilter);
+HashResult hashPath(HashType ht, const Path & path, PathFilter & filter = defaultPathFilter);
 
 /* Compress a hash to the specified number of bytes by cyclically
    XORing bytes together. */
@@ -134,7 +128,6 @@ std::optional<HashType> parseHashTypeOpt(std::string_view s);
 
 /* And the reverse. */
 std::string printHashType(HashType ht);
-
 
 union Ctx;
 
@@ -158,6 +151,5 @@ public:
     HashResult finish() override;
     HashResult currentHash();
 };
-
 
 }

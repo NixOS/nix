@@ -3,7 +3,8 @@
 
 namespace nix {
 
-struct TarArchive {
+struct TarArchive
+{
     struct archive * archive;
     Source * source;
     std::vector<unsigned char> buffer;

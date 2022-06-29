@@ -12,24 +12,23 @@ using namespace nix;
 struct CmdUpgradeNix : MixDryRun, StoreCommand
 {
     Path profileDir;
-    std::string storePathsUrl = "https://github.com/NixOS/nixpkgs/raw/master/nixos/modules/installer/tools/nix-fallback-paths.nix";
+    std::string storePathsUrl =
+        "https://github.com/NixOS/nixpkgs/raw/master/nixos/modules/installer/tools/nix-fallback-paths.nix";
 
     CmdUpgradeNix()
     {
-        addFlag({
-            .longName = "profile",
-            .shortName = 'p',
-            .description = "The path to the Nix profile to upgrade.",
-            .labels = {"profile-dir"},
-            .handler = {&profileDir}
-        });
+        addFlag(
+            {.longName = "profile",
+             .shortName = 'p',
+             .description = "The path to the Nix profile to upgrade.",
+             .labels = {"profile-dir"},
+             .handler = {&profileDir}});
 
-        addFlag({
-            .longName = "nix-store-paths-url",
-            .description = "The URL of the file that contains the store paths of the latest Nix release.",
-            .labels = {"url"},
-            .handler = {&storePathsUrl}
-        });
+        addFlag(
+            {.longName = "nix-store-paths-url",
+             .description = "The URL of the file that contains the store paths of the latest Nix release.",
+             .labels = {"url"},
+             .handler = {&storePathsUrl}});
     }
 
     std::string description() override
@@ -40,11 +39,14 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
     std::string doc() override
     {
         return
-          #include "upgrade-nix.md"
-          ;
+#include "upgrade-nix.md"
+            ;
     }
 
-    Category category() override { return catNixInstallation; }
+    Category category() override
+    {
+        return catNixInstallation;
+    }
 
     void run(ref<Store> store) override
     {
@@ -71,7 +73,8 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         }
 
         {
-            Activity act(*logger, lvlInfo, actUnknown, fmt("verifying that '%s' works...", store->printStorePath(storePath)));
+            Activity act(
+                *logger, lvlInfo, actUnknown, fmt("verifying that '%s' works...", store->printStorePath(storePath)));
             auto program = store->printStorePath(storePath) + "/bin/nix-env";
             auto s = runProgram(program, false, {"--version"});
             if (s.find("Nix") == std::string::npos)
@@ -81,9 +84,11 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         stopProgressBar();
 
         {
-            Activity act(*logger, lvlInfo, actUnknown,
+            Activity act(
+                *logger, lvlInfo, actUnknown,
                 fmt("installing '%s' into profile '%s'...", store->printStorePath(storePath), profileDir));
-            runProgram(settings.nixBinDir + "/nix-env", false,
+            runProgram(
+                settings.nixBinDir + "/nix-env", false,
                 {"--profile", profileDir, "-i", store->printStorePath(storePath), "--no-sandbox"});
         }
 
@@ -119,8 +124,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
         Path userEnv = canonPath(profileDir, true);
 
-        if (baseNameOf(where) != "bin" ||
-            !hasSuffix(userEnv, "user-environment"))
+        if (baseNameOf(where) != "bin" || !hasSuffix(userEnv, "user-environment"))
             throw Error("directory '%s' does not appear to be part of a Nix profile", where);
 
         if (!store->isValidPath(store->parseStorePath(userEnv)))

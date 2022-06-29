@@ -15,7 +15,10 @@ struct FetchSettings : public Config
 {
     FetchSettings();
 
-    Setting<StringMap> accessTokens{this, {}, "access-tokens",
+    Setting<StringMap> accessTokens{
+        this,
+        {},
+        "access-tokens",
         R"(
           Access tokens used to access protected GitHub, GitLab, or
           other locations requiring token-based authentication.
@@ -64,20 +67,19 @@ struct FetchSettings : public Config
           value.
           )"};
 
-    Setting<bool> allowDirty{this, true, "allow-dirty",
-        "Whether to allow dirty Git/Mercurial trees."};
+    Setting<bool> allowDirty{this, true, "allow-dirty", "Whether to allow dirty Git/Mercurial trees."};
 
-    Setting<bool> warnDirty{this, true, "warn-dirty",
-        "Whether to warn about dirty Git/Mercurial trees."};
+    Setting<bool> warnDirty{this, true, "warn-dirty", "Whether to warn about dirty Git/Mercurial trees."};
 
-    Setting<std::string> flakeRegistry{this, "https://channels.nixos.org/flake-registry.json", "flake-registry",
+    Setting<std::string> flakeRegistry{
+        this, "https://channels.nixos.org/flake-registry.json", "flake-registry",
         "Path or URI of the global flake registry."};
 
-    Setting<bool> useRegistries{this, true, "use-registries",
-        "Whether to use flake registries to resolve flake references."};
+    Setting<bool> useRegistries{
+        this, true, "use-registries", "Whether to use flake registries to resolve flake references."};
 
-    Setting<bool> acceptFlakeConfig{this, false, "accept-flake-config",
-        "Whether to accept nix configuration from a flake without prompting."};
+    Setting<bool> acceptFlakeConfig{
+        this, false, "accept-flake-config", "Whether to accept nix configuration from a flake without prompting."};
 
     Setting<std::string> commitLockFileSummary{
         this, "", "commit-lockfile-summary",

@@ -4,8 +4,9 @@ using namespace nix;
 
 struct CmdNar : NixMultiCommand
 {
-    CmdNar() : MultiCommand(RegisterCommand::getCommandsFor({"nar"}))
-    { }
+    CmdNar()
+        : MultiCommand(RegisterCommand::getCommandsFor({"nar"}))
+    {}
 
     std::string description() override
     {
@@ -15,11 +16,14 @@ struct CmdNar : NixMultiCommand
     std::string doc() override
     {
         return
-          #include "nar.md"
-          ;
+#include "nar.md"
+            ;
     }
 
-    Category category() override { return catUtility; }
+    Category category() override
+    {
+        return catUtility;
+    }
 
     void run() override
     {

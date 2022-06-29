@@ -28,17 +28,17 @@ public:
         return baseName;
     }
 
-    bool operator < (const StorePath & other) const
+    bool operator<(const StorePath & other) const
     {
         return baseName < other.baseName;
     }
 
-    bool operator == (const StorePath & other) const
+    bool operator==(const StorePath & other) const
     {
         return baseName == other.baseName;
     }
 
-    bool operator != (const StorePath & other) const
+    bool operator!=(const StorePath & other) const
     {
         return baseName != other.baseName;
     }
@@ -75,10 +75,12 @@ const std::string drvExtension = ".drv";
 
 namespace std {
 
-template<> struct hash<nix::StorePath> {
+template<>
+struct hash<nix::StorePath>
+{
     std::size_t operator()(const nix::StorePath & path) const noexcept
     {
-        return * (std::size_t *) path.to_string().data();
+        return *(std::size_t *) path.to_string().data();
     }
 };
 

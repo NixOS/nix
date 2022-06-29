@@ -8,7 +8,9 @@
 
 #include <memory>
 
-namespace nix { class Store; }
+namespace nix {
+class Store;
+}
 
 namespace nix::fetchers {
 
@@ -57,15 +59,21 @@ public:
 
     /* Check whether this is a "direct" input, that is, not
        one that goes through a registry. */
-    bool isDirect() const { return direct; }
+    bool isDirect() const
+    {
+        return direct;
+    }
 
     /* Check whether this is a "locked" input, that is,
        one that contains a commit hash or content hash. */
-    bool isLocked() const { return locked; }
+    bool isLocked() const
+    {
+        return locked;
+    }
 
     bool hasAllInfo() const;
 
-    bool operator ==(const Input & other) const;
+    bool operator==(const Input & other) const;
 
     bool contains(const Input & other) const;
 
@@ -73,17 +81,13 @@ public:
        the Nix store and the locked input. */
     std::pair<Tree, Input> fetch(ref<Store> store) const;
 
-    Input applyOverrides(
-        std::optional<std::string> ref,
-        std::optional<Hash> rev) const;
+    Input applyOverrides(std::optional<std::string> ref, std::optional<Hash> rev) const;
 
     void clone(const Path & destDir) const;
 
     std::optional<Path> getSourcePath() const;
 
-    void markChangedFile(
-        std::string_view file,
-        std::optional<std::string> commitMsg) const;
+    void markChangedFile(std::string_view file, std::optional<std::string> commitMsg) const;
 
     std::string getName() const;
 
@@ -98,7 +102,6 @@ public:
     std::optional<time_t> getLastModified() const;
 };
 
-
 /* The InputScheme represents a type of fetcher.  Each fetcher
  * registers with nix at startup time.  When processing an input for a
  * flake, each scheme is given an opportunity to "recognize" that
@@ -110,8 +113,7 @@ public:
 
 struct InputScheme
 {
-    virtual ~InputScheme()
-    { }
+    virtual ~InputScheme() {}
 
     virtual std::optional<Input> inputFromURL(const ParsedURL & url) = 0;
 
@@ -121,10 +123,7 @@ struct InputScheme
 
     virtual bool hasAllInfo(const Input & input) = 0;
 
-    virtual Input applyOverrides(
-        const Input & input,
-        std::optional<std::string> ref,
-        std::optional<Hash> rev);
+    virtual Input applyOverrides(const Input & input, std::optional<std::string> ref, std::optional<Hash> rev);
 
     virtual void clone(const Input & input, const Path & destDir);
 
@@ -145,17 +144,9 @@ struct DownloadFileResult
 };
 
 DownloadFileResult downloadFile(
-    ref<Store> store,
-    const std::string & url,
-    const std::string & name,
-    bool locked,
-    const Headers & headers = {});
+    ref<Store> store, const std::string & url, const std::string & name, bool locked, const Headers & headers = {});
 
 std::pair<Tree, time_t> downloadTarball(
-    ref<Store> store,
-    const std::string & url,
-    const std::string & name,
-    bool locked,
-    const Headers & headers = {});
+    ref<Store> store, const std::string & url, const std::string & name, bool locked, const Headers & headers = {});
 
 }

@@ -15,20 +15,23 @@
 #include <map>
 #include <iostream>
 
-
 using namespace nix;
-
 
 static Path gcRoot;
 static int rootNr = 0;
 
-
 enum OutputKind { okPlain, okXML, okJSON };
 
-
-void processExpr(EvalState & state, const Strings & attrPaths,
-    bool parseOnly, bool strict, Bindings & autoArgs,
-    bool evalOnly, OutputKind output, bool location, Expr * e)
+void processExpr(
+    EvalState & state,
+    const Strings & attrPaths,
+    bool parseOnly,
+    bool strict,
+    Bindings & autoArgs,
+    bool evalOnly,
+    OutputKind output,
+    bool location,
+    Expr * e)
 {
     if (parseOnly) {
         e->show(state.symbols, std::cout);
@@ -55,7 +58,8 @@ void processExpr(EvalState & state, const Strings & attrPaths,
             else if (output == okJSON)
                 printValueAsJSON(state, strict, vRes, v.determinePos(noPos), std::cout, context);
             else {
-                if (strict) state.forceValueDeep(vRes);
+                if (strict)
+                    state.forceValueDeep(vRes);
                 vRes.print(state.symbols, std::cout);
                 std::cout << std::endl;
             }
@@ -75,7 +79,8 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                     printGCWarning();
                 else {
                     Path rootName = absPath(gcRoot);
-                    if (++rootNr > 1) rootName += "-" + std::to_string(rootNr);
+                    if (++rootNr > 1)
+                        rootName += "-" + std::to_string(rootNr);
                     auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();
                     if (store2)
                         drvPathS = store2->addPermRoot(drvPath, rootName);
@@ -86,8 +91,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
     }
 }
 
-
-static int main_nix_instantiate(int argc, char * * argv)
+static int main_nix_instantiate(int argc, char ** argv)
 {
     {
         Strings files;
@@ -163,12 +167,14 @@ static int main_nix_instantiate(int argc, char * * argv)
 
         Bindings & autoArgs = *myArgs.getAutoArgs(*state);
 
-        if (attrPaths.empty()) attrPaths = {""};
+        if (attrPaths.empty())
+            attrPaths = {""};
 
         if (findFile) {
             for (auto & i : files) {
                 Path p = state->findFile(i);
-                if (p == "") throw Error("unable to find '%1%'", i);
+                if (p == "")
+                    throw Error("unable to find '%1%'", i);
                 std::cout << p << std::endl;
             }
             return 0;
@@ -176,17 +182,17 @@ static int main_nix_instantiate(int argc, char * * argv)
 
         if (readStdin) {
             Expr * e = state->parseStdin();
-            processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
-                evalOnly, outputKind, xmlOutputSourceLocation, e);
+            processExpr(
+                *state, attrPaths, parseOnly, strict, autoArgs, evalOnly, outputKind, xmlOutputSourceLocation, e);
         } else if (files.empty() && !fromArgs)
             files.push_back("./default.nix");
 
         for (auto & i : files) {
-            Expr * e = fromArgs
-                ? state->parseExprFromString(i, absPath("."))
-                : state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state, i))));
-            processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
-                evalOnly, outputKind, xmlOutputSourceLocation, e);
+            Expr * e =
+                fromArgs ? state->parseExprFromString(i, absPath("."))
+                         : state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state, i))));
+            processExpr(
+                *state, attrPaths, parseOnly, strict, autoArgs, evalOnly, outputKind, xmlOutputSourceLocation, e);
         }
 
         state->printStats();
