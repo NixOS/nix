@@ -1036,11 +1036,16 @@ InstallablesCommand::InstallablesCommand()
 
 void InstallablesCommand::prepare()
 {
+    installables = load();
+}
+
+Installables InstallablesCommand::load() {
+    Installables installables;
     if (_installables.empty() && useDefaultInstallables())
         // FIXME: commands like "nix profile install" should not have a
         // default, probably.
         _installables.push_back(".");
-    installables = parseInstallables(getStore(), _installables);
+    return parseInstallables(getStore(), _installables);
 }
 
 std::optional<FlakeRef> InstallablesCommand::getFlakeRefForCompletion()

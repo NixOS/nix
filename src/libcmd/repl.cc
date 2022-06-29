@@ -22,6 +22,7 @@ extern "C" {
 #include "ansicolor.hh"
 #include "shared.hh"
 #include "eval.hh"
+#include "eval-cache.hh"
 #include "eval-inline.hh"
 #include "attr-path.hh"
 #include "store-api.hh"
@@ -54,6 +55,8 @@ struct NixRepl
     size_t debugTraceIndex;
 
     Strings loadedFiles;
+    typedef std::vector<std::pair<Value*,std::string>> AnnotatedValues;
+    std::function<AnnotatedValues()> getValues;
 
     const static int envSize = 32768;
     std::shared_ptr<StaticEnv> staticEnv;
@@ -63,13 +66,15 @@ struct NixRepl
 
     const Path historyFile;
 
-    NixRepl(ref<EvalState> state);
+    NixRepl(const Strings & searchPath, nix::ref<Store> store,ref<EvalState> state,
+            std::function<AnnotatedValues()> getValues);
     ~NixRepl();
-    void mainLoop(const std::vector<std::string> & files);
+    void mainLoop();
     StringSet completePrefix(const std::string & prefix);
     bool getLine(std::string & input, const std::string & prompt);
     StorePath getDerivationPath(Value & v);
     bool processLine(std::string line);
+
     void loadFile(const Path & path);
     void loadFlake(const std::string & flakeRef);
     void initEnv();
@@ -96,9 +101,11 @@ std::string removeWhitespace(std::string s)
 }
 
 
-NixRepl::NixRepl(ref<EvalState> state)
+NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store, ref<EvalState> state,
+            std::function<NixRepl::AnnotatedValues()> getValues)
     : state(state)
     , debugTraceIndex(0)
+    , getValues(getValues)
     , staticEnv(new StaticEnv(false, state->staticBaseEnv.get()))
     , historyFile(getDataDir() + "/nix/repl-history")
 {
@@ -225,18 +232,12 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
     return out;
 }
 
-void NixRepl::mainLoop(const std::vector<std::string> & files)
+void NixRepl::mainLoop()
 {
     std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
     notice("Welcome to Nix " + nixVersion + ". Type :? for help.\n");
 
-    if (!files.empty()) {
-        for (auto & i : files)
-            loadedFiles.push_back(i);
-    }
-
     loadFiles();
-    if (!loadedFiles.empty()) notice("");
 
     // Allow nix-repl specific settings in .inputrc
     rl_readline_name = "nix-repl";
@@ -746,7 +747,6 @@ bool NixRepl::processLine(std::string line)
     return true;
 }
 
-
 void NixRepl::loadFile(const Path & path)
 {
     loadedFiles.remove(path);
@@ -806,12 +806,14 @@ void NixRepl::loadFiles()
     Strings old = loadedFiles;
     loadedFiles.clear();
 
-    bool first = true;
     for (auto & i : old) {
-        if (!first) notice("");
-        first = false;
         notice("Loading '%1%'...", i);
         loadFile(i);
+    }
+
+    for (auto & [i, what] : getValues()) {
+        notice("Loading installable '%1%'...", what);
+        addAttrsToScope(*i);
     }
 }
 
@@ -1012,7 +1014,17 @@ void runRepl(
     ref<EvalState>evalState,
     const ValMap & extraEnv)
 {
-    auto repl = std::make_unique<NixRepl>(evalState);
+    auto getValues = [&]()->NixRepl::AnnotatedValues{
+        NixRepl::AnnotatedValues values;
+        return values;
+    };
+    const Strings & searchPath = {};
+    auto repl = std::make_unique<NixRepl>(
+            searchPath,
+            openStore(),
+            evalState,
+            getValues
+        );
 
     repl->initEnv();
 
@@ -1020,20 +1032,35 @@ void runRepl(
     for (auto & [name, value] : extraEnv)
         repl->addVarToScope(repl->state->symbols.create(name), *value);
 
-    repl->mainLoop({});
+    repl->mainLoop();
 }
 
-struct CmdRepl : StoreCommand, MixEvalArgs
+struct CmdRepl : InstallablesCommand
 {
-    std::vector<std::string> files;
-
-    CmdRepl()
+    CmdRepl(){
+        evalSettings.pureEval = false;
+    }
+    void prepare()
     {
-        expectArgs({
-            .label = "files",
-            .handler = {&files},
-            .completer = completePath
-        });
+        if (!settings.isExperimentalFeatureEnabled(Xp::ReplFlake) && !(file) && this->_installables.size() >= 1) {
+            warn("future versions of Nix will require using `--file` to load a file");
+            if (this->_installables.size() > 1)
+                warn("more than one input file is not currently supported");
+            auto filePath = this->_installables[0].data();
+            file = std::optional(filePath);
+            _installables.front() = _installables.back();
+            _installables.pop_back();
+        }
+        installables = InstallablesCommand::load();
+    }
+    std::vector<std::string> files;
+    Strings getDefaultFlakeAttrPaths() override
+    {
+        return {""};
+    }
+    virtual bool useDefaultInstallables() override
+    {
+        return file.has_value() or expr.has_value();
     }
 
     bool forceImpureByDefault() override
@@ -1055,12 +1082,37 @@ struct CmdRepl : StoreCommand, MixEvalArgs
 
     void run(ref<Store> store) override
     {
-        auto evalState = make_ref<EvalState>(searchPath, store);
-
-        auto repl = std::make_unique<NixRepl>(evalState);
+        auto state = getEvalState();
+        auto getValues = [&]()->NixRepl::AnnotatedValues{
+            auto installables = load();
+            NixRepl::AnnotatedValues values;
+            for (auto & installable: installables){
+                auto what = installable->what();
+                if (file){
+                    auto [val, pos] = installable->toValue(*state);
+                    auto what = installable->what();
+                    state->forceValue(*val, pos);
+                    auto autoArgs = getAutoArgs(*state);
+                    auto valPost = state->allocValue();
+                    state->autoCallFunction(*autoArgs, *val, *valPost);
+                    state->forceValue(*valPost, pos);
+                    values.push_back( {valPost, what });
+                } else {
+                    auto [val, pos] = installable->toValue(*state);
+                    values.push_back( {val, what} );
+                }
+            }
+            return values;
+        };
+        auto repl = std::make_unique<NixRepl>(
+            searchPath,
+            openStore(),
+            state,
+            getValues
+        );
         repl->autoArgs = getAutoArgs(*repl->state);
         repl->initEnv();
-        repl->mainLoop(files);
+        repl->mainLoop();
     }
 };
 
