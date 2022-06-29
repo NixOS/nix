@@ -182,8 +182,26 @@ static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, 
     fetchTree(state, pos, args, v, std::nullopt, FetchTreeParams { .allowNameArgument = false });
 }
 
-// FIXME: document
-static RegisterPrimOp primop_fetchTree("fetchTree", 1, prim_fetchTree);
+static RegisterPrimOp primop_fetchTree({
+    .name = "fetchTree",
+    .args = {"args"},
+    .arity = 1,
+    .doc = R"(
+      Introduced in 2.4
+
+      The fetcher infrastructure is exposed via the `fetchTree` built-in.
+
+      `builtins.fetchTree` allows fetching a source tree using any
+      backends supported by the fetcher infrastructure. It subsumes the
+      functionality of existing built-ins like `fetchGit`,
+      `fetchMercurial` and `fetchTarball`.
+
+      `builtins.fetchTree` can be used to fetch
+      plain files over the `http(s)` and `file` protocols in addition to
+      directory tarballs.
+    )",
+    .fun = prim_fetchTree,
+});
 
 static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v,
     const std::string & who, bool unpack, std::string name)
