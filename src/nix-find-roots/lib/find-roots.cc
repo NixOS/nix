@@ -12,6 +12,7 @@
 #include <vector>
 #include <algorithm>
 #include <fstream>
+#include <optional>
 
 #include "find-roots.hh"
 
