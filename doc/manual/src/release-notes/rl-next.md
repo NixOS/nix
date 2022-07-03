@@ -9,3 +9,7 @@
   `nix repl --file '<nixpkgs>'` or `nix repl --expr 'import <nixpkgs>{}'`
   
   This is currently guarded by the 'repl-flake' experimental feature
+  
+* Let expressions returning a trivial value are treated as a trivial
+  value in expression evaluation. This allows one, for instance, to
+  use a let-expression in the `outputs` attribute of a Flake.
