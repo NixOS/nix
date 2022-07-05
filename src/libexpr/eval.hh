@@ -76,7 +76,7 @@ struct RegexCache;
 std::shared_ptr<RegexCache> makeRegexCache();
 
 struct DebugTrace {
-    std::optional<ErrPos> pos;
+    std::shared_ptr<AbstractPos> pos;
     const Expr & expr;
     const Env & env;
     hintformat hint;

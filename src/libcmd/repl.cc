@@ -210,17 +210,16 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
     out << dt.hint.str() << "\n";
 
     // prefer direct pos, but if noPos then try the expr.
-    auto pos = *dt.pos
-        ? *dt.pos
-        : positions[dt.expr.getPos() ? dt.expr.getPos() : noPos];
+    auto pos = dt.pos
+        ? dt.pos
+        : (std::shared_ptr<AbstractPos>) positions[dt.expr.getPos() ? dt.expr.getPos() : noPos];
 
     if (pos) {
-        printAtPos(pos, out);
+        pos->print(out);
 
-        auto loc = getCodeLines(pos);
-        if (loc.has_value()) {
+        if (auto loc = pos->getCodeLines()) {;
             out << "\n";
-            printCodeLines(out, "", pos, *loc);
+            printCodeLines(out, "", *pos, *loc);
             out << "\n";
         }
     }

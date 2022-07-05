@@ -135,7 +135,7 @@ void DerivationGoal::killChild()
 void DerivationGoal::timedOut(Error && ex)
 {
     killChild();
-    done(BuildResult::TimedOut, {}, ex);
+    done(BuildResult::TimedOut, {}, std::move(ex));
 }
 
 
@@ -958,7 +958,7 @@ void DerivationGoal::buildDone()
                 BuildResult::PermanentFailure;
         }
 
-        done(st, {}, e);
+        done(st, {}, std::move(e));
         return;
     }
 }
@@ -1409,7 +1409,7 @@ void DerivationGoal::done(
         fs << worker.store.printStorePath(drvPath) << "\t" << buildResult.toString() << std::endl;
     }
 
-    amDone(buildResult.success() ? ecSuccess : ecFailed, ex);
+    amDone(buildResult.success() ? ecSuccess : ecFailed, std::move(ex));
 }
 
 

@@ -142,9 +142,9 @@ struct curlFileTransfer : public FileTransfer
         }
 
         template<class T>
-        void fail(const T & e)
+        void fail(T && e)
         {
-            failEx(std::make_exception_ptr(e));
+            failEx(std::make_exception_ptr(std::move(e)));
         }
 
         LambdaSink finalSink;
@@ -470,7 +470,7 @@ struct curlFileTransfer : public FileTransfer
                     fileTransfer.enqueueItem(shared_from_this());
                 }
                 else
-                    fail(exc);
+                    fail(std::move(exc));
             }
         }
     };

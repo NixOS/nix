@@ -775,7 +775,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
         ? std::make_unique<DebugTraceStacker>(
             *this,
             DebugTrace {
-                .pos = error->info().errPos ? *error->info().errPos : positions[expr.getPos()],
+                .pos = error->info().errPos ? error->info().errPos : (std::shared_ptr<AbstractPos>) positions[expr.getPos()],
                 .expr = expr,
                 .env = env,
                 .hint = error->info().msg,
@@ -957,7 +957,7 @@ void EvalState::throwMissingArgumentError(const PosIdx pos, const char * s, cons
 
 void EvalState::addErrorTrace(Error & e, const char * s, const std::string & s2) const
 {
-    e.addTrace(std::nullopt, s, s2);
+    e.addTrace(nullptr, s, s2);
 }
 
 void EvalState::addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2) const
@@ -969,13 +969,13 @@ static std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(
     EvalState & state,
     Expr & expr,
     Env & env,
-    std::optional<ErrPos> pos,
+    std::shared_ptr<AbstractPos> && pos,
     const char * s,
     const std::string & s2)
 {
     return std::make_unique<DebugTraceStacker>(state,
         DebugTrace {
-            .pos = pos,
+            .pos = std::move(pos),
             .expr = expr,
             .env = env,
             .hint = hintfmt(s, s2),
@@ -1171,7 +1171,7 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
                 *this,
                 *e,
                 this->baseEnv,
-                e->getPos() ? std::optional(ErrPos(positions[e->getPos()])) : std::nullopt,
+                e->getPos() ? (std::shared_ptr<AbstractPos>) positions[e->getPos()] : nullptr,
                 "while evaluating the file '%1%':", resolvedPath.to_string())
             : nullptr;
 

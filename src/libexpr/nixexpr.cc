@@ -8,6 +8,64 @@
 
 namespace nix {
 
+struct SourcePathAdapter : AbstractPos
+{
+    std::string file;
+
+    std::optional<std::string> getSource() const override
+    {
+        return std::nullopt;
+    }
+
+    void print(std::ostream & out) const override
+    {
+        out << fmt(ANSI_BLUE "at " ANSI_WARNING "%s:%s" ANSI_NORMAL ":", file, showErrPos());
+    }
+};
+
+struct StringPosAdapter : AbstractPos
+{
+    void print(std::ostream & out) const override
+    {
+        out << fmt(ANSI_BLUE "at " ANSI_WARNING "«string»:%s" ANSI_NORMAL ":", showErrPos());
+    }
+};
+
+struct StdinPosAdapter : AbstractPos
+{
+    void print(std::ostream & out) const override
+    {
+        out << fmt(ANSI_BLUE "at " ANSI_WARNING "«stdin»:%s" ANSI_NORMAL ":", showErrPos());
+    }
+};
+
+Pos::operator std::shared_ptr<AbstractPos>() const
+{
+    if (!line) return nullptr;
+
+    switch (origin) {
+    case foFile: {
+        auto pos = std::make_shared<SourcePathAdapter>();
+        pos->line = line;
+        pos->column = column;
+        pos->file = file;
+        return pos;
+    }
+    case foStdin: {
+        auto pos = std::make_shared<StdinPosAdapter>();
+        pos->line = line;
+        pos->column = column;
+        return pos;
+    }
+    case foString:
+        auto pos = std::make_shared<StringPosAdapter>();
+        pos->line = line;
+        pos->column = column;
+        return pos;
+    }
+    assert(false);
+}
+
 /* Displaying abstract syntax trees. */
 
 static void showString(std::ostream & str, std::string_view s)
@@ -287,7 +345,6 @@ std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
     }
     return out.str();
 }
-
 
 
 /* Computing levels/displacements for variables. */

@@ -82,7 +82,7 @@ public:
         log(lvlInfo, fs);
     }
 
-    virtual void logEI(const ErrorInfo &ei) = 0;
+    virtual void logEI(const ErrorInfo & ei) = 0;
 
     void logEI(Verbosity lvl, ErrorInfo ei)
     {

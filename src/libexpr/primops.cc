@@ -799,7 +799,7 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * 
         v = *args[1];
     } catch (Error & e) {
         PathSet context;
-        e.addTrace(std::nullopt, state.coerceToString(pos, *args[0], context).toOwned());
+        e.addTrace(nullptr, state.coerceToString(pos, *args[0], context).toOwned());
         throw;
     }
 }

@@ -21,8 +21,14 @@ MakeError(TypeError, EvalError);
 MakeError(UndefinedVarError, Error);
 MakeError(MissingArgumentError, EvalError);
 
-/* Position objects. */
+// FIXME: change this into a variant?
+typedef enum {
+    foFile,
+    foStdin,
+    foString
+} FileOrigin;
 
+/* Position objects. */
 struct Pos
 {
     std::string file;
@@ -31,6 +37,8 @@ struct Pos
     uint32_t column;
 
     explicit operator bool() const { return line > 0; }
+
+    operator std::shared_ptr<AbstractPos>() const;
 };
 
 class PosIdx {
