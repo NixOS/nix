@@ -154,7 +154,7 @@ static Flake readFlake(
     Value vInfo;
     state.evalFile(flakePath, vInfo, true);
 
-    expectType(state, nAttrs, vInfo, state.positions.add({flakePath.to_string(), foFile}, 0, 0));
+    expectType(state, nAttrs, vInfo, state.positions.add(Pos::Origin(rootDir), 1, 1));
 
     Flake flake {
         .originalRef = originalRef,

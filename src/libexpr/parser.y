@@ -648,30 +648,16 @@ namespace nix {
 Expr * EvalState::parse(
     char * text,
     size_t length,
-    FileOrigin origin,
-    const PathView path,
+    Pos::Origin origin,
     const SourcePath & basePath,
     std::shared_ptr<StaticEnv> & staticEnv)
 {
     yyscan_t scanner;
-    std::string file;
-    switch (origin) {
-        case foFile:
-            // FIXME: change this to a SourcePath.
-            file = path;
-            break;
-        case foStdin:
-        case foString:
-            file = text;
-            break;
-        default:
-            assert(false);
-    }
     ParseData data {
         .state = *this,
         .symbols = symbols,
         .basePath = basePath,
-        .origin = {file, origin},
+        .origin = {origin},
     };
 
     yylex_init(&scanner);
@@ -713,14 +699,14 @@ Expr * EvalState::parseExprFromFile(const SourcePath & path, std::shared_ptr<Sta
     // readFile hopefully have left some extra space for terminators
     buffer.append("\0\0", 2);
     // FIXME: pass SourcePaths
-    return parse(buffer.data(), buffer.size(), foFile, path.path.abs(), path.parent(), staticEnv);
+    return parse(buffer.data(), buffer.size(), Pos::Origin(path), path.parent(), staticEnv);
 }
 
 
 Expr * EvalState::parseExprFromString(std::string s, const SourcePath & basePath, std::shared_ptr<StaticEnv> & staticEnv)
 {
     s.append("\0\0", 2);
-    return parse(s.data(), s.size(), foString, "", basePath, staticEnv);
+    return parse(s.data(), s.size(), Pos::string_tag(), basePath, staticEnv);
 }
 
 
@@ -736,7 +722,7 @@ Expr * EvalState::parseStdin()
     auto buffer = drainFD(0);
     // drainFD should have left some extra space for terminators
     buffer.append("\0\0", 2);
-    return parse(buffer.data(), buffer.size(), foStdin, "", rootPath(absPath(".")), staticBaseEnv);
+    return parse(buffer.data(), buffer.size(), Pos::stdin_tag(), rootPath(absPath(".")), staticBaseEnv);
 }
 
 

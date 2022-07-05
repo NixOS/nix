@@ -453,8 +453,7 @@ private:
     Expr * parse(
         char * text,
         size_t length,
-        FileOrigin origin,
-        const PathView path,
+        Pos::Origin origin,
         const SourcePath & basePath,
         std::shared_ptr<StaticEnv> & staticEnv);
 

@@ -10,16 +10,27 @@ namespace nix {
 
 struct SourcePathAdapter : AbstractPos
 {
-    std::string file;
+    SourcePath path;
+    ref<InputAccessor> hack; // FIXME: remove
+
+    SourcePathAdapter(SourcePath path)
+        : path(std::move(path))
+        , hack(path.accessor.shared_from_this())
+    {
+    }
 
     std::optional<std::string> getSource() const override
     {
-        return std::nullopt;
+        try {
+            return path.readFile();
+        } catch (Error &) {
+            return std::nullopt;
+        }
     }
 
     void print(std::ostream & out) const override
     {
-        out << fmt(ANSI_BLUE "at " ANSI_WARNING "%s:%s" ANSI_NORMAL ":", file, showErrPos());
+        out << path;
     }
 };
 
@@ -27,7 +38,7 @@ struct StringPosAdapter : AbstractPos
 {
     void print(std::ostream & out) const override
     {
-        out << fmt(ANSI_BLUE "at " ANSI_WARNING "«string»:%s" ANSI_NORMAL ":", showErrPos());
+        out << "«string»";
     }
 };
 
@@ -35,35 +46,27 @@ struct StdinPosAdapter : AbstractPos
 {
     void print(std::ostream & out) const override
     {
-        out << fmt(ANSI_BLUE "at " ANSI_WARNING "«stdin»:%s" ANSI_NORMAL ":", showErrPos());
+        out << "«stdin»";
     }
 };
 
 Pos::operator std::shared_ptr<AbstractPos>() const
 {
-    if (!line) return nullptr;
+    std::shared_ptr<AbstractPos> pos;
 
-    switch (origin) {
-    case foFile: {
-        auto pos = std::make_shared<SourcePathAdapter>();
+    if (auto path = std::get_if<SourcePath>(&origin))
+        pos = std::make_shared<SourcePathAdapter>(*path);
+    else if (std::get_if<stdin_tag>(&origin))
+        pos = std::make_shared<StdinPosAdapter>();
+    else if (std::get_if<string_tag>(&origin))
+        pos = std::make_shared<StringPosAdapter>();
+
+    if (pos) {
         pos->line = line;
         pos->column = column;
-        pos->file = file;
-        return pos;
     }
-    case foStdin: {
-        auto pos = std::make_shared<StdinPosAdapter>();
-        pos->line = line;
-        pos->column = column;
-        return pos;
-    }
-    case foString:
-        auto pos = std::make_shared<StringPosAdapter>();
-        pos->line = line;
-        pos->column = column;
-        return pos;
-    }
-    assert(false);
+
+    return pos;
 }
 
 /* Displaying abstract syntax trees. */
@@ -306,24 +309,10 @@ void ExprPos::show(const SymbolTable & symbols, std::ostream & str) const
 
 std::ostream & operator << (std::ostream & str, const Pos & pos)
 {
-    if (!pos)
+    if (auto pos2 = (std::shared_ptr<AbstractPos>) pos) {
+        str << *pos2;
+    } else
         str << "undefined position";
-    else
-    {
-        auto f = format(ANSI_BOLD "%1%" ANSI_NORMAL ":%2%:%3%");
-        switch (pos.origin) {
-            case foFile:
-                f % (const std::string &) pos.file;
-                break;
-            case foStdin:
-            case foString:
-                f % "(string)";
-                break;
-            default:
-                throw Error("unhandled Pos origin!");
-        }
-        str << (f % pos.line % pos.column).str();
-    }
 
     return str;
 }

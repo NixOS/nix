@@ -368,8 +368,8 @@ void prim_exec(EvalState & state, const PosIdx pos, Value * * args, Value & v)
     auto output = runProgram(program, true, commandArgs);
     Expr * parsed;
     try {
-        auto base = state.positions[pos];
-        parsed = state.parseExprFromString(std::move(output), state.rootPath(base.file));
+        //auto base = state.positions[pos];
+        parsed = state.parseExprFromString(std::move(output), state.rootPath("/"));
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "While parsing the output from '%1%'", program);
         throw;
@@ -3979,6 +3979,7 @@ void EvalState::createBaseEnv()
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
+    // FIXME: use corepkgsFS.
     sDerivationNix = symbols.create(derivationNixPath);
     auto vDerivation = allocValue();
     addConstant("derivation", vDerivation);
@@ -3996,7 +3997,7 @@ void EvalState::createBaseEnv()
         // the parser needs two NUL bytes as terminators; one of them
         // is implied by being a C string.
         "\0";
-    eval(parse(code, sizeof(code), foFile, derivationNixPath, rootPath("/"), staticBaseEnv), *vDerivation);
+    eval(parse(code, sizeof(code), Pos::string_tag(), rootPath("/"), staticBaseEnv), *vDerivation);
 }
 
 

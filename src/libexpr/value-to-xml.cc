@@ -24,7 +24,8 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 
 static void posToXML(EvalState & state, XMLAttrs & xmlAttrs, const Pos & pos)
 {
-    xmlAttrs["path"] = pos.file;
+    // FIXME
+    //xmlAttrs["path"] = pos.file;
     xmlAttrs["line"] = (format("%1%") % pos.line).str();
     xmlAttrs["column"] = (format("%1%") % pos.column).str();
 }

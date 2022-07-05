@@ -73,10 +73,10 @@ struct AbstractPos
 
     virtual void print(std::ostream & out) const = 0;
 
-    std::string showErrPos() const;
-
     std::optional<LinesOfCode> getCodeLines() const;
 };
+
+std::ostream & operator << (std::ostream & str, const AbstractPos & pos);
 
 void printCodeLines(std::ostream & out,
     const std::string & prefix,

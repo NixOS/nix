@@ -35,13 +35,13 @@ std::ostream & operator<<(std::ostream & os, const hintformat & hf)
     return os << hf.str();
 }
 
-std::string AbstractPos::showErrPos() const
+std::ostream & operator << (std::ostream & str, const AbstractPos & pos)
 {
-    if (column > 0) {
-        return fmt("%d:%d", line, column);
-    } else {
-        return fmt("%d", line);
-    }
+    pos.print(str);
+    str << ":" << pos.line;
+    if (pos.column > 0)
+        str << ":" << pos.column;
+    return str;
 }
 
 std::optional<LinesOfCode> AbstractPos::getCodeLines() const
@@ -202,8 +202,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     auto noSource = ANSI_ITALIC " (source not available)" ANSI_NORMAL "\n";
 
     if (einfo.errPos) {
-        oss << "\n";
-        einfo.errPos->print(oss);
+        oss << "\n" << ANSI_BLUE << "at " ANSI_WARNING << *einfo.errPos << ANSI_NORMAL << ":";
 
         if (auto loc = einfo.errPos->getCodeLines()) {
             oss << "\n";
@@ -226,8 +225,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
             oss << "\n" << "… " << iter->hint.str() << "\n";
 
             if (iter->pos) {
-                oss << "\n";
-                iter->pos->print(oss);
+                oss << "\n" << ANSI_BLUE << "at " ANSI_WARNING << *iter->pos << ANSI_NORMAL << ":";
 
                 if (auto loc = iter->pos->getCodeLines()) {
                     oss << "\n";

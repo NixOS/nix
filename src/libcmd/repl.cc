@@ -215,9 +215,8 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
         : (std::shared_ptr<AbstractPos>) positions[dt.expr.getPos() ? dt.expr.getPos() : noPos];
 
     if (pos) {
-        pos->print(out);
-
-        if (auto loc = pos->getCodeLines()) {;
+        out << pos;
+        if (auto loc = pos->getCodeLines()) {
             out << "\n";
             printCodeLines(out, "", *pos, *loc);
             out << "\n";
@@ -584,7 +583,9 @@ bool NixRepl::processLine(std::string line)
                 return {filename, 0};
             } else if (v.isLambda()) {
                 auto pos = state->positions[v.lambda.fun->pos];
-                return {pos.file, pos.line};
+                // FIXME
+                abort();
+                //return {pos.file, pos.line};
             } else {
                 // assume it's a derivation
                 return findPackageFilename(*state, v, arg);

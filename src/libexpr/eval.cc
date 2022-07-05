@@ -1081,9 +1081,9 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 void EvalState::mkPos(Value & v, PosIdx p)
 {
     auto pos = positions[p];
-    if (!pos.file.empty()) {
+    if (auto path = std::get_if<SourcePath>(&pos.origin)) {
         auto attrs = buildBindings(3);
-        attrs.alloc(sFile).mkString(pos.file);
+        attrs.alloc(sFile).mkString(path->path.abs());
         attrs.alloc(sLine).mkInt(pos.line);
         attrs.alloc(sColumn).mkInt(pos.column);
         v.mkAttrs(attrs);
@@ -1450,7 +1450,8 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 
     } catch (Error & e) {
         auto pos2r = state.positions[pos2];
-        if (pos2 && pos2r.file != state.derivationNixPath)
+        // FIXME: use MemoryAccessor
+        if (pos2 /* && pos2r.origin != Pos(state.derivationNixPath) */)
             state.addErrorTrace(e, pos2, "while evaluating the attribute '%1%'",
                 showAttrPath(state, env, attrPath));
         throw;
@@ -2465,7 +2466,8 @@ void EvalState::printStats()
                     else
                         obj.attr("name", nullptr);
                     if (auto pos = positions[i.first->pos]) {
-                        obj.attr("file", (const std::string &) pos.file);
+                        // FIXME
+                        //obj.attr("file", (const std::string &) pos.file);
                         obj.attr("line", pos.line);
                         obj.attr("column", pos.column);
                     }
@@ -2477,7 +2479,8 @@ void EvalState::printStats()
                 for (auto & i : attrSelects) {
                     auto obj = list.object();
                     if (auto pos = positions[i.first]) {
-                        obj.attr("file", (const std::string &) pos.file);
+                        // FIXME
+                        //obj.attr("file", (const std::string &) pos.file);
                         obj.attr("line", pos.line);
                         obj.attr("column", pos.column);
                     }

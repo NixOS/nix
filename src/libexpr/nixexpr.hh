@@ -21,20 +21,19 @@ MakeError(TypeError, EvalError);
 MakeError(UndefinedVarError, Error);
 MakeError(MissingArgumentError, EvalError);
 
-// FIXME: change this into a variant?
-typedef enum {
-    foFile,
-    foStdin,
-    foString
-} FileOrigin;
-
 /* Position objects. */
 struct Pos
 {
-    std::string file;
-    FileOrigin origin;
     uint32_t line;
     uint32_t column;
+
+    struct no_pos_tag {};
+    struct stdin_tag {};
+    struct string_tag {};
+
+    typedef std::variant<no_pos_tag, stdin_tag, string_tag, SourcePath> Origin;
+
+    Origin origin;
 
     explicit operator bool() const { return line > 0; }
 
@@ -68,13 +67,12 @@ public:
         // current origins.back() can be reused or not.
         mutable uint32_t idx = std::numeric_limits<uint32_t>::max();
 
-        explicit Origin(uint32_t idx): idx(idx), file{}, origin{} {}
+        explicit Origin(uint32_t idx): idx(idx), origin{Pos::no_pos_tag()} {}
 
     public:
-        const std::string file;
-        const FileOrigin origin;
+        const Pos::Origin origin;
 
-        Origin(std::string file, FileOrigin origin): file(std::move(file)), origin(origin) {}
+        Origin(Pos::Origin origin): origin(origin) {}
     };
 
     struct Offset {
@@ -114,7 +112,7 @@ public:
             [] (const auto & a, const auto & b) { return a.idx < b.idx; });
         const auto origin = *std::prev(pastOrigin);
         const auto offset = offsets[idx];
-        return {origin.file, origin.origin, offset.line, offset.column};
+        return {offset.line, offset.column, origin.origin};
     }
 };
 
