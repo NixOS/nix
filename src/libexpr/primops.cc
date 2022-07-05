@@ -973,7 +973,7 @@ static RegisterPrimOp primop_trace({
 /* Takes two arguments and evaluates to the second one. Used as the
  * builtins.traceVerbose implementation when --trace-verbose is not enabled
  */
-static void prim_second(EvalState & state, const Pos & pos, Value * * args, Value & v)
+static void prim_second(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     state.forceValue(*args[1], pos);
     v = *args[1];
@@ -3938,7 +3938,7 @@ void EvalState::createBaseEnv()
     addPrimOp({
         .fun = evalSettings.traceVerbose ? prim_trace : prim_second,
         .arity = 2,
-        .name = symbols.create("__traceVerbose"),
+        .name = "__traceVerbose",
         .args = { "e1", "e2" },
         .doc = R"(
           Evaluate *e1* and print its abstract syntax representation on standard
