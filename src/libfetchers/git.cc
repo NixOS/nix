@@ -512,7 +512,7 @@ struct GitInputScheme : InputScheme
             Path localRefFile =
                 input.getRef()->compare(0, 5, "refs/") == 0
                 ? cacheDir + "/" + *input.getRef()
-                : cacheDir + "/refs/heads/" + *input.getRef();
+                : cacheDir + "/refs/tags/" + *input.getRef();
 
             bool doFetch;
             time_t now = time(0);
@@ -548,15 +548,17 @@ struct GitInputScheme : InputScheme
                 // FIXME: git stderr messes up our progress indicator, so
                 // we're using --quiet for now. Should process its stderr.
                 try {
-                    auto ref = input.getRef();
-                    auto fetchRef = allRefs
-                        ? "refs/*"
-                        : ref->compare(0, 5, "refs/") == 0
+                    if (allRefs) {
+                        runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "fetch", "--quiet", "--force", "--", actualUrl, "refs/*:refs/*" });
+                    } else {
+                        auto ref = input.getRef();
+
+                        auto localRef =
+                            ref->compare(0, 5, "refs/") == 0
                             ? *ref
-                            : ref == "HEAD"
-                                ? *ref
-                                : "refs/heads/" + *ref;
-                    runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", fetchRef, fetchRef) }, {}, true);
+                            : "refs/tags/" + *ref;
+                        runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", *ref, localRef) });
+                    }
                 } catch (Error & e) {
                     if (!pathExists(localRefFile)) throw;
                     warn("could not update local clone of Git repository '%s'; continuing with the most recent version", actualUrl);
