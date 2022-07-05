@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
 
+permissions: read-all
+
 jobs:
 
   tests:

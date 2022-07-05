@@ -1,4 +1,7 @@
 name: Hydra status
+
+permissions: read-all
+
 on:
   schedule:
     - cron: "12,42 * * * *"
