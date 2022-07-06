@@ -768,7 +768,7 @@ SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view p
     }
 
     if (hasPrefix(path, "nix/"))
-        return {*corepkgsFS, CanonPath(path.substr(3))};
+        return {corepkgsFS, CanonPath(path.substr(3))};
 
     debugThrowLastTrace(ThrownError({
         .msg = hintfmt(evalSettings.pureEval
@@ -791,7 +791,8 @@ SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view p
         try {
             auto storePath = fetchers::downloadTarball(
                 store, resolveUri(elem.second), "source", false).first.storePath;
-            auto & accessor = registerAccessor(makeFSInputAccessor(CanonPath(store->toRealPath(storePath))));
+            auto accessor = makeFSInputAccessor(CanonPath(store->toRealPath(storePath)));
+            registerAccessor(accessor);
             res.emplace(SourcePath {accessor, CanonPath::root});
         } catch (FileTransferError & e) {
             logWarning({

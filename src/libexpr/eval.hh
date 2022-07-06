@@ -219,7 +219,7 @@ public:
 
     SourcePath rootPath(const Path & path);
 
-    InputAccessor & registerAccessor(ref<InputAccessor> accessor);
+    void registerAccessor(ref<InputAccessor> accessor);
 
     /* Allow access to a path. */
     void allowPath(const Path & path);

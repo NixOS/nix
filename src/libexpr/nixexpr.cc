@@ -11,11 +11,9 @@ namespace nix {
 struct SourcePathAdapter : AbstractPos
 {
     SourcePath path;
-    ref<InputAccessor> hack; // FIXME: remove
 
     SourcePathAdapter(SourcePath path)
         : path(std::move(path))
-        , hack(path.accessor.shared_from_this())
     {
     }
 

@@ -60,9 +60,11 @@ static void prim_patch(EvalState & state, const PosIdx pos, Value * * args, Valu
     if (!src->path.isRoot())
         throw UnimplementedError("applying patches to a non-root path ('%s') is not yet supported", src->path);
 
-    auto accessor = makePatchingInputAccessor(ref(src->accessor.shared_from_this()), patches);
+    auto accessor = makePatchingInputAccessor(src->accessor, patches);
 
-    v.mkPath(SourcePath { state.registerAccessor(accessor), src->path });
+    state.registerAccessor(accessor);
+
+    v.mkPath(SourcePath{accessor, src->path});
 }
 
 static RegisterPrimOp primop_patch({

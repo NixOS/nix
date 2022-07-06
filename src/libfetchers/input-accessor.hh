@@ -92,7 +92,7 @@ ref<InputAccessor> makePatchingInputAccessor(
 
 struct SourcePath
 {
-    InputAccessor & accessor;
+    ref<InputAccessor> accessor;
     CanonPath path;
 
     std::string_view baseName() const;
@@ -100,30 +100,30 @@ struct SourcePath
     SourcePath parent() const;
 
     std::string readFile() const
-    { return accessor.readFile(path); }
+    { return accessor->readFile(path); }
 
     bool pathExists() const
-    { return accessor.pathExists(path); }
+    { return accessor->pathExists(path); }
 
     InputAccessor::Stat lstat() const
-    { return accessor.lstat(path); }
+    { return accessor->lstat(path); }
 
     std::optional<InputAccessor::Stat> maybeLstat() const
-    { return accessor.maybeLstat(path); }
+    { return accessor->maybeLstat(path); }
 
     InputAccessor::DirEntries readDirectory() const
-    { return accessor.readDirectory(path); }
+    { return accessor->readDirectory(path); }
 
     std::string readLink() const
-    { return accessor.readLink(path); }
+    { return accessor->readLink(path); }
 
     void dumpPath(
         Sink & sink,
         PathFilter & filter = defaultPathFilter) const
-    { return accessor.dumpPath(path, sink, filter); }
+    { return accessor->dumpPath(path, sink, filter); }
 
     std::string to_string() const
-    { return accessor.showPath(path); }
+    { return accessor->showPath(path); }
 
     SourcePath operator + (const CanonPath & x) const
     { return {accessor, path + x}; }

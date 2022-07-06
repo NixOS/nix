@@ -186,9 +186,11 @@ static void fetchTree(
     if (params.returnPath) {
         auto [accessor, input2] = input.lazyFetch(state.store);
 
+        state.registerAccessor(accessor);
+
         emitTreeAttrs(
             state,
-            { state.registerAccessor(accessor), CanonPath::root },
+            { accessor, CanonPath::root },
             input2,
             v,
             params.emptyRevFallback,

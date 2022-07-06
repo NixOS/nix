@@ -266,7 +266,9 @@ static Flake getFlake(
 
     auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
 
-    return readFlake(state, originalRef, resolvedRef, lockedRef, SourcePath {state.registerAccessor(accessor), CanonPath::root}, lockRootPath);
+    state.registerAccessor(accessor);
+
+    return readFlake(state, originalRef, resolvedRef, lockedRef, SourcePath {accessor, CanonPath::root}, lockRootPath);
 }
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries)

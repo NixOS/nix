@@ -1025,7 +1025,7 @@ void Value::mkStringMove(const char * s, const PathSet & context)
 
 void Value::mkPath(const SourcePath & path)
 {
-    mkPath(&path.accessor, makeImmutableString(path.path.abs()));
+    mkPath(&*path.accessor, makeImmutableString(path.path.abs()));
 }
 
 
@@ -1928,7 +1928,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 
     Value values[es->size()];
     Value * vTmpP = values;
-    InputAccessor * accessor = nullptr;
+    std::shared_ptr<InputAccessor> accessor;
 
     for (auto & [i_pos, i] : *es) {
         Value * vTmp = vTmpP++;
@@ -1947,7 +1947,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         if (first) {
             firstType = vTmp->type();
             if (vTmp->type() == nPath)
-                accessor = &vTmp->path().accessor;
+                accessor = vTmp->path().accessor;
         }
 
         if (firstType == nInt) {
@@ -1984,7 +1984,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     else if (firstType == nPath) {
         if (!context.empty())
             state.throwEvalError(pos, "a string that refers to a store path cannot be appended to a path", env, *this);
-        v.mkPath({.accessor = *accessor, .path = CanonPath(str())});
+        v.mkPath({ref(accessor), CanonPath(str())});
     } else
         v.mkStringMove(c_str(), context);
 }
@@ -2267,7 +2267,7 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, PathSet & contex
         auto path = v.str();
         if (path == "" || path[0] != '/')
             throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path);
-        return {*rootFS, CanonPath(path)};
+        return {rootFS, CanonPath(path)};
     }
 
     if (v.type() == nPath)

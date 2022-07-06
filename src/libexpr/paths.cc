@@ -5,13 +5,12 @@ namespace nix {
 
 SourcePath EvalState::rootPath(const Path & path)
 {
-    return {*rootFS, CanonPath(path)};
+    return {rootFS, CanonPath(path)};
 }
 
-InputAccessor & EvalState::registerAccessor(ref<InputAccessor> accessor)
+void EvalState::registerAccessor(ref<InputAccessor> accessor)
 {
     inputAccessors.emplace(&*accessor, accessor);
-    return *accessor;
 }
 
 }
