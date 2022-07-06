@@ -9,3 +9,6 @@
   `nix repl --file '<nixpkgs>'` or `nix repl --expr 'import <nixpkgs>{}'`
   
   This is currently guarded by the 'repl-flake' experimental feature
+
+* A new primop `builtins.traceVerbose` is available. It is similar to `builtins.trace`
+  if the `trace-verbose` setting is set to true, and it is a no-op otherwise.
