@@ -1,5 +1,6 @@
 #include "eval.hh"
 #include "hash.hh"
+#include "nixexpr.hh"
 #include "types.hh"
 #include "util.hh"
 #include "store-api.hh"
@@ -258,14 +259,23 @@ PosIdx Value::determinePos(const PosIdx pos) const
 
 bool Value::isTrivial() const
 {
-    return
-        internalType != tApp
-        && internalType != tPrimOpApp
-        && (internalType != tThunk
-            || (dynamic_cast<ExprAttrs *>(thunk.expr)
-                && ((ExprAttrs *) thunk.expr)->dynamicAttrs.empty())
-            || dynamic_cast<ExprLambda *>(thunk.expr)
-            || dynamic_cast<ExprList *>(thunk.expr));
+    if (internalType == tApp || internalType == tPrimOp) {
+        return false;
+    } else if (internalType == tThunk) {
+        auto expr = thunk.expr;
+        for (;;) {
+            if ((dynamic_cast<ExprAttrs *>(expr)
+                    && ((ExprAttrs *) expr)->dynamicAttrs.empty())
+                || dynamic_cast<ExprLambda *>(expr)
+                || dynamic_cast<ExprList *>(expr))
+                return true;
+            else if (dynamic_cast<ExprLet *>(expr)) {
+                expr = dynamic_cast<ExprLet *>(expr)->body;
+            } else {
+                return false;
+            }
+        }
+    } else return false;
 }
 
 
