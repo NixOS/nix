@@ -91,8 +91,6 @@ public:
     SymbolTable symbols;
     PosTable positions;
 
-    static inline std::string derivationNixPath = "//builtin/derivation.nix";
-
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
         sFile, sLine, sColumn, sFunctor, sToString,
@@ -103,7 +101,6 @@ public:
         sDescription, sSelf, sEpsilon, sStartSet, sOperator, sKey, sPath,
         sPrefix,
         sOutputSpecified;
-    Symbol sDerivationNix;
 
     /* If set, force copying files to the Nix store even if they
        already exist there. */
@@ -111,8 +108,10 @@ public:
 
     Bindings emptyBindings;
 
-    ref<FSInputAccessor> rootFS;
-    ref<MemoryInputAccessor> corepkgsFS;
+    const ref<FSInputAccessor> rootFS;
+    const ref<MemoryInputAccessor> corepkgsFS;
+
+    const SourcePath derivationInternal;
 
     std::unordered_map<InputAccessor *, ref<InputAccessor>> inputAccessors;
 

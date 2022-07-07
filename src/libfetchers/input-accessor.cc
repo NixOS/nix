@@ -258,9 +258,11 @@ struct MemoryInputAccessorImpl : MemoryInputAccessor
         throw UnimplementedError("MemoryInputAccessor::readLink");
     }
 
-    void addFile(CanonPath path, std::string && contents) override
+    SourcePath addFile(CanonPath path, std::string && contents) override
     {
-        files.emplace(std::move(path), std::move(contents));
+        files.emplace(path, std::move(contents));
+
+        return {ref(shared_from_this()), std::move(path)};
     }
 };
 

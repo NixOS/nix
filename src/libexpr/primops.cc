@@ -3979,8 +3979,6 @@ void EvalState::createBaseEnv()
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
-    // FIXME: use corepkgsFS.
-    sDerivationNix = symbols.create(derivationNixPath);
     auto vDerivation = allocValue();
     addConstant("derivation", vDerivation);
 
@@ -3992,12 +3990,7 @@ void EvalState::createBaseEnv()
 
     /* Note: we have to initialize the 'derivation' constant *after*
        building baseEnv/staticBaseEnv because it uses 'builtins'. */
-    char code[] =
-        #include "primops/derivation.nix.gen.hh"
-        // the parser needs two NUL bytes as terminators; one of them
-        // is implied by being a C string.
-        "\0";
-    eval(parse(code, sizeof(code), Pos::string_tag(), rootPath("/"), staticBaseEnv), *vDerivation);
+    evalFile(derivationInternal, *vDerivation);
 }
 
 

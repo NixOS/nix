@@ -77,9 +77,11 @@ ref<FSInputAccessor> makeFSInputAccessor(
     std::optional<std::set<CanonPath>> && allowedPaths = {},
     MakeNotAllowedError && makeNotAllowedError = {});
 
+struct SourcePath;
+
 struct MemoryInputAccessor : InputAccessor
 {
-    virtual void addFile(CanonPath path, std::string && contents) = 0;
+    virtual SourcePath addFile(CanonPath path, std::string && contents) = 0;
 };
 
 ref<MemoryInputAccessor> makeMemoryInputAccessor();

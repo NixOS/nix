@@ -475,6 +475,10 @@ EvalState::EvalState(
                 throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
             }))
     , corepkgsFS(makeMemoryInputAccessor())
+    , derivationInternal{corepkgsFS->addFile(
+        CanonPath("derivation-internal.nix"),
+        #include "primops/derivation.nix.gen.hh"
+    )}
     , store(store)
     , buildStore(buildStore ? buildStore : store)
     , debugRepl(0)
@@ -508,12 +512,12 @@ EvalState::EvalState(
         for (auto & i : searchPath)
             resolveSearchPathElem(i, true);
 
-    createBaseEnv();
-
     corepkgsFS->addFile(
         CanonPath("fetchurl.nix"),
         #include "fetchurl.nix.gen.hh"
     );
+
+    createBaseEnv();
 }
 
 
@@ -1449,11 +1453,13 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
         state.forceValue(*vAttrs, (pos2 ? pos2 : this->pos ) );
 
     } catch (Error & e) {
-        auto pos2r = state.positions[pos2];
-        // FIXME: use MemoryAccessor
-        if (pos2 /* && pos2r.origin != Pos(state.derivationNixPath) */)
-            state.addErrorTrace(e, pos2, "while evaluating the attribute '%1%'",
-                showAttrPath(state, env, attrPath));
+        if (pos2) {
+            auto pos2r = state.positions[pos2];
+            auto origin = std::get_if<SourcePath>(&pos2r.origin);
+            if (!origin || *origin != state.derivationInternal)
+                state.addErrorTrace(e, pos2, "while evaluating the attribute '%1%'",
+                    showAttrPath(state, env, attrPath));
+        }
         throw;
     }
 
