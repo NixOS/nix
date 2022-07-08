@@ -19,7 +19,7 @@
 
       linux64BitSystems = [ "x86_64-linux" "aarch64-linux" ];
       linuxSystems = linux64BitSystems ++ [ "i686-linux" ];
-      systems = linuxSystems ++ [ "x86_64-darwin" "aarch64-darwin" ];
+      systems = linuxSystems ++ [ "x86_64-darwin"  ];
 
       crossSystems = [ "armv6l-linux" "armv7l-linux" ];
 
@@ -702,5 +702,15 @@
         // { default = self.devShells.${system}.stdenv; }
       );
 
+
+
+
+      perSystem = {system}: {
+        packages.a = nixpkgsFor.${system}.bash;
+        packages.default = nixpkgsFor.${system}.bash; # Overwrites default package
+      };
+
+      #systems = linuxSystems ++ [ "x86_64-darwin"  ];
+      inherit systems;
   };
 }
