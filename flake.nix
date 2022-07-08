@@ -19,7 +19,7 @@
 
       linux64BitSystems = [ "x86_64-linux" "aarch64-linux" ];
       linuxSystems = linux64BitSystems ++ [ "i686-linux" ];
-      systems = linuxSystems ++ [ "x86_64-darwin"  ];
+      systems = linuxSystems ++ [ "x86_64-darwin" "aarch64-darwin" ];
 
       crossSystems = [ "armv6l-linux" "armv7l-linux" ];
 

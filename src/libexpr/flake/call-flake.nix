@@ -62,6 +62,7 @@ let
     in
     builtins.foldl' op { } systems
   ;
+
   merger = flake:
     let
       filterAttrs = pred: set:
@@ -83,12 +84,8 @@ let
                 { ${output} = otherArguments.${output}.${system}; })
               (optionalAttrs (systemOutputs ? ${output})
                 { ${output} = systemOutputs.${output}; });
-
-
         in
-        (
-          (foldl' mkOutputs { } (attrNames systemOutputs))
-        )
+        (foldl' mkOutputs { } (attrNames systemOutputs))
       )
     )
   ;
