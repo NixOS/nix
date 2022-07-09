@@ -320,9 +320,35 @@ struct CmdFlakeCheck : FlakeCommand
         };
 
         auto checkSystemName = [&](const std::string & system, const PosIdx pos) {
-            // FIXME: what's the format of "system"?
-            if (system.find('-') == std::string::npos)
-                reportError(Error("'%s' is not a valid system type, at %s", system, resolve(pos)));
+            StringSet systems{"aarch64-darwin",    "aarch64-genode", "aarch64-linux",
+                              "aarch64-netbsd",    "aarch64-none",   "aarch64_be-none",
+                              "arm-none",          "armv5tel-linux", "armv6l-linux",
+                              "armv6l-netbsd",     "armv6l-none",    "armv7a-darwin",
+                              "armv7a-linux",      "armv7a-netbsd",  "armv7l-linux",
+                              "armv7l-netbsd",     "avr-none",       "i686-cygwin",
+                              "i686-darwin",       "i686-freebsd",   "i686-genode",
+                              "i686-linux",        "i686-netbsd",    "i686-none",
+                              "i686-openbsd",      "i686-windows",   "js-ghcjs",
+                              "m68k-linux",        "m68k-netbsd",    "m68k-none",
+                              "mips64el-linux",    "mipsel-linux",   "mipsel-netbsd",
+                              "mmix-mmixware",     "msp430-none",    "or1k-none",
+                              "powerpc-netbsd",    "powerpc-none",   "powerpc64-linux",
+                              "powerpc64le-linux", "powerpcle-none", "riscv32-linux",
+                              "riscv32-netbsd",    "riscv32-none",   "riscv64-linux",
+                              "riscv64-netbsd",    "riscv64-none",   "s390-linux",
+                              "s390-none",         "s390x-linux",    "s390x-none",
+                              "vc4-none",          "wasm32-wasi",    "wasm64-wasi",
+                              "x86_64-cygwin",     "x86_64-darwin",  "x86_64-freebsd",
+                              "x86_64-genode",     "x86_64-linux",   "x86_64-netbsd",
+                              "x86_64-none",       "x86_64-openbsd", "x86_64-redox",
+                              "x86_64-solaris",    "x86_64-windows"};
+
+            if (systems.find(system) == systems.end()) {
+                auto err = Error("'%s' is not a valid system type, at %s", system, resolve(pos)).info();
+                err.suggestions = Suggestions::bestMatches(systems, system);
+
+                logError(err);
+            };
         };
 
         auto checkDerivation = [&](const std::string & attrPath, Value & v, const PosIdx pos) -> std::optional<StorePath> {
