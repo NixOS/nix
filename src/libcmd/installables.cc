@@ -184,20 +184,21 @@ SourceExprCommand::SourceExprCommand(bool supportReadOnlyMode)
 Strings SourceExprCommand::getDefaultFlakeAttrPaths()
 {
     return {
-        "packages." + settings.thisSystem.get() + ".default",
-        "defaultPackage." + settings.thisSystem.get()
+        settings.thisSystem.get() + ".packages.default",
+        settings.thisSystem.get() + ".defaultPackage"
     };
 }
 
 Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
 {
     return {
+        settings.thisSystem.get() + ".",
         // As a convenience, look for the attribute in
         // 'outputs.packages'.
-        "packages." + settings.thisSystem.get() + ".",
+        settings.thisSystem.get() + ".packages.",
         // As a temporary hack until Nixpkgs is properly converted
         // to provide a clean 'packages' set, look in 'legacyPackages'.
-        "legacyPackages." + settings.thisSystem.get() + "."
+        settings.thisSystem.get() + ".legacyPackages."
     };
 }
 

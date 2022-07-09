@@ -53,8 +53,8 @@ struct CmdBundle : InstallableCommand
     Strings getDefaultFlakeAttrPaths() override
     {
         Strings res{
-            "apps." + settings.thisSystem.get() + ".default",
-            "defaultApp." + settings.thisSystem.get()
+            settings.thisSystem.get() + ".apps.default",
+            settings.thisSystem.get() + ".defaultApp"
         };
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPaths())
             res.push_back(s);
@@ -63,7 +63,7 @@ struct CmdBundle : InstallableCommand
 
     Strings getDefaultFlakeAttrPathPrefixes() override
     {
-        Strings res{"apps." + settings.thisSystem.get() + "."};
+        Strings res{settings.thisSystem.get() + ".apps."};
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPathPrefixes())
             res.push_back(s);
         return res;
@@ -79,10 +79,10 @@ struct CmdBundle : InstallableCommand
         const flake::LockFlags lockFlags{ .writeLockFile = false };
         InstallableFlake bundler{this,
             evalState, std::move(bundlerFlakeRef), bundlerName, outputsSpec,
-            {"bundlers." + settings.thisSystem.get() + ".default",
-             "defaultBundler." + settings.thisSystem.get()
+            {settings.thisSystem.get() + ".bundlers.default",
+             settings.thisSystem.get() + ".defaultBundler"
             },
-            {"bundlers." + settings.thisSystem.get() + "."},
+            {settings.thisSystem.get() + ".bundlers."},
             lockFlags
         };
 
