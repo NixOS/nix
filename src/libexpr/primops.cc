@@ -846,15 +846,6 @@ static RegisterPrimOp primop_floor({
     .fun = prim_floor,
 });
 
-class Counter
-{
-    private:
-        int &counter;
-    public:
-        Counter(int &counter) :counter(counter) { counter++; }
-        ~Counter() { counter--; }
-};
-
 /* Try evaluating the argument. Success => {success=true; value=something;},
  * else => {success=false; value=false;} */
 static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Value & v)
@@ -862,7 +853,7 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
     auto attrs = state.buildBindings(2);
 
     /* increment state.trylevel, and decrement it when this function returns. */
-    Counter trylevel(state.trylevel);
+    MaintainCount trylevel(state.trylevel);
 
     void (* savedDebugRepl)(ref<EvalState> es, const ValMap & extraEnv) = nullptr;
     if (state.debugRepl && state.ignoreTry)
