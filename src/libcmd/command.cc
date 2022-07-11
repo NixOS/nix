@@ -91,12 +91,6 @@ EvalCommand::EvalCommand()
         .description = "start an interactive environment if evaluation fails",
         .handler = {&startReplOnEvalErrors, true},
     });
-
-    addFlag({
-        .longName = "ignore-try",
-        .description = "ignore exceptions in try clauses during debug",
-        .handler = {&ignoreExceptionsDuringTry, true},
-    });
 }
 
 EvalCommand::~EvalCommand()
@@ -127,9 +121,6 @@ ref<EvalState> EvalCommand::getEvalState()
 
         if (startReplOnEvalErrors) {
             evalState->debugRepl = &runRepl;
-        };
-        if (ignoreExceptionsDuringTry) {
-            evalState->ignoreTry = ignoreExceptionsDuringTry;
         };
     }
     return ref<EvalState>(evalState);

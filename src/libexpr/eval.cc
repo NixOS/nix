@@ -467,7 +467,6 @@ EvalState::EvalState(
     , debugRepl(nullptr)
     , debugStop(false)
     , debugQuit(false)
-    , ignoreTry(false)
     , trylevel(0)
     , regexCache(makeRegexCache())
 #if HAVE_BOEHMGC
