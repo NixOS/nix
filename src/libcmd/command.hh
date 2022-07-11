@@ -58,6 +58,7 @@ struct CopyCommand : virtual StoreCommand
 struct EvalCommand : virtual StoreCommand, MixEvalArgs
 {
     bool startReplOnEvalErrors = false;
+    bool ignoreExceptionsDuringTry = false;
 
     EvalCommand();
 

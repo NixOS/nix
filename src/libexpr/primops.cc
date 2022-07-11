@@ -851,6 +851,18 @@ static RegisterPrimOp primop_floor({
 static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     auto attrs = state.buildBindings(2);
+
+    /* increment state.trylevel, and decrement it when this function returns. */
+    MaintainCount trylevel(state.trylevel);
+
+    void (* savedDebugRepl)(ref<EvalState> es, const ValMap & extraEnv) = nullptr;
+    if (state.debugRepl && evalSettings.ignoreExceptionsDuringTry)
+    {
+        /* to prevent starting the repl from exceptions withing a tryEval, null it. */
+        savedDebugRepl = state.debugRepl;
+        state.debugRepl = nullptr;
+    }
+
     try {
         state.forceValue(*args[0], pos);
         attrs.insert(state.sValue, args[0]);
@@ -859,6 +871,11 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
         attrs.alloc(state.sValue).mkBool(false);
         attrs.alloc("success").mkBool(false);
     }
+
+    // restore the debugRepl pointer if we saved it earlier.
+    if (savedDebugRepl)
+        state.debugRepl = savedDebugRepl;
+
     v.mkAttrs(attrs);
 }
 
