@@ -54,7 +54,7 @@
         # we want most of the time and for backwards compatibility
         forAllSystems (system: stdenvsPackages.${system} // stdenvsPackages.${system}.stdenvPackages);
 
-      commonDeps = pkgs: with pkgs; rec {
+      commonDeps = { pkgs, isStatic ? false }: with pkgs; rec {
         # Use "busybox-sandbox-shell" if present,
         # if not (legacy) fallback and hope it's sufficient.
         sh = pkgs.busybox-sandbox-shell or (busybox.override {
@@ -85,6 +85,8 @@
           lib.optionals stdenv.isLinux [
             "--with-boost=${boost}/lib"
             "--with-sandbox-shell=${sh}/bin/busybox"
+          ]
+          ++ lib.optionals (stdenv.isLinux && !(isStatic && stdenv.system == "aarch64-linux")) [
             "LDFLAGS=-fuse-ld=gold"
           ];
 
@@ -170,7 +172,7 @@
             echo "file installer $out/install" >> $out/nix-support/hydra-build-products
           '';
 
-      testNixVersions = pkgs: client: daemon: with commonDeps pkgs; with pkgs.lib; pkgs.stdenv.mkDerivation {
+      testNixVersions = pkgs: client: daemon: with commonDeps { inherit pkgs; }; with pkgs.lib; pkgs.stdenv.mkDerivation {
         NIX_DAEMON_PACKAGE = daemon;
         NIX_CLIENT_PACKAGE = client;
         name =
@@ -281,7 +283,7 @@
           # Forward from the previous stage as we don’t want it to pick the lowdown override
           nixUnstable = prev.nixUnstable;
 
-          nix = with final; with commonDeps pkgs; currentStdenv.mkDerivation {
+          nix = with final; with commonDeps { inherit pkgs; }; currentStdenv.mkDerivation {
             name = "nix-${version}";
             inherit version;
 
@@ -448,7 +450,7 @@
         # Line coverage analysis.
         coverage =
           with nixpkgsFor.x86_64-linux;
-          with commonDeps pkgs;
+          with commonDeps { inherit pkgs; };
 
           releaseTools.coverageAnalysis {
             name = "nix-coverage-${version}";
@@ -559,7 +561,7 @@
       } // (nixpkgs.lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         nix-static = let
           nixpkgs = nixpkgsFor.${system}.pkgsStatic;
-        in with commonDeps nixpkgs; nixpkgs.stdenv.mkDerivation {
+        in with commonDeps { pkgs = nixpkgs; isStatic = true; }; nixpkgs.stdenv.mkDerivation {
           name = "nix-${version}";
 
           src = self;
@@ -630,7 +632,7 @@
             inherit system crossSystem;
             overlays = [ self.overlays.default ];
           };
-        in with commonDeps nixpkgsCross; nixpkgsCross.stdenv.mkDerivation {
+        in with commonDeps { pkgs = nixpkgsCross; }; nixpkgsCross.stdenv.mkDerivation {
           name = "nix-${version}";
 
           src = self;
@@ -673,7 +675,7 @@
       devShells = forAllSystems (system:
         forAllStdenvs (stdenv:
           with nixpkgsFor.${system};
-          with commonDeps pkgs;
+          with commonDeps { inherit pkgs; };
           nixpkgsFor.${system}.${stdenv}.mkDerivation {
             name = "nix";
 
