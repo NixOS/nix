@@ -32,7 +32,7 @@ for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeD
     rm -rf $repo $repo.tmp
     mkdir -p $repo
 
-    # Give one repo a non-master initial branch.
+    # Give one repo a non-main initial branch.
     extraArgs=
     if [[ $repo == $flake2Dir ]]; then
       extraArgs="--initial-branch=main"
@@ -173,11 +173,11 @@ nix build -o $TEST_ROOT/result $flake2Dir#bar --no-write-lock-file
 nix build -o $TEST_ROOT/result $flake2Dir#bar --no-update-lock-file 2>&1 | grep 'requires lock file changes'
 nix build -o $TEST_ROOT/result $flake2Dir#bar --commit-lock-file
 [[ -e $flake2Dir/flake.lock ]]
-[[ -z $(git -C $flake2Dir diff master) ]]
+[[ -z $(git -C $flake2Dir diff main || echo failed) ]]
 
 # Rerunning the build should not change the lockfile.
 nix build -o $TEST_ROOT/result $flake2Dir#bar
-[[ -z $(git -C $flake2Dir diff master) ]]
+[[ -z $(git -C $flake2Dir diff main || echo failed) ]]
 
 # Building with a lockfile should not require a fetch of the registry.
 nix build -o $TEST_ROOT/result --flake-registry file:///no-registry.json $flake2Dir#bar --refresh
@@ -186,7 +186,7 @@ nix build -o $TEST_ROOT/result --no-use-registries $flake2Dir#bar --refresh
 
 # Updating the flake should not change the lockfile.
 nix flake lock $flake2Dir
-[[ -z $(git -C $flake2Dir diff master) ]]
+[[ -z $(git -C $flake2Dir diff main || echo failed) ]]
 
 # Now we should be able to build the flake in pure mode.
 nix build -o $TEST_ROOT/result flake2#bar
@@ -221,7 +221,7 @@ nix build -o $TEST_ROOT/result $flake3Dir#"sth sth"
 nix build -o $TEST_ROOT/result $flake3Dir#"sth%20sth"
 
 # Check whether it saved the lockfile
-(! [[ -z $(git -C $flake3Dir diff master) ]])
+[[ -n $(git -C $flake3Dir diff master) ]]
 
 git -C $flake3Dir add flake.lock
 
@@ -321,10 +321,10 @@ nix build -o $TEST_ROOT/result flake4#xyzzy
 
 # Test 'nix flake update' and --override-flake.
 nix flake lock $flake3Dir
-[[ -z $(git -C $flake3Dir diff master) ]]
+[[ -z $(git -C $flake3Dir diff master || echo failed) ]]
 
 nix flake update $flake3Dir --override-flake flake2 nixpkgs
-[[ ! -z $(git -C $flake3Dir diff master) ]]
+[[ ! -z $(git -C $flake3Dir diff master || echo failed) ]]
 
 # Make branch "removeXyzzy" where flake3 doesn't have xyzzy anymore
 git -C $flake3Dir checkout -b removeXyzzy
@@ -408,8 +408,10 @@ cat > $templatesDir/trivial/flake.nix <<EOF
   };
 }
 EOF
+echo a > $templatesDir/trivial/a
+echo b > $templatesDir/trivial/b
 
-git -C $templatesDir add flake.nix trivial/flake.nix
+git -C $templatesDir add flake.nix trivial/
 git -C $templatesDir commit -m 'Initial'
 
 nix flake check templates
@@ -423,6 +425,18 @@ nix flake check $flake7Dir
 nix flake show $flake7Dir
 nix flake show $flake7Dir --json | jq
 git -C $flake7Dir commit -a -m 'Initial'
+
+# Test 'nix flake init' with benign conflicts
+rm -rf $flake7Dir && mkdir $flake7Dir && git -C $flake7Dir init
+echo a > $flake7Dir/a
+(cd $flake7Dir && nix flake init) # check idempotence
+
+# Test 'nix flake init' with conflicts
+rm -rf $flake7Dir && mkdir $flake7Dir && git -C $flake7Dir init
+echo b > $flake7Dir/a
+pushd $flake7Dir
+(! nix flake init) |& grep "refusing to overwrite existing file '$flake7Dir/a'"
+popd
 
 # Test 'nix flake new'.
 rm -rf $flake6Dir

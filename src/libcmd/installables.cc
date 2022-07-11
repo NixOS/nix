@@ -146,7 +146,8 @@ SourceExprCommand::SourceExprCommand(bool supportReadOnlyMode)
         .shortName = 'f',
         .description =
             "Interpret installables as attribute paths relative to the Nix expression stored in *file*. "
-            "If *file* is the character -, then a Nix expression will be read from standard input.",
+            "If *file* is the character -, then a Nix expression will be read from standard input. "
+            "Implies `--impure`.",
         .category = installablesCategory,
         .labels = {"file"},
         .handler = {&file},
@@ -919,6 +920,9 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::bui
         break;
 
     case Realise::Outputs: {
+        if (settings.printMissing)
+          printMissing(store, pathsToBuild, lvlInfo);
+
         for (auto & buildResult : store->buildPathsWithResults(pathsToBuild, bMode, evalStore)) {
             if (!buildResult.success())
                 buildResult.rethrow();
@@ -1032,11 +1036,16 @@ InstallablesCommand::InstallablesCommand()
 
 void InstallablesCommand::prepare()
 {
+    installables = load();
+}
+
+Installables InstallablesCommand::load() {
+    Installables installables;
     if (_installables.empty() && useDefaultInstallables())
         // FIXME: commands like "nix profile install" should not have a
         // default, probably.
         _installables.push_back(".");
-    installables = parseInstallables(getStore(), _installables);
+    return parseInstallables(getStore(), _installables);
 }
 
 std::optional<FlakeRef> InstallablesCommand::getFlakeRefForCompletion()

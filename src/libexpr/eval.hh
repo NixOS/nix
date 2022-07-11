@@ -151,7 +151,7 @@ public:
         if (debugRepl)
             runDebugRepl(&error, env, expr);
 
-        throw error;
+        throw std::move(error);
     }
 
     template<class E>
@@ -166,7 +166,7 @@ public:
             runDebugRepl(&e, last.env, last.expr);
         }
 
-        throw e;
+        throw std::move(e);
     }
 
 
@@ -654,6 +654,8 @@ struct EvalSettings : Config
           debug mode (using the --debugger flag). By default the debugger will pause on all exceptions.
         )"};
 
+    Setting<bool> traceVerbose{this, false, "trace-verbose",
+        "Whether `builtins.traceVerbose` should trace its first argument when evaluated."};
 };
 
 extern EvalSettings evalSettings;

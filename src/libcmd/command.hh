@@ -117,12 +117,13 @@ struct InstallablesCommand : virtual Args, SourceExprCommand
     InstallablesCommand();
 
     void prepare() override;
+    Installables load();
 
     virtual bool useDefaultInstallables() { return true; }
 
     std::optional<FlakeRef> getFlakeRefForCompletion() override;
 
-private:
+protected:
 
     std::vector<std::string> _installables;
 };
