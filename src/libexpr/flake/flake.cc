@@ -357,6 +357,7 @@ LockedFlake lockFlake(
             std::shared_ptr<Node> node,
             const InputPath & inputPathPrefix,
             std::shared_ptr<const Node> oldNode,
+            std::shared_ptr<const Node> inputNode,
             const InputPath & lockRootPath,
             const Path & parentPath,
             bool trustLock)>
@@ -367,6 +368,7 @@ LockedFlake lockFlake(
             std::shared_ptr<Node> node,
             const InputPath & inputPathPrefix,
             std::shared_ptr<const Node> oldNode,
+            std::shared_ptr<const Node> inputNode,
             const InputPath & lockRootPath,
             const Path & parentPath,
             bool trustLock)
@@ -429,6 +431,11 @@ LockedFlake lockFlake(
 
                     if (oldNode && !lockFlags.inputUpdates.count(inputPath))
                         if (auto oldLock2 = get(oldNode->inputs, id))
+                            if (auto oldLock3 = std::get_if<0>(&*oldLock2))
+                                oldLock = *oldLock3;
+                    // fallback to load input from this nodes lock file
+                    if (!oldLock && inputNode && !lockFlags.inputUpdates.count(inputPath))
+                        if (auto oldLock2 = get(inputNode->inputs, id))
                             if (auto oldLock3 = std::get_if<0>(&*oldLock2))
                                 oldLock = *oldLock3;
 
@@ -503,7 +510,7 @@ LockedFlake lockFlake(
                             mustRefetch
                             ? getFlake(state, oldLock->lockedRef, false, flakeCache, inputPath).inputs
                             : fakeInputs,
-                            childNode, inputPath, oldLock, lockRootPath, parentPath, !mustRefetch);
+                            childNode, inputPath, oldLock, nullptr, lockRootPath, parentPath, !mustRefetch);
 
                     } else {
                         /* We need to create a new lock file entry. So fetch
@@ -552,7 +559,8 @@ LockedFlake lockFlake(
                                 inputFlake.inputs, childNode, inputPath,
                                 oldLock
                                 ? std::dynamic_pointer_cast<const Node>(oldLock)
-                                : LockFile::read(
+                                : nullptr,
+                                LockFile::read(
                                     inputFlake.sourceInfo->actualPath + "/" + inputFlake.lockedRef.subdir + "/flake.lock").root,
                                 oldLock ? lockRootPath : inputPath, localPath, false);
                         }
@@ -577,7 +585,7 @@ LockedFlake lockFlake(
 
         computeLocks(
             flake.inputs, newLockFile.root, {},
-            lockFlags.recreateLockFile ? nullptr : oldLockFile.root, {}, parentPath, false);
+            lockFlags.recreateLockFile ? nullptr : oldLockFile.root, nullptr, {}, parentPath, false);
 
         for (auto & i : lockFlags.inputOverrides)
             if (!overridesUsed.count(i.first))
