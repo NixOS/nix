@@ -187,10 +187,6 @@ static RegisterPrimOp primop_fetchTree({
     .args = {"args"},
     .arity = 1,
     .doc = R"(
-      Introduced in 2.4
-
-      The fetcher infrastructure is exposed via the `fetchTree` built-in.
-
       `builtins.fetchTree` allows fetching a source tree using any
       backends supported by the fetcher infrastructure. It subsumes the
       functionality of existing built-ins like `fetchGit`,
