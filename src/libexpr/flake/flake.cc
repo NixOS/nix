@@ -353,26 +353,15 @@ LockedFlake lockFlake(
         std::vector<FlakeRef> parents;
 
         std::function<void(
-            const FlakeInputs & flakeInputs,
-            std::shared_ptr<Node> node,
             const InputPath & inputPathPrefix,
-            std::shared_ptr<const Node> oldNode,
-            const InputPath & lockRootPath,
-            const Path & parentPath,
-            bool trustLock)>
-            computeLocks;
+            const FlakeInputs & flakeInputs
+            )>
+            checkFollowsDeclarations;
 
-        computeLocks = [&](
-            const FlakeInputs & flakeInputs,
-            std::shared_ptr<Node> node,
+        checkFollowsDeclarations = [&](
             const InputPath & inputPathPrefix,
-            std::shared_ptr<const Node> oldNode,
-            const InputPath & lockRootPath,
-            const Path & parentPath,
-            bool trustLock)
-        {
-            debug("computing lock file node '%s'", printInputPath(inputPathPrefix));
-
+            const FlakeInputs & flakeInputs
+        ) {
             for (auto [inputPath, inputOverride] : overrides) {
                 auto inputPath2(inputPath);
                 auto follow = inputPath2.back();
@@ -394,6 +383,30 @@ LockedFlake lockFlake(
                     );
                 }
             }
+        };
+
+        std::function<void(
+            const FlakeInputs & flakeInputs,
+            std::shared_ptr<Node> node,
+            const InputPath & inputPathPrefix,
+            std::shared_ptr<const Node> oldNode,
+            const InputPath & lockRootPath,
+            const Path & parentPath,
+            bool trustLock)>
+            computeLocks;
+
+        computeLocks = [&](
+            const FlakeInputs & flakeInputs,
+            std::shared_ptr<Node> node,
+            const InputPath & inputPathPrefix,
+            std::shared_ptr<const Node> oldNode,
+            const InputPath & lockRootPath,
+            const Path & parentPath,
+            bool trustLock)
+        {
+            debug("computing lock file node '%s'", printInputPath(inputPathPrefix));
+
+            checkFollowsDeclarations(inputPathPrefix, flakeInputs);
 
             /* Get the overrides (i.e. attributes of the form
                'inputs.nixops.inputs.nixpkgs.url = ...'). */
