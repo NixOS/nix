@@ -42,7 +42,7 @@ Examples:
     └── nix_node -> /nix/store/f20...-nodejs-10.24.
 
 A bare file or symlink can be a root file system object.
-Examles:
+Examples:
 
     /nix/store/<hash>-hello-2.10.tar.gz
 
