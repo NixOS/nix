@@ -102,7 +102,7 @@ nix_tests = \
   suggestions.sh \
   store-ping.sh \
   fetchClosure.sh \
-  completion.sh \
+  completions.sh \
   impure-derivations.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
