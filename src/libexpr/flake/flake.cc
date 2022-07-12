@@ -373,8 +373,7 @@ LockedFlake lockFlake(
         {
             debug("computing lock file node '%s'", printInputPath(inputPathPrefix));
 
-            auto overrides2 = overrides;
-            for (auto & [inputPath, inputOverride] : overrides2) {
+            for (auto [inputPath, inputOverride] : overrides) {
                 auto inputPath2(inputPath);
                 auto follow = inputPath2.back();
                 inputPath2.pop_back();
@@ -388,7 +387,7 @@ LockedFlake lockFlake(
                             root.append(".inputs.");
                         }
                     }
-                    throw Error(
+                    warn(
                         "%s has a `follows'-declaration for a non-existant input %s!",
                         root,
                         follow
