@@ -23,15 +23,15 @@ EOF
 popd
 
 # Test the completion of a subcommand
-[[ $(printf "normal\nbuild\t\n") == $(NIX_GET_COMPLETIONS=1 nix buil) ]]
-[[ $(printf "normal\nmetadata\t\n") == $(NIX_GET_COMPLETIONS=2 nix flake metad) ]]
+[[ "$(NIX_GET_COMPLETIONS=1 nix buil)" == $'normal\nbuild\t' ]]
+[[ "$(NIX_GET_COMPLETIONS=2 nix flake metad)" == $'normal\nmetadata\t' ]]
 
 # Filename completion
-[[ $(printf "filenames\n./foo\t\n") == $(NIX_GET_COMPLETIONS=2 nix build ./f) ]]
-[[ $(printf "filenames\n") == $(NIX_GET_COMPLETIONS=2 nix build ./nonexistent) ]]
+[[ "$(NIX_GET_COMPLETIONS=2 nix build ./f)" == $'filenames\n./foo\t' ]]
+[[ "$(NIX_GET_COMPLETIONS=2 nix build ./nonexistent)" == $'filenames' ]]
 
 # Input override completion
-[[ $(printf "normal\na\t\n") == $(NIX_GET_COMPLETIONS=4 nix build ./foo --override-input '') ]]
+[[ "$(NIX_GET_COMPLETIONS=4 nix build ./foo --override-input '')" == $'normal\na\t' ]]
 
 # Cli flag completion
 NIX_GET_COMPLETIONS=2 nix build --log-form | grep -- "--log-format"
@@ -44,5 +44,5 @@ NIX_GET_COMPLETIONS=3 nix build --option allow-import-from | grep -- "allow-impo
 
 
 # Attr path completions
-[[ $(printf "attrs\n./foo#sampleOutput\t\n") == $(NIX_GET_COMPLETIONS=2 nix eval ./foo\#sam) ]]
-[[ $(printf "attrs\noutputs\t\n") == $(NIX_GET_COMPLETIONS=4 nix eval --file ./foo/flake.nix outp) ]]
+[[ "$(NIX_GET_COMPLETIONS=2 nix eval ./foo\#sam)" == $'attrs\n./foo#sampleOutput\t' ]]
+[[ "$(NIX_GET_COMPLETIONS=4 nix eval --file ./foo/flake.nix outp)" == $'attrs\noutputs\t' ]]
