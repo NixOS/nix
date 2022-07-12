@@ -50,9 +50,9 @@ public:
         return flake::lockFlake(*getEvalState(), getFlakeRef(), lockFlags);
     }
 
-    std::optional<FlakeRef> getFlakeRefForCompletion() override
+    std::vector<std::string> getFlakesForCompletion() override
     {
-        return getFlakeRef();
+        return {flakeUrl};
     }
 };
 

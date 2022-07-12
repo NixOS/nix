@@ -347,7 +347,10 @@ void mainWrapped(int argc, char * * argv)
         if (!completions) throw;
     }
 
-    if (completions) return;
+    if (completions) {
+        args.completionHook();
+        return;
+    }
 
     if (args.showVersion) {
         printVersion(programName);
