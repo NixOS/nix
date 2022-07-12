@@ -353,6 +353,39 @@ LockedFlake lockFlake(
         std::vector<FlakeRef> parents;
 
         std::function<void(
+            const InputPath & inputPathPrefix,
+            const FlakeInputs & flakeInputs
+            )>
+            checkFollowsDeclarations;
+
+        checkFollowsDeclarations = [&](
+            const InputPath & inputPathPrefix,
+            const FlakeInputs & flakeInputs
+        ) {
+            for (auto [inputPath, inputOverride] : overrides) {
+                auto inputPath2(inputPath);
+                auto follow = inputPath2.back();
+                inputPath2.pop_back();
+                if (inputPath2 == inputPathPrefix
+                    && flakeInputs.find(follow) == flakeInputs.end()
+                ) {
+                    std::string root;
+                    for (auto & element : inputPath2) {
+                        root.append(element);
+                        if (element != inputPath2.back()) {
+                            root.append(".inputs.");
+                        }
+                    }
+                    warn(
+                        "%s has a `follows'-declaration for a non-existant input %s!",
+                        root,
+                        follow
+                    );
+                }
+            }
+        };
+
+        std::function<void(
             const FlakeInputs & flakeInputs,
             std::shared_ptr<Node> node,
             const InputPath & inputPathPrefix,
@@ -372,6 +405,8 @@ LockedFlake lockFlake(
             bool trustLock)
         {
             debug("computing lock file node '%s'", printInputPath(inputPathPrefix));
+
+            checkFollowsDeclarations(inputPathPrefix, flakeInputs);
 
             /* Get the overrides (i.e. attributes of the form
                'inputs.nixops.inputs.nixpkgs.url = ...'). */
