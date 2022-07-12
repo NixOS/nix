@@ -877,4 +877,4 @@ EOF
 
 git -C $flakeFollowsA add flake.nix
 
-nix flake lock $flakeFollowsA 2>&1 | grep "error: B has a \`follows'-declaration for a non-existant input invalid!"
+nix flake lock $flakeFollowsA 2>&1 | grep "warning: B has a \`follows'-declaration for a non-existant input invalid!"
