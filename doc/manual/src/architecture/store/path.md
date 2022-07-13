@@ -62,12 +62,13 @@ Store objects are therefore said to be either [input-addressed](#input-addressin
 
 ::: {.note}
 **Historical note**: The 20 byte restriction is because originally digests were [SHA-1][sha-1] hashes.
-This is no longer true, but longer hashes and other information are still truncated to 20 bytes for compatibility.
+Nix now uses [SHA-256][sha-256], and longer hashes are still reduced to 20 bytes for compatibility.
 :::
 
 [digest]: https://en.m.wiktionary.org/wiki/digest#Noun
 [hash]: https://en.m.wikipedia.org/wiki/Cryptographic_hash_function
 [sha-1]: https://en.m.wikipedia.org/wiki/SHA-1
+[sha-256]: https://en.m.wikipedia.org/wiki/SHA-256
 
 ### Reference scanning
 
