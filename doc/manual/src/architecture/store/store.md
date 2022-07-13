@@ -32,7 +32,7 @@ A store object can hold
 - arbitrary *data*
 - *references* to other store objects.
 
-Nix makes no distinction if store objects are build inputs, build results, or build tasks.
+A Nix store makes no distinction if store objects are build inputs, build results, or build tasks.
 
 Store objects are [immutable][immutable-object]: once created, they do not change until they are deleted.
 
