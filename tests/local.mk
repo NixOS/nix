@@ -4,6 +4,7 @@ nix_tests = \
   flakes/mercurial.sh \
   flakes/circular.sh \
   flakes/init.sh \
+  flakes/follow-paths.sh \
   ca/gc.sh \
   gc.sh \
   remote-store.sh \

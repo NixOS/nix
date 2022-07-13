@@ -13,13 +13,8 @@ flake7Dir=$TEST_ROOT/flake7
 nonFlakeDir=$TEST_ROOT/nonFlake
 badFlakeDir=$TEST_ROOT/badFlake
 flakeGitBare=$TEST_ROOT/flakeGitBare
-flakeFollowsA=$TEST_ROOT/follows/flakeA
-flakeFollowsB=$TEST_ROOT/follows/flakeA/flakeB
-flakeFollowsC=$TEST_ROOT/follows/flakeA/flakeB/flakeC
-flakeFollowsD=$TEST_ROOT/follows/flakeA/flakeD
-flakeFollowsE=$TEST_ROOT/follows/flakeA/flakeE
 
-for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $nonFlakeDir $flakeFollowsA; do
+for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $nonFlakeDir; do
     # Give one repo a non-main initial branch.
     extraArgs=
     if [[ $repo == $flake2Dir ]]; then
@@ -551,127 +546,6 @@ nix flake lock $flake3Dir --update-input flake2/flake1
 # Test 'nix flake metadata --json'.
 nix flake metadata $flake3Dir --json | jq .
 
-# Test flake follow paths
-mkdir -p $flakeFollowsB
-mkdir -p $flakeFollowsC
-mkdir -p $flakeFollowsD
-mkdir -p $flakeFollowsE
-
-cat > $flakeFollowsA/flake.nix <<EOF
-{
-    description = "Flake A";
-    inputs = {
-        B = {
-            url = "path:./flakeB";
-            inputs.foobar.follows = "foobar";
-        };
-
-        foobar.url = "path:$flakeFollowsA/flakeE";
-    };
-    outputs = { ... }: {};
-}
-EOF
-
-cat > $flakeFollowsB/flake.nix <<EOF
-{
-    description = "Flake B";
-    inputs = {
-        foobar.url = "path:$flakeFollowsA/flakeE";
-        goodoo.follows = "C/goodoo";
-        C = {
-            url = "path:./flakeC";
-            inputs.foobar.follows = "foobar";
-        };
-    };
-    outputs = { ... }: {};
-}
-EOF
-
-cat > $flakeFollowsC/flake.nix <<EOF
-{
-    description = "Flake C";
-    inputs = {
-        foobar.url = "path:$flakeFollowsA/flakeE";
-        goodoo.follows = "foobar";
-    };
-    outputs = { ... }: {};
-}
-EOF
-
-cat > $flakeFollowsD/flake.nix <<EOF
-{
-    description = "Flake D";
-    inputs = {};
-    outputs = { ... }: {};
-}
-EOF
-
-cat > $flakeFollowsE/flake.nix <<EOF
-{
-    description = "Flake E";
-    inputs = {};
-    outputs = { ... }: {};
-}
-EOF
-
-git -C $flakeFollowsA add flake.nix flakeB/flake.nix \
-  flakeB/flakeC/flake.nix flakeD/flake.nix flakeE/flake.nix
-
-nix flake metadata $flakeFollowsA
-
-nix flake update $flakeFollowsA
-
-nix flake lock $flakeFollowsA
-
-oldLock="$(cat "$flakeFollowsA/flake.lock")"
-
-# Ensure that locking twice doesn't change anything
-
-nix flake lock $flakeFollowsA
-
-newLock="$(cat "$flakeFollowsA/flake.lock")"
-
-diff <(echo "$newLock") <(echo "$oldLock")
-
-[[ $(jq -c .nodes.B.inputs.C $flakeFollowsA/flake.lock) = '"C"' ]]
-[[ $(jq -c .nodes.B.inputs.foobar $flakeFollowsA/flake.lock) = '["foobar"]' ]]
-[[ $(jq -c .nodes.C.inputs.foobar $flakeFollowsA/flake.lock) = '["B","foobar"]' ]]
-
-# Ensure removing follows from flake.nix removes them from the lockfile
-
-cat > $flakeFollowsA/flake.nix <<EOF
-{
-    description = "Flake A";
-    inputs = {
-        B = {
-            url = "path:./flakeB";
-        };
-        D.url = "path:./flakeD";
-    };
-    outputs = { ... }: {};
-}
-EOF
-
-nix flake lock $flakeFollowsA
-
-[[ $(jq -c .nodes.B.inputs.foobar $flakeFollowsA/flake.lock) = '"foobar"' ]]
-jq -r -c '.nodes | keys | .[]' $flakeFollowsA/flake.lock | grep "^foobar$"
-
-# Ensure a relative path is not allowed to go outside the store path
-cat > $flakeFollowsA/flake.nix <<EOF
-{
-    description = "Flake A";
-    inputs = {
-        B.url = "path:../flakeB";
-    };
-    outputs = { ... }: {};
-}
-EOF
-
-git -C $flakeFollowsA add flake.nix
-
-nix flake lock $flakeFollowsA 2>&1 | grep 'points outside'
-
 # Test flake in store does not evaluate
 rm -rf $badFlakeDir
 mkdir $badFlakeDir
@@ -680,23 +554,3 @@ nix store delete $(nix store add-path $badFlakeDir)
 
 [[ $(nix path-info      $(nix store add-path $flake1Dir)) =~ flake1 ]]
 [[ $(nix path-info path:$(nix store add-path $flake1Dir)) =~ simple ]]
-
-# Non-existant follows causes an error
-
-cat >$flakeFollowsA/flake.nix <<EOF
-{
-    description = "Flake A";
-    inputs.B = {
-        url = "path:./flakeB";
-        inputs.invalid.follows = "D";
-        inputs.invalid2.url = "path:./flakeD";
-    };
-    inputs.D.url = "path:./flakeD";
-    outputs = { ... }: {};
-}
-EOF
-
-git -C $flakeFollowsA add flake.nix
-
-nix flake lock $flakeFollowsA 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid'"
-nix flake lock $flakeFollowsA 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid2'"
