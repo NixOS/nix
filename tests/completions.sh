@@ -34,8 +34,8 @@ popd
 [[ "$(NIX_GET_COMPLETIONS=4 nix build ./foo --override-input '')" == $'normal\na\t' ]]
 ## With tilde expansion
 [[ "$(HOME=$PWD NIX_GET_COMPLETIONS=4 nix build '~/foo' --override-input '')" == $'normal\na\t' ]]
-## Out of order – not working atm. Should have been fixed by #6693 but apparently not
-# [[ "$(NIX_GET_COMPLETIONS=3 nix build --override-input '' ./foo)" == $'normal\na\t' ]]
+## Out of order
+[[ "$(NIX_GET_COMPLETIONS=3 nix build --update-input '' ./foo)" == $'normal\na\t' ]]
 
 # Cli flag completion
 NIX_GET_COMPLETIONS=2 nix build --log-form | grep -- "--log-format"
