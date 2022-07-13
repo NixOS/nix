@@ -1,4 +1,4 @@
-source ../common.sh
+source ./common.sh
 
 if [[ -z $(type -p git) ]]; then
     echo "Git not installed; skipping flake tests"
@@ -7,8 +7,6 @@ fi
 
 clearStore
 rm -rf $TEST_HOME/.cache $TEST_HOME/.config
-
-registry=$TEST_ROOT/registry.json
 
 flake1Dir=$TEST_ROOT/flake1
 flake2Dir=$TEST_ROOT/flake2
@@ -50,23 +48,8 @@ for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeD
     initRepo "$repo" "$extraArgs"
 done
 
-cat > $flake1Dir/flake.nix <<EOF
-{
-  description = "Bla bla";
+writeSimpleFlake $flake1Dir
 
-  outputs = inputs: rec {
-    packages.$system = rec {
-      foo = import ./simple.nix;
-      default = foo;
-    };
-
-    # To test "nix flake init".
-    legacyPackages.x86_64-linux.hello = import ./simple.nix;
-  };
-}
-EOF
-
-cp ../simple.nix ../simple.builder.sh ../config.nix $flake1Dir/
 git -C $flake1Dir add flake.nix simple.nix simple.builder.sh config.nix
 git -C $flake1Dir commit -m 'Initial'
 
@@ -112,12 +95,11 @@ nix registry add --registry $registry flake1 git+file://$flake1Dir
 nix registry add --registry $registry flake2 git+file://$flake2Dir
 nix registry add --registry $registry flake3 git+file://$flake3Dir
 nix registry add --registry $registry flake4 flake3
-nix registry add --registry $registry flake5 hg+file://$flake5Dir
 nix registry add --registry $registry nixpkgs flake1
 nix registry add --registry $registry templates git+file://$templatesDir
 
 # Test 'nix flake list'.
-[[ $(nix registry list | wc -l) == 7 ]]
+[[ $(nix registry list | wc -l) == 6 ]]
 
 # Test 'nix flake metadata'.
 nix flake metadata flake1
@@ -373,13 +355,13 @@ nix build -o $TEST_ROOT/result flake4/removeXyzzy#sth
 
 # Testing the nix CLI
 nix registry add flake1 flake3
-[[ $(nix registry list | wc -l) == 8 ]]
-nix registry pin flake1
-[[ $(nix registry list | wc -l) == 8 ]]
-nix registry pin flake1 flake3
-[[ $(nix registry list | wc -l) == 8 ]]
-nix registry remove flake1
 [[ $(nix registry list | wc -l) == 7 ]]
+nix registry pin flake1
+[[ $(nix registry list | wc -l) == 7 ]]
+nix registry pin flake1 flake3
+[[ $(nix registry list | wc -l) == 7 ]]
+nix registry remove flake1
+[[ $(nix registry list | wc -l) == 6 ]]
 
 # Test 'nix flake init'.
 cat > $templatesDir/flake.nix <<EOF
@@ -619,50 +601,9 @@ rm -rf $flakeGitBare
 git clone --bare $flake1Dir $flakeGitBare
 nix build -o $TEST_ROOT/result git+file://$flakeGitBare
 
-# Test Mercurial flakes.
-rm -rf $flake5Dir
-mkdir $flake5Dir
-
-cat > $flake5Dir/flake.nix <<EOF
-{
-  outputs = { self, flake1 }: {
-    packages.$system.default = flake1.packages.$system.default;
-    expr = assert builtins.pathExists ./flake.lock; 123;
-  };
-}
-EOF
-
-if [[ -n $(type -p hg) ]]; then
-    hg init $flake5Dir
-
-    hg add $flake5Dir/flake.nix
-    hg commit --config ui.username=foobar@example.org $flake5Dir -m 'Initial commit'
-
-    nix build -o $TEST_ROOT/result hg+file://$flake5Dir
-    [[ -e $TEST_ROOT/result/hello ]]
-
-    (! nix flake metadata --json hg+file://$flake5Dir | jq -e -r .revision)
-
-    nix eval hg+file://$flake5Dir#expr
-
-    nix eval hg+file://$flake5Dir#expr
-
-    (! nix eval hg+file://$flake5Dir#expr --no-allow-dirty)
-
-    (! nix flake metadata --json hg+file://$flake5Dir | jq -e -r .revision)
-
-    hg commit --config ui.username=foobar@example.org $flake5Dir -m 'Add lock file'
-
-    nix flake metadata --json hg+file://$flake5Dir --refresh | jq -e -r .revision
-    nix flake metadata --json hg+file://$flake5Dir
-    [[ $(nix flake metadata --json hg+file://$flake5Dir | jq -e -r .revCount) = 1 ]]
-
-    nix build -o $TEST_ROOT/result hg+file://$flake5Dir --no-registries --no-allow-dirty
-    nix build -o $TEST_ROOT/result hg+file://$flake5Dir --no-use-registries --no-allow-dirty
-fi
-
 # Test path flakes.
-rm -rf $flake5Dir/.hg $flake5Dir/flake.lock
+mkdir -p $flake5Dir
+writeDependentFlake $flake5Dir
 nix flake lock path://$flake5Dir
 
 # Test tarball flakes.
