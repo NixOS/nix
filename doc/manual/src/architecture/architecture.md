@@ -36,7 +36,7 @@ The command line and Nix language are what users interact with most.
 
 ::: {.note}
 The Nix language itself does not have a notion of *packages* or *configurations*.
-As far as we are concerned here, the inputs and results of a derivation are just data.
+As far as we are concerned here, the inputs and results of a build plan are just data.
 :::
 
 Underlying these is the [Nix store](./store/store.md), a mechanism to keep track of build plans, data, and references between them.
