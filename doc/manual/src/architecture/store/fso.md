@@ -61,4 +61,9 @@ Examples:
     /nix/store/<hash>-bar
     └── bar -> /nix/store/abc...-foo
 
+Nix file system objects do not support [hard links][hardlink]:
+each file system object which is not the root has exactly one parent and one name.
+However, as store objects are immutable, an underlying file system can use hard links for optimization.
+
 [symlink]: https://en.m.wikipedia.org/wiki/Symbolic_link
+[hardlink]: https://en.m.wikipedia.org/wiki/Hard_link
