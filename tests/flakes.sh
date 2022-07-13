@@ -28,6 +28,15 @@ flakeFollowsC=$TEST_ROOT/follows/flakeA/flakeB/flakeC
 flakeFollowsD=$TEST_ROOT/follows/flakeA/flakeD
 flakeFollowsE=$TEST_ROOT/follows/flakeA/flakeE
 
+initRepo() {
+    local repo="$1"
+    local extraArgs="$2"
+
+    git -C $repo init $extraArgs
+    git -C $repo config user.email "foobar@example.com"
+    git -C $repo config user.name "Foobar"
+}
+
 for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB $flakeFollowsA; do
     rm -rf $repo $repo.tmp
     mkdir -p $repo
@@ -38,9 +47,7 @@ for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeD
       extraArgs="--initial-branch=main"
     fi
 
-    git -C $repo init $extraArgs
-    git -C $repo config user.email "foobar@example.com"
-    git -C $repo config user.name "Foobar"
+    initRepo "$repo" "$extraArgs"
 done
 
 cat > $flake1Dir/flake.nix <<EOF
@@ -427,16 +434,17 @@ nix flake show $flake7Dir --json | jq
 git -C $flake7Dir commit -a -m 'Initial'
 
 # Test 'nix flake init' with benign conflicts
-rm -rf $flake7Dir && mkdir $flake7Dir && git -C $flake7Dir init
+rm -rf $flake7Dir && mkdir $flake7Dir && initRepo "$flake7Dir"
 echo a > $flake7Dir/a
 (cd $flake7Dir && nix flake init) # check idempotence
 
 # Test 'nix flake init' with conflicts
-rm -rf $flake7Dir && mkdir $flake7Dir && git -C $flake7Dir init
+rm -rf $flake7Dir && mkdir $flake7Dir && initRepo "$flake7Dir"
 echo b > $flake7Dir/a
 pushd $flake7Dir
 (! nix flake init) |& grep "refusing to overwrite existing file '$flake7Dir/a'"
 popd
+git -C $flake7Dir commit -a -m 'Changed'
 
 # Test 'nix flake new'.
 rm -rf $flake6Dir
