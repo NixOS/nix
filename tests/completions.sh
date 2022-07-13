@@ -2,25 +2,32 @@ source common.sh
 
 cd "$TEST_ROOT"
 
-mkdir -p dep && pushd dep
-cat <<EOF > flake.nix
+mkdir -p dep
+cat <<EOF > dep/flake.nix
 {
     outputs = i: { };
 }
 EOF
-popd
-mkdir -p foo && pushd foo
-cat <<EOF > flake.nix
+mkdir -p foo
+cat <<EOF > foo/flake.nix
 {
-    inputs.a.url = "path:$(realpath ../dep)";
+    inputs.a.url = "path:$(realpath dep)";
 
     outputs = i: {
         sampleOutput = 1;
     };
 }
 EOF
+mkdir -p bar
+cat <<EOF > bar/flake.nix
+{
+    inputs.b.url = "path:$(realpath dep)";
 
-popd
+    outputs = i: {
+        sampleOutput = 1;
+    };
+}
+EOF
 
 # Test the completion of a subcommand
 [[ "$(NIX_GET_COMPLETIONS=1 nix buil)" == $'normal\nbuild\t' ]]
@@ -32,10 +39,14 @@ popd
 
 # Input override completion
 [[ "$(NIX_GET_COMPLETIONS=4 nix build ./foo --override-input '')" == $'normal\na\t' ]]
+[[ "$(NIX_GET_COMPLETIONS=5 nix flake show ./foo --override-input '')" == $'normal\na\t' ]]
+## With multiple input flakes
+[[ "$(NIX_GET_COMPLETIONS=5 nix build ./foo ./bar --override-input '')" == $'normal\na\t\nb\t' ]]
 ## With tilde expansion
 [[ "$(HOME=$PWD NIX_GET_COMPLETIONS=4 nix build '~/foo' --override-input '')" == $'normal\na\t' ]]
 ## Out of order
 [[ "$(NIX_GET_COMPLETIONS=3 nix build --update-input '' ./foo)" == $'normal\na\t' ]]
+[[ "$(NIX_GET_COMPLETIONS=4 nix build ./foo --update-input '' ./bar)" == $'normal\na\t\nb\t' ]]
 
 # Cli flag completion
 NIX_GET_COMPLETIONS=2 nix build --log-form | grep -- "--log-format"
@@ -45,7 +56,6 @@ NIX_GET_COMPLETIONS=2 nix build --log-form | grep -- "--log-format"
 NIX_GET_COMPLETIONS=3 nix build --option allow-import-from | grep -- "allow-import-from-derivation"
 ## As a cli flag – not working atm
 # NIX_GET_COMPLETIONS=2 nix build --allow-import-from | grep -- "allow-import-from-derivation"
-
 
 # Attr path completions
 [[ "$(NIX_GET_COMPLETIONS=2 nix eval ./foo\#sam)" == $'attrs\n./foo#sampleOutput\t' ]]
