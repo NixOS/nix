@@ -377,7 +377,7 @@ LockedFlake lockFlake(
                         }
                     }
                     warn(
-                        "%s has a `follows'-declaration for a non-existant input %s!",
+                        "%s has a `follows'-declaration for a non-existent input %s!",
                         root,
                         follow
                     );
