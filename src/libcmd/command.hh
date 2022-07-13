@@ -58,6 +58,7 @@ struct CopyCommand : virtual StoreCommand
 struct EvalCommand : virtual StoreCommand, MixEvalArgs
 {
     bool startReplOnEvalErrors = false;
+    bool ignoreExceptionsDuringTry = false;
 
     EvalCommand();
 
@@ -77,10 +78,16 @@ struct MixFlakeOptions : virtual Args, EvalCommand
 {
     flake::LockFlags lockFlags;
 
+    std::optional<std::string> needsFlakeInputCompletion = {};
+
     MixFlakeOptions();
 
-    virtual std::optional<FlakeRef> getFlakeRefForCompletion()
+    virtual std::vector<std::string> getFlakesForCompletion()
     { return {}; }
+
+    void completeFlakeInput(std::string_view prefix);
+
+    void completionHook() override;
 };
 
 struct SourceExprCommand : virtual Args, MixFlakeOptions
@@ -116,12 +123,13 @@ struct InstallablesCommand : virtual Args, SourceExprCommand
     InstallablesCommand();
 
     void prepare() override;
+    Installables load();
 
     virtual bool useDefaultInstallables() { return true; }
 
-    std::optional<FlakeRef> getFlakeRefForCompletion() override;
+    std::vector<std::string> getFlakesForCompletion() override;
 
-private:
+protected:
 
     std::vector<std::string> _installables;
 };
@@ -135,9 +143,9 @@ struct InstallableCommand : virtual Args, SourceExprCommand
 
     void prepare() override;
 
-    std::optional<FlakeRef> getFlakeRefForCompletion() override
+    std::vector<std::string> getFlakesForCompletion() override
     {
-        return parseFlakeRefWithFragment(_installable, absPath(".")).first;
+        return {_installable};
     }
 
 private:

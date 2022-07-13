@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
 
+permissions: read-all
+
 jobs:
 
   tests:
@@ -28,6 +30,8 @@ jobs:
     - run: nix --experimental-features 'nix-command flakes' flake check -L
 
   check_cachix:
+    permissions:
+      contents: none
     name: Cachix secret present for installer tests
     runs-on: ubuntu-latest
     outputs:

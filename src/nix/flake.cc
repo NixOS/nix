@@ -50,9 +50,9 @@ public:
         return flake::lockFlake(*getEvalState(), getFlakeRef(), lockFlags);
     }
 
-    std::optional<FlakeRef> getFlakeRefForCompletion() override
+    std::vector<std::string> getFlakesForCompletion() override
     {
-        return getFlakeRef();
+        return {flakeUrl};
     }
 };
 
@@ -731,7 +731,8 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         PathSet context;
         auto templateDir = evalState->coerceToPath(noPos, templateDirAttr, context);
 
-        std::vector<CanonPath> files;
+        std::vector<CanonPath> changedFiles;
+        std::vector<CanonPath> conflictedFiles;
 
         std::function<void(const SourcePath & from, const CanonPath & to)> copyDir;
         copyDir = [&](const SourcePath & from, const CanonPath & to)
@@ -748,31 +749,41 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                     auto contents = from2.readFile();
                     if (pathExists(to2.abs())) {
                         auto contents2 = readFile(to2.abs());
-                        if (contents != contents2)
-                            throw Error("refusing to overwrite existing file '%s'", to2);
+                        if (contents != contents2) {
+                            printError("refusing to overwrite existing file '%s'\nplease merge it manually with '%s'", to2, from2);
+                            conflictedFiles.push_back(to2);
+                        } else {
+                            notice("skipping identical file: %s", from2);
+                        }
+                        continue;
                     } else
                         writeFile(to2.abs(), contents);
                 }
                 else if (st.type == InputAccessor::tSymlink) {
                     auto target = from2.readLink();
                     if (pathExists(to2.abs())) {
-                        if (readLink(to2.abs()) != target)
-                            throw Error("refusing to overwrite existing symlink '%s'", to2);
+                        if (readLink(to2.abs()) != target) {
+                            printError("refusing to overwrite existing file '%s'\n please merge it manually with '%s'", to2, from2);
+                            conflictedFiles.push_back(to2);
+                        } else {
+                            notice("skipping identical file: %s", from2);
+                        }
+                        continue;
                     } else
                         createSymlink(target, to2.abs());
                 }
                 else
                     throw Error("file '%s' has unsupported type", from2);
-                files.push_back(to2);
+                changedFiles.push_back(to2);
                 notice("wrote: %s", to2);
             }
         };
 
         copyDir(templateDir, CanonPath(flakeDir));
 
-        if (pathExists(flakeDir + "/.git")) {
+        if (!changedFiles.empty() && pathExists(flakeDir + "/.git")) {
             Strings args = { "-C", flakeDir, "add", "--intent-to-add", "--force", "--" };
-            for (auto & s : files) args.push_back(s.abs());
+            for (auto & s : changedFiles) args.push_back(s.abs());
             runProgram("git", true, args);
         }
 
@@ -780,6 +791,9 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             notice("\n");
             notice(renderMarkdownToTerminal(welcomeText->getString()));
         }
+
+        if (!conflictedFiles.empty())
+            throw Error("encountered %d conflicts - see above", conflictedFiles.size());
     }
 };
 

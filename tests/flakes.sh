@@ -410,8 +410,10 @@ cat > $templatesDir/trivial/flake.nix <<EOF
   };
 }
 EOF
+echo a > $templatesDir/trivial/a
+echo b > $templatesDir/trivial/b
 
-git -C $templatesDir add flake.nix trivial/flake.nix
+git -C $templatesDir add flake.nix trivial/
 git -C $templatesDir commit -m 'Initial'
 
 nix flake check templates
@@ -425,6 +427,18 @@ nix flake check $flake7Dir
 nix flake show $flake7Dir
 nix flake show $flake7Dir --json | jq
 git -C $flake7Dir commit -a -m 'Initial'
+
+# Test 'nix flake init' with benign conflicts
+rm -rf $flake7Dir && mkdir $flake7Dir && git -C $flake7Dir init
+echo a > $flake7Dir/a
+(cd $flake7Dir && nix flake init) # check idempotence
+
+# Test 'nix flake init' with conflicts
+rm -rf $flake7Dir && mkdir $flake7Dir && git -C $flake7Dir init
+echo b > $flake7Dir/a
+pushd $flake7Dir
+(! nix flake init) |& grep "refusing to overwrite existing file '$flake7Dir/a'"
+popd
 
 # Test 'nix flake new'.
 rm -rf $flake6Dir
@@ -793,6 +807,8 @@ nix flake metadata $flakeFollowsA
 
 nix flake update $flakeFollowsA
 
+nix flake lock $flakeFollowsA
+
 oldLock="$(cat "$flakeFollowsA/flake.lock")"
 
 # Ensure that locking twice doesn't change anything
@@ -815,7 +831,6 @@ cat > $flakeFollowsA/flake.nix <<EOF
     inputs = {
         B = {
             url = "path:./flakeB";
-            inputs.nonFlake.follows = "D";
         };
         D.url = "path:./flakeD";
     };
@@ -851,3 +866,21 @@ nix store delete $(nix store add-path $badFlakeDir)
 
 [[ $(nix path-info      $(nix store add-path $flake1Dir)) =~ flake1 ]]
 [[ $(nix path-info path:$(nix store add-path $flake1Dir)) =~ simple ]]
+
+# Non-existant follows causes an error
+
+cat >$flakeFollowsA/flake.nix <<EOF
+{
+    description = "Flake A";
+    inputs.B = {
+        url = "path:./flakeB";
+        inputs.invalid.follows = "D";
+    };
+    inputs.D.url = "path:./flakeD";
+    outputs = { ... }: {};
+}
+EOF
+
+git -C $flakeFollowsA add flake.nix
+
+nix flake lock $flakeFollowsA 2>&1 | grep "warning: B has a \`follows'-declaration for a non-existant input invalid!"
