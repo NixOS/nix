@@ -869,6 +869,7 @@ cat >$flakeFollowsA/flake.nix <<EOF
     inputs.B = {
         url = "path:./flakeB";
         inputs.invalid.follows = "D";
+        inputs.invalid2.url = "path:./flakeD";
     };
     inputs.D.url = "path:./flakeD";
     outputs = { ... }: {};
@@ -877,4 +878,5 @@ EOF
 
 git -C $flakeFollowsA add flake.nix
 
-nix flake lock $flakeFollowsA 2>&1 | grep "warning: B has a \`follows'-declaration for a non-existant input invalid!"
+nix flake lock $flakeFollowsA 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid'"
+nix flake lock $flakeFollowsA 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid2'"
