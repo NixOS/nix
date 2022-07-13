@@ -85,7 +85,7 @@ nix_tests = \
   nix-copy-ssh.sh \
   post-hook.sh \
   function-trace.sh \
-  flake-local-settings.sh \
+  flakes/config.sh \
   fmt.sh \
   eval-store.sh \
   why-depends.sh \
