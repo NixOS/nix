@@ -3,6 +3,7 @@ nix_tests = \
   flakes/run.sh \
   flakes/mercurial.sh \
   flakes/circular.sh \
+  flakes/init.sh \
   ca/gc.sh \
   gc.sh \
   remote-store.sh \

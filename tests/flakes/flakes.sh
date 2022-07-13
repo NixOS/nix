@@ -9,9 +9,7 @@ flake1Dir=$TEST_ROOT/flake1
 flake2Dir=$TEST_ROOT/flake2
 flake3Dir=$TEST_ROOT/flake3
 flake5Dir=$TEST_ROOT/flake5
-flake6Dir=$TEST_ROOT/flake6
 flake7Dir=$TEST_ROOT/flake7
-templatesDir=$TEST_ROOT/templates
 nonFlakeDir=$TEST_ROOT/nonFlake
 badFlakeDir=$TEST_ROOT/badFlake
 flakeGitBare=$TEST_ROOT/flakeGitBare
@@ -21,7 +19,7 @@ flakeFollowsC=$TEST_ROOT/follows/flakeA/flakeB/flakeC
 flakeFollowsD=$TEST_ROOT/follows/flakeA/flakeD
 flakeFollowsE=$TEST_ROOT/follows/flakeA/flakeE
 
-for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeFollowsA; do
+for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $nonFlakeDir $flakeFollowsA; do
     # Give one repo a non-main initial branch.
     extraArgs=
     if [[ $repo == $flake2Dir ]]; then
@@ -31,10 +29,7 @@ for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeD
     createGitRepo "$repo" "$extraArgs"
 done
 
-writeSimpleFlake $flake1Dir
-
-git -C $flake1Dir add flake.nix simple.nix simple.builder.sh config.nix
-git -C $flake1Dir commit -m 'Initial'
+createSimpleGitFlake $flake1Dir
 
 cat > $flake2Dir/flake.nix <<EOF
 {
@@ -79,10 +74,9 @@ nix registry add --registry $registry flake2 git+file://$flake2Dir
 nix registry add --registry $registry flake3 git+file://$flake3Dir
 nix registry add --registry $registry flake4 flake3
 nix registry add --registry $registry nixpkgs flake1
-nix registry add --registry $registry templates git+file://$templatesDir
 
 # Test 'nix flake list'.
-[[ $(nix registry list | wc -l) == 6 ]]
+[[ $(nix registry list | wc -l) == 5 ]]
 
 # Test 'nix flake metadata'.
 nix flake metadata flake1
@@ -338,84 +332,13 @@ nix build -o $TEST_ROOT/result flake4/removeXyzzy#sth
 
 # Testing the nix CLI
 nix registry add flake1 flake3
-[[ $(nix registry list | wc -l) == 7 ]]
-nix registry pin flake1
-[[ $(nix registry list | wc -l) == 7 ]]
-nix registry pin flake1 flake3
-[[ $(nix registry list | wc -l) == 7 ]]
-nix registry remove flake1
 [[ $(nix registry list | wc -l) == 6 ]]
-
-# Test 'nix flake init'.
-cat > $templatesDir/flake.nix <<EOF
-{
-  description = "Some templates";
-
-  outputs = { self }: {
-    templates = rec {
-      trivial = {
-        path = ./trivial;
-        description = "A trivial flake";
-        welcomeText = ''
-            Welcome to my trivial flake
-        '';
-      };
-      default = trivial;
-    };
-  };
-}
-EOF
-
-mkdir $templatesDir/trivial
-
-cat > $templatesDir/trivial/flake.nix <<EOF
-{
-  description = "A flake for building Hello World";
-
-  outputs = { self, nixpkgs }: {
-    packages.x86_64-linux = rec {
-      hello = nixpkgs.legacyPackages.x86_64-linux.hello;
-      default = hello;
-    };
-  };
-}
-EOF
-echo a > $templatesDir/trivial/a
-echo b > $templatesDir/trivial/b
-
-git -C $templatesDir add flake.nix trivial/
-git -C $templatesDir commit -m 'Initial'
-
-nix flake check templates
-nix flake show templates
-nix flake show templates --json | jq
-
-(cd $flake7Dir && nix flake init)
-(cd $flake7Dir && nix flake init) # check idempotence
-git -C $flake7Dir add flake.nix
-nix flake check $flake7Dir
-nix flake show $flake7Dir
-nix flake show $flake7Dir --json | jq
-git -C $flake7Dir commit -a -m 'Initial'
-
-# Test 'nix flake init' with benign conflicts
-createGitRepo "$flake7Dir"
-echo a > $flake7Dir/a
-(cd $flake7Dir && nix flake init) # check idempotence
-
-# Test 'nix flake init' with conflicts
-createGitRepo "$flake7Dir"
-echo b > $flake7Dir/a
-pushd $flake7Dir
-(! nix flake init) |& grep "refusing to overwrite existing file '$flake7Dir/a'"
-popd
-git -C $flake7Dir commit -a -m 'Changed'
-
-# Test 'nix flake new'.
-rm -rf $flake6Dir
-nix flake new -t templates#trivial $flake6Dir
-nix flake new -t templates#trivial $flake6Dir # check idempotence
-nix flake check $flake6Dir
+nix registry pin flake1
+[[ $(nix registry list | wc -l) == 6 ]]
+nix registry pin flake1 flake3
+[[ $(nix registry list | wc -l) == 6 ]]
+nix registry remove flake1
+[[ $(nix registry list | wc -l) == 5 ]]
 
 # Test 'nix flake clone'.
 rm -rf $TEST_ROOT/flake1-v2
@@ -550,6 +473,10 @@ nix flake lock $flake3Dir
 [[ $(jq -c .nodes.root.inputs.bar $flake3Dir/flake.lock) = '["flake2"]' ]]
 
 # Test overriding inputs of inputs.
+writeTrivialFlake $flake7Dir
+git -C $flake7Dir add flake.nix
+git -C $flake7Dir commit -m 'Initial'
+
 cat > $flake3Dir/flake.nix <<EOF
 {
   inputs.flake2.inputs.flake1 = {

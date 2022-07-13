@@ -30,6 +30,13 @@ EOF
     cp ../simple.nix ../simple.builder.sh ../config.nix $flakeDir/
 }
 
+createSimpleGitFlake() {
+    local flakeDir="$1"
+    writeSimpleFlake $flakeDir
+    git -C $flakeDir add flake.nix simple.nix simple.builder.sh config.nix
+    git -C $flakeDir commit -m 'Initial'
+}
+
 writeDependentFlake() {
     local flakeDir="$1"
     cat > $flakeDir/flake.nix <<EOF
@@ -37,6 +44,17 @@ writeDependentFlake() {
   outputs = { self, flake1 }: {
     packages.$system.default = flake1.packages.$system.default;
     expr = assert builtins.pathExists ./flake.lock; 123;
+  };
+}
+EOF
+}
+
+writeTrivialFlake() {
+    local flakeDir="$1"
+    cat > $flakeDir/flake.nix <<EOF
+{
+  outputs = { self }: {
+    expr = 123;
   };
 }
 EOF
