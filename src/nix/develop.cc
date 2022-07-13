@@ -240,6 +240,9 @@ struct Common : InstallableCommand, MixProfile
 {
     std::set<std::string> ignoreVars{
         "BASHOPTS",
+        "EPOCHREALTIME",
+        "EPOCHSECONDS",
+        "LINENO",
         "HOME", // FIXME: don't ignore in pure mode?
         "NIX_BUILD_TOP",
         "NIX_ENFORCE_PURITY",
