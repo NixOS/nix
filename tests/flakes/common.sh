@@ -2,6 +2,13 @@ source ../common.sh
 
 registry=$TEST_ROOT/registry.json
 
+requireGit() {
+    if [[ -z $(type -p git) ]]; then
+        echo "Git not installed; skipping flake tests"
+        exit 99
+    fi
+}
+
 writeSimpleFlake() {
     local flakeDir="$1"
     cat > $flakeDir/flake.nix <<EOF
@@ -33,4 +40,16 @@ writeDependentFlake() {
   };
 }
 EOF
+}
+
+createGitRepo() {
+    local repo="$1"
+    local extraArgs="$2"
+
+    rm -rf $repo $repo.tmp
+    mkdir -p $repo
+
+    git -C $repo init $extraArgs
+    git -C $repo config user.email "foobar@example.com"
+    git -C $repo config user.name "Foobar"
 }

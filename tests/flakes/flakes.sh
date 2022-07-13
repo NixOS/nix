@@ -1,9 +1,6 @@
 source ./common.sh
 
-if [[ -z $(type -p git) ]]; then
-    echo "Git not installed; skipping flake tests"
-    exit 99
-fi
+requireGit
 
 clearStore
 rm -rf $TEST_HOME/.cache $TEST_HOME/.config
@@ -17,8 +14,6 @@ flake7Dir=$TEST_ROOT/flake7
 templatesDir=$TEST_ROOT/templates
 nonFlakeDir=$TEST_ROOT/nonFlake
 badFlakeDir=$TEST_ROOT/badFlake
-flakeA=$TEST_ROOT/flakeA
-flakeB=$TEST_ROOT/flakeB
 flakeGitBare=$TEST_ROOT/flakeGitBare
 flakeFollowsA=$TEST_ROOT/follows/flakeA
 flakeFollowsB=$TEST_ROOT/follows/flakeA/flakeB
@@ -26,26 +21,14 @@ flakeFollowsC=$TEST_ROOT/follows/flakeA/flakeB/flakeC
 flakeFollowsD=$TEST_ROOT/follows/flakeA/flakeD
 flakeFollowsE=$TEST_ROOT/follows/flakeA/flakeE
 
-initRepo() {
-    local repo="$1"
-    local extraArgs="$2"
-
-    git -C $repo init $extraArgs
-    git -C $repo config user.email "foobar@example.com"
-    git -C $repo config user.name "Foobar"
-}
-
-for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB $flakeFollowsA; do
-    rm -rf $repo $repo.tmp
-    mkdir -p $repo
-
+for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeFollowsA; do
     # Give one repo a non-main initial branch.
     extraArgs=
     if [[ $repo == $flake2Dir ]]; then
       extraArgs="--initial-branch=main"
     fi
 
-    initRepo "$repo" "$extraArgs"
+    createGitRepo "$repo" "$extraArgs"
 done
 
 writeSimpleFlake $flake1Dir
@@ -416,12 +399,12 @@ nix flake show $flake7Dir --json | jq
 git -C $flake7Dir commit -a -m 'Initial'
 
 # Test 'nix flake init' with benign conflicts
-rm -rf $flake7Dir && mkdir $flake7Dir && initRepo "$flake7Dir"
+createGitRepo "$flake7Dir"
 echo a > $flake7Dir/a
 (cd $flake7Dir && nix flake init) # check idempotence
 
 # Test 'nix flake init' with conflicts
-rm -rf $flake7Dir && mkdir $flake7Dir && initRepo "$flake7Dir"
+createGitRepo "$flake7Dir"
 echo b > $flake7Dir/a
 pushd $flake7Dir
 (! nix flake init) |& grep "refusing to overwrite existing file '$flake7Dir/a'"
@@ -640,45 +623,6 @@ nix flake lock $flake3Dir --update-input flake2/flake1
 
 # Test 'nix flake metadata --json'.
 nix flake metadata $flake3Dir --json | jq .
-
-# Test circular flake dependencies.
-cat > $flakeA/flake.nix <<EOF
-{
-  inputs.b.url = git+file://$flakeB;
-  inputs.b.inputs.a.follows = "/";
-
-  outputs = { self, nixpkgs, b }: {
-    foo = 123 + b.bar;
-    xyzzy = 1000;
-  };
-}
-EOF
-
-git -C $flakeA add flake.nix
-
-cat > $flakeB/flake.nix <<EOF
-{
-  inputs.a.url = git+file://$flakeA;
-
-  outputs = { self, nixpkgs, a }: {
-    bar = 456 + a.xyzzy;
-  };
-}
-EOF
-
-git -C $flakeB add flake.nix
-git -C $flakeB commit -a -m 'Foo'
-
-[[ $(nix eval $flakeA#foo) = 1579 ]]
-[[ $(nix eval $flakeA#foo) = 1579 ]]
-
-sed -i $flakeB/flake.nix -e 's/456/789/'
-git -C $flakeB commit -a -m 'Foo'
-
-[[ $(nix eval --update-input b $flakeA#foo) = 1912 ]]
-
-# Test list-inputs with circular dependencies
-nix flake metadata $flakeA
 
 # Test flake follow paths
 mkdir -p $flakeFollowsB
