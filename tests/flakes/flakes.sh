@@ -1,4 +1,4 @@
-source common.sh
+source ../common.sh
 
 if [[ -z $(type -p git) ]]; then
     echo "Git not installed; skipping flake tests"
@@ -66,7 +66,7 @@ cat > $flake1Dir/flake.nix <<EOF
 }
 EOF
 
-cp ./simple.nix ./simple.builder.sh ./config.nix $flake1Dir/
+cp ../simple.nix ../simple.builder.sh ../config.nix $flake1Dir/
 git -C $flake1Dir add flake.nix simple.nix simple.builder.sh config.nix
 git -C $flake1Dir commit -m 'Initial'
 
@@ -298,7 +298,7 @@ cat > $flake3Dir/flake.nix <<EOF
 }
 EOF
 
-cp ./config.nix $flake3Dir
+cp ../config.nix $flake3Dir
 
 git -C $flake3Dir add flake.nix config.nix
 git -C $flake3Dir commit -m 'Add nonFlakeInputs'
