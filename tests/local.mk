@@ -49,7 +49,7 @@ nix_tests = \
   secure-drv-outputs.sh \
   restricted.sh \
   fetchGitSubmodules.sh \
-  flake-searching.sh \
+  flakes/search-root.sh \
   ca/duplicate-realisation-in-closure.sh \
   readfile-context.sh \
   nix-channel.sh \
