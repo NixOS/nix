@@ -16,7 +16,7 @@ It is rendered to a file system path as the concatenation of
 
   - [store directory](#store-directory)
   - path-separator (`/`)
-  - [digest](#digest) rendered in [base-32](https://en.m.wikipedia.org/wiki/Base32) (20 arbitrary bytes become 32 ASCII characters)
+  - [digest](#digest) rendered in a custom variant of [base-32](https://en.m.wikipedia.org/wiki/Base32) (20 arbitrary bytes become 32 ASCII characters)
   - hyphen (`-`)
   - name
 
