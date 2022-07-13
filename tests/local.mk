@@ -6,6 +6,7 @@ nix_tests = \
   flakes/init.sh \
   flakes/follow-paths.sh \
   flakes/bundle.sh \
+  flakes/check.sh \
   ca/gc.sh \
   gc.sh \
   remote-store.sh \
