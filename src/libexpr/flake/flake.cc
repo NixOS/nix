@@ -384,6 +384,18 @@ LockedFlake lockFlake(
                 }
             }
 
+            /* Check whether this input has overrides for a
+               non-existent input. */
+            for (auto [inputPath, inputOverride] : overrides) {
+                auto inputPath2(inputPath);
+                auto follow = inputPath2.back();
+                inputPath2.pop_back();
+                if (inputPath2 == inputPathPrefix && !flakeInputs.count(follow))
+                    warn(
+                        "input '%s' has an override for a non-existent input '%s'",
+                        printInputPath(inputPathPrefix), follow);
+            }
+
             /* Go over the flake inputs, resolve/fetch them if
                necessary (i.e. if they're new or the flakeref changed
                from what's in the lock file). */
@@ -513,6 +525,15 @@ LockedFlake lockFlake(
                         if (!lockFlags.allowMutable && !input.ref->input.isLocked())
                             throw Error("cannot update flake input '%s' in pure mode", inputPathS);
 
+                        /* Note: in case of an --override-input, we use
+                            the *original* ref (input2.ref) for the
+                            "original" field, rather than the
+                            override. This ensures that the override isn't
+                            nuked the next time we update the lock
+                            file. That is, overrides are sticky unless you
+                            use --no-write-lock-file. */
+                        auto ref = input2.ref ? *input2.ref : *input.ref;
+
                         if (input.isFlake) {
                             Path localPath = parentPath;
                             FlakeRef localRef = *input.ref;
@@ -524,15 +545,7 @@ LockedFlake lockFlake(
 
                             auto inputFlake = getFlake(state, localRef, useRegistries, flakeCache, inputPath);
 
-                            /* Note: in case of an --override-input, we use
-                               the *original* ref (input2.ref) for the
-                               "original" field, rather than the
-                               override. This ensures that the override isn't
-                               nuked the next time we update the lock
-                               file. That is, overrides are sticky unless you
-                               use --no-write-lock-file. */
-                            auto childNode = std::make_shared<LockedNode>(
-                                inputFlake.lockedRef, input2.ref ? *input2.ref : *input.ref);
+                            auto childNode = std::make_shared<LockedNode>(inputFlake.lockedRef, ref);
 
                             node->inputs.insert_or_assign(id, childNode);
 
@@ -560,7 +573,7 @@ LockedFlake lockFlake(
                             auto [sourceInfo, resolvedRef, lockedRef] = fetchOrSubstituteTree(
                                 state, *input.ref, useRegistries, flakeCache);
                             node->inputs.insert_or_assign(id,
-                                std::make_shared<LockedNode>(lockedRef, *input.ref, false));
+                                std::make_shared<LockedNode>(lockedRef, ref, false));
                         }
                     }
 

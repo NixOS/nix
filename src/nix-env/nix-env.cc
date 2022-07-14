@@ -1485,7 +1485,7 @@ static int main_nix_env(int argc, char * * argv)
         if (globals.profile == "")
             globals.profile = getDefaultProfile();
 
-        op(globals, opFlags, opArgs);
+        op(globals, std::move(opFlags), std::move(opArgs));
 
         globals.state->printStats();
 

@@ -257,11 +257,12 @@ static void main_nix_build(int argc, char * * argv)
 
     auto autoArgs = myArgs.getAutoArgs(*state);
 
+    auto autoArgsWithInNixShell = autoArgs;
     if (runEnv) {
-        auto newArgs = state->buildBindings(autoArgs->size() + 1);
+        auto newArgs = state->buildBindings(autoArgsWithInNixShell->size() + 1);
         newArgs.alloc("inNixShell").mkBool(true);
         for (auto & i : *autoArgs) newArgs.insert(i);
-        autoArgs = newArgs.finish();
+        autoArgsWithInNixShell = newArgs.finish();
     }
 
     if (packages) {
@@ -316,10 +317,39 @@ static void main_nix_build(int argc, char * * argv)
         Value vRoot;
         state->eval(e, vRoot);
 
+        std::function<bool(const Value & v)> takesNixShellAttr;
+        takesNixShellAttr = [&](const Value & v) {
+            if (!runEnv) {
+                return false;
+            }
+            bool add = false;
+            if (v.type() == nFunction && v.lambda.fun->hasFormals()) {
+                for (auto & i : v.lambda.fun->formals->formals) {
+                    if (state->symbols[i.name] == "inNixShell") {
+                        add = true;
+                        break;
+                    }
+                }
+            }
+            return add;
+        };
+
         for (auto & i : attrPaths) {
-            Value & v(*findAlongAttrPath(*state, i, *autoArgs, vRoot).first);
+            Value & v(*findAlongAttrPath(
+                *state,
+                i,
+                takesNixShellAttr(vRoot) ? *autoArgsWithInNixShell : *autoArgs,
+                vRoot
+            ).first);
             state->forceValue(v, [&]() { return v.determinePos(noPos); });
-            getDerivations(*state, v, "", *autoArgs, drvs, false);
+            getDerivations(
+                *state,
+                v,
+                "",
+                takesNixShellAttr(v) ? *autoArgsWithInNixShell : *autoArgs,
+                drvs,
+                false
+            );
         }
     }
 
@@ -543,6 +573,8 @@ static void main_nix_build(int argc, char * * argv)
 
         restoreProcessContext();
 
+        logger->stop();
+
         execvp(shell->c_str(), argPtrs.data());
 
         throw SysError("executing shell '%s'", *shell);
@@ -600,6 +632,8 @@ static void main_nix_build(int argc, char * * argv)
 
             outPaths.push_back(outputPath);
         }
+
+        logger->stop();
 
         for (auto & path : outPaths)
             std::cout << store->printStorePath(path) << '\n';

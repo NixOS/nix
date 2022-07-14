@@ -1,6 +1,12 @@
 nix_tests = \
-  flakes.sh \
-  flakes-run.sh \
+  flakes/flakes.sh \
+  flakes/run.sh \
+  flakes/mercurial.sh \
+  flakes/circular.sh \
+  flakes/init.sh \
+  flakes/follow-paths.sh \
+  flakes/bundle.sh \
+  flakes/check.sh \
   ca/gc.sh \
   gc.sh \
   remote-store.sh \
@@ -44,7 +50,7 @@ nix_tests = \
   secure-drv-outputs.sh \
   restricted.sh \
   fetchGitSubmodules.sh \
-  flake-searching.sh \
+  flakes/search-root.sh \
   ca/duplicate-realisation-in-closure.sh \
   readfile-context.sh \
   nix-channel.sh \
@@ -80,7 +86,7 @@ nix_tests = \
   nix-copy-ssh.sh \
   post-hook.sh \
   function-trace.sh \
-  flake-local-settings.sh \
+  flakes/config.sh \
   fmt.sh \
   eval-store.sh \
   why-depends.sh \
@@ -115,4 +121,8 @@ tests-environment = NIX_REMOTE= $(bash) -e
 
 clean-files += $(d)/common.sh $(d)/config.nix $(d)/ca/config.nix
 
-test-deps += tests/common.sh tests/config.nix tests/ca/config.nix tests/plugins/libplugintest.$(SO_EXT)
+test-deps += tests/common.sh tests/config.nix tests/ca/config.nix
+
+ifeq ($(BUILD_SHARED_LIBS), 1)
+  test-deps += tests/plugins/libplugintest.$(SO_EXT)
+endif

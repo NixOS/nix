@@ -320,6 +320,14 @@ if test ${cross_compiling:-no} = no && ! test -z ${sandbox_shell+x}; then
   fi
 fi
 
+AC_ARG_ENABLE(embedded-sandbox-shell, AS_HELP_STRING([--enable-embedded-sandbox-shell],[include the sandbox shell in the Nix binary [default=no]]),
+  embedded_sandbox_shell=$enableval, embedded_sandbox_shell=no)
+AC_SUBST(embedded_sandbox_shell)
+if test "$embedded_sandbox_shell" = yes; then
+  AC_DEFINE(HAVE_EMBEDDED_SANDBOX_SHELL, 1, [Include the sandbox shell in the Nix binary.])
+fi
+
+
 # Expand all variables in config.status.
 test "$prefix" = NONE && prefix=$ac_default_prefix
 test "$exec_prefix" = NONE && exec_prefix='${prefix}'

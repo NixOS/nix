@@ -69,6 +69,7 @@ protected:
         } catch (SysError & e) {
             if (e.errNo == ENOENT)
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache", path);
+            throw;
         }
     }
 

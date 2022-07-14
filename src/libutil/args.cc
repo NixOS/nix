@@ -124,7 +124,7 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
         bool anyCompleted = false;
         for (size_t n = 0 ; n < flag.handler.arity; ++n) {
             if (pos == end) {
-                if (flag.handler.arity == ArityAny) break;
+                if (flag.handler.arity == ArityAny || anyCompleted) break;
                 throw UsageError("flag '%s' requires %d argument(s)", name, flag.handler.arity);
             }
             if (auto prefix = needsCompletion(*pos)) {
@@ -360,6 +360,14 @@ bool MultiCommand::processArgs(const Strings & args, bool finish)
         return command->second->processArgs(args, finish);
     else
         return Args::processArgs(args, finish);
+}
+
+void MultiCommand::completionHook()
+{
+    if (command)
+        return command->second->completionHook();
+    else
+        return Args::completionHook();
 }
 
 nlohmann::json MultiCommand::toJSON()

@@ -282,7 +282,7 @@ struct AttrDb
         auto queryAttribute(state->queryAttribute.use()(key.first)(symbols[key.second]));
         if (!queryAttribute.next()) return {};
 
-        auto rowId = (AttrType) queryAttribute.getInt(0);
+        auto rowId = (AttrId) queryAttribute.getInt(0);
         auto type = (AttrType) queryAttribute.getInt(1);
 
         switch (type) {
@@ -486,7 +486,7 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name, bool forceErro
                         return nullptr;
                     else if (std::get_if<failed_t>(&attr->second)) {
                         if (forceErrors)
-                            debug("reevaluating failed cached attribute '%s'");
+                            debug("reevaluating failed cached attribute '%s'", getAttrPathStr(name));
                         else
                             throw CachedEvalError("cached failure of attribute '%s'", getAttrPathStr(name));
                     } else
