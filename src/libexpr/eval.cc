@@ -1464,7 +1464,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
         if (pos2) {
             auto pos2r = state.positions[pos2];
             auto origin = std::get_if<SourcePath>(&pos2r.origin);
-            if (!origin || *origin != state.derivationInternal)
+            if (!(origin && *origin == state.derivationInternal))
                 state.addErrorTrace(e, pos2, "while evaluating the attribute '%1%'",
                     showAttrPath(state, env, attrPath));
         }
