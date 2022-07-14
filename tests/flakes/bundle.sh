@@ -1,9 +1,6 @@
 source common.sh
 
-clearStore
-rm -rf $TEST_HOME/.cache $TEST_HOME/.config $TEST_HOME/.local
-
-cp ./simple.nix ./simple.builder.sh ./config.nix $TEST_HOME
+cp ../simple.nix ../simple.builder.sh ../config.nix $TEST_HOME
 
 cd $TEST_HOME
 
@@ -25,6 +22,7 @@ cat <<EOF > flake.nix
     };
 }
 EOF
+
 nix build .#
 nix bundle --bundler .# .#
 nix bundle --bundler .#bundlers.$system.default .#packages.$system.default
@@ -32,6 +30,3 @@ nix bundle --bundler .#bundlers.$system.simple  .#packages.$system.default
 
 nix bundle --bundler .#bundlers.$system.default .#apps.$system.default
 nix bundle --bundler .#bundlers.$system.simple  .#apps.$system.default
-
-clearStore
-
