@@ -108,7 +108,7 @@
           ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)];
 
         buildDeps =
-          [ curl
+          [ (curl.override { patchNetrcRegression = true; })
             bzip2 xz brotli editline
             openssl sqlite
             libarchive
@@ -363,7 +363,7 @@
 
               buildInputs =
                 [ nix
-                  curl
+                  (curl.override { patchNetrcRegression = true; })
                   bzip2
                   xz
                   pkgs.perl
