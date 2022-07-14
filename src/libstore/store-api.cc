@@ -1321,7 +1321,7 @@ std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Para
         else if (pathExists(settings.nixDaemonSocketFile))
             return std::make_shared<UDSRemoteStore>(params);
         #if __linux__
-        else if (!pathExists(stateDir) && params.empty() && getuid() != 0) {
+        else if (!pathExists(stateDir) && params.empty() && getuid() != 0 && !getEnv("NIX_STORE_DIR").has_value()) {
             /* If /nix doesn't exist, there is no daemon socket, and
                we're not root, then automatically set up a chroot
                store in ~/.local/share/nix/root. */
