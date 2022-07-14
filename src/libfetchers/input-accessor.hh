@@ -13,6 +13,8 @@ struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
 {
     const size_t number;
 
+    std::string displayPrefix, displaySuffix;
+
     InputAccessor();
 
     virtual ~InputAccessor()
@@ -57,6 +59,8 @@ struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
     {
         return number < x.number;
     }
+
+    void setPathDisplay(std::string displayPrefix, std::string displaySuffix = "");
 
     virtual std::string showPath(const CanonPath & path);
 };

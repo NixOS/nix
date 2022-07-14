@@ -9,7 +9,9 @@ static std::atomic<size_t> nextNumber{0};
 
 InputAccessor::InputAccessor()
     : number(++nextNumber)
-{ }
+    , displayPrefix{"/virtual/" + std::to_string(number)}
+{
+}
 
 // FIXME: merge with archive.cc.
 void InputAccessor::dumpPath(
@@ -91,9 +93,15 @@ std::optional<InputAccessor::Stat> InputAccessor::maybeLstat(const CanonPath & p
     return lstat(path);
 }
 
+void InputAccessor::setPathDisplay(std::string displayPrefix, std::string displaySuffix)
+{
+    this->displayPrefix = std::move(displayPrefix);
+    this->displaySuffix = std::move(displaySuffix);
+}
+
 std::string InputAccessor::showPath(const CanonPath & path)
 {
-    return "/virtual/" + std::to_string(number) + path.abs();
+    return displayPrefix + path.abs() + displaySuffix;
 }
 
 struct FSInputAccessorImpl : FSInputAccessor
@@ -109,7 +117,9 @@ struct FSInputAccessorImpl : FSInputAccessor
         : root(root)
         , allowedPaths(std::move(allowedPaths))
         , makeNotAllowedError(std::move(makeNotAllowedError))
-    { }
+    {
+        displayPrefix = root.abs();
+    }
 
     std::string readFile(const CanonPath & path) override
     {
@@ -200,11 +210,6 @@ struct FSInputAccessorImpl : FSInputAccessor
     bool hasAccessControl() override
     {
         return (bool) allowedPaths;
-    }
-
-    std::string showPath(const CanonPath & path) override
-    {
-        return (root + path).abs();
     }
 };
 

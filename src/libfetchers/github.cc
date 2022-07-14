@@ -232,7 +232,11 @@ struct GitArchiveInputScheme : InputScheme
     {
         auto [storePath, input2] = downloadArchive(store, input);
 
-        return {makeZipInputAccessor(CanonPath(store->toRealPath(storePath))), input2};
+        auto accessor = makeZipInputAccessor(CanonPath(store->toRealPath(storePath)));
+
+        accessor->setPathDisplay("«" + input2.to_string() + "»");
+
+        return {accessor, input2};
     }
 };
 
