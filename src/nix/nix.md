@@ -133,7 +133,7 @@ the Nix store. Here are the recognised types of installables:
 * **Indexed store derivations**: `/nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv^out`
 
   Store derivations can be indexed with a non-empty comma-separated list
-  of specific output names, or `*` meaning all ouptuts. This allows
+  of specific output names, or `*` meaning all outputs. This allows
   finer control versus just specifying a derivation (without
   `--derivation`) and getting all the outputs.
 
