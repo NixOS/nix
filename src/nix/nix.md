@@ -134,8 +134,9 @@ the Nix store. Here are the recognised types of installables:
 
   *(Experimental, part of by the `computed-derivations` experimental feature.)*
 
-  Store derivations can be indexed with a specific output name. This
-  allows finer control versus just specifying a derivation (without
+  Store derivations can be indexed with a non-empty comma-separated list
+  of specific output names, or `*` meaning all ouptuts. This allows
+  finer control versus just specifying a derivation (without
   `--derivation`) and getting all the outputs.
 
   This is especially useful for (currently unstable) floating content
