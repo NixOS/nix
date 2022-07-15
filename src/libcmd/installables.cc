@@ -814,7 +814,6 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                     result.push_back(std::make_shared<InstallableStorePath>(
                         store,
                         DerivedPath::Built::parse(*store, s.substr(0, found), s.substr(found + 1))));
-                    settings.requireExperimentalFeature(Xp::ComputedDerivations);
                     continue;
                 } catch (BadStorePath &) {
                 } catch (...) {

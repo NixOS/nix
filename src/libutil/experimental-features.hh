@@ -23,7 +23,6 @@ enum struct ExperimentalFeature
     NoUrlLiterals,
     FetchClosure,
     ReplFlake,
-    ComputedDerivations, // RFC 92
 };
 
 /**
