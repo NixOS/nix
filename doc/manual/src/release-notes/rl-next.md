@@ -1,3 +1,3 @@
 # Release X.Y (202?-??-??)
 
-* Add *indexed store derivations* installable syntax.
+* Allow explicitly selecting outputs with *store derivations* installable syntax too.

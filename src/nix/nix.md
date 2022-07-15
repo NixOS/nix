@@ -130,17 +130,6 @@ the Nix store. Here are the recognised types of installables:
   If you want to operate on the store derivation itself, pass the
   `--derivation` flag.
 
-* **Indexed store derivations**: `/nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv^out`
-
-  Store derivations can be indexed with a non-empty comma-separated list
-  of specific output names, or `*` meaning all outputs. This allows
-  finer control versus just specifying a derivation (without
-  `--derivation`) and getting all the outputs.
-
-  This is especially useful for (currently unstable) floating content
-  addressed derivations, which do not have precomputed output paths that
-  can be used instead.
-
 * **Nix attributes**: `--file /path/to/nixpkgs hello`
 
   When the `-f` / `--file` *path* option is given, installables are
@@ -175,6 +164,13 @@ operate are determined as follows:
   …
   ```
 
+  and likewise, using a store path to a "drv" file to specify the derivation:
+
+  ```console
+  # nix build '/nix/store/gzaflydcr6sb3567hap9q6srzx8ggdgg-glibc-2.33-78.drv^dev,static'
+  …
+  ```
+
 * You can also specify that *all* outputs should be used using the
   syntax *installable*`^*`. For example, the following shows the size
   of all outputs of the `glibc` package in the binary cache:
@@ -188,9 +184,17 @@ operate are determined as follows:
   /nix/store/q6580lr01jpcsqs4r5arlh4ki2c1m9rv-glibc-2.33-123-dev             44200560
   ```
 
-* If you didn't specify the desired outputs, but the derivation has an
-  attribute `meta.outputsToInstall`, Nix will use those outputs. For
-  example, since the package `nixpkgs#libxml2` has this attribute:
+  and likewise, again using a store path to a "drv" file to specify the derivation:
+
+  ```console
+  # nix path-info -S --eval-store auto --store https://cache.nixos.org '/nix/store/gzaflydcr6sb3567hap9q6srzx8ggdgg-glibc-2.33-78.drv^*'
+  …
+  ```
+
+* If you didn't specify the desired outputs, but the derivation comes
+  from an expression which has an attribute `meta.outputsToInstall`, Nix
+  will use those outputs. For example, since the package
+  `nixpkgs#libxml2` has this attribute:
 
   ```console
   # nix eval 'nixpkgs#libxml2.meta.outputsToInstall'
