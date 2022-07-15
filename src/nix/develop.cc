@@ -288,8 +288,10 @@ struct Common : InstallableCommand, MixProfile
 
         out << "unset shellHook\n";
 
-        for (auto & var : savedVars)
+        for (auto & var : savedVars) {
+            out << fmt("%s=${%s:-}\n", var, var);
             out << fmt("nix_saved_%s=\"$%s\"\n", var, var);
+        }
 
         buildEnvironment.toBash(out, ignoreVars);
 
