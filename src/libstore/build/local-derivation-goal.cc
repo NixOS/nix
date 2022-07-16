@@ -850,13 +850,23 @@ void LocalDerivationGoal::startBuilder()
                 flags &= ~CLONE_NEWUSER;
                 child = clone(childEntry, stack + stackSize, flags, this);
             }
-            /* Otherwise exit with EPERM so we can handle this in the
-               parent. This is only done when sandbox-fallback is set
-               to true (the default). */
-            if (child == -1 && (errno == EPERM || errno == EINVAL) && settings.sandboxFallback)
-                _exit(1);
-            if (child == -1) throw SysError("cloning builder process");
-
+            if (child == -1)
+                switch(errno) {
+                    case EPERM:
+                    case EINVAL: {
+                        /* Otherwise exit with EPERM so we can handle this in the
+                           parent. This is only done when sandbox-fallback is set
+                           to true (the default). */
+                        if (settings.sandboxFallback)
+                            _exit(1);
+                        /* Mention sandbox-fallback in the error message so the user
+                           knows that having it disabled contributed to the
+                           unrecoverability of this failure */
+                        throw SysError("creating sandboxed builder process using clone(), without sandbox-fallback");
+                    }
+                    default:
+                        throw SysError("creating sandboxed builder process using clone()");
+                }
             writeFull(builderOut.writeSide.get(),
                 fmt("%d %d\n", usingUserNamespace, child));
             _exit(0);
