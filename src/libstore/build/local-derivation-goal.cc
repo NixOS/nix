@@ -845,6 +845,7 @@ void LocalDerivationGoal::startBuilder()
                 /* Some distros patch Linux to not allow unprivileged
                  * user namespaces. If we get EPERM or EINVAL, try
                  * without CLONE_NEWUSER and see if that works.
+                 * Details: https://salsa.debian.org/kernel-team/linux/-/commit/d98e00eda6bea437e39b9e80444eee84a32438a6
                  */
                 usingUserNamespace = false;
                 flags &= ~CLONE_NEWUSER;
