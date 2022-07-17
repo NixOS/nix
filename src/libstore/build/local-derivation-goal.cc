@@ -859,6 +859,8 @@ void LocalDerivationGoal::startBuilder()
                            to true (the default). */
                         if (settings.sandboxFallback)
                             _exit(1);
+                        if (!userNamespacesEnabled && errno==EPERM)
+                            warn("user namespaces appear to be disabled; they are required for sandboxing; check /proc/sys/user/max_user_namespaces");
                         /* Mention sandbox-fallback in the error message so the user
                            knows that having it disabled contributed to the
                            unrecoverability of this failure */
