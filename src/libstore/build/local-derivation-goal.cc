@@ -862,6 +862,13 @@ void LocalDerivationGoal::startBuilder()
                             _exit(1);
                         if (!userNamespacesEnabled && errno==EPERM)
                             warn("user namespaces appear to be disabled; they are required for sandboxing; check /proc/sys/user/max_user_namespaces");
+                        if (userNamespacesEnabled) {
+                            Path procSysKernelUnprivilegedUsernsClone = "/proc/sys/kernel/unprivileged_userns_clone";
+                            if (pathExists(procSysKernelUnprivilegedUsernsClone)
+                                && trim(readFile(procSysKernelUnprivilegedUsernsClone)) == "0") {
+                                warn("user namespaces appear to be disabled; they are required for sandboxing; check /proc/sys/kernel/unprivileged_userns_clone");
+                            }
+                        }
                         Path procSelfNsUser = "/proc/self/ns/user";
                         if (!pathExists(procSelfNsUser))
                             warn("/proc/self/ns/user does not exist; your kernel was likely built without CONFIG_USER_NS=y, which is required for sandboxing");
