@@ -204,12 +204,18 @@ public:
     int errNo;
 
     template<typename... Args>
-    SysError(const Args & ... args)
+    SysError(int errNo_, const Args & ... args)
         : Error("")
     {
-        errNo = errno;
+        errNo = errNo_;
         auto hf = hintfmt(args...);
         err.msg = hintfmt("%1%: %2%", normaltxt(hf.str()), strerror(errNo));
+    }
+
+    template<typename... Args>
+    SysError(const Args & ... args)
+        : SysError(errno, args ...)
+    {
     }
 };
 
