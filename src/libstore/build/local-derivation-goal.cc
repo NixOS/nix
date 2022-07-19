@@ -855,11 +855,6 @@ void LocalDerivationGoal::startBuilder()
                 switch(errno) {
                     case EPERM:
                     case EINVAL: {
-                        /* Otherwise exit with EPERM so we can handle this in the
-                           parent. This is only done when sandbox-fallback is set
-                           to true (the default). */
-                        if (settings.sandboxFallback)
-                            _exit(1);
                         if (!userNamespacesEnabled && errno==EPERM)
                             notice("user namespaces appear to be disabled; they are required for sandboxing; check /proc/sys/user/max_user_namespaces");
                         if (userNamespacesEnabled) {
@@ -872,6 +867,11 @@ void LocalDerivationGoal::startBuilder()
                         Path procSelfNsUser = "/proc/self/ns/user";
                         if (!pathExists(procSelfNsUser))
                             notice("/proc/self/ns/user does not exist; your kernel was likely built without CONFIG_USER_NS=y, which is required for sandboxing");
+                        /* Otherwise exit with EPERM so we can handle this in the
+                           parent. This is only done when sandbox-fallback is set
+                           to true (the default). */
+                        if (settings.sandboxFallback)
+                            _exit(1);
                         /* Mention sandbox-fallback in the error message so the user
                            knows that having it disabled contributed to the
                            unrecoverability of this failure */
