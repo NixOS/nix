@@ -11,11 +11,6 @@
 #include <dlfcn.h>
 #include <sys/utsname.h>
 
-#if __linux__
-#include <mntent.h>
-#include <cmath>
-#endif
-
 #include <nlohmann/json.hpp>
 
 
@@ -119,50 +114,13 @@ std::vector<Path> getUserConfigFiles()
 
 unsigned int Settings::getDefaultCores()
 {
-    unsigned int concurrency = std::max(1U, std::thread::hardware_concurrency());
+    const unsigned int concurrency = std::max(1U, std::thread::hardware_concurrency());
+    const unsigned int maxCPU = getMaxCPU();
 
-    #if __linux__
-    FILE *fp = fopen("/proc/mounts", "r");
-    if (!fp)
-        return concurrency;
-
-    Strings cgPathParts;
-
-    struct mntent *ent;
-    while ((ent = getmntent(fp))) {
-        std::string mountType, mountPath;
-
-        mountType = ent->mnt_type;
-        mountPath = ent->mnt_dir;
-
-        if (mountType == "cgroup2") {
-            cgPathParts.push_back(mountPath);
-            break;
-        }
-    }
-
-    fclose(fp);
-
-    if (cgPathParts.size() > 0 && pathExists("/proc/self/cgroup")) {
-        std::string currentCgroup = readFile("/proc/self/cgroup");
-        Strings cgValues = tokenizeString<Strings>(currentCgroup, ":");
-        cgPathParts.push_back(trim(cgValues.back(), "\n"));
-        cgPathParts.push_back("cpu.max");
-        std::string fullCgPath = canonPath(concatStringsSep("/", cgPathParts));
-
-        if (pathExists(fullCgPath)) {
-            std::string cpuMax = readFile(fullCgPath);
-            std::vector<std::string> cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " ");
-            std::string quota = cpuMaxParts[0];
-            std::string period = trim(cpuMaxParts[1], "\n");
-
-            if (quota != "max")
-                concurrency = std::ceil(std::stoi(quota) / std::stof(period));
-        }
-    }
-    #endif
-
-    return concurrency;
+    if (maxCPU > 0)
+      return maxCPU;
+    else
+      return concurrency;
 }
 
 StringSet Settings::getDefaultSystemFeatures()

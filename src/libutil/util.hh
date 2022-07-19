@@ -182,6 +182,9 @@ std::string drainFD(int fd, bool block = true, const size_t reserveSize=0);
 
 void drainFD(int fd, Sink & sink, bool block = true);
 
+/* If cgroups are active, attempt to calculate the number of CPUs available.
+   If cgroups are unavailable or if cpu.max is set to "max", return 0. */
+unsigned int getMaxCPU();
 
 /* Automatic cleanup of resources. */
 
