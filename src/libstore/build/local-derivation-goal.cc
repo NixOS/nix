@@ -851,10 +851,11 @@ void LocalDerivationGoal::startBuilder()
                 flags &= ~CLONE_NEWUSER;
                 child = clone(childEntry, stack + stackSize, flags, this);
             }
-            if (child == -1)
+            if (child == -1) {
                 switch(errno) {
                     case EPERM:
                     case EINVAL: {
+                        int errno_ = errno;
                         if (!userNamespacesEnabled && errno==EPERM)
                             notice("user namespaces appear to be disabled; they are required for sandboxing; check /proc/sys/user/max_user_namespaces");
                         if (userNamespacesEnabled) {
@@ -875,11 +876,12 @@ void LocalDerivationGoal::startBuilder()
                         /* Mention sandbox-fallback in the error message so the user
                            knows that having it disabled contributed to the
                            unrecoverability of this failure */
-                        throw SysError("creating sandboxed builder process using clone(), without sandbox-fallback");
+                        throw SysError(errno_, "creating sandboxed builder process using clone(), without sandbox-fallback");
                     }
                     default:
                         throw SysError("creating sandboxed builder process using clone()");
                 }
+            }
             writeFull(builderOut.writeSide.get(),
                 fmt("%d %d\n", usingUserNamespace, child));
             _exit(0);
