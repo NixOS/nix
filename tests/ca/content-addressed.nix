@@ -75,7 +75,7 @@ rec {
     buildCommand = ''
       mkdir -p $out/bin
       echo ${rootCA} # Just to make it depend on it
-      echo "" > $out/bin/${name}
+      echo "#! ${shell}" > $out/bin/${name}
       chmod +x $out/bin/${name}
     '';
   };

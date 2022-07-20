@@ -50,6 +50,8 @@ export busybox="@sandbox_shell@"
 export version=@PACKAGE_VERSION@
 export system=@system@
 
+export BUILD_SHARED_LIBS=@BUILD_SHARED_LIBS@
+
 export IMPURE_VAR1=foo
 export IMPURE_VAR2=bar
 
@@ -117,11 +119,11 @@ killDaemon() {
 }
 
 restartDaemon() {
-  [[ -z "${pidDaemon:-}" ]] && return 0
+    [[ -z "${pidDaemon:-}" ]] && return 0
 
-  killDaemon
-  unset NIX_REMOTE
-  startDaemon
+    killDaemon
+    unset NIX_REMOTE
+    startDaemon
 }
 
 if [[ $(uname) == Linux ]] && [[ -L /proc/self/ns/user ]] && unshare --user true; then
@@ -187,5 +189,16 @@ set -x
 if [[ -n "${NIX_DAEMON_PACKAGE:-}" ]]; then
     startDaemon
 fi
+
+onError() {
+    set +x
+    echo "$0: test failed at:" >&2
+    for ((i = 1; i < 16; i++)); do
+        if [[ -z ${BASH_SOURCE[i]} ]]; then break; fi
+        echo "  ${FUNCNAME[i]} in ${BASH_SOURCE[i]}:${BASH_LINENO[i-1]}" >&2
+    done
+}
+
+trap onError ERR
 
 fi # COMMON_SH_SOURCED

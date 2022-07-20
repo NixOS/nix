@@ -79,9 +79,6 @@ public:
     /* A list of user configuration files to load. */
     std::vector<Path> nixUserConfFiles;
 
-    /* The directory where internal helper programs are stored. */
-    Path nixLibexecDir;
-
     /* The directory where the main programs are stored. */
     Path nixBinDir;
 
@@ -195,7 +192,7 @@ public:
         )",
         {"build-timeout"}};
 
-    PathSetting buildHook{this, true, nixLibexecDir + "/nix/build-remote", "build-hook",
+    PathSetting buildHook{this, true, "", "build-hook",
         "The path of the helper program that executes builds to remote machines."};
 
     Setting<std::string> builders{
@@ -802,7 +799,7 @@ public:
         )"};
 
     Setting<StringSet> ignoredAcls{
-        this, {"security.selinux", "system.nfs4_acl"}, "ignored-acls",
+        this, {"security.selinux", "system.nfs4_acl", "security.csm"}, "ignored-acls",
         R"(
           A list of ACLs that should be ignored, normally Nix attempts to
           remove all ACLs from files and directories in the Nix store, but

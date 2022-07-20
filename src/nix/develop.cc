@@ -276,15 +276,27 @@ struct Common : InstallableCommand, MixProfile
         const BuildEnvironment & buildEnvironment,
         const Path & outputsDir = absPath(".") + "/outputs")
     {
+        // A list of colon-separated environment variables that should be
+        // prepended to, rather than overwritten, in order to keep the shell usable.
+        // Please keep this list minimal in order to avoid impurities.
+        static const char * const savedVars[] = {
+            "PATH",          // for commands
+            "XDG_DATA_DIRS", // for loadable completion
+        };
+
         std::ostringstream out;
 
         out << "unset shellHook\n";
 
-        out << "nix_saved_PATH=\"$PATH\"\n";
+        for (auto & var : savedVars) {
+            out << fmt("%s=${%s:-}\n", var, var);
+            out << fmt("nix_saved_%s=\"$%s\"\n", var, var);
+        }
 
         buildEnvironment.toBash(out, ignoreVars);
 
-        out << "PATH=\"$PATH:$nix_saved_PATH\"\n";
+        for (auto & var : savedVars)
+            out << fmt("%s=\"$%s:$nix_saved_%s\"\n", var, var, var);
 
         out << "export NIX_BUILD_TOP=\"$(mktemp -d -t nix-shell.XXXXXX)\"\n";
         for (auto & i : {"TMP", "TMPDIR", "TEMP", "TEMPDIR"})

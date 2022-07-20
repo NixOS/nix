@@ -14,7 +14,6 @@ struct NarInfo : ValidPathInfo
     std::string compression;
     std::optional<Hash> fileHash;
     uint64_t fileSize = 0;
-    std::string system;
 
     NarInfo() = delete;
     NarInfo(StorePath && path, Hash narHash) : ValidPathInfo(std::move(path), narHash) { }

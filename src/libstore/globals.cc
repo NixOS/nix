@@ -36,7 +36,6 @@ Settings::Settings()
     , nixStateDir(canonPath(getEnv("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
     , nixConfDir(canonPath(getEnv("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
     , nixUserConfFiles(getUserConfigFiles())
-    , nixLibexecDir(canonPath(getEnv("NIX_LIBEXEC_DIR").value_or(NIX_LIBEXEC_DIR)))
     , nixBinDir(canonPath(getEnv("NIX_BIN_DIR").value_or(NIX_BIN_DIR)))
     , nixManDir(canonPath(NIX_MAN_DIR))
     , nixDaemonSocketFile(canonPath(getEnv("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
@@ -67,12 +66,13 @@ Settings::Settings()
     sandboxPaths = tokenizeString<StringSet>("/bin/sh=" SANDBOX_SHELL);
 #endif
 
-
-/* chroot-like behavior from Apple's sandbox */
+    /* chroot-like behavior from Apple's sandbox */
 #if __APPLE__
     sandboxPaths = tokenizeString<StringSet>("/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
     allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
 #endif
+
+    buildHook = getSelfExe().value_or("nix") + " __build-remote";
 }
 
 void loadConfFile()

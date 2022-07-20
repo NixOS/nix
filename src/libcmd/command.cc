@@ -120,7 +120,7 @@ ref<EvalState> EvalCommand::getEvalState()
             ;
 
         if (startReplOnEvalErrors) {
-            evalState->debugRepl = &runRepl;        
+            evalState->debugRepl = &runRepl;
         };
     }
     return ref<EvalState>(evalState);

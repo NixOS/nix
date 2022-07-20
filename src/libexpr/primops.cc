@@ -851,6 +851,18 @@ static RegisterPrimOp primop_floor({
 static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     auto attrs = state.buildBindings(2);
+
+    /* increment state.trylevel, and decrement it when this function returns. */
+    MaintainCount trylevel(state.trylevel);
+
+    void (* savedDebugRepl)(ref<EvalState> es, const ValMap & extraEnv) = nullptr;
+    if (state.debugRepl && evalSettings.ignoreExceptionsDuringTry)
+    {
+        /* to prevent starting the repl from exceptions withing a tryEval, null it. */
+        savedDebugRepl = state.debugRepl;
+        state.debugRepl = nullptr;
+    }
+
     try {
         state.forceValue(*args[0], pos);
         attrs.insert(state.sValue, args[0]);
@@ -859,6 +871,11 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value * * args, Va
         attrs.alloc(state.sValue).mkBool(false);
         attrs.alloc("success").mkBool(false);
     }
+
+    // restore the debugRepl pointer if we saved it earlier.
+    if (savedDebugRepl)
+        state.debugRepl = savedDebugRepl;
+
     v.mkAttrs(attrs);
 }
 
@@ -969,6 +986,15 @@ static RegisterPrimOp primop_trace({
     .fun = prim_trace,
 });
 
+
+/* Takes two arguments and evaluates to the second one. Used as the
+ * builtins.traceVerbose implementation when --trace-verbose is not enabled
+ */
+static void prim_second(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    state.forceValue(*args[1], pos);
+    v = *args[1];
+}
 
 /*************************************************************
  * Derivations
@@ -3925,6 +3951,18 @@ void EvalState::createBaseEnv()
         addPrimOp("__importNative", 2, prim_importNative);
         addPrimOp("__exec", 1, prim_exec);
     }
+
+    addPrimOp({
+        .fun = evalSettings.traceVerbose ? prim_trace : prim_second,
+        .arity = 2,
+        .name = "__traceVerbose",
+        .args = { "e1", "e2" },
+        .doc = R"(
+          Evaluate *e1* and print its abstract syntax representation on standard
+          error if `--trace-verbose` is enabled. Then return *e2*. This function
+          is useful for debugging.
+        )",
+    });
 
     /* Add a value containing the current Nix expression search path. */
     mkList(v, searchPath.size());

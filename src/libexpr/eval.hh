@@ -130,6 +130,7 @@ public:
     void (* debugRepl)(ref<EvalState> es, const ValMap & extraEnv);
     bool debugStop;
     bool debugQuit;
+    int trylevel;
     std::list<DebugTrace> debugTraces;
     std::map<const Expr*, const std::shared_ptr<const StaticEnv>> exprEnvs;
     const std::shared_ptr<const StaticEnv> getStaticEnv(const Expr & expr) const
@@ -646,6 +647,15 @@ struct EvalSettings : Config
 
     Setting<bool> useEvalCache{this, true, "eval-cache",
         "Whether to use the flake evaluation cache."};
+
+    Setting<bool> ignoreExceptionsDuringTry{this, false, "ignore-try",
+        R"(
+          If set to true, ignore exceptions inside 'tryEval' calls when evaluating nix expressions in
+          debug mode (using the --debugger flag). By default the debugger will pause on all exceptions.
+        )"};
+
+    Setting<bool> traceVerbose{this, false, "trace-verbose",
+        "Whether `builtins.traceVerbose` should trace its first argument when evaluated."};
 };
 
 extern EvalSettings evalSettings;

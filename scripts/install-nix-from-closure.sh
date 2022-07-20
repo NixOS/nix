@@ -148,7 +148,9 @@ if ! [ -w "$dest" ]; then
     exit 1
 fi
 
-mkdir -p "$dest/store"
+# The auto-chroot code in openFromNonUri() checks for the
+# non-existence of /nix/var/nix, so we need to create it here.
+mkdir -p "$dest/store" "$dest/var/nix"
 
 printf "copying Nix to %s..." "${dest}/store" >&2
 # Insert a newline if no progress is shown.
