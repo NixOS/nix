@@ -23,6 +23,12 @@ R""(
   Hi everybody!
   ```
 
+* Run multiple commands in a shell environment:
+
+  ```console
+  # nix shell nixpkgs#gnumake -c /bin/sh -c "cd src && make"
+  ```
+
 * Run GNU Hello in a chroot store:
 
   ```console
