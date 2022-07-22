@@ -86,13 +86,14 @@ struct PathInputScheme : InputScheme
         // nothing to do
     }
 
-    CanonPath getAbsPath(ref<Store> store, const Input & input)
+    CanonPath getAbsPath(ref<Store> store, const Input & input) const
     {
         auto path = getStrAttr(input.attrs, "path");
 
         if (path[0] == '/')
             return CanonPath(path);
 
+        // FIXME: remove this?
         if (!input.parent)
             throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
 
@@ -145,6 +146,19 @@ struct PathInputScheme : InputScheme
         input2.attrs.emplace("path", (std::string) absPath.abs());
         return {makeFSInputAccessor(absPath), std::move(input2)};
     }
+
+    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
+    {
+        /* If this path is in the Nix store, we can consider it
+           locked, so just use the path as its fingerprint. Maybe we
+           should restrict this to CA paths but that's not
+           super-important. */
+        auto path = getAbsPath(store, input);
+        if (store->isInStore(path.abs()))
+            return path.abs();
+        return std::nullopt;
+    }
+
 };
 
 static auto rPathInputScheme = OnStartup([] { registerInputScheme(std::make_unique<PathInputScheme>()); });

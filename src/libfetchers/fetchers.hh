@@ -104,6 +104,10 @@ public:
     std::optional<uint64_t> getRevCount() const;
     std::optional<time_t> getLastModified() const;
 
+    // For locked inputs, returns a string that uniquely specifies the
+    // content of the input (typically a commit hash or content hash).
+    std::optional<std::string> getFingerprint(ref<Store> store) const;
+
 private:
 
     void checkLocked(Store & store, const StorePath & storePath, Input & input) const;
@@ -156,6 +160,9 @@ struct InputScheme
 
     virtual bool isRelative(const Input & input) const
     { return false; }
+
+    virtual std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const
+    { return std::nullopt; }
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);

@@ -79,7 +79,7 @@ struct LockedFlake
     Flake flake;
     LockFile lockFile;
 
-    Fingerprint getFingerprint() const;
+    std::optional<Fingerprint> getFingerprint(ref<Store> store) const;
 };
 
 struct LockFlags

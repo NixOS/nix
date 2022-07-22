@@ -289,6 +289,14 @@ std::optional<time_t> Input::getLastModified() const
     return {};
 }
 
+std::optional<std::string> Input::getFingerprint(ref<Store> store) const
+{
+    if (auto rev = getRev())
+        return rev->gitRev();
+    assert(scheme);
+    return scheme->getFingerprint(store, *this);
+}
+
 ParsedURL InputScheme::toURL(const Input & input)
 {
     throw Error("don't know how to convert input '%s' to a URL", attrsToJSON(input.attrs));
