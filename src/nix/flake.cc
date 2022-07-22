@@ -1029,14 +1029,19 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     auto name = visitor.getAttr(state->sName)->getString();
                     if (json) {
                         std::optional<std::string> description;
+                        std::optional<std::string> homepage;
                         if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
                             if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
                                 description = aDescription->getString();
+                            if (auto aHomepage = aMeta->maybeGetAttr(state->sHomepage))
+                                homepage = aHomepage->getString();
                         }
                         j.emplace("type", "derivation");
                         j.emplace("name", name);
                         if (description)
                             j.emplace("description", *description);
+                        if (homepage)
+                            j.emplace("homepage", *homepage);
                     } else {
                         logger->cout("%s: %s '%s'",
                             headerPrefix,

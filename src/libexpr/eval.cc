@@ -452,6 +452,7 @@ EvalState::EvalState(
     , sOutputHashMode(symbols.create("outputHashMode"))
     , sRecurseForDerivations(symbols.create("recurseForDerivations"))
     , sDescription(symbols.create("description"))
+    , sHomepage(symbols.create("homepage"))
     , sSelf(symbols.create("self"))
     , sEpsilon(symbols.create(""))
     , sStartSet(symbols.create("startSet"))
