@@ -93,23 +93,7 @@ struct PathInputScheme : InputScheme
         if (path[0] == '/')
             return CanonPath(path);
 
-        // FIXME: remove this?
-        if (!input.parent)
-            throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
-
-        CanonPath parent(*input.parent);
-
-        // the path isn't relative, prefix it
-        auto absPath = CanonPath(path, parent);
-
-        // for security, ensure that if the parent is a store path, it's inside it
-        if (store->isInStore(parent.abs())) {
-            auto storePath = store->printStorePath(store->toStorePath(parent.abs()).first);
-            if (!absPath.isWithin(CanonPath(storePath)))
-                throw BadStorePath("relative path '%s' points outside of its parent's store path '%s'", path, storePath);
-        }
-
-        return absPath;
+        throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
     }
 
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
