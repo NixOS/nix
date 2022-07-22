@@ -35,6 +35,9 @@
 #ifdef __linux__
 #include <sys/prctl.h>
 #include <sys/resource.h>
+
+#include <mntent.h>
+#include <cmath>
 #endif
 
 
@@ -788,7 +791,55 @@ void drainFD(int fd, Sink & sink, bool block)
     }
 }
 
+//////////////////////////////////////////////////////////////////////
 
+unsigned int getMaxCPU()
+{
+    #if __linux__
+    try {
+        FILE *fp = fopen("/proc/mounts", "r");
+        if (!fp)
+            return 0;
+
+        Strings cgPathParts;
+
+        struct mntent *ent;
+        while ((ent = getmntent(fp))) {
+            std::string mountType, mountPath;
+
+            mountType = ent->mnt_type;
+            mountPath = ent->mnt_dir;
+
+            if (mountType == "cgroup2") {
+                cgPathParts.push_back(mountPath);
+                break;
+            }
+        }
+
+        fclose(fp);
+
+        if (cgPathParts.size() > 0 && pathExists("/proc/self/cgroup")) {
+            std::string currentCgroup = readFile("/proc/self/cgroup");
+            Strings cgValues = tokenizeString<Strings>(currentCgroup, ":");
+            cgPathParts.push_back(trim(cgValues.back(), "\n"));
+            cgPathParts.push_back("cpu.max");
+            std::string fullCgPath = canonPath(concatStringsSep("/", cgPathParts));
+
+            if (pathExists(fullCgPath)) {
+                std::string cpuMax = readFile(fullCgPath);
+                std::vector<std::string> cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " ");
+                std::string quota = cpuMaxParts[0];
+                std::string period = trim(cpuMaxParts[1], "\n");
+
+                if (quota != "max")
+                    return std::ceil(std::stoi(quota) / std::stof(period));
+            }
+        }
+    } catch (Error &) { ignoreException(); }
+    #endif
+
+    return 0;
+}
 
 //////////////////////////////////////////////////////////////////////
 
