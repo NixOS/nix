@@ -118,7 +118,7 @@ struct FSInputAccessorImpl : FSInputAccessor
         , allowedPaths(std::move(allowedPaths))
         , makeNotAllowedError(std::move(makeNotAllowedError))
     {
-        displayPrefix = root.abs();
+        displayPrefix = root.isRoot() ? "" : root.abs();
     }
 
     std::string readFile(const CanonPath & path) override
