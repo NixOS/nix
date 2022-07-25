@@ -228,7 +228,7 @@ struct GitArchiveInputScheme : InputScheme
         return {res.storePath, input};
     }
 
-    std::pair<ref<InputAccessor>, Input> lazyFetch(ref<Store> store, const Input & input) override
+    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) override
     {
         auto [storePath, input2] = downloadArchive(store, input);
 

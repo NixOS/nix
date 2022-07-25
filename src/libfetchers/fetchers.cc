@@ -119,7 +119,7 @@ std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
 
     auto [storePath, input] = [&]() -> std::pair<StorePath, Input> {
         try {
-            return scheme->fetch(store, *this);
+            return scheme->fetchToStore(store, *this);
         } catch (Error & e) {
             e.addTrace({}, "while fetching the input '%s'", to_string());
             throw;
@@ -159,13 +159,13 @@ void Input::checkLocked(Store & store, const StorePath & storePath, Input & inpu
     assert(input.hasAllInfo());
 }
 
-std::pair<ref<InputAccessor>, Input> Input::lazyFetch(ref<Store> store) const
+std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
 {
     if (!scheme)
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
 
     try {
-        return scheme->lazyFetch(store, *this);
+        return scheme->getAccessor(store, *this);
     } catch (Error & e) {
         e.addTrace({}, "while fetching the input '%s'", to_string());
         throw;
@@ -298,9 +298,9 @@ void InputScheme::clone(const Input & input, const Path & destDir)
     throw Error("do not know how to clone input '%s'", input.to_string());
 }
 
-std::pair<StorePath, Input> InputScheme::fetch(ref<Store> store, const Input & input)
+std::pair<StorePath, Input> InputScheme::fetchToStore(ref<Store> store, const Input & input)
 {
-    auto [accessor, input2] = lazyFetch(store, input);
+    auto [accessor, input2] = getAccessor(store, input);
 
     auto source = sinkToSource([&, accessor{accessor}](Sink & sink) {
         accessor->dumpPath(CanonPath::root, sink);
@@ -311,9 +311,9 @@ std::pair<StorePath, Input> InputScheme::fetch(ref<Store> store, const Input & i
     return {storePath, input2};
 }
 
-std::pair<ref<InputAccessor>, Input> InputScheme::lazyFetch(ref<Store> store, const Input & input)
+std::pair<ref<InputAccessor>, Input> InputScheme::getAccessor(ref<Store> store, const Input & input)
 {
-    auto [storePath, input2] = fetch(store, input);
+    auto [storePath, input2] = fetchToStore(store, input);
 
     input.checkLocked(*store, storePath, input2);
 

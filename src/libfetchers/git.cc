@@ -447,7 +447,7 @@ struct GitInputScheme : InputScheme
         return *head;
     }
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
+    std::pair<StorePath, Input> fetchToStore(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
 
@@ -718,7 +718,7 @@ struct GitInputScheme : InputScheme
         return {std::move(storePath), input};
     }
 
-    std::pair<ref<InputAccessor>, Input> lazyFetch(ref<Store> store, const Input & _input) override
+    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
 
@@ -728,7 +728,7 @@ struct GitInputScheme : InputScheme
            Nix store. TODO: We could have an accessor for fetching
            files from the Git repository directly. */
         if (input.getRef() || input.getRev() || !repoInfo.isLocal)
-            return InputScheme::lazyFetch(store, input);
+            return InputScheme::getAccessor(store, input);
 
         repoInfo.checkDirty();
 

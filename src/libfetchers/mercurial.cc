@@ -145,7 +145,7 @@ struct MercurialInputScheme : InputScheme
         return {isLocal, isLocal ? url.path : url.base};
     }
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
+    std::pair<StorePath, Input> fetchToStore(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
 

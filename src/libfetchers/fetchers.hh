@@ -69,7 +69,7 @@ public:
     /* Return an InputAccessor that allows access to files in the
        input without copying it to the store. Also return a possibly
        unlocked input. */
-    std::pair<ref<InputAccessor>, Input> lazyFetch(ref<Store> store) const;
+    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store) const;
 
     Input applyOverrides(
         std::optional<std::string> ref,
@@ -134,18 +134,13 @@ struct InputScheme
 
     virtual void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg);
 
-    /* Note: the default implementations of fetch() and lazyFetch()
-       are defined using the other, so implementations have to
-       override at least one. */
+    /* Note: the default implementations of fetchToStore() and
+       getAccessor() are defined using the other, so implementations
+       have to override at least one. */
 
-    virtual std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input);
+    virtual std::pair<StorePath, Input> fetchToStore(ref<Store> store, const Input & input);
 
-    virtual std::pair<ref<InputAccessor>, Input> lazyFetch(ref<Store> store, const Input & input);
-
-    virtual ref<InputAccessor> getAccessor()
-    {
-        throw UnimplementedError("getAccessor");
-    }
+    virtual std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input);
 
     virtual bool isRelative(const Input & input) const
     { return false; }

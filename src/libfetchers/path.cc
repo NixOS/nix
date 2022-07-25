@@ -96,34 +96,7 @@ struct PathInputScheme : InputScheme
         throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
     }
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
-    {
-        Input input(_input);
-
-        auto absPath = getAbsPath(store, input);
-
-        Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s'", absPath));
-
-        // FIXME: check whether access to 'path' is allowed.
-        auto storePath = store->maybeParseStorePath(absPath.abs());
-
-        if (storePath)
-            store->addTempRoot(*storePath);
-
-        time_t mtime = 0;
-        if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath)) {
-            // FIXME: try to substitute storePath.
-            auto src = sinkToSource([&](Sink & sink) {
-                mtime = dumpPathAndGetMtime(absPath.abs(), sink, defaultPathFilter);
-            });
-            storePath = store->addToStoreFromDump(*src, "source");
-        }
-        input.attrs.insert_or_assign("lastModified", uint64_t(mtime));
-
-        return {std::move(*storePath), input};
-    }
-
-    std::pair<ref<InputAccessor>, Input> lazyFetch(ref<Store> store, const Input & input) override
+    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) override
     {
         auto absPath = getAbsPath(store, input);
         auto input2(input);

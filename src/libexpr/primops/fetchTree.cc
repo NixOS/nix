@@ -184,7 +184,7 @@ static void fetchTree(
         state.debugThrowLastTrace(EvalError("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", state.positions[pos]));
 
     if (params.returnPath) {
-        auto [accessor, input2] = input.lazyFetch(state.store);
+        auto [accessor, input2] = input.getAccessor(state.store);
 
         state.registerAccessor(accessor);
 

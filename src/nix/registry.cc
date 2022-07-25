@@ -188,7 +188,7 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
         auto ref = parseFlakeRef(url);
         auto lockedRef = parseFlakeRef(locked);
         registry->remove(ref.input);
-        auto [accessor, resolved] = lockedRef.resolve(store).input.lazyFetch(store);
+        auto  resolved = lockedRef.resolve(store).input.getAccessor(store).second;
         if (!resolved.isLocked())
             warn("flake '%s' is not locked", resolved.to_string());
         fetchers::Attrs extraAttrs;

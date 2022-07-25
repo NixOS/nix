@@ -250,7 +250,7 @@ struct FileInputScheme : CurlInputScheme
                     : !hasTarballExtension(url.path));
     }
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
+    std::pair<StorePath, Input> fetchToStore(ref<Store> store, const Input & input) override
     {
         auto file = downloadFile(store, getStrAttr(input.attrs, "url"), input.getName(), false);
         return {std::move(file.storePath), input};
@@ -271,7 +271,7 @@ struct TarballInputScheme : CurlInputScheme
                     : hasTarballExtension(url.path));
     }
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
+    std::pair<StorePath, Input> fetchToStore(ref<Store> store, const Input & input) override
     {
         return {
             downloadTarball(store, getStrAttr(input.attrs, "url"), input.getName(), false).first,
