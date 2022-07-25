@@ -112,7 +112,7 @@ bool Input::contains(const Input & other) const
     return false;
 }
 
-std::pair<StorePath, Input> Input::fetch(ref<Store> store) const
+std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
 {
     if (!scheme)
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));

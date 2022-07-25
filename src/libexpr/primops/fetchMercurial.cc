@@ -68,7 +68,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     auto input = fetchers::Input::fromAttrs(std::move(attrs));
 
     // FIXME: use name
-    auto [storePath, input2] = input.fetch(state.store);
+    auto [storePath, input2] = input.fetchToStore(state.store);
 
     auto attrs2 = state.buildBindings(8);
     auto storePath2 = state.store->printStorePath(storePath);

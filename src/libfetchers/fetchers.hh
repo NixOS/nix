@@ -62,9 +62,9 @@ public:
 
     bool contains(const Input & other) const;
 
-    /* Fetch the input into the Nix store, returning the location in
-       the Nix store and the locked input. */
-    std::pair<StorePath, Input> fetch(ref<Store> store) const;
+    /* Fetch the entire input into the Nix store, returning the
+       location in the Nix store and the locked input. */
+    std::pair<StorePath, Input> fetchToStore(ref<Store> store) const;
 
     /* Return an InputAccessor that allows access to files in the
        input without copying it to the store. Also return a possibly

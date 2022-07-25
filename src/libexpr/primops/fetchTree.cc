@@ -196,7 +196,7 @@ static void fetchTree(
             params.emptyRevFallback,
             false);
     } else {
-        auto [storePath, input2] = input.fetch(state.store);
+        auto [storePath, input2] = input.fetchToStore(state.store);
 
         auto storePath2 = state.store->printStorePath(storePath);
 
