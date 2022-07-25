@@ -1163,7 +1163,7 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
 
     std::string description() override
     {
-        return "download the source tree denoted by a flake reference into the Nix store";
+        return "fetch the source tree denoted by a flake reference";
     }
 
     std::string doc() override
@@ -1177,19 +1177,13 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
     {
         auto originalRef = getFlakeRef();
         auto resolvedRef = originalRef.resolve(store);
-        auto [tree, lockedRef] = resolvedRef.fetchTree(store);
-        auto hash = store->queryPathInfo(tree.storePath)->narHash;
+        auto [accessor, lockedRef] = resolvedRef.lazyFetch(store);
 
         if (json) {
             auto res = nlohmann::json::object();
-            res["storePath"] = store->printStorePath(tree.storePath);
-            res["hash"] = hash.to_string(SRI, true);
             logger->cout(res.dump());
         } else {
-            notice("Downloaded '%s' to '%s' (hash '%s').",
-                lockedRef.to_string(),
-                store->printStorePath(tree.storePath),
-                hash.to_string(SRI, true));
+            notice("Fetched '%s'.", lockedRef.to_string());
         }
     }
 };
