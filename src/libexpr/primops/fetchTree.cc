@@ -196,19 +196,19 @@ static void fetchTree(
             params.emptyRevFallback,
             false);
     } else {
-        auto [tree, input2] = input.fetch(state.store);
+        auto [storePath, input2] = input.fetch(state.store);
 
-        auto storePath = state.store->printStorePath(tree.storePath);
+        auto storePath2 = state.store->printStorePath(storePath);
 
         emitTreeAttrs(
             state, input2, v,
             [&](Value & vOutPath) {
-                vOutPath.mkString(storePath, {storePath});
+                vOutPath.mkString(storePath2, {storePath2});
             },
             params.emptyRevFallback,
             false);
 
-        state.allowPath(tree.storePath);
+        state.allowPath(storePath);
     }
 }
 
@@ -283,7 +283,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
     //       https://github.com/NixOS/nix/issues/4313
     auto storePath =
         unpack
-        ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
+        ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first
         : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
     if (expectedHash) {

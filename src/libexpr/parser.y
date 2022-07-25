@@ -790,7 +790,7 @@ SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view p
     if (isUri(elem.second)) {
         try {
             auto storePath = fetchers::downloadTarball(
-                store, resolveUri(elem.second), "source", false).first.storePath;
+                store, resolveUri(elem.second), "source", false).first;
             auto accessor = makeFSInputAccessor(CanonPath(store->toRealPath(storePath)));
             registerAccessor(accessor);
             res.emplace(SourcePath {accessor, CanonPath::root});

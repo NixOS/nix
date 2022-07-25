@@ -68,11 +68,11 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     auto input = fetchers::Input::fromAttrs(std::move(attrs));
 
     // FIXME: use name
-    auto [tree, input2] = input.fetch(state.store);
+    auto [storePath, input2] = input.fetch(state.store);
 
     auto attrs2 = state.buildBindings(8);
-    auto storePath = state.store->printStorePath(tree.storePath);
-    attrs2.alloc(state.sOutPath).mkString(storePath, {storePath});
+    auto storePath2 = state.store->printStorePath(storePath);
+    attrs2.alloc(state.sOutPath).mkString(storePath2, {storePath2});
     if (input2.getRef())
         attrs2.alloc("branch").mkString(*input2.getRef());
     // Backward compatibility: set 'rev' to
@@ -84,7 +84,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
         attrs2.alloc("revCount").mkInt(*revCount);
     v.mkAttrs(attrs2);
 
-    state.allowPath(tree.storePath);
+    state.allowPath(storePath);
 }
 
 static RegisterPrimOp r_fetchMercurial("fetchMercurial", 1, prim_fetchMercurial);

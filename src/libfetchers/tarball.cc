@@ -110,7 +110,7 @@ DownloadFileResult downloadFile(
     };
 }
 
-std::pair<Tree, time_t> downloadTarball(
+std::pair<StorePath, time_t> downloadTarball(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
@@ -127,7 +127,7 @@ std::pair<Tree, time_t> downloadTarball(
 
     if (cached && !cached->expired)
         return {
-            Tree { .actualPath = store->toRealPath(cached->storePath), .storePath = std::move(cached->storePath) },
+            std::move(cached->storePath),
             getIntAttr(cached->infoAttrs, "lastModified")
         };
 
@@ -164,7 +164,7 @@ std::pair<Tree, time_t> downloadTarball(
         locked);
 
     return {
-        Tree { .actualPath = store->toRealPath(*unpackedStorePath), .storePath = std::move(*unpackedStorePath) },
+        std::move(*unpackedStorePath),
         lastModified,
     };
 }
@@ -273,8 +273,10 @@ struct TarballInputScheme : CurlInputScheme
 
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
     {
-        auto tree = downloadTarball(store, getStrAttr(input.attrs, "url"), input.getName(), false).first;
-        return {std::move(tree.storePath), input};
+        return {
+            downloadTarball(store, getStrAttr(input.attrs, "url"), input.getName(), false).first,
+            input
+        };
     }
 };
 

@@ -93,7 +93,7 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s)
 {
     if (isUri(s)) {
         auto storePath = fetchers::downloadTarball(
-            state.store, resolveUri(s), "source", false).first.storePath;
+            state.store, resolveUri(s), "source", false).first;
         auto accessor = makeFSInputAccessor(CanonPath(state.store->toRealPath(storePath)));
         state.registerAccessor(accessor);
         return {accessor, CanonPath::root};
