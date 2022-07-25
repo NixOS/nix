@@ -189,6 +189,8 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
         auto lockedRef = parseFlakeRef(locked);
         registry->remove(ref.input);
         auto [accessor, resolved] = lockedRef.resolve(store).input.lazyFetch(store);
+        if (!resolved.isLocked())
+            warn("flake '%s' is not locked", resolved.to_string());
         fetchers::Attrs extraAttrs;
         if (ref.subdir != "") extraAttrs["dir"] = ref.subdir;
         registry->add(ref.input, resolved, extraAttrs);
