@@ -117,24 +117,6 @@ std::pair<StorePath, Input> Input::fetch(ref<Store> store) const
     if (!scheme)
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
 
-    /* The tree may already be in the Nix store, or it could be
-       substituted (which is often faster than fetching from the
-       original source). So check that. */
-    if (hasAllInfo()) {
-        try {
-            auto storePath = computeStorePath(*store);
-
-            store->ensurePath(storePath);
-
-            debug("using substituted/cached input '%s' in '%s'",
-                to_string(), store->printStorePath(storePath));
-
-            return {std::move(storePath), *this};
-        } catch (Error & e) {
-            debug("substitution of input '%s' failed: %s", to_string(), e.what());
-        }
-    }
-
     auto [storePath, input] = [&]() -> std::pair<StorePath, Input> {
         try {
             return scheme->fetch(store, *this);
@@ -221,14 +203,6 @@ void Input::markChangedFile(
 std::string Input::getName() const
 {
     return maybeGetStrAttr(attrs, "name").value_or("source");
-}
-
-StorePath Input::computeStorePath(Store & store) const
-{
-    auto narHash = getNarHash();
-    if (!narHash)
-        throw Error("cannot compute store path for unlocked input '%s'", to_string());
-    return store.makeFixedOutputPath(FileIngestionMethod::Recursive, *narHash, getName());
 }
 
 std::string Input::getType() const

@@ -46,8 +46,6 @@ struct LockedNode : Node
     { }
 
     LockedNode(const nlohmann::json & json);
-
-    StorePath computeStorePath(Store & store) const;
 };
 
 struct LockFile

@@ -41,11 +41,6 @@ LockedNode::LockedNode(const nlohmann::json & json)
             fetchers::attrsToJSON(lockedRef.input.toAttrs()));
 }
 
-StorePath LockedNode::computeStorePath(Store & store) const
-{
-    return lockedRef.input.computeStorePath(store);
-}
-
 std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
 {
     auto pos = root;
