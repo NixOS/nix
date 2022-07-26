@@ -431,10 +431,10 @@ LockedFlake lockFlake(
                        flakerefs relative to the parent flake. */
                     auto getInputFlake = [&]()
                     {
-                        if (input.ref->input.isRelative()) {
+                        if (auto relativePath = input.ref->input.isRelative()) {
                             SourcePath inputSourcePath {
                                 overridenSourcePath.accessor,
-                                CanonPath(*input.ref->input.getSourcePath(), *overridenSourcePath.path.parent())
+                                *overridenSourcePath.path.parent() + *relativePath
                             };
                             return readFlake(state, *input.ref, *input.ref, *input.ref, inputSourcePath, inputPath);
                         } else
@@ -621,7 +621,7 @@ LockedFlake lockFlake(
             auto diff = LockFile::diff(oldLockFile, newLockFile);
 
             if (lockFlags.writeLockFile) {
-                if (auto sourcePath = topRef.input.getSourcePath()) {
+                if (auto sourcePath = topRef.input.getAccessor(state.store).first->root().getPhysicalPath()) {
                     if (auto unlockedInput = newLockFile.isUnlocked()) {
                         if (fetchSettings.warnDirty)
                             warn("will not write lock file of flake '%s' because it has an unlocked input ('%s')", topRef, *unlockedInput);
@@ -629,11 +629,13 @@ LockedFlake lockFlake(
                         if (!lockFlags.updateLockFile)
                             throw Error("flake '%s' requires lock file changes but they're not allowed due to '--no-update-lock-file'", topRef);
 
-                        auto relPath = (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock";
+                        CanonPath flakeDir(*sourcePath);
 
-                        auto path = *sourcePath + "/" + relPath;
+                        auto relPath = flakeDir + "flake.lock";
 
-                        bool lockFileExists = pathExists(path);
+                        auto path = flakeDir + "flake.lock";
+
+                        bool lockFileExists = pathExists(path.abs());
 
                         if (lockFileExists) {
                             auto s = chomp(diff);
@@ -644,7 +646,7 @@ LockedFlake lockFlake(
                         } else
                             warn("creating lock file '%s'", path);
 
-                        newLockFile.write(path);
+                        newLockFile.write(path.abs());
 
                         std::optional<std::string> commitMessage = std::nullopt;
                         if (lockFlags.commitLockFile) {

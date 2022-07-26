@@ -54,7 +54,9 @@ public:
        one that contains a commit hash or content hash. */
     bool isLocked() const { return locked; }
 
-    bool isRelative() const;
+    /* Only for relative path flakes, i.e. 'path:./foo', returns the
+       relative path, i.e. './foo'. */
+    std::optional<CanonPath> isRelative() const;
 
     bool hasAllInfo() const;
 
@@ -76,8 +78,6 @@ public:
         std::optional<Hash> rev) const;
 
     void clone(const Path & destDir) const;
-
-    std::optional<Path> getSourcePath() const;
 
     void markChangedFile(
         std::string_view file,
@@ -130,8 +130,6 @@ struct InputScheme
 
     virtual void clone(const Input & input, const Path & destDir);
 
-    virtual std::optional<Path> getSourcePath(const Input & input);
-
     virtual void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg);
 
     /* Note: the default implementations of fetchToStore() and
@@ -142,8 +140,8 @@ struct InputScheme
 
     virtual std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input);
 
-    virtual bool isRelative(const Input & input) const
-    { return false; }
+    virtual std::optional<CanonPath> isRelative(const Input & input) const
+    { return std::nullopt; }
 
     virtual std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const
     { return std::nullopt; }

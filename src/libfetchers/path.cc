@@ -66,19 +66,18 @@ struct PathInputScheme : InputScheme
         };
     }
 
-    bool isRelative(const Input & input) const override
+    std::optional<CanonPath> isRelative(const Input & input) const override
     {
-        return !hasPrefix(*input.getSourcePath(), "/");
+        auto path = getStrAttr(input.attrs, "path");
+        if (hasPrefix(path, "/"))
+            return std::nullopt;
+        else
+            return CanonPath(path);
     }
 
     bool hasAllInfo(const Input & input) override
     {
         return true;
-    }
-
-    std::optional<Path> getSourcePath(const Input & input) override
-    {
-        return getStrAttr(input.attrs, "path");
     }
 
     void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg) override

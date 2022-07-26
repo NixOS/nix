@@ -104,6 +104,11 @@ std::string InputAccessor::showPath(const CanonPath & path)
     return displayPrefix + path.abs() + displaySuffix;
 }
 
+SourcePath InputAccessor::root()
+{
+    return {ref(shared_from_this()), CanonPath::root};
+}
+
 struct FSInputAccessorImpl : FSInputAccessor
 {
     CanonPath root;
@@ -210,6 +215,15 @@ struct FSInputAccessorImpl : FSInputAccessor
     bool hasAccessControl() override
     {
         return (bool) allowedPaths;
+    }
+
+    std::optional<CanonPath> getPhysicalPath(const CanonPath & path) override
+    {
+        auto absPath = makeAbsPath(path);
+        if (isAllowed(absPath))
+            return absPath;
+        else
+            return std::nullopt;
     }
 };
 

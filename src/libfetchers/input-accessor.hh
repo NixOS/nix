@@ -9,6 +9,8 @@ namespace nix {
 
 MakeError(RestrictedPathError, Error);
 
+struct SourcePath;
+
 struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
 {
     const size_t number;
@@ -50,6 +52,12 @@ struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
         Sink & sink,
         PathFilter & filter = defaultPathFilter);
 
+    /* Return a corresponding path in the root filesystem, if
+       possible. This is only possible for inputs that are
+       materialized in the root filesystem. */
+    virtual std::optional<CanonPath> getPhysicalPath(const CanonPath & path)
+    { return std::nullopt; }
+
     bool operator == (const InputAccessor & x) const
     {
         return number == x.number;
@@ -63,6 +71,8 @@ struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
     void setPathDisplay(std::string displayPrefix, std::string displaySuffix = "");
 
     virtual std::string showPath(const CanonPath & path);
+
+    SourcePath root();
 };
 
 struct FSInputAccessor : InputAccessor
@@ -127,6 +137,9 @@ struct SourcePath
         Sink & sink,
         PathFilter & filter = defaultPathFilter) const
     { return accessor->dumpPath(path, sink, filter); }
+
+    std::optional<CanonPath> getPhysicalPath() const
+    { return accessor->getPhysicalPath(path); }
 
     std::string to_string() const
     { return accessor->showPath(path); }

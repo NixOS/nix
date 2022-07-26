@@ -106,7 +106,7 @@ std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::strin
 }
 
 
-std::pair<std::string, uint32_t> findPackageFilename(EvalState & state, Value & v, std::string what)
+std::pair<SourcePath, uint32_t> findPackageFilename(EvalState & state, Value & v, std::string what)
 {
     Value * v2;
     try {
@@ -120,19 +120,41 @@ std::pair<std::string, uint32_t> findPackageFilename(EvalState & state, Value & 
     //        toString + parsing?
     auto pos = state.forceString(*v2);
 
-    auto colon = pos.rfind(':');
-    if (colon == std::string::npos)
-        throw ParseError("cannot parse meta.position attribute '%s'", pos);
+    auto fail = [pos]() {
+        throw ParseError("cannot parse 'meta.position' attribute '%s'", pos);
+    };
 
-    std::string filename(pos, 0, colon);
-    unsigned int lineno;
     try {
-        lineno = std::stoi(std::string(pos, colon + 1, std::string::npos));
-    } catch (std::invalid_argument & e) {
-        throw ParseError("cannot parse line number '%s'", pos);
-    }
+        std::string_view prefix = "/virtual/";
 
-    return { std::move(filename), lineno };
+        if (!hasPrefix(pos, prefix)) fail();
+        pos = pos.substr(prefix.size());
+
+        auto slash = pos.find('/');
+        if (slash == std::string::npos) fail();
+        size_t number = std::stoi(std::string(pos, 0, slash));
+        pos = pos.substr(slash);
+
+        std::shared_ptr<InputAccessor> accessor;
+        for (auto & i : state.inputAccessors)
+            if (i.second->number == number) {
+                accessor = i.second;
+                break;
+            }
+
+        if (!accessor) fail();
+
+        auto colon = pos.rfind(':');
+        if (colon == std::string::npos) fail();
+        std::string filename(pos, 0, colon);
+        auto lineno = std::stoi(std::string(pos, colon + 1, std::string::npos));
+
+        return {SourcePath{ref(accessor), CanonPath(filename)}, lineno};
+
+    } catch (std::invalid_argument & e) {
+        fail();
+        abort();
+    }
 }
 
 

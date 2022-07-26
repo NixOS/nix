@@ -116,26 +116,18 @@ struct MercurialInputScheme : InputScheme
         return res;
     }
 
-    std::optional<Path> getSourcePath(const Input & input) override
-    {
-        auto url = parseURL(getStrAttr(input.attrs, "url"));
-        if (url.scheme == "file" && !input.getRef() && !input.getRev())
-            return url.path;
-        return {};
-    }
-
     void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg) override
     {
-        auto sourcePath = getSourcePath(input);
-        assert(sourcePath);
+        auto [isLocal, path] = getActualUrl(input);
+        assert(isLocal);
 
         // FIXME: shut up if file is already tracked.
         runHg(
-            { "add", *sourcePath + "/" + std::string(file) });
+            { "add", path + "/" + file });
 
         if (commitMsg)
             runHg(
-                { "commit", *sourcePath + "/" + std::string(file), "-m", *commitMsg });
+                { "commit", path + "/" + file, "-m", *commitMsg });
     }
 
     std::pair<bool, std::string> getActualUrl(const Input & input) const

@@ -245,26 +245,17 @@ struct GitInputScheme : InputScheme
         runProgram("git", true, args);
     }
 
-    std::optional<Path> getSourcePath(const Input & input) override
-    {
-        auto url = parseURL(getStrAttr(input.attrs, "url"));
-        if (url.scheme == "file" && !input.getRef() && !input.getRev())
-            return url.path;
-        return {};
-    }
-
     void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg) override
     {
-        auto sourcePath = getSourcePath(input);
-        assert(sourcePath);
-        auto gitDir = ".git";
+        auto repoInfo = getRepoInfo(input);
+        assert(repoInfo.isLocal);
 
         runProgram("git", true,
-            { "-C", *sourcePath, "--git-dir", gitDir, "add", "--force", "--intent-to-add", "--", std::string(file) });
+            { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "add", "--force", "--intent-to-add", "--", std::string(file) });
 
         if (commitMsg)
             runProgram("git", true,
-                { "-C", *sourcePath, "--git-dir", gitDir, "commit", std::string(file), "-m", *commitMsg });
+                { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "commit", std::string(file), "-m", *commitMsg });
     }
 
     struct RepoInfo

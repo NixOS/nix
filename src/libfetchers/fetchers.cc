@@ -87,8 +87,9 @@ Attrs Input::toAttrs() const
     return attrs;
 }
 
-bool Input::isRelative() const
+std::optional<CanonPath> Input::isRelative() const
 {
+    assert(scheme);
     return scheme->isRelative(*this);
 }
 
@@ -186,12 +187,6 @@ void Input::clone(const Path & destDir) const
     scheme->clone(*this, destDir);
 }
 
-std::optional<Path> Input::getSourcePath() const
-{
-    assert(scheme);
-    return scheme->getSourcePath(*this);
-}
-
 void Input::markChangedFile(
     std::string_view file,
     std::optional<std::string> commitMsg) const
@@ -281,11 +276,6 @@ Input InputScheme::applyOverrides(
     if (rev)
         throw Error("don't know how to set revision of input '%s' to '%s'", input.to_string(), rev->gitRev());
     return input;
-}
-
-std::optional<Path> InputScheme::getSourcePath(const Input & input)
-{
-    return {};
 }
 
 void InputScheme::markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg)

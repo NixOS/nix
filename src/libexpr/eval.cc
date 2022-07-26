@@ -1097,7 +1097,7 @@ void EvalState::mkPos(Value & v, PosIdx p)
     auto pos = positions[p];
     if (auto path = std::get_if<SourcePath>(&pos.origin)) {
         auto attrs = buildBindings(3);
-        attrs.alloc(sFile).mkString(path->path.abs());
+        attrs.alloc(sFile).mkString(fmt("/virtual/%d%s", path->accessor->number, path->path.abs()));
         attrs.alloc(sLine).mkInt(pos.line);
         attrs.alloc(sColumn).mkInt(pos.column);
         v.mkAttrs(attrs);
