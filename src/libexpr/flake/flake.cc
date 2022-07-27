@@ -621,65 +621,53 @@ LockedFlake lockFlake(
             auto diff = LockFile::diff(oldLockFile, newLockFile);
 
             if (lockFlags.writeLockFile) {
-                if (auto sourcePath = topRef.input.getAccessor(state.store).first->root().getPhysicalPath()) {
-                    if (auto unlockedInput = newLockFile.isUnlocked()) {
-                        if (fetchSettings.warnDirty)
-                            warn("will not write lock file of flake '%s' because it has an unlocked input ('%s')", topRef, *unlockedInput);
-                    } else {
-                        if (!lockFlags.updateLockFile)
-                            throw Error("flake '%s' requires lock file changes but they're not allowed due to '--no-update-lock-file'", topRef);
+                if (auto unlockedInput = newLockFile.isUnlocked()) {
+                    if (fetchSettings.warnDirty)
+                        warn("will not write lock file of flake '%s' because it has an unlocked input ('%s')", topRef, *unlockedInput);
+                } else {
+                    if (!lockFlags.updateLockFile)
+                        throw Error("flake '%s' requires lock file changes but they're not allowed due to '--no-update-lock-file'", topRef);
 
-                        CanonPath flakeDir(*sourcePath);
+                    auto path = flake->path.parent() + "flake.lock";
 
-                        auto relPath = flakeDir + "flake.lock";
+                    bool lockFileExists = path.pathExists();
 
-                        auto path = flakeDir + "flake.lock";
+                    if (lockFileExists) {
+                        auto s = chomp(diff);
+                        if (s.empty())
+                            warn("updating lock file '%s'", path);
+                        else
+                            warn("updating lock file '%s':\n%s", path, s);
+                    } else
+                        warn("creating lock file '%s'", path);
 
-                        bool lockFileExists = pathExists(path.abs());
+                    std::optional<std::string> commitMessage = std::nullopt;
+                    if (lockFlags.commitLockFile) {
+                        std::string cm;
 
-                        if (lockFileExists) {
-                            auto s = chomp(diff);
-                            if (s.empty())
-                                warn("updating lock file '%s'", path);
-                            else
-                                warn("updating lock file '%s':\n%s", path, s);
-                        } else
-                            warn("creating lock file '%s'", path);
+                        cm = fetchSettings.commitLockFileSummary.get();
 
-                        newLockFile.write(path.abs());
+                        if (cm == "")
+                            cm = fmt("%s: %s", path.path.rel(), lockFileExists ? "Update" : "Add");
 
-                        std::optional<std::string> commitMessage = std::nullopt;
-                        if (lockFlags.commitLockFile) {
-                            std::string cm;
-
-                            cm = fetchSettings.commitLockFileSummary.get();
-
-                            if (cm == "") {
-                                cm = fmt("%s: %s", relPath, lockFileExists ? "Update" : "Add");
-                            }
-
-                            cm += "\n\nFlake lock file updates:\n\n";
-                            cm += filterANSIEscapes(diff, true);
-                            commitMessage = cm;
-                        }
-
-                        topRef.input.markChangedFile(
-                            (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock",
-                            commitMessage);
-
-                        /* Rewriting the lockfile changed the top-level
-                           repo, so we should re-read it. FIXME: we could
-                           also just clear the 'rev' field... */
-                        auto prevLockedRef = flake->lockedRef;
-                        flake = std::make_unique<Flake>(getFlake(state, topRef, useRegistries));
-
-                        if (lockFlags.commitLockFile &&
-                            flake->lockedRef.input.getRev() &&
-                            prevLockedRef.input.getRev() != flake->lockedRef.input.getRev())
-                            warn("committed new revision '%s'", flake->lockedRef.input.getRev()->gitRev());
+                        cm += "\n\nFlake lock file updates:\n\n";
+                        cm += filterANSIEscapes(diff, true);
+                        commitMessage = cm;
                     }
-                } else
-                    throw Error("cannot write modified lock file of flake '%s' (use '--no-write-lock-file' to ignore)", topRef);
+
+                    topRef.input.putFile(path.path, fmt("%s\n", newLockFile), commitMessage);
+
+                    /* Rewriting the lockfile changed the top-level
+                       repo, so we should re-read it. FIXME: we could
+                       also just clear the 'rev' field... */
+                    auto prevLockedRef = flake->lockedRef;
+                    flake = std::make_unique<Flake>(getFlake(state, topRef, useRegistries));
+
+                    if (lockFlags.commitLockFile &&
+                        flake->lockedRef.input.getRev() &&
+                        prevLockedRef.input.getRev() != flake->lockedRef.input.getRev())
+                        warn("committed new revision '%s'", flake->lockedRef.input.getRev()->gitRev());
+                }
             } else {
                 warn("not writing modified lock file of flake '%s':\n%s", topRef, chomp(diff));
                 flake->forceDirty = true;

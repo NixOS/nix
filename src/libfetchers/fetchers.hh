@@ -79,8 +79,9 @@ public:
 
     void clone(const Path & destDir) const;
 
-    void markChangedFile(
-        std::string_view file,
+    void putFile(
+        const CanonPath & path,
+        std::string_view contents,
         std::optional<std::string> commitMsg) const;
 
     std::string getName() const;
@@ -130,7 +131,11 @@ struct InputScheme
 
     virtual void clone(const Input & input, const Path & destDir);
 
-    virtual void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg);
+    virtual void putFile(
+        const Input & input,
+        const CanonPath & path,
+        std::string_view contents,
+        std::optional<std::string> commitMsg) const;
 
     /* Note: the default implementations of fetchToStore() and
        getAccessor() are defined using the other, so implementations

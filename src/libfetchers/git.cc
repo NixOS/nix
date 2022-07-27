@@ -245,17 +245,28 @@ struct GitInputScheme : InputScheme
         runProgram("git", true, args);
     }
 
-    void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg) override
+    void putFile(
+        const Input & input,
+        const CanonPath & path,
+        std::string_view contents,
+        std::optional<std::string> commitMsg) const
     {
         auto repoInfo = getRepoInfo(input);
-        assert(repoInfo.isLocal);
+        if (!repoInfo.isLocal)
+            throw Error("cannot commit '%s' to Git repository '%s' because it's not a working tree", path, input.to_string());
+
+        auto absPath = CanonPath(repoInfo.url) + path;
+
+        // FIXME: make sure that absPath is not a symlink that escapes
+        // the repo.
+        writeFile(absPath.abs(), contents);
 
         runProgram("git", true,
-            { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "add", "--force", "--intent-to-add", "--", std::string(file) });
+            { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "add", "--force", "--intent-to-add", "--", std::string(path.rel()) });
 
         if (commitMsg)
             runProgram("git", true,
-                { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "commit", std::string(file), "-m", *commitMsg });
+                { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "commit", std::string(path.rel()), "-m", *commitMsg });
     }
 
     struct RepoInfo
@@ -292,7 +303,7 @@ struct GitInputScheme : InputScheme
         std::string gitDir = ".git";
     };
 
-    RepoInfo getRepoInfo(const Input & input)
+    RepoInfo getRepoInfo(const Input & input) const
     {
         auto checkHashType = [&](const std::optional<Hash> & hash)
         {

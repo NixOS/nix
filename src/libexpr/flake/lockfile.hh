@@ -59,10 +59,6 @@ struct LockFile
 
     std::string to_string() const;
 
-    static LockFile read(const Path & path);
-
-    void write(const Path & path) const;
-
     /* Check whether this lock file has any unlocked inputs. If so,
        return one. */
     std::optional<FlakeRef> isUnlocked() const;

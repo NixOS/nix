@@ -80,12 +80,20 @@ struct PathInputScheme : InputScheme
         return true;
     }
 
-    void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg) override
+    void putFile(
+        const Input & input,
+        const CanonPath & path,
+        std::string_view contents,
+        std::optional<std::string> commitMsg) const
     {
-        // nothing to do
+        auto absPath = CanonPath(getAbsPath(input)) + path;
+
+        // FIXME: make sure that absPath is not a symlink that escapes
+        // the repo.
+        writeFile(absPath.abs(), contents);
     }
 
-    CanonPath getAbsPath(ref<Store> store, const Input & input) const
+    CanonPath getAbsPath(const Input & input) const
     {
         auto path = getStrAttr(input.attrs, "path");
 
@@ -97,7 +105,7 @@ struct PathInputScheme : InputScheme
 
     std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) override
     {
-        auto absPath = getAbsPath(store, input);
+        auto absPath = getAbsPath(input);
         auto input2(input);
         input2.attrs.emplace("path", (std::string) absPath.abs());
         return {makeFSInputAccessor(absPath), std::move(input2)};
@@ -109,7 +117,7 @@ struct PathInputScheme : InputScheme
            locked, so just use the path as its fingerprint. Maybe we
            should restrict this to CA paths but that's not
            super-important. */
-        auto path = getAbsPath(store, input);
+        auto path = getAbsPath(input);
         if (store->isInStore(path.abs()))
             return path.abs();
         return std::nullopt;

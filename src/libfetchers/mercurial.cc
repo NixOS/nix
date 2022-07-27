@@ -116,18 +116,29 @@ struct MercurialInputScheme : InputScheme
         return res;
     }
 
-    void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg) override
+    void putFile(
+        const Input & input,
+        const CanonPath & path,
+        std::string_view contents,
+        std::optional<std::string> commitMsg) const
     {
-        auto [isLocal, path] = getActualUrl(input);
-        assert(isLocal);
+        auto [isLocal, repoPath] = getActualUrl(input);
+        if (!isLocal)
+            throw Error("cannot commit '%s' to Mercurial repository '%s' because it's not a working tree", path, input.to_string());
+
+        auto absPath = CanonPath(repoPath) + path;
+
+        // FIXME: make sure that absPath is not a symlink that escapes
+        // the repo.
+        writeFile(absPath.abs(), contents);
 
         // FIXME: shut up if file is already tracked.
         runHg(
-            { "add", path + "/" + file });
+            { "add", absPath.abs() });
 
         if (commitMsg)
             runHg(
-                { "commit", path + "/" + file, "-m", *commitMsg });
+                { "commit", absPath.abs(), "-m", *commitMsg });
     }
 
     std::pair<bool, std::string> getActualUrl(const Input & input) const

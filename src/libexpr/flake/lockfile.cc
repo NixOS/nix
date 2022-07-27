@@ -190,12 +190,6 @@ std::ostream & operator <<(std::ostream & stream, const LockFile & lockFile)
     return stream;
 }
 
-void LockFile::write(const Path & path) const
-{
-    createDirs(dirOf(path));
-    writeFile(path, fmt("%s\n", *this));
-}
-
 std::optional<FlakeRef> LockFile::isUnlocked() const
 {
     std::unordered_set<std::shared_ptr<const Node>> nodes;
