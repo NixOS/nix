@@ -156,7 +156,9 @@ namespace nix {
 
         auto file = v.attrs->find(createSymbol("file"));
         ASSERT_NE(file, nullptr);
-        ASSERT_THAT(*file->value, IsStringEq("/foo.nix"));
+        ASSERT_THAT(*file->value, IsString());
+        auto s = baseNameOf(file->value->string.s);
+        ASSERT_EQ(s, "foo.nix");
 
         auto line = v.attrs->find(createSymbol("line"));
         ASSERT_NE(line, nullptr);
