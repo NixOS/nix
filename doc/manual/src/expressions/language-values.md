@@ -172,25 +172,27 @@ function and the fifth being a set.
 
 Note that lists are only lazy in values, and they are strict in length.
 
-## Sets
+## Attribute Sets
 
-Sets are really the core of the language, since ultimately the Nix
-language is all about creating derivations, which are really just sets
-of attributes to be passed to build scripts.
+Attribute sets are collections of name-value-pairs (called *attributes*) enclosed in curly brackets (`{ }`).
 
-Sets are just a list of name/value pairs (called *attributes*) enclosed
-in curly brackets, where each value is an arbitrary expression
-terminated by a semicolon. For example:
+Names and values are separated by an equal sign (`=`).
+Each value is an arbitrary expression terminated by a semicolon (`;`).
+
+Attributes can appear in any order.
+An attribute name may only occur once.
+
+Example:
 
 ```nix
-{ x = 123;
+{
+  x = 123;
   text = "Hello";
   y = f { bla = 456; };
 }
 ```
 
-This defines a set with attributes named `x`, `text`, `y`. The order of
-the attributes is irrelevant. An attribute name may only occur once.
+This defines a set with attributes named `x`, `text`, `y`.
 
 Attributes can be selected from a set using the `.` operator. For
 instance,

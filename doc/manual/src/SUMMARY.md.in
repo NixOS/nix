@@ -33,7 +33,7 @@
     - [Arguments and Variables](expressions/arguments-variables.md)
     - [Building and Testing](expressions/simple-building-testing.md)
     - [Generic Builder Syntax](expressions/generic-builder.md)
-  - [Writing Nix Expressions](expressions/expression-language.md)
+  - [Nix Expression Language](expressions/expression-language.md)
     - [Values](expressions/language-values.md)
     - [Language Constructs](expressions/language-constructs.md)
     - [Operators](expressions/language-operators.md)
