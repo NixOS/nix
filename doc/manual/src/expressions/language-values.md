@@ -2,7 +2,7 @@
 
 ## Primitives
 
-### Strings
+### String
 
 *Strings* can be written in three ways.
 
@@ -112,7 +112,7 @@ is*, without quotes. For instance, the string
 `"http://example.org/foo.tar.bz2"` can also be written as
 `http://example.org/foo.tar.bz2`.
 
-### Numbers
+### Number
 
 Numbers, which can be *integers* (like `123`) or *floating point*
 (like `123.43` or `.27e13`).
@@ -121,7 +121,7 @@ Numbers are type-compatible: pure integer operations will always
 return integers, whereas any operation involving at least one
 floating point number will have a floating point number as a result.
 
-### Paths
+### Path
 
 *Paths*, e.g., `/bin/sh` or `./builder.sh`. A path must contain at
 least one slash to be recognised as such. For instance, `builder.sh`
@@ -150,7 +150,7 @@ least one slash must appear *before* any antiquotations for this to be
 recognized as a path. `a.${foo}/b.${bar}` is a syntactically valid division
 operation. `./a.${foo}/b.${bar}` is a path.
 
-### Booleans
+### Boolean
 
 *Booleans* with values `true` and `false`.
 
@@ -158,7 +158,7 @@ operation. `./a.${foo}/b.${bar}` is a path.
 
 The null value, denoted as `null`.
 
-## Lists
+## List
 
 Lists are formed by enclosing a whitespace-separated list of values
 between square brackets. For example,
@@ -180,7 +180,7 @@ function and the fifth being a set.
 
 Note that lists are only lazy in values, and they are strict in length.
 
-## Attribute Sets
+## Attribute Set
 
 Attribute sets are collections of name-value-pairs (called *attributes*) enclosed in curly brackets (`{ }`).
 
