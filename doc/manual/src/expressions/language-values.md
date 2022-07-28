@@ -182,7 +182,7 @@ Note that lists are only lazy in values, and they are strict in length.
 
 ## Attribute Set
 
-Attribute sets are collections of name-value-pairs (called *attributes*) enclosed in curly brackets (`{ }`).
+An attribute set is a collection of name-value-pairs (called *attributes*) enclosed in curly brackets (`{ }`).
 
 Names and values are separated by an equal sign (`=`).
 Each value is an arbitrary expression terminated by a semicolon (`;`).
