@@ -1,8 +1,6 @@
 # Values
 
-## Simple Values
-
-Nix has the following basic data types:
+## Primitives
 
 ### Strings
 
