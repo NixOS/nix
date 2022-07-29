@@ -385,6 +385,16 @@ expr_select
     { $$ = new ExprSelect(CUR_POS, $1, *$3, 0); }
   | expr_simple '.' attrpath OR_KW expr_select
     { $$ = new ExprSelect(CUR_POS, $1, *$3, $5); }
+  | expr_simple '.' '[' attrs ']'
+    {
+      auto lst = new ExprList;
+      lst->elems.reserve($4->size());
+      for (auto & i : *$4) {
+          /* !!! Should ensure sharing of the expression in $4. */
+          lst->elems.push_back(new ExprSelect(makeCurPos(@4, data), $1, i.symbol));
+      }
+      $$ = lst;
+    }
   | /* Backwards compatibility: because Nixpkgs has a rarely used
        function named ‘or’, allow stuff like ‘map or [...]’. */
     expr_simple OR_KW
@@ -550,21 +560,6 @@ string_attr
 
 expr_list
   : expr_list expr_select { $$ = $1; $1->elems.push_back($2); /* !!! dangerous */ }
-  | expr_list INHERIT attrs ';'
-    {
-      $$->elems.reserve($$->elems.size() + $3->size());
-      for (auto & i : *$3) {
-          $$->elems.push_back(new ExprVar(makeCurPos(@3, data), i.symbol));
-      }
-    }
-  | expr_list INHERIT '(' expr ')' attrs ';'
-    {
-      $$->elems.reserve($$->elems.size() + $6->size());
-      for (auto & i : *$6) {
-          /* !!! Should ensure sharing of the expression in $4. */
-          $$->elems.push_back(new ExprSelect(makeCurPos(@6, data), $4, i.symbol));
-      }
-    }
   | { $$ = new ExprList; }
   ;
 
