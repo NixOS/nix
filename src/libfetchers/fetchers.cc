@@ -115,32 +115,40 @@ bool Input::contains(const Input & other) const
 
 std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
 {
-    if (!scheme)
-        throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
-
     auto [storePath, input] = [&]() -> std::pair<StorePath, Input> {
         try {
-            return scheme->fetchToStore(store, *this);
+            auto [accessor, input2] = getAccessor(store);
+
+            // FIXME: add an optimisation for the case where the
+            // accessor is an FSInputAccessor pointing to a store
+            // path.
+            auto source = sinkToSource([&, accessor{accessor}](Sink & sink) {
+                accessor->dumpPath(CanonPath::root, sink);
+            });
+
+            auto storePath = store->addToStoreFromDump(*source, input2.getName());
+
+            return {storePath, input2};
         } catch (Error & e) {
             e.addTrace({}, "while fetching the input '%s'", to_string());
             throw;
         }
     }();
 
-    checkLocked(*store, storePath, input);
-
     return {std::move(storePath), input};
 }
 
-void Input::checkLocked(Store & store, const StorePath & storePath, Input & input) const
+void Input::checkLocks(Input & input) const
 {
+    #if 0
     auto narHash = store.queryPathInfo(storePath)->narHash;
     input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
+    #endif
 
     if (auto prevNarHash = getNarHash()) {
-        if (narHash != *prevNarHash)
-            throw Error((unsigned int) 102, "NAR hash mismatch in input '%s' (%s), expected '%s', got '%s'",
-                to_string(), store.printStorePath(storePath), prevNarHash->to_string(SRI, true), narHash.to_string(SRI, true));
+        if (input.getNarHash() != prevNarHash)
+            throw Error((unsigned int) 102, "NAR hash mismatch in input '%s', expected '%s'",
+                to_string(), prevNarHash->to_string(SRI, true));
     }
 
     if (auto prevLastModified = getLastModified()) {
@@ -155,9 +163,12 @@ void Input::checkLocked(Store & store, const StorePath & storePath, Input & inpu
                 input.to_string(), *prevRevCount);
     }
 
+    // FIXME
+    #if 0
     input.locked = true;
 
     assert(input.hasAllInfo());
+    #endif
 }
 
 std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
@@ -166,7 +177,9 @@ std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
 
     try {
-        return scheme->getAccessor(store, *this);
+        auto [accessor, final] = scheme->getAccessor(store, *this);
+        checkLocks(final);
+        return {accessor, std::move(final)};
     } catch (Error & e) {
         e.addTrace({}, "while fetching the input '%s'", to_string());
         throw;
@@ -262,7 +275,7 @@ std::optional<std::string> Input::getFingerprint(ref<Store> store) const
     return scheme->getFingerprint(store, *this);
 }
 
-ParsedURL InputScheme::toURL(const Input & input)
+ParsedURL InputScheme::toURL(const Input & input) const
 {
     throw Error("don't know how to convert input '%s' to a URL", attrsToJSON(input.attrs));
 }
@@ -270,7 +283,7 @@ ParsedURL InputScheme::toURL(const Input & input)
 Input InputScheme::applyOverrides(
     const Input & input,
     std::optional<std::string> ref,
-    std::optional<Hash> rev)
+    std::optional<Hash> rev) const
 {
     if (ref)
         throw Error("don't know how to set branch/tag name of input '%s' to '%s'", input.to_string(), *ref);
@@ -288,31 +301,9 @@ void InputScheme::putFile(
     throw Error("input '%s' does not support modifying file '%s'", input.to_string(), path);
 }
 
-void InputScheme::clone(const Input & input, const Path & destDir)
+void InputScheme::clone(const Input & input, const Path & destDir) const
 {
     throw Error("do not know how to clone input '%s'", input.to_string());
-}
-
-std::pair<StorePath, Input> InputScheme::fetchToStore(ref<Store> store, const Input & input)
-{
-    auto [accessor, input2] = getAccessor(store, input);
-
-    auto source = sinkToSource([&, accessor{accessor}](Sink & sink) {
-        accessor->dumpPath(CanonPath::root, sink);
-    });
-
-    auto storePath = store->addToStoreFromDump(*source, "source");
-
-    return {storePath, input2};
-}
-
-std::pair<ref<InputAccessor>, Input> InputScheme::getAccessor(ref<Store> store, const Input & input)
-{
-    auto [storePath, input2] = fetchToStore(store, input);
-
-    input.checkLocked(*store, storePath, input2);
-
-    return {makeFSInputAccessor(CanonPath(store->toRealPath(storePath))), input2};
 }
 
 }

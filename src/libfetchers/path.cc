@@ -6,7 +6,7 @@ namespace nix::fetchers {
 
 struct PathInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url) override
+    std::optional<Input> inputFromURL(const ParsedURL & url) const override
     {
         if (url.scheme != "path") return {};
 
@@ -32,7 +32,7 @@ struct PathInputScheme : InputScheme
         return input;
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) override
+    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
         if (maybeGetStrAttr(attrs, "type") != "path") return {};
 
@@ -54,7 +54,7 @@ struct PathInputScheme : InputScheme
         return input;
     }
 
-    ParsedURL toURL(const Input & input) override
+    ParsedURL toURL(const Input & input) const override
     {
         auto query = attrsToQuery(input.attrs);
         query.erase("path");
@@ -75,7 +75,7 @@ struct PathInputScheme : InputScheme
             return CanonPath(path);
     }
 
-    bool hasAllInfo(const Input & input) override
+    bool hasAllInfo(const Input & input) const override
     {
         return true;
     }
@@ -103,7 +103,7 @@ struct PathInputScheme : InputScheme
         throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) override
+    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const override
     {
         auto absPath = getAbsPath(input);
         auto input2(input);

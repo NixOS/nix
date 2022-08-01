@@ -10,6 +10,8 @@ namespace nix {
 MakeError(RestrictedPathError, Error);
 
 struct SourcePath;
+class StorePath;
+class Store;
 
 struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
 {
@@ -89,6 +91,11 @@ typedef std::function<RestrictedPathError(const CanonPath & path)> MakeNotAllowe
 ref<FSInputAccessor> makeFSInputAccessor(
     const CanonPath & root,
     std::optional<std::set<CanonPath>> && allowedPaths = {},
+    MakeNotAllowedError && makeNotAllowedError = {});
+
+ref<FSInputAccessor> makeStorePathAccessor(
+    ref<Store> store,
+    const StorePath & storePath,
     MakeNotAllowedError && makeNotAllowedError = {});
 
 struct SourcePath;

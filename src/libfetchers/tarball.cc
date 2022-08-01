@@ -185,7 +185,7 @@ struct CurlInputScheme : InputScheme
 
     virtual bool isValidURL(const ParsedURL & url) const = 0;
 
-    std::optional<Input> inputFromURL(const ParsedURL & url) override
+    std::optional<Input> inputFromURL(const ParsedURL & url) const override
     {
         if (!isValidURL(url))
             return std::nullopt;
@@ -203,7 +203,7 @@ struct CurlInputScheme : InputScheme
         return input;
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) override
+    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
         auto type = maybeGetStrAttr(attrs, "type");
         if (type != inputType()) return {};
@@ -220,7 +220,7 @@ struct CurlInputScheme : InputScheme
         return input;
     }
 
-    ParsedURL toURL(const Input & input) override
+    ParsedURL toURL(const Input & input) const override
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         // NAR hashes are preferred over file hashes since tar/zip
@@ -230,7 +230,7 @@ struct CurlInputScheme : InputScheme
         return url;
     }
 
-    bool hasAllInfo(const Input & input) override
+    bool hasAllInfo(const Input & input) const override
     {
         return true;
     }
@@ -250,10 +250,18 @@ struct FileInputScheme : CurlInputScheme
                     : !hasTarballExtension(url.path));
     }
 
-    std::pair<StorePath, Input> fetchToStore(ref<Store> store, const Input & input) override
+    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
+        auto input(_input);
+
         auto file = downloadFile(store, getStrAttr(input.attrs, "url"), input.getName(), false);
-        return {std::move(file.storePath), input};
+
+        // FIXME: remove?
+        auto narHash = store->queryPathInfo(file.storePath)->narHash;
+        input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
+        input.locked = true;
+
+        return {makeStorePathAccessor(store, file.storePath), input};
     }
 };
 
@@ -271,12 +279,18 @@ struct TarballInputScheme : CurlInputScheme
                     : hasTarballExtension(url.path));
     }
 
-    std::pair<StorePath, Input> fetchToStore(ref<Store> store, const Input & input) override
+    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
-        return {
-            downloadTarball(store, getStrAttr(input.attrs, "url"), input.getName(), false).first,
-            input
-        };
+        auto input(_input);
+
+        auto storePath = downloadTarball(store, getStrAttr(input.attrs, "url"), input.getName(), false).first;
+
+        // FIXME: remove?
+        auto narHash = store->queryPathInfo(storePath)->narHash;
+        input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
+        input.locked = true;
+
+        return {makeStorePathAccessor(store, storePath), input};
     }
 };
 

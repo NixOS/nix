@@ -100,7 +100,7 @@ public:
 
 private:
 
-    void checkLocked(Store & store, const StorePath & storePath, Input & input) const;
+    void checkLocks(Input & input) const;
 };
 
 /* The InputScheme represents a type of fetcher.  Each fetcher
@@ -116,20 +116,20 @@ struct InputScheme
     virtual ~InputScheme()
     { }
 
-    virtual std::optional<Input> inputFromURL(const ParsedURL & url) = 0;
+    virtual std::optional<Input> inputFromURL(const ParsedURL & url) const = 0;
 
-    virtual std::optional<Input> inputFromAttrs(const Attrs & attrs) = 0;
+    virtual std::optional<Input> inputFromAttrs(const Attrs & attrs) const = 0;
 
-    virtual ParsedURL toURL(const Input & input);
+    virtual ParsedURL toURL(const Input & input) const;
 
-    virtual bool hasAllInfo(const Input & input) = 0;
+    virtual bool hasAllInfo(const Input & input) const = 0;
 
     virtual Input applyOverrides(
         const Input & input,
         std::optional<std::string> ref,
-        std::optional<Hash> rev);
+        std::optional<Hash> rev) const;
 
-    virtual void clone(const Input & input, const Path & destDir);
+    virtual void clone(const Input & input, const Path & destDir) const;
 
     virtual void putFile(
         const Input & input,
@@ -137,13 +137,7 @@ struct InputScheme
         std::string_view contents,
         std::optional<std::string> commitMsg) const;
 
-    /* Note: the default implementations of fetchToStore() and
-       getAccessor() are defined using the other, so implementations
-       have to override at least one. */
-
-    virtual std::pair<StorePath, Input> fetchToStore(ref<Store> store, const Input & input);
-
-    virtual std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input);
+    virtual std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const = 0;
 
     virtual std::optional<CanonPath> isRelative(const Input & input) const
     { return std::nullopt; }

@@ -140,7 +140,7 @@ bool isNotDotGitDirectory(const Path & path)
 
 struct GitInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url) override
+    std::optional<Input> inputFromURL(const ParsedURL & url) const override
     {
         if (url.scheme != "git" &&
             url.scheme != "git+http" &&
@@ -169,7 +169,7 @@ struct GitInputScheme : InputScheme
         return inputFromAttrs(attrs);
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) override
+    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
         if (maybeGetStrAttr(attrs, "type") != "git") return {};
 
@@ -192,7 +192,7 @@ struct GitInputScheme : InputScheme
         return input;
     }
 
-    ParsedURL toURL(const Input & input) override
+    ParsedURL toURL(const Input & input) const override
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         if (url.scheme != "git") url.scheme = "git+" + url.scheme;
@@ -203,7 +203,7 @@ struct GitInputScheme : InputScheme
         return url;
     }
 
-    bool hasAllInfo(const Input & input) override
+    bool hasAllInfo(const Input & input) const override
     {
         bool maybeDirty = !input.getRef();
         bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
@@ -215,7 +215,7 @@ struct GitInputScheme : InputScheme
     Input applyOverrides(
         const Input & input,
         std::optional<std::string> ref,
-        std::optional<Hash> rev) override
+        std::optional<Hash> rev) const override
     {
         auto res(input);
         if (rev) res.attrs.insert_or_assign("rev", rev->gitRev());
@@ -225,7 +225,7 @@ struct GitInputScheme : InputScheme
         return res;
     }
 
-    void clone(const Input & input, const Path & destDir) override
+    void clone(const Input & input, const Path & destDir) const override
     {
         auto repoInfo = getRepoInfo(input);
 
@@ -394,7 +394,7 @@ struct GitInputScheme : InputScheme
         return repoInfo;
     }
 
-    std::set<CanonPath> listFiles(const RepoInfo & repoInfo)
+    std::set<CanonPath> listFiles(const RepoInfo & repoInfo) const
     {
         auto gitOpts = Strings({ "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "ls-files", "-z" });
         if (repoInfo.submodules)
@@ -409,14 +409,14 @@ struct GitInputScheme : InputScheme
         return res;
     }
 
-    void updateRev(Input & input, const RepoInfo & repoInfo, const std::string & ref)
+    void updateRev(Input & input, const RepoInfo & repoInfo, const std::string & ref) const
     {
         if (!input.getRev())
             input.attrs.insert_or_assign("rev",
                 Hash::parseAny(chomp(runProgram("git", true, { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "rev-parse", ref })), htSHA1).gitRev());
     }
 
-    uint64_t getLastModified(const RepoInfo & repoInfo, const std::string & repoDir, const std::string & ref)
+    uint64_t getLastModified(const RepoInfo & repoInfo, const std::string & repoDir, const std::string & ref) const
     {
         return
             repoInfo.hasHead
@@ -426,7 +426,7 @@ struct GitInputScheme : InputScheme
             : 0;
     }
 
-    uint64_t getRevCount(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev)
+    uint64_t getRevCount(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
     {
         // FIXME: cache this.
         return
@@ -437,7 +437,7 @@ struct GitInputScheme : InputScheme
             : 0;
     }
 
-    std::string getDefaultRef(const RepoInfo & repoInfo)
+    std::string getDefaultRef(const RepoInfo & repoInfo) const
     {
         auto head = repoInfo.isLocal
             ? readHead(repoInfo.url)
@@ -449,11 +449,14 @@ struct GitInputScheme : InputScheme
         return *head;
     }
 
-    std::pair<StorePath, Input> fetchToStore(ref<Store> store, const Input & _input) override
+    StorePath fetchToStore(
+        ref<Store> store,
+        RepoInfo & repoInfo,
+        Input & input) const
     {
-        Input input(_input);
+        assert(!repoInfo.isDirty);
 
-        auto repoInfo = getRepoInfo(input);
+        auto origRev = input.getRev();
 
         std::string name = input.getName();
 
@@ -466,24 +469,27 @@ struct GitInputScheme : InputScheme
             });
         };
 
-        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
-            -> std::pair<StorePath, Input>
+        auto makeResult = [&](const Attrs & infoAttrs, const StorePath & storePath) -> StorePath
         {
             assert(input.getRev());
-            assert(!_input.getRev() || _input.getRev() == input.getRev());
+            assert(!origRev || origRev == input.getRev());
             if (!repoInfo.shallow)
                 input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
             input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
-            return {std::move(storePath), input};
+
+            // FIXME: remove?
+            //input.attrs.erase("narHash");
+            auto narHash = store->queryPathInfo(storePath)->narHash;
+            input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
+            input.locked = true;
+
+            return storePath;
         };
 
         if (input.getRev()) {
             if (auto res = getCache()->lookup(store, getLockedAttrs()))
                 return makeResult(res->first, std::move(res->second));
         }
-
-        if (repoInfo.isDirty)
-            return fetchFromWorkdir(store, repoInfo, std::move(input));
 
         auto originalRef = input.getRef();
         auto ref = originalRef ? *originalRef : getDefaultRef(repoInfo);
@@ -674,7 +680,7 @@ struct GitInputScheme : InputScheme
             infoAttrs.insert_or_assign("revCount",
                 getRevCount(repoInfo, repoDir, rev));
 
-        if (!_input.getRev())
+        if (!origRev)
             getCache()->add(
                 store,
                 unlockedAttrs,
@@ -692,45 +698,27 @@ struct GitInputScheme : InputScheme
         return makeResult(infoAttrs, std::move(storePath));
     }
 
-    std::pair<StorePath, Input> fetchFromWorkdir(
-        ref<Store> store,
-        const RepoInfo & repoInfo,
-        Input input)
-    {
-        /* This is an unclean working tree. So copy all tracked
-           files. */
-        repoInfo.checkDirty();
-
-        auto files = listFiles(repoInfo);
-
-        CanonPath repoDir(repoInfo.url);
-
-        PathFilter filter = [&](const Path & p) -> bool {
-            return CanonPath(p).removePrefix(repoDir).isAllowed(files);
-        };
-
-        auto storePath = store->addToStore(input.getName(), repoInfo.url, FileIngestionMethod::Recursive, htSHA256, filter);
-
-        // FIXME: maybe we should use the timestamp of the last
-        // modified dirty file?
-        input.attrs.insert_or_assign(
-            "lastModified",
-            getLastModified(repoInfo, repoInfo.url, "HEAD"));
-
-        return {std::move(storePath), input};
-    }
-
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) override
+    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
         Input input(_input);
 
         auto repoInfo = getRepoInfo(input);
 
+        auto makeNotAllowedError = [url{repoInfo.url}](const CanonPath & path) -> RestrictedPathError
+        {
+            if (nix::pathExists(path.abs()))
+                return RestrictedPathError("access to path '%s' is forbidden because it is not under Git control; maybe you should 'git add' it to the repository '%s'?", path, url);
+            else
+                return RestrictedPathError("path '%s' does not exist in Git repository '%s'", path, url);
+        };
+
         /* Unless we're using the working tree, copy the tree into the
            Nix store. TODO: We could have an accessor for fetching
            files from the Git repository directly. */
-        if (input.getRef() || input.getRev() || !repoInfo.isLocal)
-            return InputScheme::getAccessor(store, input);
+        if (input.getRef() || input.getRev() || !repoInfo.isLocal) {
+            auto storePath = fetchToStore(store, repoInfo, input);
+            return {makeStorePathAccessor(store, storePath, std::move(makeNotAllowedError)), input};
+        }
 
         repoInfo.checkDirty();
 
@@ -752,14 +740,6 @@ struct GitInputScheme : InputScheme
         input.attrs.insert_or_assign(
             "lastModified",
             getLastModified(repoInfo, repoInfo.url, ref));
-
-        auto makeNotAllowedError = [url{repoInfo.url}](const CanonPath & path) -> RestrictedPathError
-        {
-            if (nix::pathExists(path.abs()))
-                return RestrictedPathError("access to path '%s' is forbidden because it is not under Git control; maybe you should 'git add' it to the repository '%s'?", path, url);
-            else
-                return RestrictedPathError("path '%s' does not exist in Git repository '%s'", path, url);
-        };
 
         return {makeFSInputAccessor(CanonPath(repoInfo.url), listFiles(repoInfo), std::move(makeNotAllowedError)), input};
     }

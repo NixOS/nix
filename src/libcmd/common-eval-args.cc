@@ -94,7 +94,7 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s)
     if (isUri(s)) {
         auto storePath = fetchers::downloadTarball(
             state.store, resolveUri(s), "source", false).first;
-        auto accessor = makeFSInputAccessor(CanonPath(state.store->toRealPath(storePath)));
+        auto accessor = makeStorePathAccessor(state.store, storePath);
         state.registerAccessor(accessor);
         return {accessor, CanonPath::root};
     } else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {

@@ -120,6 +120,7 @@ git -C $repo commit -m 'Bla3' -a
 path4=$(nix eval --impure --refresh --raw --expr "(builtins.fetchGit file://$repo).outPath")
 [[ $path2 = $path4 ]]
 
+status=0
 nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; rev = \"$rev2\"; narHash = \"sha256-B5yIPHhEm0eysJKEsO7nqxprh9vcblFxpJG11gXJus1=\"; }).outPath" || status=$?
 [[ "$status" = "102" ]]
 
@@ -223,4 +224,5 @@ rm -rf $repo/.git
 
 # should succeed for a repo without commits
 git init $repo
+git -C $repo add hello # need to add at least one file to cause the root of the repo to be visible
 path10=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")

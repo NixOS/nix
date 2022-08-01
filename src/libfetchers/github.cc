@@ -26,11 +26,11 @@ std::regex hostRegex(hostRegexS, std::regex::ECMAScript);
 
 struct GitArchiveInputScheme : InputScheme
 {
-    virtual std::string type() = 0;
+    virtual std::string type() const = 0;
 
     virtual std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const = 0;
 
-    std::optional<Input> inputFromURL(const ParsedURL & url) override
+    std::optional<Input> inputFromURL(const ParsedURL & url) const override
     {
         if (url.scheme != type()) return {};
 
@@ -100,7 +100,7 @@ struct GitArchiveInputScheme : InputScheme
         return input;
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) override
+    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
         if (maybeGetStrAttr(attrs, "type") != type()) return {};
 
@@ -116,7 +116,7 @@ struct GitArchiveInputScheme : InputScheme
         return input;
     }
 
-    ParsedURL toURL(const Input & input) override
+    ParsedURL toURL(const Input & input) const override
     {
         auto owner = getStrAttr(input.attrs, "owner");
         auto repo = getStrAttr(input.attrs, "repo");
@@ -132,7 +132,7 @@ struct GitArchiveInputScheme : InputScheme
         };
     }
 
-    bool hasAllInfo(const Input & input) override
+    bool hasAllInfo(const Input & input) const override
     {
         return input.getRev() &&
             true; // FIXME
@@ -142,7 +142,7 @@ struct GitArchiveInputScheme : InputScheme
     Input applyOverrides(
         const Input & _input,
         std::optional<std::string> ref,
-        std::optional<Hash> rev) override
+        std::optional<Hash> rev) const override
     {
         auto input(_input);
         if (rev && ref)
@@ -185,7 +185,7 @@ struct GitArchiveInputScheme : InputScheme
 
     virtual DownloadUrl getDownloadUrl(const Input & input) const = 0;
 
-    std::pair<StorePath, Input> downloadArchive(ref<Store> store, Input input)
+    std::pair<StorePath, Input> downloadArchive(ref<Store> store, Input input) const
     {
         if (!maybeGetStrAttr(input.attrs, "ref")) input.attrs.insert_or_assign("ref", "HEAD");
 
@@ -228,7 +228,7 @@ struct GitArchiveInputScheme : InputScheme
         return {res.storePath, input};
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) override
+    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const override
     {
         auto [storePath, input2] = downloadArchive(store, input);
 
@@ -242,7 +242,7 @@ struct GitArchiveInputScheme : InputScheme
 
 struct GitHubInputScheme : GitArchiveInputScheme
 {
-    std::string type() override { return "github"; }
+    std::string type() const override { return "github"; }
 
     std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
     {
@@ -291,7 +291,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
         return DownloadUrl { url, headers };
     }
 
-    void clone(const Input & input, const Path & destDir) override
+    void clone(const Input & input, const Path & destDir) const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
         Input::fromURL(fmt("git+https://%s/%s/%s.git",
@@ -303,7 +303,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
 
 struct GitLabInputScheme : GitArchiveInputScheme
 {
-    std::string type() override { return "gitlab"; }
+    std::string type() const override { return "gitlab"; }
 
     std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
     {
@@ -358,7 +358,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         return DownloadUrl { url, headers };
     }
 
-    void clone(const Input & input, const Path & destDir) override
+    void clone(const Input & input, const Path & destDir) const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
         // FIXME: get username somewhere
@@ -371,7 +371,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
 
 struct SourceHutInputScheme : GitArchiveInputScheme
 {
-    std::string type() override { return "sourcehut"; }
+    std::string type() const override { return "sourcehut"; }
 
     std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
     {
@@ -445,7 +445,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         return DownloadUrl { url, headers };
     }
 
-    void clone(const Input & input, const Path & destDir) override
+    void clone(const Input & input, const Path & destDir) const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("git.sr.ht");
         Input::fromURL(fmt("git+https://%s/%s/%s",

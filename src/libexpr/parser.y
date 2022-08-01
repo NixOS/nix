@@ -791,7 +791,7 @@ SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view p
         try {
             auto storePath = fetchers::downloadTarball(
                 store, resolveUri(elem.second), "source", false).first;
-            auto accessor = makeFSInputAccessor(CanonPath(store->toRealPath(storePath)));
+            auto accessor = makeStorePathAccessor(store, storePath);
             registerAccessor(accessor);
             res.emplace(SourcePath {accessor, CanonPath::root});
         } catch (FileTransferError & e) {

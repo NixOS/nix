@@ -1,5 +1,6 @@
 #include "input-accessor.hh"
 #include "util.hh"
+#include "store-api.hh"
 
 #include <atomic>
 
@@ -233,6 +234,14 @@ ref<FSInputAccessor> makeFSInputAccessor(
     MakeNotAllowedError && makeNotAllowedError)
 {
     return make_ref<FSInputAccessorImpl>(root, std::move(allowedPaths), std::move(makeNotAllowedError));
+}
+
+ref<FSInputAccessor> makeStorePathAccessor(
+    ref<Store> store,
+    const StorePath & storePath,
+    MakeNotAllowedError && makeNotAllowedError)
+{
+    return makeFSInputAccessor(CanonPath(store->toRealPath(storePath)), {}, std::move(makeNotAllowedError));
 }
 
 std::ostream & operator << (std::ostream & str, const SourcePath & path)
