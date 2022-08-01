@@ -914,12 +914,6 @@ void DerivationGoal::buildDone()
             outputPaths
         );
 
-        if (buildMode == bmCheck) {
-            cleanupPostOutputsRegisteredModeCheck();
-            done(BuildResult::Built, std::move(builtOutputs));
-            return;
-        }
-
         cleanupPostOutputsRegisteredModeNonCheck();
 
         /* Repeat the build if necessary. */
