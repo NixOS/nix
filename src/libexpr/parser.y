@@ -640,6 +640,7 @@ formal
 #include "filetransfer.hh"
 #include "fetchers.hh"
 #include "fs-input-accessor.hh"
+#include "tarball.hh"
 #include "store-api.hh"
 
 

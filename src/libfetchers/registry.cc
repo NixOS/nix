@@ -1,5 +1,5 @@
 #include "registry.hh"
-#include "fetchers.hh"
+#include "tarball.hh"
 #include "util.hh"
 #include "globals.hh"
 #include "store-api.hh"

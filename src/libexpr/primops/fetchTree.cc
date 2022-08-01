@@ -4,6 +4,7 @@
 #include "fetchers.hh"
 #include "filetransfer.hh"
 #include "registry.hh"
+#include "tarball.hh"
 
 #include <ctime>
 #include <iomanip>

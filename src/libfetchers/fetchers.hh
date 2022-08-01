@@ -2,14 +2,13 @@
 
 #include "types.hh"
 #include "hash.hh"
-#include "path.hh"
 #include "canon-path.hh"
 #include "attrs.hh"
 #include "url.hh"
 
 #include <memory>
 
-namespace nix { class Store; class InputAccessor; }
+namespace nix { class Store; class StorePath; class InputAccessor; }
 
 namespace nix::fetchers {
 
@@ -147,26 +146,5 @@ struct InputScheme
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
-
-struct DownloadFileResult
-{
-    StorePath storePath;
-    std::string etag;
-    std::string effectiveUrl;
-};
-
-DownloadFileResult downloadFile(
-    ref<Store> store,
-    const std::string & url,
-    const std::string & name,
-    bool locked,
-    const Headers & headers = {});
-
-std::pair<StorePath, time_t> downloadTarball(
-    ref<Store> store,
-    const std::string & url,
-    const std::string & name,
-    bool locked,
-    const Headers & headers = {});
 
 }

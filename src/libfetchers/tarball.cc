@@ -1,3 +1,4 @@
+#include "tarball.hh"
 #include "fetchers.hh"
 #include "cache.hh"
 #include "filetransfer.hh"

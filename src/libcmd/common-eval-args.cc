@@ -9,6 +9,7 @@
 #include "store-api.hh"
 #include "command.hh"
 #include "fs-input-accessor.hh"
+#include "tarball.hh"
 
 namespace nix {
 

@@ -8,6 +8,7 @@
 #include "fetchers.hh"
 #include "fetch-settings.hh"
 #include "input-accessor.hh"
+#include "tarball.hh"
 
 #include <optional>
 #include <nlohmann/json.hpp>
