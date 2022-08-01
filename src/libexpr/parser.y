@@ -639,6 +639,7 @@ formal
 #include "eval.hh"
 #include "filetransfer.hh"
 #include "fetchers.hh"
+#include "fs-input-accessor.hh"
 #include "store-api.hh"
 
 

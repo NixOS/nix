@@ -7,6 +7,7 @@
 #include "git.hh"
 #include "fetchers.hh"
 #include "fetch-settings.hh"
+#include "input-accessor.hh"
 
 #include <optional>
 #include <nlohmann/json.hpp>

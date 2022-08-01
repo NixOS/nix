@@ -10,8 +10,6 @@ namespace nix {
 MakeError(RestrictedPathError, Error);
 
 struct SourcePath;
-class StorePath;
-class Store;
 
 struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
 {
@@ -77,26 +75,7 @@ struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
     SourcePath root();
 };
 
-struct FSInputAccessor : InputAccessor
-{
-    virtual void checkAllowed(const CanonPath & absPath) = 0;
-
-    virtual void allowPath(CanonPath path) = 0;
-
-    virtual bool hasAccessControl() = 0;
-};
-
 typedef std::function<RestrictedPathError(const CanonPath & path)> MakeNotAllowedError;
-
-ref<FSInputAccessor> makeFSInputAccessor(
-    const CanonPath & root,
-    std::optional<std::set<CanonPath>> && allowedPaths = {},
-    MakeNotAllowedError && makeNotAllowedError = {});
-
-ref<FSInputAccessor> makeStorePathAccessor(
-    ref<Store> store,
-    const StorePath & storePath,
-    MakeNotAllowedError && makeNotAllowedError = {});
 
 struct SourcePath;
 

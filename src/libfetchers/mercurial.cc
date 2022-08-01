@@ -4,7 +4,7 @@
 #include "tarfile.hh"
 #include "store-api.hh"
 #include "url-parts.hh"
-
+#include "fs-input-accessor.hh"
 #include "fetch-settings.hh"
 
 #include <sys/time.h>

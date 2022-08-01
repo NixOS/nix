@@ -7,6 +7,7 @@
 #include "tarfile.hh"
 #include "types.hh"
 #include "split.hh"
+#include "fs-input-accessor.hh"
 
 namespace nix::fetchers {
 

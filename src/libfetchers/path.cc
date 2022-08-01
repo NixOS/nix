@@ -1,6 +1,7 @@
 #include "fetchers.hh"
 #include "store-api.hh"
 #include "archive.hh"
+#include "fs-input-accessor.hh"
 
 namespace nix::fetchers {
 

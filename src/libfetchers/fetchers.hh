@@ -3,13 +3,13 @@
 #include "types.hh"
 #include "hash.hh"
 #include "path.hh"
+#include "canon-path.hh"
 #include "attrs.hh"
 #include "url.hh"
-#include "input-accessor.hh"
 
 #include <memory>
 
-namespace nix { class Store; }
+namespace nix { class Store; class InputAccessor; }
 
 namespace nix::fetchers {
 

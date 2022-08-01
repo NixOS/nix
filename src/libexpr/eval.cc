@@ -9,6 +9,7 @@
 #include "filetransfer.hh"
 #include "json.hh"
 #include "function-trace.hh"
+#include "fs-input-accessor.hh"
 
 #include <algorithm>
 #include <chrono>

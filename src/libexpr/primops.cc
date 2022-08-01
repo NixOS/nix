@@ -11,6 +11,7 @@
 #include "value-to-json.hh"
 #include "value-to-xml.hh"
 #include "primops.hh"
+#include "fs-input-accessor.hh"
 
 #include <boost/container/small_vector.hpp>
 

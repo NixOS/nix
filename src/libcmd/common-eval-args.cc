@@ -8,6 +8,7 @@
 #include "flake/flakeref.hh"
 #include "store-api.hh"
 #include "command.hh"
+#include "fs-input-accessor.hh"
 
 namespace nix {
 

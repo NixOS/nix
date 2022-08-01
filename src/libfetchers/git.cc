@@ -7,6 +7,7 @@
 #include "pathlocks.hh"
 #include "util.hh"
 #include "git.hh"
+#include "fs-input-accessor.hh"
 
 #include "fetch-settings.hh"
 

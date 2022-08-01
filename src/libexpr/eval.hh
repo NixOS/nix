@@ -22,6 +22,7 @@ class EvalState;
 class StorePath;
 struct SourcePath;
 enum RepairFlag : bool;
+struct FSInputAccessor;
 
 
 typedef void (* PrimOpFun) (EvalState & state, const PosIdx pos, Value * * args, Value & v);

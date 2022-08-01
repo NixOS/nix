@@ -1,5 +1,6 @@
 #include "eval.hh"
 #include "util.hh"
+#include "fs-input-accessor.hh"
 
 namespace nix {
 
