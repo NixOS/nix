@@ -142,6 +142,30 @@ public:
         )",
         {"build-cores"}, false};
 
+    Setting<unsigned int> loadLimit{
+      this,
+      getDefaultCores(),
+      "load-limit",
+      R"(
+        Sets the value of the `NIX_LOAD_LIMIT` environment variable in the
+        invocation of builders. Builders can use this value at their discretion
+        to dynamically control the amount of parallelism with respect to the
+        machine's load average. For instance, in Nixpkgs, if this value is >0,
+        the builder passes the `-lN` flag to GNU Make. In this case, if the
+        load average of the machine exceeds `N`, the amount of parallelism will
+        be dynamically reduced to 1.
+
+        By default, it is set to the number of cores available to Nix.
+
+        On busy machines where Nix co-exists with other workloads, parallelism
+        may not work as intended. For example, consider a 64 core machine whose
+        load average is 24 and where Nix is limited to 8 cores. By default,
+        `-j8 -l8` will be passed to GNU Make. Since the load average exceeds 8,
+        no parallelism will take place despite the fact that 8 cores are
+        available. In this case, `load-limit` should be set to `0` to prevent
+        the `-lN` flag from being passed to GNU Make.
+      )"};
+
     /* Read-only mode.  Don't copy stuff to the store, don't change
        the database. */
     bool readOnlyMode = false;
