@@ -1030,11 +1030,17 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     if (json) {
                         std::optional<std::string> description;
                         std::optional<std::string> homepage;
+                        std::optional<std::vector<std::string>> maintainers;
+                        std::optional<std::vector<std::string>> licenses;
                         if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
                             if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
                                 description = aDescription->getString();
                             if (auto aHomepage = aMeta->maybeGetAttr(state->sHomepage))
                                 homepage = aHomepage->getString();
+                            if (auto aMaintainers = aMeta->maybeGetAttr(state->sMaintainers))
+                                maintainers = aMaintainers->getListOfStrings();
+                            if (auto aLicenses = aMeta->maybeGetAttr(state->sLicenses))
+                                licenses = aLicenses->getListOfStrings();
                         }
                         j.emplace("type", "derivation");
                         j.emplace("name", name);
@@ -1042,6 +1048,12 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             j.emplace("description", *description);
                         if (homepage)
                             j.emplace("homepage", *homepage);
+                        if (maintainers)
+                            j.emplace("maintainers", *maintainers);
+                        if (licenses) 
+                            j.emplace("licenses", *licenses);
+
+
                     } else {
                         logger->cout("%s: %s '%s'",
                             headerPrefix,

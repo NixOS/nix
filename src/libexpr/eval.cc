@@ -453,6 +453,8 @@ EvalState::EvalState(
     , sRecurseForDerivations(symbols.create("recurseForDerivations"))
     , sDescription(symbols.create("description"))
     , sHomepage(symbols.create("homepage"))
+    , sMaintainers(symbols.create("maintainers"))
+    , sLicenses(symbols.create("licenses"))
     , sSelf(symbols.create("self"))
     , sEpsilon(symbols.create(""))
     , sStartSet(symbols.create("startSet"))

@@ -102,7 +102,7 @@ public:
         sContentAddressed, sImpure,
         sOutputHash, sOutputHashAlgo, sOutputHashMode,
         sRecurseForDerivations,
-        sDescription, sHomepage, sSelf, sEpsilon, sStartSet, sOperator, sKey, sPath,
+        sDescription, sHomepage, sMaintainers, sLicenses, sSelf, sEpsilon, sStartSet, sOperator, sKey, sPath,
         sPrefix,
         sOutputSpecified;
     Symbol sDerivationNix;
