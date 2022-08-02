@@ -375,7 +375,7 @@ void mainWrapped(int argc, char * * argv)
         if (!settings.useSubstitutes.overridden)
             settings.useSubstitutes = false;
         if (!settings.tarballTtl.overridden)
-            settings.tarballTtl = std::numeric_limits<unsigned int>::max();
+            settings.tarballTtl = 60 * 60;
         if (!fileTransferSettings.tries.overridden)
             fileTransferSettings.tries = 0;
         if (!fileTransferSettings.connectTimeout.overridden)
