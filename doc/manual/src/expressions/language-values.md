@@ -2,7 +2,7 @@
 
 ## Primitives
 
-- <a id="#type-string" href="#type-string">String</a>
+- <a id="type-string" href="#type-string">String</a>
 
   *Strings* can be written in three ways.
 
@@ -112,7 +112,7 @@
   `"http://example.org/foo.tar.bz2"` can also be written as
   `http://example.org/foo.tar.bz2`.
 
-- <a id="#type-number" href="#type-number">Number</a>
+- <a id="type-number" href="#type-number">Number</a>
 
   Numbers, which can be *integers* (like `123`) or *floating point*
   (like `123.43` or `.27e13`).
@@ -121,7 +121,7 @@
   return integers, whereas any operation involving at least one
   floating point number will have a floating point number as a result.
 
-- <a id="#type-path" href="#type-path">Path</a>
+- <a id="type-path" href="#type-path">Path</a>
 
   *Paths*, e.g., `/bin/sh` or `./builder.sh`. A path must contain at
   least one slash to be recognised as such. For instance, `builder.sh`
@@ -150,11 +150,11 @@
   recognized as a path. `a.${foo}/b.${bar}` is a syntactically valid division
   operation. `./a.${foo}/b.${bar}` is a path.
 
-- <a id="#type-boolean" href="#type-boolean">Boolean</a>
+- <a id="type-boolean" href="#type-boolean">Boolean</a>
 
   *Booleans* with values `true` and `false`.
 
-- <a id="#type-null" href="#type-null">Null</a>
+- <a id="type-null" href="#type-null">Null</a>
 
   The null value, denoted as `null`.
 
