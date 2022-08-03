@@ -908,7 +908,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     case nPath:
-        str << ANSI_GREEN << v.path().path << ANSI_NORMAL; // !!! escaping?
+        str << ANSI_GREEN << v.path().to_string() << ANSI_NORMAL; // !!! escaping?
         break;
 
     case nNull:
