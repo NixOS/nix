@@ -102,8 +102,8 @@ namespace nix {
 
     TEST(toJSON, substringEscape) {
         std::stringstream out;
-        const char *s = "foo\t";
-        toJSON(out, s+3, s + strlen(s));
+        std::string_view s = "foo\t";
+        toJSON(out, s.substr(3));
 
         ASSERT_EQ(out.str(), "\"\\t\"");
     }

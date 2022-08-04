@@ -2476,19 +2476,19 @@ void EvalState::printStats()
             }
             {
                 auto list = topObj.list("functions");
-                for (auto & i : functionCalls) {
+                for (auto & [fun, count] : functionCalls) {
                     auto obj = list.object();
-                    if (i.first->name)
-                        obj.attr("name", (const std::string &) i.first->name);
+                    if (fun->name)
+                        obj.attr("name", (std::string_view) symbols[fun->name]);
                     else
                         obj.attr("name", nullptr);
-                    if (auto pos = positions[i.first->pos]) {
-                        // FIXME
-                        //obj.attr("file", (const std::string &) pos.file);
+                    if (auto pos = positions[fun->pos]) {
+                        if (auto path = std::get_if<SourcePath>(&pos.origin))
+                            obj.attr("file", path->to_string());
                         obj.attr("line", pos.line);
                         obj.attr("column", pos.column);
                     }
-                    obj.attr("count", i.second);
+                    obj.attr("count", count);
                 }
             }
             {
@@ -2496,8 +2496,8 @@ void EvalState::printStats()
                 for (auto & i : attrSelects) {
                     auto obj = list.object();
                     if (auto pos = positions[i.first]) {
-                        // FIXME
-                        //obj.attr("file", (const std::string &) pos.file);
+                        if (auto path = std::get_if<SourcePath>(&pos.origin))
+                            obj.attr("file", path->to_string());
                         obj.attr("line", pos.line);
                         obj.attr("column", pos.column);
                     }
