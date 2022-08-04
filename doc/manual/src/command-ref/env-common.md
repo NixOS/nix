@@ -44,6 +44,12 @@ Most Nix commands interpret the following environment variables:
     The Nix search path can also be extended using the `-I` option to
     many Nix commands, which takes precedence over `NIX_PATH`.
 
+    If `NIX_PATH` is not set or empty, Nix will look up the following locations for a revision of `nixpkgs`:
+
+    1. `$HOME/.nix-defexpr/channels`
+    2. `/nix/var/nix/profiles/per-user/root/channels/nixpkgs`
+    3. `/nix/var/nix/profiles/per-user/root/channels.`
+
   - [`NIX_IGNORE_SYMLINK_STORE`]{#env-NIX_IGNORE_SYMLINK_STORE}\
     Normally, the Nix store directory (typically `/nix/store`) is not
     allowed to contain any symlink components. This is to prevent
