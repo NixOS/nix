@@ -26,7 +26,7 @@ Example:
       |--------| |------------------------------| |----------|
     store directory            digest                 name
 
-## Store Directory {#store-directory}
+## Store Directory
 
 Every [store](./store.md) has a store directory.
 
@@ -53,7 +53,7 @@ One cannot copy a store object to a store with a different store directory.
 Instead, it has to be rebuilt, together with all its dependencies.
 It is in general not enough to replace the store directory string in file contents, as this may render executables unusable by invalidating their internal offsets or checksums.
 
-# Digest {#digest}
+# Digest
 
 In a [store path](#store-path), the [digest][digest] is the output of a [cryptographic hash function][hash] of either all *inputs* involved in building the referenced store object or its actual *contents*.
 
@@ -84,7 +84,7 @@ This depends on the specifics of the software to build and run.
 >
 > For example, Java programs are compressed after compilation, which obfuscates any store paths they may refer to and prevents Nix from automatically detecting them.
 
-## Input Addressing {#input-addressing}
+## Input Addressing
 
 Input addressing means that the digest derives from how the store object was produced, namely its build inputs and build plan.
 
@@ -95,7 +95,7 @@ Nix has a custom serialisation format called Nix Archive (NAR)
 Store object references of this sort can *not* be validated from the content of the store object.
 Rather, a cryptographic signature has to be used to indicate that someone is vouching for the store object really being produced from a build plan with that digest.
 
-## Content Addressing {#content-addressing}
+## Content Addressing
 
 Content addressing means that the digest derives from the store object's contents, namely its file system objects and references.
 If one knows content addressing was used, one can recalculate the reference and thus verify the store object.

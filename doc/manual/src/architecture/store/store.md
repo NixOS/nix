@@ -25,7 +25,7 @@ Arrows indicate suggested reading order.
 [ input addressing ] [ content addressing ]
 ```
 
-## Store Object {#store-object}
+## Store Object
 
 A store object can hold
 
@@ -36,13 +36,13 @@ Store objects can be build inputs, build results, or build tasks.
 
 Store objects are [immutable][immutable-object]: once created, they do not change until they are deleted.
 
-## Reference {#reference}
+## Reference
 
 A store object reference is an [opaque][opaque-data-type], [unique identifier][unique-identifier]:
 The only way to obtain references is by adding or building store objects.
 A reference will always point to exactly one store object.
 
-## Operations {#operations}
+## Operations
 
 A Nix store can *add*, *retrieve*, and *delete* store objects.
 
@@ -89,7 +89,7 @@ As it keeps track of references, it can [garbage-collect][garbage-collection] un
 
     [ store ] --> collect garbage --> [ store' ]
 
-## Files and Processes {#files-and-processes}
+## Files and Processes
 
 Nix maps between its store model and the [Unix paradigm][unix-paradigm] of [files and processes][file-descriptor], by encoding immutable store objects and opaque identifiers as file system primitives: files and directories, and paths.
 That allows processes to resolve references contained in files and thus access the contents of store objects.
