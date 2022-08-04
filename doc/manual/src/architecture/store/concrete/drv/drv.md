@@ -130,10 +130,10 @@ This parses like so:
 
 ```
 /nix/store/lxrn8v5aamkikg6agxwdqd1jz7746wz4-firefox-98.0.2.drv^out
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^
+|------------------------------------------------------------| |-|
 store path (usual encoding)                                    output name
-                                                           ^^^
-                                                           note the ".drv"
+                                                          |--|
+                                                          note the ".drv"
 ```
 
 ## Extending the model to be higher-order
@@ -166,11 +166,11 @@ The encoding is adjusted in a very simplest way, merely displaying the same
 
 ```
 /nix/store/lxrn8v5aamkikg6agxwdqd1jz7746wz4-firefox-98.0.2.drv^foo.drv^bar.drv^out
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^
+|----------------------------------------------------------------------------| |-|
 inner derived path (usual encoding)                                            output name
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^^^^^
+|--------------------------------------------------------------------| |-----|
 even more inner derived path (usual encoding)                          output name
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^^^^^
+|------------------------------------------------------------| |-----|
 innermost opaque store path (usual encoding)                   output name
 ```
 
