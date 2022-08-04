@@ -28,7 +28,7 @@ typedef std::string FlakeId;
  * object that fetcher generates (usually via
  * FlakeRef::fromAttrs(attrs) or parseFlakeRef(url) calls).
  *
- * The actual fetch not have been performed yet (i.e. a FlakeRef may
+ * The actual fetch may not have been performed yet (i.e. a FlakeRef may
  * be lazy), but the fetcher can be invoked at any time via the
  * FlakeRef to ensure the store is populated with this input.
  */

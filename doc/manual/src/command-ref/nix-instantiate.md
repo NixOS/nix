@@ -51,7 +51,7 @@ standard input.
   - `--strict`\
     When used with `--eval`, recursively evaluate list elements and
     attributes. Normally, such sub-expressions are left unevaluated
-    (since the Nix expression language is lazy).
+    (since the Nix language is lazy).
 
     > **Warning**
     >
@@ -66,7 +66,7 @@ standard input.
     When used with `--eval`, print the resulting value as an XML
     representation of the abstract syntax tree rather than as an ATerm.
     The schema is the same as that used by the [`toXML`
-    built-in](../expressions/builtins.md).
+    built-in](../language/builtins.md).
 
   - `--read-write-mode`\
     When used with `--eval`, perform evaluation in read/write mode so
