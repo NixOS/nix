@@ -34,9 +34,8 @@ If the store has a [file system representation](./store.md#files-and-processes),
 
 This means a store path is not just derived from the referenced store object itself, but depends on the store the store object is in.
 
-::: {.note}
-The store directory defaults to `/nix/store`, but is in principle arbitrary.
-:::
+> **Note**
+> The store directory defaults to `/nix/store`, but is in principle arbitrary.
 
 It is important which store a given store object belongs to:
 Files in the store object can contain store paths, and processes may read these paths.
@@ -60,10 +59,9 @@ In a [store path](#store-path), the [digest][digest] is the output of a [cryptog
 
 Store objects are therefore said to be either [input-addressed](#input-addressing) or [content-addressed](#content-addressing).
 
-::: {.note}
-**Historical note**: The 20 byte restriction is because originally digests were [SHA-1][sha-1] hashes.
-Nix now uses [SHA-256][sha-256], and longer hashes are still reduced to 20 bytes for compatibility.
-:::
+> **Historical Note**
+> The 20 byte restriction is because originally digests were [SHA-1][sha-1] hashes.
+> Nix now uses [SHA-256][sha-256], and longer hashes are still reduced to 20 bytes for compatibility.
 
 [digest]: https://en.m.wiktionary.org/wiki/digest#Noun
 [hash]: https://en.m.wikipedia.org/wiki/Cryptographic_hash_function
@@ -80,12 +78,11 @@ Nix uses the [closure](store.md#closure) of build inputs to derive the list of a
 This way, scanning files captures run time dependencies without the user having to declare them explicitly.
 Doing it at build time and persisting references in the store object avoids repeating this time-consuming operation.
 
-::: {.note}
-In practice, it is sometimes still necessary for users to declare certain dependencies explicitly, if they are to be preserved in the build result's closure.
+> **Note**
+> In practice, it is sometimes still necessary for users to declare certain dependencies explicitly, if they are to be preserved in the build result's closure.
 This depends on the specifics of the software to build and run.
-
-For example, Java programs are compressed after compilation, which obfuscates any store paths they may refer to and prevents Nix from automatically detecting them.
-:::
+>
+> For example, Java programs are compressed after compilation, which obfuscates any store paths they may refer to and prevents Nix from automatically detecting them.
 
 ## Input Addressing {#input-addressing}
 
