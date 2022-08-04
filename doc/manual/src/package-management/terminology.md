@@ -22,7 +22,7 @@ copy the realisation of a derivation instead of building it.  Nix will
 not copy a realisation from a remote store unless one of the following
 is true:
 
-- the realisation is signed by one of the `trusted-public-key`s
+- the realisation is signed by one of the `trusted-public-keys`
 - the substituter is in the `trusted-substituters` list
 - the `no-require-sigs` option has been set to disable signature checking
 - the derivation is a fixed-output derivation
