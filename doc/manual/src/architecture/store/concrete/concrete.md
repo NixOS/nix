@@ -4,7 +4,7 @@ The concrete model reconciles this abstract vision with the reality of Unix as i
 Store objects own file system data, reference can be encoded as file system paths, and build steps run arbitrary processes.
 As none of these three Unix abstractions are inherently "functional" per the properties above, it is up to Nix to enforce those properties.
 
-## Files and Processes {#files-and-processes}
+## Files and Processes
 
 Nix maps between its store model and the [Unix paradigm][unix-paradigm] of [files and processes][file-descriptor], by encoding immutable store objects and opaque identifiers as file system primitives: files and directories, and paths.
 That allows processes to resolve references contained in files and thus access the contents of store objects.

@@ -1,4 +1,4 @@
-# A [Rosetta stone][rosetta-stone] for build system terminology {#build-system-terminology}
+# A [Rosetta stone][rosetta-stone] for build system terminology
 
 Nix is far from the only project to try to envision build systems abstractly, and indeed the design of the Nix store is comparable to other such efforts.
 Usage of terms is, for historic reasons, not entirely consistent within the Nix ecosystem, and still subject to slow change.

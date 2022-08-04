@@ -1,5 +1,7 @@
 # Architecture
 
+*(This chapter is unstable and a work in progress. Incoming links may rot.)*
+
 This chapter describes how Nix works.
 It should help users understand why Nix behaves as it does, and it should help developers understand how to modify Nix and how to write similar tools.
 

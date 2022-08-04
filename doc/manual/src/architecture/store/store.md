@@ -28,7 +28,7 @@ Arrows indicate suggested reading order.
 These store objects can hold arbitrary data.
 Store objects can be build inputs, build results, or build tasks.
 
-## Operations {#operations}
+## Operations
 
 A Nix store can *add*, *retrieve*, and *delete* store objects.
 

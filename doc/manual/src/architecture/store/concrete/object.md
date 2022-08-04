@@ -25,7 +25,7 @@ The string name is subject to this condition (taken from an error message in the
 
 > names are alphanumeric and can include the symbols +-._?= and must not begin with a period.
 
-## References {#references}
+## References
 
 The references independence from the file system reflects the fact that Unix has no built-in concept of a file system reference that fit's Nix's needs:
 
