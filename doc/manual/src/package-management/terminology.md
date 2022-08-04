@@ -25,3 +25,5 @@ is true:
 - the realisation is signed by one of the `trusted-public-key`s
 - the substituter is in the `trusted-substituters` list
 - the `no-require-sigs` option has been set to disable signature checking
+- the derivation is a fixed-output derivation
+
