@@ -17,7 +17,7 @@ disk layout that is different from local stores; in particular, they
 keep metadata and signatures in `.narinfo` files rather than in
 `/nix/var/nix/db`.
 
-A *substituter* is a store other than `/nix/store` from which nix will
+A *substituter* is a store other than `/nix/store` from which Nix will
 copy the realisation of a derivation instead of building it.  Nix will
 not copy a realisation from a remote store unless one of the following
 is true:
