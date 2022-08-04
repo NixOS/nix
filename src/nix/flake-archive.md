@@ -15,11 +15,10 @@ R""(
   # nix flake archive dwarffs
   ```
 
-* Print the store paths of the flake sources of NixOps without
-  fetching them:
+* Copy and print the store paths of the flake sources of NixOps:
 
   ```console
-  # nix flake archive --json --dry-run nixops
+  # nix flake archive --json nixops
   ```
 
 # Description

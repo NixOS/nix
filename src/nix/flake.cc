@@ -877,8 +877,7 @@ struct CmdFlakeClone : FlakeCommand
     }
 };
 
-#if 0
-struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
+struct CmdFlakeArchive : FlakeCommand, MixJSON
 {
     std::string dstUri;
 
@@ -906,45 +905,44 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
     void run(nix::ref<nix::Store> store) override
     {
+        auto dstStore = store;
+        if (!dstUri.empty())
+            dstStore = openStore(dstUri);
+
         auto flake = lockFlake();
 
         auto jsonRoot = json ? std::optional<JSONObject>(std::cout) : std::nullopt;
 
-        StorePathSet sources;
-
-        sources.insert(flake.flake.sourceInfo->storePath);
-        if (jsonRoot)
-            jsonRoot->attr("path", store->printStorePath(flake.flake.sourceInfo->storePath));
+        {
+            Activity act(*logger, lvlChatty, actUnknown, fmt("archiving root"));
+            auto storePath = flake.flake.lockedRef.input.fetchToStore(dstStore).first;
+            if (jsonRoot)
+                jsonRoot->attr("path", store->printStorePath(storePath));
+        }
 
         // FIXME: use graph output, handle cycles.
-        std::function<void(const Node & node, std::optional<JSONObject> & jsonObj)> traverse;
-        traverse = [&](const Node & node, std::optional<JSONObject> & jsonObj)
+        std::function<void(const Node & node, const InputPath & parentPath, std::optional<JSONObject> & jsonObj)> traverse;
+        traverse = [&](const Node & node, const InputPath & parentPath, std::optional<JSONObject> & jsonObj)
         {
             auto jsonObj2 = jsonObj ? jsonObj->object("inputs") : std::optional<JSONObject>();
             for (auto & [inputName, input] : node.inputs) {
                 if (auto inputNode = std::get_if<0>(&input)) {
+                    auto inputPath = parentPath;
+                    inputPath.push_back(inputName);
+                    Activity act(*logger, lvlChatty, actUnknown,
+                        fmt("archiving input '%s'", printInputPath(inputPath)));
                     auto jsonObj3 = jsonObj2 ? jsonObj2->object(inputName) : std::optional<JSONObject>();
-                    auto storePath =
-                        dryRun
-                        ? (*inputNode)->lockedRef.input.computeStorePath(*store)
-                        : (*inputNode)->lockedRef.input.fetch(store).first.storePath;
+                    auto storePath = (*inputNode)->lockedRef.input.fetchToStore(dstStore).first;
                     if (jsonObj3)
                         jsonObj3->attr("path", store->printStorePath(storePath));
-                    sources.insert(std::move(storePath));
-                    traverse(**inputNode, jsonObj3);
+                    traverse(**inputNode, inputPath, jsonObj3);
                 }
             }
         };
 
-        traverse(*flake.lockFile.root, jsonRoot);
-
-        if (!dryRun && !dstUri.empty()) {
-            ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
-            copyPaths(*store, *dstStore, sources);
-        }
+        traverse(*flake.lockFile.root, {}, jsonRoot);
     }
 };
-#endif
 
 struct CmdFlakeShow : FlakeCommand, MixJSON
 {
@@ -1200,7 +1198,7 @@ struct CmdFlake : NixMultiCommand
                 {"init", []() { return make_ref<CmdFlakeInit>(); }},
                 {"new", []() { return make_ref<CmdFlakeNew>(); }},
                 {"clone", []() { return make_ref<CmdFlakeClone>(); }},
-                //{"archive", []() { return make_ref<CmdFlakeArchive>(); }},
+                {"archive", []() { return make_ref<CmdFlakeArchive>(); }},
                 {"show", []() { return make_ref<CmdFlakeShow>(); }},
                 {"prefetch", []() { return make_ref<CmdFlakePrefetch>(); }},
             })
