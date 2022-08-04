@@ -1,23 +1,8 @@
 # Store
 
-A Nix store is a collection of *store objects*.
+A Nix store is a collection of *store objects* which refer to one another.
 
-## Store Object
-
-A store object can hold
-
-- arbitrary *data*
-- *references* to other store objects.
-
-Nix makes no distinction if store objects are build inputs, build results, or build tasks.
-
-Store objects are [immutable][immutable-object]: once created, they do not change until they are deleted.
-
-## Reference
-
-A store object reference is an [opaque][opaque-data-type], [unique identifier][unique-identifier]:
-The only way to obtain references is by adding or building store objects.
-A reference will always point to exactly one store object.
+These store objects can hold arbitrary data, and Nix makes no distinction if they are used as build inputs, build results, or build tasks.
 
 ## Operations
 
@@ -68,93 +53,21 @@ As it keeps track of references, it can [garbage-collect][garbage-collection] un
 
     [ store ] --> collect garbage --> [ store' ]
 
-
-## Closure
-
-Nix stores have the *closure property*: for each store object in the store, all the store objects it references must also be in the store.
-
-Adding, building, copying and deleting store objects must be done in a way that obeys this property:
-
-- A newly added store object cannot have references, unless it is a build task.
-
-- Build results must only refer to store objects in the closure of the build inputs.
-
-  Building a store object will add appropriate references, according to the build task.
-  These references can only come from declared build inputs.
-
-- Store objects being copied must refer to objects already in the destination store.
-
-  Recursive copying must either proceed in dependency order or be atomic.
-
-- We can only safely delete store objects which are not reachable from any reference still in use.
-
-  Garbage collection will delete those store objects that cannot be reached from any reference in use.
-
-  <!-- more details in section on garbage collection, link to it once it exists -->
-
 [garbage-collection]: https://en.m.wikipedia.org/wiki/Garbage_collection_(computer_science)
-[immutable-object]: https://en.m.wikipedia.org/wiki/Immutable_object
-[opaque-data-type]: https://en.m.wikipedia.org/wiki/Opaque_data_type
-[unique-identifier]: https://en.m.wikipedia.org/wiki/Unique_identifier
 
-## Files and Processes
+## Two models, abstract and concrete
 
-Nix maps between its store model and the [Unix paradigm][unix-paradigm] of [files and processes][file-descriptor], by encoding immutable store objects and opaque identifiers as file system primitives: files and directories, and paths.
-That allows processes to resolve references contained in files and thus access the contents of store objects.
-
-Store objects are therefore implemented as the pair of
-
-  - a *file system object* for data
-  - a set of *store paths* for references.
-
-[unix-paradigm]: https://en.m.wikipedia.org/wiki/Everything_is_a_file
-[file-descriptor]: https://en.m.wikipedia.org/wiki/File_descriptor
-
-```
-+-----------------------------------------------------------------+
-| Nix                                                             |
-|                  [ commmand line interface ]------,             |
-|                               |                   |             |
-|                           evaluates               |             |
-|                               |                manages          |
-|                               V                   |             |
-|                  [ configuration language  ]      |             |
-|                               |                   |             |
-| +-----------------------------|-------------------V-----------+ |
-| | store                  evaluates to                         | |
-| |                             |                               | |
-| |             referenced by   V       builds                  | |
-| |  [ build input ] ---> [ build plan ] ---> [ build result ]  | |
-| |         ^                                        |          | |
-| +---------|----------------------------------------|----------+ |
-+-----------|----------------------------------------|------------+
-            |                                        |
-    file system object                          store path
-            |                                        |
-+-----------|----------------------------------------|------------+
-| operating system        +------------+             |            |
-|           '------------ |            | <-----------'            |
-|                         |    file    |                          |
-|                     ,-- |            | <-,                      |
-|                     |   +------------+   |                      |
-|          execute as |                    | read, write, execute |
-|                     |   +------------+   |                      |
-|                     '-> |  process   | --'                      |
-|                         +------------+                          |
-+-----------------------------------------------------------------+
-```
-
-There exist different types of stores, which all follow this model.
-Examples:
-- store on the local file system
-- remote store accessible via SSH
-- binary cache store accessible via HTTP
-
-To make store objects accessible to processes, stores ultimately have to expose store objects through the file system.
+The Nix store layer is the heart of Nix, the cornerstone of its design.
+It comes from two basic insights: a vision for build systems in the abstract based on functional programming, and an application of the vision to conventional software for conventional operating system.
+We could just present the combination of those two in the form of the current design of the Nix store, but we believe there is value introducing them separately.
+This still describes how Nix works, so this section still serves as a spec, but it also demonstrates with Nix's authors believe is a good way to think* about Nix.
+If one tries to learn the concrete specifics before learning the abstract model, the following text might come across as a wall of details without sufficient motivation.
+Conversely, if one learns the abstract model first, many of the concrete specifics will make more sense as miscellaneous details placed in the "slots" where the abstract model expects.
+The hope is that makes the material far less daunting, and helps it make sense in the mind of the reader.
 
 ## A [Rosetta stone][rosetta-stone] for build system terminology
 
-The Nix store's design is comparable to other build systems.
+Nix is far from the other project to try to envision build systems abstractly, and indeed the design of the Nix store is comparable to other work.
 Usage of terms is, for historic reasons, not entirely consistent within the Nix ecosystem, and still subject to slow change.
 
 The following translation table points out similarities and equivalent terms, to help clarify their meaning and inform consistent use in the future.
