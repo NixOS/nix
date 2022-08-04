@@ -176,7 +176,7 @@ and `/etc/zshrc` which you may remove.
    This will remove the Nix Store volume and everything that was added to the
    store.
 
-   If this command indicates that it couldn't remove the volume, you should
+   If the output indicates that the command couldn't remove the volume, you should
    make sure you don't have an _unmounted_ Nix Store volume. Look for a
    "Nix Store" volume in the output of the following command:
 
