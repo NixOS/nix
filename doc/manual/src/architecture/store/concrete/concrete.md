@@ -4,18 +4,23 @@ The concrete model reconciles this abstract vision with the reality of Unix as i
 Store objects own file system data, reference can be encoded as file system paths, and build steps run arbitrary processes.
 As none of these three Unix abstractions are inherently "functional" per the properties above, it is up to Nix to enforce those properties.
 
-## Files and Processes
+## Files and Processes {#files-and-processes}
 
 Nix maps between its store model and the [Unix paradigm][unix-paradigm] of [files and processes][file-descriptor], by encoding immutable store objects and opaque identifiers as file system primitives: files and directories, and paths.
 That allows processes to resolve references contained in files and thus access the contents of store objects.
 
 Store objects are therefore implemented as the pair of
 
-  - a *file system object* for data
-  - a set of *store paths* for references.
+  - a [file system object](fso.md) for data
+  - a set of [store paths](path.md) for references.
 
 [unix-paradigm]: https://en.m.wikipedia.org/wiki/Everything_is_a_file
 [file-descriptor]: https://en.m.wikipedia.org/wiki/File_descriptor
+
+The following diagram shows a radical simplification of how Nix interacts with the operating system:
+It uses files as build inputs, and build outputs are files again.
+On the operating system, files can be run as processes, which in turn operate on files.
+A build function also amounts to an operating system process (not depicted).
 
 ```
 +-----------------------------------------------------------------+

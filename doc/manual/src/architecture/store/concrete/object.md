@@ -2,7 +2,7 @@
 
 Concrete Store objects comes in a few variations of Nix, but the basic model of a store object is the triple of
 
-  - a [file system object](#file-system-object)
+  - a [file system object](./file-system-object.md)
   - a set of [references](#references) to store objects.
   - a name
 
@@ -19,34 +19,11 @@ record StoreObject where
 getReferences so = so.references
 ```
 
-We call a store object's outermost file system object the *root*.
+We call a store object's outermost file system object its *root*.
 
 The string name is subject to this condition (taken from an error message in the implementation):
 
 > names are alphanumeric and can include the symbols +-._?= and must not begin with a period.
-
-## File system object {#file-system-object}
-
-The Nix store uses a simple file system model.
-
-Every file system object is one of the following:
- - File: an executable flag, and arbitrary data for contents
- - Directory: mapping of names to child file system objects
- - [Symbolic link](https://en.m.wikipedia.org/wiki/Symbolic_link): may point anywhere.
-
-```idris
-data FileSystemObject
-  = File {
-      isExecutable : Bool,
-      contents     : Bytes,
-    }
-  | Directory { entries : Map FileName FileSystemObject }
-  | SymLink { target : Path }
-```
-
-A bare file or symlink can be a root file system object.
-
-Symbolic links pointing outside of their own root, or to a store object without a matching reference, are allowed, but might not function as intended.
 
 ## References {#references}
 

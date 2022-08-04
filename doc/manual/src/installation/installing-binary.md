@@ -148,7 +148,8 @@ and `/etc/zshrc` which you may remove.
    This will remove all the build users that no longer serve a purpose.
 
 4. Edit fstab using `sudo vifs` to remove the line mounting the Nix Store
-   volume on `/nix`, which looks like this,
+   volume on `/nix`, which looks like
+   `UUID=<uuid> /nix apfs rw,noauto,nobrowse,suid,owners` or
    `LABEL=Nix\040Store /nix apfs rw,nobrowse`. This will prevent automatic
    mounting of the Nix Store volume.
 
@@ -175,6 +176,18 @@ and `/etc/zshrc` which you may remove.
    This will remove the Nix Store volume and everything that was added to the
    store.
 
+   If the output indicates that the command couldn't remove the volume, you should
+   make sure you don't have an _unmounted_ Nix Store volume. Look for a
+   "Nix Store" volume in the output of the following command:
+
+   ```console
+   diskutil list
+   ```
+
+   If you _do_ see a "Nix Store" volume, delete it by re-running the diskutil
+   deleteVolume command, but replace `/nix` with the store volume's `diskXsY`
+   identifier.
+
 > **Note**
 > 
 > After you complete the steps here, you will still have an empty `/nix`
@@ -191,8 +204,7 @@ and `/etc/zshrc` which you may remove.
 <!-- Note: anchors above to catch permalinks to old explanations -->
 
 We believe we have ironed out how to cleanly support the read-only root
-on modern macOS. New installs will do this automatically, and you can
-also re-run a new installer to convert your existing setup.
+on modern macOS. New installs will do this automatically.
 
 This section previously detailed the situation, options, and trade-offs,
 but it now only outlines what the installer does. You don't need to know
