@@ -27,6 +27,7 @@
     - [Digest](architecture/store/path.md#digest)
     - [Input Addressing](architecture/store/path.md#input-addressing)
     - [Content Addressing](architecture/store/path.md#content-addressing)
+  - [File System Object](architecture/store/fso.md)
 - [Package Management](package-management/package-management.md)
   - [Basic Package Management](package-management/basic-package-mgmt.md)
   - [Profiles](package-management/profiles.md)
