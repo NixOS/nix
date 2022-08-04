@@ -89,7 +89,7 @@ type OutputName = String
 
 data DerivedPath
   = OpaquePath { path : StorePath }
-  | BuiltObj {
+  | BuiltPath {
       drv    : StorePath,
       output : OutputName,
     }
@@ -123,18 +123,55 @@ Built paths are encoded by
 An example would be:
 
 ```
-/nix/store/lxrn8v5aamkikg6agxwdqd1jz7746wz4-firefox-98.0.2.drv!out
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^
+/nix/store/lxrn8v5aamkikg6agxwdqd1jz7746wz4-firefox-98.0.2.drv^out
 ```
 
 This parses like so:
 
 ```
-/nix/store/lxrn8v5aamkikg6agxwdqd1jz7746wz4-firefox-98.0.2.drv!out
+/nix/store/lxrn8v5aamkikg6agxwdqd1jz7746wz4-firefox-98.0.2.drv^out
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^
 store path (usual encoding)                                    output name
                                                            ^^^
                                                            note the ".drv"
+```
+
+## Extending the model to be higher-order
+
+**Experimental feature**: `computed-derivations**
+**RFC***: [92](https://github.com/NixOS/rfcs/pull/92)
+
+We can apply the same extension discussed for the abstract model to the concrete model.
+Again, only the data type for Derived Paths needs to be modified.
+Derivations are the same except for using the new extended derived path data type.
+
+```idris
+type OutputName = String
+
+data DerivedPath
+  = OpaquePath { storeObj : StorePath }
+  | BuiltPath {
+      drv    : DerivedPath, -- changed
+      output : OutputName,
+    }
+```
+
+Now, the `drv` field of `BuiltObject` is itself a `DerivedPath` instead of an `StorePath`.
+
+Under this extended model, `DerivedPath`s are thus inductively built up from an `OpaquePath`, contains in 0 or more outer `BuiltPaths`.
+
+### Encoding
+
+The encoding is adjusted in a very simplest way, merely displaying the same
+
+```
+/nix/store/lxrn8v5aamkikg6agxwdqd1jz7746wz4-firefox-98.0.2.drv^foo.drv^bar.drv^out
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^
+inner derived path (usual encoding)                                            output name
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^^^^^
+even more inner derived path (usual encoding)                          output name
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^^^^^
+innermost opaque store path (usual encoding)                   output name
 ```
 
 ## Extra extensions

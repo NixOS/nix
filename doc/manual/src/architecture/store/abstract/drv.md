@@ -8,6 +8,8 @@ This is where Nix comes in.
 Abstract derivations and derived references are a mutually recursive concepts that allow Nix to represent builds plans.
 In particular, derivations are the nodes and derived references the edges of the graphs that are build plans
 
+## The Base Model
+
 ### Abstract Derivations
 
 Derivations represent individual build steps.
@@ -176,7 +178,7 @@ type OutputName = String
 data DerivedRef
   = OpaqueObj { storeObj : StoreObjectRef }
   | BuiltObj {
-      drv    : Derived, -- changed again
+      drv    : DerivedRef, -- changed again
       output : OutputName,
     }
 ```
