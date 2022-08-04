@@ -81,7 +81,7 @@ This way, scanning files captures run time dependencies without the user having 
 Doing it at build time and persisting references in the store object avoids repeating this time-consuming operation.
 
 ::: {.note}
-In practice, it is sometimes still necessary to declare certain dependencies explicitly, if they are to be preserved in the build result's closure.
+In practice, it is sometimes still necessary for users to declare certain dependencies explicitly, if they are to be preserved in the build result's closure.
 This depends on the specifics of the software to build and run.
 
 For example, Java programs are compressed after compilation, which obfuscates any store paths they may refer to and prevents Nix from automatically detecting them.
