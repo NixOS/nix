@@ -149,7 +149,7 @@ and `/etc/zshrc` which you may remove.
 
 4. Edit fstab using `sudo vifs` to remove the line mounting the Nix Store
    volume on `/nix`, which looks like
-   `UUID=<unique uuid> /nix apfs rw,noauto,nobrowse,suid,owners` or
+   `UUID=<uuid> /nix apfs rw,noauto,nobrowse,suid,owners` or
    `LABEL=Nix\040Store /nix apfs rw,nobrowse`. This will prevent automatic
    mounting of the Nix Store volume.
 
