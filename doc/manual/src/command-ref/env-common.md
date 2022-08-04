@@ -47,7 +47,7 @@ Most Nix commands interpret the following environment variables:
     If `NIX_PATH` is not set at all, Nix will fall back to the following list in impure and unrestricted evaluation mode:
 
     1. `$HOME/.nix-defexpr/channels`
-    2. `/nix/var/nix/profiles/per-user/root/channels/nixpkgs`
+    2. `nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixpkgs`
     3. `/nix/var/nix/profiles/per-user/root/channels`
 
   - [`NIX_IGNORE_SYMLINK_STORE`]{#env-NIX_IGNORE_SYMLINK_STORE}\
