@@ -39,7 +39,7 @@ This means a store path is not just derived from the referenced store object its
 
 It is important which store a given store object belongs to:
 Files in the store object can contain store paths, and processes may read these paths.
-Nix can only guarantee [referential integrity](store.md#closure) if store paths do not cross store boundaries.
+Nix can only guarantee [referential integrity](store/closure.md) if store paths do not cross store boundaries.
 
 Therefore one can only copy store objects to a different store if
 
