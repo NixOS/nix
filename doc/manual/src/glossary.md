@@ -3,7 +3,7 @@
   - [derivation]{#gloss-derivation}\
     A description of a build action. The result of a derivation is a
     store object. Derivations are typically specified in Nix expressions
-    using the [`derivation` primitive](expressions/derivations.md). These are
+    using the [`derivation` primitive](language/derivations.md). These are
     translated into low-level *store derivations* (implicitly by
     `nix-env` and `nix-build`, or explicitly by `nix-instantiate`).
 
