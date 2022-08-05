@@ -113,11 +113,12 @@ You can run them manually with `nix build .#hydraJobs.tests.{testName}` or `nix-
 
 Testing the install scripts has traditionally been tedious, but you can now do this much more easily via the GitHub Actions CI runs (at least for platforms that Github Actions supports).
 
-If you've already pushed to a fork of Nix on GitHub before, you may have noticed that the CI workflows in your fork list skipped "installer" and "installer_test" jobs. Once your Nix fork is set up correctly, pushing to it will also run these jobs.
-- The `installer` job will generate installers for these platforms: x86_64-linux, armv6l-linux, armv7l-linux, x86_64-darwin. While this installer is in your Cachix cache, you can use it for manual testing on any of these platforms.
+If you've already pushed to a fork of Nix on GitHub before, you may have noticed that the CI workflows in your fork list skipped `installer` and `installer_test` jobs. Once your Nix fork is set up correctly, pushing to it will also run these jobs.
+- The `installer` job will generate installers for these platforms: `x86_64-linux`, `armv6l-linux`, `armv7l-linux`, `x86_64-darwin`. While this installer is in your Cachix cache, you can use it for manual testing on any of these platforms.
 - the `installer_test` job will try to use this installer and run a trivial Nix command on `ubuntu-latest` and `macos-latest`.
 
 ### One-time setup
+
 1. Have a GitHub account with a fork of the Nix repo.
 2. At cachix.org:
     - Create or log in to an account.
