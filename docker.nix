@@ -7,6 +7,7 @@
 , extraPkgs ? []
 , maxLayers ? 100
 , nixConf ? {}
+, sourceInfo ? null
 }:
 let
   defaultPkgs = with pkgs; [
@@ -138,41 +139,40 @@ let
 
   baseSystem =
     let
-      nixpkgs = pkgs.path;
-      channel = pkgs.runCommand "channel-nixos" { } ''
+      nixpkgs = if builtins.isNull sourceInfo then pkgs.path else sourceInfo;
+      channel = pkgs.runCommandLocal "channel-nixos" { } ''
         mkdir $out
         ln -s ${nixpkgs} $out/nixpkgs
-        echo "[]" > $out/manifest.nix
       '';
+
       rootEnv = pkgs.buildPackages.buildEnv {
         name = "root-profile-env";
         paths = defaultPkgs;
       };
-      manifest = pkgs.buildPackages.runCommand "manifest.nix" { } ''
-        cat > $out <<EOF
-        [
-        ${lib.concatStringsSep "\n" (builtins.map (drv: let
-          outputs = drv.outputsToInstall or [ "out" ];
-        in ''
-          {
-            ${lib.concatStringsSep "\n" (builtins.map (output: ''
-              ${output} = { outPath = "${lib.getOutput output drv}"; };
-            '') outputs)}
-            outputs = [ ${lib.concatStringsSep " " (builtins.map (x: "\"${x}\"") outputs)} ];
-            name = "${drv.name}";
-            outPath = "${drv}";
-            system = "${drv.system}";
-            type = "derivation";
-            meta = { };
-          }
-        '') defaultPkgs)}
-        ]
-        EOF
-      '';
-      profile = pkgs.buildPackages.runCommand "user-environment" { } ''
+
+      manifest = {
+        version = 2;
+        elements = (builtins.map (drv:
+        let outputs = drv.meta.outputsToInstall or [ "out" ]; in
+        {
+          active = true;
+          outputs = null;
+          storePaths = builtins.map (output: lib.getOutput output drv) outputs;
+          priority = 5;
+        }) defaultPkgs);
+      };
+
+      profile = pkgs.buildPackages.runCommand "user-environment" {
+        allowSubstitutes = false;
+        preferLocalBuild = true;
+        manifest = builtins.toJSON manifest;
+        passAsFile = [
+          "manifest"
+        ];
+      } ''
         mkdir $out
         cp -a ${rootEnv}/* $out/
-        ln -s ${manifest} $out/manifest.nix
+        cp $manifestPath $out/manifest.json
       '';
     in
     pkgs.runCommand "base-system"
