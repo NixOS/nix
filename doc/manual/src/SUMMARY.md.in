@@ -22,7 +22,6 @@
     - [Garbage Collector Roots](package-management/garbage-collector-roots.md)
   - [Channels](package-management/channels.md)
   - [Sharing Packages Between Machines](package-management/sharing-packages.md)
-    - [Terminology](package-management/terminology.md)
     - [Serving a Nix store via HTTP](package-management/binary-cache-substituter.md)
     - [Copying Closures via SSH](package-management/copy-closure.md)
     - [Serving a Nix store via SSH](package-management/ssh-substituter.md)
