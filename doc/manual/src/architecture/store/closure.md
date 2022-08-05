@@ -21,8 +21,6 @@ Adding, building, copying and deleting store objects must be done in a way that 
   <!-- more details in section on garbage collection, link to it once it exists -->
 
 [referential-integrity]: https://en.m.wikipedia.org/wiki/Referential_integrity
-[garbage-collection]: https://en.m.wikipedia.org/wiki/Garbage_collection_(computer_science)
-[immutable-object]: https://en.m.wikipedia.org/wiki/Immutable_object
 [opaque-data-type]: https://en.m.wikipedia.org/wiki/Opaque_data_type
 [unique-identifier]: https://en.m.wikipedia.org/wiki/Unique_identifier
 

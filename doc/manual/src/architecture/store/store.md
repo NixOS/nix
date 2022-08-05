@@ -36,6 +36,8 @@ Store objects can be build inputs, build results, or build tasks.
 
 Store objects are [immutable][immutable-object]: once created, they do not change until they are deleted.
 
+[immutable-object]: https://en.m.wikipedia.org/wiki/Immutable_object
+
 ## Reference
 
 A store object reference is an [opaque][opaque-data-type], [unique identifier][unique-identifier]:
@@ -88,6 +90,8 @@ As it keeps track of references, it can [garbage-collect][garbage-collection] un
 
 
     [ store ] --> collect garbage --> [ store' ]
+
+[garbage-collection]: https://en.m.wikipedia.org/wiki/Garbage_collection_(computer_science)
 
 ## Files and Processes
 
