@@ -1,14 +1,22 @@
 # Terminology
 
-A *local store* exists on the local filesystem of the machine where
-Nix is invoked.  The `/nix/store` directory is one example of a
-local store.  You can use other local stores by passing the
-`--store` flag to `nix`.
+From   the  perspective   of   the  location   where  Nix   is
+invoked<sup><b>1</b></sup>, the  Nix store can be  referred to
+as a "_local_" or a "_remote_" one:
 
-A *remote store* is a store which exists anywhere other than the
-local filesystem.  One example is the `/nix/store` directory on
-another machine, accessed via `ssh` or served by the `nix-serve`
-Perl script.
+<sup>\[1]: Where "invoking Nix" means  an executing a Nix core
+action/operation on  a Nix store.  For example, using  any CLI
+commands from the `NixOS/nix` implementation.</sup>
+
++ A *local  store* exists  on the local  filesystem of
+  the machine where Nix is  invoked. You can use other
+  local stores  by passing  the `--store` flag  to the
+  `nix` command.
+
++ A  *remote store*  exists  anywhere  other than  the
+  local  filesystem. One  example is  the `/nix/store`
+  directory on another machine,  accessed via `ssh` or
+  served by the `nix-serve` Perl script.
 
 A *binary cache* is a remote store which is not the local store of
 any machine.  Examples of binary caches include S3 buckets and the
