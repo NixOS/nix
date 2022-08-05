@@ -18,11 +18,10 @@ keep metadata and signatures in `.narinfo` files rather than in
 `/nix/var/nix/db`.
 
 A *substituter* is a store other than `/nix/store` from which Nix will
-copy the realisation of a derivation instead of building it.  Nix will
-not copy a realisation from a remote store unless one of the following
-is true:
+copy a store path instead of building it.  Nix will not copy a store
+path from a remote store unless one of the following is true:
 
-- the realisation is signed by one of the `trusted-public-keys`
+- the store object is signed by one of the `trusted-public-keys`
 - the substituter is in the `trusted-substituters` list
 - the `no-require-sigs` option has been set to disable signature checking
-- the derivation is a fixed-output derivation
+- the store object is the realisation of a fixed-output derivation
