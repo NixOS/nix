@@ -24,4 +24,5 @@ path from a remote store unless one of the following is true:
 - the store object is signed by one of the `trusted-public-keys`
 - the substituter is in the `trusted-substituters` list
 - the `no-require-sigs` option has been set to disable signature checking
+- the store object is a derivation
 - the store object is the realisation of a fixed-output derivation
