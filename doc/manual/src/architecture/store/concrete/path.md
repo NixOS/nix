@@ -89,55 +89,94 @@ Putting it altogether, we have
 digest = truncate (sha256 (intercallate ":" type "sha256" innerDigest storeDir name))
 ```
 
-### The Type and the Inner Digest
-
-The remaining bits of information making up the pre-image of the digest are the *store object type* and the *inner digest*.
-
-
-of either all *inputs* involved in building the referenced store object or its actual *contents*.
-
-
-
-> Nix now uses [SHA-256][sha-256], and longer hashes are still reduced to 20 bytes for compatibility.
-
 [digest]: https://en.m.wiktionary.org/wiki/digest#Noun
 [hash]: https://en.m.wikipedia.org/wiki/Cryptographic_hash_function
 [sha-1]: https://en.m.wikipedia.org/wiki/SHA-1
 [sha-256]: https://en.m.wikipedia.org/wiki/SHA-256
 
-Store objects are therefore said to be either [input-addressed](#input-addressing) or [content-addressed](#content-addressing).
 
-#### Reference scanning
+### The Type and the Inner Digest
 
-When a new store object is built, Nix scans its file contents for store paths to construct its set of references.
+The remaining bits of information making up the pre-image of the digest are the *store object type* and the *inner digest*.
 
-The special format of a store path's [digest](#digest) allows reliably detecting it among arbitrary data.
-Nix uses the [closure](store.md#closure) of build inputs to derive the list of allowed store paths, to avoid false positives.
+Unlike the information discussed so far, these two values depend on the type of store object we are referencing.
+Broadly speaking, store objects are referenced in one of two ways:
 
-This way, scanning files captures run time dependencies without the user having to declare them explicitly.
-Doing it at build time and persisting references in the store object avoids repeating this time-consuming operation.
+ - *content-addressed*: where the store object is referred to its own contents
 
-> **Note**
-> In practice, it is sometimes still necessary for users to declare certain dependencies explicitly, if they are to be preserved in the build result's closure.
-This depends on the specifics of the software to build and run.
->
-> For example, Java programs are compressed after compilation, which obfuscates any store paths they may refer to and prevents Nix from automatically detecting them.
+ - *input-addressed*: where the store object is referred to by the way in which it was made.
 
-### Input Addressing
+We will go over the details of how these two methods determine the type and inner digest in subsequent sections.
 
-Input addressing means that the digest derives from how the store object was produced, namely its build inputs and build plan.
+## Summary
 
-To compute the hash of a store object one needs a deterministic serialisation, i.e., a binary string representation which only changes if the store object changes.
+This is the complete store path grammar.
+This includes the details of the type and digest which, as stated just above, are yet to be described.
+We do this to collect the entirety of the grammar in one place.
 
-Nix has a custom serialisation format called Nix Archive (NAR)
+```bnf
+<realized-path> ::= <store-dir>/<digest>-<name>
+```
+and that `<digest>` = base-32 representation of the first 160 bits of a SHA-256
+hash of `<pre>`; the hash part of the store name
 
-Store object references of this sort can *not* be validated from the content of the store object.
-Rather, a cryptographic signature has to be used to indicate that someone is vouching for the store object really being produced from a build plan with that digest.
+- `<pre>` = the string `<type>:sha256:<inner-digest>:<store>:<name>`;
 
-### Content Addressing
+  Note that it includes the location of the store as well as the name to make sure that changes to either of those are reflected in the hash
+  (e.g. you won't get `/nix/store/<digest>-name1` and `/nix/store/<digest>-name2` with equal hash parts).
 
-Content addressing means that the digest derives from the store object's contents, namely its file system objects and references.
-If one knows content addressing was used, one can recalculate the reference and thus verify the store object.
+- `<type>` = one of:
 
-Content addressing is currently only used for the special cases of source files and "fixed-output derivations", where the contents of a store object are known in advance.
-Content addressing of build results is still an [experimental feature subject to some restrictions](https://github.com/tweag/rfcs/blob/cas-rfc/rfcs/0062-content-addressed-paths.md).
+  - `text:<r1>:<r2>:...<rN>`
+
+    for encoded derivations written to the store.
+    `<r1> ... <rN>` are the store paths referenced by this path.
+    Those are encoded in the form described by `<realized-path>`.
+
+  - `source:<r1>:<r2>:...:<rN>:self`
+
+    For paths copied to the store and hashed via a [Nix Archive (NAR)](./nar.md) and [SHA-256](sha-256).
+    Just like in the text case, we can have the store objects referenced by their paths.
+    Additionally, we can have an optional `:self` label to denote self reference.
+
+  - `output:<id>`
+
+    For either the outputs built from derivations, OR paths copied to the store hashed that area single file hashed directly, or the via a hash algorithm other than [SHA-256](sha-256).
+    (in that case "source" is used; it's silly, but it's done that way for compatibility).
+    `<id>` is the name of the output (usually, "out").
+
+- `<inner-digest>` = base-16 representation of a SHA-256 hash of:
+
+  - if `<type>` = `text:...`:
+
+    the string written to the resulting store path.
+
+  - if `<type>` = `source`:
+
+    the serialisation of the path from which this store path is copied, as returned by hashPath()
+
+  - if `<type>` = `output:<id>`:
+
+    - For input-addressed derivation outputs:
+
+      the hash of the derivation modulo fixed output derivations.
+
+
+    - For content-addressed store paths:
+
+      the string `fixed:out:<rec><algo>:<hash>:`, where
+
+        - `<rec>` = `r:` for recursive ([NAR](./nar.md) hashes, or `` for flat (file) hashes
+
+        - `<algo>` = `md5`, `sha1` or `sha256`
+
+        -`<hash>` = base-16 representation of the path or flat hash of the contents of the path (or expected contents of the path for fixed-output derivations).
+
+Note that since a derivation output has always type `output`, while something added to the store manually can have type `output` or `source` depending on the hash,
+this means that the same input can be hashed differently if added to the store via addToStore or via a derivation, in the [SHA-256](sha-256) & [NAR](./nar.md) case.
+
+It would have been nicer to handle fixed-output derivations under `source`, e.g. have something like `source:<rec><algo>`, but we're stuck with this for now.
+
+The main reason for this way of computing names is to prevent name collisions (for security).
+For instance, it shouldn't be feasible to come up with a derivation whose output path collides with the path for a copied source.
+The former would have a `<pre>` starting with `output:out:`, while the latter would have a `<pre>` starting with `source:`.

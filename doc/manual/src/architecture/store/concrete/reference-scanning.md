@@ -55,3 +55,22 @@ The specific reasons for this will be given then, but we can still ask how how c
 The fundamental answer is that since the drv file format is known to Nix, it can "do better" than plain scanning.
 Nix knows how to parse them, and thus meaningfully differentiate between hashes based on *where* they occur.
 It can decide which contexts correspond to an assumption that the store path ought to exist and be accessible, and which contexts do not.
+
+
+---------------------
+
+#### Reference scanning
+
+When a new store object is built, Nix scans its file contents for store paths to construct its set of references.
+
+The special format of a store path's [digest](#digest) allows reliably detecting it among arbitrary data.
+Nix uses the [closure](store.md#closure) of build inputs to derive the list of allowed store paths, to avoid false positives.
+
+This way, scanning files captures run time dependencies without the user having to declare them explicitly.
+Doing it at build time and persisting references in the store object avoids repeating this time-consuming operation.
+
+> **Note**
+> In practice, it is sometimes still necessary for users to declare certain dependencies explicitly, if they are to be preserved in the build result's closure.
+This depends on the specifics of the software to build and run.
+>
+> For example, Java programs are compressed after compilation, which obfuscates any store paths they may refer to and prevents Nix from automatically detecting them.
