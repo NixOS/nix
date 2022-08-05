@@ -59,12 +59,14 @@
 @manpages@
   - [Files](command-ref/files.md)
     - [nix.conf](command-ref/conf-file.md)
+<!--
 - [Architecture](architecture/architecture.md)
   - [Store](architecture/store/store.md)
     - [Closure](architecture/store/store/closure.md)
     - [Build system terminology](architecture/store/store/build-system-terminology.md)
   - [Store Path](architecture/store/path.md)
   - [File System Object](architecture/store/fso.md)
+-->
 - [Glossary](glossary.md)
 - [Contributing](contributing/contributing.md)
   - [Hacking](contributing/hacking.md)
