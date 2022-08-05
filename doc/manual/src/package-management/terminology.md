@@ -18,10 +18,12 @@ commands from the `NixOS/nix` implementation.</sup>
   directory on another machine,  accessed via `ssh` or
   served by the `nix-serve` Perl script.
 
-A *binary cache* is a specialized Nix store whose metadata and
-signatures are kept in `.narinfo` files rather than in the Nix
-database. Examples of binary caches include S3 buckets and the
-[NixOS binary cache](https://cache.nixos.org).
+A *binary cache* is a Nix store which uses a different format: its
+metadata and signatures are kept in `.narinfo` files rather than in a
+Nix database.  This different format simplifies serving store objects
+over the network, but cannot host builds.  Examples of binary caches
+include S3 buckets and the [NixOS binary
+cache](https://cache.nixos.org).
 
 A *substituter* is a store other than `/nix/store` from which Nix will
 copy a store path instead of building it.  Nix will not copy a store
