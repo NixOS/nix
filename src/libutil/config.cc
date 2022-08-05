@@ -206,7 +206,7 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
 {
     args.addFlag({
         .longName = name,
-        .description = fmt("Set the `%s` setting.", name),
+        .description = fmt("Set the `%s` setting.\n%s", name, description),
         .category = category,
         .labels = {"value"},
         .handler = {[=](std::string s) { overridden = true; set(s); }},
@@ -215,7 +215,7 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
     if (isAppendable())
         args.addFlag({
             .longName = "extra-" + name,
-            .description = fmt("Append to the `%s` setting.", name),
+            .description = fmt("Append to the `%s` setting.\n%s", name, description),
             .category = category,
             .labels = {"value"},
             .handler = {[=](std::string s) { overridden = true; set(s, true); }},
@@ -268,13 +268,13 @@ template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string &
 {
     args.addFlag({
         .longName = name,
-        .description = fmt("Enable the `%s` setting.", name),
+        .description = fmt("Enable the `%s` setting.\n%s", name, description),
         .category = category,
         .handler = {[=]() { override(true); }}
     });
     args.addFlag({
         .longName = "no-" + name,
-        .description = fmt("Disable the `%s` setting.", name),
+        .description = fmt("Disable the `%s` setting.\n%s", name, description),
         .category = category,
         .handler = {[=]() { override(false); }}
     });
