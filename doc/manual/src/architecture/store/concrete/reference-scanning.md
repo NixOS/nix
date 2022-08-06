@@ -27,13 +27,15 @@ The result is that just scanning for hashes works quite well!
 ## How it works
 
 Hashes are scanned for, not entire store paths.
-Thus, Nix would look for, e.g.,
+Thus, Nix would look for, e.g.:
 ```
 b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z
 ```
-not
+not all of:
 ```
 /nix/store/b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z-firefox-33.1
+           |------------------------------|
+                the part we search for
 ```
 
 ## When it happens

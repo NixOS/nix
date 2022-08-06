@@ -127,19 +127,25 @@ hash of `<pre>`; the hash part of the store name
 
 - `<type>` = one of:
 
-  - `text:<r1>:<r2>:...<rN>`
+  - ```bnf
+    text:<r1>:<r2>:...<rN>
+    ```
 
     for encoded derivations written to the store.
     `<r1> ... <rN>` are the store paths referenced by this path.
     Those are encoded in the form described by `<realized-path>`.
 
-  - `source:<r1>:<r2>:...:<rN>:self`
+  - ```bnf
+    source:<r1>:<r2>:...:<rN>:self
+    ```
 
     For paths copied to the store and hashed via a [Nix Archive (NAR)](./nar.md) and [SHA-256](sha-256).
     Just like in the text case, we can have the store objects referenced by their paths.
     Additionally, we can have an optional `:self` label to denote self reference.
 
-  - `output:<id>`
+  - ```bnf
+    output:<id>
+    ```
 
     For either the outputs built from derivations, OR paths copied to the store hashed that area single file hashed directly, or the via a hash algorithm other than [SHA-256](sha-256).
     (in that case "source" is used; it's silly, but it's done that way for compatibility).
@@ -166,17 +172,12 @@ hash of `<pre>`; the hash part of the store name
 
       the string `fixed:out:<rec><algo>:<hash>:`, where
 
-        - `<rec>` = `r:` for recursive ([NAR](./nar.md) hashes, or `` for flat (file) hashes
+        - `<rec>` = one of:
+
+          - `r:` for [NAR](./nar.md) (arbitrary file system object) hashes
+
+          - `` (empty string) for flat (single file) hashes
 
         - `<algo>` = `md5`, `sha1` or `sha256`
 
         -`<hash>` = base-16 representation of the path or flat hash of the contents of the path (or expected contents of the path for fixed-output derivations).
-
-Note that since a derivation output has always type `output`, while something added to the store manually can have type `output` or `source` depending on the hash,
-this means that the same input can be hashed differently if added to the store via addToStore or via a derivation, in the [SHA-256](sha-256) & [NAR](./nar.md) case.
-
-It would have been nicer to handle fixed-output derivations under `source`, e.g. have something like `source:<rec><algo>`, but we're stuck with this for now.
-
-The main reason for this way of computing names is to prevent name collisions (for security).
-For instance, it shouldn't be feasible to come up with a derivation whose output path collides with the path for a copied source.
-The former would have a `<pre>` starting with `output:out:`, while the latter would have a `<pre>` starting with `source:`.
