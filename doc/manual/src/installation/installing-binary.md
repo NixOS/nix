@@ -13,7 +13,7 @@ for your platform:
 - multi-user on macOS
 
   > **Notes on read-only filesystem root in macOS 10.15 Catalina +**
-  > 
+  >
   > - It took some time to support this cleanly. You may see posts,
   >   examples, and tutorials using obsolete workarounds.
   > - Supporting it cleanly made macOS installs too complex to qualify
@@ -75,7 +75,7 @@ should run this under your usual user account, *not* as root. The script
 will invoke `sudo` as needed.
 
 > **Note**
-> 
+>
 > If you need Nix to use a different group ID or user ID set, you will
 > have to download the tarball manually and [edit the install
 > script](#installing-from-a-binary-tarball).
@@ -167,7 +167,7 @@ and `/etc/zshrc` which you may remove.
    removed next.
 
 7. Remove the Nix Store volume:
-   
+
    ```console
    sudo diskutil apfs deleteVolume /nix
    ```
@@ -176,7 +176,7 @@ and `/etc/zshrc` which you may remove.
    store.
 
 > **Note**
-> 
+>
 > After you complete the steps here, you will still have an empty `/nix`
 > directory. This is an expected sign of a successful uninstall. The empty
 > `/nix` directory will disappear the next time you reboot.
