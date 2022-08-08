@@ -12,12 +12,8 @@
     `/nix/store`.
 
     From   the  perspective   of   the  location   where  Nix   is
-    invoked<sup><b>1</b></sup>, the  Nix store can be  referred to
+    invoked, the  Nix store can be  referred to
     as a "_local_" or a "_remote_" one:
-
-    <sup>\[1]: Where "invoking Nix" means  an executing a Nix core
-    action/operation on  a Nix store.  For example, using  any CLI
-    commands from the `NixOS/nix` implementation.</sup>
 
     + A *local  store* exists  on the local  filesystem of
       the machine where Nix is  invoked. You can use other
