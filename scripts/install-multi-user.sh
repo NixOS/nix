@@ -337,10 +337,15 @@ __sudo() {
 _sudo() {
     local expl="$1"
     shift
-    if ! headless; then
+    if ! headless || is_root; then
         __sudo "$expl" "$*" >&2
     fi
-    sudo "$@"
+
+    if is_root; then
+        env "$@"
+    else
+        sudo "$@"
+    fi
 }
 
 
@@ -891,17 +896,6 @@ EOF
 
 
 main() {
-    # TODO: I've moved this out of validate_starting_assumptions so we
-    # can fail faster in this case. Sourcing install-darwin... now runs
-    # `touch /` to detect Read-only root, but it could update times on
-    # pre-Catalina macOS if run as root user.
-    if is_root; then
-        failure <<EOF
-Please do not run this script with root privileges. I will call sudo
-when I need to.
-EOF
-    fi
-
     check_selinux
 
     if is_os_darwin; then
@@ -915,7 +909,10 @@ EOF
     fi
 
     welcome_to_nix
-    chat_about_sudo
+
+    if ! is_root; then
+        chat_about_sudo
+    fi
 
     cure_artifacts
     # TODO: there's a tension between cure and validate. I moved the

@@ -31,8 +31,8 @@ $ sh <(curl -L https://nixos.org/nix/install) --no-daemon
 ```
 
 This will perform a single-user installation of Nix, meaning that `/nix`
-is owned by the invoking user. You should run this under your usual user
-account, *not* as root. The script will invoke `sudo` to create `/nix`
+is owned by the invoking user. You can run this under your usual user
+account or root. The script will invoke `sudo` to create `/nix`
 if it doesn’t already exist. If you don’t have `sudo`, you should
 manually create `/nix` first as root, e.g.:
 
@@ -71,7 +71,7 @@ $ sh <(curl -L https://nixos.org/nix/install) --daemon
 
 The multi-user installation of Nix will create build users between the
 user IDs 30001 and 30032, and a group with the group ID 30000. You
-should run this under your usual user account, *not* as root. The script
+can run this under your usual user account or root. The script
 will invoke `sudo` as needed.
 
 > **Note**
