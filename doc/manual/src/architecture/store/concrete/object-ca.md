@@ -94,7 +94,7 @@ data ContentAddressMethod
     }
   | Fixed {
       method           : Method,
-    } -- has side condition
+    }
 ```
 
 The following simple record
@@ -132,13 +132,97 @@ This however, is in some cases still experimental, so in practice input addressi
 
 With the semantics of content-addressing thus clarified, we can now discuss the encoding to a string.
 
-TODO
+Per the [previous section on store paths](./path.md), every store path is calculated using a hashed
 
-Note that since a derivation output has always type `output`, while something added to the store manually can have type `output` or `source` depending on the hash,
-this means that the same input can be hashed differently if added to the store via addToStore or via a derivation, in the [SHA-256](sha-256) & [NAR](./nar.md) case.
+`<pre>` = the string `<type>:sha256:<inner-digest>:<store>:<name>`;
 
-It would have been nicer to handle fixed-output derivations under `source`, e.g. have something like `source:<rec><algo>`, but we're stuck with this for now.
+and within that just `<type>` and `<inner-digest>` are determined differently based on the type of store path.
 
-The main reason for this way of computing names is to prevent name collisions (for security).
+### Type
+
+#### Spec
+
+`<type>` = one of:
+
+- For the "text" content-addressing method:
+  ```bnf
+  text:<r1>:<r2>:...<rN>
+  ```
+
+- For the "fixed" content-addressing method, one of:
+
+   - When the method is [Nix Archive (NAR)](./nar.md) (not flat) and the hash type is [SHA-256](sha-256):
+     ```bnf
+     source:<r1>:<r2>:...:<rN>:self
+     ```
+
+   - Otherwise:
+     ```bnf
+     output:out
+     ```
+
+In all of the above, `<r1> ... <rN>` are the store paths referenced by this path.
+Those are encoded in the form described by `<realized-path>`.
+
+#### Restrictions on references
+
+Note that the `output:out` case alone doesn't have any `<r1> ... <rN>`; this is why there was the side condition stated above that cases besides [Nix Archive (NAR)](./nar.md) and [SHA-256](sha-256) didn't support references.
+
+#### A historical accident
+
+The `source` vs `output:out` distinction dates back to making sure that input-addressed derivation outputs and content-addressed sources would never share store paths (baring a hash collision).
+This is a good property, important for security.
 For instance, it shouldn't be feasible to come up with a derivation whose output path collides with the path for a copied source.
-The former would have a `<pre>` starting with `output:out:`, while the latter would have a `<pre>` starting with `source:`.
+The former would have a `<type>` of `output:out`, while the latter would have a `<type>` of `source`.
+
+However, later on derivations with content addressed outputs existed (the fixed output case much earlier than the floating output one), and they nonetheless used `output:out` despite being fixed output, muddling the distinction.
+The "inner digest" still ensures our security property is intact, but the "type" no longer tells a clear store.
+
+It would have been nicer to handle all paths for content-addressed objects in a uniform way, but we're stuck with this for now.
+
+### Inner Digest
+
+#### Spec
+
+`<inner-digest>` = base-16 representation of a SHA-256 hash of:
+
+- For the "text" content-addressing method:
+
+  the string -- root file system object must be a single file which is that string.
+
+- For the "fixed" content-addressing method, one of:
+
+  - When the method is [Nix Archive (NAR)](./nar.md) (not flat) and the hash type is [SHA-256](sha-256):
+
+    the NAR serialisation of the path from which this store path is copied
+
+  - Otherwise:
+
+    the string `fixed:out:<rec><algo>:<hash>:`, where
+
+      - `<rec>` = one of:
+
+        - `r:` for [NAR](./nar.md) (arbitrary file system object) hashes
+
+        - `` (empty string) for flat (single file) hashes
+
+      - `<algo>` = `md5`, `sha1` or `sha256`
+
+      -`<hash>` = base-16 representation of the path or flat hash of the contents of the path (or expected contents of the path for fixed-output derivations).
+
+#### Relying on invariants to encode less information
+
+Both in the "text" and "fixed and method = flat" cases, the file system objects are just a single root file, and so we just take that directly, and don't need the extra information a NAR wrapping that single object would provide
+
+Both in the "text" and "fixed, method = NAR, and hash type = SHA-256" (i.e. in the encoding type = `source`) cases,
+We also the hash type is SHA-256, so we don't need to encode that either.
+
+#### How many times do we hash?
+
+In all cases, the complete contents of the file system objects of the store object affects the store hash.
+
+In the "text" and "fixed, method = NAR, and hash type = SHA-256" (i.e. with the encoding type = `source`) cases,
+we know both the hash type and file system object serialization method.
+We therefore *directly* hash the file system object(s) to get the inner digest.
+
+In the other "fixed" cases (i.e. with the encoding type = `fixed:output`), we do not know this information statically, so we need to wrap the file system objects digest with that information and hash a *second* time to produce the inner digest

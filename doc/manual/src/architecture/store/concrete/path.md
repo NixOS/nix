@@ -149,7 +149,9 @@ hash of `<pre>`; the hash part of the store name
 
     For either the outputs built from derivations, OR paths copied to the store hashed that area single file hashed directly, or the via a hash algorithm other than [SHA-256](sha-256).
     (in that case "source" is used; it's silly, but it's done that way for compatibility).
+
     `<id>` is the name of the output (usually, "out").
+    For content-addressed store objects, `<id>`, is always "out".
 
 - `<inner-digest>` = base-16 representation of a SHA-256 hash of:
 
