@@ -59,6 +59,30 @@ headless() {
     fi
 }
 
+is_root() {
+    if [ "$EUID" -eq 0 ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+is_os_linux() {
+    if [ "$(uname -s)" = "Linux" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+is_os_darwin() {
+    if [ "$(uname -s)" = "Darwin" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 contact_us() {
     echo "You can open an issue at https://github.com/nixos/nix/issues"
     echo ""
@@ -423,7 +447,7 @@ EOF
         fi
     done
 
-    if [ "$(uname -s)" = "Linux" ] && [ ! -e /run/systemd/system ]; then
+    if is_os_linux && [ ! -e /run/systemd/system ]; then
         warning <<EOF
 We did not detect systemd on your system. With a multi-user install
 without systemd you will have to manually configure your init system to
@@ -865,12 +889,13 @@ EOF
           install -m 0664 "$SCRATCH/nix.conf" /etc/nix/nix.conf
 }
 
+
 main() {
     # TODO: I've moved this out of validate_starting_assumptions so we
     # can fail faster in this case. Sourcing install-darwin... now runs
     # `touch /` to detect Read-only root, but it could update times on
     # pre-Catalina macOS if run as root user.
-    if [ "$EUID" -eq 0 ]; then
+    if is_root; then
         failure <<EOF
 Please do not run this script with root privileges. I will call sudo
 when I need to.
@@ -879,10 +904,10 @@ EOF
 
     check_selinux
 
-    if [ "$(uname -s)" = "Darwin" ]; then
+    if is_os_darwin; then
         # shellcheck source=./install-darwin-multi-user.sh
         . "$EXTRACTED_NIX_PATH/install-darwin-multi-user.sh"
-    elif [ "$(uname -s)" = "Linux" ]; then
+    elif is_os_linux; then
         # shellcheck source=./install-systemd-multi-user.sh
         . "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh" # most of this works on non-systemd distros also
     else
