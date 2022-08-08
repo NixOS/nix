@@ -1,6 +1,6 @@
 # Operators
 
-The table below lists the operators in the Nix expression language, in
+The table below lists the operators in the Nix language, in
 order of precedence (from strongest to weakest binding).
 
 | Name                     | Syntax                              | Associativity | Description                                                                                                                                                                                                                   | Precedence |

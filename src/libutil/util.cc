@@ -522,6 +522,7 @@ Path getHome()
 {
     static Path homeDir = []()
     {
+        std::optional<std::string> unownedUserHomeDir = {};
         auto homeDir = getEnv("HOME");
         if (homeDir) {
             // Only use $HOME if doesn't exist or is owned by the current user.
@@ -533,8 +534,7 @@ Path getHome()
                     homeDir.reset();
                 }
             } else if (st.st_uid != geteuid()) {
-                warn("$HOME ('%s') is not owned by you, falling back to the one defined in the 'passwd' file", *homeDir);
-                homeDir.reset();
+                unownedUserHomeDir.swap(homeDir);
             }
         }
         if (!homeDir) {
@@ -545,6 +545,9 @@ Path getHome()
                 || !pw || !pw->pw_dir || !pw->pw_dir[0])
                 throw Error("cannot determine user's home directory");
             homeDir = pw->pw_dir;
+            if (unownedUserHomeDir.has_value() && unownedUserHomeDir != homeDir) {
+                warn("$HOME ('%s') is not owned by you, falling back to the one defined in the 'passwd' file ('%s')", *unownedUserHomeDir, *homeDir);
+            }
         }
         return *homeDir;
     }();
