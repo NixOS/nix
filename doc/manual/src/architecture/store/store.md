@@ -48,6 +48,10 @@ A reference will always point to exactly one store object.
 
 A Nix store can *add*, *retrieve*, and *delete* store objects.
 
+As a visual aid to the functional interface, the following diagrams can be read
+- top to bottom: input and output
+- left to right: change of state.
+
                 [ data ]
                     |
                     V
@@ -83,7 +87,7 @@ It can *perform builds*, that is, create new store objects by transforming build
     [ store ] --> build --(maybe)--> [ store' ]
                              |
                              V
-                       [ reference ]
+                       [ reference' ]
 
 
 As it keeps track of references, it can [garbage-collect][garbage-collection] unused store objects.
