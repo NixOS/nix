@@ -508,61 +508,6 @@ void deletePath(const Path & path, uint64_t & bytesFreed)
 }
 
 
-static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
-    int & counter)
-{
-    tmpRoot = canonPath(tmpRoot.empty() ? getEnv("TMPDIR").value_or("/tmp") : tmpRoot, true);
-    if (includePid)
-        return (format("%1%/%2%-%3%-%4%") % tmpRoot % prefix % getpid() % counter++).str();
-    else
-        return (format("%1%/%2%-%3%") % tmpRoot % prefix % counter++).str();
-}
-
-
-Path createTempDir(const Path & tmpRoot, const Path & prefix,
-    bool includePid, bool useGlobalCounter, mode_t mode)
-{
-    static int globalCounter = 0;
-    int localCounter = 0;
-    int & counter(useGlobalCounter ? globalCounter : localCounter);
-
-    while (1) {
-        checkInterrupt();
-        Path tmpDir = tempName(tmpRoot, prefix, includePid, counter);
-        if (mkdir(tmpDir.c_str(), mode) == 0) {
-#if __FreeBSD__
-            /* Explicitly set the group of the directory.  This is to
-               work around around problems caused by BSD's group
-               ownership semantics (directories inherit the group of
-               the parent).  For instance, the group of /tmp on
-               FreeBSD is "wheel", so all directories created in /tmp
-               will be owned by "wheel"; but if the user is not in
-               "wheel", then "tar" will fail to unpack archives that
-               have the setgid bit set on directories. */
-            if (chown(tmpDir.c_str(), (uid_t) -1, getegid()) != 0)
-                throw SysError("setting group of directory '%1%'", tmpDir);
-#endif
-            return tmpDir;
-        }
-        if (errno != EEXIST)
-            throw SysError("creating directory '%1%'", tmpDir);
-    }
-}
-
-
-std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
-{
-    Path tmpl(getEnv("TMPDIR").value_or("/tmp") + "/" + prefix + ".XXXXXX");
-    // Strictly speaking, this is UB, but who cares...
-    // FIXME: use O_TMPFILE.
-    AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
-    if (!fd)
-        throw SysError("creating temporary file '%s'", tmpl);
-    closeOnExec(fd.get());
-    return {std::move(fd), tmpl};
-}
-
-
 std::string getUserName()
 {
     auto pw = getpwuid(geteuid());
@@ -681,44 +626,6 @@ Paths createDirs(const Path & path)
     if (!S_ISDIR(st.st_mode)) throw Error("'%1%' is not a directory", path);
 
     return created;
-}
-
-
-void createSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime)
-{
-    if (symlink(target.c_str(), link.c_str()))
-        throw SysError("creating symlink from '%1%' to '%2%'", link, target);
-    if (mtime) {
-        struct timeval times[2];
-        times[0].tv_sec = *mtime;
-        times[0].tv_usec = 0;
-        times[1].tv_sec = *mtime;
-        times[1].tv_usec = 0;
-        if (lutimes(link.c_str(), times))
-            throw SysError("setting time of symlink '%s'", link);
-    }
-}
-
-
-void replaceSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime)
-{
-    for (unsigned int n = 0; true; n++) {
-        Path tmp = canonPath(fmt("%s/.%d_%s", dirOf(link), n, baseNameOf(link)));
-
-        try {
-            createSymlink(target, tmp, mtime);
-        } catch (SysError & e) {
-            if (e.errNo == EEXIST) continue;
-            throw;
-        }
-
-        if (rename(tmp.c_str(), link.c_str()) != 0)
-            throw SysError("renaming '%1%' to '%2%'", tmp, link);
-
-        break;
-    }
 }
 
 
