@@ -139,7 +139,7 @@ hash of `<pre>`; the hash part of the store name
     source:<r1>:<r2>:...:<rN>:self
     ```
 
-    For paths copied to the store and hashed via a [Nix Archive (NAR)](./nar.md) and [SHA-256](sha-256).
+    For paths copied to the store and hashed via a [Nix Archive (NAR)](./ca-fso.md#nix-archive) and [SHA-256](sha-256).
     Just like in the text case, we can have the store objects referenced by their paths.
     Additionally, we can have an optional `:self` label to denote self reference.
 
@@ -176,7 +176,7 @@ hash of `<pre>`; the hash part of the store name
 
         - `<rec>` = one of:
 
-          - `r:` for [NAR](./nar.md) (arbitrary file system object) hashes
+          - `r:` for [NAR](./ca-fso.md#nix-archive) (arbitrary file system object) hashes
 
           - `` (empty string) for flat (single file) hashes
 

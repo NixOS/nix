@@ -12,7 +12,7 @@ let's reasons *forwards* first describing the semantics, and then the string enc
 
 File system objects are hashed in
 
-- [Nix Archive (NAR)](./nar.md) hashing, where an arbitrary FSOs and its children are serialized according to that format and then hashed.
+- [Nix Archive (NAR)](./ca-fso.md#nix-archive) hashing, where an arbitrary FSOs and its children are serialized according to that format and then hashed.
 
 - Flat hashing, where the FSO must be a single file, and its contents are hashed.
 
@@ -151,7 +151,7 @@ and within that just `<type>` and `<inner-digest>` are determined differently ba
 
 - For the "fixed" content-addressing method, one of:
 
-   - When the method is [Nix Archive (NAR)](./nar.md) (not flat) and the hash type is [SHA-256](sha-256):
+   - When the method is [Nix Archive (NAR)](./ca-fso.md#nix-archive) (not flat) and the hash type is [SHA-256](sha-256):
      ```bnf
      source:<r1>:<r2>:...:<rN>:self
      ```
@@ -166,7 +166,7 @@ Those are encoded in the form described by `<realized-path>`.
 
 #### Restrictions on references
 
-Note that the `output:out` case alone doesn't have any `<r1> ... <rN>`; this is why there was the side condition stated above that cases besides [Nix Archive (NAR)](./nar.md) and [SHA-256](sha-256) didn't support references.
+Note that the `output:out` case alone doesn't have any `<r1> ... <rN>`; this is why there was the side condition stated above that cases besides [Nix Archive (NAR)](./ca-fso.md#nix-archive) and [SHA-256](sha-256) didn't support references.
 
 #### A historical accident
 
@@ -192,7 +192,7 @@ It would have been nicer to handle all paths for content-addressed objects in a 
 
 - For the "fixed" content-addressing method, one of:
 
-  - When the method is [Nix Archive (NAR)](./nar.md) (not flat) and the hash type is [SHA-256](sha-256):
+  - When the method is [Nix Archive (NAR)](./ca-fso.md#nix-archive) (not flat) and the hash type is [SHA-256](sha-256):
 
     the NAR serialisation of the path from which this store path is copied
 
@@ -202,13 +202,13 @@ It would have been nicer to handle all paths for content-addressed objects in a 
 
       - `<rec>` = one of:
 
-        - `r:` for [NAR](./nar.md) (arbitrary file system object) hashes
+        - `r:` for [NAR](./ca-fso.md#nix-archive) (arbitrary file system object) hashes
 
         - `` (empty string) for flat (single file) hashes
 
       - `<algo>` = `md5`, `sha1` or `sha256`
 
-      -`<hash>` = base-16 representation of the path or flat hash of the contents of the path (or expected contents of the path for fixed-output derivations).
+      - `<hash>` = base-16 representation of the path or flat hash of the contents of the path (or expected contents of the path for fixed-output derivations).
 
 #### Relying on invariants to encode less information
 
