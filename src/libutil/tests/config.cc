@@ -245,7 +245,7 @@ namespace nix {
 
     TEST(Config, applyConfigInvalidThrows) {
         Config config;
-        ASSERT_THROW(config.applyConfig("value == key"), UsageError);
-        ASSERT_THROW(config.applyConfig("value "), UsageError);
+        ASSERT_THROW(config.applyConfig("value == key"), ConfigError);
+        ASSERT_THROW(config.applyConfig("value "), ConfigError);
     }
 }

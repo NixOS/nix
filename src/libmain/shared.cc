@@ -382,6 +382,10 @@ int handleExceptions(const std::string & programName, std::function<void()> fun)
         }
     } catch (Exit & e) {
         return e.status;
+    } catch (ConfigError & e) {
+        logError(e.info());
+        printError("Try 'man nix.conf' for more information.");
+        return 1;
     } catch (UsageError & e) {
         logError(e.info());
         printError("Try '%1% --help' for more information.", programName);
