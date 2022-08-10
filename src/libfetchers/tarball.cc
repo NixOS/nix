@@ -232,11 +232,6 @@ struct CurlInputScheme : InputScheme
         return url;
     }
 
-    bool hasAllInfo(const Input & input) const override
-    {
-        return true;
-    }
-
     bool isLocked(const Input & input) const override
     {
         return (bool) input.getNarHash();

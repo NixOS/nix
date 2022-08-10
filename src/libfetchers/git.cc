@@ -204,15 +204,6 @@ struct GitInputScheme : InputScheme
         return url;
     }
 
-    bool hasAllInfo(const Input & input) const override
-    {
-        bool maybeDirty = !input.getRef();
-        bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
-        return
-            maybeGetIntAttr(input.attrs, "lastModified")
-            && (shallow || maybeDirty || maybeGetIntAttr(input.attrs, "revCount"));
-    }
-
     Input applyOverrides(
         const Input & input,
         std::optional<std::string> ref,

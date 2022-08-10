@@ -84,11 +84,6 @@ struct PathInputScheme : InputScheme
         return (bool) input.getNarHash();
     }
 
-    bool hasAllInfo(const Input & input) const override
-    {
-        return true;
-    }
-
     void putFile(
         const Input & input,
         const CanonPath & path,

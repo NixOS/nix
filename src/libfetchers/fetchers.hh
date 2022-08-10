@@ -55,8 +55,6 @@ public:
        relative path, i.e. './foo'. */
     std::optional<CanonPath> isRelative() const;
 
-    bool hasAllInfo() const;
-
     bool operator ==(const Input & other) const;
 
     bool contains(const Input & other) const;
@@ -118,8 +116,6 @@ struct InputScheme
     virtual std::optional<Input> inputFromAttrs(const Attrs & attrs) const = 0;
 
     virtual ParsedURL toURL(const Input & input) const;
-
-    virtual bool hasAllInfo(const Input & input) const = 0;
 
     virtual Input applyOverrides(
         const Input & input,

@@ -76,11 +76,6 @@ struct IndirectInputScheme : InputScheme
         return url;
     }
 
-    bool hasAllInfo(const Input & input) const override
-    {
-        return false;
-    }
-
     Input applyOverrides(
         const Input & _input,
         std::optional<std::string> ref,

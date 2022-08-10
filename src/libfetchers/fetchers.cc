@@ -101,11 +101,6 @@ std::optional<CanonPath> Input::isRelative() const
     return scheme->isRelative(*this);
 }
 
-bool Input::hasAllInfo() const
-{
-    return getNarHash() && scheme && scheme->hasAllInfo(*this);
-}
-
 bool Input::operator ==(const Input & other) const
 {
     return attrs == other.attrs;
@@ -170,11 +165,6 @@ void Input::checkLocks(Input & input) const
             throw Error("'revCount' attribute mismatch in input '%s', expected %d",
                 input.to_string(), *prevRevCount);
     }
-
-    // FIXME
-    #if 0
-    assert(input.hasAllInfo());
-    #endif
 }
 
 std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
