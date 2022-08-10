@@ -229,7 +229,6 @@ struct MercurialInputScheme : InputScheme
             assert(input.getRev());
             assert(!origRev || origRev == input.getRev());
             input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
-            input.locked = true;
             return storePath;
         };
 
@@ -335,6 +334,11 @@ struct MercurialInputScheme : InputScheme
         auto storePath = fetchToStore(store, input);
 
         return {makeStorePathAccessor(store, storePath), input};
+    }
+
+    bool isLocked(const Input & input) const override
+    {
+        return (bool) input.getRev();
     }
 };
 

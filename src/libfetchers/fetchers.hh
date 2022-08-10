@@ -27,7 +27,6 @@ struct Input
 
     std::shared_ptr<InputScheme> scheme; // note: can be null
     Attrs attrs;
-    bool locked = false;
 
 public:
     static Input fromURL(const std::string & url);
@@ -50,7 +49,7 @@ public:
 
     /* Check whether this is a "locked" input, that is,
        one that contains a commit hash or content hash. */
-    bool isLocked() const { return locked; }
+    bool isLocked() const;
 
     /* Only for relative path flakes, i.e. 'path:./foo', returns the
        relative path, i.e. './foo'. */
@@ -139,6 +138,9 @@ struct InputScheme
 
     virtual bool isDirect(const Input & input) const
     { return true; }
+
+    virtual bool isLocked(const Input & input) const
+    { return false; }
 
     virtual std::optional<CanonPath> isRelative(const Input & input) const
     { return std::nullopt; }

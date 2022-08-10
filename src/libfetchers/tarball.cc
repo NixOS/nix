@@ -237,6 +237,10 @@ struct CurlInputScheme : InputScheme
         return true;
     }
 
+    bool isLocked(const Input & input) const override
+    {
+        return (bool) input.getNarHash();
+    }
 };
 
 struct FileInputScheme : CurlInputScheme
@@ -261,7 +265,6 @@ struct FileInputScheme : CurlInputScheme
         // FIXME: remove?
         auto narHash = store->queryPathInfo(file.storePath)->narHash;
         input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
-        input.locked = true;
 
         return {makeStorePathAccessor(store, file.storePath), input};
     }
@@ -290,7 +293,6 @@ struct TarballInputScheme : CurlInputScheme
         // FIXME: remove?
         auto narHash = store->queryPathInfo(storePath)->narHash;
         input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
-        input.locked = true;
 
         return {makeStorePathAccessor(store, storePath), input};
     }

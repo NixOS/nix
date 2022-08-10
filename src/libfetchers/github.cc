@@ -194,8 +194,6 @@ struct GitArchiveInputScheme : InputScheme
         auto rev = input.getRev();
         if (!rev) rev = getRevFromRef(store, input);
 
-        input.locked = true;
-
         input.attrs.erase("ref");
         input.attrs.insert_or_assign("rev", rev->gitRev());
 
@@ -239,6 +237,11 @@ struct GitArchiveInputScheme : InputScheme
         accessor->setPathDisplay("«" + input2.to_string() + "»");
 
         return {accessor, input2};
+    }
+
+    bool isLocked(const Input & input) const override
+    {
+        return (bool) input.getRev();
     }
 };
 

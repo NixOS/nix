@@ -24,12 +24,8 @@ static void fixupInput(Input & input)
     // Check common attributes.
     input.getType();
     input.getRef();
-    if (input.getRev())
-        input.locked = true;
     input.getRevCount();
     input.getLastModified();
-    if (input.getNarHash())
-        input.locked = true;
 }
 
 Input Input::fromURL(const ParsedURL & url)
@@ -92,6 +88,11 @@ bool Input::isDirect() const
 {
     assert(scheme);
     return !scheme || scheme->isDirect(*this);
+}
+
+bool Input::isLocked() const
+{
+    return scheme && scheme->isLocked(*this);
 }
 
 std::optional<CanonPath> Input::isRelative() const
@@ -172,8 +173,6 @@ void Input::checkLocks(Input & input) const
 
     // FIXME
     #if 0
-    input.locked = true;
-
     assert(input.hasAllInfo());
     #endif
 }

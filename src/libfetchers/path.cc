@@ -43,7 +43,10 @@ struct PathInputScheme : InputScheme
             /* Allow the user to pass in "fake" tree info
                attributes. This is useful for making a pinned tree
                work the same as the repository from which is exported
-               (e.g. path:/nix/store/...-source?lastModified=1585388205&rev=b0c285...). */
+               (e.g. path:/nix/store/...-source?lastModified=1585388205&rev=b0c285...).
+               FIXME: remove this hack once we have a prepopulated
+               flake input cache mechanism.
+            */
             if (name == "type" || name == "rev" || name == "revCount" || name == "lastModified" || name == "narHash" || name == "path")
                 // checked in Input::fromAttrs
                 ;
@@ -74,6 +77,11 @@ struct PathInputScheme : InputScheme
             return std::nullopt;
         else
             return CanonPath(path);
+    }
+
+    bool isLocked(const Input & input) const override
+    {
+        return (bool) input.getNarHash();
     }
 
     bool hasAllInfo(const Input & input) const override

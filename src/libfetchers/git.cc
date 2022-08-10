@@ -482,7 +482,6 @@ struct GitInputScheme : InputScheme
             //input.attrs.erase("narHash");
             auto narHash = store->queryPathInfo(storePath)->narHash;
             input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
-            input.locked = true;
 
             return storePath;
         };
@@ -732,8 +731,6 @@ struct GitInputScheme : InputScheme
             input.attrs.insert_or_assign(
                 "revCount",
                 getRevCount(repoInfo, repoInfo.url, *input.getRev()));
-
-            input.locked = true;
         }
 
         // FIXME: maybe we should use the timestamp of the last
@@ -743,6 +740,11 @@ struct GitInputScheme : InputScheme
             getLastModified(repoInfo, repoInfo.url, ref));
 
         return {makeFSInputAccessor(CanonPath(repoInfo.url), listFiles(repoInfo), std::move(makeNotAllowedError)), input};
+    }
+
+    bool isLocked(const Input & input) const override
+    {
+        return (bool) input.getRev();
     }
 };
 
