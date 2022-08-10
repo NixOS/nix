@@ -1,6 +1,6 @@
-# Nix Expression Language
+# Nix Language
 
-The Nix expression language is a pure, lazy, functional language. Purity
+The Nix language is a pure, lazy, functional language. Purity
 means that operations in the language don't have side-effects (for
 instance, there is no variable assignment). Laziness means that
 arguments to functions are evaluated only when they are needed.
@@ -10,3 +10,4 @@ full-featured, general purpose language. Its main job is to describe
 packages, compositions of packages, and the variability within packages.
 
 This section presents the various features of the language.
+
