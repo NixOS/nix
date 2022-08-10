@@ -57,8 +57,7 @@ protected:
         AutoDelete del(tmp, false);
         StreamToSourceAdapter source(istream);
         writeFile(tmp, source);
-        if (rename(tmp.c_str(), path2.c_str()))
-            throw SysError("renaming '%1%' to '%2%'", tmp, path2);
+        renameFile(tmp, path2);
         del.cancel();
     }
 
