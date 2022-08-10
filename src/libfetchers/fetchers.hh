@@ -28,7 +28,6 @@ struct Input
     std::shared_ptr<InputScheme> scheme; // note: can be null
     Attrs attrs;
     bool locked = false;
-    bool direct = true;
 
 public:
     static Input fromURL(const std::string & url);
@@ -47,7 +46,7 @@ public:
 
     /* Check whether this is a "direct" input, that is, not
        one that goes through a registry. */
-    bool isDirect() const { return direct; }
+    bool isDirect() const;
 
     /* Check whether this is a "locked" input, that is,
        one that contains a commit hash or content hash. */
@@ -137,6 +136,9 @@ struct InputScheme
         std::optional<std::string> commitMsg) const;
 
     virtual std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const = 0;
+
+    virtual bool isDirect(const Input & input) const
+    { return true; }
 
     virtual std::optional<CanonPath> isRelative(const Input & input) const
     { return std::nullopt; }

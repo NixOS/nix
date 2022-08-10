@@ -88,6 +88,12 @@ Attrs Input::toAttrs() const
     return attrs;
 }
 
+bool Input::isDirect() const
+{
+    assert(scheme);
+    return !scheme || scheme->isDirect(*this);
+}
+
 std::optional<CanonPath> Input::isRelative() const
 {
     assert(scheme);
