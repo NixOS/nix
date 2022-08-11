@@ -401,11 +401,15 @@ struct GitInputScheme : InputScheme
         return res;
     }
 
-    void updateRev(Input & input, const RepoInfo & repoInfo, const std::string & ref) const
+    Hash updateRev(Input & input, const RepoInfo & repoInfo, const std::string & ref) const
     {
-        if (!input.getRev())
-            input.attrs.insert_or_assign("rev",
-                Hash::parseAny(chomp(runProgram("git", true, { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "rev-parse", ref })), htSHA1).gitRev());
+        if (auto r = input.getRev())
+            return *r;
+        else {
+            auto rev = Hash::parseAny(chomp(runProgram("git", true, { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "rev-parse", ref })), htSHA1);
+            input.attrs.insert_or_assign("rev", rev.gitRev());
+            return rev;
+        }
     }
 
     uint64_t getLastModified(const RepoInfo & repoInfo, const std::string & repoDir, const std::string & ref) const
@@ -418,15 +422,46 @@ struct GitInputScheme : InputScheme
             : 0;
     }
 
+    uint64_t getLastModified(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
+    {
+        if (!repoInfo.hasHead) return 0;
+
+        auto key = fmt("git-%s-last-modified", rev.gitRev());
+
+        auto cache = getCache();
+
+        if (auto lastModifiedS = cache->queryFact(key)) {
+            if (auto lastModified = string2Int<uint64_t>(*lastModifiedS))
+                return *lastModified;
+        }
+
+        auto lastModified = getLastModified(repoInfo, repoDir, rev.gitRev());
+
+        cache->upsertFact(key, std::to_string(lastModified));
+
+        return lastModified;
+    }
+
     uint64_t getRevCount(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
     {
-        // FIXME: cache this.
-        return
-            repoInfo.hasHead
-            ? std::stoull(
-                runProgram("git", true,
-                    { "-C", repoDir, "--git-dir", repoInfo.gitDir, "rev-list", "--count", rev.gitRev() }))
-            : 0;
+        if (!repoInfo.hasHead) return 0;
+
+        auto key = fmt("git-%s-revcount", rev.gitRev());
+
+        auto cache = getCache();
+
+        if (auto revCountS = cache->queryFact(key)) {
+            if (auto revCount = string2Int<uint64_t>(*revCountS))
+                return *revCount;
+        }
+
+        auto revCount = std::stoull(
+            runProgram("git", true,
+                { "-C", repoDir, "--git-dir", repoInfo.gitDir, "rev-list", "--count", rev.gitRev() }));
+
+        cache->upsertFact(key, std::to_string(revCount));
+
+        return revCount;
     }
 
     std::string getDefaultRef(const RepoInfo & repoInfo) const
@@ -664,7 +699,7 @@ struct GitInputScheme : InputScheme
 
         Attrs infoAttrs({
             {"rev", rev.gitRev()},
-            {"lastModified", getLastModified(repoInfo, repoDir, rev.gitRev())},
+            {"lastModified", getLastModified(repoInfo, repoDir, rev)},
         });
 
         if (!repoInfo.shallow)
@@ -717,18 +752,22 @@ struct GitInputScheme : InputScheme
         input.attrs.insert_or_assign("ref", ref);
 
         if (!repoInfo.isDirty) {
-            updateRev(input, repoInfo, ref);
+            auto rev = updateRev(input, repoInfo, ref);
 
             input.attrs.insert_or_assign(
                 "revCount",
-                getRevCount(repoInfo, repoInfo.url, *input.getRev()));
-        }
+                getRevCount(repoInfo, repoInfo.url, rev));
 
-        // FIXME: maybe we should use the timestamp of the last
-        // modified dirty file?
-        input.attrs.insert_or_assign(
-            "lastModified",
-            getLastModified(repoInfo, repoInfo.url, ref));
+            input.attrs.insert_or_assign(
+                "lastModified",
+                getLastModified(repoInfo, repoInfo.url, rev));
+        } else {
+            // FIXME: maybe we should use the timestamp of the last
+            // modified dirty file?
+            input.attrs.insert_or_assign(
+                "lastModified",
+                getLastModified(repoInfo, repoInfo.url, ref));
+        }
 
         return {makeFSInputAccessor(CanonPath(repoInfo.url), listFiles(repoInfo), std::move(makeNotAllowedError)), input};
     }

@@ -17,6 +17,12 @@ create table if not exists Cache (
     timestamp integer not null,
     primary key (input)
 );
+
+create table if not exists Facts (
+    name     text not null,
+    value    text not null,
+    primary key (name)
+);
 )sql";
 
 struct CacheImpl : Cache
@@ -24,7 +30,7 @@ struct CacheImpl : Cache
     struct State
     {
         SQLite db;
-        SQLiteStmt add, lookup;
+        SQLiteStmt add, lookup, upsertFact, queryFact;
     };
 
     Sync<State> _state;
@@ -33,7 +39,7 @@ struct CacheImpl : Cache
     {
         auto state(_state.lock());
 
-        auto dbPath = getCacheDir() + "/nix/fetcher-cache-v1.sqlite";
+        auto dbPath = getCacheDir() + "/nix/fetcher-cache-v2.sqlite";
         createDirs(dirOf(dbPath));
 
         state->db = SQLite(dbPath);
@@ -45,6 +51,12 @@ struct CacheImpl : Cache
 
         state->lookup.create(state->db,
             "select info, path, immutable, timestamp from Cache where input = ?");
+
+        state->upsertFact.create(state->db,
+            "insert or replace into Facts(name, value) values (?, ?)");
+
+        state->queryFact.create(state->db,
+            "select value from Facts where name = ?");
     }
 
     void add(
@@ -109,6 +121,25 @@ struct CacheImpl : Cache
             .infoAttrs = jsonToAttrs(nlohmann::json::parse(infoJSON)),
             .storePath = std::move(storePath)
         };
+    }
+
+    void upsertFact(
+        std::string_view key,
+        std::string_view value) override
+    {
+        _state.lock()->upsertFact.use()
+            (key)
+            (value).exec();
+    }
+
+    std::optional<std::string> queryFact(std::string_view key) override
+    {
+        auto state(_state.lock());
+
+        auto stmt(state->queryFact.use()(key));
+        if (!stmt.next()) return {};
+
+        return stmt.getStr(0);
     }
 };
 
