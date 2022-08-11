@@ -4,12 +4,16 @@
 #include "types.hh"
 #include "archive.hh"
 #include "canon-path.hh"
+#include "repair-flag.hh"
 
 namespace nix {
 
 MakeError(RestrictedPathError, Error);
 
 struct SourcePath;
+struct StorePath;
+class Store;
+enum RepairFlag;
 
 struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
 {
@@ -51,6 +55,13 @@ struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
         const CanonPath & path,
         Sink & sink,
         PathFilter & filter = defaultPathFilter);
+
+    StorePath fetchToStore(
+        ref<Store> store,
+        const CanonPath & path,
+        std::string_view name,
+        PathFilter * filter = nullptr,
+        RepairFlag repair = NoRepair);
 
     /* Return a corresponding path in the root filesystem, if
        possible. This is only possible for inputs that are
@@ -123,6 +134,12 @@ struct SourcePath
         Sink & sink,
         PathFilter & filter = defaultPathFilter) const
     { return accessor->dumpPath(path, sink, filter); }
+
+    StorePath fetchToStore(
+        ref<Store> store,
+        std::string_view name,
+        PathFilter * filter = nullptr,
+        RepairFlag repair = NoRepair) const;
 
     std::optional<CanonPath> getPhysicalPath() const
     { return accessor->getPhysicalPath(path); }

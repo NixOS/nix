@@ -2257,13 +2257,7 @@ StorePath EvalState::copyPathToStore(PathSet & context, const SourcePath & path)
     auto dstPath = i != srcToStore.end()
         ? i->second
         : [&]() {
-            auto source = sinkToSource([&](Sink & sink) {
-                path.dumpPath(sink);
-            });
-            auto dstPath =
-                settings.readOnlyMode
-                ? store->computeStorePathFromDump(*source, path.baseName()).first
-                : store->addToStoreFromDump(*source, path.baseName(), FileIngestionMethod::Recursive, htSHA256, repair);
+            auto dstPath = path.fetchToStore(store, path.baseName(), nullptr, repair);
             allowPath(dstPath);
             srcToStore.insert_or_assign(path, dstPath);
             printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));

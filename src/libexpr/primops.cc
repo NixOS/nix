@@ -2006,7 +2006,8 @@ static void addPath(
         }
         #endif
 
-        PathFilter filter = filterFun ? ([&](const Path & p) {
+        std::unique_ptr<PathFilter> filter;
+        if (filterFun) filter = std::make_unique<PathFilter>([&](const Path & p) {
             SourcePath path2{path.accessor, CanonPath(p)};
 
             auto st = path2.lstat();
@@ -2025,7 +2026,7 @@ static void addPath(
             state.callFunction(*filterFun, 2, args, res, pos);
 
             return state.forceBool(res, pos);
-        }) : defaultPathFilter;
+        });
 
         std::optional<StorePath> expectedStorePath;
         if (expectedHash)
@@ -2036,13 +2037,10 @@ static void addPath(
         // store on-demand.
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-            auto source = sinkToSource([&](Sink & sink) {
-                path.dumpPath(sink, filter);
-            });
-            auto dstPath =
-                settings.readOnlyMode
-                ? state.store->computeStorePathFromDump(*source, name, method, htSHA256, refs).first
-                : state.store->addToStoreFromDump(*source, name, method, htSHA256, state.repair);
+            // FIXME
+            if (method != FileIngestionMethod::Recursive)
+                throw Error("'recursive = false' is not implemented");
+            auto dstPath = path.fetchToStore(state.store, name, filter.get(), state.repair);
             if (expectedHash && expectedStorePath != dstPath)
                 state.debugThrowLastTrace(Error("store path mismatch in (possibly filtered) path added from '%s'", path));
             state.allowAndSetStorePathString(dstPath, v);

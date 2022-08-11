@@ -1,5 +1,6 @@
 #include "input-accessor.hh"
 #include "util.hh"
+#include "store-api.hh"
 
 #include <atomic>
 
@@ -85,6 +86,28 @@ void InputAccessor::dumpPath(
     dump(path);
 }
 
+StorePath InputAccessor::fetchToStore(
+    ref<Store> store,
+    const CanonPath & path,
+    std::string_view name,
+    PathFilter * filter,
+    RepairFlag repair)
+{
+    // FIXME: add an optimisation for the case where the accessor is
+    // an FSInputAccessor pointing to a store path.
+
+    auto source = sinkToSource([&](Sink & sink) {
+        dumpPath(path, sink, filter ? *filter : defaultPathFilter);
+    });
+
+    auto storePath =
+        settings.readOnlyMode
+        ? store->computeStorePathFromDump(*source, name).first
+        : store->addToStoreFromDump(*source, name, FileIngestionMethod::Recursive, htSHA256, repair);
+
+    return storePath;
+}
+
 std::optional<InputAccessor::Stat> InputAccessor::maybeLstat(const CanonPath & path)
 {
     // FIXME: merge these into one operation.
@@ -162,6 +185,15 @@ struct MemoryInputAccessorImpl : MemoryInputAccessor
 ref<MemoryInputAccessor> makeMemoryInputAccessor()
 {
     return make_ref<MemoryInputAccessorImpl>();
+}
+
+StorePath SourcePath::fetchToStore(
+    ref<Store> store,
+    std::string_view name,
+    PathFilter * filter,
+    RepairFlag repair) const
+{
+    return accessor->fetchToStore(store, path, name, filter, repair);
 }
 
 std::string_view SourcePath::baseName() const

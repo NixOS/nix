@@ -121,16 +121,7 @@ std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
     auto [storePath, input] = [&]() -> std::pair<StorePath, Input> {
         try {
             auto [accessor, input2] = getAccessor(store);
-
-            // FIXME: add an optimisation for the case where the
-            // accessor is an FSInputAccessor pointing to a store
-            // path.
-            auto source = sinkToSource([&, accessor{accessor}](Sink & sink) {
-                accessor->dumpPath(CanonPath::root, sink);
-            });
-
-            auto storePath = store->addToStoreFromDump(*source, input2.getName());
-
+            auto storePath = accessor->root().fetchToStore(store, input2.getName());
             return {storePath, input2};
         } catch (Error & e) {
             e.addTrace({}, "while fetching the input '%s'", to_string());
