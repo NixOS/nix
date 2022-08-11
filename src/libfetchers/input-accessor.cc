@@ -1,6 +1,7 @@
 #include "input-accessor.hh"
 #include "util.hh"
 #include "store-api.hh"
+#include "cache.hh"
 
 #include <atomic>
 
@@ -96,6 +97,21 @@ StorePath InputAccessor::fetchToStore(
     // FIXME: add an optimisation for the case where the accessor is
     // an FSInputAccessor pointing to a store path.
 
+    std::optional<std::string> cacheKey;
+
+    if (!filter && fingerprint) {
+        cacheKey = *fingerprint + "|" + name + "|" + path.abs();
+        if (auto storePathS = fetchers::getCache()->queryFact(*cacheKey)) {
+            if (auto storePath = store->maybeParseStorePath(*storePathS)) {
+                if (store->isValidPath(*storePath)) {
+                    debug("store path cache hit for '%s'", showPath(path));
+                    return *storePath;
+                }
+            }
+        }
+    } else
+        debug("source path '%s' is uncacheable", showPath(path));
+
     auto source = sinkToSource([&](Sink & sink) {
         dumpPath(path, sink, filter ? *filter : defaultPathFilter);
     });
@@ -104,6 +120,9 @@ StorePath InputAccessor::fetchToStore(
         settings.readOnlyMode
         ? store->computeStorePathFromDump(*source, name).first
         : store->addToStoreFromDump(*source, name, FileIngestionMethod::Recursive, htSHA256, repair);
+
+    if (cacheKey)
+        fetchers::getCache()->upsertFact(*cacheKey, store->printStorePath(storePath));
 
     return storePath;
 }

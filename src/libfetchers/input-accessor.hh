@@ -21,6 +21,8 @@ struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
 
     std::string displayPrefix, displaySuffix;
 
+    std::optional<std::string> fingerprint;
+
     InputAccessor();
 
     virtual ~InputAccessor()

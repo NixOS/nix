@@ -160,11 +160,14 @@ void Input::checkLocks(Input & input) const
 
 std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
 {
+    // FIXME: cache the accessor
+
     if (!scheme)
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
 
     try {
         auto [accessor, final] = scheme->getAccessor(store, *this);
+        accessor->fingerprint = scheme->getFingerprint(store, *this);
         checkLocks(final);
         return {accessor, std::move(final)};
     } catch (Error & e) {
@@ -256,10 +259,7 @@ std::optional<time_t> Input::getLastModified() const
 
 std::optional<std::string> Input::getFingerprint(ref<Store> store) const
 {
-    if (auto rev = getRev())
-        return rev->gitRev();
-    assert(scheme);
-    return scheme->getFingerprint(store, *this);
+    return scheme ? scheme->getFingerprint(store, *this) : std::nullopt;
 }
 
 ParsedURL InputScheme::toURL(const Input & input) const
@@ -291,6 +291,14 @@ void InputScheme::putFile(
 void InputScheme::clone(const Input & input, const Path & destDir) const
 {
     throw Error("do not know how to clone input '%s'", input.to_string());
+}
+
+std::optional<std::string> InputScheme::getFingerprint(ref<Store> store, const Input & input) const
+{
+    if (auto rev = input.getRev())
+        return rev->gitRev();
+    else
+        return std::nullopt;
 }
 
 }

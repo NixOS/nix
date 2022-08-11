@@ -141,8 +141,7 @@ struct InputScheme
     virtual std::optional<CanonPath> isRelative(const Input & input) const
     { return std::nullopt; }
 
-    virtual std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const
-    { return std::nullopt; }
+    virtual std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const;
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
