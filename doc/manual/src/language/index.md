@@ -106,6 +106,14 @@ the rest.
   </tr>
   <tr>
     <td>
+       <nixpkgs>
+    </td>
+    <td>
+      Search path. Value determined by [`$NIX_PATH` environment variable](../command-ref/env-common.md#env-NIX_PATH).
+    </td>
+  </tr>
+  <tr>
+    <td>
        *Compound values*
     </td>
     <td>
