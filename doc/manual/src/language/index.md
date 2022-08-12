@@ -339,6 +339,8 @@ the rest.
   <tr>
     <td>
        `{ x, y } @ args: x + y`
+
+       `args @ { x, y }: x + y`
     </td>
     <td>
       A function that expects a set with required attributes `x` and `y`, and binds the whole set to `args`
