@@ -209,7 +209,7 @@ the rest.
        `assert 1 + 1 == 2; "yes!"`
     </td>
     <td>
-      Assertion check (evaluates to `"yes!"`). See [](#sec-assertions) for using assertions in modules
+      Assertion check (evaluates to `"yes!"`).
     </td>
   </tr>
   <tr>
