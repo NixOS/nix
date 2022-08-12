@@ -43,6 +43,18 @@ the rest.
     <td>
       A string
     </td>
+    <td>
+       ```
+        ''
+          multi
+           line
+            string
+        ''
+       ```
+    </td>
+    <td>
+      A multiline string. Strips common prefixed whitespace. Evaluates to `"multi\n line\n  string"`.
+    </td>
   </tr>
   <tr>
     <td>
