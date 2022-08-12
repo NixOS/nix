@@ -106,6 +106,14 @@ the rest.
   </tr>
   <tr>
     <td>
+       `~/.config`
+    </td>
+    <td>
+      A home path. Evaluates to the `"<user's home directory>/.config"`.
+    </td>
+  </tr>
+  <tr>
+    <td>
        <nixpkgs>
     </td>
     <td>
