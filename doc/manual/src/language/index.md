@@ -11,3 +11,309 @@ packages, compositions of packages, and the variability within packages.
 
 This section presents the various features of the language.
 
+# Syntax Summary
+
+Below is a summary of the most important syntactic constructs in the Nix
+expression language. It's not complete. In particular, there are many
+other built-in functions. See the [Nix
+manual](https://nixos.org/nix/manual/#chap-writing-nix-expressions) for
+the rest.
+
+<table>
+  <tr>
+    <th>
+       Example
+    </th>
+    <th>
+      Description
+    </th>
+  </tr>
+  <tr>
+    <td>
+       *Basic values*
+    </td>
+    <td>
+
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `"Hello world"`
+    </td>
+    <td>
+      A string
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `"${pkgs.bash}/bin/sh"`
+    </td>
+    <td>
+      A string containing an expression (expands to `"/nix/store/hash-bash-version/bin/sh"`)
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `true`, `false`
+    </td>
+    <td>
+      Booleans
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `123`
+    </td>
+    <td>
+      An integer
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `./foo.png`
+    </td>
+    <td>
+      A path (relative to the containing Nix expression)
+    </td>
+  </tr>
+  <tr>
+    <td>
+       *Compound values*
+    </td>
+    <td>
+
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `{ x = 1; y = 2; }`
+    </td>
+    <td>
+      A set with attributes named `x` and `y`
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `{ foo.bar = 1; }`
+    </td>
+    <td>
+      A nested set, equivalent to `{ foo = { bar = 1; }; }`
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `rec { x = "foo"; y = x + "bar"; }`
+    </td>
+    <td>
+      A recursive set, equivalent to `{ x = "foo"; y = "foobar"; }`
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `[ "foo" "bar" ]`
+    </td>
+    <td>
+      A list with two elements
+    </td>
+  </tr>
+  <tr>
+    <td>
+       *Operators*
+    </td>
+    <td>
+
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `"foo" + "bar"`
+    </td>
+    <td>
+      String concatenation
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `1 + 2`
+    </td>
+    <td>
+      Integer addition
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `"foo" == "f" + "oo"`
+    </td>
+    <td>
+      Equality test (evaluates to `true`)
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `"foo" != "bar"`
+    </td>
+    <td>
+      Inequality test (evaluates to `true`)
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `!true`
+    </td>
+    <td>
+      Boolean negation
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `{ x = 1; y = 2; }.x`
+    </td>
+    <td>
+      Attribute selection (evaluates to `1`)
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `{ x = 1; y = 2; }.z or 3`
+    </td>
+    <td>
+      Attribute selection with default (evaluates to `3`)
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `{ x = 1; y = 2; } // { z = 3; }`
+    </td>
+    <td>
+      Merge two sets (attributes in the right-hand set taking precedence)
+    </td>
+  </tr>
+  <tr>
+    <td>
+       *Control structures*
+    </td>
+    <td>
+
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `if 1 + 1 == 2 then "yes!" else "no!"`
+    </td>
+    <td>
+      Conditional expression
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `assert 1 + 1 == 2; "yes!"`
+    </td>
+    <td>
+      Assertion check (evaluates to `"yes!"`). See [](#sec-assertions) for using assertions in modules
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `let x = "foo"; y = "bar"; in x + y`
+    </td>
+    <td>
+      Variable definition
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `with pkgs.lib; head [ 1 2 3 ]`
+    </td>
+    <td>
+      Add all attributes from the given set to the scope (evaluates to `1`)
+    </td>
+  </tr>
+  <tr>
+    <td>
+       *Functions (lambdas)*
+    </td>
+    <td>
+
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `x: x + 1`
+    </td>
+    <td>
+      A function that expects an integer and returns it increased by 1
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `(x: x + 1) 100`
+    </td>
+    <td>
+      A function call (evaluates to 101)
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `let inc = x: x + 1; in inc (inc (inc 100))`
+    </td>
+    <td>
+      A function bound to a variable and subsequently called by name (evaluates to 103)
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `{ x, y }: x + y`
+    </td>
+    <td>
+      A function that expects a set with required attributes `x` and `y` and concatenates them
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `{ x, y ? "bar" }: x + y`
+    </td>
+    <td>
+      A function that expects a set with required attribute `x` and optional `y`, using `"bar"` as default value for `y`
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `{ x, y, ... }: x + y`
+    </td>
+    <td>
+      A function that expects a set with required attributes `x` and `y` and ignores any other attributes
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `{ x, y } @ args: x + y`
+    </td>
+    <td>
+      A function that expects a set with required attributes `x` and `y`, and binds the whole set to `args`
+    </td>
+  </tr>
+  <tr>
+    <td>
+       *Built-in functions*
+    </td>
+    <td>
+
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `import ./foo.nix`
+    </td>
+    <td>
+      Load and return Nix expression in given file
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `map (x: x + x) [ 1 2 3 ]`
+    </td>
+    <td>
+      Apply a function to every element of a list (evaluates to `[ 2 4 6 ]`)
+    </td>
+  </tr>
+</table>
