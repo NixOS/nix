@@ -38,7 +38,7 @@ the rest.
   </tr>
   <tr>
     <td>
-       `"Hello world"`
+       `"hello world"`
     </td>
     <td>
       A string
@@ -58,10 +58,14 @@ the rest.
   </tr>
   <tr>
     <td>
+       `"hello ${ { a = "world" }.a }"`
+
+       `"1 2 ${3}"`
+
        `"${pkgs.bash}/bin/sh"`
     </td>
     <td>
-      A string containing an expression (expands to `"/nix/store/<hash>-bash-<version>/bin/sh"`)
+      String interpolation (expands to `"hello world"`, `"1 2 3"`, `"/nix/store/<hash>-bash-<version>/bin/sh"`)
     </td>
   </tr>
   <tr>
