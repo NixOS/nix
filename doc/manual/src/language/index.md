@@ -90,6 +90,14 @@ the rest.
   </tr>
   <tr>
     <td>
+       `/etc`
+    </td>
+    <td>
+      An absolute path
+    </td>
+  </tr>
+  <tr>
+    <td>
        `./foo.png`
     </td>
     <td>
