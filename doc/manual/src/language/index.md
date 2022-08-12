@@ -74,6 +74,14 @@ the rest.
   </tr>
   <tr>
     <td>
+       `null`
+    </td>
+    <td>
+      Null value
+    </td>
+  </tr>
+  <tr>
+    <td>
        `123`
     </td>
     <td>
