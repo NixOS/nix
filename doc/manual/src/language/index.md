@@ -73,7 +73,7 @@ the rest.
        `./foo.png`
     </td>
     <td>
-      A path (relative to the containing Nix expression)
+      A path relative to the file containing this Nix expression
     </td>
   </tr>
   <tr>
