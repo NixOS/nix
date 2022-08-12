@@ -49,7 +49,7 @@ the rest.
        `"${pkgs.bash}/bin/sh"`
     </td>
     <td>
-      A string containing an expression (expands to `"/nix/store/hash-bash-version/bin/sh"`)
+      A string containing an expression (expands to `"/nix/store/<hash>-bash-<version>/bin/sh"`)
     </td>
   </tr>
   <tr>
