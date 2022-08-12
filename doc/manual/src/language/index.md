@@ -53,7 +53,7 @@ the rest.
        ```
     </td>
     <td>
-      A multiline string. Strips common prefixed whitespace. Evaluates to `"multi\n line\n  string"`.
+      A multi-line string. Strips common prefixed whitespace. Evaluates to `"multi\n line\n  string"`.
     </td>
   </tr>
   <tr>
@@ -78,6 +78,14 @@ the rest.
     </td>
     <td>
       An integer
+    </td>
+  </tr>
+  <tr>
+    <td>
+       `3.141`
+    </td>
+    <td>
+      A floating point number
     </td>
   </tr>
   <tr>
