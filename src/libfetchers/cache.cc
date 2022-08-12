@@ -25,6 +25,9 @@ create table if not exists Facts (
 );
 )sql";
 
+// FIXME: we should periodically purge/nuke this cache to prevent it
+// from growing too big.
+
 struct CacheImpl : Cache
 {
     struct State
