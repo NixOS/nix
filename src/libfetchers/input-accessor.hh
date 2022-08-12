@@ -11,9 +11,8 @@ namespace nix {
 MakeError(RestrictedPathError, Error);
 
 struct SourcePath;
-struct StorePath;
+class StorePath;
 class Store;
-enum RepairFlag;
 
 struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
 {
