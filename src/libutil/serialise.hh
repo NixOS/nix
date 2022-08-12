@@ -97,19 +97,17 @@ protected:
 struct FdSink : BufferedSink
 {
     int fd;
-    bool warn = false;
     size_t written = 0;
 
     FdSink() : fd(-1) { }
     FdSink(int fd) : fd(fd) { }
     FdSink(FdSink&&) = default;
 
-    FdSink& operator=(FdSink && s)
+    FdSink & operator=(FdSink && s)
     {
         flush();
         fd = s.fd;
         s.fd = -1;
-        warn = s.warn;
         written = s.written;
         return *this;
     }
