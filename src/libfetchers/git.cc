@@ -295,6 +295,11 @@ struct GitInputScheme : InputScheme
         std::string gitDir = ".git";
     };
 
+    bool getSubmodulesAttr(const Input & input) const
+    {
+        return maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
+    }
+
     RepoInfo getRepoInfo(const Input & input) const
     {
         auto checkHashType = [&](const std::optional<Hash> & hash)
@@ -308,7 +313,7 @@ struct GitInputScheme : InputScheme
 
         RepoInfo repoInfo {
             .shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false),
-            .submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false),
+            .submodules = getSubmodulesAttr(input),
             .allRefs = maybeGetBoolAttr(input.attrs, "allRefs").value_or(false)
         };
 
@@ -776,6 +781,15 @@ struct GitInputScheme : InputScheme
     {
         return (bool) input.getRev();
     }
+
+    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
+    {
+        if (auto rev = input.getRev()) {
+            return fmt("%s;%s", rev->gitRev(), getSubmodulesAttr(input) ? "1" : "0");
+        } else
+            return std::nullopt;
+    }
+
 };
 
 static auto rGitInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GitInputScheme>()); });
