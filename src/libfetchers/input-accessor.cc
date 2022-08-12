@@ -112,6 +112,8 @@ StorePath InputAccessor::fetchToStore(
     } else
         debug("source path '%s' is uncacheable", showPath(path));
 
+    Activity act(*logger, lvlChatty, actUnknown, fmt("copying '%s' to the store", showPath(path)));
+
     auto source = sinkToSource([&](Sink & sink) {
         dumpPath(path, sink, filter ? *filter : defaultPathFilter);
     });
