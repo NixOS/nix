@@ -162,10 +162,14 @@ the rest.
   </tr>
   <tr>
     <td>
-       `[ "foo" "bar" ]`
+       `[ "foo" "bar" "baz" ]`
+
+       `[ 1 2 3 ]`
+
+       `[ (f 1) { a = 1; b = 2; } [ "c" ] ]`
     </td>
     <td>
-      A list with two elements
+      Lists with three elements.
     </td>
   </tr>
   <tr>
