@@ -298,6 +298,14 @@ the rest.
   </tr>
   <tr>
     <td>
+       `x: y: x + y`
+    </td>
+    <td>
+      Curried function, equivalent to `x: (y: x + y)`. Can be used like a function that takes two arguments and returns their sum.
+    </td>
+  </tr>
+  <tr>
+    <td>
        `(x: x + 1) 100`
     </td>
     <td>
