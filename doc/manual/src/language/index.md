@@ -11,13 +11,9 @@ packages, compositions of packages, and the variability within packages.
 
 This section presents the various features of the language.
 
-# Syntax Summary
+# Overview
 
-Below is a summary of the most important syntactic constructs in the Nix
-expression language. It's not complete. In particular, there are many
-other built-in functions. See the [Nix
-manual](https://nixos.org/nix/manual/#chap-writing-nix-expressions) for
-the rest.
+This is an incomplete overview of language features, by example.
 
 <table>
  <tr>
