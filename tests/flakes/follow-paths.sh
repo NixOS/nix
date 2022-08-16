@@ -27,9 +27,7 @@ cat > $flakeFollowsA/flake.nix <<EOF
             inputs.foobar.follows = "foobar";
         };
 
-        # FIXME: currently absolute path: flakes cannot be locked.
-        #foobar.url = "path:$flakeFollowsA/flakeE";
-        foobar.url = "git+file://$flake1Dir";
+        foobar.url = "path:$flakeFollowsA/flakeE?lock=1";
     };
     outputs = { ... }: {};
 }
@@ -39,8 +37,7 @@ cat > $flakeFollowsB/flake.nix <<EOF
 {
     description = "Flake B";
     inputs = {
-        #foobar.url = "path:$flakeFollowsA/flakeE";
-        foobar.url = "git+file://$flake1Dir";
+        foobar.url = "path:$flakeFollowsA/flakeE?lock=1";
         goodoo.follows = "C/goodoo";
         C = {
             url = "path:./flakeC";
@@ -55,8 +52,7 @@ cat > $flakeFollowsC/flake.nix <<EOF
 {
     description = "Flake C";
     inputs = {
-        #foobar.url = "path:$flakeFollowsA/flakeE";
-        foobar.url = "git+file://$flake1Dir";
+        foobar.url = "path:$flakeFollowsA/flakeE?lock=1";
         goodoo.follows = "foobar";
     };
     outputs = { ... }: {};

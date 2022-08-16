@@ -221,11 +221,10 @@ cat > $flake3Dir/flake.nix <<EOF
       url = git+file://$nonFlakeDir;
       flake = false;
     };
-    # FIXME: we can't lock path:// inputs at the moment.
-    #nonFlakeFile = {
-    #  url = path://$nonFlakeDir/README.md;
-    #  flake = false;
-    #};
+    nonFlakeFile = {
+      url = path://$nonFlakeDir/README.md?lock=1;
+      flake = false;
+    };
     #nonFlakeFile2 = {
     #  url = "$nonFlakeDir/README.md";
     #  flake = false;
@@ -246,8 +245,8 @@ cat > $flake3Dir/flake.nix <<EOF
         dummy2 = builtins.readFile (builtins.path { name = "source"; path = inputs.flake1; filter = path: type: baseNameOf path == "simple.nix"; } + "/simple.nix");
         buildCommand = ''
           cat \${inputs.nonFlake}/README.md > \$out
+          [[ \$(cat \${inputs.nonFlake}/README.md) = \$(cat \${inputs.nonFlakeFile}) ]]
         '';
-        #  [[ \$(cat \${inputs.nonFlake}/README.md) = \$(cat \${inputs.nonFlakeFile}) ]]
         #  [[ \${inputs.nonFlakeFile} = \${inputs.nonFlakeFile2} ]]
       };
   };

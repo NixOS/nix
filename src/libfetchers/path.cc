@@ -27,6 +27,8 @@ struct PathInputScheme : InputScheme
                 else
                     throw Error("path URL '%s' has invalid parameter '%s'", url.to_string(), name);
             }
+            else if (name == "lock")
+                input.attrs.emplace(name, Explicit<bool> { value == "1" });
             else
                 throw Error("path URL '%s' has unsupported parameter '%s'", url.to_string(), name);
 
@@ -38,6 +40,7 @@ struct PathInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "path") return {};
 
         getStrAttr(attrs, "path");
+        maybeGetBoolAttr(attrs, "lock");
 
         for (auto & [name, value] : attrs)
             /* Allow the user to pass in "fake" tree info
@@ -47,8 +50,8 @@ struct PathInputScheme : InputScheme
                FIXME: remove this hack once we have a prepopulated
                flake input cache mechanism.
             */
-            if (name == "type" || name == "rev" || name == "revCount" || name == "lastModified" || name == "narHash" || name == "path")
-                // checked in Input::fromAttrs
+            if (name == "type" || name == "rev" || name == "revCount" || name == "lastModified" || name == "narHash" || name == "path" || name == "lock")
+                // checked elsewhere
                 ;
             else
                 throw Error("unsupported path input attribute '%s'", name);
@@ -56,6 +59,11 @@ struct PathInputScheme : InputScheme
         Input input;
         input.attrs = attrs;
         return input;
+    }
+
+    bool getLockAttr(const Input & input) const
+    {
+        return maybeGetBoolAttr(input.attrs, "lock").value_or(false);
     }
 
     ParsedURL toURL(const Input & input) const override
@@ -112,7 +120,31 @@ struct PathInputScheme : InputScheme
         auto absPath = getAbsPath(input);
         auto input2(input);
         input2.attrs.emplace("path", (std::string) absPath.abs());
-        return {makeFSInputAccessor(absPath), std::move(input2)};
+
+        if (getLockAttr(input2)) {
+
+            auto storePath = store->maybeParseStorePath(absPath.abs());
+
+            if (!storePath || storePath->name() != input.getName() || !store->isValidPath(*storePath)) {
+                Activity act(*logger, lvlChatty, actUnknown, fmt("copying '%s' to the store", absPath));
+                storePath = store->addToStore(input.getName(), absPath.abs());
+                auto narHash = store->queryPathInfo(*storePath)->narHash;
+                input2.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
+            } else
+                input2.attrs.erase("narHash");
+
+            input2.attrs.erase("lastModified");
+
+            auto makeNotAllowedError = [absPath](const CanonPath & path) -> RestrictedPathError
+            {
+                return RestrictedPathError("path '%s' does not exist'", absPath + path);
+            };
+
+            return {makeStorePathAccessor(store, *storePath, std::move(makeNotAllowedError)), std::move(input2)};
+
+        } else {
+            return {makeFSInputAccessor(absPath), std::move(input2)};
+        }
     }
 
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override

@@ -134,11 +134,6 @@ std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
 
 void Input::checkLocks(Input & input) const
 {
-    #if 0
-    auto narHash = store.queryPathInfo(storePath)->narHash;
-    input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
-    #endif
-
     if (auto prevNarHash = getNarHash()) {
         if (input.getNarHash() != prevNarHash)
             throw Error((unsigned int) 102, "NAR hash mismatch in input '%s', expected '%s'",
