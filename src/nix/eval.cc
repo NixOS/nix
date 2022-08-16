@@ -116,7 +116,7 @@ struct CmdEval : MixJSON, InstallableCommand
 
         else if (json) {
             JSONPlaceholder jsonOut(std::cout);
-            printValueAsJSON(*state, true, *v, pos, jsonOut, context);
+            printValueAsJSON(*state, true, *v, pos, jsonOut, context, false);
         }
 
         else {
