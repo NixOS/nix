@@ -349,7 +349,7 @@ _sudo() {
 }
 
 
-readonly SCRATCH=$(mktemp -d "${TMPDIR:-/tmp/}tmp.XXXXXXXXXX")
+readonly SCRATCH=$(mktemp -d)
 finish_cleanup() {
     rm -rf "$SCRATCH"
 }
