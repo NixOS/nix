@@ -149,7 +149,7 @@ static Flake readFlake(
     auto flakePath = rootDir + flakeDir + "flake.nix";
 
     if (!flakePath.pathExists())
-        throw Error("source tree referenced by '%s' does not contain a file named '%s'", resolvedRef, flakePath.path);
+        throw Error("file '%s' does not exist", flakePath);
 
     Value vInfo;
     state.evalFile(flakePath, vInfo, true);
