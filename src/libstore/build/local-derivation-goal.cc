@@ -2374,10 +2374,8 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             if (*scratchPath != finalPath) {
                 // Also rewrite the output path
                 auto source = sinkToSource([&](Sink & nextSink) {
-                    StringSink sink;
-                    dumpPath(actualPath, sink);
                     RewritingSink rsink2(oldHashPart, std::string(finalPath.hashPart()), nextSink);
-                    rsink2(sink.s);
+                    dumpPath(actualPath, rsink2);
                     rsink2.flush();
                 });
                 Path tmpPath = actualPath + ".tmp";

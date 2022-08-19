@@ -254,7 +254,7 @@ struct GitInputScheme : InputScheme
         writeFile(absPath.abs(), contents);
 
         runProgram("git", true,
-            { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "add", "--force", "--intent-to-add", "--", std::string(path.rel()) });
+            { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "add", "--intent-to-add", "--", std::string(path.rel()) });
 
         if (commitMsg)
             runProgram("git", true,
