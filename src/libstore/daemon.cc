@@ -994,11 +994,12 @@ void processConnection(
     if (clientVersion < 0x10a)
         throw Error("the Nix client version is too old");
 
-    auto tunnelLogger = new TunnelLogger(to, clientVersion);
-    auto prevLogger = nix::logger;
+    std::shared_ptr<TunnelLogger> tunnelLogger = std::shared_ptr<TunnelLogger>(new TunnelLogger(to, clientVersion));
+    std::shared_ptr<Logger> prevLogger = nix::logger;
     // FIXME
-    if (!recursive)
+    if (!recursive) {
         logger = tunnelLogger;
+    }
 
     unsigned int opCount = 0;
 
@@ -1046,7 +1047,7 @@ void processConnection(
             opCount++;
 
             try {
-                performOp(tunnelLogger, store, trusted, recursive, clientVersion, from, to, op);
+                performOp(tunnelLogger.get(), store, trusted, recursive, clientVersion, from, to, op);
             } catch (Error & e) {
                 /* If we're not in a state where we can send replies, then
                    something went wrong processing the input of the

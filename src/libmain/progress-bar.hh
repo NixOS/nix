@@ -4,7 +4,7 @@
 
 namespace nix {
 
-Logger * makeProgressBar(bool printBuildLogs = false);
+std::unique_ptr<Logger> makeProgressBar(bool printBuildLogs = false);
 
 void startProgressBar(bool printBuildLogs = false);
 

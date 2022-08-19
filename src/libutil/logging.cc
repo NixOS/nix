@@ -23,7 +23,7 @@ void setCurActivity(const ActivityId activityId)
     curActivity = activityId;
 }
 
-Logger * logger = makeSimpleLogger(true);
+std::shared_ptr<Logger> logger = makeSimpleLogger(true);
 
 void Logger::warn(const std::string & msg)
 {
@@ -125,9 +125,9 @@ void writeToStderr(std::string_view s)
     }
 }
 
-Logger * makeSimpleLogger(bool printBuildLogs)
+std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs)
 {
-    return new SimpleLogger(printBuildLogs);
+    return std::unique_ptr<Logger>(new SimpleLogger(printBuildLogs));
 }
 
 std::atomic<uint64_t> nextId{(uint64_t) getpid() << 32};
@@ -140,9 +140,9 @@ Activity::Activity(Logger & logger, Verbosity lvl, ActivityType type,
 }
 
 struct JSONLogger : Logger {
-    Logger & prevLogger;
+    std::shared_ptr<Logger> prevLogger;
 
-    JSONLogger(Logger & prevLogger) : prevLogger(prevLogger) { }
+    JSONLogger(std::shared_ptr<Logger> prevLogger) : prevLogger(prevLogger) { }
 
     bool isVerbose() override {
         return true;
@@ -163,7 +163,7 @@ struct JSONLogger : Logger {
 
     void write(const nlohmann::json & json)
     {
-        prevLogger.log(lvlError, "@nix " + json.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace));
+        prevLogger->log(lvlError, "@nix " + json.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace));
     }
 
     void log(Verbosity lvl, const FormatOrString & fs) override
@@ -248,9 +248,9 @@ struct JSONLogger : Logger {
     }
 };
 
-Logger * makeJSONLogger(Logger & prevLogger)
+std::unique_ptr<Logger> makeJSONLogger(std::shared_ptr<Logger> prevLogger)
 {
-    return new JSONLogger(prevLogger);
+    return std::unique_ptr<Logger>(new JSONLogger(prevLogger));
 }
 
 static Logger::Fields getFields(nlohmann::json & json)

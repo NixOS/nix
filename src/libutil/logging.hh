@@ -162,11 +162,11 @@ struct PushActivity
     ~PushActivity() { setCurActivity(prevAct); }
 };
 
-extern Logger * logger;
+extern std::shared_ptr<Logger> logger;
 
-Logger * makeSimpleLogger(bool printBuildLogs = true);
+std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs = true);
 
-Logger * makeJSONLogger(Logger & prevLogger);
+std::unique_ptr<Logger> makeJSONLogger(std::shared_ptr<Logger> prevLogger);
 
 std::optional<nlohmann::json> parseJSONMessage(const std::string & msg);
 

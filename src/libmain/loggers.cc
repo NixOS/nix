@@ -20,14 +20,14 @@ LogFormat parseLogFormat(const std::string & logFormatStr) {
     throw Error("option 'log-format' has an invalid value '%s'", logFormatStr);
 }
 
-Logger * makeDefaultLogger() {
+std::unique_ptr<Logger> makeDefaultLogger() {
     switch (defaultLogFormat) {
     case LogFormat::raw:
         return makeSimpleLogger(false);
     case LogFormat::rawWithLogs:
         return makeSimpleLogger(true);
     case LogFormat::internalJSON:
-        return makeJSONLogger(*makeSimpleLogger(true));
+        return makeJSONLogger(makeSimpleLogger(true));
     case LogFormat::bar:
         return makeProgressBar();
     case LogFormat::barWithLogs:

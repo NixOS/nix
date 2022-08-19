@@ -112,7 +112,12 @@ public:
     {
         {
             auto state(state_.lock());
-            if (!state->active) return;
+            if (!state->active) {
+                // wait for the thread to complete to avoid
+                // 'terminate called without an active exception'
+                if (updateThread.joinable()) updateThread.join();
+                return;
+            }
             state->active = false;
             writeToStderr("\r\e[K");
             updateCV.notify_one();
@@ -505,12 +510,12 @@ public:
     }
 };
 
-Logger * makeProgressBar(bool printBuildLogs)
+std::unique_ptr<Logger> makeProgressBar(bool printBuildLogs)
 {
-    return new ProgressBar(
+    return std::unique_ptr<Logger>(new ProgressBar(
         printBuildLogs,
         shouldANSI()
-    );
+    ));
 }
 
 void startProgressBar(bool printBuildLogs)
@@ -520,7 +525,7 @@ void startProgressBar(bool printBuildLogs)
 
 void stopProgressBar()
 {
-    auto progressBar = dynamic_cast<ProgressBar *>(logger);
+    auto progressBar = dynamic_cast<ProgressBar *>(logger.get());
     if (progressBar) progressBar->stop();
 
 }

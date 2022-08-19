@@ -49,7 +49,7 @@ static bool allSupportedLocally(Store & store, const std::set<std::string>& requ
 static int main_build_remote(int argc, char * * argv)
 {
     {
-        logger = makeJSONLogger(*logger);
+        logger = makeJSONLogger(logger);
 
         /* Ensure we don't get any SSH passphrase or host key popups. */
         unsetenv("DISPLAY");
