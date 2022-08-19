@@ -46,9 +46,13 @@ Most Nix commands interpret the following environment variables:
 
     If `NIX_PATH` is not set at all, Nix will fall back to the following list in impure and unrestricted evaluation mode:
 
-    1. `$HOME/.nix-defexpr/channels`
-    2. `nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixpkgs`
-    3. `/nix/var/nix/profiles/per-user/root/channels`
+      1. `$HOME/.nix-defexpr/channels`
+      2. `nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixpkgs`
+      3. `/nix/var/nix/profiles/per-user/root/channels`
+
+    If `NIX_PATH` is set to an empty string the above fallback will not happen and building will fail with:
+
+      `error: file 'nixpkgs' was not found in the Nix search path`
 
   - [`NIX_IGNORE_SYMLINK_STORE`]{#env-NIX_IGNORE_SYMLINK_STORE}\
     Normally, the Nix store directory (typically `/nix/store`) is not
