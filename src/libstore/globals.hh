@@ -749,7 +749,7 @@ public:
     Setting<unsigned int> downloadSpeed {
         this, 0, "download-speed",
         R"(
-          Specify the maxium transfer rate in kilobytes per second you want
+          Specify the maximum transfer rate in kilobytes per second you want
           nix to use for download.
         )"};
 
