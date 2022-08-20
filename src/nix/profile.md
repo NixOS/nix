@@ -11,7 +11,7 @@ them to be rolled back easily.
 
 The default profile used by `nix profile` is `$HOME/.nix-profile`,
 which, if it does not exist, is created as a symlink to
-`/nix/var/nix/profiles/per-user/default` if Nix is invoked by the
+`/nix/var/nix/profiles/default` if Nix is invoked by the
 `root` user, or `/nix/var/nix/profiles/per-user/`*username* otherwise.
 
 You can specify another profile location using `--profile` *path*.
