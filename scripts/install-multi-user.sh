@@ -348,8 +348,12 @@ _sudo() {
     fi
 }
 
+# Ensure that $TMPDIR exists if defined.
+if [[ -n "${TMPDIR:-}" ]] && [[ ! -d "${TMPDIR:-}" ]]; then
+    mkdir -m 0700 -p "${TMPDIR:-}"
+fi
 
-readonly SCRATCH=$(mktemp -d "${TMPDIR:-/tmp/}tmp.XXXXXXXXXX")
+readonly SCRATCH=$(mktemp -d)
 finish_cleanup() {
     rm -rf "$SCRATCH"
 }
