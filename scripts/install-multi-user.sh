@@ -348,10 +348,9 @@ _sudo() {
     fi
 }
 
-
 # Ensure that $TMPDIR exists if defined.
-if [[ -v TMPDIR ]]; then
-    mkdir -m 0700 -p "$TMPDIR"
+if [[ -n "${TMPDIR:-}" ]] && [[ ! -d "${TMPDIR:-}" ]]; then
+    mkdir -m 0700 -p "${TMPDIR:-}"
 fi
 
 readonly SCRATCH=$(mktemp -d)
