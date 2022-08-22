@@ -178,7 +178,7 @@ struct CmdSearch : InstallableCommand, MixJSON
                 else if (initialRecurse)
                     recurse();
 
-                else if (attrPathS[0] == "legacyPackages" && attrPath.size() > 2) {
+                else if (attrPath.size() >= 2) {
                     auto attr = cursor.maybeGetAttr(state->sRecurseForDerivations);
                     if (attr && attr->getBool())
                         recurse();
