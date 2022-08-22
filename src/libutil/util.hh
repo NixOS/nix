@@ -506,6 +506,17 @@ std::optional<N> string2Float(const std::string_view s)
 }
 
 
+/* Convert a little-endian integer to host order. */
+template<typename T>
+T readLittleEndian(unsigned char * p)
+{
+    T x = 0;
+    for (size_t i = 0; i < sizeof(x); ++i)
+        x |= *p++ << (i * 8);
+    return x;
+}
+
+
 /* Return true iff `s' starts with `prefix'. */
 bool hasPrefix(std::string_view s, std::string_view prefix);
 
