@@ -212,7 +212,8 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                     ANSI_BOLD "Last modified:" ANSI_NORMAL " %s",
                     std::put_time(std::localtime(&*lastModified), "%F %T"));
 
-            logger->cout(ANSI_BOLD "Inputs:" ANSI_NORMAL);
+            if (!lockedFlake.lockFile.root->inputs.empty())
+                logger->cout(ANSI_BOLD "Inputs:" ANSI_NORMAL);
 
             std::unordered_set<std::shared_ptr<Node>> visited;
 

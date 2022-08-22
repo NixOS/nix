@@ -114,7 +114,13 @@ std::vector<Path> getUserConfigFiles()
 
 unsigned int Settings::getDefaultCores()
 {
-    return std::max(1U, std::thread::hardware_concurrency());
+    const unsigned int concurrency = std::max(1U, std::thread::hardware_concurrency());
+    const unsigned int maxCPU = getMaxCPU();
+
+    if (maxCPU > 0)
+      return maxCPU;
+    else
+      return concurrency;
 }
 
 StringSet Settings::getDefaultSystemFeatures()

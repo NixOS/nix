@@ -193,7 +193,7 @@ fi
 onError() {
     set +x
     echo "$0: test failed at:" >&2
-    for ((i = 1; i < 16; i++)); do
+    for ((i = 1; i < ${#BASH_SOURCE[@]}; i++)); do
         if [[ -z ${BASH_SOURCE[i]} ]]; then break; fi
         echo "  ${FUNCNAME[i]} in ${BASH_SOURCE[i]}:${BASH_LINENO[i-1]}" >&2
     done

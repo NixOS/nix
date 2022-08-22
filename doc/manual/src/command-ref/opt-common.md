@@ -145,7 +145,7 @@ Most Nix commands accept the following command-line options:
     expression evaluator will automatically try to call functions that
     it encounters. It can automatically call functions for which every
     argument has a [default
-    value](../expressions/language-constructs.md#functions) (e.g.,
+    value](../language/constructs.md#functions) (e.g.,
     `{ argName ?  defaultValue }: ...`). With `--arg`, you can also
     call functions that have arguments without a default value (or
     override a default value). That is, if the evaluator encounters a
@@ -164,7 +164,7 @@ Most Nix commands accept the following command-line options:
 
     So if you call this Nix expression (e.g., when you do `nix-env -iA
     pkgname`), the function will be called automatically using the
-    value [`builtins.currentSystem`](../expressions/builtins.md) for
+    value [`builtins.currentSystem`](../language/builtins.md) for
     the `system` argument. You can override this using `--arg`, e.g.,
     `nix-env -iA pkgname --arg system \"i686-freebsd\"`. (Note that
     since the argument is a Nix string literal, you have to escape the

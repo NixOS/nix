@@ -580,7 +580,6 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
 
                 try {
                     conn->to.written = 0;
-                    conn->to.warn = true;
                     connections->incCapacity();
                     {
                         Finally cleanup([&]() { connections->decCapacity(); });
@@ -591,7 +590,6 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
                             dumpString(contents, conn->to);
                         }
                     }
-                    conn->to.warn = false;
                     conn.processStderr();
                 } catch (SysError & e) {
                     /* Daemon closed while we were sending the path. Probably OOM

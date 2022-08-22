@@ -308,6 +308,9 @@ struct curlFileTransfer : public FileTransfer
 
             curl_easy_setopt(req, CURLOPT_HTTPHEADER, requestHeaders);
 
+            if (settings.downloadSpeed.get() > 0)
+                curl_easy_setopt(req, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t) (settings.downloadSpeed.get() * 1024));
+
             if (request.head)
                 curl_easy_setopt(req, CURLOPT_NOBODY, 1);
 

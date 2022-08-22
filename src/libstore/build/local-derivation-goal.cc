@@ -223,8 +223,7 @@ static void movePath(const Path & src, const Path & dst)
     if (changePerm)
         chmod_(src, st.st_mode | S_IWUSR);
 
-    if (rename(src.c_str(), dst.c_str()))
-        throw SysError("renaming '%1%' to '%2%'", src, dst);
+    renameFile(src, dst);
 
     if (changePerm)
         chmod_(dst, st.st_mode);
@@ -311,7 +310,7 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
             if (buildMode != bmCheck && status.known->isValid()) continue;
             auto p = worker.store.printStorePath(status.known->path);
             if (pathExists(chrootRootDir + p))
-                rename((chrootRootDir + p).c_str(), p.c_str());
+                renameFile((chrootRootDir + p), p);
         }
 
     return diskFull;
@@ -845,18 +844,43 @@ void LocalDerivationGoal::startBuilder()
                 /* Some distros patch Linux to not allow unprivileged
                  * user namespaces. If we get EPERM or EINVAL, try
                  * without CLONE_NEWUSER and see if that works.
+                 * Details: https://salsa.debian.org/kernel-team/linux/-/commit/d98e00eda6bea437e39b9e80444eee84a32438a6
                  */
                 usingUserNamespace = false;
                 flags &= ~CLONE_NEWUSER;
                 child = clone(childEntry, stack + stackSize, flags, this);
             }
-            /* Otherwise exit with EPERM so we can handle this in the
-               parent. This is only done when sandbox-fallback is set
-               to true (the default). */
-            if (child == -1 && (errno == EPERM || errno == EINVAL) && settings.sandboxFallback)
-                _exit(1);
-            if (child == -1) throw SysError("cloning builder process");
-
+            if (child == -1) {
+                switch(errno) {
+                    case EPERM:
+                    case EINVAL: {
+                        int errno_ = errno;
+                        if (!userNamespacesEnabled && errno==EPERM)
+                            notice("user namespaces appear to be disabled; they are required for sandboxing; check /proc/sys/user/max_user_namespaces");
+                        if (userNamespacesEnabled) {
+                            Path procSysKernelUnprivilegedUsernsClone = "/proc/sys/kernel/unprivileged_userns_clone";
+                            if (pathExists(procSysKernelUnprivilegedUsernsClone)
+                                && trim(readFile(procSysKernelUnprivilegedUsernsClone)) == "0") {
+                                notice("user namespaces appear to be disabled; they are required for sandboxing; check /proc/sys/kernel/unprivileged_userns_clone");
+                            }
+                        }
+                        Path procSelfNsUser = "/proc/self/ns/user";
+                        if (!pathExists(procSelfNsUser))
+                            notice("/proc/self/ns/user does not exist; your kernel was likely built without CONFIG_USER_NS=y, which is required for sandboxing");
+                        /* Otherwise exit with EPERM so we can handle this in the
+                           parent. This is only done when sandbox-fallback is set
+                           to true (the default). */
+                        if (settings.sandboxFallback)
+                            _exit(1);
+                        /* Mention sandbox-fallback in the error message so the user
+                           knows that having it disabled contributed to the
+                           unrecoverability of this failure */
+                        throw SysError(errno_, "creating sandboxed builder process using clone(), without sandbox-fallback");
+                    }
+                    default:
+                        throw SysError("creating sandboxed builder process using clone()");
+                }
+            }
             writeFull(builderOut.writeSide.get(),
                 fmt("%d %d\n", usingUserNamespace, child));
             _exit(0);
@@ -2350,10 +2374,8 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             if (*scratchPath != finalPath) {
                 // Also rewrite the output path
                 auto source = sinkToSource([&](Sink & nextSink) {
-                    StringSink sink;
-                    dumpPath(actualPath, sink);
                     RewritingSink rsink2(oldHashPart, std::string(finalPath.hashPart()), nextSink);
-                    rsink2(sink.s);
+                    dumpPath(actualPath, rsink2);
                     rsink2.flush();
                 });
                 Path tmpPath = actualPath + ".tmp";
@@ -2600,8 +2622,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             Path prev = path + checkSuffix;
             deletePath(prev);
             Path dst = path + checkSuffix;
-            if (rename(path.c_str(), dst.c_str()))
-                throw SysError("renaming '%s' to '%s'", path, dst);
+            renameFile(path, dst);
         }
     }
 
