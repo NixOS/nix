@@ -750,7 +750,7 @@ public:
         this, 0, "download-speed",
         R"(
           Specify the maximum transfer rate in kilobytes per second you want
-          nix to use for download.
+          Nix to use for downloads.
         )"};
 
     Setting<std::string> netrcFile{
