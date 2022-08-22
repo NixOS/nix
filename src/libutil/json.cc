@@ -193,7 +193,11 @@ JSONObject JSONPlaceholder::object()
 
 JSONPlaceholder::~JSONPlaceholder()
 {
-    assert(!first || std::uncaught_exceptions());
+    if (first) {
+        assert(std::uncaught_exceptions());
+        if (state->stack != 0)
+            write(nullptr);
+    }
 }
 
 }
