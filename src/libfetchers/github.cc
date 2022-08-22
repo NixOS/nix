@@ -195,30 +195,23 @@ struct GitArchiveInputScheme : InputScheme
             {"rev", rev->gitRev()},
         });
 
-        if (auto res = getCache()->lookup(store, lockedAttrs)) {
-            // FIXME
-            //input.attrs.insert_or_assign("lastModified", getIntAttr(res->first, "lastModified"));
-            return {std::move(res->second), input};
-        }
+        if (auto res = getCache()->lookup(store, lockedAttrs))
+            return {std::move(res->second), std::move(input)};
 
         auto url = getDownloadUrl(input);
 
         auto res = downloadFile(store, url.url, input.getName(), true, url.headers);
-
-        //input.attrs.insert_or_assign("lastModified", uint64_t(lastModified));
 
         getCache()->add(
             store,
             lockedAttrs,
             {
                 {"rev", rev->gitRev()},
-                // FIXME: get lastModified
-                //{"lastModified", uint64_t(lastModified)}
             },
             res.storePath,
             true);
 
-        return {res.storePath, input};
+        return {res.storePath, std::move(input)};
     }
 
     std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const override
@@ -226,6 +219,10 @@ struct GitArchiveInputScheme : InputScheme
         auto [storePath, input2] = downloadArchive(store, input);
 
         auto accessor = makeZipInputAccessor(CanonPath(store->toRealPath(storePath)));
+
+        auto lastModified = accessor->getLastModified();
+        assert(lastModified);
+        input2.attrs.insert_or_assign("lastModified", uint64_t(*lastModified));
 
         accessor->setPathDisplay("«" + input2.to_string() + "»");
 

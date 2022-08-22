@@ -1,6 +1,7 @@
 #include "input-accessor.hh"
 
 #include <zip.h>
+#include <endian.h>
 
 namespace nix {
 
@@ -28,6 +29,8 @@ struct ZipInputAccessor : InputAccessor
     typedef std::map<const char *, struct zip_stat, cmp_str> Members;
     Members members;
 
+    time_t lastModified = 0;
+
     ZipInputAccessor(const CanonPath & _zipPath)
         : zipPath(_zipPath)
     {
@@ -47,10 +50,34 @@ struct ZipInputAccessor : InputAccessor
         for (zip_uint64_t n = 0; n < nrEntries; ++n) {
             if (zip_stat_index(zipFile, n, 0, &sb))
                 throw Error("couldn't stat archive member #%d in '%s': %s", n, zipPath, zip_strerror(zipFile));
+
+            /* Get the timestamp of this file. */
+            #if 0
+            if (sb.valid & ZIP_STAT_MTIME)
+                lastModified = std::max(lastModified, sb.mtime);
+            #endif
+            auto nExtra = zip_file_extra_fields_count(zipFile, n, ZIP_FL_CENTRAL);
+            for (auto i = 0; i < nExtra; ++i) {
+                zip_uint16_t id, len;
+                auto extra = zip_file_extra_field_get(zipFile, i, 0, &id, &len, ZIP_FL_CENTRAL);
+                if (id == 0x5455 && len >= 5)
+                    lastModified = std::max(lastModified, (time_t) le32toh(*((uint32_t *) (extra + 1))));
+            }
+
             auto slash = strchr(sb.name, '/');
             if (!slash) continue;
             members.emplace(slash, sb);
         }
+
+        #if 0
+        /* Sigh, libzip returns a local time, so convert to Unix
+           time. */
+        if (lastModified) {
+            struct tm tm;
+            localtime_r(&lastModified, &tm);
+            lastModified = timegm(&tm);
+        }
+        #endif
     }
 
     ~ZipInputAccessor()
@@ -163,6 +190,11 @@ struct ZipInputAccessor : InputAccessor
             throw Error("file '%s' is not a symlink");
 
         return _readFile(path);
+    }
+
+    std::optional<time_t> getLastModified() override
+    {
+        return lastModified;
     }
 };
 

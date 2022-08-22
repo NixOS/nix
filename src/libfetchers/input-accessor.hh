@@ -85,6 +85,13 @@ struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
     virtual std::string showPath(const CanonPath & path);
 
     SourcePath root();
+
+    /* Return the maximum last-modified time of the files in this
+       tree, if available. */
+    virtual std::optional<time_t> getLastModified()
+    {
+        return std::nullopt;
+    }
 };
 
 typedef std::function<RestrictedPathError(const CanonPath & path)> MakeNotAllowedError;
