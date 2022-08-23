@@ -947,7 +947,7 @@ static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool prin
                         placeholder.write(nullptr);
                     } else {
                         PathSet context;
-                        printValueAsJSON(*globals.state, true, *v, noPos, placeholder, context, false);
+                        printValueAsJSON(*globals.state, true, *v, noPos, placeholder, context);
                     }
                 }
             }
