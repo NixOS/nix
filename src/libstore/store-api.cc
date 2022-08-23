@@ -11,6 +11,7 @@
 #include "archive.hh"
 #include "callback.hh"
 #include "remote-store.hh"
+#include "finally.hh"
 
 #include <regex>
 
@@ -271,7 +272,7 @@ void Store::addMultipleToStore(
 
     using PathWithInfo = std::pair<ValidPathInfo, std::unique_ptr<Source>>;
 
-    std::map<StorePath, PathWithInfo*> infosMap;
+    std::map<StorePath, PathWithInfo *> infosMap;
     StorePathSet storePathsToAdd;
     for (auto & thingToAdd : pathsToCopy) {
         infosMap.insert_or_assign(thingToAdd.first.path, &thingToAdd);
@@ -288,7 +289,8 @@ void Store::addMultipleToStore(
         storePathsToAdd,
 
         [&](const StorePath & path) {
-            auto & [info, source] = *infosMap.at(path);
+
+            auto & [info, _] = *infosMap.at(path);
 
             if (isValidPath(info.path)) {
                 nrDone++;
@@ -309,12 +311,21 @@ void Store::addMultipleToStore(
             auto info = info_;
             info.ultimate = false;
 
+            /* Make sure that the Source object is destroyed when
+               we're done. In particular, a SinkToSource object must
+               be destroyed to ensure that the destructors on its
+               stack frame are run; this includes
+               LegacySSHStore::narFromPath()'s connection lock. */
+            Finally cleanupSource{[&]() {
+                source.reset();
+            }};
+
             if (!isValidPath(info.path)) {
                 MaintainCount<decltype(nrRunning)> mc(nrRunning);
                 showProgress();
                 try {
                     addToStore(info, *source, repair, checkSigs);
-                } catch (Error &e) {
+                } catch (Error & e) {
                     nrFailed++;
                     if (!settings.keepGoing)
                         throw e;
