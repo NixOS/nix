@@ -11,7 +11,6 @@
 #include "archive.hh"
 #include "callback.hh"
 #include "remote-store.hh"
-#include "finally.hh"
 
 #include <regex>
 
@@ -309,7 +308,6 @@ void Store::addMultipleToStore(
 
             auto & [info_, source_] = *infosMap.at(path);
             auto info = info_;
-            auto source = std::move(source_);
             info.ultimate = false;
 
             /* Make sure that the Source object is destroyed when
@@ -317,9 +315,7 @@ void Store::addMultipleToStore(
                be destroyed to ensure that the destructors on its
                stack frame are run; this includes
                LegacySSHStore::narFromPath()'s connection lock. */
-            Finally cleanupSource{[&]() {
-                source.reset();
-            }};
+            auto source = std::move(source_);
 
             if (!isValidPath(info.path)) {
                 MaintainCount<decltype(nrRunning)> mc(nrRunning);
