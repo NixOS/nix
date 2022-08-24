@@ -307,8 +307,9 @@ void Store::addMultipleToStore(
         [&](const StorePath & path) {
             checkInterrupt();
 
-            auto & [info_, source] = *infosMap.at(path);
+            auto & [info_, source_] = *infosMap.at(path);
             auto info = info_;
+            auto source = std::move(source_);
             info.ultimate = false;
 
             /* Make sure that the Source object is destroyed when
