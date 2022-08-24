@@ -672,6 +672,23 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
 
 
 void RemoteStore::addMultipleToStore(
+    PathsSource & pathsToCopy,
+    Activity & act,
+    RepairFlag repair,
+    CheckSigsFlag checkSigs)
+{
+    auto source = sinkToSource([&](Sink & sink) {
+        sink << pathsToCopy.size();
+        for (auto & [pathInfo, pathSource] : pathsToCopy) {
+            pathInfo.write(sink, *this, 16);
+            pathSource->drainInto(sink);
+        }
+    });
+
+    addMultipleToStore(*source, repair, checkSigs);
+}
+
+void RemoteStore::addMultipleToStore(
     Source & source,
     RepairFlag repair,
     CheckSigsFlag checkSigs)
