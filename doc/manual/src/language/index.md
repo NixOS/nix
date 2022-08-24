@@ -403,7 +403,7 @@ This is an incomplete overview of language features, by example.
  <tr>
   <td>
 
-   `with pkgs.lib; head [ 1 2 3 ]`
+   `with builtins; head [ 1 2 3 ]`
 
   </td>
   <td>
