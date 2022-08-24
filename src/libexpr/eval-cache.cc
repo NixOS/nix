@@ -507,11 +507,6 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name, bool forceErro
         return nullptr;
         //throw TypeError("'%s' is not an attribute set", getAttrPathStr());
 
-    for (auto & attr : *v.attrs) {
-        if (root->db)
-            root->db->setPlaceholder({cachedValue->first, attr.name});
-    }
-
     auto attr = v.attrs->get(name);
 
     if (!attr) {
