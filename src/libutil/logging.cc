@@ -29,7 +29,7 @@ void setCurActivity(const ActivityId activityId)
     curActivity = activityId;
 }
 
-Logger * logger = makeSimpleLogger(true);
+std::unique_ptr<Logger> logger = makeSimpleLogger(true);
 
 void Logger::warn(const std::string & msg)
 {
@@ -128,9 +128,9 @@ void writeToStderr(std::string_view s)
     }
 }
 
-Logger * makeSimpleLogger(bool printBuildLogs)
+std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs)
 {
-    return new SimpleLogger(printBuildLogs);
+    return std::make_unique<SimpleLogger>(printBuildLogs);
 }
 
 std::atomic<uint64_t> nextId{0};
@@ -262,9 +262,9 @@ struct JSONLogger : Logger {
     }
 };
 
-Logger * makeJSONLogger(Descriptor fd)
+std::unique_ptr<Logger> makeJSONLogger(Descriptor fd)
 {
-    return new JSONLogger(fd);
+    return std::make_unique<JSONLogger>(fd);
 }
 
 static Logger::Fields getFields(nlohmann::json & json)
