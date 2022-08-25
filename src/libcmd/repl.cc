@@ -35,6 +35,7 @@ extern "C" {
 #include "finally.hh"
 #include "markdown.hh"
 #include "local-fs-store.hh"
+#include "progress-bar.hh"
 
 #if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
@@ -249,6 +250,10 @@ void NixRepl::mainLoop()
     rl_set_complete_func(completionCallback);
     rl_set_list_possib_func(listPossibleCallback);
 #endif
+
+    /* Stop the progress bar because it interferes with the display of
+       the repl. */
+    stopProgressBar();
 
     std::string input;
 
@@ -1037,9 +1042,10 @@ void runRepl(
 
 struct CmdRepl : InstallablesCommand
 {
-    CmdRepl(){
+    CmdRepl() {
         evalSettings.pureEval = false;
     }
+
     void prepare()
     {
         if (!settings.isExperimentalFeatureEnabled(Xp::ReplFlake) && !(file) && this->_installables.size() >= 1) {
@@ -1053,12 +1059,15 @@ struct CmdRepl : InstallablesCommand
         }
         installables = InstallablesCommand::load();
     }
+
     std::vector<std::string> files;
+
     Strings getDefaultFlakeAttrPaths() override
     {
         return {""};
     }
-    virtual bool useDefaultInstallables() override
+
+    bool useDefaultInstallables() override
     {
         return file.has_value() or expr.has_value();
     }

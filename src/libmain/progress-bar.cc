@@ -81,14 +81,13 @@ private:
 
     std::condition_variable quitCV, updateCV;
 
-    bool printBuildLogs;
+    bool printBuildLogs = false;
     bool isTTY;
 
 public:
 
-    ProgressBar(bool printBuildLogs, bool isTTY)
-        : printBuildLogs(printBuildLogs)
-        , isTTY(isTTY)
+    ProgressBar(bool isTTY)
+        : isTTY(isTTY)
     {
         state_.lock()->active = isTTY;
         updateThread = std::thread([&]() {
@@ -503,19 +502,21 @@ public:
         draw(*state);
         return s[0];
     }
+
+    virtual void setPrintBuildLogs(bool printBuildLogs)
+    {
+        this->printBuildLogs = printBuildLogs;
+    }
 };
 
-Logger * makeProgressBar(bool printBuildLogs)
+Logger * makeProgressBar()
 {
-    return new ProgressBar(
-        printBuildLogs,
-        shouldANSI()
-    );
+    return new ProgressBar(shouldANSI());
 }
 
-void startProgressBar(bool printBuildLogs)
+void startProgressBar()
 {
-    logger = makeProgressBar(printBuildLogs);
+    logger = makeProgressBar();
 }
 
 void stopProgressBar()

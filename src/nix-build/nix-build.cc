@@ -406,7 +406,7 @@ static void main_nix_build(int argc, char * * argv)
                 auto bashDrv = drv->requireDrvPath();
                 pathsToBuild.push_back(DerivedPath::Built {
                     .drvPath = bashDrv,
-                    .outputs = {},
+                    .outputs = {"out"},
                 });
                 pathsToCopy.insert(bashDrv);
                 shellDrv = bashDrv;

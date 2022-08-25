@@ -111,6 +111,9 @@ public:
 
     virtual std::optional<char> ask(std::string_view s)
     { return {}; }
+
+    virtual void setPrintBuildLogs(bool printBuildLogs)
+    { }
 };
 
 ActivityId getCurActivity();

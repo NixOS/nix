@@ -30,8 +30,11 @@ Logger * makeDefaultLogger() {
         return makeJSONLogger(*makeSimpleLogger(true));
     case LogFormat::bar:
         return makeProgressBar();
-    case LogFormat::barWithLogs:
-        return makeProgressBar(true);
+    case LogFormat::barWithLogs: {
+        auto logger = makeProgressBar();
+        logger->setPrintBuildLogs(true);
+        return logger;
+    }
     default:
         abort();
     }

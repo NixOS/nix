@@ -2,6 +2,7 @@
 , lib ? pkgs.lib
 , name ? "nix"
 , tag ? "latest"
+, bundleNixpkgs ? true
 , channelName ? "nixpkgs"
 , channelURL ? "https://nixos.org/channels/nixpkgs-unstable"
 , extraPkgs ? []
@@ -139,10 +140,12 @@ let
   baseSystem =
     let
       nixpkgs = pkgs.path;
-      channel = pkgs.runCommand "channel-nixos" { } ''
+      channel = pkgs.runCommand "channel-nixos" { inherit bundleNixpkgs; } ''
         mkdir $out
-        ln -s ${nixpkgs} $out/nixpkgs
-        echo "[]" > $out/manifest.nix
+        if [ "$bundleNixpkgs" ]; then
+          ln -s ${nixpkgs} $out/nixpkgs
+          echo "[]" > $out/manifest.nix
+        fi
       '';
       rootEnv = pkgs.buildPackages.buildEnv {
         name = "root-profile-env";
