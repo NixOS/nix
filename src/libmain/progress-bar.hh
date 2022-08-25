@@ -4,7 +4,7 @@
 
 namespace nix {
 
-Logger * makeProgressBar();
+std::unique_ptr<Logger> makeProgressBar();
 
 void startProgressBar();
 
