@@ -130,11 +130,11 @@ Logger * makeSimpleLogger(bool printBuildLogs)
     return new SimpleLogger(printBuildLogs);
 }
 
-std::atomic<uint64_t> nextId{(uint64_t) getpid() << 32};
+std::atomic<uint64_t> nextId{0};
 
 Activity::Activity(Logger & logger, Verbosity lvl, ActivityType type,
     const std::string & s, const Logger::Fields & fields, ActivityId parent)
-    : logger(logger), id(nextId++)
+    : logger(logger), id(nextId++ + (((uint64_t) getpid()) << 32))
 {
     logger.startActivity(id, lvl, type, s, fields, parent);
 }
