@@ -698,6 +698,33 @@ std::vector<std::string> AttrCursor::getListOfStrings()
     return res;
 }
 
+std::vector<Bindings *> AttrCursor::getListOfAttrs()
+{
+    // TODO: Insert caching
+
+    debug("evaluating uncached attribute '%s'", getAttrPathStr());
+
+    auto & v = getValue();
+    root->state.forceValue(v, noPos);
+
+    if (v.type() != nList)
+        throw TypeError("'%s' is not a list", getAttrPathStr());
+
+    std::vector<Bindings *> attrsList;
+
+    for (auto & attrs : v.listItems()) {
+        root->state.forceValue(*attrs, noPos);
+
+        if (attrs->type() != nAttrs) {
+            throw TypeError("'%s' is not a list of attributes", getAttrPathStr());
+        }
+
+        attrsList.push_back(attrs->attrs);
+    }
+
+    return attrsList;
+}
+
 std::vector<Symbol> AttrCursor::getAttrs()
 {
     if (root->db) {
@@ -720,6 +747,7 @@ std::vector<Symbol> AttrCursor::getAttrs()
     std::vector<Symbol> attrs;
     for (auto & attr : *getValue().attrs)
         attrs.push_back(attr.name);
+
     std::sort(attrs.begin(), attrs.end(), [&](Symbol a, Symbol b) {
         std::string_view sa = root->state.symbols[a], sb = root->state.symbols[b];
         return sa < sb;

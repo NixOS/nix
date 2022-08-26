@@ -123,6 +123,8 @@ public:
 
     std::vector<std::string> getListOfStrings();
 
+    std::vector<Bindings *> getListOfAttrs();
+
     std::vector<Symbol> getAttrs();
 
     bool isDerivation();
