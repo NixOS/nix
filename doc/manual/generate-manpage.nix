@@ -8,12 +8,18 @@ let
   showCommand =
     { command, def, filename }:
     ''
-      **Warning**: This program is **experimental** and its interface is subject to change.
+      > **Warning**
+      > This program is **experimental** and its interface is subject to change.
+
+      # Name
+
+      `${command}` - ${def.description}
+
+      # Synopsis
+
+      ${showSynopsis { inherit command; args = def.args; }}
+
     ''
-    + "# Name\n\n"
-    + "`${command}` - ${def.description}\n\n"
-    + "# Synopsis\n\n"
-    + showSynopsis { inherit command; args = def.args; }
     + (if def.commands or {} != {}
        then
          let
@@ -24,8 +30,10 @@ let
                + "[`${command} ${name}`](./${appendName filename name}.md)"
                + " - ${cmds.${name}.description}\n")
                (attrNames cmds));
-         in
-         "where *subcommand* is one of the following:\n\n"
+         in ''
+         where *subcommand* is one of the following:
+
+         ''
          # FIXME: group by category
          + (if length categories > 1
             then
@@ -76,7 +84,7 @@ let
   showSynopsis =
     { command, args }:
     "`${command}` [*option*...] ${concatStringsSep " "
-      (map (arg: "*${arg.label}*" + (if arg ? arity then "" else "...")) args)}\n\n";
+      (map (arg: "*${arg.label}*" + (if arg ? arity then "" else "...")) args)}";
 
   processCommand = { command, def, filename }:
     [ { name = filename + ".md"; value = showCommand { inherit command def filename; }; inherit command; } ]
