@@ -41,33 +41,26 @@ let
 
         ${showOptions def.flags}
       '';
-      showOptions = flags:
+      showOptions = options:
         let
-          categories = sort builtins.lessThan (unique (map (cmd: cmd.category) (attrValues flags)));
-        in
-          concatStrings (map
-            (cat:
-              (if cat != ""
-               then "**${cat}:**\n\n"
-               else "")
-              + concatStrings
-                (map (longName:
-                  let
-                    flag = flags.${longName};
-                  in
-                    "  - `--${longName}`"
-                    + (if flag ? shortName then " / `-${flag.shortName}`" else "")
-                    + (if flag ? labels then " " + (concatStringsSep " " (map (s: "*${s}*") flag.labels)) else "")
-                    + "  \n"
-                    + "    " + flag.description + "\n\n"
-                ) (attrNames (filterAttrs (n: v: v.category == cat) flags))))
-            categories);
-      squash = string: # squash more than two repeated newlines
-        let
-          replaced = replaceStrings [ "\n\n\n" ] [ "\n\n" ] string;
-        in
-          if replaced == string then string else squash replaced;
-    in squash ''
+          showCategory = cat: ''
+            ${if cat != "" then "**${cat}:**" else ""}
+
+            ${listOptions (filterAttrs (n: v: v.category == cat) options)}
+            '';
+          listOptions = opts: concatStringsSep "\n" (attrValues (mapAttrs showOption opts));
+          showOption = name: option:
+            let
+              shortName = if option ? shortName then "/ `-${option.shortName}`" else "";
+              labels = if option ? labels then (concatStringsSep " " (map (s: "*${s}*") option.labels)) else "";
+            in trim ''
+              - `--${name}` ${shortName} ${labels}
+
+                ${option.description}
+            '';
+          categories = sort builtins.lessThan (unique (map (cmd: cmd.category) (attrValues options)));
+        in concatStrings (map showCategory categories);
+    in squash  ''
       > **Warning** \
       > This program is **experimental** and its interface is subject to change.
 
