@@ -1030,7 +1030,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     if (json) {
                         std::optional<std::string> description;
                         std::optional<std::string> homepage;
-                        std::optional<std::vector<std::string>> maintainers;
+                        std::optional<std::vector<Bindings *>> maintainers;
                         std::optional<std::vector<std::string>> licenses;
                         if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
                             if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
@@ -1038,7 +1038,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             if (auto aHomepage = aMeta->maybeGetAttr(state->sHomepage))
                                 homepage = aHomepage->getString();
                             if (auto aMaintainers = aMeta->maybeGetAttr(state->sMaintainers))
-                                maintainers = aMaintainers->getListOfStrings();
+                                maintainers = aMaintainers->getListOfAttrs();
                             if (auto aLicenses = aMeta->maybeGetAttr(state->sLicenses))
                                 licenses = aLicenses->getListOfStrings();
                         }
@@ -1048,8 +1048,24 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             j.emplace("description", *description);
                         if (homepage)
                             j.emplace("homepage", *homepage);
-                        if (maintainers)
-                            j.emplace("maintainers", *maintainers);
+                        if (maintainers) {
+                            auto jMaintainers = nlohmann::json::object();
+                            for(auto k : *maintainers) {
+                                Bindings::iterator i = k->begin();
+                                while(i != k->end()) {
+                                    auto val = *i->value;
+                                    PathSet context;
+
+                                    std::string valString = state->coerceToString(i->pos, val, context, true, false).toOwned();
+                                    std::string symbolString = std::string(state->symbols[i->name]);
+
+                                    jMaintainers.emplace(symbolString, valString);
+
+                                    ++i;
+                                }
+                            }
+                            j.emplace("maintainers", std::move(jMaintainers));
+                        }
                         if (licenses) 
                             j.emplace("licenses", *licenses);
 
