@@ -512,7 +512,7 @@ T readLittleEndian(unsigned char * p)
 {
     T x = 0;
     for (size_t i = 0; i < sizeof(x); ++i)
-        x |= *p++ << (i * 8);
+        x |= ((T) *p++) << (i * 8);
     return x;
 }
 
