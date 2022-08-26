@@ -50,7 +50,7 @@ $(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli
 
 $(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/generate-manpage.nix $(bindir)/nix
 	@rm -rf $@
-	$(trace-gen) $(nix-eval) --write-to $@ --expr 'import doc/manual/generate-manpage.nix { command = builtins.readFile $<; renderLinks = true; }'
+	$(trace-gen) $(nix-eval) --write-to $@ --expr 'import doc/manual/generate-manpage.nix { command = builtins.readFile $<; }'
 
 $(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/generate-options.nix $(d)/src/command-ref/conf-file-prefix.md $(bindir)/nix
 	@cat doc/manual/src/command-ref/conf-file-prefix.md > $@.tmp
@@ -96,7 +96,7 @@ doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
 	  if [[ $$name = SUMMARY ]]; then continue; fi; \
 	  printf "Title: %s\n\n" "$$name" > $$tmpFile; \
 	  cat $$i >> $$tmpFile; \
-	  lowdown -sT man -M section=1 $$tmpFile -o $(DESTDIR)$$(dirname $@)/$$name.1; \
+	  lowdown -sT man --nroff-nolinks -M section=1 $$tmpFile -o $(DESTDIR)$$(dirname $@)/$$name.1; \
 	  rm $$tmpFile; \
 	done
 	@touch $@
