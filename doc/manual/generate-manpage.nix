@@ -5,7 +5,7 @@ with import ./utils.nix;
 
 let
 
-  showCommand = { command, def, filename }:
+  showCommand = { command, details, filename }:
     let
       result = ''
         > **Warning** \
@@ -13,11 +13,11 @@ let
 
         # Name
 
-        `${command}` - ${def.description}
+        `${command}` - ${details.description}
 
         # Synopsis
 
-        ${showSynopsis command def.args}
+        ${showSynopsis command details.args}
 
         ${maybeSubcommands}
 
@@ -32,7 +32,7 @@ let
         in ''
          `${command}` [*option*...] ${arguments}
         '';
-      maybeSubcommands = if def ? commands && def.commands != {}
+      maybeSubcommands = if details ? commands && details.commands != {}
         then ''
            where *subcommand* is one of the following:
 
@@ -41,23 +41,23 @@ let
         else "";
       subcommands = if length categories > 1
         then listCategories
-        else listSubcommands def.commands;
-      categories = sort (x: y: x.id < y.id) (unique (map (cmd: cmd.category) (attrValues def.commands)));
+        else listSubcommands details.commands;
+      categories = sort (x: y: x.id < y.id) (unique (map (cmd: cmd.category) (attrValues details.commands)));
       listCategories = concatStrings (map showCategory categories);
       showCategory = cat: ''
         **${toString cat.description}:**
 
-        ${listSubcommands (filterAttrs (n: v: v.category == cat) def.commands)}
+        ${listSubcommands (filterAttrs (n: v: v.category == cat) details.commands)}
       '';
       listSubcommands = cmds: concatStrings (attrValues (mapAttrs showSubcommand cmds));
       showSubcommand = name: subcmd: ''
         * [`${command} ${name}`](./${appendName filename name}.md) - ${subcmd.description}
       '';
-      maybeDocumentation = if def ? doc then def.doc else "";
-      maybeOptions = if def.flags == {} then "" else ''
+      maybeDocumentation = if details ? doc then details.doc else "";
+      maybeOptions = if details.flags == {} then "" else ''
         # Options
 
-        ${showOptions def.flags}
+        ${showOptions details.flags}
       '';
       showOptions = options:
         let
@@ -82,17 +82,29 @@ let
 
   appendName = filename: name: (if filename == "nix" then "nix3" else filename) + "-" + name;
 
-  processCommand = { command, def, filename }:
-    [ { name = filename + ".md"; value = showCommand { inherit command def filename; }; inherit command; } ]
-    ++ concatMap
-      (name: processCommand {
-        filename = appendName filename name;
-        command = command + " " + name;
-        def = def.commands.${name};
-      })
-      (attrNames def.commands or {});
+  processCommand = { command, details, filename }:
+    let
+      cmd = {
+        inherit command;
+        name = filename + ".md";
+        value = showCommand { inherit command details filename; };
+      };
+      subcommand = subCmd: processCommand {
+        command = command + " " + subCmd;
+        details = details.commands.${subCmd};
+        filename = appendName filename subCmd;
+      };
+    in [ cmd ] ++ concatMap subcommand (attrNames details.commands or {});
 
-  manpages = processCommand { filename = "nix"; command = "nix"; def = builtins.fromJSON command; };
-  summary = concatStrings (map (manpage: "    - [${manpage.command}](command-ref/new-cli/${manpage.name})\n") manpages);
-in
-(listToAttrs manpages) // { "SUMMARY.md" = summary; }
+  manpages = processCommand {
+    command = "nix";
+    details = builtins.fromJSON command;
+    filename = "nix";
+  };
+
+  tableOfContents = let
+    showEntry = page:
+      "    - [${page.command}](command-ref/new-cli/${page.name})";
+    in concatStringsSep "\n" (map showEntry manpages);
+
+in (listToAttrs manpages) // { "SUMMARY.md" = tableOfContents; }
