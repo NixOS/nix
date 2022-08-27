@@ -7,6 +7,24 @@ let
 
   showCommand = { command, def, filename }:
     let
+      result = ''
+        > **Warning** \
+        > This program is **experimental** and its interface is subject to change.
+
+        # Name
+
+        `${command}` - ${def.description}
+
+        # Synopsis
+
+        ${showSynopsis command def.args}
+
+        ${maybeSubcommands}
+
+        ${maybeDocumentation}
+
+        ${maybeOptions}
+      '';
       showSynopsis = command: args:
         let
           showArgument = arg: "*${arg.label}*" + (if arg ? arity then "" else "...");
@@ -60,24 +78,7 @@ let
             '';
           categories = sort builtins.lessThan (unique (map (cmd: cmd.category) (attrValues options)));
         in concatStrings (map showCategory categories);
-    in squash  ''
-      > **Warning** \
-      > This program is **experimental** and its interface is subject to change.
-
-      # Name
-
-      `${command}` - ${def.description}
-
-      # Synopsis
-
-      ${showSynopsis command def.args}
-
-      ${maybeSubcommands}
-
-      ${maybeDocumentation}
-
-      ${maybeOptions}
-    '';
+    in squash result;
 
   appendName = filename: name: (if filename == "nix" then "nix3" else filename) + "-" + name;
 
