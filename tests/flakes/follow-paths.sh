@@ -149,7 +149,7 @@ git -C $flakeFollowsA add flake.nix
 nix flake lock $flakeFollowsA 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid'"
 nix flake lock $flakeFollowsA 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid2'"
 
-# Test nested flake overrides
+# Test nested flake overrides: A overrides B/C/D
 
 cat <<EOF > $flakeFollowsD/flake.nix
 { outputs = _: {}; }
@@ -178,3 +178,33 @@ EOF
 nix flake lock $flakeFollowsA
 
 [[ $(jq -c .nodes.C.inputs.D $flakeFollowsA/flake.lock) = '["D"]' ]]
+
+# Test overlapping flake follows: B has D follow C/D, while A has B/C follow C
+
+cat <<EOF > $flakeFollowsC/flake.nix
+{
+  inputs.D.url = "path:$flakeFollowsD";
+  outputs = _: {};
+}
+EOF
+cat <<EOF > $flakeFollowsB/flake.nix
+{
+  inputs.C.url = "path:nosuchflake";
+  inputs.D.url = "path:nosuchflake";
+  inputs.D.follows = "C/D";
+  outputs = _: {};
+}
+EOF
+cat <<EOF > $flakeFollowsA/flake.nix
+{
+  inputs.B.url = "path:$flakeFollowsB";
+  inputs.C.url = "path:$flakeFollowsC";
+  inputs.B.inputs.C.follows = "C";
+  outputs = _: {};
+}
+EOF
+
+# bug was not triggered without recreating the lockfile
+nix flake lock $flakeFollowsA --recreate-lock-file
+
+[[ $(jq -c .nodes.B.inputs.D $flakeFollowsA/flake.lock) = '["B","C","D"]' ]]
