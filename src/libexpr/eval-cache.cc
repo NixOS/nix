@@ -443,7 +443,6 @@ Value & AttrCursor::forceValue()
             cachedValue = {root->db->setString(getKey(), v.string.s, v.string.context),
                            string_t{v.string.s, {}}};
         else if (v.type() == nPath) {
-            // FIXME: take accessor into account?
             auto path = v.path().path;
             cachedValue = {root->db->setString(getKey(), path.abs()), string_t{path.abs(), {}}};
         }
