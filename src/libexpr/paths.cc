@@ -11,7 +11,7 @@ SourcePath EvalState::rootPath(const Path & path)
 
 void EvalState::registerAccessor(ref<InputAccessor> accessor)
 {
-    inputAccessors.emplace(&*accessor, accessor);
+    inputAccessors.emplace(accessor->number, accessor);
 }
 
 }

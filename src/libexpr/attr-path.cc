@@ -135,21 +135,15 @@ std::pair<SourcePath, uint32_t> findPackageFilename(EvalState & state, Value & v
         size_t number = std::stoi(std::string(pos, 0, slash));
         pos = pos.substr(slash);
 
-        std::shared_ptr<InputAccessor> accessor;
-        for (auto & i : state.inputAccessors)
-            if (i.second->number == number) {
-                accessor = i.second;
-                break;
-            }
-
-        if (!accessor) fail();
+        auto accessor = state.inputAccessors.find(number);
+        if (accessor == state.inputAccessors.end()) fail();
 
         auto colon = pos.rfind(':');
         if (colon == std::string::npos) fail();
         std::string filename(pos, 0, colon);
         auto lineno = std::stoi(std::string(pos, colon + 1, std::string::npos));
 
-        return {SourcePath{ref(accessor), CanonPath(filename)}, lineno};
+        return {SourcePath{accessor->second, CanonPath(filename)}, lineno};
 
     } catch (std::invalid_argument & e) {
         fail();

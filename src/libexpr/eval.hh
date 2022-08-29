@@ -114,7 +114,9 @@ public:
 
     const SourcePath derivationInternal;
 
-    std::unordered_map<InputAccessor *, ref<InputAccessor>> inputAccessors;
+    /* A map keyed by InputAccessor::number that keeps input accessors
+       alive. */
+    std::unordered_map<size_t, ref<InputAccessor>> inputAccessors;
 
     /* Store used to materialise .drv files. */
     const ref<Store> store;
