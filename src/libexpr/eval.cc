@@ -454,7 +454,7 @@ EvalState::EvalState(
     , sDescription(symbols.create("description"))
     , sHomepage(symbols.create("homepage"))
     , sMaintainers(symbols.create("maintainers"))
-    , sLicense(symbols.create("license"))
+    , sLicenses(symbols.create("licenses"))
     , sSelf(symbols.create("self"))
     , sEpsilon(symbols.create(""))
     , sStartSet(symbols.create("startSet"))

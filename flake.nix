@@ -300,53 +300,6 @@
 
             disallowedReferences = [ boost ];
 
-            # wyill's test meta fields
-            meta.homepage = "http://www.google.com";
-            meta.license = 
-            {
-              spdxId = "MIT";
-              fullName = "MIT License";
-            };
-
-
-            # meta.maintainers = 
-            # {
-            #   _0qq = "dimitry kulikov";
-            #   _0x4a6f = "joachim ernst";
-            #   _0xbe7a = "bela stoyan";
-            # };
-
-            meta.maintainers = 
-            [
-              {
-                email = "0qqw0qqw@gmail.com";
-                github = "0qq";
-                githubid = 64707304;
-                name = "dmitry kulikov";
-              }
-
-              {
-                email = "mail-maintainer@0x4a6f.dev";
-                matrix = "@0x4a6f:matrix.org";
-                name = "joachim ernst";
-                github = "0x4a6f";
-                githubid = 9675338;
-                # keys = {
-                #   fingerprint = "f466 a548 ad3f c1f1 8c88  4576 8702 7528 b006 d66d";
-                # };
-              }
-
-              {
-                email = "nix@be7a.de";
-                name = "bela stoyan";
-                github = "0xbe7a";
-                githubid = 6232980;
-                # keys = {
-                #   fingerprint = "2536 9e86 1aa5 9eb7 4c47  b138 6510 870a 77f4 9a99";
-                # };
-              }
-            ];
-
             preConfigure =
               ''
                 # Copy libboost_context so we don't get all of Boost in our closure.
