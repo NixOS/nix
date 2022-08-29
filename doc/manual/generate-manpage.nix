@@ -1,4 +1,4 @@
-{ command, renderLinks ? false }:
+{ command }:
 
 with builtins;
 with import ./utils.nix;
@@ -21,9 +21,7 @@ let
            listCommands = cmds:
              concatStrings (map (name:
                "* "
-               + (if renderLinks
-                  then "[`${command} ${name}`](./${appendName filename name}.md)"
-                  else "`${command} ${name}`")
+               + "[`${command} ${name}`](./${appendName filename name}.md)"
                + " - ${cmds.${name}.description}\n")
                (attrNames cmds));
          in
