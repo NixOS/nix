@@ -978,7 +978,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
           ;
     }
 
-    void run(nix::ref<nix::Store> store) override
+    void run(nix::ref<nix::Store> store) override __attribute__((optimize(0)))
     {
         evalSettings.enableImportFromDerivation.setDefault(false);
 
@@ -1049,8 +1049,11 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         if (homepage)
                             j.emplace("homepage", *homepage);
                         if (maintainers) {
+                            std::string github = "";
                             auto jMaintainers = nlohmann::json::object();
-                            for(auto k : *maintainers) {
+                            std::vector<Bindings *> maintainers_vec = *maintainers;
+                            for(auto k : maintainers_vec) {
+                                auto jFields = nlohmann::json::object();
                                 Bindings::iterator i = k->begin();
                                 while(i != k->end()) {
                                     auto val = *i->value;
@@ -1059,10 +1062,17 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                     std::string valString = state->coerceToString(i->pos, val, context, true, false).toOwned();
                                     std::string symbolString = std::string(state->symbols[i->name]);
 
-                                    jMaintainers.emplace(symbolString, valString);
+                                    jFields.emplace(symbolString, valString);
 
+                                    // TODO: what if no github? name?
+                                    auto sGithub = state->symbols.create("github");
+
+                                    if (i->name == sGithub) {
+                                        github = valString;
+                                    }
                                     ++i;
                                 }
+                                jMaintainers.emplace(github, std::move(jFields));
                             }
                             j.emplace("maintainers", std::move(jMaintainers));
                         }
