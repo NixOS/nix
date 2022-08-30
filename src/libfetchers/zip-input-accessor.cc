@@ -61,7 +61,7 @@ struct ZipInputAccessor : InputAccessor
                 zip_uint16_t id, len;
                 auto extra = zip_file_extra_field_get(zipFile, i, 0, &id, &len, ZIP_FL_CENTRAL);
                 if (id == 0x5455 && len >= 5)
-                    lastModified = std::max(lastModified, readLittleEndian<time_t>((unsigned char *) extra + 1));
+                    lastModified = std::max(lastModified, (time_t) readLittleEndian<uint32_t>((unsigned char *) extra + 1));
             }
 
             auto slash = strchr(sb.name, '/');
