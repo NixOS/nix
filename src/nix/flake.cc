@@ -1051,8 +1051,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         if (maintainers) {
                             std::string github = "";
                             auto jMaintainers = nlohmann::json::object();
-                            std::vector<Bindings *> maintainers_vec = *maintainers;
-                            for(auto k : maintainers_vec) {
+                            for(auto k : *maintainers) {
                                 auto jFields = nlohmann::json::object();
                                 Bindings::iterator i = k->begin();
                                 while(i != k->end()) {
@@ -1065,9 +1064,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                     jFields.emplace(symbolString, valString);
 
                                     // TODO: what if no github? name?
-                                    auto sGithub = state->symbols.create("github");
-
-                                    if (i->name == sGithub) {
+                                    if (i->name == state->symbols.create("github")) {
                                         github = valString;
                                     }
                                     ++i;
