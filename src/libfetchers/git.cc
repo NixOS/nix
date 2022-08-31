@@ -460,6 +460,8 @@ struct GitInputScheme : InputScheme
                 return *revCount;
         }
 
+        Activity act(*logger, lvlChatty, actUnknown, fmt("getting Git revision count of '%s'", repoInfo.url));
+
         auto revCount = std::stoull(
             runProgram("git", true,
                 { "-C", repoDir, "--git-dir", repoInfo.gitDir, "rev-list", "--count", rev.gitRev() }));
@@ -659,14 +661,16 @@ struct GitInputScheme : InputScheme
         {
             throw Error(
                 "Cannot find Git revision '%s' in ref '%s' of repository '%s'! "
-                    "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the "
-                    ANSI_BOLD "ref" ANSI_NORMAL " you've specified or add " ANSI_BOLD
-                    "allRefs = true;" ANSI_NORMAL " to " ANSI_BOLD "fetchGit" ANSI_NORMAL ".",
+                "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the "
+                ANSI_BOLD "ref" ANSI_NORMAL " you've specified or add " ANSI_BOLD
+                "allRefs = true;" ANSI_NORMAL " to " ANSI_BOLD "fetchGit" ANSI_NORMAL ".",
                 input.getRev()->gitRev(),
                 ref,
                 repoInfo.url
             );
         }
+
+        Activity act(*logger, lvlChatty, actUnknown, fmt("copying Git tree '%s' to the store", input.to_string()));
 
         if (repoInfo.submodules) {
             Path tmpGitDir = createTempDir();
