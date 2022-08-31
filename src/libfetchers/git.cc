@@ -281,7 +281,7 @@ struct GitInputScheme : InputScheme
         /* URL of the repo, or its path if isLocal. */
         std::string url;
 
-        void checkDirty() const
+        void warnDirty() const
         {
             if (isDirty) {
                 if (!fetchSettings.allowDirty)
@@ -753,12 +753,10 @@ struct GitInputScheme : InputScheme
             return {accessor, input};
         }
 
-        repoInfo.checkDirty();
-
-        auto ref = getDefaultRef(repoInfo);
-        input.attrs.insert_or_assign("ref", ref);
-
         if (!repoInfo.isDirty) {
+            auto ref = getDefaultRef(repoInfo);
+            input.attrs.insert_or_assign("ref", ref);
+
             auto rev = updateRev(input, repoInfo, ref);
 
             input.attrs.insert_or_assign(
@@ -769,11 +767,13 @@ struct GitInputScheme : InputScheme
                 "lastModified",
                 getLastModified(repoInfo, repoInfo.url, rev));
         } else {
+            repoInfo.warnDirty();
+
             // FIXME: maybe we should use the timestamp of the last
             // modified dirty file?
             input.attrs.insert_or_assign(
                 "lastModified",
-                getLastModified(repoInfo, repoInfo.url, ref));
+                getLastModified(repoInfo, repoInfo.url, "HEAD"));
         }
 
         return {makeFSInputAccessor(CanonPath(repoInfo.url), listFiles(repoInfo), std::move(makeNotAllowedError)), input};
