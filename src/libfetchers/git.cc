@@ -748,7 +748,9 @@ struct GitInputScheme : InputScheme
            files from the Git repository directly. */
         if (input.getRef() || input.getRev() || !repoInfo.isLocal) {
             auto storePath = fetchToStore(store, repoInfo, input);
-            return {makeStorePathAccessor(store, storePath, std::move(makeNotAllowedError)), input};
+            auto accessor = makeStorePathAccessor(store, storePath, std::move(makeNotAllowedError));
+            accessor->setPathDisplay("«" + input.to_string() + "»");
+            return {accessor, input};
         }
 
         repoInfo.checkDirty();
