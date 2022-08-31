@@ -292,6 +292,8 @@ class BoehmGCStackAllocator : public StackAllocator {
         return sctx.size - boost::context::stack_traits::page_size();
     }
 
+    char* old_stack_bottom;
+
   public:
     boost::context::stack_context allocate() override {
         auto sctx = stack.allocate();
@@ -301,11 +303,22 @@ class BoehmGCStackAllocator : public StackAllocator {
         // boost_routine does not implement it.
         // So we subtract the stack size.
         GC_add_roots(static_cast<char *>(sctx.sp) - pfss_usable_stack_size(sctx), sctx.sp);
+
+        // Set GC_stackbottom to bottom of our new stack.
+        // This assumes everything is single-threaded though, so
+        // will need to be revisited on multi-threaded evaluation.
+        // XXX: what if stack gets allocated but not used?
+        old_stack_bottom = GC_stackbottom;
+        GC_stackbottom = static_cast<char *>(sctx.sp) - sctx.size;
+
         return sctx;
     }
 
     void deallocate(boost::context::stack_context sctx) override {
         GC_remove_roots(static_cast<char *>(sctx.sp) - pfss_usable_stack_size(sctx), sctx.sp);
+
+        GC_stackbottom = old_stack_bottom;
+
         stack.deallocate(sctx);
     }
 
