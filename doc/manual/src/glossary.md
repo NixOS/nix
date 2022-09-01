@@ -7,13 +7,14 @@
     translated into low-level *store derivations* (implicitly by
     `nix-env` and `nix-build`, or explicitly by `nix-instantiate`).
 
-  - [content-addressed derivation]{#gloss-fixed-output-derivation}
-    FIXME
+  - [content-addressed derivation]{#gloss-content-addressed-derivation}\
+    A derivation which has the
+    [`__contentAddressed`](language/advanced-attributes.md#contentAddressed)
+    attribute set to `true`.
 
-  - [fixed-output derivation]{#gloss-fixed-output-derivation}
-    A derivation which includes the `__outHash` attribute; the output
-    of such derivations must exactly match the hash.  All fixed-output
-    derivations are [content-addressed derivations](#gloss-content-addressed-derivation).
+  - [fixed-output derivation]{#gloss-fixed-output-derivation}\
+    A derivation which includes the `__outputHash` attribute; the output
+    of such derivations must exactly match the hash.
 
   - [store]{#gloss-store}\
     The location in the file system where store objects live. Typically
@@ -59,8 +60,10 @@
 
   - [output-addressed store object]{#gloss-output-addressed-store-object}\
     A store object whose store path hashes its content.  This
-    includes derivations and the outputs of
-    [content-addressed derivations](#gloss-content-addressed-derivation)
+    includes derivations, the outputs of
+    [content-addressed derivations](#gloss-content-addressed-derivation),
+    and the outputs of
+    [fixed-output derivations](#gloss-fixed-output-derivation).
 
   - [substitute]{#gloss-substitute}\
     A substitute is a command invocation stored in the Nix database that
