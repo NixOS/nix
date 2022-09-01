@@ -338,7 +338,7 @@ void LockFile::check()
 
     for (auto & [inputPath, input] : inputs) {
         if (auto follows = std::get_if<1>(&input)) {
-            if (!follows->empty() && !get(inputs, *follows))
+            if (!follows->empty() && !findInput(*follows))
                 throw Error("input '%s' follows a non-existent input '%s'",
                     printInputPath(inputPath),
                     printInputPath(*follows));
