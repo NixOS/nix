@@ -15,10 +15,10 @@
     invoked, the  Nix store can be  referred to
     as a "_local_" or a "_remote_" one:
 
-    + A *local  store* exists  on the local  filesystem of
+    + A *local  store* exists  on the filesystem of
       the machine where Nix is  invoked. You can use other
       local stores  by passing  the `--store` flag  to the
-      `nix` command.
+      `nix` command.  Local stores can be used for building derivations.
 
     + A  *remote store*  exists  anywhere  other than  the
       local  filesystem. One  example is  the `/nix/store`
