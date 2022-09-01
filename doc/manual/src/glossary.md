@@ -9,7 +9,7 @@
 
   - [content-addressed derivation]{#gloss-content-addressed-derivation}\
     A derivation which has the
-    [`__contentAddressed`](language/advanced-attributes.md#contentAddressed)
+    [`__contentAddressed`](language/advanced-attributes.md#adv-attr-contentAddressed)
     attribute set to `true`.
 
   - [fixed-output derivation]{#gloss-fixed-output-derivation}\
