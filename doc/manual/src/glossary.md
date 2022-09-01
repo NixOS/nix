@@ -7,6 +7,14 @@
     translated into low-level *store derivations* (implicitly by
     `nix-env` and `nix-build`, or explicitly by `nix-instantiate`).
 
+  - [content-addressed derivation]{#gloss-fixed-output-derivation}
+    FIXME
+
+  - [fixed-output derivation]{#gloss-fixed-output-derivation}
+    A derivation which includes the `__outHash` attribute; the output
+    of such derivations must exactly match the hash.  All fixed-output
+    derivations are [content-addressed derivations](#gloss-content-addressed-derivation).
+
   - [store]{#gloss-store}\
     The location in the file system where store objects live. Typically
     `/nix/store`.
@@ -44,6 +52,16 @@
     derivation outputs (objects produced by running a build action), or
     derivations (files describing a build action).
 
+  - [input-addressed store object]{#gloss-input-addressed-store-object}\
+    Store objects produced by building a
+    non-[content-addressed](#gloss-content-addressed-derivation)
+    derivation.
+
+  - [output-addressed store object]{#gloss-output-addressed-store-object}\
+    A store object whose store path hashes its content.  This
+    includes derivations and the outputs of
+    [content-addressed derivations](#gloss-content-addressed-derivation)
+
   - [substitute]{#gloss-substitute}\
     A substitute is a command invocation stored in the Nix database that
     describes how to build a store object, bypassing the normal build
@@ -59,9 +77,7 @@
     - the store object is signed by one of the `trusted-public-keys`
     - the substituter is in the `trusted-substituters` list
     - the `no-require-sigs` option has been set to disable signature checking
-    - the store object is *output-addressed*; this includes
-      derivations, the outputs of content-addressed derivations, and
-      the outputs of fixed-output derivations.
+    - the store object is [output-addressed](#gloss-output-addressed-store-object)
 
   - [purity]{#gloss-purity}\
     The assumption that equal Nix derivations when run always produce
