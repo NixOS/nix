@@ -90,11 +90,11 @@ static void expectType(EvalState & state, ValueType type,
 
 static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     EvalState & state, Value * value, const PosIdx pos,
-    const std::optional<Path> & baseDir, InputPath lockRootPath, unsigned depth);
+    const std::optional<Path> & baseDir, InputPath lockRootPath);
 
 static FlakeInput parseFlakeInput(EvalState & state,
     const std::string & inputName, Value * value, const PosIdx pos,
-    const std::optional<Path> & baseDir, InputPath lockRootPath, unsigned depth)
+    const std::optional<Path> & baseDir, InputPath lockRootPath)
 {
     expectType(state, nAttrs, *value, pos);
 
@@ -118,7 +118,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
                 expectType(state, nBool, *attr.value, attr.pos);
                 input.isFlake = attr.value->boolean;
             } else if (attr.name == sInputs) {
-                input.overrides = parseFlakeInputs(state, attr.value, attr.pos, baseDir, lockRootPath, depth + 1);
+                input.overrides = parseFlakeInputs(state, attr.value, attr.pos, baseDir, lockRootPath);
             } else if (attr.name == sFollows) {
                 expectType(state, nString, *attr.value, attr.pos);
                 auto follows(parseInputPath(attr.value->string.s));
@@ -163,11 +163,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
             input.ref = parseFlakeRef(*url, baseDir, true, input.isFlake);
     }
 
-    if (!input.follows && !input.ref && depth == 0)
-        // in `input.nixops.inputs.nixpkgs.url = ...`, we assume `nixops` is from
-        // the flake registry absent `ref`/`follows`, but we should not assume so
-        // about `nixpkgs` (where `depth == 1`) as the `nixops` flake should
-        // determine its default source
+    if (!input.follows && !input.ref)
         input.ref = FlakeRef::fromAttrs({{"type", "indirect"}, {"id", inputName}});
 
     return input;
@@ -175,7 +171,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
 
 static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     EvalState & state, Value * value, const PosIdx pos,
-    const std::optional<Path> & baseDir, InputPath lockRootPath, unsigned depth)
+    const std::optional<Path> & baseDir, InputPath lockRootPath)
 {
     std::map<FlakeId, FlakeInput> inputs;
 
@@ -188,8 +184,7 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
                 inputAttr.value,
                 inputAttr.pos,
                 baseDir,
-                lockRootPath,
-                depth));
+                lockRootPath));
     }
 
     return inputs;
@@ -235,7 +230,7 @@ static Flake getFlake(
     auto sInputs = state.symbols.create("inputs");
 
     if (auto inputs = vInfo.attrs->get(sInputs))
-        flake.inputs = parseFlakeInputs(state, inputs->value, inputs->pos, flakeDir, lockRootPath, 0);
+        flake.inputs = parseFlakeInputs(state, inputs->value, inputs->pos, flakeDir, lockRootPath);
 
     auto sOutputs = state.symbols.create("outputs");
 
@@ -318,19 +313,6 @@ Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool allowLookup
     return getFlake(state, originalRef, allowLookup, flakeCache);
 }
 
-/* Recursively merge `overrides` into `overrideMap` */
-static void updateOverrides(std::map<InputPath, FlakeInput> & overrideMap, const FlakeInputs & overrides,
-                       const InputPath & inputPathPrefix)
-{
-    for (auto & [id, input] : overrides) {
-        auto inputPath(inputPathPrefix);
-        inputPath.push_back(id);
-        // Do not override existing assignment from outer flake
-        overrideMap.insert({inputPath, input});
-        updateOverrides(overrideMap, input.overrides, inputPath);
-    }
-}
-
 /* Compute an in-memory lock file for the specified top-level flake,
    and optionally write it to file, if the flake is writable. */
 LockedFlake lockFlake(
@@ -393,9 +375,12 @@ LockedFlake lockFlake(
             /* Get the overrides (i.e. attributes of the form
                'inputs.nixops.inputs.nixpkgs.url = ...'). */
             for (auto & [id, input] : flakeInputs) {
-                auto inputPath(inputPathPrefix);
-                inputPath.push_back(id);
-                updateOverrides(overrides, input.overrides, inputPath);
+                for (auto & [idOverride, inputOverride] : input.overrides) {
+                    auto inputPath(inputPathPrefix);
+                    inputPath.push_back(id);
+                    inputPath.push_back(idOverride);
+                    overrides.insert_or_assign(inputPath, inputOverride);
+                }
             }
 
             /* Check whether this input has overrides for a
@@ -430,12 +415,6 @@ LockedFlake lockFlake(
                         // Respect the “flakeness” of the input even if we
                         // override it
                         i->second.isFlake = input2.isFlake;
-                        if (!i->second.ref)
-                            i->second.ref = input2.ref;
-                        if (!i->second.follows)
-                            i->second.follows = input2.follows;
-                        // Note that `input.overrides` is not used in the following,
-                        // so no need to merge it here (already done by `updateOverrides`)
                     }
                     auto & input = hasOverride ? i->second : input2;
 
