@@ -13,8 +13,8 @@
     attribute set to `true`.
 
   - [fixed-output derivation]{#gloss-fixed-output-derivation}\
-    A derivation which includes the `__outputHash` attribute; the output
-    of such derivations must exactly match the hash.
+    A derivation which includes the
+    [`__outputHash`](language/advanced-attributes.md#adv-attr-outputHash) attribute.
 
   - [store]{#gloss-store}\
     The location in the file system where store objects live. Typically
