@@ -53,7 +53,7 @@
 
   - [substituter]{#gloss-substituter}\
     A *substituter* is an additional store from which Nix will
-    copy a store path instead of building it.  Nix will not copy a store
+    copy store objects it doesn't have. Nix will not copy a store
     path from a remote store unless one of the following is true:
 
     - the store object is signed by one of the `trusted-public-keys`
