@@ -21,4 +21,4 @@ function _nix() {
   compadd -J nix "${args[@]}" -a suggestions
 }
 
-# _nix "$@"
+_nix "$@"
