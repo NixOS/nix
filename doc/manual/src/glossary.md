@@ -75,13 +75,8 @@
 
   - [substituter]{#gloss-substituter}\
     A *substituter* is an additional store from which Nix will
-    copy store objects it doesn't have. Nix will copy a store
-    path from a remote store only if one of the following is true:
-
-    - the store object is signed by one of the `trusted-public-keys`
-    - the substituter is in the `trusted-substituters` list
-    - the `no-require-sigs` option has been set to disable signature checking
-    - the store object is [output-addressed](#gloss-output-addressed-store-object)
+    copy store objects it doesn't have.  For details, see the
+    [`substituters` option](command-ref/conf-file.html#conf-substituters).
 
   - [purity]{#gloss-purity}\
     The assumption that equal Nix derivations when run always produce
