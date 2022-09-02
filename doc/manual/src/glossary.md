@@ -14,7 +14,7 @@
 
   - [fixed-output derivation]{#gloss-fixed-output-derivation}\
     A derivation which includes the
-    [`__outputHash`](language/advanced-attributes.md#adv-attr-outputHash) attribute.
+    [`outputHash`](language/advanced-attributes.md#adv-attr-outputHash) attribute.
 
   - [store]{#gloss-store}\
     The location in the file system where store objects live. Typically
