@@ -34,7 +34,7 @@
       directory on another machine,  accessed via `ssh` or
       served by the `nix-serve` Perl script.
 
-  - [binary cache]{#binary-cache}\
+  - [binary cache]{#gloss-binary-cache}\
     A *binary cache* is a Nix store which uses a different format: its
     metadata and signatures are kept in `.narinfo` files rather than in a
     Nix database.  This different format simplifies serving store objects
