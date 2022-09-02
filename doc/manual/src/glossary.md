@@ -34,6 +34,9 @@
       directory on another machine,  accessed via `ssh` or
       served by the `nix-serve` Perl script.
 
+  - [chroot store]{#gloss-chroot-store}\
+    A local store whose canonical path is anything other than `/nix/store`.
+
   - [binary cache]{#gloss-binary-cache}\
     A *binary cache* is a Nix store which uses a different format: its
     metadata and signatures are kept in `.narinfo` files rather than in a
