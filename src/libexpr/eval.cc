@@ -1098,7 +1098,7 @@ void EvalState::mkPos(Value & v, PosIdx p)
     auto pos = positions[p];
     if (auto path = std::get_if<SourcePath>(&pos.origin)) {
         auto attrs = buildBindings(3);
-        attrs.alloc(sFile).mkString(fmt("/virtual/%d%s", path->accessor->number, path->path.abs()));
+        attrs.alloc(sFile).mkString(encodePath(*path));
         attrs.alloc(sLine).mkInt(pos.line);
         attrs.alloc(sColumn).mkInt(pos.column);
         v.mkAttrs(attrs);
@@ -1963,8 +1963,12 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
            and none of the strings are allowed to have contexts. */
         if (first) {
             firstType = vTmp->type();
-            if (vTmp->type() == nPath)
+            if (vTmp->type() == nPath) {
                 accessor = vTmp->path().accessor;
+                auto part = vTmp->path().path.abs();
+                sSize += part.size();
+                s.emplace_back(std::move(part));
+            }
         }
 
         if (firstType == nInt) {
@@ -1984,6 +1988,12 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 nf += vTmp->fpoint;
             } else
                 state.throwEvalError(i_pos, "cannot add %1% to a float", showType(*vTmp), env, *this);
+        } else if (firstType == nPath) {
+            if (!first) {
+                auto part = state.coerceToString(i_pos, *vTmp, context, false, false);
+                sSize += part->size();
+                s.emplace_back(std::move(part));
+            }
         } else {
             if (s.empty()) s.reserve(es->size());
             auto part = state.coerceToString(i_pos, *vTmp, context, false, firstType == nString);
@@ -2205,7 +2215,7 @@ BackedStringView EvalState::coerceToString(const PosIdx pos, Value & v, PathSet 
         auto path = v.path();
         return copyToStore
             ? store->printStorePath(copyPathToStore(context, path))
-            : BackedStringView((Path) path.path.abs());
+            : encodePath(path);
     }
 
     if (v.type() == nAttrs) {
@@ -2275,10 +2285,7 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, PathSet & contex
 
     if (v.type() == nString) {
         copyContext(v, context);
-        auto path = v.str();
-        if (path == "" || path[0] != '/')
-            throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path);
-        return {rootFS, CanonPath(path)};
+        return decodePath(v.str(), pos);
     }
 
     if (v.type() == nPath)

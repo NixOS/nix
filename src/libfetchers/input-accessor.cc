@@ -11,7 +11,7 @@ static std::atomic<size_t> nextNumber{0};
 
 InputAccessor::InputAccessor()
     : number(++nextNumber)
-    , displayPrefix{"/virtual/" + std::to_string(number)}
+    , displayPrefix{"«unknown»"}
 {
 }
 

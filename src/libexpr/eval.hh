@@ -224,6 +224,13 @@ public:
 
     void registerAccessor(ref<InputAccessor> accessor);
 
+    /* Convert a path to a string representation of the format
+       `/__virtual__/<accessor-number>/<path>`. */
+    std::string encodePath(const SourcePath & path);
+
+    /* Decode a path encoded by `encodePath()`. */
+    SourcePath decodePath(std::string_view s, PosIdx pos = noPos);
+
     /* Allow access to a path. */
     void allowPath(const Path & path);
 

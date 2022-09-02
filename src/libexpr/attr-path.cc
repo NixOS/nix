@@ -118,33 +118,21 @@ std::pair<SourcePath, uint32_t> findPackageFilename(EvalState & state, Value & v
 
     // FIXME: is it possible to extract the Pos object instead of doing this
     //        toString + parsing?
-    auto pos = state.forceString(*v2);
+    PathSet context;
+    auto path = state.coerceToPath(noPos, *v2, context);
 
-    auto fail = [pos]() {
-        throw ParseError("cannot parse 'meta.position' attribute '%s'", pos);
+    auto fn = path.path.abs();
+
+    auto fail = [fn]() {
+        throw ParseError("cannot parse 'meta.position' attribute '%s'", fn);
     };
 
     try {
-        std::string_view prefix = "/virtual/";
-
-        if (!hasPrefix(pos, prefix)) fail();
-        pos = pos.substr(prefix.size());
-
-        auto slash = pos.find('/');
-        if (slash == std::string::npos) fail();
-        size_t number = std::stoi(std::string(pos, 0, slash));
-        pos = pos.substr(slash);
-
-        auto accessor = state.inputAccessors.find(number);
-        if (accessor == state.inputAccessors.end()) fail();
-
-        auto colon = pos.rfind(':');
+        auto colon = fn.rfind(':');
         if (colon == std::string::npos) fail();
-        std::string filename(pos, 0, colon);
-        auto lineno = std::stoi(std::string(pos, colon + 1, std::string::npos));
-
-        return {SourcePath{accessor->second, CanonPath(filename)}, lineno};
-
+        std::string filename(fn, 0, colon);
+        auto lineno = std::stoi(std::string(fn, colon + 1, std::string::npos));
+        return {SourcePath{path.accessor, CanonPath(fn.substr(0, colon))}, lineno};
     } catch (std::invalid_argument & e) {
         fail();
         abort();
