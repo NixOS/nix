@@ -1388,7 +1388,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
         StringSource dumpSource { dump };
         ChainSource bothSource { dumpSource, source };
 
-        auto tempDir = createTempDir(realStoreDir, "add");
+        auto tempDir = createTempDir("", "add");
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir + "/x";
 
