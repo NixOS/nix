@@ -24,7 +24,13 @@ dummy-env = env -i \
 	NIX_STATE_DIR=/dummy \
 	NIX_CONFIG='cores = 0'
 
-nix-eval = $(dummy-env) $(nix_DIR)/nix eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw
+ifneq (,$(findstring qemu,$(CROSS_EMULATOR)))
+  _nix-emu := QEMU_LD_PREFIX=${QEMU_LD_PREFIX} $(CROSS_EMULATOR)
+else
+  _nix-emu := $(CROSS_EMULATOR)
+endif
+
+nix-eval = $(dummy-env) $(_nix-emu) $(nix_DIR)/nix eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw
 
 $(d)/%.1: $(d)/src/command-ref/%.md
 	@printf "Title: %s\n\n" "$$(basename $@ .1)" > $^.tmp
@@ -58,11 +64,11 @@ $(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/generate-options.nix
 	@mv $@.tmp $@
 
 $(d)/nix.json: $(nix_DIR)/nix
-	$(trace-gen) $(dummy-env) $(nix_DIR)/nix __dump-args > $@.tmp
+	$(trace-gen) $(dummy-env) $(_nix-emu) $(nix_DIR)/nix __dump-args > $@.tmp
 	@mv $@.tmp $@
 
 $(d)/conf-file.json: $(nix_DIR)/nix
-	$(trace-gen) $(dummy-env) $(nix_DIR)/nix show-config --json --experimental-features nix-command > $@.tmp
+	$(trace-gen) $(dummy-env) $(_nix-emu) $(nix_DIR)/nix show-config --json --experimental-features nix-command > $@.tmp
 	@mv $@.tmp $@
 
 $(d)/src/language/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d)/src/language/builtins-prefix.md $(nix_DIR)/nix
@@ -72,7 +78,7 @@ $(d)/src/language/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d
 	@mv $@.tmp $@
 
 $(d)/builtins.json: $(nix_DIR)/nix
-	$(trace-gen) $(dummy-env) NIX_PATH=nix/corepkgs=corepkgs $(nix_DIR)/nix __dump-builtins > $@.tmp
+	$(trace-gen) $(dummy-env) NIX_PATH=nix/corepkgs=corepkgs $(_nix-emu) $(nix_DIR)/nix __dump-builtins > $@.tmp
 	@mv $@.tmp $@
 
 # Generate the HTML manual.
