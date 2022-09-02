@@ -89,12 +89,12 @@ struct ZipInputAccessor : InputAccessor
     {
         auto i = members.find(((std::string) path.abs()).c_str());
         if (i == members.end())
-            throw Error("file '%s' does not exist", path);
+            throw Error("file '%s' does not exist", showPath(path));
 
         ZipMember member(zip_fopen_index(zipFile, i->second.index, 0));
         if (!member)
-            throw Error("couldn't open archive member '%s' in '%s': %s",
-                path, zipPath, zip_strerror(zipFile));
+            throw Error("couldn't open archive member '%s': %s",
+                showPath(path), zip_strerror(zipFile));
 
         std::string buf(i->second.size, 0);
         if (zip_fread(member, buf.data(), i->second.size) != (zip_int64_t) i->second.size)
@@ -132,14 +132,14 @@ struct ZipInputAccessor : InputAccessor
             type = tDirectory;
         }
         if (i == members.end())
-            throw Error("file '%s' does not exist", path);
+            throw Error("file '%s' does not exist", showPath(path));
 
         // FIXME: cache this
         zip_uint8_t opsys;
         zip_uint32_t attributes;
         if (zip_file_get_external_attributes(zipFile, i->second.index, ZIP_FL_UNCHANGED, &opsys, &attributes) == -1)
-            throw Error("couldn't get external attributes of '%s' in '%s': %s",
-                path, zipPath, zip_strerror(zipFile));
+            throw Error("couldn't get external attributes of '%s': %s",
+                showPath(path), zip_strerror(zipFile));
 
         switch (opsys) {
         case ZIP_OPSYS_UNIX:
@@ -152,7 +152,7 @@ struct ZipInputAccessor : InputAccessor
                 break;
             case 0120000: type = tSymlink; break;
             default:
-                throw Error("file '%s' in '%s' has unsupported type %o", path, zipPath, t);
+                throw Error("file '%s' has unsupported type %o", showPath(path), t);
             }
             break;
         }
@@ -167,7 +167,7 @@ struct ZipInputAccessor : InputAccessor
 
         auto i = members.find(path.c_str());
         if (i == members.end())
-            throw Error("directory '%s' does not exist", path);
+            throw Error("directory '%s' does not exist", showPath(_path));
 
         ++i;
 
@@ -187,7 +187,7 @@ struct ZipInputAccessor : InputAccessor
     std::string readLink(const CanonPath & path) override
     {
         if (lstat(path).type != tSymlink)
-            throw Error("file '%s' is not a symlink");
+            throw Error("file '%s' is not a symlink", showPath(path));
 
         return _readFile(path);
     }
