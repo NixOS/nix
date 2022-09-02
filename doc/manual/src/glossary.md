@@ -56,7 +56,7 @@
   - [input-addressed store object]{#gloss-input-addressed-store-object}\
     A store object produced by building a
     non-[content-addressed](#gloss-content-addressed-derivation),
-    non-[fixed-output](#gloss-fixed-output-derivation),
+    non-[fixed-output](#gloss-fixed-output-derivation)
     derivation.
 
   - [output-addressed store object]{#gloss-output-addressed-store-object}\
