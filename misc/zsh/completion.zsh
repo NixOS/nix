@@ -10,14 +10,15 @@ function _nix() {
   local -a suggestions
   declare -a suggestions
   for suggestion in ${res:1}; do
-    # FIXME: This doesn't work properly if the suggestion word contains a `:`
-    # itself
-    suggestions+="${suggestion/	/:}"
+    suggestions+=("${suggestion%%	*}")
   done
+  local -a args
   if [[ "$tpe" == filenames ]]; then
-    compadd -f
+    args+=('-f')
+  elif [[ "$tpe" == attrs ]]; then
+    args+=('-S' '')
   fi
-  _describe 'nix' suggestions
+  compadd -J nix "${args[@]}" -a suggestions
 }
 
-_nix "$@"
+# _nix "$@"
