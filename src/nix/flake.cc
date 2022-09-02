@@ -1069,6 +1069,9 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                     }
                                     ++i;
                                 }
+                                if (github.empty()) {
+                                    throw Error("set in maintainers expects github attribute");
+                                }
                                 jMaintainers.emplace(github, std::move(jFields));
                             }
                             j.emplace("maintainers", std::move(jMaintainers));
