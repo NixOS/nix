@@ -1078,11 +1078,11 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         }
                         if (license) {
                             auto jLicense = nlohmann::json::object();
+                            auto aMeta = visitor.maybeGetAttr(state->sMeta);
+                            auto aLicense = aMeta->maybeGetAttr(state->sLicense);
                             for(const auto & attr : *license) {
                                 auto attrName = state->symbols[attr];
                                 // TODO: clean up
-                                auto aMeta = visitor.maybeGetAttr(state->sMeta);
-                                auto aLicense = aMeta->maybeGetAttr(state->sLicense);
                                 auto valStr = aLicense->getAttr(attr)->getString();
                                 jLicense.emplace(std::string(attrName), valStr);
                             } 
