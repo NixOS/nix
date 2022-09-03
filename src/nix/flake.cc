@@ -978,7 +978,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
           ;
     }
 
-    void run(nix::ref<nix::Store> store) override __attribute__((optimize(0)))
+    void run(nix::ref<nix::Store> store) override
     {
         evalSettings.enableImportFromDerivation.setDefault(false);
 
@@ -1031,7 +1031,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         std::optional<std::string> description;
                         std::optional<std::string> homepage;
                         std::optional<std::vector<Bindings *>> maintainers;
-                        std::optional<std::vector<std::string>> license;
+                        std::optional<std::vector<Symbol>> license;
                         if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
                             if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
                                 description = aDescription->getString();
@@ -1039,8 +1039,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                 homepage = aHomepage->getString();
                             if (auto aMaintainers = aMeta->maybeGetAttr(state->sMaintainers))
                                 maintainers = aMaintainers->getListOfAttrs();
-                            if (auto alicense = aMeta->maybeGetAttr(state->sLicense))
-                                license = alicense->getListOfStrings();
+                            if (auto aLicense = aMeta->maybeGetAttr(state->sLicense))
+                                license = aLicense->getAttrs();
                         }
                         j.emplace("type", "derivation");
                         j.emplace("name", name);
@@ -1076,11 +1076,18 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             }
                             j.emplace("maintainers", std::move(jMaintainers));
                         }
-                        if (license) 
+                        if (license) {
                             auto jLicense = nlohmann::json::object();
-                            j.emplace("license", *license);
-
-
+                            for(const auto & attr : *license) {
+                                auto attrName = state->symbols[attr];
+                                // TODO: clean up
+                                auto aMeta = visitor.maybeGetAttr(state->sMeta);
+                                auto aLicense = aMeta->maybeGetAttr(state->sLicense);
+                                auto valStr = aLicense->getAttr(attr)->getString();
+                                jLicense.emplace(std::string(attrName), valStr);
+                            } 
+                            j.emplace("license", jLicense);
+                        }
                     } else {
                         logger->cout("%s: %s '%s'",
                             headerPrefix,
