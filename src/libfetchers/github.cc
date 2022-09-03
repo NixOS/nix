@@ -262,13 +262,8 @@ struct GitHubInputScheme : GitArchiveInputScheme
 
     DownloadUrl getDownloadUrl(const Input & input) const override
     {
-        // FIXME: use regular /archive URLs instead? api.github.com
-        // might have stricter rate limits.
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
-        auto url = fmt(
-            host == "github.com"
-            ? "https://api.%s/repos/%s/%s/tarball/%s"
-            : "https://%s/api/v3/repos/%s/%s/tarball/%s",
+        auto url = fmt("https://%s/%s/%s/archive/%s.tar.gz",
             host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(Base16, false));
 
