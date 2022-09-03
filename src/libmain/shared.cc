@@ -181,8 +181,9 @@ void initNix()
     /* Reset SIGCHLD to its default. */
     struct sigaction act;
     sigemptyset(&act.sa_mask);
-    act.sa_handler = SIG_DFL;
     act.sa_flags = 0;
+
+    act.sa_handler = SIG_DFL;
     if (sigaction(SIGCHLD, &act, 0))
         throw SysError("resetting SIGCHLD");
 
@@ -197,13 +198,23 @@ void initNix()
     act.sa_handler = sigHandler;
     if (sigaction(SIGWINCH, &act, 0)) throw SysError("handling SIGWINCH");
 
-    // Disable SA_RESTART for interrupts, so that system calls on this thread
-    // error with EINTR like they do on Linux, and we don’t hang forever.
+    /* Disable SA_RESTART for interrupts, so that system calls on this thread
+     * error with EINTR like they do on Linux.
+     * Most signals on BSD systems default to SA_RESTART on, but Nix
+     * expects EINTR from syscalls to properly exit. */
     act.sa_handler = SIG_DFL;
     if (sigaction(SIGINT, &act, 0)) throw SysError("handling SIGINT");
     if (sigaction(SIGTERM, &act, 0)) throw SysError("handling SIGTERM");
     if (sigaction(SIGHUP, &act, 0)) throw SysError("handling SIGHUP");
     if (sigaction(SIGPIPE, &act, 0)) throw SysError("handling SIGPIPE");
+    if (sigaction(SIGQUIT, &act, 0)) throw SysError("handling SIGQUIT");
+    if (sigaction(SIGILL, &act, 0)) throw SysError("handling SIGILL");
+    if (sigaction(SIGTRAP, &act, 0)) throw SysError("handling SIGTRAP");
+    if (sigaction(SIGABRT, &act, 0)) throw SysError("handling SIGABRT");
+    if (sigaction(SIGFPE, &act, 0)) throw SysError("handling SIGFPE");
+    if (sigaction(SIGBUS, &act, 0)) throw SysError("handling SIGBUS");
+    if (sigaction(SIGXCPU, &act, 0)) throw SysError("handling SIGXCPU");
+    if (sigaction(SIGXFSZ, &act, 0)) throw SysError("handling SIGXFSZ");
 #endif
 
     /* Register a SIGSEGV handler to detect stack overflows. */
