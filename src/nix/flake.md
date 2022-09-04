@@ -102,7 +102,9 @@ The following generic flake reference attributes are supported:
 * `narHash`: The hash of the NAR serialisation (in SRI format) of the
   contents of the flake. This is useful for flake types such as
   tarballs that lack a unique content identifier such as a Git commit
-  hash.
+  hash. The hash can be grabbed with the command `nix-prefetch-git`, 
+  which can subsequently be converted to the SRI format with
+  `nix hash to-sri --type sha256 some-hash`.
 
 In addition, the following attributes are common to several flake
 reference types:
@@ -163,6 +165,11 @@ Currently the `type` attribute can be one of the following:
   doesn't allow fetching a `rev` without a known `ref`). The default
   is the commit currently pointed to by `ref`.
 
+  The `narHash` attribute resolves to the sha256 hash specified. It must
+  be inserted in SRI format. The hash can be grabbed with the command 
+  `nix-prefetch-git` and can subsequently be converted to the SRI
+  format with `nix hash to-sri --type sha256 some-hash`.
+  
   When `git+file` is used without specifying `ref` or `rev`, files are
   fetched directly from the local `path` as long as they have been added
   to the Git repository. If there are uncommitted changes, the reference
@@ -332,8 +339,10 @@ The following attributes are supported in `flake.nix`:
     denoting the number of seconds since 1970.
 
   * `narHash`: The SHA-256 (in SRI format) of the NAR serialization of
-    the flake's source tree.
-
+    the flake's source tree. The hash can be grabbed with the command 
+	`nix-prefetch-git` and can subsequently be converted to the SRI
+	format with `nix hash to-sri --type sha256 some-hash`.
+	
   The value returned by the `outputs` function must be an attribute
   set. The attributes can have arbitrary values; however, various
   `nix` subcommands require specific attributes to have a specific
