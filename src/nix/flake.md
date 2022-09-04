@@ -432,6 +432,26 @@ outputs = { self, nixpkgs, grcov }: {
 };
 ```
 
+Or, if fetching from a git repository other than Github or Sourcehut:
+
+```nix
+inputs.bearssl-src = {
+  url = "git+https://www.bearssl.org/git/BearSSL?narHash=sha256-Mdkfgq8v5n1yKnSoaQBVjwF6JdT76RoZfdv44XT1ivI=&rev=";
+  flake = false;
+};
+```
+
+which is equivalent to:
+
+```nix
+inputs.bearssl-src = {
+  type = "git";
+  url = "https://www.bearssl.org/git/BearSSL";
+  narHash = "sha256-Mdkfgq8v5n1yKnSoaQBVjwF6JdT76RoZfdv44XT1ivI=";
+  flake = false;
+}; 
+```
+
 Transitive inputs can be overridden from a `flake.nix` file. For
 example, the following overrides the `nixpkgs` input of the `nixops`
 input:
