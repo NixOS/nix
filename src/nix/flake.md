@@ -85,6 +85,8 @@ Here are some examples of flake references in their URL-like representation:
   branch of a Git repository.
 * `git+https://github.com/NixOS/patchelf?ref=master&rev=f34751b88bd07d7f44f5cd3200fb4122bf916c7e`:
   A specific branch *and* revision of a Git repository.
+* `git+https://github.com/NixOS/patchelf?narHash=sha256-8U3EFO6nKTpPurrmdT3SjwiuU07Aztrp71Oe3CLQvcw=`:
+  A Git repository with a specific sha256 hash in SRI format.
 * `https://github.com/NixOS/patchelf/archive/master.tar.gz`: A tarball
   flake.
 
@@ -172,6 +174,7 @@ Currently the `type` attribute can be one of the following:
   * `git+https://example.org/my/repo?dir=flake1`
   * `git+ssh://git@github.com/NixOS/nix?ref=v1.2.3`
   * `git://github.com/edolstra/dwarffs?ref=unstable&rev=e486d8d40e626a20e06d792db8cc5ac5aba9a5b4`
+  * `git://github.com/edolstra/dwarffs?narHash=sha256-8U3EFO6nKTpPurrmdT3SjwiuU07Aztrp71Oe3CLQvcw=`
   * `git+file:///home/my-user/some-repo/some-repo`
 
 * `mercurial`: Mercurial repositories. The URL form is similar to the
