@@ -231,6 +231,7 @@ Currently the `type` attribute can be one of the following:
   * `github:edolstra/dwarffs`
   * `github:edolstra/dwarffs/unstable`
   * `github:edolstra/dwarffs/d3f2baba8f425779026c6ec04021b2e927f61e31`
+  * `github:edolstra/dwarffs?narHash=sha256-kq5dejftKMkHMBhwyocis9wZrkdCIZUFm2IfO6KLYjU=`
 
 * `sourcehut`: Similar to `github`, is a more efficient way to fetch
   SourceHut repositories. The following attributes are required:
@@ -263,6 +264,8 @@ Currently the `type` attribute can be one of the following:
   * `sourcehut:~misterio/nix-colors?host=git.example.org`
   * `sourcehut:~misterio/nix-colors/182b4b8709b8ffe4e9774a4c5d6877bf6bb9a21c`
   * `sourcehut:~misterio/nix-colors/21c1a380a6915d890d408e9f22203436a35bb2de?host=hg.sr.ht`
+  * `sourcehut:~misterio/nix-colors?narHash=sha256-Mjdh3ackWoxkNBIcfXyqPlAc4mNe0EtZvb1cmgcyd+I=`
+
 
 * `indirect`: Indirections through the flake registry. These have the
   form
