@@ -1032,6 +1032,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         std::optional<std::string> homepage;
                         std::optional<std::vector<Bindings *>> maintainers;
                         std::optional<std::vector<Symbol>> license;
+                        std::shared_ptr<eval_cache::AttrCursor> aLicense;
                         if (auto aMeta = visitor.maybeGetAttr(state->sMeta)) {
                             if (auto aDescription = aMeta->maybeGetAttr(state->sDescription))
                                 description = aDescription->getString();
@@ -1039,7 +1040,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                 homepage = aHomepage->getString();
                             if (auto aMaintainers = aMeta->maybeGetAttr(state->sMaintainers))
                                 maintainers = aMaintainers->getListOfAttrs();
-                            if (auto aLicense = aMeta->maybeGetAttr(state->sLicense))
+                            aLicense = aMeta->maybeGetAttr(state->sLicense);
+                            if (aLicense)
                                 license = aLicense->getAttrs();
                         }
                         j.emplace("type", "derivation");
@@ -1078,8 +1080,6 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                         }
                         if (license) {
                             auto jLicense = nlohmann::json::object();
-                            auto aMeta = visitor.maybeGetAttr(state->sMeta);
-                            auto aLicense = aMeta->maybeGetAttr(state->sLicense);
                             for(const auto & attr : *license) {
                                 auto attrName = state->symbols[attr];
                                 // TODO: clean up
