@@ -436,7 +436,7 @@ Or, if fetching a specific commit from a git repository other than
 Github or Sourcehut using a sha256 rather than a sha1 hash algorithm:
 
 ```nix
-inputs.bearssl = {
+inputs.bearssl-src = {
   url = "git+https://www.bearssl.org/git/BearSSL?narHash=sha256-Mdkfgq8v5n1yKnSoaQBVjwF6JdT76RoZfdv44XT1ivI=";
   flake = false;
 };
@@ -445,7 +445,7 @@ inputs.bearssl = {
 which is equivalent to:
 
 ```nix
-inputs.bearssl-src = {
+inputs.bearssl = {
   type = "git";
   url = "https://www.bearssl.org/git/BearSSL";
   narHash = "sha256-Mdkfgq8v5n1yKnSoaQBVjwF6JdT76RoZfdv44XT1ivI=";
