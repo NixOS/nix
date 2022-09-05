@@ -436,7 +436,7 @@ Or, if fetching from a git repository other than Github or Sourcehut:
 
 ```nix
 inputs.bearssl-src = {
-  url = "git+https://www.bearssl.org/git/BearSSL?narHash=sha256-Mdkfgq8v5n1yKnSoaQBVjwF6JdT76RoZfdv44XT1ivI=&rev=";
+  url = "git+https://www.bearssl.org/git/BearSSL?narHash=sha256-Mdkfgq8v5n1yKnSoaQBVjwF6JdT76RoZfdv44XT1ivI=";
   flake = false;
 };
 ```
