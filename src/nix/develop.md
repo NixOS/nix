@@ -66,6 +66,12 @@ R""(
   `nixpkgs#glibc` in `~/my-glibc` and want to compile another package
   against it.
 
+* Run a series of script commands:
+
+  ```console
+  # nix develop --command bash -c "mkdir build && cmake .. && make"
+  ```
+
 # Description
 
 `nix develop` starts a `bash` shell that provides an interactive build
