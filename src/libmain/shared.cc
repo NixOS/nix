@@ -208,13 +208,7 @@ void initNix()
     if (sigaction(SIGHUP, &act, 0)) throw SysError("handling SIGHUP");
     if (sigaction(SIGPIPE, &act, 0)) throw SysError("handling SIGPIPE");
     if (sigaction(SIGQUIT, &act, 0)) throw SysError("handling SIGQUIT");
-    if (sigaction(SIGILL, &act, 0)) throw SysError("handling SIGILL");
     if (sigaction(SIGTRAP, &act, 0)) throw SysError("handling SIGTRAP");
-    if (sigaction(SIGABRT, &act, 0)) throw SysError("handling SIGABRT");
-    if (sigaction(SIGFPE, &act, 0)) throw SysError("handling SIGFPE");
-    if (sigaction(SIGBUS, &act, 0)) throw SysError("handling SIGBUS");
-    if (sigaction(SIGXCPU, &act, 0)) throw SysError("handling SIGXCPU");
-    if (sigaction(SIGXFSZ, &act, 0)) throw SysError("handling SIGXFSZ");
 #endif
 
     /* Register a SIGSEGV handler to detect stack overflows. */
