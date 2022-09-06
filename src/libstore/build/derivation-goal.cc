@@ -344,7 +344,7 @@ void DerivationGoal::gaveUpOnSubstitution()
         for (auto & i : dynamic_cast<Derivation *>(drv.get())->inputDrvs) {
             /* Ensure that pure, non-fixed-output derivations don't
                depend on impure derivations. */
-            if (drv->type().isPure() && !drv->type().isFixed()) {
+            if (settings.isExperimentalFeatureEnabled(Xp::ImpureDerivations) && drv->type().isPure() && !drv->type().isFixed()) {
                 auto inputDrv = worker.evalStore.readDerivation(i.first);
                 if (!inputDrv.type().isPure())
                     throw Error("pure derivation '%s' depends on impure derivation '%s'",
@@ -705,8 +705,7 @@ static void movePath(const Path & src, const Path & dst)
     if (changePerm)
         chmod_(src, st.st_mode | S_IWUSR);
 
-    if (rename(src.c_str(), dst.c_str()))
-        throw SysError("renaming '%1%' to '%2%'", src, dst);
+    renameFile(src, dst);
 
     if (changePerm)
         chmod_(dst, st.st_mode);
@@ -786,8 +785,7 @@ void runPostBuildHook(
     Store & store,
     Logger & logger,
     const StorePath & drvPath,
-    StorePathSet outputPaths
-)
+    const StorePathSet & outputPaths)
 {
     auto hook = settings.postBuildHook;
     if (hook == "")
@@ -906,7 +904,7 @@ void DerivationGoal::buildDone()
         auto builtOutputs = registerOutputs();
 
         StorePathSet outputPaths;
-        for (auto & [_, output] : buildResult.builtOutputs)
+        for (auto & [_, output] : builtOutputs)
             outputPaths.insert(output.outPath);
         runPostBuildHook(
             worker.store,
@@ -914,12 +912,6 @@ void DerivationGoal::buildDone()
             drvPath,
             outputPaths
         );
-
-        if (buildMode == bmCheck) {
-            cleanupPostOutputsRegisteredModeCheck();
-            done(BuildResult::Built, std::move(builtOutputs));
-            return;
-        }
 
         cleanupPostOutputsRegisteredModeNonCheck();
 
@@ -985,21 +977,28 @@ void DerivationGoal::resolvedFinished()
             realWantedOutputs = resolvedDrv.outputNames();
 
         for (auto & wantedOutput : realWantedOutputs) {
-            assert(initialOutputs.count(wantedOutput) != 0);
-            assert(resolvedHashes.count(wantedOutput) != 0);
-            auto realisation = resolvedResult.builtOutputs.at(
-                DrvOutput { resolvedHashes.at(wantedOutput), wantedOutput });
+            auto initialOutput = get(initialOutputs, wantedOutput);
+            auto resolvedHash = get(resolvedHashes, wantedOutput);
+            if ((!initialOutput) || (!resolvedHash))
+                throw Error(
+                    "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolvedFinished,resolve)",
+                    worker.store.printStorePath(drvPath), wantedOutput);
+            auto realisation = get(resolvedResult.builtOutputs, DrvOutput { *resolvedHash, wantedOutput });
+            if (!realisation)
+                throw Error(
+                    "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolvedFinished,realisation)",
+                    worker.store.printStorePath(resolvedDrvGoal->drvPath), wantedOutput);
             if (drv->type().isPure()) {
-                auto newRealisation = realisation;
-                newRealisation.id = DrvOutput { initialOutputs.at(wantedOutput).outputHash, wantedOutput };
+                auto newRealisation = *realisation;
+                newRealisation.id = DrvOutput { initialOutput->outputHash, wantedOutput };
                 newRealisation.signatures.clear();
                 if (!drv->type().isFixed())
-                    newRealisation.dependentRealisations = drvOutputReferences(worker.store, *drv, realisation.outPath);
+                    newRealisation.dependentRealisations = drvOutputReferences(worker.store, *drv, realisation->outPath);
                 signRealisation(newRealisation);
                 worker.store.registerDrvOutput(newRealisation);
             }
-            outputPaths.insert(realisation.outPath);
-            builtOutputs.emplace(realisation.id, realisation);
+            outputPaths.insert(realisation->outPath);
+            builtOutputs.emplace(realisation->id, *realisation);
         }
 
         runPostBuildHook(
@@ -1295,7 +1294,11 @@ std::pair<bool, DrvOutputs> DerivationGoal::checkPathValidity()
     DrvOutputs validOutputs;
 
     for (auto & i : queryPartialDerivationOutputMap()) {
-        InitialOutput & info = initialOutputs.at(i.first);
+        auto initialOutput = get(initialOutputs, i.first);
+        if (!initialOutput)
+            // this is an invalid output, gets catched with (!wantedOutputsLeft.empty())
+            continue;
+        auto & info = *initialOutput;
         info.wanted = wantOutput(i.first, wantedOutputs);
         if (info.wanted)
             wantedOutputsLeft.erase(i.first);
@@ -1310,7 +1313,7 @@ std::pair<bool, DrvOutputs> DerivationGoal::checkPathValidity()
                     : PathStatus::Corrupt,
             };
         }
-        auto drvOutput = DrvOutput{initialOutputs.at(i.first).outputHash, i.first};
+        auto drvOutput = DrvOutput{info.outputHash, i.first};
         if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
             if (auto real = worker.store.queryRealisation(drvOutput)) {
                 info.known = {

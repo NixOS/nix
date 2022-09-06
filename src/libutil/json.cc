@@ -1,11 +1,13 @@
 #include "json.hh"
 
 #include <iomanip>
+#include <cstdint>
 #include <cstring>
 
 namespace nix {
 
-void toJSON(std::ostream & str, const char * start, const char * end)
+template<>
+void toJSON<std::string_view>(std::ostream & str, const std::string_view & s)
 {
     constexpr size_t BUF_SIZE = 4096;
     char buf[BUF_SIZE + 7]; // BUF_SIZE + largest single sequence of puts
@@ -20,7 +22,7 @@ void toJSON(std::ostream & str, const char * start, const char * end)
     };
 
     put('"');
-    for (auto i = start; i != end; i++) {
+    for (auto i = s.begin(); i != s.end(); i++) {
         if (bufPos >= BUF_SIZE) flush();
         if (*i == '\"' || *i == '\\') { put('\\'); put(*i); }
         else if (*i == '\n') { put('\\'); put('n'); }
@@ -43,7 +45,7 @@ void toJSON(std::ostream & str, const char * start, const char * end)
 
 void toJSON(std::ostream & str, const char * s)
 {
-    if (!s) str << "null"; else toJSON(str, s, s + strlen(s));
+    if (!s) str << "null"; else toJSON(str, std::string_view(s));
 }
 
 template<> void toJSON<int>(std::ostream & str, const int & n) { str << n; }
@@ -54,11 +56,7 @@ template<> void toJSON<long long>(std::ostream & str, const long long & n) { str
 template<> void toJSON<unsigned long long>(std::ostream & str, const unsigned long long & n) { str << n; }
 template<> void toJSON<float>(std::ostream & str, const float & n) { str << n; }
 template<> void toJSON<double>(std::ostream & str, const double & n) { str << n; }
-
-template<> void toJSON<std::string>(std::ostream & str, const std::string & s)
-{
-    toJSON(str, s.c_str(), s.c_str() + s.size());
-}
+template<> void toJSON<std::string>(std::ostream & str, const std::string & s) { toJSON(str, (std::string_view) s); }
 
 template<> void toJSON<bool>(std::ostream & str, const bool & b)
 {
@@ -153,7 +151,7 @@ JSONObject::~JSONObject()
     }
 }
 
-void JSONObject::attr(const std::string & s)
+void JSONObject::attr(std::string_view s)
 {
     comma();
     toJSON(state->str, s);
@@ -161,19 +159,19 @@ void JSONObject::attr(const std::string & s)
     if (state->indent) state->str << ' ';
 }
 
-JSONList JSONObject::list(const std::string & name)
+JSONList JSONObject::list(std::string_view name)
 {
     attr(name);
     return JSONList(state);
 }
 
-JSONObject JSONObject::object(const std::string & name)
+JSONObject JSONObject::object(std::string_view name)
 {
     attr(name);
     return JSONObject(state);
 }
 
-JSONPlaceholder JSONObject::placeholder(const std::string & name)
+JSONPlaceholder JSONObject::placeholder(std::string_view name)
 {
     attr(name);
     return JSONPlaceholder(state);
@@ -195,7 +193,11 @@ JSONObject JSONPlaceholder::object()
 
 JSONPlaceholder::~JSONPlaceholder()
 {
-    assert(!first || std::uncaught_exceptions());
+    if (first) {
+        assert(std::uncaught_exceptions());
+        if (state->stack != 0)
+            write(nullptr);
+    }
 }
 
 }

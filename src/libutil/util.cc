@@ -29,11 +29,15 @@
 
 #ifdef __APPLE__
 #include <sys/syscall.h>
+#include <mach-o/dyld.h>
 #endif
 
 #ifdef __linux__
 #include <sys/prctl.h>
 #include <sys/resource.h>
+
+#include <mntent.h>
+#include <cmath>
 #endif
 
 
@@ -504,61 +508,6 @@ void deletePath(const Path & path, uint64_t & bytesFreed)
 }
 
 
-static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
-    int & counter)
-{
-    tmpRoot = canonPath(tmpRoot.empty() ? getEnv("TMPDIR").value_or("/tmp") : tmpRoot, true);
-    if (includePid)
-        return (format("%1%/%2%-%3%-%4%") % tmpRoot % prefix % getpid() % counter++).str();
-    else
-        return (format("%1%/%2%-%3%") % tmpRoot % prefix % counter++).str();
-}
-
-
-Path createTempDir(const Path & tmpRoot, const Path & prefix,
-    bool includePid, bool useGlobalCounter, mode_t mode)
-{
-    static int globalCounter = 0;
-    int localCounter = 0;
-    int & counter(useGlobalCounter ? globalCounter : localCounter);
-
-    while (1) {
-        checkInterrupt();
-        Path tmpDir = tempName(tmpRoot, prefix, includePid, counter);
-        if (mkdir(tmpDir.c_str(), mode) == 0) {
-#if __FreeBSD__
-            /* Explicitly set the group of the directory.  This is to
-               work around around problems caused by BSD's group
-               ownership semantics (directories inherit the group of
-               the parent).  For instance, the group of /tmp on
-               FreeBSD is "wheel", so all directories created in /tmp
-               will be owned by "wheel"; but if the user is not in
-               "wheel", then "tar" will fail to unpack archives that
-               have the setgid bit set on directories. */
-            if (chown(tmpDir.c_str(), (uid_t) -1, getegid()) != 0)
-                throw SysError("setting group of directory '%1%'", tmpDir);
-#endif
-            return tmpDir;
-        }
-        if (errno != EEXIST)
-            throw SysError("creating directory '%1%'", tmpDir);
-    }
-}
-
-
-std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
-{
-    Path tmpl(getEnv("TMPDIR").value_or("/tmp") + "/" + prefix + ".XXXXXX");
-    // Strictly speaking, this is UB, but who cares...
-    // FIXME: use O_TMPFILE.
-    AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
-    if (!fd)
-        throw SysError("creating temporary file '%s'", tmpl);
-    closeOnExec(fd.get());
-    return {std::move(fd), tmpl};
-}
-
-
 std::string getUserName()
 {
     auto pw = getpwuid(geteuid());
@@ -573,7 +522,21 @@ Path getHome()
 {
     static Path homeDir = []()
     {
+        std::optional<std::string> unownedUserHomeDir = {};
         auto homeDir = getEnv("HOME");
+        if (homeDir) {
+            // Only use $HOME if doesn't exist or is owned by the current user.
+            struct stat st;
+            int result = stat(homeDir->c_str(), &st);
+            if (result != 0) {
+                if (errno != ENOENT) {
+                    warn("couldn't stat $HOME ('%s') for reason other than not existing ('%d'), falling back to the one defined in the 'passwd' file", *homeDir, errno);
+                    homeDir.reset();
+                }
+            } else if (st.st_uid != geteuid()) {
+                unownedUserHomeDir.swap(homeDir);
+            }
+        }
         if (!homeDir) {
             std::vector<char> buf(16384);
             struct passwd pwbuf;
@@ -582,6 +545,9 @@ Path getHome()
                 || !pw || !pw->pw_dir || !pw->pw_dir[0])
                 throw Error("cannot determine user's home directory");
             homeDir = pw->pw_dir;
+            if (unownedUserHomeDir.has_value() && unownedUserHomeDir != homeDir) {
+                warn("$HOME ('%s') is not owned by you, falling back to the one defined in the 'passwd' file ('%s')", *unownedUserHomeDir, *homeDir);
+            }
         }
         return *homeDir;
     }();
@@ -619,6 +585,27 @@ Path getDataDir()
 }
 
 
+std::optional<Path> getSelfExe()
+{
+    static auto cached = []() -> std::optional<Path>
+    {
+        #if __linux__
+        return readLink("/proc/self/exe");
+        #elif __APPLE__
+        char buf[1024];
+        uint32_t size = sizeof(buf);
+        if (_NSGetExecutablePath(buf, &size) == 0)
+            return buf;
+        else
+            return std::nullopt;
+        #else
+        return std::nullopt;
+        #endif
+    }();
+    return cached;
+}
+
+
 Paths createDirs(const Path & path)
 {
     Paths created;
@@ -639,44 +626,6 @@ Paths createDirs(const Path & path)
     if (!S_ISDIR(st.st_mode)) throw Error("'%1%' is not a directory", path);
 
     return created;
-}
-
-
-void createSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime)
-{
-    if (symlink(target.c_str(), link.c_str()))
-        throw SysError("creating symlink from '%1%' to '%2%'", link, target);
-    if (mtime) {
-        struct timeval times[2];
-        times[0].tv_sec = *mtime;
-        times[0].tv_usec = 0;
-        times[1].tv_sec = *mtime;
-        times[1].tv_usec = 0;
-        if (lutimes(link.c_str(), times))
-            throw SysError("setting time of symlink '%s'", link);
-    }
-}
-
-
-void replaceSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime)
-{
-    for (unsigned int n = 0; true; n++) {
-        Path tmp = canonPath(fmt("%s/.%d_%s", dirOf(link), n, baseNameOf(link)));
-
-        try {
-            createSymlink(target, tmp, mtime);
-        } catch (SysError & e) {
-            if (e.errNo == EEXIST) continue;
-            throw;
-        }
-
-        if (rename(tmp.c_str(), link.c_str()) != 0)
-            throw SysError("renaming '%1%' to '%2%'", tmp, link);
-
-        break;
-    }
 }
 
 
@@ -752,7 +701,55 @@ void drainFD(int fd, Sink & sink, bool block)
     }
 }
 
+//////////////////////////////////////////////////////////////////////
 
+unsigned int getMaxCPU()
+{
+    #if __linux__
+    try {
+        FILE *fp = fopen("/proc/mounts", "r");
+        if (!fp)
+            return 0;
+
+        Strings cgPathParts;
+
+        struct mntent *ent;
+        while ((ent = getmntent(fp))) {
+            std::string mountType, mountPath;
+
+            mountType = ent->mnt_type;
+            mountPath = ent->mnt_dir;
+
+            if (mountType == "cgroup2") {
+                cgPathParts.push_back(mountPath);
+                break;
+            }
+        }
+
+        fclose(fp);
+
+        if (cgPathParts.size() > 0 && pathExists("/proc/self/cgroup")) {
+            std::string currentCgroup = readFile("/proc/self/cgroup");
+            Strings cgValues = tokenizeString<Strings>(currentCgroup, ":");
+            cgPathParts.push_back(trim(cgValues.back(), "\n"));
+            cgPathParts.push_back("cpu.max");
+            std::string fullCgPath = canonPath(concatStringsSep("/", cgPathParts));
+
+            if (pathExists(fullCgPath)) {
+                std::string cpuMax = readFile(fullCgPath);
+                std::vector<std::string> cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " ");
+                std::string quota = cpuMaxParts[0];
+                std::string period = trim(cpuMaxParts[1], "\n");
+
+                if (quota != "max")
+                    return std::ceil(std::stoi(quota) / std::stof(period));
+            }
+        }
+    } catch (Error &) { ignoreException(); }
+    #endif
+
+    return 0;
+}
 
 //////////////////////////////////////////////////////////////////////
 
@@ -1588,7 +1585,6 @@ std::string stripIndentation(std::string_view s)
 
 //////////////////////////////////////////////////////////////////////
 
-
 static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
 
 
@@ -1819,7 +1815,7 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
     if (chmod(path.c_str(), mode) == -1)
         throw SysError("changing permissions on '%1%'", path);
 
-    if (listen(fdSocket.get(), 5) == -1)
+    if (listen(fdSocket.get(), 100) == -1)
         throw SysError("cannot listen on socket '%1%'", path);
 
     return fdSocket;

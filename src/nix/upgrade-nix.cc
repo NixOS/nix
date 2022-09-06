@@ -34,7 +34,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
     std::string description() override
     {
-        return "upgrade Nix to the latest stable version";
+        return "upgrade Nix to the stable version declared in Nixpkgs";
     }
 
     std::string doc() override

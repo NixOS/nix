@@ -39,9 +39,7 @@ static void makeSymlink(const Path & link, const Path & target)
     createSymlink(target, tempLink);
 
     /* Atomically replace the old one. */
-    if (rename(tempLink.c_str(), link.c_str()) == -1)
-        throw SysError("cannot rename '%1%' to '%2%'",
-            tempLink , link);
+    renameFile(tempLink, link);
 }
 
 
@@ -135,6 +133,7 @@ void LocalStore::addTempRoot(const StorePath & path)
                     state->fdRootsSocket.close();
                     goto restart;
                 }
+                throw;
             }
         }
 
@@ -153,6 +152,7 @@ void LocalStore::addTempRoot(const StorePath & path)
                 state->fdRootsSocket.close();
                 goto restart;
             }
+            throw;
         } catch (EndOfFile & e) {
             debug("GC socket disconnected");
             state->fdRootsSocket.close();

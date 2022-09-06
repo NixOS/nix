@@ -7,7 +7,7 @@ with import (nixpkgs + "/nixos/lib/testing-python.nix") {
 
 let
 
-  # Generate a fake root CA and a fake github.com certificate.
+  # Generate a fake root CA and a fake api.github.com / channels.nixos.org certificate.
   cert = pkgs.runCommand "cert" { buildInputs = [ pkgs.openssl ]; }
     ''
       mkdir -p $out
@@ -18,7 +18,7 @@ let
 
       openssl req -newkey rsa:2048 -nodes -keyout $out/server.key \
         -subj "/C=CN/ST=Denial/L=Springfield/O=Dis/CN=github.com" -out server.csr
-      openssl x509 -req -extfile <(printf "subjectAltName=DNS:api.github.com,DNS:github.com,DNS:raw.githubusercontent.com") \
+      openssl x509 -req -extfile <(printf "subjectAltName=DNS:api.github.com,DNS:channels.nixos.org") \
         -days 36500 -in server.csr -CA $out/ca.crt -CAkey ca.key -CAcreateserial -out $out/server.crt
     '';
 
@@ -67,7 +67,7 @@ makeTest (
   name = "github-flakes";
 
   nodes =
-    { # Impersonate github.com and api.github.com.
+    {
       github =
         { config, pkgs, ... }:
         { networking.firewall.allowedTCPPorts = [ 80 443 ];
@@ -77,12 +77,12 @@ makeTest (
           services.httpd.extraConfig = ''
             ErrorLog syslog:local6
           '';
-          services.httpd.virtualHosts."github.com" =
+          services.httpd.virtualHosts."channels.nixos.org" =
             { forceSSL = true;
               sslServerKey = "${cert}/server.key";
               sslServerCert = "${cert}/server.crt";
               servedDirs =
-                [ { urlPath = "/NixOS/flake-registry/raw/master";
+                [ { urlPath = "/";
                     dir = registry;
                   }
                 ];
@@ -103,13 +103,13 @@ makeTest (
         { config, lib, pkgs, nodes, ... }:
         { virtualisation.writableStore = true;
           virtualisation.diskSize = 2048;
-          virtualisation.pathsInNixDB = [ pkgs.hello pkgs.fuse ];
+          virtualisation.additionalPaths = [ pkgs.hello pkgs.fuse ];
           virtualisation.memorySize = 4096;
           nix.binaryCaches = lib.mkForce [ ];
           nix.extraOptions = "experimental-features = nix-command flakes";
           environment.systemPackages = [ pkgs.jq ];
           networking.hosts.${(builtins.head nodes.github.config.networking.interfaces.eth1.ipv4.addresses).address} =
-            [ "github.com" "api.github.com" "raw.githubusercontent.com" ];
+            [ "channels.nixos.org" "api.github.com" ];
           security.pki.certificateFiles = [ "${cert}/ca.crt" ];
         };
     };
@@ -123,7 +123,7 @@ makeTest (
 
     github.wait_for_unit("httpd.service")
 
-    client.succeed("curl -v https://github.com/ >&2")
+    client.succeed("curl -v https://api.github.com/ >&2")
     client.succeed("nix registry list | grep nixpkgs")
 
     rev = client.succeed("nix flake info nixpkgs --json | jq -r .revision")

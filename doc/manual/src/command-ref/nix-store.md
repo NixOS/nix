@@ -22,7 +22,7 @@ This section lists the options that are common to all operations. These
 options are allowed for every subcommand, though they may not always
 have an effect.
 
-  - `--add-root` *path*\
+  - [`--add-root`]{#opt-add-root} *path*\
     Causes the result of a realisation (`--realise` and
     `--force-realise`) to be registered as a root of the garbage
     collector. *path* will be created as a symlink to the resulting
@@ -121,7 +121,7 @@ Special exit codes:
   - `102`\
     Hash mismatch, the build output was rejected because it does not
     match the [`outputHash` attribute of the
-    derivation](../expressions/advanced-attributes.md).
+    derivation](../language/advanced-attributes.md).
 
   - `104`\
     Not deterministic, the build succeeded in check mode but the

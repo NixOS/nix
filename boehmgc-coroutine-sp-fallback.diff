@@ -1,3 +1,35 @@
+diff --git a/darwin_stop_world.c b/darwin_stop_world.c
+index 3dbaa3fb..36a1d1f7 100644
+--- a/darwin_stop_world.c
++++ b/darwin_stop_world.c
+@@ -352,6 +352,7 @@ GC_INNER void GC_push_all_stacks(void)
+   int nthreads = 0;
+   word total_size = 0;
+   mach_msg_type_number_t listcount = (mach_msg_type_number_t)THREAD_TABLE_SZ;
++  size_t stack_limit;
+   if (!EXPECT(GC_thr_initialized, TRUE))
+     GC_thr_init();
+ 
+@@ -407,6 +408,19 @@ GC_INNER void GC_push_all_stacks(void)
+             GC_push_all_stack_sections(lo, hi, p->traced_stack_sect);
+           }
+           if (altstack_lo) {
++            // When a thread goes into a coroutine, we lose its original sp until
++            // control flow returns to the thread.
++            // While in the coroutine, the sp points outside the thread stack,
++            // so we can detect this and push the entire thread stack instead,
++            // as an approximation.
++            // We assume that the coroutine has similarly added its entire stack.
++            // This could be made accurate by cooperating with the application
++            // via new functions and/or callbacks.
++            stack_limit = pthread_get_stacksize_np(p->id);
++            if (altstack_lo >= altstack_hi || altstack_lo < altstack_hi - stack_limit) { // sp outside stack
++              altstack_lo = altstack_hi - stack_limit;
++            }
++
+             total_size += altstack_hi - altstack_lo;
+             GC_push_all_stack(altstack_lo, altstack_hi);
+           }
 diff --git a/pthread_stop_world.c b/pthread_stop_world.c
 index 4b2c429..1fb4c52 100644
 --- a/pthread_stop_world.c

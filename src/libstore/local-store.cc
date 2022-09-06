@@ -718,7 +718,11 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
                     // somewhat expensive so we do lazily
                     hashesModulo = hashDerivationModulo(*this, drv, true);
                 }
-                StorePath recomputed = makeOutputPath(i.first, hashesModulo->hashes.at(i.first), drvName);
+                auto currentOutputHash = get(hashesModulo->hashes, i.first);
+                if (!currentOutputHash)
+                    throw Error("derivation '%s' has unexpected output '%s' (local-store / hashesModulo) named '%s'",
+                        printStorePath(drvPath), printStorePath(doia.path), i.first);
+                StorePath recomputed = makeOutputPath(i.first, *currentOutputHash, drvName);
                 if (doia.path != recomputed)
                     throw Error("derivation '%s' has incorrect output '%s', should be '%s'",
                         printStorePath(drvPath), printStorePath(doia.path), printStorePath(recomputed));
@@ -1426,8 +1430,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
                     writeFile(realPath, dumpSource);
             } else {
                 /* Move the temporary path we restored above. */
-                if (rename(tempPath.c_str(), realPath.c_str()))
-                    throw Error("renaming '%s' to '%s'", tempPath, realPath);
+                moveFile(tempPath, realPath);
             }
 
             /* For computing the nar hash. In recursive SHA-256 mode, this
@@ -1938,8 +1941,7 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
 
     writeFile(tmpFile, compress("bzip2", log));
 
-    if (rename(tmpFile.c_str(), logPath.c_str()) != 0)
-        throw SysError("renaming '%1%' to '%2%'", tmpFile, logPath);
+    renameFile(tmpFile, logPath);
 }
 
 std::optional<std::string> LocalStore::getVersion()

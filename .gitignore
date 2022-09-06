@@ -22,7 +22,7 @@ perl/Makefile.config
 /doc/manual/src/SUMMARY.md
 /doc/manual/src/command-ref/new-cli
 /doc/manual/src/command-ref/conf-file.md
-/doc/manual/src/expressions/builtins.md
+/doc/manual/src/language/builtins.md
 
 # /scripts/
 /scripts/nix-profile.sh
@@ -35,6 +35,7 @@ perl/Makefile.config
 /src/libexpr/parser-tab.hh
 /src/libexpr/parser-tab.output
 /src/libexpr/nix.tbl
+/src/libexpr/tests/libexpr-tests
 
 # /src/libstore/
 *.gen.*

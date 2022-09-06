@@ -59,6 +59,30 @@ headless() {
     fi
 }
 
+is_root() {
+    if [ "$EUID" -eq 0 ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+is_os_linux() {
+    if [ "$(uname -s)" = "Linux" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+is_os_darwin() {
+    if [ "$(uname -s)" = "Darwin" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 contact_us() {
     echo "You can open an issue at https://github.com/nixos/nix/issues"
     echo ""
@@ -313,14 +337,23 @@ __sudo() {
 _sudo() {
     local expl="$1"
     shift
-    if ! headless; then
+    if ! headless || is_root; then
         __sudo "$expl" "$*" >&2
     fi
-    sudo "$@"
+
+    if is_root; then
+        env "$@"
+    else
+        sudo "$@"
+    fi
 }
 
+# Ensure that $TMPDIR exists if defined.
+if [[ -n "${TMPDIR:-}" ]] && [[ ! -d "${TMPDIR:-}" ]]; then
+    mkdir -m 0700 -p "${TMPDIR:-}"
+fi
 
-readonly SCRATCH=$(mktemp -d "${TMPDIR:-/tmp/}tmp.XXXXXXXXXX")
+readonly SCRATCH=$(mktemp -d)
 finish_cleanup() {
     rm -rf "$SCRATCH"
 }
@@ -423,7 +456,7 @@ EOF
         fi
     done
 
-    if [ "$(uname -s)" = "Linux" ] && [ ! -e /run/systemd/system ]; then
+    if is_os_linux && [ ! -e /run/systemd/system ]; then
         warning <<EOF
 We did not detect systemd on your system. With a multi-user install
 without systemd you will have to manually configure your init system to
@@ -638,6 +671,17 @@ place_channel_configuration() {
     fi
 }
 
+check_selinux() {
+    if command -v getenforce > /dev/null 2>&1; then
+        if [ "$(getenforce)" = "Enforcing" ]; then
+            failure <<EOF
+Nix does not work with selinux enabled yet!
+see https://github.com/NixOS/nix/issues/2374
+EOF
+        fi
+    fi
+}
+
 welcome_to_nix() {
     ok "Welcome to the Multi-User Nix Installation"
 
@@ -766,7 +810,7 @@ EOF
         fi
 
         _sudo "to load data for the first time in to the Nix Database" \
-              "$NIX_INSTALLED_NIX/bin/nix-store" --load-db < ./.reginfo
+              HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-store" --load-db < ./.reginfo
 
         echo "      Just finished getting the nix database ready."
     )
@@ -854,22 +898,14 @@ EOF
           install -m 0664 "$SCRATCH/nix.conf" /etc/nix/nix.conf
 }
 
-main() {
-    # TODO: I've moved this out of validate_starting_assumptions so we
-    # can fail faster in this case. Sourcing install-darwin... now runs
-    # `touch /` to detect Read-only root, but it could update times on
-    # pre-Catalina macOS if run as root user.
-    if [ "$EUID" -eq 0 ]; then
-        failure <<EOF
-Please do not run this script with root privileges. I will call sudo
-when I need to.
-EOF
-    fi
 
-    if [ "$(uname -s)" = "Darwin" ]; then
+main() {
+    check_selinux
+
+    if is_os_darwin; then
         # shellcheck source=./install-darwin-multi-user.sh
         . "$EXTRACTED_NIX_PATH/install-darwin-multi-user.sh"
-    elif [ "$(uname -s)" = "Linux" ]; then
+    elif is_os_linux; then
         # shellcheck source=./install-systemd-multi-user.sh
         . "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh" # most of this works on non-systemd distros also
     else
@@ -877,7 +913,10 @@ EOF
     fi
 
     welcome_to_nix
-    chat_about_sudo
+
+    if ! is_root; then
+        chat_about_sudo
+    fi
 
     cure_artifacts
     # TODO: there's a tension between cure and validate. I moved the

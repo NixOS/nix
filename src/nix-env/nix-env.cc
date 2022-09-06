@@ -940,12 +940,12 @@ static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool prin
                 JSONObject metaObj = pkgObj.object("meta");
                 StringSet metaNames = i.queryMetaNames();
                 for (auto & j : metaNames) {
-                    auto placeholder = metaObj.placeholder(j);
                     Value * v = i.queryMeta(j);
                     if (!v) {
                         printError("derivation '%s' has invalid meta attribute '%s'", i.queryName(), j);
-                        placeholder.write(nullptr);
+                        metaObj.attr(j, nullptr);
                     } else {
+                        auto placeholder = metaObj.placeholder(j);
                         PathSet context;
                         printValueAsJSON(*globals.state, true, *v, noPos, placeholder, context);
                     }
@@ -1485,11 +1485,9 @@ static int main_nix_env(int argc, char * * argv)
         if (globals.profile == "")
             globals.profile = getDefaultProfile();
 
-        op(globals, opFlags, opArgs);
+        op(globals, std::move(opFlags), std::move(opArgs));
 
         globals.state->printStats();
-
-        logger->stop();
 
         return 0;
     }

@@ -82,7 +82,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .shortName = 'L',
             .description = "Print full build logs on standard error.",
             .category = loggingCategory,
-            .handler = {[&]() {setLogFormat(LogFormat::barWithLogs); }},
+            .handler = {[&]() { logger->setPrintBuildLogs(true); }},
         });
 
         addFlag({
@@ -261,8 +261,15 @@ void mainWrapped(int argc, char * * argv)
     }
     #endif
 
+    Finally f([] { logger->stop(); });
+
     programPath = argv[0];
     auto programName = std::string(baseNameOf(programPath));
+
+    if (argc > 0 && std::string_view(argv[0]) == "__build-remote") {
+        programName = "build-remote";
+        argv++; argc--;
+    }
 
     {
         auto legacy = (*RegisterLegacyCommand::commands)[programName];
@@ -278,8 +285,6 @@ void mainWrapped(int argc, char * * argv)
     } else {
         verbosity = lvlInfo;
     }
-
-    Finally f([] { logger->stop(); });
 
     NixArgs args;
 
@@ -342,7 +347,10 @@ void mainWrapped(int argc, char * * argv)
         if (!completions) throw;
     }
 
-    if (completions) return;
+    if (completions) {
+        args.completionHook();
+        return;
+    }
 
     if (args.showVersion) {
         printVersion(programName);
@@ -380,6 +388,9 @@ void mainWrapped(int argc, char * * argv)
         settings.ttlPositiveNarInfoCache = 0;
     }
 
+    if (args.command->second->forceImpureByDefault() && !evalSettings.pureEval.overridden) {
+        evalSettings.pureEval = false;
+    }
     args.command->second->prepare();
     args.command->second->run();
 }

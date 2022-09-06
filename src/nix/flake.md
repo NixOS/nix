@@ -153,13 +153,18 @@ Currently the `type` attribute can be one of the following:
   git(+http|+https|+ssh|+git|+file|):(//<server>)?<path>(\?<params>)?
   ```
 
-  The `ref` attribute defaults to `master`.
+  The `ref` attribute defaults to resolving the `HEAD` reference.
 
   The `rev` attribute must denote a commit that exists in the branch
   or tag specified by the `ref` attribute, since Nix doesn't do a full
   clone of the remote repository by default (and the Git protocol
   doesn't allow fetching a `rev` without a known `ref`). The default
   is the commit currently pointed to by `ref`.
+
+  When `git+file` is used without specifying `ref` or `rev`, files are
+  fetched directly from the local `path` as long as they have been added
+  to the Git repository. If there are uncommitted changes, the reference
+  is treated as dirty and a warning is printed.
 
   For example, the following are valid Git flake references:
 
@@ -176,9 +181,17 @@ Currently the `type` attribute can be one of the following:
 * `tarball`: Tarballs. The location of the tarball is specified by the
   attribute `url`.
 
-  In URL form, the schema must be `http://`, `https://` or `file://`
-  URLs and the extension must be `.zip`, `.tar`, `.tgz`, `.tar.gz`,
-  `.tar.xz`, `.tar.bz2` or `.tar.zst`.
+  In URL form, the schema must be `tarball+http://`, `tarball+https://` or `tarball+file://`.
+  If the extension corresponds to a known archive format (`.zip`, `.tar`,
+  `.tgz`, `.tar.gz`, `.tar.xz`, `.tar.bz2` or `.tar.zst`), then the `tarball+`
+  can be dropped.
+
+* `file`: Plain files or directory tarballs, either over http(s) or from the local
+  disk.
+
+  In URL form, the schema must be `file+http://`, `file+https://` or `file+file://`.
+  If the extension doesn’t correspond to a known archive format (as defined by the
+  `tarball` fetcher), then the `file+` prefix can be dropped.
 
 * `github`: A more efficient way to fetch repositories from
   GitHub. The following attributes are required:
@@ -326,9 +339,10 @@ The following attributes are supported in `flake.nix`:
 
 * `nixConfig`: a set of `nix.conf` options to be set when evaluating any
   part of a flake. In the interests of security, only a small set of
-  whitelisted options (currently `bash-prompt`, `bash-prompt-suffix`,
-  and `flake-registry`) are allowed to be set without confirmation so long as
-  `accept-flake-config` is not set in the global configuration.
+  whitelisted options (currently `bash-prompt`, `bash-prompt-prefix`,
+  `bash-prompt-suffix`, and `flake-registry`) are allowed to be set without
+  confirmation so long as `accept-flake-config` is not set in the global
+  configuration.
 
 ## Flake inputs
 

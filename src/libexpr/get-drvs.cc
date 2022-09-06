@@ -34,7 +34,7 @@ DrvInfo::DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPat
 
     outputName =
         selectedOutputs.empty()
-        ? get(drv.env, "outputName").value_or("out")
+        ? getOr(drv.env, "outputName", "out")
         : *selectedOutputs.begin();
 
     auto i = drv.outputs.find(outputName);
@@ -132,23 +132,36 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool withPaths, bool onlyOutputsToInstall
         } else
             outputs.emplace("out", withPaths ? std::optional{queryOutPath()} : std::nullopt);
     }
+
     if (!onlyOutputsToInstall || !attrs)
         return outputs;
 
-    /* Check for `meta.outputsToInstall` and return `outputs` reduced to that. */
-    const Value * outTI = queryMeta("outputsToInstall");
-    if (!outTI) return outputs;
-    const auto errMsg = Error("this derivation has bad 'meta.outputsToInstall'");
-        /* ^ this shows during `nix-env -i` right under the bad derivation */
-    if (!outTI->isList()) throw errMsg;
-    Outputs result;
-    for (auto elem : outTI->listItems()) {
-        if (elem->type() != nString) throw errMsg;
-        auto out = outputs.find(elem->string.s);
-        if (out == outputs.end()) throw errMsg;
+    Bindings::iterator i;
+    if (attrs && (i = attrs->find(state->sOutputSpecified)) != attrs->end() && state->forceBool(*i->value, i->pos)) {
+        Outputs result;
+        auto out = outputs.find(queryOutputName());
+        if (out == outputs.end())
+            throw Error("derivation does not have output '%s'", queryOutputName());
         result.insert(*out);
+        return result;
     }
-    return result;
+
+    else {
+        /* Check for `meta.outputsToInstall` and return `outputs` reduced to that. */
+        const Value * outTI = queryMeta("outputsToInstall");
+        if (!outTI) return outputs;
+        const auto errMsg = Error("this derivation has bad 'meta.outputsToInstall'");
+            /* ^ this shows during `nix-env -i` right under the bad derivation */
+        if (!outTI->isList()) throw errMsg;
+        Outputs result;
+        for (auto elem : outTI->listItems()) {
+            if (elem->type() != nString) throw errMsg;
+            auto out = outputs.find(elem->string.s);
+            if (out == outputs.end()) throw errMsg;
+            result.insert(*out);
+        }
+        return result;
+    }
 }
 
 

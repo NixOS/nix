@@ -31,7 +31,7 @@ static void writeTrustedList(const TrustedList & trustedList)
 
 void ConfigFile::apply()
 {
-    std::set<std::string> whitelist{"bash-prompt", "bash-prompt-suffix", "flake-registry"};
+    std::set<std::string> whitelist{"bash-prompt", "bash-prompt-prefix", "bash-prompt-suffix", "flake-registry"};
 
     for (auto & [name, value] : settings) {
 
@@ -50,13 +50,11 @@ void ConfigFile::apply()
         else
             assert(false);
 
-        if (!whitelist.count(baseName)) {
-            auto trustedList = readTrustedList();
-
+        if (!whitelist.count(baseName) && !nix::fetchSettings.acceptFlakeConfig) {
             bool trusted = false;
-            if (nix::fetchSettings.acceptFlakeConfig){
-                trusted = true;
-            } else if (auto saved = get(get(trustedList, name).value_or(std::map<std::string, bool>()), valueS)) {
+            auto trustedList = readTrustedList();
+            auto tlname = get(trustedList, name);
+            if (auto saved = tlname ? get(*tlname, valueS) : nullptr) {
                 trusted = *saved;
                 warn("Using saved setting for '%s = %s' from ~/.local/share/nix/trusted-settings.json.", name,valueS);
             } else {
@@ -69,7 +67,6 @@ void ConfigFile::apply()
                     writeTrustedList(trustedList);
                 }
             }
-
             if (!trusted) {
                 warn("ignoring untrusted flake configuration setting '%s'", name);
                 continue;

@@ -101,7 +101,7 @@ In particular, notice the
 `/nix/store/krpqk0l9ib0ibi1d2w52z293zw455cap-unstable.check` output. Nix
 has copied the build results to that directory where you can examine it.
 
-> **Note**
+> []{#check-dirs-are-unregistered} **Note**
 > 
 > Check paths are not protected against garbage collection, and this
 > path will be deleted on the next garbage collection.

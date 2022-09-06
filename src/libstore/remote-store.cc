@@ -580,7 +580,6 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
 
                 try {
                     conn->to.written = 0;
-                    conn->to.warn = true;
                     connections->incCapacity();
                     {
                         Finally cleanup([&]() { connections->decCapacity(); });
@@ -591,7 +590,6 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
                             dumpString(contents, conn->to);
                         }
                     }
-                    conn->to.warn = false;
                     conn.processStderr();
                 } catch (SysError & e) {
                     /* Daemon closed while we were sending the path. Probably OOM
@@ -674,6 +672,23 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
 
 
 void RemoteStore::addMultipleToStore(
+    PathsSource & pathsToCopy,
+    Activity & act,
+    RepairFlag repair,
+    CheckSigsFlag checkSigs)
+{
+    auto source = sinkToSource([&](Sink & sink) {
+        sink << pathsToCopy.size();
+        for (auto & [pathInfo, pathSource] : pathsToCopy) {
+            pathInfo.write(sink, *this, 16);
+            pathSource->drainInto(sink);
+        }
+    });
+
+    addMultipleToStore(*source, repair, checkSigs);
+}
+
+void RemoteStore::addMultipleToStore(
     Source & source,
     RepairFlag repair,
     CheckSigsFlag checkSigs)
@@ -718,36 +733,34 @@ void RemoteStore::registerDrvOutput(const Realisation & info)
 void RemoteStore::queryRealisationUncached(const DrvOutput & id,
     Callback<std::shared_ptr<const Realisation>> callback) noexcept
 {
-    auto conn(getConnection());
-
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 27) {
-        warn("the daemon is too old to support content-addressed derivations, please upgrade it to 2.4");
-        try {
-            callback(nullptr);
-        } catch (...) { return callback.rethrow(); }
-    }
-
-    conn->to << wopQueryRealisation;
-    conn->to << id.to_string();
-    conn.processStderr();
-
-    auto real = [&]() -> std::shared_ptr<const Realisation> {
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 31) {
-            auto outPaths = worker_proto::read(
-                *this, conn->from, Phantom<std::set<StorePath>> {});
-            if (outPaths.empty())
-                return nullptr;
-            return std::make_shared<const Realisation>(Realisation { .id = id, .outPath = *outPaths.begin() });
-        } else {
-            auto realisations = worker_proto::read(
-                *this, conn->from, Phantom<std::set<Realisation>> {});
-            if (realisations.empty())
-                return nullptr;
-            return std::make_shared<const Realisation>(*realisations.begin());
-        }
-    }();
-
     try {
+        auto conn(getConnection());
+
+        if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 27) {
+            warn("the daemon is too old to support content-addressed derivations, please upgrade it to 2.4");
+            return callback(nullptr);
+        }
+
+        conn->to << wopQueryRealisation;
+        conn->to << id.to_string();
+        conn.processStderr();
+
+        auto real = [&]() -> std::shared_ptr<const Realisation> {
+            if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 31) {
+                auto outPaths = worker_proto::read(
+                    *this, conn->from, Phantom<std::set<StorePath>> {});
+                if (outPaths.empty())
+                    return nullptr;
+                return std::make_shared<const Realisation>(Realisation { .id = id, .outPath = *outPaths.begin() });
+            } else {
+                auto realisations = worker_proto::read(
+                    *this, conn->from, Phantom<std::set<Realisation>> {});
+                if (realisations.empty())
+                    return nullptr;
+                return std::make_shared<const Realisation>(*realisations.begin());
+            }
+        }();
+
         callback(std::shared_ptr<const Realisation>(real));
     } catch (...) { return callback.rethrow(); }
 }
@@ -853,15 +866,15 @@ std::vector<BuildResult> RemoteStore::buildPathsWithResults(
 
                         OutputPathMap outputs;
                         auto drv = evalStore->readDerivation(bfd.drvPath);
-                        auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
-                        auto drvOutputs = drv.outputsAndOptPaths(*this);
+                        const auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
+                        const auto drvOutputs = drv.outputsAndOptPaths(*this);
                         for (auto & output : bfd.outputs) {
-                            if (!outputHashes.count(output))
+                            auto outputHash = get(outputHashes, output);
+                            if (!outputHash)
                                 throw Error(
                                     "the derivation '%s' doesn't have an output named '%s'",
                                     printStorePath(bfd.drvPath), output);
-                            auto outputId =
-                                DrvOutput{outputHashes.at(output), output};
+                            auto outputId = DrvOutput{ *outputHash, output };
                             if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
                                 auto realisation =
                                     queryRealisation(outputId);
@@ -874,13 +887,14 @@ std::vector<BuildResult> RemoteStore::buildPathsWithResults(
                             } else {
                                 // If ca-derivations isn't enabled, assume that
                                 // the output path is statically known.
-                                assert(drvOutputs.count(output));
-                                assert(drvOutputs.at(output).second);
+                                const auto drvOutput = get(drvOutputs, output);
+                                assert(drvOutput);
+                                assert(drvOutput->second);
                                 res.builtOutputs.emplace(
                                     outputId,
                                     Realisation {
                                         .id = outputId,
-                                        .outPath = *drvOutputs.at(output).second
+                                        .outPath = *drvOutput->second,
                                     });
                             }
                         }

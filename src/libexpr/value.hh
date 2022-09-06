@@ -99,7 +99,7 @@ class ExternalValueBase
 
     /* Print the value as JSON. Defaults to unconvertable, i.e. throws an error */
     virtual void printValueAsJSON(EvalState & state, bool strict,
-        JSONPlaceholder & out, PathSet & context) const;
+        JSONPlaceholder & out, PathSet & context, bool copyToStore = true) const;
 
     /* Print the value as XML. Defaults to unevaluated */
     virtual void printValueAsXML(EvalState & state, bool strict, bool location,
@@ -404,9 +404,9 @@ public:
 
 
 #if HAVE_BOEHMGC
-typedef std::vector<Value *, traceable_allocator<Value *> > ValueVector;
-typedef std::map<Symbol, Value *, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, Value *> > > ValueMap;
-typedef std::map<Symbol, ValueVector, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, ValueVector> > > ValueVectorMap;
+typedef std::vector<Value *, traceable_allocator<Value *>> ValueVector;
+typedef std::map<Symbol, Value *, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, Value *>>> ValueMap;
+typedef std::map<Symbol, ValueVector, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, ValueVector>>> ValueVectorMap;
 #else
 typedef std::vector<Value *> ValueVector;
 typedef std::map<Symbol, Value *> ValueMap;

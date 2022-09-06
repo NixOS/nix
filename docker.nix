@@ -2,8 +2,12 @@
 , lib ? pkgs.lib
 , name ? "nix"
 , tag ? "latest"
+, bundleNixpkgs ? true
 , channelName ? "nixpkgs"
 , channelURL ? "https://nixos.org/channels/nixpkgs-unstable"
+, extraPkgs ? []
+, maxLayers ? 100
+, nixConf ? {}
 }:
 let
   defaultPkgs = with pkgs; [
@@ -23,7 +27,7 @@ let
     iana-etc
     git
     openssh
-  ];
+  ] ++ extraPkgs;
 
   users = {
 
@@ -121,20 +125,27 @@ let
       (lib.attrValues (lib.mapAttrs groupToGroup groups))
   );
 
-  nixConf = {
+  defaultNixConf = {
     sandbox = "false";
     build-users-group = "nixbld";
-    trusted-public-keys = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
+    trusted-public-keys = [ "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" ];
   };
-  nixConfContents = (lib.concatStringsSep "\n" (lib.mapAttrsFlatten (n: v: "${n} = ${v}") nixConf)) + "\n";
+
+  nixConfContents = (lib.concatStringsSep "\n" (lib.mapAttrsFlatten (n: v:
+    let
+      vStr = if builtins.isList v then lib.concatStringsSep " " v else v;
+    in
+      "${n} = ${vStr}") (defaultNixConf // nixConf))) + "\n";
 
   baseSystem =
     let
       nixpkgs = pkgs.path;
-      channel = pkgs.runCommand "channel-nixos" { } ''
+      channel = pkgs.runCommand "channel-nixos" { inherit bundleNixpkgs; } ''
         mkdir $out
-        ln -s ${nixpkgs} $out/nixpkgs
-        echo "[]" > $out/manifest.nix
+        if [ "$bundleNixpkgs" ]; then
+          ln -s ${nixpkgs} $out/nixpkgs
+          echo "[]" > $out/manifest.nix
+        fi
       '';
       rootEnv = pkgs.buildPackages.buildEnv {
         name = "root-profile-env";
@@ -229,7 +240,7 @@ let
 in
 pkgs.dockerTools.buildLayeredImageWithNixDb {
 
-  inherit name tag;
+  inherit name tag maxLayers;
 
   contents = [ baseSystem ];
 
