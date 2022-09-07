@@ -957,7 +957,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 struct CmdFlakeShow : FlakeCommand, MixJSON
 {
     bool showLegacy = false;
-    bool showForeign = false;
+    bool showAllSystems = false;
 
     CmdFlakeShow()
     {
@@ -967,9 +967,9 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
             .handler = {&showLegacy, true}
         });
         addFlag({
-            .longName = "foreign",
-            .description = "Show the contents of outputs for foreign systems.",
-            .handler = {&showForeign, true}
+            .longName = "all-systems",
+            .description = "Show the contents of outputs for all systems.",
+            .handler = {&showAllSystems, true}
         });
     }
 
@@ -1082,11 +1082,11 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     || (attrPath.size() == 3 && (attrPathS[0] == "checks" || attrPathS[0] == "packages" || attrPathS[0] == "devShells"))
                     )
                 {
-                    if (!showForeign && std::string(attrPathS[1]) != localSystem) {
+                    if (!showAllSystems && std::string(attrPathS[1]) != localSystem) {
                         if (!json)
-                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--foreign' to show)", headerPrefix));
+                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--all-systems' to show)", headerPrefix));
                         else {
-                            logger->warn(fmt("%s omitted (use '--foreign' to show)", concatStringsSep(".", attrPathS)));
+                            logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
                         }
                     } else {
                         if (visitor.isDerivation())
