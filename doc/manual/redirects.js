@@ -1,9 +1,12 @@
-// Redirect rules for anchors ensure backwards compatibility of URLs.
-// This must be done on the client side, as web servers do not see the anchor part of the URL.
+// redirect rules for anchors ensure backwards compatibility of URLs.
+// this must be done on the client side, as web servers do not see the anchor part of the URL.
 
-// Redirections are declared as follows:
-// Each entry has as key the matched URL path relative to the mdBook document root.
-// Each entry is a set of key-value pairs, where
+// redirections are declared as follows:
+// each entry has as key the matched URL path relative to the mdBook document root.
+//
+//     IMPORTANT: it must specify the full path with file name and suffix
+//
+// each entry is a set of key-value pairs, where
 // - keys are anchors on to the matched path.
 // - values are redirection targets relative to the current path.
 
@@ -332,7 +335,7 @@ var redirects = {
     "ssec-relnotes-2.2": "release-notes/rl-2.2.html",
     "ssec-relnotes-2.3": "release-notes/rl-2.3.html"
   },
-  "language/values": {
+  "language/values.html": {
     "simple-values": "#primitives",
     "lists": "#list",
     "strings": "#string",
@@ -341,73 +344,79 @@ var redirects = {
   }
 };
 
+// the following code matches the current page's URL against the set of redirects.
+//
+// it is written to minimize the latency between page load and redirect.
+// therefore we avoid function calls, copying data, and unnecessary loops.
+// IMPORTANT: we use stateful array operations and their order matters!
+//
+// matching URLs is more involved than it should be:
+//
+// 1. `document.location.pathname` can have an have an arbitrary prefix.
+//
+// 2. `path_to_root` is set by mdBook and consists only of `../`s and
+//    determines the depth of `<path>` relative to the prefix:
+//
+//          `document.location.pathname`
+//        |------------------------------|
+//        /<prefix>/<path>/[<file>[.html]][#<anchor>]
+//                  |----|
+//              `path_to_root` has same number of segments
+//
+//    source: https://phaiax.github.io/mdBook/format/theme/index-hbs.html#data
+//
+// 3. the following paths are equivalent:
+//
+//        /foo/bar/
+//        /foo/bar/index.html
+//        /foo/bar/index
+//
+//  4. the following paths are also equivalent:
+//
+//        /foo/bar/baz
+//        /foo/bar/baz.html
+//
 
-function pathsMatch(a, b, path_to_root) {
-  // Do paths `a` and `b` match?
-  //
-  // This is more involved than it should be:
-  //
-  // 1. Path `b` can have an have an arbitrary prefix.
-  //
-  // 2. `path_to_root` consists only of `../`s and determines the depth
-  //     of `b` relative to the prefix:
-  //
-  //          `document.location.pathname`
-  //        |-----------------------------|
-  //        <prefix>/<path>/[<file>[.html]][#<anchor>]
-  //                 |----|
-  //             `path_to_root` has same number of segments
-  //
-  // 3. The following paths are equivalent:
-  //
-  //        foo/bar/
-  //        foo/bar/index.html
-  //        foo/bar/index
-  //
-  //  4. The following paths are also equivalent:
-  //
-  //         foo/bar/baz
-  //         foo/bar/baz.html
-  //
-  // We can use `path_to_root` to discern prefix from path.
-  //
-  // The last element of the following split is always empty.
-  // Example: '../../'.split('/') -> [ '..', '..', '' ]
-  const depth = path_to_root.split('/').length - 1;
-  var segmentsB = b.split('/');
-  // get file name of `b`
-  const fileB = segmentsB.pop(); // mutates `segmentsB`!
-  // get path of `b` without prefix and file name
-  const pathB = segmentsB.slice(segmentsB.length - depth).join('/');
+var segments = document.location.pathname.split('/');
 
-  var segmentsA = a.split('/');
-  const fileA = segmentsA.pop(); // mutates `segmentsA`!
-  const pathA = segmentsA.join('/')
+var file = segments.pop();
 
-  function normalize(file) {
-    if (file === '') { return "index.html"; }
-    if (!file.endsWith('.html')) { return file + '.html'; }
-    return file;
-  }
+// normalize file name
+if (file === '') { file = "index.html"; }
+else if (!file.endsWith('.html')) { file = file + '.html'; }
 
-  return pathA === pathB && normalize(fileA) === normalize(fileB);
-}
+segments.push(file);
 
-// The anchor starts with the hash character (`#`),
+// use `path_to_root` to discern prefix from path.
+const depth = path_to_root.split('/').length;
+
+// remove segments containing prefix. the following works because
+// 1. the original `document.location.pathname` is absolute,
+//    hence first element of `segments` is always empty.
+// 2. last element of splitting `path_to_root` is also always empty.
+// 3. last element of `segments` is the file name.
+//
+// visual example:
+//
+//     '/foo/bar/baz.html'.split('/') -> [ '', 'foo', 'bar', 'baz.html' ]
+//          '../'.split('/')          -> [ '..', '' ]
+//
+// the following operations will then result in
+//
+//     path = 'bar/baz.html'
+//
+segments.splice(0, segments.length - depth);
+const path = segments.join('/');
+
+// anchor starts with the hash character (`#`),
 // but our redirect declarations don't, so we strip it.
-// Example: document.location.hash -> '#foo'
+// example: document.location.hash -> '#foo'
 const anchor = document.location.hash.substring(1);
 
-for (const [path, redirect] of Object.entries(redirects)) {
-  // The global variable `path_to_root` is set by `mdBook`:
-  //
-  // > This is a path containing exclusively `../`'s that points to the root of the
-  // > book from the current file. Since the original directory structure is
-  // > maintained, it is useful to prepend relative links with this `path_to_root`.
-  //
-  // Source: https://phaiax.github.io/mdBook/format/theme/index-hbs.html#data
-  if (pathsMatch(path, document.location.pathname, path_to_root) && redirect[anchor]) {
-    document.location.href = redirect[anchor];
-    break;
+const redirect = redirects[path];
+if (redirect) {
+  const target = redirect[anchor];
+  if (target) {
+    document.location.href = target;
   }
 }
