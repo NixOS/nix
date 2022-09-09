@@ -362,7 +362,7 @@ finish_fail() {
     finish_cleanup
 
     failure <<EOF
-Jeeze, something went wrong. If you can take all the output and open
+Oh no, something went wrong. If you can take all the output and open
 an issue, we'd love to fix the problem so nobody else has this issue.
 
 :(
