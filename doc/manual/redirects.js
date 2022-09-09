@@ -10,7 +10,7 @@
 // - keys are anchors on to the matched path.
 // - values are redirection targets relative to the current path.
 
-var redirects = {
+const redirects = {
  "index.html": {
     "part-advanced-topics": "advanced-topics/advanced-topics.html",
     "chap-tuning-cores-and-jobs": "advanced-topics/cores-vs-jobs.html",
@@ -377,9 +377,9 @@ var redirects = {
 //        /foo/bar/baz.html
 //
 
-var segments = document.location.pathname.split('/');
+let segments = document.location.pathname.split('/');
 
-var file = segments.pop();
+let file = segments.pop();
 
 // normalize file name
 if (file === '') { file = "index.html"; }
