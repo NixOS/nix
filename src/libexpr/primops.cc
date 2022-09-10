@@ -561,7 +561,7 @@ struct CompareValues
                 return v1->integer < v2->fpoint;
             if (v1->type() != v2->type())
                 state.debugThrowLastTrace(EvalError({
-                    ."cannot compare %1% with %2%", showType(*v1), showType(*v2)));
+                    .msg = hintfmt("%scannot compare %s with %s", errorCtx, showType(*v1), showType(*v2)),
                     .errPos = std::nullopt,
                 }));
             switch (v1->type()) {
@@ -586,7 +586,7 @@ struct CompareValues
                     }
                 default:
                     state.debugThrowLastTrace(EvalError({
-                        .msg = hintfmt("%scannot compare %s with %s", errorCtx, showType(*v1), showType(*v2)),
+                        .msg = hintfmt("%scannot compare %s with %s: nix does not define an ordering for that type", errorCtx, showType(*v1), showType(*v2)),
                         .errPos = std::nullopt,
                     }));
             }
@@ -617,12 +617,11 @@ static Bindings::iterator getAttr(
             .msg = hintfmt("attribute '%s' missing %s", state.symbols[attrSym], errorCtx),
             .errPos = state.positions[attrSet->pos],
         });
-            // TODO XXX
-            // Adding another trace for the function name to make it clear
-            // which call received wrong arguments.
-            //e.addTrace(state.positions[pos], hintfmt("while invoking '%s'", funcName));
-            //state.debugThrowLastTrace(e);
-        }
+        // TODO XXX
+        // Adding another trace for the function name to make it clear
+        // which call received wrong arguments.
+        //e.addTrace(state.positions[pos], hintfmt("while invoking '%s'", funcName));
+        //state.debugThrowLastTrace(e);
     }
     return value;
 }

@@ -396,7 +396,7 @@ expr_function
   ;
 
 expr_if
-  : IF expr THEN expr ELSE expr { $$ = new ExprIf(CUR_POS, $2, $4, $6); }
+  : IF expr THEN expr ELSE expr { $$ = new ExprIf(makeCurPos(@2, data), $2, $4, $6); }
   | expr_op
   ;
 
@@ -788,13 +788,13 @@ Path EvalState::findFile(SearchPath & searchPath, const std::string_view path, c
     if (hasPrefix(path, "nix/"))
         return concatStrings(corepkgsPrefix, path.substr(4));
 
-    debugThrowLastTrace(ThrownError({
+    debugThrow(ThrownError({
         .msg = hintfmt(evalSettings.pureEval
             ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"
             : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)",
             path),
         .errPos = positions[pos]
-    }));
+    }), 0, 0);
 }
 
 

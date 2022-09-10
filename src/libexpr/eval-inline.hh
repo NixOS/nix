@@ -103,7 +103,7 @@ void EvalState::forceValue(Value & v, Callable getPos)
     else if (v.isApp())
         callFunction(*v.app.left, *v.app.right, v, noPos);
     else if (v.isBlackhole())
-        throwEvalError(getPos(), "infinite recursion encountered");
+        throwError<EvalError>(getPos(), "infinite recursion encountered", "", "", 0, 0, 0, 0, noPos, "", 0, 0, 0);
 }
 
 
@@ -118,15 +118,10 @@ template <typename Callable>
 [[gnu::always_inline]]
 inline void EvalState::forceAttrs(Value & v, Callable getPos, std::string_view errorCtx)
 {
-    try {
-        forceValue(v, noPos);
-        if (v.type() != nAttrs) {
-            throwTypeError(noPos, "value is %1% while a set was expected", v);
-        }
-    } catch (Error & e) {
+    forceValue(v, noPos);
+    if (v.type() != nAttrs) {
         PosIdx pos = getPos();
-        e.addTrace(positions[pos], errorCtx);
-        throw;
+        this->throwErrorWithTrace<TypeError>(noPos, "value is %1% while a set was expected", "", "", 0, 0, &v, 0, noPos, "", 0, pos, errorCtx, 0, 0);
     }
 }
 
@@ -134,14 +129,9 @@ inline void EvalState::forceAttrs(Value & v, Callable getPos, std::string_view e
 [[gnu::always_inline]]
 inline void EvalState::forceList(Value & v, const PosIdx pos, std::string_view errorCtx)
 {
-    try {
-        forceValue(v, noPos);
-        if (!v.isList()) {
-            throwTypeError(noPos, "value is %1% while a list was expected", v);
-        }
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
+    forceValue(v, noPos);
+    if (!v.isList()) {
+        this->throwErrorWithTrace<TypeError>(noPos, "value is %1% while a list was expected", "", "", 0, 0, &v, 0, noPos, "", 0, pos, errorCtx, 0, 0);
     }
 }
 
