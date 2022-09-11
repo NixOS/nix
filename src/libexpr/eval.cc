@@ -1389,11 +1389,10 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                     std::set<std::string> allAttrNames;
                     for (auto & attr : *vAttrs->attrs)
                         allAttrNames.insert(state.symbols[attr.name]);
-                    throw EvalError("foo");
-                    //tmp: state.throwEvalError(
-                    //    pos,
-                    //    Suggestions::bestMatches(allAttrNames, state.symbols[name]),
-                    //    "attribute '%1%' missing", state.symbols[name], env, *this);
+                    auto suggestions = Suggestions::bestMatches(allAttrNames, state.symbols[name]);
+                    state.throwError<EvalError>(pos, "attribute '%1%' missing",
+                            "", "", &name, 0, 0, 0, noPos, "", &suggestions,
+                            &env, this);
                 }
             }
             vAttrs = j->value;
@@ -1503,13 +1502,10 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     auto j = args[0]->attrs->get(i.name);
                     if (!j) {
                         if (!i.def) {
-                            throw EvalError("foo");
-                            /*
-                            throwTypeErrorWithTrace(lambda.pos,
+                            throwErrorWithTrace<TypeError>(lambda.pos,
                                     "function '%1%' called without required argument '%2%'",
-                                    (lambda.name ? std::string(symbols[lambda.name]) : "anonymous lambda"),
-                                    i.name, pos, "from call site", *fun.lambda.env, lambda);
-                                    */
+                                    (lambda.name ? std::string(symbols[lambda.name]) : "anonymous lambda"), "",
+                                    &i.name, 0, 0, 0, noPos, "", 0, pos, "from call site", fun.lambda.env, &lambda);
                         }
                         env2.values[displ++] = i.def->maybeThunk(*this, env2);
                     } else {
@@ -1528,14 +1524,11 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                             std::set<std::string> formalNames;
                             for (auto & formal : lambda.formals->formals)
                                 formalNames.insert(symbols[formal.name]);
-                            throw EvalError("foo");
-                            /*
-                            throwTypeErrorWithTrace(lambda.pos,
-                                    Suggestions::bestMatches(formalNames, symbols[i.name]),
+                            auto suggestions = Suggestions::bestMatches(formalNames, symbols[i.name]);
+                            throwErrorWithTrace<TypeError>(lambda.pos,
                                     "function '%1%' called with unexpected argument '%2%'",
-                                    (lambda.name ? std::string(symbols[lambda.name]) : "anonymous lambda"),
-                                    i.name, pos, "from call site");
-                                    */
+                                    (lambda.name ? std::string(symbols[lambda.name]) : "anonymous lambda"), "",
+                                    &i.name, 0, 0, 0, noPos, "", &suggestions, pos, "from call site", fun.lambda.env, &lambda);
                         }
                     abort(); // can't happen
                 }
@@ -1763,7 +1756,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
     if (!state.evalBool(env, cond, pos, "in the condition of the assert statement")) {
         std::ostringstream out;
         cond->show(state.symbols, out);
-        //tmp: state.throwAssertionError(pos, "assertion '%1%' failed", out.str(), env, *this);
+        state.throwError<AssertionError>(pos, "assertion '%1%' failed", out.str(), "", 0, 0, 0, 0, noPos, "", 0, &env, this);
     }
     body->eval(state, env, v);
 }
