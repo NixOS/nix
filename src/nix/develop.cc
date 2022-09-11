@@ -482,7 +482,7 @@ struct CmdDevelop : Common, MixEnvironment
             // FIXME: foundMakefile is set by buildPhase, need to get
             // rid of that.
             script += fmt("foundMakefile=1\n");
-            script += fmt("runHook %1%Phase\n", *phase);
+            script += fmt("eval \"${!%1%Phase:-$1%1Phase}\";\n", *phase);
         }
 
         else if (!command.empty()) {
