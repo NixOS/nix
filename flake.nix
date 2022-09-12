@@ -264,6 +264,7 @@
             echo "file binary-dist $fn" >> $out/nix-support/hydra-build-products
             tar cvfJ $fn \
               --owner=0 --group=0 --mode=u+rw,uga+r \
+              --mtime='1970-01-01' \
               --absolute-names \
               --hard-dereference \
               --transform "s,$TMPDIR/install,$dir/install," \

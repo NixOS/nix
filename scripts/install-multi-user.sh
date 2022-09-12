@@ -362,7 +362,7 @@ finish_fail() {
     finish_cleanup
 
     failure <<EOF
-Jeeze, something went wrong. If you can take all the output and open
+Oh no, something went wrong. If you can take all the output and open
 an issue, we'd love to fix the problem so nobody else has this issue.
 
 :(
@@ -810,7 +810,7 @@ EOF
         fi
 
         _sudo "to load data for the first time in to the Nix Database" \
-              "$NIX_INSTALLED_NIX/bin/nix-store" --load-db < ./.reginfo
+              HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-store" --load-db < ./.reginfo
 
         echo "      Just finished getting the nix database ready."
     )
