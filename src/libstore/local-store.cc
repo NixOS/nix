@@ -1433,7 +1433,6 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
             } else {
                 /* Move the temporary path we restored above. */
                 moveFile(tempPath, realPath);
-                tempDirFd.close();
             }
 
             /* For computing the nar hash. In recursive SHA-256 mode, this
@@ -1520,7 +1519,7 @@ std::pair<Path, AutoCloseFD> LocalStore::createTempDirInStore()
         /* There is a slight possibility that `tmpDir' gets deleted by
            the GC between createTempDir() and when we acquire a lock on it.
            We'll repeat until 'tmpDir' exists and we've locked it. */
-        tmpDirFn = createTempDir(realStoreDir, "add");
+        tmpDirFn = createTempDir(realStoreDir, "tmp");
         tmpDirFd = open(tmpDirFn.c_str(), O_RDONLY | O_DIRECTORY);
         if (tmpDirFd.get() < 0) {
             continue;
