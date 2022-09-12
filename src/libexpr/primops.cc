@@ -770,7 +770,7 @@ static RegisterPrimOp primop_abort({
     .fun = [](EvalState & state, const PosIdx pos, Value * * args, Value & v)
     {
         PathSet context;
-        auto s = state.coerceToString(pos, *args[0], context).toOwned();
+        auto s = state.decodePaths(*state.coerceToString(pos, *args[0], context));
         state.debugThrowLastTrace(Abort("evaluation aborted with the following error message: '%1%'", s));
     }
 });
@@ -788,7 +788,7 @@ static RegisterPrimOp primop_throw({
     .fun = [](EvalState & state, const PosIdx pos, Value * * args, Value & v)
     {
       PathSet context;
-      auto s = state.coerceToString(pos, *args[0], context).toOwned();
+      auto s = state.decodePaths(*state.coerceToString(pos, *args[0], context));
       state.debugThrowLastTrace(ThrownError(s));
     }
 });
@@ -800,7 +800,7 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * 
         v = *args[1];
     } catch (Error & e) {
         PathSet context;
-        e.addTrace(nullptr, state.coerceToString(pos, *args[0], context).toOwned());
+        e.addTrace(nullptr, state.decodePaths(*state.coerceToString(pos, *args[0], context)));
         throw;
     }
 }

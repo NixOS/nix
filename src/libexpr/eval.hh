@@ -231,6 +231,11 @@ public:
     /* Decode a path encoded by `encodePath()`. */
     SourcePath decodePath(std::string_view s, PosIdx pos = noPos);
 
+    /* Decode all virtual paths in a string, i.e. all
+       /__virtual__/... substrings are replaced by the corresponding
+       input accessor. */
+    std::string decodePaths(std::string_view s);
+
     /* Allow access to a path. */
     void allowPath(const Path & path);
 

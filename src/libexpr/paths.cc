@@ -63,4 +63,34 @@ SourcePath EvalState::decodePath(std::string_view s, PosIdx pos)
         return {rootFS, CanonPath(s)};
 }
 
+std::string EvalState::decodePaths(std::string_view s)
+{
+    std::string res;
+
+    size_t pos = 0;
+
+    while (true) {
+        auto m = s.find(marker, pos);
+        if (m == s.npos) {
+            res.append(s.substr(pos));
+            return res;
+        }
+
+        res.append(s.substr(pos, m - pos));
+
+        auto end = s.find_first_of(" \n\r\t'\"’:", m);
+        if (end == s.npos) end = s.size();
+
+        try {
+            auto path = decodePath(s.substr(m, end - m), noPos);
+            res.append(path.to_string());
+        } catch (...) {
+            throw;
+            res.append(s.substr(pos, end - m));
+        }
+
+        pos = end;
+    }
+}
+
 }
