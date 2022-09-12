@@ -776,17 +776,17 @@ SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view p
 }
 
 
- std::optional<SourcePath> EvalState::resolveSearchPathElem(const SearchPathElem & elem, bool initAccessControl)
+std::optional<SourcePath> EvalState::resolveSearchPathElem(const SearchPathElem & elem, bool initAccessControl)
 {
     auto i = searchPathResolved.find(elem.second);
     if (i != searchPathResolved.end()) return i->second;
 
     std::optional<SourcePath> res;
 
-    if (isUri(elem.second)) {
+    if (EvalSettings::isPseudoUrl(elem.second)) {
         try {
             auto storePath = fetchers::downloadTarball(
-                store, resolveUri(elem.second), "source", false).first;
+                store, EvalSettings::resolvePseudoUrl(elem.second), "source", false).first;
             auto accessor = makeStorePathAccessor(store, storePath);
             registerAccessor(accessor);
             res.emplace(SourcePath {accessor, CanonPath::root});
