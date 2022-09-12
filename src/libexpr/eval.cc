@@ -532,12 +532,12 @@ EvalState::~EvalState()
 
 void EvalState::allowPath(const Path & path)
 {
-    rootFS->allowPath(CanonPath(path)); // FIXME
+    rootFS->allowPath(CanonPath(path));
 }
 
 void EvalState::allowPath(const StorePath & storePath)
 {
-    rootFS->allowPath(CanonPath(store->toRealPath(storePath))); // FIXME
+    rootFS->allowPath(CanonPath(store->toRealPath(storePath)));
 }
 
 void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & v)

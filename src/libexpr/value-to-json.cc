@@ -34,7 +34,6 @@ void printValueAsJSON(EvalState & state, bool strict,
 
         case nPath:
             if (copyToStore)
-                // FIXME: handle accessors
                 out.write(
                     state.store->printStorePath(
                         state.copyPathToStore(context, v.path())));

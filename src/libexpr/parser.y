@@ -509,11 +509,6 @@ string_parts_interpolated
 path_start
   : PATH {
     SourcePath path { data->basePath.accessor, CanonPath({$1.p, $1.l}, data->basePath.path) };
-    #if 0
-    /* add back in the trailing '/' to the first segment */
-    if ($1.p[$1.l-1] == '/' && $1.l > 1)
-      path.path += "/";
-    #endif
     $$ = new ExprPath(std::move(path));
   }
   | HPATH {
@@ -700,7 +695,6 @@ Expr * EvalState::parseExprFromFile(const SourcePath & path, std::shared_ptr<Sta
     auto buffer = path.readFile();
     // readFile hopefully have left some extra space for terminators
     buffer.append("\0\0", 2);
-    // FIXME: pass SourcePaths
     return parse(buffer.data(), buffer.size(), Pos::Origin(path), path.parent(), staticEnv);
 }
 

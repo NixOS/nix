@@ -369,7 +369,6 @@ void prim_exec(EvalState & state, const PosIdx pos, Value * * args, Value & v)
     auto output = runProgram(program, true, commandArgs);
     Expr * parsed;
     try {
-        //auto base = state.positions[pos];
         parsed = state.parseExprFromString(std::move(output), state.rootPath("/"));
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "While parsing the output from '%1%'", program);
