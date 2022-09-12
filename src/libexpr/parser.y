@@ -805,10 +805,11 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
 
     std::pair<bool, std::string> res;
 
-    if (isUri(elem.second)) {
+    if (EvalSettings::isPseudoUrl(elem.second)) {
         try {
-            res = { true, store->toRealPath(fetchers::downloadTarball(
-                        store, resolveUri(elem.second), "source", false).first.storePath) };
+            auto storePath = fetchers::downloadTarball(
+                store, EvalSettings::resolvePseudoUrl(elem.second), "source", false).first.storePath;
+            res = { true, store->toRealPath(storePath) };
         } catch (FileTransferError & e) {
             logWarning({
                 .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second)
