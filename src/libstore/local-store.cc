@@ -1382,13 +1382,15 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
 
     std::unique_ptr<AutoDelete> delTempDir;
     Path tempPath;
+    Path tempDir;
+    AutoCloseFD tempDirFd;
 
     if (!inMemory) {
         /* Drain what we pulled so far, and then keep on pulling */
         StringSource dumpSource { dump };
         ChainSource bothSource { dumpSource, source };
 
-        auto tempDir = createTempDir(realStoreDir, "add");
+        std::tie(tempDir, tempDirFd) = createTempDirInStore();
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir + "/x";
 
@@ -1507,18 +1509,24 @@ StorePath LocalStore::addTextToStore(
 
 
 /* Create a temporary directory in the store that won't be
-   garbage-collected. */
-Path LocalStore::createTempDirInStore()
+   garbage-collected until the returned FD is closed. */
+std::pair<Path, AutoCloseFD> LocalStore::createTempDirInStore()
 {
-    Path tmpDir;
+    Path tmpDirFn;
+    AutoCloseFD tmpDirFd;
+    bool lockedByUs = false;
     do {
         /* There is a slight possibility that `tmpDir' gets deleted by
-           the GC between createTempDir() and addTempRoot(), so repeat
-           until `tmpDir' exists. */
-        tmpDir = createTempDir(realStoreDir);
-        addTempRoot(parseStorePath(tmpDir));
-    } while (!pathExists(tmpDir));
-    return tmpDir;
+           the GC between createTempDir() and when we acquire a lock on it.
+           We'll repeat until 'tmpDir' exists and we've locked it. */
+        tmpDirFn = createTempDir(realStoreDir, "tmp");
+        tmpDirFd = open(tmpDirFn.c_str(), O_RDONLY | O_DIRECTORY);
+        if (tmpDirFd.get() < 0) {
+            continue;
+        }
+        lockedByUs = lockFile(tmpDirFd.get(), ltWrite, true);
+    } while (!pathExists(tmpDirFn) || !lockedByUs);
+    return {tmpDirFn, std::move(tmpDirFd)};
 }
 
 
