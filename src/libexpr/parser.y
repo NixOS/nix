@@ -637,6 +637,7 @@ formal
 #include "fs-input-accessor.hh"
 #include "tarball.hh"
 #include "store-api.hh"
+#include "flake/flake.hh"
 
 
 namespace nix {
@@ -789,13 +790,22 @@ std::optional<SourcePath> EvalState::resolveSearchPathElem(const SearchPathElem 
                 store, EvalSettings::resolvePseudoUrl(elem.second), "source", false).first;
             auto accessor = makeStorePathAccessor(store, storePath);
             registerAccessor(accessor);
-            res.emplace(SourcePath {accessor, CanonPath::root});
+            res.emplace(accessor->root());
         } catch (FileTransferError & e) {
             logWarning({
                 .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second)
             });
         }
-    } else {
+    }
+
+    else if (hasPrefix(elem.second, "flake:")) {
+        auto flakeRef = parseFlakeRef(elem.second.substr(6), {}, true, false);
+        debug("fetching flake search path element '%s''", elem.second);
+        auto [accessor, _] = flakeRef.resolve(store).lazyFetch(store);
+        res.emplace(accessor->root());
+    }
+
+    else {
         auto path = rootPath(absPath(elem.second));
 
         /* Allow access to paths in the search path. */

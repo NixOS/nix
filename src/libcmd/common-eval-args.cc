@@ -36,7 +36,68 @@ MixEvalArgs::MixEvalArgs()
     addFlag({
         .longName = "include",
         .shortName = 'I',
-        .description = "Add *path* to the list of locations used to look up `<...>` file names.",
+        .description = R"(
+  Add *path* to the Nix search path. The Nix search path is
+  initialized from the colon-separated `NIX_PATH` environment
+  variable, and is used to look up Nix expressions enclosed in angle
+  brackets (i.e., `<nixpkgs>`). For instance, if the Nix search path
+  consists of the entries
+
+  ```
+  /home/eelco/Dev
+  /etc/nixos
+  ```
+
+  Nix will look for paths relative to `/home/eelco/Dev` and
+  `/etc/nixos`, in this order. It is also possible to match paths
+  against a prefix. For example, the search path
+
+  ```
+  nixpkgs=/home/eelco/Dev/nixpkgs-branch
+  /etc/nixos
+  ```
+
+  will cause Nix to search for `<nixpkgs/path>` in
+  `/home/eelco/Dev/nixpkgs-branch/path` and `/etc/nixos/nixpkgs/path`.
+
+  If a path in the Nix search path starts with `http://` or `https://`,
+  it is interpreted as the URL of a tarball that will be downloaded and
+  unpacked to a temporary location. The tarball must consist of a single
+  top-level directory. For example, setting `NIX_PATH` to
+
+  ```
+  nixpkgs=https://github.com/NixOS/nixpkgs/archive/master.tar.gz
+  ```
+
+  tells Nix to download and use the current contents of the `master`
+  branch in the `nixpkgs` repository.
+
+  The URLs of the tarballs from the official `nixos.org` channels
+  (see [the manual page for `nix-channel`](nix-channel.md)) can be
+  abbreviated as `channel:<channel-name>`.  For instance, the
+  following two values of `NIX_PATH` are equivalent:
+
+  ```
+  nixpkgs=channel:nixos-21.05
+  nixpkgs=https://nixos.org/channels/nixos-21.05/nixexprs.tar.xz
+  ```
+
+  You can also use refer to source trees looked up in the flake
+  registry. For instance,
+
+  ```
+  nixpkgs=flake:nixpkgs
+  ```
+
+  specifies that the prefix `nixpkgs` shall refer to the source tree
+  downloaded from the `nixpkgs` entry in the flake registry. Similarly,
+
+  ```
+  nixpkgs=flake:github:NixOS/nixpkgs/nixos-22.05
+
+  makes `<nixpkgs>` refer to a particular branch of the
+  `NixOS/nixpkgs` repository on GitHub.
+  ```)",
         .category = category,
         .labels = {"path"},
         .handler = {[&](std::string s) { searchPath.push_back(s); }}
@@ -98,11 +159,21 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s)
             state.store, EvalSettings::resolvePseudoUrl(s), "source", false).first;
         auto accessor = makeStorePathAccessor(state.store, storePath);
         state.registerAccessor(accessor);
-        return {accessor, CanonPath::root};
-    } else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
+        return accessor->root();
+    }
+
+    else if (hasPrefix(s, "flake:")) {
+        auto flakeRef = parseFlakeRef(std::string(s.substr(6)), {}, true, false);
+        auto [accessor, _] = flakeRef.resolve(state.store).lazyFetch(state.store);
+        return accessor->root();
+    }
+
+    else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
         Path p(s.substr(1, s.size() - 2));
         return state.findFile(p);
-    } else
+    }
+
+    else
         return state.rootPath(absPath(std::string(s)));
 }
 

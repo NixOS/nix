@@ -53,7 +53,11 @@ cat > $flake3Dir/flake.nix <<EOF
 }
 EOF
 
-git -C $flake3Dir add flake.nix
+cat > $flake3Dir/default.nix <<EOF
+{ x = 123; }
+EOF
+
+git -C $flake3Dir add flake.nix default.nix
 git -C $flake3Dir commit -m 'Initial'
 
 cat > $nonFlakeDir/README.md <<EOF
@@ -461,7 +465,7 @@ nix flake lock $flake3Dir --update-input flake2/flake1
 # Test 'nix flake metadata --json'.
 nix flake metadata $flake3Dir --json | jq .
 
-# Test flake in store does not evaluate
+# Test flake in store does not evaluate.
 rm -rf $badFlakeDir
 mkdir $badFlakeDir
 echo INVALID > $badFlakeDir/flake.nix
@@ -469,3 +473,9 @@ nix store delete $(nix store add-path $badFlakeDir)
 
 [[ $(nix path-info      $(nix store add-path $flake1Dir)) =~ flake1 ]]
 [[ $(nix path-info path:$(nix store add-path $flake1Dir)) =~ simple ]]
+
+# Test fetching flakerefs in the legacy CLI.
+[[ $(nix-instantiate --eval flake:flake3 -A x) = 123 ]]
+[[ $(nix-instantiate --eval flake:git+file://$flake3Dir -A x) = 123 ]]
+[[ $(nix-instantiate -I flake3=flake:flake3 --eval '<flake3>' -A x) = 123 ]]
+[[ $(NIX_PATH=flake3=flake:flake3 nix-instantiate --eval '<flake3>' -A x) = 123 ]]
