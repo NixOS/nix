@@ -7,8 +7,6 @@ let
   installScripts = {
     install-default = {
       script = ''
-        set -eux
-
         tar -xf ./nix.tar.xz
         mv ./nix-* nix
         ./nix/install --no-channel-add
@@ -17,8 +15,6 @@ let
 
     install-force-no-daemon = {
       script = ''
-        set -eux
-
         tar -xf ./nix.tar.xz
         mv ./nix-* nix
         ./nix/install --no-daemon
@@ -27,14 +23,14 @@ let
 
     install-force-daemon = {
       script = ''
-        set -eux
-
         tar -xf ./nix.tar.xz
         mv ./nix-* nix
-        ./nix/install --daemon
+        ./nix/install --daemon --no-channel-add
       '';
     };
   };
+
+  disableSELinux = "sudo setenforce 0";
 
   images = {
 
@@ -65,7 +61,6 @@ let
       system = "x86_64-linux";
     };
 
-
     "fedora-36" = {
       image = import <nix/fetchurl.nix> {
         url = https://app.vagrantup.com/generic/boxes/fedora36/versions/4.1.12/providers/libvirt.box;
@@ -73,6 +68,7 @@ let
       };
       rootDisk = "box.img";
       system = "x86_64-linux";
+      postBoot = disableSELinux;
     };
 
   };
@@ -84,6 +80,7 @@ let
       "installer-test-${imageName}-${testName}"
       { buildInputs = [ qemu_kvm openssh ];
         image = image.image;
+        postBoot = image.postBoot or "";
         installScript = installScripts.${testName}.script;
         binaryTarball = binaryTarballs.${system};
       }
@@ -125,15 +122,25 @@ let
           sleep 1
         done
 
+        if [[ -n $postBoot ]]; then
+          echo "Running post-boot commands..."
+          $ssh "set -ex; $postBoot"
+        fi
+
         echo "Copying installer..."
         scp -P 20022 $ssh_opts $binaryTarball/nix-*.tar.xz vagrant@localhost:nix.tar.xz
 
         echo "Running installer..."
-        $ssh "$installScript"
+        $ssh "set -eux; $installScript"
 
         echo "Testing Nix installation..."
         # FIXME: should update ~/.bashrc.
-        $ssh "source ~/.bash_profile || source ~/.bash_login || source ~/.profile || true; nix-env --version"
+        $ssh "
+          set -ex
+          source ~/.bash_profile || source ~/.bash_login || source ~/.profile || true
+          nix-env --version
+          nix --extra-experimental-features nix-command store ping
+        "
 
         echo "Done!"
         touch $out
@@ -146,4 +153,5 @@ in
   #ubuntu-16-04.install-default = makeTest "ubuntu-16-04" "install-default";
   #ubuntu-22-10.install-default = makeTest "ubuntu-22-10" "install-default";
   fedora-36.install-default = makeTest "fedora-36" "install-default";
+  fedora-36.install-force-daemon = makeTest "fedora-36" "install-force-daemon";
 }
