@@ -65,6 +65,16 @@ let
       system = "x86_64-linux";
     };
 
+
+    "fedora-36" = {
+      image = import <nix/fetchurl.nix> {
+        url = https://app.vagrantup.com/generic/boxes/fedora36/versions/4.1.12/providers/libvirt.box;
+        hash = "sha256-rxPgnDnFkTDwvdqn2CV3ZUo3re9AdPtSZ9SvOHNvaks=";
+      };
+      rootDisk = "box.img";
+      system = "x86_64-linux";
+    };
+
   };
 
   makeTest = imageName: testName:
@@ -78,10 +88,12 @@ let
         binaryTarball = binaryTarballs.${system};
       }
       ''
-        echo "Unpacking Vagrant box..."
+        echo "Unpacking Vagrant box $image..."
         tar xvf $image
 
-        qemu-img create -b ./${image.rootDisk} -F vmdk -f qcow2 ./disk.qcow2
+        image_type=$(qemu-img info ${image.rootDisk} | sed 's/file format: \(.*\)/\1/; t; d')
+
+        qemu-img create -b ./${image.rootDisk} -F "$image_type" -f qcow2 ./disk.qcow2
 
         echo "Starting qemu..."
         qemu-kvm -m 4096 -nographic \
@@ -121,7 +133,7 @@ let
 
         echo "Testing Nix installation..."
         # FIXME: should update ~/.bashrc.
-        $ssh "source ~/.profile; nix-env --version"
+        $ssh "source ~/.bash_profile || source ~/.bash_login || source ~/.profile || true; nix-env --version"
 
         echo "Done!"
         touch $out
@@ -133,4 +145,5 @@ in
   ubuntu-14-04.install-default = makeTest "ubuntu-14-04" "install-default";
   #ubuntu-16-04.install-default = makeTest "ubuntu-16-04" "install-default";
   #ubuntu-22-10.install-default = makeTest "ubuntu-22-10" "install-default";
+  fedora-36.install-default = makeTest "fedora-36" "install-default";
 }
