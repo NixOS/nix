@@ -33,7 +33,7 @@ let
 
     root = {
       uid = 0;
-      shell = "/bin/bash";
+      shell = "${pkgs.bashInteractive}/bin/bash";
       home = "/root";
       gid = 0;
     };
