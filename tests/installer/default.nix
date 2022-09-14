@@ -85,6 +85,8 @@ let
         binaryTarball = binaryTarballs.${system};
       }
       ''
+        shopt -s nullglob
+
         echo "Unpacking Vagrant box $image..."
         tar xvf $image
 
@@ -92,10 +94,19 @@ let
 
         qemu-img create -b ./${image.rootDisk} -F "$image_type" -f qcow2 ./disk.qcow2
 
+        extra_qemu_opts=
+
+        # Add the config disk, required by the Ubuntu images.
+        config_drive=$(echo *configdrive.vmdk || true)
+        if [[ -n $config_drive ]]; then
+          extra_qemu_opts+=" -drive id=disk2,file=$config_drive,if=virtio"
+        fi
+
         echo "Starting qemu..."
         qemu-kvm -m 4096 -nographic \
           -drive id=disk1,file=./disk.qcow2,if=virtio \
-          -netdev user,id=net0,restrict=yes,hostfwd=tcp::20022-:22 -device virtio-net-pci,netdev=net0 &
+          -netdev user,id=net0,restrict=yes,hostfwd=tcp::20022-:22 -device virtio-net-pci,netdev=net0 \
+          $extra_qemu_opts &
         qemu_pid=$!
         trap "kill $qemu_pid" EXIT
 
@@ -137,7 +148,13 @@ let
         # FIXME: should update ~/.bashrc.
         $ssh "
           set -ex
-          source ~/.bash_profile || source ~/.bash_login || source ~/.profile || true
+
+          # FIXME: get rid of this; ideally ssh should just work.
+          source ~/.bash_profile || true
+          source ~/.bash_login || true
+          source ~/.profile || true
+          source /etc/bashrc || true
+
           nix-env --version
           nix --extra-experimental-features nix-command store ping
         "
@@ -151,7 +168,8 @@ in
 {
   ubuntu-14-04.install-default = makeTest "ubuntu-14-04" "install-default";
   #ubuntu-16-04.install-default = makeTest "ubuntu-16-04" "install-default";
-  #ubuntu-22-10.install-default = makeTest "ubuntu-22-10" "install-default";
+  ubuntu-22-10.install-default = makeTest "ubuntu-22-10" "install-default";
+  ubuntu-22-10.install-force-daemon = makeTest "ubuntu-22-10" "install-force-daemon";
   fedora-36.install-default = makeTest "fedora-36" "install-default";
   fedora-36.install-force-daemon = makeTest "fedora-36" "install-force-daemon";
 }
