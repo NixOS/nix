@@ -81,7 +81,14 @@ jobs:
       with:
         install_url: '${{needs.installer.outputs.installerURL}}'
         install_options: "--tarball-url-prefix https://${{ env.CACHIX_NAME }}.cachix.org/serve"
-    - run: nix-instantiate -E 'builtins.currentTime' --eval
+    - run: sudo apt install fish zsh
+      if: matrix.os == 'ubuntu-latest'
+    - run: brew install fish
+      if: matrix.os == 'macos-latest'
+    - run: exec bash -c "nix-instantiate -E 'builtins.currentTime' --eval"
+    - run: exec sh -c "nix-instantiate -E 'builtins.currentTime' --eval"
+    - run: exec zsh -c "nix-instantiate -E 'builtins.currentTime' --eval"
+    - run: exec fish -c "nix-instantiate -E 'builtins.currentTime' --eval"
 
   docker_push_image:
     needs: [check_secrets, tests]
