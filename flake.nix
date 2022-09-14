@@ -546,6 +546,11 @@
             # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;
           } "touch $out");
 
+        installerTests = import ./tests/installer {
+          binaryTarballs = self.hydraJobs.binaryTarball;
+          inherit nixpkgsFor;
+        };
+
       };
 
       checks = forAllSystems (system: {
