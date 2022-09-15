@@ -168,11 +168,9 @@ let
 
 in
 
-{
-  ubuntu-14-04.install-default = makeTest "ubuntu-14-04" "install-default";
-  #ubuntu-16-04.install-default = makeTest "ubuntu-16-04" "install-default";
-  ubuntu-22-10.install-default = makeTest "ubuntu-22-10" "install-default";
-  ubuntu-22-10.install-force-daemon = makeTest "ubuntu-22-10" "install-force-daemon";
-  fedora-36.install-default = makeTest "fedora-36" "install-default";
-  fedora-36.install-force-daemon = makeTest "fedora-36" "install-force-daemon";
-}
+builtins.mapAttrs (imageName: image:
+  { ${image.system} = builtins.mapAttrs (testName: test:
+      makeTest imageName testName
+    ) installScripts;
+  }
+) images
