@@ -38,15 +38,12 @@ bool isCacheFileWithinTtl(time_t now, const struct stat & st)
     return st.st_mtime + settings.tarballTtl > now;
 }
 
-bool touchCacheFile(const Path & path, time_t touch_time)
+static void touchCacheFile(const std::filesystem::path & path, time_t touch_time)
 {
-    struct timeval times[2];
-    times[0].tv_sec = touch_time;
-    times[0].tv_usec = 0;
-    times[1].tv_sec = touch_time;
-    times[1].tv_usec = 0;
-
-    return lutimes(path.c_str(), times) == 0;
+    auto st = lstat(path);
+    st.st_atime = touch_time;
+    st.st_mtime = touch_time;
+    setWriteTime(path, st);
 }
 
 Path getCachePath(std::string_view key)
@@ -541,8 +538,11 @@ struct GitInputScheme : InputScheme
                     warn("could not update local clone of Git repository '%s'; continuing with the most recent version", repoInfo.url);
                 }
 
-                if (!touchCacheFile(localRefFile, now))
-                    warn("could not update mtime for file '%s': %s", localRefFile, strerror(errno));
+                try {
+                    touchCacheFile(localRefFile, now);
+                } catch (SysError & e) {
+                    warn("could not update mtime for file '%s': %s", localRefFile, e.msg());
+                }
                 if (!originalRef && !storeCachedHead(repoInfo.url, ref))
                     warn("could not update cached head '%s' for '%s'", ref, repoInfo.url);
             }

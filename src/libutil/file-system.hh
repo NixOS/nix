@@ -19,6 +19,7 @@
 #include <boost/lexical_cast.hpp>
 
 #include <atomic>
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <sstream>
@@ -164,6 +165,15 @@ inline Paths createDirs(PathView path)
 {
     return createDirs(Path(path));
 }
+
+/**
+ * Set the access and modification times of the given path, not
+ * following symlinks.
+ *
+ * Whether or not the path is a symlink is taken from the mode of `st`
+ * in fallback code.
+ */
+void setWriteTime(const std::filesystem::path & path, const struct stat & st);
 
 /**
  * Create a symlink.
