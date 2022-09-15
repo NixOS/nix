@@ -61,15 +61,6 @@ let
       system = "x86_64-linux";
     };
 
-    "ubuntu-22-10" = {
-      image = import <nix/fetchurl.nix> {
-        url = https://app.vagrantup.com/ubuntu/boxes/kinetic64/versions/20220910.0.0/providers/virtualbox.box;
-        hash = "sha256-/IXr+Apyx2dqX6Gj4SoNtQ/5v1eKKopwzFgozAq6GFY=";
-      };
-      rootDisk = "ubuntu-kinetic-22.10-cloudimg.vmdk";
-      system = "x86_64-linux";
-    };
-
     "fedora-36" = {
       image = import <nix/fetchurl.nix> {
         url = https://app.vagrantup.com/generic/boxes/fedora36/versions/4.1.12/providers/libvirt.box;
