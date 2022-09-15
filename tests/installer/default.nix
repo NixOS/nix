@@ -139,7 +139,7 @@ let
 
         qemu-img create -b ./${image.rootDisk} -F "$image_type" -f qcow2 ./disk.qcow2
 
-        extra_qemu_opts="${image.extraQemuOpts}"
+        extra_qemu_opts="${image.extraQemuOpts or ""}"
 
         # Add the config disk, required by the Ubuntu images.
         config_drive=$(echo *configdrive.vmdk || true)
