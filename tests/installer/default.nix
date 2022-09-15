@@ -34,6 +34,7 @@ let
 
   images = {
 
+    /*
     "ubuntu-14-04" = {
       image = import <nix/fetchurl.nix> {
         url = https://app.vagrantup.com/ubuntu/boxes/trusty64/versions/20190514.0.0/providers/virtualbox.box;
@@ -42,6 +43,7 @@ let
       rootDisk = "box-disk1.vmdk";
       system = "x86_64-linux";
     };
+    */
 
     "ubuntu-16-04" = {
       image = import <nix/fetchurl.nix> {
