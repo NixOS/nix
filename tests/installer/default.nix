@@ -45,10 +45,10 @@ let
 
     "ubuntu-16-04" = {
       image = import <nix/fetchurl.nix> {
-        url = https://app.vagrantup.com/ubuntu/boxes/xenial64/versions/20211001.0.0/providers/virtualbox.box;
-        hash = "sha256-JCc0wd9vaSzCU8coByVtb/oDTAXYBPnORwEShS4oj4U=";
+        url = https://app.vagrantup.com/generic/boxes/ubuntu1604/versions/4.1.12/providers/libvirt.box;
+        hash = "sha256-lO4oYQR2tCh5auxAYe6bPOgEqOgv3Y3GC1QM1tEEEU8=";
       };
-      rootDisk = "ubuntu-xenial-16.04-cloudimg.vmdk";
+      rootDisk = "box.img";
       system = "x86_64-linux";
     };
 
