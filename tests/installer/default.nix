@@ -52,6 +52,15 @@ let
       system = "x86_64-linux";
     };
 
+    "ubuntu-22-04" = {
+      image = import <nix/fetchurl.nix> {
+        url = https://app.vagrantup.com/generic/boxes/ubuntu2204/versions/4.1.12/providers/libvirt.box;
+        hash = "sha256-HNll0Qikw/xGIcogni5lz01vUv+R3o8xowP2EtqjuUQ=";
+      };
+      rootDisk = "box.img";
+      system = "x86_64-linux";
+    };
+
     "ubuntu-22-10" = {
       image = import <nix/fetchurl.nix> {
         url = https://app.vagrantup.com/ubuntu/boxes/kinetic64/versions/20220910.0.0/providers/virtualbox.box;
