@@ -146,7 +146,7 @@ let
 
         echo "Testing Nix installation..."
         # FIXME: should update ~/.bashrc.
-        $ssh "
+        $ssh <<EOF
           set -ex
 
           # FIXME: get rid of this; ideally ssh should just work.
@@ -157,7 +157,10 @@ let
 
           nix-env --version
           nix --extra-experimental-features nix-command store ping
-        "
+
+          out=\$(nix-build --no-substitute -E 'derivation { name = "foo"; system = "x86_64-linux"; builder = "/bin/sh"; args = ["-c" "echo foobar > \$out"]; }')
+          [[ \$(cat \$out) = foobar ]]
+        EOF
 
         echo "Done!"
         touch $out
