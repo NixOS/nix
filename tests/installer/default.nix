@@ -71,6 +71,38 @@ let
       postBoot = disableSELinux;
     };
 
+    # Currently fails with 'error while loading shared libraries:
+    # libsodium.so.23: cannot stat shared object: Invalid argument'.
+    /*
+    "rhel-6" = {
+      image = import <nix/fetchurl.nix> {
+        url = https://app.vagrantup.com/generic/boxes/rhel6/versions/4.1.12/providers/libvirt.box;
+        hash = "sha256-QwzbvRoRRGqUCQptM7X/InRWFSP2sqwRt2HaaO6zBGM=";
+      };
+      rootDisk = "box.img";
+      system = "x86_64-linux";
+    };
+    */
+
+    "rhel-7" = {
+      image = import <nix/fetchurl.nix> {
+        url = https://app.vagrantup.com/generic/boxes/rhel7/versions/4.1.12/providers/libvirt.box;
+        hash = "sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U=";
+      };
+      rootDisk = "box.img";
+      system = "x86_64-linux";
+    };
+
+    "rhel-8" = {
+      image = import <nix/fetchurl.nix> {
+        url = https://app.vagrantup.com/generic/boxes/rhel8/versions/4.1.12/providers/libvirt.box;
+        hash = "sha256-zFOPjSputy1dPgrQRixBXmlyN88cAKjJ21VvjSWUCUY=";
+      };
+      rootDisk = "box.img";
+      system = "x86_64-linux";
+      postBoot = disableSELinux;
+    };
+
   };
 
   makeTest = imageName: testName:
@@ -116,7 +148,7 @@ let
 
         chmod 0400 ./vagrant_insecure_key
 
-        ssh_opts="-o StrictHostKeyChecking=no -o PubkeyAcceptedKeyTypes=+ssh-rsa -i ./vagrant_insecure_key"
+        ssh_opts="-o StrictHostKeyChecking=no -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa -i ./vagrant_insecure_key"
         ssh="ssh -p 20022 -q $ssh_opts vagrant@localhost"
 
         echo "Waiting for SSH..."
