@@ -105,6 +105,17 @@ let
       postBoot = disableSELinux;
     };
 
+    "rhel-9" = {
+      image = import <nix/fetchurl.nix> {
+        url = https://app.vagrantup.com/generic/boxes/rhel9/versions/4.1.12/providers/libvirt.box;
+        hash = "sha256-vL/FbB3kK1rcSaR627nWmScYGKGk4seSmAdq6N5diMg=";
+      };
+      rootDisk = "box.img";
+      system = "x86_64-linux";
+      postBoot = disableSELinux;
+      extraQemuOpts = "-cpu Westmere-v2";
+    };
+
   };
 
   makeTest = imageName: testName:
@@ -128,7 +139,7 @@ let
 
         qemu-img create -b ./${image.rootDisk} -F "$image_type" -f qcow2 ./disk.qcow2
 
-        extra_qemu_opts=
+        extra_qemu_opts="${image.extraQemuOpts}"
 
         # Add the config disk, required by the Ubuntu images.
         config_drive=$(echo *configdrive.vmdk || true)
