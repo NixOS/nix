@@ -15,7 +15,7 @@ assignees: ''
 
 <!-- make sure this issue is not redundant or obsolete -->
 
-- [ ] checked [latest Nix manual]\ ([source])
+- [ ] checked [latest Nix manual] \([source])
 - [ ] checked [open documentation issues and pull requests] for possible duplicates
 
 [latest Nix manual]: https://nixos.org/manual/nix/unstable/
