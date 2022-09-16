@@ -38,6 +38,6 @@ derivation ({
 
   # To make "nix-prefetch-url" work.
   urls = [ url ];
-} // (if __impure
-      then { inherit __impure; }
+} // (if impure
+      then { __impure = true; }
       else { inherit outputHashAlgo outputHash; }))
