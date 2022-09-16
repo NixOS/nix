@@ -138,7 +138,7 @@ If you've already pushed to a fork of Nix on GitHub before, you may have noticed
 
 ### Using the CI-generated installer for manual testing
 
-After the CI run completes, you can check the output to extract the installer url:
+After the CI run completes, you can check the output to extract the installer URL:
 1. Click into the detailed view of the CI run.
 2. Click into any `installer_test` run (the URL you're here to extract will be the same in all of them).
 3. Click into the `Run cachix/install-nix-action@v...` step and click the detail triangle next to the first log line (it will also be `Run cachix/install-nix-action@v...`)
