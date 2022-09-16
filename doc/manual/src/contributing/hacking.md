@@ -130,7 +130,7 @@ If you've already pushed to a fork of Nix on GitHub before, you may have noticed
     - Create or log in to an account.
     - Create a Cachix cache using the format `<github-username>-nix-install-tests`.
     - Navigate to the new cache > Settings > Auth Tokens.
-    - Generate a new cachix auth token and copy the generated value.
+    - Generate a new Cachix auth token and copy the generated value.
 4. At github.com:
     - Navigate to your Nix fork > Settings > Secrets > Actions > New repository secret.
     - Name the secret `CACHIX_AUTH_TOKEN`
