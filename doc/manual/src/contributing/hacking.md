@@ -142,8 +142,8 @@ After the CI run completes, you can check the output to extract the installer ur
 1. Click into the detailed view of the CI run.
 2. Click into any `installer_test` run (the URL you're here to extract will be the same in all of them).
 3. Click into the `Run cachix/install-nix-action@v...` step and click the detail triangle next to the first log line (it will also be `Run cachix/install-nix-action@v...`)
-4. Copy the install_url
-5. To generate an install command, plug this install_url and your github username into this template:
+4. Copy the value of `install_url`
+5. To generate an install command, plug this `install_url` and your GitHub username into this template:
 
     ```console
     sh <(curl -L <install_url>) --tarball-url-prefix https://<github-username>-nix-install-tests.cachix.org/serve
