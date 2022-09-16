@@ -12,7 +12,7 @@
 , executable ? false
 , unpack ? false
 , name ? baseNameOf (toString url)
-, __impure ? false
+, impure ? false
 }:
 
 derivation ({
