@@ -121,7 +121,7 @@ If you've already pushed to a fork of Nix on GitHub before, you may have noticed
   - `x86_64-darwin`.
   
   While this installer is in your Cachix cache, you can use it for manual testing on any of these platforms.
-- the `installer_test` job will try to use this installer and run a trivial Nix command on `ubuntu-latest` and `macos-latest`.
+- The `installer_test` job will try to use this installer and run a trivial Nix command on `ubuntu-latest` and `macos-latest`.
 
 ### One-time setup
 
