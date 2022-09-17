@@ -85,8 +85,6 @@ $ nix develop
 
 ## Testing Nix
 
-Nix comes with three different flavors of tests: unit, functional and integration.
-
 ### Unit-tests
 
 The unit-tests for each Nix library (`libexpr`, `libstore`, etc..) are defined
