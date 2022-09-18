@@ -83,7 +83,7 @@ by:
 $ nix develop
 ```
 
-## Testing Nix
+## Running tests
 
 ### Unit-tests
 
@@ -107,21 +107,21 @@ Because these tests are expensive and require more than what the standard github
 
 You can run them manually with `nix build .#hydraJobs.tests.{testName}` or `nix-build -A hydraJobs.tests.{testName}`
 
-## Testing the install scripts
+### Installer tests
 
-Testing the install scripts has traditionally been tedious, but you can now do this much more easily via the GitHub Actions CI runs (at least for platforms that Github Actions supports).
+With just a little one-time setup, the Nix repository's GitHub Actions continuous integration (CI) workflow can easily test the installer each time you push to a branch.
 
-If you've already pushed to a fork of Nix on GitHub before, you may have noticed that the CI workflows in your fork list skipped `installer` and `installer_test` jobs. Once your Nix fork is set up correctly, pushing to it will also run these jobs.
-- The `installer` job will generate installers for these platforms:
+Creating a Cachix cache for your installer tests and adding its authorization token to GitHub enables [two installer-specific jobs in the CI workflow](https://github.com/NixOS/nix/blob/88a45d6149c0e304f6eb2efcc2d7a4d0d569f8af/.github/workflows/ci.yml#L50-L91):
+
+- The `installer` job generates installers for the platforms below and uploads them to your Cachix cache:
   - `x86_64-linux`
   - `armv6l-linux`
   - `armv7l-linux`
-  - `x86_64-darwin`.
-  
-  While this installer is in your Cachix cache, you can use it for manual testing on any of these platforms.
-- The `installer_test` job will try to use this installer and run a trivial Nix command on `ubuntu-latest` and `macos-latest`.
+  - `x86_64-darwin`
 
-### One-time setup
+- The `installer_test` job (which runs on `ubuntu-latest` and `macos-latest`) will try to install Nix with the cached installer and run a trivial Nix command.
+
+#### One-time setup
 
 1. Have a GitHub account with a fork of the Nix repo.
 2. At cachix.org:
@@ -129,12 +129,12 @@ If you've already pushed to a fork of Nix on GitHub before, you may have noticed
     - Create a Cachix cache using the format `<github-username>-nix-install-tests`.
     - Navigate to the new cache > Settings > Auth Tokens.
     - Generate a new Cachix auth token and copy the generated value.
-4. At github.com:
+3. At github.com:
     - Navigate to your Nix fork > Settings > Secrets > Actions > New repository secret.
-    - Name the secret `CACHIX_AUTH_TOKEN`
+    - Name the secret `CACHIX_AUTH_TOKEN`.
     - Paste the copied value of the Cachix cache auth token.
 
-### Using the CI-generated installer for manual testing
+#### Using the CI-generated installer for manual testing
 
 After the CI run completes, you can check the output to extract the installer URL:
 1. Click into the detailed view of the CI run.
@@ -147,7 +147,7 @@ After the CI run completes, you can check the output to extract the installer UR
     sh <(curl -L <install_url>) --tarball-url-prefix https://<github-username>-nix-install-tests.cachix.org/serve
     ```
 
-<!-- ### Manually generating test installers
+<!-- #### Manually generating test installers
 
 There's obviously a manual way to do this, and it's still the only way for
 platforms that lack GA runners.
