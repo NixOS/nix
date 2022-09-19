@@ -1,8 +1,8 @@
 ---
 name: Missing or incorrect documentation
-about:
+about: Help us improve the reference manual
 title: ''
-labels: 'documentation'
+labels: documentation
 assignees: ''
 
 ---
