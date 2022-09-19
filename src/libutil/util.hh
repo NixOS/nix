@@ -115,9 +115,12 @@ std::string readFile(const Path & path);
 void readFile(const Path & path, Sink & sink);
 
 /* Write a string to a file. */
-void writeFile(const Path & path, std::string_view s, mode_t mode = 0666);
+void writeFile(const Path & path, std::string_view s, mode_t mode = 0666, bool sync = false);
 
-void writeFile(const Path & path, Source & source, mode_t mode = 0666);
+void writeFile(const Path & path, Source & source, mode_t mode = 0666, bool sync = false);
+
+/* Flush a file's parent directory to disk */
+void syncParent(const Path & path);
 
 /* Read a line from a file descriptor. */
 std::string readLine(int fd);
@@ -231,6 +234,7 @@ public:
     explicit operator bool() const;
     int release();
     void close();
+    void fsync();
 };
 
 
