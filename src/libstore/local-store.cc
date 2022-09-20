@@ -158,7 +158,7 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
             txn.commit();
         }
 
-        writeFile(schemaPath, fmt("%d", nixCASchemaVersion));
+        writeFile(schemaPath, fmt("%d", nixCASchemaVersion), 0666, true);
         lockFile(lockFd.get(), ltRead, true);
     }
 }
@@ -281,7 +281,7 @@ LocalStore::LocalStore(const Params & params)
     else if (curSchema == 0) { /* new store */
         curSchema = nixSchemaVersion;
         openDB(*state, true);
-        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
+        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str(), 0666, true);
     }
 
     else if (curSchema < nixSchemaVersion) {
@@ -329,7 +329,7 @@ LocalStore::LocalStore(const Params & params)
             txn.commit();
         }
 
-        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
+        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str(), 0666, true);
 
         lockFile(globalLock.get(), ltRead, true);
     }
