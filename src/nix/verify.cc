@@ -41,7 +41,7 @@ struct CmdVerify : StorePathsCommand
         addFlag({
             .longName = "sigs-needed",
             .shortName = 'n',
-            .description = "Require that each path has at least *n* valid signatures.",
+            .description = "Require that each path has at least *n* trustworthy signatures.",
             .labels = {"n"},
             .handler = {&sigsNeeded}
         });

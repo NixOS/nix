@@ -22,7 +22,7 @@ R""(
 
   ```console
   # nix copy --to /tmp/nix --trusted-public-keys '' nixpkgs#hello
-  cannot add path '/nix/store/zy9wbxwcygrwnh8n2w9qbbcr6zk87m26-libunistring-0.9.10' because it lacks a valid signature
+  cannot add path '/nix/store/zy9wbxwcygrwnh8n2w9qbbcr6zk87m26-libunistring-0.9.10' because it lacks a trustworthy signature
   ```
 
 * Create a content-addressed representation of the current NixOS

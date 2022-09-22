@@ -81,7 +81,7 @@ info=$(nix path-info --store file://$cacheDir --json $outPath2)
 [[ $info =~ 'cache1.example.org' ]]
 [[ $info =~ 'cache2.example.org' ]]
 
-# Copying to a diverted store should fail due to a lack of valid signatures.
+# Copying to a diverted store should fail due to a lack of trustworthy signatures.
 chmod -R u+w $TEST_ROOT/store0 || true
 rm -rf $TEST_ROOT/store0
 (! nix copy --to $TEST_ROOT/store0 $outPath)
