@@ -75,6 +75,9 @@ struct NarAccessor : public FSAccessor
             createMember(path, {FSAccessor::Type::tRegular, false, 0, 0});
         }
 
+        void closeRegularFile() override
+        { }
+
         void isExecutable() override
         {
             parents.top()->isExecutable = true;
