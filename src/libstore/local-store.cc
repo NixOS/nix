@@ -751,7 +751,7 @@ void LocalStore::registerDrvOutput(const Realisation & info, CheckSigsFlag check
     if (checkSigs == NoCheckSigs || !realisationIsUntrusted(info))
         registerDrvOutput(info);
     else
-        throw Error("cannot register realisation '%s' because it lacks a trustworthy signature", info.outPath.to_string());
+        throw Error("cannot register realisation '%s' because it lacks a signature by a trusted key", info.outPath.to_string());
 }
 
 void LocalStore::registerDrvOutput(const Realisation & info)
@@ -1266,7 +1266,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     RepairFlag repair, CheckSigsFlag checkSigs)
 {
     if (checkSigs && pathInfoIsUntrusted(info))
-        throw Error("cannot add path '%s' because it lacks a trustworthy signature", printStorePath(info.path));
+        throw Error("cannot add path '%s' because it lacks a signature by a trusted key", printStorePath(info.path));
 
     addTempRoot(info.path);
 

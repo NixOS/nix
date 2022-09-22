@@ -560,9 +560,15 @@ public:
         R"(
           If set to `true` (the default), any non-content-addressed path added
           or copied to the Nix store (e.g. when substituting from a binary
-          cache) must have a trustworthy signature, that is, be signed using one of
-          the keys listed in `trusted-public-keys` or `secret-key-files`. Set
-          to `false` to disable signature checking.
+          cache) must have a signature by a key we trust. A trusted key is one
+          listed in `trusted-public-keys`, or a public key counterpart to a
+          private key stored in a file listed in `secret-key-files`.
+          
+          Set to `false` to disable signature checking and trust all
+          non-content-addressed paths unconditionally.
+          
+          (Content-addressed paths are inherently trustworthy and thus
+          unaffected by this configuration option.)
         )"};
 
     Setting<StringSet> extraPlatforms{
