@@ -560,7 +560,7 @@ public:
         R"(
           If set to `true` (the default), any non-content-addressed path added
           or copied to the Nix store (e.g. when substituting from a binary
-          cache) must have a signature by a key we trust. A trusted key is one
+          cache) must have a signature by a trusted key. A trusted key is one
           listed in `trusted-public-keys`, or a public key counterpart to a
           private key stored in a file listed in `secret-key-files`.
           
