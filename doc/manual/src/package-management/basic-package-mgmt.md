@@ -59,10 +59,13 @@ nixpkgs.bzip2                       bzip2-1.0.2
 
 The flag `-q` specifies a query operation, `-a` means that you want
 to show the “available” (i.e., installable) packages, as opposed to the
-installed packages, and `-P` prints the attribute paths that can be used
-to unambiguously select a package for installation (listed in the first column).
-If you downloaded Nixpkgs yourself, or if you checked it out from GitHub,
-then you need to pass the path to your Nixpkgs tree using the `-f` flag:
+installed packages, and `-P` prints the attribute paths, that can be used
+to unambiguously select a package for installation. In the example above,
+`nixpkgs`is the channel, and `aterm` is the
+[derivation](../language/derivation.md) name in the attribute path,
+`nixpkgs.aterm`. If you downloaded Nixpkgs yourself, or if you checked it
+out from GitHub, then you need to pass the path to your Nixpkgs tree using
+the `-f` flag:
 
 ```console
 $ nix-env -qaPf /path/to/nixpkgs
