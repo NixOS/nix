@@ -42,7 +42,7 @@ The command line interface and the Nix language are what users interact with mos
 > The Nix language itself does not have a notion of *packages* or *configurations*.
 > As far as we are concerned here, the inputs and results of a build plan are just data.
 
-Underlying these is the [Nix store](../glossary.md#gloss-store), a mechanism to keep track of build plans, data, and references between them.
+Underlying the command line interface and the Nix language is the [Nix store](../glossary.md#gloss-store), a mechanism to keep track of build plans, data, and references between them.
 It can also execute build plans to produce new data.
 
 A build plan is a series of *build tasks*.
