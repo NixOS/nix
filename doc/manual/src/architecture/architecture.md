@@ -36,7 +36,7 @@ It is used to compose expressions which ultimately evaluate to self-contained *b
 
 [purely functional]: https://en.m.wikipedia.org/wiki/Purely_functional_programming
 
-Command line interface and Nix language are what users interact with most.
+The command line interface and the Nix language are what users interact with most.
 
 > **Note**
 > The Nix language itself does not have a notion of *packages* or *configurations*.
