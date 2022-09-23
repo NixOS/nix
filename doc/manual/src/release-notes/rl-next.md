@@ -21,3 +21,15 @@
 * Error traces have been reworked to provide detailed explanations and more
   accurate error locations. A short excerpt of the trace is now shown by
   default when an error occurs.
+
+* In derivations that use structured attributes, you can now use `unsafeDiscardReferences`
+  to disable scanning a given output for runtime dependencies:
+  ```nix
+  __structuredAttrs = true;
+  outputChecks.out.unsafeDiscardReferences = true;
+  ```
+  This is useful e.g. when generating self-contained filesystem images with
+  their own embedded Nix store: hashes found inside such an image refer
+  to the embedded store and not to the host's Nix store.
+
+  This requires the `discard-references` experimental feature.

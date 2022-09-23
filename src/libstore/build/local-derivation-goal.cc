@@ -2319,11 +2319,30 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             buildUser ? std::optional(buildUser->getUIDRange()) : std::nullopt,
             inodesSeen);
 
-        debug("scanning for references for output '%s' in temp location '%s'", outputName, actualPath);
+        bool discardReferences = false;
+        if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
+            if (auto outputChecks = get(*structuredAttrs, "outputChecks")) {
+                if (auto output = get(*outputChecks, outputName)) {
+                    if (auto unsafeDiscardReferences = get(*output, "unsafeDiscardReferences")) {
+                        settings.requireExperimentalFeature(Xp::DiscardReferences);
+                        if (!unsafeDiscardReferences->is_boolean())
+                            throw Error("attribute 'outputChecks.\"%s\".unsafeDiscardReferences' of derivation '%s' must be a Boolean", outputName, drvPath.to_string());
+                        discardReferences = unsafeDiscardReferences->get<bool>();
+                    }
+                }
+            }
+        }
 
-        /* Pass blank Sink as we are not ready to hash data at this stage. */
-        NullSink blank;
-        auto references = scanForReferences(blank, actualPath, referenceablePaths);
+        StorePathSet references;
+        if (discardReferences)
+            debug("discarding references of output '%s'", outputName);
+        else {
+            debug("scanning for references for output '%s' in temp location '%s'", outputName, actualPath);
+
+            /* Pass blank Sink as we are not ready to hash data at this stage. */
+            NullSink blank;
+            references = scanForReferences(blank, actualPath, referenceablePaths);
+        }
 
         outputReferencesIfUnregistered.insert_or_assign(
             outputName,

@@ -67,4 +67,13 @@ rec {
     disallowedReferences = [test5];
   };
 
+  test11 = makeTest 11 {
+    __structuredAttrs = true;
+    outputChecks.out = {
+      unsafeDiscardReferences = true;
+      allowedReferences = [];
+    };
+    buildCommand = ''echo ${dep} > "''${outputs[out]}"'';
+  };
+
 }
