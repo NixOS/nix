@@ -42,7 +42,7 @@ $ nix develop
 ```
 
 To get a shell with a different compilation environment (e.g. stdenv,
-gccStdenv, clangStdenv, clang11Stdenv):
+gccStdenv, clangStdenv, clang11Stdenv, ccacheStdenv):
 
 ```console
 $ nix-shell -A devShells.x86_64-linux.clang11StdenvPackages
@@ -53,6 +53,9 @@ or if you have a flake-enabled nix:
 ```console
 $ nix develop .#clang11StdenvPackages
 ```
+
+Note: you can use `ccacheStdenv` to drastically improve rebuild
+time. By default, ccache keeps artifacts in `~/.cache/ccache/`.
 
 To build Nix itself in this shell:
 
