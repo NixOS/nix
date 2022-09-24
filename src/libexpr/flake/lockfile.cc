@@ -36,7 +36,7 @@ LockedNode::LockedNode(const nlohmann::json & json)
     , isFlake(json.find("flake") != json.end() ? (bool) json["flake"] : true)
 {
     if (!lockedRef.input.isLocked())
-        throw Error("lockfile contains mutable lock '%s'",
+        throw Error("lock file contains mutable lock '%s'",
             fetchers::attrsToJSON(lockedRef.input.toAttrs()));
 }
 
