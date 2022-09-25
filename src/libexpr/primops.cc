@@ -2454,8 +2454,8 @@ static RegisterPrimOp primop_intersectAttrs({
     .name = "__intersectAttrs",
     .args = {"e1", "e2"},
     .doc = R"(
-      Return a set consisting of the attributes in the set *e2* that also
-      exist in the set *e1*.
+      Return a set consisting of the attributes in the set *e2* which have the
+      same name as some attribute in *e1*.
     )",
     .fun = prim_intersectAttrs,
 });
