@@ -68,7 +68,7 @@ void ConfigFile::apply()
                 }
             }
             if (!trusted) {
-                warn("ignoring untrusted flake configuration setting '%s'", name);
+                warn("ignoring untrusted flake configuration setting '%s'.\nPass '%s' to trust it", name, "--accept-flake-config");
                 continue;
             }
         }
