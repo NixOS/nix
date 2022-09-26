@@ -37,7 +37,7 @@ let
     /*
     "ubuntu-14-04" = {
       image = import <nix/fetchurl.nix> {
-        url = https://app.vagrantup.com/ubuntu/boxes/trusty64/versions/20190514.0.0/providers/virtualbox.box;
+        url = "https://app.vagrantup.com/ubuntu/boxes/trusty64/versions/20190514.0.0/providers/virtualbox.box";
         hash = "sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8=";
       };
       rootDisk = "box-disk1.vmdk";
@@ -47,7 +47,7 @@ let
 
     "ubuntu-16-04" = {
       image = import <nix/fetchurl.nix> {
-        url = https://app.vagrantup.com/generic/boxes/ubuntu1604/versions/4.1.12/providers/libvirt.box;
+        url = "https://app.vagrantup.com/generic/boxes/ubuntu1604/versions/4.1.12/providers/libvirt.box";
         hash = "sha256-lO4oYQR2tCh5auxAYe6bPOgEqOgv3Y3GC1QM1tEEEU8=";
       };
       rootDisk = "box.img";
@@ -56,7 +56,7 @@ let
 
     "ubuntu-22-04" = {
       image = import <nix/fetchurl.nix> {
-        url = https://app.vagrantup.com/generic/boxes/ubuntu2204/versions/4.1.12/providers/libvirt.box;
+        url = "https://app.vagrantup.com/generic/boxes/ubuntu2204/versions/4.1.12/providers/libvirt.box";
         hash = "sha256-HNll0Qikw/xGIcogni5lz01vUv+R3o8xowP2EtqjuUQ=";
       };
       rootDisk = "box.img";
@@ -65,7 +65,7 @@ let
 
     "fedora-36" = {
       image = import <nix/fetchurl.nix> {
-        url = https://app.vagrantup.com/generic/boxes/fedora36/versions/4.1.12/providers/libvirt.box;
+        url = "https://app.vagrantup.com/generic/boxes/fedora36/versions/4.1.12/providers/libvirt.box";
         hash = "sha256-rxPgnDnFkTDwvdqn2CV3ZUo3re9AdPtSZ9SvOHNvaks=";
       };
       rootDisk = "box.img";
@@ -78,7 +78,7 @@ let
     /*
     "rhel-6" = {
       image = import <nix/fetchurl.nix> {
-        url = https://app.vagrantup.com/generic/boxes/rhel6/versions/4.1.12/providers/libvirt.box;
+        url = "https://app.vagrantup.com/generic/boxes/rhel6/versions/4.1.12/providers/libvirt.box";
         hash = "sha256-QwzbvRoRRGqUCQptM7X/InRWFSP2sqwRt2HaaO6zBGM=";
       };
       rootDisk = "box.img";
@@ -88,7 +88,7 @@ let
 
     "rhel-7" = {
       image = import <nix/fetchurl.nix> {
-        url = https://app.vagrantup.com/generic/boxes/rhel7/versions/4.1.12/providers/libvirt.box;
+        url = "https://app.vagrantup.com/generic/boxes/rhel7/versions/4.1.12/providers/libvirt.box";
         hash = "sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U=";
       };
       rootDisk = "box.img";
@@ -97,7 +97,7 @@ let
 
     "rhel-8" = {
       image = import <nix/fetchurl.nix> {
-        url = https://app.vagrantup.com/generic/boxes/rhel8/versions/4.1.12/providers/libvirt.box;
+        url = "https://app.vagrantup.com/generic/boxes/rhel8/versions/4.1.12/providers/libvirt.box";
         hash = "sha256-zFOPjSputy1dPgrQRixBXmlyN88cAKjJ21VvjSWUCUY=";
       };
       rootDisk = "box.img";
@@ -107,7 +107,7 @@ let
 
     "rhel-9" = {
       image = import <nix/fetchurl.nix> {
-        url = https://app.vagrantup.com/generic/boxes/rhel9/versions/4.1.12/providers/libvirt.box;
+        url = "https://app.vagrantup.com/generic/boxes/rhel9/versions/4.1.12/providers/libvirt.box";
         hash = "sha256-vL/FbB3kK1rcSaR627nWmScYGKGk4seSmAdq6N5diMg=";
       };
       rootDisk = "box.img";
