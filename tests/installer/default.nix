@@ -190,7 +190,6 @@ let
         $ssh "set -eux; $installScript"
 
         echo "Testing Nix installation..."
-        # FIXME: should update ~/.bashrc.
         $ssh <<EOF
           set -ex
 
