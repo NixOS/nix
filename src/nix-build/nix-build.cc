@@ -85,7 +85,6 @@ static void main_nix_build(int argc, char * * argv)
     Strings attrPaths;
     Strings left;
     RepairFlag repair = NoRepair;
-    Path gcRoot;
     BuildMode buildMode = bmNormal;
     bool readStdin = false;
 
@@ -166,9 +165,6 @@ static void main_nix_build(int argc, char * * argv)
 
         else if (*arg == "--out-link" || *arg == "-o")
             outLink = getArg(*arg, arg, end);
-
-        else if (*arg == "--add-root")
-            gcRoot = getArg(*arg, arg, end);
 
         else if (*arg == "--dry-run")
             dryRun = true;
