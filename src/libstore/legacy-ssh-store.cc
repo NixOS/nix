@@ -255,8 +255,8 @@ private:
                 << settings.maxLogSize;
         if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 3)
             conn.to
-                << settings.buildRepeat
-                << settings.enforceDeterminism;
+                << 0 // buildRepeat hasn't worked for ages anyway
+                << 0;
 
         if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 7) {
             conn.to << ((int) settings.keepFailed);

@@ -104,10 +104,6 @@ The following flags are available:
     previous build, the new output path is left in
     `/nix/store/name.check.`
 
-    See also the `build-repeat` configuration option, which repeats a
-    derivation a number of times and prevents its outputs from being
-    registered as “valid” in the Nix store unless they are identical.
-
 Special exit codes:
 
   - `100`\

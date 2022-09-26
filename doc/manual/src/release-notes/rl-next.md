@@ -46,3 +46,6 @@
 
 * `nix build --json` now prints some statistics about top-level
   derivations, such as CPU statistics when cgroups are enabled.
+
+* The `repeat` and `enforce-determinism` options have been removed
+  since they had been broken under many circumstances for a long time.

@@ -571,10 +571,6 @@ void DerivationGoal::inputsRealised()
     /* What type of derivation are we building? */
     derivationType = drv->type();
 
-    /* Don't repeat fixed-output derivations since they're already
-       verified by their output hash.*/
-    nrRounds = derivationType.isFixed() ? 1 : settings.buildRepeat + 1;
-
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
        build hook. */
@@ -589,12 +585,11 @@ void DerivationGoal::started()
     auto msg = fmt(
         buildMode == bmRepair ? "repairing outputs of '%s'" :
         buildMode == bmCheck ? "checking outputs of '%s'" :
-        nrRounds > 1 ? "building '%s' (round %d/%d)" :
-        "building '%s'", worker.store.printStorePath(drvPath), curRound, nrRounds);
+        "building '%s'", worker.store.printStorePath(drvPath));
     fmt("building '%s'", worker.store.printStorePath(drvPath));
     if (hook) msg += fmt(" on '%s'", machineName);
     act = std::make_unique<Activity>(*logger, lvlInfo, actBuild, msg,
-        Logger::Fields{worker.store.printStorePath(drvPath), hook ? machineName : "", curRound, nrRounds});
+        Logger::Fields{worker.store.printStorePath(drvPath), hook ? machineName : "", 1, 1});
     mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
     worker.updateProgress();
 }
@@ -947,14 +942,6 @@ void DerivationGoal::buildDone()
         );
 
         cleanupPostOutputsRegisteredModeNonCheck();
-
-        /* Repeat the build if necessary. */
-        if (curRound++ < nrRounds) {
-            outputLocks.unlock();
-            state = &DerivationGoal::tryToBuild;
-            worker.wakeUp(shared_from_this());
-            return;
-        }
 
         /* It is now safe to delete the lock files, since all future
            lockers will see that the output paths are valid; they will
