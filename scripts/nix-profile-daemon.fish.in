@@ -1,6 +1,6 @@
 # Only execute this file once per shell.
 if test -n "$__ETC_PROFILE_NIX_SOURCED"
-  return
+  exit
 end
 
 set __ETC_PROFILE_NIX_SOURCED 1
