@@ -322,7 +322,7 @@ void mainWrapped(int argc, char * * argv)
                 std::cout << "attrs\n"; break;
             }
             for (auto & s : *completions)
-                std::cout << s.completion << "\t" << s.description << "\n";
+                std::cout << s.completion << "\t" << trim(s.description) << "\n";
         }
     });
 

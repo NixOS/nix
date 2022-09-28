@@ -240,7 +240,11 @@ void NixRepl::mainLoop()
 
     // Allow nix-repl specific settings in .inputrc
     rl_readline_name = "nix-repl";
-    createDirs(dirOf(historyFile));
+    try {
+        createDirs(dirOf(historyFile));
+    } catch (SysError & e) {
+        logWarning(e.info());
+    }
 #ifndef READLINE
     el_hist_size = 1000;
 #endif

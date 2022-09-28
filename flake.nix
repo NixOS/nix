@@ -23,7 +23,7 @@
 
       crossSystems = [ "armv6l-linux" "armv7l-linux" ];
 
-      stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" ];
+      stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" "ccacheStdenv" ];
 
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
       forAllSystemsAndStdenvs = f: forAllSystems (system:
@@ -549,6 +549,11 @@
             # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
             # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;
           } "touch $out");
+
+        installerTests = import ./tests/installer {
+          binaryTarballs = self.hydraJobs.binaryTarball;
+          inherit nixpkgsFor;
+        };
 
       };
 

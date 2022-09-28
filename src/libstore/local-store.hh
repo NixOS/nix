@@ -256,7 +256,7 @@ private:
 
     void findRuntimeRoots(Roots & roots, bool censor);
 
-    Path createTempDirInStore();
+    std::pair<Path, AutoCloseFD> createTempDirInStore();
 
     void checkDerivationOutputs(const StorePath & drvPath, const Derivation & drv);
 
