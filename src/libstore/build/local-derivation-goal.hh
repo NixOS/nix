@@ -41,6 +41,9 @@ struct LocalDerivationGoal : public DerivationGoal
 
     Path chrootRootDir;
 
+    /* Whether we allow network access during a chroot build. */
+    bool allowNetwork = false;
+
     /* RAII object to delete the chroot directory. */
     std::shared_ptr<AutoDelete> autoDelChroot;
 

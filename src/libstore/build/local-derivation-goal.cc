@@ -379,9 +379,13 @@ void LocalDerivationGoal::startBuilder()
     /* Are we doing a chroot build? */
     {
         auto noChroot = parsedDrv->getBoolAttr("__noChroot");
+        auto allowNetwork = parsedDrv->getBoolAttr("__allowNetwork");
         if (settings.sandboxMode == smEnabled) {
             if (noChroot)
                 throw Error("derivation '%s' has '__noChroot' set, "
+                    "but that's not allowed when 'sandbox' is 'true'", worker.store.printStorePath(drvPath));
+            if (allowNetwork)
+                throw Error("derivation '%s' has '__allowNetwork' set, "
                     "but that's not allowed when 'sandbox' is 'true'", worker.store.printStorePath(drvPath));
 #if __APPLE__
             if (additionalSandboxProfile != "")
@@ -389,11 +393,16 @@ void LocalDerivationGoal::startBuilder()
                     "but this is only allowed when 'sandbox' is 'relaxed'", worker.store.printStorePath(drvPath));
 #endif
             useChroot = true;
+            privateNetwork = true;
         }
-        else if (settings.sandboxMode == smDisabled)
+        else if (settings.sandboxMode == smDisabled) {
             useChroot = false;
-        else if (settings.sandboxMode == smRelaxed)
+            privateNetwork = false;
+        }
+        else if (settings.sandboxMode == smRelaxed) {
             useChroot = derivationType.isSandboxed() && !noChroot;
+            privateNetwork = derivationType.isSandboxed() && !allowNetwork;
+        }
     }
 
     auto & localStore = getLocalStore();
@@ -796,9 +805,6 @@ void LocalDerivationGoal::startBuilder()
            CLONE_PARENT to ensure that the real builder is parented to
            us.
         */
-
-        if (derivationType.isSandboxed())
-            privateNetwork = true;
 
         userNamespaceSync.create();
 

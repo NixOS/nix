@@ -412,6 +412,10 @@ public:
           and derivations that have the `__noChroot` attribute set to `true`
           do not run in sandboxes.
 
+          If this option is set to `relaxed`, then fixed-output derivations
+          and derivations that have the `__allowNetwork` attribute set to
+          `true` will have host network access.
+
           The default is `true` on Linux and `false` on all other platforms.
         )",
         {"build-use-chroot", "build-use-sandbox"}};
