@@ -111,8 +111,11 @@ public:
 
     const ref<FSInputAccessor> rootFS;
     const ref<MemoryInputAccessor> corepkgsFS;
+    const ref<MemoryInputAccessor> internalFS;
 
     const SourcePath derivationInternal;
+
+    const SourcePath callFlakeInternal;
 
     /* A map keyed by InputAccessor::number that keeps input accessors
        alive. */
@@ -124,7 +127,6 @@ public:
     /* Store used to build stuff. */
     const ref<Store> buildStore;
 
-    RootValue vCallFlake = nullptr;
     RootValue vImportedDrvToDerivation = nullptr;
 
     /* Debugger */

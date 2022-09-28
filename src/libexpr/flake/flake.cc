@@ -704,14 +704,10 @@ void callFlake(EvalState & state,
 
     vRootSubdir->mkString(lockedFlake.flake.lockedRef.subdir);
 
-    if (!state.vCallFlake) {
-        state.vCallFlake = allocRootValue(state.allocValue());
-        state.eval(state.parseExprFromString(
-            #include "call-flake.nix.gen.hh"
-            , state.rootPath("/")), **state.vCallFlake);
-    }
+    Value vCallFlake;
+    state.evalFile(state.callFlakeInternal, vCallFlake);
 
-    state.callFunction(**state.vCallFlake, *vLocks, *vTmp1, noPos);
+    state.callFunction(vCallFlake, *vLocks, *vTmp1, noPos);
     state.callFunction(*vTmp1, *vRootSrc, *vTmp2, noPos);
     state.callFunction(*vTmp2, *vRootSubdir, vRes, noPos);
 }

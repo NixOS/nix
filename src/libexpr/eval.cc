@@ -477,9 +477,14 @@ EvalState::EvalState(
                 throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
             }))
     , corepkgsFS(makeMemoryInputAccessor())
+    , internalFS(makeMemoryInputAccessor())
     , derivationInternal{corepkgsFS->addFile(
         CanonPath("derivation-internal.nix"),
         #include "primops/derivation.nix.gen.hh"
+    )}
+    , callFlakeInternal{internalFS->addFile(
+        CanonPath("call-flake.nix"),
+        #include "flake/call-flake.nix.gen.hh"
     )}
     , store(store)
     , buildStore(buildStore ? buildStore : store)
@@ -499,6 +504,7 @@ EvalState::EvalState(
     , staticBaseEnv{std::make_shared<StaticEnv>(false, nullptr)}
 {
     corepkgsFS->setPathDisplay("<nix", ">");
+    internalFS->setPathDisplay("«nix-internal»", "");
 
     countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
