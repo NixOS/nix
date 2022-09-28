@@ -30,12 +30,12 @@ const std::string & BaseError::calcWhat() const
 
 std::optional<std::string> ErrorInfo::programName = std::nullopt;
 
-std::ostream & operator<<(std::ostream & os, const hintformat & hf)
+std::ostream & operator <<(std::ostream & os, const hintformat & hf)
 {
     return os << hf.str();
 }
 
-std::ostream & operator << (std::ostream & str, const AbstractPos & pos)
+std::ostream & operator <<(std::ostream & str, const AbstractPos & pos)
 {
     pos.print(str);
     str << ":" << pos.line;

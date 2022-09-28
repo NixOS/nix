@@ -52,7 +52,11 @@ public:
 
     explicit operator bool() const { return id > 0; }
 
-    bool operator<(const PosIdx other) const { return id < other.id; }
+    bool operator <(const PosIdx other) const { return id < other.id; }
+
+    bool operator ==(const PosIdx other) const { return id == other.id; }
+
+    bool operator !=(const PosIdx other) const { return id != other.id; }
 };
 
 class PosTable
