@@ -105,6 +105,6 @@ let
   tableOfContents = let
     showEntry = page:
       "    - [${page.command}](command-ref/new-cli/${page.name})";
-    in concatStringsSep "\n" (map showEntry manpages);
+    in concatStringsSep "\n" (map showEntry manpages) + "\n";
 
 in (listToAttrs manpages) // { "SUMMARY.md" = tableOfContents; }
