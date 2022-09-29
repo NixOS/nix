@@ -79,6 +79,11 @@ struct LockedFlake
     Flake flake;
     LockFile lockFile;
 
+    /* Source tree accessors for nodes that have been fetched in
+       lockFlake(); in particular, the root node and the overriden
+       inputs. */
+    std::map<ref<Node>, SourcePath> nodePaths;
+
     std::optional<Fingerprint> getFingerprint(ref<Store> store) const;
 };
 

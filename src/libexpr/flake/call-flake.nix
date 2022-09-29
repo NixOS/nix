@@ -1,4 +1,14 @@
-lockFileStr: rootSrc: rootSubdir:
+# This is a helper to callFlake() to lazily fetch flake inputs.
+
+# The contents of the lock file, in JSON format.
+lockFileStr:
+
+# A mapping of lock file node IDs to { sourceInfo, subdir } attrsets,
+# with sourceInfo.outPath providing an InputAccessor to a previously
+# fetched tree. This is necessary for possibly unlocked inputs, in
+# particular the root input, but also --override-inputs pointing to
+# unlocked trees.
+overrides:
 
 let
 
@@ -29,8 +39,8 @@ let
         let
 
           sourceInfo =
-            if key == lockFile.root
-            then rootSrc
+            if overrides ? ${key}
+            then overrides.${key}.sourceInfo
             else if node.locked.type == "path" && builtins.substring 0 1 node.locked.path != "/"
             then
               let
@@ -42,7 +52,8 @@ let
               # FIXME: remove obsolete node.info.
               fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
 
-          subdir = if key == lockFile.root then rootSubdir else node.locked.dir or "";
+          # With overrides, the accessor already points to the right subdirectory.
+          subdir = if overrides ? ${key} then "" else node.locked.dir or "";
 
           flake =
             import (sourceInfo.outPath + ((if subdir != "" then "/" else "") + subdir + "/flake.nix"));
