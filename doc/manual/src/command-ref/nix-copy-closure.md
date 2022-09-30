@@ -30,8 +30,8 @@ Since `nix-copy-closure` calls `ssh`, you may be asked to type in the
 appropriate password or passphrase.  In fact, you may be asked _twice_
 because `nix-copy-closure` currently connects twice to the remote
 machine, first to get the set of paths missing on the target machine,
-and second to send the dump of those paths.  If this bothers you, use
-`ssh-agent`.
+and second to send the dump of those paths.  When using public key
+authentication, you can avoid typing the passphrase with `ssh-agent`.
 
 # Options
 
