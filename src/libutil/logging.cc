@@ -105,14 +105,6 @@ public:
 
 Verbosity verbosity = lvlInfo;
 
-void warnOnce(bool & haveWarned, const FormatOrString & fs)
-{
-    if (!haveWarned) {
-        warn(fs.s);
-        haveWarned = true;
-    }
-}
-
 void writeToStderr(std::string_view s)
 {
     try {

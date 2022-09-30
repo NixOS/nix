@@ -225,7 +225,11 @@ inline void warn(const std::string & fs, const Args & ... args)
     logger->warn(f.str());
 }
 
-void warnOnce(bool & haveWarned, const FormatOrString & fs);
+#define warnOnce(haveWarned, args...) \
+    if (!haveWarned) {                \
+        haveWarned = true;            \
+        warn(args);                   \
+    }
 
 void writeToStderr(std::string_view s);
 
