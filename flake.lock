@@ -13,16 +13,17 @@
       "original": {
         "owner": "kristapsdz",
         "repo": "lowdown",
+        "rev": "d2c2b44ff6c27b936ec27358a2653caaef8f73b8",
         "type": "github"
       }
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1657693803,
-        "narHash": "sha256-G++2CJ9u0E7NNTAi9n5G8TdDmGJXcIjkJ3NF8cetQB8=",
+        "lastModified": 1664753758,
+        "narHash": "sha256-6Mw2Rk4EWhdz/QmVr7te9/X0jXBYsRCEJVumdG26MmU=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "365e1b3a859281cf11b94f87231adeabbdd878a2",
+        "rev": "038b71b753d54049f40091413215c32e7c507df9",
         "type": "github"
       },
       "original": {

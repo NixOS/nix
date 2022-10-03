@@ -3,7 +3,7 @@
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.05-small";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
-  inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
+  inputs.lowdown-src = { url = "github:kristapsdz/lowdown/d2c2b44ff6c27b936ec27358a2653caaef8f73b8"; flake = false; };
 
   outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src }:
 
@@ -108,7 +108,7 @@
           ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)];
 
         buildDeps =
-          [ (curl.override { patchNetrcRegression = true; })
+          [ curl
             bzip2 xz brotli editline
             openssl sqlite
             libarchive
@@ -364,7 +364,7 @@
 
               buildInputs =
                 [ nix
-                  (curl.override { patchNetrcRegression = true; })
+                  curl
                   bzip2
                   xz
                   pkgs.perl
