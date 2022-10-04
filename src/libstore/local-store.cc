@@ -1299,7 +1299,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             TeeSource wrapperSource { source, hashSink };
 
-            restorePath(realPath, wrapperSource);
+            restorePath(realPath, wrapperSource, settings.fsyncStorePaths);
 
             auto hashResult = hashSink.finish();
 
@@ -1341,6 +1341,11 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             canonicalisePathMetaData(realPath, {});
 
             optimisePath(realPath, repair); // FIXME: combine with hashPath()
+
+            if (settings.fsyncStorePaths) {
+                recursiveSync(realPath);
+                syncParent(realPath);
+            }
 
             registerValidPath(info);
         }
@@ -1402,7 +1407,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
         tempPath = tempDir + "/x";
 
         if (method == FileIngestionMethod::Recursive)
-            restorePath(tempPath, bothSource);
+            restorePath(tempPath, bothSource, settings.fsyncStorePaths);
         else
             writeFile(tempPath, bothSource);
 
@@ -1434,7 +1439,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
                  StringSource dumpSource { dump };
                 /* Restore from the NAR in memory. */
                 if (method == FileIngestionMethod::Recursive)
-                    restorePath(realPath, dumpSource);
+                    restorePath(realPath, dumpSource, settings.fsyncStorePaths);
                 else
                     writeFile(realPath, dumpSource);
             } else {
@@ -1459,6 +1464,12 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
             info.narSize = narHash.second;
             info.references = references;
             info.ca = FixedOutputHash { .method = method, .hash = hash };
+
+            if (settings.fsyncStorePaths) {
+                recursiveSync(realPath);
+                syncParent(realPath);
+            }
+
             registerValidPath(info);
         }
 
@@ -1491,7 +1502,7 @@ StorePath LocalStore::addTextToStore(
 
             autoGC();
 
-            writeFile(realPath, s);
+            writeFile(realPath, s, 0666, settings.fsyncStorePaths);
 
             canonicalisePathMetaData(realPath, {});
 
@@ -1505,6 +1516,10 @@ StorePath LocalStore::addTextToStore(
             info.narSize = sink.s.size();
             info.references = references;
             info.ca = TextHash { .hash = hash };
+
+            if (settings.fsyncStorePaths)
+                syncParent(realPath);
+
             registerValidPath(info);
         }
 

@@ -119,8 +119,11 @@ void writeFile(const Path & path, std::string_view s, mode_t mode = 0666, bool s
 
 void writeFile(const Path & path, Source & source, mode_t mode = 0666, bool sync = false);
 
-/* Flush a file's parent directory to disk */
+/* Flush a path's parent directory to disk */
 void syncParent(const Path & path);
+
+/* Flush a file or entire directory tree to disk */
+void recursiveSync(const Path & path);
 
 /* Read a line from a file descriptor. */
 std::string readLine(int fd);
@@ -234,7 +237,11 @@ public:
     explicit operator bool() const;
     int release();
     void close();
-    void fsync();
+    /* Perform a blocking fsync operation */
+    void fsync() const;
+    /* Asynchronously flush to disk without blocking, if available on the platform. This is just a performance
+     * optimization, and fsync must be run later even if this is called. */
+    void startFsync() const;
 };
 
 

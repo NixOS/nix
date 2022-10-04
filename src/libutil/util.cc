@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <future>
 #include <iostream>
 #include <mutex>
@@ -838,7 +839,7 @@ void AutoCloseFD::close()
     }
 }
 
-void AutoCloseFD::fsync()
+void AutoCloseFD::fsync() const
 {
   if (fd != -1) {
       int result;
@@ -850,6 +851,17 @@ void AutoCloseFD::fsync()
       if (result == -1)
           throw SysError("fsync file descriptor %1%", fd);
   }
+}
+
+
+void AutoCloseFD::startFsync() const
+{
+#if __linux__
+        if (fd != -1) {
+            /* Ignore failure, since fsync must be run later anyway. This is just a performance optimization. */
+            ::sync_file_range(fd, 0, 0, SYNC_FILE_RANGE_WRITE);
+        }
+#endif
 }
 
 

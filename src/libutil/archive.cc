@@ -306,6 +306,9 @@ struct RestoreSink : ParseSink
 {
     Path dstPath;
     AutoCloseFD fd;
+    bool startFsync;
+
+    explicit RestoreSink(bool startFsync) : startFsync{startFsync} {}
 
     void createDirectory(const Path & path) override
     {
@@ -323,6 +326,10 @@ struct RestoreSink : ParseSink
 
     void closeRegularFile() override
     {
+        /* Initiate an fsync operation without waiting for the result. The real fsync should be run before registering
+           a store path, but this is a performance optimization to allow the disk write to start early. */
+        if (startFsync)
+            fd.startFsync();
         /* Call close explicitly to make sure the error is checked */
         fd.close();
     }
@@ -367,9 +374,9 @@ struct RestoreSink : ParseSink
 };
 
 
-void restorePath(const Path & path, Source & source)
+void restorePath(const Path & path, Source & source, bool startFsync)
 {
-    RestoreSink sink;
+    RestoreSink sink { startFsync };
     sink.dstPath = path;
     parseDump(sink, source);
 }
