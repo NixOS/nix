@@ -48,11 +48,28 @@
         "type": "github"
       }
     },
+    "nixpkgs-test": {
+      "locked": {
+        "lastModified": 1660067722,
+        "narHash": "sha256-gR97zsWCTSYtCVaqzG2j4C1gkwp5xmb/aAlUV8zBPlI=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "65a60bd702d96ed10e776217fb28788772cf3984",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "65a60bd702d96ed10e776217fb28788772cf3984",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "lowdown-src": "lowdown-src",
         "nixpkgs": "nixpkgs",
-        "nixpkgs-regression": "nixpkgs-regression"
+        "nixpkgs-regression": "nixpkgs-regression",
+        "nixpkgs-test": "nixpkgs-test"
       }
     }
   },

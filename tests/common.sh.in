@@ -4,7 +4,7 @@ if [[ -z "$COMMON_SH_SOURCED" ]]; then
 
 COMMON_SH_SOURCED=1
 
-export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)/${TEST_NAME:-default}
+test -d $TEST_ROOT
 export NIX_STORE_DIR
 if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store 2> /dev/null); then
     # Maybe the build directory is symlinked.
@@ -67,7 +67,6 @@ clearProfiles() {
 }
 
 clearStore() {
-    echo "clearing store..."
     chmod -R +w "$NIX_STORE_DIR"
     rm -rf "$NIX_STORE_DIR"
     mkdir "$NIX_STORE_DIR"
@@ -183,8 +182,6 @@ enableFeatures() {
     local features="$1"
     sed -i 's/experimental-features .*/& '"$features"'/' "$NIX_CONF_DIR"/nix.conf
 }
-
-set -x
 
 if [[ -n "${NIX_DAEMON_PACKAGE:-}" ]]; then
     startDaemon

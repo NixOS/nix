@@ -2,10 +2,11 @@
   description = "The purely functional package manager";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.05-small";
+  inputs.nixpkgs-test.url = "github:NixOS/nixpkgs/65a60bd702d96ed10e776217fb28788772cf3984";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
 
-  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src }:
+  outputs = { self, nixpkgs, nixpkgs-test, nixpkgs-regression, lowdown-src }:
 
     let
 
@@ -104,6 +105,7 @@
             buildPackages.git
             buildPackages.mercurial # FIXME: remove? only needed for tests
             buildPackages.jq # Also for custom mdBook preprocessor.
+            (nixpkgs-test.legacyPackages.x86_64-linux.bats.withLibraries (p: [ p.bats-support p.bats-assert ]))  # used to run integration tests
           ]
           ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)];
 
