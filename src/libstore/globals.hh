@@ -619,6 +619,14 @@ public:
           are tried based on their Priority value, which each substituter can set
           independently. Lower value means higher priority.
           The default is `https://cache.nixos.org`, with a Priority of 40.
+
+          Nix will copy a store path from a remote store only if one
+          of the following is true:
+
+          - the store object is signed by one of the [`trusted-public-keys`](#conf-trusted-public-keys)
+          - the substituter is in the [`trusted-substituters`](#conf-trusted-substituters) list
+          - the [`require-sigs`](#conf-require-sigs) option has been set to `false`
+          - the store object is [output-addressed](glossary.md#gloss-output-addressed-store-object)
         )",
         {"binary-caches"}};
 
