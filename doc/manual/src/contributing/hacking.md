@@ -109,7 +109,7 @@ You can run them manually with `nix build .#hydraJobs.tests.{testName}` or `nix-
 
 ### Installer tests
 
-With just a little one-time setup, the Nix repository's GitHub Actions continuous integration (CI) workflow can easily test the installer each time you push to a branch.
+After a one-time setup, the Nix repository's GitHub Actions continuous integration (CI) workflow can test the installer each time you push to a branch.
 
 Creating a Cachix cache for your installer tests and adding its authorization token to GitHub enables [two installer-specific jobs in the CI workflow](https://github.com/NixOS/nix/blob/88a45d6149c0e304f6eb2efcc2d7a4d0d569f8af/.github/workflows/ci.yml#L50-L91):
 
@@ -123,7 +123,7 @@ Creating a Cachix cache for your installer tests and adding its authorization to
 
 #### One-time setup
 
-1. Have a GitHub account with a fork of the Nix repo.
+1. Have a GitHub account with a fork of the [Nix repository](https://github.com/NixOS/nix).
 2. At cachix.org:
     - Create or log in to an account.
     - Create a Cachix cache using the format `<github-username>-nix-install-tests`.
