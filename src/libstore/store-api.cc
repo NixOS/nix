@@ -585,7 +585,7 @@ void Store::queryPathInfo(const StorePath & storePath,
             if (res && res->isKnownNow()) {
                 stats.narInfoReadAverted++;
                 if (!res->didExist())
-                    throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
+                    throw InvalidPath("path '%s' does not exist", printStorePath(storePath));
                 return callback(ref<const ValidPathInfo>(res->value));
             }
         }
