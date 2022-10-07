@@ -187,7 +187,7 @@ static void showHelp(std::vector<std::string> subcommand, MultiCommand & topleve
         *vUtils);
 
     auto attrs = state.buildBindings(16);
-    attrs.alloc("command").mkString(toplevel.toJSON().dump());
+    attrs.alloc("toplevel").mkString(toplevel.toJSON().dump());
 
     auto vRes = state.allocValue();
     state.callFunction(*vGenerateManpage, state.allocValue()->mkAttrs(attrs), *vRes, noPos);
