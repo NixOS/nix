@@ -569,8 +569,6 @@ static void main_nix_build(int argc, char * * argv)
 
         restoreProcessContext();
 
-        logger->stop();
-
         execvp(shell->c_str(), argPtrs.data());
 
         throw SysError("executing shell '%s'", *shell);
@@ -628,8 +626,6 @@ static void main_nix_build(int argc, char * * argv)
 
             outPaths.push_back(outputPath);
         }
-
-        logger->stop();
 
         for (auto & path : outPaths)
             std::cout << store->printStorePath(path) << '\n';
