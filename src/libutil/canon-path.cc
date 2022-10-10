@@ -61,6 +61,7 @@ CanonPath CanonPath::operator + (const CanonPath & x) const
 void CanonPath::push(std::string_view c)
 {
     assert(c.find('/') == c.npos);
+    assert(c != "." && c != "..");
     if (!isRoot()) path += '/';
     path += c;
 }

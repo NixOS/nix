@@ -78,13 +78,13 @@ struct PathInputScheme : InputScheme
         };
     }
 
-    std::optional<CanonPath> isRelative(const Input & input) const override
+    std::optional<std::string> isRelative(const Input & input) const override
     {
         auto path = getStrAttr(input.attrs, "path");
         if (hasPrefix(path, "/"))
             return std::nullopt;
         else
-            return CanonPath(path);
+            return path;
     }
 
     bool isLocked(const Input & input) const override

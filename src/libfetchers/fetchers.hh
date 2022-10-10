@@ -53,7 +53,7 @@ public:
 
     /* Only for relative path flakes, i.e. 'path:./foo', returns the
        relative path, i.e. './foo'. */
-    std::optional<CanonPath> isRelative() const;
+    std::optional<std::string> isRelative() const;
 
     bool operator ==(const Input & other) const;
 
@@ -138,7 +138,7 @@ struct InputScheme
     virtual bool isLocked(const Input & input) const
     { return false; }
 
-    virtual std::optional<CanonPath> isRelative(const Input & input) const
+    virtual std::optional<std::string> isRelative(const Input & input) const
     { return std::nullopt; }
 
     virtual std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const;

@@ -434,7 +434,7 @@ LockedFlake lockFlake(
                         if (auto relativePath = input.ref->input.isRelative()) {
                             SourcePath inputSourcePath {
                                 overridenSourcePath.accessor,
-                                *overridenSourcePath.path.parent() + *relativePath
+                                CanonPath(*relativePath, *overridenSourcePath.path.parent())
                             };
                             return readFlake(state, *input.ref, *input.ref, *input.ref, inputSourcePath, inputPath);
                         } else
