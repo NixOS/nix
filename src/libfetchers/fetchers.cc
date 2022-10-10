@@ -162,7 +162,7 @@ std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
 
     try {
         auto [accessor, final] = scheme->getAccessor(store, *this);
-        accessor->fingerprint = scheme->getFingerprint(store, *this);
+        accessor->fingerprint = scheme->getFingerprint(store, final);
         checkLocks(final);
         return {accessor, std::move(final)};
     } catch (Error & e) {

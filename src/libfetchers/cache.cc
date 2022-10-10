@@ -130,6 +130,7 @@ struct CacheImpl : Cache
         std::string_view key,
         std::string_view value) override
     {
+        debug("upserting fact '%s' -> '%s'", key, value);
         _state.lock()->upsertFact.use()
             (key)
             (value).exec();
