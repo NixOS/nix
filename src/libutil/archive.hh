@@ -60,6 +60,7 @@ struct ParseSink
     virtual void createDirectory(const Path & path) { };
 
     virtual void createRegularFile(const Path & path) { };
+    virtual void closeRegularFile() { };
     virtual void isExecutable() { };
     virtual void preallocateContents(uint64_t size) { };
     virtual void receiveContents(std::string_view data) { };
