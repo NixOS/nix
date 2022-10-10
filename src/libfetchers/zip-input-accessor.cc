@@ -35,7 +35,7 @@ struct ZipInputAccessor : InputAccessor
         : zipPath(_zipPath)
     {
         int error;
-        zipFile = zip_open(zipPath.c_str(), 0, &error);
+        zipFile = zip_open(zipPath.c_str(), ZIP_RDONLY, &error);
         if (!zipFile) {
             char errorMsg[1024];
             zip_error_to_str(errorMsg, sizeof errorMsg, error, errno);
@@ -68,16 +68,6 @@ struct ZipInputAccessor : InputAccessor
             if (!slash) continue;
             members.emplace(slash, sb);
         }
-
-        #if 0
-        /* Sigh, libzip returns a local time, so convert to Unix
-           time. */
-        if (lastModified) {
-            struct tm tm;
-            localtime_r(&lastModified, &tm);
-            lastModified = timegm(&tm);
-        }
-        #endif
     }
 
     ~ZipInputAccessor()
