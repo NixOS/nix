@@ -250,14 +250,29 @@ struct GitHubInputScheme : GitArchiveInputScheme
         return std::pair<std::string, std::string>("Authorization", fmt("token %s", token));
     }
 
+    std::string getHost(const Input & input) const
+    {
+        return maybeGetStrAttr(input.attrs, "host").value_or("github.com");
+    }
+
+    std::string getOwner(const Input & input) const
+    {
+        return getStrAttr(input.attrs, "owner");
+    }
+
+    std::string getRepo(const Input & input) const
+    {
+        return getStrAttr(input.attrs, "repo");
+    }
+
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
-        auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
+        auto host = getHost(input);
         auto url = fmt(
             host == "github.com"
             ? "https://api.%s/repos/%s/%s/commits/%s"
             : "https://%s/api/v3/repos/%s/%s/commits/%s",
-            host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
+            host, getOwner(input), getRepo(input), *input.getRef());
 
         Headers headers = makeHeadersWithAuthTokens(host);
 
@@ -274,12 +289,12 @@ struct GitHubInputScheme : GitArchiveInputScheme
     {
         // FIXME: use regular /archive URLs instead? api.github.com
         // might have stricter rate limits.
-        auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
+        auto host = getHost(input);
         auto url = fmt(
             host == "github.com"
             ? "https://api.%s/repos/%s/%s/zipball/%s"
             : "https://%s/api/v3/repos/%s/%s/zipball/%s",
-            host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
+            host, getOwner(input), getRepo(input),
             input.getRev()->to_string(Base16, false));
 
         Headers headers = makeHeadersWithAuthTokens(host);
@@ -288,11 +303,22 @@ struct GitHubInputScheme : GitArchiveInputScheme
 
     void clone(const Input & input, const Path & destDir) const override
     {
-        auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
+        auto host = getHost(input);
         Input::fromURL(fmt("git+https://%s/%s/%s.git",
-                host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
+                host, getOwner(input), getRepo(input)))
             .applyOverrides(input.getRef(), input.getRev())
             .clone(destDir);
+    }
+
+    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    {
+        auto [accessor, input] = GitArchiveInputScheme::getAccessor(store, _input);
+        if (getHost(input) == "github.com")
+            accessor->setPathDisplay(fmt("https://github.com/%s/%s/blob/%s",
+                    getOwner(input),
+                    getRepo(input),
+                    input.getRev()->to_string(Base16, false)));
+        return {accessor, input};
     }
 };
 
