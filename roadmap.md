@@ -79,9 +79,6 @@ To this end, the Nix team will work towards the following goals.
       - ...
 
     
-<!-- roberth after meeting, feel free to remove when processed: be the binary distribution method of choice for dev tooling, such as IDE plugins that bundle their own binaries (needs Nix (libstore? installer?) to run trivially, anywhere) -->
-<!-- valentin: see the top-level goal above, does that match your idea? -->
-<!-- valentin: the architectural aspects seem to be dispersed a bit. I still think all the component notes should belong to one goal and rearranged accordingly. -->
 
 
 "Likewise, we want Nix to be everywhere. We want a world where finding a flake.nix at the root of a software project is not a pleasant surprise but something expected and common. And we want the people who design tomorrow’s software distribution mechanism to at least know and recognize the Nix model, and take that into account."
