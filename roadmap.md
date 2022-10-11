@@ -3,7 +3,7 @@
 Software developers use Nix as a matter of course every day, mostly without even noticing.
 Nix runs trivially, anywhere.
 
-For individuals to large organizations, Nix underpins the the entire software supply chain:
+For individuals to large organizations, Nix underpins the entire software supply chain:
 - Developer tooling
 - Build automation
 - Binary distribution.
