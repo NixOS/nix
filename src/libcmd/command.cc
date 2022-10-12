@@ -88,7 +88,8 @@ EvalCommand::EvalCommand()
 {
     addFlag({
         .longName = "debugger",
-        .description = "start an interactive environment if evaluation fails",
+        .description = "Start an interactive environment if evaluation fails.",
+        .category = MixEvalArgs::category,
         .handler = {&startReplOnEvalErrors, true},
     });
 }
