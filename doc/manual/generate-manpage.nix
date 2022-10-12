@@ -1,11 +1,11 @@
-{ command }:
+{ toplevel }:
 
 with builtins;
 with import ./utils.nix;
 
 let
 
-  showCommand = { command, details, filename }:
+  showCommand = { command, details, filename, toplevel }:
     let
       result = ''
         > **Warning** \
@@ -57,14 +57,15 @@ let
       maybeOptions = if details.flags == {} then "" else ''
         # Options
 
-        ${showOptions details.flags}
+        ${showOptions details.flags toplevel.flags}
       '';
-      showOptions = options:
+      showOptions = options: commonOptions:
         let
+          allOptions = options // commonOptions;
           showCategory = cat: ''
             ${if cat != "" then "**${cat}:**" else ""}
 
-            ${listOptions (filterAttrs (n: v: v.category == cat) options)}
+            ${listOptions (filterAttrs (n: v: v.category == cat) allOptions)}
             '';
           listOptions = opts: concatStringsSep "\n" (attrValues (mapAttrs showOption opts));
           showOption = name: option:
@@ -76,30 +77,33 @@ let
 
                 ${option.description}
             '';
-          categories = sort builtins.lessThan (unique (map (cmd: cmd.category) (attrValues options)));
+          categories = sort builtins.lessThan (unique (map (cmd: cmd.category) (attrValues allOptions)));
         in concatStrings (map showCategory categories);
     in squash result;
 
   appendName = filename: name: (if filename == "nix" then "nix3" else filename) + "-" + name;
 
-  processCommand = { command, details, filename }:
+  processCommand = { command, details, filename, toplevel }:
     let
       cmd = {
         inherit command;
         name = filename + ".md";
-        value = showCommand { inherit command details filename; };
+        value = showCommand { inherit command details filename toplevel; };
       };
       subcommand = subCmd: processCommand {
         command = command + " " + subCmd;
         details = details.commands.${subCmd};
         filename = appendName filename subCmd;
+        inherit toplevel;
       };
     in [ cmd ] ++ concatMap subcommand (attrNames details.commands or {});
 
+  parsedToplevel = builtins.fromJSON toplevel;
   manpages = processCommand {
     command = "nix";
-    details = builtins.fromJSON command;
+    details = parsedToplevel;
     filename = "nix";
+    toplevel = parsedToplevel;
   };
 
   tableOfContents = let
