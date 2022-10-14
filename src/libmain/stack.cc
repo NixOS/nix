@@ -1,4 +1,5 @@
 #include "error.hh"
+#include "shared.hh"
 
 #include <cstring>
 #include <cstddef>
@@ -31,6 +32,7 @@ static void sigsegvHandler(int signo, siginfo_t * info, void * ctx)
         if (diff < 4096) {
             char msg[] = "error: stack overflow (possible infinite recursion)\n";
             [[gnu::unused]] auto res = write(2, msg, strlen(msg));
+            nix::extraStackOverflowHandler(info, ctx);
             _exit(1); // maybe abort instead?
         }
     }
@@ -67,5 +69,9 @@ void detectStackOverflow()
 #endif
 }
 
+std::function<void(siginfo_t * info, void * ctx)> extraStackOverflowHandler(
+    [](siginfo_t * info, void * ctx) {
+    }
+);
 
 }
