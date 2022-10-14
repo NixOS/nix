@@ -113,14 +113,15 @@ struct PrintFreed
 /* Install a SIGSEGV handler to detect stack overflows. */
 void detectStackOverflow();
 
-/* Pluggable behavior to run before _exit(1) in case of a stack overflow.
+/* Pluggable behavior to run in case of a stack overflow.
 
-   Default value: do nothing, return immediately.
+   Default value: defaultStackOverflowHandler.
 
    This is called by the handler installed by detectStackOverflow().
 
    This gives Nix library consumers a limit opportunity to report the error
-   condition.
+   condition. The handler should exit the process.
+   See defaultStackOverflowHandler() for a reference implementation.
 
    NOTE: Use with diligence, because this runs in the signal handler, with very
    limited stack space and a potentially a corrupted heap, all while the failed
