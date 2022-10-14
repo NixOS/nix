@@ -503,7 +503,7 @@ public:
         return s[0];
     }
 
-    virtual void setPrintBuildLogs(bool printBuildLogs)
+    void setPrintBuildLogs(bool printBuildLogs) override
     {
         this->printBuildLogs = printBuildLogs;
     }
