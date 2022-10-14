@@ -163,9 +163,6 @@ static FlakeInput parseFlakeInput(EvalState & state,
             input.ref = parseFlakeRef(*url, baseDir, true, input.isFlake);
     }
 
-    if (!input.follows && !input.ref)
-        input.ref = FlakeRef::fromAttrs({{"type", "indirect"}, {"id", inputName}});
-
     return input;
 }
 
@@ -410,13 +407,21 @@ LockedFlake lockFlake(
                        ancestors? */
                     auto i = overrides.find(inputPath);
                     bool hasOverride = i != overrides.end();
+                    bool hasRefOverride = hasOverride;
+                    FlakeInput input = input2;
                     if (hasOverride) {
                         overridesUsed.insert(inputPath);
                         // Respect the “flakeness” of the input even if we
                         // override it
                         i->second.isFlake = input2.isFlake;
+                        // If there’s no ref provided, we can just use
+                        // the original one
+                        if (!i->second.ref) {
+                            i->second.ref = input2.ref;
+                            hasRefOverride = false;
+                        }
+                        input = i->second;
                     }
-                    auto & input = hasOverride ? i->second : input2;
 
                     /* Resolve 'follows' later (since it may refer to an input
                        path we haven't processed yet. */
@@ -430,7 +435,8 @@ LockedFlake lockFlake(
                         continue;
                     }
 
-                    assert(input.ref);
+                    if (!input.ref)
+                        input.ref = std::optional<FlakeRef>(FlakeRef::fromAttrs({{"type", "indirect"}, {"id", id}}));
 
                     /* Do we have an entry in the existing lock file? And we
                        don't have a --update-input flag for this input? */
@@ -445,7 +451,7 @@ LockedFlake lockFlake(
 
                     if (oldLock
                         && oldLock->originalRef == *input.ref
-                        && !hasOverride)
+                        && !hasRefOverride)
                     {
                         debug("keeping existing input '%s'", inputPathS);
 
