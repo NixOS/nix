@@ -155,7 +155,7 @@ StringSet Settings::getDefaultExtraPlatforms()
     // x86_64 in aarch64 environments or vice versa since they can
     // always exec with their own binary preferences.
     if (std::string{SYSTEM} == "aarch64-darwin") {
-        if (runProgram(RunOptions {.program = "arch", .args = {"-arch", "x86_64", "/bin/pwd"}, .mergeStderrToStdout = true}).first == 0) {
+        if (runProgram(RunOptions {.program = "arch", .args = {"-arch", "x86_64", "/usr/bin/true"}, .mergeStderrToStdout = true}).first == 0) {
             debug("Rosetta detected");
             extraPlatforms.insert("x86_64-darwin");
         } else
