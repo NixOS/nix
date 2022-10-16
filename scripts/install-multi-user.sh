@@ -37,6 +37,19 @@ readonly PROFILE_TARGETS=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/zshrc" "/e
 readonly PROFILE_BACKUP_SUFFIX=".backup-before-nix"
 readonly PROFILE_NIX_FILE="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
 
+# Fish has different syntax than zsh/bash, treat it separate
+readonly PROFILE_FISH_SUFFIX="conf.d/nix.fish"
+readonly PROFILE_FISH_PREFIXES=(
+    # each of these are common values of $__fish_sysconf_dir,
+    # under which Fish will look for a file named
+    # $PROFILE_FISH_SUFFIX.
+    "/etc/fish"              # standard
+    "/usr/local/etc/fish"    # their installer .pkg for macOS
+    "/opt/homebrew/etc/fish" # homebrew
+    "/opt/local/etc/fish"    # macports
+)
+readonly PROFILE_NIX_FILE_FISH="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.fish"
+
 readonly NIX_INSTALLED_NIX="@nix@"
 readonly NIX_INSTALLED_CACERT="@cacert@"
 #readonly NIX_INSTALLED_NIX="/nix/store/j8dbv5w6jl34caywh2ygdy88knx1mdf7-nix-2.3.6"
@@ -362,7 +375,7 @@ finish_fail() {
     finish_cleanup
 
     failure <<EOF
-Jeeze, something went wrong. If you can take all the output and open
+Oh no, something went wrong. If you can take all the output and open
 an issue, we'd love to fix the problem so nobody else has this issue.
 
 :(
@@ -828,6 +841,19 @@ fi
 EOF
 }
 
+# Fish has differing syntax
+fish_source_lines() {
+    cat <<EOF
+
+# Nix
+if test -e '$PROFILE_NIX_FILE_FISH'
+  . '$PROFILE_NIX_FILE_FISH'
+end
+# End Nix
+
+EOF
+}
+
 configure_shell_profile() {
     task "Setting up shell profiles: ${PROFILE_TARGETS[*]}"
     for profile_target in "${PROFILE_TARGETS[@]}"; do
@@ -849,6 +875,27 @@ configure_shell_profile() {
                         tee -a "$profile_target"
         fi
     done
+
+    task "Setting up shell profiles for Fish with with ${PROFILE_FISH_SUFFIX} inside ${PROFILE_FISH_PREFIXES[*]}"
+    for fish_prefix in "${PROFILE_FISH_PREFIXES[@]}"; do
+        if [ ! -d "$fish_prefix" ]; then
+            # this specific prefix (ie: /etc/fish) is very likely to exist
+            # if Fish is installed with this sysconfdir.
+            continue
+        fi
+
+        profile_target="${fish_prefix}/${PROFILE_FISH_SUFFIX}"
+        conf_dir=$(dirname "$profile_target")
+        if [ ! -d "$conf_dir" ]; then
+            _sudo "create $conf_dir for our Fish hook" \
+                mkdir "$conf_dir"
+        fi
+
+        fish_source_lines \
+            | _sudo "write nix-daemon settings to $profile_target" \
+                    tee "$profile_target"
+    done
+
     # TODO: should we suggest '. $PROFILE_NIX_FILE'? It would get them on
     # their way less disruptively, but a counter-argument is that they won't
     # immediately notice if something didn't get set up right?

@@ -322,7 +322,6 @@ struct curlFileTransfer : public FileTransfer
             }
 
             if (request.verifyTLS) {
-                debug("verify TLS: Nix CA file = '%s'", settings.caFile);
                 if (settings.caFile != "")
                     curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.c_str());
             } else {

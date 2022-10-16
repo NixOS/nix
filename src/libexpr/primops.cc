@@ -2423,8 +2423,8 @@ static RegisterPrimOp primop_intersectAttrs({
     .name = "__intersectAttrs",
     .args = {"e1", "e2"},
     .doc = R"(
-      Return a set consisting of the attributes in the set *e2* that also
-      exist in the set *e1*.
+      Return a set consisting of the attributes in the set *e2* which have the
+      same name as some attribute in *e1*.
     )",
     .fun = prim_intersectAttrs,
 });
@@ -3818,8 +3818,8 @@ static RegisterPrimOp primop_parseDrvName({
     .args = {"s"},
     .doc = R"(
       Split the string *s* into a package name and version. The package
-      name is everything up to but not including the first dash followed
-      by a digit, and the version is everything following that dash. The
+      name is everything up to but not including the first dash not followed
+      by a letter, and the version is everything following that dash. The
       result is returned in a set `{ name, version }`. Thus,
       `builtins.parseDrvName "nix-0.12pre12876"` returns `{ name =
       "nix"; version = "0.12pre12876"; }`.

@@ -560,9 +560,15 @@ public:
         R"(
           If set to `true` (the default), any non-content-addressed path added
           or copied to the Nix store (e.g. when substituting from a binary
-          cache) must have a valid signature, that is, be signed using one of
-          the keys listed in `trusted-public-keys` or `secret-key-files`. Set
-          to `false` to disable signature checking.
+          cache) must have a signature by a trusted key. A trusted key is one
+          listed in `trusted-public-keys`, or a public key counterpart to a
+          private key stored in a file listed in `secret-key-files`.
+          
+          Set to `false` to disable signature checking and trust all
+          non-content-addressed paths unconditionally.
+          
+          (Content-addressed paths are inherently trustworthy and thus
+          unaffected by this configuration option.)
         )"};
 
     Setting<StringSet> extraPlatforms{
@@ -613,6 +619,14 @@ public:
           are tried based on their Priority value, which each substituter can set
           independently. Lower value means higher priority.
           The default is `https://cache.nixos.org`, with a Priority of 40.
+
+          Nix will copy a store path from a remote store only if one
+          of the following is true:
+
+          - the store object is signed by one of the [`trusted-public-keys`](#conf-trusted-public-keys)
+          - the substituter is in the [`trusted-substituters`](#conf-trusted-substituters) list
+          - the [`require-sigs`](#conf-require-sigs) option has been set to `false`
+          - the store object is [output-addressed](glossary.md#gloss-output-addressed-store-object)
         )",
         {"binary-caches"}};
 

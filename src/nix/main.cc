@@ -74,6 +74,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         addFlag({
             .longName = "help",
             .description = "Show usage information.",
+            .category = miscCategory,
             .handler = {[&]() { throw HelpRequested(); }},
         });
 
@@ -88,6 +89,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         addFlag({
             .longName = "version",
             .description = "Show version information.",
+            .category = miscCategory,
             .handler = {[&]() { showVersion = true; }},
         });
 
@@ -95,12 +97,14 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .longName = "offline",
             .aliases = {"no-net"}, // FIXME: remove
             .description = "Disable substituters and consider all previously downloaded files up-to-date.",
+            .category = miscCategory,
             .handler = {[&]() { useNet = false; }},
         });
 
         addFlag({
             .longName = "refresh",
             .description = "Consider all previously downloaded files out-of-date.",
+            .category = miscCategory,
             .handler = {[&]() { refresh = true; }},
         });
     }
@@ -187,7 +191,7 @@ static void showHelp(std::vector<std::string> subcommand, MultiCommand & topleve
         *vUtils);
 
     auto attrs = state.buildBindings(16);
-    attrs.alloc("command").mkString(toplevel.toJSON().dump());
+    attrs.alloc("toplevel").mkString(toplevel.toJSON().dump());
 
     auto vRes = state.allocValue();
     state.callFunction(*vGenerateManpage, state.allocValue()->mkAttrs(attrs), *vRes, noPos);
@@ -325,7 +329,7 @@ void mainWrapped(int argc, char * * argv)
                 std::cout << "attrs\n"; break;
             }
             for (auto & s : *completions)
-                std::cout << s.completion << "\t" << s.description << "\n";
+                std::cout << s.completion << "\t" << trim(s.description) << "\n";
         }
     });
 

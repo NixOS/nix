@@ -1,7 +1,6 @@
 if [ -n "$HOME" ] && [ -n "$USER" ]; then
 
     # Set up the per-user profile.
-    # This part should be kept in sync with nixpkgs:nixos/modules/programs/shell.nix
 
     NIX_LINK=$HOME/.nix-profile
 

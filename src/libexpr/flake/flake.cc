@@ -483,12 +483,12 @@ LockedFlake lockFlake(
                                 } else if (auto follows = std::get_if<1>(&i.second)) {
                                     if (! trustLock) {
                                         // It is possible that the flake has changed,
-                                        // so we must confirm all the follows that are in the lockfile are also in the flake.
+                                        // so we must confirm all the follows that are in the lock file are also in the flake.
                                         auto overridePath(inputPath);
                                         overridePath.push_back(i.first);
                                         auto o = overrides.find(overridePath);
                                         // If the override disappeared, we have to refetch the flake,
-                                        // since some of the inputs may not be present in the lockfile.
+                                        // since some of the inputs may not be present in the lock file.
                                         if (o == overrides.end()) {
                                             mustRefetch = true;
                                             // There's no point populating the rest of the fake inputs,
