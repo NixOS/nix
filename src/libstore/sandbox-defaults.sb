@@ -69,6 +69,7 @@
        (literal "/dev/stdin")
        (literal "/dev/stdout")
        (literal "/dev/tty")
+       (literal "/dev/fuse")
        (literal "/dev/urandom")
        (literal "/dev/zero")
        (subpath "/dev/fd"))

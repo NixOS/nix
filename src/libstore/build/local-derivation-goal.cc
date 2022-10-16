@@ -1691,6 +1691,7 @@ void LocalDerivationGoal::runChild()
                 ss.push_back("/dev/null");
                 ss.push_back("/dev/random");
                 ss.push_back("/dev/tty");
+                ss.push_back("/dev/fuse");
                 ss.push_back("/dev/urandom");
                 ss.push_back("/dev/zero");
                 createSymlink("/proc/self/fd", chrootRootDir + "/dev/fd");
