@@ -1171,9 +1171,9 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
             }
 
         } catch (Error & e) {
-            e.addTrace(state.positions[posDrvName],
-                "while evaluating the attribute '%1%' of the derivation '%2%'",
-                key, drvName);
+            e.addTrace(state.positions[noPos],
+                hintfmt("while evaluating the attribute '%1%' of the derivation '%2%'", key, drvName),
+                true);
             throw;
         }
     }

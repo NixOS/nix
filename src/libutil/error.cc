@@ -9,9 +9,9 @@ namespace nix {
 
 const std::string nativeSystem = SYSTEM;
 
-void BaseError::addTrace(std::optional<ErrPos> e, hintformat hint)
+void BaseError::addTrace(std::optional<ErrPos> e, hintformat hint, bool frame)
 {
-    err.traces.push_front(Trace { .pos = e, .hint = hint });
+    err.traces.push_front(Trace { .pos = e, .hint = hint, .frame = frame });
 }
 
 // c++ std::exception descendants must have a 'const char* what()' function.
@@ -382,6 +382,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
      *
      */
 
+    bool frameOnly = false;
     if (!einfo.traces.empty()) {
         unsigned int count = 0;
         for (auto iter = einfo.traces.rbegin(); iter != einfo.traces.rend(); ++iter) {
@@ -391,7 +392,11 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
             }
 
             if (iter->hint.str().empty()) continue;
+            if (frameOnly && !iter->frame) continue;
+
             count++;
+            frameOnly = iter->frame;
+
             oss << "\n" << "… " << iter->hint.str() << "\n";
 
             if (iter->pos.has_value() && (*iter->pos)) {

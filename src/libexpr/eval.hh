@@ -314,6 +314,19 @@ public:
 
     template <typename ErrorType>
     [[gnu::noinline, gnu::noreturn]]
+    void throwFrameErrorWithTrace(
+        PosIdx pos, const char* format,
+        const std::string_view s1, const std::string_view s2,
+        const Symbol * sym1, const Symbol * sym2,
+        Value * val1, Value * val2,
+        PosIdx pos1,
+        const std::string_view s3,
+        const Suggestions * suggestions,
+        PosIdx tracePos, const std::string_view traceStr,
+        Env * env, Expr * expr);
+
+    template <typename ErrorType>
+    [[gnu::noinline, gnu::noreturn]]
     void throwErrorWithTrace(
         PosIdx pos, const char* format,
         const std::string_view s1, const std::string_view s2,
@@ -340,7 +353,7 @@ public:
     [[gnu::noinline]]
     void addErrorTrace(Error & e, const char * s, const std::string & s2) const;
     [[gnu::noinline]]
-    void addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2) const;
+    void addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2, bool frame = false) const;
 
 public:
     /* Return true iff the value `v' denotes a derivation (i.e. a

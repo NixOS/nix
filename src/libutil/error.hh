@@ -110,6 +110,7 @@ void printAtPos(const ErrPos & pos, std::ostream & out);
 struct Trace {
     std::optional<ErrPos> pos;
     hintformat hint;
+    bool frame;
 };
 
 struct ErrorInfo {
@@ -188,7 +189,7 @@ public:
         addTrace(e, hintfmt(std::string(fs), args...));
     }
 
-    void addTrace(std::optional<ErrPos> e, hintformat hint);
+    void addTrace(std::optional<ErrPos> e, hintformat hint, bool frame = false);
 
     bool hasTrace() const { return !err.traces.empty(); }
 };
