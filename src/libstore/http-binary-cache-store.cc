@@ -82,7 +82,7 @@ protected:
     void maybeDisable()
     {
         auto state(_state.lock());
-        if (state->enabled && settings.tryFallback) {
+        if (state->enabled) {
             int t = 60;
             printError("disabling binary cache '%s' for %s seconds", getUri(), t);
             state->enabled = false;

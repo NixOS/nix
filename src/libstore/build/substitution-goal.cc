@@ -110,18 +110,12 @@ void PathSubstitutionGoal::tryNext()
         tryNext();
         return;
     } catch (SubstituterDisabled &) {
-        if (settings.tryFallback) {
-            tryNext();
-            return;
-        }
-        throw;
+        tryNext();
+        return;
     } catch (Error & e) {
-        if (settings.tryFallback) {
-            logError(e.info());
-            tryNext();
-            return;
-        }
-        throw;
+        logError(e.info());
+        tryNext();
+        return;
     }
 
     if (info->path != storePath) {
