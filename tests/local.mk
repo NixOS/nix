@@ -109,7 +109,8 @@ nix_tests = \
   store-ping.sh \
   fetchClosure.sh \
   completions.sh \
-  impure-derivations.sh
+  impure-derivations.sh \
+  path-from-hash-part.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh
