@@ -2168,19 +2168,11 @@ std::string_view EvalState::forceString(Value & v, PathSet & context, const PosI
 
 std::string_view EvalState::forceStringNoCtx(Value & v, const PosIdx pos, std::string_view errorCtx)
 {
-    try {
-        auto s = forceString(v, pos, errorCtx);
-        if (v.string.context) {
-            if (pos)
-                throwError<EvalError>(noPos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')", v.string.s, v.string.context[0], 0, 0, 0, 0, noPos, "", 0, 0, 0);
-            else
-                throwError<EvalError>(noPos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')", v.string.s, v.string.context[0], 0, 0, 0, 0, noPos, "", 0, 0, 0);
-        }
-        return s;
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
+    auto s = forceString(v, pos, errorCtx);
+    if (v.string.context) {
+        throwErrorWithTrace<EvalError>(noPos, "the string '%1%' is not allowed to refer to a store path (such as '%2%')", v.string.s, v.string.context[0], 0, 0, 0, 0, noPos, "", 0, pos, errorCtx, 0, 0);
     }
+    return s;
 }
 
 
