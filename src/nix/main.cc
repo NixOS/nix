@@ -369,13 +369,6 @@ void mainWrapped(int argc, char * * argv)
         && args.command->first != "upgrade-nix")
         settings.requireExperimentalFeature(Xp::NixCommand);
 
-    if (args.command->first == "show-config") {
-        // show-config must run before any settings are modified so that it outputs the defaults
-        args.command->second->prepare();
-        args.command->second->run();
-        return;
-    }
-
     if (args.useNet && !haveInternet()) {
         warn("you don't have Internet access; disabling some network-dependent features");
         args.useNet = false;
