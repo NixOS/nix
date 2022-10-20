@@ -586,7 +586,7 @@ struct CompareValues
                     }
                 default:
                     state.debugThrowLastTrace(EvalError({
-                        .msg = hintfmt("%scannot compare %s with %s: nix does not define an ordering for that type", errorCtx, showType(*v1), showType(*v2)),
+                        .msg = hintfmt("%scannot compare %s with %s; values of that type are incomparable", errorCtx, showType(*v1), showType(*v2)),
                         .errPos = std::nullopt,
                     }));
             }
