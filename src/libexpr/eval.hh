@@ -314,19 +314,6 @@ public:
 
     template <typename ErrorType>
     [[gnu::noinline, gnu::noreturn]]
-    void throwFrameErrorWithTrace(
-        PosIdx pos, const char* format,
-        const std::string_view s1, const std::string_view s2,
-        const Symbol * sym1, const Symbol * sym2,
-        Value * val1, Value * val2,
-        PosIdx pos1,
-        const std::string_view s3,
-        const Suggestions * suggestions,
-        PosIdx tracePos, const std::string_view traceStr,
-        Env * env, Expr * expr);
-
-    template <typename ErrorType>
-    [[gnu::noinline, gnu::noreturn]]
     void throwErrorWithTrace(
         PosIdx pos, const char* format,
         const std::string_view s1, const std::string_view s2,

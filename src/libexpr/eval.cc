@@ -837,37 +837,6 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
    exceptions. */
 
 template <typename ErrorType>
-void EvalState::throwFrameErrorWithTrace(
-        PosIdx pos, const char* format,
-        const std::string_view s1, const std::string_view s2,
-        const Symbol * sym1, const Symbol * sym2,
-        Value * val1, Value * val2,
-        PosIdx pos1,
-        const std::string_view s3,
-        const Suggestions * suggestions,
-        PosIdx tracePos, const std::string_view traceStr,
-        Env * env, Expr * expr)
-{
-    hintformat f(format);
-    if (!s1.empty()) { f = f % s1; }
-    if (!s2.empty()) { f = f % s2; }
-    if (sym1) { f = f % symbols[*sym1]; }
-    if (sym2) { f = f % symbols[*sym2]; }
-    if (val1) { f = f % showType(*val1); }
-    if (val2) { f = f % showType(*val2); }
-    if (pos1) { f = f % positions[pos1]; }
-    if (!s3.empty()) { f = f % s3; }
-
-    auto e = ErrorType(ErrorInfo {
-        .msg = f,
-        .errPos = positions[pos],
-        .suggestions = suggestions ? *suggestions : Suggestions(),
-    });
-    e.addTrace(positions[tracePos], traceStr, true);
-    debugThrow(e, env, expr);
-}
-
-template <typename ErrorType>
 void EvalState::throwErrorWithTrace(
         PosIdx pos, const char* format,
         const std::string_view s1, const std::string_view s2,
@@ -1533,7 +1502,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     auto j = args[0]->attrs->get(i.name);
                     if (!j) {
                         if (!i.def) {
-                            throwFrameErrorWithTrace<TypeError>(lambda.pos,
+                            throwErrorWithTrace<TypeError>(lambda.pos,
                                     "function '%1%' called without required argument '%2%'",
                                     (lambda.name ? std::string(symbols[lambda.name]) : "anonymous lambda"), "",
                                     &i.name, 0, 0, 0, noPos, "", 0, pos, "from call site", fun.lambda.env, &lambda);
@@ -1556,7 +1525,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                             for (auto & formal : lambda.formals->formals)
                                 formalNames.insert(symbols[formal.name]);
                             auto suggestions = Suggestions::bestMatches(formalNames, symbols[i.name]);
-                            throwFrameErrorWithTrace<TypeError>(lambda.pos,
+                            throwErrorWithTrace<TypeError>(lambda.pos,
                                     "function '%1%' called with unexpected argument '%2%'",
                                     (lambda.name ? std::string(symbols[lambda.name]) : "anonymous lambda"), "",
                                     &i.name, 0, 0, 0, noPos, "", &suggestions, pos, "from call site", fun.lambda.env, &lambda);
@@ -1582,9 +1551,12 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 lambda.body->eval(*this, env2, vCur);
             } catch (Error & e) {
                 if (loggerSettings.showTrace.get()) {
-                    addErrorTrace(e, lambda.pos, "while evaluating the '%s' function",
-                            (lambda.name ? std::string(symbols[lambda.name]) : "anonymous lambda"));
-                    if (pos) addErrorTrace(e, pos, "from call site%s", "");
+                    addErrorTrace(e,
+                                  lambda.pos,
+                                  "while evaluating the '%s' function",
+                                  (lambda.name ? std::string(symbols[lambda.name]) : "anonymous lambda"),
+                                  true);
+                    if (pos) addErrorTrace(e, pos, "from call site%s", "", true);
                 }
                 throw;
             }
