@@ -32,6 +32,10 @@ extern std::regex refRegex;
 const static std::string badGitRefRegexS = "//|^[./]|/\\.|\\.\\.|[[:cntrl:][:space:]:?^~\[]|\\\\|\\*|\\.lock$|\\.lock/|@\\{|[/.]$|^@$|^$";
 extern std::regex badGitRefRegex;
 
+// Git short status shows untracked files in lines starting with ?? followed by space
+const static std::string gitUntrackedRegexS = "(?:^|\n)\\?\\?\\s";
+extern std::regex gitUntrackedRegex;
+
 // A Git revision (a SHA-1 commit hash).
 const static std::string revRegexS = "[0-9a-fA-F]{40}";
 extern std::regex revRegex;

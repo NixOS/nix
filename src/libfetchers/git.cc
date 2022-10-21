@@ -179,6 +179,21 @@ WorkdirInfo getWorkdirInfo(const Input & input, const Path & workdir)
     bool clean = false;
     bool hasHead = exitCode == 0;
 
+    auto statusResult = runProgram(RunOptions {
+        .program = "git",
+        .args = { "-C", workdir, "--git-dir", gitDir, "status", "--untracked-files=normal", "--short"},
+        .environment = env,
+        .mergeStderrToStdout = true
+    });
+
+    if (WEXITSTATUS(statusResult.first) != 0) {
+        throw Error("getting status of Git repository '%s'", workdir);
+    }
+
+    if (std::regex_search(statusResult.second, gitUntrackedRegex)) {
+        warn("Git tree '%s' has untracked files that are ignored by nix", workdir);
+    }
+
     try {
         if (hasHead) {
             // Using git diff is preferrable over lower-level operations here,
