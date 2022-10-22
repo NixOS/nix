@@ -87,6 +87,47 @@ struct DebugTrace {
 
 void debugError(Error * e, Env & env, Expr & expr);
 
+template<class ErrorType>
+class ErrorBuilder
+{
+
+        EvalState & state;
+        ErrorInfo info;
+
+    public:
+        [[gnu::noinline]]
+        ErrorBuilder(EvalState & s);
+
+        [[gnu::noinline]]
+        ErrorBuilder<ErrorType> & atPos(PosIdx pos);
+
+        template<typename... Args>
+        [[gnu::noinline]]
+        ErrorBuilder<ErrorType> & msg(const std::string & fs, const Args & ... args)
+        {
+            hintformat f(fs);
+            formatHelper(f, args...);
+            info.msg = f;
+            return *this;
+        }
+
+        [[gnu::noinline]]
+        ErrorBuilder<ErrorType> & withTrace(PosIdx pos, const std::string_view text);
+
+        [[gnu::noinline]]
+        ErrorBuilder<ErrorType> & withFrameTrace(PosIdx pos, const std::string_view text);
+
+        [[gnu::noinline]]
+        ErrorBuilder<ErrorType> & suggestions(Suggestions & s);
+
+        [[gnu::noinline]]
+        ErrorBuilder<ErrorType> & withFrame(const Env & e, const Expr & ex);
+
+        [[gnu::noinline, gnu::noreturn]]
+        void debugThrow();
+};
+
+
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
@@ -165,6 +206,13 @@ public:
         }
 
         throw std::move(error);
+    }
+
+    template<class E, typename... Args>
+    ErrorBuilder<E> & error(const std::string & fs, const Args & ... args) {
+        ErrorBuilder<E> * errorBuilder = new ErrorBuilder<E>(*this);
+        errorBuilder->msg(fs, args ...);
+        return *errorBuilder;
     }
 
 private:
@@ -311,31 +359,6 @@ public:
     std::string_view forceString(Value & v, const PosIdx pos, std::string_view errorCtx);
     std::string_view forceString(Value & v, PathSet & context, const PosIdx pos, std::string_view errorCtx);
     std::string_view forceStringNoCtx(Value & v, const PosIdx pos, std::string_view errorCtx);
-
-    template <typename ErrorType>
-    [[gnu::noinline, gnu::noreturn]]
-    void throwErrorWithTrace(
-        PosIdx pos, const char* format,
-        const std::string_view s1, const std::string_view s2,
-        const Symbol * sym1, const Symbol * sym2,
-        Value * val1, Value * val2,
-        PosIdx pos1,
-        const std::string_view s3,
-        const Suggestions * suggestions,
-        PosIdx tracePos, const std::string_view traceStr,
-        Env * env, Expr * expr);
-
-    template <typename ErrorType>
-    [[gnu::noinline, gnu::noreturn]]
-    void throwError(
-        PosIdx pos, const char* format,
-        const std::string_view s1, const std::string_view s2,
-        const Symbol * sym1, const Symbol * sym2,
-        Value * val1, Value * val2,
-        PosIdx pos1,
-        const std::string_view s3,
-        const Suggestions * suggestions,
-        Env * env, Expr * expr);
 
     [[gnu::noinline]]
     void addErrorTrace(Error & e, const char * s, const std::string & s2) const;
