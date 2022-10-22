@@ -124,7 +124,11 @@ class ErrorBuilder
         ErrorBuilder<ErrorType> & withFrame(const Env & e, const Expr & ex);
 
         [[gnu::noinline, gnu::noreturn]]
-        void debugThrow();
+        void ErrorBuilder<ErrorType>::debugThrow() {
+            // NOTE: We always use the -LastTrace version as we push the new trace in withFrame()
+            state.debugThrowLastTrace(ErrorType(info));
+        }
+
 };
 
 

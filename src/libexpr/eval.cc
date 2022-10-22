@@ -465,12 +465,6 @@ ErrorBuilder<ErrorType> & ErrorBuilder<ErrorType>::withFrame(const Env & env, co
     return *this;
 }
 
-template<class ErrorType>
-void ErrorBuilder<ErrorType>::debugThrow() {
-    // NOTE: We always use the -LastTrace version as we push the new trace in withFrame()
-    state.debugThrowLastTrace(ErrorType(info));
-}
-
 
 EvalState::EvalState(
     const Strings & _searchPath,
