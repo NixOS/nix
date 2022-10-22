@@ -87,8 +87,6 @@ endif
 # Pass -g if we want debug info.
 BUILD_DEBUG ?= 1
 
-GLOBAL_CXXFLAGS += -gdwarf-4
-
 ifeq ($(BUILD_DEBUG), 1)
   GLOBAL_CFLAGS += -g
   GLOBAL_CXXFLAGS += -g
