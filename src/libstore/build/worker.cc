@@ -276,7 +276,7 @@ void Worker::run(const Goals & _topGoals)
         if (!children.empty() || !waitingForAWhile.empty())
             waitForInput();
         else {
-            if (awake.empty() && 0 == settings.maxBuildJobs)
+            if (awake.empty() && 0U == settings.maxBuildJobs)
             {
                 if (getMachines().empty())
                    throw Error("unable to start any build; either increase '--max-jobs' "
