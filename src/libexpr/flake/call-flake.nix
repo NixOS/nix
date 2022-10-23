@@ -43,7 +43,7 @@ let
 
           outputs = flake.outputs (inputs // { self = result; });
 
-          result = outputs // sourceInfo // { inherit inputs; inherit outputs; inherit sourceInfo; };
+          result = outputs // sourceInfo // { inherit inputs; inherit outputs; inherit sourceInfo; type = "flake"; };
         in
           if node.flake or true then
             assert builtins.isFunction flake.outputs;
