@@ -560,10 +560,7 @@ struct CompareValues
             if (v1->type() == nInt && v2->type() == nFloat)
                 return v1->integer < v2->fpoint;
             if (v1->type() != v2->type())
-                state.debugThrowLastTrace(EvalError({
-                    .msg = hintfmt("%scannot compare %s with %s", errorCtx, showType(*v1), showType(*v2)),
-                    .errPos = std::nullopt,
-                }));
+                state.error("cannot compare %s with %s", showType(*v1), showType(*v2)).debugThrow<EvalError>();
             switch (v1->type()) {
                 case nInt:
                     return v1->integer < v2->integer;
@@ -581,14 +578,11 @@ struct CompareValues
                         } else if (i == v1->listSize()) {
                             return true;
                         } else if (!state.eqValues(*v1->listElems()[i], *v2->listElems()[i], pos, errorCtx)) {
-                            return (*this)(v1->listElems()[i], v2->listElems()[i], "while comparing two lists");
+                            return (*this)(v1->listElems()[i], v2->listElems()[i], "while comparing two list elements");
                         }
                     }
                 default:
-                    state.debugThrowLastTrace(EvalError({
-                        .msg = hintfmt("%scannot compare %s with %s; values of that type are incomparable", errorCtx, showType(*v1), showType(*v2)),
-                        .errPos = std::nullopt,
-                    }));
+                    state.error("cannot compare %s with %s; values of that type are incomparable", showType(*v1), showType(*v2)).debugThrow<EvalError>();
             }
         } catch (Error & e) {
             e.addTrace(std::nullopt, errorCtx);
@@ -614,7 +608,7 @@ static Bindings::iterator getAttr(
     Bindings::iterator value = attrSet->find(attrSym);
     if (value == attrSet->end()) {
         throw TypeError({
-            .msg = hintfmt("attribute '%s' missing %s", state.symbols[attrSym], errorCtx),
+            .msg = hintfmt("attribute '%s' missing %s", state.symbols[attrSym], normaltxt(errorCtx)),
             .errPos = state.positions[attrSet->pos],
         });
         // TODO XXX
@@ -628,7 +622,7 @@ static Bindings::iterator getAttr(
 
 static void prim_genericClosure(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    state.forceAttrs(*args[0], noPos, "while evaluating the first argument pased to builtins.genericClosure");
+    state.forceAttrs(*args[0], noPos, "while evaluating the first argument passed to builtins.genericClosure");
 
     /* Get the start set. */
     Bindings::iterator startSet = getAttr(state, state.sStartSet, args[0]->attrs, "in the attrset passed as argument to builtins.genericClosure");

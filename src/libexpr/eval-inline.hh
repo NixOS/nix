@@ -103,7 +103,7 @@ void EvalState::forceValue(Value & v, Callable getPos)
     else if (v.isApp())
         callFunction(*v.app.left, *v.app.right, v, noPos);
     else if (v.isBlackhole())
-        error<EvalError>("infinite recursion encountered").atPos(getPos()).debugThrow();
+        error("infinite recursion encountered").atPos(getPos()).template debugThrow<EvalError>();
 }
 
 
@@ -121,7 +121,7 @@ inline void EvalState::forceAttrs(Value & v, Callable getPos, std::string_view e
     forceValue(v, noPos);
     if (v.type() != nAttrs) {
         PosIdx pos = getPos();
-        this->error<TypeError>("value is %1% while a set was expected", showType(v)).withTrace(pos, errorCtx).debugThrow();
+        error("value is %1% while a set was expected", showType(v)).withTrace(pos, errorCtx).debugThrow<TypeError>();
     }
 }
 
@@ -131,7 +131,7 @@ inline void EvalState::forceList(Value & v, const PosIdx pos, std::string_view e
 {
     forceValue(v, noPos);
     if (!v.isList()) {
-        this->error<TypeError>("value is %1% while a list was expected", showType(v)).withTrace(pos, errorCtx).debugThrow();
+        error("value is %1% while a list was expected", showType(v)).withTrace(pos, errorCtx).debugThrow<TypeError>();
     }
 }
 

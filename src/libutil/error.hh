@@ -192,6 +192,8 @@ public:
     void addTrace(std::optional<ErrPos> e, hintformat hint, bool frame = false);
 
     bool hasTrace() const { return !err.traces.empty(); }
+
+    const ErrorInfo & info() { return err; };
 };
 
 #define MakeError(newClass, superClass) \

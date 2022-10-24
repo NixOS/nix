@@ -87,48 +87,40 @@ struct DebugTrace {
 
 void debugError(Error * e, Env & env, Expr & expr);
 
-template<class ErrorType>
 class ErrorBuilder
 {
-
+    private:
         EvalState & state;
         ErrorInfo info;
 
+        ErrorBuilder(EvalState & s, ErrorInfo && i): state(s), info(i) { }
+
     public:
-        [[gnu::noinline]]
-        ErrorBuilder(EvalState & s);
-
-        [[gnu::noinline]]
-        ErrorBuilder<ErrorType> & atPos(PosIdx pos);
-
         template<typename... Args>
-        [[gnu::noinline]]
-        ErrorBuilder<ErrorType> & msg(const std::string & fs, const Args & ... args)
+        [[nodiscard, gnu::noinline]]
+        static ErrorBuilder * create(EvalState & s, const Args & ... args)
         {
-            hintformat f(fs);
-            formatHelper(f, args...);
-            info.msg = f;
-            return *this;
+            return new ErrorBuilder(s, ErrorInfo { .msg = hintfmt(args...) });
         }
 
-        [[gnu::noinline]]
-        ErrorBuilder<ErrorType> & withTrace(PosIdx pos, const std::string_view text);
+        [[nodiscard, gnu::noinline]]
+        ErrorBuilder & atPos(PosIdx pos);
 
-        [[gnu::noinline]]
-        ErrorBuilder<ErrorType> & withFrameTrace(PosIdx pos, const std::string_view text);
+        [[nodiscard, gnu::noinline]]
+        ErrorBuilder & withTrace(PosIdx pos, const std::string_view text);
 
-        [[gnu::noinline]]
-        ErrorBuilder<ErrorType> & suggestions(Suggestions & s);
+        [[nodiscard, gnu::noinline]]
+        ErrorBuilder & withFrameTrace(PosIdx pos, const std::string_view text);
 
-        [[gnu::noinline]]
-        ErrorBuilder<ErrorType> & withFrame(const Env & e, const Expr & ex);
+        [[nodiscard, gnu::noinline]]
+        ErrorBuilder & withSuggestions(Suggestions & s);
 
+        [[nodiscard, gnu::noinline]]
+        ErrorBuilder & withFrame(const Env & e, const Expr & ex);
+
+        template<class ErrorType>
         [[gnu::noinline, gnu::noreturn]]
-        void ErrorBuilder<ErrorType>::debugThrow() {
-            // NOTE: We always use the -LastTrace version as we push the new trace in withFrame()
-            state.debugThrowLastTrace(ErrorType(info));
-        }
-
+        void debugThrow();
 };
 
 
@@ -212,10 +204,12 @@ public:
         throw std::move(error);
     }
 
-    template<class E, typename... Args>
-    ErrorBuilder<E> & error(const std::string & fs, const Args & ... args) {
-        ErrorBuilder<E> * errorBuilder = new ErrorBuilder<E>(*this);
-        errorBuilder->msg(fs, args ...);
+    ErrorBuilder * errorBuilder;
+
+    template<typename... Args>
+    [[nodiscard, gnu::noinline]]
+    ErrorBuilder & error(const Args & ... args) {
+        errorBuilder = ErrorBuilder::create(*this, args...);
         return *errorBuilder;
     }
 
@@ -647,6 +641,13 @@ struct EvalSettings : Config
 extern EvalSettings evalSettings;
 
 static const std::string corepkgsPrefix{"/__corepkgs__/"};
+
+template<class ErrorType>
+void ErrorBuilder::debugThrow()
+{
+    // NOTE: We always use the -LastTrace version as we push the new trace in withFrame()
+    state.debugThrowLastTrace(ErrorType(info));
+}
 
 }
 
