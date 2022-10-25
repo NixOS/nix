@@ -13,6 +13,8 @@ ifeq ($(BUILD_SHARED_LIBS), 1)
 endif
 
 shellspec.test: $(test-deps)
-	@cd tests && shellspec --quiet --no-banner -f tap
+	## check for make -j flag to pass it to shellspec
+	$(eval J := $(patsubst -j%,%,$(filter -j%,$(MAKEFLAGS))))
+	cd tests && shellspec --quiet --no-banner -f tap $(if $(J),--jobs $(J),)
 
 installcheck: shellspec.test $(installcheck)
