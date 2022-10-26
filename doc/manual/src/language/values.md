@@ -150,6 +150,20 @@
   recognized as a path. `a.${foo}/b.${bar}` is a syntactically valid division
   operation. `./a.${foo}/b.${bar}` is a path.
 
+  When a path appears in an antiquotation, and is thus coerced into a string,
+  the path is first copied into the Nix store and the resulting string is
+  the Nix store path. For instance `"${./foo.txt}" will cause `foo.txt` in
+  the current directory to be copied into the Nix store and result in the
+  string `"/nix/store/<HASH>-foo.txt"`.
+
+  Note that the Nix language assumes that all input files will remain
+  _unchanged_ during the course of the Nix expression evaluation.
+  If you for example antiquote a file path during a `nix repl` session, and
+  then later in the same session, after having changed the file contents,
+  evaluate the antiquotation with the file path again, then Nix will still
+  return the first store path. It will _not_ reread the file contents to
+  produce a different Nix store path.
+
 - <a id="type-boolean" href="#type-boolean">Boolean</a>
 
   *Booleans* with values `true` and `false`.
