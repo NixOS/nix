@@ -227,15 +227,15 @@ public:
     void registerAccessor(ref<InputAccessor> accessor);
 
     /* Convert a path to a string representation of the format
-       `/__virtual__/<accessor-number>/<path>`. */
+       `/__nix_virtual__/<accessor-number>/<path>`. */
     std::string encodePath(const SourcePath & path);
 
     /* Decode a path encoded by `encodePath()`. */
     SourcePath decodePath(std::string_view s, PosIdx pos = noPos);
 
     /* Decode all virtual paths in a string, i.e. all
-       /__virtual__/... substrings are replaced by the corresponding
-       input accessor. */
+       /__nix_virtual__/... substrings are replaced by the
+       corresponding input accessor. */
     std::string decodePaths(std::string_view s);
 
     /* Allow access to a path. */

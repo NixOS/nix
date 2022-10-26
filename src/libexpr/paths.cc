@@ -14,14 +14,14 @@ void EvalState::registerAccessor(ref<InputAccessor> accessor)
     inputAccessors.emplace(accessor->number, accessor);
 }
 
-static constexpr std::string_view marker = "/__virtual__/";
+static constexpr std::string_view marker = "/__nix_virtual__/";
 
 std::string EvalState::encodePath(const SourcePath & path)
 {
     /* For backward compatibility, return paths in the root FS
        normally. Encoding any other path is not very reproducible (due
-       to /__virtual__/<N>) and we should depreceate it eventually. So
-       print a warning about use of an encoded path in
+       to /__nix_virtual__/<N>) and we should depreceate it
+       eventually. So print a warning about use of an encoded path in
        decodePath(). */
     return path.accessor == rootFS
         ? path.path.abs()
