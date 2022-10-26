@@ -472,7 +472,7 @@ EvalState::EvalState(
             : std::nullopt,
             [](const CanonPath & path) -> RestrictedPathError {
                 auto modeInformation = evalSettings.pureEval
-                    ? "in pure eval mode (use '--impure' to override)"
+                    ? "in pure evaluation mode (use '--impure' to override)"
                     : "in restricted mode";
                 throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
             }))

@@ -508,8 +508,14 @@ string_parts_interpolated
 
 path_start
   : PATH {
-    SourcePath path { data->basePath.accessor, CanonPath({$1.p, $1.l}, data->basePath.path) };
-    $$ = new ExprPath(std::move(path));
+      std::string_view path({$1.p, $1.l});
+      $$ = new ExprPath(
+          /* Absolute paths are always interpreted relative to the
+             root filesystem accessor, rather than the accessor of the
+             current Nix expression. */
+          hasPrefix(path, "/")
+          ? SourcePath{data->state.rootFS, CanonPath(path)}
+          : SourcePath{data->basePath.accessor, CanonPath(path, data->basePath.path)});
   }
   | HPATH {
     if (evalSettings.pureEval) {

@@ -8,6 +8,7 @@ nix_tests = \
   flakes/bundle.sh \
   flakes/check.sh \
   flakes/unlocked-override.sh \
+  flakes/absolute-paths.sh \
   ca/gc.sh \
   gc.sh \
   remote-store.sh \
