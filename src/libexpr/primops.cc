@@ -3563,7 +3563,7 @@ static void prim_substring(EvalState & state, const PosIdx pos, Value * * args, 
             .errPos = state.positions[pos]
         }));
 
-    v.mkString((unsigned int) start >= s->size() ? "" : s->substr(start, len), context);
+    v.mkString((unsigned NixInt) start >= s->size() ? "" : s->substr(start, len), context);
 }
 
 static RegisterPrimOp primop_substring({
