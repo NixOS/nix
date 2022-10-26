@@ -331,6 +331,17 @@ bool BinaryCacheStore::isValidPathUncached(const StorePath & storePath)
     return fileExists(narInfoFileFor(storePath));
 }
 
+std::optional<StorePath> BinaryCacheStore::queryPathFromHashPart(const std::string & hashPart)
+{
+    auto pseudoPath = StorePath(hashPart + "-" + MissingName);
+    try {
+        auto info = queryPathInfo(pseudoPath);
+        return info->path;
+    } catch (InvalidPath &) {
+        return std::nullopt;
+    }
+}
+
 void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
 {
     auto info = queryPathInfo(storePath).cast<const NarInfo>();

@@ -111,6 +111,7 @@ nix_tests = \
   fetchClosure.sh \
   completions.sh \
   impure-derivations.sh \
+  path-from-hash-part.sh \
   toString-path.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)

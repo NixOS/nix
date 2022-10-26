@@ -15,8 +15,6 @@ namespace nix {
 
 MixEvalArgs::MixEvalArgs()
 {
-    auto category = "Common evaluation options";
-
     addFlag({
         .longName = "arg",
         .description = "Pass the value *expr* as the argument *name* to Nix functions.",

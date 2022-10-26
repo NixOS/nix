@@ -1050,7 +1050,7 @@ struct CmdRepl : InstallablesCommand
         evalSettings.pureEval = false;
     }
 
-    void prepare()
+    void prepare() override
     {
         if (!settings.isExperimentalFeatureEnabled(Xp::ReplFlake) && !(file) && this->_installables.size() >= 1) {
             warn("future versions of Nix will require using `--file` to load a file");
