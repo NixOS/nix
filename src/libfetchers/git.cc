@@ -485,6 +485,10 @@ struct GitInputScheme : InputScheme
                 }
                 input.attrs.insert_or_assign("ref", *head);
                 unlockedAttrs.insert_or_assign("ref", *head);
+            } else {
+                if (!input.getRev()) {
+                    unlockedAttrs.insert_or_assign("ref", input.getRef().value());
+                }
             }
 
             if (auto res = getCache()->lookup(store, unlockedAttrs)) {
