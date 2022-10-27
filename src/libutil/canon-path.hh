@@ -58,6 +58,14 @@ public:
     const std::string & abs() const
     { return path; }
 
+    /* Like abs(), but return an empty string if this path is
+       '/'. Thus the returned string never ends in a slash. */
+    const std::string & absOrEmpty() const
+    {
+        const static std::string epsilon;
+        return isRoot() ? epsilon : path;
+    }
+
     const char * c_str() const
     { return path.c_str(); }
 

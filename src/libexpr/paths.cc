@@ -14,18 +14,16 @@ void EvalState::registerAccessor(ref<InputAccessor> accessor)
     inputAccessors.emplace(accessor->number, accessor);
 }
 
-static constexpr std::string_view marker = "/__nix_virtual__/";
-
 std::string EvalState::encodePath(const SourcePath & path)
 {
     /* For backward compatibility, return paths in the root FS
        normally. Encoding any other path is not very reproducible (due
-       to /__nix_virtual__/<N>) and we should depreceate it
+       to /nix/store/virtual000...<N>) and we should deprecate it
        eventually. So print a warning about use of an encoded path in
        decodePath(). */
     return path.accessor == rootFS
         ? path.path.abs()
-        : std::string(marker) + std::to_string(path.accessor->number) + path.path.abs();
+        : fmt("%s%08x-source%s", virtualPathMarker, path.accessor->number, path.path.absOrEmpty());
 }
 
 SourcePath EvalState::decodePath(std::string_view s, PosIdx pos)
@@ -33,17 +31,17 @@ SourcePath EvalState::decodePath(std::string_view s, PosIdx pos)
     if (!hasPrefix(s, "/"))
         throwEvalError(pos, "string '%1%' doesn't represent an absolute path", s);
 
-    if (hasPrefix(s, marker)) {
+    if (hasPrefix(s, virtualPathMarker)) {
         auto fail = [s]() {
             throw Error("cannot decode virtual path '%s'", s);
         };
 
-        s = s.substr(marker.size());
+        s = s.substr(virtualPathMarker.size());
 
         try {
             auto slash = s.find('/');
             if (slash == std::string::npos) fail();
-            size_t number = std::stoi(std::string(s, 0, slash));
+            size_t number = std::stoi(std::string(s, 0, slash), nullptr, 16);
             s = s.substr(slash);
 
             auto accessor = inputAccessors.find(number);
@@ -70,7 +68,7 @@ std::string EvalState::decodePaths(std::string_view s)
     size_t pos = 0;
 
     while (true) {
-        auto m = s.find(marker, pos);
+        auto m = s.find(virtualPathMarker, pos);
         if (m == s.npos) {
             res.append(s.substr(pos));
             return res;

@@ -500,6 +500,7 @@ EvalState::EvalState(
     , valueAllocCache(std::make_shared<void *>(nullptr))
     , env1AllocCache(std::make_shared<void *>(nullptr))
 #endif
+    , virtualPathMarker(settings.nixStore + "/virtual00000000000000000")
     , baseEnv(allocEnv(128))
     , staticBaseEnv{std::make_shared<StaticEnv>(false, nullptr)}
 {
