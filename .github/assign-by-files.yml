@@ -1,0 +1,5 @@
+---
+# This files is used by https://github.com/marketplace/actions/auto-assign-reviewer-by-files
+# to assign maintainers
+"doc/**/*":
+  - fricklerhandwerk
