@@ -400,6 +400,7 @@ If an error occurs, try manually uninstalling, then rerunning this script.
 
 $(poly_uninstall_directions)
 EOF
+        poly_forcefull_uninstall_offer
     fi
 
     # TODO: I think it would be good for this step to accumulate more

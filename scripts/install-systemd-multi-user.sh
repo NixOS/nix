@@ -246,3 +246,12 @@ poly_create_build_user() {
 poly_prepare_to_install() {
     :
 }
+
+
+poly_forcefull_uninstall_offer() {
+    # potentially fill this out in future:
+    # if ! ui_confirm "Would you like to try forcefully purging the old Nix install?"
+    #     return 1
+    # fi
+    :
+}
