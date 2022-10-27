@@ -64,6 +64,41 @@ $1. Delete the systemd service and socket units
 EOF
 }
 
+poly_uninstall_directions() {
+    subheader "Uninstalling nix:"
+    local step=0
+
+    if poly_service_installed_check; then
+        step=$((step + 1))
+        poly_service_uninstall_directions "$step"
+    fi
+
+    for profile_target in "${PROFILE_TARGETS[@]}"; do
+        if [ -e "$profile_target" ] && [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
+            step=$((step + 1))
+            cat <<EOF
+$step. Restore $profile_target$PROFILE_BACKUP_SUFFIX back to $profile_target
+
+  sudo mv $profile_target$PROFILE_BACKUP_SUFFIX $profile_target
+
+(after this one, you may need to re-open any terminals that were
+opened while it existed.)
+
+EOF
+        fi
+    done
+
+    step=$((step + 1))
+    cat <<EOF
+$step. Delete the files Nix added to your system:
+
+  sudo rm -rf /etc/nix $NIX_ROOT $ROOT_HOME/.nix-profile $ROOT_HOME/.nix-defexpr $ROOT_HOME/.nix-channels $HOME/.nix-profile $HOME/.nix-defexpr $HOME/.nix-channels
+
+and that is it.
+
+EOF
+}
+
 poly_service_setup_note() {
     cat <<EOF
  - load and start a service (at $SERVICE_DEST

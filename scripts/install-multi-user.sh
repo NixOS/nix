@@ -111,41 +111,6 @@ get_help() {
     contact_us
 }
 
-uninstall_directions() {
-    subheader "Uninstalling nix:"
-    local step=0
-
-    if poly_service_installed_check; then
-        step=$((step + 1))
-        poly_service_uninstall_directions "$step"
-    fi
-
-    for profile_target in "${PROFILE_TARGETS[@]}"; do
-        if [ -e "$profile_target" ] && [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
-            step=$((step + 1))
-            cat <<EOF
-$step. Restore $profile_target$PROFILE_BACKUP_SUFFIX back to $profile_target
-
-  sudo mv $profile_target$PROFILE_BACKUP_SUFFIX $profile_target
-
-(after this one, you may need to re-open any terminals that were
-opened while it existed.)
-
-EOF
-        fi
-    done
-
-    step=$((step + 1))
-    cat <<EOF
-$step. Delete the files Nix added to your system:
-
-  sudo rm -rf /etc/nix $NIX_ROOT $ROOT_HOME/.nix-profile $ROOT_HOME/.nix-defexpr $ROOT_HOME/.nix-channels $HOME/.nix-profile $HOME/.nix-defexpr $HOME/.nix-channels
-
-and that is it.
-
-EOF
-}
-
 nix_user_for_core() {
     printf "$NIX_BUILD_USER_NAME_TEMPLATE" "$1"
 }
@@ -433,7 +398,7 @@ EOF
 Nix already appears to be installed. This installer may run into issues.
 If an error occurs, try manually uninstalling, then rerunning this script.
 
-$(uninstall_directions)
+$(poly_uninstall_directions)
 EOF
     fi
 

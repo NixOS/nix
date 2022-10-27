@@ -85,6 +85,15 @@ poly_service_uninstall_directions() {
     fi
 }
 
+poly_uninstall_directions() {
+    subheader "Uninstalling nix:"
+    # this is a better alternative than the more-detailed but incorrect  correct/verified uninstall directions can be 
+    echo "Looks like there are still some pieces of a previous Nix installation on your machine"
+    echo "Please follow the instructions linked below to purge these peices, and then try again"
+    echo "at installing Nix"
+    echo "Here are the uninstall/pure instructions: https://nixos.org/manual/nix/stable/installation/installing-binary.html#macos"
+}
+
 poly_service_setup_note() {
     if should_create_volume; then
         echo " - create a Nix volume and a LaunchDaemon to mount it"
