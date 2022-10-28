@@ -1,4 +1,8 @@
-# Nix is everywhere and invisible
+# Nix is everywhere
+
+Nix is the universal build and [configuration management] tool.
+
+[configuration management]: https://www.sebokwiki.org/wiki/Configuration_Management
 
 Software developers use Nix as a matter of course every day, mostly without even noticing.
 Nix runs trivially, anywhere.
@@ -6,13 +10,15 @@ Nix runs trivially, anywhere.
 For individuals to large organizations, Nix underpins the entire software supply chain:
 - Developer tooling
 - Build automation
-- Binary distribution.
+- Binary distribution
 
 To this end, the Nix team will work towards the following goals.
 
 ## Make Nix easy to adopt
 
   - Well-defined target user base
+      - anyone who wants to manage the complexity of - and build - software
+      - transform bits in a declarative and reproducible way
   - Well-defined core user stories
     - Ad hoc environments
         - One-liner setup (nix-shell)
@@ -77,8 +83,3 @@ To this end, the Nix team will work towards the following goals.
       - Capnproto for RPC
       - Bazel RBE protocol
       - ...
-
-    
-
-
-"Likewise, we want Nix to be everywhere. We want a world where finding a flake.nix at the root of a software project is not a pleasant surprise but something expected and common. And we want the people who design tomorrow’s software distribution mechanism to at least know and recognize the Nix model, and take that into account."
