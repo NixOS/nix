@@ -970,7 +970,7 @@ static void prim_trace(EvalState & state, const PosIdx pos, Value * * args, Valu
 {
     state.forceValue(*args[0], pos);
     if (args[0]->type() == nString)
-        printError("trace: %1%", args[0]->string.s);
+        printError("trace: %1%", state.decodePaths(args[0]->string.s));
     else
         printError("trace: %1%", printValue(state, *args[0]));
     state.forceValue(*args[1], pos);
