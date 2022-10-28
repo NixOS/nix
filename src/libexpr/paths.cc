@@ -49,8 +49,7 @@ SourcePath EvalState::decodePath(std::string_view s, PosIdx pos)
 
             SourcePath path {accessor->second, CanonPath(s)};
 
-            static bool warned = false;
-            warnOnce(warned, "applying 'toString' to path '%s' and then accessing it is deprecated, at %s", path, positions[pos]);
+            warn("applying 'toString' to path '%s' and then accessing it is deprecated, at %s", path, positions[pos]);
 
             return path;
         } catch (std::invalid_argument & e) {
