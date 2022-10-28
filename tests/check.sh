@@ -40,6 +40,14 @@ nix-build check.nix -A deterministic --argstr checkBuildId $checkBuildId \
 if grep -q 'may not be deterministic' $TEST_ROOT/log; then false; fi
 checkBuildTempDirRemoved $TEST_ROOT/log
 
+nix build -f check.nix deterministic --rebuild --repeat 1 \
+    --argstr checkBuildId $checkBuildId --keep-failed --no-link \
+    2> $TEST_ROOT/log
+if grep -q 'checking is not possible' $TEST_ROOT/log; then false; fi
+# Repeat is set to 1, ie. nix should build deterministic twice.
+if [ "$(grep "checking outputs" $TEST_ROOT/log | wc -l)" -ne 2 ]; then false; fi
+checkBuildTempDirRemoved $TEST_ROOT/log
+
 nix-build check.nix -A nondeterministic --argstr checkBuildId $checkBuildId \
     --no-out-link 2> $TEST_ROOT/log
 checkBuildTempDirRemoved $TEST_ROOT/log
@@ -48,6 +56,12 @@ nix-build check.nix -A nondeterministic --argstr checkBuildId $checkBuildId \
     --no-out-link --check 2> $TEST_ROOT/log || status=$?
 grep 'may not be deterministic' $TEST_ROOT/log
 [ "$status" = "104" ]
+checkBuildTempDirRemoved $TEST_ROOT/log
+
+nix build -f check.nix nondeterministic --rebuild --repeat 1 \
+    --argstr checkBuildId $checkBuildId --keep-failed --no-link \
+    2> $TEST_ROOT/log || status=$?
+grep 'may not be deterministic' $TEST_ROOT/log
 checkBuildTempDirRemoved $TEST_ROOT/log
 
 nix-build check.nix -A nondeterministic --argstr checkBuildId $checkBuildId \

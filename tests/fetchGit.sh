@@ -24,12 +24,14 @@ touch $repo/.gitignore
 git -C $repo add hello .gitignore
 git -C $repo commit -m 'Bla1'
 rev1=$(git -C $repo rev-parse HEAD)
+git -C $repo tag -a tag1 -m tag1
 
 echo world > $repo/hello
 git -C $repo commit -m 'Bla2' -a
 git -C $repo worktree add $TEST_ROOT/worktree
 echo hello >> $TEST_ROOT/worktree/hello
 rev2=$(git -C $repo rev-parse HEAD)
+git -C $repo tag -a tag2 -m tag2
 
 # Fetch a worktree
 unset _NIX_FORCE_HTTP
@@ -216,6 +218,16 @@ rev4_nix=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$
 # The name argument should be handled
 path9=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; name = \"foo\"; }).outPath")
 [[ $path9 =~ -foo$ ]]
+
+# Specifying a ref without a rev shouldn't pick a cached rev for a different ref
+export _NIX_FORCE_HTTP=1
+rev_tag1_nix=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"refs/tags/tag1\"; }).rev")
+rev_tag1=$(git -C $repo rev-parse refs/tags/tag1)
+[[ $rev_tag1_nix = $rev_tag1 ]]
+rev_tag2_nix=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"refs/tags/tag2\"; }).rev")
+rev_tag2=$(git -C $repo rev-parse refs/tags/tag2)
+[[ $rev_tag2_nix = $rev_tag2 ]]
+unset _NIX_FORCE_HTTP
 
 # should fail if there is no repo
 rm -rf $repo/.git

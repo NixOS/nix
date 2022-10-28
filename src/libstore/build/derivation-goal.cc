@@ -344,7 +344,7 @@ void DerivationGoal::gaveUpOnSubstitution()
         for (auto & i : dynamic_cast<Derivation *>(drv.get())->inputDrvs) {
             /* Ensure that pure, non-fixed-output derivations don't
                depend on impure derivations. */
-            if (drv->type().isPure() && !drv->type().isFixed()) {
+            if (settings.isExperimentalFeatureEnabled(Xp::ImpureDerivations) && drv->type().isPure() && !drv->type().isFixed()) {
                 auto inputDrv = worker.evalStore.readDerivation(i.first);
                 if (!inputDrv.type().isPure())
                     throw Error("pure derivation '%s' depends on impure derivation '%s'",
@@ -705,8 +705,7 @@ static void movePath(const Path & src, const Path & dst)
     if (changePerm)
         chmod_(src, st.st_mode | S_IWUSR);
 
-    if (rename(src.c_str(), dst.c_str()))
-        throw SysError("renaming '%1%' to '%2%'", src, dst);
+    renameFile(src, dst);
 
     if (changePerm)
         chmod_(dst, st.st_mode);
@@ -913,12 +912,6 @@ void DerivationGoal::buildDone()
             drvPath,
             outputPaths
         );
-
-        if (buildMode == bmCheck) {
-            cleanupPostOutputsRegisteredModeCheck();
-            done(BuildResult::Built, std::move(builtOutputs));
-            return;
-        }
 
         cleanupPostOutputsRegisteredModeNonCheck();
 

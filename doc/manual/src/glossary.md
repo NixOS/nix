@@ -3,13 +3,47 @@
   - [derivation]{#gloss-derivation}\
     A description of a build action. The result of a derivation is a
     store object. Derivations are typically specified in Nix expressions
-    using the [`derivation` primitive](expressions/derivations.md). These are
+    using the [`derivation` primitive](language/derivations.md). These are
     translated into low-level *store derivations* (implicitly by
     `nix-env` and `nix-build`, or explicitly by `nix-instantiate`).
+
+  - [content-addressed derivation]{#gloss-content-addressed-derivation}\
+    A derivation which has the
+    [`__contentAddressed`](language/advanced-attributes.md#adv-attr-__contentAddressed)
+    attribute set to `true`.
+
+  - [fixed-output derivation]{#gloss-fixed-output-derivation}\
+    A derivation which includes the
+    [`outputHash`](language/advanced-attributes.md#adv-attr-outputHash) attribute.
 
   - [store]{#gloss-store}\
     The location in the file system where store objects live. Typically
     `/nix/store`.
+
+    From   the  perspective   of   the  location   where  Nix   is
+    invoked, the  Nix store can be  referred to
+    as a "_local_" or a "_remote_" one:
+
+    + A *local  store* exists  on the filesystem of
+      the machine where Nix is  invoked. You can use other
+      local stores  by passing  the `--store` flag  to the
+      `nix` command.  Local stores can be used for building derivations.
+
+    + A  *remote store*  exists  anywhere  other than  the
+      local  filesystem. One  example is  the `/nix/store`
+      directory on another machine,  accessed via `ssh` or
+      served by the `nix-serve` Perl script.
+
+  - [chroot store]{#gloss-chroot-store}\
+    A local store whose canonical path is anything other than `/nix/store`.
+
+  - [binary cache]{#gloss-binary-cache}\
+    A *binary cache* is a Nix store which uses a different format: its
+    metadata and signatures are kept in `.narinfo` files rather than in a
+    Nix database.  This different format simplifies serving store objects
+    over the network, but cannot host builds.  Examples of binary caches
+    include S3 buckets and the [NixOS binary
+    cache](https://cache.nixos.org).
 
   - [store path]{#gloss-store-path}\
     The location in the file system of a store object, i.e., an
@@ -22,12 +56,30 @@
     derivation outputs (objects produced by running a build action), or
     derivations (files describing a build action).
 
+  - [input-addressed store object]{#gloss-input-addressed-store-object}\
+    A store object produced by building a
+    non-[content-addressed](#gloss-content-addressed-derivation),
+    non-[fixed-output](#gloss-fixed-output-derivation)
+    derivation.
+
+  - [output-addressed store object]{#gloss-output-addressed-store-object}\
+    A store object whose store path hashes its content.  This
+    includes derivations, the outputs of
+    [content-addressed derivations](#gloss-content-addressed-derivation),
+    and the outputs of
+    [fixed-output derivations](#gloss-fixed-output-derivation).
+
   - [substitute]{#gloss-substitute}\
     A substitute is a command invocation stored in the Nix database that
     describes how to build a store object, bypassing the normal build
     mechanism (i.e., derivations). Typically, the substitute builds the
     store object by downloading a pre-built version of the store object
     from some server.
+
+  - [substituter]{#gloss-substituter}\
+    A *substituter* is an additional store from which Nix will
+    copy store objects it doesn't have.  For details, see the
+    [`substituters` option](command-ref/conf-file.html#conf-substituters).
 
   - [purity]{#gloss-purity}\
     The assumption that equal Nix derivations when run always produce

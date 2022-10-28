@@ -198,7 +198,7 @@ a number of possible ways:
     another.
 
   - If `--from-expression` is given, *args* are Nix
-    [functions](../expressions/language-constructs.md#functions)
+    [functions](../language/constructs.md#functions)
     that are called with the active Nix expression as their single
     argument. The derivations returned by those function calls are
     installed. This allows derivations to be specified in an

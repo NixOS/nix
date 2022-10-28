@@ -39,9 +39,7 @@ static void makeSymlink(const Path & link, const Path & target)
     createSymlink(target, tempLink);
 
     /* Atomically replace the old one. */
-    if (rename(tempLink.c_str(), link.c_str()) == -1)
-        throw SysError("cannot rename '%1%' to '%2%'",
-            tempLink , link);
+    renameFile(tempLink, link);
 }
 
 
@@ -620,6 +618,17 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     {
         Path path = storeDir + "/" + std::string(baseName);
         Path realPath = realStoreDir + "/" + std::string(baseName);
+
+        /* There may be temp directories in the store that are still in use
+           by another process. We need to be sure that we can acquire an
+           exclusive lock before deleting them. */
+        if (baseName.find("tmp-", 0) == 0) {
+            AutoCloseFD tmpDirFd = open(realPath.c_str(), O_RDONLY | O_DIRECTORY);
+            if (tmpDirFd.get() == -1 || !lockFile(tmpDirFd.get(), ltWrite, false)) {
+                debug("skipping locked tempdir '%s'", realPath);
+                return;
+            }
+        }
 
         printInfo("deleting '%1%'", path);
 

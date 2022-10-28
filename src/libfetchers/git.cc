@@ -370,7 +370,7 @@ struct GitInputScheme : InputScheme
         auto gitDir = ".git";
 
         runProgram("git", true,
-            { "-C", *sourcePath, "--git-dir", gitDir, "add", "--force", "--intent-to-add", "--", std::string(file) });
+            { "-C", *sourcePath, "--git-dir", gitDir, "add", "--intent-to-add", "--", std::string(file) });
 
         if (commitMsg)
             runProgram("git", true,
@@ -485,6 +485,10 @@ struct GitInputScheme : InputScheme
                 }
                 input.attrs.insert_or_assign("ref", *head);
                 unlockedAttrs.insert_or_assign("ref", *head);
+            } else {
+                if (!input.getRev()) {
+                    unlockedAttrs.insert_or_assign("ref", input.getRef().value());
+                }
             }
 
             if (auto res = getCache()->lookup(store, unlockedAttrs)) {

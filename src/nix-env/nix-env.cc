@@ -940,12 +940,12 @@ static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool prin
                 JSONObject metaObj = pkgObj.object("meta");
                 StringSet metaNames = i.queryMetaNames();
                 for (auto & j : metaNames) {
-                    auto placeholder = metaObj.placeholder(j);
                     Value * v = i.queryMeta(j);
                     if (!v) {
                         printError("derivation '%s' has invalid meta attribute '%s'", i.queryName(), j);
-                        placeholder.write(nullptr);
+                        metaObj.attr(j, nullptr);
                     } else {
+                        auto placeholder = metaObj.placeholder(j);
                         PathSet context;
                         printValueAsJSON(*globals.state, true, *v, noPos, placeholder, context);
                     }

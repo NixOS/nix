@@ -115,9 +115,12 @@ std::string readFile(const Path & path);
 void readFile(const Path & path, Sink & sink);
 
 /* Write a string to a file. */
-void writeFile(const Path & path, std::string_view s, mode_t mode = 0666);
+void writeFile(const Path & path, std::string_view s, mode_t mode = 0666, bool sync = false);
 
-void writeFile(const Path & path, Source & source, mode_t mode = 0666);
+void writeFile(const Path & path, Source & source, mode_t mode = 0666, bool sync = false);
+
+/* Flush a file's parent directory to disk */
+void syncParent(const Path & path);
 
 /* Read a line from a file descriptor. */
 std::string readLine(int fd);
@@ -168,6 +171,17 @@ void createSymlink(const Path & target, const Path & link,
 void replaceSymlink(const Path & target, const Path & link,
     std::optional<time_t> mtime = {});
 
+void renameFile(const Path & src, const Path & dst);
+
+/**
+ * Similar to 'renameFile', but fallback to a copy+remove if `src` and `dst`
+ * are on a different filesystem.
+ *
+ * Beware that this might not be atomic because of the copy that happens behind
+ * the scenes
+ */
+void moveFile(const Path & src, const Path & dst);
+
 
 /* Wrappers arount read()/write() that read/write exactly the
    requested number of bytes. */
@@ -182,6 +196,9 @@ std::string drainFD(int fd, bool block = true, const size_t reserveSize=0);
 
 void drainFD(int fd, Sink & sink, bool block = true);
 
+/* If cgroups are active, attempt to calculate the number of CPUs available.
+   If cgroups are unavailable or if cpu.max is set to "max", return 0. */
+unsigned int getMaxCPU();
 
 /* Automatic cleanup of resources. */
 
@@ -217,6 +234,7 @@ public:
     explicit operator bool() const;
     int release();
     void close();
+    void fsync();
 };
 
 

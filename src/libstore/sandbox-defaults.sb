@@ -98,7 +98,9 @@
 (allow file*
        (literal "/private/var/select/sh"))
 
-; Allow Rosetta 2 to run x86_64 binaries on aarch64-darwin.
+; Allow Rosetta 2 to run x86_64 binaries on aarch64-darwin (and vice versa).
 (allow file-read*
        (subpath "/Library/Apple/usr/libexec/oah")
-       (subpath "/System/Library/Apple/usr/libexec/oah"))
+       (subpath "/System/Library/Apple/usr/libexec/oah")
+       (subpath "/System/Library/LaunchDaemons/com.apple.oahd.plist")
+       (subpath "/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist"))

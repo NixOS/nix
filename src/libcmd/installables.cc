@@ -628,6 +628,8 @@ InstallableFlake::InstallableFlake(
 
 std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableFlake::toDerivation()
 {
+    Activity act(*logger, lvlTalkative, actUnknown, fmt("evaluating derivation '%s'", what()));
+
     auto attr = getCursor(*state);
 
     auto attrPath = attr->getAttrPathStr();

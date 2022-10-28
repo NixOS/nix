@@ -95,8 +95,7 @@ public:
     void queryPathInfoUncached(const StorePath & path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
-    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
-    { unsupported("queryPathFromHashPart"); }
+    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
     void addToStore(const ValidPathInfo & info, Source & narSource,
         RepairFlag repair, CheckSigsFlag checkSigs) override;

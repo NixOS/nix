@@ -35,6 +35,7 @@ extern "C" {
 #include "finally.hh"
 #include "markdown.hh"
 #include "local-fs-store.hh"
+#include "progress-bar.hh"
 
 #if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
@@ -241,7 +242,11 @@ void NixRepl::mainLoop()
 
     // Allow nix-repl specific settings in .inputrc
     rl_readline_name = "nix-repl";
-    createDirs(dirOf(historyFile));
+    try {
+        createDirs(dirOf(historyFile));
+    } catch (SysError & e) {
+        logWarning(e.info());
+    }
 #ifndef READLINE
     el_hist_size = 1000;
 #endif
@@ -251,6 +256,10 @@ void NixRepl::mainLoop()
     rl_set_complete_func(completionCallback);
     rl_set_list_possib_func(listPossibleCallback);
 #endif
+
+    /* Stop the progress bar because it interferes with the display of
+       the repl. */
+    stopProgressBar();
 
     std::string input;
 
@@ -1037,10 +1046,11 @@ void runRepl(
 
 struct CmdRepl : InstallablesCommand
 {
-    CmdRepl(){
+    CmdRepl() {
         evalSettings.pureEval = false;
     }
-    void prepare()
+
+    void prepare() override
     {
         if (!settings.isExperimentalFeatureEnabled(Xp::ReplFlake) && !(file) && this->_installables.size() >= 1) {
             warn("future versions of Nix will require using `--file` to load a file");
@@ -1053,12 +1063,15 @@ struct CmdRepl : InstallablesCommand
         }
         installables = InstallablesCommand::load();
     }
+
     std::vector<std::string> files;
+
     Strings getDefaultFlakeAttrPaths() override
     {
         return {""};
     }
-    virtual bool useDefaultInstallables() override
+
+    bool useDefaultInstallables() override
     {
         return file.has_value() or expr.has_value();
     }

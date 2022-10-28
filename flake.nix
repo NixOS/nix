@@ -23,7 +23,7 @@
 
       crossSystems = [ "armv6l-linux" "armv7l-linux" ];
 
-      stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" ];
+      stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" "ccacheStdenv" ];
 
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
       forAllSystemsAndStdenvs = f: forAllSystems (system:
@@ -108,7 +108,7 @@
           ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)];
 
         buildDeps =
-          [ curl
+          [ (curl.override { patchNetrcRegression = true; })
             bzip2 xz brotli editline
             openssl sqlite
             libarchive
@@ -260,6 +260,7 @@
             echo "file binary-dist $fn" >> $out/nix-support/hydra-build-products
             tar cvfJ $fn \
               --owner=0 --group=0 --mode=u+rw,uga+r \
+              --mtime='1970-01-01' \
               --absolute-names \
               --hard-dereference \
               --transform "s,$TMPDIR/install,$dir/install," \
@@ -363,7 +364,7 @@
 
               buildInputs =
                 [ nix
-                  curl
+                  (curl.override { patchNetrcRegression = true; })
                   bzip2
                   xz
                   pkgs.perl
@@ -544,6 +545,11 @@
             # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
             # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;
           } "touch $out");
+
+        installerTests = import ./tests/installer {
+          binaryTarballs = self.hydraJobs.binaryTarball;
+          inherit nixpkgsFor;
+        };
 
       };
 

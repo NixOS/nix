@@ -114,7 +114,13 @@ std::vector<Path> getUserConfigFiles()
 
 unsigned int Settings::getDefaultCores()
 {
-    return std::max(1U, std::thread::hardware_concurrency());
+    const unsigned int concurrency = std::max(1U, std::thread::hardware_concurrency());
+    const unsigned int maxCPU = getMaxCPU();
+
+    if (maxCPU > 0)
+      return maxCPU;
+    else
+      return concurrency;
 }
 
 StringSet Settings::getDefaultSystemFeatures()
@@ -148,13 +154,9 @@ StringSet Settings::getDefaultExtraPlatforms()
     // machines. Note that we can’t force processes from executing
     // x86_64 in aarch64 environments or vice versa since they can
     // always exec with their own binary preferences.
-    if (pathExists("/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist") ||
-        pathExists("/System/Library/LaunchDaemons/com.apple.oahd.plist")) {
-        if (std::string{SYSTEM} == "x86_64-darwin")
-            extraPlatforms.insert("aarch64-darwin");
-        else if (std::string{SYSTEM} == "aarch64-darwin")
-            extraPlatforms.insert("x86_64-darwin");
-    }
+    if (std::string{SYSTEM} == "aarch64-darwin" &&
+        runProgram(RunOptions {.program = "arch", .args = {"-arch", "x86_64", "/usr/bin/true"}, .mergeStderrToStdout = true}).first == 0)
+        extraPlatforms.insert("x86_64-darwin");
 #endif
 
     return extraPlatforms;
