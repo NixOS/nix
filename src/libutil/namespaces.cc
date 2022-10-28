@@ -18,19 +18,28 @@ bool userNamespacesSupported()
         }
 
         Path maxUserNamespaces = "/proc/sys/user/max_user_namespaces";
-        if (!pathExists(maxUserNamespaces) ||
-            trim(readFile(maxUserNamespaces)) == "0")
-        {
-            debug("user namespaces appear to be disabled; check '/proc/sys/user/max_user_namespaces'");
-            return false;
+        if (pathExists(maxUserNamespaces) {
+            /* If the file exists, we should respect what it says. */
+            if (trim(readFile(maxUserNamespaces)) == "0") {
+                debug("user namespaces appear to be disabled; check '/proc/sys/user/max_user_namespaces'");
+                return false;
+            }
+        } else {
+            /* Older Linux kernels never produce this file, whether or
+               not user namespaces are available. Assume we are running
+               an older kernel and continue. */
         }
 
         Path procSysKernelUnprivilegedUsernsClone = "/proc/sys/kernel/unprivileged_userns_clone";
-        if (pathExists(procSysKernelUnprivilegedUsernsClone)
-            && trim(readFile(procSysKernelUnprivilegedUsernsClone)) == "0")
-        {
-            debug("user namespaces appear to be disabled; check '/proc/sys/kernel/unprivileged_userns_clone'");
-            return false;
+        if (pathExists(procSysKernelUnprivilegedUsernsClone) {
+            /* If the file exists, we should respect what it says. */
+            if (trim(readFile(procSysKernelUnprivilegedUsernsClone)) == "0")
+            {
+                debug("user namespaces appear to be disabled; check '/proc/sys/kernel/unprivileged_userns_clone'");
+                return false;
+            }
+        } else {
+            /* Assume all good, just like above. */
         }
 
         try {
