@@ -53,7 +53,6 @@ static bool haveInternet()
 }
 
 std::string programPath;
-char * * savedArgv;
 
 struct HelpRequested { };
 
