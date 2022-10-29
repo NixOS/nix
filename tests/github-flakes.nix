@@ -7,7 +7,7 @@ with import (nixpkgs + "/nixos/lib/testing-python.nix") {
 
 let
 
-  # Generate a fake root CA and a fake api.github.com / channels.nixos.org certificate.
+  # Generate a fake root CA and a fake api.github.com / github.com / channels.nixos.org certificate.
   cert = pkgs.runCommand "cert" { buildInputs = [ pkgs.openssl ]; }
     ''
       mkdir -p $out
@@ -18,7 +18,7 @@ let
 
       openssl req -newkey rsa:2048 -nodes -keyout $out/server.key \
         -subj "/C=CN/ST=Denial/L=Springfield/O=Dis/CN=github.com" -out server.csr
-      openssl x509 -req -extfile <(printf "subjectAltName=DNS:api.github.com,DNS:channels.nixos.org") \
+      openssl x509 -req -extfile <(printf "subjectAltName=DNS:api.github.com,DNS:github.com,DNS:channels.nixos.org") \
         -days 36500 -in server.csr -CA $out/ca.crt -CAkey ca.key -CAcreateserial -out $out/server.crt
     '';
 
@@ -47,18 +47,20 @@ let
 
   api = pkgs.runCommand "nixpkgs-flake" {}
     ''
-      mkdir -p $out/tarball
+      mkdir -p $out/commits
+      echo '{"sha": "${nixpkgs.rev}"}' > $out/commits/HEAD
+    '';
+
+  archive = pkgs.runCommand "nixpkgs-flake" {}
+    ''
+      mkdir -p $out/archive
 
       dir=NixOS-nixpkgs-${nixpkgs.shortRev}
       cp -prd ${nixpkgs} $dir
       # Set the correct timestamp in the tarball.
       find $dir -print0 | xargs -0 touch -t ${builtins.substring 0 12 nixpkgs.lastModifiedDate}.${builtins.substring 12 2 nixpkgs.lastModifiedDate} --
-      tar cfz $out/tarball/${nixpkgs.rev} $dir --hard-dereference
-
-      mkdir -p $out/commits
-      echo '{"sha": "${nixpkgs.rev}"}' > $out/commits/HEAD
+      tar cfz $out/archive/${nixpkgs.rev}.tar.gz $dir --hard-dereference
     '';
-
 in
 
 makeTest (
@@ -97,6 +99,16 @@ makeTest (
                   }
                 ];
             };
+          services.httpd.virtualHosts."github.com" =
+            { forceSSL = true;
+              sslServerKey = "${cert}/server.key";
+              sslServerCert = "${cert}/server.crt";
+              servedDirs =
+                [ { urlPath = "/NixOS/nixpkgs";
+                    dir = archive;
+                  }
+                ];
+            };
         };
 
       client =
@@ -109,7 +121,7 @@ makeTest (
           nix.extraOptions = "experimental-features = nix-command flakes";
           environment.systemPackages = [ pkgs.jq ];
           networking.hosts.${(builtins.head nodes.github.config.networking.interfaces.eth1.ipv4.addresses).address} =
-            [ "channels.nixos.org" "api.github.com" ];
+            [ "channels.nixos.org" "api.github.com" "github.com" ];
           security.pki.certificateFiles = [ "${cert}/ca.crt" ];
         };
     };
@@ -123,7 +135,7 @@ makeTest (
 
     github.wait_for_unit("httpd.service")
 
-    client.succeed("curl -v https://api.github.com/ >&2")
+    client.succeed("curl -v https://github.com/ >&2")
     client.succeed("nix registry list | grep nixpkgs")
 
     rev = client.succeed("nix flake info nixpkgs --json | jq -r .revision")
