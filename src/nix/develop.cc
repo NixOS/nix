@@ -299,6 +299,13 @@ struct Common : InstallableCommand, MixProfile
         for (auto & var : savedVars)
             out << fmt("%s=\"$%s:$nix_saved_%s\"\n", var, var, var);
 
+        std::string nixInvocation = savedArgv[0];
+        for (int i = 1; i < savedArgc; i++) {
+            nixInvocation += " ";
+            nixInvocation += savedArgv[i];
+        }
+        out << fmt("nix_dev_invocation=\"%s\"; reload ()\n{\n  exec $nix_dev_invocation\n}\n", nixInvocation);
+
         out << "export NIX_BUILD_TOP=\"$(mktemp -d -t nix-shell.XXXXXX)\"\n";
         for (auto & i : {"TMP", "TMPDIR", "TEMP", "TEMPDIR"})
             out << fmt("export %s=\"$NIX_BUILD_TOP\"\n", i);
@@ -394,6 +401,8 @@ struct CmdDevelop : Common, MixEnvironment
 {
     std::vector<std::string> command;
     std::optional<std::string> phase;
+    bool printOutPath = false;
+    bool autoReload = false;
 
     CmdDevelop()
     {
@@ -450,6 +459,18 @@ struct CmdDevelop : Common, MixEnvironment
             .description = "Run the `installcheck` phase.",
             .handler = {&phase, {"installCheck"}},
         });
+
+        addFlag({
+            .longName = "print-out-path",
+            .description = "Print the out-path and exit.",
+            .handler = {&printOutPath, true},
+        });
+
+        addFlag({
+            .longName = "auto-reload",
+            .description = "Auto reload when Nix expressions change.",
+            .handler = {&autoReload, true},
+        });
     }
 
     std::string description() override
@@ -466,6 +487,13 @@ struct CmdDevelop : Common, MixEnvironment
 
     void run(ref<Store> store) override
     {
+        if (printOutPath) {
+            stopProgressBar();
+            auto outPath = getShellOutPath(store);
+            std::cout << store->printStorePath(outPath) << std::endl;
+            return;
+        }
+
         auto [buildEnvironment, gcroot] = getBuildEnvironment(store);
 
         auto [rcFileFd, rcFilePath] = createTempFile("nix-shell");
@@ -504,6 +532,9 @@ struct CmdDevelop : Common, MixEnvironment
             if (developSettings.bashPromptSuffix != "")
                 script += fmt("[ -n \"$PS1\" ] && PS1+=%s;\n",
                     shellEscape(developSettings.bashPromptSuffix.get()));
+
+            if (autoReload)
+                script += "nix_saved_dev_out_path=$($nix_dev_invocation --option warn-dirty false --print-out-path); PROMPT_COMMAND='[ \"$nix_saved_dev_out_path\" != \"$($nix_dev_invocation --option warn-dirty false --print-out-path)\" ] && reload';\n";
         }
 
         writeFull(rcFileFd.get(), script);

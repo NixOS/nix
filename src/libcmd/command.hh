@@ -13,6 +13,7 @@ namespace nix {
 extern std::string programPath;
 
 extern char * * savedArgv;
+extern int savedArgc;
 
 class EvalState;
 struct Pos;

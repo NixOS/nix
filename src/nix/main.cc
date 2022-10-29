@@ -54,6 +54,7 @@ static bool haveInternet()
 
 std::string programPath;
 char * * savedArgv;
+int savedArgc;
 
 struct HelpRequested { };
 
@@ -244,6 +245,7 @@ static auto rCmdHelp = registerCommand<CmdHelp>("help");
 void mainWrapped(int argc, char * * argv)
 {
     savedArgv = argv;
+    savedArgc = argc;
 
     /* The chroot helper needs to be run before any threads have been
        started. */
