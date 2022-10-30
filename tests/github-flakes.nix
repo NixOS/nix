@@ -37,6 +37,17 @@ let
               "owner": "NixOS",
               "repo": "nixpkgs"
             }
+          },
+          {
+            "from": {
+              "type": "indirect",
+              "id": "private-flake"
+            },
+            "to": {
+              "type": "github",
+              "owner": "fancy-enterprise",
+              "repo": "private-flake"
+            }
           }
         ],
         "version": 2
@@ -45,9 +56,27 @@ let
     destination = "/flake-registry.json";
   };
 
-  api = pkgs.runCommand "nixpkgs-flake" {}
+  private-flake-rev = "9f1dd0df5b54a7dc75b618034482ed42ce34383d";
+
+  private-flake-api = pkgs.runCommand "private-flake" {}
+    ''
+      mkdir -p $out/{commits,tarball}
+
+      # Setup https://docs.github.com/en/rest/commits/commits#get-a-commit
+      echo '{"sha": "${private-flake-rev}"}' > $out/commits/HEAD
+
+      # Setup tarball download via API
+      dir=private-flake
+      mkdir $dir
+      echo '{ outputs = {...}: {}; }' > $dir/flake.nix
+      tar cfz $out/tarball/${private-flake-rev} $dir --hard-dereference
+    '';
+
+  nixpkgs-api = pkgs.runCommand "nixpkgs-flake" {}
     ''
       mkdir -p $out/commits
+
+      # Setup https://docs.github.com/en/rest/commits/commits#get-a-commit
       echo '{"sha": "${nixpkgs.rev}"}' > $out/commits/HEAD
     '';
 
@@ -95,7 +124,10 @@ makeTest (
               sslServerCert = "${cert}/server.crt";
               servedDirs =
                 [ { urlPath = "/repos/NixOS/nixpkgs";
-                    dir = api;
+                    dir = nixpkgs-api;
+                  }
+                  { urlPath = "/repos/fancy-enterprise/private-flake";
+                    dir = private-flake-api;
                   }
                 ];
             };
@@ -119,7 +151,6 @@ makeTest (
           virtualisation.memorySize = 4096;
           nix.binaryCaches = lib.mkForce [ ];
           nix.extraOptions = "experimental-features = nix-command flakes";
-          environment.systemPackages = [ pkgs.jq ];
           networking.hosts.${(builtins.head nodes.github.config.networking.interfaces.eth1.ipv4.addresses).address} =
             [ "channels.nixos.org" "api.github.com" "github.com" ];
           security.pki.certificateFiles = [ "${cert}/ca.crt" ];
@@ -133,22 +164,39 @@ makeTest (
 
     start_all()
 
+    def cat_log():
+         github.succeed("cat /var/log/httpd/*.log >&2")
+
     github.wait_for_unit("httpd.service")
 
     client.succeed("curl -v https://github.com/ >&2")
-    client.succeed("nix registry list | grep nixpkgs")
+    out = client.succeed("nix registry list")
+    print(out)
+    assert "github:NixOS/nixpkgs" in out, "nixpkgs flake not found"
+    assert "github:fancy-enterprise/private-flake" in out, "private flake not found"
+    cat_log()
 
-    rev = client.succeed("nix flake info nixpkgs --json | jq -r .revision")
-    assert rev.strip() == "${nixpkgs.rev}", "revision mismatch"
+    # If no github access token is provided, nix should use the public archive url...
+    out = client.succeed("nix flake metadata nixpkgs --json")
+    print(out)
+    info = json.loads(out)
+    assert info["revision"] == "${nixpkgs.rev}", f"revision mismatch: {info['revision']} != ${nixpkgs.rev}"
+    cat_log()
+
+    # ... otherwise it should use the API
+    out = client.succeed("nix flake metadata private-flake --json --access-tokens github.com=ghp_000000000000000000000000000000000000 --tarball-ttl 0")
+    print(out)
+    info = json.loads(out)
+    assert info["revision"] == "${private-flake-rev}", f"revision mismatch: {info['revision']} != ${private-flake-rev}"
+    cat_log()
 
     client.succeed("nix registry pin nixpkgs")
-
-    client.succeed("nix flake info nixpkgs --tarball-ttl 0 >&2")
+    client.succeed("nix flake metadata nixpkgs --tarball-ttl 0 >&2")
 
     # Shut down the web server. The flake should be cached on the client.
     github.succeed("systemctl stop httpd.service")
 
-    info = json.loads(client.succeed("nix flake info nixpkgs --json"))
+    info = json.loads(client.succeed("nix flake metadata nixpkgs --json"))
     date = time.strftime("%Y%m%d%H%M%S", time.gmtime(info['lastModified']))
     assert date == "${nixpkgs.lastModifiedDate}", "time mismatch"
 
