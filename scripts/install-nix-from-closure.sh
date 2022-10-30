@@ -137,7 +137,7 @@ echo "performing a single-user installation of Nix..." >&2
 if ! [ -e "$dest" ]; then
     cmd="mkdir -m 0755 $dest && chown $USER $dest"
     echo "directory $dest does not exist; creating it by running '$cmd' using sudo" >&2
-    if ! sudo sh -c "$cmd"; then
+    if ! (sudo sh -c "$cmd" || doas sh -c "$cmd") ; then
         echo "$0: please manually run '$cmd' as root to create $dest" >&2
         exit 1
     fi
