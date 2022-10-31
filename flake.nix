@@ -113,6 +113,7 @@
             openssl sqlite
             libarchive
             boost
+            simdjson
             lowdown-nix
             gtest
           ]

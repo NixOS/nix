@@ -279,6 +279,20 @@ PKG_CHECK_MODULES([GTEST], [gtest_main])
 # Look for nlohmann/json.
 PKG_CHECK_MODULES([NLOHMANN_JSON], [nlohmann_json >= 3.9])
 
+# look for simdjson
+#AC_CHECK_HEADERS([simdjson.h])
+
+have_libsimdjson=
+AC_LANG_PUSH(C++)
+#AC_CHECK_LIB(simdjson, simdjson::get_available_implementations)
+AC_CHECK_LIB(simdjson, _ZN8simdjson25available_implementationsE, [
+  SIMDJSON_LIBS="-lsimdjson"
+  have_libsimdjson=1
+])
+AC_LANG_POP(C++)
+AC_DEFINE([HAVE_LIBSIMDJSON], [1], [Use libsimdjson])
+AC_SUBST(HAVE_LIBSIMDJSON, [$have_libsimdjson])
+AC_SUBST(SIMDJSON_LIBS, [$SIMDJSON_LIBS])
 
 # documentation generation switch
 AC_ARG_ENABLE(doc-gen, AS_HELP_STRING([--disable-doc-gen],[disable documentation generation]),
