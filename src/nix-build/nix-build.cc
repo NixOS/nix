@@ -266,7 +266,8 @@ static void main_nix_build(int argc, char * * argv)
         joined << "{...}@args: with import <nixpkgs> args; (pkgs.runCommandCC or pkgs.runCommand) \"shell\" { buildInputs = [ ";
         for (const auto & i : left)
             joined << '(' << i << ") ";
-        joined << "]; } \"\"";
+        joined << "]; } ";
+        joined << (outLink ? "\"touch $out\"" : "\"\"");
         fromArgs = true;
         left = {joined.str()};
     } else if (!fromArgs) {
@@ -437,6 +438,13 @@ static void main_nix_build(int argc, char * * argv)
         for (const auto & src : drv.inputSrcs) {
             pathsToBuild.push_back(DerivedPath::Opaque{src});
             pathsToCopy.insert(src);
+        }
+
+        if (outLink) {
+            pathsToBuild.push_back(DerivedPath::Built {
+                .drvPath = drvInfo.requireDrvPath(),
+                .outputs = drv.outputNames()
+            });
         }
 
         buildPaths(pathsToBuild);
