@@ -84,6 +84,10 @@ chmod a+rx $TEST_ROOT/spaced\ \\\'\"shell.shebang.rb
 output=$($TEST_ROOT/spaced\ \\\'\"shell.shebang.rb abc ruby)
 [ "$output" = '-e load(ARGV.shift) -- '"$TEST_ROOT"'/spaced \'\''"shell.shebang.rb abc ruby' ]
 
+# Test nix-shell --out-link -p creates gcroot
+nix-shell --pure -p foo --out-link $TEST_ROOT/gcroots/foo-root
+[ -L $TEST_ROOT/gcroots/foo-root ] && [ -L $TEST_ROOT/gcroots/foo-root-shell ]
+
 # Test 'nix develop'.
 nix develop -f "$shellDotNix" shellDrv -c bash -c '[[ -n $stdenv ]]'
 
