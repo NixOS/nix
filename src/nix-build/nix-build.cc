@@ -445,13 +445,21 @@ static void main_nix_build(int argc, char * * argv)
 
         if (shellDrv) {
             auto shellDrvOutputs = store->queryPartialDerivationOutputMap(shellDrv.value());
-            shell = store->printStorePath(shellDrvOutputs.at("out").value()) + "/bin/bash";
+            auto shellDrvOut = shellDrvOutputs.at("out").value();
+            shell = store->printStorePath(shellDrvOut) + "/bin/bash";
+
+            if (outLink) writeOutLink(*outLink + "-shell", shellDrvOut, "out");
         }
 
         if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
             auto resolvedDrv = drv.tryResolve(*store);
             assert(resolvedDrv && "Successfully resolved the derivation");
             drv = *resolvedDrv;
+        }
+
+        if (outLink) {
+            for (auto & [outputName, output] : drv.outputsAndOptPaths(*store))
+                if (output.second) writeOutLink(*outLink, *output.second, outputName);
         }
 
         // Set the environment.
