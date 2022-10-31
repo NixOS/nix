@@ -366,6 +366,14 @@ static void main_nix_build(int argc, char * * argv)
             store->buildPaths(paths, buildMode, evalStore);
     };
 
+    auto writeOutLink = [&](std::string_view prefix, const StorePath & outputPath, std::string_view outputName) {
+        if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
+            std::string symlink(prefix);
+            if (outputName != "out") symlink += "-" + outputName;
+            store2->addPermRoot(outputPath, absPath(symlink));
+        }
+    };
+
     if (runEnv) {
         if (drvs.size() != 1)
             throw UsageError("nix-shell requires a single derivation");
@@ -620,11 +628,7 @@ static void main_nix_build(int argc, char * * argv)
             assert(maybeOutputPath);
             auto outputPath = *maybeOutputPath;
 
-            if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
-                std::string symlink = drvPrefix;
-                if (outputName != "out") symlink += "-" + outputName;
-                store2->addPermRoot(outputPath, absPath(symlink));
-            }
+            writeOutLink(drvPrefix, outputPath, outputName);
 
             outPaths.push_back(outputPath);
         }
