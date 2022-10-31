@@ -224,3 +224,27 @@ rm -rf $repo/.git
 # should succeed for a repo without commits
 git init $repo
 path10=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
+
+# start fresh
+rm -rf $repo
+git init $repo
+git -C $repo config user.email "foobar@example.com"
+git -C $repo config user.name "Foobar"
+touch $repo/foo
+
+# check for repo dirty and untracked files warning
+nixwarnings=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\")" 2>&1 > /dev/null)
+(echo $nixwarnings | grep -Pe "warning: .* is dirty")
+(echo $nixwarnings | grep -Pe "warning: .* has untracked files")
+
+# check for repo dirty but no untracked files warning
+git -C $repo add foo
+nixwarnings=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\")" 2>&1 > /dev/null)
+(echo $nixwarnings | grep -Pe "warning: .* is dirty")
+(! echo $nixwarnings | grep -Pe "warning: .* has untracked files")
+
+# committing should remove all warnings
+git -C $repo commit -m 'Bla6'
+nixwarnings=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\")" 2>&1 > /dev/null)
+(! echo $nixwarnings | grep -Pe "warning: .* is dirty")
+(! echo $nixwarnings | grep -Pe "warning: .* has untracked files")
