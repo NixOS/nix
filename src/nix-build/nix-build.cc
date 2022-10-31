@@ -99,7 +99,7 @@ static void main_nix_build(int argc, char * * argv)
 
     AutoDelete tmpDir(createTempDir("", myName));
 
-    std::string outLink = "./result";
+    std::optional<std::string> outLink = runEnv ? std::nullopt : std::optional{"./result"};
 
     // List of environment variables kept for --pure
     std::set<std::string> keepVars{
@@ -155,7 +155,7 @@ static void main_nix_build(int argc, char * * argv)
             ; // obsolete
 
         else if (*arg == "--no-out-link" || *arg == "--no-link")
-            outLink = (Path) tmpDir + "/result";
+            outLink = std::nullopt;
 
         else if (*arg == "--attr" || *arg == "-A")
             attrPaths.push_back(getArg(*arg, arg, end));
@@ -610,7 +610,7 @@ static void main_nix_build(int argc, char * * argv)
 
         for (auto & [drvPath, outputName] : pathsToBuildOrdered) {
             auto & [counter, _wantedOutputs] = drvMap.at({drvPath});
-            std::string drvPrefix = outLink;
+            std::string drvPrefix = outLink.value_or((Path) tmpDir + "/result");
             if (counter)
                 drvPrefix += fmt("-%d", counter + 1);
 
