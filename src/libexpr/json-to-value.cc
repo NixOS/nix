@@ -49,14 +49,7 @@ static void parse_json(EvalState &state, const dom::element &doc, Value &v) {
     }
   }; break;
   case dom::element_type::STRING: {
-    /* Can't use mkString(std::string_view) since it calls strlen,
-       but our strings aren't zero-terminated so this is really slow */
-    // todo: handle null byte
-    std::string_view str = doc.get_string().value_unsafe();
-    char *buf = (char *)GC_MALLOC_ATOMIC(str.length() + 1);
-    str.copy(buf, -1);
-    buf[str.length()] = 0;
-    v.mkString(buf);
+    v.mkString(doc.get_string().value_unsafe());
   }; break;
   case dom::element_type::BOOL:
     v.mkBool(doc.get_bool().value_unsafe());

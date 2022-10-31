@@ -67,17 +67,22 @@ static char * dupString(const char * s)
 // string allocations.
 // This function handles makeImmutableStringWithLen(null, 0) by returning the
 // empty string.
+// This can't use strndup, since it calls strlen on the source string,
+// which can be really slow if it's not zero-terminated.
 static const char * makeImmutableStringWithLen(const char * s, size_t size)
 {
     char * t;
     if (size == 0)
         return "";
+    size_t len = strnlen(s, size);
 #if HAVE_BOEHMGC
-    t = GC_STRNDUP(s, size);
+    t = (char *)GC_MALLOC_ATOMIC(len + 1);
 #else
-    t = strndup(s, size);
+    t = malloc(len + 1);
 #endif
     if (!t) throw std::bad_alloc();
+    memcpy(t, s, len);
+    t[len] = 0;
     return t;
 }
 
