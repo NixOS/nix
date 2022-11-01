@@ -13,6 +13,8 @@
   [`--exclude` *regexp*]
   [`--pure`]
   [`--keep` *name*]
+  [`--no-out-link`]
+  [{`--out-link` | `-o`} *outlink*]
   {{`--packages` | `-p`} {*packages* | *expressions*} … | [*path*]}
 
 # Disambiguation
@@ -100,6 +102,16 @@ All options not listed here are passed to `nix-store
   - `--keep` *name*\
     When a `--pure` shell is started, keep the listed environment
     variables.
+
+  - [`--no-out-link`]{#opt-no-out-link}\
+    Do not create a symlink to the output path. This is the default.
+    Note that as a result the output does not become a root of the
+    garbage collector, and so might be deleted by `nix-store --gc`.
+
+  - [`--out-link`]{#opt-out-link} / `-o` *outlink*\
+    Create a symlink to the output path of the shell environment. The
+    output will then become a root of the garbage collector and will
+    not be deleted by `nix-store --gc`.
 
 The following common options are supported:
 
