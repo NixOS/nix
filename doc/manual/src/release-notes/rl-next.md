@@ -5,3 +5,4 @@
   arguments will be ignored and the resulting derivation will have
   `__impure` set to `true`, making it an impure derivation.
 
+* `nix-shell` now accepts `--out-link` and `--no-out-link` flags.
