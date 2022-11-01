@@ -1,21 +1,50 @@
 #include "json-to-value.hh"
 
-#include <variant>
-
 #ifdef HAVE_LIBSIMDJSON
 
-#include <iterator>
+#if HAVE_BOEHMGC
+#define GC_NEW_ABORTS_ON_OOM 1
+#include <gc_cpp.h>
+#endif
+
 #include <simdjson.h>
 
 using namespace simdjson;
 
 namespace nix {
 
-static void parse_json(EvalState &state, const dom::element &doc, Value &v) {
+/* dom::document with gc finalizer calling dom::document::~document() */
+struct DocumentRef
+#if HAVE_BOEHMGC
+    : gc_cleanup
+#endif
+{
+    dom::document doc;
+};
+DocumentRef& allocDocument() {
+    return *(new DocumentRef());
+}
+
+static void parse_json(EvalState &state, const dom::element &elem, Value &v, const DocumentRef& doc);
+
+/* Expression representing a partially evaluated json value */
+struct ExprJSON : Expr
+{
+    /* dom::document uses std::unique_ptr internally, so GC can't trace through elem.
+       Keep a reference to doc here. */
+    const DocumentRef& doc;
+    const dom::element elem;
+    ExprJSON(const DocumentRef& doc, const dom::element elem) : doc(doc), elem(elem) { };
+    virtual void eval(EvalState & state, Env & e, Value & v) override {
+        parse_json(state, elem, v, doc);
+    }
+};
+
+static void parse_json(EvalState &state, const dom::element &elem, Value &v, const DocumentRef& doc) {
     // TODO (C++20): using enum dom::element_type;
-    switch (doc.type()) {
+    switch (elem.type()) {
     case dom::element_type::OBJECT: {
-        dom::object obj = doc.get_object().value_unsafe();
+        dom::object obj = elem.get_object().value_unsafe();
         size_t len = obj.size();
         if (simdjson_unlikely(len == 0xFFFFFF)) {
             // TODO (C++20): len = std::distance(obj.begin(), obj.end());
@@ -33,13 +62,21 @@ static void parse_json(EvalState &state, const dom::element &doc, Value &v) {
                 field.key = field.key.substr(0, field.key.find((char)0));
             }
             Value &v2 = builder.alloc(field.key);
-            parse_json(state, field.value, v2);
+            if (field.value.is_array() || field.value.is_object()) {
+                v2.mkThunk(nullptr, new
+#if HAVE_BOEHMGC
+                (GC)
+#endif
+                    ExprJSON(doc, field.value));
+            } else {
+                parse_json(state, field.value, v2, doc);
+            }
         }
         // TODO: handle duplicate values
         v.mkAttrs(builder);
     }; break;
     case dom::element_type::ARRAY: {
-        dom::array arr = doc.get_array().value_unsafe();
+        dom::array arr = elem.get_array().value_unsafe();
         size_t len = arr.size();
         if (simdjson_unlikely(len == 0xFFFFFF)) {
             // TODO (C++20): len = std::distance(arr.begin(), arr.end());
@@ -52,31 +89,32 @@ static void parse_json(EvalState &state, const dom::element &doc, Value &v) {
         state.mkList(v, len);
         size_t i = 0;
         for (dom::element x : arr) {
-            Value *v2 = state.allocValue();
-            v.listElems()[i++] = v2;
-            parse_json(state, x, *v2);
+            Value &v2 = *state.allocValue();
+            v.listElems()[i++] = &v2;
+            parse_json(state, x, v2, doc);
         }
     }; break;
     case dom::element_type::STRING: {
-        v.mkString(doc.get_string().value_unsafe());
+        v.mkString(elem.get_string().value_unsafe());
     }; break;
     case dom::element_type::BOOL:
-        v.mkBool(doc.get_bool().value_unsafe());
+        v.mkBool(elem.get_bool().value_unsafe());
         break;
     case dom::element_type::NULL_VALUE:
         v.mkNull();
         break;
     case dom::element_type::UINT64:
     case dom::element_type::INT64:
-        v.mkInt(doc.get_int64().value_unsafe());
+        v.mkInt(elem.get_int64().value_unsafe());
         break;
     case dom::element_type::DOUBLE:
-        v.mkFloat(doc.get_double().value_unsafe());
+        v.mkFloat(elem.get_double().value_unsafe());
         break;
     default:
         assert(false);
     }
 }
+
 
 void parseJSON(EvalState & state, const std::string_view & s_, Value & v)
 {
@@ -87,8 +125,9 @@ void parseJSON(EvalState & state, const std::string_view & s_, Value & v)
            Since there's no way to guarantee this, copy the string to a temporary buffer
            This doesn't seem to be slower than calling GC_REALLOC on the string. */
         padded_string json_padded = padded_string(s_);
-        auto doc = parser.parse(json_padded);
-        parse_json(state, doc.value(), v);
+        auto& doc = allocDocument();
+        auto doc_root = parser.parse_into_document(doc.doc, json_padded);
+        parse_json(state, doc_root.value(), v, doc);
     } catch(simdjson_error &e) {
         throw JSONParseError("Error parsing JSON: %1%", e.what());
     }
@@ -97,6 +136,7 @@ void parseJSON(EvalState & state, const std::string_view & s_, Value & v)
 }
 
 #else
+#include <variant>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
