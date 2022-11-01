@@ -283,7 +283,7 @@ static void main_nix_build(int argc, char * * argv)
 
     /* Parse the expressions. */
     std::vector<Expr *> exprs;
-
+    auto parseActivity = Activity(*logger, lvlTalkative, actUnknown, "parsing expressions");
     if (readStdin)
         exprs = {state->parseStdin()};
     else
@@ -305,8 +305,9 @@ static void main_nix_build(int argc, char * * argv)
                                         inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i)))));
             }
         }
-
+    logger->stopActivity(parseActivity.id);
     /* Evaluate them into derivations. */
+    auto evaluateActivity = Activity(*logger, lvlTalkative, actUnknown, "evaluate expressions into derivations");
     if (attrPaths.empty()) attrPaths = {""};
 
     for (auto e : exprs) {
@@ -348,8 +349,8 @@ static void main_nix_build(int argc, char * * argv)
             );
         }
     }
-
     state->printStats();
+    logger->stopActivity(evaluateActivity.id);
 
     auto buildPaths = [&](const std::vector<DerivedPath> & paths) {
         /* Note: we do this even when !printMissing to efficiently

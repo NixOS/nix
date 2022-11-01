@@ -499,6 +499,7 @@ struct InstallableAttrPath : InstallableValue
 std::vector<InstallableValue::DerivationInfo> InstallableAttrPath::toDerivations()
 {
     auto v = toValue(*state).first;
+    Activity act(*logger, lvlTalkative, actUnknown, "evaluate expressions into derivations");
 
     Bindings & autoArgs = *cmd.getAutoArgs(*state);
 
@@ -760,6 +761,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
 {
     std::vector<std::shared_ptr<Installable>> result;
 
+    Activity act(*logger, lvlTalkative, actUnknown, "parsing expressions");
     if (readOnlyMode) {
         settings.readOnlyMode = true;
     }
