@@ -86,11 +86,11 @@ output=$($TEST_ROOT/spaced\ \\\'\"shell.shebang.rb abc ruby)
 
 # Test nix-shell --out-link -p creates gcroot
 nix-shell --pure -p foo --out-link $TEST_ROOT/gcroots/foo-root
-[ -L $TEST_ROOT/gcroots/foo-root ] && [ -L $TEST_ROOT/gcroots/foo-root-shell ]
+[ -L $TEST_ROOT/gcroots/foo-root ]
 
 # Test nix-shell --out-link -A creates gcroot
 nix-shell --pure -A foo --out-link $TEST_ROOT/gcroots/foo-attr-root
-[ -L $TEST_ROOT/gcroots/foo-attr-root ] && [ -L $TEST_ROOT/gcroots/foo-attr-root-shell ]
+[ -L $TEST_ROOT/gcroots/foo-attr-root ]
 
 # Test 'nix develop'.
 nix develop -f "$shellDotNix" shellDrv -c bash -c '[[ -n $stdenv ]]'

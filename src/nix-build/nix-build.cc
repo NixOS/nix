@@ -453,10 +453,7 @@ static void main_nix_build(int argc, char * * argv)
 
         if (shellDrv) {
             auto shellDrvOutputs = store->queryPartialDerivationOutputMap(shellDrv.value());
-            auto shellDrvOut = shellDrvOutputs.at("out").value();
-            shell = store->printStorePath(shellDrvOut) + "/bin/bash";
-
-            if (outLink) writeOutLink(*outLink + "-shell", shellDrvOut, "out");
+            shell = store->printStorePath(shellDrvOutputs.at("out").value()) + "/bin/bash";
         }
 
         if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
