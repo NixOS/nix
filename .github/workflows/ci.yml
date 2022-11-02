@@ -21,7 +21,7 @@ jobs:
         fetch-depth: 0
     - uses: cachix/install-nix-action@v18
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
-    - uses: cachix/cachix-action@v11
+    - uses: cachix/cachix-action@v12
       if: needs.check_secrets.outputs.cachix == 'true'
       with:
         name: '${{ env.CACHIX_NAME }}'
@@ -59,7 +59,7 @@ jobs:
         fetch-depth: 0
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
     - uses: cachix/install-nix-action@v18
-    - uses: cachix/cachix-action@v11
+    - uses: cachix/cachix-action@v12
       with:
         name: '${{ env.CACHIX_NAME }}'
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
@@ -105,7 +105,7 @@ jobs:
     - uses: cachix/install-nix-action@v18
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
     - run: echo NIX_VERSION="$(nix --experimental-features 'nix-command flakes' eval .\#default.version | tr -d \")" >> $GITHUB_ENV
-    - uses: cachix/cachix-action@v11
+    - uses: cachix/cachix-action@v12
       if: needs.check_secrets.outputs.cachix == 'true'
       with:
         name: '${{ env.CACHIX_NAME }}'
