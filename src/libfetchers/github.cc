@@ -287,17 +287,22 @@ struct GitHubInputScheme : GitArchiveInputScheme
 
     DownloadUrl getDownloadUrl(const Input & input) const override
     {
-        // FIXME: use regular /archive URLs instead? api.github.com
-        // might have stricter rate limits.
         auto host = getHost(input);
-        auto url = fmt(
-            host == "github.com"
-            ? "https://api.%s/repos/%s/%s/zipball/%s"
-            : "https://%s/api/v3/repos/%s/%s/zipball/%s",
-            host, getOwner(input), getRepo(input),
-            input.getRev()->to_string(Base16, false));
 
         Headers headers = makeHeadersWithAuthTokens(host);
+
+        // If we have no auth headers then we default to the public archive
+        // urls so we do not run into rate limits.
+        const auto urlFmt =
+            host != "github.com"
+            ? "https://%s/api/v3/repos/%s/%s/zipball/%s"
+            : headers.empty()
+            ? "https://%s/%s/%s/archive/%s.zip"
+            : "https://api.%s/repos/%s/%s/zipball/%s";
+
+        const auto url = fmt(urlFmt, host, getOwner(input), getRepo(input),
+            input.getRev()->to_string(Base16, false));
+
         return DownloadUrl { url, headers };
     }
 
