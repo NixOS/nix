@@ -81,7 +81,7 @@ int getSchema(Path schemaPath)
 
 void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
 {
-    const int nixCASchemaVersion = 3;
+    const int nixCASchemaVersion = 4;
     int curCASchema = getSchema(schemaPath);
     if (curCASchema != nixCASchemaVersion) {
         if (curCASchema > nixCASchemaVersion) {
@@ -143,7 +143,22 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
             )");
             txn.commit();
         }
-        writeFile(schemaPath, fmt("%d", nixCASchemaVersion));
+        if (curCASchema < 4) {
+            SQLiteTxn txn(db);
+            db.exec(R"(
+                create trigger if not exists DeleteSelfRefsViaRealisations before delete on ValidPaths
+                begin
+                    delete from RealisationsRefs where realisationReference in (
+                    select id from Realisations where outputPath = old.id
+                    );
+                end;
+                -- used by deletion trigger
+                create index if not exists IndexRealisationsRefsRealisationReference on RealisationsRefs(realisationReference);
+            )");
+            txn.commit();
+        }
+
+        writeFile(schemaPath, fmt("%d", nixCASchemaVersion), 0666, true);
         lockFile(lockFd.get(), ltRead, true);
     }
 }
@@ -266,7 +281,7 @@ LocalStore::LocalStore(const Params & params)
     else if (curSchema == 0) { /* new store */
         curSchema = nixSchemaVersion;
         openDB(*state, true);
-        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
+        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str(), 0666, true);
     }
 
     else if (curSchema < nixSchemaVersion) {
@@ -314,7 +329,7 @@ LocalStore::LocalStore(const Params & params)
             txn.commit();
         }
 
-        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
+        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str(), 0666, true);
 
         lockFile(globalLock.get(), ltRead, true);
     }
@@ -482,18 +497,18 @@ void LocalStore::openDB(State & state, bool create)
         SQLiteStmt stmt;
         stmt.create(db, "pragma main.journal_mode;");
         if (sqlite3_step(stmt) != SQLITE_ROW)
-            throwSQLiteError(db, "querying journal mode");
+            SQLiteError::throw_(db, "querying journal mode");
         prevMode = std::string((const char *) sqlite3_column_text(stmt, 0));
     }
     if (prevMode != mode &&
         sqlite3_exec(db, ("pragma main.journal_mode = " + mode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
-        throwSQLiteError(db, "setting journal mode");
+        SQLiteError::throw_(db, "setting journal mode");
 
     /* Increase the auto-checkpoint interval to 40000 pages.  This
        seems enough to ensure that instantiating the NixOS system
        derivation is done in a single fsync(). */
     if (mode == "wal" && sqlite3_exec(db, "pragma wal_autocheckpoint = 40000;", 0, 0, 0) != SQLITE_OK)
-        throwSQLiteError(db, "setting autocheckpoint interval");
+        SQLiteError::throw_(db, "setting autocheckpoint interval");
 
     /* Initialise the database schema, if necessary. */
     if (create) {
@@ -702,31 +717,38 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
     // combinations that are currently prohibited.
     drv.type();
 
-    std::optional<Hash> h;
+    std::optional<DrvHash> hashesModulo;
     for (auto & i : drv.outputs) {
         std::visit(overloaded {
-            [&](const DerivationOutputInputAddressed & doia) {
-                if (!h) {
+            [&](const DerivationOutput::InputAddressed & doia) {
+                if (!hashesModulo) {
                     // somewhat expensive so we do lazily
-                    auto temp = hashDerivationModulo(*this, drv, true);
-                    h = std::get<Hash>(temp);
+                    hashesModulo = hashDerivationModulo(*this, drv, true);
                 }
-                StorePath recomputed = makeOutputPath(i.first, *h, drvName);
+                auto currentOutputHash = get(hashesModulo->hashes, i.first);
+                if (!currentOutputHash)
+                    throw Error("derivation '%s' has unexpected output '%s' (local-store / hashesModulo) named '%s'",
+                        printStorePath(drvPath), printStorePath(doia.path), i.first);
+                StorePath recomputed = makeOutputPath(i.first, *currentOutputHash, drvName);
                 if (doia.path != recomputed)
                     throw Error("derivation '%s' has incorrect output '%s', should be '%s'",
                         printStorePath(drvPath), printStorePath(doia.path), printStorePath(recomputed));
                 envHasRightPath(doia.path, i.first);
             },
-            [&](const DerivationOutputCAFixed & dof) {
+            [&](const DerivationOutput::CAFixed & dof) {
                 StorePath path = makeFixedOutputPath(dof.hash.method, dof.hash.hash, drvName);
                 envHasRightPath(path, i.first);
             },
-            [&](const DerivationOutputCAFloating &) {
+            [&](const DerivationOutput::CAFloating &) {
                 /* Nothing to check */
             },
-            [&](const DerivationOutputDeferred &) {
+            [&](const DerivationOutput::Deferred &) {
+                /* Nothing to check */
             },
-        }, i.second.output);
+            [&](const DerivationOutput::Impure &) {
+                /* Nothing to check */
+            },
+        }, i.second.raw());
     }
 }
 
@@ -736,7 +758,7 @@ void LocalStore::registerDrvOutput(const Realisation & info, CheckSigsFlag check
     if (checkSigs == NoCheckSigs || !realisationIsUntrusted(info))
         registerDrvOutput(info);
     else
-        throw Error("cannot register realisation '%s' because it lacks a valid signature", info.outPath.to_string());
+        throw Error("cannot register realisation '%s' because it lacks a signature by a trusted key", info.outPath.to_string());
 }
 
 void LocalStore::registerDrvOutput(const Realisation & info)
@@ -1251,7 +1273,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     RepairFlag repair, CheckSigsFlag checkSigs)
 {
     if (checkSigs && pathInfoIsUntrusted(info))
-        throw Error("cannot add path '%s' because it lacks a valid signature", printStorePath(info.path));
+        throw Error("cannot add path '%s' because it lacks a signature by a trusted key", printStorePath(info.path));
 
     addTempRoot(info.path);
 
@@ -1367,13 +1389,15 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
 
     std::unique_ptr<AutoDelete> delTempDir;
     Path tempPath;
+    Path tempDir;
+    AutoCloseFD tempDirFd;
 
     if (!inMemory) {
         /* Drain what we pulled so far, and then keep on pulling */
         StringSource dumpSource { dump };
         ChainSource bothSource { dumpSource, source };
 
-        auto tempDir = createTempDir(realStoreDir, "add");
+        std::tie(tempDir, tempDirFd) = createTempDirInStore();
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir + "/x";
 
@@ -1415,8 +1439,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
                     writeFile(realPath, dumpSource);
             } else {
                 /* Move the temporary path we restored above. */
-                if (rename(tempPath.c_str(), realPath.c_str()))
-                    throw Error("renaming '%s' to '%s'", tempPath, realPath);
+                moveFile(tempPath, realPath);
             }
 
             /* For computing the nar hash. In recursive SHA-256 mode, this
@@ -1493,18 +1516,24 @@ StorePath LocalStore::addTextToStore(
 
 
 /* Create a temporary directory in the store that won't be
-   garbage-collected. */
-Path LocalStore::createTempDirInStore()
+   garbage-collected until the returned FD is closed. */
+std::pair<Path, AutoCloseFD> LocalStore::createTempDirInStore()
 {
-    Path tmpDir;
+    Path tmpDirFn;
+    AutoCloseFD tmpDirFd;
+    bool lockedByUs = false;
     do {
         /* There is a slight possibility that `tmpDir' gets deleted by
-           the GC between createTempDir() and addTempRoot(), so repeat
-           until `tmpDir' exists. */
-        tmpDir = createTempDir(realStoreDir);
-        addTempRoot(parseStorePath(tmpDir));
-    } while (!pathExists(tmpDir));
-    return tmpDir;
+           the GC between createTempDir() and when we acquire a lock on it.
+           We'll repeat until 'tmpDir' exists and we've locked it. */
+        tmpDirFn = createTempDir(realStoreDir, "tmp");
+        tmpDirFd = open(tmpDirFn.c_str(), O_RDONLY | O_DIRECTORY);
+        if (tmpDirFd.get() < 0) {
+            continue;
+        }
+        lockedByUs = lockFile(tmpDirFd.get(), ltWrite, true);
+    } while (!pathExists(tmpDirFn) || !lockedByUs);
+    return {tmpDirFn, std::move(tmpDirFd)};
 }
 
 
@@ -1927,8 +1956,7 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
 
     writeFile(tmpFile, compress("bzip2", log));
 
-    if (rename(tmpFile.c_str(), logPath.c_str()) != 0)
-        throw SysError("renaming '%1%' to '%2%'", tmpFile, logPath);
+    renameFile(tmpFile, logPath);
 }
 
 std::optional<std::string> LocalStore::getVersion()

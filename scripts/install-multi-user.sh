@@ -23,10 +23,10 @@ readonly RED='\033[31m'
 # installer allows overriding build user count to speed up installation
 # as creating each user takes non-trivial amount of time on macos
 readonly NIX_USER_COUNT=${NIX_USER_COUNT:-32}
-readonly NIX_BUILD_GROUP_ID="30000"
+readonly NIX_BUILD_GROUP_ID="${NIX_BUILD_GROUP_ID:-30000}"
 readonly NIX_BUILD_GROUP_NAME="nixbld"
 # darwin installer needs to override these
-NIX_FIRST_BUILD_UID="30001"
+NIX_FIRST_BUILD_UID="${NIX_FIRST_BUILD_UID:-30001}"
 NIX_BUILD_USER_NAME_TEMPLATE="nixbld%d"
 # Please don't change this. We don't support it, because the
 # default shell profile that comes with Nix doesn't support it.
@@ -36,6 +36,19 @@ readonly NIX_EXTRA_CONF=${NIX_EXTRA_CONF:-}
 readonly PROFILE_TARGETS=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/zshrc" "/etc/bash.bashrc" "/etc/zsh/zshrc")
 readonly PROFILE_BACKUP_SUFFIX=".backup-before-nix"
 readonly PROFILE_NIX_FILE="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
+
+# Fish has different syntax than zsh/bash, treat it separate
+readonly PROFILE_FISH_SUFFIX="conf.d/nix.fish"
+readonly PROFILE_FISH_PREFIXES=(
+    # each of these are common values of $__fish_sysconf_dir,
+    # under which Fish will look for a file named
+    # $PROFILE_FISH_SUFFIX.
+    "/etc/fish"              # standard
+    "/usr/local/etc/fish"    # their installer .pkg for macOS
+    "/opt/homebrew/etc/fish" # homebrew
+    "/opt/local/etc/fish"    # macports
+)
+readonly PROFILE_NIX_FILE_FISH="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.fish"
 
 readonly NIX_INSTALLED_NIX="@nix@"
 readonly NIX_INSTALLED_CACERT="@cacert@"
@@ -53,6 +66,30 @@ fi
 
 headless() {
     if [ "$IS_HEADLESS" = "yes" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+is_root() {
+    if [ "$EUID" -eq 0 ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+is_os_linux() {
+    if [ "$(uname -s)" = "Linux" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+is_os_darwin() {
+    if [ "$(uname -s)" = "Darwin" ]; then
         return 0
     else
         return 1
@@ -313,14 +350,23 @@ __sudo() {
 _sudo() {
     local expl="$1"
     shift
-    if ! headless; then
+    if ! headless || is_root; then
         __sudo "$expl" "$*" >&2
     fi
-    sudo "$@"
+
+    if is_root; then
+        env "$@"
+    else
+        sudo "$@"
+    fi
 }
 
+# Ensure that $TMPDIR exists if defined.
+if [[ -n "${TMPDIR:-}" ]] && [[ ! -d "${TMPDIR:-}" ]]; then
+    mkdir -m 0700 -p "${TMPDIR:-}"
+fi
 
-readonly SCRATCH=$(mktemp -d "${TMPDIR:-/tmp/}tmp.XXXXXXXXXX")
+readonly SCRATCH=$(mktemp -d)
 finish_cleanup() {
     rm -rf "$SCRATCH"
 }
@@ -329,7 +375,7 @@ finish_fail() {
     finish_cleanup
 
     failure <<EOF
-Jeeze, something went wrong. If you can take all the output and open
+Oh no, something went wrong. If you can take all the output and open
 an issue, we'd love to fix the problem so nobody else has this issue.
 
 :(
@@ -423,6 +469,18 @@ EOF
         fi
     done
 
+    if is_os_linux && [ ! -e /run/systemd/system ]; then
+        warning <<EOF
+We did not detect systemd on your system. With a multi-user install
+without systemd you will have to manually configure your init system to
+launch the Nix daemon after installation.
+EOF
+        if ! ui_confirm "Do you want to proceed with a multi-user installation?"; then
+            failure <<EOF
+You have aborted the installation.
+EOF
+        fi
+    fi
 }
 
 setup_report() {
@@ -626,6 +684,17 @@ place_channel_configuration() {
     fi
 }
 
+check_selinux() {
+    if command -v getenforce > /dev/null 2>&1; then
+        if [ "$(getenforce)" = "Enforcing" ]; then
+            failure <<EOF
+Nix does not work with selinux enabled yet!
+see https://github.com/NixOS/nix/issues/2374
+EOF
+        fi
+    fi
+}
+
 welcome_to_nix() {
     ok "Welcome to the Multi-User Nix Installation"
 
@@ -739,7 +808,7 @@ install_from_extracted_nix() {
         cd "$EXTRACTED_NIX_PATH"
 
         _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
-              cp -RLp ./store/* "$NIX_ROOT/store/"
+              cp -RPp ./store/* "$NIX_ROOT/store/"
 
         _sudo "to make the new store non-writable at $NIX_ROOT/store" \
               chmod -R ugo-w "$NIX_ROOT/store/"
@@ -754,7 +823,7 @@ EOF
         fi
 
         _sudo "to load data for the first time in to the Nix Database" \
-              "$NIX_INSTALLED_NIX/bin/nix-store" --load-db < ./.reginfo
+              HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-store" --load-db < ./.reginfo
 
         echo "      Just finished getting the nix database ready."
     )
@@ -767,6 +836,19 @@ shell_source_lines() {
 if [ -e '$PROFILE_NIX_FILE' ]; then
   . '$PROFILE_NIX_FILE'
 fi
+# End Nix
+
+EOF
+}
+
+# Fish has differing syntax
+fish_source_lines() {
+    cat <<EOF
+
+# Nix
+if test -e '$PROFILE_NIX_FILE_FISH'
+  . '$PROFILE_NIX_FILE_FISH'
+end
 # End Nix
 
 EOF
@@ -793,6 +875,27 @@ configure_shell_profile() {
                         tee -a "$profile_target"
         fi
     done
+
+    task "Setting up shell profiles for Fish with with ${PROFILE_FISH_SUFFIX} inside ${PROFILE_FISH_PREFIXES[*]}"
+    for fish_prefix in "${PROFILE_FISH_PREFIXES[@]}"; do
+        if [ ! -d "$fish_prefix" ]; then
+            # this specific prefix (ie: /etc/fish) is very likely to exist
+            # if Fish is installed with this sysconfdir.
+            continue
+        fi
+
+        profile_target="${fish_prefix}/${PROFILE_FISH_SUFFIX}"
+        conf_dir=$(dirname "$profile_target")
+        if [ ! -d "$conf_dir" ]; then
+            _sudo "create $conf_dir for our Fish hook" \
+                mkdir "$conf_dir"
+        fi
+
+        fish_source_lines \
+            | _sudo "write nix-daemon settings to $profile_target" \
+                    tee "$profile_target"
+    done
+
     # TODO: should we suggest '. $PROFILE_NIX_FILE'? It would get them on
     # their way less disruptively, but a counter-argument is that they won't
     # immediately notice if something didn't get set up right?
@@ -842,22 +945,14 @@ EOF
           install -m 0664 "$SCRATCH/nix.conf" /etc/nix/nix.conf
 }
 
-main() {
-    # TODO: I've moved this out of validate_starting_assumptions so we
-    # can fail faster in this case. Sourcing install-darwin... now runs
-    # `touch /` to detect Read-only root, but it could update times on
-    # pre-Catalina macOS if run as root user.
-    if [ "$EUID" -eq 0 ]; then
-        failure <<EOF
-Please do not run this script with root privileges. I will call sudo
-when I need to.
-EOF
-    fi
 
-    if [ "$(uname -s)" = "Darwin" ]; then
+main() {
+    check_selinux
+
+    if is_os_darwin; then
         # shellcheck source=./install-darwin-multi-user.sh
         . "$EXTRACTED_NIX_PATH/install-darwin-multi-user.sh"
-    elif [ "$(uname -s)" = "Linux" ]; then
+    elif is_os_linux; then
         # shellcheck source=./install-systemd-multi-user.sh
         . "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh" # most of this works on non-systemd distros also
     else
@@ -865,7 +960,10 @@ EOF
     fi
 
     welcome_to_nix
-    chat_about_sudo
+
+    if ! is_root; then
+        chat_about_sudo
+    fi
 
     cure_artifacts
     # TODO: there's a tension between cure and validate. I moved the

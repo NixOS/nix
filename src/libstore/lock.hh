@@ -2,6 +2,8 @@
 
 #include "types.hh"
 
+#include <optional>
+
 namespace nix {
 
 struct UserLock

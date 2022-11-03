@@ -5,6 +5,7 @@
 #include "path-with-outputs.hh"
 #include "derived-path.hh"
 #include "eval.hh"
+#include "store-api.hh"
 #include "flake/flake.hh"
 
 #include <optional>
@@ -29,6 +30,27 @@ struct UnresolvedApp
     App resolve(ref<Store> evalStore, ref<Store> store);
 };
 
+enum class Realise {
+    /* Build the derivation. Postcondition: the
+       derivation outputs exist. */
+    Outputs,
+    /* Don't build the derivation. Postcondition: the store derivation
+       exists. */
+    Derivation,
+    /* Evaluate in dry-run mode. Postcondition: nothing. */
+    // FIXME: currently unused, but could be revived if we can
+    // evaluate derivations in-memory.
+    Nothing
+};
+
+/* How to handle derivations in commands that operate on store paths. */
+enum class OperateOn {
+    /* Operate on the output path. */
+    Output,
+    /* Operate on the .drv path. */
+    Derivation
+};
+
 struct Installable
 {
     virtual ~Installable() { }
@@ -46,7 +68,7 @@ struct Installable
 
     UnresolvedApp toApp(EvalState & state);
 
-    virtual std::pair<Value *, Pos> toValue(EvalState & state)
+    virtual std::pair<Value *, PosIdx> toValue(EvalState & state)
     {
         throw Error("argument '%s' cannot be evaluated", what());
     }
@@ -58,17 +80,59 @@ struct Installable
         return {};
     }
 
-    virtual std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
+    virtual std::vector<ref<eval_cache::AttrCursor>>
     getCursors(EvalState & state);
 
-    std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>
+    virtual ref<eval_cache::AttrCursor>
     getCursor(EvalState & state);
 
     virtual FlakeRef nixpkgsFlakeRef() const
     {
         return FlakeRef::fromAttrs({{"type","indirect"}, {"id", "nixpkgs"}});
     }
+
+    static BuiltPaths build(
+        ref<Store> evalStore,
+        ref<Store> store,
+        Realise mode,
+        const std::vector<std::shared_ptr<Installable>> & installables,
+        BuildMode bMode = bmNormal);
+
+    static std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> build2(
+        ref<Store> evalStore,
+        ref<Store> store,
+        Realise mode,
+        const std::vector<std::shared_ptr<Installable>> & installables,
+        BuildMode bMode = bmNormal);
+
+    static std::set<StorePath> toStorePaths(
+        ref<Store> evalStore,
+        ref<Store> store,
+        Realise mode,
+        OperateOn operateOn,
+        const std::vector<std::shared_ptr<Installable>> & installables);
+
+    static StorePath toStorePath(
+        ref<Store> evalStore,
+        ref<Store> store,
+        Realise mode,
+        OperateOn operateOn,
+        std::shared_ptr<Installable> installable);
+
+    static std::set<StorePath> toDerivations(
+        ref<Store> store,
+        const std::vector<std::shared_ptr<Installable>> & installables,
+        bool useDeriver = false);
+
+    static BuiltPaths toBuiltPaths(
+        ref<Store> evalStore,
+        ref<Store> store,
+        Realise mode,
+        OperateOn operateOn,
+        const std::vector<std::shared_ptr<Installable>> & installables);
 };
+
+typedef std::vector<std::shared_ptr<Installable>> Installables;
 
 struct InstallableValue : Installable
 {
@@ -79,8 +143,8 @@ struct InstallableValue : Installable
     struct DerivationInfo
     {
         StorePath drvPath;
-        std::optional<StorePath> outPath;
-        std::string outputName;
+        std::set<std::string> outputsToInstall;
+        std::optional<NixInt> priority;
     };
 
     virtual std::vector<DerivationInfo> toDerivations() = 0;
@@ -95,6 +159,7 @@ struct InstallableFlake : InstallableValue
     FlakeRef flakeRef;
     Strings attrPaths;
     Strings prefixes;
+    OutputsSpec outputsSpec;
     const flake::LockFlags & lockFlags;
     mutable std::shared_ptr<flake::LockedFlake> _lockedFlake;
 
@@ -103,6 +168,7 @@ struct InstallableFlake : InstallableValue
         ref<EvalState> state,
         FlakeRef && flakeRef,
         std::string_view fragment,
+        OutputsSpec outputsSpec,
         Strings attrPaths,
         Strings prefixes,
         const flake::LockFlags & lockFlags);
@@ -117,10 +183,16 @@ struct InstallableFlake : InstallableValue
 
     std::vector<DerivationInfo> toDerivations() override;
 
-    std::pair<Value *, Pos> toValue(EvalState & state) override;
+    std::pair<Value *, PosIdx> toValue(EvalState & state) override;
 
-    std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
+    /* Get a cursor to every attrpath in getActualAttrPaths() that
+       exists. */
+    std::vector<ref<eval_cache::AttrCursor>>
     getCursors(EvalState & state) override;
+
+    /* Get a cursor to the first attrpath in getActualAttrPaths() that
+       exists, or throw an exception with suggestions if none exists. */
+    ref<eval_cache::AttrCursor> getCursor(EvalState & state) override;
 
     std::shared_ptr<flake::LockedFlake> getLockedFlake() const;
 

@@ -1,15 +1,19 @@
 name: Hydra status
+
+permissions: read-all
+
 on:
   schedule:
     - cron: "12,42 * * * *"
   workflow_dispatch:
+
 jobs:
   check_hydra_status:
     name: Check Hydra status
     if: github.repository_owner == 'NixOS'
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2.4.0
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 0
     - run: bash scripts/check-hydra-status.sh

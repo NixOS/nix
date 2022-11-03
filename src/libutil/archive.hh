@@ -48,6 +48,10 @@ namespace nix {
 void dumpPath(const Path & path, Sink & sink,
     PathFilter & filter = defaultPathFilter);
 
+/* Same as `void dumpPath()`, but returns the last modified date of the path */
+time_t dumpPathAndGetMtime(const Path & path, Sink & sink,
+    PathFilter & filter = defaultPathFilter);
+
 void dumpString(std::string_view s, Sink & sink);
 
 /* FIXME: fix this API, it sucks. */
@@ -56,6 +60,7 @@ struct ParseSink
     virtual void createDirectory(const Path & path) { };
 
     virtual void createRegularFile(const Path & path) { };
+    virtual void closeRegularFile() { };
     virtual void isExecutable() { };
     virtual void preallocateContents(uint64_t size) { };
     virtual void receiveContents(std::string_view data) { };

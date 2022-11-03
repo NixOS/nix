@@ -57,12 +57,21 @@ struct DerivationGoal : public Goal
        them. */
     StringSet wantedOutputs;
 
+    /* Mapping from input derivations + output names to actual store
+       paths. This is filled in by waiteeDone() as each dependency
+       finishes, before inputsRealised() is reached, */
+    std::map<std::pair<StorePath, std::string>, StorePath> inputDrvOutputs;
+
     /* Whether additional wanted outputs have been added. */
     bool needRestart = false;
 
     /* Whether to retry substituting the outputs after building the
-       inputs. */
-    bool retrySubstitution;
+       inputs. This is done in case of an incomplete closure. */
+    bool retrySubstitution = false;
+
+    /* Whether we've retried substitution, in which case we won't try
+       again. */
+    bool retriedSubstitution = false;
 
     /* The derivation stored at drvPath. */
     std::unique_ptr<Derivation> drv;
@@ -104,19 +113,7 @@ struct DerivationGoal : public Goal
     typedef void (DerivationGoal::*GoalState)();
     GoalState state;
 
-    /* The final output paths of the build.
-
-       - For input-addressed derivations, always the precomputed paths
-
-       - For content-addressed derivations, calcuated from whatever the hash
-         ends up being. (Note that fixed outputs derivations that produce the
-         "wrong" output still install that data under its true content-address.)
-     */
-    OutputPathMap finalOutputs;
-
     BuildMode buildMode;
-
-    BuildResult result;
 
     /* The current round, if we're building multiple times. */
     size_t curRound = 1;
@@ -152,8 +149,6 @@ struct DerivationGoal : public Goal
     /* Add wanted outputs to an already existing derivation goal. */
     void addWantedOutputs(const StringSet & outputs);
 
-    BuildResult getResult() { return result; }
-
     /* The states. */
     void getDerivation();
     void loadDerivation();
@@ -175,7 +170,7 @@ struct DerivationGoal : public Goal
 
     /* Check that the derivation outputs all exist and register them
        as valid. */
-    virtual void registerOutputs();
+    virtual DrvOutputs registerOutputs();
 
     /* Open a log file and a pipe to it. */
     Path openLogFile();
@@ -210,8 +205,17 @@ struct DerivationGoal : public Goal
     std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap();
     OutputPathMap queryDerivationOutputMap();
 
-    /* Return the set of (in)valid paths. */
-    void checkPathValidity();
+    /* Update 'initialOutputs' to determine the current status of the
+       outputs of the derivation. Also returns a Boolean denoting
+       whether all outputs are valid and non-corrupt, and a
+       'DrvOutputs' structure containing the valid and wanted
+       outputs. */
+    std::pair<bool, DrvOutputs> checkPathValidity();
+
+    /* Aborts if any output is not valid or corrupt, and otherwise
+       returns a 'DrvOutputs' structure containing the wanted
+       outputs. */
+    DrvOutputs assertPathValidity();
 
     /* Forcibly kill the child process, if any. */
     virtual void killChild();
@@ -222,7 +226,10 @@ struct DerivationGoal : public Goal
 
     void done(
         BuildResult::Status status,
+        DrvOutputs builtOutputs = {},
         std::optional<Error> ex = {});
+
+    void waiteeDone(GoalPtr waitee, ExitCode result) override;
 
     StorePathSet exportReferences(const StorePathSet & storePaths);
 };

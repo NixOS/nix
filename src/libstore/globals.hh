@@ -79,9 +79,6 @@ public:
     /* A list of user configuration files to load. */
     std::vector<Path> nixUserConfFiles;
 
-    /* The directory where internal helper programs are stored. */
-    Path nixLibexecDir;
-
     /* The directory where the main programs are stored. */
     Path nixBinDir;
 
@@ -195,7 +192,7 @@ public:
         )",
         {"build-timeout"}};
 
-    PathSetting buildHook{this, true, nixLibexecDir + "/nix/build-remote", "build-hook",
+    PathSetting buildHook{this, true, "", "build-hook",
         "The path of the helper program that executes builds to remote machines."};
 
     Setting<std::string> builders{
@@ -576,9 +573,15 @@ public:
         R"(
           If set to `true` (the default), any non-content-addressed path added
           or copied to the Nix store (e.g. when substituting from a binary
-          cache) must have a valid signature, that is, be signed using one of
-          the keys listed in `trusted-public-keys` or `secret-key-files`. Set
-          to `false` to disable signature checking.
+          cache) must have a signature by a trusted key. A trusted key is one
+          listed in `trusted-public-keys`, or a public key counterpart to a
+          private key stored in a file listed in `secret-key-files`.
+          
+          Set to `false` to disable signature checking and trust all
+          non-content-addressed paths unconditionally.
+          
+          (Content-addressed paths are inherently trustworthy and thus
+          unaffected by this configuration option.)
         )"};
 
     Setting<StringSet> extraPlatforms{
@@ -629,6 +632,14 @@ public:
           are tried based on their Priority value, which each substituter can set
           independently. Lower value means higher priority.
           The default is `https://cache.nixos.org`, with a Priority of 40.
+
+          Nix will copy a store path from a remote store only if one
+          of the following is true:
+
+          - the store object is signed by one of the [`trusted-public-keys`](#conf-trusted-public-keys)
+          - the substituter is in the [`trusted-substituters`](#conf-trusted-substituters) list
+          - the [`require-sigs`](#conf-require-sigs) option has been set to `false`
+          - the store object is [output-addressed](glossary.md#gloss-output-addressed-store-object)
         )",
         {"binary-caches"}};
 
@@ -762,6 +773,13 @@ public:
               /nix/store/xfghy8ixrhz3kyy6p724iv3cxji088dx-bash-4.4-p23`.
         )"};
 
+    Setting<unsigned int> downloadSpeed {
+        this, 0, "download-speed",
+        R"(
+          Specify the maximum transfer rate in kilobytes per second you want
+          Nix to use for downloads.
+        )"};
+
     Setting<std::string> netrcFile{
         this, fmt("%s/%s", nixConfDir, "netrc"), "netrc-file",
         R"(
@@ -815,7 +833,7 @@ public:
         )"};
 
     Setting<StringSet> ignoredAcls{
-        this, {"security.selinux", "system.nfs4_acl"}, "ignored-acls",
+        this, {"security.selinux", "system.nfs4_acl", "security.csm"}, "ignored-acls",
         R"(
           A list of ACLs that should be ignored, normally Nix attempts to
           remove all ACLs from files and directories in the Nix store, but
@@ -893,55 +911,6 @@ public:
           are loaded as plugins (non-recursively).
         )"};
 
-    Setting<StringMap> accessTokens{this, {}, "access-tokens",
-        R"(
-          Access tokens used to access protected GitHub, GitLab, or
-          other locations requiring token-based authentication.
-
-          Access tokens are specified as a string made up of
-          space-separated `host=token` values.  The specific token
-          used is selected by matching the `host` portion against the
-          "host" specification of the input. The actual use of the
-          `token` value is determined by the type of resource being
-          accessed:
-
-          * Github: the token value is the OAUTH-TOKEN string obtained
-            as the Personal Access Token from the Github server (see
-            https://docs.github.com/en/developers/apps/authorizing-oath-apps).
-
-          * Gitlab: the token value is either the OAuth2 token or the
-            Personal Access Token (these are different types tokens
-            for gitlab, see
-            https://docs.gitlab.com/12.10/ee/api/README.html#authentication).
-            The `token` value should be `type:tokenstring` where
-            `type` is either `OAuth2` or `PAT` to indicate which type
-            of token is being specified.
-
-          Example `~/.config/nix/nix.conf`:
-
-          ```
-          access-tokens = github.com=23ac...b289 gitlab.mycompany.com=PAT:A123Bp_Cd..EfG gitlab.com=OAuth2:1jklw3jk
-          ```
-
-          Example `~/code/flake.nix`:
-
-          ```nix
-          input.foo = {
-            type = "gitlab";
-            host = "gitlab.mycompany.com";
-            owner = "mycompany";
-            repo = "pro";
-          };
-          ```
-
-          This example specifies three tokens, one each for accessing
-          github.com, gitlab.mycompany.com, and sourceforge.net.
-
-          The `input.foo` uses the "gitlab" fetcher, which might
-          requires specifying the token type along with the token
-          value.
-          )"};
-
     Setting<std::set<ExperimentalFeature>> experimentalFeatures{this, {}, "experimental-features",
         "Experimental Nix features to enable."};
 
@@ -949,17 +918,8 @@ public:
 
     void requireExperimentalFeature(const ExperimentalFeature &);
 
-    Setting<bool> allowDirty{this, true, "allow-dirty",
-        "Whether to allow dirty Git/Mercurial trees."};
-
-    Setting<bool> warnDirty{this, true, "warn-dirty",
-        "Whether to warn about dirty Git/Mercurial trees."};
-
     Setting<size_t> narBufferSize{this, 32 * 1024 * 1024, "nar-buffer-size",
         "Maximum size of NARs before spilling them to disk."};
-
-    Setting<std::string> flakeRegistry{this, "https://github.com/NixOS/flake-registry/raw/master/flake-registry.json", "flake-registry",
-        "Path or URI of the global flake registry."};
 
     Setting<bool> allowSymlinkedStore{
         this, false, "allow-symlinked-store",
@@ -972,19 +932,6 @@ public:
           occur if those builds are then deployed to machines where /nix/store
           resolves to a different location from that of the build machine. You
           can enable this setting if you are sure you're not going to do that.
-        )"};
-
-    Setting<bool> useRegistries{this, true, "use-registries",
-        "Whether to use flake registries to resolve flake references."};
-
-    Setting<bool> acceptFlakeConfig{this, false, "accept-flake-config",
-        "Whether to accept nix configuration from a flake without prompting."};
-
-    Setting<std::string> commitLockFileSummary{
-        this, "", "commit-lockfile-summary",
-        R"(
-          The commit summary to use when committing changed flake lock files. If
-          empty, the summary is generated based on the action performed.
         )"};
 };
 

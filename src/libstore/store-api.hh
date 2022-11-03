@@ -1,5 +1,6 @@
 #pragma once
 
+#include "nar-info.hh"
 #include "realisation.hh"
 #include "path.hh"
 #include "derived-path.hh"
@@ -10,8 +11,8 @@
 #include "sync.hh"
 #include "globals.hh"
 #include "config.hh"
-#include "derivations.hh"
 #include "path-info.hh"
+#include "repair-flag.hh"
 
 #include <atomic>
 #include <limits>
@@ -62,6 +63,8 @@ MakeError(BadStorePath, Error);
 
 MakeError(InvalidStoreURI, Error);
 
+struct BasicDerivation;
+struct Derivation;
 class FSAccessor;
 class NarInfoDiskCache;
 class Store;
@@ -76,127 +79,10 @@ enum AllowInvalidFlag : bool { DisallowInvalid = false, AllowInvalid = true };
 const uint32_t exportMagic = 0x4558494e;
 
 
-typedef std::unordered_map<StorePath, std::unordered_set<std::string>> Roots;
-
-
-struct GCOptions
-{
-    /* Garbage collector operation:
-
-       - `gcReturnLive': return the set of paths reachable from
-         (i.e. in the closure of) the roots.
-
-       - `gcReturnDead': return the set of paths not reachable from
-         the roots.
-
-       - `gcDeleteDead': actually delete the latter set.
-
-       - `gcDeleteSpecific': delete the paths listed in
-          `pathsToDelete', insofar as they are not reachable.
-    */
-    typedef enum {
-        gcReturnLive,
-        gcReturnDead,
-        gcDeleteDead,
-        gcDeleteSpecific,
-    } GCAction;
-
-    GCAction action{gcDeleteDead};
-
-    /* If `ignoreLiveness' is set, then reachability from the roots is
-       ignored (dangerous!).  However, the paths must still be
-       unreferenced *within* the store (i.e., there can be no other
-       store paths that depend on them). */
-    bool ignoreLiveness{false};
-
-    /* For `gcDeleteSpecific', the paths to delete. */
-    StorePathSet pathsToDelete;
-
-    /* Stop after at least `maxFreed' bytes have been freed. */
-    uint64_t maxFreed{std::numeric_limits<uint64_t>::max()};
-};
-
-
-struct GCResults
-{
-    /* Depending on the action, the GC roots, or the paths that would
-       be or have been deleted. */
-    PathSet paths;
-
-    /* For `gcReturnDead', `gcDeleteDead' and `gcDeleteSpecific', the
-       number of bytes that would be or was freed. */
-    uint64_t bytesFreed = 0;
-};
-
-
 enum BuildMode { bmNormal, bmRepair, bmCheck };
 
+struct BuildResult;
 
-struct BuildResult
-{
-    /* Note: don't remove status codes, and only add new status codes
-       at the end of the list, to prevent client/server
-       incompatibilities in the nix-store --serve protocol. */
-    enum Status {
-        Built = 0,
-        Substituted,
-        AlreadyValid,
-        PermanentFailure,
-        InputRejected,
-        OutputRejected,
-        TransientFailure, // possibly transient
-        CachedFailure, // no longer used
-        TimedOut,
-        MiscFailure,
-        DependencyFailed,
-        LogLimitExceeded,
-        NotDeterministic,
-        ResolvesToAlreadyValid,
-    } status = MiscFailure;
-    std::string errorMsg;
-
-    std::string toString() const {
-        auto strStatus = [&]() {
-            switch (status) {
-                case Built: return "Built";
-                case Substituted: return "Substituted";
-                case AlreadyValid: return "AlreadyValid";
-                case PermanentFailure: return "PermanentFailure";
-                case InputRejected: return "InputRejected";
-                case OutputRejected: return "OutputRejected";
-                case TransientFailure: return "TransientFailure";
-                case CachedFailure: return "CachedFailure";
-                case TimedOut: return "TimedOut";
-                case MiscFailure: return "MiscFailure";
-                case DependencyFailed: return "DependencyFailed";
-                case LogLimitExceeded: return "LogLimitExceeded";
-                case NotDeterministic: return "NotDeterministic";
-                case ResolvesToAlreadyValid: return "ResolvesToAlreadyValid";
-                default: return "Unknown";
-            };
-        }();
-        return strStatus + ((errorMsg == "") ? "" : " : " + errorMsg);
-    }
-
-    /* How many times this build was performed. */
-    unsigned int timesBuilt = 0;
-
-    /* If timesBuilt > 1, whether some builds did not produce the same
-       result. (Note that 'isNonDeterministic = false' does not mean
-       the build is deterministic, just that we don't have evidence of
-       non-determinism.) */
-    bool isNonDeterministic = false;
-
-    DrvOutputs builtOutputs;
-
-    /* The start/stop times of the build (or one of the rounds, if it
-       was repeated). */
-    time_t startTime = 0, stopTime = 0;
-
-    bool success() {
-        return status == Built || status == Substituted || status == AlreadyValid || status == ResolvesToAlreadyValid;
-    }
-};
 
 struct StoreConfig : public Config
 {
@@ -474,9 +360,19 @@ public:
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,
         RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs) = 0;
 
+    // A list of paths infos along with a source providing the content of the
+    // associated store path
+    using PathsSource = std::vector<std::pair<ValidPathInfo, std::unique_ptr<Source>>>;
+
     /* Import multiple paths into the store. */
     virtual void addMultipleToStore(
         Source & source,
+        RepairFlag repair = NoRepair,
+        CheckSigsFlag checkSigs = CheckSigs);
+
+    virtual void addMultipleToStore(
+        PathsSource & pathsToCopy,
+        Activity & act,
         RepairFlag repair = NoRepair,
         CheckSigsFlag checkSigs = CheckSigs);
 
@@ -549,6 +445,16 @@ public:
         BuildMode buildMode = bmNormal,
         std::shared_ptr<Store> evalStore = nullptr);
 
+    /* Like `buildPaths()`, but return a vector of `BuildResult`s
+       corresponding to each element in `paths`. Note that in case of
+       a build/substitution error, this function won't throw an
+       exception, but return a `BuildResult` containing an error
+       message. */
+    virtual std::vector<BuildResult> buildPathsWithResults(
+        const std::vector<DerivedPath> & paths,
+        BuildMode buildMode = bmNormal,
+        std::shared_ptr<Store> evalStore = nullptr);
+
     /* Build a single non-materialized derivation (i.e. not from an
        on-disk .drv file).
 
@@ -594,26 +500,6 @@ public:
        The root disappears as soon as we exit. */
     virtual void addTempRoot(const StorePath & path)
     { debug("not creating temporary root, store doesn't support GC"); }
-
-    /* Add an indirect root, which is merely a symlink to `path' from
-       /nix/var/nix/gcroots/auto/<hash of `path'>.  `path' is supposed
-       to be a symlink to a store path.  The garbage collector will
-       automatically remove the indirect root when it finds that
-       `path' has disappeared. */
-    virtual void addIndirectRoot(const Path & path)
-    { unsupported("addIndirectRoot"); }
-
-    /* Find the roots of the garbage collector.  Each root is a pair
-       (link, storepath) where `link' is the path of the symlink
-       outside of the Nix store that point to `storePath'. If
-       'censor' is true, privacy-sensitive information about roots
-       found in /proc is censored. */
-    virtual Roots findRoots(bool censor)
-    { unsupported("findRoots"); }
-
-    /* Perform a garbage collection. */
-    virtual void collectGarbage(const GCOptions & options, GCResults & results)
-    { unsupported("collectGarbage"); }
 
     /* Return a string representing information about the path that
        can be loaded into the database using `nix-store --load-db' or
@@ -731,14 +617,6 @@ public:
        derivations that need this information for `exportReferencesGraph`.
      */
     StorePathSet exportReferences(const StorePathSet & storePaths, const StorePathSet & inputPaths);
-
-    /* Return the build log of the specified store path, if available,
-       or null otherwise. */
-    virtual std::optional<std::string> getBuildLog(const StorePath & path)
-    { return std::nullopt; }
-
-    virtual void addBuildLog(const StorePath & path, std::string_view log)
-    { unsupported("addBuildLog"); }
 
     /* Hack to allow long-running processes like hydra-queue-runner to
        occasionally flush their path info cache. */

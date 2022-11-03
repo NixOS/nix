@@ -18,6 +18,9 @@ struct DevelopSettings : Config
     Setting<std::string> bashPrompt{this, "", "bash-prompt",
         "The bash prompt (`PS1`) in `nix develop` shells."};
 
+    Setting<std::string> bashPromptPrefix{this, "", "bash-prompt-prefix",
+        "Prefix prepended to the `PS1` environment variable in `nix develop` shells."};
+
     Setting<std::string> bashPromptSuffix{this, "", "bash-prompt-suffix",
         "Suffix appended to the `PS1` environment variable in `nix develop` shells."};
 };
@@ -196,21 +199,22 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     drv.inputSrcs.insert(std::move(getEnvShPath));
     if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
         for (auto & output : drv.outputs) {
-            output.second = {
-                .output = DerivationOutputDeferred{},
-            };
+            output.second = DerivationOutput::Deferred {},
             drv.env[output.first] = hashPlaceholder(output.first);
         }
     } else {
         for (auto & output : drv.outputs) {
-            output.second = { .output = DerivationOutputInputAddressed { .path = StorePath::dummy } };
+            output.second = DerivationOutput::Deferred { };
             drv.env[output.first] = "";
         }
-        Hash h = std::get<0>(hashDerivationModulo(*evalStore, drv, true));
+        auto hashesModulo = hashDerivationModulo(*evalStore, drv, true);
 
         for (auto & output : drv.outputs) {
+            Hash h = hashesModulo.hashes.at(output.first);
             auto outPath = store->makeOutputPath(output.first, h, drv.name);
-            output.second = { .output = DerivationOutputInputAddressed { .path = outPath } };
+            output.second = DerivationOutput::InputAddressed {
+                .path = outPath,
+            };
             drv.env[output.first] = store->printStorePath(outPath);
         }
     }
@@ -242,6 +246,7 @@ struct Common : InstallableCommand, MixProfile
         "NIX_LOG_FD",
         "NIX_REMOTE",
         "PPID",
+        "SHELL",
         "SHELLOPTS",
         "SSL_CERT_FILE", // FIXME: only want to ignore /no-cert-file.crt
         "TEMP",
@@ -272,15 +277,27 @@ struct Common : InstallableCommand, MixProfile
         const BuildEnvironment & buildEnvironment,
         const Path & outputsDir = absPath(".") + "/outputs")
     {
+        // A list of colon-separated environment variables that should be
+        // prepended to, rather than overwritten, in order to keep the shell usable.
+        // Please keep this list minimal in order to avoid impurities.
+        static const char * const savedVars[] = {
+            "PATH",          // for commands
+            "XDG_DATA_DIRS", // for loadable completion
+        };
+
         std::ostringstream out;
 
         out << "unset shellHook\n";
 
-        out << "nix_saved_PATH=\"$PATH\"\n";
+        for (auto & var : savedVars) {
+            out << fmt("%s=${%s:-}\n", var, var);
+            out << fmt("nix_saved_%s=\"$%s\"\n", var, var);
+        }
 
         buildEnvironment.toBash(out, ignoreVars);
 
-        out << "PATH=\"$PATH:$nix_saved_PATH\"\n";
+        for (auto & var : savedVars)
+            out << fmt("%s=\"$%s:$nix_saved_%s\"\n", var, var, var);
 
         out << "export NIX_BUILD_TOP=\"$(mktemp -d -t nix-shell.XXXXXX)\"\n";
         for (auto & i : {"TMP", "TMPDIR", "TEMP", "TEMPDIR"})
@@ -307,7 +324,7 @@ struct Common : InstallableCommand, MixProfile
         for (auto & [installable_, dir_] : redirects) {
             auto dir = absPath(dir_);
             auto installable = parseInstallable(store, installable_);
-            auto builtPaths = toStorePaths(
+            auto builtPaths = Installable::toStorePaths(
                 getEvalStore(), store, Realise::Nothing, OperateOn::Output, {installable});
             for (auto & path: builtPaths) {
                 auto from = store->printStorePath(path);
@@ -347,7 +364,7 @@ struct Common : InstallableCommand, MixProfile
         if (path && hasSuffix(path->to_string(), "-env"))
             return *path;
         else {
-            auto drvs = toDerivations(store, {installable});
+            auto drvs = Installable::toDerivations(store, {installable});
 
             if (drvs.size() != 1)
                 throw Error("'%s' needs to evaluate to a single derivation, but it evaluated to %d derivations",
@@ -481,6 +498,9 @@ struct CmdDevelop : Common, MixEnvironment
             if (developSettings.bashPrompt != "")
                 script += fmt("[ -n \"$PS1\" ] && PS1=%s;\n",
                     shellEscape(developSettings.bashPrompt.get()));
+            if (developSettings.bashPromptPrefix != "")
+                script += fmt("[ -n \"$PS1\" ] && PS1=%s\"$PS1\";\n",
+                    shellEscape(developSettings.bashPromptPrefix.get()));
             if (developSettings.bashPromptSuffix != "")
                 script += fmt("[ -n \"$PS1\" ] && PS1+=%s;\n",
                     shellEscape(developSettings.bashPromptSuffix.get()));
@@ -506,12 +526,25 @@ struct CmdDevelop : Common, MixEnvironment
                 state,
                 installable->nixpkgsFlakeRef(),
                 "bashInteractive",
+                DefaultOutputs(),
                 Strings{},
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
                 nixpkgsLockFlags);
 
-            shell = store->printStorePath(
-                toStorePath(getEvalStore(), store, Realise::Outputs, OperateOn::Output, bashInstallable)) + "/bin/bash";
+            bool found = false;
+
+            for (auto & path : Installable::toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, {bashInstallable})) {
+                auto s = store->printStorePath(path) + "/bin/bash";
+                if (pathExists(s)) {
+                    shell = s;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+                throw Error("package 'nixpkgs#bashInteractive' does not provide a 'bin/bash'");
+
         } catch (Error &) {
             ignoreException();
         }

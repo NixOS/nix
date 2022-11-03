@@ -1,6 +1,7 @@
 #include "crypto.hh"
 #include "fs-accessor.hh"
 #include "globals.hh"
+#include "derivations.hh"
 #include "store-api.hh"
 #include "util.hh"
 #include "nar-info-disk-cache.hh"
@@ -257,6 +258,84 @@ StorePath Store::addToStore(
     return addToStoreFromDump(*source, name, method, hashAlgo, repair, references);
 }
 
+void Store::addMultipleToStore(
+    PathsSource & pathsToCopy,
+    Activity & act,
+    RepairFlag repair,
+    CheckSigsFlag checkSigs)
+{
+    std::atomic<size_t> nrDone{0};
+    std::atomic<size_t> nrFailed{0};
+    std::atomic<uint64_t> bytesExpected{0};
+    std::atomic<uint64_t> nrRunning{0};
+
+    using PathWithInfo = std::pair<ValidPathInfo, std::unique_ptr<Source>>;
+
+    std::map<StorePath, PathWithInfo *> infosMap;
+    StorePathSet storePathsToAdd;
+    for (auto & thingToAdd : pathsToCopy) {
+        infosMap.insert_or_assign(thingToAdd.first.path, &thingToAdd);
+        storePathsToAdd.insert(thingToAdd.first.path);
+    }
+
+    auto showProgress = [&]() {
+        act.progress(nrDone, pathsToCopy.size(), nrRunning, nrFailed);
+    };
+
+    ThreadPool pool;
+
+    processGraph<StorePath>(pool,
+        storePathsToAdd,
+
+        [&](const StorePath & path) {
+
+            auto & [info, _] = *infosMap.at(path);
+
+            if (isValidPath(info.path)) {
+                nrDone++;
+                showProgress();
+                return StorePathSet();
+            }
+
+            bytesExpected += info.narSize;
+            act.setExpected(actCopyPath, bytesExpected);
+
+            return info.references;
+        },
+
+        [&](const StorePath & path) {
+            checkInterrupt();
+
+            auto & [info_, source_] = *infosMap.at(path);
+            auto info = info_;
+            info.ultimate = false;
+
+            /* Make sure that the Source object is destroyed when
+               we're done. In particular, a SinkToSource object must
+               be destroyed to ensure that the destructors on its
+               stack frame are run; this includes
+               LegacySSHStore::narFromPath()'s connection lock. */
+            auto source = std::move(source_);
+
+            if (!isValidPath(info.path)) {
+                MaintainCount<decltype(nrRunning)> mc(nrRunning);
+                showProgress();
+                try {
+                    addToStore(info, *source, repair, checkSigs);
+                } catch (Error & e) {
+                    nrFailed++;
+                    if (!settings.keepGoing)
+                        throw e;
+                    printMsg(lvlError, "could not copy %s: %s", printStorePath(path), e.what());
+                    showProgress();
+                    return;
+                }
+            }
+
+            nrDone++;
+            showProgress();
+        });
+}
 
 void Store::addMultipleToStore(
     Source & source,
@@ -991,113 +1070,61 @@ std::map<StorePath, StorePath> copyPaths(
     for (auto & path : storePaths)
         if (!valid.count(path)) missing.insert(path);
 
+    Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
+
+    // In the general case, `addMultipleToStore` requires a sorted list of
+    // store paths to add, so sort them right now
+    auto sortedMissing = srcStore.topoSortPaths(missing);
+    std::reverse(sortedMissing.begin(), sortedMissing.end());
+
     std::map<StorePath, StorePath> pathsMap;
     for (auto & path : storePaths)
         pathsMap.insert_or_assign(path, path);
 
-    Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
+    Store::PathsSource pathsToCopy;
 
-    auto sorted = srcStore.topoSortPaths(missing);
-    std::reverse(sorted.begin(), sorted.end());
+    auto computeStorePathForDst = [&](const ValidPathInfo & currentPathInfo) -> StorePath {
+        auto storePathForSrc = currentPathInfo.path;
+        auto storePathForDst = storePathForSrc;
+        if (currentPathInfo.ca && currentPathInfo.references.empty()) {
+            storePathForDst = dstStore.makeFixedOutputPathFromCA(storePathForSrc.name(), *currentPathInfo.ca);
+            if (dstStore.storeDir == srcStore.storeDir)
+                assert(storePathForDst == storePathForSrc);
+            if (storePathForDst != storePathForSrc)
+                debug("replaced path '%s' to '%s' for substituter '%s'",
+                        srcStore.printStorePath(storePathForSrc),
+                        dstStore.printStorePath(storePathForDst),
+                        dstStore.getUri());
+        }
+        return storePathForDst;
+    };
 
-    auto source = sinkToSource([&](Sink & sink) {
-        sink << sorted.size();
-        for (auto & storePath : sorted) {
+    for (auto & missingPath : sortedMissing) {
+        auto info = srcStore.queryPathInfo(missingPath);
+
+        auto storePathForDst = computeStorePathForDst(*info);
+        pathsMap.insert_or_assign(missingPath, storePathForDst);
+
+        ValidPathInfo infoForDst = *info;
+        infoForDst.path = storePathForDst;
+
+        auto source = sinkToSource([&](Sink & sink) {
+            // We can reasonably assume that the copy will happen whenever we
+            // read the path, so log something about that at that point
             auto srcUri = srcStore.getUri();
             auto dstUri = dstStore.getUri();
-            auto storePathS = srcStore.printStorePath(storePath);
+            auto storePathS = srcStore.printStorePath(missingPath);
             Activity act(*logger, lvlInfo, actCopyPath,
                 makeCopyPathMessage(srcUri, dstUri, storePathS),
                 {storePathS, srcUri, dstUri});
             PushActivity pact(act.id);
 
-            auto info = srcStore.queryPathInfo(storePath);
-            info->write(sink, srcStore, 16);
-            srcStore.narFromPath(storePath, sink);
-        }
-    });
-
-    dstStore.addMultipleToStore(*source, repair, checkSigs);
-
-    #if 0
-    std::atomic<size_t> nrDone{0};
-    std::atomic<size_t> nrFailed{0};
-    std::atomic<uint64_t> bytesExpected{0};
-    std::atomic<uint64_t> nrRunning{0};
-
-    auto showProgress = [&]() {
-        act.progress(nrDone, missing.size(), nrRunning, nrFailed);
-    };
-
-    ThreadPool pool;
-
-    processGraph<StorePath>(pool,
-        StorePathSet(missing.begin(), missing.end()),
-
-        [&](const StorePath & storePath) {
-            auto info = srcStore.queryPathInfo(storePath);
-            auto storePathForDst = storePath;
-            if (info->ca && info->references.empty()) {
-                storePathForDst = dstStore.makeFixedOutputPathFromCA(storePath.name(), *info->ca);
-                if (dstStore.storeDir == srcStore.storeDir)
-                    assert(storePathForDst == storePath);
-                if (storePathForDst != storePath)
-                    debug("replaced path '%s' to '%s' for substituter '%s'",
-                        srcStore.printStorePath(storePath),
-                        dstStore.printStorePath(storePathForDst),
-                        dstStore.getUri());
-            }
-            pathsMap.insert_or_assign(storePath, storePathForDst);
-
-            if (dstStore.isValidPath(storePath)) {
-                nrDone++;
-                showProgress();
-                return StorePathSet();
-            }
-
-            bytesExpected += info->narSize;
-            act.setExpected(actCopyPath, bytesExpected);
-
-            return info->references;
-        },
-
-        [&](const StorePath & storePath) {
-            checkInterrupt();
-
-            auto info = srcStore.queryPathInfo(storePath);
-
-            auto storePathForDst = storePath;
-            if (info->ca && info->references.empty()) {
-                storePathForDst = dstStore.makeFixedOutputPathFromCA(storePath.name(), *info->ca);
-                if (dstStore.storeDir == srcStore.storeDir)
-                    assert(storePathForDst == storePath);
-                if (storePathForDst != storePath)
-                    debug("replaced path '%s' to '%s' for substituter '%s'",
-                        srcStore.printStorePath(storePath),
-                        dstStore.printStorePath(storePathForDst),
-                        dstStore.getUri());
-            }
-            pathsMap.insert_or_assign(storePath, storePathForDst);
-
-            if (!dstStore.isValidPath(storePathForDst)) {
-                MaintainCount<decltype(nrRunning)> mc(nrRunning);
-                showProgress();
-                try {
-                    copyStorePath(srcStore, dstStore, storePath, repair, checkSigs);
-                } catch (Error &e) {
-                    nrFailed++;
-                    if (!settings.keepGoing)
-                        throw e;
-                    printMsg(lvlError, "could not copy %s: %s", dstStore.printStorePath(storePath), e.what());
-                    showProgress();
-                    return;
-                }
-            }
-
-            nrDone++;
-            showProgress();
+            srcStore.narFromPath(missingPath, sink);
         });
-    #endif
+        pathsToCopy.push_back(std::pair{infoForDst, std::move(source)});
+    }
+
+    dstStore.addMultipleToStore(pathsToCopy, act, repair, checkSigs);
 
     return pathsMap;
 }
@@ -1301,7 +1328,8 @@ std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri_
     return {uri, params};
 }
 
-static bool isNonUriPath(const std::string & spec) {
+static bool isNonUriPath(const std::string & spec)
+{
     return
         // is not a URL
         spec.find("://") == std::string::npos
@@ -1313,11 +1341,36 @@ static bool isNonUriPath(const std::string & spec) {
 std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Params & params)
 {
     if (uri == "" || uri == "auto") {
-        auto stateDir = get(params, "state").value_or(settings.nixStateDir);
+        auto stateDir = getOr(params, "state", settings.nixStateDir);
         if (access(stateDir.c_str(), R_OK | W_OK) == 0)
             return std::make_shared<LocalStore>(params);
         else if (pathExists(settings.nixDaemonSocketFile))
             return std::make_shared<UDSRemoteStore>(params);
+        #if __linux__
+        else if (!pathExists(stateDir)
+            && params.empty()
+            && getuid() != 0
+            && !getEnv("NIX_STORE_DIR").has_value()
+            && !getEnv("NIX_STATE_DIR").has_value())
+        {
+            /* If /nix doesn't exist, there is no daemon socket, and
+               we're not root, then automatically set up a chroot
+               store in ~/.local/share/nix/root. */
+            auto chrootStore = getDataDir() + "/nix/root";
+            if (!pathExists(chrootStore)) {
+                try {
+                    createDirs(chrootStore);
+                } catch (Error & e) {
+                    return std::make_shared<LocalStore>(params);
+                }
+                warn("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
+            } else
+                debug("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
+            Store::Params params2;
+            params2["root"] = chrootStore;
+            return std::make_shared<LocalStore>(params2);
+        }
+        #endif
         else
             return std::make_shared<LocalStore>(params);
     } else if (uri == "daemon") {

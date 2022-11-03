@@ -1,8 +1,10 @@
 #include "globals.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "gc-store.hh"
 #include "util.hh"
 #include "loggers.hh"
+#include "progress-bar.hh"
 
 #include <algorithm>
 #include <cctype>
@@ -31,6 +33,7 @@
 
 namespace nix {
 
+char * * savedArgv;
 
 static bool gcWarning = true;
 
@@ -59,37 +62,37 @@ void printMissing(ref<Store> store, const StorePathSet & willBuild,
 {
     if (!willBuild.empty()) {
         if (willBuild.size() == 1)
-            printMsg(lvl, fmt("this derivation will be built:"));
+            printMsg(lvl, "this derivation will be built:");
         else
-            printMsg(lvl, fmt("these %d derivations will be built:", willBuild.size()));
+            printMsg(lvl, "these %d derivations will be built:", willBuild.size());
         auto sorted = store->topoSortPaths(willBuild);
         reverse(sorted.begin(), sorted.end());
         for (auto & i : sorted)
-            printMsg(lvl, fmt("  %s", store->printStorePath(i)));
+            printMsg(lvl, "  %s", store->printStorePath(i));
     }
 
     if (!willSubstitute.empty()) {
         const float downloadSizeMiB = downloadSize / (1024.f * 1024.f);
         const float narSizeMiB = narSize / (1024.f * 1024.f);
         if (willSubstitute.size() == 1) {
-            printMsg(lvl, fmt("this path will be fetched (%.2f MiB download, %.2f MiB unpacked):",
+            printMsg(lvl, "this path will be fetched (%.2f MiB download, %.2f MiB unpacked):",
                 downloadSizeMiB,
-                narSizeMiB));
+                narSizeMiB);
         } else {
-            printMsg(lvl, fmt("these %d paths will be fetched (%.2f MiB download, %.2f MiB unpacked):",
+            printMsg(lvl, "these %d paths will be fetched (%.2f MiB download, %.2f MiB unpacked):",
                 willSubstitute.size(),
                 downloadSizeMiB,
-                narSizeMiB));
+                narSizeMiB);
         }
         for (auto & i : willSubstitute)
-            printMsg(lvl, fmt("  %s", store->printStorePath(i)));
+            printMsg(lvl, "  %s", store->printStorePath(i));
     }
 
     if (!unknown.empty()) {
-        printMsg(lvl, fmt("don't know how to build these paths%s:",
-                (settings.readOnlyMode ? " (may be caused by read-only store access)" : "")));
+        printMsg(lvl, "don't know how to build these paths%s:",
+                (settings.readOnlyMode ? " (may be caused by read-only store access)" : ""));
         for (auto & i : unknown)
-            printMsg(lvl, fmt("  %s", store->printStorePath(i)));
+            printMsg(lvl, "  %s", store->printStorePath(i));
     }
 }
 
@@ -180,8 +183,9 @@ void initNix()
     /* Reset SIGCHLD to its default. */
     struct sigaction act;
     sigemptyset(&act.sa_mask);
-    act.sa_handler = SIG_DFL;
     act.sa_flags = 0;
+
+    act.sa_handler = SIG_DFL;
     if (sigaction(SIGCHLD, &act, 0))
         throw SysError("resetting SIGCHLD");
 
@@ -193,9 +197,20 @@ void initNix()
     /* HACK: on darwin, we need can’t use sigprocmask with SIGWINCH.
      * Instead, add a dummy sigaction handler, and signalHandlerThread
      * can handle the rest. */
-    struct sigaction sa;
-    sa.sa_handler = sigHandler;
-    if (sigaction(SIGWINCH, &sa, 0)) throw SysError("handling SIGWINCH");
+    act.sa_handler = sigHandler;
+    if (sigaction(SIGWINCH, &act, 0)) throw SysError("handling SIGWINCH");
+
+    /* Disable SA_RESTART for interrupts, so that system calls on this thread
+     * error with EINTR like they do on Linux.
+     * Most signals on BSD systems default to SA_RESTART on, but Nix
+     * expects EINTR from syscalls to properly exit. */
+    act.sa_handler = SIG_DFL;
+    if (sigaction(SIGINT, &act, 0)) throw SysError("handling SIGINT");
+    if (sigaction(SIGTERM, &act, 0)) throw SysError("handling SIGTERM");
+    if (sigaction(SIGHUP, &act, 0)) throw SysError("handling SIGHUP");
+    if (sigaction(SIGPIPE, &act, 0)) throw SysError("handling SIGPIPE");
+    if (sigaction(SIGQUIT, &act, 0)) throw SysError("handling SIGQUIT");
+    if (sigaction(SIGTRAP, &act, 0)) throw SysError("handling SIGTRAP");
 #endif
 
     /* Register a SIGSEGV handler to detect stack overflows. */
@@ -227,8 +242,6 @@ LegacyArgs::LegacyArgs(const std::string & programName,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
     : MixCommonArgs(programName), parseArg(parseArg)
 {
-    printError("FOO %s", programName);
-    
     addFlag({
         .longName = "no-build-output",
         .shortName = 'Q',
@@ -410,6 +423,8 @@ RunPager::RunPager()
     char * pager = getenv("NIX_PAGER");
     if (!pager) pager = getenv("PAGER");
     if (pager && ((std::string) pager == "" || (std::string) pager == "cat")) return;
+
+    stopProgressBar();
 
     Pipe toPager;
     toPager.create();

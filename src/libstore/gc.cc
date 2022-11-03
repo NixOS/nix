@@ -39,9 +39,7 @@ static void makeSymlink(const Path & link, const Path & target)
     createSymlink(target, tempLink);
 
     /* Atomically replace the old one. */
-    if (rename(tempLink.c_str(), link.c_str()) == -1)
-        throw SysError("cannot rename '%1%' to '%2%'",
-            tempLink , link);
+    renameFile(tempLink, link);
 }
 
 
@@ -135,6 +133,7 @@ void LocalStore::addTempRoot(const StorePath & path)
                     state->fdRootsSocket.close();
                     goto restart;
                 }
+                throw;
             }
         }
 
@@ -153,6 +152,7 @@ void LocalStore::addTempRoot(const StorePath & path)
                 state->fdRootsSocket.close();
                 goto restart;
             }
+            throw;
         } catch (EndOfFile & e) {
             debug("GC socket disconnected");
             state->fdRootsSocket.close();
@@ -619,6 +619,17 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         Path path = storeDir + "/" + std::string(baseName);
         Path realPath = realStoreDir + "/" + std::string(baseName);
 
+        /* There may be temp directories in the store that are still in use
+           by another process. We need to be sure that we can acquire an
+           exclusive lock before deleting them. */
+        if (baseName.find("tmp-", 0) == 0) {
+            AutoCloseFD tmpDirFd = open(realPath.c_str(), O_RDONLY | O_DIRECTORY);
+            if (tmpDirFd.get() == -1 || !lockFile(tmpDirFd.get(), ltWrite, false)) {
+                debug("skipping locked tempdir '%s'", realPath);
+                return;
+            }
+        }
+
         printInfo("deleting '%1%'", path);
 
         results.paths.insert(path);
@@ -678,7 +689,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 alive.insert(start);
                 try {
                     StorePathSet closure;
-                    computeFSClosure(*path, closure);
+                    computeFSClosure(*path, closure,
+                        /* flipDirection */ false, gcKeepOutputs, gcKeepDerivations);
                     for (auto & p : closure)
                         alive.insert(p);
                 } catch (InvalidPath &) { }
@@ -841,7 +853,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             if (unlink(path.c_str()) == -1)
                 throw SysError("deleting '%1%'", path);
 
-            results.bytesFreed += st.st_size;
+            /* Do not accound for deleted file here. Rely on deletePath()
+               accounting.  */
         }
 
         struct stat st;

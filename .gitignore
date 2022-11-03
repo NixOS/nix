@@ -22,11 +22,13 @@ perl/Makefile.config
 /doc/manual/src/SUMMARY.md
 /doc/manual/src/command-ref/new-cli
 /doc/manual/src/command-ref/conf-file.md
-/doc/manual/src/expressions/builtins.md
+/doc/manual/src/language/builtins.md
 
 # /scripts/
 /scripts/nix-profile.sh
 /scripts/nix-profile-daemon.sh
+/scripts/nix-profile.fish
+/scripts/nix-profile-daemon.fish
 
 # /src/libexpr/
 /src/libexpr/lexer-tab.cc
@@ -35,6 +37,7 @@ perl/Makefile.config
 /src/libexpr/parser-tab.hh
 /src/libexpr/parser-tab.output
 /src/libexpr/nix.tbl
+/src/libexpr/tests/libexpr-tests
 
 # /src/libstore/
 *.gen.*
@@ -79,6 +82,7 @@ perl/Makefile.config
 /tests/shell.drv
 /tests/config.nix
 /tests/ca/config.nix
+/tests/repl-result-out
 
 # /tests/lang/
 /tests/lang/*.out
@@ -90,6 +94,7 @@ perl/Makefile.config
 
 /misc/systemd/nix-daemon.service
 /misc/systemd/nix-daemon.socket
+/misc/systemd/nix-daemon.conf
 /misc/upstart/nix-daemon.conf
 
 /src/resolve-system-dependencies/resolve-system-dependencies

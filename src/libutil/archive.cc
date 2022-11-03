@@ -64,11 +64,12 @@ static void dumpContents(const Path & path, off_t size,
 }
 
 
-static void dump(const Path & path, Sink & sink, PathFilter & filter)
+static time_t dump(const Path & path, Sink & sink, PathFilter & filter)
 {
     checkInterrupt();
 
     auto st = lstat(path);
+    time_t result = st.st_mtime;
 
     sink << "(";
 
@@ -103,7 +104,10 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
         for (auto & i : unhacked)
             if (filter(path + "/" + i.first)) {
                 sink << "entry" << "(" << "name" << i.first << "node";
-                dump(path + "/" + i.second, sink, filter);
+                auto tmp_mtime = dump(path + "/" + i.second, sink, filter);
+                if (tmp_mtime > result) {
+                    result = tmp_mtime;
+                }
                 sink << ")";
             }
     }
@@ -114,13 +118,20 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
     else throw Error("file '%1%' has an unsupported type", path);
 
     sink << ")";
+
+    return result;
 }
 
 
-void dumpPath(const Path & path, Sink & sink, PathFilter & filter)
+time_t dumpPathAndGetMtime(const Path & path, Sink & sink, PathFilter & filter)
 {
     sink << narVersionMagic1;
-    dump(path, sink, filter);
+    return dump(path, sink, filter);
+}
+
+void dumpPath(const Path & path, Sink & sink, PathFilter & filter)
+{
+    dumpPathAndGetMtime(path, sink, filter);
 }
 
 
@@ -223,6 +234,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
 
         else if (s == "contents" && type == tpRegular) {
             parseContents(sink, source, path);
+            sink.closeRegularFile();
         }
 
         else if (s == "executable" && type == tpRegular) {
@@ -311,6 +323,12 @@ struct RestoreSink : ParseSink
         Path p = dstPath + path;
         fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
         if (!fd) throw SysError("creating file '%1%'", p);
+    }
+
+    void closeRegularFile() override
+    {
+        /* Call close explicitly to make sure the error is checked */
+        fd.close();
     }
 
     void isExecutable() override

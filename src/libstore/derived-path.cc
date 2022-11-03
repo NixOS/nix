@@ -1,13 +1,31 @@
 #include "derived-path.hh"
+#include "derivations.hh"
 #include "store-api.hh"
 
 #include <nlohmann/json.hpp>
+
+#include <optional>
 
 namespace nix {
 
 nlohmann::json DerivedPath::Opaque::toJSON(ref<Store> store) const {
     nlohmann::json res;
     res["path"] = store->printStorePath(path);
+    return res;
+}
+
+nlohmann::json DerivedPath::Built::toJSON(ref<Store> store) const {
+    nlohmann::json res;
+    res["drvPath"] = store->printStorePath(drvPath);
+    // Fallback for the input-addressed derivation case: We expect to always be
+    // able to print the output paths, so let’s do it
+    const auto knownOutputs = store->queryPartialDerivationOutputMap(drvPath);
+    for (const auto& output : outputs) {
+        auto knownOutput = get(knownOutputs, output);
+        res["outputs"][output] = (knownOutput && *knownOutput)
+          ? store->printStorePath(**knownOutput)
+          : nullptr;
+    }
     return res;
 }
 
@@ -35,15 +53,21 @@ StorePathSet BuiltPath::outPaths() const
     );
 }
 
-nlohmann::json derivedPathsWithHintsToJSON(const BuiltPaths & buildables, ref<Store> store) {
+template<typename T>
+nlohmann::json stuffToJSON(const std::vector<T> & ts, ref<Store> store) {
     auto res = nlohmann::json::array();
-    for (const BuiltPath & buildable : buildables) {
-        std::visit([&res, store](const auto & buildable) {
-            res.push_back(buildable.toJSON(store));
-        }, buildable.raw());
+    for (const T & t : ts) {
+        std::visit([&res, store](const auto & t) {
+            res.push_back(t.toJSON(store));
+        }, t.raw());
     }
     return res;
 }
+
+nlohmann::json derivedPathsWithHintsToJSON(const BuiltPaths & buildables, ref<Store> store)
+{ return stuffToJSON<BuiltPath>(buildables, store); }
+nlohmann::json derivedPathsToJSON(const DerivedPaths & paths, ref<Store> store)
+{ return stuffToJSON<DerivedPath>(paths, store); }
 
 
 std::string DerivedPath::Opaque::to_string(const Store & store) const {
@@ -101,10 +125,15 @@ RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
                 for (auto& [outputName, outputPath] : p.outputs) {
                     if (settings.isExperimentalFeatureEnabled(
                                 Xp::CaDerivations)) {
+                        auto drvOutput = get(drvHashes, outputName);
+                        if (!drvOutput)
+                            throw Error(
+                                "the derivation '%s' has unrealised output '%s' (derived-path.cc/toRealisedPaths)",
+                                store.printStorePath(p.drvPath), outputName);
                         auto thisRealisation = store.queryRealisation(
-                            DrvOutput{drvHashes.at(outputName), outputName});
-                        assert(thisRealisation);  // We’ve built it, so we must h
-                                                  // ve the realisation
+                            DrvOutput{*drvOutput, outputName});
+                        assert(thisRealisation);  // We’ve built it, so we must
+                                                  // have the realisation
                         res.insert(*thisRealisation);
                     } else {
                         res.insert(outputPath);

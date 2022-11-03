@@ -148,7 +148,9 @@ if ! [ -w "$dest" ]; then
     exit 1
 fi
 
-mkdir -p "$dest/store"
+# The auto-chroot code in openFromNonUri() checks for the
+# non-existence of /nix/var/nix, so we need to create it here.
+mkdir -p "$dest/store" "$dest/var/nix"
 
 printf "copying Nix to %s..." "${dest}/store" >&2
 # Insert a newline if no progress is shown.
@@ -207,31 +209,50 @@ if [ -z "$NIX_INSTALLER_NO_CHANNEL_ADD" ]; then
 fi
 
 added=
-p=$HOME/.nix-profile/etc/profile.d/nix.sh
+p=
+p_sh=$HOME/.nix-profile/etc/profile.d/nix.sh
+p_fish=$HOME/.nix-profile/etc/profile.d/nix.fish
 if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
     # Make the shell source nix.sh during login.
     for i in .bash_profile .bash_login .profile; do
         fn="$HOME/$i"
         if [ -w "$fn" ]; then
-            if ! grep -q "$p" "$fn"; then
+            if ! grep -q "$p_sh" "$fn"; then
                 echo "modifying $fn..." >&2
-                printf '\nif [ -e %s ]; then . %s; fi # added by Nix installer\n' "$p" "$p" >> "$fn"
+                printf '\nif [ -e %s ]; then . %s; fi # added by Nix installer\n' "$p_sh" "$p_sh" >> "$fn"
             fi
             added=1
+            p=${p_sh}
             break
         fi
     done
     for i in .zshenv .zshrc; do
         fn="$HOME/$i"
         if [ -w "$fn" ]; then
-            if ! grep -q "$p" "$fn"; then
+            if ! grep -q "$p_sh" "$fn"; then
                 echo "modifying $fn..." >&2
-                printf '\nif [ -e %s ]; then . %s; fi # added by Nix installer\n' "$p" "$p" >> "$fn"
+                printf '\nif [ -e %s ]; then . %s; fi # added by Nix installer\n' "$p_sh" "$p_sh" >> "$fn"
             fi
             added=1
+            p=${p_sh}
             break
         fi
     done
+
+    if [ -d "$HOME/.config/fish" ]; then
+        fishdir=$HOME/.config/fish/conf.d
+        if [ ! -d "$fishdir" ]; then
+            mkdir -p "$fishdir"
+        fi
+
+        fn="$fishdir/nix.fish"
+        echo "placing $fn..." >&2
+        printf '\nif test -e %s; . %s; end # added by Nix installer\n' "$p_fish" "$p_fish" > "$fn"
+        added=1
+        p=${p_fish}
+    fi
+else
+    p=${p_sh}
 fi
 
 if [ -z "$added" ]; then

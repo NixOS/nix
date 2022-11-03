@@ -4,6 +4,7 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
+#include "progress-bar.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -12,6 +13,7 @@ using namespace nix;
 struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 {
     Path outLink = "result";
+    bool printOutputPaths = false;
     BuildMode buildMode = bmNormal;
 
     CmdBuild()
@@ -29,6 +31,12 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
             .longName = "no-link",
             .description = "Do not create symlinks to the build results.",
             .handler = {&outLink, Path("")},
+        });
+
+        addFlag({
+            .longName = "print-out-paths",
+            .description = "Print the resulting output paths",
+            .handler = {&printOutputPaths, true},
         });
 
         addFlag({
@@ -52,14 +60,25 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 
     void run(ref<Store> store) override
     {
-        auto buildables = build(
+        if (dryRun) {
+            std::vector<DerivedPath> pathsToBuild;
+
+            for (auto & i : installables) {
+                auto b = i->toDerivedPaths();
+                pathsToBuild.insert(pathsToBuild.end(), b.begin(), b.end());
+            }
+            printMissing(store, pathsToBuild, lvlError);
+            if (json)
+                logger->cout("%s", derivedPathsToJSON(pathsToBuild, store).dump());
+            return;
+        }
+
+        auto buildables = Installable::build(
             getEvalStore(), store,
-            dryRun ? Realise::Derivation : Realise::Outputs,
+            Realise::Outputs,
             installables, buildMode);
 
         if (json) logger->cout("%s", derivedPathsWithHintsToJSON(buildables, store).dump());
-
-        if (dryRun) return;
 
         if (outLink != "")
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
@@ -81,6 +100,22 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
                         },
                     }, buildable.raw());
                 }
+
+        if (printOutputPaths) {
+            stopProgressBar();
+            for (auto & buildable : buildables) {
+                std::visit(overloaded {
+                    [&](const BuiltPath::Opaque & bo) {
+                        std::cout << store->printStorePath(bo.path) << std::endl;
+                    },
+                    [&](const BuiltPath::Built & bfd) {
+                        for (auto & output : bfd.outputs) {
+                            std::cout << store->printStorePath(output.second) << std::endl;
+                        }
+                    },
+                }, buildable.raw());
+            }
+        }
 
         updateProfile(buildables);
     }

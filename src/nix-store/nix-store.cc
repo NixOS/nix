@@ -2,6 +2,10 @@
 #include "derivations.hh"
 #include "dotgraph.hh"
 #include "globals.hh"
+#include "build-result.hh"
+#include "store-cast.hh"
+#include "gc-store.hh"
+#include "log-store.hh"
 #include "local-store.hh"
 #include "monitor-fd.hh"
 #include "serve-protocol.hh"
@@ -427,11 +431,12 @@ static void opQuery(Strings opFlags, Strings opArgs)
             store->computeFSClosure(
                 args, referrers, true, settings.gcKeepOutputs, settings.gcKeepDerivations);
 
-            Roots roots = store->findRoots(false);
+            auto & gcStore = require<GcStore>(*store);
+            Roots roots = gcStore.findRoots(false);
             for (auto & [target, links] : roots)
                 if (referrers.find(target) != referrers.end())
                     for (auto & link : links)
-                        cout << fmt("%1% -> %2%\n", link, store->printStorePath(target));
+                        cout << fmt("%1% -> %2%\n", link, gcStore.printStorePath(target));
             break;
         }
 
@@ -471,13 +476,15 @@ static void opReadLog(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
+    auto & logStore = require<LogStore>(*store);
+
     RunPager pager;
 
     for (auto & i : opArgs) {
-        auto path = store->followLinksToStorePath(i);
-        auto log = store->getBuildLog(path);
+        auto path = logStore.followLinksToStorePath(i);
+        auto log = logStore.getBuildLog(path);
         if (!log)
-            throw Error("build log of derivation '%s' is not available", store->printStorePath(path));
+            throw Error("build log of derivation '%s' is not available", logStore.printStorePath(path));
         std::cout << *log;
     }
 }
@@ -587,20 +594,22 @@ static void opGC(Strings opFlags, Strings opArgs)
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
+    auto & gcStore = require<GcStore>(*store);
+
     if (printRoots) {
-        Roots roots = store->findRoots(false);
+        Roots roots = gcStore.findRoots(false);
         std::set<std::pair<Path, StorePath>> roots2;
         // Transpose and sort the roots.
         for (auto & [target, links] : roots)
             for (auto & link : links)
                 roots2.emplace(link, target);
         for (auto & [link, target] : roots2)
-            std::cout << link << " -> " << store->printStorePath(target) << "\n";
+            std::cout << link << " -> " << gcStore.printStorePath(target) << "\n";
     }
 
     else {
         PrintFreed freed(options.action == GCOptions::gcDeleteDead, results);
-        store->collectGarbage(options, results);
+        gcStore.collectGarbage(options, results);
 
         if (options.action != GCOptions::gcDeleteDead)
             for (auto & i : results.paths)
@@ -624,9 +633,11 @@ static void opDelete(Strings opFlags, Strings opArgs)
     for (auto & i : opArgs)
         options.pathsToDelete.insert(store->followLinksToStorePath(i));
 
+    auto & gcStore = require<GcStore>(*store);
+
     GCResults results;
     PrintFreed freed(true, results);
-    store->collectGarbage(options, results);
+    gcStore.collectGarbage(options, results);
 }
 
 
@@ -911,7 +922,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 if (GET_PROTOCOL_MINOR(clientVersion) >= 3)
                     out << status.timesBuilt << status.isNonDeterministic << status.startTime << status.stopTime;
-                if (GET_PROTOCOL_MINOR(clientVersion >= 6)) {
+                if (GET_PROTOCOL_MINOR(clientVersion) >= 6) {
                     worker_proto::write(*store, out, status.builtOutputs);
                 }
 
@@ -1082,9 +1093,7 @@ static int main_nix_store(int argc, char * * argv)
         if (op != opDump && op != opRestore) /* !!! hack */
             store = openStore();
 
-        op(opFlags, opArgs);
-
-        logger->stop();
+        op(std::move(opFlags), std::move(opArgs));
 
         return 0;
     }

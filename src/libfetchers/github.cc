@@ -1,10 +1,12 @@
 #include "filetransfer.hh"
 #include "cache.hh"
-#include "fetchers.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "types.hh"
 #include "url-parts.hh"
+#include "git.hh"
+#include "fetchers.hh"
+#include "fetch-settings.hh"
 
 #include <optional>
 #include <nlohmann/json.hpp>
@@ -157,7 +159,7 @@ struct GitArchiveInputScheme : InputScheme
 
     std::optional<std::string> getAccessToken(const std::string & host) const
     {
-        auto tokens = settings.accessTokens.get();
+        auto tokens = fetchSettings.accessTokens.get();
         if (auto token = get(tokens, host))
             return *token;
         return {};
@@ -241,7 +243,10 @@ struct GitHubInputScheme : GitArchiveInputScheme
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
-        auto url = fmt("https://api.%s/repos/%s/%s/commits/%s", // FIXME: check
+        auto url = fmt(
+            host == "github.com"
+            ? "https://api.%s/repos/%s/%s/commits/%s"
+            : "https://%s/api/v3/repos/%s/%s/commits/%s",
             host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
 
         Headers headers = makeHeadersWithAuthTokens(host);
@@ -257,14 +262,20 @@ struct GitHubInputScheme : GitArchiveInputScheme
 
     DownloadUrl getDownloadUrl(const Input & input) const override
     {
-        // FIXME: use regular /archive URLs instead? api.github.com
-        // might have stricter rate limits.
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
-        auto url = fmt("https://api.%s/repos/%s/%s/tarball/%s", // FIXME: check if this is correct for self hosted instances
-            host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
+        Headers headers = makeHeadersWithAuthTokens(host);
+        // If we have no auth headers then we default to the public archive
+        // urls so we do not run into rate limits.
+        const auto urlFmt =
+            host != "github.com"
+            ? "https://%s/api/v3/repos/%s/%s/tarball/%s"
+            : headers.empty()
+            ? "https://%s/%s/%s/archive/%s.tar.gz"
+            : "https://api.%s/repos/%s/%s/tarball/%s";
+
+        const auto url = fmt(urlFmt, host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(Base16, false));
 
-        Headers headers = makeHeadersWithAuthTokens(host);
         return DownloadUrl { url, headers };
     }
 
@@ -373,7 +384,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
 
         Headers headers = makeHeadersWithAuthTokens(host);
 
-        std::string ref_uri;
+        std::string refUri;
         if (ref == "HEAD") {
             auto file = store->toRealPath(
                 downloadFile(store, fmt("%s/HEAD", base_url), "source", false, headers).storePath);
@@ -381,33 +392,32 @@ struct SourceHutInputScheme : GitArchiveInputScheme
             std::string line;
             getline(is, line);
 
-            auto ref_index = line.find("ref: ");
-            if (ref_index == std::string::npos) {
+            auto remoteLine = git::parseLsRemoteLine(line);
+            if (!remoteLine) {
                 throw BadURL("in '%d', couldn't resolve HEAD ref '%d'", input.to_string(), ref);
             }
-
-            ref_uri = line.substr(ref_index+5, line.length()-1);
-        } else
-            ref_uri = fmt("refs/heads/%s", ref);
+            refUri = remoteLine->target;
+        } else {
+            refUri = fmt("refs/(heads|tags)/%s", ref);
+        }
+        std::regex refRegex(refUri);
 
         auto file = store->toRealPath(
             downloadFile(store, fmt("%s/info/refs", base_url), "source", false, headers).storePath);
         std::ifstream is(file);
 
         std::string line;
-        std::string id;
-        while(getline(is, line)) {
-            auto index = line.find(ref_uri);
-            if (index != std::string::npos) {
-                id = line.substr(0, index-1);
-                break;
-            }
+        std::optional<std::string> id;
+        while(!id && getline(is, line)) {
+            auto parsedLine = git::parseLsRemoteLine(line);
+            if (parsedLine && parsedLine->reference && std::regex_match(*parsedLine->reference, refRegex))
+                id = parsedLine->target;
         }
 
-        if(id.empty())
+        if(!id)
             throw BadURL("in '%d', couldn't find ref '%d'", input.to_string(), ref);
 
-        auto rev = Hash::parseAny(id, htSHA1);
+        auto rev = Hash::parseAny(*id, htSHA1);
         debug("HEAD revision for '%s' is %s", fmt("%s/%s", base_url, ref), rev.gitRev());
         return rev;
     }

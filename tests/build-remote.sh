@@ -34,6 +34,14 @@ outPath=$(readlink -f $TEST_ROOT/result)
 
 grep 'FOO BAR BAZ' $TEST_ROOT/machine0/$outPath
 
+testPrintOutPath=$(nix build -L -v -f $file --no-link --print-out-paths --max-jobs 0 \
+  --arg busybox $busybox \
+  --store $TEST_ROOT/machine0 \
+  --builders "$(join_by '; ' "${builders[@]}")"
+)
+
+[[ $testPrintOutPath =~ store.*build-remote ]]
+
 set -o pipefail
 
 # Ensure that input1 was built on store1 due to the required feature.
@@ -54,8 +62,17 @@ nix path-info --store $TEST_ROOT/machine3 --all \
   | grep -v builder-build-remote-input-2.sh \
   | grep builder-build-remote-input-3.sh
 
+
+# Temporarily disabled because of https://github.com/NixOS/nix/issues/6209
+if [[ -z "$CONTENT_ADDRESSED" ]]; then
+  for i in input1 input3; do
+    nix log --store $TEST_ROOT/machine0 --file "$file" --arg busybox $busybox passthru."$i" | grep hi-$i
+  done
+fi
+
 # Behavior of keep-failed
 out="$(nix-build 2>&1 failing.nix \
+  --no-out-link \
   --builders "$(join_by '; ' "${builders[@]}")"  \
   --keep-failed \
   --store $TEST_ROOT/machine0 \

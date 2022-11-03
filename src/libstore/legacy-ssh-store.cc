@@ -2,6 +2,7 @@
 #include "pool.hh"
 #include "remote-store.hh"
 #include "serve-protocol.hh"
+#include "build-result.hh"
 #include "store-api.hh"
 #include "path-with-outputs.hh"
 #include "worker-protocol.hh"
@@ -278,7 +279,7 @@ public:
 
         conn->to.flush();
 
-        BuildResult status;
+        BuildResult status { .path = DerivedPath::Built { .drvPath = drvPath } };
         status.status = (BuildResult::Status) readInt(conn->from);
         conn->from >> status.errorMsg;
 
@@ -316,7 +317,7 @@ public:
 
         conn->to.flush();
 
-        BuildResult result;
+        BuildResult result { .path = DerivedPath::Opaque { StorePath::dummy } };
         result.status = (BuildResult::Status) readInt(conn->from);
 
         if (!result.success()) {

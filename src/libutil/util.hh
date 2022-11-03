@@ -68,6 +68,9 @@ Path dirOf(const PathView path);
    following the final `/' (trailing slashes are removed). */
 std::string_view baseNameOf(std::string_view path);
 
+/* Perform tilde expansion on a path. */
+std::string expandTilde(std::string_view path);
+
 /* Check whether 'path' is a descendant of 'dir'. Both paths must be
    canonicalized. */
 bool isInDir(std::string_view path, std::string_view dir);
@@ -77,6 +80,7 @@ bool isInDir(std::string_view path, std::string_view dir);
 bool isDirOrInDir(std::string_view path, std::string_view dir);
 
 /* Get status of `path'. */
+struct stat stat(const Path & path);
 struct stat lstat(const Path & path);
 
 /* Return true iff the given path exists. */
@@ -111,9 +115,12 @@ std::string readFile(const Path & path);
 void readFile(const Path & path, Sink & sink);
 
 /* Write a string to a file. */
-void writeFile(const Path & path, std::string_view s, mode_t mode = 0666);
+void writeFile(const Path & path, std::string_view s, mode_t mode = 0666, bool sync = false);
 
-void writeFile(const Path & path, Source & source, mode_t mode = 0666);
+void writeFile(const Path & path, Source & source, mode_t mode = 0666, bool sync = false);
+
+/* Flush a file's parent directory to disk */
+void syncParent(const Path & path);
 
 /* Read a line from a file descriptor. */
 std::string readLine(int fd);
@@ -145,10 +152,14 @@ std::vector<Path> getConfigDirs();
 /* Return $XDG_DATA_HOME or $HOME/.local/share. */
 Path getDataDir();
 
+/* Return the path of the current executable. */
+std::optional<Path> getSelfExe();
+
 /* Create a directory and all its parents, if necessary.  Returns the
    list of created directories, in order of creation. */
 Paths createDirs(const Path & path);
-inline Paths createDirs(PathView path) {
+inline Paths createDirs(PathView path)
+{
     return createDirs(Path(path));
 }
 
@@ -159,6 +170,17 @@ void createSymlink(const Path & target, const Path & link,
 /* Atomically create or replace a symlink. */
 void replaceSymlink(const Path & target, const Path & link,
     std::optional<time_t> mtime = {});
+
+void renameFile(const Path & src, const Path & dst);
+
+/**
+ * Similar to 'renameFile', but fallback to a copy+remove if `src` and `dst`
+ * are on a different filesystem.
+ *
+ * Beware that this might not be atomic because of the copy that happens behind
+ * the scenes
+ */
+void moveFile(const Path & src, const Path & dst);
 
 
 /* Wrappers arount read()/write() that read/write exactly the
@@ -174,6 +196,9 @@ std::string drainFD(int fd, bool block = true, const size_t reserveSize=0);
 
 void drainFD(int fd, Sink & sink, bool block = true);
 
+/* If cgroups are active, attempt to calculate the number of CPUs available.
+   If cgroups are unavailable or if cpu.max is set to "max", return 0. */
+unsigned int getMaxCPU();
 
 /* Automatic cleanup of resources. */
 
@@ -209,6 +234,7 @@ public:
     explicit operator bool() const;
     int release();
     void close();
+    void fsync();
 };
 
 
@@ -539,13 +565,31 @@ std::string stripIndentation(std::string_view s);
 
 /* Get a value for the specified key from an associate container. */
 template <class T>
-std::optional<typename T::mapped_type> get(const T & map, const typename T::key_type & key)
+const typename T::mapped_type * get(const T & map, const typename T::key_type & key)
 {
     auto i = map.find(key);
-    if (i == map.end()) return {};
-    return std::optional<typename T::mapped_type>(i->second);
+    if (i == map.end()) return nullptr;
+    return &i->second;
 }
 
+template <class T>
+typename T::mapped_type * get(T & map, const typename T::key_type & key)
+{
+    auto i = map.find(key);
+    if (i == map.end()) return nullptr;
+    return &i->second;
+}
+
+/* Get a value for the specified key from an associate container, or a default value if the key isn't present. */
+template <class T>
+const typename T::mapped_type & getOr(T & map,
+    const typename T::key_type & key,
+    const typename T::mapped_type & defaultValue)
+{
+    auto i = map.find(key);
+    if (i == map.end()) return defaultValue;
+    return i->second;
+}
 
 /* Remove and return the first item from a container. */
 template <class T>
@@ -677,5 +721,20 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 std::string showBytes(uint64_t bytes);
 
+
+/* Provide an addition operator between strings and string_views
+   inexplicably omitted from the standard library. */
+inline std::string operator + (const std::string & s1, std::string_view s2)
+{
+    auto s = s1;
+    s.append(s2);
+    return s;
+}
+
+inline std::string operator + (std::string && s, std::string_view s2)
+{
+    s.append(s2);
+    return std::move(s);
+}
 
 }

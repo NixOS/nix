@@ -43,6 +43,7 @@ __dumpEnv() {
         local __var_name="${BASH_REMATCH[2]}"
 
         if [[ $__var_name =~ ^BASH_ || \
+              $__var_name =~ ^COMP_ || \
               $__var_name = _ || \
               $__var_name = DIRSTACK || \
               $__var_name = EUID || \
@@ -54,7 +55,9 @@ __dumpEnv() {
               $__var_name = PWD || \
               $__var_name = RANDOM || \
               $__var_name = SHLVL || \
-              $__var_name = SECONDS \
+              $__var_name = SECONDS || \
+              $__var_name = EPOCHREALTIME || \
+              $__var_name = EPOCHSECONDS \
             ]]; then continue; fi
 
         if [[ -z $__first ]]; then printf ',\n'; else __first=; fi

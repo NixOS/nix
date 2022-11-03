@@ -2,6 +2,8 @@
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "store-cast.hh"
+#include "gc-store.hh"
 
 using namespace nix;
 
@@ -32,12 +34,14 @@ struct CmdStoreDelete : StorePathsCommand
 
     void run(ref<Store> store, std::vector<StorePath> && storePaths) override
     {
+        auto & gcStore = require<GcStore>(*store);
+
         for (auto & path : storePaths)
             options.pathsToDelete.insert(path);
 
         GCResults results;
         PrintFreed freed(true, results);
-        store->collectGarbage(options, results);
+        gcStore.collectGarbage(options, results);
     }
 };
 

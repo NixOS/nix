@@ -96,7 +96,7 @@ static void update(const StringSet & channelNames)
         std::smatch match;
         auto urlBase = std::string(baseNameOf(url));
         if (std::regex_search(urlBase, match, std::regex("(-\\d.*)$")))
-            cname = cname + (std::string) match[1];
+            cname = cname + match.str(1);
 
         std::string extraAttrs;
 

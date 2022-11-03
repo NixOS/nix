@@ -5,6 +5,7 @@
 #include "pathlocks.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
+#include "gc-store.hh"
 #include "sync.hh"
 #include "util.hh"
 
@@ -43,7 +44,7 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
 };
 
 
-class LocalStore : public virtual LocalStoreConfig, public virtual LocalFSStore
+class LocalStore : public virtual LocalStoreConfig, public virtual LocalFSStore, public virtual GcStore
 {
 private:
 
@@ -255,7 +256,7 @@ private:
 
     void findRuntimeRoots(Roots & roots, bool censor);
 
-    Path createTempDirInStore();
+    std::pair<Path, AutoCloseFD> createTempDirInStore();
 
     void checkDerivationOutputs(const StorePath & drvPath, const Derivation & drv);
 

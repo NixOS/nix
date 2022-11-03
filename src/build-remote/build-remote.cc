@@ -14,6 +14,7 @@
 #include "pathlocks.hh"
 #include "globals.hh"
 #include "serialise.hh"
+#include "build-result.hh"
 #include "store-api.hh"
 #include "derivations.hh"
 #include "local-store.hh"
@@ -299,7 +300,7 @@ connected:
 
         std::set<Realisation> missingRealisations;
         StorePathSet missingPaths;
-        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations) && !derivationHasKnownOutputPaths(drv.type())) {
+        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations) && !drv.type().hasKnownOutputPaths()) {
             for (auto & outputName : wantedOutputs) {
                 auto thisOutputHash = outputHashes.at(outputName);
                 auto thisOutputId = DrvOutput{ thisOutputHash, outputName };

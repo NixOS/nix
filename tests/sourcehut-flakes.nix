@@ -59,7 +59,7 @@ let
       echo 'ref: refs/heads/master' > $out/HEAD
 
       mkdir -p $out/info
-      echo '${nixpkgs.rev} refs/heads/master' > $out/info/refs
+      echo -e '${nixpkgs.rev}\trefs/heads/master\n${nixpkgs.rev}\trefs/tags/foo-bar' > $out/info/refs
     '';
 
 in
@@ -106,7 +106,7 @@ makeTest (
           {
             virtualisation.writableStore = true;
             virtualisation.diskSize = 2048;
-            virtualisation.pathsInNixDB = [ pkgs.hello pkgs.fuse ];
+            virtualisation.additionalPaths = [ pkgs.hello pkgs.fuse ];
             virtualisation.memorySize = 4096;
             nix.binaryCaches = lib.mkForce [ ];
             nix.extraOptions = ''
@@ -132,6 +132,17 @@ makeTest (
       client.succeed("curl -v https://git.sr.ht/ >&2")
       client.succeed("nix registry list | grep nixpkgs")
 
+      # Test that it resolves HEAD
+      rev = client.succeed("nix flake info sourcehut:~NixOS/nixpkgs --json | jq -r .revision")
+      assert rev.strip() == "${nixpkgs.rev}", "revision mismatch"
+      # Test that it resolves branches
+      rev = client.succeed("nix flake info sourcehut:~NixOS/nixpkgs/master --json | jq -r .revision")
+      assert rev.strip() == "${nixpkgs.rev}", "revision mismatch"
+      # Test that it resolves tags
+      rev = client.succeed("nix flake info sourcehut:~NixOS/nixpkgs/foo-bar --json | jq -r .revision")
+      assert rev.strip() == "${nixpkgs.rev}", "revision mismatch"
+
+      # Registry and pinning test
       rev = client.succeed("nix flake info nixpkgs --json | jq -r .revision")
       assert rev.strip() == "${nixpkgs.rev}", "revision mismatch"
 

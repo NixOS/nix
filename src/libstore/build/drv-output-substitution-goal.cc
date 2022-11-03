@@ -6,8 +6,12 @@
 
 namespace nix {
 
-DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(const DrvOutput& id, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
-    : Goal(worker)
+DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(
+    const DrvOutput & id,
+    Worker & worker,
+    RepairFlag repair,
+    std::optional<ContentAddress> ca)
+    : Goal(worker, DerivedPath::Opaque { StorePath::dummy })
     , id(id)
 {
     state = &DrvOutputSubstitutionGoal::init;
@@ -32,12 +36,12 @@ void DrvOutputSubstitutionGoal::init()
 
 void DrvOutputSubstitutionGoal::tryNext()
 {
-    trace("Trying next substituter");
+    trace("trying next substituter");
 
     if (subs.size() == 0) {
         /* None left.  Terminate this goal and let someone else deal
            with it. */
-        debug("drv output '%s' is required, but there is no substituter that can provide it", id.to_string());
+        debug("derivation output '%s' is required, but there is no substituter that can provide it", id.to_string());
 
         /* Hack: don't indicate failure if there were no substituters.
            In that case the calling derivation should just do a
@@ -119,7 +123,7 @@ void DrvOutputSubstitutionGoal::realisationFetched()
 void DrvOutputSubstitutionGoal::outPathValid()
 {
     assert(outputInfo);
-    trace("Output path substituted");
+    trace("output path substituted");
 
     if (nrFailed > 0) {
         debug("The output path of the derivation output '%s' could not be substituted", id.to_string());

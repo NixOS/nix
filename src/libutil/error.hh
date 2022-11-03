@@ -1,5 +1,6 @@
 #pragma once
 
+#include "suggestions.hh"
 #include "ref.hh"
 #include "types.hh"
 #include "fmt.hh"
@@ -53,6 +54,7 @@ typedef enum {
     lvlVomit
 } Verbosity;
 
+/* adjust Pos::origin bit width when adding stuff here */
 typedef enum {
     foFile,
     foStdin,
@@ -85,11 +87,7 @@ struct ErrPos {
         origin = pos.origin;
         line = pos.line;
         column = pos.column;
-        // is file symbol null?
-        if (pos.file.set())
-            file = pos.file;
-        else
-            file = "";
+        file = pos.file;
         return *this;
     }
 
@@ -100,6 +98,15 @@ struct ErrPos {
     }
 };
 
+std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos);
+
+void printCodeLines(std::ostream & out,
+    const std::string & prefix,
+    const ErrPos & errPos,
+    const LinesOfCode & loc);
+
+void printAtPos(const ErrPos & pos, std::ostream & out);
+
 struct Trace {
     std::optional<ErrPos> pos;
     hintformat hint;
@@ -107,10 +114,11 @@ struct Trace {
 
 struct ErrorInfo {
     Verbosity level;
-    std::string name; // FIXME: rename
     hintformat msg;
     std::optional<ErrPos> errPos;
     std::list<Trace> traces;
+
+    Suggestions suggestions;
 
     static std::optional<std::string> programName;
 };
@@ -141,6 +149,11 @@ public:
         : err { .level = lvlError, .msg = hintfmt(fs, args...) }
     { }
 
+    template<typename... Args>
+    BaseError(const Suggestions & sug, const Args & ... args)
+        : err { .level = lvlError, .msg = hintfmt(args...), .suggestions = sug }
+    { }
+
     BaseError(hintformat hint)
         : err { .level = lvlError, .msg = hint }
     { }
@@ -153,8 +166,6 @@ public:
         : err(e)
     { }
 
-    virtual const char* sname() const { return "BaseError"; }
-
 #ifdef EXCEPTION_NEEDS_THROW_SPEC
     ~BaseError() throw () { };
     const char * what() const throw () { return calcWhat().c_str(); }
@@ -166,12 +177,12 @@ public:
     const ErrorInfo & info() const { calcWhat(); return err; }
 
     template<typename... Args>
-    BaseError & addTrace(std::optional<ErrPos> e, const std::string & fs, const Args & ... args)
+    void addTrace(std::optional<ErrPos> e, const std::string & fs, const Args & ... args)
     {
-        return addTrace(e, hintfmt(fs, args...));
+        addTrace(e, hintfmt(fs, args...));
     }
 
-    BaseError & addTrace(std::optional<ErrPos> e, hintformat hint);
+    void addTrace(std::optional<ErrPos> e, hintformat hint);
 
     bool hasTrace() const { return !err.traces.empty(); }
 };
@@ -181,7 +192,6 @@ public:
     {                                                   \
     public:                                             \
         using superClass::superClass;                   \
-        virtual const char* sname() const override { return #newClass; } \
     }
 
 MakeError(Error, BaseError);
@@ -194,15 +204,19 @@ public:
     int errNo;
 
     template<typename... Args>
-    SysError(const Args & ... args)
+    SysError(int errNo_, const Args & ... args)
         : Error("")
     {
-        errNo = errno;
+        errNo = errNo_;
         auto hf = hintfmt(args...);
         err.msg = hintfmt("%1%: %2%", normaltxt(hf.str()), strerror(errNo));
     }
 
-    virtual const char* sname() const override { return "SysError"; }
+    template<typename... Args>
+    SysError(const Args & ... args)
+        : SysError(errno, args ...)
+    {
+    }
 };
 
 }

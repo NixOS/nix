@@ -161,7 +161,12 @@ protected:
     void getFile(const std::string & path,
         Callback<std::optional<std::string>> callback) noexcept override
     {
-        checkEnabled();
+        try {
+            checkEnabled();
+        } catch (...) {
+            callback.rethrow();
+            return;
+        }
 
         auto request(makeRequest(path));
 

@@ -36,7 +36,6 @@ Settings::Settings()
     , nixStateDir(canonPath(getEnv("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
     , nixConfDir(canonPath(getEnv("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
     , nixUserConfFiles(getUserConfigFiles())
-    , nixLibexecDir(canonPath(getEnv("NIX_LIBEXEC_DIR").value_or(NIX_LIBEXEC_DIR)))
     , nixBinDir(canonPath(getEnv("NIX_BIN_DIR").value_or(NIX_BIN_DIR)))
     , nixManDir(canonPath(NIX_MAN_DIR))
     , nixDaemonSocketFile(canonPath(getEnv("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
@@ -67,12 +66,13 @@ Settings::Settings()
     sandboxPaths = tokenizeString<StringSet>("/bin/sh=" SANDBOX_SHELL);
 #endif
 
-
-/* chroot-like behavior from Apple's sandbox */
+    /* chroot-like behavior from Apple's sandbox */
 #if __APPLE__
     sandboxPaths = tokenizeString<StringSet>("/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
     allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
 #endif
+
+    buildHook = getSelfExe().value_or("nix") + " __build-remote";
 }
 
 void loadConfFile()
@@ -114,7 +114,13 @@ std::vector<Path> getUserConfigFiles()
 
 unsigned int Settings::getDefaultCores()
 {
-    return std::max(1U, std::thread::hardware_concurrency());
+    const unsigned int concurrency = std::max(1U, std::thread::hardware_concurrency());
+    const unsigned int maxCPU = getMaxCPU();
+
+    if (maxCPU > 0)
+      return maxCPU;
+    else
+      return concurrency;
 }
 
 StringSet Settings::getDefaultSystemFeatures()
@@ -148,13 +154,9 @@ StringSet Settings::getDefaultExtraPlatforms()
     // machines. Note that we can’t force processes from executing
     // x86_64 in aarch64 environments or vice versa since they can
     // always exec with their own binary preferences.
-    if (pathExists("/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist") ||
-        pathExists("/System/Library/LaunchDaemons/com.apple.oahd.plist")) {
-        if (std::string{SYSTEM} == "x86_64-darwin")
-            extraPlatforms.insert("aarch64-darwin");
-        else if (std::string{SYSTEM} == "aarch64-darwin")
-            extraPlatforms.insert("x86_64-darwin");
-    }
+    if (std::string{SYSTEM} == "aarch64-darwin" &&
+        runProgram(RunOptions {.program = "arch", .args = {"-arch", "x86_64", "/usr/bin/true"}, .mergeStderrToStdout = true}).first == 0)
+        extraPlatforms.insert("x86_64-darwin");
 #endif
 
     return extraPlatforms;

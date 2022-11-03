@@ -7,7 +7,7 @@
 namespace nix {
 
 /* A simple non-nullable reference-counted pointer. Actually a wrapper
-   around std::shared_ptr that prevents non-null constructions. */
+   around std::shared_ptr that prevents null constructions. */
 template<typename T>
 class ref
 {
@@ -98,48 +98,5 @@ make_ref(Args&&... args)
     auto p = std::make_shared<T>(std::forward<Args>(args)...);
     return ref<T>(p);
 }
-
-
-/* A non-nullable pointer.
-   This is similar to a C++ "& reference", but mutable.
-   This is similar to ref<T> but backed by a regular pointer instead of a smart pointer.
- */
-template<typename T>
-class ptr {
-private:
-    T * p;
-
-public:
-    ptr<T>(const ptr<T> & r)
-        : p(r.p)
-    { }
-
-    explicit ptr<T>(T * p)
-        : p(p)
-    {
-        if (!p)
-            throw std::invalid_argument("null pointer cast to ptr");
-    }
-
-    T* operator ->() const
-    {
-        return &*p;
-    }
-
-    T& operator *() const
-    {
-        return *p;
-    }
-
-    bool operator == (const ptr<T> & other) const
-    {
-        return p == other.p;
-    }
-
-    bool operator != (const ptr<T> & other) const
-    {
-        return p != other.p;
-    }
-};
 
 }

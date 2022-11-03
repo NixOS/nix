@@ -2,20 +2,26 @@ name: Backport
 on:
   pull_request_target:
     types: [closed, labeled]
+permissions:
+  contents: read
 jobs:
   backport:
     name: Backport Pull Request
+    permissions:
+      # for zeebe-io/backport-action
+      contents: write
+      pull-requests: write
     if: github.repository_owner == 'NixOS' && github.event.pull_request.merged == true && (github.event_name != 'labeled' || startsWith('backport', github.event.label.name))
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           # required to find all branches
           fetch-depth: 0
       - name: Create backport PRs
         # should be kept in sync with `version`
-        uses: zeebe-io/backport-action@v0.0.7
+        uses: zeebe-io/backport-action@v0.0.8
         with:
           # Config README: https://github.com/zeebe-io/backport-action#backport-action
           github_token: ${{ secrets.GITHUB_TOKEN }}
