@@ -207,55 +207,60 @@ Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
 
 void SourceExprCommand::completeInstallable(std::string_view prefix)
 {
-    if (file) {
-        completionType = ctAttrs;
+    try {
+        if (file) {
+            completionType = ctAttrs;
 
-        evalSettings.pureEval = false;
-        auto state = getEvalState();
-        Expr *e = state->parseExprFromFile(
-            resolveExprPath(state->checkSourcePath(lookupFileArg(*state, *file)))
-        );
+            evalSettings.pureEval = false;
+            auto state = getEvalState();
+            Expr *e = state->parseExprFromFile(
+                resolveExprPath(state->checkSourcePath(lookupFileArg(*state, *file)))
+                );
 
-        Value root;
-        state->eval(e, root);
+            Value root;
+            state->eval(e, root);
 
-        auto autoArgs = getAutoArgs(*state);
+            auto autoArgs = getAutoArgs(*state);
 
-        std::string prefix_ = std::string(prefix);
-        auto sep = prefix_.rfind('.');
-        std::string searchWord;
-        if (sep != std::string::npos) {
-            searchWord = prefix_.substr(sep + 1, std::string::npos);
-            prefix_ = prefix_.substr(0, sep);
-        } else {
-            searchWord = prefix_;
-            prefix_ = "";
-        }
+            std::string prefix_ = std::string(prefix);
+            auto sep = prefix_.rfind('.');
+            std::string searchWord;
+            if (sep != std::string::npos) {
+                searchWord = prefix_.substr(sep + 1, std::string::npos);
+                prefix_ = prefix_.substr(0, sep);
+            } else {
+                searchWord = prefix_;
+                prefix_ = "";
+            }
 
-        auto [v, pos] = findAlongAttrPath(*state, prefix_, *autoArgs, root);
-        Value &v1(*v);
-        state->forceValue(v1, pos);
-        Value v2;
-        state->autoCallFunction(*autoArgs, v1, v2);
+            auto [v, pos] = findAlongAttrPath(*state, prefix_, *autoArgs, root);
+            Value &v1(*v);
+            state->forceValue(v1, pos);
+            Value v2;
+            state->autoCallFunction(*autoArgs, v1, v2);
 
-        if (v2.type() == nAttrs) {
-            for (auto & i : *v2.attrs) {
-                std::string name = state->symbols[i.name];
-                if (name.find(searchWord) == 0) {
-                    if (prefix_ == "")
-                        completions->add(name);
-                    else
-                        completions->add(prefix_ + "." + name);
+            if (v2.type() == nAttrs) {
+                for (auto & i : *v2.attrs) {
+                    std::string name = state->symbols[i.name];
+                    if (name.find(searchWord) == 0) {
+                        if (prefix_ == "")
+                            completions->add(name);
+                        else
+                            completions->add(prefix_ + "." + name);
+                    }
                 }
             }
+        } else {
+            completeFlakeRefWithFragment(
+                getEvalState(),
+                lockFlags,
+                getDefaultFlakeAttrPathPrefixes(),
+                getDefaultFlakeAttrPaths(),
+                prefix);
         }
-    } else {
-        completeFlakeRefWithFragment(
-            getEvalState(),
-            lockFlags,
-            getDefaultFlakeAttrPathPrefixes(),
-            getDefaultFlakeAttrPaths(),
-            prefix);
+    } catch (EvalError& e) {
+        // swallow eval error
+        (void)e;
     }
 }
 
