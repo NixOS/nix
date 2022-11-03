@@ -87,6 +87,16 @@ void InputAccessor::dumpPath(
     dump(path);
 }
 
+Hash InputAccessor::hashPath(
+    const CanonPath & path,
+    PathFilter & filter,
+    HashType ht)
+{
+    HashSink sink(ht);
+    dumpPath(path, sink, filter);
+    return sink.finish().first;
+}
+
 StorePath InputAccessor::fetchToStore(
     ref<Store> store,
     const CanonPath & path,

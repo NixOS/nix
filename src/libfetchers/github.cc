@@ -220,6 +220,25 @@ struct GitArchiveInputScheme : InputScheme
 
         auto accessor = makeZipInputAccessor(CanonPath(store->toRealPath(storePath)));
 
+        /* Compute the NAR hash of the contents of the zip file. This
+           is checked against the NAR hash in the lock file in
+           Input::checkLocks(). */
+        auto key = fmt("zip-nar-hash-%s", store->toRealPath(storePath.to_string()));
+
+        auto cache = getCache();
+
+        auto narHash = [&]() {
+            if (auto narHashS = cache->queryFact(key)) {
+                return Hash::parseSRI(*narHashS);
+            } else {
+                auto narHash = accessor->hashPath(CanonPath::root);
+                cache->upsertFact(key, narHash.to_string(SRI, true));
+                return narHash;
+            }
+        }();
+
+        input2.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
+
         auto lastModified = accessor->getLastModified();
         assert(lastModified);
         input2.attrs.insert_or_assign("lastModified", uint64_t(*lastModified));

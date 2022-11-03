@@ -5,6 +5,7 @@
 #include "archive.hh"
 #include "canon-path.hh"
 #include "repair-flag.hh"
+#include "hash.hh"
 
 namespace nix {
 
@@ -56,6 +57,11 @@ struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
         const CanonPath & path,
         Sink & sink,
         PathFilter & filter = defaultPathFilter);
+
+    Hash hashPath(
+        const CanonPath & path,
+        PathFilter & filter = defaultPathFilter,
+        HashType ht = htSHA256);
 
     StorePath fetchToStore(
         ref<Store> store,
