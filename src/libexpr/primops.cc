@@ -5,6 +5,7 @@
 #include "globals.hh"
 #include "json-to-value.hh"
 #include "names.hh"
+#include "references.hh"
 #include "store-api.hh"
 #include "util.hh"
 #include "json.hh"
@@ -1542,6 +1543,10 @@ static void prim_readFile(EvalState & state, const PosIdx pos, Value * * args, V
             refs = state.store->queryPathInfo(state.store->toStorePath(path).first)->references;
         } catch (Error &) { // FIXME: should be InvalidPathError
         }
+        // Re-scan references to filter down to just the ones that actually occur in the file.
+        auto refsSink = PathRefScanSink::fromPaths(refs);
+        refsSink << s;
+        refs = refsSink.getResultPaths();
     }
     auto context = state.store->printStorePathSet(refs);
     v.mkString(s, context);
