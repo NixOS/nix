@@ -745,8 +745,8 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         auto current = sink.finish();
         if (current.first != info->narHash) {
             printError("path '%s' was modified! expected hash '%s', got '%s'",
-                    store->printStorePath(path),
-                    info->narHash.to_string(Base32, true),
+                store->printStorePath(path),
+                info->narHash.to_string(Base32, true),
                 current.first.to_string(Base32, true));
             status = 1;
         }
