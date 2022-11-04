@@ -904,7 +904,7 @@ void EvalState::throwEvalError(const char * s, const std::string & s2,
     const std::string & s3)
 {
     debugThrowLastTrace(EvalError({
-        .msg = hintfmt(s, s2),
+        .msg = hintfmt(s, s2, s3),
         .errPos = positions[noPos]
     }));
 }
@@ -913,7 +913,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
     const std::string & s3)
 {
     debugThrowLastTrace(EvalError({
-        .msg = hintfmt(s, s2),
+        .msg = hintfmt(s, s2, s3),
         .errPos = positions[pos]
     }));
 }
@@ -922,7 +922,7 @@ void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::stri
     const std::string & s3, Env & env, Expr & expr)
 {
     debugThrow(EvalError({
-        .msg = hintfmt(s, s2),
+        .msg = hintfmt(s, s2, s3),
         .errPos = positions[pos]
     }), env, expr);
 }
