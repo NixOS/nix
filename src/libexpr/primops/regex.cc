@@ -19,6 +19,7 @@ class Regex
 protected:
     pcre2_code* code;
     size_t usage = 0;
+    std::vector<std::pair<std::string_view, uint32_t>> name_table;
 public:
     Regex(std::string_view re)
     {
@@ -32,13 +33,31 @@ public:
             pcre2_get_error_message(errorcode, err, sizeof(err));
             throw RegexError("unable to compile regex: %1% at offset %2%", err, erroffset);
         }
-
+        // parse nametable
+        uint32_t namecount;
+        pcre2_pattern_info(code, PCRE2_INFO_NAMECOUNT, &namecount);
+        if (namecount) {
+            PCRE2_SPTR tabptr;
+            uint32_t name_entry_size;
+            pcre2_pattern_info(code, PCRE2_INFO_NAMETABLE, &tabptr);
+            pcre2_pattern_info(code, PCRE2_INFO_NAMEENTRYSIZE, &name_entry_size);
+            name_table.reserve(namecount);
+            for (size_t i = 0; i < namecount; i++) {
+                int n = tabptr[0] << 8 | tabptr[1];
+                name_table.emplace_back((const char*)(tabptr+2), n);
+                tabptr += name_entry_size;
+            }
+        }
     }
     Regex(const Regex&) = delete;
     Regex(Regex&&) = delete; // move not implemented
     ~Regex()
     {
         pcre2_code_free(code);
+    };
+
+    const decltype(name_table)& nameTable() const {
+        return name_table;
     };
 
     int match(const std::string_view str, MatchData& match, PCRE2_SIZE startoffset = 0, uint32_t options = 0);
@@ -63,8 +82,10 @@ protected:
     std::string_view str;
     uint32_t size_;
     PCRE2_SIZE* ovector;
+    Regex& re;
 public:
     MatchData(Regex& re) noexcept
+        : re(re)
     {
         match = pcre2_match_data_create_from_pattern(re.code, NULL);
         size_ = pcre2_get_ovector_count(match);
@@ -75,6 +96,11 @@ public:
     ~MatchData()
     {
         pcre2_match_data_free(match);
+    };
+
+    const Regex& regex() const noexcept
+    {
+        return re;
     };
 
     uint32_t size() const noexcept
@@ -145,14 +171,26 @@ size_t regexCacheSize(std::shared_ptr<RegexCache> cache)
 
 static void extract_matches(EvalState & state, const PCRE::MatchData& match, Value & v)
 {
-    // the first match is the whole string
-    const size_t len = match.size() - 1;
-    state.mkList(v, len);
-    for (size_t i = 0; i < len; ++i) {
-        if (!match[i+1].has_value())
-            (v.listElems()[i] = state.allocValue())->mkNull();
-        else
-            (v.listElems()[i] = state.allocValue())->mkString(*match[i + 1]);
+    auto nameTable = match.regex().nameTable();
+    if (nameTable.size()) {
+        // try to extract named bindings
+        auto bindings = state.buildBindings(nameTable.size());
+        for (auto i : nameTable) {
+            Value & elem = bindings.alloc(i.first);
+            if (!match[i.second].has_value()) elem.mkNull();
+            else elem.mkString(*match[i.second]);
+        }
+        v.mkAttrs(bindings);
+    } else {
+        // the first match is the whole string
+        const size_t len = match.size() - 1;
+        state.mkList(v, len);
+        for (size_t i = 0; i < len; ++i) {
+            if (!match[i+1].has_value())
+                (v.listElems()[i] = state.allocValue())->mkNull();
+            else
+                (v.listElems()[i] = state.allocValue())->mkString(*match[i + 1]);
+        }
     }
 }
 
@@ -254,18 +292,10 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
             result.push_back(prefix);
 
             // Add a list for matched substrings.
-            const size_t slen = match.size() - 1;
             auto elem = state.allocValue();
             result.push_back(elem);
 
-            // Start at 1, beacause the first match is the whole string.
-            state.mkList(*elem, slen);
-            for (size_t si = 0; si < slen; ++si) {
-                if (!match[si + 1].has_value())
-                    (elem->listElems()[si] = state.allocValue())->mkNull();
-                else
-                    (elem->listElems()[si] = state.allocValue())->mkString(*match[si + 1]);
-            }
+            extract_matches(state, match, *elem);
 
             lastmatchend = match.startPos() + match[0]->length();
             newmatchstart = lastmatchend + (match[0]->length() == 0 ? 1 : 0);
