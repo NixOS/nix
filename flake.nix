@@ -115,6 +115,7 @@
             boost
             lowdown-nix
             gtest
+            pcre2
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium

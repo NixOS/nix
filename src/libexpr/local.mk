@@ -15,7 +15,7 @@ libexpr_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/lib
 
 libexpr_LIBS = libutil libstore libfetchers
 
-libexpr_LDFLAGS += -lboost_context -pthread
+libexpr_LDFLAGS += -lboost_context -pthread -lpcre2-8
 ifdef HOST_LINUX
  libexpr_LDFLAGS += -ldl
 endif

@@ -26,6 +26,8 @@
 
 #include <cmath>
 
+#define PCRE2_CODE_UNIT_WIDTH 8
+#include <pcre2.h>
 
 namespace nix {
 
@@ -3497,19 +3499,84 @@ static RegisterPrimOp primop_hashString({
     .fun = prim_hashString,
 });
 
+namespace PCRE {
+class MatchData;
+class Regex {
+    friend class MatchData;
+protected:
+    pcre2_code* code;
+public:
+    Regex(std::string_view re) {
+        int errorcode; PCRE2_SIZE erroffset;
+        code = pcre2_compile((const unsigned char*)re.data(), re.length(), 0, &errorcode, &erroffset, nullptr);
+        if (code == nullptr) {
+            unsigned char err[256];
+            pcre2_get_error_message(errorcode, err, sizeof(err));
+            throw Error("Regex error: %1% at offset %2%", err, erroffset);
+        }
+        assert(pcre2_jit_compile(code, PCRE2_JIT_COMPLETE) == 0);
+    }
+    Regex(const Regex&) = delete;
+    Regex(Regex&&) = delete;
+    ~Regex() { pcre2_code_free(code); };
+    int match(const std::string_view str, MatchData& match, PCRE2_SIZE startoffset = 0, uint32_t options = 0);
+    uint32_t captureCount() {
+        uint32_t len;
+        pcre2_pattern_info(code, PCRE2_INFO_CAPTURECOUNT, &len);
+        return len;
+    }
+};
+class MatchData {
+    friend class Regex;
+protected:
+    pcre2_match_data* match;
+    std::string_view str;
+public:
+    MatchData(Regex& re) {
+        match = pcre2_match_data_create_from_pattern(re.code, NULL);
+    };
+    MatchData(const MatchData&) = delete;
+    MatchData(MatchData&&) = delete;
+    ~MatchData() { pcre2_match_data_free(match); };
+    uint32_t size() {
+        return pcre2_get_ovector_count(match);
+    };
+    std::optional<std::string_view> operator[](std::size_t i) {
+        assert(i < size());
+        PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match);
+        if (ovector[2*i] == PCRE2_UNSET) return {};
+        return str.substr(ovector[2*i], ovector[2*i+1] - ovector[2*i]);
+    };
+    uint32_t startPos() {
+        return pcre2_get_startchar(match);
+    };
+};
+int Regex::match(const std::string_view str, MatchData& match, PCRE2_SIZE startoffset, uint32_t options) {
+    match.str = str;
+    int rc = pcre2_match(code, (const unsigned char*)str.data(), str.length(), startoffset, options, match.match, NULL);
+    assert(rc != 0); // match data too small
+    if (rc < 0 && rc != PCRE2_ERROR_NOMATCH) {
+        unsigned char err[256];
+        pcre2_get_error_message(rc, err, sizeof(err));
+        throw Error("Regex matching error: %1%", err);
+    }
+    return rc;
+};
+};
+
 struct RegexCache
 {
     // TODO use C++20 transparent comparison when available
-    std::unordered_map<std::string_view, std::regex> cache;
+    std::unordered_map<std::string_view, PCRE::Regex> cache;
     std::list<std::string> keys;
 
-    std::regex get(std::string_view re)
+    PCRE::Regex& get(std::string_view re)
     {
         auto it = cache.find(re);
         if (it != cache.end())
             return it->second;
         keys.emplace_back(re);
-        return cache.emplace(keys.back(), std::regex(keys.back(), std::regex::extended)).first->second;
+        return cache.emplace(keys.back(), keys.back()).first->second;
     }
 };
 
@@ -3518,19 +3585,40 @@ std::shared_ptr<RegexCache> makeRegexCache()
     return std::make_shared<RegexCache>();
 }
 
+size_t regexCacheSize(std::shared_ptr<RegexCache> cache)
+{
+    return cache->keys.size();
+}
+
+void extract_matches(EvalState & state, PCRE::MatchData& match, Value & v)
+{
+    uint32_t rc = match.size() - 1;
+    state.mkList(v, rc);
+
+    for (size_t i = 0; i < rc; ++i) {
+        if (!match[i+1].has_value())
+            (v.listElems()[i] = state.allocValue())->mkNull();
+        else
+            (v.listElems()[i] = state.allocValue())->mkString(*match[i+1]);
+    }
+}
+
 void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     auto re = state.forceStringNoCtx(*args[0], pos);
 
     try {
 
-        auto regex = state.regexCache->get(re);
+        auto& regex = state.regexCache->get(re);
 
         PathSet context;
         const auto str = state.forceString(*args[1], context, pos);
 
-        std::cmatch match;
-        if (!std::regex_match(str.begin(), str.end(), match, regex)) {
+
+        //printTalkative("evaluating regex '%1%' on '%2%'", re, str);
+        PCRE::MatchData match(regex);
+        int rc = regex.match(str, match, 0, PCRE2_ANCHORED | PCRE2_ENDANCHORED);
+        if (rc == PCRE2_ERROR_NOMATCH) {
             v.mkNull();
             return;
         }
@@ -3539,10 +3627,10 @@ void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v)
         const size_t len = match.size() - 1;
         state.mkList(v, len);
         for (size_t i = 0; i < len; ++i) {
-            if (!match[i+1].matched)
+            if (!match[i+1].has_value())
                 (v.listElems()[i] = state.allocValue())->mkNull();
             else
-                (v.listElems()[i] = state.allocValue())->mkString(match[i + 1].str());
+                (v.listElems()[i] = state.allocValue())->mkString(*match[i + 1]);
         }
 
     } catch (std::regex_error & e) {
@@ -3604,50 +3692,59 @@ void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 
     try {
 
-        auto regex = state.regexCache->get(re);
+        auto& regex = state.regexCache->get(re);
 
         PathSet context;
         const auto str = state.forceString(*args[1], context, pos);
 
-        auto begin = std::cregex_iterator(str.begin(), str.end(), regex);
-        auto end = std::cregex_iterator();
 
-        // Any matches results are surrounded by non-matching results.
-        const size_t len = std::distance(begin, end);
-        state.mkList(v, 2 * len + 1);
-        size_t idx = 0;
+        PCRE::MatchData match(regex);
+        int rc = regex.match(str, match);
 
-        if (len == 0) {
-            v.listElems()[idx++] = args[1];
+        if (rc == PCRE2_ERROR_NOMATCH) {
+            state.mkList(v, 1);
+            v.listElems()[0] = args[1];
             return;
         }
-
-        for (auto i = begin; i != end; ++i) {
-            assert(idx <= 2 * len + 1 - 3);
-            auto match = *i;
-
+        ValueVector result;
+        result.reserve(3);
+        size_t lastmatchend = 0;
+        size_t newmatchstart = 0;
+        while (rc != PCRE2_ERROR_NOMATCH && newmatchstart <= str.length()) {
+            // TODO: retry empty match?
             // Add a string for non-matched characters.
-            (v.listElems()[idx++] = state.allocValue())->mkString(match.prefix().str());
+            Value * prefix = state.allocValue();
+            prefix->mkString(str.substr(lastmatchend, match.startPos() - lastmatchend));
+            result.push_back(prefix);
 
             // Add a list for matched substrings.
             const size_t slen = match.size() - 1;
-            auto elem = v.listElems()[idx++] = state.allocValue();
+            auto elem = state.allocValue();
+            result.push_back(elem);
 
             // Start at 1, beacause the first match is the whole string.
             state.mkList(*elem, slen);
             for (size_t si = 0; si < slen; ++si) {
-                if (!match[si + 1].matched)
+                if (!match[si + 1].has_value())
                     (elem->listElems()[si] = state.allocValue())->mkNull();
                 else
-                    (elem->listElems()[si] = state.allocValue())->mkString(match[si + 1].str());
+                    (elem->listElems()[si] = state.allocValue())->mkString(*match[si + 1]);
             }
 
-            // Add a string for non-matched suffix characters.
-            if (idx == 2 * len)
-                (v.listElems()[idx++] = state.allocValue())->mkString(match.suffix().str());
+            lastmatchend = match.startPos() + match[0]->length();
+            newmatchstart = lastmatchend + (match[0]->length() == 0 ? 1 : 0);
+            if (newmatchstart <= str.length())
+                rc = regex.match(str, match, newmatchstart);
         }
 
-        assert(idx == 2 * len + 1);
+        // Add a string for non-matched suffix characters.
+        Value * rest = state.allocValue();
+        rest->mkString(str.substr(lastmatchend, -1));
+        result.push_back(rest);
+
+        state.mkList(v, result.size());
+        for (size_t n = 0; n < result.size(); ++n)
+            v.listElems()[n] = result[n];
 
     } catch (std::regex_error & e) {
         if (e.code() == std::regex_constants::error_space) {

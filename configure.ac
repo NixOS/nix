@@ -279,6 +279,7 @@ PKG_CHECK_MODULES([GTEST], [gtest_main])
 # Look for nlohmann/json.
 PKG_CHECK_MODULES([NLOHMANN_JSON], [nlohmann_json >= 3.9])
 
+PKG_CHECK_MODULES([PCRE2], [libpcre2-8 >= 10.39])
 
 # documentation generation switch
 AC_ARG_ENABLE(doc-gen, AS_HELP_STRING([--disable-doc-gen],[disable documentation generation]),

@@ -2478,6 +2478,7 @@ void EvalState::printStats()
             sizes.attr("Bindings", sizeof(Bindings));
             sizes.attr("Attr", sizeof(Attr));
         }
+        topObj.attr("regexCache", regexCacheSize(regexCache));
         topObj.attr("nrOpUpdates", nrOpUpdates);
         topObj.attr("nrOpUpdateValuesCopied", nrOpUpdateValuesCopied);
         topObj.attr("nrThunks", nrThunks);

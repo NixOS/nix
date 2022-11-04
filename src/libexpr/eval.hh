@@ -76,6 +76,7 @@ void initGC();
 struct RegexCache;
 
 std::shared_ptr<RegexCache> makeRegexCache();
+size_t regexCacheSize(std::shared_ptr<RegexCache> cache);
 
 struct DebugTrace {
     std::optional<ErrPos> pos;
