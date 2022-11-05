@@ -85,7 +85,7 @@ static RegisterPrimOp primop_fromYAML({
     .name = "__fromYAML",
     .args = {"e"},
     .doc = R"(
-      Convert a YAML string to a Nix value, if a conversion is possible. For example,
+      Convert a YAML 1.2 string to a Nix value, if a conversion is possible. For example,
 
       ```nix
       builtins.fromYAML ''{x: [1, 2, 3], y: !!str null, z: null}''
@@ -109,7 +109,10 @@ static RegisterPrimOp primop_fromYAML({
         auto tree = parser.parse_in_arena({}, ryml::csubstr(yaml.begin(), yaml.size()));
         tree.resolve(); // resolve references
 
-        visitYAMLNode(context, val, tree.rootref());
+        auto root = tree.rootref();
+        if (root.is_stream() && root.num_children() == 1)
+            root = root.child(0);
+        visitYAMLNode(context, val, root);
     }
 });
 
