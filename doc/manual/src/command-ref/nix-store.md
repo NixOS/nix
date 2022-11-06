@@ -71,7 +71,7 @@ paths. Realisation is a somewhat overloaded term:
     outputs are already valid, in which case we are done
     immediately. Otherwise, there may be [substitutes](../glossary.md)
     that produce the outputs (e.g., by downloading them). Finally, the
-    outputs can be produced by performing the build action described
+    outputs can be produced by running the build task described
     by the derivation.
 
   - If the store path is not a derivation, realisation ensures that the
