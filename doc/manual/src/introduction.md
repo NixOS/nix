@@ -104,7 +104,7 @@ a currently running program.
 
 Packages are built from _Nix expressions_, which is a simple
 functional language.  A Nix expression describes everything that goes
-into a package build action (a “derivation”): other packages, sources,
+into a package build task (a “derivation”): other packages, sources,
 the build script, environment variables for the build script, etc.
 Nix tries very hard to ensure that Nix expressions are
 _deterministic_: building a Nix expression twice should yield the same
