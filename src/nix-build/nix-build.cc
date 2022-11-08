@@ -571,14 +571,15 @@ static void main_nix_build(int argc, char * * argv)
 
         logger->stop();
 
-        execvp(shell->c_str(), argPtrs.data());
-
         pid_t pid = fork();
 
         if (pid == -1)
             throw SysError("forking shell");
 
         if (pid == 0) {
+            for (auto & [outputName, output] : drv.outputsAndOptPaths(*store))
+                if (output.second) store->addTempRoot(*output.second);
+
             execvp(shell->c_str(), argPtrs.data());
 
             throw SysError("executing shell '%s'", *shell);
