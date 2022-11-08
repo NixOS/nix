@@ -122,15 +122,16 @@ struct AutoUserLock : UserLock
 
     ~AutoUserLock()
     {
+        #if __linux__
         // Get rid of our cgroup, ignoring errors.
         if (cgroup) rmdir(cgroup->c_str());
+        #endif
     }
 
     void kill() override
     {
         #if __linux__
         if (cgroup) {
-            printError("KILL CGROUP %s", *cgroup);
             destroyCgroup(*cgroup);
             if (mkdir(cgroup->c_str(), 0755) == -1)
                 throw SysError("creating cgroup '%s'", *cgroup);
@@ -138,7 +139,6 @@ struct AutoUserLock : UserLock
         #endif
         {
             assert(firstUid);
-            printError("KILL USER %d", firstUid);
             killUser(firstUid);
         }
     }
@@ -201,6 +201,7 @@ struct AutoUserLock : UserLock
                 lock->firstUid = settings.startId + i * maxIdsPerBuild;
                 lock->nrIds = nrIds;
 
+                #if __linux__
                 if (nrIds > 1) {
                     auto ourCgroups = getCgroups("/proc/self/cgroup");
                     auto ourCgroup = ourCgroups[""];
@@ -209,20 +210,17 @@ struct AutoUserLock : UserLock
 
                     auto ourCgroupPath = canonPath("/sys/fs/cgroup/" + ourCgroup);
 
-                    printError("PARENT CGROUP = %s", ourCgroupPath);
-
                     if (!pathExists(ourCgroupPath))
                         throw Error("expected cgroup directory '%s'", ourCgroupPath);
 
                     lock->cgroup = fmt("%s/nix-build-%d", ourCgroupPath, lock->firstUid);
-
-                    printError("CHILD CGROUP = %s", *lock->cgroup);
 
                     /* Record the cgroup in the lock file. This ensures that
                        if we subsequently get executed under a different parent
                        cgroup, we kill the previous cgroup first. */
                     writeFull(lock->fdUserLock.get(), *lock->cgroup);
                 }
+                #endif
 
                 return lock;
             }

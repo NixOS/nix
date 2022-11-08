@@ -46,7 +46,13 @@ struct PluginFilesSetting : public BaseSetting<Paths>
     void set(const std::string & str, bool append = false) override;
 };
 
-const uint32_t maxIdsPerBuild = 1 << 16;
+const uint32_t maxIdsPerBuild =
+    #if __linux__
+    1 << 16
+    #else
+    1
+    #endif
+    ;
 
 class Settings : public Config {
 
@@ -277,16 +283,26 @@ public:
           multi-user settings with untrusted users.
         )"};
 
-    #if __linux__
     Setting<bool> autoAllocateUids{this, false, "auto-allocate-uids",
         "Whether to allocate UIDs for builders automatically."};
 
-    Setting<uint32_t> startId{this, 872415232, "start-id",
+    Setting<uint32_t> startId{this,
+        #if __linux__
+        872415232,
+        #else
+        56930,
+        #endif
+        "start-id",
         "The first UID and GID to use for dynamic ID allocation."};
 
-    Setting<uint32_t> uidCount{this, maxIdsPerBuild * 128, "id-count",
+    Setting<uint32_t> uidCount{this,
+        #if __linux__
+        maxIdsPerBuild * 128,
+        #else
+        128,
+        #endif
+        "id-count",
         "The number of UIDs/GIDs to use for dynamic ID allocation."};
-    #endif
 
     Setting<bool> impersonateLinux26{this, false, "impersonate-linux-26",
         "Whether to impersonate a Linux 2.6 machine on newer kernels.",

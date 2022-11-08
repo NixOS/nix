@@ -659,7 +659,7 @@ void LocalDerivationGoal::startBuilder()
         }
 
 #else
-        if (useUidRange)
+        if (parsedDrv->useUidRange())
             throw Error("feature 'uid-range' is not supported on this platform");
         if (useSystemdCgroup)
             throw Error("feature 'systemd-cgroup' is not supported on this platform");

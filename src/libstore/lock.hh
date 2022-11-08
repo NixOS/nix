@@ -4,6 +4,8 @@
 
 #include <optional>
 
+#include <sys/types.h>
+
 namespace nix {
 
 struct UserLock
