@@ -84,6 +84,9 @@ chmod a+rx $TEST_ROOT/spaced\ \\\'\"shell.shebang.rb
 output=$($TEST_ROOT/spaced\ \\\'\"shell.shebang.rb abc ruby)
 [ "$output" = '-e load(ARGV.shift) -- '"$TEST_ROOT"'/spaced \'\''"shell.shebang.rb abc ruby' ]
 
+# Text nix-shell --run preserves exit code
+test ! $(nix-shell -p foo --run 'exit 1')
+
 # Test 'nix develop'.
 nix develop -f "$shellDotNix" shellDrv -c bash -c '[[ -n $stdenv ]]'
 
