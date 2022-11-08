@@ -573,7 +573,25 @@ static void main_nix_build(int argc, char * * argv)
 
         execvp(shell->c_str(), argPtrs.data());
 
-        throw SysError("executing shell '%s'", *shell);
+        pid_t pid = fork();
+
+        if (pid == -1)
+            throw SysError("forking shell");
+
+        if (pid == 0) {
+            execvp(shell->c_str(), argPtrs.data());
+
+            throw SysError("executing shell '%s'", *shell);
+        }
+
+        siginfo_t shellStatus;
+
+        auto shellExited = waitid(P_PID, pid, &shellStatus, WEXITED);
+
+        if (shellExited == -1)
+            throw SysError("waiting on shell");
+
+        throw Exit(shellStatus.si_status);
     }
 
     else {
