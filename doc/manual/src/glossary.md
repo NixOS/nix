@@ -60,7 +60,7 @@
     cache](https://cache.nixos.org).
 
   - [store path]{#gloss-store-path}\
-    The location in the file system of a store object, i.e., an
+    The location of a [store object] in the file system, i.e., an
     immediate child of the Nix store directory.
 
     Example: `/nix/store/a040m110amc4h71lds2jmr8qrkj2jhxd-git-2.38.1`
@@ -178,3 +178,12 @@
 
   - [`ε`]{#gloss-epsilon}\
     The epsilon symbol. In the context of a package, this means the version is empty. More precisely, the derivation does not have a version attribute.
+
+  - [string interpolation]{#gloss-string-interpolation}\
+    Expanding expressions enclosed in `${ }` within a [string], [path], or [attribute name].
+
+    See [String interpolation](./language/string-interpolation.md) for details.
+
+    [string]: ./language/values.md#type-string
+    [path]: ./language/values.md#type-path
+    [attribute name]: ./language/values.md#attribute-set
