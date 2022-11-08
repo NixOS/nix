@@ -2,12 +2,12 @@
 // this must be done on the client side, as web servers do not see the anchor part of the URL.
 
 // redirections are declared as follows:
-// each entry has as key the matched URL path relative to the mdBook document root.
+// each entry has as its key a path matching the requested URL path, relative to the mdBook document root.
 //
 //     IMPORTANT: it must specify the full path with file name and suffix
 //
-// each entry is a set of key-value pairs, where
-// - keys are anchors on to the matched path.
+// each entry is itself a set of key-value pairs, where
+// - keys are anchors on the matched path.
 // - values are redirection targets relative to the current path.
 
 const redirects = {
@@ -352,16 +352,16 @@ const redirects = {
 //
 // matching URLs is more involved than it should be:
 //
-// 1. `document.location.pathname` can have an have an arbitrary prefix.
+// 1. `document.location.pathname` can have an arbitrary prefix.
 //
-// 2. `path_to_root` is set by mdBook and consists only of `../`s and
+// 2. `path_to_root` is set by mdBook. it consists only of `../`s and
 //    determines the depth of `<path>` relative to the prefix:
 //
 //          `document.location.pathname`
 //        |------------------------------|
 //        /<prefix>/<path>/[<file>[.html]][#<anchor>]
 //                  |----|
-//              `path_to_root` has same number of segments
+//              `path_to_root` has same number of path segments
 //
 //    source: https://phaiax.github.io/mdBook/format/theme/index-hbs.html#data
 //
@@ -410,7 +410,9 @@ const path = segments.join('/');
 
 // anchor starts with the hash character (`#`),
 // but our redirect declarations don't, so we strip it.
-// example: document.location.hash -> '#foo'
+// example:
+//     document.location.hash -> '#foo'
+//     document.location.hash.substring(1) -> 'foo'
 const anchor = document.location.hash.substring(1);
 
 const redirect = redirects[path];
