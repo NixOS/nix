@@ -5,3 +5,7 @@
   arguments will be ignored and the resulting derivation will have
   `__impure` set to `true`, making it an impure derivation.
 
+* `nix-shell` now spawns a child process instead of `exec`ing immediately.
+
+* `nix-shell` creates temp roots for as long as the executed shell
+  process is alive.
