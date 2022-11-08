@@ -90,6 +90,7 @@ std::optional<Strings> ParsedDerivation::getStringsAttr(const std::string & name
 
 StringSet ParsedDerivation::getRequiredSystemFeatures() const
 {
+    // FIXME: cache this?
     StringSet res;
     for (auto & i : getStringsAttr("requiredSystemFeatures").value_or(Strings()))
         res.insert(i);
@@ -123,6 +124,11 @@ bool ParsedDerivation::willBuildLocally(Store & localStore) const
 bool ParsedDerivation::substitutesAllowed() const
 {
     return getBoolAttr("allowSubstitutes", true);
+}
+
+bool ParsedDerivation::useUidRange() const
+{
+    return getRequiredSystemFeatures().count("uid-range");
 }
 
 static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");

@@ -160,7 +160,7 @@ void LocalDerivationGoal::tryLocalBuild() {
 
     if (useBuildUsers()) {
         if (!buildUser)
-            buildUser = acquireUserLock();
+            buildUser = acquireUserLock(parsedDrv->useUidRange() ? 65536 : 1);
 
         if (!buildUser) {
             if (!actLock)
@@ -495,8 +495,8 @@ void LocalDerivationGoal::startBuilder()
         }
     }
 
-    useUidRange = parsedDrv->getRequiredSystemFeatures().count("uid-range");
     useSystemdCgroup = parsedDrv->getRequiredSystemFeatures().count("Systemd-cgroup");
+    assert(!useSystemdCgroup);
 
     if (useChroot) {
 
@@ -576,7 +576,8 @@ void LocalDerivationGoal::startBuilder()
 
         printMsg(lvlChatty, format("setting up chroot environment in '%1%'") % chrootRootDir);
 
-        if (mkdir(chrootRootDir.c_str(), useUidRange ? 0755 : 0750) == -1)
+        // FIXME: make this 0700
+        if (mkdir(chrootRootDir.c_str(), buildUser && buildUser->getUIDCount() != 1 ? 0755 : 0750) == -1)
             throw SysError("cannot create '%1%'", chrootRootDir);
 
         // FIXME: only make root writable for user namespace builds.
@@ -596,8 +597,8 @@ void LocalDerivationGoal::startBuilder()
         createDirs(chrootRootDir + "/etc");
         chownToBuilder(chrootRootDir + "/etc");
 
-        if (useUidRange && (!buildUser || buildUser->getUIDCount() < 65536))
-            throw Error("feature 'uid-range' requires '%s' to be enabled", settings.autoAllocateUids.name);
+        if (parsedDrv->useUidRange() && (!buildUser || buildUser->getUIDCount() < 65536))
+            throw Error("feature 'uid-range' requires the setting '%s' to be enabled", settings.autoAllocateUids.name);
 
         /* Declare the build user's group so that programs get a consistent
            view of the system (e.g., "id -gn"). */
@@ -670,7 +671,7 @@ void LocalDerivationGoal::startBuilder()
         #endif
 #endif
     } else {
-        if (useUidRange)
+        if (parsedDrv->useUidRange())
             throw Error("feature 'uid-range' is only supported in sandboxed builds");
         if (useSystemdCgroup)
             throw Error("feature 'systemd-cgroup' is only supported in sandboxed builds");
@@ -934,12 +935,12 @@ void LocalDerivationGoal::startBuilder()
                the calling user (if build users are disabled). */
             uid_t hostUid = buildUser ? buildUser->getUID() : getuid();
             uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
-            uint32_t nrIds = buildUser && useUidRange ? buildUser->getUIDCount() : 1;
+            uid_t nrIds = buildUser ? buildUser->getUIDCount() : 1;
 
             writeFile("/proc/" + std::to_string(pid) + "/uid_map",
                 fmt("%d %d %d", sandboxUid(), hostUid, nrIds));
 
-            if (!useUidRange)
+            if (!buildUser || buildUser->getUIDCount() == 1)
                 writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
 
             writeFile("/proc/" + std::to_string(pid) + "/gid_map",
@@ -1793,7 +1794,7 @@ void LocalDerivationGoal::runChild()
                 throw SysError("mounting /proc");
 
             /* Mount sysfs on /sys. */
-            if (useUidRange) {
+            if (buildUser && buildUser->getUIDCount() != 1) {
                 createDirs(chrootRootDir + "/sys");
                 if (mount("none", (chrootRootDir + "/sys").c_str(), "sysfs", 0, 0) == -1)
                     throw SysError("mounting /sys");

@@ -131,6 +131,10 @@ StringSet Settings::getDefaultSystemFeatures()
     StringSet features{"nixos-test", "benchmark", "big-parallel"};
 
     #if __linux__
+    features.insert("uid-range");
+    #endif
+
+    #if __linux__
     if (access("/dev/kvm", R_OK | W_OK) == 0)
         features.insert("kvm");
     #endif

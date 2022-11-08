@@ -11,18 +11,16 @@ struct UserLock
     virtual ~UserLock() { }
 
     /* Get the first and last UID. */
-    virtual std::pair<uid_t, uid_t> getUIDRange() = 0;
+    std::pair<uid_t, uid_t> getUIDRange()
+    {
+        auto first = getUID();
+        return {first, first + getUIDCount() - 1};
+    }
 
     /* Get the first UID. */
-    uid_t getUID()
-    {
-        return getUIDRange().first;
-    }
+    virtual uid_t getUID() = 0;
 
-    uid_t getUIDCount()
-    {
-        return getUIDRange().second - getUIDRange().first + 1;
-    }
+    virtual uid_t getUIDCount() = 0;
 
     virtual gid_t getGID() = 0;
 
@@ -31,12 +29,14 @@ struct UserLock
     /* Kill any processes currently executing as this user. */
     virtual void kill() = 0;
 
+    #if __linux__
     virtual std::optional<Path> getCgroup() { return {}; };
+    #endif
 };
 
-/* Acquire a user lock. Note that this may return nullptr if no user
-   is available. */
-std::unique_ptr<UserLock> acquireUserLock();
+/* Acquire a user lock for a UID range of size `nrIds`. Note that this
+   may return nullptr if no user is available. */
+std::unique_ptr<UserLock> acquireUserLock(uid_t nrIds);
 
 bool useBuildUsers();
 

@@ -13,6 +13,7 @@
 
 namespace nix {
 
+// FIXME: obsolete, check for cgroup2
 std::map<std::string, std::string> getCgroups(const Path & cgroupFile)
 {
     std::map<std::string, std::string> cgroups;

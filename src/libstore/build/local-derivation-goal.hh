@@ -41,9 +41,6 @@ struct LocalDerivationGoal : public DerivationGoal
 
     Path chrootRootDir;
 
-    /* Whether to give the build more than 1 UID. */
-    bool useUidRange = false;
-
     /* Whether to make the 'systemd' cgroup controller available to
        the build. */
     bool useSystemdCgroup = false;
@@ -99,8 +96,8 @@ struct LocalDerivationGoal : public DerivationGoal
        result. */
     std::map<Path, ValidPathInfo> prevInfos;
 
-    uid_t sandboxUid() { return usingUserNamespace ? (useUidRange ? 0 : 1000) : buildUser->getUID(); }
-    gid_t sandboxGid() { return usingUserNamespace ? (useUidRange ? 0 : 100)  : buildUser->getGID(); }
+    uid_t sandboxUid() { return usingUserNamespace ? (buildUser->getUIDCount() == 1 ? 1000 : 0) : buildUser->getUID(); }
+    gid_t sandboxGid() { return usingUserNamespace ? (buildUser->getUIDCount() == 1 ? 100  : 0) : buildUser->getGID(); }
 
     const static Path homeDir;
 
