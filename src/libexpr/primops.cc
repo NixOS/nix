@@ -1029,6 +1029,7 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
         e.addTrace(state.positions[posDrvName], "while evaluating the derivation attribute 'name'");
         throw;
     }
+    Activity act(*logger, lvlTalkative, actUnknown, fmt("instantiate '%s'", drvName), {});
 
     /* Check whether attributes should be passed as a JSON file. */
     std::ostringstream jsonBuf;
