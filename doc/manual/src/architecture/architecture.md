@@ -36,10 +36,8 @@ Nix consists of [hierarchical layers].
 
 At the top is the [command line interface](../command-ref/command-ref.md), translating from invocations of Nix executables to interactions with the underlying layers.
 
-Below that is the [Nix language](../language/index.md), a [purely functional] configuration language.
-It is used to compose expressions which ultimately evaluate to self-contained *build plans*, used to derive *build results* from referenced *build inputs*.
-
-[purely functional]: https://en.m.wikipedia.org/wiki/Purely_functional_programming
+Below that is the [Nix language](../language/index.md), the configuration language for Nix.
+Its expressions ultimately evaluate to self-contained *build plans*, used to derive *build results* from referenced *build inputs*.
 
 The command line interface and the Nix language are what users interact with most.
 
