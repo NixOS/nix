@@ -88,10 +88,24 @@ extension. The installer will also create `/etc/profile.d/nix.sh`.
 
 ### Linux
 
-```console
-sudo rm -rf /etc/profile/nix.sh /etc/nix /nix ~root/.nix-profile ~root/.nix-defexpr ~root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
+Remove files created by Nix:
 
-# If you are on Linux with systemd, you will need to run:
+```console
+sudo rm -rf /nix /etc/nix /etc/profile/nix.sh ~root/.nix-profile ~root/.nix-defexpr ~root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
+```
+
+Remove build users and their group:
+
+```console
+for i in $(seq 30001 30032); do
+  sudo userdel $i
+done
+sudo groupdel 30000
+```
+
+If you are on Linux with systemd, remove the Nix daemon service:
+
+```console
 sudo systemctl stop nix-daemon.socket
 sudo systemctl stop nix-daemon.service
 sudo systemctl disable nix-daemon.socket
@@ -99,8 +113,13 @@ sudo systemctl disable nix-daemon.service
 sudo systemctl daemon-reload
 ```
 
-There may also be references to Nix in `/etc/profile`, `/etc/bashrc`,
-and `/etc/zshrc` which you may remove.
+There may also be references to Nix in
+
+- `/etc/profile`
+- `/etc/bashrc`,
+- `/etc/zshrc`
+
+which you may remove.
 
 ### macOS
 
