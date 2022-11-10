@@ -495,9 +495,6 @@ void LocalDerivationGoal::startBuilder()
         }
     }
 
-    useSystemdCgroup = parsedDrv->getRequiredSystemFeatures().count("Systemd-cgroup");
-    assert(!useSystemdCgroup);
-
     if (useChroot) {
 
         /* Allow a user-configurable set of directories from the
@@ -649,20 +646,18 @@ void LocalDerivationGoal::startBuilder()
                 dirsInChroot.erase(worker.store.printStorePath(*i.second.second));
         }
 
-        if (useSystemdCgroup) {
-            settings.requireExperimentalFeature(Xp::SystemdCgroup);
-            std::optional<Path> cgroup;
-            if (!buildUser || !(cgroup = buildUser->getCgroup()))
-                throw Error("feature 'systemd-cgroup' requires 'auto-allocate-uids = true' in nix.conf");
-            chownToBuilder(*cgroup);
-            chownToBuilder(*cgroup + "/cgroup.procs");
+        if (buildUser) {
+            if (auto cgroup = buildUser->getCgroup()) {
+                chownToBuilder(*cgroup);
+                chownToBuilder(*cgroup + "/cgroup.procs");
+                chownToBuilder(*cgroup + "/cgroup.threads");
+                //chownToBuilder(*cgroup + "/cgroup.subtree_control");
+            }
         }
 
 #else
         if (parsedDrv->useUidRange())
             throw Error("feature 'uid-range' is not supported on this platform");
-        if (useSystemdCgroup)
-            throw Error("feature 'systemd-cgroup' is not supported on this platform");
         #if __APPLE__
             /* We don't really have any parent prep work to do (yet?)
                All work happens in the child, instead. */
@@ -673,8 +668,6 @@ void LocalDerivationGoal::startBuilder()
     } else {
         if (parsedDrv->useUidRange())
             throw Error("feature 'uid-range' is only supported in sandboxed builds");
-        if (useSystemdCgroup)
-            throw Error("feature 'systemd-cgroup' is only supported in sandboxed builds");
     }
 
     if (needsHashRewrite() && pathExists(homeDir))
@@ -1845,7 +1838,7 @@ void LocalDerivationGoal::runChild()
             /* Unshare the cgroup namespace. This means
                /proc/self/cgroup will show the child's cgroup as '/'
                rather than whatever it is in the parent. */
-            if (useSystemdCgroup && unshare(CLONE_NEWCGROUP) == -1)
+            if (buildUser && buildUser->getUIDCount() != 1 && unshare(CLONE_NEWCGROUP) == -1)
                 throw SysError("unsharing cgroup namespace");
 
             /* Do the chroot(). */

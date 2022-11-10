@@ -41,10 +41,6 @@ struct LocalDerivationGoal : public DerivationGoal
 
     Path chrootRootDir;
 
-    /* Whether to make the 'systemd' cgroup controller available to
-       the build. */
-    bool useSystemdCgroup = false;
-
     /* RAII object to delete the chroot directory. */
     std::shared_ptr<AutoDelete> autoDelChroot;
 

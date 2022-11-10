@@ -24,7 +24,6 @@ enum struct ExperimentalFeature
     FetchClosure,
     ReplFlake,
     AutoAllocateUids,
-    SystemdCgroup,
 };
 
 /**
