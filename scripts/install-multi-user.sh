@@ -248,9 +248,13 @@ printf -v _UNCHANGED_GRP_FMT "%b" $'\033[2m%='"$ESC" # "dim"
 printf -v _OLD_LINE_FMT "%b" $'\033[1;7;31m-'"$ESC ${RED}%L${ESC}"
 printf -v _NEW_LINE_FMT "%b" $'\033[1;7;32m+'"$ESC ${GREEN}%L${ESC}"
 
+# Caution: abspath to diff likely fragile, but currently this path is
+# only in use on macOS. If we started using it elsewhere it could use
+# a discovery routine like used for finding chown (or maybe set PATH
+# in this script to the output of `getconf PATH`).
 _diff() {
     # simple colorized diff comatible w/ pre `--color` versions
-    diff --unchanged-group-format="$_UNCHANGED_GRP_FMT" --old-line-format="$_OLD_LINE_FMT" --new-line-format="$_NEW_LINE_FMT" --unchanged-line-format="  %L" "$@"
+    /usr/bin/diff --unchanged-group-format="$_UNCHANGED_GRP_FMT" --old-line-format="$_OLD_LINE_FMT" --new-line-format="$_NEW_LINE_FMT" --unchanged-line-format="  %L" "$@"
 }
 
 confirm_rm() {
@@ -260,6 +264,8 @@ confirm_rm() {
     fi
 }
 
+# Caution: see note above _diff() if you're going to reuse this on
+# a platform other than macOS
 confirm_edit() {
     local path="$1"
     local edit_path="$2"
