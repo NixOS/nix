@@ -116,7 +116,7 @@ sudo systemctl daemon-reload
 There may also be references to Nix in
 
 - `/etc/profile`
-- `/etc/bashrc`,
+- `/etc/bashrc`
 - `/etc/zshrc`
 
 which you may remove.
