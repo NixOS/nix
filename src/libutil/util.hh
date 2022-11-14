@@ -695,7 +695,7 @@ std::string shellEscape(const std::string_view s);
 
 
 /* Recreate the effect of the perl shellwords function, breaking up a
- * string into arguments like a shell word, including escapes */
+   string into arguments like a shell word, including escapes. */
 std::vector<std::string> shellwords(const std::string & s);
 
 
