@@ -1594,6 +1594,8 @@ void LocalDerivationGoal::runChild()
     /* Warning: in the child we should absolutely not make any SQLite
        calls! */
 
+    bool sendException = true;
+
     try { /* child */
 
         commonChildInit(builderOut);
@@ -2050,6 +2052,8 @@ void LocalDerivationGoal::runChild()
         /* Indicate that we managed to set up the build environment. */
         writeFull(STDERR_FILENO, std::string("\2\n"));
 
+        sendException = false;
+
         /* Execute the program.  This should not return. */
         if (drv->isBuiltin()) {
             try {
@@ -2103,10 +2107,13 @@ void LocalDerivationGoal::runChild()
         throw SysError("executing '%1%'", drv->builder);
 
     } catch (Error & e) {
-        writeFull(STDERR_FILENO, "\1\n");
-        FdSink sink(STDERR_FILENO);
-        sink << e;
-        sink.flush();
+        if (sendException) {
+            writeFull(STDERR_FILENO, "\1\n");
+            FdSink sink(STDERR_FILENO);
+            sink << e;
+            sink.flush();
+        } else
+            std::cerr << e.msg();
         _exit(1);
     }
 }

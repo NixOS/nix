@@ -88,7 +88,8 @@ EvalCommand::EvalCommand()
 {
     addFlag({
         .longName = "debugger",
-        .description = "start an interactive environment if evaluation fails",
+        .description = "Start an interactive environment if evaluation fails.",
+        .category = MixEvalArgs::category,
         .handler = {&startReplOnEvalErrors, true},
     });
 }
@@ -225,7 +226,7 @@ MixProfile::MixProfile()
 {
     addFlag({
         .longName = "profile",
-        .description = "The profile to update.",
+        .description = "The profile to operate on.",
         .labels = {"path"},
         .handler = {&profile},
         .completer = completePath
