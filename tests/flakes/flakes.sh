@@ -69,8 +69,9 @@ cat > $nonFlakeDir/shebang.sh <<EOF
 #! nix --offline shell
 #! nix flake1#fooScript
 #! nix --no-write-lock-file --command bash
-set -e
+set -ex
 foo
+echo "\$@"
 EOF
 chmod +x $nonFlakeDir/shebang.sh
 
@@ -517,3 +518,4 @@ expectStderr 1 nix flake metadata $flake2Dir --no-allow-dirty --reference-lock-f
 
 # Test shebang
 [[ $($nonFlakeDir/shebang.sh) = "foo" ]]
+[[ $($nonFlakeDir/shebang.sh "bar") = "foo"$'\n'"bar" ]]
