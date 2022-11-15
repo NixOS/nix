@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <string>
 
+// Ugly, however direct access to the SAX parser is required in order to parse multiple JSON objects from a stream
 #include "json-to-value.cc"
 
 
@@ -31,7 +32,6 @@ namespace nix {
                     replaceWith = ' ';
                     seqSize = 3;
                 } else if (remSize >= 3 && newLine.find(data + i, 0, 3) != newLine.npos) {
-                    //replaceWith = '\n';
                     seqSize = 3;
                 } else if (remSize >= 2 && tab.find(data + i, 0, 2) != tab.npos) {
                     replaceWith = '\t';
@@ -86,7 +86,7 @@ namespace nix {
         protected:
 
             std::string execYAMLTest(std::string_view test) {
-                auto fromYAML = state.getBuiltin("fromYAML").primOp->fun;
+                const auto fromYAML = state.getBuiltin("fromYAML").primOp->fun;
                 Value testCases, testVal;
                 Value *pTestVal = &testVal;
                 testVal.mkString(test);
@@ -96,19 +96,13 @@ namespace nix {
                     Value *json = nullptr;
                     ctr++;
                     std::string_view yamlRaw;
-                    std::string_view tags;
                     for (auto attr = testCase->attrs->begin(); attr != testCase->attrs->end(); attr++) {
                         auto name = state.symbols[attr->name];
                         if (name == "json") {
                             json = attr->value;
-                        } else if (name == "tags") {
-                            tags = state.forceStringNoCtx(*attr->value);
                         } else if (name == "yaml") {
                             yamlRaw = state.forceStringNoCtx(*attr->value);
                         }
-                    }
-                    if (tags.find("1.3") != tags.npos) {
-                        continue;
                     }
                     bool fail = !json;
                     bool emptyJSON = false;
