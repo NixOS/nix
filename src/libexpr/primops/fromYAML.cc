@@ -1,8 +1,13 @@
+// RYML: workaround for bug in amalgamate script - nix requires at least C++17
+#include <charconv>
+// enabling this macro has a performance penalty
+#define RYML_WITH_TAB_TOKENS
 #define RYML_SINGLE_HDR_DEFINE_NOW
 #include "../../rapidyaml/ryml_all.hpp"
 
 #include "primops.hh"
 #include "eval-inline.hh"
+
 
 namespace nix {
 
@@ -32,7 +37,11 @@ static void s_error [[ noreturn ]] (const char* msg, size_t len, ryml::Location 
 static void visitYAMLNode(NixContext & context, Value & v, ryml::NodeRef t) {
 
     auto valTypeCheck = [=] (ryml::YamlTag_e tag, bool defaultVal = true) {
-        auto valTag = t.has_val_tag() ? ryml::to_tag(t.val_tag()) : ryml::TAG_NONE;
+        auto valTag = ryml::TAG_NONE;
+        if (t.has_val_tag()) {
+            auto tag = t.val_tag();
+            valTag = tag == "!" ? ryml::TAG_STR : ryml::to_tag(tag);
+        }
         return valTag == ryml::TAG_NONE ? defaultVal : valTag == tag;
     };
 
@@ -46,14 +55,22 @@ static void visitYAMLNode(NixContext & context, Value & v, ryml::NodeRef t) {
         }
     }
     if (t.is_map()) {
-        auto attrs = context.state.buildBindings(t.num_children());
-
-        for (ryml::NodeRef child : t.children()) {
-            std::string_view key(child.key().begin(), child.key().size());
-            visitYAMLNode(context, attrs.alloc(key), child);
+        if (t.num_children() == 1) { // special case for YAML string ":"
+            auto child = t.child(0);
+            if (child.key().empty() && !child.is_key_quoted() && child.has_val() && child.val().empty() && !child.is_val_quoted()) {
+                v.mkNull();
+            }
         }
+        if (v.type() != nNull) {
+            auto attrs = context.state.buildBindings(t.num_children());
 
-        v.mkAttrs(attrs);
+            for (ryml::NodeRef child : t.children()) {
+                std::string_view key(child.key().begin(), child.key().size());
+                visitYAMLNode(context, attrs.alloc(key), child);
+            }
+
+            v.mkAttrs(attrs);
+        }
     } else if (t.is_seq()) {
         context.state.mkList(v, t.num_children());
 
@@ -68,8 +85,10 @@ static void visitYAMLNode(NixContext & context, Value & v, ryml::NodeRef t) {
         NixInt _int;
         bool isQuoted = t.is_val_quoted();
         auto val = t.val();
-        // caution: ryml is able to convert integers into booleans
-        if (valTypeCheck(ryml::TAG_INT, !isQuoted) && val.is_integer() && ryml::from_chars(val, &_int)) {
+        // Caution: ryml is able to convert integers into booleans and ryml::from_chars might ignore trailing chars
+        if (t.has_val_tag() && t.val_tag() == "!" && val.empty() && !isQuoted) { // special case for YAML string "!"
+            v.mkNull();
+        } else if (valTypeCheck(ryml::TAG_INT, !isQuoted) && val.is_integer() && ryml::from_chars(val, &_int)) {
             v.mkInt(_int);
         } else if (valTypeCheck(ryml::TAG_BOOL, !isQuoted) && ryml::from_chars(val, &_bool)) {
             v.mkBool(_bool);
