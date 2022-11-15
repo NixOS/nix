@@ -31,6 +31,15 @@ rec {
     helloString = "Hello, world!";
   };
 
+  use-a = mkDerivation {
+    name = "use-a";
+    inherit (a) first second;
+    builder = builtins.toFile "builder.sh"
+      ''
+        cat $first/file $second/file >$out
+      '';
+  };
+
   b = mkDerivation {
     defaultOutput = assert a.second.helloString == "Hello, world!"; a;
     firstOutput = assert a.outputName == "first"; a.first.first;
@@ -85,6 +94,27 @@ rec {
     outputs = [ "a" "b" "c" ];
     meta.outputsToInstall = [ "a" "b" ];
     buildCommand = "mkdir $a $b $c";
+  };
+
+  independent = mkDerivation {
+    name = "multiple-outputs-independent";
+    outputs = [ "first" "second" ];
+    builder = builtins.toFile "builder.sh"
+      ''
+        mkdir $first $second
+        test -z $all
+        echo "first" > $first/file
+        echo "second" > $second/file
+      '';
+  };
+
+  use-independent = mkDerivation {
+    name = "use-independent";
+    inherit (a) first second;
+    builder = builtins.toFile "builder.sh"
+      ''
+        cat $first/file $second/file >$out
+      '';
   };
 
 }
