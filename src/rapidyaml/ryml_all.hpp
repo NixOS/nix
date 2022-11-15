@@ -10676,7 +10676,8 @@ bool from_chars(c4::csubstr buf, std::string * s);
 #           endif
 #       else
 #           if __has_include(<charconv>)
-#               include <charconv>
+//included above:
+//#               include <charconv>
 #               if defined(__cpp_lib_to_chars)
 #                   define C4CORE_HAVE_STD_TOCHARS 1
 #                   define C4CORE_HAVE_STD_FROMCHARS 0 // glibc uses fast_float internally
