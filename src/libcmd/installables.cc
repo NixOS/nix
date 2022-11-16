@@ -258,9 +258,8 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
                 getDefaultFlakeAttrPaths(),
                 prefix);
         }
-    } catch (EvalError& e) {
-        // swallow eval error
-        (void)e;
+    } catch (EvalError&) {
+        // Don't want eval errors to mess-up with the completion engine, so let's just swallow them
     }
 }
 
