@@ -1521,7 +1521,7 @@ static void prim_dirOf(EvalState & state, const PosIdx pos, Value * * args, Valu
     state.forceValue(*args[0], pos);
     if (args[0]->type() == nPath) {
         auto path = args[0]->path();
-        v.mkPath(path.parent());
+        v.mkPath(path.path.isRoot() ? path : path.parent());
     } else {
         auto path = state.coerceToString(pos, *args[0], context, false, false);
         auto dir = dirOf(*path);
