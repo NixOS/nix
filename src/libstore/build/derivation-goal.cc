@@ -7,7 +7,6 @@
 #include "finally.hh"
 #include "util.hh"
 #include "archive.hh"
-#include "json.hh"
 #include "compression.hh"
 #include "worker-protocol.hh"
 #include "topo-sort.hh"

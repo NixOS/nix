@@ -2,7 +2,6 @@
 
 #include <nlohmann/json.hpp>
 #include <regex>
-#include "json.hh"
 
 namespace nix {
 
@@ -144,16 +143,11 @@ std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & s
     auto e = json.find("exportReferencesGraph");
     if (e != json.end() && e->is_object()) {
         for (auto i = e->begin(); i != e->end(); ++i) {
-            std::ostringstream str;
-            {
-                JSONPlaceholder jsonRoot(str, true);
-                StorePathSet storePaths;
-                for (auto & p : *i)
-                    storePaths.insert(store.parseStorePath(p.get<std::string>()));
-                store.pathInfoToJSON(jsonRoot,
-                    store.exportReferences(storePaths, inputPaths), false, true);
-            }
-            json[i.key()] = nlohmann::json::parse(str.str()); // urgh
+            StorePathSet storePaths;
+            for (auto & p : *i)
+                storePaths.insert(store.parseStorePath(p.get<std::string>()));
+            json[i.key()] = store.pathInfoToJSON(
+                store.exportReferences(storePaths, inputPaths), false, true);
         }
     }
 
