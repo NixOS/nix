@@ -1,7 +1,4 @@
 #include "libexprtests.hh"
-#include <exception>
-#include <stdexcept>
-#include <string>
 
 // Ugly, however direct access to the SAX parser is required in order to parse multiple JSON objects from a stream
 #include "json-to-value.cc"
@@ -57,15 +54,22 @@ namespace nix {
         return nlohmann::json::sax_parse(s_, &parser, nlohmann::json::input_format_t::json, false);
     }
 
-    static Value parseJSONStream(EvalState & state, std::string_view json) {
+    static Value parseJSONStream(EvalState & state, std::string_view json, PrimOpFun fromYAML) {
         std::stringstream ss;
         ss << json;
         std::list<Value> list;
-        Value root, tmp;
+        Value root, refJson;
+        Value *pRoot = &root, rymlJson;
+        std::streampos start = 0;
         try {
             while (ss.peek() != EOF && json.size() - ss.tellg() > 1) {
-                parseJSON(state, ss, tmp);
-                list.emplace_back(tmp);
+                parseJSON(state, ss, refJson);
+                list.emplace_back(refJson);
+                // sanity check: builtins.fromJSON and builtins.fromYAML should return the same result when applied to a JSON string
+                root.mkString(std::string_view(json.begin() + start, ss.tellg() - start));
+                fromYAML(state, noPos, &pRoot, rymlJson);
+                EXPECT_EQ(printValue(state, refJson), printValue(state, rymlJson));
+                start = ss.tellg() + std::streampos(1);
             }
         } catch (const std::exception &e) {
         }
@@ -86,7 +90,7 @@ namespace nix {
         protected:
 
             std::string execYAMLTest(std::string_view test) {
-                const auto fromYAML = state.getBuiltin("fromYAML").primOp->fun;
+                const PrimOpFun fromYAML = state.getBuiltin("fromYAML").primOp->fun;
                 Value testCases, testVal;
                 Value *pTestVal = &testVal;
                 testVal.mkString(test);
@@ -112,48 +116,32 @@ namespace nix {
                     Value yaml, yamlVal;
                     Value *pYaml = &yaml;
                     yaml.mkString(yamlStr);
-                    yamlVal.mkBlackhole();
-                    try {
-                        if (!fail) {
-                            if (json->type() == nNull) {
-                                jsonStr = "null";
-                                jsonVal.mkNull();
-
-                            } else {
-                                jsonStr = state.forceStringNoCtx(*json);
+                    if (!fail) {
+                        if (json->type() == nNull) {
+                            jsonStr = "null";
+                            jsonVal.mkNull();
+                        } else {
+                            jsonStr = state.forceStringNoCtx(*json);
+                        }
+                        if (!(emptyJSON = jsonStr.empty())) {
+                            if (json->type() != nNull) {
+                                jsonVal = parseJSONStream(state, jsonStr, fromYAML);
+                                jsonStr = printValue(state, jsonVal);
                             }
-                            if (!(emptyJSON = jsonStr.empty())) {
-                                if (json->type() != nNull) {
-                                    jsonVal = parseJSONStream(state, jsonStr);
-                                    jsonStr = printValue(state, jsonVal);
-                                }
-                                fromYAML(state, noPos, &pYaml, yamlVal);
-                                if (printValue(state, jsonVal) == printValue(state, yamlVal)) {
-                                    continue;
-                                }
-                            }
-                        }
-                        if (yamlVal.type() == nThunk) {
-                            fromYAML(state, noPos, &pYaml, yamlVal); // should throw exception, if fail is asserted, and has to throw, if emptyJSON is asserted
-                        }
-                        if (emptyJSON) {
-                            return "Testcase[" + std::to_string(ctr) + "]: Parsing empty YAML has to fail";
-                        }
-                        // ryml parses some invalid YAML successfully
-                        // EXPECT_FALSE(fail) << "Testcase[" << ctr << "]: Invalid YAML was parsed successfully";
-                        if (fail) {
-                            continue;
-                        }
-                        std::stringstream ss;
-                        // NOTE: std::ostream & printValue(const EvalState & state, std::ostream & str, const Value & v); seems to be undefined
-                        ss << "Testcase[" << ctr << "]: parsed YAML '" << printValue(state, yamlVal) << "' does not match the expected JSON '" << jsonStr << "'";
-                        return ss.str();
-                    } catch (const EvalError &e) {
-                        if (!fail && !emptyJSON) {
-                            std::cerr << "Testcase[" << std::to_string(ctr) << "]: " << std::endl;
-                            throw;
+                            fromYAML(state, noPos, &pYaml, yamlVal);
+                            EXPECT_EQ(printValue(state, yamlVal), printValue(state, jsonVal)) << "Testcase[" + std::to_string(ctr) + "]: Parsed YAML does not match expected JSON result";
                         }
                     }
+                    if (fail || emptyJSON) {
+                        try {
+                            fromYAML(state, noPos, &pYaml, yamlVal); // should throw exception, if fail is asserted, and has to throw, if emptyJSON is asserted
+                        } catch (const EvalError &e) {
+                            continue;
+                        }
+                    }
+                    EXPECT_FALSE(emptyJSON) << "Testcase[" + std::to_string(ctr) + "]: Parsing empty YAML has to fail";
+                    // ryml parses some invalid YAML successfully
+                    // EXPECT_FALSE(fail) << "Testcase[" << ctr << "]: Invalid YAML was parsed successfully";
                 }
                 return "OK";
             }
