@@ -5,6 +5,7 @@
 #include "globals.hh"
 #include "json-to-value.hh"
 #include "names.hh"
+#include "references.hh"
 #include "store-api.hh"
 #include "util.hh"
 #include "json.hh"
@@ -1547,11 +1548,18 @@ static void prim_readFile(EvalState & state, const PosIdx pos, Value * * args, V
     auto s = path.readFile();
     if (s.find((char) 0) != std::string::npos)
         state.debugThrowLastTrace(Error("the contents of the file '%1%' cannot be represented as a Nix string", path));
-    // FIXME: only do queryPathInfo if path.accessor is the store accessor
-    auto refs =
-        state.store->isInStore(path.path.abs()) ?
-        state.store->queryPathInfo(state.store->toStorePath(path.path.abs()).first)->references :
-        StorePathSet{};
+    StorePathSet refs;
+    if (state.store->isInStore(path.path.abs())) {
+        try {
+            // FIXME: only do queryPathInfo if path.accessor is the store accessor
+            refs = state.store->queryPathInfo(state.store->toStorePath(path.path.abs()).first)->references;
+        } catch (Error &) { // FIXME: should be InvalidPathError
+        }
+        // Re-scan references to filter down to just the ones that actually occur in the file.
+        auto refsSink = PathRefScanSink::fromPaths(refs);
+        refsSink << s;
+        refs = refsSink.getResultPaths();
+    }
     auto context = state.store->printStorePathSet(refs);
     v.mkString(s, context);
 }

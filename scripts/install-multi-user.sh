@@ -58,7 +58,7 @@ readonly EXTRACTED_NIX_PATH="$(dirname "$0")"
 
 readonly ROOT_HOME=~root
 
-if [ -t 0 ]; then
+if [ -t 0 ] && [ -z "${NIX_INSTALLER_YES:-}" ]; then
     readonly IS_HEADLESS='no'
 else
     readonly IS_HEADLESS='yes'
