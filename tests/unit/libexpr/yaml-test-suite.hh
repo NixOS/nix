@@ -13182,7 +13182,7 @@ namespace nix {
     }
 
     TEST_F(FromYAMLTest, T_Y79Y) {
-        GTEST_SKIP(); // bug in ryml
+        GTEST_SKIP(); // issue in ryml
         ASSERT_EQ(execYAMLTest(T_Y79Y),"OK");
     }
 
