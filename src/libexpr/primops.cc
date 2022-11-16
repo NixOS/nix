@@ -2470,7 +2470,14 @@ static void prim_catAttrs(EvalState & state, const PosIdx pos, Value * * args, V
     auto attrName = state.symbols.create(state.forceStringNoCtx(*args[0], pos));
     state.forceList(*args[1], pos);
 
-    Value * res[args[1]->listSize()];
+    auto argSize = args[1]->listSize();
+
+    if (argSize == 0) {
+        state.mkList(v, 0);
+        return;
+    }
+
+    Value * res[argSize];
     unsigned int found = 0;
 
     for (auto v2 : args[1]->listItems()) {
@@ -2798,8 +2805,15 @@ static void prim_filter(EvalState & state, const PosIdx pos, Value * * args, Val
     state.forceFunction(*args[0], pos);
     state.forceList(*args[1], pos);
 
+    auto argSize = args[1]->listSize();
+
+    if (argSize == 0) {
+        state.mkList(v, 0);
+        return;
+    }
+
     // FIXME: putting this on the stack is risky.
-    Value * vs[args[1]->listSize()];
+    Value * vs[argSize];
     unsigned int k = 0;
 
     bool same = true;
@@ -3175,6 +3189,11 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value * * args, 
     state.forceFunction(*args[0], pos);
     state.forceList(*args[1], pos);
     auto nrLists = args[1]->listSize();
+
+    if (nrLists == 0) {
+        state.mkList(v, 0);
+        return;
+    }
 
     Value lists[nrLists];
     size_t len = 0;
