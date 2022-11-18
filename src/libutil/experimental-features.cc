@@ -15,6 +15,7 @@ std::map<ExperimentalFeature, std::string> stringifiedXpFeatures = {
     { Xp::FetchClosure, "fetch-closure" },
     { Xp::ReplFlake, "repl-flake" },
     { Xp::AutoAllocateUids, "auto-allocate-uids" },
+    { Xp::Cgroups, "cgroups" },
 };
 
 const std::optional<ExperimentalFeature> parseExperimentalFeature(const std::string_view & name)

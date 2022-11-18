@@ -15,6 +15,7 @@
 #include "topo-sort.hh"
 #include "callback.hh"
 #include "json-utils.hh"
+#include "cgroup.hh"
 
 #include <regex>
 #include <queue>
@@ -129,23 +130,33 @@ void LocalDerivationGoal::killChild()
     if (pid != -1) {
         worker.childTerminated(this);
 
-        if (buildUser) {
-            /* If we're using a build user, then there is a tricky
-               race condition: if we kill the build user before the
-               child has done its setuid() to the build user uid, then
-               it won't be killed, and we'll potentially lock up in
-               pid.wait().  So also send a conventional kill to the
-               child. */
-            ::kill(-pid, SIGKILL); /* ignore the result */
-            buildUser->kill();
-            pid.wait();
-        } else
-            pid.kill();
+        /* If we're using a build user, then there is a tricky race
+           condition: if we kill the build user before the child has
+           done its setuid() to the build user uid, then it won't be
+           killed, and we'll potentially lock up in pid.wait().  So
+           also send a conventional kill to the child. */
+        ::kill(-pid, SIGKILL); /* ignore the result */
 
-        assert(pid == -1);
+        killSandbox();
+
+        pid.wait();
     }
 
     DerivationGoal::killChild();
+}
+
+
+void LocalDerivationGoal::killSandbox()
+{
+    if (cgroup) {
+        destroyCgroup(*cgroup);
+    }
+
+    else if (buildUser) {
+        auto uid = buildUser->getUID();
+        assert(uid != 0);
+        killUser(uid);
+    }
 }
 
 
@@ -169,10 +180,6 @@ void LocalDerivationGoal::tryLocalBuild() {
             worker.waitForAWhile(shared_from_this());
             return;
         }
-
-        /* Make sure that no other processes are executing under this
-           uid. */
-        buildUser->kill();
     }
 
     actLock.reset();
@@ -263,7 +270,7 @@ void LocalDerivationGoal::cleanupPostChildKill()
        malicious user from leaving behind a process that keeps files
        open and modifies them after they have been chown'ed to
        root. */
-    if (buildUser) buildUser->kill();
+    killSandbox();
 
     /* Terminate the recursive Nix daemon. */
     stopDaemon();
@@ -356,6 +363,55 @@ static void linkOrCopy(const Path & from, const Path & to)
 
 void LocalDerivationGoal::startBuilder()
 {
+    if ((buildUser && buildUser->getUIDCount() != 1)
+        || settings.isExperimentalFeatureEnabled(Xp::Cgroups))
+    {
+        #if __linux__
+        auto ourCgroups = getCgroups("/proc/self/cgroup");
+        auto ourCgroup = ourCgroups[""];
+        if (ourCgroup == "")
+            throw Error("cannot determine cgroup name from /proc/self/cgroup");
+
+        auto ourCgroupPath = canonPath("/sys/fs/cgroup/" + ourCgroup);
+
+        if (!pathExists(ourCgroupPath))
+            throw Error("expected cgroup directory '%s'", ourCgroupPath);
+
+        static std::atomic<unsigned int> counter{0};
+
+        cgroup = buildUser
+            ? fmt("%s/nix-build-uid-%d", ourCgroupPath, buildUser->getUID())
+            : fmt("%s/nix-build-pid-%d-%d", ourCgroupPath, getpid(), counter++);
+
+        debug("using cgroup '%s'", *cgroup);
+
+        /* When using a build user, record the cgroup we used for that
+           user so that if we got interrupted previously, we can kill
+           any left-over cgroup first. */
+        if (buildUser) {
+            auto cgroupsDir = settings.nixStateDir + "/cgroups";
+            createDirs(cgroupsDir);
+
+            auto cgroupFile = fmt("%s/%d", cgroupsDir, buildUser->getUID());
+
+            if (pathExists(cgroupFile)) {
+                auto prevCgroup = readFile(cgroupFile);
+                destroyCgroup(prevCgroup);
+            }
+
+            writeFile(cgroupFile, *cgroup);
+        }
+
+        #else
+        throw Error("cgroups are not supported on this platform");
+        #endif
+    }
+
+    /* Make sure that no other processes are executing under the
+       sandbox uids. This must be done before any chownToBuilder()
+       calls. */
+    killSandbox();
+
     /* Right platform? */
     if (!parsedDrv->canBuildLocally(worker.store))
         throw Error("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
@@ -646,13 +702,13 @@ void LocalDerivationGoal::startBuilder()
                 dirsInChroot.erase(worker.store.printStorePath(*i.second.second));
         }
 
-        if (buildUser) {
-            if (auto cgroup = buildUser->getCgroup()) {
-                chownToBuilder(*cgroup);
-                chownToBuilder(*cgroup + "/cgroup.procs");
-                chownToBuilder(*cgroup + "/cgroup.threads");
-                //chownToBuilder(*cgroup + "/cgroup.subtree_control");
-            }
+        if (cgroup) {
+            if (mkdir(cgroup->c_str(), 0755) != 0)
+                throw SysError("creating cgroup '%s'", *cgroup);
+            chownToBuilder(*cgroup);
+            chownToBuilder(*cgroup + "/cgroup.procs");
+            chownToBuilder(*cgroup + "/cgroup.threads");
+            //chownToBuilder(*cgroup + "/cgroup.subtree_control");
         }
 
 #else
@@ -965,10 +1021,8 @@ void LocalDerivationGoal::startBuilder()
         }
 
         /* Move the child into its own cgroup. */
-        if (buildUser) {
-            if (auto cgroup = buildUser->getCgroup())
-                writeFile(*cgroup + "/cgroup.procs", fmt("%d", (pid_t) pid));
-        }
+        if (cgroup)
+            writeFile(*cgroup + "/cgroup.procs", fmt("%d", (pid_t) pid));
 
         /* Signal the builder that we've updated its user namespace. */
         writeFull(userNamespaceSync.writeSide.get(), "1");
@@ -1838,7 +1892,7 @@ void LocalDerivationGoal::runChild()
             /* Unshare the cgroup namespace. This means
                /proc/self/cgroup will show the child's cgroup as '/'
                rather than whatever it is in the parent. */
-            if (buildUser && buildUser->getUIDCount() != 1 && unshare(CLONE_NEWCGROUP) == -1)
+            if (cgroup && unshare(CLONE_NEWCGROUP) == -1)
                 throw SysError("unsharing cgroup namespace");
 
             /* Do the chroot(). */

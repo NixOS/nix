@@ -1,7 +1,6 @@
 #include "lock.hh"
 #include "globals.hh"
 #include "pathlocks.hh"
-#include "cgroup.hh"
 
 #include <pwd.h>
 #include <grp.h>
@@ -14,11 +13,6 @@ struct SimpleUserLock : UserLock
     uid_t uid;
     gid_t gid;
     std::vector<gid_t> supplementaryGIDs;
-
-    void kill() override
-    {
-        killUser(uid);
-    }
 
     uid_t getUID() override { assert(uid); return uid; }
     uid_t getUIDCount() override { return 1; }
@@ -116,32 +110,6 @@ struct AutoUserLock : UserLock
     AutoCloseFD fdUserLock;
     uid_t firstUid = 0;
     uid_t nrIds = 1;
-    #if __linux__
-    std::optional<Path> cgroup;
-    #endif
-
-    ~AutoUserLock()
-    {
-        #if __linux__
-        // Get rid of our cgroup, ignoring errors.
-        if (cgroup) rmdir(cgroup->c_str());
-        #endif
-    }
-
-    void kill() override
-    {
-        #if __linux__
-        if (cgroup) {
-            destroyCgroup(*cgroup);
-            if (mkdir(cgroup->c_str(), 0755) == -1)
-                throw SysError("creating cgroup '%s'", *cgroup);
-        } else
-        #endif
-        {
-            assert(firstUid);
-            killUser(firstUid);
-        }
-    }
 
     uid_t getUID() override { assert(firstUid); return firstUid; }
 
@@ -183,55 +151,16 @@ struct AutoUserLock : UserLock
                 throw SysError("opening user lock '%s'", fnUserLock);
 
             if (lockFile(fd.get(), ltWrite, false)) {
-                auto s = drainFD(fd.get());
-
-                #if __linux__
-                if (s != "") {
-                    /* Kill the old cgroup, to ensure there are no
-                       processes left over from an interrupted build. */
-                    destroyCgroup(s);
-                }
-                #endif
-
-                if (ftruncate(fd.get(), 0) == -1)
-                    throw Error("truncating user lock");
-
                 auto lock = std::make_unique<AutoUserLock>();
                 lock->fdUserLock = std::move(fd);
                 lock->firstUid = settings.startId + i * maxIdsPerBuild;
                 lock->nrIds = nrIds;
-
-                #if __linux__
-                if (nrIds > 1) {
-                    auto ourCgroups = getCgroups("/proc/self/cgroup");
-                    auto ourCgroup = ourCgroups[""];
-                    if (ourCgroup == "")
-                        throw Error("cannot determine cgroup name from /proc/self/cgroup");
-
-                    auto ourCgroupPath = canonPath("/sys/fs/cgroup/" + ourCgroup);
-
-                    if (!pathExists(ourCgroupPath))
-                        throw Error("expected cgroup directory '%s'", ourCgroupPath);
-
-                    lock->cgroup = fmt("%s/nix-build-%d", ourCgroupPath, lock->firstUid);
-
-                    /* Record the cgroup in the lock file. This ensures that
-                       if we subsequently get executed under a different parent
-                       cgroup, we kill the previous cgroup first. */
-                    writeFull(lock->fdUserLock.get(), *lock->cgroup);
-                }
-                #endif
-
                 return lock;
             }
         }
 
         return nullptr;
     }
-
-    #if __linux__
-    std::optional<Path> getCgroup() override { return cgroup; }
-    #endif
 };
 
 std::unique_ptr<UserLock> acquireUserLock(uid_t nrIds)

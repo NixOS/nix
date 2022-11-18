@@ -27,13 +27,6 @@ struct UserLock
     virtual gid_t getGID() = 0;
 
     virtual std::vector<gid_t> getSupplementaryGIDs() = 0;
-
-    /* Kill any processes currently executing as this user. */
-    virtual void kill() = 0;
-
-    #if __linux__
-    virtual std::optional<Path> getCgroup() { return {}; };
-    #endif
 };
 
 /* Acquire a user lock for a UID range of size `nrIds`. Note that this
