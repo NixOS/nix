@@ -41,6 +41,7 @@
 #include <boost/coroutine2/coroutine.hpp>
 #include <boost/coroutine2/protected_fixedsize_stack.hpp>
 #include <boost/context/stack_context.hpp>
+#include <boost/container/small_vector.hpp>
 
 #endif
 
@@ -1691,7 +1692,8 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 /* We have all the arguments, so call the primop with
                    the previous and new arguments. */
 
-                Value * vArgs[arity];
+                assert(arity < 64);
+                Value * vArgs[64];
                 auto n = argsDone;
                 for (Value * arg = &vCur; arg->isPrimOpApp(); arg = arg->primOpApp.left)
                     vArgs[--n] = arg->primOpApp.right;
@@ -1748,11 +1750,12 @@ void ExprCall::eval(EvalState & state, Env & env, Value & v)
     Value vFun;
     fun->eval(state, env, vFun);
 
-    Value * vArgs[args.size()];
+
+    boost::container::small_vector<Value *, 64> vArgs(args.size());
     for (size_t i = 0; i < args.size(); ++i)
         vArgs[i] = args[i]->maybeThunk(state, env);
 
-    state.callFunction(vFun, args.size(), vArgs, v, pos);
+    state.callFunction(vFun, args.size(), vArgs.data(), v, pos);
 }
 
 
@@ -1991,8 +1994,8 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         return result;
     };
 
-    Value values[es->size()];
-    Value * vTmpP = values;
+    boost::container::small_vector<Value, 64> values(es->size());
+    Value * vTmpP = values.data();
 
     for (auto & [i_pos, i] : *es) {
         Value & vTmp = *vTmpP++;
