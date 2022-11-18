@@ -105,11 +105,14 @@
 
 - [store object]{#gloss-store-object}
 
-
   A store object consists of a [file system object], [reference]s to other store objects, and other metadata.
   It can be referred to by a [store path].
 
   [store object]: #gloss-store-object
+
+- [IFD]{#gloss-ifd}
+
+  [Import From Derivation](./language/import-from-derivation.md)
 
 - [input-addressed store object]{#gloss-input-addressed-store-object}
 
