@@ -35,9 +35,19 @@ static CgroupStats destroyCgroup(const Path & cgroup, bool returnStats)
 {
     if (!pathExists(cgroup)) return {};
 
-    if (!pathExists(cgroup + "/cgroup.procs"))
+    auto procsFile = cgroup + "/cgroup.procs";
+
+    if (!pathExists(procsFile))
         throw Error("'%s' is not a cgroup", cgroup);
 
+    /* Use the fast way to kill every process in a cgroup, if
+       available. */
+    auto killFile = cgroup + "/cgroup.kill";
+    if (pathExists(killFile))
+        writeFile(killFile, "1");
+
+    /* Otherwise, manually kill every process in the subcgroups and
+       this cgroup. */
     for (auto & entry : readDirectory(cgroup)) {
         if (entry.type != DT_DIR) continue;
         destroyCgroup(cgroup + "/" + entry.name, false);
@@ -48,7 +58,7 @@ static CgroupStats destroyCgroup(const Path & cgroup, bool returnStats)
     std::unordered_set<pid_t> pidsShown;
 
     while (true) {
-        auto pids = tokenizeString<std::vector<std::string>>(readFile(cgroup + "/cgroup.procs"));
+        auto pids = tokenizeString<std::vector<std::string>>(readFile(procsFile));
 
         if (pids.empty()) break;
 
