@@ -29,7 +29,6 @@
 
 #include <cmath>
 
-
 namespace nix {
 
 
@@ -2729,8 +2728,8 @@ static void prim_catAttrs(EvalState & state, const PosIdx pos, Value * * args, V
     auto attrName = state.symbols.create(state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.catAttrs"));
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.catAttrs");
 
-    Value * res[args[1]->listSize()];
-    unsigned int found = 0;
+    boost::container::small_vector<Value *, 256> res(args[1]->listSize());
+    size_t found = 0;
 
     for (auto v2 : args[1]->listItems()) {
         state.forceAttrs(*v2, pos, "while evaluating an element in the list passed as second argument to builtins.catAttrs");
@@ -3064,9 +3063,8 @@ static void prim_filter(EvalState & state, const PosIdx pos, Value * * args, Val
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filter");
 
-    // FIXME: putting this on the stack is risky.
-    Value * vs[args[1]->listSize()];
-    unsigned int k = 0;
+    boost::container::small_vector<Value *, 256> vs(args[1]->listSize());
+    size_t k = 0;
 
     bool same = true;
     for (unsigned int n = 0; n < args[1]->listSize(); ++n) {
@@ -3450,7 +3448,7 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value * * args, 
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.concatMap");
     auto nrLists = args[1]->listSize();
 
-    Value lists[nrLists];
+    boost::container::small_vector<Value, 64> lists(nrLists);
     size_t len = 0;
 
     for (unsigned int n = 0; n < nrLists; ++n) {
