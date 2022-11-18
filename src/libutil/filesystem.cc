@@ -1,5 +1,6 @@
 #include <sys/time.h>
 #include <filesystem>
+#include <atomic>
 
 #include "finally.hh"
 #include "util.hh"
@@ -10,7 +11,7 @@ namespace fs = std::filesystem;
 namespace nix {
 
 static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
-    int & counter)
+    std::atomic<unsigned int> & counter)
 {
     tmpRoot = canonPath(tmpRoot.empty() ? getEnv("TMPDIR").value_or("/tmp") : tmpRoot, true);
     if (includePid)
@@ -22,9 +23,9 @@ static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
 Path createTempDir(const Path & tmpRoot, const Path & prefix,
     bool includePid, bool useGlobalCounter, mode_t mode)
 {
-    static int globalCounter = 0;
-    int localCounter = 0;
-    int & counter(useGlobalCounter ? globalCounter : localCounter);
+    static std::atomic<unsigned int> globalCounter = 0;
+    std::atomic<unsigned int> localCounter = 0;
+    auto & counter(useGlobalCounter ? globalCounter : localCounter);
 
     while (1) {
         checkInterrupt();
