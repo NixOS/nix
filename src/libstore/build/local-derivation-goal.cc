@@ -137,7 +137,7 @@ void LocalDerivationGoal::killChild()
            also send a conventional kill to the child. */
         ::kill(-pid, SIGKILL); /* ignore the result */
 
-        killSandbox();
+        killSandbox(true);
 
         pid.wait();
     }
@@ -146,10 +146,14 @@ void LocalDerivationGoal::killChild()
 }
 
 
-void LocalDerivationGoal::killSandbox()
+void LocalDerivationGoal::killSandbox(bool getStats)
 {
     if (cgroup) {
-        destroyCgroup(*cgroup);
+        auto stats = destroyCgroup(*cgroup);
+        if (getStats) {
+            buildResult.cpuUser = stats.cpuUser;
+            buildResult.cpuSystem = stats.cpuSystem;
+        }
     }
 
     else if (buildUser) {
@@ -270,7 +274,7 @@ void LocalDerivationGoal::cleanupPostChildKill()
        malicious user from leaving behind a process that keeps files
        open and modifies them after they have been chown'ed to
        root. */
-    killSandbox();
+    killSandbox(true);
 
     /* Terminate the recursive Nix daemon. */
     stopDaemon();
@@ -410,7 +414,7 @@ void LocalDerivationGoal::startBuilder()
     /* Make sure that no other processes are executing under the
        sandbox uids. This must be done before any chownToBuilder()
        calls. */
-    killSandbox();
+    killSandbox(false);
 
     /* Right platform? */
     if (!parsedDrv->canBuildLocally(worker.store))

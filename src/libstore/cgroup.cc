@@ -31,13 +31,16 @@ std::map<std::string, std::string> getCgroups(const Path & cgroupFile)
     return cgroups;
 }
 
-void destroyCgroup(const Path & cgroup)
+static CgroupStats destroyCgroup(const Path & cgroup, bool returnStats)
 {
-    if (!pathExists(cgroup)) return;
+    if (!pathExists(cgroup)) return {};
+
+    if (!pathExists(cgroup + "/cgroup.procs"))
+        throw Error("'%s' is not a cgroup", cgroup);
 
     for (auto & entry : readDirectory(cgroup)) {
         if (entry.type != DT_DIR) continue;
-        destroyCgroup(cgroup + "/" + entry.name);
+        destroyCgroup(cgroup + "/" + entry.name, false);
     }
 
     int round = 1;
@@ -79,8 +82,38 @@ void destroyCgroup(const Path & cgroup)
         round++;
     }
 
+    CgroupStats stats;
+
+    if (returnStats) {
+        auto cpustatPath = cgroup + "/cpu.stat";
+
+        if (pathExists(cpustatPath)) {
+            for (auto & line : tokenizeString<std::vector<std::string>>(readFile(cpustatPath), "\n")) {
+                std::string_view userPrefix = "user_usec ";
+                if (hasPrefix(line, userPrefix)) {
+                    auto n = string2Int<uint64_t>(line.substr(userPrefix.size()));
+                    if (n) stats.cpuUser = std::chrono::microseconds(*n);
+                }
+
+                std::string_view systemPrefix = "system_usec ";
+                if (hasPrefix(line, systemPrefix)) {
+                    auto n = string2Int<uint64_t>(line.substr(systemPrefix.size()));
+                    if (n) stats.cpuSystem = std::chrono::microseconds(*n);
+                }
+            }
+        }
+
+    }
+
     if (rmdir(cgroup.c_str()) == -1)
         throw SysError("deleting cgroup '%s'", cgroup);
+
+    return stats;
+}
+
+CgroupStats destroyCgroup(const Path & cgroup)
+{
+    return destroyCgroup(cgroup, true);
 }
 
 }

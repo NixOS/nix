@@ -202,7 +202,7 @@ struct LocalDerivationGoal : public DerivationGoal
 
     /* Kill any processes running under the build user UID or in the
        cgroup of the build. */
-    void killSandbox();
+    void killSandbox(bool getStats);
 
     /* Create alternative path calculated from but distinct from the
        input, so we can avoid overwriting outputs (or other store paths)
