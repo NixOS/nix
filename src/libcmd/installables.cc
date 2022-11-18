@@ -927,7 +927,7 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::bui
 
     case Realise::Outputs: {
         if (settings.printMissing)
-          printMissing(store, pathsToBuild, lvlInfo);
+            printMissing(store, pathsToBuild, lvlInfo);
 
         for (auto & buildResult : store->buildPathsWithResults(pathsToBuild, bMode, evalStore)) {
             if (!buildResult.success())
