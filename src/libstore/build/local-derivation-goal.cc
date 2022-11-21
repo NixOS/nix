@@ -149,11 +149,15 @@ void LocalDerivationGoal::killChild()
 void LocalDerivationGoal::killSandbox(bool getStats)
 {
     if (cgroup) {
+        #if __linux__
         auto stats = destroyCgroup(*cgroup);
         if (getStats) {
             buildResult.cpuUser = stats.cpuUser;
             buildResult.cpuSystem = stats.cpuSystem;
         }
+        #else
+        abort();
+        #endif
     }
 
     else if (buildUser) {
