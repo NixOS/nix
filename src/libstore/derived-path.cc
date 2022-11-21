@@ -64,7 +64,7 @@ nlohmann::json stuffToJSON(const std::vector<T> & ts, ref<Store> store) {
     return res;
 }
 
-nlohmann::json derivedPathsWithHintsToJSON(const BuiltPaths & buildables, ref<Store> store)
+nlohmann::json builtPathsToJSON(const BuiltPaths & buildables, ref<Store> store)
 { return stuffToJSON<BuiltPath>(buildables, store); }
 nlohmann::json derivedPathsToJSON(const DerivedPaths & paths, ref<Store> store)
 { return stuffToJSON<DerivedPath>(paths, store); }
