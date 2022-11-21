@@ -37,11 +37,13 @@ struct InstallableDerivedPath : Installable
  * Return the rewrites that are needed to resolve a string whose context is
  * included in `dependencies`.
  */
-StringPairs resolveRewrites(Store & store, const BuiltPaths dependencies)
+StringPairs resolveRewrites(
+    Store & store,
+    const std::vector<BuiltPathWithResult> & dependencies)
 {
     StringPairs res;
     for (auto & dep : dependencies)
-        if (auto drvDep = std::get_if<BuiltPathBuilt>(&dep))
+        if (auto drvDep = std::get_if<BuiltPathBuilt>(&dep.path))
             for (auto & [ outputName, outputPath ] : drvDep->outputs)
                 res.emplace(
                     downstreamPlaceholder(store, drvDep->drvPath, outputName),
@@ -53,7 +55,10 @@ StringPairs resolveRewrites(Store & store, const BuiltPaths dependencies)
 /**
  * Resolve the given string assuming the given context.
  */
-std::string resolveString(Store & store, const std::string & toResolve, const BuiltPaths dependencies)
+std::string resolveString(
+    Store & store,
+    const std::string & toResolve,
+    const std::vector<BuiltPathWithResult> & dependencies)
 {
     auto rewrites = resolveRewrites(store, dependencies);
     return rewriteStrings(toResolve, rewrites);

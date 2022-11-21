@@ -7,6 +7,7 @@
 #include "eval.hh"
 #include "store-api.hh"
 #include "flake/flake.hh"
+#include "build-result.hh"
 
 #include <optional>
 
@@ -51,6 +52,12 @@ enum class OperateOn {
     Derivation
 };
 
+struct BuiltPathWithResult
+{
+    BuiltPath path;
+    std::optional<BuildResult> result;
+};
+
 struct Installable
 {
     virtual ~Installable() { }
@@ -91,14 +98,14 @@ struct Installable
         return FlakeRef::fromAttrs({{"type","indirect"}, {"id", "nixpkgs"}});
     }
 
-    static BuiltPaths build(
+    static std::vector<BuiltPathWithResult> build(
         ref<Store> evalStore,
         ref<Store> store,
         Realise mode,
         const std::vector<std::shared_ptr<Installable>> & installables,
         BuildMode bMode = bmNormal);
 
-    static std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> build2(
+    static std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> build2(
         ref<Store> evalStore,
         ref<Store> store,
         Realise mode,
