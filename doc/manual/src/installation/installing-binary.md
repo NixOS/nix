@@ -91,23 +91,21 @@ extension. The installer will also create `/etc/profile.d/nix.sh`.
 To begin, if you are on Linux with systemd, remove the Nix daemon service:
 
 ```console
-sudo systemctl stop nix-daemon.socket
 sudo systemctl stop nix-daemon.service
-sudo systemctl disable nix-daemon.socket
-sudo systemctl disable nix-daemon.service
+sudo systemctl disable nix-daemon.socket nix-daemon.service
 sudo systemctl daemon-reload
 ```
 
 Then you can remove systemd service files:
 
 ```console
-sudo rm -f /etc/systemd/system/nix-daemon.service /etc/systemd/system/nix-daemon.socket
+sudo rm /etc/systemd/system/nix-daemon.service /etc/systemd/system/nix-daemon.socket
 ```
 
 Also, the installer script uses systemd-tmpfiles (if presents) to create the socket directory. You may also want to remove the configuration for that:
 
 ```console
-sudo rm -f /etc/tmpfiles.d/nix-daemon.conf
+sudo rm /etc/tmpfiles.d/nix-daemon.conf
 ```
 
 Remove files created by Nix:
