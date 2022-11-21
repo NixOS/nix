@@ -288,7 +288,7 @@ public:
 
     Setting<uint32_t> startId{this,
         #if __linux__
-        872415232,
+        0x34000000,
         #else
         56930,
         #endif
