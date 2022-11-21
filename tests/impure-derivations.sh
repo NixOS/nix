@@ -2,7 +2,7 @@ source common.sh
 
 requireDaemonNewerThan "2.8pre20220311"
 
-enableFeatures "ca-derivations ca-references impure-derivations"
+enableFeatures "ca-derivations impure-derivations"
 restartDaemon
 
 set -o pipefail

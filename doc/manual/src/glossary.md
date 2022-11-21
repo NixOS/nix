@@ -1,7 +1,7 @@
 # Glossary
 
   - [derivation]{#gloss-derivation}\
-    A description of a build action. The result of a derivation is a
+    A description of a build task. The result of a derivation is a
     store object. Derivations are typically specified in Nix expressions
     using the [`derivation` primitive](language/derivations.md). These are
     translated into low-level *store derivations* (implicitly by
@@ -53,8 +53,8 @@
     A file that is an immediate child of the Nix store directory. These
     can be regular files, but also entire directory trees. Store objects
     can be sources (objects copied from outside of the store),
-    derivation outputs (objects produced by running a build action), or
-    derivations (files describing a build action).
+    derivation outputs (objects produced by running a build task), or
+    derivations (files describing a build task).
 
   - [input-addressed store object]{#gloss-input-addressed-store-object}\
     A store object produced by building a

@@ -528,13 +528,31 @@ void DerivationGoal::inputsRealised()
             /* Add the relevant output closures of the input derivation
                `i' as input paths.  Only add the closures of output paths
                that are specified as inputs. */
-            for (auto & j : wantedDepOutputs)
-                if (auto outPath = get(inputDrvOutputs, { depDrvPath, j }))
+            for (auto & j : wantedDepOutputs) {
+                /* TODO (impure derivations-induced tech debt):
+                   Tracking input derivation outputs statefully through the
+                   goals is error prone and has led to bugs.
+                   For a robust nix, we need to move towards the `else` branch,
+                   which does not rely on goal state to match up with the
+                   reality of the store, which is our real source of truth.
+                   However, the impure derivations feature still relies on this
+                   fragile way of doing things, because its builds do not have
+                   a representation in the store, which is a usability problem
+                   in itself */
+                if (auto outPath = get(inputDrvOutputs, { depDrvPath, j })) {
                     worker.store.computeFSClosure(*outPath, inputPaths);
-                else
-                    throw Error(
-                        "derivation '%s' requires non-existent output '%s' from input derivation '%s'",
-                        worker.store.printStorePath(drvPath), j, worker.store.printStorePath(depDrvPath));
+                }
+                else {
+                    auto outMap = worker.evalStore.queryDerivationOutputMap(depDrvPath);
+                    auto outMapPath = outMap.find(j);
+                    if (outMapPath == outMap.end()) {
+                        throw Error(
+                            "derivation '%s' requires non-existent output '%s' from input derivation '%s'",
+                            worker.store.printStorePath(drvPath), j, worker.store.printStorePath(depDrvPath));
+                    }
+                    worker.store.computeFSClosure(outMapPath->second, inputPaths);
+                }
+            }
         }
     }
 
