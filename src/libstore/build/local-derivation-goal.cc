@@ -177,9 +177,38 @@ void LocalDerivationGoal::tryLocalBuild() {
         return;
     }
 
+    /* Are we doing a chroot build? */
+    {
+        auto noChroot = parsedDrv->getBoolAttr("__noChroot");
+        if (settings.sandboxMode == smEnabled) {
+            if (noChroot)
+                throw Error("derivation '%s' has '__noChroot' set, "
+                    "but that's not allowed when 'sandbox' is 'true'", worker.store.printStorePath(drvPath));
+#if __APPLE__
+            if (additionalSandboxProfile != "")
+                throw Error("derivation '%s' specifies a sandbox profile, "
+                    "but this is only allowed when 'sandbox' is 'relaxed'", worker.store.printStorePath(drvPath));
+#endif
+            useChroot = true;
+        }
+        else if (settings.sandboxMode == smDisabled)
+            useChroot = false;
+        else if (settings.sandboxMode == smRelaxed)
+            useChroot = derivationType.isSandboxed() && !noChroot;
+    }
+
+    auto & localStore = getLocalStore();
+    if (localStore.storeDir != localStore.realStoreDir.get()) {
+        #if __linux__
+            useChroot = true;
+        #else
+            throw Error("building using a diverted store is not supported on this platform");
+        #endif
+    }
+
     if (useBuildUsers()) {
         if (!buildUser)
-            buildUser = acquireUserLock(parsedDrv->useUidRange() ? 65536 : 1);
+            buildUser = acquireUserLock(parsedDrv->useUidRange() ? 65536 : 1, useChroot);
 
         if (!buildUser) {
             if (!actLock)
@@ -432,35 +461,6 @@ void LocalDerivationGoal::startBuilder()
 #if __APPLE__
     additionalSandboxProfile = parsedDrv->getStringAttr("__sandboxProfile").value_or("");
 #endif
-
-    /* Are we doing a chroot build? */
-    {
-        auto noChroot = parsedDrv->getBoolAttr("__noChroot");
-        if (settings.sandboxMode == smEnabled) {
-            if (noChroot)
-                throw Error("derivation '%s' has '__noChroot' set, "
-                    "but that's not allowed when 'sandbox' is 'true'", worker.store.printStorePath(drvPath));
-#if __APPLE__
-            if (additionalSandboxProfile != "")
-                throw Error("derivation '%s' specifies a sandbox profile, "
-                    "but this is only allowed when 'sandbox' is 'relaxed'", worker.store.printStorePath(drvPath));
-#endif
-            useChroot = true;
-        }
-        else if (settings.sandboxMode == smDisabled)
-            useChroot = false;
-        else if (settings.sandboxMode == smRelaxed)
-            useChroot = derivationType.isSandboxed() && !noChroot;
-    }
-
-    auto & localStore = getLocalStore();
-    if (localStore.storeDir != localStore.realStoreDir.get()) {
-        #if __linux__
-            useChroot = true;
-        #else
-            throw Error("building using a diverted store is not supported on this platform");
-        #endif
-    }
 
     /* Create a temporary directory where the build will take
        place. */

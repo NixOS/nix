@@ -109,22 +109,18 @@ struct AutoUserLock : UserLock
 {
     AutoCloseFD fdUserLock;
     uid_t firstUid = 0;
+    gid_t firstGid = 0;
     uid_t nrIds = 1;
 
     uid_t getUID() override { assert(firstUid); return firstUid; }
 
     gid_t getUIDCount() override { return nrIds; }
 
-    gid_t getGID() override
-    {
-        // We use the same GID ranges as for the UIDs.
-        assert(firstUid);
-        return firstUid;
-    }
+    gid_t getGID() override { assert(firstGid); return firstGid; }
 
     std::vector<gid_t> getSupplementaryGIDs() override { return {}; }
 
-    static std::unique_ptr<UserLock> acquire(uid_t nrIds)
+    static std::unique_ptr<UserLock> acquire(uid_t nrIds, bool useChroot)
     {
         settings.requireExperimentalFeature(Xp::AutoAllocateUids);
         assert(settings.startId > 0);
@@ -154,6 +150,14 @@ struct AutoUserLock : UserLock
                 auto lock = std::make_unique<AutoUserLock>();
                 lock->fdUserLock = std::move(fd);
                 lock->firstUid = settings.startId + i * maxIdsPerBuild;
+                if (useChroot)
+                    lock->firstGid = lock->firstUid;
+                else {
+                    struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
+                    if (!gr)
+                        throw Error("the group '%s' specified in 'build-users-group' does not exist", settings.buildUsersGroup);
+                    lock->firstGid = gr->gr_gid;
+                }
                 lock->nrIds = nrIds;
                 return lock;
             }
@@ -163,10 +167,10 @@ struct AutoUserLock : UserLock
     }
 };
 
-std::unique_ptr<UserLock> acquireUserLock(uid_t nrIds)
+std::unique_ptr<UserLock> acquireUserLock(uid_t nrIds, bool useChroot)
 {
     if (settings.autoAllocateUids)
-        return AutoUserLock::acquire(nrIds);
+        return AutoUserLock::acquire(nrIds, useChroot);
     else
         return SimpleUserLock::acquire();
 }
