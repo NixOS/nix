@@ -2,7 +2,7 @@
 
 ## Motivation
 
-The goal of the team to help other people to contribute to Nix.
+The goal of the team is to help other people to contribute to Nix.
 
 ## Members
 
@@ -39,11 +39,11 @@ Issues on the board progress through the following states:
   Team members can add pull requests or issues to discuss or review together.
 
   During the discussion meeting, the team triages new items.
-  If there is disagreement on the general idea behind the issue or pull request, items are moved to _To discuss_, otherwise to _In review_.
+  If there is disagreement on the general idea behind an issue or pull request, it is moved to _To discuss_, otherwise to _In review_.
 
 - To discuss
 
-  Pull requests and issues that are important and controverisal enough to warrant a discussion by the whole team.
+  Pull requests and issues that are important and controverisal are discussed by the team during discussion meetings.
 
   This may be where the merit of the change itself or the implementation strategy is contested by a team member.
 
