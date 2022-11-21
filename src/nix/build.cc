@@ -78,7 +78,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
             Realise::Outputs,
             installables, buildMode);
 
-        if (json) logger->cout("%s", derivedPathsWithHintsToJSON(buildables, store).dump());
+        if (json) logger->cout("%s", builtPathsToJSON(buildables, store).dump());
 
         if (outLink != "")
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
