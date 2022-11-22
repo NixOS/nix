@@ -71,21 +71,22 @@ struct SimpleUserLock : UserLock
                    user.  This is usually either empty or contains a
                    group such as "kvm".  */
                 int ngroups = 32; // arbitrary initial guess
-                lock->supplementaryGIDs.resize(ngroups);
+                std::vector<gid_t> gids;
+                gids.resize(ngroups);
 
                 int err = getgrouplist(
                     pw->pw_name, pw->pw_gid,
-                    lock->supplementaryGIDs.data(),
+                    gids.data(),
                     &ngroups);
 
                 /* Our initial size of 32 wasn't sufficient, the
                    correct size has been stored in ngroups, so we try
                    again. */
                 if (err == -1) {
-                    lock->supplementaryGIDs.resize(ngroups);
+                    gids.resize(ngroups);
                     err = getgrouplist(
                         pw->pw_name, pw->pw_gid,
-                        lock->supplementaryGIDs.data(),
+                        gids.data(),
                         &ngroups);
                 }
 
@@ -94,7 +95,9 @@ struct SimpleUserLock : UserLock
                     throw Error("failed to get list of supplementary groups for '%s'", pw->pw_name);
 
                 // Finally, trim back the GID list to its real size.
-                lock->supplementaryGIDs.resize(ngroups);
+                for (auto i = 0; i < ngroups; i++)
+                    if (gids[i] != lock->gid)
+                        lock->supplementaryGIDs.push_back(gids[i]);
                 #endif
 
                 return lock;
