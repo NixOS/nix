@@ -262,6 +262,28 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
         prefix += ":" ANSI_NORMAL " ";
 
     std::ostringstream oss;
+
+    // traces
+    if (showTrace && !einfo.traces.empty()) {
+        for (auto iter = einfo.traces.begin(); iter != einfo.traces.end(); ++iter) {
+            oss << "\n" << "… " << iter->hint.str() << "\n";
+
+            if (iter->pos.has_value() && (*iter->pos)) {
+                auto pos = iter->pos.value();
+                oss << "\n";
+                printAtPos(pos, oss);
+
+                auto loc = getCodeLines(pos);
+                if (loc.has_value()) {
+                    oss << "\n";
+                    printCodeLines(oss, "", pos, *loc);
+                    oss << "\n";
+                }
+            }
+        }
+        oss << "\n" << prefix;
+    }
+
     oss << einfo.msg << "\n";
 
     if (einfo.errPos.has_value() && *einfo.errPos) {
@@ -283,26 +305,6 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
         oss << "Did you mean " <<
             suggestions.trim() <<
             "?" << std::endl;
-    }
-
-    // traces
-    if (showTrace && !einfo.traces.empty()) {
-        for (auto iter = einfo.traces.begin(); iter != einfo.traces.end(); ++iter) {
-            oss << "\n" << "… " << iter->hint.str() << "\n";
-
-            if (iter->pos.has_value() && (*iter->pos)) {
-                auto pos = iter->pos.value();
-                oss << "\n";
-                printAtPos(pos, oss);
-
-                auto loc = getCodeLines(pos);
-                if (loc.has_value()) {
-                    oss << "\n";
-                    printCodeLines(oss, "", pos, *loc);
-                    oss << "\n";
-                }
-            }
-        }
     }
 
     out << indent(prefix, std::string(filterANSIEscapes(prefix, true).size(), ' '), chomp(oss.str()));
