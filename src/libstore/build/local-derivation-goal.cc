@@ -1988,9 +1988,8 @@ void LocalDerivationGoal::runChild()
         if (setUser && buildUser) {
             /* Preserve supplementary groups of the build user, to allow
                admins to specify groups such as "kvm".  */
-            if (!buildUser->getSupplementaryGIDs().empty() &&
-                setgroups(buildUser->getSupplementaryGIDs().size(),
-                          buildUser->getSupplementaryGIDs().data()) == -1)
+            auto gids = buildUser->getSupplementaryGIDs();
+            if (setgroups(gids.size(), gids.data()) == -1)
                 throw SysError("cannot set supplementary groups of build user");
 
             if (setgid(buildUser->getGID()) == -1 ||
