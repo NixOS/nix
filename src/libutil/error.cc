@@ -287,7 +287,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
     // traces
     if (showTrace && !einfo.traces.empty()) {
-        for (auto iter = einfo.traces.rbegin(); iter != einfo.traces.rend(); ++iter) {
+        for (auto iter = einfo.traces.begin(); iter != einfo.traces.end(); ++iter) {
             oss << "\n" << "… " << iter->hint.str() << "\n";
 
             if (iter->pos.has_value() && (*iter->pos)) {
