@@ -3,6 +3,7 @@
 #if ENABLE_S3
 
 #include "ref.hh"
+#include "serialise.hh"
 
 #include <optional>
 #include <string>
@@ -29,6 +30,18 @@ struct S3Helper
 
     FileTransferResult getObject(
         const std::string & bucketName, const std::string & key);
+
+    struct StreamResult
+    {
+        std::streamsize size = 0;
+        unsigned int durationMs = 0;
+        bool streamSuccessful = false;
+    };
+
+    StreamResult getObjectStreamed(
+        const std::string & bucketName, const std::string & key, Sink & sink, size_t bufferSize);
+
+    size_t getObjectSize(const std::string & bucketName, const std::string & key);
 };
 
 }

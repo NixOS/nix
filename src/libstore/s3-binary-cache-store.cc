@@ -183,6 +183,63 @@ S3Helper::FileTransferResult S3Helper::getObject(
 
     return res;
 }
+S3Helper::StreamResult S3Helper::getObjectStreamed(
+    const std::string & bucketName, const std::string & key, Sink & sink, size_t bufferSize)
+{
+    debug("streaming from 's3://%s/%s'...", bucketName, key);
+    auto now1 = std::chrono::steady_clock::now();
+    S3Helper::StreamResult res;
+
+    try {
+        size_t size = getObjectSize(bucketName, key);
+        size_t anchor = 0;
+        while (anchor < size)
+        {
+            const auto read_size = std::min(size - anchor, bufferSize);
+            size_t start = anchor;
+            size_t end = anchor + read_size;
+            anchor += read_size;
+
+            std::string range = boost::str(boost::format("bytes=%1%-%2%") % start % (end-1));
+            auto request =
+                Aws::S3::Model::GetObjectRequest()
+                .WithBucket(bucketName)
+                .WithKey(key)
+                .WithRange(range);
+
+            request.SetResponseStreamFactory([&]() {
+                return Aws::New<std::stringstream>("STRINGSTREAM");
+            });
+
+            auto result = checkAws(fmt("AWS error streaming '%s'", key), client->GetObject(request));
+            auto data = decompress(result.GetContentEncoding(),
+                dynamic_cast<std::stringstream &>(result.GetBody()).str());
+
+            sink(data);
+        }
+
+        res.streamSuccessful = true;
+        res.size = size;
+    } catch (S3Error & e) {
+        if ((e.err != Aws::S3::S3Errors::NO_SUCH_KEY) &&
+            (e.err != Aws::S3::S3Errors::RESOURCE_NOT_FOUND) &&
+            (e.err != Aws::S3::S3Errors::ACCESS_DENIED)) throw;
+    }
+
+    auto now2 = std::chrono::steady_clock::now();
+
+    res.durationMs = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
+
+    return res;
+}
+
+size_t S3Helper::getObjectSize(const std::string & bucketName, const std::string & key){
+    Aws::S3::Model::HeadObjectRequest headObjectRequest;
+    headObjectRequest.WithBucket(bucketName).WithKey(key);
+    auto headOutcome = checkAws(fmt("AWS error checking object size '%s'", key), client->HeadObject(headObjectRequest));
+    long long len = headOutcome.GetContentLength();
+    return static_cast<size_t>(len);
+}
 
 S3BinaryCacheStore::S3BinaryCacheStore(const Params & params)
     : BinaryCacheStoreConfig(params)
@@ -202,7 +259,7 @@ struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
     const Setting<bool> multipartUpload{
         (StoreConfig*) this, false, "multipart-upload", "whether to use multi-part uploads"};
     const Setting<uint64_t> bufferSize{
-        (StoreConfig*) this, 5 * 1024 * 1024, "buffer-size", "size (in bytes) of each part in multi-part uploads"};
+        (StoreConfig*) this, 5 * 1024 * 1024, "buffer-size", "size (in bytes) of each part in multi-part uploads and downloads"};
 
     const std::string name() override { return "S3 Binary Cache Store"; }
 };
@@ -409,17 +466,14 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     {
         stats.get++;
 
-        // FIXME: stream output to sink.
-        auto res = s3Helper.getObject(bucketName, path);
+        auto res = s3Helper.getObjectStreamed(bucketName, path, sink, bufferSize);
 
-        stats.getBytes += res.data ? res.data->size() : 0;
+        stats.getBytes += res.size;
         stats.getTimeMs += res.durationMs;
 
-        if (res.data) {
+        if (res.streamSuccessful) {
             printTalkative("downloaded 's3://%s/%s' (%d bytes) in %d ms",
-                bucketName, path, res.data->size(), res.durationMs);
-
-            sink(*res.data);
+                bucketName, path, res.size, res.durationMs);
         } else
             throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache '%s'", path, getUri());
     }
