@@ -26,3 +26,14 @@ checkRef input-1.drv
 checkRef input-2.drv
 
 for i in $(cat $outPath); do checkRef $i; done
+
+# Test the export of the dependency graph when discarding outputs
+
+nix-store --gc
+
+outPath=$(nix-build ./export-graph.nix -A 'foo."bar.buildGraphWithoutOutDeps"' -o $TEST_ROOT/result)
+
+! [[ $(checkRef "dep-a$") ]]
+checkRef "dep-a.drv"
+! [[ $(checkRef "dep-b") ]]
+checkRef "dep-b.drv"

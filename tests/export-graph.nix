@@ -26,4 +26,20 @@ rec {
     exportReferencesGraph = ["refs" (import ./dependencies.nix).drvPath];
   };
 
+  foo."bar.buildGraphWithoutOutDeps" = let
+    dep-a = mkDerivation {
+      name = "dep-a";
+      buildCommand = "mkdir $out; echo foo > $out/bar";
+    };
+
+    dep-b = mkDerivation rec {
+      name = "dep-b";
+      buildCommand = builtins.unsafeDiscardOutputDependency "mkdir $out; echo ${dep-a.drvPath} > $out/bar";
+    };
+  in mkDerivation {
+    name = "dependencies";
+    builder = builtins.toFile "build-graph-builder" "${printRefs}";
+    exportReferencesGraph = ["refs" dep-b.drvPath];
+  };
+
 }
