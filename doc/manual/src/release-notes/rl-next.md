@@ -12,8 +12,8 @@
   ([#7260](https://github.com/NixOS/nix/pull/7260)).
 
 * Nix can now automatically pick UIDs for builds, removing the need to
-  create `nixbld*` user accounts. these UIDs are allocated starting at
-  872415232 on Linux and 56930 on macOS.
+  create `nixbld*` user accounts. These UIDs are allocated starting at
+  872415232 (0x34000000) on Linux and 56930 on macOS.
 
   This is an experimental feature. To enable it, add the following to
   `nix.conf`:
