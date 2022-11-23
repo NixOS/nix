@@ -284,7 +284,7 @@ struct GitInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "git") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name")
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name" && name != "date")
                 throw Error("unsupported Git input attribute '%s'", name);
 
         parseURL(getStrAttr(attrs, "url"));
@@ -442,9 +442,9 @@ struct GitInputScheme : InputScheme
         auto [isLocal, actualUrl_] = getActualUrl(input);
         auto actualUrl = actualUrl_; // work around clang bug
 
-        /* If this is a local directory and no ref or revision is given,
+        /* If this is a local directory and no ref, revision, or date is given,
            allow fetching directly from a dirty workdir. */
-        if (!input.getRef() && !input.getRev() && isLocal) {
+        if (!input.getRef() && !input.getRev() && !input.getDate() && isLocal) {
             auto workdirInfo = getWorkdirInfo(input, actualUrl);
             if (!workdirInfo.clean) {
                 return fetchFromWorkdir(store, input, actualUrl, workdirInfo);
@@ -470,11 +470,20 @@ struct GitInputScheme : InputScheme
                 unlockedAttrs.insert_or_assign("ref", *head);
             }
 
-            if (!input.getRev())
-                input.attrs.insert_or_assign("rev",
-                    Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "--git-dir", gitDir, "rev-parse", *input.getRef() })), htSHA1).gitRev());
-
             repoDir = actualUrl;
+
+            if (!input.getRev()) {
+                std::string rev = "";
+                if (input.getDate()) {
+                    rev = chomp(runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "rev-list", "--before", *input.getDate(), "-1", *input.getRef() }));
+                    if (rev == "") {
+                        rev = chomp(runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "rev-list", "--max-parents=0", "-1", *input.getRef() }));
+                    }
+                } else {
+                    rev = chomp(runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "rev-parse", *input.getRef() }));
+                }
+                input.attrs.insert_or_assign("rev", Hash::parseAny(rev, htSHA1).gitRev());
+            }
         } else {
             const bool useHeadRef = !input.getRef();
             if (useHeadRef) {
@@ -489,6 +498,10 @@ struct GitInputScheme : InputScheme
                 if (!input.getRev()) {
                     unlockedAttrs.insert_or_assign("ref", input.getRef().value());
                 }
+            }
+
+            if (input.getDate()) {
+                unlockedAttrs.insert_or_assign("date", input.getDate().value());
             }
 
             if (auto res = getCache()->lookup(store, unlockedAttrs)) {
@@ -569,8 +582,19 @@ struct GitInputScheme : InputScheme
                     warn("could not update cached head '%s' for '%s'", *input.getRef(), actualUrl);
             }
 
-            if (!input.getRev())
-                input.attrs.insert_or_assign("rev", Hash::parseAny(chomp(readFile(localRefFile)), htSHA1).gitRev());
+            std::string rev = "";
+            if (!input.getRev()) {
+                auto startingRevision = chomp(readFile(localRefFile));
+                if (input.getDate()) {
+                    rev = chomp(runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "rev-list", "--before", *input.getDate(), "-1", startingRevision }));
+                    if (rev == "") {
+                        rev = chomp(runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "rev-list", "--max-parents=0", "-1", startingRevision }));
+                    }
+                } else {
+                    rev = startingRevision;
+                }
+                input.attrs.insert_or_assign("rev", Hash::parseAny(rev, htSHA1).gitRev());
+            }
 
             // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
         }

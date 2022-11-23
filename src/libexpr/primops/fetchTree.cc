@@ -373,6 +373,11 @@ static RegisterPrimOp primop_fetchGit({
           true, it's possible to load a `rev` from *any* `ref` (by default only
           `rev`s from the specified `ref` are supported).
 
+        - date\
+          A `git` date specification which can specify an absolute date (e.g.
+          `2000-01-01`) or a date relative to the specified reference (e.g.
+          `1 week ago`)
+
       Here are some examples of how to use `fetchGit`.
 
         - To fetch a private repository over SSH:
