@@ -10,3 +10,43 @@
   This avoids a lot of spurious errors where some benign strings end-up having
   a context just because they are read from a store path
   ([#7260](https://github.com/NixOS/nix/pull/7260)).
+
+* Nix can now automatically pick UIDs for builds, removing the need to
+  create `nixbld*` user accounts. these UIDs are allocated starting at
+  872415232 on Linux and 56930 on macOS.
+
+  This is an experimental feature. To enable it, add the following to
+  `nix.conf`:
+
+  ```
+  extra-experimental-features = auto-allocate-uids
+  auto-allocate-uids = true
+  ```
+
+* On Linux, Nix can now run builds in a user namespace where the build
+  runs as root (UID 0) and has 65,536 UIDs available. This is
+  primarily useful for running containers such as `systemd-nspawn`
+  inside a Nix build.
+
+  A build can enable this by requiring the `uid-range` system feature,
+  i.e. by setting the derivation attribute
+
+  ```
+  requiredSystemFeatures = [ "uid-range" ];
+  ```
+
+  The `uid-range` system feature requires the `auto-allocate-uids`
+  setting to be enabled (see above).
+
+* On Linux, Nix has experimental support for running builds inside a
+  cgroup. It can be enabled by adding
+
+  ```
+  extra-experimental-features = cgroups
+  ```
+
+  to `nix.conf`. It is also automatically enabled for builds that
+  require the `uid-range` system feature.
+
+* `nix build --json` now prints some statistics about top-level
+  derivations, such as CPU statistics when cgroups are enabled.
