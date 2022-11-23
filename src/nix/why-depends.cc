@@ -83,6 +83,17 @@ struct CmdWhyDepends : SourceExprCommand
     {
         auto package = parseInstallable(store, _package);
         auto packagePath = Installable::toStorePath(getEvalStore(), store, Realise::Outputs, operateOn, package);
+
+        /* We don't need to build `dependency`. We try to get the store
+         * path if it's already known, and if not, then it's not a dependency.
+         *
+         * Why? If `package` does depends on `dependency`, then getting the
+         * store path of `package` above necessitated having the store path
+         * of `dependency`. The contrapositive is, if the store path of
+         * `dependency` is not already known at this point (i.e. it's a CA
+         * derivation which hasn't been built), then `package` did not need it
+         * to build.
+         */
         auto dependency = parseInstallable(store, _dependency);
         auto derivedDependency = dependency->toDerivedPath();
         auto optDependencyPath = std::visit(overloaded {
