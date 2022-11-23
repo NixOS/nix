@@ -22,9 +22,7 @@ nix-store --gc # should force rebuild of input-1
 
 outPath=$(nix-build ./export-graph.nix -A 'foo."bar.buildGraph"' -o $TEST_ROOT/result)
 
-checkRef input-1
 checkRef input-1.drv
-checkRef input-2
 checkRef input-2.drv
 
 for i in $(cat $outPath); do checkRef $i; done

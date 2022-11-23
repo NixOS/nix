@@ -814,27 +814,6 @@ StorePathSet Store::exportReferences(const StorePathSet & storePaths, const Stor
         computeFSClosure({storePath}, paths);
     }
 
-    /* If there are derivations in the graph, then include their
-       outputs as well.  This is useful if you want to do things
-       like passing all build-time dependencies of some path to a
-       derivation that builds a NixOS DVD image. */
-    auto paths2 = paths;
-
-    for (auto & j : paths2) {
-        if (j.isDerivation()) {
-            Derivation drv = derivationFromPath(j);
-            for (auto & k : drv.outputsAndOptPaths(*this)) {
-                if (!k.second.second)
-                    /* FIXME: I am confused why we are calling
-                       `computeFSClosure` on the output path, rather than
-                       derivation itself. That doesn't seem right to me, so I
-                       won't try to implemented this for CA derivations. */
-                    throw UnimplementedError("exportReferences on CA derivations is not yet implemented");
-                computeFSClosure(*k.second.second, paths);
-            }
-        }
-    }
-
     return paths;
 }
 
