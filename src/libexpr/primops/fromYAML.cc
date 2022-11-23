@@ -34,7 +34,7 @@ static void s_error [[ noreturn ]] (const char* msg, size_t len, ryml::Location 
     }
 }
 
-static void visitYAMLNode(NixContext & context, Value & v, ryml::NodeRef t) {
+static void visitYAMLNode(NixContext & context, Value & v, ryml::ConstNodeRef t) {
 
     auto valTypeCheck = [=] (ryml::YamlTag_e tag, bool defaultVal = true) {
         auto valTag = ryml::TAG_NONE;
@@ -64,7 +64,7 @@ static void visitYAMLNode(NixContext & context, Value & v, ryml::NodeRef t) {
         if (v.type() != nNull) {
             auto attrs = context.state.buildBindings(t.num_children());
 
-            for (ryml::NodeRef child : t.children()) {
+            for (ryml::ConstNodeRef child : t.children()) {
                 std::string_view key(child.key().begin(), child.key().size());
                 visitYAMLNode(context, attrs.alloc(key), child);
             }
@@ -75,7 +75,7 @@ static void visitYAMLNode(NixContext & context, Value & v, ryml::NodeRef t) {
         context.state.mkList(v, t.num_children());
 
         size_t i = 0;
-        for (ryml::NodeRef child : t.children())
+        for (ryml::ConstNodeRef child : t.children())
             visitYAMLNode(context, *(v.listElems()[i++] = context.state.allocValue()), child);
     } else if (valTypeCheck(ryml::TAG_NULL) && t.val_is_null()) {
         v.mkNull();
@@ -141,7 +141,7 @@ static RegisterPrimOp primop_fromYAML({
         tree.resolve(); // resolve references
         tree.resolve_tags();
 
-        auto root = tree.rootref();
+        auto root = tree.crootref();
         if (!root.has_val() && !root.is_map() && !root.is_seq()) {
             std::string msg = "YAML string has no content";
             s_error(msg.data(), msg.size(), {}, &context);
