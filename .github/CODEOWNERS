@@ -4,7 +4,7 @@
 # Merge permissions are required for maintaining an entry in this file.
 # For documentation on this mechanism, see https://help.github.com/articles/about-codeowners/
 
-# Notified if nothing else matches
+# Default reviewers if nothing else matches
 * @edolstra @thufschmitt
 
 # This file
