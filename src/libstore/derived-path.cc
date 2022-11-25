@@ -53,28 +53,13 @@ StorePathSet BuiltPath::outPaths() const
     );
 }
 
-template<typename T>
-nlohmann::json stuffToJSON(const std::vector<T> & ts, ref<Store> store) {
-    auto res = nlohmann::json::array();
-    for (const T & t : ts) {
-        std::visit([&res, store](const auto & t) {
-            res.push_back(t.toJSON(store));
-        }, t.raw());
-    }
-    return res;
-}
-
-nlohmann::json derivedPathsWithHintsToJSON(const BuiltPaths & buildables, ref<Store> store)
-{ return stuffToJSON<BuiltPath>(buildables, store); }
-nlohmann::json derivedPathsToJSON(const DerivedPaths & paths, ref<Store> store)
-{ return stuffToJSON<DerivedPath>(paths, store); }
-
-
-std::string DerivedPath::Opaque::to_string(const Store & store) const {
+std::string DerivedPath::Opaque::to_string(const Store & store) const
+{
     return store.printStorePath(path);
 }
 
-std::string DerivedPath::Built::to_string(const Store & store) const {
+std::string DerivedPath::Built::to_string(const Store & store) const
+{
     return store.printStorePath(drvPath)
         + "!"
         + (outputs.empty() ? std::string { "*" } : concatStringsSep(",", outputs));

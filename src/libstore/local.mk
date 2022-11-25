@@ -20,7 +20,7 @@ endif
 $(foreach file,$(libstore_FILES),$(eval $(call install-data-in,$(d)/$(file),$(datadir)/nix/sandbox)))
 
 ifeq ($(ENABLE_S3), 1)
-	libstore_LDFLAGS += -laws-cpp-sdk-transfer -laws-cpp-sdk-s3 -laws-cpp-sdk-core
+	libstore_LDFLAGS += -laws-cpp-sdk-transfer -laws-cpp-sdk-s3 -laws-cpp-sdk-core -laws-crt-cpp
 endif
 
 ifdef HOST_SOLARIS

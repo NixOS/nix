@@ -71,6 +71,8 @@ while [ $# -gt 0 ]; do
         #     # intentional tail space
         #     ACTIONS="${ACTIONS}uninstall "
         #     ;;
+        --yes)
+            export NIX_INSTALLER_YES=1;;
         --no-channel-add)
             export NIX_INSTALLER_NO_CHANNEL_ADD=1;;
         --daemon-user-count)
@@ -90,7 +92,7 @@ while [ $# -gt 0 ]; do
             shift;;
         *)
             {
-                echo "Nix Installer [--daemon|--no-daemon] [--daemon-user-count INT] [--no-channel-add] [--no-modify-profile] [--nix-extra-conf-file FILE]"
+                echo "Nix Installer [--daemon|--no-daemon] [--daemon-user-count INT] [--yes] [--no-channel-add] [--no-modify-profile] [--nix-extra-conf-file FILE]"
 
                 echo "Choose installation method."
                 echo ""
@@ -103,6 +105,8 @@ while [ $# -gt 0 ]; do
                 echo " --no-daemon: Simple, single-user installation that does not require root and is"
                 echo "              trivial to uninstall."
                 echo "              (default)"
+                echo ""
+                echo " --yes:               Run the script non-interactively, accepting all prompts."
                 echo ""
                 echo " --no-channel-add:    Don't add any channels. nixpkgs-unstable is installed by default."
                 echo ""

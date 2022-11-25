@@ -83,19 +83,46 @@ struct CmdWhyDepends : SourceExprCommand
     {
         auto package = parseInstallable(store, _package);
         auto packagePath = Installable::toStorePath(getEvalStore(), store, Realise::Outputs, operateOn, package);
+
+        /* We don't need to build `dependency`. We try to get the store
+         * path if it's already known, and if not, then it's not a dependency.
+         *
+         * Why? If `package` does depends on `dependency`, then getting the
+         * store path of `package` above necessitated having the store path
+         * of `dependency`. The contrapositive is, if the store path of
+         * `dependency` is not already known at this point (i.e. it's a CA
+         * derivation which hasn't been built), then `package` did not need it
+         * to build.
+         */
         auto dependency = parseInstallable(store, _dependency);
-        auto dependencyPath = Installable::toStorePath(getEvalStore(), store, Realise::Derivation, operateOn, dependency);
-        auto dependencyPathHash = dependencyPath.hashPart();
+        auto derivedDependency = dependency->toDerivedPath();
+        auto optDependencyPath = std::visit(overloaded {
+            [](const DerivedPath::Opaque & nodrv) -> std::optional<StorePath> {
+                return { nodrv.path };
+            },
+            [&](const DerivedPath::Built & hasdrv) -> std::optional<StorePath> {
+                if (hasdrv.outputs.size() != 1) {
+                    throw Error("argument '%s' should evaluate to one store path", dependency->what());
+                }
+                auto outputMap = store->queryPartialDerivationOutputMap(hasdrv.drvPath);
+                auto maybePath = outputMap.find(*hasdrv.outputs.begin());
+                if (maybePath == outputMap.end()) {
+                    throw Error("unexpected end of iterator");
+                }
+                return maybePath->second;
+            },
+        }, derivedDependency.raw());
 
         StorePathSet closure;
         store->computeFSClosure({packagePath}, closure, false, false);
 
-        if (!closure.count(dependencyPath)) {
-            printError("'%s' does not depend on '%s'",
-                store->printStorePath(packagePath),
-                store->printStorePath(dependencyPath));
+        if (!optDependencyPath.has_value() || !closure.count(*optDependencyPath)) {
+            printError("'%s' does not depend on '%s'", package->what(), dependency->what());
             return;
         }
+
+        auto dependencyPath = *optDependencyPath;
+        auto dependencyPathHash = dependencyPath.hashPart();
 
         stopProgressBar(); // FIXME
 

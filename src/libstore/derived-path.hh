@@ -125,7 +125,4 @@ struct BuiltPath : _BuiltPathRaw {
 typedef std::vector<DerivedPath> DerivedPaths;
 typedef std::vector<BuiltPath> BuiltPaths;
 
-nlohmann::json derivedPathsWithHintsToJSON(const BuiltPaths & buildables, ref<Store> store);
-nlohmann::json derivedPathsToJSON(const DerivedPaths & , ref<Store> store);
-
 }
