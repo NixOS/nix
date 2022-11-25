@@ -333,17 +333,6 @@ struct GitHubInputScheme : GitArchiveInputScheme
             .applyOverrides(input.getRef(), input.getRev())
             .clone(destDir);
     }
-
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
-    {
-        auto [accessor, input] = GitArchiveInputScheme::getAccessor(store, _input);
-        if (getHost(input) == "github.com")
-            accessor->setPathDisplay(fmt("https://github.com/%s/%s/blob/%s",
-                    getOwner(input),
-                    getRepo(input),
-                    input.getRev()->to_string(Base16, false)));
-        return {accessor, input};
-    }
 };
 
 struct GitLabInputScheme : GitArchiveInputScheme
