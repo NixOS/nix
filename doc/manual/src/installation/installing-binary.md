@@ -88,25 +88,28 @@ extension. The installer will also create `/etc/profile.d/nix.sh`.
 
 ### Linux
 
-To begin, if you are on Linux with systemd, remove the Nix daemon service:
+If you are on Linux with systemd:
 
-```console
-sudo systemctl stop nix-daemon.service
-sudo systemctl disable nix-daemon.socket nix-daemon.service
-sudo systemctl daemon-reload
-```
+1. Remove the Nix daemon service:
 
-Then you can remove systemd service files:
+   ```console
+   sudo systemctl stop nix-daemon.service
+   sudo systemctl disable nix-daemon.socket nix-daemon.service
+   sudo systemctl daemon-reload
+   ```
 
-```console
-sudo rm /etc/systemd/system/nix-daemon.service /etc/systemd/system/nix-daemon.socket
-```
+1. Remove systemd service files:
 
-Also, the installer script uses systemd-tmpfiles (if presents) to create the socket directory. You may also want to remove the configuration for that:
+   ```console
+   sudo rm /etc/systemd/system/nix-daemon.service /etc/systemd/system/nix-daemon.socket
+   ```
 
-```console
-sudo rm /etc/tmpfiles.d/nix-daemon.conf
-```
+1. The installer script uses systemd-tmpfiles to create the socket directory.
+    You may also want to remove the configuration for that:
+
+   ```console
+   sudo rm /etc/tmpfiles.d/nix-daemon.conf
+   ```
 
 Remove files created by Nix:
 
