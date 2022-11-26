@@ -105,7 +105,8 @@ void Args::parseCmdline(const std::string & programName, const Strings & _cmdlin
 
                 std::string line;
                 std::getline(stream,line);
-                while (std::getline(stream,line) && !line.empty()){
+                std::string commentChars("#/\\%@*-");
+                while (std::getline(stream,line) && !line.empty() && commentChars.find(line[0]) != std::string::npos){
                     line = chomp(line);
 
                     std::smatch match;

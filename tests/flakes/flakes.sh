@@ -78,17 +78,17 @@ chmod +x $nonFlakeDir/shebang.sh
 git -C $nonFlakeDir add README.md shebang.sh
 git -C $nonFlakeDir commit -m 'Initial'
 
-cat > $nonFlakeDir/shebang-perl.sh <<EOF
+cat > $nonFlakeDir/shebang-comments.sh <<EOF
 #! $(type -P env) nix
-#! nix run nixpkgs#perl
-## Modules used
-use strict;
-use warnings;
-
-# Print function
-print("Hello World\n");
+# some comments
+# some comments
+# some comments
+#! nix --offline shell
+#! nix flake1#fooScript
+#! nix --no-write-lock-file --command bash
+foo
 EOF
-chmod +x $nonFlakeDir/shebang-perl.sh
+chmod +x $nonFlakeDir/shebang-comments.sh
 
 # Construct a custom registry, additionally test the --registry flag
 nix registry add --registry $registry flake1 git+file://$flake1Dir
@@ -531,4 +531,4 @@ expectStderr 1 nix flake metadata $flake2Dir --no-allow-dirty --reference-lock-f
 # Test shebang
 [[ $($nonFlakeDir/shebang.sh) = "foo" ]]
 [[ $($nonFlakeDir/shebang.sh "bar") = "foo"$'\n'"bar" ]]
-[[ $($nonFlakeDir/shebang-perl.sh ) = "Hello World!" ]]
+[[ $($nonFlakeDir/shebang-comments.sh ) = "foo" ]]
