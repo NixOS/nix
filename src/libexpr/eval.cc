@@ -69,15 +69,11 @@ static char * dupString(const char * s)
 // empty string.
 static const char * makeImmutableStringWithLen(const char * s, size_t size)
 {
-    char * t;
     if (size == 0)
         return "";
-#if HAVE_BOEHMGC
-    t = GC_STRNDUP(s, size);
-#else
-    t = strndup(s, size);
-#endif
-    if (!t) throw std::bad_alloc();
+    auto t = allocString(size + 1);
+    memcpy(t, s, size);
+    t[size] = 0;
     return t;
 }
 
