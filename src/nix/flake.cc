@@ -380,12 +380,19 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkModule = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
+                Value m;
                 state->forceValue(v, pos);
-                if (v.isLambda()) {
-                    if (!v.lambda.fun->hasFormals() || !v.lambda.fun->formals->ellipsis)
+                if (v.type() == nPath) {
+                    PathSet context;
+                    auto path = state->coerceToPath(pos, v, context);
+                    state->evalFile(path, m);
+                } else
+                    m = v;
+                if (m.isLambda()) {
+                    if (!m.lambda.fun->hasFormals() || !m.lambda.fun->formals->ellipsis)
                         throw Error("module must match an open attribute set ('{ config, ... }')");
-                } else if (v.type() == nAttrs) {
-                    for (auto & attr : *v.attrs)
+                } else if (m.type() == nAttrs) {
+                    for (auto & attr : *m.attrs)
                         try {
                             state->forceValue(*attr.value, attr.pos);
                         } catch (Error & e) {

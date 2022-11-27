@@ -78,6 +78,30 @@ EOF
 cat > $flakeDir/flake.nix <<EOF
 {
   outputs = { self }: {
+    nixosModules.default = ./module.nix;
+  };
+}
+EOF
+
+! nix flake check $flakeDir
+
+cat > $flakeDir/module.nix <<EOF
+{
+  a.b.c = 123;
+}
+EOF
+
+nix flake check $flakeDir
+
+cat > $flakeDir/module.nix <<EOF
+"not a module"
+EOF
+
+! nix flake check $flakeDir
+
+cat > $flakeDir/flake.nix <<EOF
+{
+  outputs = { self }: {
     packages.system-1.default = "foo";
     packages.system-2.default = "bar";
   };
