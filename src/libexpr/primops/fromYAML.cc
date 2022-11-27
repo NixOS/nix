@@ -17,9 +17,9 @@ struct NixContext {
     std::string_view yaml;
 };
 
-static void s_error [[ noreturn ]] (const char* msg, size_t len, ryml::Location loc, void *nixContext)
+static void s_error [[ noreturn ]] (const char* msg, size_t len, ryml::Location, void *nixContext)
 {
-    auto context = (const NixContext *) nixContext;
+    auto context = static_cast<const NixContext *>(nixContext);
     if (nixContext) {
         throw EvalError({
             .msg = hintfmt("while parsing the YAML string '%1%':\n\n%2%",
