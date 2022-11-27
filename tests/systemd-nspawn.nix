@@ -31,13 +31,16 @@ let
       };
     };
 
-  config = (import (nixpkgs + "/nixos/lib/eval-config.nix") {
+  cfg = (import (nixpkgs + "/nixos/lib/eval-config.nix") {
     modules = [ machine ];
-  }).config;
+    system = "x86_64-linux";
+  });
+
+  config = cfg.config;
 
 in
 
-with import nixpkgs {};
+with cfg._module.args.pkgs;
 
 runCommand "test"
   { buildInputs = [ config.system.path ];
