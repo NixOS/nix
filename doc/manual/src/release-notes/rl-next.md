@@ -43,10 +43,11 @@
 
   ```
   extra-experimental-features = cgroups
+  use-cgroups = true
   ```
 
-  to `nix.conf`. It is also automatically enabled for builds that
-  require the `uid-range` system feature.
+  to `nix.conf`. Cgroups are required for derivations that require the
+  `uid-range` system feature.
 
 * `nix build --json` now prints some statistics about top-level
   derivations, such as CPU statistics when cgroups are enabled.

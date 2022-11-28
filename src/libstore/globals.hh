@@ -304,6 +304,17 @@ public:
         "id-count",
         "The number of UIDs/GIDs to use for dynamic ID allocation."};
 
+    #if __linux__
+    Setting<bool> useCgroups{
+        this, false, "use-cgroups",
+        R"(
+          Whether to execute builds inside cgroups. Cgroups are
+          enabled automatically for derivations that require the
+          `uid-range` system feature.
+        )"
+    };
+    #endif
+
     Setting<bool> impersonateLinux26{this, false, "impersonate-linux-26",
         "Whether to impersonate a Linux 2.6 machine on newer kernels.",
         {"build-impersonate-linux-26"}};
@@ -592,10 +603,10 @@ public:
           cache) must have a signature by a trusted key. A trusted key is one
           listed in `trusted-public-keys`, or a public key counterpart to a
           private key stored in a file listed in `secret-key-files`.
-          
+
           Set to `false` to disable signature checking and trust all
           non-content-addressed paths unconditionally.
-          
+
           (Content-addressed paths are inherently trustworthy and thus
           unaffected by this configuration option.)
         )"};
@@ -681,7 +692,7 @@ public:
           is `root`.
 
           > **Warning**
-          > 
+          >
           > Adding a user to `trusted-users` is essentially equivalent to
           > giving that user root access to the system. For example, the user
           > can set `sandbox-paths` and thereby obtain read access to
@@ -771,13 +782,13 @@ public:
           The program executes with no arguments. The program's environment
           contains the following environment variables:
 
-            - `DRV_PATH`  
+            - `DRV_PATH`
               The derivation for the built paths.
 
               Example:
               `/nix/store/5nihn1a7pa8b25l9zafqaqibznlvvp3f-bash-4.4-p23.drv`
 
-            - `OUT_PATHS`  
+            - `OUT_PATHS`
               Output paths of the built derivation, separated by a space
               character.
 
@@ -815,7 +826,7 @@ public:
           documentation](https://ec.haxx.se/usingcurl-netrc.html).
 
           > **Note**
-          > 
+          >
           > This must be an absolute path, and `~` is not resolved. For
           > example, `~/.netrc` won't resolve to your home directory's
           > `.netrc`.

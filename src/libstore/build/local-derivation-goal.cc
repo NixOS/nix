@@ -401,9 +401,14 @@ static void linkOrCopy(const Path & from, const Path & to)
 void LocalDerivationGoal::startBuilder()
 {
     if ((buildUser && buildUser->getUIDCount() != 1)
-        || settings.isExperimentalFeatureEnabled(Xp::Cgroups))
+        #if __linux__
+        || settings.useCgroups
+        #endif
+        )
     {
         #if __linux__
+        settings.requireExperimentalFeature(Xp::Cgroups);
+
         auto ourCgroups = getCgroups("/proc/self/cgroup");
         auto ourCgroup = ourCgroups[""];
         if (ourCgroup == "")
