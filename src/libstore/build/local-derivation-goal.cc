@@ -8,7 +8,6 @@
 #include "finally.hh"
 #include "util.hh"
 #include "archive.hh"
-#include "json.hh"
 #include "compression.hh"
 #include "daemon.hh"
 #include "worker-protocol.hh"
@@ -56,6 +55,7 @@
 
 #include <pwd.h>
 #include <grp.h>
+#include <iostream>
 
 namespace nix {
 
