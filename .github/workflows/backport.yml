@@ -21,7 +21,7 @@ jobs:
           fetch-depth: 0
       - name: Create backport PRs
         # should be kept in sync with `version`
-        uses: zeebe-io/backport-action@v0.0.8
+        uses: zeebe-io/backport-action@v0.0.9
         with:
           # Config README: https://github.com/zeebe-io/backport-action#backport-action
           github_token: ${{ secrets.GITHUB_TOKEN }}
