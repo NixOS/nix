@@ -127,12 +127,9 @@ struct AutoUserLock : UserLock
     {
         settings.requireExperimentalFeature(Xp::AutoAllocateUids);
         assert(settings.startId > 0);
-        assert(settings.startId % maxIdsPerBuild == 0);
         assert(settings.uidCount % maxIdsPerBuild == 0);
         assert((uint64_t) settings.startId + (uint64_t) settings.uidCount <= std::numeric_limits<uid_t>::max());
         assert(nrIds <= maxIdsPerBuild);
-
-        // FIXME: check whether the id range overlaps any known users
 
         createDirs(settings.nixStateDir + "/userpool2");
 
@@ -150,11 +147,18 @@ struct AutoUserLock : UserLock
                 throw SysError("opening user lock '%s'", fnUserLock);
 
             if (lockFile(fd.get(), ltWrite, false)) {
+
+                auto firstUid = settings.startId + i * maxIdsPerBuild;
+
+                auto pw = getpwuid(firstUid);
+                if (pw)
+                    throw Error("auto-allocated UID %d clashes with existing user account '%s'", firstUid, pw->pw_name);
+
                 auto lock = std::make_unique<AutoUserLock>();
                 lock->fdUserLock = std::move(fd);
-                lock->firstUid = settings.startId + i * maxIdsPerBuild;
+                lock->firstUid = firstUid;
                 if (useChroot)
-                    lock->firstGid = lock->firstUid;
+                    lock->firstGid = firstUid;
                 else {
                     struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
                     if (!gr)
