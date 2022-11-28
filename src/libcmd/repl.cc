@@ -270,7 +270,7 @@ void NixRepl::mainLoop()
             // ctrl-D should exit the debugger.
             state->debugStop = false;
             state->debugQuit = true;
-            std::cout << std::endl;
+            logger->cout("");
             break;
         }
         try {
