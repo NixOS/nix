@@ -646,8 +646,7 @@ void LocalDerivationGoal::startBuilder()
         if (mkdir(chrootRootDir.c_str(), buildUser && buildUser->getUIDCount() != 1 ? 0755 : 0750) == -1)
             throw SysError("cannot create '%1%'", chrootRootDir);
 
-        // FIXME: only make root writable for user namespace builds.
-        if (buildUser && chown(chrootRootDir.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
+        if (buildUser && chown(chrootRootDir.c_str(), buildUser->getUIDCount() != 1 ? buildUser->getUID() : 0, buildUser->getGID()) == -1)
             throw SysError("cannot change ownership of '%1%'", chrootRootDir);
 
         /* Create a writable /tmp in the chroot.  Many builders need
