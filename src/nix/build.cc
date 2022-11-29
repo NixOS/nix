@@ -30,6 +30,10 @@ nlohmann::json builtPathsWithResultToJSON(const std::vector<BuiltPathWithResult>
             if (b.result) {
                 j["startTime"] = b.result->startTime;
                 j["stopTime"] = b.result->stopTime;
+                if (b.result->cpuUser)
+                    j["cpuUser"] = ((double) b.result->cpuUser->count()) / 1000000;
+                if (b.result->cpuSystem)
+                    j["cpuSystem"] = ((double) b.result->cpuSystem->count()) / 1000000;
             }
             res.push_back(j);
         }, b.path.raw());

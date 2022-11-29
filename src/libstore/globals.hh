@@ -46,6 +46,14 @@ struct PluginFilesSetting : public BaseSetting<Paths>
     void set(const std::string & str, bool append = false) override;
 };
 
+const uint32_t maxIdsPerBuild =
+    #if __linux__
+    1 << 16
+    #else
+    1
+    #endif
+    ;
+
 class Settings : public Config {
 
     unsigned int getDefaultCores();
@@ -274,6 +282,38 @@ public:
           `NIX_REMOTE` is `daemon`). Obviously, this should not be used in
           multi-user settings with untrusted users.
         )"};
+
+    Setting<bool> autoAllocateUids{this, false, "auto-allocate-uids",
+        "Whether to allocate UIDs for builders automatically."};
+
+    Setting<uint32_t> startId{this,
+        #if __linux__
+        0x34000000,
+        #else
+        56930,
+        #endif
+        "start-id",
+        "The first UID and GID to use for dynamic ID allocation."};
+
+    Setting<uint32_t> uidCount{this,
+        #if __linux__
+        maxIdsPerBuild * 128,
+        #else
+        128,
+        #endif
+        "id-count",
+        "The number of UIDs/GIDs to use for dynamic ID allocation."};
+
+    #if __linux__
+    Setting<bool> useCgroups{
+        this, false, "use-cgroups",
+        R"(
+          Whether to execute builds inside cgroups. Cgroups are
+          enabled automatically for derivations that require the
+          `uid-range` system feature.
+        )"
+    };
+    #endif
 
     Setting<bool> impersonateLinux26{this, false, "impersonate-linux-26",
         "Whether to impersonate a Linux 2.6 machine on newer kernels.",
@@ -563,10 +603,10 @@ public:
           cache) must have a signature by a trusted key. A trusted key is one
           listed in `trusted-public-keys`, or a public key counterpart to a
           private key stored in a file listed in `secret-key-files`.
-          
+
           Set to `false` to disable signature checking and trust all
           non-content-addressed paths unconditionally.
-          
+
           (Content-addressed paths are inherently trustworthy and thus
           unaffected by this configuration option.)
         )"};
