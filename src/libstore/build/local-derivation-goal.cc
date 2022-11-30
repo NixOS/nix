@@ -913,8 +913,13 @@ void LocalDerivationGoal::startBuilder()
             int flags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
             if (privateNetwork)
                 flags |= CLONE_NEWNET;
-            if (usingUserNamespace)
+            if (usingUserNamespace) {
+                if (getgroups(0, NULL) != 0) {
+                    warn("user namespace enabled, but we weren't able to drop supplementary groups; "
+                        "this can break some builds. consider using the nix daemon.");
+                }
                 flags |= CLONE_NEWUSER;
+            }
 
             pid_t child = clone(childEntry, stack + stackSize, flags, this);
             if (child == -1 && errno == EINVAL) {
