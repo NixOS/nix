@@ -698,6 +698,8 @@ void callFlake(EvalState & state,
     const LockedFlake & lockedFlake,
     Value & vRes)
 {
+    settings.requireExperimentalFeature(Xp::Flakes);
+
     auto [lockFileStr, keyMap] = lockedFlake.lockFile.to_string();
 
     auto overrides = state.buildBindings(lockedFlake.nodePaths.size());

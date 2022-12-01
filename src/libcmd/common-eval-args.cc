@@ -161,6 +161,7 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s)
     }
 
     else if (hasPrefix(s, "flake:")) {
+        settings.requireExperimentalFeature(Xp::Flakes);
         auto flakeRef = parseFlakeRef(std::string(s.substr(6)), {}, true, false);
         auto [accessor, _] = flakeRef.resolve(state.store).lazyFetch(state.store);
         return accessor->root();

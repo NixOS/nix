@@ -805,6 +805,7 @@ std::optional<SourcePath> EvalState::resolveSearchPathElem(const SearchPathElem 
     }
 
     else if (hasPrefix(elem.second, "flake:")) {
+        settings.requireExperimentalFeature(Xp::Flakes);
         auto flakeRef = parseFlakeRef(elem.second.substr(6), {}, true, false);
         debug("fetching flake search path element '%s''", elem.second);
         auto [accessor, _] = flakeRef.resolve(store).lazyFetch(store);
