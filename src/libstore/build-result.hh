@@ -80,6 +80,7 @@ struct BuildResult
 
     /* User and system CPU time the build took. */
     std::optional<std::chrono::microseconds> cpuUser, cpuSystem;
+    std::optional<uint64_t> memoryHigh;
 
     bool success()
     {

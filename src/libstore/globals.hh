@@ -313,6 +313,22 @@ public:
           `uid-range` system feature.
         )"
     };
+
+    Setting<uint64_t> memoryHigh{
+        this, 0, "memory-high",
+        R"(
+          sets the cgroup memory.high limit, causing the build to throttle if exceeded
+          depends on use-cgroups=true
+        )"
+    };
+
+    Setting<uint64_t> memoryMax{
+        this, 0, "memory-max",
+        R"(
+          sets the cgroup memory.max limit, causing the build to be killed if exceeded
+          depends on use-cgroups=true
+        )"
+    };
     #endif
 
     Setting<bool> impersonateLinux26{this, false, "impersonate-linux-26",

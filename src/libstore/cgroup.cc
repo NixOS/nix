@@ -113,6 +113,11 @@ static CgroupStats destroyCgroup(const Path & cgroup, bool returnStats)
             }
         }
 
+        auto memoryhighPath = cgroup + "/memory.high";
+        if (pathExists(memoryhighPath)) {
+          stats.memoryHigh = string2Int<uint64_t>(trim(readFile(memoryhighPath)));
+        }
+        debug("memory events %s", readFile(cgroup + "/memory.events"));
     }
 
     if (rmdir(cgroup.c_str()) == -1)
