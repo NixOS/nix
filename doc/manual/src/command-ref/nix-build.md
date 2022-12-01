@@ -71,22 +71,29 @@ The following common options are supported:
 # Examples
 
 ```console
-$ nix-build '<nixpkgs>' -A firefox
-store derivation is /nix/store/qybprl8sz2lc...-firefox-1.5.0.7.drv
-/nix/store/d18hyl92g30l...-firefox-1.5.0.7
-
-$ ls -l result
-lrwxrwxrwx  ...  result -> /nix/store/d18hyl92g30l...-firefox-1.5.0.7
-
-$ ls ./result/bin/
-firefox  firefox-config
+nix-build '<nixpkgs>' -A firefox
 ```
+
+    store derivation is /nix/store/qybprl8sz2lc...-firefox-1.5.0.7.drv
+    /nix/store/d18hyl92g30l...-firefox-1.5.0.7
+
+```console
+ls -l result
+```
+
+    lrwxrwxrwx  ...  result -> /nix/store/d18hyl92g30l...-firefox-1.5.0.7
+
+```console
+ls ./result/bin/
+```
+
+    firefox  firefox-config
 
 If a derivation has multiple outputs, `nix-build` will build the default
 (first) output. You can also build all outputs:
 
 ```console
-$ nix-build '<nixpkgs>' -A openssl.all
+nix-build '<nixpkgs>' -A openssl.all
 ```
 
 This will create a symlink for each output named `result-outputname`.
@@ -96,7 +103,7 @@ outputs `out`, `bin` and `man`, `nix-build` will create symlinks
 specific output:
 
 ```console
-$ nix-build '<nixpkgs>' -A openssl.man
+nix-build '<nixpkgs>' -A openssl.man
 ```
 
 This will create a symlink `result-man`.
@@ -104,14 +111,15 @@ This will create a symlink `result-man`.
 Build a Nix expression given on the command line:
 
 ```console
-$ nix-build -E 'with import <nixpkgs> { }; runCommand "foo" { } "echo bar > $out"'
-$ cat ./result
-bar
+nix-build -E 'with import <nixpkgs> { }; runCommand "foo" { } "echo bar > $out"'
+cat ./result
 ```
+
+    bar
 
 Build the GNU Hello package from the latest revision of the master
 branch of Nixpkgs:
 
 ```console
-$ nix-build https://github.com/NixOS/nixpkgs/archive/master.tar.gz -A hello
+nix-build https://github.com/NixOS/nixpkgs/archive/master.tar.gz -A hello
 ```

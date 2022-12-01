@@ -5,9 +5,9 @@ R""(
 * Check out the source code of the `dwarffs` flake and build it:
 
   ```console
-  # nix flake clone dwarffs --dest dwarffs
-  # cd dwarffs
-  # nix build
+  nix flake clone dwarffs --dest dwarffs
+  cd dwarffs
+  nix build
   ```
 
 # Description

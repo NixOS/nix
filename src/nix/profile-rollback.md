@@ -5,16 +5,18 @@ R""(
 * Roll back your default profile to the previous version:
 
   ```console
-  # nix profile rollback
-  switching profile from version 519 to 518
+  nix profile rollback
   ```
+
+      switching profile from version 519 to 518
 
 * Switch your default profile to version 510:
 
   ```console
-  # nix profile rollback --to 510
-  switching profile from version 518 to 510
+  nix profile rollback --to 510
   ```
+
+      switching profile from version 518 to 510
 
 # Description
 

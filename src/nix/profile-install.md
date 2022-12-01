@@ -5,25 +5,25 @@ R""(
 * Install a package from Nixpkgs:
 
   ```console
-  # nix profile install nixpkgs#hello
+  nix profile install nixpkgs#hello
   ```
 
 * Install a package from a specific branch of Nixpkgs:
 
   ```console
-  # nix profile install nixpkgs/release-20.09#hello
+  nix profile install nixpkgs/release-20.09#hello
   ```
 
 * Install a package from a specific revision of Nixpkgs:
 
   ```console
-  # nix profile install nixpkgs/d73407e8e6002646acfdef0e39ace088bacc83da#hello
+  nix profile install nixpkgs/d73407e8e6002646acfdef0e39ace088bacc83da#hello
   ```
 
 * Install a specific output of a package:
 
   ```console
-  # nix profile install nixpkgs#bash^man
+  nix profile install nixpkgs#bash^man
   ```
 
 

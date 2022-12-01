@@ -5,7 +5,7 @@ R""(
 * Delete a specific store path:
 
   ```console
-  # nix store delete /nix/store/yb5q57zxv6hgqql42d5r8b5k5mcq6kay-hello-2.10
+  nix store delete /nix/store/yb5q57zxv6hgqql42d5r8b5k5mcq6kay-hello-2.10
   ```
 
 # Description

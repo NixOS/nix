@@ -6,7 +6,7 @@ instance, the following command makes the path
 `/nix/store/d718ef...-foo` a root of the collector:
 
 ```console
-$ ln -s /nix/store/d718ef...-foo /nix/var/nix/gcroots/bar
+ln -s /nix/store/d718ef...-foo /nix/var/nix/gcroots/bar
 ```
 
 That is, after this command, the garbage collector will not remove

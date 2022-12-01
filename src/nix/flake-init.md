@@ -5,19 +5,19 @@ R""(
 * Create a flake using the default template:
 
   ```console
-  # nix flake init
+  nix flake init
   ```
 
 * List available templates:
 
   ```console
-  # nix flake show templates
+  nix flake show templates
   ```
 
 * Create a flake from a specific template:
 
   ```console
-  # nix flake init -t templates#simpleContainer
+  nix flake init -t templates#simpleContainer
   ```
 
 # Description

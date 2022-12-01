@@ -41,7 +41,7 @@ flake. These have two different forms:
   to the attribute set representation. For instance, in the command
 
   ```console
-  # nix build github:NixOS/nixpkgs#hello
+  nix build github:NixOS/nixpkgs#hello
   ```
 
   `github:NixOS/nixpkgs` is a flake reference (while `hello` is an

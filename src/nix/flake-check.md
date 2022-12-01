@@ -5,14 +5,14 @@ R""(
 * Evaluate the flake in the current directory, and build its checks:
 
   ```console
-  # nix flake check
+  nix flake check
   ```
 
 * Verify that the `patchelf` flake evaluates, but don't build its
   checks:
 
   ```console
-  # nix flake check --no-build github:NixOS/patchelf
+  nix flake check --no-build github:NixOS/patchelf
   ```
 
 # Description

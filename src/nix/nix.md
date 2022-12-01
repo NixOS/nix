@@ -5,39 +5,46 @@ R""(
 * Create a new flake:
 
   ```console
-  # nix flake new hello
-  # cd hello
+  nix flake new hello
+  cd hello
   ```
 
 * Build the flake in the current directory:
 
   ```console
-  # nix build
-  # ./result/bin/hello
-  Hello, world!
+  nix build
+  ./result/bin/hello
   ```
+
+      Hello, world!
 
 * Run the flake in the current directory:
 
   ```console
-  # nix run
-  Hello, world!
+  nix run
   ```
+
+      Hello, world!
 
 * Start a development shell for hacking on this flake:
 
   ```console
-  # nix develop
-  # unpackPhase
-  # cd hello-*
-  # configurePhase
-  # buildPhase
-  # ./hello
-  Hello, world!
-  # installPhase
-  # ../outputs/out/bin/hello
-  Hello, world!
+  nix develop
+  unpackPhase
+  cd hello-*
+  configurePhase
+  buildPhase
+  ./hello
   ```
+
+      Hello, world!
+
+  ```console
+  installPhase
+  ../outputs/out/bin/hello
+  ```
+
+      Hello, world!
 
 # Description
 
@@ -123,9 +130,10 @@ the Nix store. Here are the recognised types of installables:
   the output paths:
 
   ```console
-  # nix path-info --json /nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv
-  [{"path":"/nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10",…}]
+  nix path-info --json /nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv
   ```
+
+      [{"path":"/nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10",…}]
 
   If you want to operate on the store derivation itself, pass the
   `--derivation` flag.
@@ -159,32 +167,35 @@ operate are determined as follows:
   obtain the `dev` and `static` outputs of the `glibc` package:
 
   ```console
-  # nix build 'nixpkgs#glibc^dev,static'
-  # ls ./result-dev/include/ ./result-static/lib/
-  …
+  nix build 'nixpkgs#glibc^dev,static'
+  ls ./result-dev/include/ ./result-static/lib/
   ```
+
+      …
 
 * You can also specify that *all* outputs should be used using the
   syntax *installable*`^*`. For example, the following shows the size
   of all outputs of the `glibc` package in the binary cache:
 
   ```console
-  # nix path-info -S --eval-store auto --store https://cache.nixos.org 'nixpkgs#glibc^*'
-  /nix/store/g02b1lpbddhymmcjb923kf0l7s9nww58-glibc-2.33-123                 33208200
-  /nix/store/851dp95qqiisjifi639r0zzg5l465ny4-glibc-2.33-123-bin             36142896
-  /nix/store/kdgs3q6r7xdff1p7a9hnjr43xw2404z7-glibc-2.33-123-debug          155787312
-  /nix/store/n4xa8h6pbmqmwnq0mmsz08l38abb06zc-glibc-2.33-123-static          42488328
-  /nix/store/q6580lr01jpcsqs4r5arlh4ki2c1m9rv-glibc-2.33-123-dev             44200560
+  nix path-info -S --eval-store auto --store https://cache.nixos.org 'nixpkgs#glibc^*'
   ```
+
+      /nix/store/g02b1lpbddhymmcjb923kf0l7s9nww58-glibc-2.33-123                 33208200
+      /nix/store/851dp95qqiisjifi639r0zzg5l465ny4-glibc-2.33-123-bin             36142896
+      /nix/store/kdgs3q6r7xdff1p7a9hnjr43xw2404z7-glibc-2.33-123-debug          155787312
+      /nix/store/n4xa8h6pbmqmwnq0mmsz08l38abb06zc-glibc-2.33-123-static          42488328
+      /nix/store/q6580lr01jpcsqs4r5arlh4ki2c1m9rv-glibc-2.33-123-dev             44200560
 
 * If you didn't specify the desired outputs, but the derivation has an
   attribute `meta.outputsToInstall`, Nix will use those outputs. For
   example, since the package `nixpkgs#libxml2` has this attribute:
 
   ```console
-  # nix eval 'nixpkgs#libxml2.meta.outputsToInstall'
-  [ "bin" "man" ]
+  nix eval 'nixpkgs#libxml2.meta.outputsToInstall'
   ```
+
+      [ "bin" "man" ]
 
   a command like `nix shell nixpkgs#libxml2` will provide only those
   two outputs by default.

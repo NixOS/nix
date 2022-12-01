@@ -5,59 +5,62 @@ R""(
 * Show all packages in the `nixpkgs` flake:
 
   ```console
-  # nix search nixpkgs
-  * legacyPackages.x86_64-linux.AMB-plugins (0.8.1)
-    A set of ambisonics ladspa plugins
-
-  * legacyPackages.x86_64-linux.ArchiSteamFarm (4.3.1.0)
-    Application with primary purpose of idling Steam cards from multiple accounts simultaneously
-  …
+  nix search nixpkgs
   ```
+
+      * legacyPackages.x86_64-linux.AMB-plugins (0.8.1)
+        A set of ambisonics ladspa plugins
+
+      * legacyPackages.x86_64-linux.ArchiSteamFarm (4.3.1.0)
+        Application with primary purpose of idling Steam cards from multiple accounts simultaneously
+      …
 
 * Show packages in the `nixpkgs` flake containing `blender` in its
   name or description:
 
   ```console
-  # nix search nixpkgs blender
-  * legacyPackages.x86_64-linux.blender (2.91.0)
-    3D Creation/Animation/Publishing System
+  nix search nixpkgs blender
   ```
+
+      * legacyPackages.x86_64-linux.blender (2.91.0)
+        3D Creation/Animation/Publishing System
 
 * Search for packages underneath the attribute `gnome3` in Nixpkgs:
 
   ```console
-  # nix search nixpkgs#gnome3 vala
-  * legacyPackages.x86_64-linux.gnome3.vala (0.48.9)
-    Compiler for GObject type system
+  nix search nixpkgs#gnome3 vala
   ```
+
+      * legacyPackages.x86_64-linux.gnome3.vala (0.48.9)
+        Compiler for GObject type system
 
 * Show all packages in the flake in the current directory:
 
   ```console
-  # nix search
+  nix search
   ```
 
 * Search for Firefox or Chromium:
 
   ```console
-  # nix search nixpkgs 'firefox|chromium'
+  nix search nixpkgs 'firefox|chromium'
   ```
 
 * Search for packages containing `git` and either `frontend` or `gui`:
 
   ```console
-  # nix search nixpkgs git 'frontend|gui'
+  nix search nixpkgs git 'frontend|gui'
   ```
 
 * Search for packages containing `neovim` but hide ones containing either `gui` or `python`:
 
   ```console
-  # nix search nixpkgs neovim -e 'python|gui'
+  nix search nixpkgs neovim -e 'python|gui'
   ```
   or
 
   ```console
-  # nix search nixpkgs neovim -e 'python' -e 'gui'
+  nix search nixpkgs neovim -e 'python' -e 'gui'
   ```
 
 # Description

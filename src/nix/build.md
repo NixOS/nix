@@ -5,54 +5,58 @@ R""(
 * Build the default package from the flake in the current directory:
 
   ```console
-  # nix build
+  nix build
   ```
 
 * Build and run GNU Hello from the `nixpkgs` flake:
 
   ```console
-  # nix build nixpkgs#hello
-  # ./result/bin/hello
-  Hello, world!
+  nix build nixpkgs#hello
+  ./result/bin/hello
   ```
+
+      Hello, world!
 
 * Build GNU Hello and Cowsay, leaving two result symlinks:
 
   ```console
-  # nix build nixpkgs#hello nixpkgs#cowsay
-  # ls -l result*
-  lrwxrwxrwx 1 … result -> /nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10
-  lrwxrwxrwx 1 … result-1 -> /nix/store/rkfrm0z6x6jmi7d3gsmma4j53h15mg33-cowsay-3.03+dfsg2
+  nix build nixpkgs#hello nixpkgs#cowsay
+  ls -l result*
   ```
+
+      lrwxrwxrwx 1 … result -> /nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10
+      lrwxrwxrwx 1 … result-1 -> /nix/store/rkfrm0z6x6jmi7d3gsmma4j53h15mg33-cowsay-3.03+dfsg2
 
 * Build GNU Hello and print the resulting store path.
 
   ```console
-  # nix build nixpkgs#hello --print-out-paths
-  /nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10
+  nix build nixpkgs#hello --print-out-paths
   ```
+
+      /nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10
 
 * Build a specific output:
 
   ```console
-  # nix build nixpkgs#glibc.dev
-  # ls -ld ./result-dev
-  lrwxrwxrwx 1 … ./result-dev -> /nix/store/dkm3gwl0xrx0wrw6zi5x3px3lpgjhlw4-glibc-2.32-dev
+  nix build nixpkgs#glibc.dev
+  ls -ld ./result-dev
   ```
+
+      lrwxrwxrwx 1 … ./result-dev -> /nix/store/dkm3gwl0xrx0wrw6zi5x3px3lpgjhlw4-glibc-2.32-dev
 
 * Build attribute `build.x86_64-linux` from (non-flake) Nix expression
   `release.nix`:
 
   ```console
-  # nix build -f release.nix build.x86_64-linux
+  nix build -f release.nix build.x86_64-linux
   ```
 
 * Build a NixOS system configuration from a flake, and make a profile
   point to the result:
 
   ```console
-  # nix build --profile /nix/var/nix/profiles/system \
-      ~/my-configurations#nixosConfigurations.machine.config.system.build.toplevel
+  nix build --profile /nix/var/nix/profiles/system \
+    ~/my-configurations#nixosConfigurations.machine.config.system.build.toplevel
   ```
 
   (This is essentially what `nixos-rebuild` does.)
@@ -60,15 +64,16 @@ R""(
 * Build an expression specified on the command line:
 
   ```console
-  # nix build --impure --expr \
-      'with import <nixpkgs> {};
-       runCommand "foo" {
-         buildInputs = [ hello ];
-       }
-       "hello > $out"'
-  # cat ./result
-  Hello, world!
+  nix build --impure --expr \
+    'with import <nixpkgs> {};
+     runCommand "foo" {
+       buildInputs = [ hello ];
+     }
+     "hello > $out"'
+  cat ./result
   ```
+
+      Hello, world!
 
   Note that `--impure` is needed because we're using `<nixpkgs>`,
   which relies on the `$NIX_PATH` environment variable.
@@ -77,7 +82,7 @@ R""(
   already exist:
 
   ```console
-  # nix build /nix/store/rkfrm0z6x6jmi7d3gsmma4j53h15mg33-cowsay-3.03+dfsg2
+  nix build /nix/store/rkfrm0z6x6jmi7d3gsmma4j53h15mg33-cowsay-3.03+dfsg2
   ```
 
 # Description

@@ -6,60 +6,60 @@ R""(
   the flake in the current directory:
 
   ```console
-  # nix develop
+  nix develop
   ```
 
   Typical commands to run inside this shell are:
 
   ```console
-  # configurePhase
-  # buildPhase
-  # installPhase
+  configurePhase
+  buildPhase
+  installPhase
   ```
 
   Alternatively, you can run whatever build tools your project uses
   directly, e.g. for a typical Unix project:
 
   ```console
-  # ./configure --prefix=$out
-  # make
-  # make install
+  ./configure --prefix=$out
+  make
+  make install
   ```
 
 * Run a particular build phase directly:
 
   ```console
-  # nix develop --unpack
-  # nix develop --configure
-  # nix develop --build
-  # nix develop --check
-  # nix develop --install
-  # nix develop --installcheck
+  nix develop --unpack
+  nix develop --configure
+  nix develop --build
+  nix develop --check
+  nix develop --install
+  nix develop --installcheck
   ```
 
 * Start a shell with the build environment of GNU Hello:
 
   ```console
-  # nix develop nixpkgs#hello
+  nix develop nixpkgs#hello
   ```
 
 * Record a build environment in a profile:
 
   ```console
-  # nix develop --profile /tmp/my-build-env nixpkgs#hello
+  nix develop --profile /tmp/my-build-env nixpkgs#hello
   ```
 
 * Use a build environment previously recorded in a profile:
 
   ```console
-  # nix develop /tmp/my-build-env
+  nix develop /tmp/my-build-env
   ```
 
 * Replace all occurrences of the store path corresponding to
   `glibc.dev` with a writable directory:
 
   ```console
-  # nix develop --redirect nixpkgs#glibc.dev ~/my-glibc/outputs/dev
+  nix develop --redirect nixpkgs#glibc.dev ~/my-glibc/outputs/dev
   ```
 
   Note that this is useful if you're running a `nix develop` shell for
@@ -69,7 +69,7 @@ R""(
 * Run a series of script commands:
 
   ```console
-  # nix develop --command bash -c "mkdir build && cmake .. && make"
+  nix develop --command bash -c "mkdir build && cmake .. && make"
   ```
 
 # Description

@@ -5,7 +5,7 @@ R""(
 * To serialise directory `foo` as a NAR:
 
   ```console
-  # nix nar dump-path ./foo > foo.nar
+  nix nar dump-path ./foo > foo.nar
   ```
 
 # Description

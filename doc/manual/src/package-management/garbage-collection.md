@@ -19,20 +19,20 @@ be done if you are certain that you will not need to roll back.
 To delete all old (non-current) generations of your current profile:
 
 ```console
-$ nix-env --delete-generations old
+nix-env --delete-generations old
 ```
 
 Instead of `old` you can also specify a list of generations, e.g.,
 
 ```console
-$ nix-env --delete-generations 10 11 14
+nix-env --delete-generations 10 11 14
 ```
 
 To delete all generations older than a specified number of days (except
 the current generation), use the `d` suffix. For example,
 
 ```console
-$ nix-env --delete-generations 14d
+nix-env --delete-generations 14d
 ```
 
 deletes all generations older than two weeks.
@@ -41,7 +41,7 @@ After removing appropriate old generations you can run the garbage
 collector as follows:
 
 ```console
-$ nix-store --gc
+nix-store --gc
 ```
 
 The behaviour of the garbage collector is affected by the
@@ -56,7 +56,7 @@ are feeling uncertain, you can also first view what files would be
 deleted:
 
 ```console
-$ nix-store --gc --print-dead
+nix-store --gc --print-dead
 ```
 
 Likewise, the option `--print-live` will show the paths that *won’t* be
@@ -67,7 +67,7 @@ when invoked with the `-d` (`--delete-old`) switch deletes all old
 generations of all profiles in `/nix/var/nix/profiles`. So
 
 ```console
-$ nix-collect-garbage -d
+nix-collect-garbage -d
 ```
 
 is a quick and easy way to clean up your system.

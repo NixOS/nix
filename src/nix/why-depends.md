@@ -6,48 +6,52 @@ R""(
   Glibc:
 
   ```console
-  # nix why-depends nixpkgs#hello nixpkgs#glibc
-  /nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10
-  └───bin/hello: …...................../nix/store/9l06v7fc38c1x3r2iydl15ksgz0ysb82-glibc-2.32/lib/ld-linux-x86-64.…
-      → /nix/store/9l06v7fc38c1x3r2iydl15ksgz0ysb82-glibc-2.32
+  nix why-depends nixpkgs#hello nixpkgs#glibc
   ```
+
+      /nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10
+      └───bin/hello: …...................../nix/store/9l06v7fc38c1x3r2iydl15ksgz0ysb82-glibc-2.32/lib/ld-linux-x86-64.…
+          → /nix/store/9l06v7fc38c1x3r2iydl15ksgz0ysb82-glibc-2.32
 
 * Show all files and paths in the dependency graph leading from
   Thunderbird to libX11:
 
   ```console
-  # nix why-depends --all nixpkgs#thunderbird nixpkgs#xorg.libX11
-  /nix/store/qfc8729nzpdln1h0hvi1ziclsl3m84sr-thunderbird-78.5.1
-  ├───lib/thunderbird/libxul.so: …6wrw-libxcb-1.14/lib:/nix/store/adzfjjh8w25vdr0xdx9x16ah4f5rqrw5-libX11-1.7.0/lib:/nix/store/ssf…
-  │   → /nix/store/adzfjjh8w25vdr0xdx9x16ah4f5rqrw5-libX11-1.7.0
-  ├───lib/thunderbird/libxul.so: …pxyc-libXt-1.2.0/lib:/nix/store/1qj29ipxl2fyi2b13l39hdircq17gnk0-libXdamage-1.1.5/lib:/nix/store…
-  │   → /nix/store/1qj29ipxl2fyi2b13l39hdircq17gnk0-libXdamage-1.1.5
-  │   ├───lib/libXdamage.so.1.1.0: …-libXfixes-5.0.3/lib:/nix/store/adzfjjh8w25vdr0xdx9x16ah4f5rqrw5-libX11-1.7.0/lib:/nix/store/9l0…
-  │   │   → /nix/store/adzfjjh8w25vdr0xdx9x16ah4f5rqrw5-libX11-1.7.0
-  …
+  nix why-depends --all nixpkgs#thunderbird nixpkgs#xorg.libX11
   ```
+
+      /nix/store/qfc8729nzpdln1h0hvi1ziclsl3m84sr-thunderbird-78.5.1
+      ├───lib/thunderbird/libxul.so: …6wrw-libxcb-1.14/lib:/nix/store/adzfjjh8w25vdr0xdx9x16ah4f5rqrw5-libX11-1.7.0/lib:/nix/store/ssf…
+      │   → /nix/store/adzfjjh8w25vdr0xdx9x16ah4f5rqrw5-libX11-1.7.0
+      ├───lib/thunderbird/libxul.so: …pxyc-libXt-1.2.0/lib:/nix/store/1qj29ipxl2fyi2b13l39hdircq17gnk0-libXdamage-1.1.5/lib:/nix/store…
+      │   → /nix/store/1qj29ipxl2fyi2b13l39hdircq17gnk0-libXdamage-1.1.5
+      │   ├───lib/libXdamage.so.1.1.0: …-libXfixes-5.0.3/lib:/nix/store/adzfjjh8w25vdr0xdx9x16ah4f5rqrw5-libX11-1.7.0/lib:/nix/store/9l0…
+      │   │   → /nix/store/adzfjjh8w25vdr0xdx9x16ah4f5rqrw5-libX11-1.7.0
+      …
 
 * Show why Glibc depends on itself:
 
   ```console
-  # nix why-depends nixpkgs#glibc nixpkgs#glibc
-  /nix/store/9df65igwjmf2wbw0gbrrgair6piqjgmi-glibc-2.31
-  └───lib/ld-2.31.so: …che       Do not use /nix/store/9df65igwjmf2wbw0gbrrgair6piqjgmi-glibc-2.31/etc/ld.so.cache.  --…
-      → /nix/store/9df65igwjmf2wbw0gbrrgair6piqjgmi-glibc-2.31
+  nix why-depends nixpkgs#glibc nixpkgs#glibc
   ```
+
+      /nix/store/9df65igwjmf2wbw0gbrrgair6piqjgmi-glibc-2.31
+      └───lib/ld-2.31.so: …che       Do not use /nix/store/9df65igwjmf2wbw0gbrrgair6piqjgmi-glibc-2.31/etc/ld.so.cache.  --…
+          → /nix/store/9df65igwjmf2wbw0gbrrgair6piqjgmi-glibc-2.31
 
 * Show why Geeqie has a build-time dependency on `systemd`:
 
   ```console
-  # nix why-depends --derivation nixpkgs#geeqie nixpkgs#systemd
-  /nix/store/drrpq2fqlrbj98bmazrnww7hm1in3wgj-geeqie-1.4.drv
-  └───/: …atch.drv",["out"]),("/nix/store/qzh8dyq3lfbk3i1acbp7x9wh3il2imiv-gtk+3-3.24.21.drv",["dev"]),("/…
-      → /nix/store/qzh8dyq3lfbk3i1acbp7x9wh3il2imiv-gtk+3-3.24.21.drv
-      └───/: …16.0.drv",["dev"]),("/nix/store/8kp79fyslf3z4m3dpvlh6w46iaadz5c2-cups-2.3.3.drv",["dev"]),("/nix…
-          → /nix/store/8kp79fyslf3z4m3dpvlh6w46iaadz5c2-cups-2.3.3.drv
-          └───/: ….3.1.drv",["out"]),("/nix/store/yd3ihapyi5wbz1kjacq9dbkaq5v5hqjg-systemd-246.4.drv",["dev"]),("/…
-              → /nix/store/yd3ihapyi5wbz1kjacq9dbkaq5v5hqjg-systemd-246.4.drv
+  nix why-depends --derivation nixpkgs#geeqie nixpkgs#systemd
   ```
+
+      /nix/store/drrpq2fqlrbj98bmazrnww7hm1in3wgj-geeqie-1.4.drv
+      └───/: …atch.drv",["out"]),("/nix/store/qzh8dyq3lfbk3i1acbp7x9wh3il2imiv-gtk+3-3.24.21.drv",["dev"]),("/…
+          → /nix/store/qzh8dyq3lfbk3i1acbp7x9wh3il2imiv-gtk+3-3.24.21.drv
+          └───/: …16.0.drv",["dev"]),("/nix/store/8kp79fyslf3z4m3dpvlh6w46iaadz5c2-cups-2.3.3.drv",["dev"]),("/nix…
+              → /nix/store/8kp79fyslf3z4m3dpvlh6w46iaadz5c2-cups-2.3.3.drv
+              └───/: ….3.1.drv",["out"]),("/nix/store/yd3ihapyi5wbz1kjacq9dbkaq5v5hqjg-systemd-246.4.drv",["dev"]),("/…
+                  → /nix/store/yd3ihapyi5wbz1kjacq9dbkaq5v5hqjg-systemd-246.4.drv
 
 # Description
 

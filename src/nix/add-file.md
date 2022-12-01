@@ -16,13 +16,17 @@ store path on standard output.
 Add a regular file to the store:
 
 ```console
-# echo foo > bar
+echo foo > bar
 
-# nix store add-file ./bar
-/nix/store/cbv2s4bsvzjri77s2gb8g8bpcb6dpa8w-bar
-
-# cat /nix/store/cbv2s4bsvzjri77s2gb8g8bpcb6dpa8w-bar
-foo
+nix store add-file ./bar
 ```
+
+    /nix/store/cbv2s4bsvzjri77s2gb8g8bpcb6dpa8w-bar
+
+```
+cat /nix/store/cbv2s4bsvzjri77s2gb8g8bpcb6dpa8w-bar
+```
+
+    foo
 
 )""

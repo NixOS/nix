@@ -5,21 +5,21 @@ R""(
 * Generate a new secret key:
 
   ```console
-  # nix key generate-secret --key-name cache.example.org-1 > ./secret-key
+  nix key generate-secret --key-name cache.example.org-1 > ./secret-key
   ```
 
   We can then use this key to sign the closure of the Hello package:
 
   ```console
-  # nix build nixpkgs#hello
-  # nix store sign --key-file ./secret-key --recursive ./result
+  nix build nixpkgs#hello
+  nix store sign --key-file ./secret-key --recursive ./result
   ```
 
   Finally, we can verify the store paths using the corresponding
   public key:
 
   ```
-  # nix store verify --trusted-public-keys $(nix key convert-secret-to-public < ./secret-key) ./result
+  nix store verify --trusted-public-keys $(nix key convert-secret-to-public < ./secret-key) ./result
   ```
 
 # Description

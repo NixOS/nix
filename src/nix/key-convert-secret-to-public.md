@@ -5,8 +5,8 @@ R""(
 * Convert a secret key to a public key:
 
   ```console
-  # echo cache.example.org-0:E7lAO+MsPwTFfPXsdPtW8GKui/5ho4KQHVcAGnX+Tti1V4dUxoVoqLyWJ4YESuZJwQ67GVIksDt47og+tPVUZw== \
-    | nix key convert-secret-to-public
+  echo cache.example.org-0:E7lAO+MsPwTFfPXsdPtW8GKui/5ho4KQHVcAGnX+Tti1V4dUxoVoqLyWJ4YESuZJwQ67GVIksDt47og+tPVUZw== \
+  | nix key convert-secret-to-public
   cache.example.org-0:tVeHVMaFaKi8lieGBErmScEOuxlSJLA7eO6IPrT1VGc=
   ```
 

@@ -5,15 +5,16 @@ R""(
 * Open the Nix expression of the GNU Hello package:
 
   ```console
-  # nix edit nixpkgs#hello
+  nix edit nixpkgs#hello
   ```
 
 * Get the filename and line number used by `nix edit`:
 
   ```console
-  # nix eval --raw nixpkgs#hello.meta.position
-  /nix/store/fvafw0gvwayzdan642wrv84pzm5bgpmy-source/pkgs/applications/misc/hello/default.nix:15
+  nix eval --raw nixpkgs#hello.meta.position
   ```
+
+      /nix/store/fvafw0gvwayzdan642wrv84pzm5bgpmy-source/pkgs/applications/misc/hello/default.nix:15
 
 # Description
 

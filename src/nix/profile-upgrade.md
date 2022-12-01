@@ -6,22 +6,25 @@ R""(
   reference:
 
   ```console
-  # nix profile upgrade '.*'
+  nix profile upgrade '.*'
   ```
 
 * Upgrade a specific package:
 
   ```console
-  # nix profile upgrade packages.x86_64-linux.hello
+  nix profile upgrade packages.x86_64-linux.hello
   ```
 
 * Upgrade a specific profile element by number:
 
   ```console
-  # nix profile list
-  0 flake:nixpkgs#legacyPackages.x86_64-linux.spotify …
+  nix profile list
+  ```
 
-  # nix profile upgrade 0
+      0 flake:nixpkgs#legacyPackages.x86_64-linux.spotify …
+
+  ```console
+  nix profile upgrade 0
   ```
 
 # Description

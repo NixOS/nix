@@ -5,13 +5,13 @@ R""(
 * Delete unreachable paths in the Nix store:
 
   ```console
-  # nix store gc
+  nix store gc
   ```
 
 * Delete up to 1 gigabyte of garbage:
 
   ```console
-  # nix store gc --max 1G
+  nix store gc --max 1G
   ```
 
 # Description

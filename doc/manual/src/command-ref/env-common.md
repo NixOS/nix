@@ -60,8 +60,8 @@ Most Nix commands interpret the following environment variables:
     better off using `bind` mount points, e.g.,
 
     ```console
-    $ mkdir /nix
-    $ mount -o bind /mnt/otherdisk/nix /nix
+    mkdir /nix
+    mount -o bind /mnt/otherdisk/nix /nix
     ```
 
     Consult the mount 8 manual page for details.

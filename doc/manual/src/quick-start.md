@@ -7,7 +7,7 @@ to subsequent chapters.
 1. Install single-user Nix by running the following:
 
    ```console
-   $ bash <(curl -L https://nixos.org/nix/install)
+   bash <(curl -L https://nixos.org/nix/install)
    ```
 
    This will install Nix in `/nix`. The install script will create
@@ -19,19 +19,20 @@ to subsequent chapters.
    channel:
 
    ```console
-   $ nix-env -qaP
-   nixpkgs.docbook_xml_dtd_43                    docbook-xml-4.3
-   nixpkgs.docbook_xml_dtd_45                    docbook-xml-4.5
-   nixpkgs.firefox                               firefox-33.0.2
-   nixpkgs.hello                                 hello-2.9
-   nixpkgs.libxslt                               libxslt-1.1.28
-   …
+   nix-env -qaP
    ```
+
+       nixpkgs.docbook_xml_dtd_43                    docbook-xml-4.3
+       nixpkgs.docbook_xml_dtd_45                    docbook-xml-4.5
+       nixpkgs.firefox                               firefox-33.0.2
+       nixpkgs.hello                                 hello-2.9
+       nixpkgs.libxslt                               libxslt-1.1.28
+       …
 
 1. Install some packages from the channel:
 
    ```console
-   $ nix-env -iA nixpkgs.hello
+   nix-env -iA nixpkgs.hello
    ```
 
    This should download pre-built packages; it should not build them
@@ -40,22 +41,27 @@ to subsequent chapters.
 1. Test that they work:
 
    ```console
-   $ which hello
-   /home/eelco/.nix-profile/bin/hello
-   $ hello
-   Hello, world!
+   which hello
    ```
+
+       /home/eelco/.nix-profile/bin/hello
+
+   ```
+   hello
+   ```
+
+       Hello, world!
 
 1. Uninstall a package:
 
    ```console
-   $ nix-env -e hello
+   nix-env -e hello
    ```
 
 1. You can also test a package without installing it:
 
    ```console
-   $ nix-shell -p hello
+   nix-shell -p hello
    ```
 
    This builds or downloads GNU Hello and its dependencies, then drops
@@ -64,19 +70,25 @@ to subsequent chapters.
 
    ```console
    [nix-shell:~]$ hello
-   Hello, world!
-
-   [nix-shell:~]$ exit
-
-   $ hello
-   hello: command not found
    ```
+
+       Hello, world!
+
+   ```
+   [nix-shell:~]$ exit
+   ```
+
+   ```
+   hello
+   ```
+
+       hello: command not found
 
 1. To keep up-to-date with the channel, do:
 
    ```console
-   $ nix-channel --update nixpkgs
-   $ nix-env -u '*'
+   nix-channel --update nixpkgs
+   nix-env -u '*'
    ```
 
    The latter command will upgrade each installed package for which
@@ -87,7 +99,7 @@ to subsequent chapters.
    upgraded package turned out not to work properly), you can go back:
 
    ```console
-   $ nix-env --rollback
+   nix-env --rollback
    ```
 
 1. You should periodically run the Nix garbage collector to get rid of
@@ -95,5 +107,5 @@ to subsequent chapters.
    them:
 
    ```console
-   $ nix-collect-garbage -d
+   nix-collect-garbage -d
    ```

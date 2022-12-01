@@ -16,14 +16,18 @@ standard output.
 Add a directory to the store:
 
 ```console
-# mkdir dir
-# echo foo > dir/bar
+mkdir dir
+echo foo > dir/bar
 
-# nix store add-path ./dir
-/nix/store/6pmjx56pm94n66n4qw1nff0y1crm8nqg-dir
-
-# cat /nix/store/6pmjx56pm94n66n4qw1nff0y1crm8nqg-dir/bar
-foo
+nix store add-path ./dir
 ```
+
+    /nix/store/6pmjx56pm94n66n4qw1nff0y1crm8nqg-dir
+
+```
+cat /nix/store/6pmjx56pm94n66n4qw1nff0y1crm8nqg-dir/bar
+```
+
+    foo
 
 )""

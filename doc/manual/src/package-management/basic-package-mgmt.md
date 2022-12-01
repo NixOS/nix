@@ -32,8 +32,8 @@ install Nix. If this is not the case for some reason, you can add it
 as follows:
 
 ```console
-$ nix-channel --add https://nixos.org/channels/nixpkgs-unstable
-$ nix-channel --update
+nix-channel --add https://nixos.org/channels/nixpkgs-unstable
+nix-channel --update
 ```
 
 > **Note**
@@ -47,15 +47,16 @@ $ nix-channel --update
 You can view the set of available packages in Nixpkgs:
 
 ```console
-$ nix-env -qaP
-nixpkgs.aterm                       aterm-2.2
-nixpkgs.bash                        bash-3.0
-nixpkgs.binutils                    binutils-2.15
-nixpkgs.bison                       bison-1.875d
-nixpkgs.blackdown                   blackdown-1.4.2
-nixpkgs.bzip2                       bzip2-1.0.2
-…
+nix-env -qaP
 ```
+
+    nixpkgs.aterm                       aterm-2.2
+    nixpkgs.bash                        bash-3.0
+    nixpkgs.binutils                    binutils-2.15
+    nixpkgs.bison                       bison-1.875d
+    nixpkgs.blackdown                   blackdown-1.4.2
+    nixpkgs.bzip2                       bzip2-1.0.2
+    …
 
 The flag `-q` specifies a query operation, `-a` means that you want
 to show the “available” (i.e., installable) packages, as opposed to the
@@ -65,11 +66,12 @@ If you downloaded Nixpkgs yourself, or if you checked it out from GitHub,
 then you need to pass the path to your Nixpkgs tree using the `-f` flag:
 
 ```console
-$ nix-env -qaPf /path/to/nixpkgs
-aterm                               aterm-2.2
-bash                                bash-3.0
-…
+nix-env -qaPf /path/to/nixpkgs
 ```
+
+    aterm                               aterm-2.2
+    bash                                bash-3.0
+    …
 
 where */path/to/nixpkgs* is where you’ve unpacked or checked out
 Nixpkgs.
@@ -77,15 +79,16 @@ Nixpkgs.
 You can filter the packages by name:
 
 ```console
-$ nix-env -qaP firefox
-nixpkgs.firefox-esr                 firefox-91.3.0esr
-nixpkgs.firefox                     firefox-94.0.1
+nix-env -qaP firefox
 ```
+
+    nixpkgs.firefox-esr                 firefox-91.3.0esr
+    nixpkgs.firefox                     firefox-94.0.1
 
 and using regular expressions:
 
 ```console
-$ nix-env -qaP 'firefox.*'
+nix-env -qaP 'firefox.*'
 ```
 
 It is also possible to see the *status* of available packages, i.e.,
@@ -93,13 +96,14 @@ whether they are installed into the user environment and/or present in
 the system:
 
 ```console
-$ nix-env -qaPs
-…
--PS  nixpkgs.bash                bash-3.0
---S  nixpkgs.binutils            binutils-2.15
-IPS  nixpkgs.bison               bison-1.875d
-…
+nix-env -qaPs
 ```
+
+    …
+    -PS  nixpkgs.bash                bash-3.0
+    --S  nixpkgs.binutils            binutils-2.15
+    IPS  nixpkgs.bison               bison-1.875d
+    …
 
 The first character (`I`) indicates whether the package is installed in
 your current user environment. The second (`P`) indicates whether it is
@@ -113,7 +117,7 @@ Nix knows that it can fetch a pre-built package from somewhere
 You can install a package using `nix-env -iA`. For instance,
 
 ```console
-$ nix-env -iA nixpkgs.subversion
+nix-env -iA nixpkgs.subversion
 ```
 
 will install the package called `subversion` from `nixpkgs` channel (which is, of course, the
@@ -143,14 +147,14 @@ instead of the attribute path, as `nix-env` does not record which attribute
 was used for installing:
 
 ```console
-$ nix-env -e subversion
+nix-env -e subversion
 ```
 
 Upgrading to a new version is just as easy. If you have a new release of
 Nix Packages, you can do:
 
 ```console
-$ nix-env -uA nixpkgs.subversion
+nix-env -uA nixpkgs.subversion
 ```
 
 This will *only* upgrade Subversion if there is a “newer” version in the
@@ -163,7 +167,7 @@ whatever version is in the Nix expressions, use `-i` instead of `-u`;
 You can also upgrade all packages for which there are newer versions:
 
 ```console
-$ nix-env -u
+nix-env -u
 ```
 
 Sometimes it’s useful to be able to ask what `nix-env` would do, without
@@ -171,9 +175,10 @@ actually doing it. For instance, to find out what packages would be
 upgraded by `nix-env -u`, you can do
 
 ```console
-$ nix-env -u --dry-run
-(dry run; not doing anything)
-upgrading `libxslt-1.1.0' to `libxslt-1.1.10'
-upgrading `graphviz-1.10' to `graphviz-1.12'
-upgrading `coreutils-5.0' to `coreutils-5.2.1'
+nix-env -u --dry-run
 ```
+
+    (dry run; not doing anything)
+    upgrading `libxslt-1.1.0' to `libxslt-1.1.10'
+    upgrading `graphviz-1.10' to `graphviz-1.12'
+    upgrading `coreutils-5.0' to `coreutils-5.2.1'

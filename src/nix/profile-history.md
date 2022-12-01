@@ -5,13 +5,14 @@ R""(
 * Show the changes between each version of your default profile:
 
   ```console
-  # nix profile history
-  Version 508 (2020-04-10):
-    flake:nixpkgs#legacyPackages.x86_64-linux.awscli: ∅ -> 1.17.13
-
-  Version 509 (2020-05-16) <- 508:
-    flake:nixpkgs#legacyPackages.x86_64-linux.awscli: 1.17.13 -> 1.18.211
+  nix profile history
   ```
+
+      Version 508 (2020-04-10):
+        flake:nixpkgs#legacyPackages.x86_64-linux.awscli: ∅ -> 1.17.13
+
+      Version 509 (2020-05-16) <- 508:
+        flake:nixpkgs#legacyPackages.x86_64-linux.awscli: 1.17.13 -> 1.18.211
 
 # Description
 

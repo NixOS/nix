@@ -3,10 +3,10 @@
 After cloning Nix's Git repository, issue the following commands:
 
 ```console
-$ ./bootstrap.sh
-$ ./configure options...
-$ make
-$ make install
+./bootstrap.sh
+./configure options...
+make
+make install
 ```
 
 Nix requires GNU Make so you may need to invoke `gmake` instead.

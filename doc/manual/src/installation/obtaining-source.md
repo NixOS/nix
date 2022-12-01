@@ -6,7 +6,7 @@ command will check out the latest revision into a directory called
 `nix`:
 
 ```console
-$ git clone https://github.com/NixOS/nix
+git clone https://github.com/NixOS/nix
 ```
 
 Likewise, specific releases can be obtained from the

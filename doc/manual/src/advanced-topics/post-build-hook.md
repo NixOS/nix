@@ -28,10 +28,11 @@ private signing keys. We will sign paths with the private key, and
 distribute the public key for verifying the authenticity of the paths.
 
 ```console
-# nix-store --generate-binary-cache-key example-nix-cache-1 /etc/nix/key.private /etc/nix/key.public
-# cat /etc/nix/key.public
-example-nix-cache-1:1/cKDz3QCCOmwcztD2eV6Coggp6rqc9DGjWv7C0G+rM=
+nix-store --generate-binary-cache-key example-nix-cache-1 /etc/nix/key.private /etc/nix/key.public
+cat /etc/nix/key.public
 ```
+
+    example-nix-cache-1:1/cKDz3QCCOmwcztD2eV6Coggp6rqc9DGjWv7C0G+rM=
 
 Then, add the public key and the cache URL to your `nix.conf`'s
 `trusted-public-keys` and `substituters` options:
@@ -70,7 +71,7 @@ exec nix copy --to 's3://example-nix-cache' $OUT_PATHS
 Then make sure the hook program is executable by the `root` user:
 
 ```console
-# chmod +x /etc/nix/upload-to-cache.sh
+chmod +x /etc/nix/upload-to-cache.sh
 ```
 
 # Updating Nix Configuration
@@ -87,32 +88,34 @@ Then, restart the `nix-daemon`.
 Build any derivation, for example:
 
 ```console
-$ nix-build -E '(import <nixpkgs> {}).writeText "example" (builtins.toString builtins.currentTime)'
-this derivation will be built:
-  /nix/store/s4pnfbkalzy5qz57qs6yybna8wylkig6-example.drv
-building '/nix/store/s4pnfbkalzy5qz57qs6yybna8wylkig6-example.drv'...
-running post-build-hook '/home/grahamc/projects/github.com/NixOS/nix/post-hook.sh'...
-post-build-hook: Signing paths /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
-post-build-hook: Uploading paths /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
-/nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
+nix-build -E '(import <nixpkgs> {}).writeText "example" (builtins.toString builtins.currentTime)'
 ```
+
+    this derivation will be built:
+      /nix/store/s4pnfbkalzy5qz57qs6yybna8wylkig6-example.drv
+    building '/nix/store/s4pnfbkalzy5qz57qs6yybna8wylkig6-example.drv'...
+    running post-build-hook '/home/grahamc/projects/github.com/NixOS/nix/post-hook.sh'...
+    post-build-hook: Signing paths /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
+    post-build-hook: Uploading paths /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
+    /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
 
 Then delete the path from the store, and try substituting it from the
 binary cache:
 
 ```console
-$ rm ./result
-$ nix-store --delete /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
+rm ./result
+nix-store --delete /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
 ```
 
 Now, copy the path back from the cache:
 
 ```console
-$ nix-store --realise /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
-copying path '/nix/store/m8bmqwrch6l3h8s0k3d673xpmipcdpsa-example from 's3://example-nix-cache'...
-warning: you did not specify '--add-root'; the result might be removed by the garbage collector
-/nix/store/m8bmqwrch6l3h8s0k3d673xpmipcdpsa-example
+nix-store --realise /nix/store/ibcyipq5gf91838ldx40mjsp0b8w9n18-example
 ```
+
+    copying path '/nix/store/m8bmqwrch6l3h8s0k3d673xpmipcdpsa-example from 's3://example-nix-cache'...
+    warning: you did not specify '--add-root'; the result might be removed by the garbage collector
+    /nix/store/m8bmqwrch6l3h8s0k3d673xpmipcdpsa-example
 
 # Conclusion
 

@@ -5,52 +5,54 @@ R""(
 * Show what `nixpkgs` resolves to:
 
   ```console
-  # nix flake metadata nixpkgs
-  Resolved URL:  github:edolstra/dwarffs
-  Locked URL:    github:edolstra/dwarffs/f691e2c991e75edb22836f1dbe632c40324215c5
-  Description:   A filesystem that fetches DWARF debug info from the Internet on demand
-  Path:          /nix/store/769s05vjydmc2lcf6b02az28wsa9ixh1-source
-  Revision:      f691e2c991e75edb22836f1dbe632c40324215c5
-  Last modified: 2021-01-21 15:41:26
-  Inputs:
-  ├───nix: github:NixOS/nix/6254b1f5d298ff73127d7b0f0da48f142bdc753c
-  │   ├───lowdown-src: github:kristapsdz/lowdown/1705b4a26fbf065d9574dce47a94e8c7c79e052f
-  │   └───nixpkgs: github:NixOS/nixpkgs/ad0d20345219790533ebe06571f82ed6b034db31
-  └───nixpkgs follows input 'nix/nixpkgs'
+  nix flake metadata nixpkgs
   ```
+
+      Resolved URL:  github:edolstra/dwarffs
+      Locked URL:    github:edolstra/dwarffs/f691e2c991e75edb22836f1dbe632c40324215c5
+      Description:   A filesystem that fetches DWARF debug info from the Internet on demand
+      Path:          /nix/store/769s05vjydmc2lcf6b02az28wsa9ixh1-source
+      Revision:      f691e2c991e75edb22836f1dbe632c40324215c5
+      Last modified: 2021-01-21 15:41:26
+      Inputs:
+      ├───nix: github:NixOS/nix/6254b1f5d298ff73127d7b0f0da48f142bdc753c
+      │   ├───lowdown-src: github:kristapsdz/lowdown/1705b4a26fbf065d9574dce47a94e8c7c79e052f
+      │   └───nixpkgs: github:NixOS/nixpkgs/ad0d20345219790533ebe06571f82ed6b034db31
+      └───nixpkgs follows input 'nix/nixpkgs'
 
 * Show information about `dwarffs` in JSON format:
 
   ```console
-  # nix flake metadata dwarffs --json | jq .
-  {
-    "description": "A filesystem that fetches DWARF debug info from the Internet on demand",
-    "lastModified": 1597153508,
-    "locked": {
-      "lastModified": 1597153508,
-      "narHash": "sha256-VHg3MYVgQ12LeRSU2PSoDeKlSPD8PYYEFxxwkVVDRd0=",
-      "owner": "edolstra",
-      "repo": "dwarffs",
-      "rev": "d181d714fd36eb06f4992a1997cd5601e26db8f5",
-      "type": "github"
-    },
-    "locks": { ... },
-    "original": {
-      "id": "dwarffs",
-      "type": "indirect"
-    },
-    "originalUrl": "flake:dwarffs",
-    "path": "/nix/store/hang3792qwdmm2n0d9nsrs5n6bsws6kv-source",
-    "resolved": {
-      "owner": "edolstra",
-      "repo": "dwarffs",
-      "type": "github"
-    },
-    "resolvedUrl": "github:edolstra/dwarffs",
-    "revision": "d181d714fd36eb06f4992a1997cd5601e26db8f5",
-    "url": "github:edolstra/dwarffs/d181d714fd36eb06f4992a1997cd5601e26db8f5"
-  }
+  nix flake metadata dwarffs --json | jq .
   ```
+
+      {
+        "description": "A filesystem that fetches DWARF debug info from the Internet on demand",
+        "lastModified": 1597153508,
+        "locked": {
+          "lastModified": 1597153508,
+          "narHash": "sha256-VHg3MYVgQ12LeRSU2PSoDeKlSPD8PYYEFxxwkVVDRd0=",
+          "owner": "edolstra",
+          "repo": "dwarffs",
+          "rev": "d181d714fd36eb06f4992a1997cd5601e26db8f5",
+          "type": "github"
+        },
+        "locks": { ... },
+        "original": {
+          "id": "dwarffs",
+          "type": "indirect"
+        },
+        "originalUrl": "flake:dwarffs",
+        "path": "/nix/store/hang3792qwdmm2n0d9nsrs5n6bsws6kv-source",
+        "resolved": {
+          "owner": "edolstra",
+          "repo": "dwarffs",
+          "type": "github"
+        },
+        "resolvedUrl": "github:edolstra/dwarffs",
+        "revision": "d181d714fd36eb06f4992a1997cd5601e26db8f5",
+        "url": "github:edolstra/dwarffs/d181d714fd36eb06f4992a1997cd5601e26db8f5"
+      }
 
 # Description
 

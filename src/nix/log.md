@@ -5,19 +5,19 @@ R""(
 * Get the build log of GNU Hello:
 
   ```console
-  # nix log nixpkgs#hello
+  nix log nixpkgs#hello
   ```
 
 * Get the build log of a specific store path:
 
   ```console
-  # nix log /nix/store/lmngj4wcm9rkv3w4dfhzhcyij3195hiq-thunderbird-52.2.1
+  nix log /nix/store/lmngj4wcm9rkv3w4dfhzhcyij3195hiq-thunderbird-52.2.1
   ```
 
 * Get a build log from a specific binary cache:
 
   ```console
-  # nix log --store https://cache.nixos.org nixpkgs#hello
+  nix log --store https://cache.nixos.org nixpkgs#hello
   ```
 
 # Description

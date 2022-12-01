@@ -6,10 +6,11 @@ R""(
   directory:
 
   ```console
-  # nix flake lock --update-input nixpkgs --update-input nix
-  * Updated 'nix': 'github:NixOS/nix/9fab14adbc3810d5cc1f88672fde1eee4358405c' -> 'github:NixOS/nix/8927cba62f5afb33b01016d5c4f7f8b7d0adde3c'
-  * Updated 'nixpkgs': 'github:NixOS/nixpkgs/3d2d8f281a27d466fa54b469b5993f7dde198375' -> 'github:NixOS/nixpkgs/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293'
+  nix flake lock --update-input nixpkgs --update-input nix
   ```
+
+      * Updated 'nix': 'github:NixOS/nix/9fab14adbc3810d5cc1f88672fde1eee4358405c' -> 'github:NixOS/nix/8927cba62f5afb33b01016d5c4f7f8b7d0adde3c'
+      * Updated 'nixpkgs': 'github:NixOS/nixpkgs/3d2d8f281a27d466fa54b469b5993f7dde198375' -> 'github:NixOS/nixpkgs/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293'
 
 # Description
 
@@ -22,14 +23,14 @@ Note that every command that operates on a flake will also update the
 lock file if needed, and supports the same flags. Therefore,
 
 ```console
-# nix flake lock --update-input nixpkgs
-# nix build
+nix flake lock --update-input nixpkgs
+nix build
 ```
 
 is equivalent to:
 
 ```console
-# nix build --update-input nixpkgs
+nix build --update-input nixpkgs
 ```
 
 Thus, this command is only useful if you want to update the lock file

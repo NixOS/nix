@@ -76,8 +76,8 @@ there after an upgrade.  This means that you can _roll back_ to the
 old version:
 
 ```console
-$ nix-env --upgrade -A nixpkgs.some-package
-$ nix-env --rollback
+nix-env --upgrade -A nixpkgs.some-package
+nix-env --rollback
 ```
 
 ## Garbage collection
@@ -85,7 +85,7 @@ $ nix-env --rollback
 When you uninstall a package like this…
 
 ```console
-$ nix-env --uninstall firefox
+nix-env --uninstall firefox
 ```
 
 the package isn’t deleted from the system right away (after all, you
@@ -94,7 +94,7 @@ users).  Instead, unused packages can be deleted safely by running the
 _garbage collector_:
 
 ```console
-$ nix-collect-garbage
+nix-collect-garbage
 ```
 
 This deletes all packages that aren’t in use by any user profile or by
@@ -122,7 +122,7 @@ Nix expressions generally describe how to build a package from
 source, so an installation action like
 
 ```console
-$ nix-env --install -A nixpkgs.firefox
+nix-env --install -A nixpkgs.firefox
 ```
 
 _could_ cause quite a bit of build activity, as not only Firefox but
@@ -158,7 +158,7 @@ Pan newsreader, as described by [its
 Nix expression](https://github.com/NixOS/nixpkgs/blob/master/pkgs/applications/networking/newsreaders/pan/default.nix):
 
 ```console
-$ nix-shell '<nixpkgs>' -A pan
+nix-shell '<nixpkgs>' -A pan
 ```
 
 You’re then dropped into a shell where you can edit, build and test

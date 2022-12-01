@@ -26,5 +26,5 @@ To delete from the Nix store everything that is not used by the current
 generations of each profile, do
 
 ```console
-$ nix-collect-garbage -d
+nix-collect-garbage -d
 ```

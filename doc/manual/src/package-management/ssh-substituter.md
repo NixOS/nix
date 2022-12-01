@@ -6,7 +6,7 @@ automatically fetching any store paths in Firefox’s closure if they are
 available on the server `avalon`:
 
 ```console
-$ nix-env -iA nixpkgs.firefox --substituters ssh://alice@avalon
+nix-env -iA nixpkgs.firefox --substituters ssh://alice@avalon
 ```
 
 This works similar to the binary cache substituter that Nix usually
@@ -25,16 +25,18 @@ You can also copy the closure of some store path, without installing it
 into your profile, e.g.
 
 ```console
-$ nix-store -r /nix/store/m85bxg…-firefox-34.0.5 --substituters
-ssh://alice@avalon
+nix-store -r /nix/store/m85bxg…-firefox-34.0.5 --substituters
 ```
+
+    ssh://alice@avalon
 
 This is essentially equivalent to doing
 
 ```console
-$ nix-copy-closure --from alice@avalon
-/nix/store/m85bxg…-firefox-34.0.5
+nix-copy-closure --from alice@avalon
 ```
+
+    /nix/store/m85bxg…-firefox-34.0.5
 
 You can use SSH’s *forced command* feature to set up a restricted user
 account for SSH substituter access, allowing read-only access to the

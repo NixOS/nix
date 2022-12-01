@@ -133,13 +133,13 @@ Your account will need the following IAM policy to upload to the cache:
 To upload with a specific credential profile for Amazon S3:
 
 ```console
-$ nix copy nixpkgs.hello \
-  --to 's3://example-nix-cache?profile=cache-upload&region=eu-west-2'
+nix copy nixpkgs.hello \
+--to 's3://example-nix-cache?profile=cache-upload&region=eu-west-2'
 ```
 
 To upload to an S3-compatible binary cache:
 
 ```console
-$ nix copy nixpkgs.hello --to \
-  's3://example-nix-cache?profile=cache-upload&scheme=https&endpoint=minio.example.com'
+nix copy nixpkgs.hello --to \
+'s3://example-nix-cache?profile=cache-upload&scheme=https&endpoint=minio.example.com'
 ```

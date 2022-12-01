@@ -26,8 +26,8 @@ and use its own certificate bundle.
 Set the environment variable and install Nix
 
 ```console
-$ export NIX_SSL_CERT_FILE=/etc/ssl/my-certificate-bundle.crt
-$ sh <(curl -L https://nixos.org/nix/install)
+export NIX_SSL_CERT_FILE=/etc/ssl/my-certificate-bundle.crt
+sh <(curl -L https://nixos.org/nix/install)
 ```
 
 In the shell profile and rc files (for example, `/etc/bashrc`,
@@ -48,8 +48,8 @@ On macOS you must specify the environment variable for the Nix daemon
 service, then restart it:
 
 ```console
-$ sudo launchctl setenv NIX_SSL_CERT_FILE /etc/ssl/my-certificate-bundle.crt
-$ sudo launchctl kickstart -k system/org.nixos.nix-daemon
+sudo launchctl setenv NIX_SSL_CERT_FILE /etc/ssl/my-certificate-bundle.crt
+sudo launchctl kickstart -k system/org.nixos.nix-daemon
 ```
 
 ## Proxy Environment Variables

@@ -12,14 +12,14 @@ machine is accessible via SSH and that it has Nix installed. You can
 test whether connecting to the remote Nix instance works, e.g.
 
 ```console
-$ nix store ping --store ssh://mac
+nix store ping --store ssh://mac
 ```
 
 will try to connect to the machine named `mac`. It is possible to
 specify an SSH identity file as part of the remote store URI, e.g.
 
 ```console
-$ nix store ping --store ssh://mac?ssh-key=/home/alice/my-key
+nix store ping --store ssh://mac?ssh-key=/home/alice/my-key
 ```
 
 Since builds should be non-interactive, the key should not have a
@@ -28,7 +28,7 @@ passphrase. Alternatively, you can load identities ahead of time into
 
 If you get the error
 
-```console
+```
 bash: nix-store: command not found
 error: cannot connect to 'mac'
 ```
@@ -50,17 +50,24 @@ example, the following command allows you to build a derivation for
 `x86_64-darwin` on a Linux machine:
 
 ```console
-$ uname
-Linux
-
-$ nix build --impure \
-  --expr '(with import <nixpkgs> { system = "x86_64-darwin"; }; runCommand "foo" {} "uname > $out")' \
-  --builders 'ssh://mac x86_64-darwin'
-[1/0/1 built, 0.0 MiB DL] building foo on ssh://mac
-
-$ cat ./result
-Darwin
+uname
 ```
+
+    Linux
+
+```console
+nix build --impure \
+--expr '(with import <nixpkgs> { system = "x86_64-darwin"; }; runCommand "foo" {} "uname > $out")' \
+--builders 'ssh://mac x86_64-darwin'
+```
+
+    [1/0/1 built, 0.0 MiB DL] building foo on ssh://mac
+
+```console
+cat ./result
+```
+
+    Darwin
 
 It is possible to specify multiple builders separated by a semicolon or
 a newline, e.g.

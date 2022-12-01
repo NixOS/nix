@@ -5,7 +5,7 @@ R""(
 * Copy Firefox from the local store to a binary cache in `/tmp/cache`:
 
   ```console
-  # nix copy --to file:///tmp/cache $(type -p firefox)
+  nix copy --to file:///tmp/cache $(type -p firefox)
   ```
 
   Note the `file://` - without this, the destination is a chroot
@@ -15,7 +15,7 @@ R""(
   SSH:
 
   ```console
-  # nix copy -s --to ssh://server /run/current-system
+  nix copy -s --to ssh://server /run/current-system
   ```
 
   The `-s` flag causes the remote machine to try to substitute missing
@@ -26,19 +26,19 @@ R""(
 * Copy a closure from another machine via SSH:
 
   ```console
-  # nix copy --from ssh://server /nix/store/a6cnl93nk1wxnq84brbbwr6hxw9gp2w9-blender-2.79-rc2
+  nix copy --from ssh://server /nix/store/a6cnl93nk1wxnq84brbbwr6hxw9gp2w9-blender-2.79-rc2
   ```
 
 * Copy Hello to a binary cache in an Amazon S3 bucket:
 
   ```console
-  # nix copy --to s3://my-bucket?region=eu-west-1 nixpkgs#hello
+  nix copy --to s3://my-bucket?region=eu-west-1 nixpkgs#hello
   ```
 
   or to an S3-compatible storage system:
 
   ```console
-  # nix copy --to s3://my-bucket?region=eu-west-1&endpoint=example.com nixpkgs#hello
+  nix copy --to s3://my-bucket?region=eu-west-1&endpoint=example.com nixpkgs#hello
   ```
 
   Note that this only works if Nix is built with AWS support.
@@ -46,7 +46,7 @@ R""(
 * Copy a closure from `/nix/store` to the chroot store `/tmp/nix/nix/store`:
 
   ```console
-  # nix copy --to /tmp/nix nixpkgs#hello --no-check-sigs
+  nix copy --to /tmp/nix nixpkgs#hello --no-check-sigs
   ```
 
 # Description

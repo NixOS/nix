@@ -5,19 +5,19 @@ R""(
 * Test whether connecting to a remote Nix store via SSH works:
 
   ```console
-  # nix store ping --store ssh://mac1
+  nix store ping --store ssh://mac1
   ```
 
 * Test whether a URL is a valid binary cache:
 
   ```console
-  # nix store ping --store https://cache.nixos.org
+  nix store ping --store https://cache.nixos.org
   ```
 
 * Test whether the Nix daemon is up and running:
 
   ```console
-  # nix store ping --store daemon
+  nix store ping --store daemon
   ```
 
 # Description

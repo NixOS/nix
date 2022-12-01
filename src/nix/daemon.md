@@ -5,7 +5,7 @@ R""(
 * Run the daemon in the foreground:
 
   ```console
-  # nix daemon
+  nix daemon
   ```
 
 # Description

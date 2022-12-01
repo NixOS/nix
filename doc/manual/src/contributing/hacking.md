@@ -4,20 +4,20 @@ This section provides some notes on how to hack on Nix. To get the
 latest version of Nix from GitHub:
 
 ```console
-$ git clone https://github.com/NixOS/nix.git
-$ cd nix
+git clone https://github.com/NixOS/nix.git
+cd nix
 ```
 
 To build Nix for the current operating system/architecture use
 
 ```console
-$ nix-build
+nix-build
 ```
 
 or if you have a flake-enabled nix:
 
 ```console
-$ nix build
+nix build
 ```
 
 This will build `defaultPackage` attribute defined in the `flake.nix`
@@ -25,33 +25,33 @@ file. To build for other platforms add one of the following suffixes to
 it: aarch64-linux, i686-linux, x86\_64-darwin, x86\_64-linux. i.e.
 
 ```console
-$ nix-build -A defaultPackage.x86_64-linux
+nix-build -A defaultPackage.x86_64-linux
 ```
 
 To build all dependencies and start a shell in which all environment
 variables are set up so that those dependencies can be found:
 
 ```console
-$ nix-shell
+nix-shell
 ```
 
 or if you have a flake-enabled nix:
 
 ```console
-$ nix develop
+nix develop
 ```
 
 To get a shell with a different compilation environment (e.g. stdenv,
 gccStdenv, clangStdenv, clang11Stdenv, ccacheStdenv):
 
 ```console
-$ nix-shell -A devShells.x86_64-linux.clang11StdenvPackages
+nix-shell -A devShells.x86_64-linux.clang11StdenvPackages
 ```
 
 or if you have a flake-enabled nix:
 
 ```console
-$ nix develop .#clang11StdenvPackages
+nix develop .#clang11StdenvPackages
 ```
 
 Note: you can use `ccacheStdenv` to drastically improve rebuild
@@ -77,13 +77,13 @@ nix (Nix) 3.0
 If you have a flakes-enabled Nix you can replace:
 
 ```console
-$ nix-shell
+nix-shell
 ```
 
 by:
 
 ```console
-$ nix develop
+nix develop
 ```
 
 ## Running tests

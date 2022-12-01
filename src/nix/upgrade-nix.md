@@ -5,13 +5,13 @@ R""(
 * Upgrade Nix to the stable version declared in Nixpkgs:
 
   ```console
-  # nix upgrade-nix
+  nix upgrade-nix
   ```
 
 * Upgrade Nix in a specific profile:
 
   ```console
-  # nix upgrade-nix -p /nix/var/nix/profiles/per-user/alice/profile
+  nix upgrade-nix -p /nix/var/nix/profiles/per-user/alice/profile
   ```
 
 # Description

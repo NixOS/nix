@@ -6,28 +6,29 @@ R""(
   package:
 
   ```console
-  # nix show-derivation nixpkgs#hello
-  {
-    "/nix/store/s6rn4jz1sin56rf4qj5b5v8jxjm32hlk-hello-2.10.drv": {
-      …
-    }
-  }
+  nix show-derivation nixpkgs#hello
   ```
+
+      {
+        "/nix/store/s6rn4jz1sin56rf4qj5b5v8jxjm32hlk-hello-2.10.drv": {
+          …
+        }
+      }
 
 * Show the full derivation graph (if available) that produced your
   NixOS system:
 
   ```console
-  # nix show-derivation -r /run/current-system
+  nix show-derivation -r /run/current-system
   ```
 
 * Print all files fetched using `fetchurl` by Firefox's dependency
   graph:
 
   ```console
-  # nix show-derivation -r nixpkgs#firefox \
-    | jq -r '.[] | select(.outputs.out.hash and .env.urls) | .env.urls' \
-    | uniq | sort
+  nix show-derivation -r nixpkgs#firefox \
+  | jq -r '.[] | select(.outputs.out.hash and .env.urls) | .env.urls' \
+  | uniq | sort
   ```
 
   Note that `.outputs.out.hash` selects *fixed-output derivations*

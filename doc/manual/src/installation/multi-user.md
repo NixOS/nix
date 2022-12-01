@@ -29,10 +29,10 @@ members of any other group. On Linux, you can create the group and users
 as follows:
 
 ```console
-$ groupadd -r nixbld
-$ for n in $(seq 1 10); do useradd -c "Nix build user $n" \
-    -d /var/empty -g nixbld -G nixbld -M -N -r -s "$(which nologin)" \
-    nixbld$n; done
+groupadd -r nixbld
+for n in $(seq 1 10); do useradd -c "Nix build user $n" \
+  -d /var/empty -g nixbld -G nixbld -M -N -r -s "$(which nologin)" \
+  nixbld$n; done
 ```
 
 This creates 10 build users. There can never be more concurrent builds
@@ -45,7 +45,7 @@ The [Nix daemon](../command-ref/nix-daemon.md) should be started as
 follows (as `root`):
 
 ```console
-$ nix-daemon
+nix-daemon
 ```
 
 You’ll want to put that line somewhere in your system’s boot scripts.
@@ -68,8 +68,8 @@ if you want to restrict the use of Nix to the members of a group called
 `nix-users`, do
 
 ```console
-$ chgrp nix-users /nix/var/nix/daemon-socket
-$ chmod ug=rwx,o= /nix/var/nix/daemon-socket
+chgrp nix-users /nix/var/nix/daemon-socket
+chmod ug=rwx,o= /nix/var/nix/daemon-socket
 ```
 
 This way, users who are not in the `nix-users` group cannot connect to

@@ -60,43 +60,68 @@ md5sum`.
 Computing the same hash as `nix-prefetch-url`:
 
 ```console
-$ nix-prefetch-url file://<(echo test)
-1lkgqb6fclns49861dwk9rzb6xnfkxbpws74mxnx01z9qyv1pjpj
-$ nix-hash --type sha256 --flat --base32 <(echo test)
-1lkgqb6fclns49861dwk9rzb6xnfkxbpws74mxnx01z9qyv1pjpj
+nix-prefetch-url file://<(echo test)
 ```
+
+    1lkgqb6fclns49861dwk9rzb6xnfkxbpws74mxnx01z9qyv1pjpj
+
+```console
+nix-hash --type sha256 --flat --base32 <(echo test)
+```
+
+    1lkgqb6fclns49861dwk9rzb6xnfkxbpws74mxnx01z9qyv1pjpj
 
 Computing hashes:
 
 ```console
-$ mkdir test
-$ echo "hello" > test/world
+mkdir test
+echo "hello" > test/world
 
-$ nix-hash test/ (MD5 hash; default)
-8179d3caeff1869b5ba1744e5a245c04
-
-$ nix-store --dump test/ | md5sum (for comparison)
-8179d3caeff1869b5ba1744e5a245c04  -
-
-$ nix-hash --type sha1 test/
-e4fd8ba5f7bbeaea5ace89fe10255536cd60dab6
-
-$ nix-hash --type sha1 --base32 test/
-nvd61k9nalji1zl9rrdfmsmvyyjqpzg4
-
-$ nix-hash --type sha256 --flat test/
-error: reading file `test/': Is a directory
-
-$ nix-hash --type sha256 --flat test/world
-5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03
+nix-hash test/ (MD5 hash; default)
 ```
+
+    8179d3caeff1869b5ba1744e5a245c04
+
+```console
+nix-store --dump test/ | md5sum (for comparison)
+```
+
+    8179d3caeff1869b5ba1744e5a245c04  -
+
+```console
+nix-hash --type sha1 test/
+```
+
+    e4fd8ba5f7bbeaea5ace89fe10255536cd60dab6
+
+```console
+nix-hash --type sha1 --base32 test/
+```
+
+    nvd61k9nalji1zl9rrdfmsmvyyjqpzg4
+
+```console
+nix-hash --type sha256 --flat test/
+```
+
+    error: reading file `test/': Is a directory
+
+```console
+nix-hash --type sha256 --flat test/world
+```
+
+    5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03
 
 Converting between hexadecimal and base-32:
 
 ```console
-$ nix-hash --type sha1 --to-base32 e4fd8ba5f7bbeaea5ace89fe10255536cd60dab6
-nvd61k9nalji1zl9rrdfmsmvyyjqpzg4
-
-$ nix-hash --type sha1 --to-base16 nvd61k9nalji1zl9rrdfmsmvyyjqpzg4
-e4fd8ba5f7bbeaea5ace89fe10255536cd60dab6
+nix-hash --type sha1 --to-base32 e4fd8ba5f7bbeaea5ace89fe10255536cd60dab6
 ```
+
+    nvd61k9nalji1zl9rrdfmsmvyyjqpzg4
+
+```console
+nix-hash --type sha1 --to-base16 nvd61k9nalji1zl9rrdfmsmvyyjqpzg4
+```
+
+    e4fd8ba5f7bbeaea5ace89fe10255536cd60dab6

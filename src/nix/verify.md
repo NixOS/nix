@@ -5,21 +5,21 @@ R""(
 * Verify the entire Nix store:
 
   ```console
-  # nix store verify --all
+  nix store verify --all
   ```
 
 * Check whether each path in the closure of Firefox has at least 2
   signatures:
 
   ```console
-  # nix store verify -r -n2 --no-contents $(type -p firefox)
+  nix store verify -r -n2 --no-contents $(type -p firefox)
   ```
 
 * Verify a store path in the binary cache `https://cache.nixos.org/`:
 
   ```console
-  # nix store verify --store https://cache.nixos.org/ \
-      /nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10
+  nix store verify --store https://cache.nixos.org/ \
+    /nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10
   ```
 
 # Description

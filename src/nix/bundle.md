@@ -5,27 +5,30 @@ R""(
 * Bundle Hello:
 
   ```console
-  # nix bundle nixpkgs#hello
-  # ./hello
-  Hello, world!
+  nix bundle nixpkgs#hello
+  ./hello
   ```
+
+      Hello, world!
 
 * Bundle a specific version of Nix:
 
   ```console
-  # nix bundle github:NixOS/nix/e3ddffb27e5fc37a209cfd843c6f7f6a9460a8ec
-  # ./nix --version
-  nix (Nix) 2.4pre20201215_e3ddffb
+  nix bundle github:NixOS/nix/e3ddffb27e5fc37a209cfd843c6f7f6a9460a8ec
+  ./nix --version
   ```
+
+      nix (Nix) 2.4pre20201215_e3ddffb
 
 * Bundle a Hello using a specific bundler:
 
   ```console
-  # nix bundle --bundler github:NixOS/bundlers#toDockerImage nixpkgs#hello
-  # docker load < hello-2.10.tar.gz
-  # docker run hello-2.10:latest hello
-  Hello, world!
+  nix bundle --bundler github:NixOS/bundlers#toDockerImage nixpkgs#hello
+  docker load < hello-2.10.tar.gz
+  docker run hello-2.10:latest hello
   ```
+
+      Hello, world!
 
 # Description
 

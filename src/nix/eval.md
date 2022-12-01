@@ -5,48 +5,55 @@ R""(
 * Evaluate a Nix expression given on the command line:
 
   ```console
-  # nix eval --expr '1 + 2'
+  nix eval --expr '1 + 2'
   ```
 
 * Evaluate a Nix expression to JSON:
 
   ```console
-  # nix eval --json --expr '{ x = 1; }'
-  {"x":1}
+  nix eval --json --expr '{ x = 1; }'
   ```
+
+      {"x":1}
 
 * Evaluate a Nix expression from a file:
 
   ```console
-  # nix eval -f ./my-nixpkgs hello.name
+  nix eval -f ./my-nixpkgs hello.name
   ```
 
 * Get the current version of the `nixpkgs` flake:
 
   ```console
-  # nix eval --raw nixpkgs#lib.version
+  nix eval --raw nixpkgs#lib.version
   ```
 
 * Print the store path of the Hello package:
 
   ```console
-  # nix eval --raw nixpkgs#hello
+  nix eval --raw nixpkgs#hello
   ```
 
 * Get a list of checks in the `nix` flake:
 
   ```console
-  # nix eval nix#checks.x86_64-linux --apply builtins.attrNames
+  nix eval nix#checks.x86_64-linux --apply builtins.attrNames
   ```
 
 * Generate a directory with the specified contents:
 
   ```console
-  # nix eval --write-to ./out --expr '{ foo = "bar"; subdir.bla = "123"; }'
-  # cat ./out/foo
-  bar
-  # cat ./out/subdir/bla
-  123
+  nix eval --write-to ./out --expr '{ foo = "bar"; subdir.bla = "123"; }'
+  cat ./out/foo
+  ```
+
+      bar
+
+  ```console
+  cat ./out/subdir/bla
+  ```
+
+      123
 
 # Description
 

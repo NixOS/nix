@@ -5,13 +5,13 @@ R""(
 * Remove the entry `nixpkgs` from the user registry:
 
   ```console
-  # nix registry remove nixpkgs
+  nix registry remove nixpkgs
   ```
 
 * Remove the entry `nixpkgs` from a custom registry:
 
   ```console
-  # nix registry remove --registry ./custom-flake-registry.json nixpkgs
+  nix registry remove --registry ./custom-flake-registry.json nixpkgs
   ```
 
 # Description

@@ -5,13 +5,13 @@ R""(
 * Run the default app from the `blender-bin` flake:
 
   ```console
-  # nix run blender-bin
+  nix run blender-bin
   ```
 
 * Run a non-default app from the `blender-bin` flake:
 
   ```console
-  # nix run blender-bin#blender_2_83
+  nix run blender-bin#blender_2_83
   ```
 
   Tip: you can find apps provided by this flake by running `nix flake
@@ -20,7 +20,7 @@ R""(
 * Run `vim` from the `nixpkgs` flake:
 
   ```console
-  # nix run nixpkgs#vim
+  nix run nixpkgs#vim
   ```
 
   Note that `vim` (as of the time of writing of this page) is not an
@@ -30,7 +30,7 @@ R""(
 * Run `vim` with arguments:
 
   ```console
-  # nix run nixpkgs#vim -- --help
+  nix run nixpkgs#vim -- --help
   ```
 
 # Description
