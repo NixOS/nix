@@ -153,7 +153,7 @@ SourceExprCommand::SourceExprCommand()
         .longName = "file",
         .shortName = 'f',
         .description =
-            "Interpret installables as attribute paths relative to the Nix expression stored in *file*. "
+            "Interpret [*installables*](@docroot@/command-ref/new-cli/nix.md#installables) as attribute paths relative to the Nix expression stored in *file*. "
             "If *file* is the character -, then a Nix expression will be read from standard input. "
             "Implies `--impure`.",
         .category = installablesCategory,
@@ -164,7 +164,7 @@ SourceExprCommand::SourceExprCommand()
 
     addFlag({
         .longName = "expr",
-        .description = "Interpret installables as attribute paths relative to the Nix expression *expr*.",
+        .description = "Interpret [*installables*](@docroot@/command-ref/new-cli/nix.md#installables) as attribute paths relative to the Nix expression *expr*.",
         .category = installablesCategory,
         .labels = {"expr"},
         .handler = {&expr}

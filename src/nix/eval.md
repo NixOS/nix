@@ -50,7 +50,7 @@ R""(
 
 # Description
 
-This command evaluates the Nix expression *installable* and prints the
+This command evaluates the given Nix expression and prints the
 result on standard output.
 
 # Output format

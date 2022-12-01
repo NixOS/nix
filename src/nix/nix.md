@@ -48,22 +48,26 @@ manual](https://nixos.org/manual/nix/stable/).
 
 # Installables
 
-Many `nix` subcommands operate on one or more *installables*. These are
-command line arguments that represent something that can be built in
-the Nix store.
+Many `nix` subcommands operate on one or more *installables*.
+These are command line arguments that represent something that can be realised in the Nix store.
 
-For most commands, if no installable is specified, the default is `.`,
-i.e. Nix will operate on the default flake output attribute of the
-flake in the current directory.
+The following types of installable are supported by most commands:
 
-Here are the recognised types of installables:
+- [Flake output attribute](#flake-output-attribute)
+- [Store path](#store-path)
+- [Store derivation](#store-derivation)
+- [Nix file](#nix-file), optionally qualified by an attribute path
+- [Nix expression](#nix-expression), optionally qualified by an attribute path
 
-## Flake output attributes
+For most commands, if no installable is specified, `.` as assumed.
+That is, Nix will operate on the default flake output attribute of the flake in the current directory.
+
+### Flake output attribute
 
 Example: `nixpkgs#hello`
 
 These have the form *flakeref*[`#`*attrpath*], where *flakeref* is a
-flake reference and *attrpath* is an optional attribute path. For
+[flake reference](./nix3-flake.md#flake-references) and *attrpath* is an optional attribute path. For
 more information on flakes, see [the `nix flake` manual
 page](./nix3-flake.md).  Flake references are most commonly a flake
 identifier in the flake registry (e.g. `nixpkgs`), or a raw path
@@ -116,46 +120,46 @@ subcommands, these are `packages.`*system*,
 attributes `packages.x86_64-linux.hello`,
 `legacyPackages.x86_64-linux.hello` and `hello`.
 
-## Store paths
+### Store path
 
 Example: `/nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10`
 
-These are paths inside the Nix store, or symlinks that resolve to a
-path in the Nix store.
+These are paths inside the Nix store, or symlinks that resolve to a path in the Nix store.
 
-## Store derivations
+### Store derivation
 
 Example: `/nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv`
 
-By default, if you pass a [store derivation] path to a `nix` subcommand, the command will operate on the [output path]s of the derivation.
+By default, if you pass a [store derivation] path to a `nix` subcommand other than [`show-derivation`](./nix3-show-derivation.md), the command will operate on the [output path]s of the derivation.
 
 [output path]: ../../glossary.md#gloss-output-path
 
-For example, `nix path-info` prints information about the output paths:
+For example, [`nix path-info`](./nix3-path-info.md) prints information about the output paths:
 
 ```console
 # nix path-info --json /nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv
 [{"path":"/nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10",…}]
 ```
 
-If you want to operate on the store derivation itself, pass the
-`--derivation` flag.
+If you want to operate on the store derivation itself, pass the `--derivation` flag.
 
-## Nix attributes
+### Nix file
 
 Example: `--file /path/to/nixpkgs hello`
 
-When the `-f` / `--file` *path* option is given, installables are
-interpreted as attribute paths referencing a value returned by
-evaluating the Nix file *path*.
+When the option `-f` / `--file` *path* \[*attrpath*...\] is given, installables are interpreted as the value of the expression in the Nix file at *path*.
+If attribute paths are provided, commands will operate on the corresponding values accessible at these paths.
+The Nix expression in that file, or any selected attribute, must evaluate to a derivation.
 
-## Nix expressions
+### Nix expression
 
-Example: `--expr '(import <nixpkgs> {}).hello.overrideDerivation (prev: { name = "my-hello"; })'`.
+Example: `--expr 'import <nixpkgs> {}' hello`
 
-When the `--expr` option is given, all installables are interpreted
-as Nix expressions. You may need to specify `--impure` if the
-expression references impure inputs (such as `<nixpkgs>`).
+When the option `--expr` *expression* \[*attrpath*...\] is given, installables are interpreted as the value of the of the Nix expression.
+If attribute paths are provided, commands will operate on the corresponding values accessible at these paths.
+The Nix expression, or any selected attribute, must evaluate to a derivation.
+
+You may need to specify `--impure` if the expression references impure inputs (such as `<nixpkgs>`).
 
 ## Derivation output selection
 

@@ -22,7 +22,7 @@ static constexpr Command::Category catSecondary = 100;
 static constexpr Command::Category catUtility = 101;
 static constexpr Command::Category catNixInstallation = 102;
 
-static constexpr auto installablesCategory = "Options that change the interpretation of installables";
+static constexpr auto installablesCategory = "Options that change the interpretation of [installables](@docroot@/command-ref/new-cli/nix.md#installables)";
 
 struct NixMultiCommand : virtual MultiCommand, virtual Command
 {
