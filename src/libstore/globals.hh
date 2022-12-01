@@ -284,7 +284,21 @@ public:
         )"};
 
     Setting<bool> autoAllocateUids{this, false, "auto-allocate-uids",
-        "Whether to allocate UIDs for builders automatically."};
+        R"(
+          Whether to allocate UIDs for builders automatically.
+
+          These UIDs are allocated starting at 872415232 (0x34000000) on Linux and 56930 on macOS.
+
+          > **Warning**
+          > This is an experimental feature.
+
+          To enable it, add the following to [`nix.conf`](#):
+
+          ```
+          extra-experimental-features = auto-allocate-uids
+          auto-allocate-uids = true
+          ```
+        )"};
 
     Setting<uint32_t> startId{this,
         #if __linux__
@@ -308,11 +322,21 @@ public:
     Setting<bool> useCgroups{
         this, false, "use-cgroups",
         R"(
-          Whether to execute builds inside cgroups. Cgroups are
-          enabled automatically for derivations that require the
-          `uid-range` system feature.
-        )"
-    };
+          Whether to execute builds inside cgroups.
+          Only on Linux with systemd.
+
+          cgroups are required and enabled automatically for derivations that require the `uid-range` system feature.
+
+          > **Warning**
+          > This is an experimental feature.
+
+          To enable it, add the following to [`nix.conf`](#):
+
+          ```
+          extra-experimental-features = cgroups
+          use-cgroups = true
+          ```
+        )"};
     #endif
 
     Setting<bool> impersonateLinux26{this, false, "impersonate-linux-26",
