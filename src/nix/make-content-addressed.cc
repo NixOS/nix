@@ -37,13 +37,15 @@ struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand,
             StorePathSet(storePaths.begin(), storePaths.end()));
 
         if (json) {
-            nlohmann::json jsonRewrites = json::object();
+            auto jsonRewrites = json::object();
             for (auto & path : storePaths) {
                 auto i = remappings.find(path);
                 assert(i != remappings.end());
                 jsonRewrites[srcStore->printStorePath(path)] = srcStore->printStorePath(i->second);
             }
-            std::cout << nlohmann::json{"rewrites", jsonRewrites}.dump();
+            auto json = json::object();
+            json["rewrites"] = jsonRewrites;
+            std::cout << json.dump();
         } else {
             for (auto & path : storePaths) {
                 auto i = remappings.find(path);
