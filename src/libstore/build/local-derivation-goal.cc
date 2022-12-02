@@ -409,12 +409,16 @@ void LocalDerivationGoal::startBuilder()
         #if __linux__
         settings.requireExperimentalFeature(Xp::Cgroups);
 
+        auto cgroupFS = getCgroupFS();
+        if (!cgroupFS)
+            throw Error("cannot determine the cgroups file system");
+
         auto ourCgroups = getCgroups("/proc/self/cgroup");
         auto ourCgroup = ourCgroups[""];
         if (ourCgroup == "")
             throw Error("cannot determine cgroup name from /proc/self/cgroup");
 
-        auto ourCgroupPath = canonPath("/sys/fs/cgroup/" + ourCgroup);
+        auto ourCgroupPath = canonPath(*cgroupFS + "/" + ourCgroup);
 
         if (!pathExists(ourCgroupPath))
             throw Error("expected cgroup directory '%s'", ourCgroupPath);

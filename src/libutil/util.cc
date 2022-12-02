@@ -2,6 +2,7 @@
 #include "sync.hh"
 #include "finally.hh"
 #include "serialise.hh"
+#include "cgroup.hh"
 
 #include <array>
 #include <cctype>
@@ -36,7 +37,6 @@
 #include <sys/prctl.h>
 #include <sys/resource.h>
 
-#include <mntent.h>
 #include <cmath>
 #endif
 
@@ -727,43 +727,24 @@ unsigned int getMaxCPU()
 {
     #if __linux__
     try {
-        FILE *fp = fopen("/proc/mounts", "r");
-        if (!fp)
-            return 0;
+        auto cgroupFS = getCgroupFS();
+        if (!cgroupFS) return 0;
 
-        Strings cgPathParts;
+        if (!pathExists("/proc/self/cgroup")) return 0;
 
-        struct mntent *ent;
-        while ((ent = getmntent(fp))) {
-            std::string mountType, mountPath;
+        auto cgroups = getCgroups("/proc/self/cgroup");
+        auto cgroup = cgroups[""];
+        if (cgroup == "") return 0;
 
-            mountType = ent->mnt_type;
-            mountPath = ent->mnt_dir;
+        auto cpuFile = *cgroupFS + "/" + cgroup + "/cpu.max";
 
-            if (mountType == "cgroup2") {
-                cgPathParts.push_back(mountPath);
-                break;
-            }
-        }
-
-        fclose(fp);
-
-        if (cgPathParts.size() > 0 && pathExists("/proc/self/cgroup")) {
-            std::string currentCgroup = readFile("/proc/self/cgroup");
-            Strings cgValues = tokenizeString<Strings>(currentCgroup, ":");
-            cgPathParts.push_back(trim(cgValues.back(), "\n"));
-            cgPathParts.push_back("cpu.max");
-            std::string fullCgPath = canonPath(concatStringsSep("/", cgPathParts));
-
-            if (pathExists(fullCgPath)) {
-                std::string cpuMax = readFile(fullCgPath);
-                std::vector<std::string> cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " ");
-                std::string quota = cpuMaxParts[0];
-                std::string period = trim(cpuMaxParts[1], "\n");
-
-                if (quota != "max")
-                    return std::ceil(std::stoi(quota) / std::stof(period));
-            }
+        if (pathExists(cpuFile)) {
+            auto cpuMax = readFile(cpuFile);
+            auto cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " \n");
+            auto quota = cpuMaxParts[0];
+            auto period = cpuMaxParts[1];
+            if (quota != "max")
+                return std::ceil(std::stoi(quota) / std::stof(period));
         }
     } catch (Error &) { ignoreException(); }
     #endif
