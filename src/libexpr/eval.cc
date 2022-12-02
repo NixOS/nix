@@ -1646,7 +1646,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 auto dts = debugRepl
                     ? makeDebugTraceStacker(
                         *this, *lambda.body, env2, positions[lambda.pos],
-                        "while evaluating %s",
+                        "while calling %s",
                         lambda.name
                         ? concatStrings("'", symbols[lambda.name], "'")
                         : "anonymous lambda")
@@ -1655,7 +1655,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 lambda.body->eval(*this, env2, vCur);
             } catch (Error & e) {
                 if (loggerSettings.showTrace.get()) {
-                    addErrorTrace(e, lambda.pos, "while evaluating %s",
+                    addErrorTrace(e, lambda.pos, "while calling %s",
                         (lambda.name
                             ? concatStrings("'", symbols[lambda.name], "'")
                             : "anonymous lambda"));
