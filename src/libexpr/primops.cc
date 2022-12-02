@@ -1670,12 +1670,9 @@ static void prim_readDir(EvalState & state, const PosIdx pos, Value * * args, Va
     auto attrs = state.buildBindings(entries.size());
 
     for (auto & [name, type] : entries) {
-        #if 0
-        // FIXME?
-        if (type == InputAccessor::Type::Misc)
-            type = getFileType(path + "/" + name);
-        #endif
-        attrs.alloc(name).mkString(fileTypeToString(type.value_or(InputAccessor::Type::tMisc)));
+        if (!type)
+            type = (path + name).lstat().type;
+        attrs.alloc(name).mkString(fileTypeToString(*type));
     }
 
     v.mkAttrs(attrs);
