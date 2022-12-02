@@ -730,23 +730,19 @@ unsigned int getMaxCPU()
         auto cgroupFS = getCgroupFS();
         if (!cgroupFS) return 0;
 
-        if (!pathExists("/proc/self/cgroup")) return 0;
-
-        auto cgroups = getCgroups("/proc/self/cgroup");
+        auto cgroups = getCgroups("/proc/self/cgroupp");
         auto cgroup = cgroups[""];
         if (cgroup == "") return 0;
 
         auto cpuFile = *cgroupFS + "/" + cgroup + "/cpu.max";
 
-        if (pathExists(cpuFile)) {
-            auto cpuMax = readFile(cpuFile);
-            auto cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " \n");
-            auto quota = cpuMaxParts[0];
-            auto period = cpuMaxParts[1];
-            if (quota != "max")
+        auto cpuMax = readFile(cpuFile);
+        auto cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " \n");
+        auto quota = cpuMaxParts[0];
+        auto period = cpuMaxParts[1];
+        if (quota != "max")
                 return std::ceil(std::stoi(quota) / std::stof(period));
-        }
-    } catch (Error &) { ignoreException(); }
+    } catch (Error &) { ignoreException(lvlDebug); }
     #endif
 
     return 0;
@@ -1408,7 +1404,7 @@ std::string shellEscape(const std::string_view s)
 }
 
 
-void ignoreException()
+void ignoreException(Verbosity lvl)
 {
     /* Make sure no exceptions leave this function.
        printError() also throws when remote is closed. */
@@ -1416,7 +1412,7 @@ void ignoreException()
         try {
             throw;
         } catch (std::exception & e) {
-            printError("error (ignored): %1%", e.what());
+            printMsg(lvl, "error (ignored): %1%", e.what());
         }
     } catch (...) { }
 }
