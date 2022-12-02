@@ -116,6 +116,26 @@ struct curlFileTransfer : public FileTransfer
             for (auto it = request.headers.begin(); it != request.headers.end(); ++it){
                 requestHeaders = curl_slist_append(requestHeaders, fmt("%s: %s", it->first, it->second).c_str());
             }
+
+            for (auto &[host, prog] : fileTransferSettings.preHTTPRequestHooks.get())
+            {
+                if (hasPrefix(request.uri, fmt("https://%s/", host)) || hasPrefix(request.uri, fmt("http://%s/", host)))
+                {
+                    auto verb = request.data ? "upload" : "download";
+                    debug("pre-http-request-hooks: '%s' for '%s' (%d)", prog, request.uri, verb);
+                    auto lines = runProgram(prog, false, Strings({ request.uri, verb }));
+                    auto lastPos = std::string::size_type{0};
+                    for (auto nlPos = lines.find('\n'); nlPos != std::string::npos; nlPos = lines.find('\n', lastPos))
+                    {
+                        auto line = lines.substr(lastPos, nlPos - lastPos);
+                        lastPos = nlPos + 1;
+                        auto hn = line.substr(0, line.find(':'));
+                        debug("add header: '%s: *****' to '%s' (%d)", hn, request.uri, verb);
+                        requestHeaders = curl_slist_append(requestHeaders, line.c_str());
+                    }
+                    break;
+                }
+            }
         }
 
         ~TransferItem()

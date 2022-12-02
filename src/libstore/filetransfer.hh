@@ -26,6 +26,35 @@ struct FileTransferSettings : Config
         )",
         {"binary-caches-parallel-connections"}};
 
+    Setting<StringMap> preHTTPRequestHooks{this, {}, "pre-http-request-hooks",
+        R"(
+          Optional. A whitespace-separated list of tuples (`host=<path to a program>`) where 
+          the program can set extra URL-specific HTTP headers. This is used for URLs
+          that can't be accessed publically.
+
+          The hook is passed wth the resource URL and the verb (`upload` or `download`).
+          It can then add https headers to the HTTP request by send them to stdout. 
+          
+          When using the nix-daemon, the daemon executes the hook as `root`.
+          If the nix-daemon is not involved, the hook runs as the user
+          executing the nix-build.
+
+          Example:
+              `#!/usr/bin/env bash
+
+              source /my/lib.sh
+
+              url=$1
+              verb=$2
+
+              host=$(parse_host ${url})
+              token=$(get_cached_CF_token_for ${url} ${verb})
+
+              echo Cookie: CF_Authorization=${token}; Domain=${host}; Secure; HttpOnly
+              echo Origin: ${host}
+              `.
+          )"};
+
     Setting<unsigned long> connectTimeout{
         this, 0, "connect-timeout",
         R"(
