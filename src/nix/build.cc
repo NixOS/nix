@@ -34,6 +34,7 @@ nlohmann::json builtPathsWithResultToJSON(const std::vector<BuiltPathWithResult>
                     j["cpuUser"] = ((double) b.result->cpuUser->count()) / 1000000;
                 if (b.result->cpuSystem)
                     j["cpuSystem"] = ((double) b.result->cpuSystem->count()) / 1000000;
+                if (b.result->memoryHigh) j["memoryHigh"] = *b.result->memoryHigh;
             }
             res.push_back(j);
         }, b.path.raw());

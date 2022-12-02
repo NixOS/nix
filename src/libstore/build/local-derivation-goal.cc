@@ -154,6 +154,7 @@ void LocalDerivationGoal::killSandbox(bool getStats)
         if (getStats) {
             buildResult.cpuUser = stats.cpuUser;
             buildResult.cpuSystem = stats.cpuSystem;
+            buildResult.memoryHigh = stats.memoryHigh;
         }
         #else
         abort();
@@ -415,6 +416,7 @@ void LocalDerivationGoal::startBuilder()
             throw Error("cannot determine cgroup name from /proc/self/cgroup");
 
         auto ourCgroupPath = canonPath("/sys/fs/cgroup/" + ourCgroup);
+        ourCgroupPath = dirOf(ourCgroupPath);
 
         if (!pathExists(ourCgroupPath))
             throw Error("expected cgroup directory '%s'", ourCgroupPath);
@@ -720,6 +722,15 @@ void LocalDerivationGoal::startBuilder()
             chownToBuilder(*cgroup);
             chownToBuilder(*cgroup + "/cgroup.procs");
             chownToBuilder(*cgroup + "/cgroup.threads");
+            auto parentCgroup = dirOf(*cgroup);
+            writeFile(parentCgroup + "/cgroup.subtree_control", "+memory");
+            writeFile(*cgroup + "/memory.oom.group", "1");
+            if (settings.memoryHigh) {
+              writeFile(*cgroup + "/memory.high", fmt("%d", settings.memoryHigh));
+            }
+            if (settings.memoryMax) {
+              writeFile(*cgroup + "/memory.max", fmt("%d", settings.memoryMax));
+            }
             //chownToBuilder(*cgroup + "/cgroup.subtree_control");
         }
 
@@ -751,7 +762,14 @@ void LocalDerivationGoal::startBuilder()
             stExtraChrootDirs
         };
         auto state = stBegin;
-        auto lines = runProgram(settings.preBuildHook, false, args);
+        auto hookEnv = getEnv();
+        if (cgroup) hookEnv["NIX_CGROUP"] = *cgroup;
+        auto res = runProgram(RunOptions {.program = settings.preBuildHook, .searchPath = false, .args = args, .environment = hookEnv, .input = {} });
+
+        if (!statusOk(res.first))
+            throw ExecError(res.first, "program '%1%' %2%", settings.preBuildHook, statusToString(res.first));
+
+        auto lines = res.second;
         auto lastPos = std::string::size_type{0};
         for (auto nlPos = lines.find('\n'); nlPos != std::string::npos;
                 nlPos = lines.find('\n', lastPos))

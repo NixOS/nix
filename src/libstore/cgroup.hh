@@ -14,6 +14,7 @@ std::map<std::string, std::string> getCgroups(const Path & cgroupFile);
 struct CgroupStats
 {
     std::optional<std::chrono::microseconds> cpuUser, cpuSystem;
+    std::optional<uint64_t> memoryHigh;
 };
 
 /* Destroy the cgroup denoted by 'path'. The postcondition is that
