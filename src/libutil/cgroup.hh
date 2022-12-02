@@ -9,6 +9,8 @@
 
 namespace nix {
 
+std::optional<Path> getCgroupFS();
+
 std::map<std::string, std::string> getCgroups(const Path & cgroupFile);
 
 struct CgroupStats

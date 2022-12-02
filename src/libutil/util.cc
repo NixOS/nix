@@ -2,6 +2,7 @@
 #include "sync.hh"
 #include "finally.hh"
 #include "serialise.hh"
+#include "cgroup.hh"
 
 #include <array>
 #include <cctype>
@@ -36,7 +37,6 @@
 #include <sys/prctl.h>
 #include <sys/resource.h>
 
-#include <mntent.h>
 #include <cmath>
 #endif
 
@@ -727,45 +727,22 @@ unsigned int getMaxCPU()
 {
     #if __linux__
     try {
-        FILE *fp = fopen("/proc/mounts", "r");
-        if (!fp)
-            return 0;
+        auto cgroupFS = getCgroupFS();
+        if (!cgroupFS) return 0;
 
-        Strings cgPathParts;
+        auto cgroups = getCgroups("/proc/self/cgroupp");
+        auto cgroup = cgroups[""];
+        if (cgroup == "") return 0;
 
-        struct mntent *ent;
-        while ((ent = getmntent(fp))) {
-            std::string mountType, mountPath;
+        auto cpuFile = *cgroupFS + "/" + cgroup + "/cpu.max";
 
-            mountType = ent->mnt_type;
-            mountPath = ent->mnt_dir;
-
-            if (mountType == "cgroup2") {
-                cgPathParts.push_back(mountPath);
-                break;
-            }
-        }
-
-        fclose(fp);
-
-        if (cgPathParts.size() > 0 && pathExists("/proc/self/cgroup")) {
-            std::string currentCgroup = readFile("/proc/self/cgroup");
-            Strings cgValues = tokenizeString<Strings>(currentCgroup, ":");
-            cgPathParts.push_back(trim(cgValues.back(), "\n"));
-            cgPathParts.push_back("cpu.max");
-            std::string fullCgPath = canonPath(concatStringsSep("/", cgPathParts));
-
-            if (pathExists(fullCgPath)) {
-                std::string cpuMax = readFile(fullCgPath);
-                std::vector<std::string> cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " ");
-                std::string quota = cpuMaxParts[0];
-                std::string period = trim(cpuMaxParts[1], "\n");
-
-                if (quota != "max")
-                    return std::ceil(std::stoi(quota) / std::stof(period));
-            }
-        }
-    } catch (Error &) { ignoreException(); }
+        auto cpuMax = readFile(cpuFile);
+        auto cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " \n");
+        auto quota = cpuMaxParts[0];
+        auto period = cpuMaxParts[1];
+        if (quota != "max")
+                return std::ceil(std::stoi(quota) / std::stof(period));
+    } catch (Error &) { ignoreException(lvlDebug); }
     #endif
 
     return 0;
@@ -1427,7 +1404,7 @@ std::string shellEscape(const std::string_view s)
 }
 
 
-void ignoreException()
+void ignoreException(Verbosity lvl)
 {
     /* Make sure no exceptions leave this function.
        printError() also throws when remote is closed. */
@@ -1435,7 +1412,7 @@ void ignoreException()
         try {
             throw;
         } catch (std::exception & e) {
-            printError("error (ignored): %1%", e.what());
+            printMsg(lvl, "error (ignored): %1%", e.what());
         }
     } catch (...) { }
 }

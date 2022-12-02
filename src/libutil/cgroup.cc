@@ -2,6 +2,7 @@
 
 #include "cgroup.hh"
 #include "util.hh"
+#include "finally.hh"
 
 #include <chrono>
 #include <cmath>
@@ -10,8 +11,24 @@
 #include <thread>
 
 #include <dirent.h>
+#include <mntent.h>
 
 namespace nix {
+
+std::optional<Path> getCgroupFS()
+{
+    static auto res = [&]() -> std::optional<Path> {
+        auto fp = fopen("/proc/mounts", "r");
+        if (!fp) return std::nullopt;
+        Finally delFP = [&]() { fclose(fp); };
+        while (auto ent = getmntent(fp))
+            if (std::string_view(ent->mnt_type) == "cgroup2")
+                return ent->mnt_dir;
+
+        return std::nullopt;
+    }();
+    return res;
+}
 
 // FIXME: obsolete, check for cgroup2
 std::map<std::string, std::string> getCgroups(const Path & cgroupFile)
