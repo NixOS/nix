@@ -52,3 +52,6 @@
 
 * `nix build --json` now prints some statistics about top-level
   derivations, such as CPU statistics when cgroups are enabled.
+
+* `builtins.unsafeGetAttrPos` was renamed to `builtins.tryGetAttrPos`
+  ([#5557](https://github.com/NixOS/nix/issues/5557)).

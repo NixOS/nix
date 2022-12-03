@@ -2276,7 +2276,7 @@ static RegisterPrimOp primop_getAttr({
 });
 
 /* Return position information of the specified attribute. */
-static void prim_unsafeGetAttrPos(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_tryGetAttrPos(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     auto attr = state.forceStringNoCtx(*args[0], pos);
     state.forceAttrs(*args[1], pos);
@@ -2287,10 +2287,17 @@ static void prim_unsafeGetAttrPos(EvalState & state, const PosIdx pos, Value * *
         state.mkPos(v, i->pos);
 }
 
+static RegisterPrimOp primop_tryGetAttrPos(RegisterPrimOp::Info {
+    .name = "__tryGetAttrPos",
+    .arity = 2,
+    .fun = prim_tryGetAttrPos,
+});
+
+/* TODO deprecate eventually */
 static RegisterPrimOp primop_unsafeGetAttrPos(RegisterPrimOp::Info {
     .name = "__unsafeGetAttrPos",
     .arity = 2,
-    .fun = prim_unsafeGetAttrPos,
+    .fun = prim_tryGetAttrPos,
 });
 
 /* Dynamic version of the `?' operator. */

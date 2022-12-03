@@ -1,1 +1,1 @@
-builtins.unsafeGetAttrPos "abort" builtins
+builtins.tryGetAttrPos "abort" builtins

@@ -2,5 +2,5 @@ let
   as = {
     foo = "bar";
   };
-  pos = builtins.unsafeGetAttrPos "foo" as;
+  pos = builtins.tryGetAttrPos "foo" as;
 in { inherit (pos) column line; file = baseNameOf pos.file; }

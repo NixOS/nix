@@ -147,9 +147,9 @@ namespace nix {
         ASSERT_THROW(eval("builtins.getAttr \"y\" { }"), TypeError);
     }
 
-    TEST_F(PrimOpTest, unsafeGetAttrPos) {
+    TEST_F(PrimOpTest, tryGetAttrPos) {
         // The `y` attribute is at position
-        const char* expr = "builtins.unsafeGetAttrPos \"y\" { y = \"x\"; }";
+        const char* expr = "builtins.tryGetAttrPos \"y\" { y = \"x\"; }";
         auto v = eval(expr);
         ASSERT_THAT(v, IsAttrsOfSize(3));
 
@@ -164,7 +164,7 @@ namespace nix {
 
         auto column = v.attrs->find(createSymbol("column"));
         ASSERT_NE(column, nullptr);
-        ASSERT_THAT(*column->value, IsIntEq(33));
+        ASSERT_THAT(*column->value, IsIntEq(30));
     }
 
     TEST_F(PrimOpTest, hasAttr) {
