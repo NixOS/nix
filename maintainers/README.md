@@ -43,7 +43,7 @@ Issues on the board progress through the following states:
 
 - To discuss
 
-  Pull requests and issues that are important and controverisal are discussed by the team during discussion meetings.
+  Pull requests and issues that are important and controversial are discussed by the team during discussion meetings.
 
   This may be where the merit of the change itself or the implementation strategy is contested by a team member.
 
