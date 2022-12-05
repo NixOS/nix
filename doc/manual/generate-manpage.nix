@@ -99,6 +99,7 @@ let
     in [ cmd ] ++ concatMap subcommand (attrNames details.commands or {});
 
   parsedToplevel = builtins.fromJSON toplevel;
+  
   manpages = processCommand {
     command = "nix";
     details = parsedToplevel;

@@ -14,6 +14,7 @@
 #include "path-info.hh"
 #include "repair-flag.hh"
 
+#include <nlohmann/json_fwd.hpp>
 #include <atomic>
 #include <limits>
 #include <map>
@@ -68,7 +69,6 @@ struct Derivation;
 class FSAccessor;
 class NarInfoDiskCache;
 class Store;
-class JSONPlaceholder;
 
 
 enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
@@ -514,7 +514,7 @@ public:
        variable elements such as the registration time are
        included. If ‘showClosureSize’ is true, the closure size of
        each path is included. */
-    void pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & storePaths,
+    nlohmann::json pathInfoToJSON(const StorePathSet & storePaths,
         bool includeImpureInfo, bool showClosureSize,
         Base hashBase = Base32,
         AllowInvalidFlag allowInvalid = DisallowInvalid);

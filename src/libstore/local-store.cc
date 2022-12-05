@@ -583,7 +583,10 @@ void canonicaliseTimestampAndPermissions(const Path & path)
 }
 
 
-static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSeen & inodesSeen)
+static void canonicalisePathMetaData_(
+    const Path & path,
+    std::optional<std::pair<uid_t, uid_t>> uidRange,
+    InodesSeen & inodesSeen)
 {
     checkInterrupt();
 
@@ -630,7 +633,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
        However, ignore files that we chown'ed ourselves previously to
        ensure that we don't fail on hard links within the same build
        (i.e. "touch $out/foo; ln $out/foo $out/bar"). */
-    if (fromUid != (uid_t) -1 && st.st_uid != fromUid) {
+    if (uidRange && (st.st_uid < uidRange->first || st.st_uid > uidRange->second)) {
         if (S_ISDIR(st.st_mode) || !inodesSeen.count(Inode(st.st_dev, st.st_ino)))
             throw BuildError("invalid ownership on file '%1%'", path);
         mode_t mode = st.st_mode & ~S_IFMT;
@@ -663,14 +666,17 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
     if (S_ISDIR(st.st_mode)) {
         DirEntries entries = readDirectory(path);
         for (auto & i : entries)
-            canonicalisePathMetaData_(path + "/" + i.name, fromUid, inodesSeen);
+            canonicalisePathMetaData_(path + "/" + i.name, uidRange, inodesSeen);
     }
 }
 
 
-void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen)
+void canonicalisePathMetaData(
+    const Path & path,
+    std::optional<std::pair<uid_t, uid_t>> uidRange,
+    InodesSeen & inodesSeen)
 {
-    canonicalisePathMetaData_(path, fromUid, inodesSeen);
+    canonicalisePathMetaData_(path, uidRange, inodesSeen);
 
     /* On platforms that don't have lchown(), the top-level path can't
        be a symlink, since we can't change its ownership. */
@@ -683,10 +689,11 @@ void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & ino
 }
 
 
-void canonicalisePathMetaData(const Path & path, uid_t fromUid)
+void canonicalisePathMetaData(const Path & path,
+    std::optional<std::pair<uid_t, uid_t>> uidRange)
 {
     InodesSeen inodesSeen;
-    canonicalisePathMetaData(path, fromUid, inodesSeen);
+    canonicalisePathMetaData(path, uidRange, inodesSeen);
 }
 
 
@@ -1331,7 +1338,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             autoGC();
 
-            canonicalisePathMetaData(realPath, -1);
+            canonicalisePathMetaData(realPath, {});
 
             optimisePath(realPath, repair); // FIXME: combine with hashPath()
 
@@ -1444,7 +1451,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
                 narHash = narSink.finish();
             }
 
-            canonicalisePathMetaData(realPath, -1); // FIXME: merge into restorePath
+            canonicalisePathMetaData(realPath, {}); // FIXME: merge into restorePath
 
             optimisePath(realPath, repair);
 
@@ -1486,7 +1493,7 @@ StorePath LocalStore::addTextToStore(
 
             writeFile(realPath, s);
 
-            canonicalisePathMetaData(realPath, -1);
+            canonicalisePathMetaData(realPath, {});
 
             StringSink sink;
             dumpString(s, sink);

@@ -11,7 +11,6 @@
 #include "attr-path.hh"
 #include "fetchers.hh"
 #include "registry.hh"
-#include "json.hh"
 #include "eval-cache.hh"
 #include "markdown.hh"
 
@@ -21,6 +20,7 @@
 
 using namespace nix;
 using namespace nix::flake;
+using json = nlohmann::json;
 
 class FlakeCommand : virtual Args, public MixFlakeOptions
 {
@@ -912,36 +912,42 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON
 
         auto flake = lockFlake();
 
-        auto jsonRoot = json ? std::optional<JSONObject>(std::cout) : std::nullopt;
-
-        {
-            Activity act(*logger, lvlChatty, actUnknown, fmt("archiving root"));
-            auto storePath = flake.flake.lockedRef.input.fetchToStore(dstStore).first;
-            if (jsonRoot)
-                jsonRoot->attr("path", store->printStorePath(storePath));
-        }
+        auto jsonRoot = json ? std::optional<nlohmann::json>() : std::nullopt;
 
         // FIXME: use graph output, handle cycles.
-        std::function<void(const Node & node, const InputPath & parentPath, std::optional<JSONObject> & jsonObj)> traverse;
-        traverse = [&](const Node & node, const InputPath & parentPath, std::optional<JSONObject> & jsonObj)
+        std::function<nlohmann::json(const Node & node, const InputPath & parentPath)> traverse;
+        traverse = [&](const Node & node, const InputPath & parentPath)
         {
-            auto jsonObj2 = jsonObj ? jsonObj->object("inputs") : std::optional<JSONObject>();
+            nlohmann::json jsonObj2 = json ? json::object() : nlohmann::json(nullptr);
             for (auto & [inputName, input] : node.inputs) {
                 if (auto inputNode = std::get_if<0>(&input)) {
                     auto inputPath = parentPath;
                     inputPath.push_back(inputName);
                     Activity act(*logger, lvlChatty, actUnknown,
                         fmt("archiving input '%s'", printInputPath(inputPath)));
-                    auto jsonObj3 = jsonObj2 ? jsonObj2->object(inputName) : std::optional<JSONObject>();
                     auto storePath = (*inputNode)->lockedRef.input.fetchToStore(dstStore).first;
-                    if (jsonObj3)
-                        jsonObj3->attr("path", store->printStorePath(storePath));
-                    traverse(**inputNode, inputPath, jsonObj3);
+                    auto res = traverse(**inputNode, inputPath);
+                    if (json) {
+                        auto & jsonObj3 = jsonObj2[inputName];
+                        jsonObj3["path"] = store->printStorePath(storePath);
+                        jsonObj3["inputs"] = res;
+                    }
                 }
             }
+            return jsonObj2;
         };
 
-        traverse(*flake.lockFile.root, {}, jsonRoot);
+        auto res = traverse(*flake.lockFile.root, {});
+
+        if (json) {
+            Activity act(*logger, lvlChatty, actUnknown, fmt("archiving root"));
+            auto storePath = flake.flake.lockedRef.input.fetchToStore(dstStore).first;
+            nlohmann::json jsonRoot = {
+                {"path", store->printStorePath(storePath)},
+                {"inputs", res},
+            };
+            std::cout << jsonRoot.dump() << std::endl;
+        }
     }
 };
 

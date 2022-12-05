@@ -846,20 +846,20 @@ std::shared_ptr<Installable> SourceExprCommand::parseInstallable(
     return installables.front();
 }
 
-BuiltPaths Installable::build(
+std::vector<BuiltPathWithResult> Installable::build(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode,
     const std::vector<std::shared_ptr<Installable>> & installables,
     BuildMode bMode)
 {
-    BuiltPaths res;
-    for (auto & [_, builtPath] : build2(evalStore, store, mode, installables, bMode))
-        res.push_back(builtPath);
+    std::vector<BuiltPathWithResult> res;
+    for (auto & [_, builtPathWithResult] : build2(evalStore, store, mode, installables, bMode))
+        res.push_back(builtPathWithResult);
     return res;
 }
 
-std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::build2(
+std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> Installable::build2(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode,
@@ -879,7 +879,7 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::bui
         }
     }
 
-    std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> res;
+    std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> res;
 
     switch (mode) {
 
@@ -920,10 +920,10 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::bui
                                     output, *drvOutput->second);
                             }
                         }
-                        res.push_back({installable, BuiltPath::Built { bfd.drvPath, outputs }});
+                        res.push_back({installable, {.path = BuiltPath::Built { bfd.drvPath, outputs }}});
                     },
                     [&](const DerivedPath::Opaque & bo) {
-                        res.push_back({installable, BuiltPath::Opaque { bo.path }});
+                        res.push_back({installable, {.path = BuiltPath::Opaque { bo.path }}});
                     },
                 }, path.raw());
             }
@@ -933,7 +933,7 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::bui
 
     case Realise::Outputs: {
         if (settings.printMissing)
-          printMissing(store, pathsToBuild, lvlInfo);
+            printMissing(store, pathsToBuild, lvlInfo);
 
         for (auto & buildResult : store->buildPathsWithResults(pathsToBuild, bMode, evalStore)) {
             if (!buildResult.success())
@@ -945,10 +945,10 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::bui
                         std::map<std::string, StorePath> outputs;
                         for (auto & path : buildResult.builtOutputs)
                             outputs.emplace(path.first.outputName, path.second.outPath);
-                        res.push_back({installable, BuiltPath::Built { bfd.drvPath, outputs }});
+                        res.push_back({installable, {.path = BuiltPath::Built { bfd.drvPath, outputs }, .result = buildResult}});
                     },
                     [&](const DerivedPath::Opaque & bo) {
-                        res.push_back({installable, BuiltPath::Opaque { bo.path }});
+                        res.push_back({installable, {.path = BuiltPath::Opaque { bo.path }, .result = buildResult}});
                     },
                 }, buildResult.path.raw());
             }
@@ -971,9 +971,12 @@ BuiltPaths Installable::toBuiltPaths(
     OperateOn operateOn,
     const std::vector<std::shared_ptr<Installable>> & installables)
 {
-    if (operateOn == OperateOn::Output)
-        return Installable::build(evalStore, store, mode, installables);
-    else {
+    if (operateOn == OperateOn::Output) {
+        BuiltPaths res;
+        for (auto & p : Installable::build(evalStore, store, mode, installables))
+            res.push_back(p.path);
+        return res;
+    } else {
         if (mode == Realise::Nothing)
             settings.readOnlyMode = true;
 

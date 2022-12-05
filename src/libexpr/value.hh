@@ -8,6 +8,7 @@
 #if HAVE_BOEHMGC
 #include <gc/gc_allocator.h>
 #endif
+#include <nlohmann/json_fwd.hpp>
 
 namespace nix {
 
@@ -63,7 +64,6 @@ class StorePath;
 class Store;
 class EvalState;
 class XMLWriter;
-class JSONPlaceholder;
 
 
 typedef int64_t NixInt;
@@ -99,8 +99,8 @@ class ExternalValueBase
     virtual bool operator ==(const ExternalValueBase & b) const;
 
     /* Print the value as JSON. Defaults to unconvertable, i.e. throws an error */
-    virtual void printValueAsJSON(EvalState & state, bool strict,
-        JSONPlaceholder & out, PathSet & context, bool copyToStore = true) const;
+    virtual nlohmann::json printValueAsJSON(EvalState & state, bool strict,
+        PathSet & context, bool copyToStore = true) const;
 
     /* Print the value as XML. Defaults to unevaluated */
     virtual void printValueAsXML(EvalState & state, bool strict, bool location,

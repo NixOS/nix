@@ -511,6 +511,12 @@
           overlay = self.overlays.default;
         });
 
+        tests.containers = (import ./tests/containers.nix rec {
+          system = "x86_64-linux";
+          inherit nixpkgs;
+          overlay = self.overlays.default;
+        });
+
         tests.setuid = nixpkgs.lib.genAttrs
           ["i686-linux" "x86_64-linux"]
           (system:

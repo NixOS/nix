@@ -9,7 +9,6 @@
 #include "remote-fs-accessor.hh"
 #include "nar-info-disk-cache.hh"
 #include "nar-accessor.hh"
-#include "json.hh"
 #include "thread-pool.hh"
 #include "callback.hh"
 
@@ -194,19 +193,12 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     /* Optionally write a JSON file containing a listing of the
        contents of the NAR. */
     if (writeNARListing) {
-        std::ostringstream jsonOut;
+        nlohmann::json j = {
+            {"version", 1},
+            {"root", listNar(ref<FSAccessor>(narAccessor), "", true)},
+        };
 
-        {
-            JSONObject jsonRoot(jsonOut);
-            jsonRoot.attr("version", 1);
-
-            {
-                auto res = jsonRoot.placeholder("root");
-                listNar(res, ref<FSAccessor>(narAccessor), "", true);
-            }
-        }
-
-        upsertFile(std::string(info.path.hashPart()) + ".ls", jsonOut.str(), "application/json");
+        upsertFile(std::string(info.path.hashPart()) + ".ls", j.dump(), "application/json");
     }
 
     /* Optionally maintain an index of DWARF debug info files

@@ -3,7 +3,7 @@
 The easiest way to install Nix is to run the following command:
 
 ```console
-$ sh <(curl -L https://nixos.org/nix/install)
+sh <(curl -L https://nixos.org/nix/install)
 ```
 
 This will run the installer interactively (causing it to explain what
@@ -27,7 +27,7 @@ you can authenticate with `sudo`.
 To explicitly select a single-user installation on your system:
 
 ```console
-$ sh <(curl -L https://nixos.org/nix/install) --no-daemon
+sh <(curl -L https://nixos.org/nix/install) --no-daemon
 ```
 
 This will perform a single-user installation of Nix, meaning that `/nix`
@@ -37,8 +37,8 @@ if it doesn’t already exist. If you don’t have `sudo`, you should
 manually create `/nix` first as root, e.g.:
 
 ```console
-$ mkdir /nix
-$ chown alice /nix
+mkdir /nix
+chown alice /nix
 ```
 
 The install script will modify the first writable file from amongst
@@ -50,7 +50,7 @@ the install script to disable this behaviour.
 You can uninstall Nix simply by running:
 
 ```console
-$ rm -rf /nix
+rm -rf /nix
 ```
 
 # Multi User Installation
@@ -66,7 +66,7 @@ You can instruct the installer to perform a multi-user installation on
 your system:
 
 ```console
-$ sh <(curl -L https://nixos.org/nix/install) --daemon
+sh <(curl -L https://nixos.org/nix/install) --daemon
 ```
 
 The multi-user installation of Nix will create build users between the
@@ -274,7 +274,7 @@ These install scripts can be used the same as the main NixOS.org
 installation script:
 
 ```console
-$ sh <(curl -L https://nixos.org/nix/install)
+sh <(curl -L https://nixos.org/nix/install)
 ```
 
 In the same directory of the install script are sha256 sums, and gpg
@@ -289,10 +289,10 @@ it somewhere (e.g. in `/tmp`), and then run the script named `install`
 inside the binary tarball:
 
 ```console
-$ cd /tmp
-$ tar xfj nix-1.8-x86_64-darwin.tar.bz2
-$ cd nix-1.8-x86_64-darwin
-$ ./install
+cd /tmp
+tar xfj nix-1.8-x86_64-darwin.tar.bz2
+cd nix-1.8-x86_64-darwin
+./install
 ```
 
 If you need to edit the multi-user installation script to use different

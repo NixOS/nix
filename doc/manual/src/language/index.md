@@ -93,7 +93,7 @@ This is an incomplete overview of language features, by example.
 
    `"hello ${ { a = "world" }.a }"`
 
-   `"1 2 ${3}"`
+   `"1 2 ${toString 3}"`
 
    `"${pkgs.bash}/bin/sh"`
 

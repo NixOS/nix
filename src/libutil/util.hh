@@ -539,7 +539,7 @@ std::string shellEscape(const std::string_view s);
 
 /* Exception handling in destructors: print an error message, then
    ignore the exception. */
-void ignoreException();
+void ignoreException(Verbosity lvl = lvlError);
 
 
 

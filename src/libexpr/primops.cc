@@ -8,13 +8,13 @@
 #include "references.hh"
 #include "store-api.hh"
 #include "util.hh"
-#include "json.hh"
 #include "value-to-json.hh"
 #include "value-to-xml.hh"
 #include "primops.hh"
 #include "fs-input-accessor.hh"
 
 #include <boost/container/small_vector.hpp>
+#include <nlohmann/json.hpp>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -1013,6 +1013,7 @@ static void prim_second(EvalState & state, const PosIdx pos, Value * * args, Val
    derivation. */
 static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    using nlohmann::json;
     state.forceAttrs(*args[0], pos);
 
     /* Figure out the name first (for stack backtraces). */
@@ -1034,11 +1035,10 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
     }
 
     /* Check whether attributes should be passed as a JSON file. */
-    std::ostringstream jsonBuf;
-    std::unique_ptr<JSONObject> jsonObject;
+    std::optional<json> jsonObject;
     attr = args[0]->attrs->find(state.sStructuredAttrs);
     if (attr != args[0]->attrs->end() && state.forceBool(*attr->value, pos))
-        jsonObject = std::make_unique<JSONObject>(jsonBuf);
+        jsonObject = json::object();
 
     /* Check whether null attributes should be ignored. */
     bool ignoreNulls = false;
@@ -1140,8 +1140,7 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
 
                     if (i->name == state.sStructuredAttrs) continue;
 
-                    auto placeholder(jsonObject->placeholder(key));
-                    printValueAsJSON(state, true, *i->value, pos, placeholder, context);
+                    (*jsonObject)[key] = printValueAsJSON(state, true, *i->value, pos, context);
 
                     if (i->name == state.sBuilder)
                         drv.builder = state.forceString(*i->value, context, posDrvName);
@@ -1185,8 +1184,8 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
     }
 
     if (jsonObject) {
+        drv.env.emplace("__json", jsonObject->dump());
         jsonObject.reset();
-        drv.env.emplace("__json", jsonBuf.str());
     }
 
     /* Everything in the context of the strings in the derivation
@@ -2445,12 +2444,18 @@ static RegisterPrimOp primop_listToAttrs({
       Construct a set from a list specifying the names and values of each
       attribute. Each element of the list should be a set consisting of a
       string-valued attribute `name` specifying the name of the attribute,
-      and an attribute `value` specifying its value. Example:
+      and an attribute `value` specifying its value.
+
+      In case of duplicate occurrences of the same name, the first
+      takes precedence.
+
+      Example:
 
       ```nix
       builtins.listToAttrs
         [ { name = "foo"; value = 123; }
           { name = "bar"; value = 456; }
+          { name = "bar"; value = 420; }
         ]
       ```
 

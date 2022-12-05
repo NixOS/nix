@@ -12,7 +12,6 @@
 #include "local-fs-store.hh"
 #include "user-env.hh"
 #include "util.hh"
-#include "json.hh"
 #include "value-to-json.hh"
 #include "xml-writer.hh"
 #include "legacy.hh"
@@ -26,6 +25,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <nlohmann/json.hpp>
 
 using namespace nix;
 using std::cout;
@@ -913,43 +913,47 @@ static VersionDiff compareVersionAgainstSet(
 
 static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool printOutPath, bool printMeta)
 {
-    JSONObject topObj(cout, true);
+    using nlohmann::json;
+    json topObj = json::object();
     for (auto & i : elems) {
         try {
             if (i.hasFailed()) continue;
 
-            JSONObject pkgObj = topObj.object(i.attrPath);
 
             auto drvName = DrvName(i.queryName());
-            pkgObj.attr("name", drvName.fullName);
-            pkgObj.attr("pname", drvName.name);
-            pkgObj.attr("version", drvName.version);
-            pkgObj.attr("system", i.querySystem());
-            pkgObj.attr("outputName", i.queryOutputName());
+            json &pkgObj = topObj[i.attrPath];
+            pkgObj = {
+                {"name", drvName.fullName},
+                {"pname", drvName.name},
+                {"version", drvName.version},
+                {"system", i.querySystem()},
+                {"outputName", i.queryOutputName()},
+            };
 
             {
                 DrvInfo::Outputs outputs = i.queryOutputs(printOutPath);
-                JSONObject outputObj = pkgObj.object("outputs");
+                json &outputObj = pkgObj["outputs"];
+                outputObj = json::object();
                 for (auto & j : outputs) {
                     if (j.second)
-                        outputObj.attr(j.first, globals.state->store->printStorePath(*j.second));
+                        outputObj[j.first] = globals.state->store->printStorePath(*j.second);
                     else
-                        outputObj.attr(j.first, nullptr);
+                        outputObj[j.first] = nullptr;
                 }
             }
 
             if (printMeta) {
-                JSONObject metaObj = pkgObj.object("meta");
+                json &metaObj = pkgObj["meta"];
+                metaObj = json::object();
                 StringSet metaNames = i.queryMetaNames();
                 for (auto & j : metaNames) {
                     Value * v = i.queryMeta(j);
                     if (!v) {
                         printError("derivation '%s' has invalid meta attribute '%s'", i.queryName(), j);
-                        metaObj.attr(j, nullptr);
+                        metaObj[j] = nullptr;
                     } else {
-                        auto placeholder = metaObj.placeholder(j);
                         PathSet context;
-                        printValueAsJSON(*globals.state, true, *v, noPos, placeholder, context);
+                        metaObj[j] = printValueAsJSON(*globals.state, true, *v, noPos, context);
                     }
                 }
             }
@@ -960,6 +964,7 @@ static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool prin
             throw;
         }
     }
+    std::cout << topObj.dump(2);
 }
 
 

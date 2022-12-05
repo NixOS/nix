@@ -7,7 +7,6 @@
 #include "finally.hh"
 #include "util.hh"
 #include "archive.hh"
-#include "json.hh"
 #include "compression.hh"
 #include "worker-protocol.hh"
 #include "topo-sort.hh"
@@ -886,6 +885,14 @@ void DerivationGoal::buildDone()
     closeLogFile();
 
     cleanupPostChildKill();
+
+    if (buildResult.cpuUser && buildResult.cpuSystem) {
+        debug("builder for '%s' terminated with status %d, user CPU %.3fs, system CPU %.3fs",
+            worker.store.printStorePath(drvPath),
+            status,
+            ((double) buildResult.cpuUser->count()) / 1000000,
+            ((double) buildResult.cpuSystem->count()) / 1000000);
+    }
 
     bool diskFull = false;
 

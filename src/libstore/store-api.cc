@@ -6,13 +6,15 @@
 #include "util.hh"
 #include "nar-info-disk-cache.hh"
 #include "thread-pool.hh"
-#include "json.hh"
 #include "url.hh"
 #include "archive.hh"
 #include "callback.hh"
 #include "remote-store.hh"
 
+#include <nlohmann/json.hpp>
 #include <regex>
+
+using json = nlohmann::json;
 
 namespace nix {
 
@@ -842,56 +844,53 @@ StorePathSet Store::exportReferences(const StorePathSet & storePaths, const Stor
     return paths;
 }
 
-
-void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & storePaths,
+json Store::pathInfoToJSON(const StorePathSet & storePaths,
     bool includeImpureInfo, bool showClosureSize,
     Base hashBase,
     AllowInvalidFlag allowInvalid)
 {
-    auto jsonList = jsonOut.list();
+    json::array_t jsonList = json::array();
 
     for (auto & storePath : storePaths) {
-        auto jsonPath = jsonList.object();
+        auto& jsonPath = jsonList.emplace_back(json::object());
 
         try {
             auto info = queryPathInfo(storePath);
 
-            jsonPath.attr("path", printStorePath(info->path));
-            jsonPath
-                .attr("narHash", info->narHash.to_string(hashBase, true))
-                .attr("narSize", info->narSize);
+            jsonPath["path"] = printStorePath(info->path);
+            jsonPath["narHash"] = info->narHash.to_string(hashBase, true);
+            jsonPath["narSize"] = info->narSize;
 
             {
-                auto jsonRefs = jsonPath.list("references");
+                auto& jsonRefs = (jsonPath["references"] = json::array());
                 for (auto & ref : info->references)
-                    jsonRefs.elem(printStorePath(ref));
+                    jsonRefs.emplace_back(printStorePath(ref));
             }
 
             if (info->ca)
-                jsonPath.attr("ca", renderContentAddress(info->ca));
+                jsonPath["ca"] = renderContentAddress(info->ca);
 
             std::pair<uint64_t, uint64_t> closureSizes;
 
             if (showClosureSize) {
                 closureSizes = getClosureSize(info->path);
-                jsonPath.attr("closureSize", closureSizes.first);
+                jsonPath["closureSize"] = closureSizes.first;
             }
 
             if (includeImpureInfo) {
 
                 if (info->deriver)
-                    jsonPath.attr("deriver", printStorePath(*info->deriver));
+                    jsonPath["deriver"] = printStorePath(*info->deriver);
 
                 if (info->registrationTime)
-                    jsonPath.attr("registrationTime", info->registrationTime);
+                    jsonPath["registrationTime"] = info->registrationTime;
 
                 if (info->ultimate)
-                    jsonPath.attr("ultimate", info->ultimate);
+                    jsonPath["ultimate"] = info->ultimate;
 
                 if (!info->sigs.empty()) {
-                    auto jsonSigs = jsonPath.list("signatures");
                     for (auto & sig : info->sigs)
-                        jsonSigs.elem(sig);
+                        jsonPath["signatures"].push_back(sig);
                 }
 
                 auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
@@ -899,21 +898,22 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
 
                 if (narInfo) {
                     if (!narInfo->url.empty())
-                        jsonPath.attr("url", narInfo->url);
+                        jsonPath["url"] = narInfo->url;
                     if (narInfo->fileHash)
-                        jsonPath.attr("downloadHash", narInfo->fileHash->to_string(hashBase, true));
+                        jsonPath["downloadHash"] = narInfo->fileHash->to_string(hashBase, true);
                     if (narInfo->fileSize)
-                        jsonPath.attr("downloadSize", narInfo->fileSize);
+                        jsonPath["downloadSize"] = narInfo->fileSize;
                     if (showClosureSize)
-                        jsonPath.attr("closureDownloadSize", closureSizes.second);
+                        jsonPath["closureDownloadSize"] = closureSizes.second;
                 }
             }
 
         } catch (InvalidPath &) {
-            jsonPath.attr("path", printStorePath(storePath));
-            jsonPath.attr("valid", false);
+            jsonPath["path"] = printStorePath(storePath);
+            jsonPath["valid"] = false;
         }
     }
+    return jsonList;
 }
 
 
