@@ -216,11 +216,15 @@ Currently the `type` attribute can be one of the following:
   commit hash (`rev`). Note that unlike Git, GitHub allows fetching by
   commit hash without specifying a branch or tag.
 
+  You can also specify `host` as a parameter, to point to a custom GitHub
+  Enterprise server.
+
   Some examples:
 
   * `github:edolstra/dwarffs`
   * `github:edolstra/dwarffs/unstable`
   * `github:edolstra/dwarffs/d3f2baba8f425779026c6ec04021b2e927f61e31`
+  * `github:internal/project?host=company-github.example.org`
 
 * `gitlab`: Similar to `github`, is a more efficient way to fetch
   GitLab repositories. The following attributes are required:
