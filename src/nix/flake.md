@@ -222,6 +222,37 @@ Currently the `type` attribute can be one of the following:
   * `github:edolstra/dwarffs/unstable`
   * `github:edolstra/dwarffs/d3f2baba8f425779026c6ec04021b2e927f61e31`
 
+* `gitlab`: Similar to `github`, is a more efficient way to fetch
+  GitLab repositories. The following attributes are required:
+
+  * `owner`: The owner of the repository.
+
+  * `repo`: The name of the repository.
+
+  Like `github`, these are downloaded as tarball archives.
+
+  The URL syntax for `gitlab` flakes is:
+
+  `gitlab:<owner>/<repo>(/<rev-or-ref>)?(\?<params>)?`
+
+  `<rev-or-ref>` works the same as `github`. Either a branch or tag name
+  (`ref`), or a commit hash (`rev`) can be specified.
+
+  Since GitLab allows for self-hosting, you can specify `host` as
+  a parameter, to point to any instances other than `gitlab.com`.
+
+  Some examples:
+
+  * `gitlab:veloren/veloren`
+  * `gitlab:veloren/veloren/master`
+  * `gitlab:veloren/veloren/80a4d7f13492d916e47d6195be23acae8001985a`
+  * `gitlab:openldap/openldap?host=git.openldap.org`
+
+  When accessing a project in a (nested) subgroup, make sure to URL-encode any
+  slashes, i.e. replace `/` with `%2F`:
+
+  * `gitlab:veloren%2Fdev/rfcs`
+
 * `sourcehut`: Similar to `github`, is a more efficient way to fetch
   SourceHut repositories. The following attributes are required:
 
