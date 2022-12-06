@@ -9,13 +9,14 @@
 
     let
 
-      version = builtins.readFile ./.version + versionSuffix;
+      officialRelease = false;
+
+      version = strip (builtins.readFile ./.version) + versionSuffix;
+      strip = nixpkgs.lib.removeSuffix "\n";
       versionSuffix =
         if officialRelease
         then ""
         else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
-
-      officialRelease = false;
 
       linux64BitSystems = [ "x86_64-linux" "aarch64-linux" ];
       linuxSystems = linux64BitSystems ++ [ "i686-linux" ];
