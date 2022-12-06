@@ -1016,11 +1016,20 @@ void DerivationGoal::resolvedFinished()
                 throw Error(
                     "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolvedFinished,resolve)",
                     worker.store.printStorePath(drvPath), wantedOutput);
-            auto realisation = get(resolvedResult.builtOutputs, DrvOutput { *resolvedHash, wantedOutput });
-            if (!realisation)
+
+            const Realisation * realisation = get(resolvedResult.builtOutputs, DrvOutput { *resolvedHash, wantedOutput });
+            if (!realisation) {
+              /* The above `get` should work. But sateful tracking of
+                 outputs in resolvedResult, this can get out of sync with the
+                 store, which is our actual source of truth. For now we just
+                 check the store directly if it fails. */
+              realisation = worker.evalStore.queryRealisation(DrvOutput { *resolvedHash, wantedOutput }).get();
+              if (!realisation) {
                 throw Error(
                     "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolvedFinished,realisation)",
                     worker.store.printStorePath(resolvedDrvGoal->drvPath), wantedOutput);
+              }
+            }
             if (drv->type().isPure()) {
                 auto newRealisation = *realisation;
                 newRealisation.id = DrvOutput { initialOutput->outputHash, wantedOutput };
