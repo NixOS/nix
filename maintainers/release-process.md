@@ -59,7 +59,7 @@ release:
 
 * Wait for the PR to be merged.
 
-* Branch the release:
+* Create a branch for the release:
 
   ```console
   $ git checkout master
