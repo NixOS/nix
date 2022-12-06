@@ -12,43 +12,37 @@
   ([#7260](https://github.com/NixOS/nix/pull/7260)).
 
 * Nix can now automatically pick UIDs for builds, removing the need to
-  create `nixbld*` user accounts. These UIDs are allocated starting at
-  872415232 (0x34000000) on Linux and 56930 on macOS.
+  create `nixbld*` user accounts.
 
-  This is an experimental feature. To enable it, add the following to
-  `nix.conf`:
+  See [`auto-allocate-uids`].
 
-  ```
-  extra-experimental-features = auto-allocate-uids
-  auto-allocate-uids = true
-  ```
+  [`auto-allocate-uids`]: (../command-ref/conf-file.md#conf-auto-allocate-uids)
 
 * On Linux, Nix can now run builds in a user namespace where the build
-  runs as root (UID 0) and has 65,536 UIDs available. This is
-  primarily useful for running containers such as `systemd-nspawn`
-  inside a Nix build. For an example, see
-  https://github.com/NixOS/nix/blob/67bcb99700a0da1395fa063d7c6586740b304598/tests/systemd-nspawn.nix.
+  runs as root (UID 0) and has 65,536 UIDs available.
 
-  A build can enable this by requiring the `uid-range` system feature,
-  i.e. by setting the derivation attribute
+  <!-- FIXME: move this to its own section about system features -->
+
+  This is primarily useful for running containers such as `systemd-nspawn`
+  inside a Nix build. For an example, see [`tests/systemd-nspawn/nix`][nspawn].
+
+  [nspawn]: https://github.com/NixOS/nix/blob/67bcb99700a0da1395fa063d7c6586740b304598/tests/systemd-nspawn.nix.
+
+  A build can enable this by by setting the derivation attribute:
 
   ```
   requiredSystemFeatures = [ "uid-range" ];
   ```
 
-  The `uid-range` system feature requires the `auto-allocate-uids`
-  setting to be enabled (see above).
+  The `uid-range` [system feature] requires the [`auto-allocate-uids`]
+  setting to be enabled.
+
+  [system feature]: (../command-ref/conf-file.md#conf-system-features),
 
 * On Linux, Nix has experimental support for running builds inside a
-  cgroup. It can be enabled by adding
+  cgroup.
 
-  ```
-  extra-experimental-features = cgroups
-  use-cgroups = true
-  ```
-
-  to `nix.conf`. Cgroups are required for derivations that require the
-  `uid-range` system feature.
+  See [`use-cgroups`](../command-ref/conf-file.md#conf-use-cgroups).
 
 * `nix build --json` now prints some statistics about top-level
   derivations, such as CPU statistics when cgroups are enabled.
