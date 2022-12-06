@@ -139,10 +139,12 @@ release:
 
   ```console
   $ git checkout master
-  $ echo -n 2.13.0 > .version
-  $ git checkout -b bump-2.13
+  $ git pull
+  $ NEW_VERSION=2.13.0
+  $ echo -n $NEW_VERSION > .version
+  $ git checkout -b bump-$NEW_VERSION
   $ git commit -a -m 'Bump version'
-  $ git push
+  $ git push --set-upstream origin bump-$NEW_VERSION
   ```
 
   Make a PR and auto-merge it.
