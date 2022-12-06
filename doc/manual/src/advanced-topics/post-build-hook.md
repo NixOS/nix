@@ -59,7 +59,7 @@ exec nix copy --to 's3://example-nix-cache' $OUT_PATHS
 ```
 
 > **Note**
-> 
+>
 > The `$OUT_PATHS` variable is a space-separated list of Nix store
 > paths. In this case, we expect and want the shell to perform word
 > splitting to make each output path its own argument to `nix
