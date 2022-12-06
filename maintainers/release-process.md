@@ -15,7 +15,7 @@ release:
 
 * (Optionally) Updated `fallback-paths.nix` in Nixpkgs
 
-* Update the manual on https://nixos.org/manual/nix/stable/
+* An updated manual on https://nixos.org/manual/nix/stable/
 
 ## Creating a new release from master
 
