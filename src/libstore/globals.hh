@@ -285,9 +285,10 @@ public:
 
     Setting<bool> autoAllocateUids{this, false, "auto-allocate-uids",
         R"(
-          Whether to allocate UIDs for builders automatically.
+          Whether to select UIDs for builds automatically, instead of using the
+          users in `build-users-group`.
 
-          These UIDs are allocated starting at 872415232 (0x34000000) on Linux and 56930 on macOS.
+          UIDs are allocated starting at 872415232 (0x34000000) on Linux and 56930 on macOS.
 
           > **Warning**
           > This is an experimental feature.
@@ -323,9 +324,10 @@ public:
         this, false, "use-cgroups",
         R"(
           Whether to execute builds inside cgroups.
-          Only on Linux with systemd.
+          This is only supported on Linux.
 
-          cgroups are required and enabled automatically for derivations that require the `uid-range` system feature.
+          Cgroups are required and enabled automatically for derivations 
+          that require the `uid-range` system feature.
 
           > **Warning**
           > This is an experimental feature.
