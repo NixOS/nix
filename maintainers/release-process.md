@@ -79,7 +79,7 @@ release:
 * Push the release branch:
 
   ```console
-  $ git push
+  $ git push --set-upstream origin $VERSION-maintenance
   ```
 
 * Create a jobset for the release branch on Hydra as follows:
@@ -150,6 +150,9 @@ release:
 * Create a milestone for the next release, move all unresolved issues
   from the previous milestone, and close the previous milestone. Set
   the date for the next milestone 6 weeks from now.
+
+* Post an announcement on Discourse, including the contents of
+  `rl-$VERSION.md`.
 
 ## Creating a point release
 
