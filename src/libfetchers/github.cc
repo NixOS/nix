@@ -159,25 +159,17 @@ struct GitArchiveInputScheme : InputScheme
 
     std::optional<std::string> getAccessToken(const std::string & host, const std::string & url) const
     {
-        warn("host: %s",host);
-        warn("url: %s",url);
         auto tokens = fetchSettings.accessTokens.get();
         std::string answer;
         if(! url.empty()){
-            for ( auto & token : tokens) {
-                if (url.find(token.first) != std::string::npos) {
+            for (auto & token : tokens)
+                if (url.find(token.first) != std::string::npos)
                     answer = token.second;
-                }
-            }
-            if (!answer.empty()) {
-                warn("answer: %s", answer);
+            if (!answer.empty())
                 return answer;
-            }
         }
-        if (auto token = get(tokens, host)){
-            warn("returning token: %s", token);
+        if (auto token = get(tokens, host))
             return *token;
-        }
         return {};
     }
 
