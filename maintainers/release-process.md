@@ -147,6 +147,10 @@ release:
 
   Make a PR and auto-merge it.
 
+* Create a milestone for the next release, move all unresolved issues
+  from the previous milestone, and close the previous milestone. Set
+  the date for the next milestone 6 weeks from now.
+
 ## Creating a point release
 
 * Wait for the desired evaluation of the maintenance jobset to finish
