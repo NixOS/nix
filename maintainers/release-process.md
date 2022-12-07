@@ -52,10 +52,10 @@ release:
   $ git checkout -b release-notes
   $ git add doc/manual/src/release-notes/rl-$VERSION.md
   $ git commit -a -m 'Release notes'
-  $ git push --set-upstream edolstra release-notes
+  $ git push --set-upstream $REMOTE release-notes
   ```
 
-* Create a PR for `release-notes` and auto-merge it.
+* Create a PR for `release-notes`.
 
 * Wait for the PR to be merged.
 
@@ -122,16 +122,15 @@ release:
   `/home/eelco/Dev/nix-pristine` and
   `/home/eelco/Dev/nixpkgs-pristine`.
 
+  TODO: trigger nixos.org netlify: https://docs.netlify.com/configure-builds/build-hooks/
 * Prepare for the next point release by editing `.version` to
   e.g.
 
   ```console
-  $ echo -n 2.12.1 > .version
+  $ echo 2.12.1 > .version
   $ git commit -a -m 'Bump version'
   $ git push
   ```
-
-  Note the `-n`: `.version` must not end in a newline.
 
   Commit and push this to the maintenance branch.
 
@@ -173,3 +172,8 @@ release:
 
 * Bump the version number of the release branch as above (e.g. to
   `2.12.2`).
+  
+## Recovering from mistakes
+
+`upload-release.pl` should be idempotent. For instance a wrong `IS_LATEST` value can be fixed that way, by running the script on the actual latest release.
+
