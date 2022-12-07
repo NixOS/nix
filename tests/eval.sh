@@ -29,3 +29,7 @@ nix-instantiate --eval -E 'assert 1 + 2 == 3; true'
 [[ $(nix-instantiate -A attr --eval "./eval.nix") == '{ foo = "bar"; }' ]]
 [[ $(nix-instantiate -A attr --eval --json "./eval.nix") == '{"foo":"bar"}' ]]
 [[ $(nix-instantiate -A int --eval - < "./eval.nix") == 123 ]]
+
+# Check that symlink cycles don't cause a hang.
+ln -sfn cycle.nix $TEST_ROOT/cycle.nix
+(! nix eval --file $TEST_ROOT/cycle.nix)

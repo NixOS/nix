@@ -7,6 +7,8 @@ nix_tests = \
   flakes/follow-paths.sh \
   flakes/bundle.sh \
   flakes/check.sh \
+  flakes/unlocked-override.sh \
+  flakes/absolute-paths.sh \
   ca/gc.sh \
   gc.sh \
   remote-store.sh \
@@ -110,7 +112,8 @@ nix_tests = \
   fetchClosure.sh \
   completions.sh \
   impure-derivations.sh \
-  path-from-hash-part.sh
+  path-from-hash-part.sh \
+  toString-path.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh

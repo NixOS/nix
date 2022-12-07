@@ -132,7 +132,7 @@ public:
         log(*state, lvl, fs.s);
     }
 
-    void logEI(const ErrorInfo &ei) override
+    void logEI(const ErrorInfo & ei) override
     {
         auto state(state_.lock());
 

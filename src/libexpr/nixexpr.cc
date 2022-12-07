@@ -289,7 +289,6 @@ std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
 }
 
 
-
 /* Computing levels/displacements for variables. */
 
 void Expr::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)

@@ -19,21 +19,21 @@ using json = nlohmann::json;
 namespace nix {
 
 
-bool Store::isInStore(const Path & path) const
+bool Store::isInStore(PathView path) const
 {
     return isInDir(path, storeDir);
 }
 
 
-std::pair<StorePath, Path> Store::toStorePath(const Path & path) const
+std::pair<StorePath, Path> Store::toStorePath(PathView path) const
 {
     if (!isInStore(path))
         throw Error("path '%1%' is not in the Nix store", path);
-    Path::size_type slash = path.find('/', storeDir.size() + 1);
+    auto slash = path.find('/', storeDir.size() + 1);
     if (slash == Path::npos)
         return {parseStorePath(path), ""};
     else
-        return {parseStorePath(std::string_view(path).substr(0, slash)), path.substr(slash)};
+        return {parseStorePath(path.substr(0, slash)), (Path) path.substr(slash)};
 }
 
 

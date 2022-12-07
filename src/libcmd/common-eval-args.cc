@@ -32,7 +32,52 @@ MixEvalArgs::MixEvalArgs()
     addFlag({
         .longName = "include",
         .shortName = 'I',
-        .description = "Add *path* to the list of locations used to look up `<...>` file names.",
+        .description = R"(
+  Add *path* to the Nix search path. The Nix search path is
+  initialized from the colon-separated `NIX_PATH` environment
+  variable, and is used to look up Nix expressions enclosed in angle
+  brackets (i.e., `<nixpkgs>`). For instance, if the Nix search path
+  consists of the entries
+
+  ```
+  /home/eelco/Dev
+  /etc/nixos
+  ```
+
+  Nix will look for paths relative to `/home/eelco/Dev` and
+  `/etc/nixos`, in this order. It is also possible to match paths
+  against a prefix. For example, the search path
+
+  ```
+  nixpkgs=/home/eelco/Dev/nixpkgs-branch
+  /etc/nixos
+  ```
+
+  will cause Nix to search for `<nixpkgs/path>` in
+  `/home/eelco/Dev/nixpkgs-branch/path` and `/etc/nixos/nixpkgs/path`.
+
+  If a path in the Nix search path starts with `http://` or `https://`,
+  it is interpreted as the URL of a tarball that will be downloaded and
+  unpacked to a temporary location. The tarball must consist of a single
+  top-level directory. For example, setting `NIX_PATH` to
+
+  ```
+  nixpkgs=https://github.com/NixOS/nixpkgs/archive/master.tar.gz
+  ```
+
+  tells Nix to download and use the current contents of the `master`
+  branch in the `nixpkgs` repository.
+
+  The URLs of the tarballs from the official `nixos.org` channels
+  (see [the manual page for `nix-channel`](nix-channel.md)) can be
+  abbreviated as `channel:<channel-name>`.  For instance, the
+  following two values of `NIX_PATH` are equivalent:
+
+  ```
+  nixpkgs=channel:nixos-21.05
+  nixpkgs=https://nixos.org/channels/nixos-21.05/nixexprs.tar.xz
+  ```
+  )",
         .category = category,
         .labels = {"path"},
         .handler = {[&](std::string s) { searchPath.push_back(s); }}

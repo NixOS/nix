@@ -510,6 +510,17 @@ std::optional<N> string2Float(const std::string_view s)
 }
 
 
+/* Convert a little-endian integer to host order. */
+template<typename T>
+T readLittleEndian(unsigned char * p)
+{
+    T x = 0;
+    for (size_t i = 0; i < sizeof(x); ++i)
+        x |= ((T) *p++) << (i * 8);
+    return x;
+}
+
+
 /* Return true iff `s' starts with `prefix'. */
 bool hasPrefix(std::string_view s, std::string_view prefix);
 
@@ -561,6 +572,12 @@ std::string base64Decode(std::string_view s);
    's'. For example, if every line is indented by at least 3 spaces,
    then we remove 3 spaces from the start of every line. */
 std::string stripIndentation(std::string_view s);
+
+
+/* Get the prefix of 's' up to and excluding the next line break (LF
+   optionally preceded by CR), and the remainder following the line
+   break. */
+std::pair<std::string_view, std::string_view> getLine(std::string_view s);
 
 
 /* Get a value for the specified key from an associate container. */
@@ -735,6 +752,13 @@ inline std::string operator + (std::string && s, std::string_view s2)
 {
     s.append(s2);
     return std::move(s);
+}
+
+inline std::string operator + (std::string_view s1, const char * s2)
+{
+    std::string s(s1);
+    s.append(s2);
+    return s;
 }
 
 }

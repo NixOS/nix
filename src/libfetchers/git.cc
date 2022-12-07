@@ -18,6 +18,7 @@
 using namespace std::string_literals;
 
 namespace nix::fetchers {
+
 namespace {
 
 // Explicit initial branch of our bare repo to suppress warnings from new version of git.
@@ -26,23 +27,23 @@ namespace {
 // old version of git, which will ignore unrecognized `-c` options.
 const std::string gitInitialBranch = "__nix_dummy_branch";
 
-bool isCacheFileWithinTtl(const time_t now, const struct stat & st)
+bool isCacheFileWithinTtl(time_t now, const struct stat & st)
 {
     return st.st_mtime + settings.tarballTtl > now;
 }
 
-bool touchCacheFile(const Path& path, const time_t& touch_time)
+bool touchCacheFile(const Path & path, time_t touch_time)
 {
-  struct timeval times[2];
-  times[0].tv_sec = touch_time;
-  times[0].tv_usec = 0;
-  times[1].tv_sec = touch_time;
-  times[1].tv_usec = 0;
+    struct timeval times[2];
+    times[0].tv_sec = touch_time;
+    times[0].tv_usec = 0;
+    times[1].tv_sec = touch_time;
+    times[1].tv_usec = 0;
 
-  return lutimes(path.c_str(), times) == 0;
+    return lutimes(path.c_str(), times) == 0;
 }
 
-Path getCachePath(std::string key)
+Path getCachePath(std::string_view key)
 {
     return getCacheDir() + "/nix/gitv3/" +
         hashString(htSHA256, key).to_string(Base32, false);
@@ -57,13 +58,12 @@ Path getCachePath(std::string key)
 //   ...
 std::optional<std::string> readHead(const Path & path)
 {
-    auto [exit_code, output] = runProgram(RunOptions {
+    auto [status, output] = runProgram(RunOptions {
         .program = "git",
+        // FIXME: use 'HEAD' to avoid returning all refs
         .args = {"ls-remote", "--symref", path},
     });
-    if (exit_code != 0) {
-        return std::nullopt;
-    }
+    if (status != 0) return std::nullopt;
 
     std::string_view line = output;
     line = line.substr(0, line.find("\n"));
@@ -82,12 +82,11 @@ std::optional<std::string> readHead(const Path & path)
 }
 
 // Persist the HEAD ref from the remote repo in the local cached repo.
-bool storeCachedHead(const std::string& actualUrl, const std::string& headRef)
+bool storeCachedHead(const std::string & actualUrl, const std::string & headRef)
 {
     Path cacheDir = getCachePath(actualUrl);
-    auto gitDir = ".";
     try {
-        runProgram("git", true, { "-C", cacheDir, "--git-dir", gitDir, "symbolic-ref", "--", "HEAD", headRef });
+        runProgram("git", true, { "-C", cacheDir, "--git-dir", ".", "symbolic-ref", "--", "HEAD", headRef });
     } catch (ExecError &e) {
         if (!WIFEXITED(e.status)) throw;
         return false;
@@ -96,7 +95,7 @@ bool storeCachedHead(const std::string& actualUrl, const std::string& headRef)
     return true;
 }
 
-std::optional<std::string> readHeadCached(const std::string& actualUrl)
+std::optional<std::string> readHeadCached(const std::string & actualUrl)
 {
     // Create a cache path to store the branch of the HEAD ref. Append something
     // in front of the URL to prevent collision with the repository itself.
@@ -110,16 +109,15 @@ std::optional<std::string> readHeadCached(const std::string& actualUrl)
         cachedRef = readHead(cacheDir);
         if (cachedRef != std::nullopt &&
             *cachedRef != gitInitialBranch &&
-            isCacheFileWithinTtl(now, st)) {
+            isCacheFileWithinTtl(now, st))
+        {
             debug("using cached HEAD ref '%s' for repo '%s'", *cachedRef, actualUrl);
             return cachedRef;
         }
     }
 
     auto ref = readHead(actualUrl);
-    if (ref) {
-        return ref;
-    }
+    if (ref) return ref;
 
     if (cachedRef) {
         // If the cached git ref is expired in fetch() below, and the 'git fetch'
@@ -250,7 +248,7 @@ std::pair<StorePath, Input> fetchFromWorkdir(ref<Store> store, Input & input, co
 
 struct GitInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url) override
+    std::optional<Input> inputFromURL(const ParsedURL & url) const override
     {
         if (url.scheme != "git" &&
             url.scheme != "git+http" &&
@@ -265,7 +263,7 @@ struct GitInputScheme : InputScheme
         Attrs attrs;
         attrs.emplace("type", "git");
 
-        for (auto &[name, value] : url.query) {
+        for (auto & [name, value] : url.query) {
             if (name == "rev" || name == "ref")
                 attrs.emplace(name, value);
             else if (name == "shallow" || name == "submodules")
@@ -279,7 +277,7 @@ struct GitInputScheme : InputScheme
         return inputFromAttrs(attrs);
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) override
+    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
         if (maybeGetStrAttr(attrs, "type") != "git") return {};
 
@@ -302,7 +300,7 @@ struct GitInputScheme : InputScheme
         return input;
     }
 
-    ParsedURL toURL(const Input & input) override
+    ParsedURL toURL(const Input & input) const override
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         if (url.scheme != "git") url.scheme = "git+" + url.scheme;
@@ -313,7 +311,7 @@ struct GitInputScheme : InputScheme
         return url;
     }
 
-    bool hasAllInfo(const Input & input) override
+    bool hasAllInfo(const Input & input) const override
     {
         bool maybeDirty = !input.getRef();
         bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
@@ -325,7 +323,7 @@ struct GitInputScheme : InputScheme
     Input applyOverrides(
         const Input & input,
         std::optional<std::string> ref,
-        std::optional<Hash> rev) override
+        std::optional<Hash> rev) const override
     {
         auto res(input);
         if (rev) res.attrs.insert_or_assign("rev", rev->gitRev());
@@ -335,7 +333,7 @@ struct GitInputScheme : InputScheme
         return res;
     }
 
-    void clone(const Input & input, const Path & destDir) override
+    void clone(const Input & input, const Path & destDir) const override
     {
         auto [isLocal, actualUrl] = getActualUrl(input);
 
@@ -603,9 +601,9 @@ struct GitInputScheme : InputScheme
         {
             throw Error(
                 "Cannot find Git revision '%s' in ref '%s' of repository '%s'! "
-                    "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the "
-                    ANSI_BOLD "ref" ANSI_NORMAL " you've specified or add " ANSI_BOLD
-                    "allRefs = true;" ANSI_NORMAL " to " ANSI_BOLD "fetchGit" ANSI_NORMAL ".",
+                "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the "
+                ANSI_BOLD "ref" ANSI_NORMAL " you've specified or add " ANSI_BOLD
+                "allRefs = true;" ANSI_NORMAL " to " ANSI_BOLD "fetchGit" ANSI_NORMAL ".",
                 input.getRev()->gitRev(),
                 *input.getRef(),
                 actualUrl

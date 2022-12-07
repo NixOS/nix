@@ -230,7 +230,7 @@ void LocalDerivationGoal::tryLocalBuild() {
         outputLocks.unlock();
         buildUser.reset();
         worker.permanentFailure = true;
-        done(BuildResult::InputRejected, {}, e);
+        done(BuildResult::InputRejected, {}, std::move(e));
         return;
     }
 

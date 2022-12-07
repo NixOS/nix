@@ -215,7 +215,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
             if (!lockedFlake.lockFile.root->inputs.empty())
                 logger->cout(ANSI_BOLD "Inputs:" ANSI_NORMAL);
 
-            std::unordered_set<std::shared_ptr<Node>> visited;
+            std::set<ref<Node>> visited;
 
             std::function<void(const Node & node, const std::string & prefix)> recurse;
 
@@ -227,7 +227,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                     if (auto lockedNode = std::get_if<0>(&input.second)) {
                         logger->cout("%s" ANSI_BOLD "%s" ANSI_NORMAL ": %s",
                             prefix + (last ? treeLast : treeConn), input.first,
-                            *lockedNode ? (*lockedNode)->lockedRef : flake.lockedRef);
+                            (*lockedNode)->lockedRef);
 
                         bool firstVisit = visited.insert(*lockedNode).second;
 

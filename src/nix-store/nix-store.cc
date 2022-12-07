@@ -926,7 +926,6 @@ static void opServe(Strings opFlags, Strings opArgs)
                     worker_proto::write(*store, out, status.builtOutputs);
                 }
 
-
                 break;
             }
 
