@@ -501,6 +501,14 @@ void DerivationGoal::inputsRealised()
                now-known results of dependencies. If so, we become a
                stub goal aliasing that resolved derivation goal. */
             std::optional attempt = fullDrv.tryResolve(worker.store, inputDrvOutputs);
+            if (!attempt) {
+              /* TODO (impure derivations-induced tech debt) (see below):
+                 The above attempt should have found it, but because we manage
+                 inputDrvOutputs statefully, sometimes it gets out of sync with
+                 the real source of truth (store). So we query the store
+                 directly if there's a problem. */
+              attempt = fullDrv.tryResolve(worker.store);
+            }
             assert(attempt);
             Derivation drvResolved { *std::move(attempt) };
 

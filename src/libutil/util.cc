@@ -730,7 +730,7 @@ unsigned int getMaxCPU()
         auto cgroupFS = getCgroupFS();
         if (!cgroupFS) return 0;
 
-        auto cgroups = getCgroups("/proc/self/cgroupp");
+        auto cgroups = getCgroups("/proc/self/cgroup");
         auto cgroup = cgroups[""];
         if (cgroup == "") return 0;
 
