@@ -9,7 +9,7 @@ let
     let
       inherit (optionsInfo.${name}) description documentDefault defaultValue aliases;
       result = squash ''
-          - [`${name}`]{#conf-${name}}
+          - <span id="conf-${name}">[`${name}`](#conf-${name})</span>
 
           ${indent "  " body}
         '';
