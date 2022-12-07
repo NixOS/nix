@@ -92,10 +92,11 @@ MixEvalArgs::MixEvalArgs()
 
   ```
   nixpkgs=flake:github:NixOS/nixpkgs/nixos-22.05
+  ```
 
   makes `<nixpkgs>` refer to a particular branch of the
   `NixOS/nixpkgs` repository on GitHub.
-  ```)",
+  )",
         .category = category,
         .labels = {"path"},
         .handler = {[&](std::string s) { searchPath.push_back(s); }}
