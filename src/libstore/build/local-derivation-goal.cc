@@ -2260,7 +2260,6 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
     InodesSeen inodesSeen;
 
     Path checkSuffix = ".check";
-    bool keepPreviousRound = settings.keepFailed || settings.runDiffHook;
 
     std::exception_ptr delayedException;
 
@@ -2688,10 +2687,8 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 debug("unreferenced input: '%1%'", worker.store.printStorePath(i));
         }
 
-        if (curRound == nrRounds) {
-            localStore.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
-            worker.markContentsGood(newInfo.path);
-        }
+        localStore.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
+        worker.markContentsGood(newInfo.path);
 
         newInfo.deriver = drvPath;
         newInfo.ultimate = true;
@@ -2719,61 +2716,6 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
 
     /* Apply output checks. */
     checkOutputs(infos);
-
-    /* Compare the result with the previous round, and report which
-       path is different, if any.*/
-    if (curRound > 1 && prevInfos != infos) {
-        assert(prevInfos.size() == infos.size());
-        for (auto i = prevInfos.begin(), j = infos.begin(); i != prevInfos.end(); ++i, ++j)
-            if (!(*i == *j)) {
-                buildResult.isNonDeterministic = true;
-                Path prev = worker.store.printStorePath(i->second.path) + checkSuffix;
-                bool prevExists = keepPreviousRound && pathExists(prev);
-                hintformat hint = prevExists
-                    ? hintfmt("output '%s' of '%s' differs from '%s' from previous round",
-                        worker.store.printStorePath(i->second.path), worker.store.printStorePath(drvPath), prev)
-                    : hintfmt("output '%s' of '%s' differs from previous round",
-                        worker.store.printStorePath(i->second.path), worker.store.printStorePath(drvPath));
-
-                handleDiffHook(
-                    buildUser ? buildUser->getUID() : getuid(),
-                    buildUser ? buildUser->getGID() : getgid(),
-                    prev, worker.store.printStorePath(i->second.path),
-                    worker.store.printStorePath(drvPath), tmpDir);
-
-                if (settings.enforceDeterminism)
-                    throw NotDeterministic(hint);
-
-                printError(hint);
-
-                curRound = nrRounds; // we know enough, bail out early
-            }
-    }
-
-    /* If this is the first round of several, then move the output out of the way. */
-    if (nrRounds > 1 && curRound == 1 && curRound < nrRounds && keepPreviousRound) {
-        for (auto & [_, outputStorePath] : finalOutputs) {
-            auto path = worker.store.printStorePath(outputStorePath);
-            Path prev = path + checkSuffix;
-            deletePath(prev);
-            Path dst = path + checkSuffix;
-            renameFile(path, dst);
-        }
-    }
-
-    if (curRound < nrRounds) {
-        prevInfos = std::move(infos);
-        return {};
-    }
-
-    /* Remove the .check directories if we're done. FIXME: keep them
-       if the result was not determistic? */
-    if (curRound == nrRounds) {
-        for (auto & [_, outputStorePath] : finalOutputs) {
-            Path prev = worker.store.printStorePath(outputStorePath) + checkSuffix;
-            deletePath(prev);
-        }
-    }
 
     /* Register each output path as valid, and register the sets of
        paths referenced by each of them.  If there are cycles in the
