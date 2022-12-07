@@ -643,6 +643,7 @@ formal
 #include "filetransfer.hh"
 #include "fetchers.hh"
 #include "store-api.hh"
+#include "flake/flake.hh"
 
 
 namespace nix {
@@ -816,7 +817,17 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
             });
             res = { false, "" };
         }
-    } else {
+    }
+
+    else if (hasPrefix(elem.second, "flake:")) {
+        settings.requireExperimentalFeature(Xp::Flakes);
+        auto flakeRef = parseFlakeRef(elem.second.substr(6), {}, true, false);
+        debug("fetching flake search path element '%s''", elem.second);
+        auto storePath = flakeRef.resolve(store).fetchTree(store).first.storePath;
+        res = { true, store->toRealPath(storePath) };
+    }
+
+    else {
         auto path = absPath(elem.second);
         if (pathExists(path))
             res = { true, path };

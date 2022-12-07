@@ -146,10 +146,21 @@ Path lookupFileArg(EvalState & state, std::string_view s)
         auto storePath = fetchers::downloadTarball(
             state.store, EvalSettings::resolvePseudoUrl(s), "source", false).first.storePath;
         return state.store->toRealPath(storePath);
-    } else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
+    }
+
+    else if (hasPrefix(s, "flake:")) {
+        settings.requireExperimentalFeature(Xp::Flakes);
+        auto flakeRef = parseFlakeRef(std::string(s.substr(6)), {}, true, false);
+        auto storePath = flakeRef.resolve(state.store).fetchTree(state.store).first.storePath;
+        return state.store->toRealPath(storePath);
+    }
+
+    else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
         Path p(s.substr(1, s.size() - 2));
         return state.findFile(p);
-    } else
+    }
+
+    else
         return absPath(std::string(s));
 }
 

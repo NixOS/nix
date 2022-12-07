@@ -402,7 +402,8 @@ static Strings parseNixPath(const std::string & s)
         }
 
         if (*p == ':') {
-            if (EvalSettings::isPseudoUrl(std::string(start2, s.end()))) {
+            auto prefix = std::string(start2, s.end());
+            if (EvalSettings::isPseudoUrl(prefix) || hasPrefix(prefix, "flake:")) {
                 ++p;
                 while (p != s.end() && *p != ':') ++p;
             }
