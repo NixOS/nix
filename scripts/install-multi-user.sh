@@ -100,11 +100,7 @@ contact_us() {
     echo "You can open an issue at"
     echo "https://github.com/NixOS/nix/issues/new?labels=installer&template=installer.md"
     echo ""
-    echo "Or feel free to contact the team:"
-    echo " - Matrix: #nix:nixos.org"
-    echo " - IRC: in #nixos on irc.libera.chat"
-    echo " - twitter: @nixos_org"
-    echo " - forum: https://discourse.nixos.org"
+    echo "Or get in touch with the community: https://nixos.org/community"
 }
 get_help() {
     echo "We'd love to help if you need it."
