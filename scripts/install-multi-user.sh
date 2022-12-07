@@ -97,7 +97,8 @@ is_os_darwin() {
 }
 
 contact_us() {
-    echo "You can open an issue at https://github.com/nixos/nix/issues"
+    echo "You can open an issue at"
+    echo "https://github.com/NixOS/nix/issues/new?labels=installer&template=installer.md"
     echo ""
     echo "Or feel free to contact the team:"
     echo " - Matrix: #nix:nixos.org"
