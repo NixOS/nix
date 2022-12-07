@@ -83,7 +83,7 @@ protected:
     {
         auto state(_state.lock());
         if (state->enabled && settings.tryFallback) {
-            int t = 60;
+            int t = settings.substituterDisableTime;
             printError("disabling binary cache '%s' for %s seconds", getUri(), t);
             state->enabled = false;
             state->disabledUntil = std::chrono::steady_clock::now() + std::chrono::seconds(t);

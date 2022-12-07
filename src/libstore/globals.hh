@@ -515,6 +515,10 @@ public:
         this, true, "enforce-determinism",
         "Whether to fail if repeated builds produce different output. See `repeat`."};
 
+    Setting<unsigned int> substituterDisableTime{
+        this, 60, "substituter-disable-time",
+            "How long to disable substituters on fail"};
+
     Setting<Strings> trustedPublicKeys{
         this,
         {"cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="},
