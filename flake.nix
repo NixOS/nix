@@ -11,8 +11,7 @@
 
       officialRelease = false;
 
-      version = strip (builtins.readFile ./.version) + versionSuffix;
-      strip = nixpkgs.lib.removeSuffix "\n";
+      version = nixpkgs.lib.fileContents ./.version + versionSuffix;
       versionSuffix =
         if officialRelease
         then ""
