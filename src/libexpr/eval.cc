@@ -1998,6 +1998,11 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         } else if (firstType == nPath) {
             if (!first) {
                 auto part = state.coerceToString(i_pos, *vTmp, context, false, false);
+                if (sSize <= 1 && !hasPrefix(*part, "/"))
+                    state.throwEvalError(i_pos,
+                        "cannot append non-absolute path '%1%' to '%2%' (hint: change it to '/%1%')",
+                        (std::string) *part, accessor->root().to_string(),
+                        env, *this);
                 sSize += part->size();
                 s.emplace_back(std::move(part));
             }
