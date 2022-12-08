@@ -1317,7 +1317,7 @@ std::optional<StorePath> Store::getBuildDerivationPath(const StorePath & path)
         return path;
 
     auto drv = readDerivation(path);
-    if (!derivationHasKnownOutputPaths(drv.type())) {
+    if (!drv.type().hasKnownOutputPaths()) {
         // The build log is actually attached to the corresponding
         // resolved derivation, so we need to get it first
         auto resolvedDrv = drv.tryResolve(*this);
