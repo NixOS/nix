@@ -265,11 +265,11 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
     // traces
     if (showTrace && !einfo.traces.empty()) {
-        for (auto iter = einfo.traces.begin(); iter != einfo.traces.end(); ++iter) {
-            oss << "\n" << "… " << iter->hint.str() << "\n";
+        for (const auto & trace : einfo.traces) {
+            oss << "\n" << "… " << trace.hint.str() << "\n";
 
-            if (iter->pos.has_value() && (*iter->pos)) {
-                auto pos = iter->pos.value();
+            if (trace.pos.has_value() && (*trace.pos)) {
+                auto pos = trace.pos.value();
                 oss << "\n";
                 printAtPos(pos, oss);
 
