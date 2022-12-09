@@ -808,14 +808,17 @@ static void opServe(Strings opFlags, Strings opArgs)
         if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
             settings.maxLogSize = readNum<unsigned long>(in);
         if (GET_PROTOCOL_MINOR(clientVersion) >= 3) {
-            settings.buildRepeat = readInt(in);
-            settings.enforceDeterminism = readInt(in);
+            if (readInt(in) != 0) {
+                throw Error("client requested repeating builds, but this is not currently implemented");
+            }
+            if (readInt(in) != 0) {
+                throw Error("client requested enforcing determinism, but this is not currently implemented");
+            }
             settings.runDiffHook = true;
         }
         if (GET_PROTOCOL_MINOR(clientVersion) >= 7) {
             settings.keepFailed = (bool) readInt(in);
         }
-        settings.printRepeatedBuilds = false;
     };
 
     while (true) {

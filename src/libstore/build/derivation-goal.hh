@@ -115,11 +115,6 @@ struct DerivationGoal : public Goal
 
     BuildMode buildMode;
 
-    /* The current round, if we're building multiple times. */
-    size_t curRound = 1;
-
-    size_t nrRounds;
-
     std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds, mcRunningBuilds;
 
     std::unique_ptr<Activity> act;

@@ -29,19 +29,19 @@ nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -
 $(d)/%.1: $(d)/src/command-ref/%.md
 	@printf "Title: %s\n\n" "$$(basename $@ .1)" > $^.tmp
 	@cat $^ >> $^.tmp
-	$(trace-gen) lowdown -sT man -M section=1 $^.tmp -o $@
+	$(trace-gen) lowdown -sT man --nroff-nolinks -M section=1 $^.tmp -o $@
 	@rm $^.tmp
 
 $(d)/%.8: $(d)/src/command-ref/%.md
 	@printf "Title: %s\n\n" "$$(basename $@ .8)" > $^.tmp
 	@cat $^ >> $^.tmp
-	$(trace-gen) lowdown -sT man -M section=8 $^.tmp -o $@
+	$(trace-gen) lowdown -sT man --nroff-nolinks -M section=8 $^.tmp -o $@
 	@rm $^.tmp
 
 $(d)/nix.conf.5: $(d)/src/command-ref/conf-file.md
 	@printf "Title: %s\n\n" "$$(basename $@ .5)" > $^.tmp
 	@cat $^ >> $^.tmp
-	$(trace-gen) lowdown -sT man -M section=5 $^.tmp -o $@
+	$(trace-gen) lowdown -sT man --nroff-nolinks -M section=5 $^.tmp -o $@
 	@rm $^.tmp
 
 $(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli

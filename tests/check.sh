@@ -91,13 +91,13 @@ nix-build check.nix -A fetchurl --no-out-link --check
 nix-build check.nix -A fetchurl --no-out-link --repair
 [[ $(cat $path) != foo ]]
 
-echo 'Hello World' > $TMPDIR/dummy
+echo 'Hello World' > $TEST_ROOT/dummy
 nix-build check.nix -A hashmismatch --no-out-link || status=$?
 [ "$status" = "102" ]
 
-echo -n > $TMPDIR/dummy
+echo -n > $TEST_ROOT/dummy
 nix-build check.nix -A hashmismatch --no-out-link
-echo 'Hello World' > $TMPDIR/dummy
+echo 'Hello World' > $TEST_ROOT/dummy
 
 nix-build check.nix -A hashmismatch --no-out-link --check || status=$?
 [ "$status" = "102" ]

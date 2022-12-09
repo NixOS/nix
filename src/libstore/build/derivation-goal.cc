@@ -571,10 +571,6 @@ void DerivationGoal::inputsRealised()
     /* What type of derivation are we building? */
     derivationType = drv->type();
 
-    /* Don't repeat fixed-output derivations since they're already
-       verified by their output hash.*/
-    nrRounds = derivationType.isFixed() ? 1 : settings.buildRepeat + 1;
-
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
        build hook. */
@@ -589,12 +585,11 @@ void DerivationGoal::started()
     auto msg = fmt(
         buildMode == bmRepair ? "repairing outputs of '%s'" :
         buildMode == bmCheck ? "checking outputs of '%s'" :
-        nrRounds > 1 ? "building '%s' (round %d/%d)" :
-        "building '%s'", worker.store.printStorePath(drvPath), curRound, nrRounds);
+        "building '%s'", worker.store.printStorePath(drvPath));
     fmt("building '%s'", worker.store.printStorePath(drvPath));
     if (hook) msg += fmt(" on '%s'", machineName);
     act = std::make_unique<Activity>(*logger, lvlInfo, actBuild, msg,
-        Logger::Fields{worker.store.printStorePath(drvPath), hook ? machineName : "", curRound, nrRounds});
+        Logger::Fields{worker.store.printStorePath(drvPath), hook ? machineName : "", 1, 1});
     mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
     worker.updateProgress();
 }
@@ -948,14 +943,6 @@ void DerivationGoal::buildDone()
 
         cleanupPostOutputsRegisteredModeNonCheck();
 
-        /* Repeat the build if necessary. */
-        if (curRound++ < nrRounds) {
-            outputLocks.unlock();
-            state = &DerivationGoal::tryToBuild;
-            worker.wakeUp(shared_from_this());
-            return;
-        }
-
         /* It is now safe to delete the lock files, since all future
            lockers will see that the output paths are valid; they will
            not create new lock files with the same names as the old
@@ -1016,22 +1003,34 @@ void DerivationGoal::resolvedFinished()
                 throw Error(
                     "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolvedFinished,resolve)",
                     worker.store.printStorePath(drvPath), wantedOutput);
-            auto realisation = get(resolvedResult.builtOutputs, DrvOutput { *resolvedHash, wantedOutput });
-            if (!realisation)
-                throw Error(
-                    "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolvedFinished,realisation)",
-                    worker.store.printStorePath(resolvedDrvGoal->drvPath), wantedOutput);
+
+            auto realisation = [&]{
+              auto take1 = get(resolvedResult.builtOutputs, DrvOutput { *resolvedHash, wantedOutput });
+              if (take1) return *take1;
+
+              /* The above `get` should work. But sateful tracking of
+                 outputs in resolvedResult, this can get out of sync with the
+                 store, which is our actual source of truth. For now we just
+                 check the store directly if it fails. */
+              auto take2 = worker.evalStore.queryRealisation(DrvOutput { *resolvedHash, wantedOutput });
+              if (take2) return *take2;
+
+              throw Error(
+                  "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolvedFinished,realisation)",
+                  worker.store.printStorePath(resolvedDrvGoal->drvPath), wantedOutput);
+            }();
+
             if (drv->type().isPure()) {
-                auto newRealisation = *realisation;
+                auto newRealisation = realisation;
                 newRealisation.id = DrvOutput { initialOutput->outputHash, wantedOutput };
                 newRealisation.signatures.clear();
                 if (!drv->type().isFixed())
-                    newRealisation.dependentRealisations = drvOutputReferences(worker.store, *drv, realisation->outPath);
+                    newRealisation.dependentRealisations = drvOutputReferences(worker.store, *drv, realisation.outPath);
                 signRealisation(newRealisation);
                 worker.store.registerDrvOutput(newRealisation);
             }
-            outputPaths.insert(realisation->outPath);
-            builtOutputs.emplace(realisation->id, *realisation);
+            outputPaths.insert(realisation.outPath);
+            builtOutputs.emplace(realisation.id, realisation);
         }
 
         runPostBuildHook(

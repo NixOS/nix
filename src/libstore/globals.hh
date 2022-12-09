@@ -373,11 +373,6 @@ public:
         )",
         {"build-max-log-size"}};
 
-    /* When buildRepeat > 0 and verboseBuild == true, whether to print
-       repeated builds (i.e. builds other than the first one) to
-       stderr. Hack to prevent Hydra logs from being polluted. */
-    bool printRepeatedBuilds = true;
-
     Setting<unsigned int> pollInterval{this, 5, "build-poll-interval",
         "How often (in seconds) to poll for locks."};
 
@@ -501,19 +496,6 @@ public:
     Setting<bool> sandboxFallback{this, true, "sandbox-fallback",
         "Whether to disable sandboxing when the kernel doesn't allow it."};
 
-    Setting<size_t> buildRepeat{
-        this, 0, "repeat",
-        R"(
-          How many times to repeat builds to check whether they are
-          deterministic. The default value is 0. If the value is non-zero,
-          every build is repeated the specified number of times. If the
-          contents of any of the runs differs from the previous ones and
-          `enforce-determinism` is true, the build is rejected and the
-          resulting store paths are not registered as “valid” in Nix’s
-          database.
-        )",
-        {"build-repeat"}};
-
 #if __linux__
     Setting<std::string> sandboxShmSize{
         this, "50%", "sandbox-dev-shm-size",
@@ -576,10 +558,6 @@ public:
           When using the Nix daemon, `diff-hook` must be set in the `nix.conf`
           configuration file, and cannot be passed at the command line.
         )"};
-
-    Setting<bool> enforceDeterminism{
-        this, true, "enforce-determinism",
-        "Whether to fail if repeated builds produce different output. See `repeat`."};
 
     Setting<Strings> trustedPublicKeys{
         this,
