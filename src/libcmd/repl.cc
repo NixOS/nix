@@ -497,6 +497,7 @@ bool NixRepl::processLine(std::string line)
              << "  :p <expr>     Evaluate and print expression recursively\n"
              << "  :q            Exit nix-repl\n"
              << "  :r            Reload all files\n"
+             << "  :cc           Clean the Nix REPL environment\n"
              << "  :sh <expr>    Build dependencies of derivation, then start nix-shell\n"
              << "  :t <expr>     Describe result of evaluation\n"
              << "  :u <expr>     Build derivation, then start nix-shell\n"
@@ -583,6 +584,11 @@ bool NixRepl::processLine(std::string line)
     else if (command == ":r" || command == ":reload") {
         state->resetFileCache();
         reloadFiles();
+    }
+
+    else if (command == ":cc" || command == ":clear") {
+        state->resetFileCache();
+        initEnv();
     }
 
     else if (command == ":e" || command == ":edit") {
