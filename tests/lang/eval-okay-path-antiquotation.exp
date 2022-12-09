@@ -1,0 +1,1 @@
+{ absolute = /foo; expr = /home/eelco/Dev/nix/tests/lang/foo/bar; home = /tmp/nix-shell.ZeLfDw/nix-test/default/test-home/foo; notfirst = /home/eelco/Dev/nix/tests/lang/bar/foo; simple = /home/eelco/Dev/nix/tests/lang/foo; slashes = /foo/bar; surrounded = /home/eelco/Dev/nix/tests/lang/a-foo-b; }
