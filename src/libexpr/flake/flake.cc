@@ -148,9 +148,6 @@ static Flake readFlake(
     CanonPath flakeDir(resolvedRef.subdir);
     auto flakePath = rootDir + flakeDir + "flake.nix";
 
-    if (!flakePath.pathExists())
-        throw Error("file '%s' does not exist", flakePath);
-
     Value vInfo;
     state.evalFile(flakePath, vInfo, true);
 
