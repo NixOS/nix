@@ -701,6 +701,16 @@ public:
           > giving that user root access to the system. For example, the user
           > can set `sandbox-paths` and thereby obtain read access to
           > directories that are otherwise inacessible to them.
+
+          `nix-daemon` will allow only the following options to be set
+          by an untrusted user; any others will be silently ignored:
+
+            - `build-timeout`
+            - `max-silent-time`
+            - `poll-interval`
+            - `connect-timeout`
+            - `builders`, if set to `""` (i.e. local builds only)
+            - `substituters` which are among `trusted-substituters`
         )"};
 
     Setting<unsigned int> ttlNegativeNarInfoCache{
