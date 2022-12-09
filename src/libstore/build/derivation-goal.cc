@@ -1003,22 +1003,34 @@ void DerivationGoal::resolvedFinished()
                 throw Error(
                     "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolvedFinished,resolve)",
                     worker.store.printStorePath(drvPath), wantedOutput);
-            auto realisation = get(resolvedResult.builtOutputs, DrvOutput { *resolvedHash, wantedOutput });
-            if (!realisation)
-                throw Error(
-                    "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolvedFinished,realisation)",
-                    worker.store.printStorePath(resolvedDrvGoal->drvPath), wantedOutput);
+
+            auto realisation = [&]{
+              auto take1 = get(resolvedResult.builtOutputs, DrvOutput { *resolvedHash, wantedOutput });
+              if (take1) return *take1;
+
+              /* The above `get` should work. But sateful tracking of
+                 outputs in resolvedResult, this can get out of sync with the
+                 store, which is our actual source of truth. For now we just
+                 check the store directly if it fails. */
+              auto take2 = worker.evalStore.queryRealisation(DrvOutput { *resolvedHash, wantedOutput });
+              if (take2) return *take2;
+
+              throw Error(
+                  "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolvedFinished,realisation)",
+                  worker.store.printStorePath(resolvedDrvGoal->drvPath), wantedOutput);
+            }();
+
             if (drv->type().isPure()) {
-                auto newRealisation = *realisation;
+                auto newRealisation = realisation;
                 newRealisation.id = DrvOutput { initialOutput->outputHash, wantedOutput };
                 newRealisation.signatures.clear();
                 if (!drv->type().isFixed())
-                    newRealisation.dependentRealisations = drvOutputReferences(worker.store, *drv, realisation->outPath);
+                    newRealisation.dependentRealisations = drvOutputReferences(worker.store, *drv, realisation.outPath);
                 signRealisation(newRealisation);
                 worker.store.registerDrvOutput(newRealisation);
             }
-            outputPaths.insert(realisation->outPath);
-            builtOutputs.emplace(realisation->id, *realisation);
+            outputPaths.insert(realisation.outPath);
+            builtOutputs.emplace(realisation.id, realisation);
         }
 
         runPostBuildHook(
