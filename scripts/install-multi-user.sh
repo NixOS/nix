@@ -810,6 +810,24 @@ install_from_extracted_nix() {
         _sudo "to make the new store non-writable at $NIX_ROOT/store" \
               chmod -R ugo-w "$NIX_ROOT/store/"
 
+        # This is copied from create_directories, see it for why we do all this stuff just to find chown.
+        local get_chr_own="$(PATH="$(getconf PATH 2>/dev/null)" command -vp chown)"
+        if [[ -z "$get_chr_own" ]]; then
+            get_chr_own="$(command -v chown)"
+        fi
+
+        if [[ -z "$get_chr_own" ]]; then
+            reminder <<EOF
+I wanted to change ownership of new Nix store files,
+but I couldn't locate 'chown'. (You may need to fix your PATH.)
+To manually change file ownership, you can run:
+    sudo chown -R 'root:$NIX_BUILD_GROUP_NAME' '$NIX_ROOT/store'
+EOF
+        else
+            _sudo "to change ownership of Nix store files" \
+                  "$get_chr_own" -R "root:$NIX_BUILD_GROUP_NAME" "$NIX_ROOT/store" || true
+        fi
+
         if [ -d "$NIX_INSTALLED_NIX" ]; then
             echo "      Alright! We have our first nix at $NIX_INSTALLED_NIX"
         else
