@@ -70,8 +70,10 @@ nix registry add --registry $registry flake3 git+file://$flake3Dir
 nix registry add --registry $registry flake4 flake3
 nix registry add --registry $registry nixpkgs flake1
 
-# Test 'nix flake list'.
+# Test 'nix registry list'.
 [[ $(nix registry list | wc -l) == 5 ]]
+nix registry list | grep -q '^global'
+nix registry list | grep -q -v '^user'
 
 # Test 'nix flake metadata'.
 nix flake metadata flake1
@@ -334,6 +336,22 @@ nix registry pin flake1 flake3
 [[ $(nix registry list | wc -l) == 6 ]]
 nix registry remove flake1
 [[ $(nix registry list | wc -l) == 5 ]]
+
+# Test 'nix registry list' without global registry.
+# set empty global registry with user flakes only
+setGlobalRegistry "$TEST_ROOT/not-a-global-registry"
+nix registry add user-flake1 flake3
+nix registry add user-flake2 flake3
+[[ $(nix registry list | wc -l) == 2 ]]
+nix registry list | grep -q -v '^global' # no global flakes
+nix registry list | grep -q    '^user'   # has user flakes
+# reset global registry
+setGlobalRegistry "$registry"
+nix registry remove user-flake1
+nix registry remove user-flake2
+[[ $(nix registry list | wc -l) == 5 ]]
+nix registry list | grep -q    '^global' # has global flakes
+nix registry list | grep -q -v '^user'   # no user flakes
 
 # Test 'nix flake clone'.
 rm -rf $TEST_ROOT/flake1-v2

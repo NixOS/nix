@@ -184,6 +184,11 @@ enableFeatures() {
     sed -i 's/experimental-features .*/& '"$features"'/' "$NIX_CONF_DIR"/nix.conf
 }
 
+setGlobalRegistry() {
+    local path_or_url="$1"
+    sed -i 's!flake-registry = .*!flake-registry = '"$path_or_url"'!' "$NIX_CONF_DIR"/nix.conf
+}
+
 set -x
 
 if [[ -n "${NIX_DAEMON_PACKAGE:-}" ]]; then
