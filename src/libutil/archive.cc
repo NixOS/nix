@@ -35,10 +35,6 @@ static ArchiveSettings archiveSettings;
 
 static GlobalConfig::Register rArchiveSettings(&archiveSettings);
 
-const std::string narVersionMagic1 = "nix-archive-1";
-
-static std::string caseHackSuffix = "~nix~case~hack~";
-
 PathFilter defaultPathFilter = [](const Path &) { return true; };
 
 

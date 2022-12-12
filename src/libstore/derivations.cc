@@ -448,7 +448,7 @@ std::string Derivation::unparse(const Store & store, bool maskOutputs,
 
 
 // FIXME: remove
-bool isDerivation(const std::string & fileName)
+bool isDerivation(std::string_view fileName)
 {
     return hasSuffix(fileName, drvExtension);
 }
