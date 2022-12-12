@@ -33,14 +33,6 @@ FileTransferSettings fileTransferSettings;
 
 static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
 
-std::string resolveUri(std::string_view uri)
-{
-    if (uri.compare(0, 8, "channel:") == 0)
-        return "https://nixos.org/channels/" + std::string(uri.substr(8)) + "/nixexprs.tar.xz";
-    else
-        return std::string(uri);
-}
-
 struct curlFileTransfer : public FileTransfer
 {
     CURLM * curlm = 0;
@@ -872,15 +864,5 @@ FileTransferError::FileTransferError(FileTransfer::Error error, std::optional<st
     else
         err.msg = hf;
 }
-
-bool isUri(std::string_view s)
-{
-    if (s.compare(0, 8, "channel:") == 0) return true;
-    size_t pos = s.find("://");
-    if (pos == std::string::npos) return false;
-    std::string scheme(s, 0, pos);
-    return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "channel" || scheme == "git" || scheme == "s3" || scheme == "ssh";
-}
-
 
 }

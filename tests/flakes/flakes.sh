@@ -473,3 +473,9 @@ nix store delete $(nix store add-path $badFlakeDir)
 
 [[ $(nix path-info      $(nix store add-path $flake1Dir)) =~ flake1 ]]
 [[ $(nix path-info path:$(nix store add-path $flake1Dir)) =~ simple ]]
+
+# Test fetching flakerefs in the legacy CLI.
+[[ $(nix-instantiate --eval flake:flake3 -A x) = 123 ]]
+[[ $(nix-instantiate --eval flake:git+file://$flake3Dir -A x) = 123 ]]
+[[ $(nix-instantiate -I flake3=flake:flake3 --eval '<flake3>' -A x) = 123 ]]
+[[ $(NIX_PATH=flake3=flake:flake3 nix-instantiate --eval '<flake3>' -A x) = 123 ]]

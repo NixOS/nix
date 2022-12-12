@@ -643,6 +643,7 @@ formal
 #include "filetransfer.hh"
 #include "fetchers.hh"
 #include "store-api.hh"
+#include "flake/flake.hh"
 
 
 namespace nix {
@@ -805,17 +806,28 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
 
     std::pair<bool, std::string> res;
 
-    if (isUri(elem.second)) {
+    if (EvalSettings::isPseudoUrl(elem.second)) {
         try {
-            res = { true, store->toRealPath(fetchers::downloadTarball(
-                        store, resolveUri(elem.second), "source", false).first.storePath) };
+            auto storePath = fetchers::downloadTarball(
+                store, EvalSettings::resolvePseudoUrl(elem.second), "source", false).first.storePath;
+            res = { true, store->toRealPath(storePath) };
         } catch (FileTransferError & e) {
             logWarning({
                 .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second)
             });
             res = { false, "" };
         }
-    } else {
+    }
+
+    else if (hasPrefix(elem.second, "flake:")) {
+        settings.requireExperimentalFeature(Xp::Flakes);
+        auto flakeRef = parseFlakeRef(elem.second.substr(6), {}, true, false);
+        debug("fetching flake search path element '%s''", elem.second);
+        auto storePath = flakeRef.resolve(store).fetchTree(store).first.storePath;
+        res = { true, store->toRealPath(storePath) };
+    }
+
+    else {
         auto path = absPath(elem.second);
         if (pathExists(path))
             res = { true, path };

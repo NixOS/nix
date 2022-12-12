@@ -85,6 +85,23 @@ MixEvalArgs::MixEvalArgs()
   -I nixpkgs=channel:nixos-21.05
   -I nixpkgs=https://nixos.org/channels/nixos-21.05/nixexprs.tar.xz
   ```
+
+  You can also fetch source trees using flake URLs and add them to the
+  search path. For instance,
+
+  ```
+  -I nixpkgs=flake:nixpkgs
+  ```
+
+  specifies that the prefix `nixpkgs` shall refer to the source tree
+  downloaded from the `nixpkgs` entry in the flake registry. Similarly,
+
+  ```
+  -I nixpkgs=flake:github:NixOS/nixpkgs/nixos-22.05
+  ```
+
+  makes `<nixpkgs>` refer to a particular branch of the
+  `NixOS/nixpkgs` repository on GitHub.
   )",
         .category = category,
         .labels = {"path"},
@@ -142,14 +159,25 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
 
 Path lookupFileArg(EvalState & state, std::string_view s)
 {
-    if (isUri(s)) {
-        return state.store->toRealPath(
-            fetchers::downloadTarball(
-                state.store, resolveUri(s), "source", false).first.storePath);
-    } else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
+    if (EvalSettings::isPseudoUrl(s)) {
+        auto storePath = fetchers::downloadTarball(
+            state.store, EvalSettings::resolvePseudoUrl(s), "source", false).first.storePath;
+        return state.store->toRealPath(storePath);
+    }
+
+    else if (hasPrefix(s, "flake:")) {
+        settings.requireExperimentalFeature(Xp::Flakes);
+        auto flakeRef = parseFlakeRef(std::string(s.substr(6)), {}, true, false);
+        auto storePath = flakeRef.resolve(state.store).fetchTree(state.store).first.storePath;
+        return state.store->toRealPath(storePath);
+    }
+
+    else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
         Path p(s.substr(1, s.size() - 2));
         return state.findFile(p);
-    } else
+    }
+
+    else
         return absPath(std::string(s));
 }
 
