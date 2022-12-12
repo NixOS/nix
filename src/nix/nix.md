@@ -190,11 +190,9 @@ operate are determined as follows:
   # nix path-info -S '/nix/store/gzaflydcr6sb3567hap9q6srzx8ggdgg-glibc-2.33-78.drv^*'
   …
   ```
-
-* If you didn't specify the desired outputs, but the derivation comes
-  from an expression which has an attribute `meta.outputsToInstall`, Nix
-  will use those outputs. For example, since the package
-  `nixpkgs#libxml2` has this attribute:
+* If you didn't specify the desired outputs, but the derivation hs an
+  attribute `meta.outputsToInstall`, Nix will use those outputs. For
+  example, since the package `nixpkgs#libxml2` has this attribute:
 
   ```console
   # nix eval 'nixpkgs#libxml2.meta.outputsToInstall'
@@ -203,6 +201,9 @@ operate are determined as follows:
 
   a command like `nix shell nixpkgs#libxml2` will provide only those
   two outputs by default.
+
+  Note that a store derivation (given by `.drv` file store path) doesn't have
+  any attributes like `meta`, and thus this case doesn't apply to it.
 
 * Otherwise, Nix will use all outputs of the derivation.
 
