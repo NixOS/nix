@@ -823,7 +823,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
         ? std::make_unique<DebugTraceStacker>(
             *this,
             DebugTrace {
-                .pos = error->info().errPos ? *error->info().errPos : positions[expr.getPos()],
+                .pos = error->info().errPos ? error->info().errPos : (std::shared_ptr<AbstractPos>) positions[expr.getPos()],
                 .expr = expr,
                 .env = env,
                 .hint = error->info().msg,
@@ -1012,7 +1012,7 @@ void EvalState::throwMissingArgumentError(const PosIdx pos, const char * s, cons
 
 void EvalState::addErrorTrace(Error & e, const char * s, const std::string & s2) const
 {
-    e.addTrace(std::nullopt, s, s2);
+    e.addTrace(nullptr, s, s2);
 }
 
 void EvalState::addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2) const
@@ -1024,13 +1024,13 @@ static std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(
     EvalState & state,
     Expr & expr,
     Env & env,
-    std::optional<ErrPos> pos,
+    std::shared_ptr<AbstractPos> && pos,
     const char * s,
     const std::string & s2)
 {
     return std::make_unique<DebugTraceStacker>(state,
         DebugTrace {
-            .pos = pos,
+            .pos = std::move(pos),
             .expr = expr,
             .env = env,
             .hint = hintfmt(s, s2),
@@ -1136,9 +1136,9 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 void EvalState::mkPos(Value & v, PosIdx p)
 {
     auto pos = positions[p];
-    if (!pos.file.empty()) {
+    if (auto path = std::get_if<Path>(&pos.origin)) {
         auto attrs = buildBindings(3);
-        attrs.alloc(sFile).mkString(pos.file);
+        attrs.alloc(sFile).mkString(*path);
         attrs.alloc(sLine).mkInt(pos.line);
         attrs.alloc(sColumn).mkInt(pos.column);
         v.mkAttrs(attrs);
@@ -1246,7 +1246,7 @@ void EvalState::cacheFile(
                 *this,
                 *e,
                 this->baseEnv,
-                e->getPos() ? std::optional(ErrPos(positions[e->getPos()])) : std::nullopt,
+                e->getPos() ? (std::shared_ptr<AbstractPos>) positions[e->getPos()] : nullptr,
                 "while evaluating the file '%1%':", resolvedPath)
             : nullptr;
 
@@ -1517,10 +1517,13 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
         state.forceValue(*vAttrs, (pos2 ? pos2 : this->pos ) );
 
     } catch (Error & e) {
-        auto pos2r = state.positions[pos2];
-        if (pos2 && pos2r.file != state.derivationNixPath)
-            state.addErrorTrace(e, pos2, "while evaluating the attribute '%1%'",
-                showAttrPath(state, env, attrPath));
+        if (pos2) {
+            auto pos2r = state.positions[pos2];
+            auto origin = std::get_if<Path>(&pos2r.origin);
+            if (!(origin && *origin == state.derivationNixPath))
+                state.addErrorTrace(e, pos2, "while evaluating the attribute '%1%'",
+                    showAttrPath(state, env, attrPath));
+        }
         throw;
     }
 
@@ -2497,7 +2500,8 @@ void EvalState::printStats()
                     else
                         obj["name"] = nullptr;
                     if (auto pos = positions[fun->pos]) {
-                        obj["file"] = (std::string_view) pos.file;
+                        if (auto path = std::get_if<Path>(&pos.origin))
+                            obj["file"] = *path;
                         obj["line"] = pos.line;
                         obj["column"] = pos.column;
                     }
@@ -2511,7 +2515,8 @@ void EvalState::printStats()
                 for (auto & i : attrSelects) {
                     json obj = json::object();
                     if (auto pos = positions[i.first]) {
-                        obj["file"] = (const std::string &) pos.file;
+                        if (auto path = std::get_if<Path>(&pos.origin))
+                            obj["file"] = *path;
                         obj["line"] = pos.line;
                         obj["column"] = pos.column;
                     }

@@ -8,6 +8,65 @@
 
 namespace nix {
 
+struct SourcePathAdapter : AbstractPos
+{
+    Path path;
+
+    SourcePathAdapter(Path path)
+        : path(std::move(path))
+    {
+    }
+
+    std::optional<std::string> getSource() const override
+    {
+        try {
+            return readFile(path);
+        } catch (Error &) {
+            return std::nullopt;
+        }
+    }
+
+    void print(std::ostream & out) const override
+    {
+        out << path;
+    }
+};
+
+struct StringPosAdapter : AbstractPos
+{
+    void print(std::ostream & out) const override
+    {
+        out << "«string»";
+    }
+};
+
+struct StdinPosAdapter : AbstractPos
+{
+    void print(std::ostream & out) const override
+    {
+        out << "«stdin»";
+    }
+};
+
+Pos::operator std::shared_ptr<AbstractPos>() const
+{
+    std::shared_ptr<AbstractPos> pos;
+
+    if (auto path = std::get_if<Path>(&origin))
+        pos = std::make_shared<SourcePathAdapter>(*path);
+    else if (std::get_if<stdin_tag>(&origin))
+        pos = std::make_shared<StdinPosAdapter>();
+    else if (std::get_if<string_tag>(&origin))
+        pos = std::make_shared<StringPosAdapter>();
+
+    if (pos) {
+        pos->line = line;
+        pos->column = column;
+    }
+
+    return pos;
+}
+
 /* Displaying abstract syntax trees. */
 
 static void showString(std::ostream & str, std::string_view s)
@@ -248,24 +307,10 @@ void ExprPos::show(const SymbolTable & symbols, std::ostream & str) const
 
 std::ostream & operator << (std::ostream & str, const Pos & pos)
 {
-    if (!pos)
+    if (auto pos2 = (std::shared_ptr<AbstractPos>) pos) {
+        str << *pos2;
+    } else
         str << "undefined position";
-    else
-    {
-        auto f = format(ANSI_BOLD "%1%" ANSI_NORMAL ":%2%:%3%");
-        switch (pos.origin) {
-            case foFile:
-                f % (const std::string &) pos.file;
-                break;
-            case foStdin:
-            case foString:
-                f % "(string)";
-                break;
-            default:
-                throw Error("unhandled Pos origin!");
-        }
-        str << (f % pos.line % pos.column).str();
-    }
 
     return str;
 }

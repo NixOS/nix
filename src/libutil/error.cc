@@ -9,9 +9,9 @@ namespace nix {
 
 const std::string nativeSystem = SYSTEM;
 
-void BaseError::addTrace(std::optional<ErrPos> e, hintformat hint)
+void BaseError::addTrace(std::shared_ptr<AbstractPos> && e, hintformat hint)
 {
-    err.traces.push_front(Trace { .pos = e, .hint = hint });
+    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint });
 }
 
 // c++ std::exception descendants must have a 'const char* what()' function.
@@ -30,91 +30,46 @@ const std::string & BaseError::calcWhat() const
 
 std::optional<std::string> ErrorInfo::programName = std::nullopt;
 
-std::ostream & operator<<(std::ostream & os, const hintformat & hf)
+std::ostream & operator <<(std::ostream & os, const hintformat & hf)
 {
     return os << hf.str();
 }
 
-std::string showErrPos(const ErrPos & errPos)
+std::ostream & operator <<(std::ostream & str, const AbstractPos & pos)
 {
-    if (errPos.line > 0) {
-        if (errPos.column > 0) {
-            return fmt("%d:%d", errPos.line, errPos.column);
-        } else {
-            return fmt("%d", errPos.line);
-        }
-    }
-    else {
-        return "";
-    }
+    pos.print(str);
+    str << ":" << pos.line;
+    if (pos.column > 0)
+        str << ":" << pos.column;
+    return str;
 }
 
-std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos)
+std::optional<LinesOfCode> AbstractPos::getCodeLines() const
 {
-    if (errPos.line <= 0)
+    if (line == 0)
         return std::nullopt;
 
-    if (errPos.origin == foFile) {
-        LinesOfCode loc;
-        try {
-            // FIXME: when running as the daemon, make sure we don't
-            // open a file to which the client doesn't have access.
-            AutoCloseFD fd = open(errPos.file.c_str(), O_RDONLY | O_CLOEXEC);
-            if (!fd) return {};
+    if (auto source = getSource()) {
 
-            // count the newlines.
-            int count = 0;
-            std::string line;
-            int pl = errPos.line - 1;
-            do
-            {
-                line = readLine(fd.get());
-                ++count;
-                if (count < pl)
-                    ;
-                else if (count == pl)
-                    loc.prevLineOfCode = line;
-                else if (count == pl + 1)
-                    loc.errLineOfCode = line;
-                else if (count == pl + 2) {
-                    loc.nextLineOfCode = line;
-                    break;
-                }
-            } while (true);
-            return loc;
-        }
-        catch (EndOfFile & eof) {
-            if (loc.errLineOfCode.has_value())
-                return loc;
-            else
-                return std::nullopt;
-        }
-        catch (std::exception & e) {
-            return std::nullopt;
-        }
-    } else {
-        std::istringstream iss(errPos.file);
+        std::istringstream iss(*source);
         // count the newlines.
         int count = 0;
-        std::string line;
-        int pl = errPos.line - 1;
+        std::string curLine;
+        int pl = line - 1;
 
         LinesOfCode loc;
 
-        do
-        {
-            std::getline(iss, line);
+        do {
+            std::getline(iss, curLine);
             ++count;
             if (count < pl)
-            {
                 ;
-            }
             else if (count == pl) {
-                loc.prevLineOfCode = line;
+                loc.prevLineOfCode = curLine;
             } else if (count == pl + 1) {
-                loc.errLineOfCode = line;
+                loc.errLineOfCode = curLine;
             } else if (count == pl + 2) {
-                loc.nextLineOfCode = line;
+                loc.nextLineOfCode = curLine;
                 break;
             }
 
@@ -124,12 +79,14 @@ std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos)
 
         return loc;
     }
+
+    return std::nullopt;
 }
 
 // print lines of code to the ostream, indicating the error column.
 void printCodeLines(std::ostream & out,
     const std::string & prefix,
-    const ErrPos & errPos,
+    const AbstractPos & errPos,
     const LinesOfCode & loc)
 {
     // previous line of code.
@@ -173,28 +130,6 @@ void printCodeLines(std::ostream & out,
             prefix,
             (errPos.line + 1),
             *loc.nextLineOfCode);
-    }
-}
-
-void printAtPos(const ErrPos & pos, std::ostream & out)
-{
-    if (pos) {
-        switch (pos.origin) {
-            case foFile: {
-                out << fmt(ANSI_BLUE "at " ANSI_WARNING "%s:%s" ANSI_NORMAL ":", pos.file, showErrPos(pos));
-                break;
-            }
-            case foString: {
-                out << fmt(ANSI_BLUE "at " ANSI_WARNING "«string»:%s" ANSI_NORMAL ":", showErrPos(pos));
-                break;
-            }
-            case foStdin: {
-                out << fmt(ANSI_BLUE "at " ANSI_WARNING "«stdin»:%s" ANSI_NORMAL ":", showErrPos(pos));
-                break;
-            }
-            default:
-                throw Error("invalid FileOrigin in errPos");
-        }
     }
 }
 
@@ -263,22 +198,22 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
     std::ostringstream oss;
 
+    auto noSource = ANSI_ITALIC " (source not available)" ANSI_NORMAL "\n";
+
     // traces
     if (showTrace && !einfo.traces.empty()) {
         for (const auto & trace : einfo.traces) {
             oss << "\n" << "… " << trace.hint.str() << "\n";
 
-            if (trace.pos.has_value() && (*trace.pos)) {
-                auto pos = trace.pos.value();
-                oss << "\n";
-                printAtPos(pos, oss);
+            if (trace.pos) {
+                oss << "\n" << ANSI_BLUE << "at " ANSI_WARNING << *trace.pos << ANSI_NORMAL << ":";
 
-                auto loc = getCodeLines(pos);
-                if (loc.has_value()) {
+                if (auto loc = trace.pos->getCodeLines()) {
                     oss << "\n";
-                    printCodeLines(oss, "", pos, *loc);
+                    printCodeLines(oss, "", *trace.pos, *loc);
                     oss << "\n";
-                }
+                } else
+                    oss << noSource;
             }
         }
         oss << "\n" << prefix;
@@ -286,22 +221,19 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
     oss << einfo.msg << "\n";
 
-    if (einfo.errPos.has_value() && *einfo.errPos) {
-        oss << "\n";
-        printAtPos(*einfo.errPos, oss);
+    if (einfo.errPos) {
+        oss << "\n" << ANSI_BLUE << "at " ANSI_WARNING << *einfo.errPos << ANSI_NORMAL << ":";
 
-        auto loc = getCodeLines(*einfo.errPos);
-
-        // lines of code.
-        if (loc.has_value()) {
+        if (auto loc = einfo.errPos->getCodeLines()) {
             oss << "\n";
             printCodeLines(oss, "", *einfo.errPos, *loc);
             oss << "\n";
-        }
+        } else
+            oss << noSource;
     }
 
     auto suggestions = einfo.suggestions.trim();
-    if (! suggestions.suggestions.empty()){
+    if (!suggestions.suggestions.empty()) {
         oss << "Did you mean " <<
             suggestions.trim() <<
             "?" << std::endl;
