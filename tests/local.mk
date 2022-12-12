@@ -98,7 +98,6 @@ nix_tests = \
   ssh-relay.sh \
   plugins.sh \
   build.sh \
-  build-explicit-output.sh \
   ca/nix-run.sh \
   selfref-gc.sh ca/selfref-gc.sh \
   db-migration.sh \
