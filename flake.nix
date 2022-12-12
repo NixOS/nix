@@ -9,13 +9,13 @@
 
     let
 
-      version = builtins.readFile ./.version + versionSuffix;
+      officialRelease = false;
+
+      version = nixpkgs.lib.fileContents ./.version + versionSuffix;
       versionSuffix =
         if officialRelease
         then ""
         else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
-
-      officialRelease = false;
 
       linux64BitSystems = [ "x86_64-linux" "aarch64-linux" ];
       linuxSystems = linux64BitSystems ++ [ "i686-linux" ];
@@ -501,6 +501,12 @@
         });
 
         tests.sourcehutFlakes = (import ./tests/sourcehut-flakes.nix rec {
+          system = "x86_64-linux";
+          inherit nixpkgs;
+          overlay = self.overlays.default;
+        });
+
+        tests.containers = (import ./tests/containers.nix rec {
           system = "x86_64-linux";
           inherit nixpkgs;
           overlay = self.overlays.default;

@@ -147,7 +147,7 @@ void LocalStore::addTempRoot(const StorePath & path)
         } catch (SysError & e) {
             /* The garbage collector may have exited, so we need to
                restart. */
-            if (e.errNo == EPIPE) {
+            if (e.errNo == EPIPE || e.errNo == ECONNRESET) {
                 debug("GC socket disconnected");
                 state->fdRootsSocket.close();
                 goto restart;
@@ -506,6 +506,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         Finally cleanup([&]() {
             debug("GC roots server shutting down");
+            fdServer.close();
             while (true) {
                 auto item = remove_begin(*connections.lock());
                 if (!item) break;
