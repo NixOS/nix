@@ -85,6 +85,23 @@ MixEvalArgs::MixEvalArgs()
   -I nixpkgs=channel:nixos-21.05
   -I nixpkgs=https://nixos.org/channels/nixos-21.05/nixexprs.tar.xz
   ```
+
+  You can also fetch source trees using flake URLs and add them to the
+  search path. For instance,
+
+  ```
+  -I nixpkgs=flake:nixpkgs
+  ```
+
+  specifies that the prefix `nixpkgs` shall refer to the source tree
+  downloaded from the `nixpkgs` entry in the flake registry. Similarly,
+
+  ```
+  -I nixpkgs=flake:github:NixOS/nixpkgs/nixos-22.05
+  ```
+
+  makes `<nixpkgs>` refer to a particular branch of the
+  `NixOS/nixpkgs` repository on GitHub.
   )",
         .category = category,
         .labels = {"path"},
