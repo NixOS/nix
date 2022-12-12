@@ -220,8 +220,6 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
     } else
         url = state.forceStringNoCtx(*args[0], pos);
 
-    url = resolveUri(*url);
-
     state.checkURI(*url);
 
     if (name == "")

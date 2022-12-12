@@ -590,6 +590,10 @@ struct EvalSettings : Config
 
     static Strings getDefaultNixPath();
 
+    static bool isPseudoUrl(std::string_view s);
+
+    static std::string resolvePseudoUrl(std::string_view url);
+
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
         "Whether builtin functions that allow executing native code should be enabled."};
 
