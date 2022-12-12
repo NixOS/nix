@@ -812,10 +812,13 @@ static void opServe(Strings opFlags, Strings opArgs)
             if (nrRepeats != 0) {
                 throw Error("client requested repeating builds, but this is not currently implemented");
             }
-            // Ignore. It used to be true by default, but also only never had any effect when `nrRepeats == 0`.
-            // We have already asserted that `nrRepeats` in fact is 0, so we can safely ignore this without
-            // doing something other than what the client asked for.
-            auto _enforceDeterminism = readInt(in);
+            // Ignore 'enforceDeterminism'. It used to be true by
+            // default, but also only never had any effect when
+            // `nrRepeats == 0`.  We have already asserted that
+            // `nrRepeats` in fact is 0, so we can safely ignore this
+            // without doing something other than what the client
+            // asked for.
+            readInt(in);
 
             settings.runDiffHook = true;
         }
