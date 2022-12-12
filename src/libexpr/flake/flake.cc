@@ -353,7 +353,7 @@ LockedFlake lockFlake(
 
         std::function<void(
             const FlakeInputs & flakeInputs,
-            std::shared_ptr<Node> node,
+            ref<Node> node,
             const InputPath & inputPathPrefix,
             std::shared_ptr<const Node> oldNode,
             const InputPath & lockRootPath,
@@ -362,9 +362,15 @@ LockedFlake lockFlake(
             computeLocks;
 
         computeLocks = [&](
+            /* The inputs of this node, either from flake.nix or
+               flake.lock. */
             const FlakeInputs & flakeInputs,
-            std::shared_ptr<Node> node,
+            /* The node whose locks are to be updated.*/
+            ref<Node> node,
+            /* The path to this node in the lock file graph. */
             const InputPath & inputPathPrefix,
+            /* The old node, if any, from which locks can be
+               copied. */
             std::shared_ptr<const Node> oldNode,
             const InputPath & lockRootPath,
             const Path & parentPath,
@@ -452,7 +458,7 @@ LockedFlake lockFlake(
                         /* Copy the input from the old lock since its flakeref
                            didn't change and there is no override from a
                            higher level flake. */
-                        auto childNode = std::make_shared<LockedNode>(
+                        auto childNode = make_ref<LockedNode>(
                             oldLock->lockedRef, oldLock->originalRef, oldLock->isFlake);
 
                         node->inputs.insert_or_assign(id, childNode);
@@ -481,7 +487,7 @@ LockedFlake lockFlake(
                                         .isFlake = (*lockedNode)->isFlake,
                                     });
                                 } else if (auto follows = std::get_if<1>(&i.second)) {
-                                    if (! trustLock) {
+                                    if (!trustLock) {
                                         // It is possible that the flake has changed,
                                         // so we must confirm all the follows that are in the lock file are also in the flake.
                                         auto overridePath(inputPath);
@@ -521,8 +527,8 @@ LockedFlake lockFlake(
                            this input. */
                         debug("creating new input '%s'", inputPathS);
 
-                        if (!lockFlags.allowMutable && !input.ref->input.isLocked())
-                            throw Error("cannot update flake input '%s' in pure mode", inputPathS);
+                        if (!lockFlags.allowUnlocked && !input.ref->input.isLocked())
+                            throw Error("cannot update unlocked flake input '%s' in pure mode", inputPathS);
 
                         /* Note: in case of an --override-input, we use
                             the *original* ref (input2.ref) for the
@@ -544,7 +550,7 @@ LockedFlake lockFlake(
 
                             auto inputFlake = getFlake(state, localRef, useRegistries, flakeCache, inputPath);
 
-                            auto childNode = std::make_shared<LockedNode>(inputFlake.lockedRef, ref);
+                            auto childNode = make_ref<LockedNode>(inputFlake.lockedRef, ref);
 
                             node->inputs.insert_or_assign(id, childNode);
 
@@ -564,15 +570,19 @@ LockedFlake lockFlake(
                                 oldLock
                                 ? std::dynamic_pointer_cast<const Node>(oldLock)
                                 : LockFile::read(
-                                    inputFlake.sourceInfo->actualPath + "/" + inputFlake.lockedRef.subdir + "/flake.lock").root,
-                                oldLock ? lockRootPath : inputPath, localPath, false);
+                                    inputFlake.sourceInfo->actualPath + "/" + inputFlake.lockedRef.subdir + "/flake.lock").root.get_ptr(),
+                                oldLock ? lockRootPath : inputPath,
+                                localPath,
+                                false);
                         }
 
                         else {
                             auto [sourceInfo, resolvedRef, lockedRef] = fetchOrSubstituteTree(
                                 state, *input.ref, useRegistries, flakeCache);
-                            node->inputs.insert_or_assign(id,
-                                std::make_shared<LockedNode>(lockedRef, ref, false));
+
+                            auto childNode = make_ref<LockedNode>(lockedRef, ref, false);
+
+                            node->inputs.insert_or_assign(id, childNode);
                         }
                     }
 
@@ -587,8 +597,13 @@ LockedFlake lockFlake(
         auto parentPath = canonPath(flake.sourceInfo->actualPath + "/" + flake.lockedRef.subdir, true);
 
         computeLocks(
-            flake.inputs, newLockFile.root, {},
-            lockFlags.recreateLockFile ? nullptr : oldLockFile.root, {}, parentPath, false);
+            flake.inputs,
+            newLockFile.root,
+            {},
+            lockFlags.recreateLockFile ? nullptr : oldLockFile.root.get_ptr(),
+            {},
+            parentPath,
+            false);
 
         for (auto & i : lockFlags.inputOverrides)
             if (!overridesUsed.count(i.first))
@@ -611,9 +626,9 @@ LockedFlake lockFlake(
 
             if (lockFlags.writeLockFile) {
                 if (auto sourcePath = topRef.input.getSourcePath()) {
-                    if (!newLockFile.isImmutable()) {
+                    if (auto unlockedInput = newLockFile.isUnlocked()) {
                         if (fetchSettings.warnDirty)
-                            warn("will not write lock file of flake '%s' because it has a mutable input", topRef);
+                            warn("will not write lock file of flake '%s' because it has an unlocked input ('%s')", topRef, *unlockedInput);
                     } else {
                         if (!lockFlags.updateLockFile)
                             throw Error("flake '%s' requires lock file changes but they're not allowed due to '--no-update-lock-file'", topRef);
@@ -737,7 +752,7 @@ static void prim_getFlake(EvalState & state, const PosIdx pos, Value * * args, V
                 .updateLockFile = false,
                 .writeLockFile = false,
                 .useRegistries = !evalSettings.pureEval && fetchSettings.useRegistries,
-                .allowMutable  = !evalSettings.pureEval,
+                .allowUnlocked = !evalSettings.pureEval,
             }),
         v);
 }

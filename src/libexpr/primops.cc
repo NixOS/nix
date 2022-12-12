@@ -1461,10 +1461,10 @@ static RegisterPrimOp primop_storePath({
 static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     /* We don’t check the path right now, because we don’t want to
-      throw if the path isn’t allowed, but just return false (and we
-      can’t just catch the exception here because we still want to
-      throw if something in the evaluation of `*args[0]` tries to
-      access an unauthorized path). */
+       throw if the path isn’t allowed, but just return false (and we
+       can’t just catch the exception here because we still want to
+       throw if something in the evaluation of `*args[0]` tries to
+       access an unauthorized path). */
     auto path = realisePath(state, pos, *args[0], { .checkForPureEval = false });
 
     try {

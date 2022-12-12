@@ -107,26 +107,25 @@ public:
  * recognized.  The Input object contains the information the fetcher
  * needs to actually perform the "fetch()" when called.
  */
-
 struct InputScheme
 {
     virtual ~InputScheme()
     { }
 
-    virtual std::optional<Input> inputFromURL(const ParsedURL & url) = 0;
+    virtual std::optional<Input> inputFromURL(const ParsedURL & url) const = 0;
 
-    virtual std::optional<Input> inputFromAttrs(const Attrs & attrs) = 0;
+    virtual std::optional<Input> inputFromAttrs(const Attrs & attrs) const = 0;
 
-    virtual ParsedURL toURL(const Input & input);
+    virtual ParsedURL toURL(const Input & input) const;
 
-    virtual bool hasAllInfo(const Input & input) = 0;
+    virtual bool hasAllInfo(const Input & input) const = 0;
 
     virtual Input applyOverrides(
         const Input & input,
         std::optional<std::string> ref,
-        std::optional<Hash> rev);
+        std::optional<Hash> rev) const;
 
-    virtual void clone(const Input & input, const Path & destDir);
+    virtual void clone(const Input & input, const Path & destDir) const;
 
     virtual std::optional<Path> getSourcePath(const Input & input);
 

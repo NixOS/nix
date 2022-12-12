@@ -177,7 +177,7 @@ fi
 PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
 
 
-# Checks for libarchive
+# Look for libarchive.
 PKG_CHECK_MODULES([LIBARCHIVE], [libarchive >= 3.1.2], [CXXFLAGS="$LIBARCHIVE_CFLAGS $CXXFLAGS"])
 # Workaround until https://github.com/libarchive/libarchive/issues/1446 is fixed
 if test "$shared" != yes; then

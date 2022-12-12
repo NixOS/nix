@@ -1594,6 +1594,21 @@ std::string stripIndentation(std::string_view s)
 }
 
 
+std::pair<std::string_view, std::string_view> getLine(std::string_view s)
+{
+    auto newline = s.find('\n');
+
+    if (newline == s.npos) {
+        return {s, ""};
+    } else {
+        auto line = s.substr(0, newline);
+        if (!line.empty() && line[line.size() - 1] == '\r')
+            line = line.substr(0, line.size() - 1);
+        return {line, s.substr(newline + 1)};
+    }
+}
+
+
 //////////////////////////////////////////////////////////////////////
 
 static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};

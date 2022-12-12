@@ -11,7 +11,7 @@ expect_trace() {
             --expr "$expr" 2>&1 \
             | grep "function-trace" \
             | sed -e 's/ [0-9]*$//'
-    );
+    )
 
     echo -n "Tracing expression '$expr'"
     set +e

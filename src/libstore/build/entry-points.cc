@@ -30,7 +30,7 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
             if (ex)
                 logError(i->ex->info());
             else
-                ex = i->ex;
+                ex = std::move(i->ex);
         }
         if (i->exitCode != Goal::ecSuccess) {
             if (auto i2 = dynamic_cast<DerivationGoal *>(i.get())) failed.insert(i2->drvPath);
@@ -40,7 +40,7 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
 
     if (failed.size() == 1 && ex) {
         ex->status = worker.exitStatus();
-        throw *ex;
+        throw std::move(*ex);
     } else if (!failed.empty()) {
         if (ex) logError(ex->info());
         throw Error(worker.exitStatus(), "build of %s failed", showPaths(failed));
@@ -109,7 +109,7 @@ void Store::ensurePath(const StorePath & path)
     if (goal->exitCode != Goal::ecSuccess) {
         if (goal->ex) {
             goal->ex->status = worker.exitStatus();
-            throw *goal->ex;
+            throw std::move(*goal->ex);
         } else
             throw Error(worker.exitStatus(), "path '%s' does not exist and cannot be created", printStorePath(path));
     }
