@@ -756,7 +756,9 @@ inline std::string operator + (std::string && s, std::string_view s2)
 
 inline std::string operator + (std::string_view s1, const char * s2)
 {
-    std::string s(s1);
+    std::string s;
+    s.reserve(s1.size() + strlen(s2));
+    s.append(s1);
     s.append(s2);
     return s;
 }
