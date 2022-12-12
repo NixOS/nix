@@ -569,8 +569,8 @@ LockedFlake lockFlake(
                                 inputFlake.inputs, childNode, inputPath,
                                 oldLock
                                 ? std::dynamic_pointer_cast<const Node>(oldLock)
-                                : (std::shared_ptr<Node>) LockFile::read(
-                                    inputFlake.sourceInfo->actualPath + "/" + inputFlake.lockedRef.subdir + "/flake.lock").root,
+                                : LockFile::read(
+                                    inputFlake.sourceInfo->actualPath + "/" + inputFlake.lockedRef.subdir + "/flake.lock").root.get_ptr(),
                                 oldLock ? lockRootPath : inputPath,
                                 localPath,
                                 false);
@@ -600,7 +600,7 @@ LockedFlake lockFlake(
             flake.inputs,
             newLockFile.root,
             {},
-            lockFlags.recreateLockFile ? nullptr : (std::shared_ptr<Node>) oldLockFile.root,
+            lockFlags.recreateLockFile ? nullptr : oldLockFile.root.get_ptr(),
             {},
             parentPath,
             false);
