@@ -187,7 +187,7 @@ operate are determined as follows:
   and likewise, again using a store path to a "drv" file to specify the derivation:
 
   ```console
-  # nix path-info -S --eval-store auto --store https://cache.nixos.org '/nix/store/gzaflydcr6sb3567hap9q6srzx8ggdgg-glibc-2.33-78.drv^*'
+  # nix path-info -S '/nix/store/gzaflydcr6sb3567hap9q6srzx8ggdgg-glibc-2.33-78.drv^*'
   …
   ```
 

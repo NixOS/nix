@@ -93,7 +93,7 @@ DerivedPath::Built DerivedPath::Built::parse(const Store & store, std::string_vi
 
 DerivedPath DerivedPath::parse(const Store & store, std::string_view s)
 {
-    size_t n = s.rfind("!");
+    size_t n = s.find("!");
     return n == s.npos
         ? (DerivedPath) DerivedPath::Opaque::parse(store, s)
         : (DerivedPath) DerivedPath::Built::parse(store, s.substr(0, n), s.substr(n + 1));
