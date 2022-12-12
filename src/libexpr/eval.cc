@@ -1660,7 +1660,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                         (lambda.name
                             ? concatStrings("'", symbols[lambda.name], "'")
                             : "anonymous lambda"));
-                    addErrorTrace(e, pos, "from call site%s", "");
+                    addErrorTrace(e, pos, "while evaluating call site%s", "");
                 }
                 throw;
             }
