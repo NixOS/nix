@@ -15,14 +15,14 @@ Nix consists of [hierarchical layers].
 |                 | commmand line interface |------.            |
 |                 '-------------------------'      |            |
 |                              |                   |            |
-|                          evaluates               |            |
+|                            calls                 |            |
 |                              |                manages         |
 |                              V                   |            |
 |                 .-------------------------.      |            |
-|                 | configuration language  |      |            |
+|                 |    language evaluator   |      |            |
 |                 '-------------------------'      |            |
 |                              |                   |            |
-|                         evaluates to             |            |
+|                           produces               |            |
 |                              |                   V            |
 | +----------------------------|------------------------------+ |
 | | store                      |                              | |
@@ -36,7 +36,7 @@ Nix consists of [hierarchical layers].
 
 At the top is the [command line interface](../command-ref/command-ref.md), translating from invocations of Nix executables to interactions with the underlying layers.
 
-Below that is the [Nix language](../language/index.md), the configuration language for Nix.
+Below that is the evaluator for the [Nix language](../language/index.md), the configuration language for Nix.
 Its expressions ultimately evaluate to self-contained *build plans*, used to derive *build results* from referenced *build inputs*.
 
 The command line interface and the Nix language are what users interact with most.
