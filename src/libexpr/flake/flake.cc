@@ -7,6 +7,7 @@
 #include "fetchers.hh"
 #include "finally.hh"
 #include "fetch-settings.hh"
+#include "registry.hh"
 
 namespace nix {
 
@@ -104,6 +105,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
     auto sUrl = state.symbols.create("url");
     auto sFlake = state.symbols.create("flake");
     auto sFollows = state.symbols.create("follows");
+    auto sRegister = state.symbols.create("register");
 
     fetchers::Attrs attrs;
     std::optional<std::string> url;
@@ -124,7 +126,11 @@ static FlakeInput parseFlakeInput(EvalState & state,
                 auto follows(parseInputPath(attr.value->string.s));
                 follows.insert(follows.begin(), lockRootPath.begin(), lockRootPath.end());
                 input.follows = follows;
-            } else {
+            } else if (attr.name == sRegister) {
+                expectType(state, nBool, *attr.value, attr.pos);
+                input.registered = attr.value;
+            }
+            else {
                 switch (attr.value->type()) {
                     case nString:
                         attrs.emplace(state.symbols[attr.name], attr.value->string.s);
@@ -358,7 +364,8 @@ LockedFlake lockFlake(
             std::shared_ptr<const Node> oldNode,
             const InputPath & lockRootPath,
             const Path & parentPath,
-            bool trustLock)>
+            bool trustLock,
+            std::map<Path, InputPath> registered)>
             computeLocks;
 
         computeLocks = [&](
@@ -368,9 +375,12 @@ LockedFlake lockFlake(
             std::shared_ptr<const Node> oldNode,
             const InputPath & lockRootPath,
             const Path & parentPath,
-            bool trustLock)
+            bool trustLock,
+            std::map<Path, InputPath> registered)
         {
             debug("computing lock file node '%s'", printInputPath(inputPathPrefix));
+
+            std::set<Path> registeredChilds;
 
             /* Get the overrides (i.e. attributes of the form
                'inputs.nixops.inputs.nixpkgs.url = ...'). */
@@ -380,6 +390,16 @@ LockedFlake lockFlake(
                     inputPath.push_back(id);
                     inputPath.push_back(idOverride);
                     overrides.insert_or_assign(inputPath, inputOverride);
+                }
+                if (input.registered) {
+                    /* Record the name and the eventual path of
+                       registered inputs.  Registered inputs are set to follow the recorded input path.
+                       Only in the defining flake the registered input is handled explicitly to catch transistive inputs */
+                    auto inputPath(inputPathPrefix);
+                    inputPath.push_back(id);
+                    debug("preregistering %s", id.c_str());
+                    registeredChilds.insert(id);
+                    registered.insert_or_assign(id, inputPath);
                 }
             }
 
@@ -426,6 +446,19 @@ LockedFlake lockFlake(
                         target.insert(target.end(), input.follows->begin(), input.follows->end());
 
                         debug("input '%s' follows '%s'", inputPathS, printInputPath(target));
+                        node->inputs.insert_or_assign(id, target);
+                        continue;
+                    }
+
+                    auto registeredInputID = registered.find(id);
+                    if (registeredInputID != registered.end()
+                        && (registeredChilds.find(id) == registeredChilds.end()) // do not substitute original input
+                        && (input.ref->to_string() == "flake:" + id) // check that the input is not explicitly defined
+                    )
+                    {
+                        debug("Using already registered node for %s", id);
+                        InputPath target;
+                        target.insert(target.end(), registeredInputID->second.begin(), registeredInputID->second.end());
                         node->inputs.insert_or_assign(id, target);
                         continue;
                     }
@@ -514,7 +547,7 @@ LockedFlake lockFlake(
                             mustRefetch
                             ? getFlake(state, oldLock->lockedRef, false, flakeCache, inputPath).inputs
                             : fakeInputs,
-                            childNode, inputPath, oldLock, lockRootPath, parentPath, !mustRefetch);
+                            childNode, inputPath, oldLock, lockRootPath, parentPath, !mustRefetch, registered);
 
                     } else {
                         /* We need to create a new lock file entry. So fetch
@@ -565,7 +598,7 @@ LockedFlake lockFlake(
                                 ? std::dynamic_pointer_cast<const Node>(oldLock)
                                 : LockFile::read(
                                     inputFlake.sourceInfo->actualPath + "/" + inputFlake.lockedRef.subdir + "/flake.lock").root,
-                                oldLock ? lockRootPath : inputPath, localPath, false);
+                                oldLock ? lockRootPath : inputPath, localPath, false, registered);
                         }
 
                         else {
@@ -585,10 +618,11 @@ LockedFlake lockFlake(
 
         // Bring in the current ref for relative path resolution if we have it
         auto parentPath = canonPath(flake.sourceInfo->actualPath + "/" + flake.lockedRef.subdir, true);
+        std::map<Path, InputPath> registered;
 
         computeLocks(
             flake.inputs, newLockFile.root, {},
-            lockFlags.recreateLockFile ? nullptr : oldLockFile.root, {}, parentPath, false);
+            lockFlags.recreateLockFile ? nullptr : oldLockFile.root, {}, parentPath, false, registered);
 
         for (auto & i : lockFlags.inputOverrides)
             if (!overridesUsed.count(i.first))
