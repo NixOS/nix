@@ -808,12 +808,18 @@ static void opServe(Strings opFlags, Strings opArgs)
         if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
             settings.maxLogSize = readNum<unsigned long>(in);
         if (GET_PROTOCOL_MINOR(clientVersion) >= 3) {
-            if (readInt(in) != 0) {
+            auto nrRepeats = readInt(in);
+            if (nrRepeats != 0) {
                 throw Error("client requested repeating builds, but this is not currently implemented");
             }
-            if (readInt(in) != 0) {
-                throw Error("client requested enforcing determinism, but this is not currently implemented");
-            }
+            // Ignore 'enforceDeterminism'. It used to be true by
+            // default, but also only never had any effect when
+            // `nrRepeats == 0`.  We have already asserted that
+            // `nrRepeats` in fact is 0, so we can safely ignore this
+            // without doing something other than what the client
+            // asked for.
+            readInt(in);
+
             settings.runDiffHook = true;
         }
         if (GET_PROTOCOL_MINOR(clientVersion) >= 7) {

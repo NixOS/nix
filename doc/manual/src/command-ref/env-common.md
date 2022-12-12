@@ -7,11 +7,11 @@ Most Nix commands interpret the following environment variables:
     `nix-shell`. It can have the values `pure` or `impure`.
 
   - [`NIX_PATH`]{#env-NIX_PATH}\
-    A colon-separated list of directories used to look up Nix
-    expressions enclosed in angle brackets (i.e., `<path>`),
-     e.g. `/home/eelco/Dev:/etc/nixos`. It can be extended using the
-    `-I` option. For more information about the semantics of the Nix
-    search path, see the documentation for `-I`.
+    A colon-separated list of directories used to look up the location of Nix
+    expressions using [paths](../language/values.md#type-path)
+    enclosed in angle brackets (i.e., `<path>`),
+    e.g. `/home/eelco/Dev:/etc/nixos`. It can be extended using the
+    [`-I` option](./opt-common#opt-I).
 
   - [`NIX_IGNORE_SYMLINK_STORE`]{#env-NIX_IGNORE_SYMLINK_STORE}\
     Normally, the Nix store directory (typically `/nix/store`) is not

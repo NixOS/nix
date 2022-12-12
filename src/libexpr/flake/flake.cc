@@ -333,7 +333,7 @@ LockedFlake lockFlake(
 
         computeLocks = [&](
             /* The inputs of this node, either from flake.nix or
-               flake.lock */
+               flake.lock. */
             const FlakeInputs & flakeInputs,
             /* The node whose locks are to be updated.*/
             ref<Node> node,
@@ -568,7 +568,7 @@ LockedFlake lockFlake(
                                 inputFlake.inputs, childNode, inputPath,
                                 oldLock
                                 ? std::dynamic_pointer_cast<const Node>(oldLock)
-                                : (std::shared_ptr<Node>) readLockFile(inputFlake).root,
+                                : readLockFile(inputFlake).root.get_ptr(),
                                 oldLock ? followsPrefix : inputPath,
                                 inputFlake.path,
                                 false);
@@ -600,7 +600,7 @@ LockedFlake lockFlake(
             flake->inputs,
             newLockFile.root,
             {},
-            lockFlags.recreateLockFile ? nullptr : (std::shared_ptr<Node>) oldLockFile.root,
+            lockFlags.recreateLockFile ? nullptr : oldLockFile.root.get_ptr(),
             {},
             flake->path,
             false);

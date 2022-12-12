@@ -45,15 +45,15 @@ std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
 {
     std::shared_ptr<Node> pos = root;
 
-    if (!pos) return {};
-
     for (auto & elem : path) {
         if (auto i = get(pos->inputs, elem)) {
             if (auto node = std::get_if<0>(&*i))
                 pos = (std::shared_ptr<LockedNode>) *node;
             else if (auto follows = std::get_if<1>(&*i)) {
-                pos = findInput(*follows);
-                if (!pos) return {};
+                if (auto p = findInput(*follows))
+                    pos = ref(p);
+                else
+                    return {};
             }
         } else
             return {};

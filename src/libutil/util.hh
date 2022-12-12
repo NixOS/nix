@@ -515,8 +515,9 @@ template<typename T>
 T readLittleEndian(unsigned char * p)
 {
     T x = 0;
-    for (size_t i = 0; i < sizeof(x); ++i)
-        x |= ((T) *p++) << (i * 8);
+    for (size_t i = 0; i < sizeof(x); ++i, ++p) {
+        x |= ((T) *p) << (i * 8);
+    }
     return x;
 }
 
@@ -756,7 +757,9 @@ inline std::string operator + (std::string && s, std::string_view s2)
 
 inline std::string operator + (std::string_view s1, const char * s2)
 {
-    std::string s(s1);
+    std::string s;
+    s.reserve(s1.size() + strlen(s2));
+    s.append(s1);
     s.append(s2);
     return s;
 }

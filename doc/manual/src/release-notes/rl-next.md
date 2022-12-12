@@ -3,7 +3,10 @@
 * The `repeat` and `enforce-determinism` options have been removed
   since they had been broken under many circumstances for a long time.
 
-* You can now use flake references in the old CLI, e.g.
+* You can now use [flake references] in the [old command line interface], e.g.
+
+   [flake references]: ../command-ref/new-cli/nix3-flake.md#flake-references
+   [old command line interface]: ../command-ref/main-commands.md
 
   ```
   # nix-build flake:nixpkgs -A hello
