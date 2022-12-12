@@ -17,11 +17,11 @@ release:
 
 * An updated manual on https://nixos.org/manual/nix/stable/
 
-## Creating a new release from master
+## Creating a new release from the `master` branch
 
-* Make sure that https://hydra.nixos.org/jobset/nix/master is green.
+* Make sure that the [Hydra `master` jobset](https://hydra.nixos.org/jobset/nix/master) succeeds.
 
-* In a checkout of the Nix repo, make sure you're on `master` and do a
+* In a checkout of the Nix repo, make sure you're on `master` and run
   `git pull`.
 
 * Move the contents of `doc/manual/src/release-notes/rl-next.md`
@@ -103,10 +103,10 @@ release:
 
 * When the jobset evaluation has succeeded building, take note of the
   evaluation ID (e.g. `1780832` in
-  https://hydra.nixos.org/eval/1780832).
+  `https://hydra.nixos.org/eval/1780832`).
 
 * Tag the release and upload the release artifacts to
-  `releases.nixos.org` and dockerhub:
+  [`releases.nixos.org`](https://releases.nixos.org/) and [Docker Hub](https://hub.docker.com/):
 
   ```console
   $ IS_LATEST=1 ./maintainers/upload-release.pl <EVAL-ID>
@@ -114,7 +114,7 @@ release:
 
   Note: `IS_LATEST=1` causes the `latest-release` branch to be
   force-updated. This is used by the `nixos.org` website to get the
-  latest Nix manual.
+  [latest Nix manual](https://nixos.org/manual/nixpkgs/unstable/).
 
   TODO: This script requires the right AWS credentials. Document.
 
@@ -146,13 +146,13 @@ release:
   $ git push --set-upstream origin bump-$NEW_VERSION
   ```
 
-  Make a PR and auto-merge it.
+  Make a pull request and auto-merge it.
 
 * Create a milestone for the next release, move all unresolved issues
   from the previous milestone, and close the previous milestone. Set
   the date for the next milestone 6 weeks from now.
 
-* Post an announcement on Discourse, including the contents of
+* Post an [announcement on Discourse](https://discourse.nixos.org/c/announcements/8), including the contents of
   `rl-$VERSION.md`.
 
 ## Creating a point release
