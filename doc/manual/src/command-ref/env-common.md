@@ -9,7 +9,7 @@ Most Nix commands interpret the following environment variables:
   - [`NIX_PATH`]{#env-NIX_PATH}\
     A colon-separated list of directories used to look up the location of Nix
     expressions enclosed in angle brackets (i.e., `<path>`),
-     e.g. `/home/eelco/Dev:/etc/nixos`. It can be extended using the
+    e.g. `/home/eelco/Dev:/etc/nixos`. It can be extended using the
     `-I` option. For more information about the semantics of the Nix
     search path, see the documentation for `-I`.
 
