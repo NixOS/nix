@@ -1246,7 +1246,7 @@ void EvalState::cacheFile(
                 *this,
                 *e,
                 this->baseEnv,
-                e->getPos() ? static_cast<std::shared_ptr<AbstractPos>>(positions[e->getPos()] : nullptr),
+                e->getPos() ? static_cast<std::shared_ptr<AbstractPos>>(positions[e->getPos()]) : nullptr,
                 "while evaluating the file '%1%':", resolvedPath)
             : nullptr;
 
