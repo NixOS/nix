@@ -86,7 +86,7 @@ MixEvalArgs::MixEvalArgs()
   -I nixpkgs=https://nixos.org/channels/nixos-21.05/nixexprs.tar.xz
   ```
 
-  You can also fetch source trees using flake URLs and add them to the
+  You can also fetch source trees using [flake URLs](./nix3-flake.md#url-like-syntax) and add them to the
   search path. For instance,
 
   ```
