@@ -399,44 +399,56 @@ static StorePath getDeriver(
 struct InstallableStorePath : Installable
 {
     ref<Store> store;
-    StorePath storePath;
+    DerivedPath req;
 
     InstallableStorePath(ref<Store> store, StorePath && storePath)
-        : store(store), storePath(std::move(storePath)) { }
+        : store(store),
+          req(storePath.isDerivation()
+              ? (DerivedPath) DerivedPath::Built {
+                  .drvPath = std::move(storePath),
+                  .outputs = {},
+              }
+              : (DerivedPath) DerivedPath::Opaque {
+                  .path = std::move(storePath),
+              })
+    { }
 
-    std::string what() const override { return store->printStorePath(storePath); }
+    InstallableStorePath(ref<Store> store, DerivedPath && req)
+        : store(store), req(std::move(req))
+    { }
+
+    std::string what() const override
+    {
+        return req.to_string(*store);
+    }
 
     DerivedPaths toDerivedPaths() override
     {
-        if (storePath.isDerivation()) {
-            auto drv = store->readDerivation(storePath);
-            return {
-                DerivedPath::Built {
-                    .drvPath = storePath,
-                    .outputs = drv.outputNames(),
-                }
-            };
-        } else {
-            return {
-                DerivedPath::Opaque {
-                    .path = storePath,
-                }
-            };
-        }
+        return { req };
     }
 
     StorePathSet toDrvPaths(ref<Store> store) override
     {
-        if (storePath.isDerivation()) {
-            return {storePath};
-        } else {
-            return {getDeriver(store, *this, storePath)};
-        }
+        return std::visit(overloaded {
+            [&](const DerivedPath::Built & bfd) -> StorePathSet {
+                return { bfd.drvPath };
+            },
+            [&](const DerivedPath::Opaque & bo) -> StorePathSet {
+                return { getDeriver(store, *this, bo.path) };
+            },
+        }, req.raw());
     }
 
     std::optional<StorePath> getStorePath() override
     {
-        return storePath;
+        return std::visit(overloaded {
+            [&](const DerivedPath::Built & bfd) {
+                return bfd.drvPath;
+            },
+            [&](const DerivedPath::Opaque & bo) {
+                return bo.path;
+            },
+        }, req.raw());
     }
 };
 
@@ -803,7 +815,22 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         for (auto & s : ss) {
             std::exception_ptr ex;
 
-            if (s.find('/') != std::string::npos) {
+            auto found = s.rfind('^');
+            if (found != std::string::npos) {
+                try {
+                    result.push_back(std::make_shared<InstallableStorePath>(
+                        store,
+                        DerivedPath::Built::parse(*store, s.substr(0, found), s.substr(found + 1))));
+                    continue;
+                } catch (BadStorePath &) {
+                } catch (...) {
+                    if (!ex)
+                        ex = std::current_exception();
+                }
+            }
+
+            found = s.find('/');
+            if (found != std::string::npos) {
                 try {
                     result.push_back(std::make_shared<InstallableStorePath>(store, store->followLinksToStorePath(s)));
                     continue;
