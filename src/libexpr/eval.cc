@@ -45,7 +45,7 @@ static char * allocString(size_t size)
 #if HAVE_BOEHMGC
     t = (char *) GC_MALLOC_ATOMIC(size);
 #else
-    t = malloc(size);
+    t = (char *) malloc(size);
 #endif
     if (!t) throw std::bad_alloc();
     return t;
@@ -471,9 +471,6 @@ EvalState::EvalState(
 #if HAVE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
     , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
-#else
-    , valueAllocCache(std::make_shared<void *>(nullptr))
-    , env1AllocCache(std::make_shared<void *>(nullptr))
 #endif
     , baseEnv(allocEnv(128))
     , staticBaseEnv{std::make_shared<StaticEnv>(false, nullptr)}
