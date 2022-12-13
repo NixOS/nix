@@ -402,18 +402,6 @@ struct InstallableStorePath : Installable
     ref<Store> store;
     DerivedPath req;
 
-    InstallableStorePath(ref<Store> store, StorePath && storePath)
-        : store(store),
-          req(storePath.isDerivation()
-              ? (DerivedPath) DerivedPath::Built {
-                  .drvPath = std::move(storePath),
-                  .outputs = {},
-              }
-              : (DerivedPath) DerivedPath::Opaque {
-                  .path = std::move(storePath),
-              })
-    { }
-
     InstallableStorePath(ref<Store> store, DerivedPath && req)
         : store(store), req(std::move(req))
     { }
@@ -814,24 +802,46 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         for (auto & s : ss) {
             std::exception_ptr ex;
 
-            auto found = s.rfind('^');
-            if (found != std::string::npos) {
-                try {
-                    result.push_back(std::make_shared<InstallableStorePath>(
-                        store,
-                        DerivedPath::Built::parse(*store, s.substr(0, found), s.substr(found + 1))));
-                    continue;
-                } catch (BadStorePath &) {
-                } catch (...) {
-                    if (!ex)
-                        ex = std::current_exception();
-                }
-            }
+            auto [prefix_, extendedOutputsSpec_] = ExtendedOutputsSpec::parse(s);
+            // To avoid clang's pedantry
+            auto prefix = std::move(prefix_);
+            auto extendedOutputsSpec = std::move(extendedOutputsSpec_);
 
-            found = s.find('/');
+            auto found = prefix.find('/');
             if (found != std::string::npos) {
                 try {
-                    result.push_back(std::make_shared<InstallableStorePath>(store, store->followLinksToStorePath(s)));
+                    auto derivedPath = std::visit(overloaded {
+                        // If the user did not use ^, we treat the output more liberally.
+                        [&](const ExtendedOutputsSpec::Default &) -> DerivedPath {
+                            // First, we accept a symlink chain or an actual store path.
+                            auto storePath = store->followLinksToStorePath(prefix);
+                            // Second, we see if the store path ends in `.drv` to decide what sort
+                            // of derived path they want.
+                            //
+                            // This handling predates the `^` syntax. The `^*` in
+                            // `/nix/store/hash-foo.drv^*` unambiguously means "do the
+                            // `DerivedPath::Built` case", so plain `/nix/store/hash-foo.drv` could
+                            // also unambiguously mean "do the DerivedPath::Opaque` case".
+                            //
+                            // Issue #7261 tracks reconsidering this `.drv` dispatching.
+                            return storePath.isDerivation()
+                                ? (DerivedPath) DerivedPath::Built {
+                                    .drvPath = std::move(storePath),
+                                    .outputs = {},
+                                }
+                                : (DerivedPath) DerivedPath::Opaque {
+                                    .path = std::move(storePath),
+                                };
+                        },
+                        // If the user did use ^, we just do exactly what is written.
+                        [&](const ExtendedOutputsSpec::Explicit & outputSpec) -> DerivedPath {
+                            return DerivedPath::Built {
+                                .drvPath = store->parseStorePath(prefix),
+                                .outputs = outputSpec,
+                            };
+                        },
+                    }, extendedOutputsSpec.raw());
+                    result.push_back(std::make_shared<InstallableStorePath>(store, std::move(derivedPath)));
                     continue;
                 } catch (BadStorePath &) {
                 } catch (...) {
@@ -841,7 +851,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             }
 
             try {
-                auto [flakeRef, fragment, extendedOutputsSpec] = parseFlakeRefWithFragmentAndExtendedOutputsSpec(s, absPath("."));
+                auto [flakeRef, fragment] = parseFlakeRefWithFragment(std::string { prefix }, absPath("."));
                 result.push_back(std::make_shared<InstallableFlake>(
                         this,
                         getEvalState(),
