@@ -189,7 +189,7 @@ std::unique_ptr<UserLock> acquireUserLock(uid_t nrIds, bool useUserNamespace)
 bool useBuildUsers()
 {
     #if __linux__
-    static bool b = (settings.buildUsersGroup != "" || settings.startId.get() != 0) && getuid() == 0;
+    static bool b = (settings.buildUsersGroup != "" || settings.autoAllocateUids) && getuid() == 0;
     return b;
     #elif __APPLE__
     static bool b = settings.buildUsersGroup != "" && getuid() == 0;
