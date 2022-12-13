@@ -77,7 +77,7 @@ MixEvalArgs::MixEvalArgs()
   branch in the `nixpkgs` repository.
 
   The URLs of the tarballs from the official `nixos.org` channels
-  (see [the manual page for `nix-channel`](nix-channel.md)) can be
+  (see [the manual page for `nix-channel`](../nix-channel.md)) can be
   abbreviated as `channel:<channel-name>`.  For instance, the
   following two flags are equivalent:
 
