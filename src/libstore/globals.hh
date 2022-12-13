@@ -281,7 +281,10 @@ public:
           `NIX_REMOTE` is empty, the uid under which the Nix daemon runs if
           `NIX_REMOTE` is `daemon`). Obviously, this should not be used in
           multi-user settings with untrusted users.
-        )"};
+
+          Defaults to `nixbld` when running as root, *empty* otherwise.
+        )",
+        {}, false};
 
     Setting<bool> autoAllocateUids{this, false, "auto-allocate-uids",
         R"(
