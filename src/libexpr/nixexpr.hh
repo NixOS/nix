@@ -28,10 +28,11 @@ struct Pos
     uint32_t line;
     uint32_t column;
 
-    struct stdin_tag {};
-    struct string_tag {};
+    struct none_tag { };
+    struct Stdin { ref<std::string> source; };
+    struct String { ref<std::string> source; };
 
-    typedef std::variant<stdin_tag, string_tag, Path> Origin;
+    typedef std::variant<none_tag, Stdin, String, Path> Origin;
 
     Origin origin;
 
@@ -72,7 +73,7 @@ public:
         mutable uint32_t idx = std::numeric_limits<uint32_t>::max();
 
         // Used for searching in PosTable::[].
-        explicit Origin(uint32_t idx): idx(idx), origin{Pos::stdin_tag()} {}
+        explicit Origin(uint32_t idx): idx(idx), origin{Pos::none_tag()} {}
 
     public:
         const Pos::Origin origin;

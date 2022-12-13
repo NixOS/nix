@@ -713,10 +713,11 @@ Expr * EvalState::parseExprFromFile(const Path & path, std::shared_ptr<StaticEnv
 }
 
 
-Expr * EvalState::parseExprFromString(std::string s, const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv)
+Expr * EvalState::parseExprFromString(std::string s_, const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv)
 {
-    s.append("\0\0", 2);
-    return parse(s.data(), s.size(), Pos::string_tag(), basePath, staticEnv);
+    auto s = make_ref<std::string>(std::move(s_));
+    s->append("\0\0", 2);
+    return parse(s->data(), s->size(), Pos::String{.source = s}, basePath, staticEnv);
 }
 
 
@@ -732,7 +733,8 @@ Expr * EvalState::parseStdin()
     auto buffer = drainFD(0);
     // drainFD should have left some extra space for terminators
     buffer.append("\0\0", 2);
-    return parse(buffer.data(), buffer.size(), Pos::stdin_tag(), absPath("."), staticBaseEnv);
+    auto s = make_ref<std::string>(std::move(buffer));
+    return parse(s->data(), s->size(), Pos::Stdin{.source = s}, absPath("."), staticBaseEnv);
 }
 
 
