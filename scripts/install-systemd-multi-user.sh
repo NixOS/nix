@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # 
-# Setup
+# setup
 # 
 	set -eu
 	set -o pipefail
@@ -54,7 +54,7 @@
 	}
 
 	remove_service () {
-		service="$1"
+		local service="$1"
 		# if systemctl exists
 		if [ -n "$(command -v "systemctl")" ]
 		then
@@ -237,6 +237,16 @@
 		_sudo "" userdel --remove "$user" 2>/dev/null # non-debian
 	}
 
+	poly_commands_needed_before_init_nix_shell() {
+		if [ -e /run/systemd/system ]; then
+			:
+		else
+			cat <<-EOF
+			$ sudo nix-daemon
+			EOF
+		fi
+	}
+
 # 
 # 
 # main poly methods (in chronological order)
@@ -257,10 +267,10 @@
 		# 
 		# gather information
 		# 
-		nixenv_check_failed=""
-		backup_profiles_check_failed=""
-		nixenv_command_doesnt_exist_check || nixenv_check_failed="true"
-		backup_profiles_dont_exist_check  || backup_profiles_check_failed="true"
+		local nixenv_check_failed=""
+		local backup_profiles_check_failed=""
+		check_nixenv_command_doesnt_exist || nixenv_check_failed="true"
+		check_backup_profiles_exist  || backup_profiles_check_failed="true"
 		# <<<could insert Linux specific checks here>>>
 		
 		# 
@@ -268,8 +278,8 @@
 		# 
 		if [ -n "$nixenv_check_failed$backup_profiles_check_failed" ]
 		then
-			[ "$nixenv_check_failed"          = "true" ] && nixenv_command_exists_error
-			[ "$backup_profiles_check_failed" = "true" ] && backup_profiles_dont_exist_check
+			[ "$nixenv_check_failed"          = "true" ] && message_nixenv_command_doesnt_exist
+			[ "$backup_profiles_check_failed" = "true" ] && message_backup_profiles_exist
 			
 			return 1
 		else
@@ -281,6 +291,8 @@
 		# remove as much as possible, even if some commands fail
 		# (restore set -e behavior at the end of this function)
 		set +e
+		
+		header "Agressively removing previous nix install"
 		
 		# 
 		# remove services
@@ -333,7 +345,7 @@
 		# 
 		# gather information
 		# 
-		system_d_check_failed=""
+		local system_d_check_failed=""
 		if [ ! -e /run/systemd/system ]; then
 			failed_check "/run/systemd/system does not exist"
 			system_d_check_failed="true"
@@ -360,7 +372,7 @@
 	}
 
 	poly_6_prepare_to_install() {
-		:
+		: # no action needed
 	}
 
 	poly_7_configure_nix_daemon_service() {
@@ -391,15 +403,5 @@
 					systemctl restart $NIX_DAEMON_SERVICE_BASE
 		else
 			reminder "I don't support your init system yet; you may want to add nix-daemon manually."
-		fi
-	}
-
-	poly_8_extra_try_me_commands() {
-		if [ -e /run/systemd/system ]; then
-			:
-		else
-			cat <<-EOF
-			$ sudo nix-daemon
-			EOF
 		fi
 	}

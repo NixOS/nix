@@ -65,7 +65,7 @@
 	test_nix_daemon_installed() {
 		test -e "$NIX_DAEMON_DEST"
 	}
-
+	
 # 
 # shared interface implementation
 # 
@@ -212,8 +212,10 @@
 		_sudo "" deluser --remove-home "$user" 2>/dev/null # debian
 		_sudo "" userdel --remove "$user" 2>/dev/null # non-debian
 	}
-	
-	
+
+	poly_commands_needed_before_init_nix_shell() {
+		:
+	}	
 
 # 
 # 
@@ -242,13 +244,13 @@
 	}
 
 	poly_3_check_for_leftover_artifacts() {
-		nixenv_check_failed=""
-		backup_profiles_check_failed=""
+		local nixenv_check_failed=""
+		local backup_profiles_check_failed=""
 		# 
 		# gather information
 		# 
-		nixenv_command_doesnt_exist_check || nixenv_check_failed="true"
-		backup_profiles_dont_exist_check  || backup_profiles_check_failed="true"
+		check_nixenv_command_doesnt_exist || nixenv_check_failed="true"
+		check_backup_profiles_exist  || backup_profiles_check_failed="true"
 		# <<<could insert MacOS specific checks here>>>
 		
 		# 
@@ -256,8 +258,8 @@
 		# 
 		if [ -n "$nixenv_check_failed$backup_profiles_check_failed" ]
 		then
-			[ "$nixenv_check_failed"          = "true" ] && nixenv_command_exists_error
-			[ "$backup_profiles_check_failed" = "true" ] && backup_profiles_dont_exist_check
+			[ "$nixenv_check_failed"          = "true" ] && message_nixenv_command_doesnt_exist
+			[ "$backup_profiles_check_failed" = "true" ] && check_backup_profiles_exist
 			return 1
 		else
 			return 0
@@ -267,7 +269,9 @@
 	poly_4_agressive_remove_artifacts() {
 		# remove as much as possible, even if some commands fail
 		# (restore set -e behavior at the end of this function)
-		set +e
+		set +eu
+		
+		header "Agressively removing previous nix install"
 		
 		# 
 		# detach mounted volumes
@@ -277,7 +281,7 @@
 			if sudo diskutil list | grep 'Nix Store' 1>/dev/null; then
 				# it was removed successfully
 				if sudo diskutil apfs deleteVolume "$NIX_ROOT"; then
-					_sudo "" diskutil apfs deleteVolume "$NIX_ROOT" && _sudo rm -rf "$NIX_ROOT"
+					_sudo "" diskutil apfs deleteVolume "$NIX_ROOT" && _sudo "" rm -rf "$NIX_ROOT"
 				fi
 			fi
 			
@@ -372,7 +376,7 @@
 		subheader "Restoring all shell files" 
 			unsetup_profiles
 		
-		set -e # go back to all uncaught errors failing
+		set -eu # go back to all uncaught errors failing
 		
 		# MacOS mounted volume for /nix wont be deleted until reboot
 		if [ -d "$NIX_ROOT" ]
@@ -416,8 +420,4 @@
 
 		_sudo "to start the nix-daemon" \
 				launchctl kickstart -k system/$NIX_DAEMON_BASE
-	}
-
-	poly_8_extra_try_me_commands() {
-		:
 	}

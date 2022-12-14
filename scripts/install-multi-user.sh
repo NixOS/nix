@@ -74,7 +74,7 @@
 	fi
 
 # 
-# global helpers
+# generic global helpers
 # 
 	headless() {
 		if [ "$IS_HEADLESS" = "yes" ]; then
@@ -106,29 +106,6 @@
 		else
 			return 1
 		fi
-	}
-
-	contact_us() {
-		echo "You can open an issue at https://github.com/nixos/nix/issues"
-		echo ""
-		echo "Or feel free to contact the team:"
-		echo " - Matrix: #nix:nixos.org"
-		echo " - IRC: in #nixos on irc.libera.chat"
-		echo " - twitter: @nixos_org"
-		echo " - forum: https://discourse.nixos.org"
-	}
-	get_help() {
-		echo "We'd love to help if you need it."
-		echo ""
-		contact_us
-	}
-
-	nix_user_for_core() {
-		printf "$NIX_BUILD_USER_NAME_TEMPLATE" "$1"
-	}
-
-	nix_uid_for_core() {
-		echo $((NIX_FIRST_BUILD_UID + $1 - 1))
 	}
 
 	_textout() {
@@ -258,23 +235,6 @@
 		fi
 	}
 
-	confirm_edit() {
-		local path="$1"
-		local edit_path="$2"
-		cat <<-EOF
-
-		Nix isn't the only thing in $path,
-		but I think I know how to edit it out.
-		Here's the diff:
-		EOF
-
-		# could technically test the diff, but caller should do it
-		_diff "$path" "$edit_path"
-		if ui_confirm "Does the change above look right?"; then
-			_sudo "remove nix from $path" cp "$edit_path" "$path"
-		fi
-	}
-
 	_SERIOUS_BUSINESS="${RED}%s:${ESC} "
 	password_confirm() {
 		local do_something_consequential="$1"
@@ -359,6 +319,10 @@
 		fi
 	}
 
+	command_exists() {
+		[ -n "$(command -v "$1")" ]
+	}
+
 	# Ensure that $TMPDIR exists if defined.
 	if [[ -n "${TMPDIR:-}" ]] && [[ ! -d "${TMPDIR:-}" ]]; then
 		mkdir -m 0700 -p "${TMPDIR:-}"
@@ -381,12 +345,56 @@
 	}
 	trap finish_fail EXIT
 
+	contact_us() {
+		echo "You can open an issue at https://github.com/nixos/nix/issues"
+		echo ""
+		echo "Or feel free to contact the team:"
+		echo " - Matrix: #nix:nixos.org"
+		echo " - IRC: in #nixos on irc.libera.chat"
+		echo " - twitter: @nixos_org"
+		echo " - forum: https://discourse.nixos.org"
+	}
+
+	get_help() {
+		echo "We'd love to help if you need it."
+		echo ""
+		contact_us
+	}
+
+# 
+# nix-specific helpers
+# 
+	nix_user_for_core() {
+		printf "$NIX_BUILD_USER_NAME_TEMPLATE" "$1"
+	}
+
+	nix_uid_for_core() {
+		echo $((NIX_FIRST_BUILD_UID + $1 - 1))
+	}
+
+	confirm_edit() {
+		local path="$1"
+		local edit_path="$2"
+		cat <<-EOF
+
+		Nix isn't the only thing in $path,
+		but I think I know how to edit it out.
+		Here's the diff:
+		EOF
+
+		# could technically test the diff, but caller should do it
+		_diff "$path" "$edit_path"
+		if ui_confirm "Does the change above look right?"; then
+			_sudo "remove nix from $path" cp "$edit_path" "$path"
+		fi
+	}
+
 	finish_success() {
 		ok "Alright! We're done!"
 
 		cat <<-EOF
 		Try it! Open a new terminal, and type:
-		$(poly_8_extra_try_me_commands)
+		$(poly_commands_needed_before_init_nix_shell)
 		$ nix-shell -p nix-info --run "nix-info -m"
 
 		Thank you for using this installer. If you have any feedback or need
@@ -409,10 +417,6 @@
 		EOF
 		remind
 		finish_cleanup
-	}
-
-	command_exists() {
-		[ -n "$(command -v "$1")" ]
 	}
 
 	unsetup_profiles() {
@@ -473,11 +477,8 @@
 			restore_profile "$profile_target"
 		done
 	}
-# 
-# artifact-checking helpers
-# 
 
-	nixenv_command_doesnt_exist_check() { # checks run, before full explaination/warnings are generated
+	check_nixenv_command_doesnt_exist() {
 		if command_exists "nix-env"; then
 			failed_check "nix-env command already exists"
 		else
@@ -485,7 +486,7 @@
 		fi
 	}
 
-	nixenv_command_exists_error() {
+	message_nixenv_command_doesnt_exist() {
 		echo
 		error <<-EOF
 		Nix already appears to be installed. This installer may run into issues.
@@ -493,8 +494,8 @@
 		EOF
 	}
 
-	backup_profiles_dont_exist_check() {
-		at_least_one_failed="false"
+	check_backup_profiles_exist() {
+		local at_least_one_failed="false"
 		for profile_target in "${PROFILE_TARGETS[@]}"; do
 			# TODO: I think it would be good to accumulate a list of all
 			#       of the copies so that people don't hit this 2 or 3x in
@@ -513,7 +514,7 @@
 		fi
 	}
 
-	backup_profiles_error() {
+	message_backup_profiles_exist() {
 		echo
 		profiles=""
 		profile_backups=""
@@ -542,56 +543,29 @@
 		EOF
 	}
 
-	leftovers_detected_conversation() {
-		warningheader "Leftovers From Previous Install Detected"
-		echo 
-		echo 
-		echo '    Please remove the leftovers (instructions above)'
-		echo '    The instructions are customized your specific leftovers/system'
-		echo '    Detailed instructions can be found at:'
-		if is_os_linux; then
-			echo "        https://nixos.org/manual/nix/stable/installation/installing-binary.html#linux"
-		elif is_os_darwin; then
-			echo "        https://nixos.org/manual/nix/stable/installation/installing-binary.html#macos"
-		else
-			echo "        https://nixos.org/manual/nix/stable/installation/installing-binary.html"
-		fi
-		
-		echo
-		ui_confirm 'Understood?' 
-		# Presumably most people will attempt to manually remove leftovers before even getting to the un_confirm below
-		# (which is intentional)
-		
-		# in all honesty the operation is pretty safe
-		# the biggest risk is that, somehow, PROFILE_NIX_START_DELIMETER and PROFILE_NIX_END_DELIMETER are BOTH
-		# present, in order, but for some reason there is important non-nix profile-commands inbetween them.
-		# I can't imagine how/why that would happen, but people do crazy things with profiles
-		if ui_confirm "Are you interested in a UNSAFE automatic purge of leftovers?"; then
-			# this 2nd check is so the no-tty-scenario doesnt trigger something labelled as unsafe
-			# maybe in the future when the agressive purge is throughly tested, it will make sense to have it as the default no-tty behavior
-			if ! ui_confirm "Opposite-question check: do you want only safe operations to be completed"; then
-				_should_aggresive_remove_artifacts="true"
-			else
-				failure "Because the automated-purge is considered unsafe, please follow the instructions above and re-run this script"
-			fi
-		else
-			failure "Please re-run script after leftovers have manually been purged"
-		fi
-	}
 # 
 # main
 # 
 	_would_like_more_information="false"
 	_should_aggresive_remove_artifacts="false"
 	main() {
+		# 
+		# preface
+		# 
 		check_selinux
 		generate_poly_interface_for_os
 		
+		# 
+		# introduction
+		# 
 		welcome_to_nix
 		[ "$_would_like_more_information" = "true" ] && poly_1_additional_welcome_information
 		[ "$_would_like_more_information" = "true" ] && additional_info_confirm_prompt
 		chat_about_sudo_if_needed
-
+		
+		# 
+		# saftey checks
+		# 
 		poly_2_passive_remove_artifacts
 		message_about_artifacts
 		# TODO: there's a tension between cure and validate. I moved the
@@ -603,38 +577,21 @@
 		# even if removal is successful, re-run the script so that ENV vars are refreshed with the changes
 		[ "$_should_aggresive_remove_artifacts" = "true" ] && stop "Please re-run script so the purge will take effect"
 		poly_5_assumption_validation
-		# TODO: I think it would be good for this step to accumulate more
-		#       knowledge of older obsolete artifacts, if there are any.
-		#       We could issue a "reminder" here that the user might want
-		#       to clean them up?
-
-		setup_report
-
-		if ! ui_confirm "Ready to continue?"; then
-			ok "Alright, no changes have been made :)"
-			get_help
-			trap finish_cleanup EXIT
-			exit 1
-		fi
-
+		setup_report_confirm
+		
+		# 
+		# installation
+		# 
 		poly_6_prepare_to_install
-
 		create_build_group
 		create_build_users
 		create_directories
 		place_channel_configuration
 		install_from_extracted_nix
-
 		configure_shell_profile
-
-		set +eu
-		# shellcheck disable=SC1091
-		. /etc/profile
-		set -eu
-
+		source_etc_profile
 		setup_default_profile
 		place_nix_configuration
-
 		poly_7_configure_nix_daemon_service
 
 		trap finish_success EXIT
@@ -663,7 +620,7 @@
 			# poly_5_assumption_validation
 			# poly_6_prepare_to_install
 			# poly_7_configure_nix_daemon_service
-			# poly_8_extra_try_me_commands
+			# poly_commands_needed_before_init_nix_shell
 			# poly_create_build_group
 			# poly_create_build_user
 			# poly_group_exists
@@ -817,7 +774,44 @@
 		EOF
 	}
 
-	setup_report() {
+	leftovers_detected_conversation() {
+		warningheader "Leftovers From Previous Install Detected"
+		echo 
+		echo 
+		echo '    Please remove the leftovers (instructions above)'
+		echo '    The instructions are customized your specific leftovers/system'
+		echo '    Detailed instructions can be found at:'
+		if is_os_linux; then
+			echo "        https://nixos.org/manual/nix/stable/installation/installing-binary.html#linux"
+		elif is_os_darwin; then
+			echo "        https://nixos.org/manual/nix/stable/installation/installing-binary.html#macos"
+		else
+			echo "        https://nixos.org/manual/nix/stable/installation/installing-binary.html"
+		fi
+		
+		echo
+		ui_confirm 'Understood?' 
+		# Presumably most people will attempt to manually remove leftovers before even getting to the un_confirm below
+		# (which is intentional)
+		
+		# in all honesty the operation is pretty safe
+		# the biggest risk is that, somehow, PROFILE_NIX_START_DELIMETER and PROFILE_NIX_END_DELIMETER are BOTH
+		# present, in order, but for some reason there is important non-nix profile-commands inbetween them.
+		# I can't imagine how/why that would happen, but people do crazy things with profiles
+		if ui_confirm "Are you interested in a UNSAFE automatic purge of leftovers?"; then
+			# this 2nd check is so the no-tty-scenario doesnt trigger something labelled as unsafe
+			# maybe in the future when the agressive purge is throughly tested, it will make sense to have it as the default no-tty behavior
+			if ! ui_confirm "Opposite-question check: do you want only safe operations to be completed"; then
+				_should_aggresive_remove_artifacts="true"
+			else
+				failure "Because the automated-purge is considered unsafe, please follow the instructions above and re-run this script"
+			fi
+		else
+			failure "Please re-run script after leftovers have manually been purged"
+		fi
+	}
+
+	setup_report_confirm() {
 		header "Nix config report"
 		row "        Temp Dir" "$SCRATCH"
 		row "        Nix Root" "$NIX_ROOT"
@@ -835,6 +829,13 @@
 			row "     $(nix_user_for_core "$i")" "$(nix_uid_for_core "$i")"
 		done
 		echo ""
+
+		if ! ui_confirm "Ready to continue?"; then
+			ok "Alright, no changes have been made :)"
+			get_help
+			trap finish_cleanup EXIT
+			exit 1
+		fi
 	}
 
 	create_build_group() {
@@ -1116,6 +1117,13 @@
 		# their way less disruptively, but a counter-argument is that they won't
 		# immediately notice if something didn't get set up right?
 		reminder "Nix won't work in active shell sessions until you restart them."
+	}
+
+	source_etc_profile() {
+		set +eu # allow errors when sourcing the profile
+		# shellcheck disable=SC1091
+		. /etc/profile
+		set -eu
 	}
 
 	cert_in_store() {
