@@ -27,10 +27,14 @@
 	# as creating each user takes non-trivial amount of time on macos
 	readonly NIX_USER_COUNT=${NIX_USER_COUNT:-32}
 	readonly NIX_BUILD_GROUP_ID="${NIX_BUILD_GROUP_ID:-30000}"
+	# if this prefix changed, then poly_4_agressive_remove_artifacts() needs to be updated to include both the new and old group 
 	readonly NIX_BUILD_GROUP_NAME="nixbld"
+	# if this prefix changed, then poly_4_agressive_remove_artifacts() needs to be updated to include both the new and old prefix
+	# additionally this should never include characters that are special when used in grep -E
+	readonly NIX_USER_PREFIX="$NIX_BUILD_GROUP_NAME"
 	# darwin installer needs to override these
 	NIX_FIRST_BUILD_UID="${NIX_FIRST_BUILD_UID:-30001}"
-	NIX_BUILD_USER_NAME_TEMPLATE="nixbld%d"
+	NIX_BUILD_USER_NAME_TEMPLATE="$NIX_USER_PREFIX%d"
 	# Please don't change this. We don't support it, because the
 	# default shell profile that comes with Nix doesn't support it.
 	readonly NIX_ROOT="/nix"
@@ -184,6 +188,11 @@
 		warningheader "error!"
 		cat
 		echo ""
+	}
+
+	stop() {
+		echo "$1"
+		exit 0
 	}
 
 	failure() {
@@ -402,10 +411,6 @@
 		finish_cleanup
 	}
 
-	remove_nix_artifacts() {
-		failure "Not implemented yet"
-	}
-
 	command_exists() {
 		[ -n "$(command -v "$1")" ]
 	}
@@ -479,57 +484,47 @@
 		EOF
 	}
 
-	validate_starting_assumptions() {
-		task "Checking for artifacts of previous installs"
-		cat <<-EOF
-		Before I try to install, I'll check for signs Nix already is or has
-		been installed on this system.
-		EOF
-		if ! poly_3_check_for_leftover_artifacts; then
-			warningheader "Leftovers From Previous Install Detected"
-			echo 
-			echo 
-			echo '    Please remove the leftovers (instructions above)'
-			echo '    The instructions are customized your specific leftovers/system'
-			echo '    Detailed instructions can be found at:'
-			if is_os_linux; then
-				echo "        https://nixos.org/manual/nix/stable/installation/installing-binary.html#linux"
-			elif is_os_darwin; then
-				echo "        https://nixos.org/manual/nix/stable/installation/installing-binary.html#macos"
-			else
-				echo "        https://nixos.org/manual/nix/stable/installation/installing-binary.html"
-			fi
-			
-			echo '   '
-			ui_confirm 'Understood?' 
-			# Presumably most people will attempt to manually remove leftovers before even getting to the un_confirm below
-			# (which is intentional)
-			
-			if ui_confirm "Are you interested in a UNSAFE automatic purge of leftovers?"; then
-				# 2nd check is not only for humans, but also so that the no-tty-scenario doesnt trigger a purge
-				# maybe in the future when the agressive purge is throughly tested, it will make sense to have it as the default no-tty behavior
-				if ! ui_confirm "Opposite-question check: do you want only safe operations to be completed"; then
-					poly_4_agressive_remove_artifacts
-					# even if removal is successful, re-run the script so that ENV vars are refreshed with the changes
-					failure "Please re-run script so the purge will take effect"
-				else
-					failure "Because the automated-purge is considered unsafe, please follow the instructions above and re-run this script"
-				fi
-			else
-				failure "Please re-run script after leftovers have manually been purged"
-			fi
+	leftovers_detected_conversation() {
+		warningheader "Leftovers From Previous Install Detected"
+		echo 
+		echo 
+		echo '    Please remove the leftovers (instructions above)'
+		echo '    The instructions are customized your specific leftovers/system'
+		echo '    Detailed instructions can be found at:'
+		if is_os_linux; then
+			echo "        https://nixos.org/manual/nix/stable/installation/installing-binary.html#linux"
+		elif is_os_darwin; then
+			echo "        https://nixos.org/manual/nix/stable/installation/installing-binary.html#macos"
+		else
+			echo "        https://nixos.org/manual/nix/stable/installation/installing-binary.html"
 		fi
-
-		poly_5_assumption_validation
-		# TODO: I think it would be good for this step to accumulate more
-		#       knowledge of older obsolete artifacts, if there are any.
-		#       We could issue a "reminder" here that the user might want
-		#       to clean them up?
+		
+		echo
+		ui_confirm 'Understood?' 
+		# Presumably most people will attempt to manually remove leftovers before even getting to the un_confirm below
+		# (which is intentional)
+		
+		# in all honesty the operation is pretty safe
+		# the biggest risk is that, somehow, PROFILE_NIX_START_DELIMETER and PROFILE_NIX_END_DELIMETER are BOTH
+		# present, in order, but for some reason there is important non-nix profile-commands inbetween them.
+		# I can't imagine how/why that would happen, but people do crazy things with profiles
+		if ui_confirm "Are you interested in a UNSAFE automatic purge of leftovers?"; then
+			# this 2nd check is so the no-tty-scenario doesnt trigger something labelled as unsafe
+			# maybe in the future when the agressive purge is throughly tested, it will make sense to have it as the default no-tty behavior
+			if ! ui_confirm "Opposite-question check: do you want only safe operations to be completed"; then
+				_should_aggresive_remove_artifacts="true"
+			else
+				failure "Because the automated-purge is considered unsafe, please follow the instructions above and re-run this script"
+			fi
+		else
+			failure "Please re-run script after leftovers have manually been purged"
+		fi
 	}
 # 
 # main
 # 
 	_would_like_more_information="false"
+	_should_aggresive_remove_artifacts="false"
 	main() {
 		check_selinux
 		generate_poly_interface_for_os
@@ -540,11 +535,20 @@
 		chat_about_sudo_if_needed
 
 		poly_2_passive_remove_artifacts
+		message_about_artifacts
 		# TODO: there's a tension between cure and validate. I moved the
 		# the sudo/root check out of validate to the head of this func.
 		# Cure is *intended* to subsume the validate-and-abort approach,
 		# so it may eventually obsolete it.
-		validate_starting_assumptions
+		poly_3_check_for_leftover_artifacts || leftovers_detected_conversation
+		[ "$_should_aggresive_remove_artifacts" = "true" ] && { poly_4_agressive_remove_artifacts }
+		# even if removal is successful, re-run the script so that ENV vars are refreshed with the changes
+		[ "$_should_aggresive_remove_artifacts" = "true" ] && stop "Please re-run script so the purge will take effect"
+		poly_5_assumption_validation
+		# TODO: I think it would be good for this step to accumulate more
+		#       knowledge of older obsolete artifacts, if there are any.
+		#       We could issue a "reminder" here that the user might want
+		#       to clean them up?
 
 		setup_report
 
@@ -745,6 +749,14 @@
 				EOF
 			fi
 		fi
+	}
+
+	message_about_artifacts() {
+		task "Checking for artifacts of previous installs"
+		cat <<-EOF
+		Before I try to install, I'll check for signs Nix already is or has
+		been installed on this system.
+		EOF
 	}
 
 	setup_report() {

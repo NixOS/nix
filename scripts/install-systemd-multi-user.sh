@@ -6,11 +6,15 @@
 	set -eu
 	set -o pipefail
 
-	readonly SERVICE_SRC=/lib/systemd/system/nix-daemon.service
-	readonly SERVICE_DEST=/etc/systemd/system/nix-daemon.service
+	readonly NIX_LEGACY_DAEMON1_BASE="org.nixos.activate-system"
 
-	readonly SOCKET_SRC=/lib/systemd/system/nix-daemon.socket
-	readonly SOCKET_DEST=/etc/systemd/system/nix-daemon.socket
+	readonly NIX_DAEMON_SERVICE_BASE="nix-daemon.service" # any time this is changed, it should be added above as a legacy service name
+	readonly SERVICE_SRC=/lib/systemd/system/$NIX_DAEMON_SERVICE_BASE
+	readonly SERVICE_DEST=/etc/systemd/system/$NIX_DAEMON_SERVICE_BASE
+
+	readonly NIX_DAEMON_SOCKET_BASE="nix-daemon.socket" # any time this is changed, it should be added above as a legacy service name
+	readonly SOCKET_SRC=/lib/systemd/system/$NIX_DAEMON_SOCKET_BASE
+	readonly SOCKET_DEST=/etc/systemd/system/$NIX_DAEMON_SOCKET_BASE
 
 	readonly TMPFILES_SRC=/lib/tmpfiles.d/nix-daemon.conf
 	readonly TMPFILES_DEST=/etc/tmpfiles.d/nix-daemon.conf
@@ -49,23 +53,38 @@
 		fi
 	}
 
+	remove_service () {
+		service="$1"
+		# if systemctl exists
+		if [ -n "$(command -v "systemctl")" ]
+		then
+			_sudo "" systemctl stop "$service"
+			_sudo "" systemctl disable "$service"
+			_sudo "" rm -f /etc/systemd/system/"$service"
+			_sudo "" rm -f /etc/systemd/system/"$service" # and symlinks that might be related
+			_sudo "" rm -f /usr/lib/systemd/system/"$service" 
+			_sudo "" rm -f /usr/lib/systemd/system/"$service" # and symlinks that might be related
+			_sudo "" systemctl daemon-reload
+			_sudo "" systemctl reset-failed
+		fi
+	}
 
 # 
 # shared interface implementation
 # 
 	poly_service_installed_check() {
-		[ "$(systemctl is-enabled nix-daemon.service)" = "linked" ] \
-			|| [ "$(systemctl is-enabled nix-daemon.socket)" = "enabled" ]
+		[ "$(systemctl is-enabled $NIX_DAEMON_SERVICE_BASE)" = "linked" ] \
+			|| [ "$(systemctl is-enabled $NIX_DAEMON_SOCKET_BASE)" = "enabled" ]
 	}
 
 	poly_service_uninstall_directions() {
 		cat <<-EOF
 		$1. Delete the systemd service and socket units
 
-		sudo systemctl stop nix-daemon.socket
-		sudo systemctl stop nix-daemon.service
-		sudo systemctl disable nix-daemon.socket
-		sudo systemctl disable nix-daemon.service
+		sudo systemctl stop $NIX_DAEMON_SOCKET_BASE
+		sudo systemctl stop $NIX_DAEMON_SERVICE_BASE
+		sudo systemctl disable $NIX_DAEMON_SOCKET_BASE
+		sudo systemctl disable $NIX_DAEMON_SERVICE_BASE
 		sudo systemctl daemon-reload
 		EOF
 	}
@@ -200,6 +219,24 @@
 				"$username"
 	}
 
+	poly_force_delete_user() {
+		user="$1"
+		# logs them out by locking the account
+		_sudo "" passwd -l "$user" 2>/dev/null
+		# kill all their processes
+		_sudo "" pkill -KILL -u "$user" 2>/dev/null
+		# kill all their cron jobs
+		_sudo "" crontab -r -u "$user" 2>/dev/null
+		# kill all their print jobs
+		if [ -n "$(command -v "lprm")" ]
+		then
+			lprm -U "$user" 2>/dev/null
+		fi
+		# actually remove the user
+		_sudo "" deluser --remove-home "$user" 2>/dev/null # debian
+		_sudo "" userdel --remove "$user" 2>/dev/null # non-debian
+	}
+
 # 
 # 
 # main poly methods (in chronological order)
@@ -241,11 +278,64 @@
 	}
 
 	poly_4_agressive_remove_artifacts() {
-		# potentially fill this out in future:
-		# if ! ui_confirm "Would you like to try forcefully purging the old Nix install?"
-		#	 return 1
-		# fi
-		:
+		# remove as much as possible, even if some commands fail
+		# (restore set -e behavior at the end of this function)
+		set +e
+		
+		# 
+		# remove services
+		# 
+		subheader "Removing any services"
+			remove_service $NIX_DAEMON_SERVICE_BASE
+			remove_service $NIX_DAEMON_SOCKET_BASE
+			remove_service $NIX_LEGACY_DAEMON1_BASE
+		
+		# 
+		# delete group
+		#
+		subheader "Removing group(s)" 
+			_sudo "" groupdel "$NIX_BUILD_GROUP_NAME" 2>/dev/null
+		
+		# 
+		# delete users
+		# 
+		subheader "Removing user(s)"
+			# cant use NIX_USER_COUNT since it could change relative to previous installs
+			for username in $(awk -F: '{ print $1}' /etc/passwd | grep -E '^'"$NIX_USER_PREFIX"'[0-9]+$'); do
+				# remove the users
+				poly_force_delete_user "$username"
+			done
+
+		# 
+		# purge all files
+		# 
+		subheader "Removing all nix files" 
+			# multiple commands are used because some (e.g. the mounted volumes) may fail, and shouldn't stop the other files from being removed
+			_sudo "" rm -rf /etc/nix                2>/dev/null
+			_sudo "" rm -rf "$NIX_ROOT"             2>/dev/null
+			_sudo "" rm -rf /var/root/.nix-profile  2>/dev/null
+			_sudo "" rm -rf /var/root/.nix-defexpr  2>/dev/null
+			_sudo "" rm -rf /var/root/.nix-channels 2>/dev/null
+			_sudo "" rm -rf "$HOME"/.nix-profile    2>/dev/null
+			_sudo "" rm -rf "$HOME"/.nix-defexpr    2>/dev/null
+			_sudo "" rm -rf "$HOME"/.nix-channels   2>/dev/null
+		
+		# 
+		# restoring any shell files
+		# 
+		subheader "Restoring all shell files" 
+			unsetup_profiles
+		
+		set -e # go back to all uncaught errors failing
+		
+		# MacOS mounted volume for /nix wont be deleted until reboot
+		if [ -d "$NIX_ROOT" ]
+		then
+			failure <<-EOF
+
+			Please reboot the machine and then re-run this script
+			EOF
+		fi
 	}
 
 	poly_5_assumption_validation() {
@@ -303,11 +393,11 @@
 			_sudo "to load the systemd unit for nix-daemon" \
 					systemctl daemon-reload
 
-			_sudo "to start the nix-daemon.socket" \
-					systemctl start nix-daemon.socket
+			_sudo "to start the $NIX_DAEMON_SOCKET_BASE" \
+					systemctl start $NIX_DAEMON_SOCKET_BASE
 
-			_sudo "to start the nix-daemon.service" \
-					systemctl restart nix-daemon.service
+			_sudo "to start the $NIX_DAEMON_SERVICE_BASE" \
+					systemctl restart $NIX_DAEMON_SERVICE_BASE
 		else
 			reminder "I don't support your init system yet; you may want to add nix-daemon manually."
 		fi

@@ -13,7 +13,7 @@
 	# create by default; set 0 to DIY, use a symlink, etc.
 	readonly NIX_VOLUME_CREATE=${NIX_VOLUME_CREATE:-1} # now default
 	NIX_FIRST_BUILD_UID="301"
-	NIX_BUILD_USER_NAME_TEMPLATE="_nixbld%d"
+	NIX_BUILD_USER_NAME_TEMPLATE="_$NIX_USER_PREFIX%d"
 
 # 
 # load create-darwin-volumn.sh
@@ -192,6 +192,29 @@
 				UniqueID "${uid}"
 	}
 
+	poly_force_delete_user() {
+		user="$1"
+		# logs them out by locking the account
+		_sudo "" passwd -l "$user" 2>/dev/null
+		# kill all their processes
+		_sudo "" pkill -KILL -u "$user" 2>/dev/null
+		# kill all their cron jobs
+		_sudo "" crontab -r -u "$user" 2>/dev/null
+		# kill all their print jobs
+		if [ -n "$(command -v "lprm")" ]
+		then
+			lprm -U "$user" 2>/dev/null
+		fi
+		# Mac-specific
+		_sudo "" dscl . -delete "/Users/$user"
+		
+		# overkill/fallback for good measure
+		_sudo "" deluser --remove-home "$user" 2>/dev/null # debian
+		_sudo "" userdel --remove "$user" 2>/dev/null # non-debian
+	}
+	
+	
+
 # 
 # 
 # main poly methods (in chronological order)
@@ -242,8 +265,10 @@
 	}
 
 	poly_4_agressive_remove_artifacts() {
-		set +e # remove as much as possible, even if some commands fail
-				# (restore set -e behavior at the end of this function)
+		# remove as much as possible, even if some commands fail
+		# (restore set -e behavior at the end of this function)
+		set +e
+		
 		# 
 		# detach mounted volumes
 		# 
@@ -252,7 +277,7 @@
 			if sudo diskutil list | grep 'Nix Store' 1>/dev/null; then
 				# it was removed successfully
 				if sudo diskutil apfs deleteVolume "$NIX_ROOT"; then
-					_sudo diskutil apfs deleteVolume "$NIX_ROOT" && _sudo rm -rf "$NIX_ROOT"
+					_sudo "" diskutil apfs deleteVolume "$NIX_ROOT" && _sudo rm -rf "$NIX_ROOT"
 				fi
 			fi
 			
@@ -265,7 +290,7 @@
 				if cat "$mount_filepath" | grep 'nix' 1>/dev/null
 				then
 					# remove nix from the file
-					_sudo mount_filepath="$mount_filepath" -- bash -c '
+					_sudo "" mount_filepath="$mount_filepath" -- bash -c '
 						sudo cat "$mount_filepath" | sed -E '"'"'s/nix\n?$//g'"'"' > "$mount_filepath"
 					'
 				fi
@@ -280,7 +305,7 @@
 					# vifs must be used to edit fstab
 					# to make that work we  create a patch using "diff"
 					# then tell vifs to use "patch" as an editor and apply the patch
-					/usr/bin/diff /etc/fstab <(/usr/bin/printf "%s" "$new_fstab_lines") | EDITOR="/usr/bin/patch" _sudo /usr/sbin/vifs
+					/usr/bin/diff /etc/fstab <(/usr/bin/printf "%s" "$new_fstab_lines") | EDITOR="/usr/bin/patch" _sudo "" /usr/sbin/vifs
 				}
 				if /usr/bin/grep "$NIX_ROOT apfs rw" /etc/fstab; then
 					echo "Patching fstab"
@@ -298,9 +323,9 @@
 				if [ -f "/Library/LaunchDaemon/$1.plist" ]
 				then
 					echo "removing LaunchDaemon $1"
-					_sudo launchctl bootout "system/$1" 2>/dev/null 
-					_sudo launchctl unload "/Library/LaunchDaemon/$1.plist"
-					_sudo rm "/Library/LaunchDaemons/$1.plist"
+					_sudo "" launchctl bootout "system/$1" 2>/dev/null 
+					_sudo "" launchctl unload "/Library/LaunchDaemon/$1.plist"
+					_sudo "" rm "/Library/LaunchDaemons/$1.plist"
 				fi
 			}
 			remove_service "$NIX_DAEMON_BASE"
@@ -311,36 +336,20 @@
 		# delete group
 		#
 		subheader "Removing group(s)" 
-			_sudo groupdel nixbld 2>/dev/null
+			_sudo "" groupdel nixbld 2>/dev/null
 		
 		# 
 		# delete users
 		# 
-		subheader "Removing user(s)" 
-			delete_user() {
-				user="$1"
-				# logs them out by locking the account
-				_sudo passwd -l "$user" 2>/dev/null
-				# kill all their processes
-				_sudo pkill -KILL -u "$user" 2>/dev/null
-				# kill all their cron jobs
-				_sudo crontab -r -u "$user" 2>/dev/null
-				# kill all their print jobs
-				if [ -n "$(command -v "lprm")" ]
-				then
-					lprm -U "$user" 2>/dev/null
-				fi
-				# actually remove the user
-				_sudo deluser --remove-home "$user" 2>/dev/null # debian
-				_sudo userdel --remove "$user" 2>/dev/null # non-debian
-			}
-			
+		subheader "Removing user(s)"
 			# attempt 1
-			for each_user in $(_sudo dscl . -list /Users | grep _nixbld); do _sudo dscl . -delete "/Users/$each_user"; done
+			for each_user in $(_sudo "" dscl . -list /Users | grep "_$NIX_USER_PREFIX"); do
+				poly_force_delete_user "$each_user"
+			done
 			# attempt 2 (just for redundancy/fallback)
 			for i in $(seq 1 "$NIX_USER_COUNT"); do
 				# remove the users
-				delete_user "$(nix_user_for_core "$i")"
+				poly_force_delete_user "$(nix_user_for_core "$i")"
 			done
 
 		# 
@@ -348,14 +357,14 @@
 		# 
 		subheader "Removing all nix files" 
 			# multiple commands are used because some (e.g. the mounted volumes) may fail, and shouldn't stop the other files from being removed
-			_sudo rm -rf /etc/nix                2>/dev/null
-			_sudo rm -rf "$NIX_ROOT"             2>/dev/null
-			_sudo rm -rf /var/root/.nix-profile  2>/dev/null
-			_sudo rm -rf /var/root/.nix-defexpr  2>/dev/null
-			_sudo rm -rf /var/root/.nix-channels 2>/dev/null
-			_sudo rm -rf "$HOME"/.nix-profile    2>/dev/null
-			_sudo rm -rf "$HOME"/.nix-defexpr    2>/dev/null
-			_sudo rm -rf "$HOME"/.nix-channels   2>/dev/null
+			_sudo "" rm -rf /etc/nix                2>/dev/null
+			_sudo "" rm -rf "$NIX_ROOT"             2>/dev/null
+			_sudo "" rm -rf /var/root/.nix-profile  2>/dev/null
+			_sudo "" rm -rf /var/root/.nix-defexpr  2>/dev/null
+			_sudo "" rm -rf /var/root/.nix-channels 2>/dev/null
+			_sudo "" rm -rf "$HOME"/.nix-profile    2>/dev/null
+			_sudo "" rm -rf "$HOME"/.nix-defexpr    2>/dev/null
+			_sudo "" rm -rf "$HOME"/.nix-channels   2>/dev/null
 		
 		# 
 		# restoring any shell files
