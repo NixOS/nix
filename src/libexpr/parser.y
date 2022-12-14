@@ -317,6 +317,10 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   std::vector<nix::AttrName> * attrNames;
   std::vector<std::pair<nix::PosIdx, nix::Expr *>> * string_parts;
   std::vector<std::pair<nix::PosIdx, std::variant<nix::Expr *, StringToken>>> * ind_string_parts;
+  struct {
+      nix::Expr * e;
+      bool appendSlash;
+  } pathStart;
 }
 
 %type <e> start expr expr_function expr_if expr_op
@@ -328,7 +332,8 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <attrNames> attrs attrpath
 %type <string_parts> string_parts_interpolated
 %type <ind_string_parts> ind_string_parts
-%type <e> path_start string_parts string_attr
+%type <pathStart> path_start
+%type <e> string_parts string_attr
 %type <id> attr
 %token <id> ID ATTRPATH
 %token <str> STR IND_STR
@@ -455,9 +460,11 @@ expr_simple
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = stripIndentation(CUR_POS, data->symbols, *$2);
   }
-  | path_start PATH_END { $$ = $1; }
+  | path_start PATH_END { $$ = $1.e; }
   | path_start string_parts_interpolated PATH_END {
-      $2->insert($2->begin(), {makeCurPos(@1, data), $1});
+      if ($1.appendSlash)
+          $2->insert($2->begin(), {noPos, new ExprString("/")});
+      $2->insert($2->begin(), {makeCurPos(@1, data), $1.e});
       $$ = new ExprConcatStrings(CUR_POS, false, $2);
   }
   | SPATH {
@@ -509,13 +516,16 @@ string_parts_interpolated
 path_start
   : PATH {
       std::string_view path({$1.p, $1.l});
-      $$ = new ExprPath(
-          /* Absolute paths are always interpreted relative to the
-             root filesystem accessor, rather than the accessor of the
-             current Nix expression. */
-          hasPrefix(path, "/")
-          ? SourcePath{data->state.rootFS, CanonPath(path)}
-          : SourcePath{data->basePath.accessor, CanonPath(path, data->basePath.path)});
+      $$ = {
+          .e = new ExprPath(
+              /* Absolute paths are always interpreted relative to the
+                 root filesystem accessor, rather than the accessor of the
+                 current Nix expression. */
+              hasPrefix(path, "/")
+              ? SourcePath{data->state.rootFS, CanonPath(path)}
+              : SourcePath{data->basePath.accessor, CanonPath(path, data->basePath.path)}),
+          .appendSlash = hasSuffix(path, "/")
+      };
   }
   | HPATH {
     if (evalSettings.pureEval) {
@@ -525,7 +535,7 @@ path_start
         );
     }
     Path path(getHome() + std::string($1.p + 1, $1.l - 1));
-    $$ = new ExprPath(data->state.rootPath(path));
+    $$ = {.e = new ExprPath(data->state.rootPath(path)), .appendSlash = true};
   }
   ;
 
