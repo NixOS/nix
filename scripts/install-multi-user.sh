@@ -36,17 +36,19 @@ readonly NIX_EXTRA_CONF=${NIX_EXTRA_CONF:-}
 readonly PROFILE_TARGETS=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/zshrc" "/etc/bash.bashrc" "/etc/zsh/zshrc")
 readonly PROFILE_BACKUP_SUFFIX=".backup-before-nix"
 readonly PROFILE_NIX_FILE="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
+readonly PROFILE_NIX_START_DELIMETER="# Nix"
+readonly PROFILE_NIX_END_DELIMETER="# End Nix" # Caution, used both as a comment and inside grep argument (so $ or \+, etc would break things)
 
 # Fish has different syntax than zsh/bash, treat it separate
 readonly PROFILE_FISH_SUFFIX="conf.d/nix.fish"
 readonly PROFILE_FISH_PREFIXES=(
-    # each of these are common values of $__fish_sysconf_dir,
-    # under which Fish will look for a file named
-    # $PROFILE_FISH_SUFFIX.
-    "/etc/fish"              # standard
-    "/usr/local/etc/fish"    # their installer .pkg for macOS
-    "/opt/homebrew/etc/fish" # homebrew
-    "/opt/local/etc/fish"    # macports
+	# each of these are common values of $__fish_sysconf_dir,
+	# under which Fish will look for a file named
+	# $PROFILE_FISH_SUFFIX.
+	"/etc/fish"              # standard
+	"/usr/local/etc/fish"    # their installer .pkg for macOS
+	"/opt/homebrew/etc/fish" # homebrew
+	"/opt/local/etc/fish"    # macports
 )
 readonly PROFILE_NIX_FILE_FISH="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.fish"
 
@@ -59,152 +61,168 @@ readonly EXTRACTED_NIX_PATH="$(dirname "$0")"
 readonly ROOT_HOME=~root
 
 if [ -t 0 ]; then
-    readonly IS_HEADLESS='no'
+	readonly IS_HEADLESS='no'
 else
-    readonly IS_HEADLESS='yes'
+	readonly IS_HEADLESS='yes'
 fi
 
 headless() {
-    if [ "$IS_HEADLESS" = "yes" ]; then
-        return 0
-    else
-        return 1
-    fi
+	if [ "$IS_HEADLESS" = "yes" ]; then
+		return 0
+	else
+		return 1
+	fi
 }
 
 is_root() {
-    if [ "$EUID" -eq 0 ]; then
-        return 0
-    else
-        return 1
-    fi
+	if [ "$EUID" -eq 0 ]; then
+		return 0
+	else
+		return 1
+	fi
 }
 
 is_os_linux() {
-    if [ "$(uname -s)" = "Linux" ]; then
-        return 0
-    else
-        return 1
-    fi
+	if [ "$(uname -s)" = "Linux" ]; then
+		return 0
+	else
+		return 1
+	fi
 }
 
 is_os_darwin() {
-    if [ "$(uname -s)" = "Darwin" ]; then
-        return 0
-    else
-        return 1
-    fi
+	if [ "$(uname -s)" = "Darwin" ]; then
+		return 0
+	else
+		return 1
+	fi
 }
 
 contact_us() {
-    echo "You can open an issue at https://github.com/nixos/nix/issues"
-    echo ""
-    echo "Or feel free to contact the team:"
-    echo " - Matrix: #nix:nixos.org"
-    echo " - IRC: in #nixos on irc.libera.chat"
-    echo " - twitter: @nixos_org"
-    echo " - forum: https://discourse.nixos.org"
+	echo "You can open an issue at https://github.com/nixos/nix/issues"
+	echo ""
+	echo "Or feel free to contact the team:"
+	echo " - Matrix: #nix:nixos.org"
+	echo " - IRC: in #nixos on irc.libera.chat"
+	echo " - twitter: @nixos_org"
+	echo " - forum: https://discourse.nixos.org"
 }
 get_help() {
-    echo "We'd love to help if you need it."
-    echo ""
-    contact_us
+	echo "We'd love to help if you need it."
+	echo ""
+	contact_us
 }
 
 nix_user_for_core() {
-    printf "$NIX_BUILD_USER_NAME_TEMPLATE" "$1"
+	printf "$NIX_BUILD_USER_NAME_TEMPLATE" "$1"
 }
 
 nix_uid_for_core() {
-    echo $((NIX_FIRST_BUILD_UID + $1 - 1))
+	echo $((NIX_FIRST_BUILD_UID + $1 - 1))
 }
 
 _textout() {
-    echo -en "$1"
-    shift
-    if [ "$*" = "" ]; then
-        cat
-    else
-        echo "$@"
-    fi
-    echo -en "$ESC"
+	echo -en "$1"
+	shift
+	if [ "$*" = "" ]; then
+		cat
+	else
+		echo "$@"
+	fi
+	echo -en "$ESC"
 }
 
 header() {
-    follow="---------------------------------------------------------"
-    header=$(echo "---- $* $follow$follow$follow" | head -c 80)
-    echo ""
-    _textout "$BLUE" "$header"
+	follow="---------------------------------------------------------"
+	header=$(echo "---- $* $follow$follow$follow" | head -c 80)
+	echo ""
+	_textout "$BLUE" "$header"
 }
 
 warningheader() {
-    follow="---------------------------------------------------------"
-    header=$(echo "---- $* $follow$follow$follow" | head -c 80)
-    echo ""
-    _textout "$RED" "$header"
+	follow="---------------------------------------------------------"
+	header=$(echo "---- $* $follow$follow$follow" | head -c 80)
+	echo ""
+	_textout "$RED" "$header"
 }
 
 subheader() {
-    echo ""
-    _textout "$BLUE_UL" "$*"
+	echo ""
+	_textout "$BLUE_UL" "$*"
 }
 
 row() {
-    printf "$BOLD%s$ESC:\\t%s\\n" "$1" "$2"
+	printf "$BOLD%s$ESC:\\t%s\\n" "$1" "$2"
 }
 
 task() {
-    echo ""
-    ok "~~> $1"
+	echo ""
+	ok "~~> $1"
 }
 
 bold() {
-    echo "$BOLD$*$ESC"
+	echo "$BOLD$*$ESC"
 }
 
 ok() {
-    _textout "$GREEN" "$@"
+	_textout "$GREEN" "$@"
 }
 
 warning() {
-    warningheader "warning!"
-    cat
-    echo ""
+	warningheader "warning!"
+	cat
+	echo ""
+}
+
+error() { # used as one-part of a mutli-part failure message
+	warningheader "error!"
+	cat
+	echo ""
 }
 
 failure() {
-    header "oh no!"
-    _textout "$RED" "$@"
-    echo ""
-    _textout "$RED" "$(get_help)"
-    trap finish_cleanup EXIT
-    exit 1
+	header "oh no!"
+	_textout "$RED" "$@"
+	echo ""
+	_textout "$RED" "$(get_help)"
+	trap finish_cleanup EXIT
+	exit 1
+}
+
+failed_check() {
+	_textout "$RED" "    ! : $@"
+	return 1
+}
+
+passed_check() {
+	_textout "$GREEN" "    . : $@"
+	return 0
 }
 
 ui_confirm() {
-    _textout "$GREEN$GREEN_UL" "$1"
+	_textout "$GREEN$GREEN_UL" "$1"
 
-    if headless; then
-        echo "No TTY, assuming you would say yes :)"
-        return 0
-    fi
+	if headless; then
+		echo "No TTY, assuming you would say yes :)"
+		return 0
+	fi
 
-    local prompt="[y/n] "
-    echo -n "$prompt"
-    while read -r y; do
-        if [ "$y" = "y" ]; then
-            echo ""
-            return 0
-        elif [ "$y" = "n" ]; then
-            echo ""
-            return 1
-        else
-            _textout "$RED" "Sorry, I didn't understand. I can only understand answers of y or n"
-            echo -n "$prompt"
-        fi
-    done
-    echo ""
-    return 1
+	local prompt="[y/n] "
+	echo -n "$prompt"
+	while read -r y; do
+		if [ "$y" = "y" ]; then
+			echo ""
+			return 0
+		elif [ "$y" = "n" ]; then
+			echo ""
+			return 1
+		else
+			_textout "$RED" "Sorry, I didn't understand. I can only understand answers of y or n"
+			echo -n "$prompt"
+		fi
+	done
+	echo ""
+	return 1
 }
 
 printf -v _UNCHANGED_GRP_FMT "%b" $'\033[2m%='"$ESC" # "dim"
@@ -214,43 +232,43 @@ printf -v _OLD_LINE_FMT "%b" $'\033[1;7;31m-'"$ESC ${RED}%L${ESC}"
 printf -v _NEW_LINE_FMT "%b" $'\033[1;7;32m+'"$ESC ${GREEN}%L${ESC}"
 
 _diff() {
-    # simple colorized diff comatible w/ pre `--color` versions
-    diff --unchanged-group-format="$_UNCHANGED_GRP_FMT" --old-line-format="$_OLD_LINE_FMT" --new-line-format="$_NEW_LINE_FMT" --unchanged-line-format="  %L" "$@"
+	# simple colorized diff comatible w/ pre `--color` versions
+	diff --unchanged-group-format="$_UNCHANGED_GRP_FMT" --old-line-format="$_OLD_LINE_FMT" --new-line-format="$_NEW_LINE_FMT" --unchanged-line-format="  %L" "$@"
 }
 
 confirm_rm() {
-    local path="$1"
-    if ui_confirm "Can I remove $path?"; then
-        _sudo "to remove $path" rm "$path"
-    fi
+	local path="$1"
+	if ui_confirm "Can I remove $path?"; then
+		_sudo "to remove $path" rm "$path"
+	fi
 }
 
 confirm_edit() {
-    local path="$1"
-    local edit_path="$2"
-    cat <<EOF
+	local path="$1"
+	local edit_path="$2"
+	cat <<-EOF
 
-Nix isn't the only thing in $path,
-but I think I know how to edit it out.
-Here's the diff:
-EOF
+	Nix isn't the only thing in $path,
+	but I think I know how to edit it out.
+	Here's the diff:
+	EOF
 
-    # could technically test the diff, but caller should do it
-    _diff "$path" "$edit_path"
-    if ui_confirm "Does the change above look right?"; then
-        _sudo "remove nix from $path" cp "$edit_path" "$path"
-    fi
+	# could technically test the diff, but caller should do it
+	_diff "$path" "$edit_path"
+	if ui_confirm "Does the change above look right?"; then
+		_sudo "remove nix from $path" cp "$edit_path" "$path"
+	fi
 }
 
 _SERIOUS_BUSINESS="${RED}%s:${ESC} "
 password_confirm() {
-    local do_something_consequential="$1"
-    if ui_confirm "Can I $do_something_consequential?"; then
-        # shellcheck disable=SC2059
-        sudo -kv --prompt="$(printf "${_SERIOUS_BUSINESS}" "Enter your password to $do_something_consequential")"
-    else
-        return 1
-    fi
+	local do_something_consequential="$1"
+	if ui_confirm "Can I $do_something_consequential?"; then
+		# shellcheck disable=SC2059
+		sudo -kv --prompt="$(printf "${_SERIOUS_BUSINESS}" "Enter your password to $do_something_consequential")"
+	else
+		return 1
+	fi
 }
 
 # Support accumulating reminders over the course of a run and showing
@@ -266,724 +284,818 @@ _reminders=()
 ((_remind_num=1))
 
 remind() {
-    # (( arithmetic expression ))
-    if (( _remind_num > 1 )); then
-        header "Reminders"
-        for line in "${_reminders[@]}"; do
-            echo "$line"
-            if ! headless && [ "${#line}" = 0 ]; then
-                if read -r -p "Press enter/return to acknowledge."; then
-                    printf $'\033[A\33[2K\r'
-                fi
-            fi
-        done
-    fi
+	# (( arithmetic expression ))
+	if (( _remind_num > 1 )); then
+		header "Reminders"
+		for line in "${_reminders[@]}"; do
+			echo "$line"
+			if ! headless && [ "${#line}" = 0 ]; then
+				if read -r -p "Press enter/return to acknowledge."; then
+					printf $'\033[A\33[2K\r'
+				fi
+			fi
+		done
+	fi
 }
 
 reminder() {
-    printf -v label "${BLUE}[ %d ]${ESC}" "$_remind_num"
-    _reminders+=("$label")
-    if [[ "$*" = "" ]]; then
-        while read -r line; do
-            _reminders+=("$line")
-        done
-    else
-        # this expands each arg to an array entry (and each entry will
-        # ultimately be a separate line in the output)
-        _reminders+=("$@")
-    fi
-    _reminders+=("")
-    ((_remind_num++))
+	printf -v label "${BLUE}[ %d ]${ESC}" "$_remind_num"
+	_reminders+=("$label")
+	if [[ "$*" = "" ]]; then
+		while read -r line; do
+			_reminders+=("$line")
+		done
+	else
+		# this expands each arg to an array entry (and each entry will
+		# ultimately be a separate line in the output)
+		_reminders+=("$@")
+	fi
+	_reminders+=("")
+	((_remind_num++))
 }
 
 __sudo() {
-    local expl="$1"
-    local cmd="$2"
-    shift
-    header "sudo execution"
+	local expl="$1"
+	local cmd="$2"
+	shift
+	header "sudo execution"
 
-    echo "I am executing:"
-    echo ""
-    printf "    $ sudo %s\\n" "$cmd"
-    echo ""
-    echo "$expl"
-    echo ""
+	echo "I am executing:"
+	echo ""
+	printf "    $ sudo %s\\n" "$cmd"
+	echo ""
+	echo "$expl"
+	echo ""
 
-    return 0
+	return 0
 }
 
 _sudo() {
-    local expl="$1"
-    shift
-    if ! headless || is_root; then
-        __sudo "$expl" "$*" >&2
-    fi
+	local expl="$1"
+	shift
+	if ! headless || is_root; then
+		__sudo "$expl" "$*" >&2
+	fi
 
-    if is_root; then
-        env "$@"
-    else
-        sudo "$@"
-    fi
+	if is_root; then
+		env "$@"
+	else
+		sudo "$@"
+	fi
 }
 
 # Ensure that $TMPDIR exists if defined.
 if [[ -n "${TMPDIR:-}" ]] && [[ ! -d "${TMPDIR:-}" ]]; then
-    mkdir -m 0700 -p "${TMPDIR:-}"
+	mkdir -m 0700 -p "${TMPDIR:-}"
 fi
 
 readonly SCRATCH=$(mktemp -d)
 finish_cleanup() {
-    rm -rf "$SCRATCH"
+	rm -rf "$SCRATCH"
 }
 
 finish_fail() {
-    finish_cleanup
+	finish_cleanup
 
-    failure <<EOF
-Oh no, something went wrong. If you can take all the output and open
-an issue, we'd love to fix the problem so nobody else has this issue.
+	failure <<-EOF
+	Oh no, something went wrong. If you can take all the output and open
+	an issue, we'd love to fix the problem so nobody else has this issue.
 
-:(
-EOF
+	:(
+	EOF
 }
 trap finish_fail EXIT
 
 finish_success() {
-    ok "Alright! We're done!"
+	ok "Alright! We're done!"
 
-    cat <<EOF
-Try it! Open a new terminal, and type:
-$(poly_extra_try_me_commands)
-  $ nix-shell -p nix-info --run "nix-info -m"
+	cat <<-EOF
+	Try it! Open a new terminal, and type:
+	$(poly_8_extra_try_me_commands)
+	$ nix-shell -p nix-info --run "nix-info -m"
 
-Thank you for using this installer. If you have any feedback or need
-help, don't hesitate:
+	Thank you for using this installer. If you have any feedback or need
+	help, don't hesitate:
 
-$(contact_us)
-EOF
-    remind
-    finish_cleanup
+	$(contact_us)
+	EOF
+	remind
+	finish_cleanup
 }
 
 finish_uninstall_success() {
-    ok "Alright! Nix should be removed!"
+	ok "Alright! Nix should be removed!"
 
-    cat <<EOF
-If you spot anything this uninstaller missed or have feedback,
-don't hesitate:
+	cat <<-EOF
+	If you spot anything this uninstaller missed or have feedback,
+	don't hesitate:
 
-$(contact_us)
-EOF
-    remind
-    finish_cleanup
+	$(contact_us)
+	EOF
+	remind
+	finish_cleanup
 }
 
 remove_nix_artifacts() {
-    failure "Not implemented yet"
+	failure "Not implemented yet"
 }
 
-cure_artifacts() {
-    poly_cure_artifacts
-    # remove_nix_artifacts (LATER)
+# 
+# artifact-checking helpers
+# 
+
+nixenv_command_doesnt_exist_check() { # checks run, before full explaination/warnings are generated
+	if type nix-env 2> /dev/null >&2; then
+		failed_check "nix-env command already exists"
+	else
+		passed_check "no previous nix-env found"
+	fi
+}
+nixenv_command_exists_error() {
+	echo
+	error <<-EOF
+	Nix already appears to be installed. This installer may run into issues.
+	If an error occurs, try manually uninstalling, then rerunning this script.
+	EOF
+}
+
+backup_profiles_dont_exist_check() {
+	at_least_one_failed="false"
+	for profile_target in "${PROFILE_TARGETS[@]}"; do
+		# TODO: I think it would be good to accumulate a list of all
+		#       of the copies so that people don't hit this 2 or 3x in
+		#       a row for different files.
+		if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
+			# this backup process first released in Nix 2.1
+			at_least_one_failed="true"
+			failed_check "$profile_target$PROFILE_BACKUP_SUFFIX already exists"
+		else
+			passed_check "$profile_target$PROFILE_BACKUP_SUFFIX does not exist yet"
+		fi
+	done
+	if [ "$at_least_one_failed" = "true" ]
+	then
+		return 1
+	fi
+}
+backup_profiles_error() {
+	echo
+	profiles=""
+	profile_backups=""
+	for profile_target in "${PROFILE_TARGETS[@]}"; do
+		if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
+			profiles="$profiles, $profile_target"
+			profile_backups="$profile_backups, $profile_target$PROFILE_BACKUP_SUFFIX"
+		fi
+	done
+	
+	error <<-EOF
+	I back up shell profile/rc scripts before I add Nix to them.
+	I need to back up each of these profiles: $profiles
+	To their respective backups: $profile_backups
+	But those backup files already exist.
+
+	Here's how to clean up the old backup files:
+
+	1. Open each of these profiles, and look for something similar to the following
+	$(shell_source_lines)
+
+	2. Remove those lines that mention Nix, and save the file
+
+	3. Move these backup files to a new location: $profile_backups
+	(ideally a location you will remember encase you need to rollback to them)
+	EOF
 }
 
 validate_starting_assumptions() {
-    task "Checking for artifacts of previous installs"
-    cat <<EOF
-Before I try to install, I'll check for signs Nix already is or has
-been installed on this system.
-EOF
-    if type nix-env 2> /dev/null >&2; then
-        warning <<EOF
-Nix already appears to be installed. This installer may run into issues.
-If an error occurs, try manually uninstalling, then rerunning this script.
+	task "Checking for artifacts of previous installs"
+	cat <<-EOF
+	Before I try to install, I'll check for signs Nix already is or has
+	been installed on this system.
+	EOF
+	if ! poly_3_check_for_leftover_artifacts; then
+		warningheader "Leftovers From Previous Install Detected"
+		echo 
+		echo 
+		echo '    Please remove the leftovers (instructions above)'
+		echo '    The instructions are customized your specific leftovers/system'
+		echo '    Detailed instructions can be found at:'
+		if is_os_linux; then
+			echo "        https://nixos.org/manual/nix/stable/installation/installing-binary.html#linux"
+		elif is_os_darwin; then
+			echo "        https://nixos.org/manual/nix/stable/installation/installing-binary.html#macos"
+		else
+			echo "        https://nixos.org/manual/nix/stable/installation/installing-binary.html"
+		fi
+		
+		echo '   '
+		ui_confirm 'Understood?' 
+		# Presumably most people will attempt to manually remove leftovers before even getting to the un_confirm below
+		# (which is intentional)
+		
+		if ui_confirm "Are you interested in a UNSAFE automatic purge of leftovers?"; then
+			# 2nd check is not only for humans, but also so that the no-tty-scenario doesnt trigger a purge
+			# maybe in the future when the agressive purge is throughly tested, it will make sense to have it as the default no-tty behavior
+			if ! ui_confirm "Opposite-question check: do you want only safe operations to be completed"; then
+				poly_4_agressive_remove_artifacts
+				# even if removal is successful, re-run the script so that ENV vars are refreshed with the changes
+				failure "Please re-run script so the purge will take effect"
+			else
+				failure "Because the automated-purge is considered unsafe, please follow the instructions above and re-run this script"
+			fi
+		else
+			failure "Please re-run script after leftovers have manually been purged"
+		fi
+	fi
 
-$(poly_uninstall_directions)
-EOF
-        poly_forcefull_uninstall_offer
-    fi
-
-    # TODO: I think it would be good for this step to accumulate more
-    #       knowledge of older obsolete artifacts, if there are any.
-    #       We could issue a "reminder" here that the user might want
-    #       to clean them up?
-
-    for profile_target in "${PROFILE_TARGETS[@]}"; do
-        # TODO: I think it would be good to accumulate a list of all
-        #       of the copies so that people don't hit this 2 or 3x in
-        #       a row for different files.
-        if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
-            # this backup process first released in Nix 2.1
-            failure <<EOF
-I back up shell profile/rc scripts before I add Nix to them.
-I need to back up $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX,
-but the latter already exists.
-
-Here's how to clean up the old backup file:
-
-1. Back up (copy) $profile_target and $profile_target$PROFILE_BACKUP_SUFFIX
-   to another location, just in case.
-
-2. Ensure $profile_target$PROFILE_BACKUP_SUFFIX does not have anything
-   Nix-related in it. If it does, something is probably quite
-   wrong. Please open an issue or get in touch immediately.
-
-3. Once you confirm $profile_target is backed up and
-   $profile_target$PROFILE_BACKUP_SUFFIX doesn't mention Nix, run:
-   mv $profile_target$PROFILE_BACKUP_SUFFIX $profile_target
-EOF
-        fi
-    done
-
-    if is_os_linux && [ ! -e /run/systemd/system ]; then
-        warning <<EOF
-We did not detect systemd on your system. With a multi-user install
-without systemd you will have to manually configure your init system to
-launch the Nix daemon after installation.
-EOF
-        if ! ui_confirm "Do you want to proceed with a multi-user installation?"; then
-            failure <<EOF
-You have aborted the installation.
-EOF
-        fi
-    fi
+	poly_5_assumption_validation
+	# TODO: I think it would be good for this step to accumulate more
+	#       knowledge of older obsolete artifacts, if there are any.
+	#       We could issue a "reminder" here that the user might want
+	#       to clean them up?
 }
 
 setup_report() {
-    header "Nix config report"
-    row "        Temp Dir" "$SCRATCH"
-    row "        Nix Root" "$NIX_ROOT"
-    row "     Build Users" "$NIX_USER_COUNT"
-    row "  Build Group ID" "$NIX_BUILD_GROUP_ID"
-    row "Build Group Name" "$NIX_BUILD_GROUP_NAME"
-    if [ "${ALLOW_PREEXISTING_INSTALLATION:-}" != "" ]; then
-        row "Preexisting Install" "Allowed"
-    fi
+	header "Nix config report"
+	row "        Temp Dir" "$SCRATCH"
+	row "        Nix Root" "$NIX_ROOT"
+	row "     Build Users" "$NIX_USER_COUNT"
+	row "  Build Group ID" "$NIX_BUILD_GROUP_ID"
+	row "Build Group Name" "$NIX_BUILD_GROUP_NAME"
+	if [ "${ALLOW_PREEXISTING_INSTALLATION:-}" != "" ]; then
+		row "Preexisting Install" "Allowed"
+	fi
 
-    subheader "build users:"
+	subheader "build users:"
 
-    row "    Username" "UID"
-    for i in $(seq 1 "$NIX_USER_COUNT"); do
-        row "     $(nix_user_for_core "$i")" "$(nix_uid_for_core "$i")"
-    done
-    echo ""
+	row "    Username" "UID"
+	for i in $(seq 1 "$NIX_USER_COUNT"); do
+		row "     $(nix_user_for_core "$i")" "$(nix_uid_for_core "$i")"
+	done
+	echo ""
 }
 
 create_build_group() {
-    local primary_group_id
+	local primary_group_id
 
-    task "Setting up the build group $NIX_BUILD_GROUP_NAME"
-    if ! poly_group_exists "$NIX_BUILD_GROUP_NAME"; then
-        poly_create_build_group
-        row "            Created" "Yes"
-    else
-        primary_group_id=$(poly_group_id_get "$NIX_BUILD_GROUP_NAME")
-        if [ "$primary_group_id" -ne "$NIX_BUILD_GROUP_ID" ]; then
-            failure <<EOF
-It seems the build group $NIX_BUILD_GROUP_NAME already exists, but
-with the UID $primary_group_id. This script can't really handle
-that right now, so I'm going to give up.
+	task "Setting up the build group $NIX_BUILD_GROUP_NAME"
+	if ! poly_group_exists "$NIX_BUILD_GROUP_NAME"; then
+		poly_create_build_group
+		row "            Created" "Yes"
+	else
+		primary_group_id=$(poly_group_id_get "$NIX_BUILD_GROUP_NAME")
+		if [ "$primary_group_id" -ne "$NIX_BUILD_GROUP_ID" ]; then
+			failure <<-EOF
+			It seems the build group $NIX_BUILD_GROUP_NAME already exists, but
+			with the UID $primary_group_id. This script can't really handle
+			that right now, so I'm going to give up.
 
-You can fix this by editing this script and changing the
-NIX_BUILD_GROUP_ID variable near the top to from $NIX_BUILD_GROUP_ID
-to $primary_group_id and re-run.
-EOF
-        else
-            row "            Exists" "Yes"
-        fi
-    fi
+			You can fix this by editing this script and changing the
+			NIX_BUILD_GROUP_ID variable near the top to from $NIX_BUILD_GROUP_ID
+			to $primary_group_id and re-run.
+			EOF
+		else
+			row "            Exists" "Yes"
+		fi
+	fi
 }
 
 create_build_user_for_core() {
-    local coreid
-    local username
-    local uid
+	local coreid
+	local username
+	local uid
 
-    coreid="$1"
-    username=$(nix_user_for_core "$coreid")
-    uid=$(nix_uid_for_core "$coreid")
+	coreid="$1"
+	username=$(nix_user_for_core "$coreid")
+	uid=$(nix_uid_for_core "$coreid")
 
-    task "Setting up the build user $username"
+	task "Setting up the build user $username"
 
-    if ! poly_user_exists "$username"; then
-        poly_create_build_user "$username" "$uid" "$coreid"
-        row "           Created" "Yes"
-    else
-        actual_uid=$(poly_user_id_get "$username")
-        if [ "$actual_uid" != "$uid" ]; then
-            failure <<EOF
-It seems the build user $username already exists, but with the UID
-with the UID '$actual_uid'. This script can't really handle that right
-now, so I'm going to give up.
+	if ! poly_user_exists "$username"; then
+		poly_create_build_user "$username" "$uid" "$coreid"
+		row "           Created" "Yes"
+	else
+		actual_uid=$(poly_user_id_get "$username")
+		if [ "$actual_uid" != "$uid" ]; then
+			failure <<-EOF
+			It seems the build user $username already exists, but with the UID
+			with the UID '$actual_uid'. This script can't really handle that right
+			now, so I'm going to give up.
 
-If you already created the users and you know they start from
-$actual_uid and go up from there, you can edit this script and change
-NIX_FIRST_BUILD_UID near the top of the file to $actual_uid and try
-again.
-EOF
-        else
-            row "            Exists" "Yes"
-        fi
-    fi
+			If you already created the users and you know they start from
+			$actual_uid and go up from there, you can edit this script and change
+			NIX_FIRST_BUILD_UID near the top of the file to $actual_uid and try
+			again.
+			EOF
+		else
+			row "            Exists" "Yes"
+		fi
+	fi
 
-    if [ "$(poly_user_hidden_get "$username")" = "1" ]; then
-        row "            Hidden" "Yes"
-    else
-        poly_user_hidden_set "$username"
-        row "            Hidden" "Yes"
-    fi
+	if [ "$(poly_user_hidden_get "$username")" = "1" ]; then
+		row "            Hidden" "Yes"
+	else
+		poly_user_hidden_set "$username"
+		row "            Hidden" "Yes"
+	fi
 
-    if [ "$(poly_user_home_get "$username")" = "/var/empty" ]; then
-        row "    Home Directory" "/var/empty"
-    else
-        poly_user_home_set "$username" "/var/empty"
-        row "    Home Directory" "/var/empty"
-    fi
+	if [ "$(poly_user_home_get "$username")" = "/var/empty" ]; then
+		row "    Home Directory" "/var/empty"
+	else
+		poly_user_home_set "$username" "/var/empty"
+		row "    Home Directory" "/var/empty"
+	fi
 
-    # We use grep instead of an equality check because it is difficult
-    # to extract _just_ the user's note, instead it is prefixed with
-    # some plist junk. This was causing the user note to always be set,
-    # even if there was no reason for it.
-    if ! poly_user_note_get "$username" | grep -q "Nix build user $coreid"; then
-        row "              Note" "Nix build user $coreid"
-    else
-        poly_user_note_set "$username" "Nix build user $coreid"
-        row "              Note" "Nix build user $coreid"
-    fi
+	# We use grep instead of an equality check because it is difficult
+	# to extract _just_ the user's note, instead it is prefixed with
+	# some plist junk. This was causing the user note to always be set,
+	# even if there was no reason for it.
+	if ! poly_user_note_get "$username" | grep -q "Nix build user $coreid"; then
+		row "              Note" "Nix build user $coreid"
+	else
+		poly_user_note_set "$username" "Nix build user $coreid"
+		row "              Note" "Nix build user $coreid"
+	fi
 
-    if [ "$(poly_user_shell_get "$username")" = "/sbin/nologin" ]; then
-        row "   Logins Disabled" "Yes"
-    else
-        poly_user_shell_set "$username" "/sbin/nologin"
-        row "   Logins Disabled" "Yes"
-    fi
+	if [ "$(poly_user_shell_get "$username")" = "/sbin/nologin" ]; then
+		row "   Logins Disabled" "Yes"
+	else
+		poly_user_shell_set "$username" "/sbin/nologin"
+		row "   Logins Disabled" "Yes"
+	fi
 
-    if poly_user_in_group_check "$username" "$NIX_BUILD_GROUP_NAME"; then
-        row "  Member of $NIX_BUILD_GROUP_NAME" "Yes"
-    else
-        poly_user_in_group_set "$username" "$NIX_BUILD_GROUP_NAME"
-        row "  Member of $NIX_BUILD_GROUP_NAME" "Yes"
-    fi
+	if poly_user_in_group_check "$username" "$NIX_BUILD_GROUP_NAME"; then
+		row "  Member of $NIX_BUILD_GROUP_NAME" "Yes"
+	else
+		poly_user_in_group_set "$username" "$NIX_BUILD_GROUP_NAME"
+		row "  Member of $NIX_BUILD_GROUP_NAME" "Yes"
+	fi
 
-    if [ "$(poly_user_primary_group_get "$username")" = "$NIX_BUILD_GROUP_ID" ]; then
-        row "    PrimaryGroupID" "$NIX_BUILD_GROUP_ID"
-    else
-        poly_user_primary_group_set "$username" "$NIX_BUILD_GROUP_ID"
-        row "    PrimaryGroupID" "$NIX_BUILD_GROUP_ID"
-    fi
+	if [ "$(poly_user_primary_group_get "$username")" = "$NIX_BUILD_GROUP_ID" ]; then
+		row "    PrimaryGroupID" "$NIX_BUILD_GROUP_ID"
+	else
+		poly_user_primary_group_set "$username" "$NIX_BUILD_GROUP_ID"
+		row "    PrimaryGroupID" "$NIX_BUILD_GROUP_ID"
+	fi
 }
 
 create_build_users() {
-    for i in $(seq 1 "$NIX_USER_COUNT"); do
-        create_build_user_for_core "$i"
-    done
+	for i in $(seq 1 "$NIX_USER_COUNT"); do
+		create_build_user_for_core "$i"
+	done
 }
 
 create_directories() {
-    # FIXME: remove all of this because it duplicates LocalStore::LocalStore().
-    task "Setting up the basic directory structure"
-    if [ -d "$NIX_ROOT" ]; then
-        # if /nix already exists, take ownership
-        #
-        # Caution: notes below are macOS-y
-        # This is a bit of a goldilocks zone for taking ownership
-        # if there are already files on the volume; the volume is
-        # now mounted, but we haven't added a bunch of new files
+	# FIXME: remove all of this because it duplicates LocalStore::LocalStore().
+	task "Setting up the basic directory structure"
+	if [ -d "$NIX_ROOT" ]; then
+		# if /nix already exists, take ownership
+		#
+		# Caution: notes below are macOS-y
+		# This is a bit of a goldilocks zone for taking ownership
+		# if there are already files on the volume; the volume is
+		# now mounted, but we haven't added a bunch of new files
 
-        # this is probably a bit slow; I've been seeing 3.3-4s even
-        # when promptly installed over a fresh single-user install.
-        # In case anyone's aware of a shortcut.
-        # `|| true`: .Trashes errors w/o full disk perm
+		# this is probably a bit slow; I've been seeing 3.3-4s even
+		# when promptly installed over a fresh single-user install.
+		# In case anyone's aware of a shortcut.
+		# `|| true`: .Trashes errors w/o full disk perm
 
-        # rumor per #4488 that macOS 11.2 may not have
-        # sbin on path, and that's where chown is, but
-        # since this bit is cross-platform:
-        # - first try with `command -vp` to try and find
-        #   chown in the usual places
-        #   * to work around some sort of deficiency in
-        #     `command -p` in macOS bash 3.2, we also add
-        #     PATH="$(getconf PATH 2>/dev/null)". As long as
-        #     getconf is found, this should set a sane PATH
-        #     which `command -p` in bash 3.2 appears to use.
-        #     A bash with a properly-working `command -p`
-        #     should ignore this hard-set PATH in favor of
-        #     whatever it obtains internally. See
-        #     github.com/NixOS/nix/issues/5768
-        # - fall back on `command -v` which would find
-        #   any chown on path
-        # if we don't find one, the command is already
-        # hiding behind || true, and the general state
-        # should be one the user can repair once they
-        # figure out where chown is...
-        local get_chr_own="$(PATH="$(getconf PATH 2>/dev/null)" command -vp chown)"
-        if [[ -z "$get_chr_own" ]]; then
-            get_chr_own="$(command -v chown)"
-        fi
+		# rumor per #4488 that macOS 11.2 may not have
+		# sbin on path, and that's where chown is, but
+		# since this bit is cross-platform:
+		# - first try with `command -vp` to try and find
+		#   chown in the usual places
+		#   * to work around some sort of deficiency in
+		#     `command -p` in macOS bash 3.2, we also add
+		#     PATH="$(getconf PATH 2>/dev/null)". As long as
+		#     getconf is found, this should set a sane PATH
+		#     which `command -p` in bash 3.2 appears to use.
+		#     A bash with a properly-working `command -p`
+		#     should ignore this hard-set PATH in favor of
+		#     whatever it obtains internally. See
+		#     github.com/NixOS/nix/issues/5768
+		# - fall back on `command -v` which would find
+		#   any chown on path
+		# if we don't find one, the command is already
+		# hiding behind || true, and the general state
+		# should be one the user can repair once they
+		# figure out where chown is...
+		local get_chr_own="$(PATH="$(getconf PATH 2>/dev/null)" command -vp chown)"
+		if [[ -z "$get_chr_own" ]]; then
+			get_chr_own="$(command -v chown)"
+		fi
 
-        if [[ -z "$get_chr_own" ]]; then
-            reminder <<EOF
-I wanted to take root ownership of existing Nix store files,
-but I couldn't locate 'chown'. (You may need to fix your PATH.)
-To manually change file ownership, you can run:
-    sudo chown -R 'root:$NIX_BUILD_GROUP_NAME' '$NIX_ROOT'
-EOF
-        else
-            _sudo "to take root ownership of existing Nix store files" \
-                  "$get_chr_own" -R "root:$NIX_BUILD_GROUP_NAME" "$NIX_ROOT" || true
-        fi
-    fi
-    _sudo "to make the basic directory structure of Nix (part 1)" \
-          install -dv -m 0755 /nix /nix/var /nix/var/log /nix/var/log/nix /nix/var/log/nix/drvs /nix/var/nix{,/db,/gcroots,/profiles,/temproots,/userpool,/daemon-socket} /nix/var/nix/{gcroots,profiles}/per-user
+		if [[ -z "$get_chr_own" ]]; then
+			reminder <<-EOF
+			I wanted to take root ownership of existing Nix store files,
+			but I couldn't locate 'chown'. (You may need to fix your PATH.)
+			To manually change file ownership, you can run:
+				sudo chown -R 'root:$NIX_BUILD_GROUP_NAME' '$NIX_ROOT'
+			EOF
+		else
+			_sudo "to take root ownership of existing Nix store files" \
+							"$get_chr_own" -R "root:$NIX_BUILD_GROUP_NAME" "$NIX_ROOT" || true
+		fi
+	fi
+	_sudo "to make the basic directory structure of Nix (part 1)" \
+					install -dv -m 0755 /nix /nix/var /nix/var/log /nix/var/log/nix /nix/var/log/nix/drvs /nix/var/nix{,/db,/gcroots,/profiles,/temproots,/userpool,/daemon-socket} /nix/var/nix/{gcroots,profiles}/per-user
 
-    _sudo "to make the basic directory structure of Nix (part 2)" \
-          install -dv -g "$NIX_BUILD_GROUP_NAME" -m 1775 /nix/store
+	_sudo "to make the basic directory structure of Nix (part 2)" \
+					install -dv -g "$NIX_BUILD_GROUP_NAME" -m 1775 /nix/store
 
-    _sudo "to place the default nix daemon configuration (part 1)" \
-          install -dv -m 0555 /etc/nix
+	_sudo "to place the default nix daemon configuration (part 1)" \
+					install -dv -m 0555 /etc/nix
 }
 
 place_channel_configuration() {
-    if [ -z "${NIX_INSTALLER_NO_CHANNEL_ADD:-}" ]; then
-        echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > "$SCRATCH/.nix-channels"
-        _sudo "to set up the default system channel (part 1)" \
-            install -m 0664 "$SCRATCH/.nix-channels" "$ROOT_HOME/.nix-channels"
-    fi
+	if [ -z "${NIX_INSTALLER_NO_CHANNEL_ADD:-}" ]; then
+		echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > "$SCRATCH/.nix-channels"
+		_sudo "to set up the default system channel (part 1)" \
+			install -m 0664 "$SCRATCH/.nix-channels" "$ROOT_HOME/.nix-channels"
+	fi
 }
 
 check_selinux() {
-    if command -v getenforce > /dev/null 2>&1; then
-        if [ "$(getenforce)" = "Enforcing" ]; then
-            failure <<EOF
-Nix does not work with selinux enabled yet!
-see https://github.com/NixOS/nix/issues/2374
-EOF
-        fi
-    fi
+	if command -v getenforce > /dev/null 2>&1; then
+		if [ "$(getenforce)" = "Enforcing" ]; then
+			failure <<-EOF
+			Nix does not work with selinux enabled yet!
+			see https://github.com/NixOS/nix/issues/2374
+			EOF
+		fi
+	fi
 }
 
 welcome_to_nix() {
-    ok "Welcome to the Multi-User Nix Installation"
+	ok "Welcome to the Multi-User Nix Installation"
 
-    cat <<EOF
+	cat <<-EOF
 
-This installation tool will set up your computer with the Nix package
-manager. This will happen in a few stages:
+	This installation tool will set up your computer with the Nix package
+	manager. This will happen in a few stages:
 
-1. Make sure your computer doesn't already have Nix. If it does, I
-   will show you instructions on how to clean up your old install.
+	1. Make sure your computer doesn't already have Nix. If it does, I
+	will show you instructions on how to clean up your old install.
 
-2. Show you what I am going to install and where. Then I will ask
-   if you are ready to continue.
+	2. Show you what I am going to install and where. Then I will ask
+	if you are ready to continue.
 
-3. Create the system users and groups that the Nix daemon uses to run
-   builds.
+	3. Create the system users and groups that the Nix daemon uses to run
+	builds.
 
-4. Perform the basic installation of the Nix files daemon.
+	4. Perform the basic installation of the Nix files daemon.
 
-5. Configure your shell to import special Nix Profile files, so you
-   can use Nix.
+	5. Configure your shell to import special Nix Profile files, so you
+	can use Nix.
 
-6. Start the Nix daemon.
+	6. Start the Nix daemon.
 
-EOF
+	EOF
 
-    if ui_confirm "Would you like to see a more detailed list of what I will do?"; then
-        cat <<EOF
+	if ui_confirm "Would you like to see a more detailed list of what I will do?"; then
+		cat <<-EOF
 
-I will:
+		I will:
 
- - make sure your computer doesn't already have Nix files
-   (if it does, I will tell you how to clean them up.)
- - create local users (see the list above for the users I'll make)
- - create a local group ($NIX_BUILD_GROUP_NAME)
- - install Nix in to $NIX_ROOT
- - create a configuration file in /etc/nix
- - set up the "default profile" by creating some Nix-related files in
-   $ROOT_HOME
-EOF
-        for profile_target in "${PROFILE_TARGETS[@]}"; do
-            if [ -e "$profile_target" ]; then
-                cat <<EOF
- - back up $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX
- - update $profile_target to include some Nix configuration
-EOF
-            fi
-        done
-        poly_service_setup_note
-        if ! ui_confirm "Ready to continue?"; then
-            failure <<EOF
-Okay, maybe you would like to talk to the team.
-EOF
-        fi
-    fi
+		- make sure your computer doesn't already have Nix files
+		(if it does, I will tell you how to clean them up.)
+		- create local users (see the list above for the users I'll make)
+		- create a local group ($NIX_BUILD_GROUP_NAME)
+		- install Nix in to $NIX_ROOT
+		- create a configuration file in /etc/nix
+		- set up the "default profile" by creating some Nix-related files in
+		$ROOT_HOME
+		EOF
+		for profile_target in "${PROFILE_TARGETS[@]}"; do
+			if [ -e "$profile_target" ]; then
+				cat <<-EOF
+				- back up $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX
+				- update $profile_target to include some Nix configuration
+				EOF
+			fi
+		done
+		poly_1_service_setup_note
+		if ! ui_confirm "Ready to continue?"; then
+			failure <<-EOF
+			Okay, maybe you would like to talk to the team.
+			EOF
+		fi
+	fi
 }
 
 chat_about_sudo() {
-    header "let's talk about sudo"
+	header "let's talk about sudo"
 
-    if headless; then
-        cat <<EOF
-This script is going to call sudo a lot. Normally, it would show you
-exactly what commands it is running and why. However, the script is
-run in a headless fashion, like this:
+	if headless; then
+		cat <<-EOF
+		This script is going to call sudo a lot. Normally, it would show you
+		exactly what commands it is running and why. However, the script is
+		run in a headless fashion, like this:
 
-  $ curl -L https://nixos.org/nix/install | sh
+		$ curl -L https://nixos.org/nix/install | sh
 
-or maybe in a CI pipeline. Because of that, I'm going to skip the
-verbose output in the interest of brevity.
+		or maybe in a CI pipeline. Because of that, I'm going to skip the
+		verbose output in the interest of brevity.
 
-If you would like to
-see the output, try like this:
+		If you would like to
+		see the output, try like this:
 
-  $ curl -L -o install-nix https://nixos.org/nix/install
-  $ sh ./install-nix
+		$ curl -L -o install-nix https://nixos.org/nix/install
+		$ sh ./install-nix
 
-EOF
-        return 0
-    fi
+		EOF
+		return 0
+	fi
 
-    cat <<EOF
-This script is going to call sudo a lot. Every time I do, it'll
-output exactly what it'll do, and why.
+	cat <<-EOF
+	This script is going to call sudo a lot. Every time I do, it'll
+	output exactly what it'll do, and why.
 
-Just like this:
-EOF
+	Just like this:
+	EOF
 
-    __sudo "to demonstrate how our sudo prompts look" \
-           echo "this is a sudo prompt"
+	__sudo "to demonstrate how our sudo prompts look" \
+		echo "this is a sudo prompt"
 
-    cat <<EOF
+	cat <<-EOF
 
-This might look scary, but everything can be undone by running just a
-few commands. I used to ask you to confirm each time sudo ran, but it
-was too many times. Instead, I'll just ask you this one time:
+	This might look scary, but everything can be undone by running just a
+	few commands. I used to ask you to confirm each time sudo ran, but it
+	was too many times. Instead, I'll just ask you this one time:
 
-EOF
-    if ui_confirm "Can I use sudo?"; then
-        ok "Yay! Thanks! Let's get going!"
-    else
-        failure <<EOF
-That is okay, but I can't install.
-EOF
-    fi
+	EOF
+	if ui_confirm "Can I use sudo?"; then
+		ok "Yay! Thanks! Let's get going!"
+	else
+		failure <<-EOF
+		That is okay, but I can't install.
+		EOF
+	fi
 }
 
 install_from_extracted_nix() {
-    task "Installing Nix"
-    (
-        cd "$EXTRACTED_NIX_PATH"
+	task "Installing Nix"
+	(
+		cd "$EXTRACTED_NIX_PATH"
 
-        _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
-              cp -RPp ./store/* "$NIX_ROOT/store/"
+		_sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
+				cp -RPp ./store/* "$NIX_ROOT/store/"
 
-        _sudo "to make the new store non-writable at $NIX_ROOT/store" \
-              chmod -R ugo-w "$NIX_ROOT/store/"
+		_sudo "to make the new store non-writable at $NIX_ROOT/store" \
+			chmod -R ugo-w "$NIX_ROOT/store/"
 
-        if [ -d "$NIX_INSTALLED_NIX" ]; then
-            echo "      Alright! We have our first nix at $NIX_INSTALLED_NIX"
-        else
-            failure <<EOF
-Something went wrong, and I didn't find Nix installed at
-$NIX_INSTALLED_NIX.
-EOF
-        fi
+		if [ -d "$NIX_INSTALLED_NIX" ]; then
+			echo "      Alright! We have our first nix at $NIX_INSTALLED_NIX"
+		else
+			failure <<-EOF
+			Something went wrong, and I didn't find Nix installed at
+			$NIX_INSTALLED_NIX.
+			EOF
+		fi
 
-        _sudo "to load data for the first time in to the Nix Database" \
-              HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-store" --load-db < ./.reginfo
+		_sudo "to load data for the first time in to the Nix Database" \
+			HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-store" --load-db < ./.reginfo
 
-        echo "      Just finished getting the nix database ready."
-    )
+		echo "      Just finished getting the nix database ready."
+	)
 }
 
 shell_source_lines() {
-    cat <<EOF
+	cat <<-EOF
 
-# Nix
-if [ -e '$PROFILE_NIX_FILE' ]; then
-  . '$PROFILE_NIX_FILE'
-fi
-# End Nix
+	$PROFILE_NIX_START_DELIMETER
+	if [ -e '$PROFILE_NIX_FILE' ]; then
+	. '$PROFILE_NIX_FILE'
+	fi
+	$PROFILE_NIX_END_DELIMETER
 
-EOF
+	EOF
 }
 
 # Fish has differing syntax
 fish_source_lines() {
-    cat <<EOF
+	cat <<-EOF
 
-# Nix
-if test -e '$PROFILE_NIX_FILE_FISH'
-  . '$PROFILE_NIX_FILE_FISH'
-end
-# End Nix
+	$PROFILE_NIX_START_DELIMETER
+	if test -e '$PROFILE_NIX_FILE_FISH'
+	. '$PROFILE_NIX_FILE_FISH'
+	end
+	$PROFILE_NIX_END_DELIMETER
 
-EOF
+	EOF
 }
 
 configure_shell_profile() {
-    task "Setting up shell profiles: ${PROFILE_TARGETS[*]}"
-    for profile_target in "${PROFILE_TARGETS[@]}"; do
-        if [ -e "$profile_target" ]; then
-            _sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
-                  cp "$profile_target" "$profile_target$PROFILE_BACKUP_SUFFIX"
-        else
-            # try to create the file if its directory exists
-            target_dir="$(dirname "$profile_target")"
-            if [ -d "$target_dir" ]; then
-                _sudo "to create a stub $profile_target which will be updated" \
-                    touch "$profile_target"
-            fi
-        fi
+	task "Setting up shell profiles: ${PROFILE_TARGETS[*]}"
+	for profile_target in "${PROFILE_TARGETS[@]}"; do
+		if [ -e "$profile_target" ]; then
+			_sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
+				cp "$profile_target" "$profile_target$PROFILE_BACKUP_SUFFIX"
+		else
+			# try to create the file if its directory exists
+			target_dir="$(dirname "$profile_target")"
+			if [ -d "$target_dir" ]; then
+				_sudo "to create a stub $profile_target which will be updated" \
+					touch "$profile_target"
+			fi
+		fi
 
-        if [ -e "$profile_target" ]; then
-            shell_source_lines \
-                | _sudo "extend your $profile_target with nix-daemon settings" \
-                        tee -a "$profile_target"
-        fi
-    done
+		if [ -e "$profile_target" ]; then
+			shell_source_lines \
+				| _sudo "extend your $profile_target with nix-daemon settings" \
+						tee -a "$profile_target"
+		fi
+	done
 
-    task "Setting up shell profiles for Fish with with ${PROFILE_FISH_SUFFIX} inside ${PROFILE_FISH_PREFIXES[*]}"
-    for fish_prefix in "${PROFILE_FISH_PREFIXES[@]}"; do
-        if [ ! -d "$fish_prefix" ]; then
-            # this specific prefix (ie: /etc/fish) is very likely to exist
-            # if Fish is installed with this sysconfdir.
-            continue
-        fi
+	task "Setting up shell profiles for Fish with with ${PROFILE_FISH_SUFFIX} inside ${PROFILE_FISH_PREFIXES[*]}"
+	for fish_prefix in "${PROFILE_FISH_PREFIXES[@]}"; do
+		if [ ! -d "$fish_prefix" ]; then
+			# this specific prefix (ie: /etc/fish) is very likely to exist
+			# if Fish is installed with this sysconfdir.
+			continue
+		fi
 
-        profile_target="${fish_prefix}/${PROFILE_FISH_SUFFIX}"
-        conf_dir=$(dirname "$profile_target")
-        if [ ! -d "$conf_dir" ]; then
-            _sudo "create $conf_dir for our Fish hook" \
-                mkdir "$conf_dir"
-        fi
+		profile_target="${fish_prefix}/${PROFILE_FISH_SUFFIX}"
+		conf_dir=$(dirname "$profile_target")
+		if [ ! -d "$conf_dir" ]; then
+			_sudo "create $conf_dir for our Fish hook" \
+				mkdir "$conf_dir"
+		fi
 
-        fish_source_lines \
-            | _sudo "write nix-daemon settings to $profile_target" \
-                    tee "$profile_target"
-    done
+		fish_source_lines \
+			| _sudo "write nix-daemon settings to $profile_target" \
+					tee "$profile_target"
+	done
 
-    # TODO: should we suggest '. $PROFILE_NIX_FILE'? It would get them on
-    # their way less disruptively, but a counter-argument is that they won't
-    # immediately notice if something didn't get set up right?
-    reminder "Nix won't work in active shell sessions until you restart them."
+	# TODO: should we suggest '. $PROFILE_NIX_FILE'? It would get them on
+	# their way less disruptively, but a counter-argument is that they won't
+	# immediately notice if something didn't get set up right?
+	reminder "Nix won't work in active shell sessions until you restart them."
 }
 
 cert_in_store() {
-    # in a subshell
-    # - change into the cert-file dir
-    # - get the phyiscal pwd
-    # and test if this path is in the Nix store
-    [[ "$(cd -- "$(dirname "$NIX_SSL_CERT_FILE")" && exec pwd -P)" == "$NIX_ROOT/store/"* ]]
+	# in a subshell
+	# - change into the cert-file dir
+	# - get the phyiscal pwd
+	# and test if this path is in the Nix store
+	[[ "$(cd -- "$(dirname "$NIX_SSL_CERT_FILE")" && exec pwd -P)" == "$NIX_ROOT/store/"* ]]
 }
 
 setup_default_profile() {
-    task "Setting up the default profile"
-    _sudo "to install a bootstrapping Nix in to the default profile" \
-          HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_NIX"
+	task "Setting up the default profile"
+	_sudo "to install a bootstrapping Nix in to the default profile" \
+		HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_NIX"
 
-    if [ -z "${NIX_SSL_CERT_FILE:-}" ] || ! [ -f "${NIX_SSL_CERT_FILE:-}" ] || cert_in_store; then
-        _sudo "to install a bootstrapping SSL certificate just for Nix in to the default profile" \
-              HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_CACERT"
-        export NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt
-    fi
+	if [ -z "${NIX_SSL_CERT_FILE:-}" ] || ! [ -f "${NIX_SSL_CERT_FILE:-}" ] || cert_in_store; then
+		_sudo "to install a bootstrapping SSL certificate just for Nix in to the default profile" \
+			HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_CACERT"
+		export NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt
+	fi
 
-    if [ -z "${NIX_INSTALLER_NO_CHANNEL_ADD:-}" ]; then
-        # Have to explicitly pass NIX_SSL_CERT_FILE as part of the sudo call,
-        # otherwise it will be lost in environments where sudo doesn't pass
-        # all the environment variables by default.
-        if ! _sudo "to update the default channel in the default profile" \
-            HOME="$ROOT_HOME" NIX_SSL_CERT_FILE="$NIX_SSL_CERT_FILE" "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs; then
-            reminder <<EOF
-I had trouble fetching the nixpkgs channel (are you offline?)
-To try again later, run: sudo -i nix-channel --update nixpkgs
-EOF
-        fi
-    fi
+	if [ -z "${NIX_INSTALLER_NO_CHANNEL_ADD:-}" ]; then
+		# Have to explicitly pass NIX_SSL_CERT_FILE as part of the sudo call,
+		# otherwise it will be lost in environments where sudo doesn't pass
+		# all the environment variables by default.
+		if ! _sudo "to update the default channel in the default profile" \
+			HOME="$ROOT_HOME" NIX_SSL_CERT_FILE="$NIX_SSL_CERT_FILE" "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs; then
+			reminder <<-EOF
+			I had trouble fetching the nixpkgs channel (are you offline?)
+			To try again later, run: sudo -i nix-channel --update nixpkgs
+			EOF
+		fi
+	fi
+}
+
+unsetup_profiles() {
+	extract_nix_profile_injection() {
+		profile="$1"
+		start_line_number="$(cat "$profile" | grep -n "$PROFILE_NIX_START_DELIMETER"'$' | cut -f1 -d: | head -n1)"
+		end_line_number="$(cat "$profile" | grep -n "$PROFILE_NIX_END_DELIMETER"'$' | cut -f1 -d: | head -n1)"
+		if [ -n "$start_line_number" ] && [ -n "$end_line_number" ]; then
+			if [ $start_line_number -gt $end_line_number ]; then
+				line_number_before=$(( $start_line_number - 1 ))
+				line_number_after=$(( $end_line_number + 1))
+				new_top_half="$(head -n$line_number_before)
+				"
+				new_profile="$new_top_half$(tail -n "+$line_number_after")"
+				# overwrite existing profile, but with only Nix removed
+				echo "$new_profile" | _sudo tee "$profile" 1>/dev/null
+				return 0
+			else 
+				echo "Something is really messed up with your $profile file"
+				echo "I think you need to manually edit it to remove everything related to Nix"
+				return 1
+			fi
+		elif [ -n "$start_line_number" ] || [ -n "$end_line_number" ]; then
+		then
+			echo "Something is really messed up with your $profile file"
+			echo "I think you need to manually edit it to remove everything related to Nix"
+			return 1
+		fi
+	}
+	
+	restore_profile() {
+		profile="$1"
+		
+		# check if file exists
+		if [ -f "$profile" ]
+		then
+			if extract_nix_profile_injection "$profile"; then
+				# the extraction is done in-place. So if successful, remove the backup
+				_sudo rm -f "$profile.backup-before-nix"
+			fi
+		fi
+	}
+	
+	for profile_target in "${PROFILE_TARGETS[@]}"; do
+		restore_profile "$profile_target"
+	done
 }
 
 
 place_nix_configuration() {
-    cat <<EOF > "$SCRATCH/nix.conf"
-$NIX_EXTRA_CONF
-build-users-group = $NIX_BUILD_GROUP_NAME
-EOF
-    _sudo "to place the default nix daemon configuration (part 2)" \
-          install -m 0664 "$SCRATCH/nix.conf" /etc/nix/nix.conf
+	cat <<-EOF > "$SCRATCH/nix.conf"
+	$NIX_EXTRA_CONF
+	build-users-group = $NIX_BUILD_GROUP_NAME
+	EOF
+	_sudo "to place the default nix daemon configuration (part 2)" \
+		install -m 0664 "$SCRATCH/nix.conf" /etc/nix/nix.conf
 }
 
 
 main() {
-    check_selinux
+	check_selinux
 
-    if is_os_darwin; then
-        # shellcheck source=./install-darwin-multi-user.sh
-        . "$EXTRACTED_NIX_PATH/install-darwin-multi-user.sh"
-    elif is_os_linux; then
-        # shellcheck source=./install-systemd-multi-user.sh
-        . "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh" # most of this works on non-systemd distros also
-    else
-        failure "Sorry, I don't know what to do on $(uname)"
-    fi
+	if is_os_darwin; then
+		# shellcheck source=./install-darwin-multi-user.sh
+		. "$EXTRACTED_NIX_PATH/install-darwin-multi-user.sh"
+	elif is_os_linux; then
+		# shellcheck source=./install-systemd-multi-user.sh
+		. "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh" # most of this works on non-systemd distros also
+	else
+		failure "Sorry, I don't know what to do on $(uname)"
+	fi
 
-    welcome_to_nix
+	welcome_to_nix
 
-    if ! is_root; then
-        chat_about_sudo
-    fi
+	if ! is_root; then
+		chat_about_sudo
+	fi
 
-    cure_artifacts
-    # TODO: there's a tension between cure and validate. I moved the
-    # the sudo/root check out of validate to the head of this func.
-    # Cure is *intended* to subsume the validate-and-abort approach,
-    # so it may eventually obsolete it.
-    validate_starting_assumptions
+	poly_2_passive_remove_artifacts
+	# TODO: there's a tension between cure and validate. I moved the
+	# the sudo/root check out of validate to the head of this func.
+	# Cure is *intended* to subsume the validate-and-abort approach,
+	# so it may eventually obsolete it.
+	validate_starting_assumptions
 
-    setup_report
+	setup_report
 
-    if ! ui_confirm "Ready to continue?"; then
-        ok "Alright, no changes have been made :)"
-        get_help
-        trap finish_cleanup EXIT
-        exit 1
-    fi
+	if ! ui_confirm "Ready to continue?"; then
+		ok "Alright, no changes have been made :)"
+		get_help
+		trap finish_cleanup EXIT
+		exit 1
+	fi
 
-    poly_prepare_to_install
+	poly_6_prepare_to_install
 
-    create_build_group
-    create_build_users
-    create_directories
-    place_channel_configuration
-    install_from_extracted_nix
+	create_build_group
+	create_build_users
+	create_directories
+	place_channel_configuration
+	install_from_extracted_nix
 
-    configure_shell_profile
+	configure_shell_profile
 
-    set +eu
-    # shellcheck disable=SC1091
-    . /etc/profile
-    set -eu
+	set +eu
+	# shellcheck disable=SC1091
+	. /etc/profile
+	set -eu
 
-    setup_default_profile
-    place_nix_configuration
+	setup_default_profile
+	place_nix_configuration
 
-    poly_configure_nix_daemon_service
+	poly_7_configure_nix_daemon_service
 
-    trap finish_success EXIT
+	trap finish_success EXIT
 }
 
 # set an empty initial arg for bare invocations in case we need to
 # disambiguate someone directly invoking this later.
 if [ "${#@}" = 0 ]; then
-    set ""
+	set ""
 fi
 
 # ACTION for override
 case "${1-}" in
-    # uninstall)
-    #     shift
-    #     uninstall "$@";;
-    # install == same as the no-arg condition for now (but, explicit)
-    ""|install)
-        main;;
-    *) # holding space for future options (like uninstall + install?)
-        failure "install-multi-user: invalid argument";;
+	# uninstall)
+	#     shift
+	#     uninstall "$@";;
+	# install == same as the no-arg condition for now (but, explicit)
+	""|install)
+		main;;
+	*) # holding space for future options (like uninstall + install?)
+		failure "install-multi-user: invalid argument";;
 esac
