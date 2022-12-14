@@ -419,60 +419,57 @@
 		finish_cleanup
 	}
 
-	unsetup_profiles() {
-		unsetup_profiles_needs_manual_editing() {
-			local profile="$1"
-			echo "Something is really messed up with your $profile file"
-			echo "I think you need to manually edit it to remove everything related to Nix"
-			# check backup exists
-			if [ -f "$profile.backup-before-nix" ]
-			then
-				echo "NOTE: you do have a backup file $profile.backup-before-nix"
-				echo "So you might want to use that for reference"
-			fi
-		}
+	unsetup_profiles_needs_manual_editing() {
+		local profile="$1"
+		echo "Something is really messed up with your $profile file"
+		echo "I think you need to manually edit it to remove everything related to Nix"
+		# check backup exists
+		if [ -f "$profile.backup-before-nix" ]; then
+			echo "NOTE: you do have a backup file $profile.backup-before-nix"
+			echo "So you might want to use that for reference"
+		fi
+	}
 
-		extract_nix_profile_injection() {
-			profile="$1"
-			start_line_number="$(cat "$profile" | grep -n "$PROFILE_NIX_START_DELIMETER"'$' | cut -f1 -d: | head -n1)"
-			end_line_number="$(cat "$profile" | grep -n "$PROFILE_NIX_END_DELIMETER"'$' | cut -f1 -d: | head -n1)"
-			if [ -n "$start_line_number" ] && [ -n "$end_line_number" ]; then
-				if [ $start_line_number -gt $end_line_number ]; then
-					line_number_before=$(( $start_line_number - 1 ))
-					line_number_after=$(( $end_line_number + 1))
-					new_top_half="$(head -n$line_number_before)
-					"
-					new_profile="$new_top_half$(tail -n "+$line_number_after")"
-					# overwrite existing profile, but with only Nix removed
-					printf '%s' "$new_profile" | _sudo "" tee "$profile" 1>/dev/null
-					return 0
-				else 
-					unsetup_profiles_needs_manual_editing "$profile"
-					return 1
-				fi
-			elif [ -n "$start_line_number" ] || [ -n "$end_line_number" ]; then
-			then
+	extract_nix_profile_injection() {
+		profile="$1"
+		start_line_number="$(cat "$profile" | grep -n "$PROFILE_NIX_START_DELIMETER"'$' | cut -f1 -d: | head -n1)"
+		end_line_number="$(cat "$profile" | grep -n "$PROFILE_NIX_END_DELIMETER"'$' | cut -f1 -d: | head -n1)"
+		if [ -n "$start_line_number" ] && [ -n "$end_line_number" ]; then
+			if [ $start_line_number -gt $end_line_number ]; then
+				line_number_before=$(( $start_line_number - 1 ))
+				line_number_after=$(( $end_line_number + 1))
+				new_top_half="$(head -n$line_number_before)
+				"
+				new_profile="$new_top_half$(tail -n "+$line_number_after")"
+				# overwrite existing profile, but with only Nix removed
+				printf '%s' "$new_profile" | _sudo "" tee "$profile" 1>/dev/null
+				return 0
+			else 
 				unsetup_profiles_needs_manual_editing "$profile"
 				return 1
 			fi
-		}
+		elif [ -n "$start_line_number" ] || [ -n "$end_line_number" ]; then
+			unsetup_profiles_needs_manual_editing "$profile"
+			return 1
+		fi
+	}
 
-		restore_profile() {
-			profile="$1"
-			
-			# check if file exists
-			if [ -f "$profile" ]
-			then
-				if extract_nix_profile_injection "$profile"; then
-					# the extraction is done in-place. 
-					# this is safer than restoring a backup because its possible
-					# other non-nix tools have added things, and restoring the backup would remove those
-					# if the extraction was 
-					_sudo "" rm -f "$profile.backup-before-nix"
-				fi
+	restore_profile() {
+		profile="$1"
+		
+		# check if file exists
+		if [ -f "$profile" ]; then
+			if extract_nix_profile_injection "$profile"; then
+				# the extraction is done in-place. 
+				# this is safer than restoring a backup because its possible
+				# other non-nix tools have added things, and restoring the backup would remove those
+				# if the extraction was 
+				_sudo "" rm -f "$profile.backup-before-nix"
 			fi
-		}
+		fi
+	}
 
+	unsetup_profiles() {
 		for profile_target in "${PROFILE_TARGETS[@]}"; do
 			restore_profile "$profile_target"
 		done
@@ -508,8 +505,7 @@
 				passed_check "$profile_target$PROFILE_BACKUP_SUFFIX does not exist yet"
 			fi
 		done
-		if [ "$at_least_one_failed" = "true" ]
-		then
+		if [ "$at_least_one_failed" = "true" ]; then
 			return 1
 		fi
 	}
@@ -550,10 +546,49 @@
 	_should_aggresive_remove_artifacts="false"
 	main() {
 		# 
-		# preface
+		# load poly interface
 		# 
+		# Interface is the following functions: 
+		#     poly_1_additional_welcome_information
+		#     poly_2_passive_remove_artifacts
+		#     poly_3_check_for_leftover_artifacts
+		#     poly_4_agressive_remove_artifacts
+		#     poly_5_assumption_validation
+		#     poly_6_prepare_to_install
+		#     poly_7_configure_nix_daemon_service
+		#     poly_commands_needed_before_init_nix_shell
+		#     poly_create_build_group
+		#     poly_create_build_user
+		#     poly_group_exists
+		#     poly_group_id_get
+		#     poly_service_installed_check
+		#     poly_service_uninstall_directions
+		#     poly_uninstall_directions
+		#     poly_user_exists
+		#     poly_user_hidden_get
+		#     poly_user_hidden_set
+		#     poly_user_home_get
+		#     poly_user_home_set
+		#     poly_user_id_get
+		#     poly_user_in_group_check
+		#     poly_user_in_group_set
+		#     poly_user_note_get
+		#     poly_user_note_set
+		#     poly_user_primary_group_get
+		#     poly_user_primary_group_set
+		#     poly_user_shell_get
+		#     poly_user_shell_set
 		check_selinux
-		generate_poly_interface_for_os
+		if is_os_darwin; then
+			# shellcheck source=./install-darwin-multi-user.sh
+			. "$EXTRACTED_NIX_PATH/install-darwin-multi-user.sh"
+		elif is_os_linux; then
+			# shellcheck source=./install-systemd-multi-user.sh
+			. "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh" # most of this works on non-systemd distros also
+		else
+			failure "Sorry, I don't know what to do on $(uname)"
+		fi
+		
 		
 		# 
 		# introduction
@@ -573,7 +608,7 @@
 		# Cure is *intended* to subsume the validate-and-abort approach,
 		# so it may eventually obsolete it.
 		poly_3_check_for_leftover_artifacts || leftovers_detected_conversation
-		[ "$_should_aggresive_remove_artifacts" = "true" ] && { poly_4_agressive_remove_artifacts }
+		[ "$_should_aggresive_remove_artifacts" = "true" ] && { poly_4_agressive_remove_artifacts; }
 		# even if removal is successful, re-run the script so that ENV vars are refreshed with the changes
 		[ "$_should_aggresive_remove_artifacts" = "true" ] && stop "Please re-run script so the purge will take effect"
 		poly_5_assumption_validation
@@ -589,7 +624,10 @@
 		place_channel_configuration
 		install_from_extracted_nix
 		configure_shell_profile
-		source_etc_profile
+		set +eu # allow errors when sourcing the profile
+		# shellcheck disable=SC1091
+		. /etc/profile
+		set -eu
 		setup_default_profile
 		place_nix_configuration
 		poly_7_configure_nix_daemon_service
@@ -608,49 +646,6 @@
 				see https://github.com/NixOS/nix/issues/2374
 				EOF
 			fi
-		fi
-	}
-
-	generate_poly_interface_for_os() {
-		# the loaded files are expected to supply function defintions for the following:
-			# poly_1_additional_welcome_information
-			# poly_2_passive_remove_artifacts
-			# poly_3_check_for_leftover_artifacts
-			# poly_4_agressive_remove_artifacts
-			# poly_5_assumption_validation
-			# poly_6_prepare_to_install
-			# poly_7_configure_nix_daemon_service
-			# poly_commands_needed_before_init_nix_shell
-			# poly_create_build_group
-			# poly_create_build_user
-			# poly_group_exists
-			# poly_group_id_get
-			# poly_service_installed_check
-			# poly_service_uninstall_directions
-			# poly_uninstall_directions
-			# poly_user_exists
-			# poly_user_hidden_get
-			# poly_user_hidden_set
-			# poly_user_home_get
-			# poly_user_home_set
-			# poly_user_id_get
-			# poly_user_in_group_check
-			# poly_user_in_group_set
-			# poly_user_note_get
-			# poly_user_note_set
-			# poly_user_primary_group_get
-			# poly_user_primary_group_set
-			# poly_user_shell_get
-			# poly_user_shell_set
-
-		if is_os_darwin; then
-			# shellcheck source=./install-darwin-multi-user.sh
-			. "$EXTRACTED_NIX_PATH/install-darwin-multi-user.sh"
-		elif is_os_linux; then
-			# shellcheck source=./install-systemd-multi-user.sh
-			. "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh" # most of this works on non-systemd distros also
-		else
-			failure "Sorry, I don't know what to do on $(uname)"
 		fi
 	}
 
@@ -687,13 +682,13 @@
 			I will:
 
 			- make sure your computer doesn't already have Nix files
-			(if it does, I will tell you how to clean them up.)
+			  (if it does, I will tell you how to clean them up.)
 			- create local users (see the list above for the users I'll make)
 			- create a local group ($NIX_BUILD_GROUP_NAME)
 			- install Nix in to $NIX_ROOT
 			- create a configuration file in /etc/nix
 			- set up the "default profile" by creating some Nix-related files in
-			$ROOT_HOME
+			  $ROOT_HOME
 			EOF
 			for profile_target in "${PROFILE_TARGETS[@]}"; do
 				if [ -e "$profile_target" ]; then
@@ -1117,13 +1112,6 @@
 		# their way less disruptively, but a counter-argument is that they won't
 		# immediately notice if something didn't get set up right?
 		reminder "Nix won't work in active shell sessions until you restart them."
-	}
-
-	source_etc_profile() {
-		set +eu # allow errors when sourcing the profile
-		# shellcheck disable=SC1091
-		. /etc/profile
-		set -eu
 	}
 
 	cert_in_store() {

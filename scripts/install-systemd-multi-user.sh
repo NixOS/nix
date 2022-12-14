@@ -56,8 +56,7 @@
 	remove_service () {
 		local service="$1"
 		# if systemctl exists
-		if [ -n "$(command -v "systemctl")" ]
-		then
+		if [ -n "$(command -v "systemctl")" ]; then
 			_sudo "" systemctl stop "$service"
 			_sudo "" systemctl disable "$service"
 			_sudo "" rm -f /etc/systemd/system/"$service"
@@ -228,8 +227,7 @@
 		# kill all their cron jobs
 		_sudo "" crontab -r -u "$user" 2>/dev/null
 		# kill all their print jobs
-		if [ -n "$(command -v "lprm")" ]
-		then
+		if [ -n "$(command -v "lprm")" ]; then
 			lprm -U "$user" 2>/dev/null
 		fi
 		# actually remove the user

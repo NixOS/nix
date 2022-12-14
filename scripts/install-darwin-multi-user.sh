@@ -201,8 +201,7 @@
 		# kill all their cron jobs
 		_sudo "" crontab -r -u "$user" 2>/dev/null
 		# kill all their print jobs
-		if [ -n "$(command -v "lprm")" ]
-		then
+		if [ -n "$(command -v "lprm")" ]; then
 			lprm -U "$user" 2>/dev/null
 		fi
 		# Mac-specific
@@ -224,9 +223,9 @@
 # 
 	poly_1_additional_welcome_information() {
 		if should_create_volume; then
-			echo " - create a Nix volume and a LaunchDaemon to mount it"
+			echo "- create a Nix volume and a LaunchDaemon to mount it"
 		fi
-		echo " - create a LaunchDaemon (at $NIX_DAEMON_DEST) for nix-daemon"
+		echo "- create a LaunchDaemon (at $NIX_DAEMON_DEST) for nix-daemon"
 		echo ""
 	}
 
@@ -256,8 +255,7 @@
 		# 
 		# aggregate & echo any issues
 		# 
-		if [ -n "$nixenv_check_failed$backup_profiles_check_failed" ]
-		then
+		if [ -n "$nixenv_check_failed$backup_profiles_check_failed" ]; then
 			[ "$nixenv_check_failed"          = "true" ] && message_nixenv_command_doesnt_exist
 			[ "$backup_profiles_check_failed" = "true" ] && check_backup_profiles_exist
 			return 1
@@ -287,12 +285,10 @@
 			
 			# check if file exists
 			mount_filepath="/etc/synthetic.conf"
-			if [ -f "$mount_filepath" ]
-			then
+			if [ -f "$mount_filepath" ]; then
 				echo "removing $mount_filepath"
 				# if file contains "nix"
-				if cat "$mount_filepath" | grep 'nix' 1>/dev/null
-				then
+				if cat "$mount_filepath" | grep 'nix' 1>/dev/null; then
 					# remove nix from the file
 					_sudo "" mount_filepath="$mount_filepath" -- bash -c '
 						sudo cat "$mount_filepath" | sed -E '"'"'s/nix\n?$//g'"'"' > "$mount_filepath"
@@ -324,8 +320,7 @@
 		subheader "Removing any services"
 			remove_service() {
 				# check if file exists
-				if [ -f "/Library/LaunchDaemon/$1.plist" ]
-				then
+				if [ -f "/Library/LaunchDaemon/$1.plist" ]; then
 					echo "removing LaunchDaemon $1"
 					_sudo "" launchctl bootout "system/$1" 2>/dev/null 
 					_sudo "" launchctl unload "/Library/LaunchDaemon/$1.plist"
@@ -379,8 +374,7 @@
 		set -eu # go back to all uncaught errors failing
 		
 		# MacOS mounted volume for /nix wont be deleted until reboot
-		if [ -d "$NIX_ROOT" ]
-		then
+		if [ -d "$NIX_ROOT" ]; then
 			failure <<-EOF
 
 			Please reboot the machine and then re-run this script
