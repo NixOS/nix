@@ -17,12 +17,12 @@
   The `uid-range` [system feature] requires the [`auto-allocate-uids`]
   setting to be enabled.
 
-  [system feature]: (../command-ref/conf-file.md#conf-system-features)
+  [system feature]: ../command-ref/conf-file.md#conf-system-features
 
 * Nix can now automatically pick UIDs for builds, removing the need to
   create `nixbld*` user accounts. See [`auto-allocate-uids`].
 
-  [`auto-allocate-uids`]: (../command-ref/conf-file.md#conf-auto-allocate-uids)
+  [`auto-allocate-uids`]: ../command-ref/conf-file.md#conf-auto-allocate-uids
 
 * On Linux, Nix has experimental support for running builds inside a
   cgroup. See

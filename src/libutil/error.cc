@@ -197,9 +197,29 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
         prefix += ":" ANSI_NORMAL " ";
 
     std::ostringstream oss;
-    oss << einfo.msg << "\n";
 
     auto noSource = ANSI_ITALIC " (source not available)" ANSI_NORMAL "\n";
+
+    // traces
+    if (showTrace && !einfo.traces.empty()) {
+        for (const auto & trace : einfo.traces) {
+            oss << "\n" << "… " << trace.hint.str() << "\n";
+
+            if (trace.pos) {
+                oss << "\n" << ANSI_BLUE << "at " ANSI_WARNING << *trace.pos << ANSI_NORMAL << ":";
+
+                if (auto loc = trace.pos->getCodeLines()) {
+                    oss << "\n";
+                    printCodeLines(oss, "", *trace.pos, *loc);
+                    oss << "\n";
+                } else
+                    oss << noSource;
+            }
+        }
+        oss << "\n" << prefix;
+    }
+
+    oss << einfo.msg << "\n";
 
     if (einfo.errPos) {
         oss << "\n" << ANSI_BLUE << "at " ANSI_WARNING << *einfo.errPos << ANSI_NORMAL << ":";
@@ -213,28 +233,10 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     }
 
     auto suggestions = einfo.suggestions.trim();
-    if (! suggestions.suggestions.empty()){
+    if (!suggestions.suggestions.empty()) {
         oss << "Did you mean " <<
             suggestions.trim() <<
             "?" << std::endl;
-    }
-
-    // traces
-    if (showTrace && !einfo.traces.empty()) {
-        for (auto iter = einfo.traces.rbegin(); iter != einfo.traces.rend(); ++iter) {
-            oss << "\n" << "… " << iter->hint.str() << "\n";
-
-            if (iter->pos) {
-                oss << "\n" << ANSI_BLUE << "at " ANSI_WARNING << *iter->pos << ANSI_NORMAL << ":";
-
-                if (auto loc = iter->pos->getCodeLines()) {
-                    oss << "\n";
-                    printCodeLines(oss, "", *iter->pos, *loc);
-                    oss << "\n";
-                } else
-                    oss << noSource;
-            }
-        }
     }
 
     out << indent(prefix, std::string(filterANSIEscapes(prefix, true).size(), ' '), chomp(oss.str()));

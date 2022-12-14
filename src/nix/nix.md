@@ -164,6 +164,13 @@ operate are determined as follows:
   …
   ```
 
+  and likewise, using a store path to a "drv" file to specify the derivation:
+
+  ```console
+  # nix build '/nix/store/gzaflydcr6sb3567hap9q6srzx8ggdgg-glibc-2.33-78.drv^dev,static'
+  …
+  ```
+
 * You can also specify that *all* outputs should be used using the
   syntax *installable*`^*`. For example, the following shows the size
   of all outputs of the `glibc` package in the binary cache:
@@ -177,6 +184,12 @@ operate are determined as follows:
   /nix/store/q6580lr01jpcsqs4r5arlh4ki2c1m9rv-glibc-2.33-123-dev             44200560
   ```
 
+  and likewise, using a store path to a "drv" file to specify the derivation:
+
+  ```console
+  # nix path-info -S '/nix/store/gzaflydcr6sb3567hap9q6srzx8ggdgg-glibc-2.33-78.drv^*'
+  …
+  ```
 * If you didn't specify the desired outputs, but the derivation has an
   attribute `meta.outputsToInstall`, Nix will use those outputs. For
   example, since the package `nixpkgs#libxml2` has this attribute:
@@ -188,6 +201,9 @@ operate are determined as follows:
 
   a command like `nix shell nixpkgs#libxml2` will provide only those
   two outputs by default.
+
+  Note that a store derivation (given by `.drv` file store path) doesn't have
+  any attributes like `meta`, and thus this case doesn't apply to it.
 
 * Otherwise, Nix will use all outputs of the derivation.
 

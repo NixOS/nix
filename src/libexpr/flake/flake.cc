@@ -89,7 +89,7 @@ static FlakeInput parseFlakeInput(
         } catch (Error & e) {
             e.addTrace(
                 state.positions[attr.pos],
-                hintfmt("in flake attribute '%s'", state.symbols[attr.name]));
+                hintfmt("while evaluating flake attribute '%s'", state.symbols[attr.name]));
             throw;
         }
     }
@@ -98,7 +98,7 @@ static FlakeInput parseFlakeInput(
         try {
             input.ref = FlakeRef::fromAttrs(attrs);
         } catch (Error & e) {
-            e.addTrace(state.positions[pos], hintfmt("in flake input"));
+            e.addTrace(state.positions[pos], hintfmt("while evaluating flake input"));
             throw;
         }
     else {

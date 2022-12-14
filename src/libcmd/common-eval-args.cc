@@ -79,7 +79,7 @@ MixEvalArgs::MixEvalArgs()
   branch in the `nixpkgs` repository.
 
   The URLs of the tarballs from the official `nixos.org` channels
-  (see [the manual page for `nix-channel`](nix-channel.md)) can be
+  (see [the manual page for `nix-channel`](../nix-channel.md)) can be
   abbreviated as `channel:<channel-name>`.  For instance, the
   following two flags are equivalent:
 
@@ -88,7 +88,7 @@ MixEvalArgs::MixEvalArgs()
   -I nixpkgs=https://nixos.org/channels/nixos-21.05/nixexprs.tar.xz
   ```
 
-  You can also fetch source trees using flake URLs and add them to the
+  You can also fetch source trees using [flake URLs](./nix3-flake.md#url-like-syntax) and add them to the
   search path. For instance,
 
   ```
