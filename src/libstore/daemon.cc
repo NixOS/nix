@@ -222,7 +222,8 @@ struct ClientSettings
                     else if (!hasSuffix(s, "/") && trusted.count(s + "/"))
                         subs.push_back(s + "/");
                     else
-                        warn("ignoring untrusted substituter '%s'", s);
+                        warn("ignoring untrusted substituter '%s', you are not a trusted user.\n"
+                             "More information about 'trusted-substituters' option in nix.conf man page", s);
                 res = subs;
                 return true;
             };
