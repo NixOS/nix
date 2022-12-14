@@ -197,7 +197,7 @@
 # main poly methods (in chronological order)
 # 
 # 
-	poly_1_service_setup_note() {
+	poly_1_additional_welcome_information() {
 		if should_create_volume; then
 			echo " - create a Nix volume and a LaunchDaemon to mount it"
 		fi

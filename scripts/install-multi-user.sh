@@ -406,12 +406,16 @@
 		failure "Not implemented yet"
 	}
 
+	command_exists() {
+		[ -n "$(command -v "$1")" ]
+	}
+
 # 
 # artifact-checking helpers
 # 
 
 	nixenv_command_doesnt_exist_check() { # checks run, before full explaination/warnings are generated
-		if type nix-env 2> /dev/null >&2; then
+		if command_exists "nix-env"; then
 			failed_check "nix-env command already exists"
 		else
 			passed_check "no previous nix-env found"
@@ -525,11 +529,14 @@
 # 
 # main
 # 
+	_would_like_more_information="false"
 	main() {
 		check_selinux
 		generate_poly_interface_for_os
 		
 		welcome_to_nix
+		[ "$_would_like_more_information" = "true" ] && poly_1_additional_welcome_information
+		[ "$_would_like_more_information" = "true" ] && additional_info_confirm_prompt
 		chat_about_sudo_if_needed
 
 		poly_2_passive_remove_artifacts
@@ -574,7 +581,49 @@
 # 
 # main helpers
 # 
+	check_selinux() {
+		if command -v getenforce > /dev/null 2>&1; then
+			if [ "$(getenforce)" = "Enforcing" ]; then
+				failure <<-EOF
+				Nix does not work with selinux enabled yet!
+				see https://github.com/NixOS/nix/issues/2374
+				EOF
+			fi
+		fi
+	}
+
 	generate_poly_interface_for_os() {
+		# the loaded files are expected to supply function defintions for the following:
+			# poly_1_additional_welcome_information
+			# poly_2_passive_remove_artifacts
+			# poly_3_check_for_leftover_artifacts
+			# poly_4_agressive_remove_artifacts
+			# poly_5_assumption_validation
+			# poly_6_prepare_to_install
+			# poly_7_configure_nix_daemon_service
+			# poly_8_extra_try_me_commands
+			# poly_create_build_group
+			# poly_create_build_user
+			# poly_group_exists
+			# poly_group_id_get
+			# poly_service_installed_check
+			# poly_service_uninstall_directions
+			# poly_uninstall_directions
+			# poly_user_exists
+			# poly_user_hidden_get
+			# poly_user_hidden_set
+			# poly_user_home_get
+			# poly_user_home_set
+			# poly_user_id_get
+			# poly_user_in_group_check
+			# poly_user_in_group_set
+			# poly_user_note_get
+			# poly_user_note_set
+			# poly_user_primary_group_get
+			# poly_user_primary_group_set
+			# poly_user_shell_get
+			# poly_user_shell_set
+
 		if is_os_darwin; then
 			# shellcheck source=./install-darwin-multi-user.sh
 			. "$EXTRACTED_NIX_PATH/install-darwin-multi-user.sh"
@@ -583,6 +632,118 @@
 			. "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh" # most of this works on non-systemd distros also
 		else
 			failure "Sorry, I don't know what to do on $(uname)"
+		fi
+	}
+
+	welcome_to_nix() {
+		ok "Welcome to the Multi-User Nix Installation"
+
+		cat <<-EOF
+
+		This installation tool will set up your computer with the Nix package
+		manager. This will happen in a few stages:
+
+		1. Make sure your computer doesn't already have Nix. If it does, I
+		will show you instructions on how to clean up your old install.
+
+		2. Show you what I am going to install and where. Then I will ask
+		if you are ready to continue.
+
+		3. Create the system users and groups that the Nix daemon uses to run
+		builds.
+
+		4. Perform the basic installation of the Nix files daemon.
+
+		5. Configure your shell to import special Nix Profile files, so you
+		can use Nix.
+
+		6. Start the Nix daemon.
+
+		EOF
+
+		if ui_confirm "Would you like to see a more detailed list of what I will do?"; then
+			_would_like_more_information="true"
+			cat <<-EOF
+
+			I will:
+
+			- make sure your computer doesn't already have Nix files
+			(if it does, I will tell you how to clean them up.)
+			- create local users (see the list above for the users I'll make)
+			- create a local group ($NIX_BUILD_GROUP_NAME)
+			- install Nix in to $NIX_ROOT
+			- create a configuration file in /etc/nix
+			- set up the "default profile" by creating some Nix-related files in
+			$ROOT_HOME
+			EOF
+			for profile_target in "${PROFILE_TARGETS[@]}"; do
+				if [ -e "$profile_target" ]; then
+					cat <<-EOF
+					- back up $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX
+					- update $profile_target to include some Nix configuration
+					EOF
+				fi
+			done
+		fi
+	}
+
+	additional_info_confirm_prompt() {
+		if ! ui_confirm "Ready to continue?"; then
+			failure <<-EOF
+			Okay, maybe you would like to talk to the team.
+			EOF
+		fi
+	}
+
+	chat_about_sudo_if_needed() {
+		if ! is_root; then
+			header "let's talk about sudo"
+
+			if headless; then
+				cat <<-EOF
+				This script is going to call sudo a lot. Normally, it would show you
+				exactly what commands it is running and why. However, the script is
+				run in a headless fashion, like this:
+
+				$ curl -L https://nixos.org/nix/install | sh
+
+				or maybe in a CI pipeline. Because of that, I'm going to skip the
+				verbose output in the interest of brevity.
+
+				If you would like to
+				see the output, try like this:
+
+				$ curl -L -o install-nix https://nixos.org/nix/install
+				$ sh ./install-nix
+
+				EOF
+				return 0
+			fi
+
+			cat <<-EOF
+			This script is going to call sudo a lot. Every time I do, it'll
+			output exactly what it'll do, and why.
+
+			Just like this:
+			EOF
+
+			__sudo "to demonstrate how our sudo prompts look" \
+				echo "this is a sudo prompt"
+
+			cat <<-EOF
+
+			This might look scary, but everything can be undone by running just a
+			few commands. I used to ask you to confirm each time sudo ran, but it
+			was too many times. Instead, I'll just ask you this one time:
+
+			EOF
+			if ui_confirm "Can I use sudo?"; then
+				ok "Yay! Thanks! Let's get going!"
+			else
+				failure <<-EOF
+				That is okay, but I can't install.
+				EOF
+			fi
 		fi
 	}
 
@@ -784,126 +945,6 @@
 			echo "https://nixos.org/channels/nixpkgs-unstable nixpkgs" > "$SCRATCH/.nix-channels"
 			_sudo "to set up the default system channel (part 1)" \
 				install -m 0664 "$SCRATCH/.nix-channels" "$ROOT_HOME/.nix-channels"
-		fi
-	}
-
-	check_selinux() {
-		if command -v getenforce > /dev/null 2>&1; then
-			if [ "$(getenforce)" = "Enforcing" ]; then
-				failure <<-EOF
-				Nix does not work with selinux enabled yet!
-				see https://github.com/NixOS/nix/issues/2374
-				EOF
-			fi
-		fi
-	}
-
-	welcome_to_nix() {
-		ok "Welcome to the Multi-User Nix Installation"
-
-		cat <<-EOF
-
-		This installation tool will set up your computer with the Nix package
-		manager. This will happen in a few stages:
-
-		1. Make sure your computer doesn't already have Nix. If it does, I
-		will show you instructions on how to clean up your old install.
-
-		2. Show you what I am going to install and where. Then I will ask
-		if you are ready to continue.
-
-		3. Create the system users and groups that the Nix daemon uses to run
-		builds.
-
-		4. Perform the basic installation of the Nix files daemon.
-
-		5. Configure your shell to import special Nix Profile files, so you
-		can use Nix.
-
-		6. Start the Nix daemon.
-
-		EOF
-
-		if ui_confirm "Would you like to see a more detailed list of what I will do?"; then
-			cat <<-EOF
-
-			I will:
-
-			- make sure your computer doesn't already have Nix files
-			(if it does, I will tell you how to clean them up.)
-			- create local users (see the list above for the users I'll make)
-			- create a local group ($NIX_BUILD_GROUP_NAME)
-			- install Nix in to $NIX_ROOT
-			- create a configuration file in /etc/nix
-			- set up the "default profile" by creating some Nix-related files in
-			$ROOT_HOME
-			EOF
-			for profile_target in "${PROFILE_TARGETS[@]}"; do
-				if [ -e "$profile_target" ]; then
-					cat <<-EOF
-					- back up $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX
-					- update $profile_target to include some Nix configuration
-					EOF
-				fi
-			done
-			poly_1_service_setup_note
-			if ! ui_confirm "Ready to continue?"; then
-				failure <<-EOF
-				Okay, maybe you would like to talk to the team.
-				EOF
-			fi
-		fi
-	}
-
-	chat_about_sudo_if_needed() {
-		if ! is_root; then
-			header "let's talk about sudo"
-
-			if headless; then
-				cat <<-EOF
-				This script is going to call sudo a lot. Normally, it would show you
-				exactly what commands it is running and why. However, the script is
-				run in a headless fashion, like this:
-
-				$ curl -L https://nixos.org/nix/install | sh
-
-				or maybe in a CI pipeline. Because of that, I'm going to skip the
-				verbose output in the interest of brevity.
-
-				If you would like to
-				see the output, try like this:
-
-				$ curl -L -o install-nix https://nixos.org/nix/install
-				$ sh ./install-nix
-
-				EOF
-				return 0
-			fi
-
-			cat <<-EOF
-			This script is going to call sudo a lot. Every time I do, it'll
-			output exactly what it'll do, and why.
-
-			Just like this:
-			EOF
-
-			__sudo "to demonstrate how our sudo prompts look" \
-				echo "this is a sudo prompt"
-
-			cat <<-EOF
-
-			This might look scary, but everything can be undone by running just a
-			few commands. I used to ask you to confirm each time sudo ran, but it
-			was too many times. Instead, I'll just ask you this one time:
-
-			EOF
-			if ui_confirm "Can I use sudo?"; then
-				ok "Yay! Thanks! Let's get going!"
-			else
-				failure <<-EOF
-				That is okay, but I can't install.
-				EOF
-			fi
 		fi
 	}
 

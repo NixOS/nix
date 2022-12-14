@@ -205,7 +205,7 @@
 # main poly methods (in chronological order)
 # 
 # 
-	poly_1_service_setup_note() {
+	poly_1_additional_welcome_information() {
 		cat <<-EOF
 		- load and start a service (at $SERVICE_DEST and $SOCKET_DEST) for nix-daemon
 
@@ -213,7 +213,7 @@
 	}
 
 	poly_2_passive_remove_artifacts() {
-		:
+		: # no action needed
 	}
 
 	poly_3_check_for_leftover_artifacts() {
