@@ -1,7 +1,7 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.05-small";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.11-small";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
 
@@ -108,7 +108,7 @@
           ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)];
 
         buildDeps =
-          [ (curl.override { patchNetrcRegression = true; })
+          [ curl
             bzip2 xz brotli editline
             openssl sqlite
             libarchive
@@ -364,7 +364,7 @@
 
               buildInputs =
                 [ nix
-                  (curl.override { patchNetrcRegression = true; })
+                  curl
                   bzip2
                   xz
                   pkgs.perl

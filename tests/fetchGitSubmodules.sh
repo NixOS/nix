@@ -32,7 +32,7 @@ addGitContent $subRepo
 initGitRepo $rootRepo
 
 git -C $rootRepo submodule init
-git -C $rootRepo submodule add $subRepo sub
+GIT_PROTOCOL_FROM_USER=1 git -C $rootRepo submodule add $subRepo sub
 git -C $rootRepo add sub
 git -C $rootRepo commit -m "Add submodule"
 
