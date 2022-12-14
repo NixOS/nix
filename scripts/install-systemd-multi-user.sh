@@ -301,7 +301,7 @@
 		# 
 		subheader "Removing user(s)"
 			# cant use NIX_USER_COUNT since it could change relative to previous installs
-			for username in $(awk -F: '{ print $1}' /etc/passwd | grep -E '^'"$NIX_USER_PREFIX"'[0-9]+$'); do
+			for username in $(awk -F: '{ print $1 }' /etc/passwd | grep -E '^'"$NIX_USER_PREFIX"'[0-9]+$'); do
 				# remove the users
 				poly_force_delete_user "$username"
 			done
@@ -327,15 +327,6 @@
 			unsetup_profiles
 		
 		set -e # go back to all uncaught errors failing
-		
-		# MacOS mounted volume for /nix wont be deleted until reboot
-		if [ -d "$NIX_ROOT" ]
-		then
-			failure <<-EOF
-
-			Please reboot the machine and then re-run this script
-			EOF
-		fi
 	}
 
 	poly_5_assumption_validation() {
