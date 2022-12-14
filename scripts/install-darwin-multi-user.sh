@@ -54,20 +54,7 @@ dsclattr() {
 }
 
 test_nix_daemon_installed() {
-  test -e "$NIX_DAEMON_DEST"
-}
-
-poly_cure_artifacts() {
-    if should_create_volume; then
-        task "Fixing any leftover Nix volume state"
-        cat <<EOF
-Before I try to install, I'll check for any existing Nix volume config
-and ask for your permission to remove it (so that the installer can
-start fresh). I'll also ask for permission to fix any issues I spot.
-EOF
-        cure_volumes
-        remove_volume_artifacts
-    fi
+    test -e "$NIX_DAEMON_DEST"
 }
 
 poly_service_installed_check() {
@@ -95,30 +82,6 @@ poly_uninstall_directions() {
     echo "Please follow the instructions linked below to purge these peices, and then try again"
     echo "at installing Nix"
     echo "Here are the uninstall/pure instructions: https://nixos.org/manual/nix/stable/installation/installing-binary.html#macos"
-}
-
-poly_service_setup_note() {
-    if should_create_volume; then
-        echo " - create a Nix volume and a LaunchDaemon to mount it"
-    fi
-    echo " - create a LaunchDaemon (at $NIX_DAEMON_DEST) for nix-daemon"
-    echo ""
-}
-
-poly_extra_try_me_commands() {
-    :
-}
-
-poly_configure_nix_daemon_service() {
-    task "Setting up the nix-daemon LaunchDaemon"
-    _sudo "to set up the nix-daemon as a LaunchDaemon" \
-          /bin/cp -f "/nix/var/nix/profiles/default$NIX_DAEMON_DEST" "$NIX_DAEMON_DEST"
-
-    _sudo "to load the LaunchDaemon plist for nix-daemon" \
-          launchctl load /Library/LaunchDaemons/$NIX_DAEMON_BASE.plist
-
-    _sudo "to start the nix-daemon" \
-          launchctl kickstart -k system/$NIX_DAEMON_BASE
 }
 
 poly_group_exists() {
@@ -217,7 +180,195 @@ poly_create_build_user() {
           UniqueID "${uid}"
 }
 
-poly_prepare_to_install() {
+# 
+# 
+# main poly methods (in chronological order)
+# 
+# 
+
+poly_1_service_setup_note() {
+    if should_create_volume; then
+        echo " - create a Nix volume and a LaunchDaemon to mount it"
+    fi
+    echo " - create a LaunchDaemon (at $NIX_DAEMON_DEST) for nix-daemon"
+    echo ""
+}
+
+poly_2_passive_remove_artifacts() {
+    if should_create_volume; then
+        task "Fixing any leftover Nix volume state"
+        cat <<EOF
+Before I try to install, I'll check for any existing Nix volume config
+and ask for your permission to remove it (so that the installer can
+start fresh). I'll also ask for permission to fix any issues I spot.
+EOF
+        cure_volumes
+        remove_volume_artifacts
+    fi
+}
+
+poly_3_check_for_leftover_artifacts() {
+    nixenv_check_failed=""
+    backup_profiles_check_failed=""
+    # 
+    # gather information
+    # 
+    nixenv_command_doesnt_exist_check || nixenv_check_failed="true"
+    backup_profiles_dont_exist_check  || backup_profiles_check_failed="true"
+    # <<<could insert MacOS specific checks here>>>
+    
+    # 
+    # aggregate & echo any issues
+    # 
+    if [ -n "$nixenv_check_failed$backup_profiles_check_failed" ]
+    then
+        [ "$nixenv_check_failed"          = "true" ] && nixenv_command_exists_error
+        [ "$backup_profiles_check_failed" = "true" ] && backup_profiles_dont_exist_check
+        return 1
+    else
+        return 0
+    fi
+}
+
+poly_4_agressive_remove_artifacts() {
+    set +e # remove as much as possible, even if some commands fail
+           # (restore set -e behavior at the end of this function)
+    # 
+    # detach mounted volumes
+    # 
+    subheader "Removing any mounted volumes"
+        # if it was mounted
+        if sudo diskutil list | grep 'Nix Store' 1>/dev/null; then
+            # it was removed successfully
+            if sudo diskutil apfs deleteVolume "$NIX_ROOT"; then
+                _sudo diskutil apfs deleteVolume "$NIX_ROOT" && _sudo rm -rf "$NIX_ROOT"
+            fi
+        fi
+        
+        # check if file exists
+        mount_filepath="/etc/synthetic.conf"
+        if [ -f "$mount_filepath" ]
+        then
+            echo "removing $mount_filepath"
+            # if file contains "nix"
+            if cat "$mount_filepath" | grep 'nix' 1>/dev/null
+            then
+                # remove nix from the file
+                _sudo mount_filepath="$mount_filepath" -- bash -c '
+                    sudo cat "$mount_filepath" | sed -E '"'"'s/nix\n?$//g'"'"' > "$mount_filepath"
+                '
+            fi
+        fi
+        
+        # check if file exists
+        if [ -f "/etc/fstab" ]; then
+            # absolute paths are used because this operation could be sensitive to BSD vs GNU implementations
+            # would probably be good to check that all exist and are executable in the future
+            write_to_fstab() {
+                new_fstab_lines="$0"
+                # vifs must be used to edit fstab
+                # to make that work we  create a patch using "diff"
+                # then tell vifs to use "patch" as an editor and apply the patch
+                /usr/bin/diff /etc/fstab <(/usr/bin/printf "%s" "$new_fstab_lines") | EDITOR="/usr/bin/patch" _sudo /usr/sbin/vifs
+            }
+            if /usr/bin/grep "$NIX_ROOT apfs rw" /etc/fstab; then
+                echo "Patching fstab"
+                fstab_without_nix="$(/usr/bin/grep -v "$NIX_ROOT apfs rw" /etc/fstab)"
+                write_to_fstab "$fstab_without_nix"
+            fi
+        fi
+        
+    # 
+    # remove services
+    # 
+    subheader "Removing any services"
+        remove_service() {
+            # check if file exists
+            if [ -f "/Library/LaunchDaemon/$1.plist" ]
+            then
+                echo "removing LaunchDaemon $1"
+                _sudo launchctl bootout "system/$1" 2>/dev/null 
+                _sudo launchctl unload "/Library/LaunchDaemon/$1.plist"
+                _sudo rm "/Library/LaunchDaemons/$1.plist"
+            fi
+        }
+        remove_service "$NIX_DAEMON_BASE"
+        remove_service "$NIX_VOLUME_DAEMON_BASE"
+        remove_service "$NIX_LEGACY_DAEMON1_BASE"
+    
+    # 
+    # delete group
+    #
+    subheader "Removing group(s)" 
+        _sudo groupdel nixbld 2>/dev/null
+    
+    # 
+    # delete users
+    # 
+    subheader "Removing user(s)" 
+        delete_user() {
+            user="$1"
+            # logs them out by locking the account
+            _sudo passwd -l "$user" 2>/dev/null
+            # kill all their processes
+            _sudo pkill -KILL -u "$user" 2>/dev/null
+            # kill all their cron jobs
+            _sudo crontab -r -u "$user" 2>/dev/null
+            # kill all their print jobs
+            if [ -n "$(command -v "lprm")" ]
+            then
+                lprm -U "$user" 2>/dev/null
+            fi
+            # actually remove the user
+            _sudo deluser --remove-home "$user" 2>/dev/null # debian
+            _sudo userdel --remove "$user" 2>/dev/null # non-debian
+        }
+        
+        # attempt 1
+        for each_user in $(_sudo dscl . -list /Users | grep _nixbld); do _sudo dscl . -delete "/Users/$each_user"; done
+        # attempt 2 (just for redundancy/fallback)
+        for i in $(seq 1 "$NIX_USER_COUNT"); do
+            # remove the users
+            delete_user "$(nix_user_for_core "$i")"
+        done
+
+    # 
+    # purge all files
+    # 
+    subheader "Removing all nix files" 
+        # multiple commands are used because some (e.g. the mounted volumes) may fail, and shouldn't stop the other files from being removed
+        _sudo rm -rf /etc/nix                2>/dev/null
+        _sudo rm -rf "$NIX_ROOT"             2>/dev/null
+        _sudo rm -rf /var/root/.nix-profile  2>/dev/null
+        _sudo rm -rf /var/root/.nix-defexpr  2>/dev/null
+        _sudo rm -rf /var/root/.nix-channels 2>/dev/null
+        _sudo rm -rf "$HOME"/.nix-profile    2>/dev/null
+        _sudo rm -rf "$HOME"/.nix-defexpr    2>/dev/null
+        _sudo rm -rf "$HOME"/.nix-channels   2>/dev/null
+    
+    # 
+    # restoring any shell files
+    # 
+    subheader "Restoring all shell files" 
+        unsetup_profiles
+    
+    set -e # go back to all uncaught errors failing
+    
+    # MacOS mounted volume for /nix wont be deleted until reboot
+    if [ -d "$NIX_ROOT" ]
+    then
+        failure <<EOF
+
+Please reboot the machine and then re-run this script
+EOF
+    fi
+}
+
+poly_5_assumption_validation() {
+    :
+}
+
+poly_6_prepare_to_install() {
     if should_create_volume; then
         header "Preparing a Nix volume"
         # intentional indent below to match task indent
@@ -235,164 +386,18 @@ EOF
     fi
 }
 
-poly_forcefull_uninstall_offer() {
-    if ! ui_confirm "Would you like this script to forcefully attempt to purge the old Nix install?"
-        return 1
-    fi
-    echo "If you've still got problems after this"
-    echo "take a look here: https://nixos.org/manual/nix/stable/installation/installing-binary.html#macos"
-    ui_confirm "Okay?"
-    
-    # 
-    # detach mounted volumes
-    # 
-        # if it was mounted
-        if sudo diskutil list | grep 'Nix Store' 1>/dev/null; then
-            echo "removing nix volume"
-            # it was removed successfully
-            if sudo diskutil apfs deleteVolume "$NIX_ROOT"; then
-                sudo diskutil apfs deleteVolume "$NIX_ROOT" && sudo rm -rf "$NIX_ROOT"
-            fi
-            echo "will need to reboot for full effect"
-        fi
-        
-        # check if file exists
-        mount_filepath="/etc/synthetic.conf"
-        if [ -f "$mount_filepath" ]
-        then
-            echo "removing $mount_filepath"
-            # if file contains "nix"
-            if cat "$mount_filepath" | grep 'nix' 1>/dev/null
-            then
-                # remove nix from the file
-                sudo mount_filepath="$mount_filepath" -- bash -c '
-                    sudo cat "$mount_filepath" | sed -E '"'"'s/nix\n?$//g'"'"' > "$mount_filepath"
-                '
-            fi
-        fi
-        
-        # check if file exists
-        if [ -f "/etc/fstab" ]; then
-            # absolute paths are used because this operation could be sensitive to BSD vs GNU implementations
-            # would probably be good to check that all exist and are executable in the future
-            write_to_fstab() {
-                new_fstab_lines="$0"
-                # vifs must be used to edit fstab
-                # to make that work we  create a patch using "diff"
-                # then tell vifs to use "patch" as an editor and apply the patch
-                /usr/bin/diff /etc/fstab <(/usr/bin/printf "%s" "$new_fstab_lines") | EDITOR="/usr/bin/patch" sudo /usr/sbin/vifs
-            }
-            if /usr/bin/grep "$NIX_ROOT apfs rw" /etc/fstab; then
-                echo "Patching fstab"
-                fstab_without_nix="$(/usr/bin/grep -v "$NIX_ROOT apfs rw" /etc/fstab)"
-                write_to_fstab "$fstab_without_nix"
-            fi
-        fi
-        
-    # 
-    # remove services
-    # 
-        remove_service() {
-            # check if file exists
-            if [ -f "/Library/LaunchDaemon/$1.plist" ]
-            then
-                echo "removing LaunchDaemon $1"
-                sudo launchctl bootout "system/$1" 2>/dev/null 
-                sudo launchctl unload "/Library/LaunchDaemon/$1.plist"
-                sudo rm "/Library/LaunchDaemons/$1.plist"
-            fi
-        }
-        remove_service "$NIX_DAEMON_BASE"
-        remove_service "$NIX_VOLUME_DAEMON_BASE"
-        remove_service "$NIX_LEGACY_DAEMON1_BASE"
-    
-    # 
-    # delete group
-    # 
-        sudo groupdel nixbld 2>/dev/null
-    
-    # 
-    # delete users
-    # 
-        delete_user() {
-            user="$1"
-            # logs them out by locking the account
-            sudo passwd -l "$user" 2>/dev/null
-            # kill all their processes
-            sudo pkill -KILL -u "$user" 2>/dev/null
-            # kill all their cron jobs
-            sudo crontab -r -u "$user" 2>/dev/null
-            # kill all their print jobs
-            if [ -n "$(command -v "lprm")" ]
-            then
-                lprm -U "$user" 2>/dev/null
-            fi
-            # actually remove the user
-            sudo deluser --remove-home "$user" 2>/dev/null # debian
-            sudo userdel --remove "$user" 2>/dev/null # non-debian
-        }
-        
-        # attempt 1
-        for each_user in $(sudo dscl . -list /Users | grep _nixbld); do sudo dscl . -delete "/Users/$each_user"; done
-        # attempt 2 (just for redundancy/fallback)
-        echo "removing nix-generated users"
-        for i in $(seq 1 "$NIX_USER_COUNT"); do
-            # remove the users
-            delete_user "$(nix_user_for_core "$i")"
-        done
+poly_7_configure_nix_daemon_service() {
+    task "Setting up the nix-daemon LaunchDaemon"
+    _sudo "to set up the nix-daemon as a LaunchDaemon" \
+          /bin/cp -f "/nix/var/nix/profiles/default$NIX_DAEMON_DEST" "$NIX_DAEMON_DEST"
 
-    # 
-    # purge all files
-    # 
-        echo "removing all nixpkgs files"
-        sudo rm -rf /etc/nix "$NIX_ROOT" /var/root/.nix-profile /var/root/.nix-defexpr /var/root/.nix-channels "$HOME"/.nix-profile "$HOME"/.nix-defexpr "$HOME"/.nix-channels 2>/dev/null
-    
-    # 
-    # restoring any shell files
-    # 
-        # TODO: this should probably be put inside install-mult-user.sh and called instead of being defined here
-        extract_nix_profile_injection() {
-            profile="$1"
-            start_line_number="$(cat "$profile" | /usr/bin/grep -n '# Nix$' | cut -f1 -d: | head -n1)"
-            end_line_number="$(cat "$profile" | /usr/bin/grep -n '# End Nix$' | cut -f1 -d: | head -n1)"
-            if [ -n "$start_line_number" ] && [ -n "$end_line_number" ]; then
-                if [ $start_line_number -gt $end_line_number ]; then
-                    line_number_before=$(( $start_line_number - 1 ))
-                    line_number_after=$(( $end_line_number + 1))
-                    new_top_half="$(head -n$line_number_before)
-                    "
-                    new_profile="$new_top_half$(tail -n "+$line_number_after")"
-                    # overwrite existing profile, but with only Nix removed
-                    echo "$new_profile" | sudo tee "$profile" 1>/dev/null
-                    return 0
-                else 
-                    echo "Something is really messed up with your $profile file"
-                    echo "I think you need to manually edit it to remove everything related to Nix"
-                    return 1
-                fi
-            elif [ -n "$start_line_number" ] || [ -n "$end_line_number" ]; then
-            then
-                echo "Something is really messed up with your $profile file"
-                echo "I think you need to manually edit it to remove everything related to Nix"
-                return 1
-            fi
-        }
-        
-        restore_profile() {
-            profile="$1"
-            
-            # check if file exists
-            if [ -f "$profile" ]
-            then
-                if extract_nix_profile_injection "$profile"; then
-                    # the extraction is done in-place. So if successful, remove the backup
-                    sudo rm -f "$profile.backup-before-nix"
-                fi
-            fi
-        }
-        
-        restore_profile "/etc/bashrc"
-        restore_profile "/etc/profile.d/nix.sh"
-        restore_profile "/etc/zshrc"
-        restore_profile "/etc/bash.bashrc"
+    _sudo "to load the LaunchDaemon plist for nix-daemon" \
+          launchctl load /Library/LaunchDaemons/$NIX_DAEMON_BASE.plist
+
+    _sudo "to start the nix-daemon" \
+          launchctl kickstart -k system/$NIX_DAEMON_BASE
+}
+
+poly_8_extra_try_me_commands() {
+    :
 }
