@@ -527,17 +527,7 @@
 # 
 	main() {
 		check_selinux
-
-		if is_os_darwin; then
-			# shellcheck source=./install-darwin-multi-user.sh
-			. "$EXTRACTED_NIX_PATH/install-darwin-multi-user.sh"
-		elif is_os_linux; then
-			# shellcheck source=./install-systemd-multi-user.sh
-			. "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh" # most of this works on non-systemd distros also
-		else
-			failure "Sorry, I don't know what to do on $(uname)"
-		fi
-
+		generate_poly_interface_for_os
 		welcome_to_nix
 
 		if ! is_root; then
@@ -586,6 +576,18 @@
 # 
 # main helpers
 # 
+	generate_poly_interface_for_os() {
+		if is_os_darwin; then
+			# shellcheck source=./install-darwin-multi-user.sh
+			. "$EXTRACTED_NIX_PATH/install-darwin-multi-user.sh"
+		elif is_os_linux; then
+			# shellcheck source=./install-systemd-multi-user.sh
+			. "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh" # most of this works on non-systemd distros also
+		else
+			failure "Sorry, I don't know what to do on $(uname)"
+		fi
+	}
+
 	setup_report() {
 		header "Nix config report"
 		row "        Temp Dir" "$SCRATCH"
