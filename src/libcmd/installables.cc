@@ -611,8 +611,37 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
 
     auto attrPath = attr->getAttrPathStr();
 
-    if (!attr->isDerivation())
-        throw Error("flake output attribute '%s' is not a derivation", attrPath);
+    if (!attr->isDerivation()) {
+
+        // FIXME: use eval cache?
+        auto v = attr->forceValue();
+
+        if (v.type() == nPath) {
+            auto storePath = v.path().fetchToStore(state->store);
+            return {{
+                .path = DerivedPath::Opaque {
+                    .path = std::move(storePath),
+                }
+            }};
+        }
+
+        else if (v.type() == nString) {
+            PathSet context;
+            auto s = state->forceString(v, context);
+            auto storePath = state->store->maybeParseStorePath(s);
+            if (storePath && context.count(std::string(s))) {
+                return {{
+                    .path = DerivedPath::Opaque {
+                        .path = std::move(*storePath),
+                    }
+                }};
+            } else
+                throw Error("flake output attribute '%s' evaluates to a string that does not denote a store path", attrPath);
+        }
+
+        else
+            throw Error("flake output attribute '%s' is not a derivation or path", attrPath);
+    }
 
     auto drvPath = attr->forceDerivation();
 

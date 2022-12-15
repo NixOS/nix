@@ -66,7 +66,7 @@ struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
     StorePath fetchToStore(
         ref<Store> store,
         const CanonPath & path,
-        std::string_view name,
+        std::string_view name = "source",
         PathFilter * filter = nullptr,
         RepairFlag repair = NoRepair);
 
@@ -151,7 +151,7 @@ struct SourcePath
 
     StorePath fetchToStore(
         ref<Store> store,
-        std::string_view name,
+        std::string_view name = "source",
         PathFilter * filter = nullptr,
         RepairFlag repair = NoRepair) const;
 
