@@ -111,7 +111,7 @@ struct CmdWhyDepends : SourceExprCommand
                 }
                 return maybePath->second;
             },
-        }, derivedDependency.raw());
+        }, derivedDependency.path.raw());
 
         StorePathSet closure;
         store->computeFSClosure({packagePath}, closure, false, false);

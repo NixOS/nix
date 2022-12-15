@@ -359,7 +359,7 @@ void completeFlakeRef(ref<Store> store, std::string_view prefix)
     }
 }
 
-DerivedPath Installable::toDerivedPath()
+DerivedPathWithInfo Installable::toDerivedPath()
 {
     auto buildables = toDerivedPaths();
     if (buildables.size() != 1)
@@ -423,21 +423,9 @@ struct InstallableStorePath : Installable
         return req.to_string(*store);
     }
 
-    DerivedPaths toDerivedPaths() override
+    DerivedPathsWithInfo toDerivedPaths() override
     {
-        return { req };
-    }
-
-    StorePathSet toDrvPaths(ref<Store> store) override
-    {
-        return std::visit(overloaded {
-            [&](const DerivedPath::Built & bfd) -> StorePathSet {
-                return { bfd.drvPath };
-            },
-            [&](const DerivedPath::Opaque & bo) -> StorePathSet {
-                return { getDeriver(store, *this, bo.path) };
-            },
-        }, req.raw());
+        return {{req}};
     }
 
     std::optional<StorePath> getStorePath() override
@@ -452,34 +440,6 @@ struct InstallableStorePath : Installable
         }, req.raw());
     }
 };
-
-DerivedPaths InstallableValue::toDerivedPaths()
-{
-    DerivedPaths res;
-
-    std::map<StorePath, std::set<std::string>> drvsToOutputs;
-    RealisedPath::Set drvsToCopy;
-
-    // Group by derivation, helps with .all in particular
-    for (auto & drv : toDerivations()) {
-        for (auto & outputName : drv.outputsToInstall)
-            drvsToOutputs[drv.drvPath].insert(outputName);
-        drvsToCopy.insert(drv.drvPath);
-    }
-
-    for (auto & i : drvsToOutputs)
-        res.push_back(DerivedPath::Built { i.first, i.second });
-
-    return res;
-}
-
-StorePathSet InstallableValue::toDrvPaths(ref<Store> store)
-{
-    StorePathSet res;
-    for (auto & drv : toDerivations())
-        res.insert(drv.drvPath);
-    return res;
-}
 
 struct InstallableAttrPath : InstallableValue
 {
@@ -510,40 +470,52 @@ struct InstallableAttrPath : InstallableValue
         return {vRes, pos};
     }
 
-    virtual std::vector<InstallableValue::DerivationInfo> toDerivations() override;
-};
+    DerivedPathsWithInfo toDerivedPaths() override
+    {
+        auto v = toValue(*state).first;
 
-std::vector<InstallableValue::DerivationInfo> InstallableAttrPath::toDerivations()
-{
-    auto v = toValue(*state).first;
+        Bindings & autoArgs = *cmd.getAutoArgs(*state);
 
-    Bindings & autoArgs = *cmd.getAutoArgs(*state);
+        DrvInfos drvInfos;
+        getDerivations(*state, *v, "", autoArgs, drvInfos, false);
 
-    DrvInfos drvInfos;
-    getDerivations(*state, *v, "", autoArgs, drvInfos, false);
+        DerivedPathsWithInfo res;
 
-    std::vector<DerivationInfo> res;
-    for (auto & drvInfo : drvInfos) {
-        auto drvPath = drvInfo.queryDrvPath();
-        if (!drvPath)
-            throw Error("'%s' is not a derivation", what());
+        // Backward compatibility hack: group results by drvPath. This
+        // helps keep .all output together.
+        std::map<StorePath, size_t> byDrvPath;
 
-        std::set<std::string> outputsToInstall;
+        for (auto & drvInfo : drvInfos) {
+            auto drvPath = drvInfo.queryDrvPath();
+            if (!drvPath)
+                throw Error("'%s' is not a derivation", what());
 
-        if (auto outputNames = std::get_if<OutputNames>(&outputsSpec))
-            outputsToInstall = *outputNames;
-        else
-            for (auto & output : drvInfo.queryOutputs(false, std::get_if<DefaultOutputs>(&outputsSpec)))
-                outputsToInstall.insert(output.first);
+            std::set<std::string> outputsToInstall;
 
-        res.push_back(DerivationInfo {
-            .drvPath = *drvPath,
-            .outputsToInstall = std::move(outputsToInstall)
-        });
+            if (auto outputNames = std::get_if<OutputNames>(&outputsSpec))
+                outputsToInstall = *outputNames;
+            else
+                for (auto & output : drvInfo.queryOutputs(false, std::get_if<DefaultOutputs>(&outputsSpec)))
+                    outputsToInstall.insert(output.first);
+
+            auto i = byDrvPath.find(*drvPath);
+            if (i == byDrvPath.end()) {
+                byDrvPath[*drvPath] = res.size();
+                res.push_back({
+                    .path = DerivedPath::Built {
+                        .drvPath = std::move(*drvPath),
+                        .outputs = std::move(outputsToInstall),
+                    }
+                });
+            } else {
+                for (auto & output : outputsToInstall)
+                    std::get<DerivedPath::Built>(res[i->second].path).outputs.insert(output);
+            }
+        }
+
+        return res;
     }
-
-    return res;
-}
+};
 
 std::vector<std::string> InstallableFlake::getActualAttrPaths()
 {
@@ -631,7 +603,7 @@ InstallableFlake::InstallableFlake(
         throw UsageError("'--arg' and '--argstr' are incompatible with flakes");
 }
 
-std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableFlake::toDerivation()
+DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
 {
     Activity act(*logger, lvlTalkative, actUnknown, fmt("evaluating derivation '%s'", what()));
 
@@ -675,20 +647,19 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
     if (auto outputNames = std::get_if<OutputNames>(&outputsSpec))
         outputsToInstall = *outputNames;
 
-    auto drvInfo = DerivationInfo {
-        .drvPath = std::move(drvPath),
-        .outputsToInstall = std::move(outputsToInstall),
-        .priority = priority,
-    };
-
-    return {attrPath, getLockedFlake()->flake.lockedRef, std::move(drvInfo)};
-}
-
-std::vector<InstallableValue::DerivationInfo> InstallableFlake::toDerivations()
-{
-    std::vector<DerivationInfo> res;
-    res.push_back(std::get<2>(toDerivation()));
-    return res;
+    return {{
+        .path = DerivedPath::Built {
+            .drvPath = std::move(drvPath),
+            .outputs = std::move(outputsToInstall),
+        },
+        .info = {
+            .priority = priority,
+            .originalRef = flakeRef,
+            .resolvedRef = getLockedFlake()->flake.lockedRef,
+            .attrPath = attrPath,
+            .outputsSpec = outputsSpec,
+        }
+    }};
 }
 
 std::pair<Value *, PosIdx> InstallableFlake::toValue(EvalState & state)
@@ -896,13 +867,19 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> Instal
     if (mode == Realise::Nothing)
         settings.readOnlyMode = true;
 
+    struct Aux
+    {
+        ExtraInfo info;
+        std::shared_ptr<Installable> installable;
+    };
+
     std::vector<DerivedPath> pathsToBuild;
-    std::map<DerivedPath, std::vector<std::shared_ptr<Installable>>> backmap;
+    std::map<DerivedPath, std::vector<Aux>> backmap;
 
     for (auto & i : installables) {
         for (auto b : i->toDerivedPaths()) {
-            pathsToBuild.push_back(b);
-            backmap[b].push_back(i);
+            pathsToBuild.push_back(b.path);
+            backmap[b.path].push_back({.info = b.info, .installable = i});
         }
     }
 
@@ -915,7 +892,7 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> Instal
         printMissing(store, pathsToBuild, lvlError);
 
         for (auto & path : pathsToBuild) {
-            for (auto & installable : backmap[path]) {
+            for (auto & aux : backmap[path]) {
                 std::visit(overloaded {
                     [&](const DerivedPath::Built & bfd) {
                         OutputPathMap outputs;
@@ -947,10 +924,14 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> Instal
                                     output, *drvOutput->second);
                             }
                         }
-                        res.push_back({installable, {.path = BuiltPath::Built { bfd.drvPath, outputs }}});
+                        res.push_back({aux.installable, {
+                            .path = BuiltPath::Built { bfd.drvPath, outputs },
+                            .info = aux.info}});
                     },
                     [&](const DerivedPath::Opaque & bo) {
-                        res.push_back({installable, {.path = BuiltPath::Opaque { bo.path }}});
+                        res.push_back({aux.installable, {
+                            .path = BuiltPath::Opaque { bo.path },
+                            .info = aux.info}});
                     },
                 }, path.raw());
             }
@@ -966,16 +947,22 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> Instal
             if (!buildResult.success())
                 buildResult.rethrow();
 
-            for (auto & installable : backmap[buildResult.path]) {
+            for (auto & aux : backmap[buildResult.path]) {
                 std::visit(overloaded {
                     [&](const DerivedPath::Built & bfd) {
                         std::map<std::string, StorePath> outputs;
                         for (auto & path : buildResult.builtOutputs)
                             outputs.emplace(path.first.outputName, path.second.outPath);
-                        res.push_back({installable, {.path = BuiltPath::Built { bfd.drvPath, outputs }, .result = buildResult}});
+                        res.push_back({aux.installable, {
+                            .path = BuiltPath::Built { bfd.drvPath, outputs },
+                            .info = aux.info,
+                            .result = buildResult}});
                     },
                     [&](const DerivedPath::Opaque & bo) {
-                        res.push_back({installable, {.path = BuiltPath::Opaque { bo.path }, .result = buildResult}});
+                        res.push_back({aux.installable, {
+                            .path = BuiltPath::Opaque { bo.path },
+                            .info = aux.info,
+                            .result = buildResult}});
                     },
                 }, buildResult.path.raw());
             }
@@ -1060,7 +1047,7 @@ StorePathSet Installable::toDerivations(
                 [&](const DerivedPath::Built & bfd) {
                     drvPaths.insert(bfd.drvPath);
                 },
-            }, b.raw());
+            }, b.path.raw());
 
     return drvPaths;
 }
