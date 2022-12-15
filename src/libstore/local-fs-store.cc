@@ -87,13 +87,8 @@ void LocalFSStore::narFromPath(const StorePath & path, Sink & sink)
 
 const std::string LocalFSStore::drvsLogDir = "drvs";
 
-std::optional<std::string> LocalFSStore::getBuildLog(const StorePath & path_)
+std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path)
 {
-    auto maybePath = getBuildDerivationPath(path_);
-    if (!maybePath)
-        return std::nullopt;
-    auto path = maybePath.value();
-
     auto baseName = path.to_string();
 
     for (int j = 0; j < 2; j++) {

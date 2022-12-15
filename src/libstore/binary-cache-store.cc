@@ -502,14 +502,9 @@ void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSe
     writeNarInfo(narInfo);
 }
 
-std::optional<std::string> BinaryCacheStore::getBuildLog(const StorePath & path)
+std::optional<std::string> BinaryCacheStore::getBuildLogExact(const StorePath & path)
 {
-    auto maybePath = getBuildDerivationPath(path);
-    if (!maybePath)
-        return std::nullopt;
-    auto drvPath = maybePath.value();
-
-    auto logPath = "log/" + std::string(baseNameOf(printStorePath(drvPath)));
+    auto logPath = "log/" + std::string(baseNameOf(printStorePath(path)));
 
     debug("fetching build log from binary cache '%s/%s'", getUri(), logPath);
 
