@@ -20,11 +20,12 @@ nlohmann::json DerivedPath::Built::toJSON(ref<Store> store) const {
     // Fallback for the input-addressed derivation case: We expect to always be
     // able to print the output paths, so let’s do it
     const auto knownOutputs = store->queryPartialDerivationOutputMap(drvPath);
-    for (const auto& output : outputs) {
+    for (const auto & output : outputs) {
         auto knownOutput = get(knownOutputs, output);
-        res["outputs"][output] = (knownOutput && *knownOutput)
-          ? store->printStorePath(**knownOutput)
-          : nullptr;
+        if (knownOutput && *knownOutput)
+            res["outputs"][output] = store->printStorePath(**knownOutput);
+        else
+            res["outputs"][output] = nullptr;
     }
     return res;
 }
