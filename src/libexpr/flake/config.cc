@@ -56,7 +56,7 @@ void ConfigFile::apply()
             auto tlname = get(trustedList, name);
             if (auto saved = tlname ? get(*tlname, valueS) : nullptr) {
                 trusted = *saved;
-                printMsg(lvlInfo, "Using saved setting for '%s = %s' from ~/.local/share/nix/trusted-settings.json.", name,valueS);
+                printInfo("Using saved setting for '%s = %s' from ~/.local/share/nix/trusted-settings.json.", name, valueS);
             } else {
                 // FIXME: filter ANSI escapes, newlines, \r, etc.
                 if (std::tolower(logger->ask(fmt("do you want to allow configuration setting '%s' to be set to '" ANSI_RED "%s" ANSI_NORMAL "' (y/N)?", name, valueS)).value_or('n')) == 'y') {
