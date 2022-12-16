@@ -99,8 +99,79 @@ You can run the whole testsuite with `make check`, or the tests for a specific c
 ### Functional tests
 
 The functional tests reside under the `tests` directory and are listed in `tests/local.mk`.
-The whole testsuite can be run with `make install && make installcheck`.
-Individual tests can be run with `make tests/{testName}.sh.test`.
+Each test is a bash script.
+
+The whole testsuite can be run with:
+
+```shell-session
+$ make install && make installcheck
+ran test tests/foo.sh... [PASS]
+ran test tests/bar.sh... [PASS]
+...
+```
+
+Individual tests can be run with `make`:
+
+```shell-session
+$ make tests/${testName}.sh.test
+ran test tests/${testName}.sh... [PASS]
+```
+
+or without `make`:
+
+```shell-session
+$ ./mk/run-test.sh tests/${testName}.sh
+ran test tests/${testName}.sh... [PASS]
+```
+
+To see the complet eoutput, one can also run:
+
+```shell-session
+$ ./mk/debug-test.sh tests/${testName}.sh
++ foo
+output from foo
++ bar
+output from bar
+...
+```
+
+The test script will be traced with `set -x` and the output displayed as it happens, regardless of whether the test succeeds or fails.
+
+#### Debugging failing functional tests
+
+When a functional test fails, it usually does so somewhere in the middle of the script.
+
+To figure out what's wrong, it is convenient to run the test regularly up to the failing `nix` command, and then run that command with a debugger like GDB.
+
+For example, if the script looks like:
+
+```bash
+foo
+nix blah blub
+bar
+```
+one would could edit it like so:
+
+```diff
+ foo
+-nix blah blub
++gdb --args nix blah blub
+ bar
+```
+
+Then, when one runs the script with `./mk/debug-test.sh`, it will drop them into GDB once the script reaches that point:
+
+```shell-session
+$ ./mk/debug-test.sh tests/${testName}.sh
+...
++ gdb blash blub
+GNU gdb (GDB) 12.1
+...
+(gdb)
+```
+
+One can debug the Nix invocation in all the usual ways.
+(For exampling running `run` will run the Nix invocation.)
 
 ### Integration tests
 
