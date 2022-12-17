@@ -8,12 +8,15 @@
 
 namespace nix {
 
-SQLiteError::SQLiteError(const char *path, int errNo, int extendedErrNo, hintformat && hf)
-  : Error(""), path(path), errNo(errNo), extendedErrNo(extendedErrNo)
+SQLiteError::SQLiteError(const char *path, const char *errMsg, int errNo, int extendedErrNo, int offset, hintformat && hf)
+  : Error(""), path(path), errMsg(errMsg), errNo(errNo), extendedErrNo(extendedErrNo), offset(offset)
 {
-    err.msg = hintfmt("%s: %s (in '%s')",
+    auto offsetStr = (offset == -1) ? "" : "at offset " + std::to_string(offset) + ": ";
+    err.msg = hintfmt("%s: %s%s, %s (in '%s')",
         normaltxt(hf.str()),
+        offsetStr,
         sqlite3_errstr(extendedErrNo),
+        errMsg,
         path ? path : "(in-memory)");
 }
 
@@ -21,11 +24,13 @@ SQLiteError::SQLiteError(const char *path, int errNo, int extendedErrNo, hintfor
 {
     int err = sqlite3_errcode(db);
     int exterr = sqlite3_extended_errcode(db);
+    int offset = sqlite3_error_offset(db);
 
     auto path = sqlite3_db_filename(db, nullptr);
+    auto errMsg = sqlite3_errmsg(db);
 
     if (err == SQLITE_BUSY || err == SQLITE_PROTOCOL) {
-        auto exp = SQLiteBusy(path, err, exterr, std::move(hf));
+        auto exp = SQLiteBusy(path, errMsg, err, exterr, offset, std::move(hf));
         exp.err.msg = hintfmt(
             err == SQLITE_PROTOCOL
                 ? "SQLite database '%s' is busy (SQLITE_PROTOCOL)"
@@ -33,7 +38,7 @@ SQLiteError::SQLiteError(const char *path, int errNo, int extendedErrNo, hintfor
             path ? path : "(in-memory)");
         throw exp;
     } else
-        throw SQLiteError(path, err, exterr, std::move(hf));
+        throw SQLiteError(path, errMsg, err, exterr, offset, std::move(hf));
 }
 
 SQLite::SQLite(const Path & path, bool create)
