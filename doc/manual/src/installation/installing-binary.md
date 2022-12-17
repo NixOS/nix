@@ -6,6 +6,12 @@ The easiest way to install Nix is to run the following command:
 $ sh <(curl -L https://nixos.org/nix/install)
 ```
 
+If running [fish shell](https://fishshell.com/), use the following command instead:
+
+```console
+$ sh (curl -L https://nixos.org/nix/install | psub)
+```
+
 This will run the installer interactively (causing it to explain what
 it is doing more explicitly), and perform the default "type" of install
 for your platform:
@@ -28,6 +34,12 @@ To explicitly select a single-user installation on your system:
 
 ```console
 $ sh <(curl -L https://nixos.org/nix/install) --no-daemon
+```
+
+In fish shell:
+
+```console
+$ sh (curl -L https://nixos.org/nix/install | psub) --no-daemon
 ```
 
 This will perform a single-user installation of Nix, meaning that `/nix`
@@ -67,6 +79,12 @@ your system:
 
 ```console
 $ sh <(curl -L https://nixos.org/nix/install) --daemon
+```
+
+In fish shell:
+
+```console
+$ sh (curl -L https://nixos.org/nix/install | psub) --daemon
 ```
 
 The multi-user installation of Nix will create build users between the
@@ -288,6 +306,12 @@ installation script:
 
 ```console
 $ sh <(curl -L https://nixos.org/nix/install)
+```
+
+In fish shell:
+
+```console
+$ sh (curl -L https://nixos.org/nix/install | psub)
 ```
 
 In the same directory of the install script are sha256 sums, and gpg
