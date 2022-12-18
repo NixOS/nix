@@ -420,7 +420,9 @@ C4_FOR_EACH(PRN_STRUCT_OFFSETS, a, b, c);
    #else
        #define C4_CPU_ARM
        #define C4_WORDSIZE 4
-       #if defined(__ARM_ARCH_8__) || (defined(__TARGET_ARCH_ARM) && __TARGET_ARCH_ARM >= 8)
+       #if defined(__ARM_ARCH_8__) || defined(__ARM_ARCH_8A__)  \
+        || (defined(__ARCH_ARM) && __ARCH_ARM >= 8)
+        || (defined(__TARGET_ARCH_ARM) && __TARGET_ARCH_ARM >= 8)  \
            #define C4_CPU_ARMV8
        #elif defined(__ARM_ARCH_7__) || defined(_ARM_ARCH_7)    \
         || defined(__ARM_ARCH_7A__) || defined(__ARM_ARCH_7R__) \
@@ -1925,7 +1927,7 @@ struct fail_type__ {};
 #endif // _DOXYGEN_
 
 
-#ifdef NDEBUG
+#if defined(NDEBUG) || defined(C4_NO_DEBUG_BREAK)
 #   define C4_DEBUG_BREAK()
 #else
 #   ifdef __clang__
@@ -12508,7 +12510,7 @@ power:
             ++pos;
         if(C4_LIKELY(pos < s.len))
         {
-            int16_t powval;
+            int16_t powval = {};
             if(C4_LIKELY(atoi(s.sub(pos), &powval)))
             {
                 *val *= ipow<T, int16_t, 16>(powval);
@@ -18507,11 +18509,24 @@ bool is_debugger_attached()
 #endif
 
 
+#if defined(NDEBUG) || defined(C4_NO_DEBUG_BREAK)
+#   define RYML_DEBUG_BREAK()
+#else
+#   define RYML_DEBUG_BREAK()                               \
+    {                                                       \
+        if(c4::get_error_flags() & c4::ON_ERROR_DEBUGBREAK) \
+        {                                                   \
+            C4_DEBUG_BREAK();                               \
+        }                                                   \
+    }
+#endif
+
+
 #define RYML_CHECK(cond)                                                \
     do {                                                                \
         if(!(cond))                                                     \
         {                                                               \
-            C4_DEBUG_BREAK();                                           \
+            RYML_DEBUG_BREAK()                                          \
             c4::yml::error("check failed: " #cond, c4::yml::Location(__FILE__, __LINE__, 0)); \
         }                                                               \
     } while(0)
@@ -18521,7 +18536,7 @@ bool is_debugger_attached()
     {                                                                   \
         if(!(cond))                                                     \
         {                                                               \
-            C4_DEBUG_BREAK();                                           \
+            RYML_DEBUG_BREAK()                                          \
             c4::yml::error(msg ": check failed: " #cond, c4::yml::Location(__FILE__, __LINE__, 0)); \
         }                                                               \
     } while(0)
@@ -18669,7 +18684,7 @@ RYML_EXPORT void reset_callbacks();
 do                                                                      \
 {                                                                       \
     const char msg[] = msg_literal;                                     \
-    C4_DEBUG_BREAK();                                                   \
+    RYML_DEBUG_BREAK()                                                  \
     (cb).m_error(msg, sizeof(msg), c4::yml::Location(__FILE__, 0, __LINE__, 0), (cb).m_user_data); \
 } while(0)
 #define _RYML_CB_CHECK(cb, cond)                                        \
@@ -18678,7 +18693,7 @@ do                                                                      \
         if(!(cond))                                                     \
         {                                                               \
             const char msg[] = "check failed: " #cond;                  \
-            C4_DEBUG_BREAK();                                           \
+            RYML_DEBUG_BREAK()                                          \
             (cb).m_error(msg, sizeof(msg), c4::yml::Location(__FILE__, 0, __LINE__, 0), (cb).m_user_data); \
         }                                                               \
     } while(0)
@@ -18958,6 +18973,8 @@ typedef enum : type_bits {
     DOCMAP  = DOC|MAP,
     DOCSEQ  = DOC|SEQ,
     DOCVAL  = DOC|VAL,
+    _KEYMASK = KEY | KEYQUO | KEYANCH | KEYREF | KEYTAG,
+    _VALMASK = VAL | VALQUO | VALANCH | VALREF | VALTAG,
     // these flags are from a work in progress and should not be used yet
     _WIP_STYLE_FLOW_SL = c4bit(14), ///< mark container with single-line flow format (seqs as '[val1,val2], maps as '{key: val, key2: val2}')
     _WIP_STYLE_FLOW_ML = c4bit(15), ///< mark container with multi-line flow format (seqs as '[val1,\nval2], maps as '{key: val,\nkey2: val2}')
@@ -19444,16 +19461,30 @@ public:
 
     bool has_parent(size_t node) const { return _p(node)->m_parent != NONE; }
 
+    /** true if @p node has a child with id @p ch */
+    bool has_child(size_t node, size_t ch) const { return _p(ch)->m_parent == node; }
+    /** true if @p node has a child with key @p key */
     bool has_child(size_t node, csubstr key) const { return find_child(node, key) != npos; }
-    bool has_child(size_t node, size_t ch) const { return child_pos(node, ch) != npos; }
+    /** true if @p node has any children key */
     bool has_children(size_t node) const { return _p(node)->m_first_child != NONE; }
 
-    bool has_sibling(size_t node, size_t sib) const { return is_root(node) ? sib==node : child_pos(_p(node)->m_parent, sib) != npos; }
+    /** true if @p node has a sibling with id @p sib */
+    bool has_sibling(size_t node, size_t sib) const { return _p(node)->m_parent == _p(sib)->m_parent; }
+    /** true if one of the node's siblings has the given key */
     bool has_sibling(size_t node, csubstr key) const { return find_sibling(node, key) != npos; }
-    /** counts with *this */
-    bool has_siblings(size_t /*node*/) const { return true; }
-    /** does not count with *this */
-    bool has_other_siblings(size_t node) const { return is_root(node) ? false : (_p(_p(node)->m_parent)->m_first_child != _p(_p(node)->m_parent)->m_last_child); }
+    /** true if node is not a single child */
+    bool has_other_siblings(size_t node) const
+    {
+        NodeData const *n = _p(node);
+        if(C4_LIKELY(n->m_parent != NONE))
+        {
+            n = _p(n->m_parent);
+            return n->m_first_child != n->m_last_child;
+        }
+        return false;
+    }
+
+    RYML_DEPRECATED("use has_other_siblings()") bool has_siblings(size_t /*node*/) const { return true; }
 
     /** @} */
 
@@ -20170,21 +20201,14 @@ public:
     void _swap_hierarchy(size_t n_, size_t m_);
     void _copy_hierarchy(size_t dst_, size_t src_);
 
-    void _copy_props(size_t dst_, size_t src_)
+    inline void _copy_props(size_t dst_, size_t src_)
     {
-        auto      & C4_RESTRICT dst = *_p(dst_);
-        auto const& C4_RESTRICT src = *_p(src_);
-        dst.m_type = src.m_type;
-        dst.m_key  = src.m_key;
-        dst.m_val  = src.m_val;
+        _copy_props(dst_, this, src_);
     }
 
-    void _copy_props_wo_key(size_t dst_, size_t src_)
+    inline void _copy_props_wo_key(size_t dst_, size_t src_)
     {
-        auto      & C4_RESTRICT dst = *_p(dst_);
-        auto const& C4_RESTRICT src = *_p(src_);
-        dst.m_type = src.m_type;
-        dst.m_val  = src.m_val;
+        _copy_props_wo_key(dst_, this, src_);
     }
 
     void _copy_props(size_t dst_, Tree const* that_tree, size_t src_)
@@ -20200,7 +20224,7 @@ public:
     {
         auto      & C4_RESTRICT dst = *_p(dst_);
         auto const& C4_RESTRICT src = *that_tree->_p(src_);
-        dst.m_type = src.m_type;
+        dst.m_type = (src.m_type & ~_KEYMASK) | (dst.m_type & _KEYMASK);
         dst.m_val  = src.m_val;
     }
 
@@ -20228,7 +20252,7 @@ public:
 
     inline void _clear_val(size_t node)
     {
-        _p(node)->m_key.clear();
+        _p(node)->m_val.clear();
         _rem_flags(node, VAL);
     }
 
@@ -20452,7 +20476,7 @@ bool _visit_stacked(NodeRefType &node, Visitor fn, size_t indentation_level, boo
 template<class Impl, class ConstImpl>
 struct RoNodeMethods
 {
-    C4_SUPPRESS_WARNING_CLANG_WITH_PUSH("-Wcast-align")
+    C4_SUPPRESS_WARNING_GCC_CLANG_WITH_PUSH("-Wcast-align")
     // helper CRTP macros, undefined at the end
     #define tree_ ((ConstImpl const* C4_RESTRICT)this)->m_tree
     #define id_ ((ConstImpl const* C4_RESTRICT)this)->m_id
@@ -20844,7 +20868,7 @@ public:
     #undef id_
     #undef id__
 
-    C4_SUPPRESS_WARNING_CLANG_POP
+    C4_SUPPRESS_WARNING_GCC_CLANG_POP
 };
 
 } // namespace detail
@@ -21415,20 +21439,23 @@ public:
 
 public:
 
-    /** change the node's position within its parent */
+    /** change the node's position within its parent, placing it after
+     * @p after. To move to the first position in the parent, simply
+     * pass an empty or default-constructed reference like this:
+     * `n.move({})`. */
     inline void move(ConstNodeRef const& after)
     {
         _C4RV();
         m_tree->move(m_id, after.m_id);
     }
 
-    /** move the node to a different parent, which may belong to a different
-     * tree. When this is the case, then this node's tree pointer is reset to
-     * the tree of the parent node. */
+    /** move the node to a different @p parent (which may belong to a
+     * different tree), placing it after @p after. When the
+     * destination parent is in a new tree, then this node's tree
+     * pointer is reset to the tree of the parent node. */
     inline void move(NodeRef const& parent, ConstNodeRef const& after)
     {
         _C4RV();
-        RYML_ASSERT(parent.m_tree == after.m_tree);
         if(parent.m_tree == m_tree)
         {
             m_tree->move(m_id, parent.m_id, after.m_id);
@@ -21440,10 +21467,28 @@ public:
         }
     }
 
+    /** duplicate the current node somewhere within its parent, and
+     * place it after the node @p after. To place into the first
+     * position of the parent, simply pass an empty or
+     * default-constructed reference like this: `n.move({})`. */
+    inline NodeRef duplicate(ConstNodeRef const& after) const
+    {
+        _C4RV();
+        RYML_ASSERT(m_tree == after.m_tree || after.m_id == NONE);
+        size_t dup = m_tree->duplicate(m_id, m_tree->parent(m_id), after.m_id);
+        NodeRef r(m_tree, dup);
+        return r;
+    }
+
+    /** duplicate the current node somewhere into a different @p parent
+     * (possibly from a different tree), and place it after the node
+     * @p after. To place into the first position of the parent,
+     * simply pass an empty or default-constructed reference like
+     * this: `n.move({})`. */
     inline NodeRef duplicate(NodeRef const& parent, ConstNodeRef const& after) const
     {
         _C4RV();
-        RYML_ASSERT(parent.m_tree == after.m_tree);
+        RYML_ASSERT(parent.m_tree == after.m_tree || after.m_id == NONE);
         if(parent.m_tree == m_tree)
         {
             size_t dup = m_tree->duplicate(m_id, parent.m_id, after.m_id);
@@ -21996,13 +22041,11 @@ inline void __c4presc(const char *s, size_t len)
 
 #define RYML_DEPRECATE_EMIT                                             \
     RYML_DEPRECATED("use emit_yaml() instead. See https://github.com/biojppm/rapidyaml/issues/120")
-
-#define RYML_DEPRECATE_EMITRS                                           \
-    RYML_DEPRECATED("use emitrs_yaml() instead. See https://github.com/biojppm/rapidyaml/issues/120")
-
 #ifdef emit
 #error "emit is defined, likely from a Qt include. This will cause a compilation error. See https://github.com/biojppm/rapidyaml/issues/120"
 #endif
+#define RYML_DEPRECATE_EMITRS                                           \
+    RYML_DEPRECATED("use emitrs_yaml() instead. See https://github.com/biojppm/rapidyaml/issues/120")
 
 
 //-----------------------------------------------------------------------------
@@ -23329,10 +23372,10 @@ void Emitter<Writer>::_write_scalar(csubstr s, bool was_quoted)
             &&
             (
                 // has leading whitespace
-                s.begins_with_any(" \n\t\r")
-                ||
-                // looks like reference or anchor or would be treated as a directive
-                s.begins_with_any("*&%")
+                // looks like reference or anchor
+                // would be treated as a directive
+                // see https://www.yaml.info/learn/quote.html#noplain
+                s.begins_with_any(" \n\t\r*&%@`")
                 ||
                 s.begins_with("<<")
                 ||
@@ -23340,7 +23383,7 @@ void Emitter<Writer>::_write_scalar(csubstr s, bool was_quoted)
                 s.ends_with_any(" \n\t\r")
                 ||
                 // has special chars
-                (s.first_of("#:-?,\n{}[]'\"@`") != npos)
+                (s.first_of("#:-?,\n{}[]'\"") != npos)
             )
         )
     );
@@ -25859,8 +25902,9 @@ void Tree::_swap_props(size_t n_, size_t m_)
 void Tree::move(size_t node, size_t after)
 {
     _RYML_CB_ASSERT(m_callbacks, node != NONE);
+    _RYML_CB_ASSERT(m_callbacks, node != after);
     _RYML_CB_ASSERT(m_callbacks,  ! is_root(node));
-    _RYML_CB_ASSERT(m_callbacks, has_sibling(node, after) && has_sibling(after, node));
+    _RYML_CB_ASSERT(m_callbacks, (after == NONE) || (has_sibling(node, after) && has_sibling(after, node)));
 
     _rem_hierarchy(node);
     _set_hierarchy(node, parent(node), after);
@@ -25871,7 +25915,10 @@ void Tree::move(size_t node, size_t after)
 void Tree::move(size_t node, size_t new_parent, size_t after)
 {
     _RYML_CB_ASSERT(m_callbacks, node != NONE);
+    _RYML_CB_ASSERT(m_callbacks, node != after);
     _RYML_CB_ASSERT(m_callbacks, new_parent != NONE);
+    _RYML_CB_ASSERT(m_callbacks, new_parent != node);
+    _RYML_CB_ASSERT(m_callbacks, new_parent != after);
     _RYML_CB_ASSERT(m_callbacks,  ! is_root(node));
 
     _rem_hierarchy(node);
@@ -25880,8 +25927,10 @@ void Tree::move(size_t node, size_t new_parent, size_t after)
 
 size_t Tree::move(Tree *src, size_t node, size_t new_parent, size_t after)
 {
+    _RYML_CB_ASSERT(m_callbacks, src != nullptr);
     _RYML_CB_ASSERT(m_callbacks, node != NONE);
     _RYML_CB_ASSERT(m_callbacks, new_parent != NONE);
+    _RYML_CB_ASSERT(m_callbacks, new_parent != after);
 
     size_t dup = duplicate(src, node, new_parent, after);
     src->remove(node);
@@ -26082,15 +26131,17 @@ size_t Tree::duplicate_children_no_rep(Tree const *src, size_t node, size_t pare
                     remove(rep);
                     prev = duplicate(src, i, parent, prev);
                 }
-                else if(after_pos == NONE || rep_pos >= after_pos)
+                else if(prev == NONE)
+                {
+                    // first iteration with prev = after = NONE and repetition
+                    prev = rep;
+                }
+                else if(rep != prev)
                 {
                     // rep is located after the node which will be inserted
                     // and overrides it. So move the rep into this node's place.
-                    if(rep != prev)
-                    {
-                        move(rep, prev);
-                        prev = rep;
-                    }
+                    move(rep, prev);
+                    prev = rep;
                 }
             } // there's a repetition
         }
@@ -31243,10 +31294,9 @@ csubstr Parser::_scan_squot_scalar()
 
         // leading whitespace also needs filtering
         needs_filter = needs_filter
-            || numlines > 1
+            || (numlines > 1)
             || line_is_blank
-            || (_at_line_begin() && line.begins_with(' '))
-            || (m_state->line_contents.full.last_of('\r') != csubstr::npos);
+            || (_at_line_begin() && line.begins_with(' '));
 
         if(pos == npos)
         {
@@ -31345,10 +31395,9 @@ csubstr Parser::_scan_dquot_scalar()
 
         // leading whitespace also needs filtering
         needs_filter = needs_filter
-            || numlines > 1
+            || (numlines > 1)
             || line_is_blank
-            || (_at_line_begin() && line.begins_with(' '))
-            || (m_state->line_contents.full.last_of('\r') != csubstr::npos);
+            || (_at_line_begin() && line.begins_with(' '));
 
         if(pos == npos)
         {
@@ -32097,7 +32146,7 @@ csubstr Parser::_filter_block_scalar(substr s, BlockStyle_e style, BlockChomp_e 
 
     _c4dbgfbl(": indentation={} before=[{}]~~~{}~~~", indentation, s.len, s);
 
-    if(chomp != CHOMP_KEEP && s.trim(" \n\r\t").len == 0u)
+    if(chomp != CHOMP_KEEP && s.trim(" \n\r").len == 0u)
     {
         _c4dbgp("filt_block: empty scalar");
         return s.first(0);
@@ -33599,4 +33648,5 @@ using namespace c4;
 // (end https://github.com/biojppm/rapidyaml/src/ryml.hpp)
 
 #endif /* _RYML_SINGLE_HEADER_AMALGAMATED_HPP_ */
+
 

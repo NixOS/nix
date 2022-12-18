@@ -31,9 +31,6 @@ for f in "$1"/src/*.yaml; do
 	testname="$(basename ${f} .yaml)"
 	[[ "${testname}" = "2SXE" ]] && echo "    /** This test case is ignored because the YAML string is parsed incorrectly by ryml, but it's a rather artificial case, which isn't valid YAML 1.3 either."
 	echo "    TEST_F(${testclass}, T_${testname}) {"
-	if [ "${testname}" = "Y79Y" ]; then
-		echo "        GTEST_SKIP(); // issue in ryml"
-	fi
 	if [ "${testname}" = "565N" ]; then
 		echo "        ASSERT_THROW(${testmethod}(T_${testname}),EvalError); // nix has no binary data type"
 	else

@@ -8,8 +8,6 @@
 [![test](https://github.com/biojppm/rapidyaml/workflows/test/badge.svg?branch=master)](https://github.com/biojppm/rapidyaml/actions)
 <!-- [![Coveralls](https://coveralls.io/repos/github/biojppm/rapidyaml/badge.svg?branch=master)](https://coveralls.io/github/biojppm/rapidyaml) -->
 [![Codecov](https://codecov.io/gh/biojppm/rapidyaml/branch/master/graph/badge.svg?branch=master)](https://codecov.io/gh/biojppm/rapidyaml)
-[![Total alerts](https://img.shields.io/lgtm/alerts/g/biojppm/rapidyaml.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/biojppm/rapidyaml/alerts/)
-[![Language grade: C/C++](https://img.shields.io/lgtm/grade/cpp/g/biojppm/rapidyaml.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/biojppm/rapidyaml/context:cpp)
 
 
 Or ryml, for short. ryml is a C++ library to parse and emit YAML,
@@ -1001,7 +999,8 @@ See also [the roadmap](./ROADMAP.md) for a list of future work.
 
 ### Known limitations
 
-ryml deliberately makes no effort to follow the standard in the following situations:
+ryml deliberately makes no effort to follow the standard in the
+following situations:
 
 * Containers are not accepted as mapping keys: keys must be scalars.
 * Tab characters after `:` and `-` are not accepted tokens, unless
@@ -1010,6 +1009,17 @@ ryml deliberately makes no effort to follow the standard in the following situat
   into the parser's hot code and in some cases costs as much as 10%
   in parsing time.
 * Anchor names must not end with a terminating colon: eg `&anchor: key: val`.
+* Non-unique map keys are allowed. Enforcing key uniqueness in the
+  parser or in the tree would cause log-linear parsing complexity (for
+  root children on a mostly flat tree), and would increase code size
+  through added structural, logical and cyclomatic complexity. So
+  enforcing uniqueness in the parser would hurt users who may not care
+  about it (they may not care either because non-uniqueness is OK for
+  their use case, or because it is impossible to occur). On the other
+  hand, any user who requires uniqueness can easily enforce it by
+  doing a post-parse walk through the tree. So choosing to not enforce
+  key uniqueness adheres to the spirit of "don't pay for what you
+  don't use".
 * `%YAML` directives have no effect and are ignored.
 * `%TAG` directives are limited to a default maximum of 4 instances
   per `Tree`. To increase this maximum, define the preprocessor symbol
