@@ -98,6 +98,7 @@ namespace nix {
                 int ctr = -1;
                 for (auto testCase : testCases.listItems()) {
                     Value *json = nullptr;
+                    bool fail = false;
                     ctr++;
                     std::string_view yamlRaw;
                     for (auto attr = testCase->attrs->begin(); attr != testCase->attrs->end(); attr++) {
@@ -106,9 +107,11 @@ namespace nix {
                             json = attr->value;
                         } else if (name == "yaml") {
                             yamlRaw = state.forceStringNoCtx(*attr->value);
+                        } else if (name == "fail") {
+                            fail = state.forceBool(*attr->value, noPos);
                         }
                     }
-                    bool fail = !json;
+                    fail |= !json;
                     bool emptyJSON = false;
                     std::string_view jsonStr;
                     Value jsonVal;
