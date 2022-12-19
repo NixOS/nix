@@ -37,7 +37,7 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
         args.push_back("-C");
 }
 
-std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string & command, Strings args)
+std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string & command, Strings & args)
 {
     Path socketPath = startMaster();
 
