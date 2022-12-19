@@ -235,6 +235,7 @@ void initNix()
 #endif
 
     preloadNSS();
+    initLibStore();
 }
 
 

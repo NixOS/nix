@@ -458,6 +458,7 @@ Store::Store(const Params & params)
     : StoreConfig(params)
     , state({(size_t) pathInfoCacheSize})
 {
+    assertLibStoreInitialized();
 }
 
 

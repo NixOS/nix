@@ -984,4 +984,12 @@ std::vector<Path> getUserConfigFiles();
 
 extern const std::string nixVersion;
 
+/* NB: This is not sufficient. You need to call initNix() */
+void initLibStore();
+
+/* It's important to initialize before doing _anything_, which is why we
+   call upon the programmer to handle this correctly. However, we only add
+   this in a key locations, so as not to litter the code. */
+void assertLibStoreInitialized();
+
 }
