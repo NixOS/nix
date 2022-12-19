@@ -1974,6 +1974,30 @@ static RegisterPrimOp primop_toFile({
     .fun = prim_toFile,
 });
 
+bool EvalState::callPathFilter(
+    Value * filterFun,
+    const SourcePath & path,
+    std::string_view pathArg,
+    PosIdx pos)
+{
+    auto st = path.lstat();
+
+    /* Call the filter function.  The first argument is the path, the
+       second is a string indicating the type of the file. */
+    Value arg1;
+    arg1.mkString(pathArg);
+
+    Value arg2;
+    // assert that type is not "unknown"
+    arg2.mkString(fileTypeToString(st.type));
+
+    Value * args []{&arg1, &arg2};
+    Value res;
+    callFunction(*filterFun, 2, args, res, pos);
+
+    return forceBool(res, pos);
+}
+
 static void addPath(
     EvalState & state,
     const PosIdx pos,
@@ -2010,26 +2034,11 @@ static void addPath(
         #endif
 
         std::unique_ptr<PathFilter> filter;
-        if (filterFun) filter = std::make_unique<PathFilter>([&](const Path & p) {
-            SourcePath path2{path.accessor, CanonPath(p)};
-
-            auto st = path2.lstat();
-
-            /* Call the filter function.  The first argument is the path,
-               the second is a string indicating the type of the file. */
-            Value arg1;
-            arg1.mkString(path2.path.abs());
-
-            Value arg2;
-            // assert that type is not "unknown"
-            arg2.mkString(fileTypeToString(st.type));
-
-            Value * args []{&arg1, &arg2};
-            Value res;
-            state.callFunction(*filterFun, 2, args, res, pos);
-
-            return state.forceBool(res, pos);
-        });
+        if (filterFun)
+            filter = std::make_unique<PathFilter>([&](const Path & p) {
+                auto p2 = CanonPath(p);
+                return state.callPathFilter(filterFun, {path.accessor, p2}, p2.abs(), pos);
+            });
 
         std::optional<StorePath> expectedStorePath;
         if (expectedHash)
@@ -2130,13 +2139,14 @@ static RegisterPrimOp primop_filterSource({
 
 static void prim_path(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    state.forceAttrs(*args[0], pos);
     std::optional<SourcePath> path;
     std::string name;
     Value * filterFun = nullptr;
     auto method = FileIngestionMethod::Recursive;
     std::optional<Hash> expectedHash;
     PathSet context;
+
+    state.forceAttrs(*args[0], pos);
 
     for (auto & attr : *args[0]->attrs) {
         auto n = state.symbols[attr.name];

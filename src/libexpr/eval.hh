@@ -525,6 +525,13 @@ public:
      */
     [[nodiscard]] StringMap realiseContext(const PathSet & context);
 
+    /* Call the binary path filter predicate used builtins.path etc. */
+    bool callPathFilter(
+        Value * filterFun,
+        const SourcePath & path,
+        std::string_view pathArg,
+        PosIdx pos);
+
 private:
 
     unsigned long nrEnvs = 0;
