@@ -34,11 +34,6 @@ namespace nix {
         Path basePath;
         PosTable::Origin origin;
         std::optional<ErrorInfo> error;
-        ParseData(EvalState & state, PosTable::Origin origin)
-            : state(state)
-            , symbols(state.symbols)
-            , origin(std::move(origin))
-            { };
     };
 
     struct ParserFormals {
@@ -649,24 +644,20 @@ formal
 namespace nix {
 
 
-Expr * EvalState::parse(char * text, size_t length, FileOrigin origin,
-    const PathView path, const PathView basePath, std::shared_ptr<StaticEnv> & staticEnv)
+Expr * EvalState::parse(
+    char * text,
+    size_t length,
+    Pos::Origin origin,
+    Path basePath,
+    std::shared_ptr<StaticEnv> & staticEnv)
 {
     yyscan_t scanner;
-    std::string file;
-    switch (origin) {
-        case foFile:
-            file = path;
-            break;
-        case foStdin:
-        case foString:
-            file = text;
-            break;
-        default:
-            assert(false);
-    }
-    ParseData data(*this, {file, origin});
-    data.basePath = basePath;
+    ParseData data {
+        .state = *this,
+        .symbols = symbols,
+        .basePath = std::move(basePath),
+        .origin = {origin},
+    };
 
     yylex_init(&scanner);
     yy_scan_buffer(text, length, scanner);
@@ -718,14 +709,15 @@ Expr * EvalState::parseExprFromFile(const Path & path, std::shared_ptr<StaticEnv
     auto buffer = readFile(path);
     // readFile should have left some extra space for terminators
     buffer.append("\0\0", 2);
-    return parse(buffer.data(), buffer.size(), foFile, path, dirOf(path), staticEnv);
+    return parse(buffer.data(), buffer.size(), path, dirOf(path), staticEnv);
 }
 
 
-Expr * EvalState::parseExprFromString(std::string s, const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv)
+Expr * EvalState::parseExprFromString(std::string s_, const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv)
 {
-    s.append("\0\0", 2);
-    return parse(s.data(), s.size(), foString, "", basePath, staticEnv);
+    auto s = make_ref<std::string>(std::move(s_));
+    s->append("\0\0", 2);
+    return parse(s->data(), s->size(), Pos::String{.source = s}, basePath, staticEnv);
 }
 
 
@@ -741,7 +733,8 @@ Expr * EvalState::parseStdin()
     auto buffer = drainFD(0);
     // drainFD should have left some extra space for terminators
     buffer.append("\0\0", 2);
-    return parse(buffer.data(), buffer.size(), foStdin, "", absPath("."), staticBaseEnv);
+    auto s = make_ref<std::string>(std::move(buffer));
+    return parse(s->data(), s->size(), Pos::Stdin{.source = s}, absPath("."), staticBaseEnv);
 }
 
 

@@ -78,7 +78,7 @@ struct RegexCache;
 std::shared_ptr<RegexCache> makeRegexCache();
 
 struct DebugTrace {
-    std::optional<ErrPos> pos;
+    std::shared_ptr<AbstractPos> pos;
     const Expr & expr;
     const Env & env;
     hintformat hint;
@@ -457,8 +457,12 @@ private:
     friend struct ExprAttrs;
     friend struct ExprLet;
 
-    Expr * parse(char * text, size_t length, FileOrigin origin, const PathView path,
-        const PathView basePath, std::shared_ptr<StaticEnv> & staticEnv);
+    Expr * parse(
+        char * text,
+        size_t length,
+        Pos::Origin origin,
+        Path basePath,
+        std::shared_ptr<StaticEnv> & staticEnv);
 
 public:
 
