@@ -202,8 +202,10 @@ operate are determined as follows:
   a command like `nix shell nixpkgs#libxml2` will provide only those
   two outputs by default.
 
-  Note that a store derivation (given by `.drv` file store path) doesn't have
+  Note that a [store derivation] (given by its `.drv` file store path) doesn't have
   any attributes like `meta`, and thus this case doesn't apply to it.
+
+  [store derivation]: ../../glossary.md#gloss-store-derivation
 
 * Otherwise, Nix will use all outputs of the derivation.
 
