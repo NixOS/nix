@@ -2250,7 +2250,7 @@ BackedStringView EvalState::coerceToString(const PosIdx pos, Value & v, PathSet 
         if (canonicalizePath)
             path = canonPath(*path);
         if (copyToStore)
-            path = copyPathToStore(context, std::move(path).toOwned());
+            path = store->printStorePath(copyPathToStore(context, std::move(path).toOwned()));
         return path;
     }
 
@@ -2293,26 +2293,26 @@ BackedStringView EvalState::coerceToString(const PosIdx pos, Value & v, PathSet 
 }
 
 
-std::string EvalState::copyPathToStore(PathSet & context, const Path & path)
+StorePath EvalState::copyPathToStore(PathSet & context, const Path & path)
 {
     if (nix::isDerivation(path))
         throwEvalError("file names are not allowed to end in '%1%'", drvExtension);
 
-    Path dstPath;
-    auto i = srcToStore.find(path);
-    if (i != srcToStore.end())
-        dstPath = store->printStorePath(i->second);
-    else {
-        auto p = settings.readOnlyMode
+    auto dstPath = [&]() -> StorePath
+    {
+        auto i = srcToStore.find(path);
+        if (i != srcToStore.end()) return i->second;
+
+        auto dstPath = settings.readOnlyMode
             ? store->computeStorePathForPath(std::string(baseNameOf(path)), checkSourcePath(path)).first
             : store->addToStore(std::string(baseNameOf(path)), checkSourcePath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
-        dstPath = store->printStorePath(p);
-        allowPath(p);
-        srcToStore.insert_or_assign(path, std::move(p));
-        printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, dstPath);
-    }
+        allowPath(dstPath);
+        srcToStore.insert_or_assign(path, dstPath);
+        printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
+        return dstPath;
+    }();
 
-    context.insert(dstPath);
+    context.insert(store->printStorePath(dstPath));
     return dstPath;
 }
 

@@ -400,7 +400,7 @@ public:
         bool coerceMore = false, bool copyToStore = true,
         bool canonicalizePath = true);
 
-    std::string copyPathToStore(PathSet & context, const Path & path);
+    StorePath copyPathToStore(PathSet & context, const Path & path);
 
     /* Path coercion.  Converts strings, paths and derivations to a
        path.  The result is guaranteed to be a canonicalised, absolute
