@@ -144,7 +144,9 @@
     references `R` then `R` is also in the closure of `P`.
 
   - [output path]{#gloss-output-path}\
-    A store path produced by a derivation.
+    A [store path] produced by a [derivation].
+
+    [output path]: #gloss-output-path
 
   - [deriver]{#gloss-deriver}\
     The deriver of an *output path* is the store

@@ -115,12 +115,12 @@ the Nix store. Here are the recognised types of installables:
 
 * **Store derivations**: `/nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv`
 
-  Store derivations are store paths with extension `.drv` and are a
-  low-level representation of a build-time dependency graph used
-  internally by Nix. By default, if you pass a store derivation to a
-  `nix` subcommand, it will operate on the *output paths* of the
-  derivation. For example, `nix path-info` prints information about
-  the output paths:
+  Store derivations are a low-level, internal representation of build tasks in Nix, and have store paths with extension `.drv`.
+  By default, if you pass the path to a store derivation to a `nix` subcommand, the command will operate on the [output path]s of the derivation.
+
+  [output path]: ../../glossary.md#gloss-output-path
+
+  For example, `nix path-info` prints information about the output paths:
 
   ```console
   # nix path-info --json /nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv
