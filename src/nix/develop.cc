@@ -192,10 +192,12 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     drv.env.erase("allowedRequisites");
     drv.env.erase("disallowedReferences");
     drv.env.erase("disallowedRequisites");
+    drv.env.erase("name");
 
     /* Rehash and write the derivation. FIXME: would be nice to use
        'buildDerivation', but that's privileged. */
     drv.name += "-env";
+    drv.env.emplace("name", drv.name);
     drv.inputSrcs.insert(std::move(getEnvShPath));
     if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
         for (auto & output : drv.outputs) {
