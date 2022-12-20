@@ -203,6 +203,9 @@ public:
         throw std::move(error);
     }
 
+    // This is dangerous, but gets in line with the idea that error creation and
+    // throwing should not allocate on the stack of hot functions.
+    // as long as errors are immediately thrown, it works.
     ErrorBuilder * errorBuilder;
 
     template<typename... Args>

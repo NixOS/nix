@@ -45,6 +45,21 @@ namespace nix {
         );
     }
 
+    TEST_F(ErrorTraceTest, NestedThrows) {
+        try {
+            state.error("Not much").withTrace(noPos, "No more").debugThrow<EvalError>();
+        } catch (BaseError & e) {
+            try {
+                state.error("Not much more").debugThrow<EvalError>();
+            } catch (Error & e2) {
+                e.addTrace(state.positions[noPos], "Something", "");
+                //e2.addTrace(state.positions[noPos], "Something", "");
+                ASSERT_TRUE(e.info().traces.size() == 2);
+                ASSERT_TRUE(e2.info().traces.size() == 0);
+                ASSERT_FALSE(&e.info() == &e2.info());
+            }
+        }
+    }
 
 #define ASSERT_TRACE1(args, type, message)                                  \
         ASSERT_THROW(                                                       \
