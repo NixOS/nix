@@ -1,5 +1,5 @@
 [book]
-title = "Nix Package Manager Manual"
+title = "Nix Reference Manual"
 
 [output.html]
 additional-css = ["custom.css"]
