@@ -115,14 +115,12 @@
     then be built.
 
   - [reference]{#gloss-reference}\
-    A store path `P` is said to have a reference to a store path `Q` if
-    the store object at `P` contains the path `Q` somewhere. The
-    *references* of a store path are the set of store paths to which it
-    has a reference.
+    A [store path] `P` is said to have a *reference* to a store path `Q` if the string `Q` appears in the [store object] at `P`.
+    The *references* of a store path `P` are the set of store paths to which `P` has a reference.
 
-    A derivation can reference other derivations and sources (but not
-    output paths), whereas an output path only references other output
-    paths.
+    A [derivation] can reference other derivations and source files, but not [output path]s, whereas an output path can only reference other output paths.
+
+    [reference]: #gloss-reference
 
   - [reachable]{#gloss-reachable}\
     A store path `Q` is reachable from another store path `P` if `Q`
