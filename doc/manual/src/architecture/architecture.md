@@ -9,18 +9,29 @@ Nix consists of [hierarchical layers].
 
 [hierarchical layers]: https://en.m.wikipedia.org/wiki/Multitier_architecture#Layers
 
+The following [concept map] shows its main components (rectangles), the objects they operate on (rounded rectangles), and their interactions (connecting phrases):
+
+[concept map]: https://en.m.wikipedia.org/wiki/Concept_map
+
 ```
-+---------------------------------------------------------------+
-| Nix             .-------------------------.                   |
-|                 | commmand line interface |------.            |
-|                 '-------------------------'      |            |
-|                              |                   |            |
-|                            calls                 |            |
-|                              |                manages         |
-|                              V                   |            |
-|                 .-------------------------.      |            |
-|                 |    language evaluator   |      |            |
-|                 '-------------------------'      |            |
+
+   .----------------.
+   | Nix expression |----------.
+   '----------------'          |
+           |              passed to
+           |                   |
++----------|-------------------|--------------------------------+
+| Nix      |                   V                                |
+|          |      +-------------------------+                   |
+|          |      | commmand line interface |------.            |
+|          |      +-------------------------+      |            |
+|          |                   |                   |            |
+|    evaluated by            calls              manages         |
+|          |                   |                   |            |
+|          |                   V                   |            |
+|          |         +--------------------+        |            |
+|          '-------->| language evaluator |        |            |
+|                    +--------------------+        |            |
 |                              |                   |            |
 |                           produces               |            |
 |                              |                   V            |
@@ -28,57 +39,77 @@ Nix consists of [hierarchical layers].
 | | store                      |                              | |
 | |            referenced by   V       builds                 | |
 | | .-------------.      .------------.      .--------------. | |
-| | | build input |----->| build plan | ---->| build result | | |
+| | | build input |----->| build plan |----->| build result | | |
 | | '-------------'      '------------'      '--------------' | |
-| +-----------------------------------------------------------+ |
-+---------------------------------------------------------------+
+| +-------------------------------------------------|---------+ |
++---------------------------------------------------|-----------+
+                                                    |
+                                              represented as
+                                                    |
+                                                    V
+                                            .---------------.
+                                            |     file      |
+                                            '---------------'
 ```
 
-At the top is the [command line interface](../command-ref/command-ref.md), translating from invocations of Nix executables to interactions with the underlying layers.
+At the top is the [command line interface](../command-ref/command-ref.md) that drives the underlying layers.
 
-Below that is the evaluator for the [Nix language](../language/index.md), the configuration language for Nix.
-Its expressions ultimately evaluate to self-contained *build plans*, used to derive *build results* from referenced *build inputs*.
+The [Nix language](../language/index.md) evaluator transforms Nix expressions into self-contained *build plans*, which are used to derive *build results* from referenced *build inputs*.
 
-The command line interface and the Nix language are what users interact with most.
+The command line interface and Nix expressions are what users deal with most.
 
 > **Note**
 > The Nix language itself does not have a notion of *packages* or *configurations*.
 > As far as we are concerned here, the inputs and results of a build plan are just data.
 
-Underlying the command line interface and the Nix language is the [Nix store](../glossary.md#gloss-store), a mechanism to keep track of build plans, data, and references between them.
-It can also execute build plans to produce new data.
+Underlying the command line interface and the Nix language evaluator is the [Nix store](../glossary.md#gloss-store), a mechanism to keep track of build plans, data, and references between them.
+It can also execute build plans to produce new data, which are made available to the operating system as files.
 
-A build plan is a series of *build tasks*.
-Each build task has a special build input, which is used as *build instructions*.
-The result of a build task can be input to another build task.
+A build plan itself is a series of *build tasks*, together with their build inputs.
 
 > **Important**
 > A build task in Nix is called [derivation](../glossary#gloss-derivation).
 
+Each build task has a special build input executed as *build instructions* in order to perform the build.
+The result of a build task can be input to another build task.
+
+The following [data flow diagram] shows a build plan for illustration.
+Build inputs used as instructions to a build task are marked accordingly:
+
+[data flow diagram]: https://en.m.wikipedia.org/wiki/Data-flow_diagram
+
 ```
-+----------------------------------------------------------------------------------+
-| store            - - - - - - - - - - -  - - - - - - - - - - -                    |
-|                 : build plan                                 :                   |
-| .-------------. :                                            :                   |
-| | build input |---instructions-.                             :                   |
-| '-------------' :              |                             :                   |
-|                 :              v                             :                   |
-| .-------------. :        .------------.                      :                   |
-| | build input |--------->| build task |-instructions-.       :                   |
-| '-------------' :        '------------'              |       :                   |
-|                 :                                    v       :                   |
-| .-------------. :                             .------------. :  .--------------. |
-| | build input |---instructions-.              | build task |--->| build result | |
-| '-------------' :              |              '------------' :  '--------------' |
-|                 :              v                     ^       :                   |
-| .-------------. :        .------------.              |       :                   |
-| | build input |--------->| build task |--------------'       :                   |
-| '-------------' :        '------------'                      :                   |
-|                 :              ^                             :                   |
-| .-------------. :              |                             :                   |
-| | build input |----------------'                             :                   |
-| '-------------' :                                            :                   |
-|                 :_ _ _ _ _ _ _ _ _ _ _  _ _ _ _ _ _ _ _ _ _ _:                   |
-+----------------------------------------------------------------------------------+
++--------------------------------------------------------------------+
+| build plan                                                         |
+|                                                                    |
+| .-------------.                                                    |
+| | build input |---------.                                          |
+| '-------------'         |                                          |
+|                    instructions                                    |
+|                         |                                          |
+|                         v                                          |
+| .-------------.    .----------.                                    |
+| | build input |-->( build task )-------.                           |
+| '-------------'    '----------'        |                           |
+|                                  instructions                      |
+|                                        |                           |
+|                                        v                           |
+| .-------------.                  .----------.     .--------------. |
+| | build input |---------.       ( build task )--->| build result | |
+| '-------------'         |        '----------'     '--------------' |
+|                    instructions        ^                           |
+|                         |              |                           |
+|                         v              |                           |
+| .-------------.    .----------.        |                           |
+| | build input |-->( build task )-------'                           |
+| '-------------'    '----------'                                    |
+|                         ^                                          |
+|                         |                                          |
+|                         |                                          |
+| .-------------.         |                                          |
+| | build input |---------'                                          |
+| '-------------'                                                    |
+|                                                                    |
++--------------------------------------------------------------------+
 ```
 
