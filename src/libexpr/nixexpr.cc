@@ -8,62 +8,55 @@
 
 namespace nix {
 
-struct SourcePathAdapter : AbstractPos
+struct PosAdapter : AbstractPos
 {
-    SourcePath path;
+    Pos::Origin origin;
 
-    SourcePathAdapter(SourcePath path)
-        : path(std::move(path))
+    PosAdapter(Pos::Origin origin)
+        : origin(std::move(origin))
     {
     }
 
     std::optional<std::string> getSource() const override
     {
-        try {
-            return path.readFile();
-        } catch (Error &) {
-            return std::nullopt;
-        }
+        return std::visit(overloaded {
+            [](const Pos::none_tag &) -> std::optional<std::string> {
+                return std::nullopt;
+            },
+            [](const Pos::Stdin & s) -> std::optional<std::string> {
+                // Get rid of the null terminators added by the parser.
+                return std::string(s.source->c_str());
+            },
+            [](const Pos::String & s) -> std::optional<std::string> {
+                // Get rid of the null terminators added by the parser.
+                return std::string(s.source->c_str());
+            },
+            [](const SourcePath & path) -> std::optional<std::string> {
+                try {
+                    return path.readFile();
+                } catch (Error &) {
+                    return std::nullopt;
+                }
+            }
+        }, origin);
     }
 
     void print(std::ostream & out) const override
     {
-        out << path;
-    }
-};
-
-struct StringPosAdapter : AbstractPos
-{
-    void print(std::ostream & out) const override
-    {
-        out << "«string»";
-    }
-};
-
-struct StdinPosAdapter : AbstractPos
-{
-    void print(std::ostream & out) const override
-    {
-        out << "«stdin»";
+        std::visit(overloaded {
+            [&](const Pos::none_tag &) { out << "«none»"; },
+            [&](const Pos::Stdin &) { out << "«stdin»"; },
+            [&](const Pos::String & s) { out << "«string»"; },
+            [&](const SourcePath & path) { out << path; }
+        }, origin);
     }
 };
 
 Pos::operator std::shared_ptr<AbstractPos>() const
 {
-    std::shared_ptr<AbstractPos> pos;
-
-    if (auto path = std::get_if<SourcePath>(&origin))
-        pos = std::make_shared<SourcePathAdapter>(*path);
-    else if (std::get_if<stdin_tag>(&origin))
-        pos = std::make_shared<StdinPosAdapter>();
-    else if (std::get_if<string_tag>(&origin))
-        pos = std::make_shared<StringPosAdapter>();
-
-    if (pos) {
-        pos->line = line;
-        pos->column = column;
-    }
-
+    auto pos = std::make_shared<PosAdapter>(origin);
+    pos->line = line;
+    pos->column = column;
     return pos;
 }
 
