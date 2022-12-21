@@ -29,8 +29,7 @@ struct FilteringInputAccessor : InputAccessor
 
     bool pathExists(const CanonPath & path) override
     {
-        checkAccess(path);
-        return next->pathExists(prefix + path);
+        return isAllowed(path) && next->pathExists(prefix + path);
     }
 
     Stat lstat(const CanonPath & path) override
