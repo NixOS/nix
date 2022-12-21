@@ -35,6 +35,10 @@ namespace nix {
 
 char * * savedArgv;
 
+#if __APPLE__
+std::optional<std::string> savedTmpDir;
+#endif
+
 static bool gcWarning = true;
 
 void printGCWarning()
@@ -230,8 +234,13 @@ void initNix()
        sshd). This breaks build users because they don't have access
        to the TMPDIR, in particular in ‘nix-store --serve’. */
 #if __APPLE__
-    if (hasPrefix(getEnv("TMPDIR").value_or("/tmp"), "/var/folders/"))
+    auto tmpDir = getEnv("TMPDIR");
+    if (tmpDir.has_value() && hasPrefix(tmpDir.value(), "/var/folders/"))
+    {
+        // We store the TMPDIR so we can re-use it for 'nix shell'
+        savedTmpDir = tmpDir;
         unsetenv("TMPDIR");
+    }
 #endif
 
     preloadNSS();
