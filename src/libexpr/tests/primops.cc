@@ -604,7 +604,7 @@ namespace nix {
 
     TEST_F(PrimOpTest, storeDir) {
         auto v = eval("builtins.storeDir");
-        ASSERT_THAT(v, IsStringEq("/nix/store"));
+        ASSERT_THAT(v, IsStringEq(settings.nixStore));
     }
 
     TEST_F(PrimOpTest, nixVersion) {
