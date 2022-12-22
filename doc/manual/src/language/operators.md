@@ -2,11 +2,11 @@
 
 ## Attribute selection
 
-> *e* `.` *attrpath* \[ `or` *def* \]
+> *attrset* `.` *attrpath* \[ `or` *value* \]
 
-Select the attribute denoted by attribute path *attrpath* from attribute set *e*.
+Select the attribute denoted by attribute path *attrpath* from attribute set *attrset*.
 An attribute path is a dot-separated list of attribute names.
-If the attribute doesn’t exist, return *def* if provided, otherwise abort evaluation.
+If the attribute doesn’t exist, return *value* if provided, otherwise abort evaluation.
 
 Associativity: none
 
@@ -14,9 +14,9 @@ Precedence: 1
 
 ## Function application
 
-> *f* *e*
+> *f* *a*
 
-Call function *f* with argument *e*.
+Call function *f* with argument *a*.
 
 Associativity: left
 
@@ -24,7 +24,9 @@ Precedence: 2
 
 ## Arithmetic negation
 
-> `-` *e*
+> `-` *n*
+
+Flip the sign of the number *n*.
 
 Associativity: none
 
@@ -32,9 +34,9 @@ Precedence: 3
 
 ## Has attribute
 
-> *e* `?` *attrpath*
+> *attrset* `?` *attrpath*
 
-Test whether set *e* contains the attribute denoted by *attrpath*; return `true` or `false`.
+Test whether attribute set *attrset* contains the attribute denoted by *attrpath*; return `true` or `false`.
 
 Associativity: none
 
@@ -42,9 +44,9 @@ Precedence: 4
 
 ## List concatenation
 
-> *e1* `++` *e2*
+> *list1* `++` *list2*
 
-Concatenate lists *e1* and *e2*.
+Concatenate lists *list1* and *list2*.
 
 Associativity: right
 
@@ -52,9 +54,9 @@ Precedence: 5
 
 ## Multiplication
 
-> *e1* `*` *e2*,
+> *n1* `*` *n2*,
 
-Multiply numbers *e1* and *e2*.
+Multiply numbers *n1* and *n2*.
 
 Associativity: left
 
@@ -62,9 +64,9 @@ Precedence: 6
 
 ## Division
 
-> *e1* `/` *e2*
+> *n1* `/` *n2*
 
-Divide numbers *e1* and *e2*.
+Divide numbers *n1* and *n2*.
 
 Associativity: left
 
@@ -72,9 +74,9 @@ Precedence: 6
 
 ## Subtraction
 
-> *e1* `-` *e2*
+> *n1* `-` *n2*
 
-Subtract numbers *e2* from *e1*.
+Subtract numbers *n2* from *n1*.
 
 Associativity: left
 
@@ -82,9 +84,9 @@ Precedence: 7
 
 ## Addition
 
-> *e1* `+` *e2*
+> *n1* `+` *n2*
 
-Add numbers *e1* and *e2*.
+Add numbers *n1* and *n2*.
 
 Associativity: left
 
@@ -140,82 +142,59 @@ Precedence: 7
 
 ## Logical negation (`NOT`)
 
-> `!` *e*
+> `!` *b*
 
-Negate the Boolean value *e*.
+Negate the Boolean value *b*.
 
 Associativity: none
 
 Precedence: 8
 
-## Merge attribute sets
+## Update
 
-> *e1* `//` *e2*
+> *attrset1* `//` *attrset1*
 
-Return a set consisting of all the attributes in *e1* and *e2*.
+Update attribute set *attrset1* with names and values from *attrset2*.
+
+The returned attribute set will have of all the attributes in *e1* and *e2*.
 If an attribute name is present in both, the attribute value from the former is taken.
 
 Associativity: right
 
 Precedence: 9
 
-## Less than
+## Comparison
+
+- Arithmetic comparison for numbers
+- Lexicographic comparison for strings and paths
+- Lexicographic comparison for lists:
+  Elements at the same index in both lists are compared according to their type and skipped if they are equal.
+
+Associativity: none
+
+Precedence: 10
+
+### Less than
 
 > *e1* `<` *e2*,
 
-- Arithmetic comparison for numbers
-- Lexicographic comparison for strings and paths
-- Lexicographic comparison for lists:
-  Elements at the same index in both lists are compared according to their type and skipped if they are equal.
-
-Associativity: none
-
-Precedence: 10
-
-## Less than or equal to
+### Less than or equal to
 
 > *e1* `<=` *e2*
 
-- Arithmetic comparison for numbers
-- Lexicographic comparison for strings and paths
-- Lexicographic comparison for lists:
-  Elements at the same index in both lists are compared according to their type and skipped if they are equal.
-
-Associativity: none
-
-Precedence: 10
-
-## Greater than
+### Greater than
 
 > *e1* `>` *e2*
 
-- Arithmetic comparison for numbers
-- Lexicographic comparison for strings and paths
-- Lexicographic comparison for lists:
-  Elements at the same index in both lists are compared according to their type and skipped if they are equal.
-
-Associativity: none
-
-Precedence: 10
-
-## Greater than or equal to
+### Greater than or equal to
 
 > *e1* `>=` *e2*
-
-- Arithmetic comparison for numbers
-- Lexicographic comparison for strings and paths
-- Lexicographic comparison for lists:
-  Elements at the same index in both lists are compared according to their type and skipped if they are equal.
-
-Associativity: none
-
-Precedence: 10
 
 ## Equality
 
 > *e1* `==` *e2*
 
-Check *e1* and *e2* for equality.
+Check expressions *e1* and *e2* for value equality.
 
 - Attribute sets and lists are compared recursively, and therefore are fully evaluated.
 - Comparison of functions always returns `false`.
@@ -238,9 +217,9 @@ Precedence: 11
 
 ## Logical conjunction (`AND`)
 
-> *e1* `&&` *e2*
+> *b1* `&&` *b2*
 
-Return `true` if and only if both `e1` and `e2` evaluate to `true`, otherwise `false`.
+Return `true` if and only if both `b1` and `b2` evaluate to `true`, otherwise `false`.
 
 Associativity: left
 
@@ -248,9 +227,9 @@ Precedence: 12
 
 ## Logical disjunction (`OR`)
 
-> *e1* `||` *e2*
+> *b1* `||` *b2*
 
-Return `true` if at least `e1` or `e2` evaluate to `true`, otherwise `false`.
+Return `true` if at least one of  `b1` or `b2` evaluate to `true`, otherwise `false`.
 
 Associativity: left
 
@@ -258,11 +237,11 @@ Precedence: 13
 
 ## Logical implication
 
->  *e1* `->` *e2*
+>  *b1* `->` *b2*
 
-Return `false` if *e1* evaluates to `true` and *e2* evaluates to `false`, otherwise `true`.
+Return `false` if *b1* evaluates to `true` and *b2* evaluates to `false`, otherwise `true`.
 
-Equivalent to `!`*e1* `||` *e2*.
+Equivalent to `!`*b1* `||` *b2*.
 
 Associativity: none
 
