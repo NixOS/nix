@@ -70,16 +70,6 @@ Associativity: left
 
 Precedence: 6
 
-## Addition
-
-> *e1* `+` *e2*
-
-Add numbers *e1* and *e2*.
-
-Associativity: left
-
-Precedence: 7
-
 ## Subtraction
 
 > *e1* `-` *e2*
@@ -90,11 +80,59 @@ Associativity: left
 
 Precedence: 7
 
+## Addition
+
+> *e1* `+` *e2*
+
+Add numbers *e1* and *e2*.
+
+Associativity: left
+
+Precedence: 7
+
 ## String concatenation
 
 > *string1* `+` *string2*
 
 Concatenate *string1* and *string1* and merge their string contexts.
+
+Associativity: left
+
+Precedence: 7
+
+## Path concatenation
+
+> *path1* `+` *path2*
+
+Concatenate two paths.
+The result is a path.
+
+## Path and string concatenation
+
+> *path* `+` *string*
+
+Concatenate *path* with *string*.
+The result is a path.
+
+> **Note**
+>
+> The string must not have a string context that refers to a store path.
+
+Associativity: left
+
+Precedence: 7
+
+## String and path concatenation
+
+> *string* `+` *path*
+
+Concatenate *string* with *path*.
+The result is a string.
+
+> **Important**
+>
+> The file or directory at *path* must exist and is copied to the store
+> The path appears in the result as the corresponding store path.
 
 Associativity: left
 
