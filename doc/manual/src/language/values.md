@@ -89,6 +89,8 @@
   return integers, whereas any operation involving at least one
   floating point number will have a floating point number as a result.
 
+  Floating point numbers only differ up to a limited precision.
+
 - <a id="type-path" href="#type-path">Path</a>
 
   *Paths*, e.g., `/bin/sh` or `./builder.sh`. A path must contain at
