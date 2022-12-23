@@ -25,3 +25,9 @@
   $ nix-build glibc^dev`
   ```
   does already.
+
+* On Linux, `nix develop` now sets the
+  [*personality*](https://man7.org/linux/man-pages/man2/personality.2.html)
+  for the development shell in the same way as the actual build of the
+  derivation. This makes shells for `i686-linux` derivations work
+  correctly on `x86_64-linux`.
