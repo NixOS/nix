@@ -101,7 +101,7 @@ You can run the whole testsuite with `make check`, or the tests for a specific c
 The functional tests reside under the `tests` directory and are listed in `tests/local.mk`.
 Each test is a bash script.
 
-The whole testsuite can be run with:
+The whole test suite can be run with:
 
 ```shell-session
 $ make install && make installcheck
@@ -124,7 +124,7 @@ $ ./mk/run-test.sh tests/${testName}.sh
 ran test tests/${testName}.sh... [PASS]
 ```
 
-To see the complet eoutput, one can also run:
+To see the complete output, one can also run:
 
 ```shell-session
 $ ./mk/debug-test.sh tests/${testName}.sh
@@ -135,7 +135,7 @@ output from bar
 ...
 ```
 
-The test script will be traced with `set -x` and the output displayed as it happens, regardless of whether the test succeeds or fails.
+The test script will then be traced with `set -x` and the output displayed as it happens, regardless of whether the test succeeds or fails.
 
 #### Debugging failing functional tests
 
@@ -150,7 +150,7 @@ foo
 nix blah blub
 bar
 ```
-one would could edit it like so:
+edit it like so:
 
 ```diff
  foo
@@ -159,7 +159,7 @@ one would could edit it like so:
  bar
 ```
 
-Then, when one runs the script with `./mk/debug-test.sh`, it will drop them into GDB once the script reaches that point:
+Then, running the test with `./mk/debug-test.sh` will drop you into GDB once the script reaches that point:
 
 ```shell-session
 $ ./mk/debug-test.sh tests/${testName}.sh
@@ -171,7 +171,7 @@ GNU gdb (GDB) 12.1
 ```
 
 One can debug the Nix invocation in all the usual ways.
-(For exampling running `run` will run the Nix invocation.)
+For example, enter `run` to start the Nix invocation.
 
 ### Integration tests
 
