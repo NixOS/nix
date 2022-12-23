@@ -110,7 +110,7 @@ public:
     std::optional<std::string_view> dirOf() const
     {
         if (isRoot()) return std::nullopt;
-        return path.substr(0, path.rfind('/'));
+        return ((std::string_view) path).substr(0, path.rfind('/'));
     }
 
     std::optional<std::string_view> baseName() const
