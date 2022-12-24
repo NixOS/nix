@@ -16,7 +16,7 @@ let
     { config, pkgs, ... }:
     { services.openssh.enable = true;
       virtualisation.writableStore = true;
-      nix.useSandbox = true;
+      nix.settings.sandbox = true;
     };
 
   # Trivial Nix expression to build remotely.
@@ -44,7 +44,7 @@ in
 
       client =
         { config, lib, pkgs, ... }:
-        { nix.maxJobs = 0; # force remote building
+        { nix.settings.max-jobs = 0; # force remote building
           nix.distributedBuilds = true;
           nix.buildMachines =
             [ { hostName = "builder1";
@@ -62,7 +62,7 @@ in
             ];
           virtualisation.writableStore = true;
           virtualisation.additionalPaths = [ config.system.build.extraUtils ];
-          nix.binaryCaches = lib.mkForce [ ];
+          nix.settings.substituters = lib.mkForce [ ];
           programs.ssh.extraConfig = "ConnectTimeout 30";
         };
     };

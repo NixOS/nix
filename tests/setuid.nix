@@ -13,7 +13,7 @@ makeTest {
   nodes.machine =
     { config, lib, pkgs, ... }:
     { virtualisation.writableStore = true;
-      nix.binaryCaches = lib.mkForce [ ];
+      nix.settings.substituters = lib.mkForce [ ];
       nix.nixPath = [ "nixpkgs=${lib.cleanSource pkgs.path}" ];
       virtualisation.additionalPaths = [ pkgs.stdenv pkgs.pkgsi686Linux.stdenv ];
     };
