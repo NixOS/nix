@@ -67,20 +67,17 @@ static char * dupString(const char * s)
 
 // When there's no need to write to the string, we can optimize away empty
 // string allocations.
-// This function handles makeImmutableStringWithLen(null, 0) by returning the
-// empty string.
-static const char * makeImmutableStringWithLen(const char * s, size_t size)
+// This function handles makeImmutableString(std::string_view()) by returning
+// the empty string.
+static const char * makeImmutableString(std::string_view s)
 {
+    const size_t size = s.size();
     if (size == 0)
         return "";
     auto t = allocString(size + 1);
-    memcpy(t, s, size);
-    t[size] = 0;
+    memcpy(t, s.data(), size);
+    t[size] = '\0';
     return t;
-}
-
-static inline const char * makeImmutableString(std::string_view s) {
-    return makeImmutableStringWithLen(s.data(), s.size());
 }
 
 
