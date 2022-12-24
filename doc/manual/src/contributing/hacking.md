@@ -68,6 +68,7 @@ To build Nix itself in this shell:
 To install it in `$(pwd)/outputs` and test it:
 
 ```console
+[nix-shell]$ make check
 [nix-shell]$ make install
 [nix-shell]$ make installcheck -j $NIX_BUILD_CORES
 [nix-shell]$ ./outputs/out/bin/nix --version
