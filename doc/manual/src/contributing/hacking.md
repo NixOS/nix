@@ -74,6 +74,13 @@ To install it in `$(pwd)/outputs` and test it:
 nix (Nix) 3.0
 ```
 
+To iterate on for example `libexpr`, prioritizing the most relevant checks:
+
+```console
+[nix-shell]$ J="-j $NIX_BUILD_CORES"
+[nix-shell]$ make $J libexpr-tests_RUN && make $J && make check && make install && make installcheck $J
+```
+
 If you have a flakes-enabled Nix you can replace:
 
 ```console
