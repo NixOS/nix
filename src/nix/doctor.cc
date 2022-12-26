@@ -33,6 +33,10 @@ bool checkFail(const std::string & msg) {
     return false;
 }
 
+void checkInfo(const std::string & msg) {
+    notice(ANSI_BLUE "[INFO] " ANSI_NORMAL + msg);
+}
+
 }
 
 struct CmdDoctor : StoreCommand
@@ -63,6 +67,7 @@ struct CmdDoctor : StoreCommand
             success &= checkProfileRoots(store);
         }
         success &= checkStoreProtocol(store->getProtocol());
+        checkTrustedUser(store);
 
         if (!success)
             throw Exit(2);
@@ -137,6 +142,14 @@ struct CmdDoctor : StoreCommand
         }
 
         return checkPass("Client protocol matches store protocol.");
+    }
+
+    void checkTrustedUser(ref<Store> store)
+    {
+        std::string_view trusted = store->isTrustedClient()
+            ? "trusted"
+            : "not trusted";
+        checkInfo(fmt("You are %s by store uri: %s", trusted, store->getUri()));
     }
 };
 

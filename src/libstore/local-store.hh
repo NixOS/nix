@@ -204,6 +204,8 @@ public:
 
     unsigned int getProtocol() override;
 
+    std::optional<TrustedFlag> isTrustedClient() override;
+
     void vacuumDB();
 
     void repairPath(const StorePath & path) override;

@@ -144,6 +144,8 @@ public:
 
     unsigned int getProtocol() override;
 
+    std::optional<TrustedFlag> isTrustedClient() override;
+
     void flushBadConnections();
 
     struct Connection
@@ -151,6 +153,7 @@ public:
         FdSink to;
         FdSource from;
         unsigned int daemonVersion;
+        std::optional<TrustedFlag> remoteTrustsUs;
         std::optional<std::string> daemonNixVersion;
         std::chrono::time_point<std::chrono::steady_clock> startTime;
 

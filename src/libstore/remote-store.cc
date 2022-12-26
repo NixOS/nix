@@ -42,6 +42,40 @@ void write(const Store & store, Sink & out, const StorePath & storePath)
 }
 
 
+std::optional<TrustedFlag> read(const Store & store, Source & from, Phantom<std::optional<TrustedFlag>> _)
+{
+    auto temp = readNum<uint8_t>(from);
+    switch (temp) {
+        case 0:
+            return std::nullopt;
+        case 1:
+            return { Trusted };
+        case 2:
+            return { NotTrusted };
+        default:
+            throw Error("Invalid trusted status from remote");
+    }
+}
+
+void write(const Store & store, Sink & out, const std::optional<TrustedFlag> & optTrusted)
+{
+    if (!optTrusted)
+        out << (uint8_t)0;
+    else {
+        switch (*optTrusted) {
+        case Trusted:
+            out << (uint8_t)1;
+            break;
+        case NotTrusted:
+            out << (uint8_t)2;
+            break;
+        default:
+            assert(false);
+        };
+    }
+}
+
+
 ContentAddress read(const Store & store, Source & from, Phantom<ContentAddress> _)
 {
     return parseContentAddress(readString(from));
@@ -224,6 +258,13 @@ void RemoteStore::initConnection(Connection & conn)
         if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 33) {
             conn.to.flush();
             conn.daemonNixVersion = readString(conn.from);
+        }
+
+        if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 35) {
+            conn.remoteTrustsUs = worker_proto::read(*this, conn.from, Phantom<std::optional<TrustedFlag>> {});
+        } else {
+            // We don't know the answer; protocol to old.
+            conn.remoteTrustsUs = std::nullopt;
         }
 
         auto ex = conn.processStderr();
@@ -1082,6 +1123,11 @@ unsigned int RemoteStore::getProtocol()
     return conn->daemonVersion;
 }
 
+std::optional<TrustedFlag> RemoteStore::isTrustedClient()
+{
+    auto conn(getConnection());
+    return conn->remoteTrustsUs;
+}
 
 void RemoteStore::flushBadConnections()
 {

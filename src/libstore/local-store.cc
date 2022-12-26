@@ -1685,6 +1685,11 @@ unsigned int LocalStore::getProtocol()
     return PROTOCOL_VERSION;
 }
 
+std::optional<TrustedFlag> LocalStore::isTrustedClient()
+{
+    return Trusted;
+}
+
 
 #if defined(FS_IOC_SETFLAGS) && defined(FS_IOC_GETFLAGS) && defined(FS_IMMUTABLE_FL)
 
