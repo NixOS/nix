@@ -7,7 +7,7 @@ to subsequent chapters.
 1. Install single-user Nix by running the following:
 
    ```console
-   $ bash <(curl -L https://nixos.org/nix/install)
+   $ curl -L https://nixos.org/nix/install | sh
    ```
 
    This will install Nix in `/nix`. The install script will create

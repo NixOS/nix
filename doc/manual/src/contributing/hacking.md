@@ -147,7 +147,7 @@ After the CI run completes, you can check the output to extract the installer UR
 5. To generate an install command, plug this `install_url` and your GitHub username into this template:
 
     ```console
-    sh <(curl -L <install_url>) --tarball-url-prefix https://<github-username>-nix-install-tests.cachix.org/serve
+    curl -L <install_url> | sh -s -- --tarball-url-prefix https://<github-username>-nix-install-tests.cachix.org/serve
     ```
 
 <!-- #### Manually generating test installers
