@@ -345,8 +345,8 @@ struct Common : InstallableCommand, MixProfile
     Strings getDefaultFlakeAttrPaths() override
     {
         Strings paths{
-            "devShells." + settings.thisSystem.get() + ".default",
-            "devShell." + settings.thisSystem.get(),
+            settings.thisSystem.get() + ".devShells.default",
+            settings.thisSystem.get() + ".devShell",
         };
         for (auto & p : SourceExprCommand::getDefaultFlakeAttrPaths())
             paths.push_back(p);
@@ -356,7 +356,7 @@ struct Common : InstallableCommand, MixProfile
     Strings getDefaultFlakeAttrPathPrefixes() override
     {
         auto res = SourceExprCommand::getDefaultFlakeAttrPathPrefixes();
-        res.emplace_front("devShells." + settings.thisSystem.get() + ".");
+        res.emplace_front(settings.thisSystem.get() + ".devShells.");
         return res;
     }
 
@@ -530,7 +530,7 @@ struct CmdDevelop : Common, MixEnvironment
                 "bashInteractive",
                 DefaultOutputs(),
                 Strings{},
-                Strings{"legacyPackages." + settings.thisSystem.get() + "."},
+                Strings{settings.thisSystem.get() + ".legacyPackages."},
                 nixpkgsLockFlags);
 
             bool found = false;

@@ -320,11 +320,29 @@ struct CmdFlakeCheck : FlakeCommand
                 || (hasPrefix(name, "_") && name.substr(1) == expected);
         };
 
-        auto checkSystemName = [&](const std::string & system, const PosIdx pos) {
-            // FIXME: what's the format of "system"?
-            if (system.find('-') == std::string::npos)
-                reportError(Error("'%s' is not a valid system type, at %s", system, resolve(pos)));
-        };
+        StringSet allSystems{"aarch64-darwin",    "aarch64-genode", "aarch64-linux",
+                             "aarch64-netbsd",    "aarch64-none",   "aarch64_be-none",
+                             "arm-none",          "armv5tel-linux", "armv6l-linux",
+                             "armv6l-netbsd",     "armv6l-none",    "armv7a-darwin",
+                             "armv7a-linux",      "armv7a-netbsd",  "armv7l-linux",
+                             "armv7l-netbsd",     "avr-none",       "i686-cygwin",
+                             "i686-darwin",       "i686-freebsd",   "i686-genode",
+                             "i686-linux",        "i686-netbsd",    "i686-none",
+                             "i686-openbsd",      "i686-windows",   "js-ghcjs",
+                             "m68k-linux",        "m68k-netbsd",    "m68k-none",
+                             "mips64el-linux",    "mipsel-linux",   "mipsel-netbsd",
+                             "mmix-mmixware",     "msp430-none",    "or1k-none",
+                             "powerpc-netbsd",    "powerpc-none",   "powerpc64-linux",
+                             "powerpc64le-linux", "powerpcle-none", "riscv32-linux",
+                             "riscv32-netbsd",    "riscv32-none",   "riscv64-linux",
+                             "riscv64-netbsd",    "riscv64-none",   "s390-linux",
+                             "s390-none",         "s390x-linux",    "s390x-none",
+                             "vc4-none",          "wasm32-wasi",    "wasm64-wasi",
+                             "x86_64-cygwin",     "x86_64-darwin",  "x86_64-freebsd",
+                             "x86_64-genode",     "x86_64-linux",   "x86_64-netbsd",
+                             "x86_64-none",       "x86_64-openbsd", "x86_64-redox",
+                             "x86_64-solaris",    "x86_64-windows"};
+
 
         auto checkDerivation = [&](const std::string & attrPath, Value & v, const PosIdx pos) -> std::optional<StorePath> {
             try {
@@ -509,97 +527,104 @@ struct CmdFlakeCheck : FlakeCommand
                         state->forceValue(vOutput, pos);
 
                         std::string_view replacement =
-                            name == "defaultPackage" ? "packages.<system>.default" :
-                            name == "defaultApp" ? "apps.<system>.default" :
+                            name == "defaultPackage" ? "<system>.packages.default" :
+                            name == "defaultApp" ? "<system>.apps.default" :
                             name == "defaultTemplate" ? "templates.default" :
-                            name == "defaultBundler" ? "bundlers.<system>.default" :
+                            name == "defaultBundler" ? "<system>.bundlers.default" :
                             name == "overlay" ? "overlays.default" :
-                            name == "devShell" ? "devShells.<system>.default" :
+                            name == "devShell" ? "<system>.devShells.default" :
                             name == "nixosModule" ? "nixosModules.default" :
                             "";
                         if (replacement != "")
                             warn("flake output attribute '%s' is deprecated; use '%s' instead", name, replacement);
 
-                        if (name == "checks") {
+                        if (allSystems.find(name) != allSystems.end()) {
                             state->forceAttrs(vOutput, pos);
+                            std::string sys_name = name;
+                            checkSystemName(sys_name, pos);
+
                             for (auto & attr : *vOutput.attrs) {
-                                const auto & attr_name = state->symbols[attr.name];
-                                checkSystemName(attr_name, attr.pos);
-                                state->forceAttrs(*attr.value, attr.pos);
-                                for (auto & attr2 : *attr.value->attrs) {
-                                    auto drvPath = checkDerivation(
-                                        fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
-                                        *attr2.value, attr2.pos);
-                                    if (drvPath && attr_name == settings.thisSystem.get())
-                                        drvPaths.push_back(DerivedPath::Built{*drvPath});
+                                const auto & name = state->symbols[attr.name];
+                                if (name == "checks") {
+                                    state->forceAttrs(vOutput, pos);
+                                    for (auto & attr : *vOutput.attrs) {
+                                        const auto & attr_name = state->symbols[attr.name];
+                                        state->forceAttrs(*attr.value, attr.pos);
+                                        auto drvPath = checkDerivation(
+                                            fmt("%s.%s.%s", name, attr_name, state->symbols[attr.name]),
+                                            *attr.value, attr.pos);
+                                        if (drvPath && sys_name == settings.thisSystem.get())
+                                            drvPaths.push_back(DerivedPath::Built{*drvPath});
+                                    }
                                 }
-                            }
-                        }
 
-                        else if (name == "formatter") {
-                            state->forceAttrs(vOutput, pos);
-                            for (auto & attr : *vOutput.attrs) {
-                                const auto & attr_name = state->symbols[attr.name];
-                                checkSystemName(attr_name, attr.pos);
-                                checkApp(
-                                    fmt("%s.%s", name, attr_name),
-                                    *attr.value, attr.pos);
-                            }
-                        }
+                                else if (name == "formatter") {
+                                  state->forceAttrs(vOutput, pos);
+                                      const auto & attr_name = state->symbols[attr.name];
+                                      checkApp(
+                                          fmt("%s.%s", name, attr_name),
+                                          *attr.value, attr.pos);
+                                }
 
-                        else if (name == "packages" || name == "devShells") {
-                            state->forceAttrs(vOutput, pos);
-                            for (auto & attr : *vOutput.attrs) {
-                                const auto & attr_name = state->symbols[attr.name];
-                                checkSystemName(attr_name, attr.pos);
-                                state->forceAttrs(*attr.value, attr.pos);
-                                for (auto & attr2 : *attr.value->attrs)
+                                else if (name == "packages" || name == "devShells") {
+                                    state->forceAttrs(vOutput, pos);
+                                    const auto & attr_name = state->symbols[attr.name];
+                                    state->forceAttrs(*attr.value, attr.pos);
+                                    for (auto & attr2 : *attr.value->attrs)
+                                        checkDerivation(
+                                            fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
+                                            *attr2.value, attr2.pos);
+                                }
+
+                                else if (name == "apps") {
+                                    state->forceAttrs(vOutput, pos);
+                                    const auto & attr_name = state->symbols[attr.name];
+                                    state->forceAttrs(*attr.value, attr.pos);
+                                    for (auto & attr2 : *attr.value->attrs)
+                                        checkApp(
+                                            fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
+                                            *attr2.value, attr2.pos);
+                                }
+
+                                else if (name == "defaultPackage" || name == "devShell") {
+                                    state->forceAttrs(vOutput, pos);
+                                    const auto & attr_name = state->symbols[attr.name];
                                     checkDerivation(
-                                        fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
-                                        *attr2.value, attr2.pos);
-                            }
-                        }
+                                        fmt("%s.%s", name, attr_name),
+                                        *attr.value, attr.pos);
+                                }
 
-                        else if (name == "apps") {
-                            state->forceAttrs(vOutput, pos);
-                            for (auto & attr : *vOutput.attrs) {
-                                const auto & attr_name = state->symbols[attr.name];
-                                checkSystemName(attr_name, attr.pos);
-                                state->forceAttrs(*attr.value, attr.pos);
-                                for (auto & attr2 : *attr.value->attrs)
+                                else if (name == "defaultApp") {
+                                    state->forceAttrs(vOutput, pos);
+                                    const auto & attr_name = state->symbols[attr.name];
                                     checkApp(
-                                        fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
-                                        *attr2.value, attr2.pos);
-                            }
-                        }
+                                        fmt("%s.%s", name, attr_name),
+                                        *attr.value, attr.pos);
+                                }
 
-                        else if (name == "defaultPackage" || name == "devShell") {
-                            state->forceAttrs(vOutput, pos);
-                            for (auto & attr : *vOutput.attrs) {
-                                const auto & attr_name = state->symbols[attr.name];
-                                checkSystemName(attr_name, attr.pos);
-                                checkDerivation(
-                                    fmt("%s.%s", name, attr_name),
-                                    *attr.value, attr.pos);
-                            }
-                        }
+                                else if (name == "legacyPackages") {
+                                    state->forceAttrs(vOutput, pos);
+                                    // FIXME: do getDerivations?
+                                }
 
-                        else if (name == "defaultApp") {
-                            state->forceAttrs(vOutput, pos);
-                            for (auto & attr : *vOutput.attrs) {
-                                const auto & attr_name = state->symbols[attr.name];
-                                checkSystemName(attr_name, attr.pos);
-                                checkApp(
-                                    fmt("%s.%s", name, attr_name),
-                                    *attr.value, attr.pos);
-                            }
-                        }
+                                else if (name == "bundlers") {
+                                    state->forceAttrs(vOutput, pos);
+                                    const auto & attr_name = state->symbols[attr.name];
+                                    state->forceAttrs(*attr.value, attr.pos);
+                                    for (auto & attr2 : *attr.value->attrs) {
+                                        checkBundler(
+                                            fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
+                                            *attr2.value, attr2.pos);
+                                    }
+                                }
 
-                        else if (name == "legacyPackages") {
-                            state->forceAttrs(vOutput, pos);
-                            for (auto & attr : *vOutput.attrs) {
-                                checkSystemName(state->symbols[attr.name], attr.pos);
-                                // FIXME: do getDerivations?
+                                else if (name == "defaultBundler") {
+                                    state->forceAttrs(vOutput, pos);
+                                    const auto & attr_name = state->symbols[attr.name];
+                                    checkBundler(
+                                        fmt("%s.%s", name, attr_name),
+                                        *attr.value, attr.pos);
+                                }
                             }
                         }
 
@@ -643,30 +668,6 @@ struct CmdFlakeCheck : FlakeCommand
                                     *attr.value, attr.pos);
                         }
 
-                        else if (name == "defaultBundler") {
-                            state->forceAttrs(vOutput, pos);
-                            for (auto & attr : *vOutput.attrs) {
-                                const auto & attr_name = state->symbols[attr.name];
-                                checkSystemName(attr_name, attr.pos);
-                                checkBundler(
-                                    fmt("%s.%s", name, attr_name),
-                                    *attr.value, attr.pos);
-                            }
-                        }
-
-                        else if (name == "bundlers") {
-                            state->forceAttrs(vOutput, pos);
-                            for (auto & attr : *vOutput.attrs) {
-                                const auto & attr_name = state->symbols[attr.name];
-                                checkSystemName(attr_name, attr.pos);
-                                state->forceAttrs(*attr.value, attr.pos);
-                                for (auto & attr2 : *attr.value->attrs) {
-                                    checkBundler(
-                                        fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
-                                        *attr2.value, attr2.pos);
-                                }
-                            }
-                        }
 
                         else
                             warn("unknown flake output '%s'", name);
