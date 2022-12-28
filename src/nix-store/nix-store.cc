@@ -805,9 +805,9 @@ static void opServe(Strings opFlags, Strings opArgs)
         settings.useSubstitutes = false;
         settings.maxSilentTime = readInt(in);
         settings.buildTimeout = readInt(in);
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
+        if (PROTOCOL_MINOR(clientVersion) >= 2)
             settings.maxLogSize = readNum<unsigned long>(in);
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 3) {
+        if (PROTOCOL_MINOR(clientVersion) >= 3) {
             auto nrRepeats = readInt(in);
             if (nrRepeats != 0) {
                 throw Error("client requested repeating builds, but this is not currently implemented");
@@ -822,7 +822,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             settings.runDiffHook = true;
         }
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 7) {
+        if (PROTOCOL_MINOR(clientVersion) >= 7) {
             settings.keepFailed = (bool) readInt(in);
         }
     };
@@ -865,7 +865,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                         // !!! Maybe we want compression?
                         out << info->narSize // downloadSize
                             << info->narSize;
-                        if (GET_PROTOCOL_MINOR(clientVersion) >= 4)
+                        if (PROTOCOL_MINOR(clientVersion) >= 4)
                             out << info->narHash.to_string(Base32, true)
                                 << renderContentAddress(info->ca)
                                 << info->sigs;
@@ -929,9 +929,9 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 out << status.status << status.errorMsg;
 
-                if (GET_PROTOCOL_MINOR(clientVersion) >= 3)
+                if (PROTOCOL_MINOR(clientVersion) >= 3)
                     out << status.timesBuilt << status.isNonDeterministic << status.startTime << status.stopTime;
-                if (GET_PROTOCOL_MINOR(clientVersion) >= 6) {
+                if (PROTOCOL_MINOR(clientVersion) >= 6) {
                     worker_proto::write(*store, out, status.builtOutputs);
                 }
 

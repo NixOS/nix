@@ -98,7 +98,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
                     host, chomp(saved.s + msg));
             }
             conn->remoteVersion = readInt(conn->from);
-            if (GET_PROTOCOL_MAJOR(conn->remoteVersion) != 0x200)
+            if (PROTOCOL_MAJOR(conn->remoteVersion) != 2)
                 throw Error("unsupported 'nix-store --serve' protocol version on '%s'", host);
 
         } catch (EndOfFile & e) {
@@ -120,7 +120,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             auto conn(connections->get());
 
             /* No longer support missing NAR hash */
-            assert(GET_PROTOCOL_MINOR(conn->remoteVersion) >= 4);
+            assert(PROTOCOL_MINOR(conn->remoteVersion) >= 4);
 
             debug("querying remote host '%s' for info on '%s'", host, printStorePath(path));
 
@@ -165,7 +165,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
         auto conn(connections->get());
 
-        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 5) {
+        if (PROTOCOL_MINOR(conn->remoteVersion) >= 5) {
 
             conn->to
                 << cmdAddToStoreNar
@@ -250,15 +250,15 @@ private:
         conn.to
             << settings.maxSilentTime
             << settings.buildTimeout;
-        if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 2)
+        if (PROTOCOL_MINOR(conn.remoteVersion) >= 2)
             conn.to
                 << settings.maxLogSize;
-        if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 3)
+        if (PROTOCOL_MINOR(conn.remoteVersion) >= 3)
             conn.to
                 << 0 // buildRepeat hasn't worked for ages anyway
                 << 0;
 
-        if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 7) {
+        if (PROTOCOL_MINOR(conn.remoteVersion) >= 7) {
             conn.to << ((int) settings.keepFailed);
         }
     }
@@ -283,9 +283,9 @@ public:
         status.status = (BuildResult::Status) readInt(conn->from);
         conn->from >> status.errorMsg;
 
-        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
+        if (PROTOCOL_MINOR(conn->remoteVersion) >= 3)
             conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
-        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 6) {
+        if (PROTOCOL_MINOR(conn->remoteVersion) >= 6) {
             status.builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
         }
         return status;

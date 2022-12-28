@@ -207,21 +207,21 @@ void RemoteStore::initConnection(Connection & conn)
         }
 
         conn.from >> conn.daemonVersion;
-        if (GET_PROTOCOL_MAJOR(conn.daemonVersion) != GET_PROTOCOL_MAJOR(PROTOCOL_VERSION))
+        if (PROTOCOL_MAJOR(conn.daemonVersion) != PROTOCOL_MAJOR(PROTOCOL_VERSION))
             throw Error("Nix daemon protocol version not supported");
-        if (GET_PROTOCOL_MINOR(conn.daemonVersion) < 10)
+        if (PROTOCOL_MINOR(conn.daemonVersion) < 10)
             throw Error("the Nix daemon version is too old");
         conn.to << PROTOCOL_VERSION;
 
-        if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 14) {
+        if (PROTOCOL_MINOR(conn.daemonVersion) >= 14) {
             // Obsolete CPU affinity.
             conn.to << 0;
         }
 
-        if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 11)
+        if (PROTOCOL_MINOR(conn.daemonVersion) >= 11)
             conn.to << false; // obsolete reserveSpace
 
-        if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 33) {
+        if (PROTOCOL_MINOR(conn.daemonVersion) >= 33) {
             conn.to.flush();
             conn.daemonNixVersion = readString(conn.from);
         }
@@ -253,7 +253,7 @@ void RemoteStore::setOptions(Connection & conn)
        << settings.buildCores
        << settings.useSubstitutes;
 
-    if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 12) {
+    if (PROTOCOL_MINOR(conn.daemonVersion) >= 12) {
         std::map<std::string, Config::SettingInfo> overrides;
         settings.getSettings(overrides, true); // libstore settings
         fileTransferSettings.getSettings(overrides, true);
@@ -339,7 +339,7 @@ bool RemoteStore::isValidPathUncached(const StorePath & path)
 StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute)
 {
     auto conn(getConnection());
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
+    if (PROTOCOL_MINOR(conn->daemonVersion) < 12) {
         StorePathSet res;
         for (auto & i : paths)
             if (isValidPath(i)) res.insert(i);
@@ -347,7 +347,7 @@ StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, Substitute
     } else {
         conn->to << wopQueryValidPaths;
         worker_proto::write(*this, conn->to, paths);
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 27) {
+        if (PROTOCOL_MINOR(conn->daemonVersion) >= 27) {
             conn->to << (settings.buildersUseSubstitutes ? 1 : 0);
         }
         conn.processStderr();
@@ -368,7 +368,7 @@ StorePathSet RemoteStore::queryAllValidPaths()
 StorePathSet RemoteStore::querySubstitutablePaths(const StorePathSet & paths)
 {
     auto conn(getConnection());
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
+    if (PROTOCOL_MINOR(conn->daemonVersion) < 12) {
         StorePathSet res;
         for (auto & i : paths) {
             conn->to << wopHasSubstitutes << printStorePath(i);
@@ -391,7 +391,7 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
 
     auto conn(getConnection());
 
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
+    if (PROTOCOL_MINOR(conn->daemonVersion) < 12) {
 
         for (auto & i : pathsMap) {
             SubstitutablePathInfo info;
@@ -411,7 +411,7 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
     } else {
 
         conn->to << wopQuerySubstitutablePathInfos;
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 22) {
+        if (PROTOCOL_MINOR(conn->daemonVersion) < 22) {
             StorePathSet paths;
             for (auto & path : pathsMap)
                 paths.insert(path.first);
@@ -450,12 +450,12 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
                     throw InvalidPath(std::move(e.info()));
                 throw;
             }
-            if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 17) {
+            if (PROTOCOL_MINOR(conn->daemonVersion) >= 17) {
                 bool valid; conn->from >> valid;
                 if (!valid) throw InvalidPath("path '%s' is not valid", printStorePath(path));
             }
             info = std::make_shared<ValidPathInfo>(
-                ValidPathInfo::read(conn->from, *this, GET_PROTOCOL_MINOR(conn->daemonVersion), StorePath{path}));
+                ValidPathInfo::read(conn->from, *this, PROTOCOL_MINOR(conn->daemonVersion), StorePath{path}));
         }
         callback(std::move(info));
     } catch (...) { callback.rethrow(); }
@@ -484,7 +484,7 @@ StorePathSet RemoteStore::queryValidDerivers(const StorePath & path)
 
 StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
 {
-    if (GET_PROTOCOL_MINOR(getProtocol()) >= 0x16) {
+    if (PROTOCOL_MINOR(getProtocol()) >= 0x16) {
         return Store::queryDerivationOutputs(path);
     }
     auto conn(getConnection());
@@ -496,7 +496,7 @@ StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
 
 std::map<std::string, std::optional<StorePath>> RemoteStore::queryPartialDerivationOutputMap(const StorePath & path)
 {
-    if (GET_PROTOCOL_MINOR(getProtocol()) >= 0x16) {
+    if (PROTOCOL_MINOR(getProtocol()) >= 0x16) {
         auto conn(getConnection());
         conn->to << wopQueryDerivationOutputMap << printStorePath(path);
         conn.processStderr();
@@ -539,7 +539,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
     std::optional<ConnectionHandle> conn_(getConnection());
     auto & conn = *conn_;
 
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 25) {
+    if (PROTOCOL_MINOR(conn->daemonVersion) >= 25) {
 
         conn->to
             << wopAddToStore
@@ -558,7 +558,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         }
 
         return make_ref<ValidPathInfo>(
-            ValidPathInfo::read(conn->from, *this, GET_PROTOCOL_MINOR(conn->daemonVersion)));
+            ValidPathInfo::read(conn->from, *this, PROTOCOL_MINOR(conn->daemonVersion)));
     }
     else {
         if (repair) throw Error("repairing is not supported when building through the Nix daemon protocol < 1.25");
@@ -623,7 +623,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
 {
     auto conn(getConnection());
 
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 18) {
+    if (PROTOCOL_MINOR(conn->daemonVersion) < 18) {
         conn->to << wopImportPaths;
 
         auto source2 = sinkToSource([&](Sink & sink) {
@@ -657,11 +657,11 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
                  << info.ultimate << info.sigs << renderContentAddress(info.ca)
                  << repair << !checkSigs;
 
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 23) {
+        if (PROTOCOL_MINOR(conn->daemonVersion) >= 23) {
             conn.withFramedSink([&](Sink & sink) {
                 copyNAR(source, sink);
             });
-        } else if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 21) {
+        } else if (PROTOCOL_MINOR(conn->daemonVersion) >= 21) {
             conn.processStderr(0, &source);
         } else {
             copyNAR(source, conn->to);
@@ -693,7 +693,7 @@ void RemoteStore::addMultipleToStore(
     RepairFlag repair,
     CheckSigsFlag checkSigs)
 {
-    if (GET_PROTOCOL_MINOR(getConnection()->daemonVersion) >= 32) {
+    if (PROTOCOL_MINOR(getConnection()->daemonVersion) >= 32) {
         auto conn(getConnection());
         conn->to
             << wopAddMultipleToStore
@@ -721,7 +721,7 @@ void RemoteStore::registerDrvOutput(const Realisation & info)
 {
     auto conn(getConnection());
     conn->to << wopRegisterDrvOutput;
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 31) {
+    if (PROTOCOL_MINOR(conn->daemonVersion) < 31) {
         conn->to << info.id.to_string();
         conn->to << std::string(info.outPath.to_string());
     } else {
@@ -736,7 +736,7 @@ void RemoteStore::queryRealisationUncached(const DrvOutput & id,
     try {
         auto conn(getConnection());
 
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 27) {
+        if (PROTOCOL_MINOR(conn->daemonVersion) < 27) {
             warn("the daemon is too old to support content-addressed derivations, please upgrade it to 2.4");
             return callback(nullptr);
         }
@@ -746,7 +746,7 @@ void RemoteStore::queryRealisationUncached(const DrvOutput & id,
         conn.processStderr();
 
         auto real = [&]() -> std::shared_ptr<const Realisation> {
-            if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 31) {
+            if (PROTOCOL_MINOR(conn->daemonVersion) < 31) {
                 auto outPaths = worker_proto::read(
                     *this, conn->from, Phantom<std::set<StorePath>> {});
                 if (outPaths.empty())
@@ -767,7 +767,7 @@ void RemoteStore::queryRealisationUncached(const DrvOutput & id,
 
 static void writeDerivedPaths(RemoteStore & store, ConnectionHandle & conn, const std::vector<DerivedPath> & reqs)
 {
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 30) {
+    if (PROTOCOL_MINOR(conn->daemonVersion) >= 30) {
         worker_proto::write(store, conn->to, reqs);
     } else {
         Strings ss;
@@ -780,8 +780,8 @@ static void writeDerivedPaths(RemoteStore & store, ConnectionHandle & conn, cons
                 [&](const StorePath & drvPath) {
                     throw Error("trying to request '%s', but daemon protocol %d.%d is too old (< 1.29) to request a derivation file",
                         store.printStorePath(drvPath),
-                        GET_PROTOCOL_MAJOR(conn->daemonVersion),
-                        GET_PROTOCOL_MINOR(conn->daemonVersion));
+                        PROTOCOL_MAJOR(conn->daemonVersion),
+                        PROTOCOL_MINOR(conn->daemonVersion));
                 },
             }, sOrDrvPath);
         }
@@ -810,9 +810,9 @@ void RemoteStore::buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMod
 
     auto conn(getConnection());
     conn->to << wopBuildPaths;
-    assert(GET_PROTOCOL_MINOR(conn->daemonVersion) >= 13);
+    assert(PROTOCOL_MINOR(conn->daemonVersion) >= 13);
     writeDerivedPaths(*this, conn, drvPaths);
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 15)
+    if (PROTOCOL_MINOR(conn->daemonVersion) >= 15)
         conn->to << buildMode;
     else
         /* Old daemons did not take a 'buildMode' parameter, so we
@@ -833,7 +833,7 @@ std::vector<BuildResult> RemoteStore::buildPathsWithResults(
     std::optional<ConnectionHandle> conn_(getConnection());
     auto & conn = *conn_;
 
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 34) {
+    if (PROTOCOL_MINOR(conn->daemonVersion) >= 34) {
         conn->to << wopBuildPathsWithResults;
         writeDerivedPaths(*this, conn, paths);
         conn->to << buildMode;
@@ -921,10 +921,10 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     BuildResult res { .path = DerivedPath::Built { .drvPath = drvPath } };
     res.status = (BuildResult::Status) readInt(conn->from);
     conn->from >> res.errorMsg;
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 29) {
+    if (PROTOCOL_MINOR(conn->daemonVersion) >= 29) {
         conn->from >> res.timesBuilt >> res.isNonDeterministic >> res.startTime >> res.stopTime;
     }
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 28) {
+    if (PROTOCOL_MINOR(conn->daemonVersion) >= 28) {
         auto builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
         res.builtOutputs = builtOutputs;
     }
@@ -1033,7 +1033,7 @@ void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
 {
     {
         auto conn(getConnection());
-        if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 19)
+        if (PROTOCOL_MINOR(conn->daemonVersion) < 19)
             // Don't hold the connection handle in the fallback case
             // to prevent a deadlock.
             goto fallback;
@@ -1154,7 +1154,7 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
         }
 
         else if (msg == STDERR_ERROR) {
-            if (GET_PROTOCOL_MINOR(daemonVersion) >= 26) {
+            if (PROTOCOL_MINOR(daemonVersion) >= 26) {
                 return std::make_exception_ptr(readError(from));
             } else {
                 auto error = readString(from);
