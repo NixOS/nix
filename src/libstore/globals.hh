@@ -329,7 +329,7 @@ public:
           Whether to execute builds inside cgroups.
           This is only supported on Linux.
 
-          Cgroups are required and enabled automatically for derivations 
+          Cgroups are required and enabled automatically for derivations
           that require the `uid-range` system feature.
 
           > **Warning**
@@ -490,6 +490,9 @@ public:
           followed by `?`, then it is not an error if *source* does not exist;
           for example, `/dev/nvidiactl?` specifies that `/dev/nvidiactl` will
           only be mounted in the sandbox if it exists in the host filesystem.
+
+          If the source is in the Nix store, then its closure will be added to
+          the sandbox as well.
 
           Depending on how Nix was built, the default value for this option
           may be empty or provide `/bin/sh` as a bind-mount of `bash`.
