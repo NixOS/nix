@@ -9,6 +9,7 @@
 #include "fs-accessor.hh"
 #include "progress-bar.hh"
 #include "eval.hh"
+#include "build/personality.hh"
 
 #if __linux__
 #include <sys/mount.h>
@@ -24,7 +25,8 @@ namespace nix {
 
 void runProgramInStore(ref<Store> store,
     const std::string & program,
-    const Strings & args)
+    const Strings & args,
+    std::optional<std::string_view> system)
 {
     stopProgressBar();
 
@@ -44,13 +46,16 @@ void runProgramInStore(ref<Store> store,
         throw Error("store '%s' is not a local store so it does not support command execution", store->getUri());
 
     if (store->storeDir != store2->getRealStoreDir()) {
-        Strings helperArgs = { chrootHelperName, store->storeDir, store2->getRealStoreDir(), program };
+        Strings helperArgs = { chrootHelperName, store->storeDir, store2->getRealStoreDir(), std::string(system.value_or("")), program };
         for (auto & arg : args) helperArgs.push_back(arg);
 
         execv(getSelfExe().value_or("nix").c_str(), stringsToCharPtrs(helperArgs).data());
 
         throw SysError("could not execute chroot helper");
     }
+
+    if (system)
+        setPersonality(*system);
 
     execvp(program.c_str(), stringsToCharPtrs(args).data());
 
@@ -199,6 +204,7 @@ void chrootHelper(int argc, char * * argv)
     int p = 1;
     std::string storeDir = argv[p++];
     std::string realStoreDir = argv[p++];
+    std::string system = argv[p++];
     std::string cmd = argv[p++];
     Strings args;
     while (p < argc)
@@ -261,6 +267,9 @@ void chrootHelper(int argc, char * * argv)
     writeFile("/proc/self/setgroups", "deny");
     writeFile("/proc/self/uid_map", fmt("%d %d %d", uid, uid, 1));
     writeFile("/proc/self/gid_map", fmt("%d %d %d", gid, gid, 1));
+
+    if (system != "")
+        setPersonality(system);
 
     execvp(cmd.c_str(), stringsToCharPtrs(args).data());
 
