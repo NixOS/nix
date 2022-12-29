@@ -289,7 +289,7 @@ error: cannot delete path `/nix/store/zq0h41l75vlb4z45kzgjjmsjxvcv1qk7-mesa-6.4'
   {`--outputs` | `--requisites` | `-R` | `--references` |
   `--referrers` | `--referrers-closure` | `--deriver` | `-d` |
   `--graph` | `--tree` | `--binding` *name* | `-b` *name* | `--hash` |
-  `--size` | `--roots`}
+  `--size` | `--roots` | `--unsubstitutable` | `-U`}
   [`--use-output`] [`-u`] [`--force-realise`] [`-f`]
   *paths…*
 
@@ -405,6 +405,10 @@ symlink.
     Prints the garbage collector roots that point, directly or
     indirectly, at the store paths *paths*.
 
+  - `--unsubstitutable`; `-U`\
+    Outputs a list of the store paths *paths* which are not available in
+    any configured substituters.
+
 ## Examples
 
 Print the closure (runtime dependencies) of the `svn` program in the
@@ -440,6 +444,16 @@ $ nix-store -q --tree $(nix-store -qd $(which svn))
 +---/nix/store/fmzxmpjx2lh849ph0l36snfj9zdibw67-bash-3.0.drv
 |   +---/nix/store/570hmhmx3v57605cqg9yfvvyh0nnb8k8-bash
 |   +---/nix/store/p3srsbd8dx44v2pg6nbnszab5mcwx03v-builder.sh
+...
+```
+
+Show unsubstitutable build & runtime dependencies:
+
+```console
+$ drv=$(nix-store -qd $(which svn))
+$ nix-store -qU $(nix-store -qR --include-outputs $drv)
+/nix/store/5mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
+/nix/store/9lz9yc6zgmc0vlqmn2ipcpkjlmbi51vv-glibc-2.3.4
 ...
 ```
 

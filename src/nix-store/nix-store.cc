@@ -276,7 +276,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
     enum QueryType
         { qDefault, qOutputs, qRequisites, qReferences, qReferrers
         , qReferrersClosure, qDeriver, qBinding, qHash, qSize
-        , qTree, qGraph, qGraphML, qResolve, qRoots };
+        , qTree, qGraph, qGraphML, qResolve, qRoots, qUnsubstitutable };
     QueryType query = qDefault;
     bool useOutput = false;
     bool includeOutputs = false;
@@ -300,6 +300,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         }
         else if (i == "--hash") query = qHash;
         else if (i == "--size") query = qSize;
+        else if (i == "--unsubstitutable" || i == "-U") query = qUnsubstitutable;
         else if (i == "--tree") query = qTree;
         else if (i == "--graph") query = qGraph;
         else if (i == "--graphml") query = qGraphML;
@@ -363,6 +364,24 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 cout << fmt("%s\n", info->deriver ? store->printStorePath(*info->deriver) : "unknown-deriver");
             }
             break;
+
+        case qUnsubstitutable: {
+            if (opArgs.empty()) throw UsageError("no paths passed");
+
+            StorePathSet storePaths;
+            for (auto const & str : opArgs) {
+               storePaths.emplace(store->followLinksToStorePath(str));
+            }
+
+            auto substitutablePaths = store->querySubstitutablePaths(storePaths);
+
+            for ( auto & path : storePaths) {
+                if (substitutablePaths.find(path) == substitutablePaths.end())
+                    std::cout << '\n' << store->printStorePath(path);
+            }
+            std::cout << std::endl;
+            break;
+        }
 
         case qBinding:
             for (auto & i : opArgs) {
@@ -679,7 +698,6 @@ static void opExport(Strings opFlags, Strings opArgs)
     store->exportPaths(paths, sink);
     sink.flush();
 }
-
 
 static void opImport(Strings opFlags, Strings opArgs)
 {
