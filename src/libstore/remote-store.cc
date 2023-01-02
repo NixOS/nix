@@ -879,10 +879,7 @@ std::vector<BuildResult> RemoteStore::buildPathsWithResults(
                                 auto realisation =
                                     queryRealisation(outputId);
                                 if (!realisation)
-                                    throw Error(
-                                        "cannot operate on an output of unbuilt "
-                                        "content-addressed derivation '%s'",
-                                        outputId.to_string());
+                                    throw MissingRealisation(outputId);
                                 res.builtOutputs.emplace(realisation->id, *realisation);
                             } else {
                                 // If ca-derivations isn't enabled, assume that

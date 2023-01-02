@@ -95,18 +95,24 @@ struct CmdWhyDepends : SourceExprCommand
          * to build.
          */
         auto dependency = parseInstallable(store, _dependency);
-        auto dependencyPath = Installable::toStorePath(getEvalStore(), store, Realise::Derivation, operateOn, dependency);
-        auto dependencyPathHash = dependencyPath.hashPart();
+        auto optDependencyPath = [&]() -> std::optional<StorePath> {
+            try {
+                return {Installable::toStorePath(getEvalStore(), store, Realise::Derivation, operateOn, dependency)};
+            } catch (MissingRealisation &) {
+                return std::nullopt;
+            }
+        }();
 
         StorePathSet closure;
         store->computeFSClosure({packagePath}, closure, false, false);
 
-        if (!closure.count(dependencyPath)) {
-            printError("'%s' does not depend on '%s'",
-                store->printStorePath(packagePath),
-                store->printStorePath(dependencyPath));
+        if (!optDependencyPath.has_value() || !closure.count(*optDependencyPath)) {
+            printError("'%s' does not depend on '%s'", package->what(), dependency->what());
             return;
         }
+
+        auto dependencyPath = *optDependencyPath;
+        auto dependencyPathHash = dependencyPath.hashPart();
 
         stopProgressBar(); // FIXME
 
