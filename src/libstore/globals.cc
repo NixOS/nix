@@ -291,4 +291,18 @@ void initPlugins()
     settings.pluginFiles.pluginsLoaded = true;
 }
 
+static bool initLibStoreDone = false;
+
+void assertLibStoreInitialized() {
+    if (!initLibStoreDone) {
+        printError("The program must call nix::initNix() before calling any libstore library functions.");
+        abort();
+    };
+}
+
+void initLibStore() {
+    initLibStoreDone = true;
+}
+
+
 }
