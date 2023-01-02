@@ -737,7 +737,7 @@ static RegisterPrimOp primop_break({
                 throw Error(ErrorInfo{
                     .level = lvlInfo,
                     .msg = hintfmt("quit the debugger"),
-                    .errPos = state.positions[noPos],
+                    .errPos = nullptr,
                 });
             }
         }
@@ -1164,7 +1164,7 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
             }
 
         } catch (Error & e) {
-            e.addTrace(state.positions[noPos],
+            e.addTrace(nullptr,
                 hintfmt("while evaluating the attribute '%1%' of the derivation '%2%'", key, drvName),
                 true);
             throw;
