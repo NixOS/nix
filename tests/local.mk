@@ -92,6 +92,7 @@ nix_tests = \
   fmt.sh \
   eval-store.sh \
   why-depends.sh \
+  ca/why-depends.sh \
   import-derivation.sh \
   ca/import-derivation.sh \
   nix_path.sh \
