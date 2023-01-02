@@ -2,7 +2,22 @@
 
 ## Motivation
 
-The goal of the team is to help other people to contribute to Nix.
+In order to attract more maintainers and thereby scale the development process to match user needs, the main goal of this team is to improve the Nix contributor experience.
+
+### Objectives
+
+- It is obvious what is worthwhile to work on.
+- It is easy to find the right place in the code to make a change.
+- It is clear what is expected of a pull request.
+- It is predictable how to get a change merged and released.
+
+### Tasks
+
+- Elaborate contribution guides and abide to them
+- Improve documentation targeted to contributors
+- Maintain the issue tracker and triage pull requests
+- Help competent contributors succeed with their pull requests
+- Ensure the required maintainer capacity for all of the above
 
 ## Members
 
