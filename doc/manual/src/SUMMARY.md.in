@@ -59,6 +59,7 @@
 @manpages@
   - [Files](command-ref/files.md)
     - [nix.conf](command-ref/conf-file.md)
+- [Architecture](architecture/architecture.md)
 - [Glossary](glossary.md)
 - [Contributing](contributing/contributing.md)
   - [Hacking](contributing/hacking.md)
