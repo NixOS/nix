@@ -303,7 +303,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
         size_t count = 0;
         for (const auto & trace : einfo.traces) {
             if (!showTrace && count > 3) {
-                oss << "\n" << ANSI_ITALIC "(stack trace truncated)" ANSI_NORMAL << "\n";
+                oss << "\n" << ANSI_WARNING "(stack trace truncated; use '--show-trace' to show the full trace)" ANSI_NORMAL << "\n";
                 break;
             }
 
