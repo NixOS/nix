@@ -15,19 +15,6 @@
   # NIX_PATH=nixpkgs=flake:nixpkgs nix-build '<nixpkgs>' -A hello
   ```
 
-* Allow explicitly selecting outputs in a store derivation installable, just like we can do with other sorts of installables.
-  For example,
-  ```shell-session
-  $ nix-build /nix/store/gzaflydcr6sb3567hap9q6srzx8ggdgg-glibc-2.33-78.drv^dev`
-  ```
-  now works just as
-  ```shell-session
-  $ nix-build glibc^dev`
-  ```
-  does already.
+* Instead of "antiquotation", the more common term [string interpolation](../language/string-interpolation.md) is now used consistently.
+  Historical release notes were not changed.
 
-* On Linux, `nix develop` now sets the
-  [*personality*](https://man7.org/linux/man-pages/man2/personality.2.html)
-  for the development shell in the same way as the actual build of the
-  derivation. This makes shells for `i686-linux` derivations work
-  correctly on `x86_64-linux`.

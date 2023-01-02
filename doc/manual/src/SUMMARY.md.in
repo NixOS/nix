@@ -29,6 +29,7 @@
 - [Nix Language](language/index.md)
   - [Data Types](language/values.md)
   - [Language Constructs](language/constructs.md)
+    - [String interpolation](language/string-interpolation.md)
   - [Operators](language/operators.md)
   - [Derivations](language/derivations.md)
     - [Advanced Attributes](language/advanced-attributes.md)
