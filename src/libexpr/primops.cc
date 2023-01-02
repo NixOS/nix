@@ -2448,12 +2448,62 @@ static void prim_intersectAttrs(EvalState & state, const PosIdx pos, Value * * a
     state.forceAttrs(*args[0], pos);
     state.forceAttrs(*args[1], pos);
 
-    auto attrs = state.buildBindings(std::min(args[0]->attrs->size(), args[1]->attrs->size()));
+    Bindings &left = *args[0]->attrs;
+    Bindings &right = *args[1]->attrs;
 
-    for (auto & i : *args[0]->attrs) {
-        Bindings::iterator j = args[1]->attrs->find(i.name);
-        if (j != args[1]->attrs->end())
-            attrs.insert(*j);
+    auto attrs = state.buildBindings(std::min(left.size(), right.size()));
+
+    // The current implementation has good asymptotic complexity and is reasonably
+    // simple. Further optimization may be possible, but does not seem productive,
+    // considering the state of eval performance in 2022.
+    //
+    // I have looked for reusable and/or standard solutions and these are my
+    // findings:
+    //
+    // STL
+    // ===
+    // std::set_intersection is not suitable, as it only performs a simultaneous
+    // linear scan; not taking advantage of random access. This is O(n + m), so
+    // linear in the largest set, which is not acceptable for callPackage in Nixpkgs.
+    //
+    // Simultaneous scan, with alternating simple binary search
+    // ===
+    // One alternative algorithm scans the attrsets simultaneously, jumping
+    // forward using `lower_bound` in case of inequality. This should perform
+    // well on very similar sets, having a local and predictable access pattern.
+    // On dissimilar sets, it seems to need more comparisons than the current
+    // algorithm, as few consecutive attrs match. `lower_bound` could take
+    // advantage of the decreasing remaining search space, but this causes
+    // the medians to move, which can mean that they don't stay in the cache
+    // like they would with the current naive `find`.
+    //
+    // Double binary search
+    // ===
+    // The optimal algorithm may be "Double binary search", which doesn't
+    // scan at all, but rather divides both sets simultaneously.
+    // See "Fast Intersection Algorithms for Sorted Sequences" by Baeza-Yates et al.
+    // https://cs.uwaterloo.ca/~ajsaling/papers/intersection_alg_app10.pdf
+    // The only downsides I can think of are not having a linear access pattern
+    // for similar sets, and having to maintain a more intricate algorithm.
+    //
+    // Adaptive
+    // ===
+    // Finally one could run try a simultaneous scan, count misses and fall back
+    // to double binary search when the counter hit some threshold and/or ratio.
+
+    if (left.size() < right.size()) {
+        for (auto & l : left) {
+            Bindings::iterator r = right.find(l.name);
+            if (r != right.end())
+                attrs.insert(*r);
+        }
+    }
+    else {
+        for (auto & r : right) {
+            Bindings::iterator l = left.find(r.name);
+            if (l != left.end())
+                attrs.insert(r);
+        }
     }
 
     v.mkAttrs(attrs.alreadySorted());
@@ -2465,6 +2515,8 @@ static RegisterPrimOp primop_intersectAttrs({
     .doc = R"(
       Return a set consisting of the attributes in the set *e2* which have the
       same name as some attribute in *e1*.
+
+      Performs in O(*n* log *m*) where *n* is the size of the smaller set and *m* the larger set's size.
     )",
     .fun = prim_intersectAttrs,
 });
