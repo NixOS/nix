@@ -20,7 +20,7 @@ makeTest ({
               (import ./systemd-nspawn.nix { inherit nixpkgs; }).toplevel
             ];
           virtualisation.memorySize = 4096;
-          nix.binaryCaches = lib.mkForce [ ];
+          nix.settings.substituters = lib.mkForce [ ];
           nix.extraOptions =
             ''
               extra-experimental-features = nix-command auto-allocate-uids cgroups

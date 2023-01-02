@@ -15,7 +15,7 @@ makeTest (let pkgA = pkgs.cowsay; pkgB = pkgs.wget; pkgC = pkgs.hello; pkgD = pk
         { config, lib, pkgs, ... }:
         { virtualisation.writableStore = true;
           virtualisation.additionalPaths = [ pkgA pkgD.drvPath ];
-          nix.binaryCaches = lib.mkForce [ ];
+          nix.settings.substituters = lib.mkForce [ ];
         };
 
       server =

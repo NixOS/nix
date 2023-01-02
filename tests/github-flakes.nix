@@ -149,7 +149,7 @@ makeTest (
           virtualisation.diskSize = 2048;
           virtualisation.additionalPaths = [ pkgs.hello pkgs.fuse ];
           virtualisation.memorySize = 4096;
-          nix.binaryCaches = lib.mkForce [ ];
+          nix.settings.substituters = lib.mkForce [ ];
           nix.extraOptions = "experimental-features = nix-command flakes";
           networking.hosts.${(builtins.head nodes.github.config.networking.interfaces.eth1.ipv4.addresses).address} =
             [ "channels.nixos.org" "api.github.com" "github.com" ];
