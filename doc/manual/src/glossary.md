@@ -7,6 +7,18 @@
     translated into low-level *store derivations* (implicitly by
     `nix-env` and `nix-build`, or explicitly by `nix-instantiate`).
 
+    [derivation]: #gloss-derivation
+
+  - [store derivation]{#gloss-store-derivation}\
+    A [derivation] represented as a `.drv` file in the [store].
+    It has a [store path], like any [store object].
+
+    Example: `/nix/store/g946hcz4c8mdvq2g8vxx42z51qb71rvp-git-2.38.1.drv`
+
+    See [`nix show-derivation`](./command-ref/new-cli/nix3-show-derivation.md) (experimental) for displaying the contents of store derivations.
+
+    [store derivation]: #gloss-store-derivation
+
   - [content-addressed derivation]{#gloss-content-addressed-derivation}\
     A derivation which has the
     [`__contentAddressed`](./language/advanced-attributes.md#adv-attr-__contentAddressed)
@@ -34,6 +46,8 @@
       directory on another machine,  accessed via `ssh` or
       served by the `nix-serve` Perl script.
 
+    [store]: #gloss-store
+
   - [chroot store]{#gloss-chroot-store}\
     A local store whose canonical path is anything other than `/nix/store`.
 
@@ -49,12 +63,18 @@
     The location in the file system of a store object, i.e., an
     immediate child of the Nix store directory.
 
+    Example: `/nix/store/a040m110amc4h71lds2jmr8qrkj2jhxd-git-2.38.1`
+
+    [store path]: #gloss-store-path
+
   - [store object]{#gloss-store-object}\
     A file that is an immediate child of the Nix store directory. These
     can be regular files, but also entire directory trees. Store objects
     can be sources (objects copied from outside of the store),
     derivation outputs (objects produced by running a build task), or
     derivations (files describing a build task).
+
+    [store object]: #gloss-store-object
 
   - [input-addressed store object]{#gloss-input-addressed-store-object}\
     A store object produced by building a
@@ -124,7 +144,9 @@
     references `R` then `R` is also in the closure of `P`.
 
   - [output path]{#gloss-output-path}\
-    A store path produced by a derivation.
+    A [store path] produced by a [derivation].
+
+    [output path]: #gloss-output-path
 
   - [deriver]{#gloss-deriver}\
     The deriver of an *output path* is the store

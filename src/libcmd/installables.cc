@@ -168,7 +168,7 @@ SourceExprCommand::SourceExprCommand(bool supportReadOnlyMode)
 
     addFlag({
         .longName = "derivation",
-        .description = "Operate on the store derivation rather than its outputs.",
+        .description = "Operate on the [store derivation](../../glossary.md#gloss-store-derivation) rather than its outputs.",
         .category = installablesCategory,
         .handler = {&operateOn, OperateOn::Derivation},
     });
