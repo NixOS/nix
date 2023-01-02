@@ -95,7 +95,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                         throw Error(
                                 "files '%1%' and '%2%' have the same priority %3%; "
                                 "use 'nix-env --set-flag priority NUMBER INSTALLED_PKGNAME' "
-                                "or type 'nix profile install --help' if using 'nix profile' to find out how"
+                                "or type 'nix profile install --help' if using 'nix profile' to find out how "
                                 "to change the priority of one of the conflicting packages"
                                 " (0 being the highest priority)",
                                 srcFile, readLink(dstFile), priority);
