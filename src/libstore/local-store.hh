@@ -310,9 +310,18 @@ typedef std::set<Inode> InodesSeen;
    - the permissions are set of 444 or 555 (i.e., read-only with or
      without execute permission; setuid bits etc. are cleared)
    - the owner and group are set to the Nix user and group, if we're
-     running as root. */
-void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen);
-void canonicalisePathMetaData(const Path & path, uid_t fromUid);
+     running as root.
+   If uidRange is not empty, this function will throw an error if it
+   encounters files owned by a user outside of the closed interval
+   [uidRange->first, uidRange->second].
+*/
+void canonicalisePathMetaData(
+    const Path & path,
+    std::optional<std::pair<uid_t, uid_t>> uidRange,
+    InodesSeen & inodesSeen);
+void canonicalisePathMetaData(
+    const Path & path,
+    std::optional<std::pair<uid_t, uid_t>> uidRange);
 
 void canonicaliseTimestampAndPermissions(const Path & path);
 

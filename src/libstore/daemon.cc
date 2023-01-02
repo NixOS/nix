@@ -238,7 +238,6 @@ struct ClientSettings
                 }
                 else if (trusted
                     || name == settings.buildTimeout.name
-                    || name == settings.buildRepeat.name
                     || name == settings.maxSilentTime.name
                     || name == settings.pollInterval.name
                     || name == "connect-timeout"

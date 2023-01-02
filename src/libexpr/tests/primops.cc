@@ -151,20 +151,7 @@ namespace nix {
         // The `y` attribute is at position
         const char* expr = "builtins.unsafeGetAttrPos \"y\" { y = \"x\"; }";
         auto v = eval(expr);
-        ASSERT_THAT(v, IsAttrsOfSize(3));
-
-        auto file = v.attrs->find(createSymbol("file"));
-        ASSERT_NE(file, nullptr);
-        // FIXME: The file when running these tests is the input string?!?
-        ASSERT_THAT(*file->value, IsStringEq(expr));
-
-        auto line = v.attrs->find(createSymbol("line"));
-        ASSERT_NE(line, nullptr);
-        ASSERT_THAT(*line->value, IsIntEq(1));
-
-        auto column = v.attrs->find(createSymbol("column"));
-        ASSERT_NE(column, nullptr);
-        ASSERT_THAT(*column->value, IsIntEq(33));
+        ASSERT_THAT(v, IsNull());
     }
 
     TEST_F(PrimOpTest, hasAttr) {
@@ -617,7 +604,7 @@ namespace nix {
 
     TEST_F(PrimOpTest, storeDir) {
         auto v = eval("builtins.storeDir");
-        ASSERT_THAT(v, IsStringEq("/nix/store"));
+        ASSERT_THAT(v, IsStringEq(settings.nixStore));
     }
 
     TEST_F(PrimOpTest, nixVersion) {

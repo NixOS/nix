@@ -1,37 +1,38 @@
 #pragma once
 
-#include "sync.hh"
 #include "types.hh"
-#include "util.hh"
+
+#include <optional>
+
+#include <sys/types.h>
 
 namespace nix {
 
-class UserLock
+struct UserLock
 {
-private:
-    Path fnUserLock;
-    AutoCloseFD fdUserLock;
+    virtual ~UserLock() { }
 
-    bool isEnabled = false;
-    std::string user;
-    uid_t uid = 0;
-    gid_t gid = 0;
-    std::vector<gid_t> supplementaryGIDs;
+    /* Get the first and last UID. */
+    std::pair<uid_t, uid_t> getUIDRange()
+    {
+        auto first = getUID();
+        return {first, first + getUIDCount() - 1};
+    }
 
-public:
-    UserLock();
+    /* Get the first UID. */
+    virtual uid_t getUID() = 0;
 
-    void kill();
+    virtual uid_t getUIDCount() = 0;
 
-    std::string getUser() { return user; }
-    uid_t getUID() { assert(uid); return uid; }
-    uid_t getGID() { assert(gid); return gid; }
-    std::vector<gid_t> getSupplementaryGIDs() { return supplementaryGIDs; }
+    virtual gid_t getGID() = 0;
 
-    bool findFreeUser();
-
-    bool enabled() { return isEnabled; }
-
+    virtual std::vector<gid_t> getSupplementaryGIDs() = 0;
 };
+
+/* Acquire a user lock for a UID range of size `nrIds`. Note that this
+   may return nullptr if no user is available. */
+std::unique_ptr<UserLock> acquireUserLock(uid_t nrIds, bool useChroot);
+
+bool useBuildUsers();
 
 }

@@ -215,17 +215,15 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
     out << dt.hint.str() << "\n";
 
     // prefer direct pos, but if noPos then try the expr.
-    auto pos = *dt.pos
-        ? *dt.pos
-        : positions[dt.expr.getPos() ? dt.expr.getPos() : noPos];
+    auto pos = dt.pos
+        ? dt.pos
+        : static_cast<std::shared_ptr<AbstractPos>>(positions[dt.expr.getPos() ? dt.expr.getPos() : noPos]);
 
     if (pos) {
-        printAtPos(pos, out);
-
-        auto loc = getCodeLines(pos);
-        if (loc.has_value()) {
+        out << pos;
+        if (auto loc = pos->getCodeLines()) {
             out << "\n";
-            printCodeLines(out, "", pos, *loc);
+            printCodeLines(out, "", *pos, *loc);
             out << "\n";
         }
     }
@@ -270,6 +268,7 @@ void NixRepl::mainLoop()
             // ctrl-D should exit the debugger.
             state->debugStop = false;
             state->debugQuit = true;
+            logger->cout("");
             break;
         }
         try {
@@ -384,6 +383,10 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             i++;
         }
     } else {
+        /* Temporarily disable the debugger, to avoid re-entering readline. */
+        auto debug_repl = state->debugRepl;
+        state->debugRepl = nullptr;
+        Finally restoreDebug([&]() { state->debugRepl = debug_repl; });
         try {
             /* This is an expression that should evaluate to an
                attribute set.  Evaluate it to get the names of the
@@ -584,15 +587,17 @@ bool NixRepl::processLine(std::string line)
         Value v;
         evalString(arg, v);
 
-        const auto [file, line] = [&] () -> std::pair<std::string, uint32_t> {
+        const auto [path, line] = [&] () -> std::pair<Path, uint32_t> {
             if (v.type() == nPath || v.type() == nString) {
                 PathSet context;
-                auto filename = state->coerceToString(noPos, v, context, "while evaluating the filename to edit").toOwned();
-                state->symbols.create(filename);
-                return {filename, 0};
+                auto path = state->coerceToPath(noPos, v, context, "while evaluating the filename to edit");
+                return {path, 0};
             } else if (v.isLambda()) {
                 auto pos = state->positions[v.lambda.fun->pos];
-                return {pos.file, pos.line};
+                if (auto path = std::get_if<Path>(&pos.origin))
+                    return {*path, pos.line};
+                else
+                    throw Error("'%s' cannot be shown in an editor", pos);
             } else {
                 // assume it's a derivation
                 return findPackageFilename(*state, v, arg);
@@ -600,7 +605,7 @@ bool NixRepl::processLine(std::string line)
         }();
 
         // Open in EDITOR
-        auto args = editorFor(file, line);
+        auto args = editorFor(path, line);
         auto editor = args.front();
         args.pop_front();
 
@@ -782,7 +787,7 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
             flake::LockFlags {
                 .updateLockFile = false,
                 .useRegistries = !evalSettings.pureEval,
-                .allowMutable  = !evalSettings.pureEval,
+                .allowUnlocked = !evalSettings.pureEval,
             }),
         v);
     addAttrsToScope(v);

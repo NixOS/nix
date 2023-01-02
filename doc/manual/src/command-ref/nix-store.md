@@ -22,7 +22,8 @@ This section lists the options that are common to all operations. These
 options are allowed for every subcommand, though they may not always
 have an effect.
 
-  - [`--add-root`]{#opt-add-root} *path*\
+  - <span id="opt-add-root">[`--add-root`](#opt-add-root)</span> *path*
+
     Causes the result of a realisation (`--realise` and
     `--force-realise`) to be registered as a root of the garbage
     collector. *path* will be created as a symlink to the resulting
@@ -71,7 +72,7 @@ paths. Realisation is a somewhat overloaded term:
     outputs are already valid, in which case we are done
     immediately. Otherwise, there may be [substitutes](../glossary.md)
     that produce the outputs (e.g., by downloading them). Finally, the
-    outputs can be produced by performing the build action described
+    outputs can be produced by running the build task described
     by the derivation.
 
   - If the store path is not a derivation, realisation ensures that the
@@ -103,10 +104,6 @@ The following flags are available:
     output path is not identical to the corresponding output from the
     previous build, the new output path is left in
     `/nix/store/name.check.`
-
-    See also the `build-repeat` configuration option, which repeats a
-    derivation a number of times and prevents its outputs from being
-    registered as “valid” in the Nix store unless they are identical.
 
 Special exit codes:
 
@@ -140,8 +137,10 @@ or.
 
 ## Examples
 
-This operation is typically used to build store derivations produced by
-[`nix-instantiate`](nix-instantiate.md):
+This operation is typically used to build [store derivation]s produced by
+[`nix-instantiate`](./nix-instantiate.md):
+
+[store derivation]: ../glossary.md#gloss-store-derivation
 
 ```console
 $ nix-store -r $(nix-instantiate ./test.nix)
@@ -301,7 +300,7 @@ symlink.
 ## Common query options
 
   - `--use-output`; `-u`\
-    For each argument to the query that is a store derivation, apply the
+    For each argument to the query that is a [store derivation], apply the
     query to the output path of the derivation instead.
 
   - `--force-realise`; `-f`\
@@ -321,7 +320,7 @@ symlink.
     This query has one option:
 
       - `--include-outputs`
-        Also include the existing output paths of store derivations,
+        Also include the existing output paths of [store derivation]s,
         and their closures.
 
     This query can be used to implement various kinds of deployment. A
@@ -375,12 +374,12 @@ symlink.
     Prints the references graph of the store paths *paths* in the
     [GraphML](http://graphml.graphdrawing.org/) file format. This can be
     used to visualise dependency graphs. To obtain a build-time
-    dependency graph, apply this to a store derivation. To obtain a
+    dependency graph, apply this to a [store derivation]. To obtain a
     runtime dependency graph, apply it to an output path.
 
   - `--binding` *name*; `-b` *name*\
     Prints the value of the attribute *name* (i.e., environment
-    variable) of the store derivations *paths*. It is an error for a
+    variable) of the [store derivation]s *paths*. It is an error for a
     derivation to not have the specified attribute.
 
   - `--hash`\

@@ -12,6 +12,7 @@ namespace nix {
     class LibExprTest : public ::testing::Test {
         public:
             static void SetUpTestSuite() {
+                initLibStore();
                 initGC();
             }
 
@@ -123,7 +124,7 @@ namespace nix {
 
     MATCHER_P(IsAttrsOfSize, n, fmt("Is a set of size [%1%]", n)) {
         if (arg.type() != nAttrs) {
-            *result_listener << "Expexted set got " << arg.type();
+            *result_listener << "Expected set got " << arg.type();
             return false;
         } else if (arg.attrs->size() != (size_t)n) {
             *result_listener << "Expected a set with " << n << " attributes but got " << arg.attrs->size();

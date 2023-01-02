@@ -54,13 +54,6 @@ typedef enum {
     lvlVomit
 } Verbosity;
 
-/* adjust Pos::origin bit width when adding stuff here */
-typedef enum {
-    foFile,
-    foStdin,
-    foString
-} FileOrigin;
-
 // the lines of code surrounding an error.
 struct LinesOfCode {
     std::optional<std::string> prevLineOfCode;
@@ -68,47 +61,30 @@ struct LinesOfCode {
     std::optional<std::string> nextLineOfCode;
 };
 
-// ErrPos indicates the location of an error in a nix file.
-struct ErrPos {
-    int line = 0;
-    int column = 0;
-    std::string file;
-    FileOrigin origin;
+/* An abstract type that represents a location in a source file. */
+struct AbstractPos
+{
+    uint32_t line = 0;
+    uint32_t column = 0;
 
-    operator bool() const
-    {
-        return line != 0;
-    }
+    /* Return the contents of the source file. */
+    virtual std::optional<std::string> getSource() const
+    { return std::nullopt; };
 
-    // convert from the Pos struct, found in libexpr.
-    template <class P>
-    ErrPos & operator=(const P & pos)
-    {
-        origin = pos.origin;
-        line = pos.line;
-        column = pos.column;
-        file = pos.file;
-        return *this;
-    }
+    virtual void print(std::ostream & out) const = 0;
 
-    template <class P>
-    ErrPos(const P & p)
-    {
-        *this = p;
-    }
+    std::optional<LinesOfCode> getCodeLines() const;
 };
 
-std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos);
+std::ostream & operator << (std::ostream & str, const AbstractPos & pos);
 
 void printCodeLines(std::ostream & out,
     const std::string & prefix,
-    const ErrPos & errPos,
+    const AbstractPos & errPos,
     const LinesOfCode & loc);
 
-void printAtPos(const ErrPos & pos, std::ostream & out);
-
 struct Trace {
-    std::optional<ErrPos> pos;
+    std::shared_ptr<AbstractPos> pos;
     hintformat hint;
     bool frame;
 };
@@ -116,7 +92,7 @@ struct Trace {
 struct ErrorInfo {
     Verbosity level;
     hintformat msg;
-    std::optional<ErrPos> errPos;
+    std::shared_ptr<AbstractPos> errPos;
     std::list<Trace> traces;
 
     Suggestions suggestions;
@@ -179,17 +155,18 @@ public:
     const std::string & msg() const { return calcWhat(); }
     const ErrorInfo & info() const { calcWhat(); return err; }
 
-    void pushTrace(Trace trace) {
+    void pushTrace(Trace trace)
+    {
         err.traces.push_front(trace);
     }
 
     template<typename... Args>
-    void addTrace(std::optional<ErrPos> e, std::string_view fs, const Args & ... args)
+    void addTrace(std::shared_ptr<AbstractPos> && e, std::string_view fs, const Args & ... args)
     {
-        addTrace(e, hintfmt(std::string(fs), args...));
+        addTrace(std::move(e), hintfmt(std::string(fs), args...));
     }
 
-    void addTrace(std::optional<ErrPos> e, hintformat hint, bool frame = false);
+    void addTrace(std::shared_ptr<AbstractPos> && e, hintformat hint, bool frame = false);
 
     bool hasTrace() const { return !err.traces.empty(); }
 

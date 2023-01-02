@@ -645,17 +645,17 @@ NixInt AttrCursor::getInt()
             cachedValue = root->db->getAttr(getKey());
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
             if (auto i = std::get_if<int_t>(&cachedValue->second)) {
-                debug("using cached Integer attribute '%s'", getAttrPathStr());
+                debug("using cached integer attribute '%s'", getAttrPathStr());
                 return i->x;
             } else
-                throw TypeError("'%s' is not an Integer", getAttrPathStr());
+                throw TypeError("'%s' is not an integer", getAttrPathStr());
         }
     }
 
     auto & v = forceValue();
 
     if (v.type() != nInt)
-        throw TypeError("'%s' is not an Integer", getAttrPathStr());
+        throw TypeError("'%s' is not an integer", getAttrPathStr());
 
     return v.integer;
 }

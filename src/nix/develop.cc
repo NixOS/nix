@@ -164,6 +164,14 @@ struct BuildEnvironment
     {
         return vars == other.vars && bashFunctions == other.bashFunctions;
     }
+
+    std::string getSystem() const
+    {
+        if (auto v = get(vars, "system"))
+            return getString(*v);
+        else
+            return settings.thisSystem;
+    }
 };
 
 const static std::string getEnvSh =
@@ -192,10 +200,12 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     drv.env.erase("allowedRequisites");
     drv.env.erase("disallowedReferences");
     drv.env.erase("disallowedRequisites");
+    drv.env.erase("name");
 
     /* Rehash and write the derivation. FIXME: would be nice to use
        'buildDerivation', but that's privileged. */
     drv.name += "-env";
+    drv.env.emplace("name", drv.name);
     drv.inputSrcs.insert(std::move(getEnvShPath));
     if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
         for (auto & output : drv.outputs) {
@@ -568,7 +578,7 @@ struct CmdDevelop : Common, MixEnvironment
             }
         }
 
-        runProgramInStore(store, shell, args);
+        runProgramInStore(store, shell, args, buildEnvironment.getSystem());
     }
 };
 

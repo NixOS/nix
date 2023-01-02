@@ -14,6 +14,7 @@
 #include "path-info.hh"
 #include "repair-flag.hh"
 
+#include <nlohmann/json_fwd.hpp>
 #include <atomic>
 #include <limits>
 #include <map>
@@ -68,7 +69,6 @@ struct Derivation;
 class FSAccessor;
 class NarInfoDiskCache;
 class Store;
-class JSONPlaceholder;
 
 
 enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
@@ -179,7 +179,7 @@ public:
 
     /* Return true if ‘path’ is in the Nix store (but not the Nix
        store itself). */
-    bool isInStore(const Path & path) const;
+    bool isInStore(PathView path) const;
 
     /* Return true if ‘path’ is a store path, i.e. a direct child of
        the Nix store. */
@@ -187,7 +187,7 @@ public:
 
     /* Split a path like /nix/store/<hash>-<name>/<bla> into
        /nix/store/<hash>-<name> and /<bla>. */
-    std::pair<StorePath, Path> toStorePath(const Path & path) const;
+    std::pair<StorePath, Path> toStorePath(PathView path) const;
 
     /* Follow symlinks until we end up with a path in the Nix store. */
     Path followLinksToStore(std::string_view path) const;
@@ -512,7 +512,7 @@ public:
        variable elements such as the registration time are
        included. If ‘showClosureSize’ is true, the closure size of
        each path is included. */
-    void pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & storePaths,
+    nlohmann::json pathInfoToJSON(const StorePathSet & storePaths,
         bool includeImpureInfo, bool showClosureSize,
         Base hashBase = Base32,
         AllowInvalidFlag allowInvalid = DisallowInvalid);

@@ -82,7 +82,7 @@ public:
         log(lvlInfo, fs);
     }
 
-    virtual void logEI(const ErrorInfo &ei) = 0;
+    virtual void logEI(const ErrorInfo & ei) = 0;
 
     void logEI(Verbosity lvl, ErrorInfo ei)
     {
@@ -225,7 +225,11 @@ inline void warn(const std::string & fs, const Args & ... args)
     logger->warn(f.str());
 }
 
-void warnOnce(bool & haveWarned, const FormatOrString & fs);
+#define warnOnce(haveWarned, args...) \
+    if (!haveWarned) {                \
+        haveWarned = true;            \
+        warn(args);                   \
+    }
 
 void writeToStderr(std::string_view s);
 

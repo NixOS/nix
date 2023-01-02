@@ -60,7 +60,6 @@ void copyContext(const Value & v, PathSet & context);
 typedef std::map<Path, StorePath> SrcToStore;
 
 
-std::ostream & printValue(const EvalState & state, std::ostream & str, const Value & v);
 std::string printValue(const EvalState & state, const Value & v);
 std::ostream & operator << (std::ostream & os, const ValueType t);
 
@@ -78,7 +77,7 @@ struct RegexCache;
 std::shared_ptr<RegexCache> makeRegexCache();
 
 struct DebugTrace {
-    std::optional<ErrPos> pos;
+    std::shared_ptr<AbstractPos> pos;
     const Expr & expr;
     const Env & env;
     hintformat hint;
@@ -437,8 +436,12 @@ private:
     friend struct ExprAttrs;
     friend struct ExprLet;
 
-    Expr * parse(char * text, size_t length, FileOrigin origin, const PathView path,
-        const PathView basePath, std::shared_ptr<StaticEnv> & staticEnv);
+    Expr * parse(
+        char * text,
+        size_t length,
+        Pos::Origin origin,
+        Path basePath,
+        std::shared_ptr<StaticEnv> & staticEnv);
 
 public:
 
@@ -569,6 +572,10 @@ struct EvalSettings : Config
     EvalSettings();
 
     static Strings getDefaultNixPath();
+
+    static bool isPseudoUrl(std::string_view s);
+
+    static std::string resolvePseudoUrl(std::string_view url);
 
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation",
         "Whether builtin functions that allow executing native code should be enabled."};

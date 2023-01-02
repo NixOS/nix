@@ -168,7 +168,7 @@ SourceExprCommand::SourceExprCommand(bool supportReadOnlyMode)
 
     addFlag({
         .longName = "derivation",
-        .description = "Operate on the store derivation rather than its outputs.",
+        .description = "Operate on the [store derivation](../../glossary.md#gloss-store-derivation) rather than its outputs.",
         .category = installablesCategory,
         .handler = {&operateOn, OperateOn::Derivation},
     });
@@ -207,55 +207,59 @@ Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
 
 void SourceExprCommand::completeInstallable(std::string_view prefix)
 {
-    if (file) {
-        completionType = ctAttrs;
+    try {
+        if (file) {
+            completionType = ctAttrs;
 
-        evalSettings.pureEval = false;
-        auto state = getEvalState();
-        Expr *e = state->parseExprFromFile(
-            resolveExprPath(state->checkSourcePath(lookupFileArg(*state, *file)))
-        );
+            evalSettings.pureEval = false;
+            auto state = getEvalState();
+            Expr *e = state->parseExprFromFile(
+                resolveExprPath(state->checkSourcePath(lookupFileArg(*state, *file)))
+                );
 
-        Value root;
-        state->eval(e, root);
+            Value root;
+            state->eval(e, root);
 
-        auto autoArgs = getAutoArgs(*state);
+            auto autoArgs = getAutoArgs(*state);
 
-        std::string prefix_ = std::string(prefix);
-        auto sep = prefix_.rfind('.');
-        std::string searchWord;
-        if (sep != std::string::npos) {
-            searchWord = prefix_.substr(sep + 1, std::string::npos);
-            prefix_ = prefix_.substr(0, sep);
-        } else {
-            searchWord = prefix_;
-            prefix_ = "";
-        }
+            std::string prefix_ = std::string(prefix);
+            auto sep = prefix_.rfind('.');
+            std::string searchWord;
+            if (sep != std::string::npos) {
+                searchWord = prefix_.substr(sep + 1, std::string::npos);
+                prefix_ = prefix_.substr(0, sep);
+            } else {
+                searchWord = prefix_;
+                prefix_ = "";
+            }
 
-        auto [v, pos] = findAlongAttrPath(*state, prefix_, *autoArgs, root);
-        Value &v1(*v);
-        state->forceValue(v1, pos);
-        Value v2;
-        state->autoCallFunction(*autoArgs, v1, v2);
+            auto [v, pos] = findAlongAttrPath(*state, prefix_, *autoArgs, root);
+            Value &v1(*v);
+            state->forceValue(v1, pos);
+            Value v2;
+            state->autoCallFunction(*autoArgs, v1, v2);
 
-        if (v2.type() == nAttrs) {
-            for (auto & i : *v2.attrs) {
-                std::string name = state->symbols[i.name];
-                if (name.find(searchWord) == 0) {
-                    if (prefix_ == "")
-                        completions->add(name);
-                    else
-                        completions->add(prefix_ + "." + name);
+            if (v2.type() == nAttrs) {
+                for (auto & i : *v2.attrs) {
+                    std::string name = state->symbols[i.name];
+                    if (name.find(searchWord) == 0) {
+                        if (prefix_ == "")
+                            completions->add(name);
+                        else
+                            completions->add(prefix_ + "." + name);
+                    }
                 }
             }
+        } else {
+            completeFlakeRefWithFragment(
+                getEvalState(),
+                lockFlags,
+                getDefaultFlakeAttrPathPrefixes(),
+                getDefaultFlakeAttrPaths(),
+                prefix);
         }
-    } else {
-        completeFlakeRefWithFragment(
-            getEvalState(),
-            lockFlags,
-            getDefaultFlakeAttrPathPrefixes(),
-            getDefaultFlakeAttrPaths(),
-            prefix);
+    } catch (EvalError&) {
+        // Don't want eval errors to mess-up with the completion engine, so let's just swallow them
     }
 }
 
@@ -395,44 +399,56 @@ static StorePath getDeriver(
 struct InstallableStorePath : Installable
 {
     ref<Store> store;
-    StorePath storePath;
+    DerivedPath req;
 
     InstallableStorePath(ref<Store> store, StorePath && storePath)
-        : store(store), storePath(std::move(storePath)) { }
+        : store(store),
+          req(storePath.isDerivation()
+              ? (DerivedPath) DerivedPath::Built {
+                  .drvPath = std::move(storePath),
+                  .outputs = {},
+              }
+              : (DerivedPath) DerivedPath::Opaque {
+                  .path = std::move(storePath),
+              })
+    { }
 
-    std::string what() const override { return store->printStorePath(storePath); }
+    InstallableStorePath(ref<Store> store, DerivedPath && req)
+        : store(store), req(std::move(req))
+    { }
+
+    std::string what() const override
+    {
+        return req.to_string(*store);
+    }
 
     DerivedPaths toDerivedPaths() override
     {
-        if (storePath.isDerivation()) {
-            auto drv = store->readDerivation(storePath);
-            return {
-                DerivedPath::Built {
-                    .drvPath = storePath,
-                    .outputs = drv.outputNames(),
-                }
-            };
-        } else {
-            return {
-                DerivedPath::Opaque {
-                    .path = storePath,
-                }
-            };
-        }
+        return { req };
     }
 
     StorePathSet toDrvPaths(ref<Store> store) override
     {
-        if (storePath.isDerivation()) {
-            return {storePath};
-        } else {
-            return {getDeriver(store, *this, storePath)};
-        }
+        return std::visit(overloaded {
+            [&](const DerivedPath::Built & bfd) -> StorePathSet {
+                return { bfd.drvPath };
+            },
+            [&](const DerivedPath::Opaque & bo) -> StorePathSet {
+                return { getDeriver(store, *this, bo.path) };
+            },
+        }, req.raw());
     }
 
     std::optional<StorePath> getStorePath() override
     {
-        return storePath;
+        return std::visit(overloaded {
+            [&](const DerivedPath::Built & bfd) {
+                return bfd.drvPath;
+            },
+            [&](const DerivedPath::Opaque & bo) {
+                return bo.path;
+            },
+        }, req.raw());
     }
 };
 
@@ -777,7 +793,8 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         if (file == "-") {
             auto e = state->parseStdin();
             state->eval(e, *vFile);
-        } else if (file)
+        }
+        else if (file)
             state->evalFile(lookupFileArg(*state, *file), *vFile);
         else {
             auto e = state->parseExprFromString(*expr, absPath("."));
@@ -798,7 +815,22 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         for (auto & s : ss) {
             std::exception_ptr ex;
 
-            if (s.find('/') != std::string::npos) {
+            auto found = s.rfind('^');
+            if (found != std::string::npos) {
+                try {
+                    result.push_back(std::make_shared<InstallableStorePath>(
+                        store,
+                        DerivedPath::Built::parse(*store, s.substr(0, found), s.substr(found + 1))));
+                    continue;
+                } catch (BadStorePath &) {
+                } catch (...) {
+                    if (!ex)
+                        ex = std::current_exception();
+                }
+            }
+
+            found = s.find('/');
+            if (found != std::string::npos) {
                 try {
                     result.push_back(std::make_shared<InstallableStorePath>(store, store->followLinksToStorePath(s)));
                     continue;
@@ -840,20 +872,20 @@ std::shared_ptr<Installable> SourceExprCommand::parseInstallable(
     return installables.front();
 }
 
-BuiltPaths Installable::build(
+std::vector<BuiltPathWithResult> Installable::build(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode,
     const std::vector<std::shared_ptr<Installable>> & installables,
     BuildMode bMode)
 {
-    BuiltPaths res;
-    for (auto & [_, builtPath] : build2(evalStore, store, mode, installables, bMode))
-        res.push_back(builtPath);
+    std::vector<BuiltPathWithResult> res;
+    for (auto & [_, builtPathWithResult] : build2(evalStore, store, mode, installables, bMode))
+        res.push_back(builtPathWithResult);
     return res;
 }
 
-std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::build2(
+std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> Installable::build2(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode,
@@ -873,7 +905,7 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::bui
         }
     }
 
-    std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> res;
+    std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> res;
 
     switch (mode) {
 
@@ -914,10 +946,10 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::bui
                                     output, *drvOutput->second);
                             }
                         }
-                        res.push_back({installable, BuiltPath::Built { bfd.drvPath, outputs }});
+                        res.push_back({installable, {.path = BuiltPath::Built { bfd.drvPath, outputs }}});
                     },
                     [&](const DerivedPath::Opaque & bo) {
-                        res.push_back({installable, BuiltPath::Opaque { bo.path }});
+                        res.push_back({installable, {.path = BuiltPath::Opaque { bo.path }}});
                     },
                 }, path.raw());
             }
@@ -927,7 +959,7 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::bui
 
     case Realise::Outputs: {
         if (settings.printMissing)
-          printMissing(store, pathsToBuild, lvlInfo);
+            printMissing(store, pathsToBuild, lvlInfo);
 
         for (auto & buildResult : store->buildPathsWithResults(pathsToBuild, bMode, evalStore)) {
             if (!buildResult.success())
@@ -939,10 +971,10 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::bui
                         std::map<std::string, StorePath> outputs;
                         for (auto & path : buildResult.builtOutputs)
                             outputs.emplace(path.first.outputName, path.second.outPath);
-                        res.push_back({installable, BuiltPath::Built { bfd.drvPath, outputs }});
+                        res.push_back({installable, {.path = BuiltPath::Built { bfd.drvPath, outputs }, .result = buildResult}});
                     },
                     [&](const DerivedPath::Opaque & bo) {
-                        res.push_back({installable, BuiltPath::Opaque { bo.path }});
+                        res.push_back({installable, {.path = BuiltPath::Opaque { bo.path }, .result = buildResult}});
                     },
                 }, buildResult.path.raw());
             }
@@ -965,9 +997,12 @@ BuiltPaths Installable::toBuiltPaths(
     OperateOn operateOn,
     const std::vector<std::shared_ptr<Installable>> & installables)
 {
-    if (operateOn == OperateOn::Output)
-        return Installable::build(evalStore, store, mode, installables);
-    else {
+    if (operateOn == OperateOn::Output) {
+        BuiltPaths res;
+        for (auto & p : Installable::build(evalStore, store, mode, installables))
+            res.push_back(p.path);
+        return res;
+    } else {
         if (mode == Realise::Nothing)
             settings.readOnlyMode = true;
 

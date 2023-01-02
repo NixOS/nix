@@ -7,7 +7,6 @@
 #include "globals.hh"
 #include "eval-inline.hh"
 #include "filetransfer.hh"
-#include "json.hh"
 #include "function-trace.hh"
 
 #include <algorithm>
@@ -21,6 +20,7 @@
 #include <functional>
 
 #include <sys/resource.h>
+#include <nlohmann/json.hpp>
 
 #if HAVE_BOEHMGC
 
@@ -35,6 +35,8 @@
 
 #endif
 
+using json = nlohmann::json;
+
 namespace nix {
 
 static char * allocString(size_t size)
@@ -43,7 +45,7 @@ static char * allocString(size_t size)
 #if HAVE_BOEHMGC
     t = (char *) GC_MALLOC_ATOMIC(size);
 #else
-    t = malloc(size);
+    t = (char *) malloc(size);
 #endif
     if (!t) throw std::bad_alloc();
     return t;
@@ -65,24 +67,17 @@ static char * dupString(const char * s)
 
 // When there's no need to write to the string, we can optimize away empty
 // string allocations.
-// This function handles makeImmutableStringWithLen(null, 0) by returning the
-// empty string.
-static const char * makeImmutableStringWithLen(const char * s, size_t size)
+// This function handles makeImmutableString(std::string_view()) by returning
+// the empty string.
+static const char * makeImmutableString(std::string_view s)
 {
-    char * t;
+    const size_t size = s.size();
     if (size == 0)
         return "";
-#if HAVE_BOEHMGC
-    t = GC_STRNDUP(s, size);
-#else
-    t = strndup(s, size);
-#endif
-    if (!t) throw std::bad_alloc();
+    auto t = allocString(size + 1);
+    memcpy(t, s.data(), size);
+    t[size] = '\0';
     return t;
-}
-
-static inline const char * makeImmutableString(std::string_view s) {
-    return makeImmutableStringWithLen(s.data(), s.size());
 }
 
 
@@ -404,7 +399,8 @@ static Strings parseNixPath(const std::string & s)
         }
 
         if (*p == ':') {
-            if (isUri(std::string(start2, s.end()))) {
+            auto prefix = std::string(start2, s.end());
+            if (EvalSettings::isPseudoUrl(prefix) || hasPrefix(prefix, "flake:")) {
                 ++p;
                 while (p != s.end() && *p != ':') ++p;
             }
@@ -436,21 +432,23 @@ ErrorBuilder & ErrorBuilder::withFrameTrace(PosIdx pos, const std::string_view t
     return *this;
 }
 
-ErrorBuilder & ErrorBuilder::withSuggestions(Suggestions & s) {
+ErrorBuilder & ErrorBuilder::withSuggestions(Suggestions & s)
+{
     info.suggestions = s;
     return *this;
 }
 
-ErrorBuilder & ErrorBuilder::withFrame(const Env & env, const Expr & expr) {
+ErrorBuilder & ErrorBuilder::withFrame(const Env & env, const Expr & expr)
+{
     // NOTE: This is abusing side-effects.
     // TODO: check compatibility with nested debugger calls.
     state.debugTraces.push_front(DebugTrace {
-                                     .pos = std::nullopt,
-                                     .expr = expr,
-                                     .env = env,
-                                     .hint = hintformat("Fake frame for debugg{ing,er} purposes"),
-                                     .isError = true
-                                 });
+        .pos = nullptr,
+        .expr = expr,
+        .env = env,
+        .hint = hintformat("Fake frame for debugging purposes"),
+        .isError = true
+    });
     return *this;
 }
 
@@ -508,9 +506,6 @@ EvalState::EvalState(
 #if HAVE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
     , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
-#else
-    , valueAllocCache(std::make_shared<void *>(nullptr))
-    , env1AllocCache(std::make_shared<void *>(nullptr))
 #endif
     , baseEnv(allocEnv(128))
     , staticBaseEnv{std::make_shared<StaticEnv>(false, nullptr)}
@@ -842,7 +837,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
         ? std::make_unique<DebugTraceStacker>(
             *this,
             DebugTrace {
-                .pos = error->info().errPos ? *error->info().errPos : positions[expr.getPos()],
+                .pos = error->info().errPos ? error->info().errPos : static_cast<std::shared_ptr<AbstractPos>>(positions[expr.getPos()]),
                 .expr = expr,
                 .env = env,
                 .hint = error->info().msg,
@@ -869,7 +864,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
 
 void EvalState::addErrorTrace(Error & e, const char * s, const std::string & s2) const
 {
-    e.addTrace(std::nullopt, s, s2);
+    e.addTrace(nullptr, s, s2);
 }
 
 void EvalState::addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2, bool frame) const
@@ -881,13 +876,13 @@ static std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(
     EvalState & state,
     Expr & expr,
     Env & env,
-    std::optional<ErrPos> pos,
+    std::shared_ptr<AbstractPos> && pos,
     const char * s,
     const std::string & s2)
 {
     return std::make_unique<DebugTraceStacker>(state,
         DebugTrace {
-            .pos = pos,
+            .pos = std::move(pos),
             .expr = expr,
             .env = env,
             .hint = hintfmt(s, s2),
@@ -993,9 +988,9 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 void EvalState::mkPos(Value & v, PosIdx p)
 {
     auto pos = positions[p];
-    if (!pos.file.empty()) {
+    if (auto path = std::get_if<Path>(&pos.origin)) {
         auto attrs = buildBindings(3);
-        attrs.alloc(sFile).mkString(pos.file);
+        attrs.alloc(sFile).mkString(*path);
         attrs.alloc(sLine).mkInt(pos.line);
         attrs.alloc(sColumn).mkInt(pos.column);
         v.mkAttrs(attrs);
@@ -1103,7 +1098,7 @@ void EvalState::cacheFile(
                 *this,
                 *e,
                 this->baseEnv,
-                e->getPos() ? std::optional(ErrPos(positions[e->getPos()])) : std::nullopt,
+                e->getPos() ? static_cast<std::shared_ptr<AbstractPos>>(positions[e->getPos()]) : nullptr,
                 "while evaluating the file '%1%':", resolvedPath)
             : nullptr;
 
@@ -1373,10 +1368,13 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
         state.forceValue(*vAttrs, (pos2 ? pos2 : this->pos ) );
 
     } catch (Error & e) {
-        auto pos2r = state.positions[pos2];
-        if (pos2 && pos2r.file != state.derivationNixPath)
-            state.addErrorTrace(e, pos2, "while evaluating the attribute '%1%'",
-                showAttrPath(state, env, attrPath));
+        if (pos2) {
+            auto pos2r = state.positions[pos2];
+            auto origin = std::get_if<Path>(&pos2r.origin);
+            if (!(origin && *origin == state.derivationNixPath))
+                state.addErrorTrace(e, pos2, "while evaluating the attribute '%1%'",
+                    showAttrPath(state, env, attrPath));
+        }
         throw;
     }
 
@@ -1519,7 +1517,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 auto dts = debugRepl
                     ? makeDebugTraceStacker(
                         *this, *lambda.body, env2, positions[lambda.pos],
-                        "while evaluating %s",
+                        "while calling %s",
                         lambda.name
                         ? concatStrings("'", symbols[lambda.name], "'")
                         : "anonymous lambda")
@@ -1528,13 +1526,14 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 lambda.body->eval(*this, env2, vCur);
             } catch (Error & e) {
                 if (loggerSettings.showTrace.get()) {
-                    addErrorTrace(e,
-                                  lambda.pos,
-                                  "while evaluating %s",
-                                  lambda.name
-                                  ? concatStrings("'", symbols[lambda.name], "'")
-                                  : "anonymous lambda",
-                                  true);
+                    addErrorTrace(
+                        e,
+                        lambda.pos,
+                        "while calling %s",
+                        lambda.name
+                        ? concatStrings("'", symbols[lambda.name], "'")
+                        : "anonymous lambda",
+                        true);
                     if (pos) addErrorTrace(e, pos, "from call site%s", "", true);
                 }
                 throw;
@@ -1704,7 +1703,7 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 Nix attempted to evaluate a function as a top level expression; in
 this case it must have its arguments supplied either by default
 values, or passed explicitly with '--arg' or '--argstr'. See
-https://nixos.org/manual/nix/stable/expressions/language-constructs.html#functions.)", symbols[i.name])
+https://nixos.org/manual/nix/stable/language/constructs.html#functions.)", symbols[i.name])
                     .atPos(i.pos).withFrame(*fun.lambda.env, *fun.lambda.fun).debugThrow<MissingArgumentError>();
             }
         }
@@ -2357,97 +2356,99 @@ void EvalState::printStats()
         std::fstream fs;
         if (outPath != "-")
             fs.open(outPath, std::fstream::out);
-        JSONObject topObj(outPath == "-" ? std::cerr : fs, true);
-        topObj.attr("cpuTime",cpuTime);
-        {
-            auto envs = topObj.object("envs");
-            envs.attr("number", nrEnvs);
-            envs.attr("elements", nrValuesInEnvs);
-            envs.attr("bytes", bEnvs);
-        }
-        {
-            auto lists = topObj.object("list");
-            lists.attr("elements", nrListElems);
-            lists.attr("bytes", bLists);
-            lists.attr("concats", nrListConcats);
-        }
-        {
-            auto values = topObj.object("values");
-            values.attr("number", nrValues);
-            values.attr("bytes", bValues);
-        }
-        {
-            auto syms = topObj.object("symbols");
-            syms.attr("number", symbols.size());
-            syms.attr("bytes", symbols.totalSize());
-        }
-        {
-            auto sets = topObj.object("sets");
-            sets.attr("number", nrAttrsets);
-            sets.attr("bytes", bAttrsets);
-            sets.attr("elements", nrAttrsInAttrsets);
-        }
-        {
-            auto sizes = topObj.object("sizes");
-            sizes.attr("Env", sizeof(Env));
-            sizes.attr("Value", sizeof(Value));
-            sizes.attr("Bindings", sizeof(Bindings));
-            sizes.attr("Attr", sizeof(Attr));
-        }
-        topObj.attr("nrOpUpdates", nrOpUpdates);
-        topObj.attr("nrOpUpdateValuesCopied", nrOpUpdateValuesCopied);
-        topObj.attr("nrThunks", nrThunks);
-        topObj.attr("nrAvoided", nrAvoided);
-        topObj.attr("nrLookups", nrLookups);
-        topObj.attr("nrPrimOpCalls", nrPrimOpCalls);
-        topObj.attr("nrFunctionCalls", nrFunctionCalls);
+        json topObj = json::object();
+        topObj["cpuTime"] = cpuTime;
+        topObj["envs"] = {
+            {"number", nrEnvs},
+            {"elements", nrValuesInEnvs},
+            {"bytes", bEnvs},
+        };
+        topObj["list"] = {
+            {"elements", nrListElems},
+            {"bytes", bLists},
+            {"concats", nrListConcats},
+        };
+        topObj["values"] = {
+            {"number", nrValues},
+            {"bytes", bValues},
+        };
+        topObj["symbols"] = {
+            {"number", symbols.size()},
+            {"bytes", symbols.totalSize()},
+        };
+        topObj["sets"] = {
+            {"number", nrAttrsets},
+            {"bytes", bAttrsets},
+            {"elements", nrAttrsInAttrsets},
+        };
+        topObj["sizes"] = {
+            {"Env", sizeof(Env)},
+            {"Value", sizeof(Value)},
+            {"Bindings", sizeof(Bindings)},
+            {"Attr", sizeof(Attr)},
+        };
+        topObj["nrOpUpdates"] = nrOpUpdates;
+        topObj["nrOpUpdateValuesCopied"] = nrOpUpdateValuesCopied;
+        topObj["nrThunks"] = nrThunks;
+        topObj["nrAvoided"] = nrAvoided;
+        topObj["nrLookups"] = nrLookups;
+        topObj["nrPrimOpCalls"] = nrPrimOpCalls;
+        topObj["nrFunctionCalls"] = nrFunctionCalls;
 #if HAVE_BOEHMGC
-        {
-            auto gc = topObj.object("gc");
-            gc.attr("heapSize", heapSize);
-            gc.attr("totalBytes", totalBytes);
-        }
+        topObj["gc"] = {
+            {"heapSize", heapSize},
+            {"totalBytes", totalBytes},
+        };
 #endif
 
         if (countCalls) {
+            topObj["primops"] = primOpCalls;
             {
-                auto obj = topObj.object("primops");
-                for (auto & i : primOpCalls)
-                    obj.attr(i.first, i.second);
-            }
-            {
-                auto list = topObj.list("functions");
+                auto& list = topObj["functions"];
+                list = json::array();
                 for (auto & [fun, count] : functionCalls) {
-                    auto obj = list.object();
+                    json obj = json::object();
                     if (fun->name)
-                        obj.attr("name", (std::string_view) symbols[fun->name]);
+                        obj["name"] = (std::string_view) symbols[fun->name];
                     else
-                        obj.attr("name", nullptr);
+                        obj["name"] = nullptr;
                     if (auto pos = positions[fun->pos]) {
-                        obj.attr("file", (std::string_view) pos.file);
-                        obj.attr("line", pos.line);
-                        obj.attr("column", pos.column);
+                        if (auto path = std::get_if<Path>(&pos.origin))
+                            obj["file"] = *path;
+                        obj["line"] = pos.line;
+                        obj["column"] = pos.column;
                     }
-                    obj.attr("count", count);
+                    obj["count"] = count;
+                    list.push_back(obj);
                 }
             }
             {
-                auto list = topObj.list("attributes");
+                auto list = topObj["attributes"];
+                list = json::array();
                 for (auto & i : attrSelects) {
-                    auto obj = list.object();
+                    json obj = json::object();
                     if (auto pos = positions[i.first]) {
-                        obj.attr("file", (const std::string &) pos.file);
-                        obj.attr("line", pos.line);
-                        obj.attr("column", pos.column);
+                        if (auto path = std::get_if<Path>(&pos.origin))
+                            obj["file"] = *path;
+                        obj["line"] = pos.line;
+                        obj["column"] = pos.column;
                     }
-                    obj.attr("count", i.second);
+                    obj["count"] = i.second;
+                    list.push_back(obj);
                 }
             }
         }
 
         if (getEnv("NIX_SHOW_SYMBOLS").value_or("0") != "0") {
-            auto list = topObj.list("symbols");
-            symbols.dump([&](const std::string & s) { list.elem(s); });
+            // XXX: overrides earlier assignment
+            topObj["symbols"] = json::array();
+            auto &list = topObj["symbols"];
+            symbols.dump([&](const std::string & s) { list.emplace_back(s); });
+        }
+        if (outPath == "-") {
+            std::cerr << topObj.dump(2) << std::endl;
+        } else {
+            fs << topObj.dump(2) << std::endl;
         }
     }
 }
@@ -2500,6 +2501,23 @@ Strings EvalSettings::getDefaultNixPath()
     }
 
     return res;
+}
+
+bool EvalSettings::isPseudoUrl(std::string_view s)
+{
+    if (s.compare(0, 8, "channel:") == 0) return true;
+    size_t pos = s.find("://");
+    if (pos == std::string::npos) return false;
+    std::string scheme(s, 0, pos);
+    return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "channel" || scheme == "git" || scheme == "s3" || scheme == "ssh";
+}
+
+std::string EvalSettings::resolvePseudoUrl(std::string_view url)
+{
+    if (hasPrefix(url, "channel:"))
+        return "https://nixos.org/channels/" + std::string(url.substr(8)) + "/nixexprs.tar.xz";
+    else
+        return std::string(url);
 }
 
 EvalSettings evalSettings;

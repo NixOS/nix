@@ -98,9 +98,9 @@ rec {
         { address = "192.168.0.10"; prefixLength = 24; }
       ];
 
-      nix.sandboxPaths = lib.mkForce [];
-      nix.binaryCaches = lib.mkForce [];
-      nix.useSandbox = lib.mkForce true;
+      nix.settings.extra-sandbox-paths = lib.mkForce [];
+      nix.settings.substituters = lib.mkForce [];
+      nix.settings.sandbox = lib.mkForce true;
     };
   };
 

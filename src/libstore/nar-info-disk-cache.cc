@@ -166,16 +166,37 @@ public:
         return i->second;
     }
 
+    std::optional<Cache> queryCacheRaw(State & state, const std::string & uri)
+    {
+        auto i = state.caches.find(uri);
+        if (i == state.caches.end()) {
+            auto queryCache(state.queryCache.use()(uri)(time(0) - cacheInfoTtl));
+            if (!queryCache.next())
+                return std::nullopt;
+            state.caches.emplace(uri,
+                Cache{(int) queryCache.getInt(0), queryCache.getStr(1), queryCache.getInt(2) != 0, (int) queryCache.getInt(3)});
+        }
+        return getCache(state, uri);
+    }
+
     void createCache(const std::string & uri, const Path & storeDir, bool wantMassQuery, int priority) override
     {
         retrySQLite<void>([&]() {
             auto state(_state.lock());
+            SQLiteTxn txn(state->db);
 
-            // FIXME: race
+            // To avoid the race, we have to check if maybe someone hasn't yet created
+            // the cache for this URI in the meantime.
+            auto cache(queryCacheRaw(*state, uri));
+
+            if (cache)
+                return;
 
             state->insertCache.use()(uri)(time(0))(storeDir)(wantMassQuery)(priority).exec();
             assert(sqlite3_changes(state->db) == 1);
             state->caches[uri] = Cache{(int) sqlite3_last_insert_rowid(state->db), storeDir, wantMassQuery, priority};
+
+            txn.commit();
         });
     }
 
@@ -183,21 +204,12 @@ public:
     {
         return retrySQLite<std::optional<CacheInfo>>([&]() -> std::optional<CacheInfo> {
             auto state(_state.lock());
-
-            auto i = state->caches.find(uri);
-            if (i == state->caches.end()) {
-                auto queryCache(state->queryCache.use()(uri)(time(0) - cacheInfoTtl));
-                if (!queryCache.next())
-                    return std::nullopt;
-                state->caches.emplace(uri,
-                    Cache{(int) queryCache.getInt(0), queryCache.getStr(1), queryCache.getInt(2) != 0, (int) queryCache.getInt(3)});
-            }
-
-            auto & cache(getCache(*state, uri));
-
+            auto cache(queryCacheRaw(*state, uri));
+            if (!cache)
+                return std::nullopt;
             return CacheInfo {
-                .wantMassQuery = cache.wantMassQuery,
-                .priority = cache.priority
+                .wantMassQuery = cache->wantMassQuery,
+                .priority = cache->priority
             };
         });
     }

@@ -5,14 +5,15 @@
 #include "globals.hh"
 #include "json-to-value.hh"
 #include "names.hh"
+#include "references.hh"
 #include "store-api.hh"
 #include "util.hh"
-#include "json.hh"
 #include "value-to-json.hh"
 #include "value-to-xml.hh"
 #include "primops.hh"
 
 #include <boost/container/small_vector.hpp>
+#include <nlohmann/json.hpp>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -361,8 +362,7 @@ void prim_exec(EvalState & state, const PosIdx pos, Value * * args, Value & v)
     auto output = runProgram(program, true, commandArgs);
     Expr * parsed;
     try {
-        auto base = state.positions[pos];
-        parsed = state.parseExprFromString(std::move(output), base.file);
+        parsed = state.parseExprFromString(std::move(output), "/");
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "while parsing the output from '%1%'", program);
         throw;
@@ -585,7 +585,7 @@ struct CompareValues
                     state.error("cannot compare %s with %s; values of that type are incomparable", showType(*v1), showType(*v2)).debugThrow<EvalError>();
             }
         } catch (Error & e) {
-            e.addTrace(std::nullopt, errorCtx);
+            e.addTrace(nullptr, errorCtx);
             throw;
         }
     }
@@ -788,8 +788,8 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * 
         v = *args[1];
     } catch (Error & e) {
         PathSet context;
-        e.addTrace(std::nullopt, state.coerceToString(pos, *args[0], context,
-                    "while evaluating the error message passed to builtins.addErrorContext").toOwned());
+        e.addTrace(nullptr, state.coerceToString(pos, *args[0], context,
+                "while evaluating the error message passed to builtins.addErrorContext").toOwned());
         throw;
     }
 }
@@ -1003,6 +1003,7 @@ static void prim_second(EvalState & state, const PosIdx pos, Value * * args, Val
    derivation. */
 static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    using nlohmann::json;
     state.forceAttrs(*args[0], pos, "while evaluating the argument passed to builtins.derivationStrict");
 
     /* Figure out the name first (for stack backtraces). */
@@ -1018,11 +1019,10 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
     }
 
     /* Check whether attributes should be passed as a JSON file. */
-    std::ostringstream jsonBuf;
-    std::unique_ptr<JSONObject> jsonObject;
+    std::optional<json> jsonObject;
     attr = args[0]->attrs->find(state.sStructuredAttrs);
     if (attr != args[0]->attrs->end() && state.forceBool(*attr->value, pos, "while evaluating the `__structuredAttrs` attribute passed to builtins.derivationStrict"))
-        jsonObject = std::make_unique<JSONObject>(jsonBuf);
+        jsonObject = json::object();
 
     /* Check whether null attributes should be ignored. */
     bool ignoreNulls = false;
@@ -1128,8 +1128,7 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
 
                     if (i->name == state.sStructuredAttrs) continue;
 
-                    auto placeholder(jsonObject->placeholder(key));
-                    printValueAsJSON(state, true, *i->value, pos, placeholder, context);
+                    (*jsonObject)[key] = printValueAsJSON(state, true, *i->value, pos, context);
 
                     if (i->name == state.sBuilder)
                         drv.builder = state.forceString(*i->value, context, posDrvName, "while evaluating the `builder` attribute passed to builtins.derivationStrict");
@@ -1173,8 +1172,8 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
     }
 
     if (jsonObject) {
+        drv.env.emplace("__json", jsonObject->dump());
         jsonObject.reset();
-        drv.env.emplace("__json", jsonBuf.str());
     }
 
     /* Everything in the context of the strings in the derivation
@@ -1452,10 +1451,10 @@ static RegisterPrimOp primop_storePath({
 static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     /* We don’t check the path right now, because we don’t want to
-      throw if the path isn’t allowed, but just return false (and we
-      can’t just catch the exception here because we still want to
-      throw if something in the evaluation of `*args[0]` tries to
-      access an unauthorized path). */
+       throw if the path isn’t allowed, but just return false (and we
+       can’t just catch the exception here because we still want to
+       throw if something in the evaluation of `*args[0]` tries to
+       access an unauthorized path). */
     auto path = realisePath(state, pos, *args[0], { .checkForPureEval = false });
 
     try {
@@ -1533,6 +1532,10 @@ static void prim_readFile(EvalState & state, const PosIdx pos, Value * * args, V
             refs = state.store->queryPathInfo(state.store->toStorePath(path).first)->references;
         } catch (Error &) { // FIXME: should be InvalidPathError
         }
+        // Re-scan references to filter down to just the ones that actually occur in the file.
+        auto refsSink = PathRefScanSink::fromPaths(refs);
+        refsSink << s;
+        refs = refsSink.getResultPaths();
     }
     auto context = state.store->printStorePathSet(refs);
     v.mkString(s, context);
@@ -1913,8 +1916,8 @@ static RegisterPrimOp primop_toFile({
       ";
       ```
 
-      Note that `${configFile}` is an
-      [antiquotation](language-values.md), so the result of the
+      Note that `${configFile}` is a
+      [string interpolation](language/values.md#type-string), so the result of the
       expression `configFile`
       (i.e., a path like `/nix/store/m7p7jfny445k...-foo.conf`) will be
       spliced into the resulting string.
@@ -2379,12 +2382,18 @@ static RegisterPrimOp primop_listToAttrs({
       Construct a set from a list specifying the names and values of each
       attribute. Each element of the list should be a set consisting of a
       string-valued attribute `name` specifying the name of the attribute,
-      and an attribute `value` specifying its value. Example:
+      and an attribute `value` specifying its value.
+
+      In case of duplicate occurrences of the same name, the first
+      takes precedence.
+
+      Example:
 
       ```nix
       builtins.listToAttrs
         [ { name = "foo"; value = 123; }
           { name = "bar"; value = 456; }
+          { name = "bar"; value = 420; }
         ]
       ```
 
@@ -2402,12 +2411,62 @@ static void prim_intersectAttrs(EvalState & state, const PosIdx pos, Value * * a
     state.forceAttrs(*args[0], pos, "while evaluating the first argument passed to builtins.intersectAttrs");
     state.forceAttrs(*args[1], pos, "while evaluating the second argument passed to builtins.intersectAttrs");
 
-    auto attrs = state.buildBindings(std::min(args[0]->attrs->size(), args[1]->attrs->size()));
+    Bindings &left = *args[0]->attrs;
+    Bindings &right = *args[1]->attrs;
 
-    for (auto & i : *args[0]->attrs) {
-        Bindings::iterator j = args[1]->attrs->find(i.name);
-        if (j != args[1]->attrs->end())
-            attrs.insert(*j);
+    auto attrs = state.buildBindings(std::min(left.size(), right.size()));
+
+    // The current implementation has good asymptotic complexity and is reasonably
+    // simple. Further optimization may be possible, but does not seem productive,
+    // considering the state of eval performance in 2022.
+    //
+    // I have looked for reusable and/or standard solutions and these are my
+    // findings:
+    //
+    // STL
+    // ===
+    // std::set_intersection is not suitable, as it only performs a simultaneous
+    // linear scan; not taking advantage of random access. This is O(n + m), so
+    // linear in the largest set, which is not acceptable for callPackage in Nixpkgs.
+    //
+    // Simultaneous scan, with alternating simple binary search
+    // ===
+    // One alternative algorithm scans the attrsets simultaneously, jumping
+    // forward using `lower_bound` in case of inequality. This should perform
+    // well on very similar sets, having a local and predictable access pattern.
+    // On dissimilar sets, it seems to need more comparisons than the current
+    // algorithm, as few consecutive attrs match. `lower_bound` could take
+    // advantage of the decreasing remaining search space, but this causes
+    // the medians to move, which can mean that they don't stay in the cache
+    // like they would with the current naive `find`.
+    //
+    // Double binary search
+    // ===
+    // The optimal algorithm may be "Double binary search", which doesn't
+    // scan at all, but rather divides both sets simultaneously.
+    // See "Fast Intersection Algorithms for Sorted Sequences" by Baeza-Yates et al.
+    // https://cs.uwaterloo.ca/~ajsaling/papers/intersection_alg_app10.pdf
+    // The only downsides I can think of are not having a linear access pattern
+    // for similar sets, and having to maintain a more intricate algorithm.
+    //
+    // Adaptive
+    // ===
+    // Finally one could run try a simultaneous scan, count misses and fall back
+    // to double binary search when the counter hit some threshold and/or ratio.
+
+    if (left.size() < right.size()) {
+        for (auto & l : left) {
+            Bindings::iterator r = right.find(l.name);
+            if (r != right.end())
+                attrs.insert(*r);
+        }
+    }
+    else {
+        for (auto & r : right) {
+            Bindings::iterator l = left.find(r.name);
+            if (l != left.end())
+                attrs.insert(r);
+        }
     }
 
     v.mkAttrs(attrs.alreadySorted());
@@ -2419,6 +2478,8 @@ static RegisterPrimOp primop_intersectAttrs({
     .doc = R"(
       Return a set consisting of the attributes in the set *e2* which have the
       same name as some attribute in *e1*.
+
+      Performs in O(*n* log *m*) where *n* is the size of the smaller set and *m* the larger set's size.
     )",
     .fun = prim_intersectAttrs,
 });
@@ -3999,7 +4060,7 @@ void EvalState::createBaseEnv()
         // the parser needs two NUL bytes as terminators; one of them
         // is implied by being a C string.
         "\0";
-    eval(parse(code, sizeof(code), foFile, derivationNixPath, "/", staticBaseEnv), *vDerivation);
+    eval(parse(code, sizeof(code), derivationNixPath, "/", staticBaseEnv), *vDerivation);
 }
 
 

@@ -131,6 +131,10 @@ StringSet Settings::getDefaultSystemFeatures()
     StringSet features{"nixos-test", "benchmark", "big-parallel"};
 
     #if __linux__
+    features.insert("uid-range");
+    #endif
+
+    #if __linux__
     if (access("/dev/kvm", R_OK | W_OK) == 0)
         features.insert("kvm");
     #endif
@@ -286,5 +290,19 @@ void initPlugins()
     /* Tell the user if they try to set plugin-files after we've already loaded */
     settings.pluginFiles.pluginsLoaded = true;
 }
+
+static bool initLibStoreDone = false;
+
+void assertLibStoreInitialized() {
+    if (!initLibStoreDone) {
+        printError("The program must call nix::initNix() before calling any libstore library functions.");
+        abort();
+    };
+}
+
+void initLibStore() {
+    initLibStoreDone = true;
+}
+
 
 }

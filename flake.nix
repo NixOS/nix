@@ -1,7 +1,7 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.05-small";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.11-small";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
 
@@ -9,13 +9,13 @@
 
     let
 
-      version = builtins.readFile ./.version + versionSuffix;
+      officialRelease = false;
+
+      version = nixpkgs.lib.fileContents ./.version + versionSuffix;
       versionSuffix =
         if officialRelease
         then ""
         else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
-
-      officialRelease = false;
 
       linux64BitSystems = [ "x86_64-linux" "aarch64-linux" ];
       linuxSystems = linux64BitSystems ++ [ "i686-linux" ];
@@ -108,7 +108,7 @@
           ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)];
 
         buildDeps =
-          [ (curl.override { patchNetrcRegression = true; })
+          [ curl
             bzip2 xz brotli editline
             openssl sqlite
             libarchive
@@ -127,13 +127,9 @@
           });
 
         propagatedDeps =
-          [ ((boehmgc.override {
+          [ (boehmgc.override {
               enableLargeConfig = true;
-            }).overrideAttrs(o: {
-              patches = (o.patches or []) ++ [
-                ./boehmgc-coroutine-sp-fallback.diff
-              ];
-            }))
+            })
             nlohmann_json
           ];
       };
@@ -364,7 +360,7 @@
 
               buildInputs =
                 [ nix
-                  (curl.override { patchNetrcRegression = true; })
+                  curl
                   bzip2
                   xz
                   pkgs.perl
@@ -419,6 +415,8 @@
 
         buildCross = nixpkgs.lib.genAttrs crossSystems (crossSystem:
           nixpkgs.lib.genAttrs ["x86_64-linux"] (system: self.packages.${system}."nix-${crossSystem}"));
+
+        buildNoGc = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix.overrideAttrs (a: { configureFlags = (a.configureFlags or []) ++ ["--enable-gc=no"];}));
 
         # Perl bindings for various platforms.
         perlBindings = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix.perl-bindings);
@@ -501,6 +499,12 @@
         });
 
         tests.sourcehutFlakes = (import ./tests/sourcehut-flakes.nix rec {
+          system = "x86_64-linux";
+          inherit nixpkgs;
+          overlay = self.overlays.default;
+        });
+
+        tests.containers = (import ./tests/containers.nix rec {
           system = "x86_64-linux";
           inherit nixpkgs;
           overlay = self.overlays.default;
