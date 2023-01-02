@@ -95,34 +95,18 @@ struct CmdWhyDepends : SourceExprCommand
          * to build.
          */
         auto dependency = parseInstallable(store, _dependency);
-        auto derivedDependency = dependency->toDerivedPath();
-        auto optDependencyPath = std::visit(overloaded {
-            [](const DerivedPath::Opaque & nodrv) -> std::optional<StorePath> {
-                return { nodrv.path };
-            },
-            [&](const DerivedPath::Built & hasdrv) -> std::optional<StorePath> {
-                if (hasdrv.outputs.size() != 1) {
-                    throw Error("argument '%s' should evaluate to one store path", dependency->what());
-                }
-                auto outputMap = store->queryPartialDerivationOutputMap(hasdrv.drvPath);
-                auto maybePath = outputMap.find(*hasdrv.outputs.begin());
-                if (maybePath == outputMap.end()) {
-                    throw Error("unexpected end of iterator");
-                }
-                return maybePath->second;
-            },
-        }, derivedDependency.raw());
+        auto dependencyPath = Installable::toStorePath(getEvalStore(), store, Realise::Derivation, operateOn, dependency);
+        auto dependencyPathHash = dependencyPath.hashPart();
 
         StorePathSet closure;
         store->computeFSClosure({packagePath}, closure, false, false);
 
-        if (!optDependencyPath.has_value() || !closure.count(*optDependencyPath)) {
-            printError("'%s' does not depend on '%s'", package->what(), dependency->what());
+        if (!closure.count(dependencyPath)) {
+            printError("'%s' does not depend on '%s'",
+                store->printStorePath(packagePath),
+                store->printStorePath(dependencyPath));
             return;
         }
-
-        auto dependencyPath = *optDependencyPath;
-        auto dependencyPathHash = dependencyPath.hashPart();
 
         stopProgressBar(); // FIXME
 
