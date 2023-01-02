@@ -903,10 +903,7 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> Instal
                                 DrvOutput outputId { *outputHash, output };
                                 auto realisation = store->queryRealisation(outputId);
                                 if (!realisation)
-                                    throw Error(
-                                        "cannot operate on an output of the "
-                                        "unbuilt derivation '%s'",
-                                        outputId.to_string());
+                                    throw MissingRealisation(outputId);
                                 outputs.insert_or_assign(output, realisation->outPath);
                             } else {
                                 // If ca-derivations isn't enabled, assume that
