@@ -8,7 +8,6 @@
 #include "error.hh"
 #include "chunked-vector.hh"
 
-
 namespace nix {
 
 

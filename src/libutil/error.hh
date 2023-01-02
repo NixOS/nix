@@ -86,6 +86,7 @@ void printCodeLines(std::ostream & out,
 struct Trace {
     std::shared_ptr<AbstractPos> pos;
     hintformat hint;
+    bool frame;
 };
 
 struct ErrorInfo {
@@ -113,6 +114,8 @@ protected:
 
 public:
     unsigned int status = 1; // exit status
+
+    BaseError(const BaseError &) = default;
 
     template<typename... Args>
     BaseError(unsigned int status, const Args & ... args)
@@ -152,15 +155,22 @@ public:
     const std::string & msg() const { return calcWhat(); }
     const ErrorInfo & info() const { calcWhat(); return err; }
 
-    template<typename... Args>
-    void addTrace(std::shared_ptr<AbstractPos> && e, const std::string & fs, const Args & ... args)
+    void pushTrace(Trace trace)
     {
-        addTrace(std::move(e), hintfmt(fs, args...));
+        err.traces.push_front(trace);
     }
 
-    void addTrace(std::shared_ptr<AbstractPos> && e, hintformat hint);
+    template<typename... Args>
+    void addTrace(std::shared_ptr<AbstractPos> && e, std::string_view fs, const Args & ... args)
+    {
+        addTrace(std::move(e), hintfmt(std::string(fs), args...));
+    }
+
+    void addTrace(std::shared_ptr<AbstractPos> && e, hintformat hint, bool frame = false);
 
     bool hasTrace() const { return !err.traces.empty(); }
+
+    const ErrorInfo & info() { return err; };
 };
 
 #define MakeError(newClass, superClass) \
