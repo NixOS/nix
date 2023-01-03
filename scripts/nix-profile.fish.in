@@ -1,3 +1,15 @@
+function add_path --argument-names new_path
+    if type -q fish_add_path
+        # fish 3.2.0 or newer
+	fish_add_path --prepend --global $new_path
+    else
+        # older versions of fish
+        if not contains $new_path $fish_user_paths
+            set --global fish_user_paths $new_path $fish_user_paths
+        end
+    end
+end
+
 if test -n "$HOME" && test -n "$USER"
 
     # Set up the per-user profile.
@@ -32,6 +44,8 @@ if test -n "$HOME" && test -n "$USER"
       set --export --prepend --path MANPATH "$NIX_LINK/share/man"
     end
 
-    fish_add_path --prepend --global "$NIX_LINK/bin"
+    add_path "$NIX_LINK/bin"
     set --erase NIX_LINK
 end
+
+functions -e add_path
