@@ -348,7 +348,7 @@ struct CmdFlakeCheck : FlakeCommand
                 // FIXME
                 auto app = App(*state, v);
                 for (auto & i : app.context) {
-                    auto [drvPathS, outputName] = decodeContext(i);
+                    auto [drvPathS, outputName] = NixStringContextElem::parse(i);
                     store->parseStorePath(drvPathS);
                 }
                 #endif

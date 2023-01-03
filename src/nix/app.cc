@@ -80,17 +80,27 @@ UnresolvedApp Installable::toApp(EvalState & state)
         auto [program, context] = cursor->getAttr("program")->getStringWithContext();
 
         std::vector<DerivedPath> context2;
-        for (auto & [path, name] : context) {
-            context2.push_back(name != "" || path.isDerivation()
-                ? (DerivedPath) DerivedPath::Built {
-                    .drvPath = path,
-                    .outputs = name != ""
-                        ? StringSet { name }
-                        : StringSet { },
-                }
-                : (DerivedPath) DerivedPath::Opaque {
-                    .path = path,
-                });
+        for (auto & c : context) {
+            context2.emplace_back(std::visit(overloaded {
+                [&](const NixStringContextElem::DrvDeep & d) -> DerivedPath {
+                    /* We want all outputs of the drv */
+                    return DerivedPath::Built {
+                        .drvPath = d.drvPath,
+                        .outputs = {},
+                    };
+                },
+                [&](const NixStringContextElem::Built & b) -> DerivedPath {
+                    return DerivedPath::Built {
+                        .drvPath = b.drvPath,
+                        .outputs = { b.output },
+                    };
+                },
+                [&](const NixStringContextElem::Opaque & o) -> DerivedPath {
+                    return DerivedPath::Opaque {
+                        .path = o.path,
+                    };
+                },
+            }, c.raw()));
         }
 
         return UnresolvedApp{App {
