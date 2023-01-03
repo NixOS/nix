@@ -268,9 +268,15 @@ In order to reflect changes to the [Makefile], clear all generated files before 
 rm $(git ls-files doc/manual/ -o | grep -F '.md') && rmdir doc/manual/src/command-ref/new-cli && make html -j $NIX_BUILD_CORES
 ```
 
-If a broken link occurs in a snippet that was inserted into multiple generated files in different directories, use `@docroot@` to reference the `doc/manual/src` directory.
-
 [`mdbook-linkcheck`] does not implement checking [URI fragments] yet.
 
 [`mdbook-linkcheck`]: https://github.com/Michael-F-Bryan/mdbook-linkcheck
 [URI fragments]: https://en.m.wikipedia.org/wiki/URI_fragment
+
+#### `@docroot@` variable
+
+`@docroot@` provides a base path for links that occur in reusable snippets or other documentation that doesn't have a base path of its own.
+
+If a broken link occurs in a snippet that was inserted into multiple generated files in different directories, use `@docroot@` to reference the `doc/manual/src` directory.
+
+If the `@docroot@` literal appears in an error message from the `mdbook-linkcheck` tool, the `@docroot@` replacement needs to be applied to the (probably) generated source file that mentions it. See existing `@docroot@` logic in the [Makefile]. Regular markdown files that are not copied to other markdown files do have a base path of their own and they can use relative paths instead of `@docroot@`.
