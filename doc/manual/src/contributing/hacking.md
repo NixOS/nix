@@ -249,3 +249,22 @@ search/replaced in it for each new build.
 The installer now supports a `--tarball-url-prefix` flag which _may_ have
 solved this need?
 -->
+
+### Checking the manual links
+
+The build checks for broken internal links, but this happens late in the process,
+so `nix build .` is not suitable for iterating. To check the manual incrementally, run:
+
+```console
+make html -j $NIX_BUILD_CORES
+```
+
+When iterating on the makefile, run:
+
+```console
+rm $(git ls-files doc/manual/ -o | grep -F '.md') && rmdir doc/manual/src/command-ref/new-cli && make html -j $NIX_BUILD_CORES
+```
+
+If a broken link occurs in a snippet that was inserted into multiple generated files in different directories, use `@docroot@` to reference the `doc/manual/src` directory.
+
+`mdbook-linkcheck` does not implement fragment checking yet.
