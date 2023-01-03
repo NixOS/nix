@@ -240,6 +240,7 @@ static RegisterPrimOp primop_scopedImport(RegisterPrimOp::Info {
 static RegisterPrimOp primop_import({
     .name = "import",
     .args = {"path"},
+    // TODO turn "normal path values" into link below
     .doc = R"(
       Load, parse and return the Nix expression in the file *path*. If
       *path* is a directory, the file ` default.nix ` in that directory
@@ -253,7 +254,7 @@ static RegisterPrimOp primop_import({
       >
       > Unlike some languages, `import` is a regular function in Nix.
       > Paths using the angle bracket syntax (e.g., `import` *\<foo\>*)
-      > are [normal path values](language-values.md).
+      > are normal path values.
 
       A Nix expression loaded by `import` must not contain any *free
       variables* (identifiers that are not defined in the Nix expression
@@ -1872,8 +1873,7 @@ static RegisterPrimOp primop_toFile({
       path.  The file has suffix *name*. This file can be used as an
       input to derivations. One application is to write builders
       “inline”. For instance, the following Nix expression combines the
-      [Nix expression for GNU Hello](expression-syntax.md) and its
-      [build script](build-script.md) into one file:
+      Nix expression for GNU Hello and its build script into one file:
 
       ```nix
       { stdenv, fetchurl, perl }:
