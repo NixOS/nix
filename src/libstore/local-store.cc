@@ -439,9 +439,9 @@ LocalStore::~LocalStore()
     }
 
     try {
-        auto state(_state.lock());
-        if (state->fdTempRoots) {
-            state->fdTempRoots = -1;
+        auto fdTempRoots(_fdTempRoots.lock());
+        if (*fdTempRoots) {
+            *fdTempRoots = -1;
             unlink(fnTempRoots.c_str());
         }
     } catch (...) {

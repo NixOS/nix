@@ -62,9 +62,6 @@ private:
         /* The global GC lock  */
         AutoCloseFD fdGCLock;
 
-        /* The file to which we write our temporary roots. */
-        AutoCloseFD fdTempRoots;
-
         /* Connection to the garbage collector. */
         AutoCloseFD fdRootsSocket;
 
@@ -155,6 +152,15 @@ public:
         RepairFlag repair) override;
 
     void addTempRoot(const StorePath & path) override;
+
+private:
+
+    void createTempRootsFile();
+
+    /* The file to which we write our temporary roots. */
+    Sync<AutoCloseFD> _fdTempRoots;
+
+public:
 
     void addIndirectRoot(const Path & path) override;
 
