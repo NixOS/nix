@@ -26,7 +26,7 @@
   to disable scanning a given output for runtime dependencies:
   ```nix
   __structuredAttrs = true;
-  outputChecks.out.unsafeDiscardReferences = true;
+  unsafeDiscardReferences.out = true;
   ```
   This is useful e.g. when generating self-contained filesystem images with
   their own embedded Nix store: hashes found inside such an image refer

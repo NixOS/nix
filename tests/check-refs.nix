@@ -69,10 +69,8 @@ rec {
 
   test11 = makeTest 11 {
     __structuredAttrs = true;
-    outputChecks.out = {
-      unsafeDiscardReferences = true;
-      allowedReferences = [];
-    };
+    unsafeDiscardReferences.out = true;
+    outputChecks.out.allowedReferences = [];
     buildCommand = ''echo ${dep} > "''${outputs[out]}"'';
   };
 

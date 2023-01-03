@@ -2321,14 +2321,12 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
 
         bool discardReferences = false;
         if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
-            if (auto outputChecks = get(*structuredAttrs, "outputChecks")) {
-                if (auto output = get(*outputChecks, outputName)) {
-                    if (auto unsafeDiscardReferences = get(*output, "unsafeDiscardReferences")) {
-                        settings.requireExperimentalFeature(Xp::DiscardReferences);
-                        if (!unsafeDiscardReferences->is_boolean())
-                            throw Error("attribute 'outputChecks.\"%s\".unsafeDiscardReferences' of derivation '%s' must be a Boolean", outputName, drvPath.to_string());
-                        discardReferences = unsafeDiscardReferences->get<bool>();
-                    }
+            if (auto udr = get(*structuredAttrs, "unsafeDiscardReferences")) {
+                settings.requireExperimentalFeature(Xp::DiscardReferences);
+                if (auto output = get(*udr, outputName)) {
+                    if (!output->is_boolean())
+                        throw Error("attribute 'unsafeDiscardReferences.\"%s\"' of derivation '%s' must be a Boolean", outputName, drvPath.to_string());
+                    discardReferences = output->get<bool>();
                 }
             }
         }
