@@ -77,37 +77,43 @@ Path LocalFSStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot
 }
 
 
-void LocalStore::addTempRoot(const StorePath & path)
+void LocalStore::createTempRootsFile()
 {
-    auto state(_state.lock());
+    auto fdTempRoots(_fdTempRoots.lock());
 
     /* Create the temporary roots file for this process. */
-    if (!state->fdTempRoots) {
+    if (*fdTempRoots) return;
 
-        while (1) {
-            if (pathExists(fnTempRoots))
-                /* It *must* be stale, since there can be no two
-                   processes with the same pid. */
-                unlink(fnTempRoots.c_str());
+    while (1) {
+        if (pathExists(fnTempRoots))
+            /* It *must* be stale, since there can be no two
+               processes with the same pid. */
+            unlink(fnTempRoots.c_str());
 
-            state->fdTempRoots = openLockFile(fnTempRoots, true);
+        *fdTempRoots = openLockFile(fnTempRoots, true);
 
-            debug("acquiring write lock on '%s'", fnTempRoots);
-            lockFile(state->fdTempRoots.get(), ltWrite, true);
+        debug("acquiring write lock on '%s'", fnTempRoots);
+        lockFile(fdTempRoots->get(), ltWrite, true);
 
-            /* Check whether the garbage collector didn't get in our
-               way. */
-            struct stat st;
-            if (fstat(state->fdTempRoots.get(), &st) == -1)
-                throw SysError("statting '%1%'", fnTempRoots);
-            if (st.st_size == 0) break;
+        /* Check whether the garbage collector didn't get in our
+           way. */
+        struct stat st;
+        if (fstat(fdTempRoots->get(), &st) == -1)
+            throw SysError("statting '%1%'", fnTempRoots);
+        if (st.st_size == 0) break;
 
-            /* The garbage collector deleted this file before we could
-               get a lock.  (It won't delete the file after we get a
-               lock.)  Try again. */
-        }
-
+        /* The garbage collector deleted this file before we could get
+           a lock.  (It won't delete the file after we get a lock.)
+           Try again. */
     }
+}
+
+
+void LocalStore::addTempRoot(const StorePath & path)
+{
+    createTempRootsFile();
+
+    auto state(_state.lock());
 
     if (!state->fdGCLock)
         state->fdGCLock = openGCLock();
@@ -162,7 +168,7 @@ void LocalStore::addTempRoot(const StorePath & path)
 
     /* Append the store path to the temporary roots file. */
     auto s = printStorePath(path) + '\0';
-    writeFull(state->fdTempRoots.get(), s);
+    writeFull(_fdTempRoots.lock()->get(), s);
 }
 
 
