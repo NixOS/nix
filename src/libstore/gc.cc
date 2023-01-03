@@ -113,30 +113,37 @@ void LocalStore::addTempRoot(const StorePath & path)
 {
     createTempRootsFile();
 
-    auto state(_state.lock());
-
-    if (!state->fdGCLock)
-        state->fdGCLock = openGCLock();
+    /* Open/create the global GC lock file. */
+    {
+        auto fdGCLock(_fdGCLock.lock());
+        if (!*fdGCLock)
+            *fdGCLock = openGCLock();
+    }
 
  restart:
-    FdLock gcLock(state->fdGCLock.get(), ltRead, false, "");
+    /* Try to acquire a shared global GC lock (non-blocking). This
+       only succeeds if the garbage collector is not currently
+       running. */
+    FdLock gcLock(_fdGCLock.lock()->get(), ltRead, false, "");
 
     if (!gcLock.acquired) {
         /* We couldn't get a shared global GC lock, so the garbage
            collector is running. So we have to connect to the garbage
            collector and inform it about our root. */
-        if (!state->fdRootsSocket) {
+        auto fdRootsSocket(_fdRootsSocket.lock());
+
+        if (!*fdRootsSocket) {
             auto socketPath = stateDir.get() + gcSocketPath;
             debug("connecting to '%s'", socketPath);
-            state->fdRootsSocket = createUnixDomainSocket();
+            *fdRootsSocket = createUnixDomainSocket();
             try {
-                nix::connect(state->fdRootsSocket.get(), socketPath);
+                nix::connect(fdRootsSocket->get(), socketPath);
             } catch (SysError & e) {
                 /* The garbage collector may have exited, so we need to
                    restart. */
                 if (e.errNo == ECONNREFUSED) {
                     debug("GC socket connection refused");
-                    state->fdRootsSocket.close();
+                    fdRootsSocket->close();
                     goto restart;
                 }
                 throw;
@@ -145,9 +152,9 @@ void LocalStore::addTempRoot(const StorePath & path)
 
         try {
             debug("sending GC root '%s'", printStorePath(path));
-            writeFull(state->fdRootsSocket.get(), printStorePath(path) + "\n", false);
+            writeFull(fdRootsSocket->get(), printStorePath(path) + "\n", false);
             char c;
-            readFull(state->fdRootsSocket.get(), &c, 1);
+            readFull(fdRootsSocket->get(), &c, 1);
             assert(c == '1');
             debug("got ack for GC root '%s'", printStorePath(path));
         } catch (SysError & e) {
@@ -155,18 +162,19 @@ void LocalStore::addTempRoot(const StorePath & path)
                restart. */
             if (e.errNo == EPIPE || e.errNo == ECONNRESET) {
                 debug("GC socket disconnected");
-                state->fdRootsSocket.close();
+                fdRootsSocket->close();
                 goto restart;
             }
             throw;
         } catch (EndOfFile & e) {
             debug("GC socket disconnected");
-            state->fdRootsSocket.close();
+            fdRootsSocket->close();
             goto restart;
         }
     }
 
-    /* Append the store path to the temporary roots file. */
+    /* Record the store path in the temporary roots file so it will be
+       seen by a future run of the garbage collector. */
     auto s = printStorePath(path) + '\0';
     writeFull(_fdTempRoots.lock()->get(), s);
 }
