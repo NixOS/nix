@@ -1917,7 +1917,7 @@ static RegisterPrimOp primop_toFile({
       ```
 
       Note that `${configFile}` is a
-      [string interpolation](language/values.md#type-string), so the result of the
+      [string interpolation](@docroot@/language/values.md#type-string), so the result of the
       expression `configFile`
       (i.e., a path like `/nix/store/m7p7jfny445k...-foo.conf`) will be
       spliced into the resulting string.

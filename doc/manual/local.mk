@@ -50,11 +50,14 @@ $(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli
 
 $(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/generate-manpage.nix $(bindir)/nix
 	@rm -rf $@
-	$(trace-gen) $(nix-eval) --write-to $@ --expr 'import doc/manual/generate-manpage.nix { toplevel = builtins.readFile $<; }'
+	$(trace-gen) $(nix-eval) --write-to $@.tmp --expr 'import doc/manual/generate-manpage.nix { toplevel = builtins.readFile $<; }'
+	$(trace-gen) sed -i $@.tmp/*.md -e 's^@docroot@^../..^g'
+	@mv $@.tmp $@
 
 $(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/generate-options.nix $(d)/src/command-ref/conf-file-prefix.md $(bindir)/nix
 	@cat doc/manual/src/command-ref/conf-file-prefix.md > $@.tmp
-	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-options.nix (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp
+	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-options.nix (builtins.fromJSON (builtins.readFile $<))' \
+	  | sed -e 's^@docroot@^..^g'>> $@.tmp
 	@mv $@.tmp $@
 
 $(d)/nix.json: $(bindir)/nix
@@ -67,7 +70,8 @@ $(d)/conf-file.json: $(bindir)/nix
 
 $(d)/src/language/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d)/src/language/builtins-prefix.md $(bindir)/nix
 	@cat doc/manual/src/language/builtins-prefix.md > $@.tmp
-	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-builtins.nix (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp
+	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-builtins.nix (builtins.fromJSON (builtins.readFile $<))' \
+	  | sed -e 's^@docroot@^..^g' >> $@.tmp
 	@cat doc/manual/src/language/builtins-suffix.md >> $@.tmp
 	@mv $@.tmp $@
 
