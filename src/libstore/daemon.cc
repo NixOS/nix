@@ -223,7 +223,7 @@ struct ClientSettings
                         subs.push_back(s + "/");
                     else
                         warn("ignoring untrusted substituter '%s', you are not a trusted user.\n"
-                             "More information about 'trusted-substituters' option in nix.conf man page", s);
+                             "Run `man nix.conf` for more information on the `substituters` configuration option.", s);
                 res = subs;
                 return true;
             };
