@@ -148,9 +148,8 @@ of Nixpkgs:
 
     #!nix shell --override-input nixpkgs github:NixOS/nixpkgs/eabc38219184cc3e04a974fe31857d8e0eac098d
 
-The examples above all used `-p` to get dependencies from Nixpkgs. You
-can also use a Nix expression to build your own dependencies. For
-example, the Python example could have been written as:
+You can also use a Nix expression to build your own dependencies. For example,
+the Python example could have been written as:
 
 ```python
 #! /usr/bin/env nix
@@ -164,8 +163,6 @@ contains:
 with import <nixpkgs> {};
 python3.withPackages (ps: with ps; [ prettytable ])
 ```
-
-
 
 
 )""
