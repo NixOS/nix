@@ -254,7 +254,7 @@ static RegisterPrimOp primop_import({
       >
       > Unlike some languages, `import` is a regular function in Nix.
       > Paths using the angle bracket syntax (e.g., `import` *\<foo\>*)
-      > are normal path values.
+      > are normal [path values](@docroot@/language/values.md#type-path).
 
       A Nix expression loaded by `import` must not contain any *free
       variables* (identifiers that are not defined in the Nix expression

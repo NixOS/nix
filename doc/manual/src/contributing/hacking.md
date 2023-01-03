@@ -250,16 +250,19 @@ The installer now supports a `--tarball-url-prefix` flag which _may_ have
 solved this need?
 -->
 
-### Checking the manual links
+### Checking links in the manual
 
-The build checks for broken internal links, but this happens late in the process,
-so `nix build .` is not suitable for iterating. To check the manual incrementally, run:
+The build checks for broken internal links.
+This happens late in the process, so `nix build` is not suitable for iterating.
+To build the manual incrementally, run:
 
 ```console
 make html -j $NIX_BUILD_CORES
 ```
 
-When iterating on the makefile, run:
+In order to reflect changes to the [Makefile], clear all generated files before re-building:
+
+[Makefile]: https://github.com/NixOS/nix/blob/master/doc/manual/local.mk
 
 ```console
 rm $(git ls-files doc/manual/ -o | grep -F '.md') && rmdir doc/manual/src/command-ref/new-cli && make html -j $NIX_BUILD_CORES
@@ -267,4 +270,7 @@ rm $(git ls-files doc/manual/ -o | grep -F '.md') && rmdir doc/manual/src/comman
 
 If a broken link occurs in a snippet that was inserted into multiple generated files in different directories, use `@docroot@` to reference the `doc/manual/src` directory.
 
-`mdbook-linkcheck` does not implement fragment checking yet.
+[`mdbook-linkcheck`] does not implement checking [URI fragments] yet.
+
+[`mdbook-linkcheck`]: https://github.com/Michael-F-Bryan/mdbook-linkcheck
+[URI fragments]: https://en.m.wikipedia.org/wiki/URI_fragment
