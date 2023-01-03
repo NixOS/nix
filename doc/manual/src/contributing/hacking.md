@@ -279,4 +279,6 @@ rm $(git ls-files doc/manual/ -o | grep -F '.md') && rmdir doc/manual/src/comman
 
 If a broken link occurs in a snippet that was inserted into multiple generated files in different directories, use `@docroot@` to reference the `doc/manual/src` directory.
 
-If the `@docroot@` literal appears in an error message from the `mdbook-linkcheck` tool, the `@docroot@` replacement needs to be applied to the (probably) generated source file that mentions it. See existing `@docroot@` logic in the [Makefile]. Regular markdown files that are not copied to other markdown files do have a base path of their own and they can use relative paths instead of `@docroot@`.
+If the `@docroot@` literal appears in an error message from the `mdbook-linkcheck` tool, the `@docroot@` replacement needs to be applied to the generated source file that mentions it.
+See existing `@docroot@` logic in the [Makefile].
+Regular markdown files used for the manual have a base path of their own and they can use relative paths instead of `@docroot@`.
