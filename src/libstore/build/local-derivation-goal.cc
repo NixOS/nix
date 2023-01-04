@@ -2050,10 +2050,14 @@ void LocalDerivationGoal::runChild()
                     sandboxProfile += "(deny default (with no-log))\n";
                 }
 
-                sandboxProfile += "(import \"sandbox-defaults.sb\")\n";
+                sandboxProfile +=
+                    #include "sandbox-defaults.sb"
+                    ;
 
                 if (!derivationType.isSandboxed())
-                    sandboxProfile += "(import \"sandbox-network.sb\")\n";
+                    sandboxProfile +=
+                        #include "sandbox-network.sb"
+                        ;
 
                 /* Add the output paths we'll use at build-time to the chroot */
                 sandboxProfile += "(allow file-read* file-write* process-exec\n";
@@ -2096,7 +2100,9 @@ void LocalDerivationGoal::runChild()
 
                 sandboxProfile += additionalSandboxProfile;
             } else
-                sandboxProfile += "(import \"sandbox-minimal.sb\")\n";
+                sandboxProfile +=
+                    #include "sandbox-minimal.sb"
+                    ;
 
             debug("Generated sandbox profile:");
             debug(sandboxProfile);
@@ -2121,8 +2127,6 @@ void LocalDerivationGoal::runChild()
                 args.push_back(sandboxFile);
                 args.push_back("-D");
                 args.push_back("_GLOBAL_TMP_DIR=" + globalTmpDir);
-                args.push_back("-D");
-                args.push_back("IMPORT_DIR=" + settings.nixDataDir + "/nix/sandbox/");
                 if (allowLocalNetworking) {
                     args.push_back("-D");
                     args.push_back(std::string("_ALLOW_LOCAL_NETWORKING=1"));
