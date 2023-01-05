@@ -381,23 +381,6 @@ struct CmdFlakeCheck : FlakeCommand
         auto checkModule = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
                 state->forceValue(v, pos);
-                if (v.isLambda()) {
-                    if (!v.lambda.fun->hasFormals() || !v.lambda.fun->formals->ellipsis)
-                        throw Error("module must match an open attribute set ('{ config, ... }')");
-                } else if (v.type() == nAttrs) {
-                    for (auto & attr : *v.attrs)
-                        try {
-                            state->forceValue(*attr.value, attr.pos);
-                        } catch (Error & e) {
-                            e.addTrace(
-                                state->positions[attr.pos],
-                                hintfmt("while evaluating the option '%s'", state->symbols[attr.name]));
-                            throw;
-                        }
-                } else
-                    throw Error("module must be a function or an attribute set");
-                // FIXME: if we have a 'nixpkgs' input, use it to
-                // check the module.
             } catch (Error & e) {
                 e.addTrace(resolve(pos), hintfmt("while checking the NixOS module '%s'", attrPath));
                 reportError(e);
