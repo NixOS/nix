@@ -85,11 +85,10 @@
   Numbers, which can be *integers* (like `123`) or *floating point*
   (like `123.43` or `.27e13`).
 
-  Numbers are type-compatible: pure integer operations will always
-  return integers, whereas any operation involving at least one
-  floating point number will have a floating point number as a result.
+  See [arithmetic] and [comparison] operators for semantics.
 
-  Floating point numbers only differ up to a limited precision.
+  [arithmetic]: ./operators.md#arithmetic
+  [comparison]: ./operators.md#comparison
 
 - <a id="type-path" href="#type-path">Path</a>
 
