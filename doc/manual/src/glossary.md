@@ -115,10 +115,12 @@
     then be built.
 
   - [reference]{#gloss-reference}\
-    A [store path] `P` is said to have a *reference* to a store path `Q` if the string `Q` appears in the [store object] at `P`.
-    The *references* of a store path `P` are the set of store paths to which `P` has a reference.
+    A [store object] `O` is said to have a *reference* to a store object `P` if the [store path] of `P` appears in the contents of `O`.
+    The *references* of a store object `O` are the set of store objects to which `O` has a reference.
 
-    A [derivation] can reference other derivations and source files, but not [output path]s, whereas an output path can only reference other output paths.
+    Source files have no references.
+    A [store derivation] can only reference source files and other store derivations, including itself.
+    In contrast, a store object that was produced from a [derivation] can only reference other "derived" store objects.
 
     [reference]: #gloss-reference
 
@@ -137,7 +139,7 @@
     files could be missing. The command `nix-store -qR` prints out
     closures of store paths.
 
-    As an example, if the store object at path `P` contains a reference
+    As an example, if the store object at path `P` contains a [reference]
     to path `Q`, then `Q` is in the closure of `P`. Further, if `Q`
     references `R` then `R` is also in the closure of `P`.
 
