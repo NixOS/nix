@@ -1,3 +1,5 @@
+R""(
+
 ; Allow local and remote network traffic.
 (allow network* (local ip) (remote ip))
 
@@ -18,3 +20,5 @@
 ; Allow access to trustd.
 (allow mach-lookup (global-name "com.apple.trustd"))
 (allow mach-lookup (global-name "com.apple.trustd.agent"))
+
+)""
