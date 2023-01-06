@@ -1248,16 +1248,14 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
         auto h = newHashAllowEmpty(*outputHash, parseHashTypeOpt(outputHashAlgo));
 
         auto method = ingestionMethod.value_or(FileIngestionMethod::Flat);
-        // FIXME non-trivial fixed refs set
-        auto ca = contentAddressFromMethodHashAndRefs(
-            method,
-            std::move(h),
-            {});
 
-        DerivationOutput::CAFixed dof { .ca = ca };
+        DerivationOutput::CAFixed dof {
+            // FIXME non-trivial fixed refs set
+            .ca = contentAddressFromMethodHashAndRefs(method, std::move(h), {}),
+        };
 
         drv.env["out"] = state.store->printStorePath(dof.path(*state.store, drvName, "out"));
-        drv.outputs.insert_or_assign("out", dof);
+        drv.outputs.insert_or_assign("out", std::move(dof));
     }
 
     else if (contentAddressed || isImpure) {
