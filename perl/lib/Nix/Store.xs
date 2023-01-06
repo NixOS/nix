@@ -299,7 +299,7 @@ SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
                     .method = method,
                     .hash = h,
                 },
-                {},
+                .references = {},
             });
             XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(path).c_str(), 0)));
         } catch (Error & e) {

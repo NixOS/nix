@@ -79,7 +79,7 @@ DownloadFileResult downloadFile(
                         .method = FileIngestionMethod::Flat,
                         .hash = hash,
                     },
-                    {},
+                    .references = {},
                 },
             },
             hashString(htSHA256, sink.s),

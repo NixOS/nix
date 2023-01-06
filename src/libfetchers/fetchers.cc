@@ -215,7 +215,7 @@ StorePath Input::computeStorePath(Store & store) const
             .method = FileIngestionMethod::Recursive,
             .hash = *narHash,
         },
-        {},
+        .references = {},
     });
 }
 
