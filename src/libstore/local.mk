@@ -69,6 +69,13 @@ $(d)/build.cc:
 
 clean-files += $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh
 
+$(d)/nix-store.pc: $(d)/nix-store.pc.in
+	$(trace-gen) rm -f $@ && ./config.status --quiet --file=$@
+ifeq ($(BUILD_SHARED_LIBS), 1)
+	sed -i 's|@LIBS_PRIVATE@||' $@
+else
+	sed -i 's|@LIBS_PRIVATE@|Libs.private: $(libstore_LDFLAGS) $(libstore_LDFLAGS_PROPAGATED) $(foreach lib, $(libstore_LIBS), $($(lib)_LDFLAGS))|' $@
+endif
 $(eval $(call install-file-in, $(d)/nix-store.pc, $(libdir)/pkgconfig, 0644))
 
 $(foreach i, $(wildcard src/libstore/builtins/*.hh), \
