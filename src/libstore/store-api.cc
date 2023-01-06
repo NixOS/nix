@@ -1340,13 +1340,13 @@ ValidPathInfo::ValidPathInfo(
       , narHash(narHash)
 {
     std::visit(overloaded {
-        [this](const TextInfo & ti) {
-            this->references = ti.references;
-            this->ca = TextHash { std::move(ti) };
+        [this](TextInfo && ti) {
+            this->references = std::move(ti.references);
+            this->ca = std::move((TextHash &&) ti);
         },
-        [this](const FixedOutputInfo & foi) {
-            *(static_cast<PathReferences<StorePath> *>(this)) = foi.references;
-            this->ca = FixedOutputHash { (FixedOutputHash) std::move(foi) };
+        [this](FixedOutputInfo && foi) {
+            *(static_cast<PathReferences<StorePath> *>(this)) = std::move(foi.references);
+            this->ca = std::move((FixedOutputHash &&) foi);
         },
     }, std::move(info.info));
 }
