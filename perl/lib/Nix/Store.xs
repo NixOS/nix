@@ -69,7 +69,7 @@ int isValidPath(char * path)
 SV * queryReferences(char * path)
     PPCODE:
         try {
-            for (auto & i : store()->queryPathInfo(store()->parseStorePath(path))->references)
+            for (auto & i : store()->queryPathInfo(store()->parseStorePath(path))->referencesPossiblyToSelf())
                 XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(i).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
