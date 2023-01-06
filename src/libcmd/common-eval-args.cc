@@ -13,8 +13,6 @@ namespace nix {
 
 MixEvalArgs::MixEvalArgs()
 {
-    auto category = "Common evaluation options";
-
     addFlag({
         .longName = "arg",
         .description = "Pass the value *expr* as the argument *name* to Nix functions.",
@@ -34,7 +32,77 @@ MixEvalArgs::MixEvalArgs()
     addFlag({
         .longName = "include",
         .shortName = 'I',
-        .description = "Add *path* to the list of locations used to look up `<...>` file names.",
+        .description = R"(
+  Add *path* to the Nix search path. The Nix search path is
+  initialized from the colon-separated [`NIX_PATH`](./env-common.md#env-NIX_PATH) environment
+  variable, and is used to look up the location of Nix expressions using [paths](../language/values.md#type-path) enclosed in angle
+  brackets (i.e., `<nixpkgs>`).
+
+  For instance, passing
+
+  ```
+  -I /home/eelco/Dev
+  -I /etc/nixos
+  ```
+
+  will cause Nix to look for paths relative to `/home/eelco/Dev` and
+  `/etc/nixos`, in that order. This is equivalent to setting the
+  `NIX_PATH` environment variable to
+
+  ```
+  /home/eelco/Dev:/etc/nixos
+  ```
+
+  It is also possible to match paths against a prefix. For example,
+  passing
+
+  ```
+  -I nixpkgs=/home/eelco/Dev/nixpkgs-branch
+  -I /etc/nixos
+  ```
+
+  will cause Nix to search for `<nixpkgs/path>` in
+  `/home/eelco/Dev/nixpkgs-branch/path` and `/etc/nixos/nixpkgs/path`.
+
+  If a path in the Nix search path starts with `http://` or `https://`,
+  it is interpreted as the URL of a tarball that will be downloaded and
+  unpacked to a temporary location. The tarball must consist of a single
+  top-level directory. For example, passing
+
+  ```
+  -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/master.tar.gz
+  ```
+
+  tells Nix to download and use the current contents of the `master`
+  branch in the `nixpkgs` repository.
+
+  The URLs of the tarballs from the official `nixos.org` channels
+  (see [the manual page for `nix-channel`](../nix-channel.md)) can be
+  abbreviated as `channel:<channel-name>`.  For instance, the
+  following two flags are equivalent:
+
+  ```
+  -I nixpkgs=channel:nixos-21.05
+  -I nixpkgs=https://nixos.org/channels/nixos-21.05/nixexprs.tar.xz
+  ```
+
+  You can also fetch source trees using [flake URLs](./nix3-flake.md#url-like-syntax) and add them to the
+  search path. For instance,
+
+  ```
+  -I nixpkgs=flake:nixpkgs
+  ```
+
+  specifies that the prefix `nixpkgs` shall refer to the source tree
+  downloaded from the `nixpkgs` entry in the flake registry. Similarly,
+
+  ```
+  -I nixpkgs=flake:github:NixOS/nixpkgs/nixos-22.05
+  ```
+
+  makes `<nixpkgs>` refer to a particular branch of the
+  `NixOS/nixpkgs` repository on GitHub.
+  )",
         .category = category,
         .labels = {"path"},
         .handler = {[&](std::string s) { searchPath.push_back(s); }}
@@ -91,14 +159,25 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
 
 Path lookupFileArg(EvalState & state, std::string_view s)
 {
-    if (isUri(s)) {
-        return state.store->toRealPath(
-            fetchers::downloadTarball(
-                state.store, resolveUri(s), "source", false).first.storePath);
-    } else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
+    if (EvalSettings::isPseudoUrl(s)) {
+        auto storePath = fetchers::downloadTarball(
+            state.store, EvalSettings::resolvePseudoUrl(s), "source", false).first.storePath;
+        return state.store->toRealPath(storePath);
+    }
+
+    else if (hasPrefix(s, "flake:")) {
+        settings.requireExperimentalFeature(Xp::Flakes);
+        auto flakeRef = parseFlakeRef(std::string(s.substr(6)), {}, true, false);
+        auto storePath = flakeRef.resolve(state.store).fetchTree(state.store).first.storePath;
+        return state.store->toRealPath(storePath);
+    }
+
+    else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
         Path p(s.substr(1, s.size() - 2));
         return state.findFile(p);
-    } else
+    }
+
+    else
         return absPath(std::string(s));
 }
 

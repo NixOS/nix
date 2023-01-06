@@ -23,7 +23,7 @@ rec {
   };
   rootCA = mkCADerivation {
     name = "rootCA";
-    outputs = [ "out" "dev" "foo"];
+    outputs = [ "out" "dev" "foo" ];
     buildCommand = ''
       echo "building a CA derivation"
       echo "The seed is ${toString seed}"
@@ -75,7 +75,7 @@ rec {
     buildCommand = ''
       mkdir -p $out/bin
       echo ${rootCA} # Just to make it depend on it
-      echo "" > $out/bin/${name}
+      echo "#! ${shell}" > $out/bin/${name}
       chmod +x $out/bin/${name}
     '';
   };

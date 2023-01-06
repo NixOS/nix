@@ -37,11 +37,13 @@ struct InstallableDerivedPath : Installable
  * Return the rewrites that are needed to resolve a string whose context is
  * included in `dependencies`.
  */
-StringPairs resolveRewrites(Store & store, const BuiltPaths dependencies)
+StringPairs resolveRewrites(
+    Store & store,
+    const std::vector<BuiltPathWithResult> & dependencies)
 {
     StringPairs res;
     for (auto & dep : dependencies)
-        if (auto drvDep = std::get_if<BuiltPathBuilt>(&dep))
+        if (auto drvDep = std::get_if<BuiltPathBuilt>(&dep.path))
             for (auto & [ outputName, outputPath ] : drvDep->outputs)
                 res.emplace(
                     downstreamPlaceholder(store, drvDep->drvPath, outputName),
@@ -53,7 +55,10 @@ StringPairs resolveRewrites(Store & store, const BuiltPaths dependencies)
 /**
  * Resolve the given string assuming the given context.
  */
-std::string resolveString(Store & store, const std::string & toResolve, const BuiltPaths dependencies)
+std::string resolveString(
+    Store & store,
+    const std::string & toResolve,
+    const std::vector<BuiltPathWithResult> & dependencies)
 {
     auto rewrites = resolveRewrites(store, dependencies);
     return rewriteStrings(toResolve, rewrites);
@@ -66,7 +71,9 @@ UnresolvedApp Installable::toApp(EvalState & state)
 
     auto type = cursor->getAttr("type")->getString();
 
-    std::string expected = !attrPath.empty() && attrPath[0] == "apps" ? "app" : "derivation";
+    std::string expected = !attrPath.empty() &&
+        (state.symbols[attrPath[0]] == "apps" || state.symbols[attrPath[0]] == "defaultApp")
+        ? "app" : "derivation";
     if (type != expected)
         throw Error("attribute '%s' should have type '%s'", cursor->getAttrPathStr(), expected);
 
@@ -89,7 +96,7 @@ UnresolvedApp Installable::toApp(EvalState & state)
         auto outputName = cursor->getAttr(state.sOutputName)->getString();
         auto name = cursor->getAttr(state.sName)->getString();
         auto aPname = cursor->maybeGetAttr("pname");
-        auto aMeta = cursor->maybeGetAttr("meta");
+        auto aMeta = cursor->maybeGetAttr(state.sMeta);
         auto aMainProgram = aMeta ? aMeta->maybeGetAttr("mainProgram") : nullptr;
         auto mainProgram =
             aMainProgram

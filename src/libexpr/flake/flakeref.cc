@@ -176,7 +176,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                             parsedURL.query.insert_or_assign("shallow", "1");
 
                         return std::make_pair(
-                            FlakeRef(Input::fromURL(parsedURL), get(parsedURL.query, "dir").value_or("")),
+                            FlakeRef(Input::fromURL(parsedURL), getOr(parsedURL.query, "dir", "")),
                             fragment);
                     }
 
@@ -189,7 +189,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
             if (!hasPrefix(path, "/"))
                 throw BadURL("flake reference '%s' is not an absolute path", url);
             auto query = decodeQuery(match[2]);
-            path = canonPath(path + "/" + get(query, "dir").value_or(""));
+            path = canonPath(path + "/" + getOr(query, "dir", ""));
         }
 
         fetchers::Attrs attrs;
@@ -208,7 +208,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         input.parent = baseDir;
 
         return std::make_pair(
-            FlakeRef(std::move(input), get(parsedURL.query, "dir").value_or("")),
+            FlakeRef(std::move(input), getOr(parsedURL.query, "dir", "")),
             fragment);
     }
 }
@@ -236,6 +236,17 @@ std::pair<fetchers::Tree, FlakeRef> FlakeRef::fetchTree(ref<Store> store) const
 {
     auto [tree, lockedInput] = input.fetch(store);
     return {std::move(tree), FlakeRef(std::move(lockedInput), subdir)};
+}
+
+std::tuple<FlakeRef, std::string, OutputsSpec> parseFlakeRefWithFragmentAndOutputsSpec(
+    const std::string & url,
+    const std::optional<Path> & baseDir,
+    bool allowMissing,
+    bool isFlake)
+{
+    auto [prefix, outputsSpec] = parseOutputsSpec(url);
+    auto [flakeRef, fragment] = parseFlakeRefWithFragment(prefix, baseDir, allowMissing, isFlake);
+    return {std::move(flakeRef), fragment, outputsSpec};
 }
 
 }

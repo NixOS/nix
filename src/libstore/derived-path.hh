@@ -48,7 +48,7 @@ struct DerivedPathBuilt {
     std::set<std::string> outputs;
 
     std::string to_string(const Store & store) const;
-    static DerivedPathBuilt parse(const Store & store, std::string_view);
+    static DerivedPathBuilt parse(const Store & store, std::string_view, std::string_view);
     nlohmann::json toJSON(ref<Store> store) const;
 
     bool operator < (const DerivedPathBuilt & b) const
@@ -125,8 +125,5 @@ struct BuiltPath : _BuiltPathRaw {
 
 typedef std::vector<DerivedPath> DerivedPaths;
 typedef std::vector<BuiltPath> BuiltPaths;
-
-nlohmann::json derivedPathsWithHintsToJSON(const BuiltPaths & buildables, ref<Store> store);
-nlohmann::json derivedPathsToJSON(const DerivedPaths & , ref<Store> store);
 
 }

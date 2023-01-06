@@ -31,7 +31,8 @@ void processExpr(EvalState & state, const Strings & attrPaths,
     bool evalOnly, OutputKind output, bool location, Expr * e)
 {
     if (parseOnly) {
-        std::cout << format("%1%\n") % *e;
+        e->show(state.symbols, std::cout);
+        std::cout << "\n";
         return;
     }
 
@@ -51,11 +52,13 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 state.autoCallFunction(autoArgs, v, vRes);
             if (output == okXML)
                 printValueAsXML(state, strict, location, vRes, std::cout, context, noPos);
-            else if (output == okJSON)
+            else if (output == okJSON) {
                 printValueAsJSON(state, strict, vRes, v.determinePos(noPos), std::cout, context);
-            else {
+                std::cout << std::endl;
+            } else {
                 if (strict) state.forceValueDeep(vRes);
-                std::cout << vRes << std::endl;
+                vRes.print(state.symbols, std::cout);
+                std::cout << std::endl;
             }
         } else {
             DrvInfos drvs;

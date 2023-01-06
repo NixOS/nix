@@ -86,6 +86,12 @@ ref<Store> CopyCommand::getDstStore()
 
 EvalCommand::EvalCommand()
 {
+    addFlag({
+        .longName = "debugger",
+        .description = "Start an interactive environment if evaluation fails.",
+        .category = MixEvalArgs::category,
+        .handler = {&startReplOnEvalErrors, true},
+    });
 }
 
 EvalCommand::~EvalCommand()
@@ -103,7 +109,7 @@ ref<Store> EvalCommand::getEvalStore()
 
 ref<EvalState> EvalCommand::getEvalState()
 {
-    if (!evalState)
+    if (!evalState) {
         evalState =
             #if HAVE_BOEHMGC
             std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
@@ -113,6 +119,11 @@ ref<EvalState> EvalCommand::getEvalState()
                 searchPath, getEvalStore(), getStore())
             #endif
             ;
+
+        if (startReplOnEvalErrors) {
+            evalState->debugRepl = &runRepl;
+        };
+    }
     return ref<EvalState>(evalState);
 }
 
@@ -197,17 +208,17 @@ void StorePathCommand::run(ref<Store> store, std::vector<StorePath> && storePath
     run(store, *storePaths.begin());
 }
 
-Strings editorFor(const Pos & pos)
+Strings editorFor(const Path & file, uint32_t line)
 {
     auto editor = getEnv("EDITOR").value_or("cat");
     auto args = tokenizeString<Strings>(editor);
-    if (pos.line > 0 && (
+    if (line > 0 && (
         editor.find("emacs") != std::string::npos ||
         editor.find("nano") != std::string::npos ||
         editor.find("vim") != std::string::npos ||
         editor.find("kak") != std::string::npos))
-        args.push_back(fmt("+%d", pos.line));
-    args.push_back(pos.file);
+        args.push_back(fmt("+%d", line));
+    args.push_back(file);
     return args;
 }
 
@@ -215,7 +226,7 @@ MixProfile::MixProfile()
 {
     addFlag({
         .longName = "profile",
-        .description = "The profile to update.",
+        .description = "The profile to operate on.",
         .labels = {"path"},
         .handler = {&profile},
         .completer = completePath

@@ -14,15 +14,15 @@ makeTest (let pkgA = pkgs.cowsay; pkgB = pkgs.wget; pkgC = pkgs.hello; pkgD = pk
     { client =
         { config, lib, pkgs, ... }:
         { virtualisation.writableStore = true;
-          virtualisation.pathsInNixDB = [ pkgA pkgD.drvPath ];
-          nix.binaryCaches = lib.mkForce [ ];
+          virtualisation.additionalPaths = [ pkgA pkgD.drvPath ];
+          nix.settings.substituters = lib.mkForce [ ];
         };
 
       server =
         { config, pkgs, ... }:
         { services.openssh.enable = true;
           virtualisation.writableStore = true;
-          virtualisation.pathsInNixDB = [ pkgB pkgC ];
+          virtualisation.additionalPaths = [ pkgB pkgC ];
         };
     };
 

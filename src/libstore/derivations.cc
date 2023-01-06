@@ -446,7 +446,7 @@ std::string Derivation::unparse(const Store & store, bool maskOutputs,
 
 
 // FIXME: remove
-bool isDerivation(const std::string & fileName)
+bool isDerivation(std::string_view fileName)
 {
     return hasSuffix(fileName, drvExtension);
 }
@@ -659,8 +659,10 @@ DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOut
         if (res.kind == DrvHash::Kind::Deferred)
             kind = DrvHash::Kind::Deferred;
         for (auto & outputName : inputOutputs) {
-            const auto h = res.hashes.at(outputName);
-            inputs2[h.to_string(Base16, false)].insert(outputName);
+            const auto h = get(res.hashes, outputName);
+            if (!h)
+                throw Error("no hash for output '%s' of derivation '%s'", outputName, drv.name);
+            inputs2[h->to_string(Base16, false)].insert(outputName);
         }
     }
 
@@ -834,8 +836,11 @@ static void rewriteDerivation(Store & store, BasicDerivation & drv, const String
     auto hashModulo = hashDerivationModulo(store, Derivation(drv), true);
     for (auto & [outputName, output] : drv.outputs) {
         if (std::holds_alternative<DerivationOutput::Deferred>(output.raw())) {
-            auto & h = hashModulo.hashes.at(outputName);
-            auto outPath = store.makeOutputPath(outputName, h, drv.name);
+            auto h = get(hashModulo.hashes, outputName);
+            if (!h)
+                throw Error("derivation '%s' output '%s' has no hash (derivations.cc/rewriteDerivation)",
+                    drv.name, outputName);
+            auto outPath = store.makeOutputPath(outputName, *h, drv.name);
             drv.env[outputName] = store.printStorePath(outPath);
             output = DerivationOutput::InputAddressed {
                 .path = std::move(outPath),

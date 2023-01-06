@@ -11,7 +11,7 @@ them to be rolled back easily.
 
 The default profile used by `nix profile` is `$HOME/.nix-profile`,
 which, if it does not exist, is created as a symlink to
-`/nix/var/nix/profiles/per-user/default` if Nix is invoked by the
+`/nix/var/nix/profiles/default` if Nix is invoked by the
 `root` user, or `/nix/var/nix/profiles/per-user/`*username* otherwise.
 
 You can specify another profile location using `--profile` *path*.
@@ -88,8 +88,7 @@ has the following fields:
   the user at the time of installation (e.g. `nixpkgs`). This is also
   the flake reference that will be used by `nix profile upgrade`.
 
-* `uri`: The immutable flake reference to which `originalUrl`
-  resolved.
+* `uri`: The locked flake reference to which `originalUrl` resolved.
 
 * `attrPath`: The flake output attribute that provided this
   package. Note that this is not necessarily the attribute that the

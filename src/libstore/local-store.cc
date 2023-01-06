@@ -81,7 +81,7 @@ int getSchema(Path schemaPath)
 
 void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
 {
-    const int nixCASchemaVersion = 3;
+    const int nixCASchemaVersion = 4;
     int curCASchema = getSchema(schemaPath);
     if (curCASchema != nixCASchemaVersion) {
         if (curCASchema > nixCASchemaVersion) {
@@ -91,6 +91,7 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
 
         if (!lockFile(lockFd.get(), ltWrite, false)) {
             printInfo("waiting for exclusive access to the Nix store for ca drvs...");
+            lockFile(lockFd.get(), ltNone, false); // We have acquired a shared lock; release it to prevent deadlocks
             lockFile(lockFd.get(), ltWrite, true);
         }
 
@@ -143,7 +144,22 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
             )");
             txn.commit();
         }
-        writeFile(schemaPath, fmt("%d", nixCASchemaVersion));
+        if (curCASchema < 4) {
+            SQLiteTxn txn(db);
+            db.exec(R"(
+                create trigger if not exists DeleteSelfRefsViaRealisations before delete on ValidPaths
+                begin
+                    delete from RealisationsRefs where realisationReference in (
+                    select id from Realisations where outputPath = old.id
+                    );
+                end;
+                -- used by deletion trigger
+                create index if not exists IndexRealisationsRefsRealisationReference on RealisationsRefs(realisationReference);
+            )");
+            txn.commit();
+        }
+
+        writeFile(schemaPath, fmt("%d", nixCASchemaVersion), 0666, true);
         lockFile(lockFd.get(), ltRead, true);
     }
 }
@@ -266,7 +282,7 @@ LocalStore::LocalStore(const Params & params)
     else if (curSchema == 0) { /* new store */
         curSchema = nixSchemaVersion;
         openDB(*state, true);
-        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
+        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str(), 0666, true);
     }
 
     else if (curSchema < nixSchemaVersion) {
@@ -284,6 +300,7 @@ LocalStore::LocalStore(const Params & params)
 
         if (!lockFile(globalLock.get(), ltWrite, false)) {
             printInfo("waiting for exclusive access to the Nix store...");
+            lockFile(globalLock.get(), ltNone, false); // We have acquired a shared lock; release it to prevent deadlocks
             lockFile(globalLock.get(), ltWrite, true);
         }
 
@@ -314,7 +331,7 @@ LocalStore::LocalStore(const Params & params)
             txn.commit();
         }
 
-        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
+        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str(), 0666, true);
 
         lockFile(globalLock.get(), ltRead, true);
     }
@@ -424,9 +441,9 @@ LocalStore::~LocalStore()
     }
 
     try {
-        auto state(_state.lock());
-        if (state->fdTempRoots) {
-            state->fdTempRoots = -1;
+        auto fdTempRoots(_fdTempRoots.lock());
+        if (*fdTempRoots) {
+            *fdTempRoots = -1;
             unlink(fnTempRoots.c_str());
         }
     } catch (...) {
@@ -482,18 +499,18 @@ void LocalStore::openDB(State & state, bool create)
         SQLiteStmt stmt;
         stmt.create(db, "pragma main.journal_mode;");
         if (sqlite3_step(stmt) != SQLITE_ROW)
-            throwSQLiteError(db, "querying journal mode");
+            SQLiteError::throw_(db, "querying journal mode");
         prevMode = std::string((const char *) sqlite3_column_text(stmt, 0));
     }
     if (prevMode != mode &&
         sqlite3_exec(db, ("pragma main.journal_mode = " + mode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
-        throwSQLiteError(db, "setting journal mode");
+        SQLiteError::throw_(db, "setting journal mode");
 
     /* Increase the auto-checkpoint interval to 40000 pages.  This
        seems enough to ensure that instantiating the NixOS system
        derivation is done in a single fsync(). */
     if (mode == "wal" && sqlite3_exec(db, "pragma wal_autocheckpoint = 40000;", 0, 0, 0) != SQLITE_OK)
-        throwSQLiteError(db, "setting autocheckpoint interval");
+        SQLiteError::throw_(db, "setting autocheckpoint interval");
 
     /* Initialise the database schema, if necessary. */
     if (create) {
@@ -568,7 +585,10 @@ void canonicaliseTimestampAndPermissions(const Path & path)
 }
 
 
-static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSeen & inodesSeen)
+static void canonicalisePathMetaData_(
+    const Path & path,
+    std::optional<std::pair<uid_t, uid_t>> uidRange,
+    InodesSeen & inodesSeen)
 {
     checkInterrupt();
 
@@ -615,7 +635,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
        However, ignore files that we chown'ed ourselves previously to
        ensure that we don't fail on hard links within the same build
        (i.e. "touch $out/foo; ln $out/foo $out/bar"). */
-    if (fromUid != (uid_t) -1 && st.st_uid != fromUid) {
+    if (uidRange && (st.st_uid < uidRange->first || st.st_uid > uidRange->second)) {
         if (S_ISDIR(st.st_mode) || !inodesSeen.count(Inode(st.st_dev, st.st_ino)))
             throw BuildError("invalid ownership on file '%1%'", path);
         mode_t mode = st.st_mode & ~S_IFMT;
@@ -648,14 +668,17 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
     if (S_ISDIR(st.st_mode)) {
         DirEntries entries = readDirectory(path);
         for (auto & i : entries)
-            canonicalisePathMetaData_(path + "/" + i.name, fromUid, inodesSeen);
+            canonicalisePathMetaData_(path + "/" + i.name, uidRange, inodesSeen);
     }
 }
 
 
-void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen)
+void canonicalisePathMetaData(
+    const Path & path,
+    std::optional<std::pair<uid_t, uid_t>> uidRange,
+    InodesSeen & inodesSeen)
 {
-    canonicalisePathMetaData_(path, fromUid, inodesSeen);
+    canonicalisePathMetaData_(path, uidRange, inodesSeen);
 
     /* On platforms that don't have lchown(), the top-level path can't
        be a symlink, since we can't change its ownership. */
@@ -668,10 +691,11 @@ void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & ino
 }
 
 
-void canonicalisePathMetaData(const Path & path, uid_t fromUid)
+void canonicalisePathMetaData(const Path & path,
+    std::optional<std::pair<uid_t, uid_t>> uidRange)
 {
     InodesSeen inodesSeen;
-    canonicalisePathMetaData(path, fromUid, inodesSeen);
+    canonicalisePathMetaData(path, uidRange, inodesSeen);
 }
 
 
@@ -703,7 +727,11 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
                     // somewhat expensive so we do lazily
                     hashesModulo = hashDerivationModulo(*this, drv, true);
                 }
-                StorePath recomputed = makeOutputPath(i.first, hashesModulo->hashes.at(i.first), drvName);
+                auto currentOutputHash = get(hashesModulo->hashes, i.first);
+                if (!currentOutputHash)
+                    throw Error("derivation '%s' has unexpected output '%s' (local-store / hashesModulo) named '%s'",
+                        printStorePath(drvPath), printStorePath(doia.path), i.first);
+                StorePath recomputed = makeOutputPath(i.first, *currentOutputHash, drvName);
                 if (doia.path != recomputed)
                     throw Error("derivation '%s' has incorrect output '%s', should be '%s'",
                         printStorePath(drvPath), printStorePath(doia.path), printStorePath(recomputed));
@@ -732,7 +760,7 @@ void LocalStore::registerDrvOutput(const Realisation & info, CheckSigsFlag check
     if (checkSigs == NoCheckSigs || !realisationIsUntrusted(info))
         registerDrvOutput(info);
     else
-        throw Error("cannot register realisation '%s' because it lacks a valid signature", info.outPath.to_string());
+        throw Error("cannot register realisation '%s' because it lacks a signature by a trusted key", info.outPath.to_string());
 }
 
 void LocalStore::registerDrvOutput(const Realisation & info)
@@ -1253,7 +1281,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     RepairFlag repair, CheckSigsFlag checkSigs)
 {
     if (checkSigs && pathInfoIsUntrusted(info))
-        throw Error("cannot add path '%s' because it lacks a valid signature", printStorePath(info.path));
+        throw Error("cannot add path '%s' because it lacks a signature by a trusted key", printStorePath(info.path));
 
     addTempRoot(info.path);
 
@@ -1318,7 +1346,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             autoGC();
 
-            canonicalisePathMetaData(realPath, -1);
+            canonicalisePathMetaData(realPath, {});
 
             optimisePath(realPath, repair); // FIXME: combine with hashPath()
 
@@ -1369,13 +1397,15 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
 
     std::unique_ptr<AutoDelete> delTempDir;
     Path tempPath;
+    Path tempDir;
+    AutoCloseFD tempDirFd;
 
     if (!inMemory) {
         /* Drain what we pulled so far, and then keep on pulling */
         StringSource dumpSource { dump };
         ChainSource bothSource { dumpSource, source };
 
-        auto tempDir = createTempDir(realStoreDir, "add");
+        std::tie(tempDir, tempDirFd) = createTempDirInStore();
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir + "/x";
 
@@ -1431,8 +1461,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
                     writeFile(realPath, dumpSource);
             } else {
                 /* Move the temporary path we restored above. */
-                if (rename(tempPath.c_str(), realPath.c_str()))
-                    throw Error("renaming '%s' to '%s'", tempPath, realPath);
+                moveFile(tempPath, realPath);
             }
 
             /* For computing the nar hash. In recursive SHA-256 mode, this
@@ -1444,7 +1473,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
                 narHash = narSink.finish();
             }
 
-            canonicalisePathMetaData(realPath, -1); // FIXME: merge into restorePath
+            canonicalisePathMetaData(realPath, {}); // FIXME: merge into restorePath
 
             optimisePath(realPath, repair);
 
@@ -1487,7 +1516,7 @@ StorePath LocalStore::addTextToStore(
 
             writeFile(realPath, s);
 
-            canonicalisePathMetaData(realPath, -1);
+            canonicalisePathMetaData(realPath, {});
 
             StringSink sink;
             dumpString(s, sink);
@@ -1510,18 +1539,24 @@ StorePath LocalStore::addTextToStore(
 
 
 /* Create a temporary directory in the store that won't be
-   garbage-collected. */
-Path LocalStore::createTempDirInStore()
+   garbage-collected until the returned FD is closed. */
+std::pair<Path, AutoCloseFD> LocalStore::createTempDirInStore()
 {
-    Path tmpDir;
+    Path tmpDirFn;
+    AutoCloseFD tmpDirFd;
+    bool lockedByUs = false;
     do {
         /* There is a slight possibility that `tmpDir' gets deleted by
-           the GC between createTempDir() and addTempRoot(), so repeat
-           until `tmpDir' exists. */
-        tmpDir = createTempDir(realStoreDir);
-        addTempRoot(parseStorePath(tmpDir));
-    } while (!pathExists(tmpDir));
-    return tmpDir;
+           the GC between createTempDir() and when we acquire a lock on it.
+           We'll repeat until 'tmpDir' exists and we've locked it. */
+        tmpDirFn = createTempDir(realStoreDir, "tmp");
+        tmpDirFd = open(tmpDirFn.c_str(), O_RDONLY | O_DIRECTORY);
+        if (tmpDirFd.get() < 0) {
+            continue;
+        }
+        lockedByUs = lockFile(tmpDirFd.get(), ltWrite, true);
+    } while (!pathExists(tmpDirFn) || !lockedByUs);
+    return {tmpDirFn, std::move(tmpDirFd)};
 }
 
 
@@ -1944,8 +1979,7 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
 
     writeFile(tmpFile, compress("bzip2", log));
 
-    if (rename(tmpFile.c_str(), logPath.c_str()) != 0)
-        throw SysError("renaming '%1%' to '%2%'", tmpFile, logPath);
+    renameFile(tmpFile, logPath);
 }
 
 std::optional<std::string> LocalStore::getVersion()

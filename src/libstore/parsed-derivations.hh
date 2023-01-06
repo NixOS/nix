@@ -38,6 +38,8 @@ public:
 
     bool substitutesAllowed() const;
 
+    bool useUidRange() const;
+
     std::optional<nlohmann::json> prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths);
 };
 

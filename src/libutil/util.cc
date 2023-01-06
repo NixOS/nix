@@ -2,6 +2,7 @@
 #include "sync.hh"
 #include "finally.hh"
 #include "serialise.hh"
+#include "cgroup.hh"
 
 #include <array>
 #include <cctype>
@@ -29,11 +30,14 @@
 
 #ifdef __APPLE__
 #include <sys/syscall.h>
+#include <mach-o/dyld.h>
 #endif
 
 #ifdef __linux__
 #include <sys/prctl.h>
 #include <sys/resource.h>
+
+#include <cmath>
 #endif
 
 
@@ -349,7 +353,7 @@ void readFile(const Path & path, Sink & sink)
 }
 
 
-void writeFile(const Path & path, std::string_view s, mode_t mode)
+void writeFile(const Path & path, std::string_view s, mode_t mode, bool sync)
 {
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
@@ -360,10 +364,16 @@ void writeFile(const Path & path, std::string_view s, mode_t mode)
         e.addTrace({}, "writing file '%1%'", path);
         throw;
     }
+    if (sync)
+        fd.fsync();
+    // Explicitly close to make sure exceptions are propagated.
+    fd.close();
+    if (sync)
+        syncParent(path);
 }
 
 
-void writeFile(const Path & path, Source & source, mode_t mode)
+void writeFile(const Path & path, Source & source, mode_t mode, bool sync)
 {
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
@@ -382,6 +392,20 @@ void writeFile(const Path & path, Source & source, mode_t mode)
         e.addTrace({}, "writing file '%1%'", path);
         throw;
     }
+    if (sync)
+        fd.fsync();
+    // Explicitly close to make sure exceptions are propagated.
+    fd.close();
+    if (sync)
+        syncParent(path);
+}
+
+void syncParent(const Path & path)
+{
+    AutoCloseFD fd = open(dirOf(path).c_str(), O_RDONLY, 0);
+    if (!fd)
+        throw SysError("opening file '%1%'", path);
+    fd.fsync();
 }
 
 std::string readLine(int fd)
@@ -504,61 +528,6 @@ void deletePath(const Path & path, uint64_t & bytesFreed)
 }
 
 
-static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
-    int & counter)
-{
-    tmpRoot = canonPath(tmpRoot.empty() ? getEnv("TMPDIR").value_or("/tmp") : tmpRoot, true);
-    if (includePid)
-        return (format("%1%/%2%-%3%-%4%") % tmpRoot % prefix % getpid() % counter++).str();
-    else
-        return (format("%1%/%2%-%3%") % tmpRoot % prefix % counter++).str();
-}
-
-
-Path createTempDir(const Path & tmpRoot, const Path & prefix,
-    bool includePid, bool useGlobalCounter, mode_t mode)
-{
-    static int globalCounter = 0;
-    int localCounter = 0;
-    int & counter(useGlobalCounter ? globalCounter : localCounter);
-
-    while (1) {
-        checkInterrupt();
-        Path tmpDir = tempName(tmpRoot, prefix, includePid, counter);
-        if (mkdir(tmpDir.c_str(), mode) == 0) {
-#if __FreeBSD__
-            /* Explicitly set the group of the directory.  This is to
-               work around around problems caused by BSD's group
-               ownership semantics (directories inherit the group of
-               the parent).  For instance, the group of /tmp on
-               FreeBSD is "wheel", so all directories created in /tmp
-               will be owned by "wheel"; but if the user is not in
-               "wheel", then "tar" will fail to unpack archives that
-               have the setgid bit set on directories. */
-            if (chown(tmpDir.c_str(), (uid_t) -1, getegid()) != 0)
-                throw SysError("setting group of directory '%1%'", tmpDir);
-#endif
-            return tmpDir;
-        }
-        if (errno != EEXIST)
-            throw SysError("creating directory '%1%'", tmpDir);
-    }
-}
-
-
-std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
-{
-    Path tmpl(getEnv("TMPDIR").value_or("/tmp") + "/" + prefix + ".XXXXXX");
-    // Strictly speaking, this is UB, but who cares...
-    // FIXME: use O_TMPFILE.
-    AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
-    if (!fd)
-        throw SysError("creating temporary file '%s'", tmpl);
-    closeOnExec(fd.get());
-    return {std::move(fd), tmpl};
-}
-
-
 std::string getUserName()
 {
     auto pw = getpwuid(geteuid());
@@ -573,7 +542,21 @@ Path getHome()
 {
     static Path homeDir = []()
     {
+        std::optional<std::string> unownedUserHomeDir = {};
         auto homeDir = getEnv("HOME");
+        if (homeDir) {
+            // Only use $HOME if doesn't exist or is owned by the current user.
+            struct stat st;
+            int result = stat(homeDir->c_str(), &st);
+            if (result != 0) {
+                if (errno != ENOENT) {
+                    warn("couldn't stat $HOME ('%s') for reason other than not existing ('%d'), falling back to the one defined in the 'passwd' file", *homeDir, errno);
+                    homeDir.reset();
+                }
+            } else if (st.st_uid != geteuid()) {
+                unownedUserHomeDir.swap(homeDir);
+            }
+        }
         if (!homeDir) {
             std::vector<char> buf(16384);
             struct passwd pwbuf;
@@ -582,6 +565,9 @@ Path getHome()
                 || !pw || !pw->pw_dir || !pw->pw_dir[0])
                 throw Error("cannot determine user's home directory");
             homeDir = pw->pw_dir;
+            if (unownedUserHomeDir.has_value() && unownedUserHomeDir != homeDir) {
+                warn("$HOME ('%s') is not owned by you, falling back to the one defined in the 'passwd' file ('%s')", *unownedUserHomeDir, *homeDir);
+            }
         }
         return *homeDir;
     }();
@@ -619,6 +605,27 @@ Path getDataDir()
 }
 
 
+std::optional<Path> getSelfExe()
+{
+    static auto cached = []() -> std::optional<Path>
+    {
+        #if __linux__
+        return readLink("/proc/self/exe");
+        #elif __APPLE__
+        char buf[1024];
+        uint32_t size = sizeof(buf);
+        if (_NSGetExecutablePath(buf, &size) == 0)
+            return buf;
+        else
+            return std::nullopt;
+        #else
+        return std::nullopt;
+        #endif
+    }();
+    return cached;
+}
+
+
 Paths createDirs(const Path & path)
 {
     Paths created;
@@ -639,44 +646,6 @@ Paths createDirs(const Path & path)
     if (!S_ISDIR(st.st_mode)) throw Error("'%1%' is not a directory", path);
 
     return created;
-}
-
-
-void createSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime)
-{
-    if (symlink(target.c_str(), link.c_str()))
-        throw SysError("creating symlink from '%1%' to '%2%'", link, target);
-    if (mtime) {
-        struct timeval times[2];
-        times[0].tv_sec = *mtime;
-        times[0].tv_usec = 0;
-        times[1].tv_sec = *mtime;
-        times[1].tv_usec = 0;
-        if (lutimes(link.c_str(), times))
-            throw SysError("setting time of symlink '%s'", link);
-    }
-}
-
-
-void replaceSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime)
-{
-    for (unsigned int n = 0; true; n++) {
-        Path tmp = canonPath(fmt("%s/.%d_%s", dirOf(link), n, baseNameOf(link)));
-
-        try {
-            createSymlink(target, tmp, mtime);
-        } catch (SysError & e) {
-            if (e.errNo == EEXIST) continue;
-            throw;
-        }
-
-        if (rename(tmp.c_str(), link.c_str()) != 0)
-            throw SysError("renaming '%1%' to '%2%'", tmp, link);
-
-        break;
-    }
 }
 
 
@@ -752,7 +721,32 @@ void drainFD(int fd, Sink & sink, bool block)
     }
 }
 
+//////////////////////////////////////////////////////////////////////
 
+unsigned int getMaxCPU()
+{
+    #if __linux__
+    try {
+        auto cgroupFS = getCgroupFS();
+        if (!cgroupFS) return 0;
+
+        auto cgroups = getCgroups("/proc/self/cgroup");
+        auto cgroup = cgroups[""];
+        if (cgroup == "") return 0;
+
+        auto cpuFile = *cgroupFS + "/" + cgroup + "/cpu.max";
+
+        auto cpuMax = readFile(cpuFile);
+        auto cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " \n");
+        auto quota = cpuMaxParts[0];
+        auto period = cpuMaxParts[1];
+        if (quota != "max")
+                return std::ceil(std::stoi(quota) / std::stof(period));
+    } catch (Error &) { ignoreException(lvlDebug); }
+    #endif
+
+    return 0;
+}
 
 //////////////////////////////////////////////////////////////////////
 
@@ -842,6 +836,20 @@ void AutoCloseFD::close()
             throw SysError("closing file descriptor %1%", fd);
         fd = -1;
     }
+}
+
+void AutoCloseFD::fsync()
+{
+  if (fd != -1) {
+      int result;
+#if __APPLE__
+      result = ::fcntl(fd, F_FULLFSYNC);
+#else
+      result = ::fsync(fd);
+#endif
+      if (result == -1)
+          throw SysError("fsync file descriptor %1%", fd);
+  }
 }
 
 
@@ -1082,7 +1090,7 @@ std::string runProgram(Path program, bool searchPath, const Strings & args,
     auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input});
 
     if (!statusOk(res.first))
-        throw ExecError(res.first, fmt("program '%1%' %2%", program, statusToString(res.first)));
+        throw ExecError(res.first, "program '%1%' %2%", program, statusToString(res.first));
 
     return res.second;
 }
@@ -1210,7 +1218,7 @@ void runProgram2(const RunOptions & options)
     if (source) promise.get_future().get();
 
     if (status)
-        throw ExecError(status, fmt("program '%1%' %2%", options.program, statusToString(status)));
+        throw ExecError(status, "program '%1%' %2%", options.program, statusToString(status));
 }
 
 
@@ -1396,7 +1404,7 @@ std::string shellEscape(const std::string_view s)
 }
 
 
-void ignoreException()
+void ignoreException(Verbosity lvl)
 {
     /* Make sure no exceptions leave this function.
        printError() also throws when remote is closed. */
@@ -1404,7 +1412,7 @@ void ignoreException()
         try {
             throw;
         } catch (std::exception & e) {
-            printError("error (ignored): %1%", e.what());
+            printMsg(lvl, "error (ignored): %1%", e.what());
         }
     } catch (...) { }
 }
@@ -1586,8 +1594,22 @@ std::string stripIndentation(std::string_view s)
 }
 
 
-//////////////////////////////////////////////////////////////////////
+std::pair<std::string_view, std::string_view> getLine(std::string_view s)
+{
+    auto newline = s.find('\n');
 
+    if (newline == s.npos) {
+        return {s, ""};
+    } else {
+        auto line = s.substr(0, newline);
+        if (!line.empty() && line[line.size() - 1] == '\r')
+            line = line.substr(0, line.size() - 1);
+        return {line, s.substr(newline + 1)};
+    }
+}
+
+
+//////////////////////////////////////////////////////////////////////
 
 static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
 
@@ -1819,7 +1841,7 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
     if (chmod(path.c_str(), mode) == -1)
         throw SysError("changing permissions on '%1%'", path);
 
-    if (listen(fdSocket.get(), 5) == -1)
+    if (listen(fdSocket.get(), 100) == -1)
         throw SysError("cannot listen on socket '%1%'", path);
 
     return fdSocket;
