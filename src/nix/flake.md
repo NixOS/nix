@@ -18,51 +18,56 @@ values such as packages or NixOS modules provided by the flake).
 Flake references (*flakerefs*) are a way to specify the location of a
 flake. These have two different forms:
 
-* An attribute set representation, e.g.
 
-  ```nix
-  {
-    type = "github";
-    owner = "NixOS";
-    repo = "nixpkgs";
-  }
-  ```
+## Attribute set representation
 
-  The only required attribute is `type`. The supported types are
-  listed below.
+Example:
 
-* A URL-like syntax, e.g.
+```nix
+{
+  type = "github";
+  owner = "NixOS";
+  repo = "nixpkgs";
+}
+```
 
-  ```
-  github:NixOS/nixpkgs
-  ```
+The only required attribute is `type`. The supported types are
+listed below.
 
-  These are used on the command line as a more convenient alternative
-  to the attribute set representation. For instance, in the command
+## URL-like syntax
 
-  ```console
-  # nix build github:NixOS/nixpkgs#hello
-  ```
+Example:
 
-  `github:NixOS/nixpkgs` is a flake reference (while `hello` is an
-  output attribute). They are also allowed in the `inputs` attribute
-  of a flake, e.g.
+```
+github:NixOS/nixpkgs
+```
 
-  ```nix
-  inputs.nixpkgs.url = github:NixOS/nixpkgs;
-  ```
+These are used on the command line as a more convenient alternative
+to the attribute set representation. For instance, in the command
 
-  is equivalent to
+```console
+# nix build github:NixOS/nixpkgs#hello
+```
 
-  ```nix
-  inputs.nixpkgs = {
-    type = "github";
-    owner = "NixOS";
-    repo = "nixpkgs";
-  };
-  ```
+`github:NixOS/nixpkgs` is a flake reference (while `hello` is an
+output attribute). They are also allowed in the `inputs` attribute
+of a flake, e.g.
 
-## Examples
+```nix
+inputs.nixpkgs.url = github:NixOS/nixpkgs;
+```
+
+is equivalent to
+
+```nix
+inputs.nixpkgs = {
+  type = "github";
+  owner = "NixOS";
+  repo = "nixpkgs";
+};
+```
+
+### Examples
 
 Here are some examples of flake references in their URL-like representation:
 
@@ -153,13 +158,18 @@ Currently the `type` attribute can be one of the following:
   git(+http|+https|+ssh|+git|+file|):(//<server>)?<path>(\?<params>)?
   ```
 
-  The `ref` attribute defaults to `master`.
+  The `ref` attribute defaults to resolving the `HEAD` reference.
 
   The `rev` attribute must denote a commit that exists in the branch
   or tag specified by the `ref` attribute, since Nix doesn't do a full
   clone of the remote repository by default (and the Git protocol
   doesn't allow fetching a `rev` without a known `ref`). The default
   is the commit currently pointed to by `ref`.
+
+  When `git+file` is used without specifying `ref` or `rev`, files are
+  fetched directly from the local `path` as long as they have been added
+  to the Git repository. If there are uncommitted changes, the reference
+  is treated as dirty and a warning is printed.
 
   For example, the following are valid Git flake references:
 
@@ -176,9 +186,17 @@ Currently the `type` attribute can be one of the following:
 * `tarball`: Tarballs. The location of the tarball is specified by the
   attribute `url`.
 
-  In URL form, the schema must be `http://`, `https://` or `file://`
-  URLs and the extension must be `.zip`, `.tar`, `.tgz`, `.tar.gz`,
-  `.tar.xz`, `.tar.bz2` or `.tar.zst`.
+  In URL form, the schema must be `tarball+http://`, `tarball+https://` or `tarball+file://`.
+  If the extension corresponds to a known archive format (`.zip`, `.tar`,
+  `.tgz`, `.tar.gz`, `.tar.xz`, `.tar.bz2` or `.tar.zst`), then the `tarball+`
+  can be dropped.
+
+* `file`: Plain files or directory tarballs, either over http(s) or from the local
+  disk.
+
+  In URL form, the schema must be `file+http://`, `file+https://` or `file+file://`.
+  If the extension doesn’t correspond to a known archive format (as defined by the
+  `tarball` fetcher), then the `file+` prefix can be dropped.
 
 * `github`: A more efficient way to fetch repositories from
   GitHub. The following attributes are required:
@@ -326,9 +344,10 @@ The following attributes are supported in `flake.nix`:
 
 * `nixConfig`: a set of `nix.conf` options to be set when evaluating any
   part of a flake. In the interests of security, only a small set of
-  whitelisted options (currently `bash-prompt`, `bash-prompt-suffix`,
-  and `flake-registry`) are allowed to be set without confirmation so long as
-  `accept-flake-config` is not set in the global configuration.
+  whitelisted options (currently `bash-prompt`, `bash-prompt-prefix`,
+  `bash-prompt-suffix`, and `flake-registry`) are allowed to be set without
+  confirmation so long as `accept-flake-config` is not set in the global
+  configuration.
 
 ## Flake inputs
 

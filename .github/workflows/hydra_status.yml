@@ -1,8 +1,12 @@
 name: Hydra status
+
+permissions: read-all
+
 on:
   schedule:
     - cron: "12,42 * * * *"
   workflow_dispatch:
+
 jobs:
   check_hydra_status:
     name: Check Hydra status

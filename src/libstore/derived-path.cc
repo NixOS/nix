@@ -4,6 +4,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include <optional>
+
 namespace nix {
 
 nlohmann::json DerivedPath::Opaque::toJSON(ref<Store> store) const {
@@ -17,10 +19,11 @@ nlohmann::json DerivedPath::Built::toJSON(ref<Store> store) const {
     res["drvPath"] = store->printStorePath(drvPath);
     // Fallback for the input-addressed derivation case: We expect to always be
     // able to print the output paths, so let’s do it
-    auto knownOutputs = store->queryPartialDerivationOutputMap(drvPath);
-    for (const auto& output : outputs) {
-        if (knownOutputs.at(output))
-            res["outputs"][output] = store->printStorePath(knownOutputs.at(output).value());
+    const auto knownOutputs = store->queryPartialDerivationOutputMap(drvPath);
+    for (const auto & output : outputs) {
+        auto knownOutput = get(knownOutputs, output);
+        if (knownOutput && *knownOutput)
+            res["outputs"][output] = store->printStorePath(**knownOutput);
         else
             res["outputs"][output] = nullptr;
     }
@@ -51,28 +54,13 @@ StorePathSet BuiltPath::outPaths() const
     );
 }
 
-template<typename T>
-nlohmann::json stuffToJSON(const std::vector<T> & ts, ref<Store> store) {
-    auto res = nlohmann::json::array();
-    for (const T & t : ts) {
-        std::visit([&res, store](const auto & t) {
-            res.push_back(t.toJSON(store));
-        }, t.raw());
-    }
-    return res;
-}
-
-nlohmann::json derivedPathsWithHintsToJSON(const BuiltPaths & buildables, ref<Store> store)
-{ return stuffToJSON<BuiltPath>(buildables, store); }
-nlohmann::json derivedPathsToJSON(const DerivedPaths & paths, ref<Store> store)
-{ return stuffToJSON<DerivedPath>(paths, store); }
-
-
-std::string DerivedPath::Opaque::to_string(const Store & store) const {
+std::string DerivedPath::Opaque::to_string(const Store & store) const
+{
     return store.printStorePath(path);
 }
 
-std::string DerivedPath::Built::to_string(const Store & store) const {
+std::string DerivedPath::Built::to_string(const Store & store) const
+{
     return store.printStorePath(drvPath)
         + "!"
         + (outputs.empty() ? std::string { "*" } : concatStringsSep(",", outputs));
@@ -91,15 +79,16 @@ DerivedPath::Opaque DerivedPath::Opaque::parse(const Store & store, std::string_
     return {store.parseStorePath(s)};
 }
 
-DerivedPath::Built DerivedPath::Built::parse(const Store & store, std::string_view s)
+DerivedPath::Built DerivedPath::Built::parse(const Store & store, std::string_view drvS, std::string_view outputsS)
 {
-    size_t n = s.find("!");
-    assert(n != s.npos);
-    auto drvPath = store.parseStorePath(s.substr(0, n));
-    auto outputsS = s.substr(n + 1);
+    auto drvPath = store.parseStorePath(drvS);
     std::set<std::string> outputs;
-    if (outputsS != "*")
+    if (outputsS != "*") {
         outputs = tokenizeString<std::set<std::string>>(outputsS, ",");
+        if (outputs.empty())
+            throw Error(
+                 "Explicit list of wanted outputs '%s' must not be empty. Consider using '*' as a wildcard meaning all outputs if no output in particular is wanted.", outputsS);
+	}
     return {drvPath, outputs};
 }
 
@@ -108,7 +97,7 @@ DerivedPath DerivedPath::parse(const Store & store, std::string_view s)
     size_t n = s.find("!");
     return n == s.npos
         ? (DerivedPath) DerivedPath::Opaque::parse(store, s)
-        : (DerivedPath) DerivedPath::Built::parse(store, s);
+        : (DerivedPath) DerivedPath::Built::parse(store, s.substr(0, n), s.substr(n + 1));
 }
 
 RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
@@ -123,10 +112,15 @@ RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
                 for (auto& [outputName, outputPath] : p.outputs) {
                     if (settings.isExperimentalFeatureEnabled(
                                 Xp::CaDerivations)) {
+                        auto drvOutput = get(drvHashes, outputName);
+                        if (!drvOutput)
+                            throw Error(
+                                "the derivation '%s' has unrealised output '%s' (derived-path.cc/toRealisedPaths)",
+                                store.printStorePath(p.drvPath), outputName);
                         auto thisRealisation = store.queryRealisation(
-                            DrvOutput{drvHashes.at(outputName), outputName});
-                        assert(thisRealisation);  // We’ve built it, so we must h
-                                                  // ve the realisation
+                            DrvOutput{*drvOutput, outputName});
+                        assert(thisRealisation);  // We’ve built it, so we must
+                                                  // have the realisation
                         res.insert(*thisRealisation);
                     } else {
                         res.insert(outputPath);

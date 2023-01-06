@@ -9,6 +9,7 @@ ConditionPathIsReadWrite=@localstatedir@/nix/daemon-socket
 [Service]
 ExecStart=@@bindir@/nix-daemon nix-daemon --daemon
 KillMode=process
+LimitNOFILE=1048576
 
 [Install]
 WantedBy=multi-user.target

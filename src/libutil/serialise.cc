@@ -48,24 +48,9 @@ FdSink::~FdSink()
 }
 
 
-size_t threshold = 256 * 1024 * 1024;
-
-static void warnLargeDump()
-{
-    warn("dumping very large path (> 256 MiB); this may run out of memory");
-}
-
-
 void FdSink::write(std::string_view data)
 {
     written += data.size();
-    static bool warned = false;
-    if (warn && !warned) {
-        if (written > threshold) {
-            warnLargeDump();
-            warned = true;
-        }
-    }
     try {
         writeFull(fd, data);
     } catch (SysError & e) {
@@ -353,7 +338,7 @@ Sink & operator << (Sink & sink, const StringSet & s)
 
 Sink & operator << (Sink & sink, const Error & ex)
 {
-    auto info = ex.info();
+    auto & info = ex.info();
     sink
         << "Error"
         << info.level
@@ -448,11 +433,6 @@ Error readError(Source & source)
 
 void StringSink::operator () (std::string_view data)
 {
-    static bool warned = false;
-    if (!warned && s.size() > threshold) {
-        warnLargeDump();
-        warned = true;
-    }
     s.append(data);
 }
 

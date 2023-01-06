@@ -18,6 +18,9 @@ struct DevelopSettings : Config
     Setting<std::string> bashPrompt{this, "", "bash-prompt",
         "The bash prompt (`PS1`) in `nix develop` shells."};
 
+    Setting<std::string> bashPromptPrefix{this, "", "bash-prompt-prefix",
+        "Prefix prepended to the `PS1` environment variable in `nix develop` shells."};
+
     Setting<std::string> bashPromptSuffix{this, "", "bash-prompt-suffix",
         "Suffix appended to the `PS1` environment variable in `nix develop` shells."};
 };
@@ -161,6 +164,14 @@ struct BuildEnvironment
     {
         return vars == other.vars && bashFunctions == other.bashFunctions;
     }
+
+    std::string getSystem() const
+    {
+        if (auto v = get(vars, "system"))
+            return getString(*v);
+        else
+            return settings.thisSystem;
+    }
 };
 
 const static std::string getEnvSh =
@@ -189,10 +200,12 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     drv.env.erase("allowedRequisites");
     drv.env.erase("disallowedReferences");
     drv.env.erase("disallowedRequisites");
+    drv.env.erase("name");
 
     /* Rehash and write the derivation. FIXME: would be nice to use
        'buildDerivation', but that's privileged. */
     drv.name += "-env";
+    drv.env.emplace("name", drv.name);
     drv.inputSrcs.insert(std::move(getEnvShPath));
     if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
         for (auto & output : drv.outputs) {
@@ -243,6 +256,7 @@ struct Common : InstallableCommand, MixProfile
         "NIX_LOG_FD",
         "NIX_REMOTE",
         "PPID",
+        "SHELL",
         "SHELLOPTS",
         "SSL_CERT_FILE", // FIXME: only want to ignore /no-cert-file.crt
         "TEMP",
@@ -273,15 +287,27 @@ struct Common : InstallableCommand, MixProfile
         const BuildEnvironment & buildEnvironment,
         const Path & outputsDir = absPath(".") + "/outputs")
     {
+        // A list of colon-separated environment variables that should be
+        // prepended to, rather than overwritten, in order to keep the shell usable.
+        // Please keep this list minimal in order to avoid impurities.
+        static const char * const savedVars[] = {
+            "PATH",          // for commands
+            "XDG_DATA_DIRS", // for loadable completion
+        };
+
         std::ostringstream out;
 
         out << "unset shellHook\n";
 
-        out << "nix_saved_PATH=\"$PATH\"\n";
+        for (auto & var : savedVars) {
+            out << fmt("%s=${%s:-}\n", var, var);
+            out << fmt("nix_saved_%s=\"$%s\"\n", var, var);
+        }
 
         buildEnvironment.toBash(out, ignoreVars);
 
-        out << "PATH=\"$PATH:$nix_saved_PATH\"\n";
+        for (auto & var : savedVars)
+            out << fmt("%s=\"$%s:$nix_saved_%s\"\n", var, var, var);
 
         out << "export NIX_BUILD_TOP=\"$(mktemp -d -t nix-shell.XXXXXX)\"\n";
         for (auto & i : {"TMP", "TMPDIR", "TEMP", "TEMPDIR"})
@@ -482,6 +508,9 @@ struct CmdDevelop : Common, MixEnvironment
             if (developSettings.bashPrompt != "")
                 script += fmt("[ -n \"$PS1\" ] && PS1=%s;\n",
                     shellEscape(developSettings.bashPrompt.get()));
+            if (developSettings.bashPromptPrefix != "")
+                script += fmt("[ -n \"$PS1\" ] && PS1=%s\"$PS1\";\n",
+                    shellEscape(developSettings.bashPromptPrefix.get()));
             if (developSettings.bashPromptSuffix != "")
                 script += fmt("[ -n \"$PS1\" ] && PS1+=%s;\n",
                     shellEscape(developSettings.bashPromptSuffix.get()));
@@ -507,13 +536,25 @@ struct CmdDevelop : Common, MixEnvironment
                 state,
                 installable->nixpkgsFlakeRef(),
                 "bashInteractive",
+                DefaultOutputs(),
                 Strings{},
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
                 nixpkgsLockFlags);
 
-            shell = store->printStorePath(
-                Installable::toStorePath(getEvalStore(), store, Realise::Outputs, OperateOn::Output, bashInstallable))
-                + "/bin/bash";
+            bool found = false;
+
+            for (auto & path : Installable::toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, {bashInstallable})) {
+                auto s = store->printStorePath(path) + "/bin/bash";
+                if (pathExists(s)) {
+                    shell = s;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+                throw Error("package 'nixpkgs#bashInteractive' does not provide a 'bin/bash'");
+
         } catch (Error &) {
             ignoreException();
         }
@@ -537,7 +578,7 @@ struct CmdDevelop : Common, MixEnvironment
             }
         }
 
-        runProgramInStore(store, shell, args);
+        runProgramInStore(store, shell, args, buildEnvironment.getSystem());
     }
 };
 

@@ -1,16 +1,20 @@
-with builtins;
-with import ./utils.nix;
+builtinsDump:
+let
+  showBuiltin = name:
+    let
+      inherit (builtinsDump.${name}) doc args;
+    in
+    ''
+      <dt id="builtins-${name}">
+        <a href="#builtins-${name}"><code>${name} ${listArgs args}</code></a>
+      </dt>
+      <dd>
 
-builtins:
+        ${doc}
 
-concatStrings (map
-  (name:
-    let builtin = builtins.${name}; in
-    "<dt id=\"builtins-${name}\"><a href=\"#builtins-${name}\"><code>${name} "
-    + concatStringsSep " " (map (s: "<var>${s}</var>") builtin.args)
-    + "</code></a></dt>"
-    + "<dd>\n\n"
-    + builtin.doc
-    + "\n\n</dd>"
-  )
-  (attrNames builtins))
+      </dd>
+    '';
+  listArgs = args: builtins.concatStringsSep " " (map (s: "<var>${s}</var>") args);
+in
+with builtins; concatStringsSep "\n" (map showBuiltin (attrNames builtinsDump))
+

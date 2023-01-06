@@ -7,6 +7,7 @@
 #include "eval.hh"
 #include "store-api.hh"
 #include "flake/flake.hh"
+#include "build-result.hh"
 
 #include <optional>
 
@@ -51,6 +52,12 @@ enum class OperateOn {
     Derivation
 };
 
+struct BuiltPathWithResult
+{
+    BuiltPath path;
+    std::optional<BuildResult> result;
+};
+
 struct Installable
 {
     virtual ~Installable() { }
@@ -68,7 +75,7 @@ struct Installable
 
     UnresolvedApp toApp(EvalState & state);
 
-    virtual std::pair<Value *, Pos> toValue(EvalState & state)
+    virtual std::pair<Value *, PosIdx> toValue(EvalState & state)
     {
         throw Error("argument '%s' cannot be evaluated", what());
     }
@@ -91,14 +98,14 @@ struct Installable
         return FlakeRef::fromAttrs({{"type","indirect"}, {"id", "nixpkgs"}});
     }
 
-    static BuiltPaths build(
+    static std::vector<BuiltPathWithResult> build(
         ref<Store> evalStore,
         ref<Store> store,
         Realise mode,
         const std::vector<std::shared_ptr<Installable>> & installables,
         BuildMode bMode = bmNormal);
 
-    static std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> build2(
+    static std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> build2(
         ref<Store> evalStore,
         ref<Store> store,
         Realise mode,
@@ -132,6 +139,8 @@ struct Installable
         const std::vector<std::shared_ptr<Installable>> & installables);
 };
 
+typedef std::vector<std::shared_ptr<Installable>> Installables;
+
 struct InstallableValue : Installable
 {
     ref<EvalState> state;
@@ -141,7 +150,8 @@ struct InstallableValue : Installable
     struct DerivationInfo
     {
         StorePath drvPath;
-        std::string outputName;
+        std::set<std::string> outputsToInstall;
+        std::optional<NixInt> priority;
     };
 
     virtual std::vector<DerivationInfo> toDerivations() = 0;
@@ -156,6 +166,7 @@ struct InstallableFlake : InstallableValue
     FlakeRef flakeRef;
     Strings attrPaths;
     Strings prefixes;
+    OutputsSpec outputsSpec;
     const flake::LockFlags & lockFlags;
     mutable std::shared_ptr<flake::LockedFlake> _lockedFlake;
 
@@ -164,6 +175,7 @@ struct InstallableFlake : InstallableValue
         ref<EvalState> state,
         FlakeRef && flakeRef,
         std::string_view fragment,
+        OutputsSpec outputsSpec,
         Strings attrPaths,
         Strings prefixes,
         const flake::LockFlags & lockFlags);
@@ -178,7 +190,7 @@ struct InstallableFlake : InstallableValue
 
     std::vector<DerivationInfo> toDerivations() override;
 
-    std::pair<Value *, Pos> toValue(EvalState & state) override;
+    std::pair<Value *, PosIdx> toValue(EvalState & state) override;
 
     /* Get a cursor to every attrpath in getActualAttrPaths() that
        exists. */

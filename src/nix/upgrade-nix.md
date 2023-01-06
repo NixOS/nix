@@ -2,7 +2,7 @@ R""(
 
 # Examples
 
-* Upgrade Nix to the latest stable version:
+* Upgrade Nix to the stable version declared in Nixpkgs:
 
   ```console
   # nix upgrade-nix
@@ -16,8 +16,11 @@ R""(
 
 # Description
 
-This command upgrades Nix to the latest version. By default, it
-locates the directory containing the `nix` binary in the `$PATH`
+This command upgrades Nix to the stable version declared in Nixpkgs.
+This stable version is defined in [nix-fallback-paths.nix](https://github.com/NixOS/nixpkgs/raw/master/nixos/modules/installer/tools/nix-fallback-paths.nix)
+and updated manually. It may not always be the latest tagged release.
+
+By default, it locates the directory containing the `nix` binary in the `$PATH`
 environment variable. If that directory is a Nix profile, it will
 upgrade the `nix` package in that profile to the latest stable binary
 release.

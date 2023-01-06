@@ -31,7 +31,7 @@ subcommand to be performed. These are documented below.
 Several commands, such as `nix-env -q` and `nix-env -i`, take a list of
 arguments that specify the packages on which to operate. These are
 extended regular expressions that must match the entire name of the
-package. (For details on regular expressions, see regex7.) The match is
+package. (For details on regular expressions, see **regex**(7).) The match is
 case-sensitive. The regular expression can optionally be followed by a
 dash and a version number; if omitted, any version of the package will
 match. Here are some examples:
@@ -198,16 +198,18 @@ a number of possible ways:
     another.
 
   - If `--from-expression` is given, *args* are Nix
-    [functions](../expressions/language-constructs.md#functions)
+    [functions](../language/constructs.md#functions)
     that are called with the active Nix expression as their single
     argument. The derivations returned by those function calls are
     installed. This allows derivations to be specified in an
     unambiguous way, which is necessary if there are multiple
     derivations with the same name.
 
-  - If *args* are store derivations, then these are
+  - If *args* are [store derivation]s, then these are
     [realised](nix-store.md#operation---realise), and the resulting output paths
     are installed.
+
+    [store derivation]: ../glossary.md#gloss-store-derivation
 
   - If *args* are store paths that are not store derivations, then these
     are [realised](nix-store.md#operation---realise) and installed.
@@ -280,7 +282,7 @@ To copy the store path with symbolic name `gcc` from another profile:
 $ nix-env -i --from-profile /nix/var/nix/profiles/foo gcc
 ```
 
-To install a specific store derivation (typically created by
+To install a specific [store derivation] (typically created by
 `nix-instantiate`):
 
 ```console
@@ -412,7 +414,7 @@ The upgrade operation determines whether a derivation `y` is an upgrade
 of a derivation `x` by looking at their respective `name` attributes.
 The names (e.g., `gcc-3.3.1` are split into two parts: the package name
 (`gcc`), and the version (`3.3.1`). The version part starts after the
-first dash not followed by a letter. `x` is considered an upgrade of `y`
+first dash not followed by a letter. `y` is considered an upgrade of `x`
 if their package names match, and the version of `y` is higher than that
 of `x`.
 
@@ -665,7 +667,7 @@ derivation is shown unless `--no-name` is specified.
     Print the `system` attribute of the derivation.
 
   - `--drv-path`\
-    Print the path of the store derivation.
+    Print the path of the [store derivation].
 
   - `--out-path`\
     Print the output path of the derivation.

@@ -6,6 +6,7 @@
 #include "archive.hh"
 #include "tarfile.hh"
 #include "types.hh"
+#include "split.hh"
 
 namespace nix::fetchers {
 
@@ -174,61 +175,106 @@ std::pair<Tree, time_t> downloadTarball(
     };
 }
 
-struct TarballInputScheme : InputScheme
+// An input scheme corresponding to a curl-downloadable resource.
+struct CurlInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url) override
-    {
-        if (url.scheme != "file" && url.scheme != "http" && url.scheme != "https") return {};
+    virtual const std::string inputType() const = 0;
+    const std::set<std::string> transportUrlSchemes = {"file", "http", "https"};
 
-        if (!hasSuffix(url.path, ".zip")
-            && !hasSuffix(url.path, ".tar")
-            && !hasSuffix(url.path, ".tgz")
-            && !hasSuffix(url.path, ".tar.gz")
-            && !hasSuffix(url.path, ".tar.xz")
-            && !hasSuffix(url.path, ".tar.bz2")
-            && !hasSuffix(url.path, ".tar.zst"))
-            return {};
+    const bool hasTarballExtension(std::string_view path) const
+    {
+        return hasSuffix(path, ".zip") || hasSuffix(path, ".tar")
+            || hasSuffix(path, ".tgz") || hasSuffix(path, ".tar.gz")
+            || hasSuffix(path, ".tar.xz") || hasSuffix(path, ".tar.bz2")
+            || hasSuffix(path, ".tar.zst");
+    }
+
+    virtual bool isValidURL(const ParsedURL & url) const = 0;
+
+    std::optional<Input> inputFromURL(const ParsedURL & url) const override
+    {
+        if (!isValidURL(url))
+            return std::nullopt;
 
         Input input;
-        input.attrs.insert_or_assign("type", "tarball");
-        input.attrs.insert_or_assign("url", url.to_string());
+
+        auto urlWithoutApplicationScheme = url;
+        urlWithoutApplicationScheme.scheme = parseUrlScheme(url.scheme).transport;
+
+        input.attrs.insert_or_assign("type", inputType());
+        input.attrs.insert_or_assign("url", urlWithoutApplicationScheme.to_string());
         auto narHash = url.query.find("narHash");
         if (narHash != url.query.end())
             input.attrs.insert_or_assign("narHash", narHash->second);
         return input;
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) override
+    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
-        if (maybeGetStrAttr(attrs, "type") != "tarball") return {};
+        auto type = maybeGetStrAttr(attrs, "type");
+        if (type != inputType()) return {};
 
+        std::set<std::string> allowedNames = {"type", "url", "narHash", "name", "unpack"};
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && /* name != "hash" && */ name != "narHash" && name != "name")
-                throw Error("unsupported tarball input attribute '%s'", name);
+            if (!allowedNames.count(name))
+                throw Error("unsupported %s input attribute '%s'", *type, name);
 
         Input input;
         input.attrs = attrs;
+
         //input.locked = (bool) maybeGetStrAttr(input.attrs, "hash");
         return input;
     }
 
-    ParsedURL toURL(const Input & input) override
+    ParsedURL toURL(const Input & input) const override
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
-        // NAR hashes are preferred over file hashes since tar/zip files
-        // don't have a canonical representation.
+        // NAR hashes are preferred over file hashes since tar/zip
+        // files don't have a canonical representation.
         if (auto narHash = input.getNarHash())
             url.query.insert_or_assign("narHash", narHash->to_string(SRI, true));
-        /*
-        else if (auto hash = maybeGetStrAttr(input.attrs, "hash"))
-            url.query.insert_or_assign("hash", Hash(*hash).to_string(SRI, true));
-        */
         return url;
     }
 
-    bool hasAllInfo(const Input & input) override
+    bool hasAllInfo(const Input & input) const override
     {
         return true;
+    }
+
+};
+
+struct FileInputScheme : CurlInputScheme
+{
+    const std::string inputType() const override { return "file"; }
+
+    bool isValidURL(const ParsedURL & url) const override
+    {
+        auto parsedUrlScheme = parseUrlScheme(url.scheme);
+        return transportUrlSchemes.count(std::string(parsedUrlScheme.transport))
+            && (parsedUrlScheme.application
+                    ? parsedUrlScheme.application.value() == inputType()
+                    : !hasTarballExtension(url.path));
+    }
+
+    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
+    {
+        auto file = downloadFile(store, getStrAttr(input.attrs, "url"), input.getName(), false);
+        return {std::move(file.storePath), input};
+    }
+};
+
+struct TarballInputScheme : CurlInputScheme
+{
+    const std::string inputType() const override { return "tarball"; }
+
+    bool isValidURL(const ParsedURL & url) const override
+    {
+        auto parsedUrlScheme = parseUrlScheme(url.scheme);
+
+        return transportUrlSchemes.count(std::string(parsedUrlScheme.transport))
+            && (parsedUrlScheme.application
+                    ? parsedUrlScheme.application.value() == inputType()
+                    : hasTarballExtension(url.path));
     }
 
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
@@ -239,5 +285,6 @@ struct TarballInputScheme : InputScheme
 };
 
 static auto rTarballInputScheme = OnStartup([] { registerInputScheme(std::make_unique<TarballInputScheme>()); });
+static auto rFileInputScheme = OnStartup([] { registerInputScheme(std::make_unique<FileInputScheme>()); });
 
 }

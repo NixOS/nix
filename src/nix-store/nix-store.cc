@@ -522,7 +522,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         if (!store->isValidPath(info->path) || reregister) {
             /* !!! races */
             if (canonicalise)
-                canonicalisePathMetaData(store->printStorePath(info->path), -1);
+                canonicalisePathMetaData(store->printStorePath(info->path), {});
             if (!hashGiven) {
                 HashResult hash = hashPath(htSHA256, store->printStorePath(info->path));
                 info->narHash = hash.first;
@@ -814,14 +814,23 @@ static void opServe(Strings opFlags, Strings opArgs)
         if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
             settings.maxLogSize = readNum<unsigned long>(in);
         if (GET_PROTOCOL_MINOR(clientVersion) >= 3) {
-            settings.buildRepeat = readInt(in);
-            settings.enforceDeterminism = readInt(in);
+            auto nrRepeats = readInt(in);
+            if (nrRepeats != 0) {
+                throw Error("client requested repeating builds, but this is not currently implemented");
+            }
+            // Ignore 'enforceDeterminism'. It used to be true by
+            // default, but also only never had any effect when
+            // `nrRepeats == 0`.  We have already asserted that
+            // `nrRepeats` in fact is 0, so we can safely ignore this
+            // without doing something other than what the client
+            // asked for.
+            readInt(in);
+
             settings.runDiffHook = true;
         }
         if (GET_PROTOCOL_MINOR(clientVersion) >= 7) {
             settings.keepFailed = (bool) readInt(in);
         }
-        settings.printRepeatedBuilds = false;
     };
 
     while (true) {
@@ -928,10 +937,9 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 if (GET_PROTOCOL_MINOR(clientVersion) >= 3)
                     out << status.timesBuilt << status.isNonDeterministic << status.startTime << status.stopTime;
-                if (GET_PROTOCOL_MINOR(clientVersion >= 6)) {
+                if (GET_PROTOCOL_MINOR(clientVersion) >= 6) {
                     worker_proto::write(*store, out, status.builtOutputs);
                 }
-
 
                 break;
             }
@@ -1099,9 +1107,7 @@ static int main_nix_store(int argc, char * * argv)
         if (op != opDump && op != opRestore) /* !!! hack */
             store = openStore();
 
-        op(opFlags, opArgs);
-
-        logger->stop();
+        op(std::move(opFlags), std::move(opArgs));
 
         return 0;
     }

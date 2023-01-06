@@ -44,7 +44,7 @@ flake output attributes:
 
 * `bundlers.<system>.default`
 
-If an attribute *name* is given, `nix run` tries the following flake
+If an attribute *name* is given, `nix bundle` tries the following flake
 output attributes:
 
 * `bundlers.<system>.<name>`

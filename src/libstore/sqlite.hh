@@ -96,10 +96,31 @@ struct SQLiteTxn
 };
 
 
-MakeError(SQLiteError, Error);
-MakeError(SQLiteBusy, SQLiteError);
+struct SQLiteError : Error
+{
+    std::string path;
+    std::string errMsg;
+    int errNo, extendedErrNo, offset;
 
-[[noreturn]] void throwSQLiteError(sqlite3 * db, const FormatOrString & fs);
+    template<typename... Args>
+    [[noreturn]] static void throw_(sqlite3 * db, const std::string & fs, const Args & ... args) {
+        throw_(db, hintfmt(fs, args...));
+    }
+
+    SQLiteError(const char *path, const char *errMsg, int errNo, int extendedErrNo, int offset, hintformat && hf);
+
+protected:
+
+    template<typename... Args>
+    SQLiteError(const char *path, const char *errMsg, int errNo, int extendedErrNo, int offset, const std::string & fs, const Args & ... args)
+      : SQLiteError(path, errNo, extendedErrNo, offset, hintfmt(fs, args...))
+    { }
+
+    [[noreturn]] static void throw_(sqlite3 * db, hintformat && hf);
+
+};
+
+MakeError(SQLiteBusy, SQLiteError);
 
 void handleSQLiteBusy(const SQLiteBusy & e);
 

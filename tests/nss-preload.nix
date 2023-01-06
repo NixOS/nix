@@ -5,6 +5,42 @@ with import (nixpkgs + "/nixos/lib/testing-python.nix") {
   extraConfigurations = [ { nixpkgs.overlays = [ overlay ]; } ];
 };
 
+let
+  nix-fetch = pkgs.writeText "fetch.nix" ''
+    derivation {
+        # This derivation is an copy from what is available over at
+        # nix.git:corepkgs/fetchurl.nix
+        builder = "builtin:fetchurl";
+
+        # We're going to fetch data from the http_dns instance created before
+        # we expect the content to be the same as the content available there.
+        # ```
+        # $ nix-hash --type sha256 --to-base32 $(echo "hello world" | sha256sum | cut -d " " -f 1)
+        # 0ix4jahrkll5zg01wandq78jw3ab30q4nscph67rniqg5x7r0j59
+        # ```
+        outputHash = "0ix4jahrkll5zg01wandq78jw3ab30q4nscph67rniqg5x7r0j59";
+        outputHashAlgo = "sha256";
+        outputHashMode = "flat";
+
+        name = "example.com";
+        url = "http://example.com";
+
+        unpack = false;
+        executable = false;
+
+        system = "builtin";
+
+        preferLocalBuild = true;
+
+        impureEnvVars = [
+            "http_proxy" "https_proxy" "ftp_proxy" "all_proxy" "no_proxy"
+        ];
+
+        urls = [ "http://example.com" ];
+      }
+  '';
+in
+
 makeTest (
 
 rec {
@@ -62,45 +98,11 @@ rec {
         { address = "192.168.0.10"; prefixLength = 24; }
       ];
 
-      nix.sandboxPaths = lib.mkForce [];
-      nix.binaryCaches = lib.mkForce [];
-      nix.useSandbox = lib.mkForce true;
+      nix.settings.extra-sandbox-paths = lib.mkForce [];
+      nix.settings.substituters = lib.mkForce [];
+      nix.settings.sandbox = lib.mkForce true;
     };
   };
-
-  nix-fetch = pkgs.writeText "fetch.nix" ''
-    derivation {
-        # This derivation is an copy from what is available over at
-        # nix.git:corepkgs/fetchurl.nix
-        builder = "builtin:fetchurl";
-
-        # We're going to fetch data from the http_dns instance created before
-        # we expect the content to be the same as the content available there.
-        # ```
-        # $ nix-hash --type sha256 --to-base32 $(echo "hello world" | sha256sum | cut -d " " -f 1)
-        # 0ix4jahrkll5zg01wandq78jw3ab30q4nscph67rniqg5x7r0j59
-        # ```
-        outputHash = "0ix4jahrkll5zg01wandq78jw3ab30q4nscph67rniqg5x7r0j59";
-        outputHashAlgo = "sha256";
-        outputHashMode = "flat";
-
-        name = "example.com";
-        url = "http://example.com";
-
-        unpack = false;
-        executable = false;
-
-        system = "builtin";
-
-        preferLocalBuild = true;
-
-        impureEnvVars = [
-            "http_proxy" "https_proxy" "ftp_proxy" "all_proxy" "no_proxy"
-        ];
-
-        urls = [ "http://example.com" ];
-      }
-  '';
 
   testScript = { nodes, ... }: ''
     http_dns.wait_for_unit("nginx")

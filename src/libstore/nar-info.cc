@@ -69,8 +69,6 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
             if (value != "unknown-deriver")
                 deriver = StorePath(value);
         }
-        else if (name == "System")
-            system = value;
         else if (name == "Sig")
             sigs.insert(value);
         else if (name == "CA") {
@@ -105,9 +103,6 @@ std::string NarInfo::to_string(const Store & store) const
 
     if (deriver)
         res += "Deriver: " + std::string(deriver->to_string()) + "\n";
-
-    if (!system.empty())
-        res += "System: " + system + "\n";
 
     for (auto sig : sigs)
         res += "Sig: " + sig + "\n";

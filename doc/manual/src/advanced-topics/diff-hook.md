@@ -101,7 +101,7 @@ In particular, notice the
 `/nix/store/krpqk0l9ib0ibi1d2w52z293zw455cap-unstable.check` output. Nix
 has copied the build results to that directory where you can examine it.
 
-> **Note**
+> []{#check-dirs-are-unregistered} **Note**
 > 
 > Check paths are not protected against garbage collection, and this
 > path will be deleted on the next garbage collection.
@@ -121,37 +121,3 @@ error:
     are not valid, so checking is not possible
 
 Run the build without `--check`, and then try with `--check` again.
-
-# Automatic and Optionally Enforced Determinism Verification
-
-Automatically verify every build at build time by executing the build
-multiple times.
-
-Setting `repeat` and `enforce-determinism` in your `nix.conf` permits
-the automated verification of every build Nix performs.
-
-The following configuration will run each build three times, and will
-require the build to be deterministic:
-
-    enforce-determinism = true
-    repeat = 2
-
-Setting `enforce-determinism` to false as in the following
-configuration will run the build multiple times, execute the build
-hook, but will allow the build to succeed even if it does not build
-reproducibly:
-
-    enforce-determinism = false
-    repeat = 1
-
-An example output of this configuration:
-
-```console
-$ nix-build ./test.nix -A unstable
-this derivation will be built:
-  /nix/store/ch6llwpr2h8c3jmnf3f2ghkhx59aa97f-unstable.drv
-building '/nix/store/ch6llwpr2h8c3jmnf3f2ghkhx59aa97f-unstable.drv' (round 1/2)...
-building '/nix/store/ch6llwpr2h8c3jmnf3f2ghkhx59aa97f-unstable.drv' (round 2/2)...
-output '/nix/store/6xg356v9gl03hpbbg8gws77n19qanh02-unstable' of '/nix/store/ch6llwpr2h8c3jmnf3f2ghkhx59aa97f-unstable.drv' differs from '/nix/store/6xg356v9gl03hpbbg8gws77n19qanh02-unstable.check' from previous round
-/nix/store/6xg356v9gl03hpbbg8gws77n19qanh02-unstable
-```

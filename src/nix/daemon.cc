@@ -257,7 +257,7 @@ static void daemonLoop()
         } catch (Interrupted & e) {
             return;
         } catch (Error & error) {
-            ErrorInfo ei = error.info();
+            auto ei = error.info();
             // FIXME: add to trace?
             ei.msg = hintfmt("error processing connection: %1%", ei.msg.str());
             logError(ei);
