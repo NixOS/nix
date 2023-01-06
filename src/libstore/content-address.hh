@@ -4,6 +4,7 @@
 #include "hash.hh"
 #include "path.hh"
 #include "comparator.hh"
+#include "reference-set.hh"
 
 namespace nix {
 
@@ -101,48 +102,7 @@ Hash getContentAddressHash(const ContentAddress & ca);
  * References set
  */
 
-template<typename Ref>
-struct PathReferences
-{
-    std::set<Ref> references;
-    bool hasSelfReference = false;
-
-    /* Functions to view references + hasSelfReference as one set, mainly for
-       compatibility's sake. */
-    StorePathSet referencesPossiblyToSelf(const Ref & self) const;
-    void insertReferencePossiblyToSelf(const Ref & self, Ref && ref);
-    void setReferencesPossiblyToSelf(const Ref & self, std::set<Ref> && refs);
-
-    GENERATE_CMP(PathReferences<Ref>, me->references, me->hasSelfReference);
-};
-
-template<typename Ref>
-StorePathSet PathReferences<Ref>::referencesPossiblyToSelf(const Ref & self) const
-{
-    StorePathSet refs { references };
-    if (hasSelfReference)
-        refs.insert(self);
-    return refs;
-}
-
-template<typename Ref>
-void PathReferences<Ref>::insertReferencePossiblyToSelf(const Ref & self, Ref && ref)
-{
-    if (ref == self)
-        hasSelfReference = true;
-    else
-        references.insert(std::move(ref));
-}
-
-template<typename Ref>
-void PathReferences<Ref>::setReferencesPossiblyToSelf(const Ref & self, std::set<Ref> && refs)
-{
-    if (refs.count(self))
-        hasSelfReference = true;
-        refs.erase(self);
-
-    references = refs;
-}
+typedef References<StorePath> StoreReferences;
 
 /*
  * Full content address
@@ -160,7 +120,7 @@ struct TextInfo : TextHash {
 
 struct FixedOutputInfo : FixedOutputHash {
     // References for the paths
-    PathReferences<StorePath> references;
+    StoreReferences references;
 
     GENERATE_CMP(FixedOutputInfo, *(const FixedOutputHash *)me, me->references);
 };
@@ -173,7 +133,7 @@ typedef std::variant<
 ContentAddressWithReferences caWithoutRefs(const ContentAddress &);
 
 ContentAddressWithReferences contentAddressFromMethodHashAndRefs(
-    ContentAddressMethod method, Hash && hash, PathReferences<StorePath> && refs);
+    ContentAddressMethod method, Hash && hash, StoreReferences && refs);
 
 ContentAddressMethod getContentAddressMethod(const ContentAddressWithReferences & ca);
 Hash getContentAddressHash(const ContentAddressWithReferences & ca);

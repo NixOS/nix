@@ -128,7 +128,7 @@ void PathSubstitutionGoal::tryNext()
     }
 
     if (info->path != storePath) {
-        if (info->isContentAddressed(*sub) && info->references.empty() && !info->hasSelfReference) {
+        if (info->isContentAddressed(*sub) && info->references.empty()) {
             auto info2 = std::make_shared<ValidPathInfo>(*info);
             info2->path = storePath;
             info = info2;
@@ -165,7 +165,7 @@ void PathSubstitutionGoal::tryNext()
 
     /* To maintain the closure invariant, we first have to realise the
        paths referenced by this one. */
-    for (auto & i : info->references)
+    for (auto & i : info->references.others)
         addWaitee(worker.makePathSubstitutionGoal(i));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
@@ -187,7 +187,7 @@ void PathSubstitutionGoal::referencesValid()
         return;
     }
 
-    for (auto & i : info->references)
+    for (auto & i : info->references.others)
         assert(worker.store.isValidPath(i));
 
     state = &PathSubstitutionGoal::tryToRun;

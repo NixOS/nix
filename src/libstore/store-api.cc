@@ -169,13 +169,13 @@ StorePath Store::makeOutputPath(std::string_view id,
 static std::string makeType(
     const Store & store,
     std::string && type,
-    const PathReferences<StorePath> & references)
+    const StoreReferences & references)
 {
-    for (auto & i : references.references) {
+    for (auto & i : references.others) {
         type += ":";
         type += store.printStorePath(i);
     }
-    if (references.hasSelfReference) type += ":self";
+    if (references.self) type += ":self";
     return std::move(type);
 }
 
@@ -185,8 +185,7 @@ StorePath Store::makeFixedOutputPath(std::string_view name, const FixedOutputInf
     if (info.hash.type == htSHA256 && info.method == FileIngestionMethod::Recursive) {
         return makeStorePath(makeType(*this, "source", info.references), info.hash, name);
     } else {
-        assert(info.references.references.size() == 0);
-        assert(!info.references.hasSelfReference);
+        assert(info.references.size() == 0);
         return makeStorePath("output:out",
             hashString(htSHA256,
                 "fixed:out:"
@@ -201,7 +200,7 @@ StorePath Store::makeTextPath(std::string_view name, const TextInfo & info) cons
 {
     assert(info.hash.type == htSHA256);
     return makeStorePath(
-        makeType(*this, "text", PathReferences<StorePath> { info.references }),
+        makeType(*this, "text", StoreReferences { info.references }),
         info.hash,
         name);
 }
@@ -311,7 +310,7 @@ void Store::addMultipleToStore(
             bytesExpected += info.narSize;
             act.setExpected(actCopyPath, bytesExpected);
 
-            return info.references;
+            return info.references.others;
         },
 
         [&](const StorePath & path) {
@@ -816,7 +815,7 @@ std::string Store::makeValidityRegistration(const StorePathSet & paths,
 
         s += (format("%1%\n") % info->references.size()).str();
 
-        for (auto & j : info->references)
+        for (auto & j : info->referencesPossiblyToSelf())
             s += printStorePath(j) + "\n";
     }
 
@@ -878,7 +877,7 @@ json Store::pathInfoToJSON(const StorePathSet & storePaths,
 
             {
                 auto& jsonRefs = (jsonPath["references"] = json::array());
-                for (auto & ref : info->references)
+                for (auto & ref : info->referencesPossiblyToSelf())
                     jsonRefs.emplace_back(printStorePath(ref));
             }
 
@@ -1231,17 +1230,17 @@ std::string showPaths(const PathSet & paths)
 
 StorePathSet ValidPathInfo::referencesPossiblyToSelf() const
 {
-    return PathReferences<StorePath>::referencesPossiblyToSelf(path);
+    return references.possiblyToSelf(path);
 }
 
 void ValidPathInfo::insertReferencePossiblyToSelf(StorePath && ref)
 {
-    return PathReferences<StorePath>::insertReferencePossiblyToSelf(path, std::move(ref));
+    return references.insertPossiblyToSelf(path, std::move(ref));
 }
 
 void ValidPathInfo::setReferencesPossiblyToSelf(StorePathSet && refs)
 {
-    return PathReferences<StorePath>::setReferencesPossiblyToSelf(path, std::move(refs));
+    return references.setPossiblyToSelf(path, std::move(refs));
 }
 
 std::string ValidPathInfo::fingerprint(const Store & store) const
@@ -1271,16 +1270,16 @@ std::optional<StorePathDescriptor> ValidPathInfo::fullStorePathDescriptorOpt() c
         .name = std::string { path.name() },
         .info = std::visit(overloaded {
             [&](const TextHash & th) -> ContentAddressWithReferences {
-                assert(!hasSelfReference);
+                assert(!references.self);
                 return TextInfo {
                     th,
-                    .references = references,
+                    .references = references.others,
                 };
             },
             [&](const FixedOutputHash & foh) -> ContentAddressWithReferences {
                 return FixedOutputInfo {
                     foh,
-                    .references = static_cast<PathReferences<StorePath>>(*this),
+                    .references = references,
                 };
             },
         }, *ca),
@@ -1341,11 +1340,14 @@ ValidPathInfo::ValidPathInfo(
 {
     std::visit(overloaded {
         [this](TextInfo && ti) {
-            this->references = std::move(ti.references);
+            this->references = {
+                .others = std::move(ti.references),
+                .self = false,
+            };
             this->ca = std::move((TextHash &&) ti);
         },
         [this](FixedOutputInfo && foi) {
-            *(static_cast<PathReferences<StorePath> *>(this)) = std::move(foi.references);
+            this->references = std::move(foi.references);
             this->ca = std::move((FixedOutputHash &&) foi);
         },
     }, std::move(info.info));

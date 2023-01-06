@@ -21,16 +21,16 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
             StorePathSet res;
             StorePathSet referrers;
             queryReferrers(path, referrers);
-            for (auto& ref : referrers)
+            for (auto & ref : referrers)
                 if (ref != path)
                     res.insert(ref);
 
             if (includeOutputs)
-                for (auto& i : queryValidDerivers(path))
+                for (auto & i : queryValidDerivers(path))
                     res.insert(i);
 
             if (includeDerivers && path.isDerivation())
-                for (auto& [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
+                for (auto & [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
                     if (maybeOutPath && isValidPath(*maybeOutPath))
                         res.insert(*maybeOutPath);
             return res;
@@ -40,11 +40,11 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
                         std::future<ref<const ValidPathInfo>> & fut) {
             StorePathSet res;
             auto info = fut.get();
-            for (auto& ref : info->references)
+            for (auto & ref : info->references.others)
                 res.insert(ref);
 
             if (includeOutputs && path.isDerivation())
-                for (auto& [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
+                for (auto & [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
                     if (maybeOutPath && isValidPath(*maybeOutPath))
                         res.insert(*maybeOutPath);
 
@@ -95,7 +95,7 @@ std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv)
                 return static_cast<TextHash>(ti);
             },
             [&](const FixedOutputInfo & fi) -> std::optional<ContentAddress> {
-                if (fi.references != PathReferences<StorePath> {})
+                if (!fi.references.empty())
                     return std::nullopt;
                 return static_cast<FixedOutputHash>(fi);
             },
@@ -235,7 +235,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
                 state->narSize += info->second.narSize;
             }
 
-            for (auto & ref : info->second.references)
+            for (auto & ref : info->second.references.others)
                 pool.enqueue(std::bind(doPath, DerivedPath::Opaque { ref }));
           },
         }, req.raw());
@@ -253,7 +253,7 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
     return topoSort(paths,
         {[&](const StorePath & path) {
             try {
-                return queryPathInfo(path)->references;
+                return queryPathInfo(path)->references.others;
             } catch (InvalidPath &) {
                 return StorePathSet();
             }
@@ -309,7 +309,7 @@ std::map<DrvOutput, StorePath> drvOutputReferences(
 
     auto info = store.queryPathInfo(outputPath);
 
-    return drvOutputReferences(Realisation::closure(store, inputRealisations), info->references);
+    return drvOutputReferences(Realisation::closure(store, inputRealisations), info->referencesPossiblyToSelf());
 }
 
 }

@@ -762,7 +762,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         else {
             to << 1
                << (i->second.deriver ? store->printStorePath(*i->second.deriver) : "");
-            worker_proto::write(*store, to, i->second.referencesPossiblyToSelf(path));
+            worker_proto::write(*store, to, i->second.references.possiblyToSelf(path));
             to << i->second.downloadSize
                << i->second.narSize;
         }
@@ -785,7 +785,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         for (auto & i : infos) {
             to << store->printStorePath(i.first)
                << (i.second.deriver ? store->printStorePath(*i.second.deriver) : "");
-            worker_proto::write(*store, to, i.second.referencesPossiblyToSelf(i.first));
+            worker_proto::write(*store, to, i.second.references.possiblyToSelf(i.first));
             to << i.second.downloadSize << i.second.narSize;
         }
         break;

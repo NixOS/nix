@@ -14,20 +14,22 @@ namespace nix {
 class Store;
 
 
-struct SubstitutablePathInfo : PathReferences<StorePath>
+struct SubstitutablePathInfo
 {
     std::optional<StorePath> deriver;
+    StoreReferences references;
     uint64_t downloadSize; /* 0 = unknown or inapplicable */
     uint64_t narSize; /* 0 = unknown */
 };
 
 typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
 
-struct ValidPathInfo : PathReferences<StorePath>
+struct ValidPathInfo
 {
     StorePath path;
     std::optional<StorePath> deriver;
     Hash narHash;
+    StoreReferences references;
     time_t registrationTime = 0;
     uint64_t narSize = 0; // 0 = unknown
     uint64_t id; // internal use only
@@ -61,7 +63,6 @@ struct ValidPathInfo : PathReferences<StorePath>
         return
             path == i.path
             && narHash == i.narHash
-            && hasSelfReference == i.hasSelfReference
             && references == i.references;
     }
 

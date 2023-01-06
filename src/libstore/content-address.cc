@@ -161,15 +161,15 @@ std::string renderContentAddress(std::optional<ContentAddress> ca)
 }
 
 ContentAddressWithReferences contentAddressFromMethodHashAndRefs(
-    ContentAddressMethod method, Hash && hash, PathReferences<StorePath> && refs)
+    ContentAddressMethod method, Hash && hash, StoreReferences && refs)
 {
     return std::visit(overloaded {
         [&](TextHashMethod _) -> ContentAddressWithReferences {
-            if (refs.hasSelfReference)
+            if (refs.self)
                 throw UsageError("Cannot have a self reference with text hashing scheme");
             return TextInfo {
                 { .hash = std::move(hash) },
-                std::move(refs.references),
+                .references = std::move(refs.others),
             };
         },
         [&](FileIngestionMethod m2) -> ContentAddressWithReferences {
@@ -178,7 +178,7 @@ ContentAddressWithReferences contentAddressFromMethodHashAndRefs(
                     .method = m2,
                     .hash = std::move(hash),
                 },
-                std::move(refs),
+                .references = std::move(refs),
             };
         },
     }, method);
