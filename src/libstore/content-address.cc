@@ -211,10 +211,16 @@ Hash getContentAddressHash(const ContentAddress & ca)
 ContentAddressWithReferences caWithoutRefs(const ContentAddress & ca) {
     return std::visit(overloaded {
         [&](const TextHash & h) -> ContentAddressWithReferences {
-            return TextInfo { h, {}};
+            return TextInfo {
+                h,
+                .references = {},
+            };
         },
         [&](const FixedOutputHash & h) -> ContentAddressWithReferences {
-            return FixedOutputInfo { h, {}};
+            return FixedOutputInfo {
+                h,
+                .references = {},
+            };
         },
     }, ca);
 }

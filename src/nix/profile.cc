@@ -205,7 +205,7 @@ struct ProfileManifest
                         .method = FileIngestionMethod::Recursive,
                         .hash = narHash,
                     },
-                    { references },
+                    .references = { references },
                 },
             },
             narHash,
