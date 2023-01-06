@@ -402,7 +402,7 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info.deriver = parseStorePath(deriver);
-            info.setReferencesPossiblyToSelf(i.first, worker_proto::read(*this, conn->from, Phantom<StorePathSet> {}));
+            info.references.setPossiblyToSelf(i.first, worker_proto::read(*this, conn->from, Phantom<StorePathSet> {}));
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
             infos.insert_or_assign(i.first, std::move(info));
@@ -426,7 +426,7 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info.deriver = parseStorePath(deriver);
-            info.setReferencesPossiblyToSelf(path, worker_proto::read(*this, conn->from, Phantom<StorePathSet> {}));
+            info.references.setPossiblyToSelf(path, worker_proto::read(*this, conn->from, Phantom<StorePathSet> {}));
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
         }

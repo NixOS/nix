@@ -2421,26 +2421,26 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             }
         };
 
-        auto rewriteRefs = [&]() -> PathReferences<StorePath> {
+        auto rewriteRefs = [&]() -> StoreReferences {
             /* In the CA case, we need the rewritten refs to calculate the
                final path, therefore we look for a *non-rewritten
                self-reference, and use a bool rather try to solve the
                computationally intractable fixed point. */
-            PathReferences<StorePath> res {
-                .hasSelfReference = false,
+            StoreReferences res {
+                .self = false,
             };
             for (auto & r : references) {
                 auto name = r.name();
                 auto origHash = std::string { r.hashPart() };
                 if (r == *scratchPath) {
-                    res.hasSelfReference = true;
+                    res.self = true;
                 } else if (auto outputRewrite = get(outputRewrites, origHash)) {
                     std::string newRef = *outputRewrite;
                     newRef += '-';
                     newRef += name;
-                    res.references.insert(StorePath { newRef });
+                    res.others.insert(StorePath { newRef });
                 } else {
-                    res.references.insert(r);
+                    res.others.insert(r);
                 }
             }
             return res;
@@ -2523,7 +2523,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 auto narHashAndSize = hashPath(htSHA256, actualPath);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
-                static_cast<PathReferences<StorePath> &>(newInfo0) = rewriteRefs();
+                newInfo0.references = rewriteRefs();
                 return newInfo0;
             },
 

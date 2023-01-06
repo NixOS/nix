@@ -180,8 +180,9 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
         duration);
 
     /* Verify that all references are valid. This may do some .narinfo
-       reads, but typically they'll already be cached. */
-    for (auto & ref : info.references)
+       reads, but typically they'll already be cached. Note that
+       self-references are always valid. */
+    for (auto & ref : info.references.others)
         try {
             queryPathInfo(ref);
         } catch (InvalidPath &) {
@@ -314,8 +315,8 @@ StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, std::string_view n
                         .hash = nar.first,
                     },
                     .references = {
-                        .references = references,
-                        .hasSelfReference = false,
+                        .others = references,
+                        .self = false,
                     },
                 },
             },
@@ -434,8 +435,8 @@ StorePath BinaryCacheStore::addToStore(
                         .hash = h,
                     },
                     .references = {
-                        .references = references,
-                        .hasSelfReference = false,
+                        .others = references,
+                        .self = false,
                     },
                 },
             },

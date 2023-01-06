@@ -1535,7 +1535,8 @@ static void prim_readFile(EvalState & state, const PosIdx pos, Value * * args, V
     StorePathSet refs;
     if (state.store->isInStore(path)) {
         try {
-            refs = state.store->queryPathInfo(state.store->toStorePath(path).first)->references;
+            // FIXME: Are self references becoming non-self references OK?
+            refs = state.store->queryPathInfo(state.store->toStorePath(path).first)->referencesPossiblyToSelf();
         } catch (Error &) { // FIXME: should be InvalidPathError
         }
         // Re-scan references to filter down to just the ones that actually occur in the file.
@@ -1971,7 +1972,7 @@ static void addPath(
             try {
                 auto [storePath, subPath] = state.store->toStorePath(path);
                 // FIXME: we should scanForReferences on the path before adding it
-                refs = state.store->queryPathInfo(storePath)->references;
+                refs = state.store->queryPathInfo(storePath)->referencesPossiblyToSelf();
                 path = state.store->toRealPath(storePath) + subPath;
             } catch (Error &) { // FIXME: should be InvalidPathError
             }
@@ -2010,7 +2011,7 @@ static void addPath(
                     .method = method,
                     .hash = *expectedHash,
                 },
-                {},
+                .references = {},
             });
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
