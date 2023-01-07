@@ -2807,7 +2807,7 @@ static RegisterPrimOp primop_map({
       example,
 
       ```nix
-      map (x"foo" + x) [ "bar" "bla" "abc" ]
+      map (x: "foo" + x) [ "bar" "bla" "abc" ]
       ```
 
       evaluates to `[ "foobar" "foobla" "fooabc" ]`.
