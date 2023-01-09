@@ -155,6 +155,12 @@ To test whether a previously-built derivation is deterministic:
 $ nix-build '<nixpkgs>' -A hello --check -K
 ```
 
+Use [`--read-log`](#operation---read-log) to show the stderr and stdout of a build:
+
+```console
+$ nix-store --read-log $(nix-instantiate ./test.nix)
+```
+
 # Operation `--serve`
 
 ## Synopsis
