@@ -478,11 +478,9 @@ struct InstallableAttrPath : InstallableValue
         DrvInfos drvInfos;
         getDerivations(*state, *v, "", autoArgs, drvInfos, false);
 
-        DerivedPathsWithInfo res;
-
         // Backward compatibility hack: group results by drvPath. This
         // helps keep .all output together.
-        std::map<StorePath, size_t> byDrvPath;
+        std::map<StorePath, DerivedPath::Built> byDrvPath;
 
         for (auto & drvInfo : drvInfos) {
             auto drvPath = drvInfo.queryDrvPath();
@@ -497,20 +495,15 @@ struct InstallableAttrPath : InstallableValue
                 for (auto & output : drvInfo.queryOutputs(false, std::get_if<DefaultOutputs>(&outputsSpec)))
                     outputsToInstall.insert(output.first);
 
-            auto i = byDrvPath.find(*drvPath);
-            if (i == byDrvPath.end()) {
-                byDrvPath[*drvPath] = res.size();
-                res.push_back({
-                    .path = DerivedPath::Built {
-                        .drvPath = std::move(*drvPath),
-                        .outputs = std::move(outputsToInstall),
-                    }
-                });
-            } else {
-                for (auto & output : outputsToInstall)
-                    std::get<DerivedPath::Built>(res[i->second].path).outputs.insert(output);
-            }
+            auto derivedPath = byDrvPath.emplace(*drvPath, DerivedPath::Built { .drvPath = *drvPath }).first;
+
+            for (auto & output : outputsToInstall)
+                derivedPath->second.outputs.insert(output);
         }
+
+        DerivedPathsWithInfo res;
+        for (auto & [_, info] : byDrvPath)
+            res.push_back({ .path = { info } });
 
         return res;
     }
