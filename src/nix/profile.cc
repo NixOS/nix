@@ -253,11 +253,11 @@ struct ProfileManifest
     }
 };
 
-static std::map<Installable *, std::pair<BuiltPaths, ExtraInfo>>
+static std::map<Installable *, std::pair<BuiltPaths, ExtraPathInfo>>
 builtPathsPerInstallable(
     const std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> & builtPaths)
 {
-    std::map<Installable *, std::pair<BuiltPaths, ExtraInfo>> res;
+    std::map<Installable *, std::pair<BuiltPaths, ExtraPathInfo>> res;
     for (auto & [installable, builtPath] : builtPaths) {
         auto & r = res[installable.get()];
         /* Note that there could be conflicting info

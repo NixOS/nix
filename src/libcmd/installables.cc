@@ -898,7 +898,7 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> Instal
 
     struct Aux
     {
-        ExtraInfo info;
+        ExtraPathInfo info;
         std::shared_ptr<Installable> installable;
     };
 
