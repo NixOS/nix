@@ -379,7 +379,7 @@ public:
         bool canonicalizePath = true,
         std::string_view errorCtx = "");
 
-    std::string copyPathToStore(PathSet & context, const Path & path);
+    StorePath copyPathToStore(PathSet & context, const Path & path);
 
     /* Path coercion.  Converts strings, paths and derivations to a
        path.  The result is guaranteed to be a canonicalised, absolute
