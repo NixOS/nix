@@ -424,7 +424,7 @@ struct InstallableStorePath : Installable
 
     DerivedPathsWithInfo toDerivedPaths() override
     {
-        return {{req}};
+        return {{.path = req, .info = {} }};
     }
 
     std::optional<StorePath> getStorePath() override
