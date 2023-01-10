@@ -262,7 +262,8 @@ builtPathsPerInstallable(
         auto & r = res[installable.get()];
         /* Note that there could be conflicting info
            (e.g. meta.priority fields) if the installable returned
-           multiple derivations. So pick one arbitrarily. */
+           multiple derivations. So pick one arbitrarily. FIXME:
+           print a warning? */
         r.first.push_back(builtPath.path);
         r.second = builtPath.info;
     }
