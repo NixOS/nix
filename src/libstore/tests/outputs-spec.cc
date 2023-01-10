@@ -1,4 +1,4 @@
-#include "path-with-outputs.hh"
+#include "outputs-spec.hh"
 
 #include <gtest/gtest.h>
 

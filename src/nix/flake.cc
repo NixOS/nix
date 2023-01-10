@@ -7,7 +7,7 @@
 #include "get-drvs.hh"
 #include "store-api.hh"
 #include "derivations.hh"
-#include "path-with-outputs.hh"
+#include "outputs-spec.hh"
 #include "attr-path.hh"
 #include "fetchers.hh"
 #include "registry.hh"

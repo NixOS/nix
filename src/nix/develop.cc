@@ -3,7 +3,7 @@
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "path-with-outputs.hh"
+#include "outputs-spec.hh"
 #include "derivations.hh"
 #include "progress-bar.hh"
 #include "run.hh"

@@ -2,7 +2,7 @@
 
 #include "util.hh"
 #include "path.hh"
-#include "path-with-outputs.hh"
+#include "outputs-spec.hh"
 #include "derived-path.hh"
 #include "eval.hh"
 #include "store-api.hh"
@@ -20,7 +20,7 @@ namespace eval_cache { class EvalCache; class AttrCursor; }
 
 struct App
 {
-    std::vector<StorePathWithOutputs> context;
+    std::vector<DerivedPath> context;
     Path program;
     // FIXME: add args, sandbox settings, metadata, ...
 };
