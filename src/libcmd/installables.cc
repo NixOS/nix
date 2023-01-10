@@ -636,7 +636,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
                     }
                 }};
             } else
-                throw Error("flake output attribute '%s' evaluates to a string that does not denote a store path", attrPath);
+                throw Error("flake output attribute '%s' evaluates to the string '%s' which is not a store path", attrPath, s);
         }
 
         else
