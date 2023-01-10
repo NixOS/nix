@@ -15,7 +15,7 @@ makeTest {
     { virtualisation.writableStore = true;
       nix.settings.substituters = lib.mkForce [ ];
       nix.nixPath = [ "nixpkgs=${lib.cleanSource pkgs.path}" ];
-      virtualisation.additionalPaths = [ pkgs.stdenv pkgs.pkgsi686Linux.stdenv ];
+      virtualisation.additionalPaths = [ pkgs.stdenvNoCC pkgs.pkgsi686Linux.stdenvNoCC ];
     };
 
   testScript = { nodes }: ''
