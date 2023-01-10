@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 set -u
 
@@ -7,7 +7,12 @@ green=""
 yellow=""
 normal=""
 
-post_run_msg="ran test $1..."
+test=$1
+
+dir="$(dirname "${BASH_SOURCE[0]}")"
+source "$dir/common-test.sh"
+
+post_run_msg="ran test $test..."
 if [ -t 1 ]; then
     red="[31;1m"
     green="[32;1m"
@@ -16,12 +21,12 @@ if [ -t 1 ]; then
 fi
 
 run_test () {
-    (cd tests && env ${TESTS_ENVIRONMENT} init.sh 2>/dev/null > /dev/null)
-    log="$(cd $(dirname $1) && env ${TESTS_ENVIRONMENT} $(basename $1) 2>&1)"
+    (init_test 2>/dev/null > /dev/null)
+    log="$(run_test_proper 2>&1)"
     status=$?
 }
 
-run_test "$1"
+run_test
 
 # Hack: Retry the test if it fails with “unexpected EOF reading a line” as these
 # appear randomly without anyone knowing why.
@@ -32,7 +37,7 @@ if [[ $status -ne 0 && $status -ne 99 && \
 ]]; then
     echo "$post_run_msg [${yellow}FAIL$normal] (possibly flaky, so will be retried)"
     echo "$log" | sed 's/^/    /'
-    run_test "$1"
+    run_test
 fi
 
 if [ $status -eq 0 ]; then

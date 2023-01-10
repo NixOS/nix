@@ -31,7 +31,7 @@ struct UserLock
 
 /* Acquire a user lock for a UID range of size `nrIds`. Note that this
    may return nullptr if no user is available. */
-std::unique_ptr<UserLock> acquireUserLock(uid_t nrIds, bool useChroot);
+std::unique_ptr<UserLock> acquireUserLock(uid_t nrIds, bool useUserNamespace);
 
 bool useBuildUsers();
 

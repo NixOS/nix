@@ -19,23 +19,21 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
 
     if (args[0]->type() == nAttrs) {
 
-        state.forceAttrs(*args[0], pos);
-
         for (auto & attr : *args[0]->attrs) {
             std::string_view n(state.symbols[attr.name]);
             if (n == "url")
-                url = state.coerceToString(attr.pos, *attr.value, context, false, false).toOwned();
+                url = state.coerceToString(attr.pos, *attr.value, context, false, false, "while evaluating the `url` attribute passed to builtins.fetchMercurial").toOwned();
             else if (n == "rev") {
                 // Ugly: unlike fetchGit, here the "rev" attribute can
                 // be both a revision or a branch/tag name.
-                auto value = state.forceStringNoCtx(*attr.value, attr.pos);
+                auto value = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `rev` attribute passed to builtins.fetchMercurial");
                 if (std::regex_match(value.begin(), value.end(), revRegex))
                     rev = Hash::parseAny(value, htSHA1);
                 else
                     ref = value;
             }
             else if (n == "name")
-                name = state.forceStringNoCtx(*attr.value, attr.pos);
+                name = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the `name` attribute passed to builtins.fetchMercurial");
             else
                 throw EvalError({
                     .msg = hintfmt("unsupported argument '%s' to 'fetchMercurial'", state.symbols[attr.name]),
@@ -50,7 +48,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
             });
 
     } else
-        url = state.coerceToString(pos, *args[0], context, false, false).toOwned();
+        url = state.coerceToString(pos, *args[0], context, false, false, "while evaluating the first argument passed to builtins.fetchMercurial").toOwned();
 
     // FIXME: git externals probably can be used to bypass the URI
     // whitelist. Ah well.

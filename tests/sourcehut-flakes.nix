@@ -108,7 +108,7 @@ makeTest (
             virtualisation.diskSize = 2048;
             virtualisation.additionalPaths = [ pkgs.hello pkgs.fuse ];
             virtualisation.memorySize = 4096;
-            nix.binaryCaches = lib.mkForce [ ];
+            nix.settings.substituters = lib.mkForce [ ];
             nix.extraOptions = ''
               experimental-features = nix-command flakes
               flake-registry = https://git.sr.ht/~NixOS/flake-registry/blob/master/flake-registry.json

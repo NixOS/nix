@@ -12,6 +12,7 @@ namespace nix {
     class LibExprTest : public ::testing::Test {
         public:
             static void SetUpTestSuite() {
+                initLibStore();
                 initGC();
             }
 

@@ -3,18 +3,30 @@
   - [derivation]{#gloss-derivation}\
     A description of a build task. The result of a derivation is a
     store object. Derivations are typically specified in Nix expressions
-    using the [`derivation` primitive](language/derivations.md). These are
+    using the [`derivation` primitive](./language/derivations.md). These are
     translated into low-level *store derivations* (implicitly by
     `nix-env` and `nix-build`, or explicitly by `nix-instantiate`).
 
+    [derivation]: #gloss-derivation
+
+  - [store derivation]{#gloss-store-derivation}\
+    A [derivation] represented as a `.drv` file in the [store].
+    It has a [store path], like any [store object].
+
+    Example: `/nix/store/g946hcz4c8mdvq2g8vxx42z51qb71rvp-git-2.38.1.drv`
+
+    See [`nix show-derivation`](./command-ref/new-cli/nix3-show-derivation.md) (experimental) for displaying the contents of store derivations.
+
+    [store derivation]: #gloss-store-derivation
+
   - [content-addressed derivation]{#gloss-content-addressed-derivation}\
     A derivation which has the
-    [`__contentAddressed`](language/advanced-attributes.md#adv-attr-__contentAddressed)
+    [`__contentAddressed`](./language/advanced-attributes.md#adv-attr-__contentAddressed)
     attribute set to `true`.
 
   - [fixed-output derivation]{#gloss-fixed-output-derivation}\
     A derivation which includes the
-    [`outputHash`](language/advanced-attributes.md#adv-attr-outputHash) attribute.
+    [`outputHash`](./language/advanced-attributes.md#adv-attr-outputHash) attribute.
 
   - [store]{#gloss-store}\
     The location in the file system where store objects live. Typically
@@ -34,6 +46,8 @@
       directory on another machine,  accessed via `ssh` or
       served by the `nix-serve` Perl script.
 
+    [store]: #gloss-store
+
   - [chroot store]{#gloss-chroot-store}\
     A local store whose canonical path is anything other than `/nix/store`.
 
@@ -46,8 +60,12 @@
     cache](https://cache.nixos.org).
 
   - [store path]{#gloss-store-path}\
-    The location in the file system of a store object, i.e., an
+    The location of a [store object] in the file system, i.e., an
     immediate child of the Nix store directory.
+
+    Example: `/nix/store/a040m110amc4h71lds2jmr8qrkj2jhxd-git-2.38.1`
+
+    [store path]: #gloss-store-path
 
   - [store object]{#gloss-store-object}\
     A file that is an immediate child of the Nix store directory. These
@@ -55,6 +73,8 @@
     can be sources (objects copied from outside of the store),
     derivation outputs (objects produced by running a build task), or
     derivations (files describing a build task).
+
+    [store object]: #gloss-store-object
 
   - [input-addressed store object]{#gloss-input-addressed-store-object}\
     A store object produced by building a
@@ -79,7 +99,7 @@
   - [substituter]{#gloss-substituter}\
     A *substituter* is an additional store from which Nix will
     copy store objects it doesn't have.  For details, see the
-    [`substituters` option](command-ref/conf-file.html#conf-substituters).
+    [`substituters` option](./command-ref/conf-file.md#conf-substituters).
 
   - [purity]{#gloss-purity}\
     The assumption that equal Nix derivations when run always produce
@@ -124,7 +144,9 @@
     references `R` then `R` is also in the closure of `P`.
 
   - [output path]{#gloss-output-path}\
-    A store path produced by a derivation.
+    A [store path] produced by a [derivation].
+
+    [output path]: #gloss-output-path
 
   - [deriver]{#gloss-deriver}\
     The deriver of an *output path* is the store
@@ -139,7 +161,7 @@
     An automatically generated store object that consists of a set of
     symlinks to “active” applications, i.e., other store paths. These
     are generated automatically by
-    [`nix-env`](command-ref/nix-env.md). See *profiles*.
+    [`nix-env`](./command-ref/nix-env.md). See *profiles*.
 
   - [profile]{#gloss-profile}\
     A symlink to the current *user environment* of a user, e.g.,
@@ -150,7 +172,18 @@
     store. It can contain regular files, directories and symbolic
     links.  NARs are generated and unpacked using `nix-store --dump`
     and `nix-store --restore`.
+
   - [`∅`]{#gloss-emtpy-set}\
     The empty set symbol. In the context of profile history, this denotes a package is not present in a particular version of the profile.
+
   - [`ε`]{#gloss-epsilon}\
     The epsilon symbol. In the context of a package, this means the version is empty. More precisely, the derivation does not have a version attribute.
+
+  - [string interpolation]{#gloss-string-interpolation}\
+    Expanding expressions enclosed in `${ }` within a [string], [path], or [attribute name].
+
+    See [String interpolation](./language/string-interpolation.md) for details.
+
+    [string]: ./language/values.md#type-string
+    [path]: ./language/values.md#type-path
+    [attribute name]: ./language/values.md#attribute-set

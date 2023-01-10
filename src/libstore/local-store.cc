@@ -91,6 +91,7 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
 
         if (!lockFile(lockFd.get(), ltWrite, false)) {
             printInfo("waiting for exclusive access to the Nix store for ca drvs...");
+            lockFile(lockFd.get(), ltNone, false); // We have acquired a shared lock; release it to prevent deadlocks
             lockFile(lockFd.get(), ltWrite, true);
         }
 
@@ -299,6 +300,7 @@ LocalStore::LocalStore(const Params & params)
 
         if (!lockFile(globalLock.get(), ltWrite, false)) {
             printInfo("waiting for exclusive access to the Nix store...");
+            lockFile(globalLock.get(), ltNone, false); // We have acquired a shared lock; release it to prevent deadlocks
             lockFile(globalLock.get(), ltWrite, true);
         }
 
@@ -439,9 +441,9 @@ LocalStore::~LocalStore()
     }
 
     try {
-        auto state(_state.lock());
-        if (state->fdTempRoots) {
-            state->fdTempRoots = -1;
+        auto fdTempRoots(_fdTempRoots.lock());
+        if (*fdTempRoots) {
+            *fdTempRoots = -1;
             unlink(fnTempRoots.c_str());
         }
     } catch (...) {

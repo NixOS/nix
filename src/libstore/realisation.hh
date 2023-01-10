@@ -93,4 +93,14 @@ struct RealisedPath {
     GENERATE_CMP(RealisedPath, me->raw);
 };
 
+class MissingRealisation : public Error
+{
+public:
+    MissingRealisation(DrvOutput & outputId)
+        : Error( "cannot operate on an output of the "
+                "unbuilt derivation '%s'",
+                outputId.to_string())
+    {}
+};
+
 }

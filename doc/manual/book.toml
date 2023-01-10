@@ -1,6 +1,11 @@
+[book]
+title = "Nix Reference Manual"
+
 [output.html]
 additional-css = ["custom.css"]
 additional-js = ["redirects.js"]
+edit-url-template = "https://github.com/NixOS/nix/tree/master/doc/manual/{path}"
+git-repository-url = "https://github.com/NixOS/nix"
 
 [preprocessor.anchors]
 renderers = ["html"]

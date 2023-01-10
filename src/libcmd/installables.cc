@@ -168,7 +168,7 @@ SourceExprCommand::SourceExprCommand(bool supportReadOnlyMode)
 
     addFlag({
         .longName = "derivation",
-        .description = "Operate on the store derivation rather than its outputs.",
+        .description = "Operate on the [store derivation](../../glossary.md#gloss-store-derivation) rather than its outputs.",
         .category = installablesCategory,
         .handler = {&operateOn, OperateOn::Derivation},
     });
@@ -563,7 +563,7 @@ ref<eval_cache::EvalCache> openEvalCache(
             auto vFlake = state.allocValue();
             flake::callFlake(state, *lockedFlake, *vFlake);
 
-            state.forceAttrs(*vFlake, noPos);
+            state.forceAttrs(*vFlake, noPos, "while parsing cached flake data");
 
             auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
             assert(aOutputs);
@@ -627,7 +627,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
 
         else if (v.type() == nString) {
             PathSet context;
-            auto s = state->forceString(v, context);
+            auto s = state->forceString(v, context, noPos, fmt("while evaluating the flake output attribute '%s'", attrPath));
             auto storePath = state->store->maybeParseStorePath(s);
             if (storePath && context.count(std::string(s))) {
                 return {{
@@ -938,10 +938,7 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> Instal
                                 DrvOutput outputId { *outputHash, output };
                                 auto realisation = store->queryRealisation(outputId);
                                 if (!realisation)
-                                    throw Error(
-                                        "cannot operate on an output of the "
-                                        "unbuilt derivation '%s'",
-                                        outputId.to_string());
+                                    throw MissingRealisation(outputId);
                                 outputs.insert_or_assign(output, realisation->outPath);
                             } else {
                                 // If ca-derivations isn't enabled, assume that
