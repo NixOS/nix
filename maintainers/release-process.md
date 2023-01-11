@@ -152,6 +152,8 @@ release:
   from the previous milestone, and close the previous milestone. Set
   the date for the next milestone 6 weeks from now.
 
+* Create a backport label
+
 * Post an [announcement on Discourse](https://discourse.nixos.org/c/announcements/8), including the contents of
   `rl-$VERSION.md`.
 
