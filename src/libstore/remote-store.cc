@@ -867,8 +867,8 @@ std::vector<BuildResult> RemoteStore::buildPathsWithResults(
                         OutputPathMap outputs;
                         auto drv = evalStore->readDerivation(bfd.drvPath);
                         const auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
-                        const auto drvOutputs = drv.outputsAndOptPaths(*this);
-                        for (auto & output : bfd.outputs) {
+                        auto built = resolveDerivedPath(*this, bfd, &*evalStore);
+                        for (auto & [output, outputPath] : built) {
                             auto outputHash = get(outputHashes, output);
                             if (!outputHash)
                                 throw Error(
@@ -882,16 +882,11 @@ std::vector<BuildResult> RemoteStore::buildPathsWithResults(
                                     throw MissingRealisation(outputId);
                                 res.builtOutputs.emplace(realisation->id, *realisation);
                             } else {
-                                // If ca-derivations isn't enabled, assume that
-                                // the output path is statically known.
-                                const auto drvOutput = get(drvOutputs, output);
-                                assert(drvOutput);
-                                assert(drvOutput->second);
                                 res.builtOutputs.emplace(
                                     outputId,
                                     Realisation {
                                         .id = outputId,
-                                        .outPath = *drvOutput->second,
+                                        .outPath = outputPath,
                                     });
                             }
                         }

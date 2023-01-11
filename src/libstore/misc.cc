@@ -185,7 +185,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
                     knownOutputPaths = false;
                     break;
                 }
-                if (wantOutput(outputName, bfd.outputs) && !isValidPath(*pathOpt))
+                if (bfd.outputs.contains(outputName) && !isValidPath(*pathOpt))
                     invalid.insert(*pathOpt);
             }
             if (knownOutputPaths && invalid.empty()) return;
@@ -299,6 +299,49 @@ std::map<DrvOutput, StorePath> drvOutputReferences(
     auto info = store.queryPathInfo(outputPath);
 
     return drvOutputReferences(Realisation::closure(store, inputRealisations), info->references);
+}
+
+OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd, Store * evalStore_)
+{
+    auto & evalStore = evalStore_ ? *evalStore_ : store;
+
+    OutputPathMap outputs;
+    auto drv = evalStore.readDerivation(bfd.drvPath);
+    auto outputHashes = staticOutputHashes(store, drv);
+    auto drvOutputs = drv.outputsAndOptPaths(store);
+    auto outputNames = std::visit(overloaded {
+        [&](const OutputsSpec::All &) {
+            StringSet names;
+            for (auto & [outputName, _] : drv.outputs)
+                names.insert(outputName);
+            return names;
+        },
+        [&](const OutputsSpec::Names & names) {
+            return names;
+        },
+    }, bfd.outputs);
+    for (auto & output : outputNames) {
+        auto outputHash = get(outputHashes, output);
+        if (!outputHash)
+            throw Error(
+                "the derivation '%s' doesn't have an output named '%s'",
+                store.printStorePath(bfd.drvPath), output);
+        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
+            DrvOutput outputId { *outputHash, output };
+            auto realisation = store.queryRealisation(outputId);
+            if (!realisation)
+                throw MissingRealisation(outputId);
+            outputs.insert_or_assign(output, realisation->outPath);
+        } else {
+            // If ca-derivations isn't enabled, assume that
+            // the output path is statically known.
+            auto drvOutput = get(drvOutputs, output);
+            assert(drvOutput);
+            assert(drvOutput->second);
+            outputs.insert_or_assign(output, *drvOutput->second);
+        }
+    }
+    return outputs;
 }
 
 }

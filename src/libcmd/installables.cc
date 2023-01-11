@@ -488,18 +488,23 @@ struct InstallableAttrPath : InstallableValue
             if (!drvPath)
                 throw Error("'%s' is not a derivation", what());
 
-            std::set<std::string> outputsToInstall;
+            auto derivedPath = byDrvPath.emplace(*drvPath, DerivedPath::Built {
+                .drvPath = *drvPath,
+                // Not normally legal, but we will merge right below
+                .outputs = OutputsSpec::Names { },
+            }).first;
 
-            if (auto outputNames = std::get_if<OutputNames>(&extendedOutputsSpec))
-                outputsToInstall = *outputNames;
-            else
-                for (auto & output : drvInfo.queryOutputs(false, std::get_if<DefaultOutputs>(&extendedOutputsSpec)))
-                    outputsToInstall.insert(output.first);
-
-            auto derivedPath = byDrvPath.emplace(*drvPath, DerivedPath::Built { .drvPath = *drvPath }).first;
-
-            for (auto & output : outputsToInstall)
-                derivedPath->second.outputs.insert(output);
+            derivedPath->second.outputs.merge(std::visit(overloaded {
+                [&](const ExtendedOutputsSpec::Default & d) -> OutputsSpec {
+                    std::set<std::string> outputsToInstall;
+                    for (auto & output : drvInfo.queryOutputs(false, true))
+                        outputsToInstall.insert(output.first);
+                    return OutputsSpec::Names { std::move(outputsToInstall) };
+                },
+                [&](const ExtendedOutputsSpec::Explicit & e) -> OutputsSpec {
+                    return e;
+                },
+            }, extendedOutputsSpec.raw()));
         }
 
         DerivedPathsWithInfo res;
@@ -639,41 +644,40 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
 
     auto drvPath = attr->forceDerivation();
 
-    std::set<std::string> outputsToInstall;
     std::optional<NixInt> priority;
 
-    if (auto aOutputSpecified = attr->maybeGetAttr(state->sOutputSpecified)) {
-        if (aOutputSpecified->getBool()) {
-            if (auto aOutputName = attr->maybeGetAttr("outputName"))
-                outputsToInstall = { aOutputName->getString() };
-        }
-    }
-
-    else if (auto aMeta = attr->maybeGetAttr(state->sMeta)) {
-        if (auto aOutputsToInstall = aMeta->maybeGetAttr("outputsToInstall"))
-            for (auto & s : aOutputsToInstall->getListOfStrings())
-                outputsToInstall.insert(s);
+    if (attr->maybeGetAttr(state->sOutputSpecified)) {
+    } else if (auto aMeta = attr->maybeGetAttr(state->sMeta)) {
         if (auto aPriority = aMeta->maybeGetAttr("priority"))
             priority = aPriority->getInt();
     }
 
-    if (outputsToInstall.empty() || std::get_if<AllOutputs>(&extendedOutputsSpec)) {
-        outputsToInstall.clear();
-        if (auto aOutputs = attr->maybeGetAttr(state->sOutputs))
-            for (auto & s : aOutputs->getListOfStrings())
-                outputsToInstall.insert(s);
-    }
-
-    if (outputsToInstall.empty())
-        outputsToInstall.insert("out");
-
-    if (auto outputNames = std::get_if<OutputNames>(&extendedOutputsSpec))
-        outputsToInstall = *outputNames;
-
     return {{
         .path = DerivedPath::Built {
             .drvPath = std::move(drvPath),
-            .outputs = std::move(outputsToInstall),
+            .outputs = std::visit(overloaded {
+                [&](const ExtendedOutputsSpec::Default & d) -> OutputsSpec {
+                    std::set<std::string> outputsToInstall;
+                    if (auto aOutputSpecified = attr->maybeGetAttr(state->sOutputSpecified)) {
+                        if (aOutputSpecified->getBool()) {
+                            if (auto aOutputName = attr->maybeGetAttr("outputName"))
+                                outputsToInstall = { aOutputName->getString() };
+                        }
+                    } else if (auto aMeta = attr->maybeGetAttr(state->sMeta)) {
+                        if (auto aOutputsToInstall = aMeta->maybeGetAttr("outputsToInstall"))
+                            for (auto & s : aOutputsToInstall->getListOfStrings())
+                                outputsToInstall.insert(s);
+                    }
+
+                    if (outputsToInstall.empty())
+                        outputsToInstall.insert("out");
+
+                    return OutputsSpec::Names { std::move(outputsToInstall) };
+                },
+                [&](const ExtendedOutputsSpec::Explicit & e) -> OutputsSpec {
+                    return e;
+                },
+            }, extendedOutputsSpec.raw()),
         },
         .info = {
             .priority = priority,
@@ -801,7 +805,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             result.push_back(
                 std::make_shared<InstallableAttrPath>(
                     state, *this, vFile,
-                    prefix == "." ? "" : prefix,
+                    prefix == "." ? "" : std::string { prefix },
                     extendedOutputsSpec));
         }
 
@@ -918,32 +922,7 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> Instal
             for (auto & aux : backmap[path]) {
                 std::visit(overloaded {
                     [&](const DerivedPath::Built & bfd) {
-                        OutputPathMap outputs;
-                        auto drv = evalStore->readDerivation(bfd.drvPath);
-                        auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
-                        auto drvOutputs = drv.outputsAndOptPaths(*store);
-                        for (auto & output : bfd.outputs) {
-                            auto outputHash = get(outputHashes, output);
-                            if (!outputHash)
-                                throw Error(
-                                    "the derivation '%s' doesn't have an output named '%s'",
-                                    store->printStorePath(bfd.drvPath), output);
-                            if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
-                                DrvOutput outputId { *outputHash, output };
-                                auto realisation = store->queryRealisation(outputId);
-                                if (!realisation)
-                                    throw MissingRealisation(outputId);
-                                outputs.insert_or_assign(output, realisation->outPath);
-                            } else {
-                                // If ca-derivations isn't enabled, assume that
-                                // the output path is statically known.
-                                auto drvOutput = get(drvOutputs, output);
-                                assert(drvOutput);
-                                assert(drvOutput->second);
-                                outputs.insert_or_assign(
-                                    output, *drvOutput->second);
-                            }
-                        }
+                        auto outputs = resolveDerivedPath(*store, bfd, &*evalStore);
                         res.push_back({aux.installable, {
                             .path = BuiltPath::Built { bfd.drvPath, outputs },
                             .info = aux.info}});

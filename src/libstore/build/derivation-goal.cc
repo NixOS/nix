@@ -63,7 +63,7 @@
 namespace nix {
 
 DerivationGoal::DerivationGoal(const StorePath & drvPath,
-    const StringSet & wantedOutputs, Worker & worker, BuildMode buildMode)
+    const OutputsSpec & wantedOutputs, Worker & worker, BuildMode buildMode)
     : Goal(worker, DerivedPath::Built { .drvPath = drvPath, .outputs = wantedOutputs })
     , useDerivation(true)
     , drvPath(drvPath)
@@ -82,7 +82,7 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath,
 
 
 DerivationGoal::DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
-    const StringSet & wantedOutputs, Worker & worker, BuildMode buildMode)
+    const OutputsSpec & wantedOutputs, Worker & worker, BuildMode buildMode)
     : Goal(worker, DerivedPath::Built { .drvPath = drvPath, .outputs = wantedOutputs })
     , useDerivation(false)
     , drvPath(drvPath)
@@ -142,18 +142,11 @@ void DerivationGoal::work()
     (this->*state)();
 }
 
-void DerivationGoal::addWantedOutputs(const StringSet & outputs)
+void DerivationGoal::addWantedOutputs(const OutputsSpec & outputs)
 {
-    /* If we already want all outputs, there is nothing to do. */
-    if (wantedOutputs.empty()) return;
-
-    if (outputs.empty()) {
-        wantedOutputs.clear();
+    bool newOutputs = wantedOutputs.merge(outputs);
+    if (newOutputs)
         needRestart = true;
-    } else
-        for (auto & i : outputs)
-            if (wantedOutputs.insert(i).second)
-                needRestart = true;
 }
 
 
@@ -390,7 +383,7 @@ void DerivationGoal::repairClosure()
     auto outputs = queryDerivationOutputMap();
     StorePathSet outputClosure;
     for (auto & i : outputs) {
-        if (!wantOutput(i.first, wantedOutputs)) continue;
+        if (!wantedOutputs.contains(i.first)) continue;
         worker.store.computeFSClosure(i.second, outputClosure);
     }
 
@@ -422,7 +415,7 @@ void DerivationGoal::repairClosure()
         if (drvPath2 == outputsToDrv.end())
             addWaitee(upcast_goal(worker.makePathSubstitutionGoal(i, Repair)));
         else
-            addWaitee(worker.makeDerivationGoal(drvPath2->second, StringSet(), bmRepair));
+            addWaitee(worker.makeDerivationGoal(drvPath2->second, OutputsSpec::All(), bmRepair));
     }
 
     if (waitees.empty()) {
@@ -991,10 +984,15 @@ void DerivationGoal::resolvedFinished()
 
         StorePathSet outputPaths;
 
-        // `wantedOutputs` might be empty, which means “all the outputs”
-        auto realWantedOutputs = wantedOutputs;
-        if (realWantedOutputs.empty())
-            realWantedOutputs = resolvedDrv.outputNames();
+        // `wantedOutputs` might merely indicate “all the outputs”
+        auto realWantedOutputs = std::visit(overloaded {
+            [&](const OutputsSpec::All &) {
+                return resolvedDrv.outputNames();
+            },
+            [&](const OutputsSpec::Names & names) {
+                return names;
+            },
+        }, wantedOutputs.raw());
 
         for (auto & wantedOutput : realWantedOutputs) {
             auto initialOutput = get(initialOutputs, wantedOutput);
@@ -1322,7 +1320,14 @@ std::pair<bool, DrvOutputs> DerivationGoal::checkPathValidity()
     if (!drv->type().isPure()) return { false, {} };
 
     bool checkHash = buildMode == bmRepair;
-    auto wantedOutputsLeft = wantedOutputs;
+    auto wantedOutputsLeft = std::visit(overloaded {
+        [&](const OutputsSpec::All &) {
+            return StringSet {};
+        },
+        [&](const OutputsSpec::Names & names) {
+            return names;
+        },
+    }, wantedOutputs.raw());
     DrvOutputs validOutputs;
 
     for (auto & i : queryPartialDerivationOutputMap()) {
@@ -1331,7 +1336,7 @@ std::pair<bool, DrvOutputs> DerivationGoal::checkPathValidity()
             // this is an invalid output, gets catched with (!wantedOutputsLeft.empty())
             continue;
         auto & info = *initialOutput;
-        info.wanted = wantOutput(i.first, wantedOutputs);
+        info.wanted = wantedOutputs.contains(i.first);
         if (info.wanted)
             wantedOutputsLeft.erase(i.first);
         if (i.second) {
@@ -1369,7 +1374,7 @@ std::pair<bool, DrvOutputs> DerivationGoal::checkPathValidity()
             validOutputs.emplace(drvOutput, Realisation { drvOutput, info.known->path });
     }
 
-    // If we requested all the outputs via the empty set, we are always fine.
+    // If we requested all the outputs, we are always fine.
     // If we requested specific elements, the loop above removes all the valid
     // ones, so any that are left must be invalid.
     if (!wantedOutputsLeft.empty())

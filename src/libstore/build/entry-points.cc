@@ -130,7 +130,8 @@ void LocalStore::repairPath(const StorePath & path)
         auto info = queryPathInfo(path);
         if (info->deriver && isValidPath(*info->deriver)) {
             goals.clear();
-            goals.insert(worker.makeDerivationGoal(*info->deriver, StringSet(), bmRepair));
+            // FIXME: Should just build the specific output we need.
+            goals.insert(worker.makeDerivationGoal(*info->deriver, OutputsSpec::All { }, bmRepair));
             worker.run(goals);
         } else
             throw Error(worker.exitStatus(), "cannot repair path '%s'", printStorePath(path));

@@ -397,7 +397,7 @@ static void main_nix_build(int argc, char * * argv)
                 auto bashDrv = drv->requireDrvPath();
                 pathsToBuild.push_back(DerivedPath::Built {
                     .drvPath = bashDrv,
-                    .outputs = {"out"},
+                    .outputs = OutputsSpec::Names {"out"},
                 });
                 pathsToCopy.insert(bashDrv);
                 shellDrv = bashDrv;
@@ -591,7 +591,7 @@ static void main_nix_build(int argc, char * * argv)
             if (outputName == "")
                 throw Error("derivation '%s' lacks an 'outputName' attribute", store->printStorePath(drvPath));
 
-            pathsToBuild.push_back(DerivedPath::Built{drvPath, {outputName}});
+            pathsToBuild.push_back(DerivedPath::Built{drvPath, OutputsSpec::Names{outputName}});
             pathsToBuildOrdered.push_back({drvPath, {outputName}});
             drvsToCopy.insert(drvPath);
 
