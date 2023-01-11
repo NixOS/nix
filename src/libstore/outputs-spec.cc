@@ -1,3 +1,4 @@
+#include "util.hh"
 #include "outputs-spec.hh"
 #include "nlohmann/json.hpp"
 
@@ -5,7 +6,7 @@
 
 namespace nix {
 
-std::pair<std::string, OutputsSpec> parseOutputsSpec(const std::string & s)
+std::pair<std::string, OutputsSpec> OutputsSpec::parse(std::string s)
 {
     static std::regex regex(R"((.*)\^((\*)|([a-z]+(,[a-z]+)*)))");
 
@@ -19,18 +20,19 @@ std::pair<std::string, OutputsSpec> parseOutputsSpec(const std::string & s)
     return {match[1], tokenizeString<OutputNames>(match[4].str(), ",")};
 }
 
-std::string printOutputsSpec(const OutputsSpec & outputsSpec)
+std::string OutputsSpec::to_string() const
 {
-    if (std::get_if<DefaultOutputs>(&outputsSpec))
-        return "";
-
-    if (std::get_if<AllOutputs>(&outputsSpec))
-        return "^*";
-
-    if (auto outputNames = std::get_if<OutputNames>(&outputsSpec))
-        return "^" + concatStringsSep(",", *outputNames);
-
-    assert(false);
+    return std::visit(overloaded {
+        [&](const OutputsSpec::Default &) -> std::string {
+            return "";
+        },
+        [&](const OutputsSpec::All &) -> std::string {
+            return "*";
+        },
+        [&](const OutputsSpec::Names & outputNames) -> std::string {
+            return "^" + concatStringsSep(",", outputNames);
+        },
+    }, raw());
 }
 
 void to_json(nlohmann::json & json, const OutputsSpec & outputsSpec)

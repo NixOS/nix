@@ -4,40 +4,40 @@
 
 namespace nix {
 
-TEST(parseOutputsSpec, basic)
+TEST(OutputsSpec_parse, basic)
 {
     {
-        auto [prefix, outputsSpec] = parseOutputsSpec("foo");
+        auto [prefix, outputsSpec] = OutputsSpec::parse("foo");
         ASSERT_EQ(prefix, "foo");
         ASSERT_TRUE(std::get_if<DefaultOutputs>(&outputsSpec));
     }
 
     {
-        auto [prefix, outputsSpec] = parseOutputsSpec("foo^*");
+        auto [prefix, outputsSpec] = OutputsSpec::parse("foo^*");
         ASSERT_EQ(prefix, "foo");
         ASSERT_TRUE(std::get_if<AllOutputs>(&outputsSpec));
     }
 
     {
-        auto [prefix, outputsSpec] = parseOutputsSpec("foo^out");
+        auto [prefix, outputsSpec] = OutputsSpec::parse("foo^out");
         ASSERT_EQ(prefix, "foo");
         ASSERT_TRUE(std::get<OutputNames>(outputsSpec) == OutputNames({"out"}));
     }
 
     {
-        auto [prefix, outputsSpec] = parseOutputsSpec("foo^out,bin");
+        auto [prefix, outputsSpec] = OutputsSpec::parse("foo^out,bin");
         ASSERT_EQ(prefix, "foo");
         ASSERT_TRUE(std::get<OutputNames>(outputsSpec) == OutputNames({"out", "bin"}));
     }
 
     {
-        auto [prefix, outputsSpec] = parseOutputsSpec("foo^bar^out,bin");
+        auto [prefix, outputsSpec] = OutputsSpec::parse("foo^bar^out,bin");
         ASSERT_EQ(prefix, "foo^bar");
         ASSERT_TRUE(std::get<OutputNames>(outputsSpec) == OutputNames({"out", "bin"}));
     }
 
     {
-        auto [prefix, outputsSpec] = parseOutputsSpec("foo^&*()");
+        auto [prefix, outputsSpec] = OutputsSpec::parse("foo^&*()");
         ASSERT_EQ(prefix, "foo^&*()");
         ASSERT_TRUE(std::get_if<DefaultOutputs>(&outputsSpec));
     }

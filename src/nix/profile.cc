@@ -44,7 +44,7 @@ struct ProfileElement
     std::string describe() const
     {
         if (source)
-            return fmt("%s#%s%s", source->originalRef, source->attrPath, printOutputsSpec(source->outputs));
+            return fmt("%s#%s%s", source->originalRef, source->attrPath, source->outputs.to_string());
         StringSet names;
         for (auto & path : storePaths)
             names.insert(DrvName(path.name()).name);
@@ -553,8 +553,8 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
         for (size_t i = 0; i < manifest.elements.size(); ++i) {
             auto & element(manifest.elements[i]);
             logger->cout("%d %s %s %s", i,
-                element.source ? element.source->originalRef.to_string() + "#" + element.source->attrPath + printOutputsSpec(element.source->outputs) : "-",
-                element.source ? element.source->resolvedRef.to_string() + "#" + element.source->attrPath + printOutputsSpec(element.source->outputs) : "-",
+                element.source ? element.source->originalRef.to_string() + "#" + element.source->attrPath + element.source->outputs.to_string() : "-",
+                element.source ? element.source->resolvedRef.to_string() + "#" + element.source->attrPath + element.source->outputs.to_string() : "-",
                 concatStringsSep(" ", store->printStorePathSet(element.storePaths)));
         }
     }

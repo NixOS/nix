@@ -1,8 +1,7 @@
 #pragma once
 
+#include <set>
 #include <variant>
-
-#include "util.hh"
 
 #include "nlohmann/json_fwd.hpp"
 
@@ -18,13 +17,26 @@ struct DefaultOutputs {
     bool operator < (const DefaultOutputs & _) const { return false; }
 };
 
-typedef std::variant<DefaultOutputs, AllOutputs, OutputNames> OutputsSpec;
+typedef std::variant<DefaultOutputs, AllOutputs, OutputNames> _OutputsSpecRaw;
 
-/* Parse a string of the form 'prefix^output1,...outputN' or
-   'prefix^*', returning the prefix and the outputs spec. */
-std::pair<std::string, OutputsSpec> parseOutputsSpec(const std::string & s);
+struct OutputsSpec : _OutputsSpecRaw {
+    using Raw = _OutputsSpecRaw;
+    using Raw::Raw;
 
-std::string printOutputsSpec(const OutputsSpec & outputsSpec);
+    using Names = OutputNames;
+    using All = AllOutputs;
+    using Default = DefaultOutputs;
+
+    inline const Raw & raw() const {
+        return static_cast<const Raw &>(*this);
+    }
+
+    /* Parse a string of the form 'prefix^output1,...outputN' or
+       'prefix^*', returning the prefix and the outputs spec. */
+    static std::pair<std::string, OutputsSpec> parse(std::string s);
+
+    std::string to_string() const;
+};
 
 void to_json(nlohmann::json &, const OutputsSpec &);
 void from_json(const nlohmann::json &, OutputsSpec &);

@@ -1,5 +1,6 @@
 #include "globals.hh"
 #include "installables.hh"
+#include "outputs-spec.hh"
 #include "util.hh"
 #include "command.hh"
 #include "attr-path.hh"
@@ -796,7 +797,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         }
 
         for (auto & s : ss) {
-            auto [prefix, outputsSpec] = parseOutputsSpec(s);
+            auto [prefix, outputsSpec] = OutputsSpec::parse(s);
             result.push_back(
                 std::make_shared<InstallableAttrPath>(
                     state, *this, vFile,

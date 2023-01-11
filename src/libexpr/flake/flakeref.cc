@@ -244,7 +244,7 @@ std::tuple<FlakeRef, std::string, OutputsSpec> parseFlakeRefWithFragmentAndOutpu
     bool allowMissing,
     bool isFlake)
 {
-    auto [prefix, outputsSpec] = parseOutputsSpec(url);
+    auto [prefix, outputsSpec] = OutputsSpec::parse(url);
     auto [flakeRef, fragment] = parseFlakeRefWithFragment(prefix, baseDir, allowMissing, isFlake);
     return {std::move(flakeRef), fragment, outputsSpec};
 }
