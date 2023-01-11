@@ -56,7 +56,7 @@ Meeting notes are collected on a [collaborative scratchpad](https://pad.lassul.u
 
 The team uses a [GitHub project board](https://github.com/orgs/NixOS/projects/19/views/1) for tracking its work.
 
-Issues on the board progress through the following states:
+Items on the board progress through the following states:
 
 - No Status
 
@@ -78,6 +78,8 @@ Issues on the board progress through the following states:
   Team members can also add pull requests or issues they would like the whole team to consider.
 
   If there is disagreement on the general idea behind an issue or pull request, it is moved to _To discuss_, otherwise to _In review_.
+
+  To ensure process quality and reliability, all pull requests must be triaged before merging.
 
 - To discuss
 
