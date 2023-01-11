@@ -827,7 +827,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                             return storePath.isDerivation()
                                 ? (DerivedPath) DerivedPath::Built {
                                     .drvPath = std::move(storePath),
-                                    .outputs = {},
+                                    .outputs = OutputsSpec::All {},
                                 }
                                 : (DerivedPath) DerivedPath::Opaque {
                                     .path = std::move(storePath),

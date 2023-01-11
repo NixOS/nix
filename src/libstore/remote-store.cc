@@ -910,7 +910,12 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     writeDerivation(conn->to, *this, drv);
     conn->to << buildMode;
     conn.processStderr();
-    BuildResult res { .path = DerivedPath::Built { .drvPath = drvPath } };
+    BuildResult res {
+        .path = DerivedPath::Built {
+            .drvPath = drvPath,
+            .outputs = OutputsSpec::All { },
+        },
+    };
     res.status = (BuildResult::Status) readInt(conn->from);
     conn->from >> res.errorMsg;
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 29) {

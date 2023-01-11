@@ -279,7 +279,12 @@ public:
 
         conn->to.flush();
 
-        BuildResult status { .path = DerivedPath::Built { .drvPath = drvPath } };
+        BuildResult status {
+            .path = DerivedPath::Built {
+                .drvPath = drvPath,
+                .outputs = OutputsSpec::All { },
+            },
+        };
         status.status = (BuildResult::Status) readInt(conn->from);
         conn->from >> status.errorMsg;
 

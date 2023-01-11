@@ -110,9 +110,21 @@ bool OutputsSpec::merge(const OutputsSpec & that)
     }, raw());
 }
 
+}
 
-void to_json(nlohmann::json & json, const OutputsSpec & outputsSpec)
-{
+namespace nlohmann {
+
+using namespace nix;
+
+OutputsSpec adl_serializer<OutputsSpec>::from_json(const json & json) {
+    auto names = json.get<StringSet>();
+    if (names == StringSet({"*"}))
+        return OutputsSpec::All {};
+    else
+        return OutputsSpec::Names { std::move(names) };
+}
+
+void adl_serializer<OutputsSpec>::to_json(json & json, OutputsSpec t) {
     std::visit(overloaded {
         [&](const OutputsSpec::All &) {
             json = std::vector<std::string>({"*"});
@@ -120,40 +132,27 @@ void to_json(nlohmann::json & json, const OutputsSpec & outputsSpec)
         [&](const OutputsSpec::Names & names) {
             json = names;
         },
-    }, outputsSpec);
+    }, t);
 }
 
 
-void to_json(nlohmann::json & json, const ExtendedOutputsSpec & extendedOutputsSpec)
-{
+ExtendedOutputsSpec adl_serializer<ExtendedOutputsSpec>::from_json(const json & json) {
+    if (json.is_null())
+        return ExtendedOutputsSpec::Default {};
+    else {
+        return ExtendedOutputsSpec::Explicit { json.get<OutputsSpec>() };
+    }
+}
+
+void adl_serializer<ExtendedOutputsSpec>::to_json(json & json, ExtendedOutputsSpec t) {
     std::visit(overloaded {
         [&](const ExtendedOutputsSpec::Default &) {
             json = nullptr;
         },
         [&](const ExtendedOutputsSpec::Explicit & e) {
-            to_json(json, e);
+            adl_serializer<OutputsSpec>::to_json(json, e);
         },
-    }, extendedOutputsSpec);
-}
-
-
-void from_json(const nlohmann::json & json, OutputsSpec & outputsSpec)
-{
-    auto names = json.get<StringSet>();
-    if (names == StringSet({"*"}))
-        outputsSpec = OutputsSpec::All {};
-    else
-        outputsSpec = OutputsSpec::Names { std::move(names) };
-}
-
-
-void from_json(const nlohmann::json & json, ExtendedOutputsSpec & extendedOutputsSpec)
-{
-    if (json.is_null())
-        extendedOutputsSpec = ExtendedOutputsSpec::Default {};
-    else {
-        extendedOutputsSpec = ExtendedOutputsSpec::Explicit { json.get<OutputsSpec>() };
-    }
+    }, t);
 }
 
 }

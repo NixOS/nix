@@ -4,7 +4,7 @@
 #include <set>
 #include <variant>
 
-#include "nlohmann/json_fwd.hpp"
+#include "json-impls.hh"
 
 namespace nix {
 
@@ -34,6 +34,9 @@ typedef std::variant<AllOutputs, OutputNames> _OutputsSpecRaw;
 struct OutputsSpec : _OutputsSpecRaw {
     using Raw = _OutputsSpecRaw;
     using Raw::Raw;
+
+    /* Force choosing a variant */
+    OutputsSpec() = delete;
 
     using Names = OutputNames;
     using All = AllOutputs;
@@ -85,11 +88,7 @@ struct ExtendedOutputsSpec : _ExtendedOutputsSpecRaw {
     std::string to_string() const;
 };
 
-
-void to_json(nlohmann::json &, const OutputsSpec &);
-void from_json(const nlohmann::json &, OutputsSpec &);
-
-void to_json(nlohmann::json &, const ExtendedOutputsSpec &);
-void from_json(const nlohmann::json &, ExtendedOutputsSpec &);
-
 }
+
+JSON_IMPL(OutputsSpec)
+JSON_IMPL(ExtendedOutputsSpec)

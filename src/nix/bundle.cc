@@ -105,7 +105,12 @@ struct CmdBundle : InstallableCommand
 
         auto outPath = evalState->coerceToStorePath(attr2->pos, *attr2->value, context2, "");
 
-        store->buildPaths({ DerivedPath::Built { drvPath } });
+        store->buildPaths({
+            DerivedPath::Built {
+                .drvPath = drvPath,
+                .outputs = OutputsSpec::All { },
+            },
+        });
 
         auto outPathS = store->printStorePath(outPath);
 
