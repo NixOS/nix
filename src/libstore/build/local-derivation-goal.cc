@@ -15,6 +15,7 @@
 #include "callback.hh"
 #include "json-utils.hh"
 #include "cgroup.hh"
+#include "personality.hh"
 
 #include <regex>
 #include <queue>
@@ -24,7 +25,6 @@
 #include <termios.h>
 #include <unistd.h>
 #include <sys/mman.h>
-#include <sys/utsname.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 
@@ -37,7 +37,6 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <netinet/ip.h>
-#include <sys/personality.h>
 #include <sys/mman.h>
 #include <sched.h>
 #include <sys/param.h>
@@ -1964,33 +1963,7 @@ void LocalDerivationGoal::runChild()
         /* Close all other file descriptors. */
         closeMostFDs({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO});
 
-#if __linux__
-        /* Change the personality to 32-bit if we're doing an
-           i686-linux build on an x86_64-linux machine. */
-        struct utsname utsbuf;
-        uname(&utsbuf);
-        if ((drv->platform == "i686-linux"
-                && (settings.thisSystem == "x86_64-linux"
-                    || (!strcmp(utsbuf.sysname, "Linux") && !strcmp(utsbuf.machine, "x86_64"))))
-            || drv->platform == "armv7l-linux"
-            || drv->platform == "armv6l-linux")
-        {
-            if (personality(PER_LINUX32) == -1)
-                throw SysError("cannot set 32-bit personality");
-        }
-
-        /* Impersonate a Linux 2.6 machine to get some determinism in
-           builds that depend on the kernel version. */
-        if ((drv->platform == "i686-linux" || drv->platform == "x86_64-linux") && settings.impersonateLinux26) {
-            int cur = personality(0xffffffff);
-            if (cur != -1) personality(cur | 0x0020000 /* == UNAME26 */);
-        }
-
-        /* Disable address space randomization for improved
-           determinism. */
-        int cur = personality(0xffffffff);
-        if (cur != -1) personality(cur | ADDR_NO_RANDOMIZE);
-#endif
+        setPersonality(drv->platform);
 
         /* Disable core dumps by default. */
         struct rlimit limit = { 0, RLIM_INFINITY };
@@ -2077,10 +2050,14 @@ void LocalDerivationGoal::runChild()
                     sandboxProfile += "(deny default (with no-log))\n";
                 }
 
-                sandboxProfile += "(import \"sandbox-defaults.sb\")\n";
+                sandboxProfile +=
+                    #include "sandbox-defaults.sb"
+                    ;
 
                 if (!derivationType.isSandboxed())
-                    sandboxProfile += "(import \"sandbox-network.sb\")\n";
+                    sandboxProfile +=
+                        #include "sandbox-network.sb"
+                        ;
 
                 /* Add the output paths we'll use at build-time to the chroot */
                 sandboxProfile += "(allow file-read* file-write* process-exec\n";
@@ -2123,7 +2100,9 @@ void LocalDerivationGoal::runChild()
 
                 sandboxProfile += additionalSandboxProfile;
             } else
-                sandboxProfile += "(import \"sandbox-minimal.sb\")\n";
+                sandboxProfile +=
+                    #include "sandbox-minimal.sb"
+                    ;
 
             debug("Generated sandbox profile:");
             debug(sandboxProfile);
@@ -2148,8 +2127,6 @@ void LocalDerivationGoal::runChild()
                 args.push_back(sandboxFile);
                 args.push_back("-D");
                 args.push_back("_GLOBAL_TMP_DIR=" + globalTmpDir);
-                args.push_back("-D");
-                args.push_back("IMPORT_DIR=" + settings.nixDataDir + "/nix/sandbox/");
                 if (allowLocalNetworking) {
                     args.push_back("-D");
                     args.push_back(std::string("_ALLOW_LOCAL_NETWORKING=1"));

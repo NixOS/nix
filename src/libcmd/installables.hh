@@ -52,7 +52,7 @@ enum class OperateOn {
     Derivation
 };
 
-struct ExtraInfo
+struct ExtraPathInfo
 {
     std::optional<NixInt> priority;
     std::optional<FlakeRef> originalRef;
@@ -67,13 +67,13 @@ struct ExtraInfo
 struct DerivedPathWithInfo
 {
     DerivedPath path;
-    ExtraInfo info;
+    ExtraPathInfo info;
 };
 
 struct BuiltPathWithResult
 {
     BuiltPath path;
-    ExtraInfo info;
+    ExtraPathInfo info;
     std::optional<BuildResult> result;
 };
 

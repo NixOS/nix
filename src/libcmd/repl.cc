@@ -397,7 +397,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             Expr * e = parseString(expr);
             Value v;
             e->eval(*state, *env, v);
-            state->forceAttrs(v, noPos);
+            state->forceAttrs(v, noPos, "nevermind, it is ignored anyway");
 
             for (auto & i : *v.attrs) {
                 std::string_view name = state->symbols[i.name];
@@ -590,7 +590,7 @@ bool NixRepl::processLine(std::string line)
         const auto [path, line] = [&] () -> std::pair<SourcePath, uint32_t> {
             if (v.type() == nPath || v.type() == nString) {
                 PathSet context;
-                auto path = state->coerceToPath(noPos, v, context);
+                auto path = state->coerceToPath(noPos, v, context, "while evaluating the filename to edit");
                 return {path, 0};
             } else if (v.isLambda()) {
                 auto pos = state->positions[v.lambda.fun->pos];
@@ -834,7 +834,7 @@ void NixRepl::loadFiles()
 
 void NixRepl::addAttrsToScope(Value & attrs)
 {
-    state->forceAttrs(attrs, [&]() { return attrs.determinePos(noPos); });
+    state->forceAttrs(attrs, [&]() { return attrs.determinePos(noPos); }, "while evaluating an attribute set to be merged in the global scope");
     if (displ + attrs.attrs->size() >= envSize)
         throw Error("environment full; cannot add more variables");
 
@@ -939,7 +939,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
             Bindings::iterator i = v.attrs->find(state->sDrvPath);
             PathSet context;
             if (i != v.attrs->end())
-                str << state->store->printStorePath(state->coerceToStorePath(i->pos, *i->value, context));
+                str << state->store->printStorePath(state->coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation"));
             else
                 str << "???";
             str << "»";

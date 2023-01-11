@@ -91,7 +91,7 @@ class ExternalValueBase
     /* Coerce the value to a string. Defaults to uncoercable, i.e. throws an
      * error.
      */
-    virtual std::string coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore) const;
+    virtual std::string coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore, std::string_view errorCtx) const;
 
     /* Compare to another value of the same type. Defaults to uncomparable,
      * i.e. always false.

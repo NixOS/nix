@@ -123,8 +123,12 @@ struct AutoUserLock : UserLock
 
     std::vector<gid_t> getSupplementaryGIDs() override { return {}; }
 
-    static std::unique_ptr<UserLock> acquire(uid_t nrIds, bool useChroot)
+    static std::unique_ptr<UserLock> acquire(uid_t nrIds, bool useUserNamespace)
     {
+        #if !defined(__linux__)
+        useUserNamespace = false;
+        #endif
+
         settings.requireExperimentalFeature(Xp::AutoAllocateUids);
         assert(settings.startId > 0);
         assert(settings.uidCount % maxIdsPerBuild == 0);
@@ -157,7 +161,7 @@ struct AutoUserLock : UserLock
                 auto lock = std::make_unique<AutoUserLock>();
                 lock->fdUserLock = std::move(fd);
                 lock->firstUid = firstUid;
-                if (useChroot)
+                if (useUserNamespace)
                     lock->firstGid = firstUid;
                 else {
                     struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
@@ -174,10 +178,10 @@ struct AutoUserLock : UserLock
     }
 };
 
-std::unique_ptr<UserLock> acquireUserLock(uid_t nrIds, bool useChroot)
+std::unique_ptr<UserLock> acquireUserLock(uid_t nrIds, bool useUserNamespace)
 {
     if (settings.autoAllocateUids)
-        return AutoUserLock::acquire(nrIds, useChroot);
+        return AutoUserLock::acquire(nrIds, useUserNamespace);
     else
         return SimpleUserLock::acquire();
 }

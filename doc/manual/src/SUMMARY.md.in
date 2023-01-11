@@ -29,6 +29,7 @@
 - [Nix Language](language/index.md)
   - [Data Types](language/values.md)
   - [Language Constructs](language/constructs.md)
+    - [String interpolation](language/string-interpolation.md)
   - [Operators](language/operators.md)
   - [Derivations](language/derivations.md)
     - [Advanced Attributes](language/advanced-attributes.md)
@@ -59,6 +60,7 @@
 @manpages@
   - [Files](command-ref/files.md)
     - [nix.conf](command-ref/conf-file.md)
+- [Architecture](architecture/architecture.md)
 - [Glossary](glossary.md)
 - [Contributing](contributing/contributing.md)
   - [Hacking](contributing/hacking.md)

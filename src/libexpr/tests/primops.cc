@@ -619,7 +619,7 @@ namespace nix {
 
     TEST_F(PrimOpTest, storeDir) {
         auto v = eval("builtins.storeDir");
-        ASSERT_THAT(v, IsStringEq("/nix/store"));
+        ASSERT_THAT(v, IsStringEq(settings.nixStore));
     }
 
     TEST_F(PrimOpTest, nixVersion) {
@@ -837,5 +837,11 @@ namespace nix {
         const std::vector<std::string_view> expected { "a", "x", "y", "z" };
         for (const auto [n, elem] : enumerate(v.listItems()))
             ASSERT_THAT(*elem, IsStringEq(expected[n]));
+    }
+
+    TEST_F(PrimOpTest, genericClosure_not_strict) {
+        // Operator should not be used when startSet is empty
+        auto v = eval("builtins.genericClosure { startSet = []; }");
+        ASSERT_THAT(v, IsListOfSize(0));
     }
 } /* namespace nix */

@@ -168,7 +168,7 @@ SourceExprCommand::SourceExprCommand(bool supportReadOnlyMode)
 
     addFlag({
         .longName = "derivation",
-        .description = "Operate on the store derivation rather than its outputs.",
+        .description = "Operate on the [store derivation](../../glossary.md#gloss-store-derivation) rather than its outputs.",
         .category = installablesCategory,
         .handler = {&operateOn, OperateOn::Derivation},
     });
@@ -479,11 +479,9 @@ struct InstallableAttrPath : InstallableValue
         DrvInfos drvInfos;
         getDerivations(*state, *v, "", autoArgs, drvInfos, false);
 
-        DerivedPathsWithInfo res;
-
         // Backward compatibility hack: group results by drvPath. This
         // helps keep .all output together.
-        std::map<StorePath, size_t> byDrvPath;
+        std::map<StorePath, DerivedPath::Built> byDrvPath;
 
         for (auto & drvInfo : drvInfos) {
             auto drvPath = drvInfo.queryDrvPath();
@@ -498,20 +496,15 @@ struct InstallableAttrPath : InstallableValue
                 for (auto & output : drvInfo.queryOutputs(false, std::get_if<DefaultOutputs>(&outputsSpec)))
                     outputsToInstall.insert(output.first);
 
-            auto i = byDrvPath.find(*drvPath);
-            if (i == byDrvPath.end()) {
-                byDrvPath[*drvPath] = res.size();
-                res.push_back({
-                    .path = DerivedPath::Built {
-                        .drvPath = std::move(*drvPath),
-                        .outputs = std::move(outputsToInstall),
-                    }
-                });
-            } else {
-                for (auto & output : outputsToInstall)
-                    std::get<DerivedPath::Built>(res[i->second].path).outputs.insert(output);
-            }
+            auto derivedPath = byDrvPath.emplace(*drvPath, DerivedPath::Built { .drvPath = *drvPath }).first;
+
+            for (auto & output : outputsToInstall)
+                derivedPath->second.outputs.insert(output);
         }
+
+        DerivedPathsWithInfo res;
+        for (auto & [_, info] : byDrvPath)
+            res.push_back({ .path = { info } });
 
         return res;
     }
@@ -564,7 +557,7 @@ ref<eval_cache::EvalCache> openEvalCache(
             auto vFlake = state.allocValue();
             flake::callFlake(state, *lockedFlake, *vFlake);
 
-            state.forceAttrs(*vFlake, noPos);
+            state.forceAttrs(*vFlake, noPos, "while parsing cached flake data");
 
             auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
             assert(aOutputs);
@@ -627,7 +620,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
 
         else if (v.type() == nString) {
             PathSet context;
-            auto s = state->forceString(v, context);
+            auto s = state->forceString(v, context, noPos, fmt("while evaluating the flake output attribute '%s'", attrPath));
             auto storePath = state->store->maybeParseStorePath(s);
             if (storePath && context.count(std::string(s))) {
                 return {{
@@ -636,7 +629,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
                     }
                 }};
             } else
-                throw Error("flake output attribute '%s' evaluates to a string that does not denote a store path", attrPath);
+                throw Error("flake output attribute '%s' evaluates to the string '%s' which is not a store path", attrPath, s);
         }
 
         else
@@ -898,7 +891,7 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> Instal
 
     struct Aux
     {
-        ExtraInfo info;
+        ExtraPathInfo info;
         std::shared_ptr<Installable> installable;
     };
 
@@ -938,10 +931,7 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> Instal
                                 DrvOutput outputId { *outputHash, output };
                                 auto realisation = store->queryRealisation(outputId);
                                 if (!realisation)
-                                    throw Error(
-                                        "cannot operate on an output of the "
-                                        "unbuilt derivation '%s'",
-                                        outputId.to_string());
+                                    throw MissingRealisation(outputId);
                                 outputs.insert_or_assign(output, realisation->outPath);
                             } else {
                                 // If ca-derivations isn't enabled, assume that

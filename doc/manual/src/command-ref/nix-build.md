@@ -37,9 +37,11 @@ directory containing at least a file named `default.nix`.
 
 `nix-build` is essentially a wrapper around
 [`nix-instantiate`](nix-instantiate.md) (to translate a high-level Nix
-expression to a low-level store derivation) and [`nix-store
+expression to a low-level [store derivation]) and [`nix-store
 --realise`](nix-store.md#operation---realise) (to build the store
 derivation).
+
+[store derivation]: ../glossary.md#gloss-store-derivation
 
 > **Warning**
 >

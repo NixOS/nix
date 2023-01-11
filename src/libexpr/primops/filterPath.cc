@@ -90,12 +90,14 @@ static void prim_filterPath(EvalState & state, PosIdx pos, Value * * args, Value
     Value * filterFun = nullptr;
     PathSet context;
 
-    state.forceAttrs(*args[0], pos);
+    state.forceAttrs(*args[0], pos,
+        "while evaluating the first argument to 'builtins.filterPath'");
 
     for (auto & attr : *args[0]->attrs) {
         auto n = state.symbols[attr.name];
         if (n == "path")
-            path.emplace(state.coerceToPath(attr.pos, *attr.value, context));
+            path.emplace(state.coerceToPath(attr.pos, *attr.value, context,
+                    "while evaluating the 'path' attribute passed to 'builtins.filterPath'"));
         else if (n == "filter") {
             state.forceValue(*attr.value, pos);
             filterFun = attr.value;

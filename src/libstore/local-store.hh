@@ -59,15 +59,6 @@ private:
         struct Stmts;
         std::unique_ptr<Stmts> stmts;
 
-        /* The global GC lock  */
-        AutoCloseFD fdGCLock;
-
-        /* The file to which we write our temporary roots. */
-        AutoCloseFD fdTempRoots;
-
-        /* Connection to the garbage collector. */
-        AutoCloseFD fdRootsSocket;
-
         /* The last time we checked whether to do an auto-GC, or an
            auto-GC finished. */
         std::chrono::time_point<std::chrono::steady_clock> lastGCCheck;
@@ -155,6 +146,21 @@ public:
         RepairFlag repair) override;
 
     void addTempRoot(const StorePath & path) override;
+
+private:
+
+    void createTempRootsFile();
+
+    /* The file to which we write our temporary roots. */
+    Sync<AutoCloseFD> _fdTempRoots;
+
+    /* The global GC lock. */
+    Sync<AutoCloseFD> _fdGCLock;
+
+    /* Connection to the garbage collector. */
+    Sync<AutoCloseFD> _fdRootsSocket;
+
+public:
 
     void addIndirectRoot(const Path & path) override;
 

@@ -2,8 +2,10 @@ R""(
 
 # Examples
 
-* Show the store derivation that results from evaluating the Hello
+* Show the [store derivation] that results from evaluating the Hello
   package:
+
+  [store derivation]: ../../glossary.md#gloss-store-derivation
 
   ```console
   # nix show-derivation nixpkgs#hello
@@ -37,7 +39,7 @@ R""(
 # Description
 
 This command prints on standard output a JSON representation of the
-store derivations to which *installables* evaluate. Store derivations
+[store derivation]s to which *installables* evaluate. Store derivations
 are used internally by Nix. They are store paths with extension `.drv`
 that represent the build-time dependency graph to which a Nix
 expression evaluates.

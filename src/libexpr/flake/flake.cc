@@ -197,28 +197,28 @@ static Flake readFlake(
             if (setting.value->type() == nString)
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
-                    std::string(state.forceStringNoCtx(*setting.value, setting.pos)));
+                    std::string(state.forceStringNoCtx(*setting.value, setting.pos, "")));
             else if (setting.value->type() == nPath) {
                 PathSet emptyContext = {};
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
-                    state.coerceToString(setting.pos, *setting.value, emptyContext, false, true).toOwned());
+                    state.coerceToString(setting.pos, *setting.value, emptyContext, false, true, "").toOwned());
             }
             else if (setting.value->type() == nInt)
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
-                    state.forceInt(*setting.value, setting.pos));
+                    state.forceInt(*setting.value, setting.pos, ""));
             else if (setting.value->type() == nBool)
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
-                    Explicit<bool> { state.forceBool(*setting.value, setting.pos) });
+                    Explicit<bool> { state.forceBool(*setting.value, setting.pos, "") });
             else if (setting.value->type() == nList) {
                 std::vector<std::string> ss;
                 for (auto elem : setting.value->listItems()) {
                     if (elem->type() != nString)
                         throw TypeError("list element in flake configuration setting '%s' is %s while a string is expected",
                             state.symbols[setting.name], showType(*setting.value));
-                    ss.emplace_back(state.forceStringNoCtx(*elem, setting.pos));
+                    ss.emplace_back(state.forceStringNoCtx(*elem, setting.pos, ""));
                 }
                 flake.config.settings.emplace(state.symbols[setting.name], ss);
             }
@@ -737,7 +737,7 @@ void callFlake(EvalState & state,
 
 static void prim_getFlake(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    std::string flakeRefS(state.forceStringNoCtx(*args[0], pos));
+    std::string flakeRefS(state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.getFlake"));
     auto flakeRef = parseFlakeRef(flakeRefS, {}, true);
     if (evalSettings.pureEval && !flakeRef.input.isLocked())
         throw Error("cannot call 'getFlake' on unlocked flake reference '%s', at %s (use --impure to override)", flakeRefS, state.positions[pos]);

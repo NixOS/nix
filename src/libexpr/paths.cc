@@ -29,11 +29,11 @@ std::string EvalState::encodePath(const SourcePath & path)
 SourcePath EvalState::decodePath(std::string_view s, PosIdx pos)
 {
     if (!hasPrefix(s, "/"))
-        throwEvalError(pos, "string '%1%' doesn't represent an absolute path", s);
+        error("string '%s' doesn't represent an absolute path", s).atPos(pos).debugThrow<EvalError>();
 
     if (hasPrefix(s, virtualPathMarker)) {
-        auto fail = [s]() {
-            throw Error("cannot decode virtual path '%s'", s);
+        auto fail = [s, pos, this]() {
+            error("cannot decode virtual path '%s'", s).atPos(pos).debugThrow<Error>();
         };
 
         s = s.substr(virtualPathMarker.size());

@@ -115,7 +115,7 @@ static void fetchTree(
     state.forceValue(*args[0], pos);
 
     if (args[0]->type() == nAttrs) {
-        state.forceAttrs(*args[0], pos);
+        state.forceAttrs(*args[0], pos, "while evaluating the argument passed to builtins.fetchTree");
 
         fetchers::Attrs attrs;
 
@@ -125,7 +125,7 @@ static void fetchTree(
                     .msg = hintfmt("unexpected attribute 'type'"),
                     .errPos = state.positions[pos]
                 }));
-            type = state.forceStringNoCtx(*aType->value, aType->pos);
+            type = state.forceStringNoCtx(*aType->value, aType->pos, "while evaluating the `type` attribute passed to builtins.fetchTree");
         } else if (!type)
             state.debugThrowLastTrace(EvalError({
                 .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
@@ -140,7 +140,7 @@ static void fetchTree(
             state.forceValue(*attr.value, attr.pos);
 
             if (attr.value->type() == nPath || attr.value->type() == nString) {
-                auto s = state.coerceToString(attr.pos, *attr.value, context, false, false).toOwned();
+                auto s = state.coerceToString(attr.pos, *attr.value, context, false, false, "").toOwned();
                 attrs.emplace(state.symbols[attr.name],
                     state.symbols[attr.name] == "url"
                     ? type == "git"
@@ -166,7 +166,7 @@ static void fetchTree(
 
         input = fetchers::Input::fromAttrs(std::move(attrs));
     } else {
-        auto url = state.coerceToString(pos, *args[0], context, false, false).toOwned();
+        auto url = state.coerceToString(pos, *args[0], context, false, false, "while evaluating the first argument passed to the fetcher").toOwned();
 
         if (type == "git") {
             fetchers::Attrs attrs;
@@ -232,16 +232,14 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
 
     if (args[0]->type() == nAttrs) {
 
-        state.forceAttrs(*args[0], pos);
-
         for (auto & attr : *args[0]->attrs) {
             std::string_view n(state.symbols[attr.name]);
             if (n == "url")
-                url = state.forceStringNoCtx(*attr.value, attr.pos);
+                url = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the url we should fetch");
             else if (n == "sha256")
-                expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos), htSHA256);
+                expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the sha256 of the content we should fetch"), htSHA256);
             else if (n == "name")
-                name = state.forceStringNoCtx(*attr.value, attr.pos);
+                name = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the name of the content we should fetch");
             else
                 state.debugThrowLastTrace(EvalError({
                     .msg = hintfmt("unsupported argument '%s' to '%s'", n, who),
@@ -255,7 +253,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
                 .errPos = state.positions[pos]
             }));
     } else
-        url = state.forceStringNoCtx(*args[0], pos);
+        url = state.forceStringNoCtx(*args[0], pos, "while evaluating the url we should fetch");
 
     state.checkURI(*url);
 

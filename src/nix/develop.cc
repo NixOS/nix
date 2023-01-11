@@ -164,6 +164,14 @@ struct BuildEnvironment
     {
         return vars == other.vars && bashFunctions == other.bashFunctions;
     }
+
+    std::string getSystem() const
+    {
+        if (auto v = get(vars, "system"))
+            return getString(*v);
+        else
+            return settings.thisSystem;
+    }
 };
 
 const static std::string getEnvSh =
@@ -572,7 +580,7 @@ struct CmdDevelop : Common, MixEnvironment
             }
         }
 
-        runProgramInStore(store, shell, args);
+        runProgramInStore(store, shell, args, buildEnvironment.getSystem());
     }
 };
 

@@ -7,7 +7,8 @@ static void prim_patch(EvalState & state, const PosIdx pos, Value * * args, Valu
     std::vector<std::string> patches;
     std::optional<SourcePath> src;
 
-    state.forceAttrs(*args[0], pos);
+    state.forceAttrs(*args[0], pos,
+        "while evaluating the first argument to 'builtins.patch'");
 
     for (auto & attr : *args[0]->attrs) {
         std::string_view n(state.symbols[attr.name]);
@@ -23,25 +24,29 @@ static void prim_patch(EvalState & state, const PosIdx pos, Value * * args, Valu
 
         if (n == "src") {
             PathSet context;
-            src.emplace(state.coerceToPath(pos, *attr.value, context));
+            src.emplace(state.coerceToPath(pos, *attr.value, context,
+                    "while evaluating the 'src' attribute passed to 'builtins.patch'"));
         }
 
         else if (n == "patchFiles") {
             check();
-            state.forceList(*attr.value, attr.pos);
+            state.forceList(*attr.value, attr.pos,
+                "while evaluating the 'patchFiles' attribute passed to 'builtins.patch'");
             for (auto elem : attr.value->listItems()) {
                 // FIXME: use realisePath
                 PathSet context;
-                auto patchFile = state.coerceToPath(attr.pos, *elem, context);
+                auto patchFile = state.coerceToPath(attr.pos, *elem, context,
+                    "while evaluating the 'patchFiles' attribute passed to 'builtins.patch'");
                 patches.push_back(patchFile.readFile());
             }
         }
 
         else if (n == "patches") {
             check();
-            state.forceList(*attr.value, attr.pos);
+            auto err = "while evaluating the 'patches' attribute passed to 'builtins.patch'";
+            state.forceList(*attr.value, attr.pos, err);
             for (auto elem : attr.value->listItems())
-                patches.push_back(std::string(state.forceStringNoCtx(*elem, attr.pos)));
+                patches.push_back(std::string(state.forceStringNoCtx(*elem, attr.pos, err)));
         }
 
         else

@@ -39,7 +39,6 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <netinet/ip.h>
-#include <sys/personality.h>
 #include <sys/mman.h>
 #include <sched.h>
 #include <sys/param.h>
@@ -545,7 +544,8 @@ void DerivationGoal::inputsRealised()
                    However, the impure derivations feature still relies on this
                    fragile way of doing things, because its builds do not have
                    a representation in the store, which is a usability problem
-                   in itself */
+                   in itself. When implementing this logic entirely with lookups
+                   make sure that they're cached. */
                 if (auto outPath = get(inputDrvOutputs, { depDrvPath, j })) {
                     worker.store.computeFSClosure(*outPath, inputPaths);
                 }

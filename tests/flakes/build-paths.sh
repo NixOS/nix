@@ -6,7 +6,7 @@ flake2Dir=$TEST_ROOT/flake2
 mkdir -p $flake1Dir $flake2Dir
 
 writeSimpleFlake $flake2Dir
-tar cfz $TEST_ROOT/flake.tar.gz -C $TEST_ROOT flake2 
+tar cfz $TEST_ROOT/flake.tar.gz -C $TEST_ROOT flake2
 hash=$(nix hash path $flake2Dir)
 
 dep=$(nix store add-path ./common.sh)

@@ -18,7 +18,9 @@ R""(
   (The flag `--substituters ''` avoids querying
   `https://cache.nixos.org` for the log.)
 
-* To copy the log for a specific store derivation via SSH:
+* To copy the log for a specific [store derivation] via SSH:
+
+  [store derivation]: ../../glossary.md#gloss-store-derivation
 
   ```console
   # nix store copy-log --to ssh-ng://machine /nix/store/ilgm50plpmcgjhcp33z6n4qbnpqfhxym-glibc-2.33-59.drv

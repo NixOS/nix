@@ -94,6 +94,7 @@ nix_tests = \
   fmt.sh \
   eval-store.sh \
   why-depends.sh \
+  ca/why-depends.sh \
   import-derivation.sh \
   ca/import-derivation.sh \
   nix_path.sh \
@@ -122,8 +123,6 @@ ifeq ($(HAVE_LIBCPUID), 1)
 endif
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
-
-tests-environment = NIX_REMOTE= $(bash) -e
 
 clean-files += $(d)/common.sh $(d)/config.nix $(d)/ca/config.nix
 
