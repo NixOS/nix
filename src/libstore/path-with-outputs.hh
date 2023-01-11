@@ -1,13 +1,18 @@
 #pragma once
 
-#include <variant>
-
 #include "path.hh"
 #include "derived-path.hh"
 #include "nlohmann/json_fwd.hpp"
 
 namespace nix {
 
+/* This is a deprecated old type just for use by the old CLI, and older
+   versions of the RPC protocols. In new code don't use it; you want
+   `DerivedPath` instead.
+
+   `DerivedPath` is better because it handles more cases, and does so more
+   explicitly without devious punning tricks.
+*/
 struct StorePathWithOutputs
 {
     StorePath path;
@@ -32,26 +37,5 @@ class Store;
 StorePathWithOutputs parsePathWithOutputs(const Store & store, std::string_view pathWithOutputs);
 
 StorePathWithOutputs followLinksToStorePathWithOutputs(const Store & store, std::string_view pathWithOutputs);
-
-typedef std::set<std::string> OutputNames;
-
-struct AllOutputs {
-    bool operator < (const AllOutputs & _) const { return false; }
-};
-
-struct DefaultOutputs {
-    bool operator < (const DefaultOutputs & _) const { return false; }
-};
-
-typedef std::variant<DefaultOutputs, AllOutputs, OutputNames> OutputsSpec;
-
-/* Parse a string of the form 'prefix^output1,...outputN' or
-   'prefix^*', returning the prefix and the outputs spec. */
-std::pair<std::string, OutputsSpec> parseOutputsSpec(const std::string & s);
-
-std::string printOutputsSpec(const OutputsSpec & outputsSpec);
-
-void to_json(nlohmann::json &, const OutputsSpec &);
-void from_json(const nlohmann::json &, OutputsSpec &);
 
 }

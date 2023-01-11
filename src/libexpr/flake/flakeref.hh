@@ -3,7 +3,7 @@
 #include "types.hh"
 #include "hash.hh"
 #include "fetchers.hh"
-#include "path-with-outputs.hh"
+#include "outputs-spec.hh"
 
 #include <variant>
 
