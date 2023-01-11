@@ -11,6 +11,7 @@ The goal of the team is to help other people to contribute to Nix.
 - Valentin Gagarin (@fricklerhandwerk)
 - Thomas Bereknyei (@tomberek)
 - Robert Hensing (@roberth)
+- John Ericson (@Ericson2314)
 
 ## Meeting protocol
 
