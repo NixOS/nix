@@ -990,7 +990,7 @@ void DerivationGoal::resolvedFinished()
                 return resolvedDrv.outputNames();
             },
             [&](const OutputsSpec::Names & names) {
-                return names;
+                return static_cast<std::set<std::string>>(names);
             },
         }, wantedOutputs.raw());
 
@@ -1325,7 +1325,7 @@ std::pair<bool, DrvOutputs> DerivationGoal::checkPathValidity()
             return StringSet {};
         },
         [&](const OutputsSpec::Names & names) {
-            return names;
+            return static_cast<StringSet>(names);
         },
     }, wantedOutputs.raw());
     DrvOutputs validOutputs;

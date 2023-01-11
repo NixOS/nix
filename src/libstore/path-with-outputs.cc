@@ -53,7 +53,7 @@ std::variant<StorePathWithOutputs, StorePath> StorePathWithOutputs::tryFromDeriv
                         return {};
                     },
                     [&](const OutputsSpec::Names & outputs) {
-                        return outputs;
+                        return static_cast<StringSet>(outputs);
                     },
                 }, bfd.outputs.raw()),
             };

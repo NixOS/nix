@@ -32,7 +32,7 @@ std::optional<OutputsSpec> OutputsSpec::parseOpt(std::string_view s)
         return { OutputsSpec::All {} };
 
     if (match[2].matched)
-        return { tokenizeString<OutputsSpec::Names>(match[2].str(), ",") };
+        return OutputsSpec::Names { tokenizeString<StringSet>(match[2].str(), ",") };
 
     assert(false);
 }
@@ -139,11 +139,11 @@ void to_json(nlohmann::json & json, const ExtendedOutputsSpec & extendedOutputsS
 
 void from_json(const nlohmann::json & json, OutputsSpec & outputsSpec)
 {
-    auto names = json.get<OutputNames>();
-    if (names == OutputNames({"*"}))
+    auto names = json.get<StringSet>();
+    if (names == StringSet({"*"}))
         outputsSpec = OutputsSpec::All {};
     else
-        outputsSpec = names;
+        outputsSpec = OutputsSpec::Names { std::move(names) };
 }
 
 

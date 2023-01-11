@@ -479,7 +479,7 @@ struct InstallableAttrPath : InstallableValue
             auto derivedPath = byDrvPath.emplace(*drvPath, DerivedPath::Built {
                 .drvPath = *drvPath,
                 // Not normally legal, but we will merge right below
-                .outputs = OutputsSpec::Names { },
+                .outputs = OutputsSpec::Names { StringSet { } },
             }).first;
 
             derivedPath->second.outputs.merge(std::visit(overloaded {

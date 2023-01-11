@@ -8,7 +8,22 @@
 
 namespace nix {
 
-typedef std::set<std::string> OutputNames;
+struct OutputNames : std::set<std::string> {
+    using std::set<std::string>::set;
+
+    // These need to be "inherited manually"
+    OutputNames(const std::set<std::string> & s)
+        : std::set<std::string>(s)
+    { }
+    OutputNames(std::set<std::string> && s)
+        : std::set<std::string>(s)
+    { }
+
+    /* This set should always be non-empty, so we delete this
+       constructor in order make creating empty ones by mistake harder.
+       */
+    OutputNames() = delete;
+};
 
 struct AllOutputs {
     bool operator < (const AllOutputs & _) const { return false; }

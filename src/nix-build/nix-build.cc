@@ -421,7 +421,7 @@ static void main_nix_build(int argc, char * * argv)
             {
                 pathsToBuild.push_back(DerivedPath::Built {
                     .drvPath = inputDrv,
-                    .outputs = inputOutputs
+                    .outputs = OutputsSpec::Names { inputOutputs },
                 });
                 pathsToCopy.insert(inputDrv);
             }
