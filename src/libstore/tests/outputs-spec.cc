@@ -4,42 +4,42 @@
 
 namespace nix {
 
-TEST(OutputsSpec_parse, basic)
+TEST(ExtendedOutputsSpec_parse, basic)
 {
     {
-        auto [prefix, outputsSpec] = OutputsSpec::parse("foo");
+        auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse("foo");
         ASSERT_EQ(prefix, "foo");
-        ASSERT_TRUE(std::get_if<DefaultOutputs>(&outputsSpec));
+        ASSERT_TRUE(std::get_if<DefaultOutputs>(&extendedOutputsSpec));
     }
 
     {
-        auto [prefix, outputsSpec] = OutputsSpec::parse("foo^*");
+        auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse("foo^*");
         ASSERT_EQ(prefix, "foo");
-        ASSERT_TRUE(std::get_if<AllOutputs>(&outputsSpec));
+        ASSERT_TRUE(std::get_if<AllOutputs>(&extendedOutputsSpec));
     }
 
     {
-        auto [prefix, outputsSpec] = OutputsSpec::parse("foo^out");
+        auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse("foo^out");
         ASSERT_EQ(prefix, "foo");
-        ASSERT_TRUE(std::get<OutputNames>(outputsSpec) == OutputNames({"out"}));
+        ASSERT_TRUE(std::get<OutputNames>(extendedOutputsSpec) == OutputNames({"out"}));
     }
 
     {
-        auto [prefix, outputsSpec] = OutputsSpec::parse("foo^out,bin");
+        auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse("foo^out,bin");
         ASSERT_EQ(prefix, "foo");
-        ASSERT_TRUE(std::get<OutputNames>(outputsSpec) == OutputNames({"out", "bin"}));
+        ASSERT_TRUE(std::get<OutputNames>(extendedOutputsSpec) == OutputNames({"out", "bin"}));
     }
 
     {
-        auto [prefix, outputsSpec] = OutputsSpec::parse("foo^bar^out,bin");
+        auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse("foo^bar^out,bin");
         ASSERT_EQ(prefix, "foo^bar");
-        ASSERT_TRUE(std::get<OutputNames>(outputsSpec) == OutputNames({"out", "bin"}));
+        ASSERT_TRUE(std::get<OutputNames>(extendedOutputsSpec) == OutputNames({"out", "bin"}));
     }
 
     {
-        auto [prefix, outputsSpec] = OutputsSpec::parse("foo^&*()");
+        auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse("foo^&*()");
         ASSERT_EQ(prefix, "foo^&*()");
-        ASSERT_TRUE(std::get_if<DefaultOutputs>(&outputsSpec));
+        ASSERT_TRUE(std::get_if<DefaultOutputs>(&extendedOutputsSpec));
     }
 }
 

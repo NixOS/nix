@@ -446,19 +446,19 @@ struct InstallableAttrPath : InstallableValue
     SourceExprCommand & cmd;
     RootValue v;
     std::string attrPath;
-    OutputsSpec outputsSpec;
+    ExtendedOutputsSpec extendedOutputsSpec;
 
     InstallableAttrPath(
         ref<EvalState> state,
         SourceExprCommand & cmd,
         Value * v,
         const std::string & attrPath,
-        OutputsSpec outputsSpec)
+        ExtendedOutputsSpec extendedOutputsSpec)
         : InstallableValue(state)
         , cmd(cmd)
         , v(allocRootValue(v))
         , attrPath(attrPath)
-        , outputsSpec(std::move(outputsSpec))
+        , extendedOutputsSpec(std::move(extendedOutputsSpec))
     { }
 
     std::string what() const override { return attrPath; }
@@ -490,10 +490,10 @@ struct InstallableAttrPath : InstallableValue
 
             std::set<std::string> outputsToInstall;
 
-            if (auto outputNames = std::get_if<OutputNames>(&outputsSpec))
+            if (auto outputNames = std::get_if<OutputNames>(&extendedOutputsSpec))
                 outputsToInstall = *outputNames;
             else
-                for (auto & output : drvInfo.queryOutputs(false, std::get_if<DefaultOutputs>(&outputsSpec)))
+                for (auto & output : drvInfo.queryOutputs(false, std::get_if<DefaultOutputs>(&extendedOutputsSpec)))
                     outputsToInstall.insert(output.first);
 
             auto derivedPath = byDrvPath.emplace(*drvPath, DerivedPath::Built { .drvPath = *drvPath }).first;
@@ -581,7 +581,7 @@ InstallableFlake::InstallableFlake(
     ref<EvalState> state,
     FlakeRef && flakeRef,
     std::string_view fragment,
-    OutputsSpec outputsSpec,
+    ExtendedOutputsSpec extendedOutputsSpec,
     Strings attrPaths,
     Strings prefixes,
     const flake::LockFlags & lockFlags)
@@ -589,7 +589,7 @@ InstallableFlake::InstallableFlake(
       flakeRef(flakeRef),
       attrPaths(fragment == "" ? attrPaths : Strings{(std::string) fragment}),
       prefixes(fragment == "" ? Strings{} : prefixes),
-      outputsSpec(std::move(outputsSpec)),
+      extendedOutputsSpec(std::move(extendedOutputsSpec)),
       lockFlags(lockFlags)
 {
     if (cmd && cmd->getAutoArgs(*state)->size())
@@ -657,7 +657,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
             priority = aPriority->getInt();
     }
 
-    if (outputsToInstall.empty() || std::get_if<AllOutputs>(&outputsSpec)) {
+    if (outputsToInstall.empty() || std::get_if<AllOutputs>(&extendedOutputsSpec)) {
         outputsToInstall.clear();
         if (auto aOutputs = attr->maybeGetAttr(state->sOutputs))
             for (auto & s : aOutputs->getListOfStrings())
@@ -667,7 +667,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
     if (outputsToInstall.empty())
         outputsToInstall.insert("out");
 
-    if (auto outputNames = std::get_if<OutputNames>(&outputsSpec))
+    if (auto outputNames = std::get_if<OutputNames>(&extendedOutputsSpec))
         outputsToInstall = *outputNames;
 
     return {{
@@ -680,7 +680,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
             .originalRef = flakeRef,
             .resolvedRef = getLockedFlake()->flake.lockedRef,
             .attrPath = attrPath,
-            .outputsSpec = outputsSpec,
+            .extendedOutputsSpec = extendedOutputsSpec,
         }
     }};
 }
@@ -797,12 +797,12 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         }
 
         for (auto & s : ss) {
-            auto [prefix, outputsSpec] = OutputsSpec::parse(s);
+            auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse(s);
             result.push_back(
                 std::make_shared<InstallableAttrPath>(
                     state, *this, vFile,
                     prefix == "." ? "" : prefix,
-                    outputsSpec));
+                    extendedOutputsSpec));
         }
 
     } else {
@@ -837,13 +837,13 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             }
 
             try {
-                auto [flakeRef, fragment, outputsSpec] = parseFlakeRefWithFragmentAndOutputsSpec(s, absPath("."));
+                auto [flakeRef, fragment, extendedOutputsSpec] = parseFlakeRefWithFragmentAndExtendedOutputsSpec(s, absPath("."));
                 result.push_back(std::make_shared<InstallableFlake>(
                         this,
                         getEvalState(),
                         std::move(flakeRef),
                         fragment,
-                        outputsSpec,
+                        extendedOutputsSpec,
                         getDefaultFlakeAttrPaths(),
                         getDefaultFlakeAttrPathPrefixes(),
                         lockFlags));

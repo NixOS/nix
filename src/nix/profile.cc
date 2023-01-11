@@ -22,7 +22,7 @@ struct ProfileElementSource
     // FIXME: record original attrpath.
     FlakeRef resolvedRef;
     std::string attrPath;
-    OutputsSpec outputs;
+    ExtendedOutputsSpec outputs;
 
     bool operator < (const ProfileElementSource & other) const
     {
@@ -126,7 +126,7 @@ struct ProfileManifest
                         parseFlakeRef(e[sOriginalUrl]),
                         parseFlakeRef(e[sUrl]),
                         e["attrPath"],
-                        e["outputs"].get<OutputsSpec>()
+                        e["outputs"].get<ExtendedOutputsSpec>()
                     };
                 }
                 elements.emplace_back(std::move(element));
@@ -308,12 +308,12 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
 
             auto & [res, info] = builtPaths[installable.get()];
 
-            if (info.originalRef && info.resolvedRef && info.attrPath && info.outputsSpec) {
+            if (info.originalRef && info.resolvedRef && info.attrPath && info.extendedOutputsSpec) {
                 element.source = ProfileElementSource {
                     .originalRef = *info.originalRef,
                     .resolvedRef = *info.resolvedRef,
                     .attrPath = *info.attrPath,
-                    .outputs = *info.outputsSpec,
+                    .outputs = *info.extendedOutputsSpec,
                 };
             }
 
@@ -497,7 +497,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                     .originalRef = installable->flakeRef,
                     .resolvedRef = *info.resolvedRef,
                     .attrPath = *info.attrPath,
-                    .outputs = installable->outputsSpec,
+                    .outputs = installable->extendedOutputsSpec,
                 };
 
                 installables.push_back(installable);

@@ -17,10 +17,10 @@ struct DefaultOutputs {
     bool operator < (const DefaultOutputs & _) const { return false; }
 };
 
-typedef std::variant<DefaultOutputs, AllOutputs, OutputNames> _OutputsSpecRaw;
+typedef std::variant<DefaultOutputs, AllOutputs, OutputNames> _ExtendedOutputsSpecRaw;
 
-struct OutputsSpec : _OutputsSpecRaw {
-    using Raw = _OutputsSpecRaw;
+struct ExtendedOutputsSpec : _ExtendedOutputsSpecRaw {
+    using Raw = _ExtendedOutputsSpecRaw;
     using Raw::Raw;
 
     using Names = OutputNames;
@@ -33,12 +33,12 @@ struct OutputsSpec : _OutputsSpecRaw {
 
     /* Parse a string of the form 'prefix^output1,...outputN' or
        'prefix^*', returning the prefix and the outputs spec. */
-    static std::pair<std::string, OutputsSpec> parse(std::string s);
+    static std::pair<std::string, ExtendedOutputsSpec> parse(std::string s);
 
     std::string to_string() const;
 };
 
-void to_json(nlohmann::json &, const OutputsSpec &);
-void from_json(const nlohmann::json &, OutputsSpec &);
+void to_json(nlohmann::json &, const ExtendedOutputsSpec &);
+void from_json(const nlohmann::json &, ExtendedOutputsSpec &);
 
 }

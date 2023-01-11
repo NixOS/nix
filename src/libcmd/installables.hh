@@ -59,7 +59,7 @@ struct ExtraPathInfo
     std::optional<FlakeRef> resolvedRef;
     std::optional<std::string> attrPath;
     // FIXME: merge with DerivedPath's 'outputs' field?
-    std::optional<OutputsSpec> outputsSpec;
+    std::optional<ExtendedOutputsSpec> extendedOutputsSpec;
 };
 
 /* A derived path with any additional info that commands might
@@ -169,7 +169,7 @@ struct InstallableFlake : InstallableValue
     FlakeRef flakeRef;
     Strings attrPaths;
     Strings prefixes;
-    OutputsSpec outputsSpec;
+    ExtendedOutputsSpec extendedOutputsSpec;
     const flake::LockFlags & lockFlags;
     mutable std::shared_ptr<flake::LockedFlake> _lockedFlake;
 
@@ -178,7 +178,7 @@ struct InstallableFlake : InstallableValue
         ref<EvalState> state,
         FlakeRef && flakeRef,
         std::string_view fragment,
-        OutputsSpec outputsSpec,
+        ExtendedOutputsSpec extendedOutputsSpec,
         Strings attrPaths,
         Strings prefixes,
         const flake::LockFlags & lockFlags);

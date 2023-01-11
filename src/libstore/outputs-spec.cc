@@ -6,7 +6,7 @@
 
 namespace nix {
 
-std::pair<std::string, OutputsSpec> OutputsSpec::parse(std::string s)
+std::pair<std::string, ExtendedOutputsSpec> ExtendedOutputsSpec::parse(std::string s)
 {
     static std::regex regex(R"((.*)\^((\*)|([a-z]+(,[a-z]+)*)))");
 
@@ -20,43 +20,43 @@ std::pair<std::string, OutputsSpec> OutputsSpec::parse(std::string s)
     return {match[1], tokenizeString<OutputNames>(match[4].str(), ",")};
 }
 
-std::string OutputsSpec::to_string() const
+std::string ExtendedOutputsSpec::to_string() const
 {
     return std::visit(overloaded {
-        [&](const OutputsSpec::Default &) -> std::string {
+        [&](const ExtendedOutputsSpec::Default &) -> std::string {
             return "";
         },
-        [&](const OutputsSpec::All &) -> std::string {
+        [&](const ExtendedOutputsSpec::All &) -> std::string {
             return "*";
         },
-        [&](const OutputsSpec::Names & outputNames) -> std::string {
+        [&](const ExtendedOutputsSpec::Names & outputNames) -> std::string {
             return "^" + concatStringsSep(",", outputNames);
         },
     }, raw());
 }
 
-void to_json(nlohmann::json & json, const OutputsSpec & outputsSpec)
+void to_json(nlohmann::json & json, const ExtendedOutputsSpec & extendedOutputsSpec)
 {
-    if (std::get_if<DefaultOutputs>(&outputsSpec))
+    if (std::get_if<DefaultOutputs>(&extendedOutputsSpec))
         json = nullptr;
 
-    else if (std::get_if<AllOutputs>(&outputsSpec))
+    else if (std::get_if<AllOutputs>(&extendedOutputsSpec))
         json = std::vector<std::string>({"*"});
 
-    else if (auto outputNames = std::get_if<OutputNames>(&outputsSpec))
+    else if (auto outputNames = std::get_if<OutputNames>(&extendedOutputsSpec))
         json = *outputNames;
 }
 
-void from_json(const nlohmann::json & json, OutputsSpec & outputsSpec)
+void from_json(const nlohmann::json & json, ExtendedOutputsSpec & extendedOutputsSpec)
 {
     if (json.is_null())
-        outputsSpec = DefaultOutputs();
+        extendedOutputsSpec = DefaultOutputs();
     else {
         auto names = json.get<OutputNames>();
         if (names == OutputNames({"*"}))
-            outputsSpec = AllOutputs();
+            extendedOutputsSpec = AllOutputs();
         else
-            outputsSpec = names;
+            extendedOutputsSpec = names;
     }
 }
 

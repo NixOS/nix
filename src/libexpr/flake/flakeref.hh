@@ -80,7 +80,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
 std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
     const std::string & url, const std::optional<Path> & baseDir = {});
 
-std::tuple<FlakeRef, std::string, OutputsSpec> parseFlakeRefWithFragmentAndOutputsSpec(
+std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragmentAndExtendedOutputsSpec(
     const std::string & url,
     const std::optional<Path> & baseDir = {},
     bool allowMissing = false,
