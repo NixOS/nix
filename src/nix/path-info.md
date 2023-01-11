@@ -39,6 +39,15 @@ R""(
 
   ```
 
+* Print all dependant paths which do not exist in any configured binary cache:
+
+  ```console
+  # nix path-info -r --filter-substitutable /nix/store/blzxgyvrk32ki6xga10phr4sby2xf25q-geeqie-1.5.1
+  /nix/store/blzxgyvrk32ki6xga10phr4sby2xf25q-geeqie-1.5.1
+  /nix/store/w2vgpk3rdl6smqz7ixxywqapgagsarjf-fbida-2.14
+  ...
+  ```
+
 * Print the 10 most recently added paths (using --json and the jq(1)
   command):
 
