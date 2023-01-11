@@ -25,9 +25,7 @@ struct OutputNames : std::set<std::string> {
     OutputNames() = delete;
 };
 
-struct AllOutputs {
-    bool operator < (const AllOutputs & _) const { return false; }
-};
+struct AllOutputs : std::monostate { };
 
 typedef std::variant<AllOutputs, OutputNames> _OutputsSpecRaw;
 
@@ -64,9 +62,7 @@ struct OutputsSpec : _OutputsSpecRaw {
     std::string to_string() const;
 };
 
-struct DefaultOutputs {
-    bool operator < (const DefaultOutputs & _) const { return false; }
-};
+struct DefaultOutputs : std::monostate { };
 
 typedef std::variant<DefaultOutputs, OutputsSpec> _ExtendedOutputsSpecRaw;
 
@@ -84,6 +80,7 @@ struct ExtendedOutputsSpec : _ExtendedOutputsSpecRaw {
     /* Parse a string of the form 'prefix^output1,...outputN' or
        'prefix^*', returning the prefix and the extended outputs spec. */
     static std::pair<std::string_view, ExtendedOutputsSpec> parse(std::string_view s);
+    static std::optional<std::pair<std::string_view, ExtendedOutputsSpec>> parseOpt(std::string_view s);
 
     std::string to_string() const;
 };

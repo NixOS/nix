@@ -4,63 +4,96 @@
 
 namespace nix {
 
-TEST(OutputsSpec_parse, basic)
-{
-    {
-        auto outputsSpec = OutputsSpec::parse("*");
-        ASSERT_TRUE(std::get_if<OutputsSpec::All>(&outputsSpec));
+#define TEST_DONT_PARSE(NAME, STR)           \
+    TEST(OutputsSpec, bad_ ## NAME) {        \
+        std::optional OutputsSpecOpt =       \
+            OutputsSpec::parseOpt(STR);      \
+        ASSERT_FALSE(OutputsSpecOpt);        \
     }
 
-    {
-        auto outputsSpec = OutputsSpec::parse("out");
-        ASSERT_TRUE(std::get<OutputsSpec::Names>(outputsSpec) == OutputsSpec::Names({"out"}));
-    }
+TEST_DONT_PARSE(empty, "")
+TEST_DONT_PARSE(garbage, "&*()")
+TEST_DONT_PARSE(double_star, "**")
+TEST_DONT_PARSE(star_first, "*,foo")
+TEST_DONT_PARSE(star_second, "foo,*")
 
-    {
-        auto outputsSpec = OutputsSpec::parse("out,bin");
-        ASSERT_TRUE(std::get<OutputsSpec::Names>(outputsSpec) == OutputsSpec::Names({"out", "bin"}));
-    }
+#undef TEST_DONT_PARSE
 
-    {
-        std::optional outputsSpecOpt = OutputsSpec::parseOpt("&*()");
-        ASSERT_FALSE(outputsSpecOpt);
-    }
+TEST(OutputsSpec, all) {
+    std::string_view str = "*";
+    OutputsSpec expected = OutputsSpec::All { };
+    ASSERT_EQ(OutputsSpec::parse(str), expected);
+    ASSERT_EQ(expected.to_string(), str);
+}
+
+TEST(OutputsSpec, names_out) {
+    std::string_view str = "out";
+    OutputsSpec expected = OutputsSpec::Names { "out" };
+    ASSERT_EQ(OutputsSpec::parse(str), expected);
+    ASSERT_EQ(expected.to_string(), str);
+}
+
+TEST(OutputsSpec, names_out_bin) {
+    OutputsSpec expected = OutputsSpec::Names { "out", "bin" };
+    ASSERT_EQ(OutputsSpec::parse("out,bin"), expected);
+    // N.B. This normalization is OK.
+    ASSERT_EQ(expected.to_string(), "bin,out");
 }
 
 
-TEST(ExtendedOutputsSpec_parse, basic)
-{
-    {
-        auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse("foo");
-        ASSERT_EQ(prefix, "foo");
-        ASSERT_TRUE(std::get_if<ExtendedOutputsSpec::Default>(&extendedOutputsSpec));
+#define TEST_DONT_PARSE(NAME, STR)                   \
+    TEST(ExtendedOutputsSpec, bad_ ## NAME) {        \
+        std::optional extendedOutputsSpecOpt =       \
+            ExtendedOutputsSpec::parseOpt(STR);      \
+        ASSERT_FALSE(extendedOutputsSpecOpt);        \
     }
 
-    {
-        auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse("foo^*");
-        ASSERT_EQ(prefix, "foo");
-        auto * explicit_p = std::get_if<ExtendedOutputsSpec::Explicit>(&extendedOutputsSpec);
-        ASSERT_TRUE(explicit_p);
-        ASSERT_TRUE(std::get_if<OutputsSpec::All>(explicit_p));
-    }
+TEST_DONT_PARSE(carot_empty, "^")
+TEST_DONT_PARSE(prefix_carot_empty, "foo^")
 
-    {
-        auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse("foo^out");
-        ASSERT_EQ(prefix, "foo");
-        ASSERT_TRUE(std::get<OutputsSpec::Names>(std::get<ExtendedOutputsSpec::Explicit>(extendedOutputsSpec)) == OutputsSpec::Names({"out"}));
-    }
+#undef TEST_DONT_PARSE
 
-    {
-        auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse("foo^out,bin");
-        ASSERT_EQ(prefix, "foo");
-        ASSERT_TRUE(std::get<OutputsSpec::Names>(std::get<ExtendedOutputsSpec::Explicit>(extendedOutputsSpec)) == OutputsSpec::Names({"out", "bin"}));
-    }
+TEST(ExtendedOutputsSpec, defeault) {
+    std::string_view str = "foo";
+    auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse(str);
+    ASSERT_EQ(prefix, "foo");
+    ExtendedOutputsSpec expected = ExtendedOutputsSpec::Default { };
+    ASSERT_EQ(extendedOutputsSpec, expected);
+    ASSERT_EQ(std::string { prefix } + expected.to_string(), str);
+}
 
-    {
-        auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse("foo^bar^out,bin");
-        ASSERT_EQ(prefix, "foo^bar");
-        ASSERT_TRUE(std::get<OutputsSpec::Names>(std::get<ExtendedOutputsSpec::Explicit>(extendedOutputsSpec)) == OutputsSpec::Names({"out", "bin"}));
-    }
+TEST(ExtendedOutputsSpec, all) {
+    std::string_view str = "foo^*";
+    auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse(str);
+    ASSERT_EQ(prefix, "foo");
+    ExtendedOutputsSpec expected = OutputsSpec::All { };
+    ASSERT_EQ(extendedOutputsSpec, expected);
+    ASSERT_EQ(std::string { prefix } + expected.to_string(), str);
+}
+
+TEST(ExtendedOutputsSpec, out) {
+    std::string_view str = "foo^out";
+    auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse(str);
+    ASSERT_EQ(prefix, "foo");
+    ExtendedOutputsSpec expected = OutputsSpec::Names { "out" };
+    ASSERT_EQ(extendedOutputsSpec, expected);
+    ASSERT_EQ(std::string { prefix } + expected.to_string(), str);
+}
+
+TEST(ExtendedOutputsSpec, out_bin) {
+    auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse("foo^out,bin");
+    ASSERT_EQ(prefix, "foo");
+    ExtendedOutputsSpec expected = OutputsSpec::Names { "out", "bin" };
+    ASSERT_EQ(extendedOutputsSpec, expected);
+    ASSERT_EQ(std::string { prefix } + expected.to_string(), "foo^bin,out");
+}
+
+TEST(ExtendedOutputsSpec, many_carrot) {
+    auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse("foo^bar^out,bin");
+    ASSERT_EQ(prefix, "foo^bar");
+    ExtendedOutputsSpec expected = OutputsSpec::Names { "out", "bin" };
+    ASSERT_EQ(extendedOutputsSpec, expected);
+    ASSERT_EQ(std::string { prefix } + expected.to_string(), "foo^bar^bin,out");
 }
 
 }

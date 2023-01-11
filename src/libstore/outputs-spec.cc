@@ -40,22 +40,33 @@ std::optional<OutputsSpec> OutputsSpec::parseOpt(std::string_view s)
 
 OutputsSpec OutputsSpec::parse(std::string_view s)
 {
-    std::optional spec = OutputsSpec::parseOpt(s);
+    std::optional spec = parseOpt(s);
     if (!spec)
         throw Error("Invalid outputs specifier: '%s'", s);
     return *spec;
 }
 
 
-std::pair<std::string_view, ExtendedOutputsSpec> ExtendedOutputsSpec::parse(std::string_view s)
+std::optional<std::pair<std::string_view, ExtendedOutputsSpec>> ExtendedOutputsSpec::parseOpt(std::string_view s)
 {
     auto found = s.rfind('^');
 
     if (found == std::string::npos)
-        return { s, ExtendedOutputsSpec::Default {} };
+        return std::pair { s, ExtendedOutputsSpec::Default {} };
 
-    auto spec = OutputsSpec::parse(s.substr(found + 1));
-    return { s.substr(0, found), ExtendedOutputsSpec::Explicit { spec } };
+    auto specOpt = OutputsSpec::parseOpt(s.substr(found + 1));
+    if (!specOpt)
+        return std::nullopt;
+    return std::pair { s.substr(0, found), ExtendedOutputsSpec::Explicit { *std::move(specOpt) } };
+}
+
+
+std::pair<std::string_view, ExtendedOutputsSpec> ExtendedOutputsSpec::parse(std::string_view s)
+{
+    std::optional spec = parseOpt(s);
+    if (!spec)
+        throw Error("Invalid extended outputs specifier: '%s'", s);
+    return *spec;
 }
 
 
