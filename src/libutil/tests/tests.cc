@@ -202,7 +202,7 @@ namespace nix {
     }
 
     TEST(pathExists, bogusPathDoesNotExist) {
-        ASSERT_FALSE(pathExists("/home/schnitzel/darmstadt/pommes"));
+        ASSERT_FALSE(pathExists("/nonexistent"));
     }
 
     /* ----------------------------------------------------------------------------

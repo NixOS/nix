@@ -326,6 +326,15 @@
 
             makeFlags = "profiledir=$(out)/etc/profile.d PRECOMPILE_HEADERS=1";
 
+            preCheck = ''
+              export prefixDir=$TMPDIR/dummy
+              export NIX_STORE_DIR=$prefixDir/store
+              export NIX_DATA_DIR=$prefixDir/share
+              export NIX_STATE_DIR=$prefixDir/var/nix
+
+              mkdir -p $NIX_STORE_DIR $NIX_DATA_DIR $NIX_STATE_DIR
+            '';
+
             doCheck = true;
 
             installFlags = "sysconfdir=$(out)/etc";

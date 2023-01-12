@@ -42,7 +42,7 @@ TEST_F(NixStringContextElemTest, slash_invalid) {
 }
 
 TEST_F(NixStringContextElemTest, opaque) {
-    std::string_view opaque = "/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x";
+    std::string opaque = settings.nixStore + "/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x";
     auto elem = NixStringContextElem::parse(store(), opaque);
     auto * p = std::get_if<NixStringContextElem::Opaque>(&elem);
     ASSERT_TRUE(p);
@@ -51,7 +51,7 @@ TEST_F(NixStringContextElemTest, opaque) {
 }
 
 TEST_F(NixStringContextElemTest, drvDeep) {
-    std::string_view drvDeep = "=/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv";
+    std::string drvDeep = "=" + settings.nixStore + "/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv";
     auto elem = NixStringContextElem::parse(store(), drvDeep);
     auto * p = std::get_if<NixStringContextElem::DrvDeep>(&elem);
     ASSERT_TRUE(p);
@@ -60,7 +60,7 @@ TEST_F(NixStringContextElemTest, drvDeep) {
 }
 
 TEST_F(NixStringContextElemTest, built) {
-    std::string_view built = "!foo!/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv";
+    std::string built = "!foo!" + settings.nixStore + "/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv";
     auto elem = NixStringContextElem::parse(store(), built);
     auto * p = std::get_if<NixStringContextElem::Built>(&elem);
     ASSERT_TRUE(p);
