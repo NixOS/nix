@@ -54,6 +54,11 @@ have an effect.
     created by sequentially numbering symlinks beyond the first one
     (e.g., `foo`, `foo-2`, `foo-3`, and so on).
 
+  - <span id="opt-stdin">[`--stdin`](#opt-stdin)</span>
+
+    Read *paths…* from the standard input.
+    Useful for chaining nix-store commands.
+
 # Operation `--realise`
 
 ## Synopsis
