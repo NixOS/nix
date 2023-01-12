@@ -124,14 +124,20 @@ cat > $flakeFollowsA/flake.nix <<EOF
     description = "Flake A";
     inputs = {
         B.url = "path:../flakeB";
+        E.flake = false;
+        E.url = "path:./foo.nix";
     };
-    outputs = { ... }: {};
+    outputs = { E, ... }: { e = import E; };
 }
 EOF
 
-git -C $flakeFollowsA add flake.nix
+echo 123 > $flakeFollowsA/foo.nix
+
+git -C $flakeFollowsA add flake.nix foo.nix
 
 nix flake lock $flakeFollowsA
+
+[[ $(nix eval --json $flakeFollowsA#e) = 123 ]]
 
 # Non-existant follows should print a warning.
 cat >$flakeFollowsA/flake.nix <<EOF

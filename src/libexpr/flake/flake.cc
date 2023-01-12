@@ -424,17 +424,24 @@ LockedFlake lockFlake(
                         ? std::optional<InputPath>(hasOverride ? std::get<2>(i->second) : inputPathPrefix)
                         : std::nullopt;
 
+                    auto resolveRelativePath = [&]() -> std::optional<SourcePath>
+                    {
+                        if (auto relativePath = input.ref->input.isRelative()) {
+                            return SourcePath {
+                                overridenSourcePath.accessor,
+                                CanonPath(*relativePath, *overridenSourcePath.path.parent())
+                            };
+                        } else
+                            return std::nullopt;
+                    };
+
                     /* Get the input flake, resolve 'path:./...'
                        flakerefs relative to the parent flake. */
                     auto getInputFlake = [&]()
                     {
-                        if (auto relativePath = input.ref->input.isRelative()) {
-                            SourcePath inputSourcePath {
-                                overridenSourcePath.accessor,
-                                CanonPath(*relativePath, *overridenSourcePath.path.parent())
-                            };
-                            return readFlake(state, *input.ref, *input.ref, *input.ref, inputSourcePath, inputPath);
-                        } else
+                        if (auto resolvedPath = resolveRelativePath())
+                            return readFlake(state, *input.ref, *input.ref, *input.ref, *resolvedPath, inputPath);
+                        else
                             return getFlake(state, *input.ref, useRegistries, inputPath);
                     };
 
@@ -575,13 +582,21 @@ LockedFlake lockFlake(
                         }
 
                         else {
-                            auto resolvedRef = maybeResolve(state, *input.ref, useRegistries);
-
-                            auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
+                            auto [path, lockedRef] = [&]() -> std::tuple<SourcePath, FlakeRef>
+                            {
+                                // Handle non-flake 'path:./...' inputs.
+                                if (auto resolvedPath = resolveRelativePath()) {
+                                    return {*resolvedPath, *input.ref};
+                                } else {
+                                    auto resolvedRef = maybeResolve(state, *input.ref, useRegistries);
+                                    auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
+                                    return {accessor->root(), lockedRef};
+                                }
+                            }();
 
                             auto childNode = make_ref<LockedNode>(lockedRef, ref, false, overridenParentPath);
 
-                            nodePaths.emplace(childNode, accessor->root());
+                            nodePaths.emplace(childNode, path);
 
                             node->inputs.insert_or_assign(id, childNode);
                         }
