@@ -3,6 +3,7 @@
 #include <cassert>
 
 #include "symbol-table.hh"
+#include "value/context.hh"
 #include "input-accessor.hh"
 
 #if HAVE_BOEHMGC
@@ -68,8 +69,6 @@ class XMLWriter;
 
 typedef int64_t NixInt;
 typedef double NixFloat;
-typedef std::pair<StorePath, std::string> NixStringContextElem;
-typedef std::vector<NixStringContextElem> NixStringContext;
 
 /* External values must descend from ExternalValueBase, so that
  * type-agnostic nix functions (e.g. showType) can be implemented

@@ -36,8 +36,8 @@ MixEvalArgs::MixEvalArgs()
         .shortName = 'I',
         .description = R"(
   Add *path* to the Nix search path. The Nix search path is
-  initialized from the colon-separated [`NIX_PATH`](./env-common.md#env-NIX_PATH) environment
-  variable, and is used to look up the location of Nix expressions using [paths](../language/values.md#type-path) enclosed in angle
+  initialized from the colon-separated [`NIX_PATH`](@docroot@/command-ref/env-common.md#env-NIX_PATH) environment
+  variable, and is used to look up the location of Nix expressions using [paths](@docroot@/language/values.md#type-path) enclosed in angle
   brackets (i.e., `<nixpkgs>`).
 
   For instance, passing

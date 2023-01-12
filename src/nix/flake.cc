@@ -7,7 +7,7 @@
 #include "get-drvs.hh"
 #include "store-api.hh"
 #include "derivations.hh"
-#include "path-with-outputs.hh"
+#include "outputs-spec.hh"
 #include "attr-path.hh"
 #include "fetchers.hh"
 #include "registry.hh"
@@ -344,7 +344,7 @@ struct CmdFlakeCheck : FlakeCommand
                 // FIXME
                 auto app = App(*state, v);
                 for (auto & i : app.context) {
-                    auto [drvPathS, outputName] = decodeContext(i);
+                    auto [drvPathS, outputName] = NixStringContextElem::parse(i);
                     store->parseStorePath(drvPathS);
                 }
                 #endif

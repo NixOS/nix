@@ -44,16 +44,32 @@ StringMap EvalState::realiseContext(const PathSet & context)
     std::vector<DerivedPath::Built> drvs;
     StringMap res;
 
-    for (auto & i : context) {
-        auto [ctx, outputName] = decodeContext(*store, i);
-        auto ctxS = store->printStorePath(ctx);
-        if (!store->isValidPath(ctx))
-            debugThrowLastTrace(InvalidPathError(store->printStorePath(ctx)));
-        if (!outputName.empty() && ctx.isDerivation()) {
-            drvs.push_back({ctx, {outputName}});
-        } else {
-            res.insert_or_assign(ctxS, ctxS);
-        }
+    for (auto & c_ : context) {
+        auto ensureValid = [&](const StorePath & p) {
+            if (!store->isValidPath(p))
+                debugThrowLastTrace(InvalidPathError(store->printStorePath(p)));
+        };
+        auto c = NixStringContextElem::parse(*store, c_);
+        std::visit(overloaded {
+            [&](const NixStringContextElem::Built & b) {
+                drvs.push_back(DerivedPath::Built {
+                    .drvPath = b.drvPath,
+                    .outputs = std::set { b.output },
+                });
+                ensureValid(b.drvPath);
+            },
+            [&](const NixStringContextElem::Opaque & o) {
+                auto ctxS = store->printStorePath(o.path);
+                res.insert_or_assign(ctxS, ctxS);
+                ensureValid(o.path);
+            },
+            [&](const NixStringContextElem::DrvDeep & d) {
+                /* Treat same as Opaque */
+                auto ctxS = store->printStorePath(d.drvPath);
+                res.insert_or_assign(ctxS, ctxS);
+                ensureValid(d.drvPath);
+            },
+        }, c.raw());
     }
 
     if (drvs.empty()) return {};
@@ -238,6 +254,7 @@ static RegisterPrimOp primop_scopedImport(RegisterPrimOp::Info {
 static RegisterPrimOp primop_import({
     .name = "import",
     .args = {"path"},
+    // TODO turn "normal path values" into link below
     .doc = R"(
       Load, parse and return the Nix expression in the file *path*. If
       *path* is a directory, the file ` default.nix ` in that directory
@@ -251,7 +268,7 @@ static RegisterPrimOp primop_import({
       >
       > Unlike some languages, `import` is a regular function in Nix.
       > Paths using the angle bracket syntax (e.g., `import` *\<foo\>*)
-      > are [normal path values](language-values.md).
+      > are normal [path values](@docroot@/language/values.md#type-path).
 
       A Nix expression loaded by `import` must not contain any *free
       variables* (identifiers that are not defined in the Nix expression
@@ -1182,35 +1199,31 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
     /* Everything in the context of the strings in the derivation
        attributes should be added as dependencies of the resulting
        derivation. */
-    for (auto & path : context) {
-
-        /* Paths marked with `=' denote that the path of a derivation
-           is explicitly passed to the builder.  Since that allows the
-           builder to gain access to every path in the dependency
-           graph of the derivation (including all outputs), all paths
-           in the graph must be added to this derivation's list of
-           inputs to ensure that they are available when the builder
-           runs. */
-        if (path.at(0) == '=') {
-            /* !!! This doesn't work if readOnlyMode is set. */
-            StorePathSet refs;
-            state.store->computeFSClosure(state.store->parseStorePath(std::string_view(path).substr(1)), refs);
-            for (auto & j : refs) {
-                drv.inputSrcs.insert(j);
-                if (j.isDerivation())
-                    drv.inputDrvs[j] = state.store->readDerivation(j).outputNames();
-            }
-        }
-
-        /* Handle derivation outputs of the form ‘!<name>!<path>’. */
-        else if (path.at(0) == '!') {
-            auto ctx = decodeContext(*state.store, path);
-            drv.inputDrvs[ctx.first].insert(ctx.second);
-        }
-
-        /* Otherwise it's a source file. */
-        else
-            drv.inputSrcs.insert(state.store->parseStorePath(path));
+    for (auto & c_ : context) {
+        auto c = NixStringContextElem::parse(*state.store, c_);
+        std::visit(overloaded {
+            /* Since this allows the builder to gain access to every
+               path in the dependency graph of the derivation (including
+               all outputs), all paths in the graph must be added to
+               this derivation's list of inputs to ensure that they are
+               available when the builder runs. */
+            [&](const NixStringContextElem::DrvDeep & d) {
+                /* !!! This doesn't work if readOnlyMode is set. */
+                StorePathSet refs;
+                state.store->computeFSClosure(d.drvPath, refs);
+                for (auto & j : refs) {
+                    drv.inputSrcs.insert(j);
+                    if (j.isDerivation())
+                        drv.inputDrvs[j] = state.store->readDerivation(j).outputNames();
+                }
+            },
+            [&](const NixStringContextElem::Built & b) {
+                drv.inputDrvs[b.drvPath].insert(b.output);
+            },
+            [&](const NixStringContextElem::Opaque & o) {
+                drv.inputSrcs.insert(o.path);
+            },
+        }, c.raw());
     }
 
     /* Do we have all required attributes? */
@@ -1891,8 +1904,7 @@ static RegisterPrimOp primop_toFile({
       path.  The file has suffix *name*. This file can be used as an
       input to derivations. One application is to write builders
       “inline”. For instance, the following Nix expression combines the
-      [Nix expression for GNU Hello](expression-syntax.md) and its
-      [build script](build-script.md) into one file:
+      Nix expression for GNU Hello and its build script into one file:
 
       ```nix
       { stdenv, fetchurl, perl }:
@@ -1936,7 +1948,7 @@ static RegisterPrimOp primop_toFile({
       ```
 
       Note that `${configFile}` is a
-      [string interpolation](language/values.md#type-string), so the result of the
+      [string interpolation](@docroot@/language/values.md#type-string), so the result of the
       expression `configFile`
       (i.e., a path like `/nix/store/m7p7jfny445k...-foo.conf`) will be
       spliced into the resulting string.

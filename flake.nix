@@ -96,6 +96,7 @@
             buildPackages.flex
             (lib.getBin buildPackages.lowdown-nix)
             buildPackages.mdbook
+            buildPackages.mdbook-linkcheck
             buildPackages.autoconf-archive
             buildPackages.autoreconfHook
             buildPackages.pkg-config
