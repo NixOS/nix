@@ -691,6 +691,13 @@ StorePathSet Installable::toDerivations(
 
 InstallablesCommand::InstallablesCommand()
 {
+
+    addFlag({
+        .longName = "stdin",
+        .description = "Read installables from the standard input.",
+        .handler = {&readFromStdIn, true}
+    });
+
     expectArgs({
         .label = "installables",
         .handler = {&_installables},
@@ -707,10 +714,18 @@ void InstallablesCommand::prepare()
 
 Installables InstallablesCommand::load()
 {
-    if (_installables.empty() && useDefaultInstallables())
+    if (_installables.empty() && useDefaultInstallables() && !readFromStdIn)
         // FIXME: commands like "nix profile install" should not have a
         // default, probably.
         _installables.push_back(".");
+
+    if (readFromStdIn && !isatty(STDIN_FILENO)) {
+        std::string word;
+        while (std::cin >> word) {
+            _installables.emplace_back(std::move(word));
+        }
+    }
+
     return parseInstallables(getStore(), _installables);
 }
 
