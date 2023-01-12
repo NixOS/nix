@@ -445,6 +445,14 @@ EOF
         #       a row for different files.
         if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
             # this backup process first released in Nix 2.1
+
+            if diff -q "$profile_target$PROFILE_BACKUP_SUFFIX" "$profile_target" > /dev/null; then
+                # a backup file for the rc-file exist, but they are identical,
+                # so we can safely ignore it and overwrite it with the same
+                # content later
+                continue
+            fi
+
             failure <<EOF
 I back up shell profile/rc scripts before I add Nix to them.
 I need to back up $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX,
