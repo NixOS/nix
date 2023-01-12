@@ -373,7 +373,22 @@ static void opQuery(Strings opFlags, Strings opArgs)
                storePaths.emplace(store->followLinksToStorePath(str));
             }
 
-            auto substitutablePaths = store->querySubstitutablePaths(storePaths);
+            StringSet pathsS;
+            // query each configured substituter
+            for (auto & sub : getDefaultSubstituters()) {
+              if (sub->storeDir != store->storeDir) continue;
+              if (!sub->wantMassQuery) continue;
+
+              auto paths = sub->queryValidPaths(StorePathSet(storePaths.begin(), storePaths.end()));
+              for (auto & path : paths) {
+                pathsS.emplace(store->printStorePath(path));
+              }
+            }
+
+            StorePathSet substitutablePaths;
+            for (auto & str : pathsS) {
+              substitutablePaths.emplace(store->followLinksToStorePath(str));
+            }
 
             for ( auto & path : storePaths) {
                 if (substitutablePaths.find(path) == substitutablePaths.end())
