@@ -618,6 +618,13 @@ public:
      */
     StorePathSet exportReferences(const StorePathSet & storePaths, const StorePathSet & inputPaths);
 
+    /**
+     * Given a store path, return the realisation actually used in the realisation of this path:
+     * - If the path is a content-addressed derivation, try to resolve it
+     * - Otherwise, find one of its derivers
+     */
+    std::optional<StorePath> getBuildDerivationPath(const StorePath &);
+
     /* Hack to allow long-running processes like hydra-queue-runner to
        occasionally flush their path info cache. */
     void clearPathInfoCache()
