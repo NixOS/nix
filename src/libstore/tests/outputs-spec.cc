@@ -1,5 +1,6 @@
 #include "outputs-spec.hh"
 
+#include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
 namespace nix {
@@ -105,6 +106,10 @@ TEST(OutputsSpec, union_names_names) {
 
 TEST_DONT_PARSE(carot_empty, "^")
 TEST_DONT_PARSE(prefix_carot_empty, "foo^")
+TEST_DONT_PARSE(garbage, "^&*()")
+TEST_DONT_PARSE(double_star, "^**")
+TEST_DONT_PARSE(star_first, "^*,foo")
+TEST_DONT_PARSE(star_second, "^foo,*")
 
 #undef TEST_DONT_PARSE
 
@@ -150,5 +155,33 @@ TEST(ExtendedOutputsSpec, many_carrot) {
     ASSERT_EQ(extendedOutputsSpec, expected);
     ASSERT_EQ(std::string { prefix } + expected.to_string(), "foo^bar^bin,out");
 }
+
+
+#define TEST_JSON(TYPE, NAME, STR, VAL)                    \
+                                                           \
+    TEST(TYPE, NAME ## _to_json) {                         \
+        using nlohmann::literals::operator "" _json;       \
+        ASSERT_EQ(                                         \
+            STR ## _json,                                  \
+            ((nlohmann::json) TYPE { VAL }));              \
+    }                                                      \
+                                                           \
+    TEST(TYPE, NAME ## _from_json) {                       \
+        using nlohmann::literals::operator "" _json;       \
+        ASSERT_EQ(                                         \
+            TYPE { VAL },                                  \
+            (STR ## _json).get<TYPE>());                   \
+    }
+
+TEST_JSON(OutputsSpec, all, R"(["*"])", OutputsSpec::All { })
+TEST_JSON(OutputsSpec, name, R"(["a"])", OutputsSpec::Names { "a" })
+TEST_JSON(OutputsSpec, names, R"(["a","b"])", (OutputsSpec::Names { "a", "b" }))
+
+TEST_JSON(ExtendedOutputsSpec, def, R"(null)", ExtendedOutputsSpec::Default { })
+TEST_JSON(ExtendedOutputsSpec, all, R"(["*"])", ExtendedOutputsSpec::Explicit { OutputsSpec::All { } })
+TEST_JSON(ExtendedOutputsSpec, name, R"(["a"])", ExtendedOutputsSpec::Explicit { OutputsSpec::Names { "a" } })
+TEST_JSON(ExtendedOutputsSpec, names, R"(["a","b"])", (ExtendedOutputsSpec::Explicit { OutputsSpec::Names { "a", "b" } }))
+
+#undef TEST_JSON
 
 }
