@@ -40,6 +40,55 @@ TEST(OutputsSpec, names_out_bin) {
     ASSERT_EQ(expected.to_string(), "bin,out");
 }
 
+#define TEST_SUBSET(X, THIS, THAT) \
+    X((OutputsSpec { THIS }).isSubsetOf(THAT));
+
+TEST(OutputsSpec, subsets_all_all) {
+    TEST_SUBSET(ASSERT_TRUE, OutputsSpec::All { }, OutputsSpec::All { });
+}
+
+TEST(OutputsSpec, subsets_names_all) {
+    TEST_SUBSET(ASSERT_TRUE, OutputsSpec::Names { "a" }, OutputsSpec::All { });
+}
+
+TEST(OutputsSpec, subsets_names_names_eq) {
+    TEST_SUBSET(ASSERT_TRUE, OutputsSpec::Names { "a" }, OutputsSpec::Names { "a" });
+}
+
+TEST(OutputsSpec, subsets_names_names_noneq) {
+    TEST_SUBSET(ASSERT_TRUE, OutputsSpec::Names { "a" }, (OutputsSpec::Names { "a", "b" }));
+}
+
+TEST(OutputsSpec, not_subsets_all_names) {
+    TEST_SUBSET(ASSERT_FALSE, OutputsSpec::All { }, OutputsSpec::Names { "a" });
+}
+
+TEST(OutputsSpec, not_subsets_names_names) {
+    TEST_SUBSET(ASSERT_FALSE, (OutputsSpec::Names { "a", "b" }), (OutputsSpec::Names { "a" }));
+}
+
+#undef TEST_SUBSET
+
+#define TEST_UNION(RES, THIS, THAT) \
+    ASSERT_EQ(OutputsSpec { RES }, (OutputsSpec { THIS }).union_(THAT));
+
+TEST(OutputsSpec, union_all_all) {
+    TEST_UNION(OutputsSpec::All { }, OutputsSpec::All { }, OutputsSpec::All { });
+}
+
+TEST(OutputsSpec, union_all_names) {
+    TEST_UNION(OutputsSpec::All { }, OutputsSpec::All { }, OutputsSpec::Names { "a" });
+}
+
+TEST(OutputsSpec, union_names_all) {
+    TEST_UNION(OutputsSpec::All { }, OutputsSpec::Names { "a" }, OutputsSpec::All { });
+}
+
+TEST(OutputsSpec, union_names_names) {
+    TEST_UNION((OutputsSpec::Names { "a", "b" }), OutputsSpec::Names { "a" }, OutputsSpec::Names { "b" });
+}
+
+#undef TEST_UNION
 
 #define TEST_DONT_PARSE(NAME, STR)                   \
     TEST(ExtendedOutputsSpec, bad_ ## NAME) {        \
