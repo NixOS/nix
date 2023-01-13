@@ -11,12 +11,7 @@ struct LogStore : public virtual Store
 
     /* Return the build log of the specified store path, if available,
        or null otherwise. */
-    std::optional<std::string> getBuildLog(const StorePath & path) {
-      auto maybePath = getBuildDerivationPath(path);
-      if (!maybePath)
-          return std::nullopt;
-      return getBuildLogExact(maybePath.value());
-    }
+    std::optional<std::string> getBuildLog(const StorePath & path);
 
     virtual std::optional<std::string> getBuildLogExact(const StorePath & path) = 0;
 
