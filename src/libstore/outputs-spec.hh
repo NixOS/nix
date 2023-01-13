@@ -49,10 +49,11 @@ struct OutputsSpec : _OutputsSpecRaw {
 
     bool contains(const std::string & output) const;
 
-    /* Modify the receiver outputs spec so it is the union of it's old value
-       and the argument. Return whether the output spec needed to be modified
-       --- if it didn't it was already "large enough". */
-    bool merge(const OutputsSpec & outputs);
+    /* Create a new OutputsSpec which is the union of this and that. */
+    OutputsSpec union_(const OutputsSpec & that) const;
+
+    /* Whether this OutputsSpec is a subset of that. */
+    bool isSubsetOf(const OutputsSpec & outputs) const;
 
     /* Parse a string of the form 'output1,...outputN' or
        '*', returning the outputs spec. */

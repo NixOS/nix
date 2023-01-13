@@ -469,20 +469,14 @@ struct InstallableAttrPath : InstallableValue
 
         // Backward compatibility hack: group results by drvPath. This
         // helps keep .all output together.
-        std::map<StorePath, DerivedPath::Built> byDrvPath;
+        std::map<StorePath, OutputsSpec> byDrvPath;
 
         for (auto & drvInfo : drvInfos) {
             auto drvPath = drvInfo.queryDrvPath();
             if (!drvPath)
                 throw Error("'%s' is not a derivation", what());
 
-            auto derivedPath = byDrvPath.emplace(*drvPath, DerivedPath::Built {
-                .drvPath = *drvPath,
-                // Not normally legal, but we will merge right below
-                .outputs = OutputsSpec::Names { StringSet { } },
-            }).first;
-
-            derivedPath->second.outputs.merge(std::visit(overloaded {
+            auto newOutputs = std::visit(overloaded {
                 [&](const ExtendedOutputsSpec::Default & d) -> OutputsSpec {
                     std::set<std::string> outputsToInstall;
                     for (auto & output : drvInfo.queryOutputs(false, true))
@@ -492,12 +486,22 @@ struct InstallableAttrPath : InstallableValue
                 [&](const ExtendedOutputsSpec::Explicit & e) -> OutputsSpec {
                     return e;
                 },
-            }, extendedOutputsSpec.raw()));
+            }, extendedOutputsSpec.raw());
+
+            auto [iter, didInsert] = byDrvPath.emplace(*drvPath, newOutputs);
+
+            if (!didInsert)
+                iter->second = iter->second.union_(newOutputs);
         }
 
         DerivedPathsWithInfo res;
-        for (auto & [_, info] : byDrvPath)
-            res.push_back({ .path = { info } });
+        for (auto & [drvPath, outputs] : byDrvPath)
+            res.push_back({
+                .path = DerivedPath::Built {
+                    .drvPath = drvPath,
+                    .outputs = outputs,
+                },
+            });
 
         return res;
     }

@@ -144,9 +144,10 @@ void DerivationGoal::work()
 
 void DerivationGoal::addWantedOutputs(const OutputsSpec & outputs)
 {
-    bool newOutputs = wantedOutputs.merge(outputs);
-    if (newOutputs)
+    auto newWanted = wantedOutputs.union_(outputs);
+    if (!newWanted.isSubsetOf(wantedOutputs))
         needRestart = true;
+    wantedOutputs = newWanted;
 }
 
 

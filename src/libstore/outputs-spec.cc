@@ -96,29 +96,49 @@ std::string ExtendedOutputsSpec::to_string() const
 }
 
 
-bool OutputsSpec::merge(const OutputsSpec & that)
+OutputsSpec OutputsSpec::union_(const OutputsSpec & that) const
 {
     return std::visit(overloaded {
-        [&](OutputsSpec::All &) {
-            /* If we already refer to all outputs, there is nothing to do. */
-            return false;
+        [&](const OutputsSpec::All &) -> OutputsSpec {
+            return OutputsSpec::All { };
         },
-        [&](OutputsSpec::Names & theseNames) {
+        [&](const OutputsSpec::Names & theseNames) -> OutputsSpec {
             return std::visit(overloaded {
-                [&](const OutputsSpec::All &) {
-                    *this = OutputsSpec::All {};
-                    return true;
+                [&](const OutputsSpec::All &) -> OutputsSpec {
+                    return OutputsSpec::All {};
                 },
-                [&](const OutputsSpec::Names & thoseNames) {
-                    bool ret = false;
-                    for (auto & i : thoseNames)
-                        if (theseNames.insert(i).second)
-                            ret = true;
+                [&](const OutputsSpec::Names & thoseNames) -> OutputsSpec {
+                    OutputsSpec::Names ret = theseNames;
+                    ret.insert(thoseNames.begin(), thoseNames.end());
                     return ret;
                 },
             }, that.raw());
         },
     }, raw());
+}
+
+
+bool OutputsSpec::isSubsetOf(const OutputsSpec & that) const
+{
+    return std::visit(overloaded {
+        [&](const OutputsSpec::All &) {
+            return true;
+        },
+        [&](const OutputsSpec::Names & thoseNames) {
+            return std::visit(overloaded {
+                [&](const OutputsSpec::All &) {
+                    return false;
+                },
+                [&](const OutputsSpec::Names & theseNames) {
+                    bool ret = true;
+                    for (auto & o : theseNames)
+                        if (thoseNames.count(o) == 0)
+                            ret = false;
+                    return ret;
+                },
+            }, raw());
+        },
+    }, that.raw());
 }
 
 }
