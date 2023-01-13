@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <optional>
 #include <set>
 #include <variant>
@@ -11,13 +12,15 @@ namespace nix {
 struct OutputNames : std::set<std::string> {
     using std::set<std::string>::set;
 
-    // These need to be "inherited manually"
+    /* These need to be "inherited manually" */
+
     OutputNames(const std::set<std::string> & s)
         : std::set<std::string>(s)
-    { }
+    { assert(!empty()); }
+
     OutputNames(std::set<std::string> && s)
         : std::set<std::string>(s)
-    { }
+    { assert(!empty()); }
 
     /* This set should always be non-empty, so we delete this
        constructor in order make creating empty ones by mistake harder.
