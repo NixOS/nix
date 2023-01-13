@@ -641,7 +641,12 @@ bool NixRepl::processLine(std::string line)
         Path drvPathRaw = state->store->printStorePath(drvPath);
 
         if (command == ":b" || command == ":bl") {
-            state->store->buildPaths({DerivedPath::Built{drvPath}});
+            state->store->buildPaths({
+                DerivedPath::Built {
+                    .drvPath = drvPath,
+                    .outputs = OutputsSpec::All { },
+                },
+            });
             auto drv = state->store->readDerivation(drvPath);
             logger->cout("\nThis derivation produced the following outputs:");
             for (auto & [outputName, outputPath] : state->store->queryDerivationOutputMap(drvPath)) {

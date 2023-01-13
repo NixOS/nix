@@ -53,7 +53,7 @@ StringMap EvalState::realiseContext(const PathSet & context)
             [&](const NixStringContextElem::Built & b) {
                 drvs.push_back(DerivedPath::Built {
                     .drvPath = b.drvPath,
-                    .outputs = std::set { b.output },
+                    .outputs = OutputsSpec::Names { b.output },
                 });
                 ensureValid(b.drvPath);
             },
@@ -84,16 +84,12 @@ StringMap EvalState::realiseContext(const PathSet & context)
     store->buildPaths(buildReqs);
 
     /* Get all the output paths corresponding to the placeholders we had */
-    for (auto & [drvPath, outputs] : drvs) {
-        const auto outputPaths = store->queryDerivationOutputMap(drvPath);
-        for (auto & outputName : outputs) {
-            auto outputPath = get(outputPaths, outputName);
-            if (!outputPath)
-                debugThrowLastTrace(Error("derivation '%s' does not have an output named '%s'",
-                    store->printStorePath(drvPath), outputName));
+    for (auto & drv : drvs) {
+        auto outputs = resolveDerivedPath(*store, drv);
+        for (auto & [outputName, outputPath] : outputs) {
             res.insert_or_assign(
-                downstreamPlaceholder(*store, drvPath, outputName),
-                store->printStorePath(*outputPath)
+                downstreamPlaceholder(*store, drv.drvPath, outputName),
+                store->printStorePath(outputPath)
             );
         }
     }

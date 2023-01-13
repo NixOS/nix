@@ -513,8 +513,12 @@ struct CmdFlakeCheck : FlakeCommand
                                     auto drvPath = checkDerivation(
                                         fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
                                         *attr2.value, attr2.pos);
-                                    if (drvPath && attr_name == settings.thisSystem.get())
-                                        drvPaths.push_back(DerivedPath::Built{*drvPath});
+                                    if (drvPath && attr_name == settings.thisSystem.get()) {
+                                        drvPaths.push_back(DerivedPath::Built {
+                                            .drvPath = *drvPath,
+                                            .outputs = OutputsSpec::All { },
+                                        });
+                                    }
                                 }
                             }
                         }

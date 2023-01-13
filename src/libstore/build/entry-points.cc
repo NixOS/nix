@@ -80,7 +80,7 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
     BuildMode buildMode)
 {
     Worker worker(*this, *this);
-    auto goal = worker.makeBasicDerivationGoal(drvPath, drv, {}, buildMode);
+    auto goal = worker.makeBasicDerivationGoal(drvPath, drv, OutputsSpec::All {}, buildMode);
 
     try {
         worker.run(Goals{goal});
@@ -89,7 +89,10 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
         return BuildResult {
             .status = BuildResult::MiscFailure,
             .errorMsg = e.msg(),
-            .path = DerivedPath::Built { .drvPath = drvPath },
+            .path = DerivedPath::Built {
+                .drvPath = drvPath,
+                .outputs = OutputsSpec::All { },
+            },
         };
     };
 }
@@ -130,7 +133,8 @@ void LocalStore::repairPath(const StorePath & path)
         auto info = queryPathInfo(path);
         if (info->deriver && isValidPath(*info->deriver)) {
             goals.clear();
-            goals.insert(worker.makeDerivationGoal(*info->deriver, StringSet(), bmRepair));
+            // FIXME: Should just build the specific output we need.
+            goals.insert(worker.makeDerivationGoal(*info->deriver, OutputsSpec::All { }, bmRepair));
             worker.run(goals);
         } else
             throw Error(worker.exitStatus(), "cannot repair path '%s'", printStorePath(path));

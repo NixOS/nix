@@ -2735,7 +2735,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             signRealisation(thisRealisation);
             worker.store.registerDrvOutput(thisRealisation);
         }
-        if (wantOutput(outputName, wantedOutputs))
+        if (wantedOutputs.contains(outputName))
             builtOutputs.emplace(thisRealisation.id, thisRealisation);
     }
 
