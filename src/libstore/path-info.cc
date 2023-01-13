@@ -3,6 +3,21 @@
 
 namespace nix {
 
+StorePathSet ValidPathInfo::referencesPossiblyToSelf() const
+{
+    return references.possiblyToSelf(path);
+}
+
+void ValidPathInfo::insertReferencePossiblyToSelf(StorePath && ref)
+{
+    return references.insertPossiblyToSelf(path, std::move(ref));
+}
+
+void ValidPathInfo::setReferencesPossiblyToSelf(StorePathSet && refs)
+{
+    return references.setPossiblyToSelf(path, std::move(refs));
+}
+
 ValidPathInfo ValidPathInfo::read(Source & source, const Store & store, unsigned int format)
 {
     return read(source, store, format, store.parseStorePath(readString(source)));
