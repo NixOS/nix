@@ -2523,10 +2523,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 auto narHashAndSize = hashPath(htSHA256, actualPath);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
-                auto refs = rewriteRefs();
-                newInfo0.references = std::move(refs.others);
-                if (refs.self)
-                    newInfo0.references.insert(newInfo0.path);
+                newInfo0.references = rewriteRefs();
                 return newInfo0;
             },
 
@@ -2777,12 +2774,12 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
                 auto i = outputsByPath.find(worker.store.printStorePath(path));
                 if (i != outputsByPath.end()) {
                     closureSize += i->second.narSize;
-                    for (auto & ref : i->second.references)
+                    for (auto & ref : i->second.referencesPossiblyToSelf())
                         pathsLeft.push(ref);
                 } else {
                     auto info = worker.store.queryPathInfo(path);
                     closureSize += info->narSize;
-                    for (auto & ref : info->references)
+                    for (auto & ref : info->referencesPossiblyToSelf())
                         pathsLeft.push(ref);
                 }
             }
@@ -2822,7 +2819,7 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
 
                 auto used = recursive
                     ? getClosure(info.path).first
-                    : info.references;
+                    : info.referencesPossiblyToSelf();
 
                 if (recursive && checks.ignoreSelfRefs)
                     used.erase(info.path);

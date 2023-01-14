@@ -12,7 +12,7 @@ std::string ValidPathInfo::fingerprint(const Store & store) const
         "1;" + store.printStorePath(path) + ";"
         + narHash.to_string(Base32, true) + ";"
         + std::to_string(narSize) + ";"
-        + concatStringsSep(",", store.printStorePathSet(references));
+        + concatStringsSep(",", store.printStorePathSet(referencesPossiblyToSelf()));
 }
 
 
@@ -30,25 +30,16 @@ std::optional<StorePathDescriptor> ValidPathInfo::fullStorePathDescriptorOpt() c
         .name = std::string { path.name() },
         .info = std::visit(overloaded {
             [&](const TextHash & th) -> ContentAddressWithReferences {
-                assert(references.count(path) == 0);
+                assert(!references.self);
                 return TextInfo {
                     th,
-                    .references = references,
+                    .references = references.others,
                 };
             },
             [&](const FixedOutputHash & foh) -> ContentAddressWithReferences {
-                auto refs = references;
-                bool hasSelfReference = false;
-                if (refs.count(path)) {
-                    hasSelfReference = true;
-                    refs.erase(path);
-                }
                 return FixedOutputInfo {
                     foh,
-                    .references = {
-                        .others = std::move(refs),
-                        .self = hasSelfReference,
-                    },
+                    .references = references,
                 };
             },
         }, *ca),
@@ -94,7 +85,7 @@ bool ValidPathInfo::checkSignature(const Store & store, const PublicKeys & publi
 Strings ValidPathInfo::shortRefs() const
 {
     Strings refs;
-    for (auto & r : references)
+    for (auto & r : referencesPossiblyToSelf())
         refs.push_back(std::string(r.to_string()));
     return refs;
 }
@@ -109,16 +100,33 @@ ValidPathInfo::ValidPathInfo(
 {
     std::visit(overloaded {
         [this](TextInfo && ti) {
-            this->references = std::move(ti.references);
+            this->references = {
+                .others = std::move(ti.references),
+                .self = false,
+            };
             this->ca = std::move((TextHash &&) ti);
         },
         [this](FixedOutputInfo && foi) {
-            this->references = std::move(foi.references.others);
-            if (foi.references.self)
-                this->references.insert(path);
+            this->references = std::move(foi.references);
             this->ca = std::move((FixedOutputHash &&) foi);
         },
     }, std::move(info.info));
+}
+
+
+StorePathSet ValidPathInfo::referencesPossiblyToSelf() const
+{
+    return references.possiblyToSelf(path);
+}
+
+void ValidPathInfo::insertReferencePossiblyToSelf(StorePath && ref)
+{
+    return references.insertPossiblyToSelf(path, std::move(ref));
+}
+
+void ValidPathInfo::setReferencesPossiblyToSelf(StorePathSet && refs)
+{
+    return references.setPossiblyToSelf(path, std::move(refs));
 }
 
 
@@ -133,7 +141,7 @@ ValidPathInfo ValidPathInfo::read(Source & source, const Store & store, unsigned
     auto narHash = Hash::parseAny(readString(source), htSHA256);
     ValidPathInfo info(path, narHash);
     if (deriver != "") info.deriver = store.parseStorePath(deriver);
-    info.references = worker_proto::read(store, source, Phantom<StorePathSet> {});
+    info.setReferencesPossiblyToSelf(worker_proto::read(store, source, Phantom<StorePathSet> {}));
     source >> info.registrationTime >> info.narSize;
     if (format >= 16) {
         source >> info.ultimate;
@@ -154,7 +162,7 @@ void ValidPathInfo::write(
         sink << store.printStorePath(path);
     sink << (deriver ? store.printStorePath(*deriver) : "")
          << narHash.to_string(Base16, false);
-    worker_proto::write(store, sink, references);
+    worker_proto::write(store, sink, referencesPossiblyToSelf());
     sink << registrationTime << narSize;
     if (format >= 16) {
         sink << ultimate

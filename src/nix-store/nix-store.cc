@@ -263,7 +263,7 @@ static void printTree(const StorePath & path,
        closure(B).  That is, if derivation A is an (possibly indirect)
        input of B, then A is printed first.  This has the effect of
        flattening the tree, preventing deeply nested structures.  */
-    auto sorted = store->topoSortPaths(info->references);
+    auto sorted = store->topoSortPaths(info->referencesPossiblyToSelf());
     reverse(sorted.begin(), sorted.end());
 
     for (const auto &[n, i] : enumerate(sorted)) {
@@ -344,7 +344,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 for (auto & j : ps) {
                     if (query == qRequisites) store->computeFSClosure(j, paths, false, includeOutputs);
                     else if (query == qReferences) {
-                        for (auto & p : store->queryPathInfo(j)->references)
+                        for (auto & p : store->queryPathInfo(j)->referencesPossiblyToSelf())
                             paths.insert(p);
                     }
                     else if (query == qReferrers) {
@@ -867,7 +867,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                         auto info = store->queryPathInfo(i);
                         out << store->printStorePath(info->path)
                             << (info->deriver ? store->printStorePath(*info->deriver) : "");
-                        worker_proto::write(*store, out, info->references);
+                        worker_proto::write(*store, out, info->referencesPossiblyToSelf());
                         // !!! Maybe we want compression?
                         out << info->narSize // downloadSize
                             << info->narSize;
@@ -964,7 +964,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 };
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.references = worker_proto::read(*store, in, Phantom<StorePathSet> {});
+                info.setReferencesPossiblyToSelf(worker_proto::read(*store, in, Phantom<StorePathSet> {}));
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
                 info.ca = parseContentAddressOpt(readString(in));

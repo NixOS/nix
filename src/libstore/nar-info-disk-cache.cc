@@ -248,7 +248,7 @@ public:
             narInfo->fileSize = queryNAR.getInt(5);
             narInfo->narSize = queryNAR.getInt(7);
             for (auto & r : tokenizeString<Strings>(queryNAR.getStr(8), " "))
-                narInfo->references.insert(StorePath(r));
+                narInfo->insertReferencePossiblyToSelf(StorePath(r));
             if (!queryNAR.isNull(9))
                 narInfo->deriver = StorePath(queryNAR.getStr(9));
             for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(10), " "))

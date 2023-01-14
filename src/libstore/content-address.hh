@@ -4,6 +4,7 @@
 #include "hash.hh"
 #include "path.hh"
 #include "comparator.hh"
+#include "reference-set.hh"
 
 namespace nix {
 
@@ -94,15 +95,7 @@ Hash getContentAddressHash(const ContentAddress & ca);
  * References set
  */
 
-struct StoreReferences {
-    StorePathSet others;
-    bool self = false;
-
-    bool empty() const;
-    size_t size() const;
-
-    GENERATE_CMP(StoreReferences, me->self, me->others);
-};
+typedef References<StorePath> StoreReferences;
 
 /*
  * Full content address
