@@ -20,7 +20,7 @@ rec {
     name = "text-hashed-root.drv";
     buildCommand = ''
       echo "Copying the derivation"
-      cp ${root.drvPath} $out
+      cp ${builtins.unsafeDiscardOutputDependency root.drvPath} $out
     '';
     __contentAddressed = true;
     outputHashMode = "text";
