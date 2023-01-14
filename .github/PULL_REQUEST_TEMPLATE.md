@@ -1,22 +1,25 @@
-##### Motivation for the changes
+# Motivation
+<!-- Briefly explain what the change is about and why it is desirable. -->
 
-<!-- An issue reference or explanation why the change is desirable. -->
-<!-- This speeds up step 1 of the process. -->
+# Context
+<!-- Provide context. Reference open issues if available. -->
 
+<!-- Non-trivial change: Briefly outline the implementation strategy. -->
 
+<!-- Invasive change: Discuss alternative designs or approaches you considered. -->
 
+<!-- Large change: Provide instructions to reviewers how to read the diff. -->
 
-
-
-##### Checklist for maintainers
+# Checklist for maintainers
 
 <!-- Contributors: please leave this as is -->
 <!-- Maintainers: tick if completed or explain if not relevant -->
 
- - [ ] is the idea good? has it been discussed by the Nix team?
+ - [ ] agreed on idea
+ - [ ] agreed on implementation strategy
  - [ ] unit tests
  - [ ] functional tests (`tests/**.sh`)
  - [ ] documentation in the manual
- - [ ] documentation in the code (if necessary; ideally code is already clear)
- - [ ] documentation in the commit message (why was this change made? for future reference when maintaining the code)
- - [ ] documentation in the changelog (to announce features and fixes to existing users who might have to do something to finally solve their problem, and to summarize the development history)
+ - [ ] code and comments are self-explanatory
+ - [ ] commit message explains why the change was made
+ - [ ] new feature or bug fix: updated release notes
