@@ -165,8 +165,9 @@ void PathSubstitutionGoal::tryNext()
 
     /* To maintain the closure invariant, we first have to realise the
        paths referenced by this one. */
-    for (auto & i : info->references.others)
-        addWaitee(worker.makePathSubstitutionGoal(i));
+    for (auto & i : info->references)
+        if (i != storePath) /* ignore self-references */
+            addWaitee(worker.makePathSubstitutionGoal(i));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
         referencesValid();
@@ -187,8 +188,9 @@ void PathSubstitutionGoal::referencesValid()
         return;
     }
 
-    for (auto & i : info->references.others)
-        assert(worker.store.isValidPath(i));
+    for (auto & i : info->references)
+        if (i != storePath) /* ignore self-references */
+            assert(worker.store.isValidPath(i));
 
     state = &PathSubstitutionGoal::tryToRun;
     worker.wakeUp(shared_from_this());

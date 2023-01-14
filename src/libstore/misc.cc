@@ -40,8 +40,9 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
                         std::future<ref<const ValidPathInfo>> & fut) {
             StorePathSet res;
             auto info = fut.get();
-            for (auto & ref : info->references.others)
-                res.insert(ref);
+            for (auto & ref : info->references)
+                if (ref != path)
+                    res.insert(ref);
 
             if (includeOutputs && path.isDerivation())
                 for (auto & [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
@@ -223,7 +224,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
                 state->narSize += info->second.narSize;
             }
 
-            for (auto & ref : info->second.references.others)
+            for (auto & ref : info->second.references)
                 pool.enqueue(std::bind(doPath, DerivedPath::Opaque { ref }));
           },
         }, req.raw());
@@ -241,7 +242,7 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
     return topoSort(paths,
         {[&](const StorePath & path) {
             try {
-                return queryPathInfo(path)->references.others;
+                return queryPathInfo(path)->references;
             } catch (InvalidPath &) {
                 return StorePathSet();
             }
@@ -297,7 +298,7 @@ std::map<DrvOutput, StorePath> drvOutputReferences(
 
     auto info = store.queryPathInfo(outputPath);
 
-    return drvOutputReferences(Realisation::closure(store, inputRealisations), info->referencesPossiblyToSelf());
+    return drvOutputReferences(Realisation::closure(store, inputRealisations), info->references);
 }
 
 OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd, Store * evalStore_)

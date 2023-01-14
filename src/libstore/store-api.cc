@@ -200,7 +200,10 @@ StorePath Store::makeTextPath(std::string_view name, const TextInfo & info) cons
 {
     assert(info.hash.type == htSHA256);
     return makeStorePath(
-        makeType(*this, "text", StoreReferences { info.references }),
+        makeType(*this, "text", StoreReferences {
+            .others = info.references,
+            .self = false,
+        }),
         info.hash,
         name);
 }
@@ -310,7 +313,7 @@ void Store::addMultipleToStore(
             bytesExpected += info.narSize;
             act.setExpected(actCopyPath, bytesExpected);
 
-            return info.references.others;
+            return info.references;
         },
 
         [&](const StorePath & path) {
@@ -815,7 +818,7 @@ std::string Store::makeValidityRegistration(const StorePathSet & paths,
 
         s += (format("%1%\n") % info->references.size()).str();
 
-        for (auto & j : info->referencesPossiblyToSelf())
+        for (auto & j : info->references)
             s += printStorePath(j) + "\n";
     }
 
@@ -877,7 +880,7 @@ json Store::pathInfoToJSON(const StorePathSet & storePaths,
 
             {
                 auto& jsonRefs = (jsonPath["references"] = json::array());
-                for (auto & ref : info->referencesPossiblyToSelf())
+                for (auto & ref : info->references)
                     jsonRefs.emplace_back(printStorePath(ref));
             }
 
@@ -1205,7 +1208,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istre
     if (!n) throw Error("number expected");
     while ((*n)--) {
         getline(str, s);
-        info.insertReferencePossiblyToSelf(store.parseStorePath(s));
+        info.references.insert(store.parseStorePath(s));
     }
     if (!str || str.eof()) throw Error("missing input");
     return std::optional<ValidPathInfo>(std::move(info));
@@ -1227,6 +1230,7 @@ std::string showPaths(const PathSet & paths)
 {
     return concatStringsSep(", ", quoteStrings(paths));
 }
+
 
 Derivation Store::derivationFromPath(const StorePath & drvPath)
 {

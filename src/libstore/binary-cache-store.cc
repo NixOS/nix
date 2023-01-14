@@ -180,11 +180,11 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
         duration);
 
     /* Verify that all references are valid. This may do some .narinfo
-       reads, but typically they'll already be cached. Note that
-       self-references are always valid. */
-    for (auto & ref : info.references.others)
+       reads, but typically they'll already be cached. */
+    for (auto & ref : info.references)
         try {
-            queryPathInfo(ref);
+            if (ref != info.path)
+                queryPathInfo(ref);
         } catch (InvalidPath &) {
             throw Error("cannot add '%s' to the binary cache because the reference '%s' is not valid",
                 printStorePath(info.path), printStorePath(ref));
