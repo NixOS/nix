@@ -49,7 +49,7 @@ struct CmdLog : InstallableCommand
                 [&](const DerivedPath::Built & bfd) {
                     return logSub.getBuildLog(bfd.drvPath);
                 },
-            }, b.raw());
+            }, b.path.raw());
             if (!log) continue;
             stopProgressBar();
             printInfo("got build log for '%s' from '%s'", installable->what(), logSub.getUri());

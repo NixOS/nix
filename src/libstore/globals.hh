@@ -676,7 +676,7 @@ public:
           - the store object is signed by one of the [`trusted-public-keys`](#conf-trusted-public-keys)
           - the substituter is in the [`trusted-substituters`](#conf-trusted-substituters) list
           - the [`require-sigs`](#conf-require-sigs) option has been set to `false`
-          - the store object is [output-addressed](glossary.md#gloss-output-addressed-store-object)
+          - the store object is [output-addressed](@docroot@/glossary.md#gloss-output-addressed-store-object)
         )",
         {"binary-caches"}};
 

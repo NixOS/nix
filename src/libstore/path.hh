@@ -65,7 +65,6 @@ public:
 
 typedef std::set<StorePath> StorePathSet;
 typedef std::vector<StorePath> StorePaths;
-typedef std::map<std::string, StorePath> OutputPathMap;
 
 /* Extension of derivations in the Nix store. */
 const std::string drvExtension = ".drv";

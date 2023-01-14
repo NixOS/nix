@@ -7,7 +7,7 @@
 #include "get-drvs.hh"
 #include "store-api.hh"
 #include "derivations.hh"
-#include "path-with-outputs.hh"
+#include "outputs-spec.hh"
 #include "attr-path.hh"
 #include "fetchers.hh"
 #include "registry.hh"
@@ -348,7 +348,7 @@ struct CmdFlakeCheck : FlakeCommand
                 // FIXME
                 auto app = App(*state, v);
                 for (auto & i : app.context) {
-                    auto [drvPathS, outputName] = decodeContext(i);
+                    auto [drvPathS, outputName] = NixStringContextElem::parse(i);
                     store->parseStorePath(drvPathS);
                 }
                 #endif
@@ -513,8 +513,12 @@ struct CmdFlakeCheck : FlakeCommand
                                     auto drvPath = checkDerivation(
                                         fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
                                         *attr2.value, attr2.pos);
-                                    if (drvPath && attr_name == settings.thisSystem.get())
-                                        drvPaths.push_back(DerivedPath::Built{*drvPath});
+                                    if (drvPath && attr_name == settings.thisSystem.get()) {
+                                        drvPaths.push_back(DerivedPath::Built {
+                                            .drvPath = *drvPath,
+                                            .outputs = OutputsSpec::All { },
+                                        });
+                                    }
                                 }
                             }
                         }

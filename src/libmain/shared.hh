@@ -39,7 +39,6 @@ void printVersion(const std::string & programName);
 void printGCWarning();
 
 class Store;
-struct StorePathWithOutputs;
 
 void printMissing(
     ref<Store> store,
