@@ -137,7 +137,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info->deriver = parseStorePath(deriver);
-            info->setReferencesPossiblyToSelf(worker_proto::read(*this, conn->from, Phantom<StorePathSet> {}));
+            info->references = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
             readLongLong(conn->from); // download size
             info->narSize = readLongLong(conn->from);
 
@@ -171,7 +171,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
                 << printStorePath(info.path)
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << info.narHash.to_string(Base16, false);
-            worker_proto::write(*this, conn->to, info.referencesPossiblyToSelf());
+            worker_proto::write(*this, conn->to, info.references);
             conn->to
                 << info.registrationTime
                 << info.narSize
@@ -200,7 +200,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             conn->to
                 << exportMagic
                 << printStorePath(info.path);
-            worker_proto::write(*this, conn->to, info.referencesPossiblyToSelf());
+            worker_proto::write(*this, conn->to, info.references);
             conn->to
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << 0
@@ -278,7 +278,12 @@ public:
 
         conn->to.flush();
 
-        BuildResult status { .path = DerivedPath::Built { .drvPath = drvPath } };
+        BuildResult status {
+            .path = DerivedPath::Built {
+                .drvPath = drvPath,
+                .outputs = OutputsSpec::All { },
+            },
+        };
         status.status = (BuildResult::Status) readInt(conn->from);
         conn->from >> status.errorMsg;
 

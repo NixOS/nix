@@ -200,7 +200,10 @@ StorePath Store::makeTextPath(std::string_view name, const TextInfo & info) cons
 {
     assert(info.hash.type == htSHA256);
     return makeStorePath(
-        makeType(*this, "text", StoreReferences { info.references }),
+        makeType(*this, "text", StoreReferences {
+            .others = info.references,
+            .self = false,
+        }),
         info.hash,
         name);
 }
@@ -310,7 +313,7 @@ void Store::addMultipleToStore(
             bytesExpected += info.narSize;
             act.setExpected(actCopyPath, bytesExpected);
 
-            return info.references.others;
+            return info.references;
         },
 
         [&](const StorePath & path) {
@@ -815,7 +818,7 @@ std::string Store::makeValidityRegistration(const StorePathSet & paths,
 
         s += (format("%1%\n") % info->references.size()).str();
 
-        for (auto & j : info->referencesPossiblyToSelf())
+        for (auto & j : info->references)
             s += printStorePath(j) + "\n";
     }
 
@@ -877,7 +880,7 @@ json Store::pathInfoToJSON(const StorePathSet & storePaths,
 
             {
                 auto& jsonRefs = (jsonPath["references"] = json::array());
-                for (auto & ref : info->referencesPossiblyToSelf())
+                for (auto & ref : info->references)
                     jsonRefs.emplace_back(printStorePath(ref));
             }
 
@@ -1205,7 +1208,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istre
     if (!n) throw Error("number expected");
     while ((*n)--) {
         getline(str, s);
-        info.insertReferencePossiblyToSelf(store.parseStorePath(s));
+        info.references.insert(store.parseStorePath(s));
     }
     if (!str || str.eof()) throw Error("missing input");
     return std::optional<ValidPathInfo>(std::move(info));
@@ -1228,131 +1231,6 @@ std::string showPaths(const PathSet & paths)
     return concatStringsSep(", ", quoteStrings(paths));
 }
 
-StorePathSet ValidPathInfo::referencesPossiblyToSelf() const
-{
-    return references.possiblyToSelf(path);
-}
-
-void ValidPathInfo::insertReferencePossiblyToSelf(StorePath && ref)
-{
-    return references.insertPossiblyToSelf(path, std::move(ref));
-}
-
-void ValidPathInfo::setReferencesPossiblyToSelf(StorePathSet && refs)
-{
-    return references.setPossiblyToSelf(path, std::move(refs));
-}
-
-std::string ValidPathInfo::fingerprint(const Store & store) const
-{
-    if (narSize == 0)
-        throw Error("cannot calculate fingerprint of path '%s' because its size is not known",
-            store.printStorePath(path));
-    return
-        "1;" + store.printStorePath(path) + ";"
-        + narHash.to_string(Base32, true) + ";"
-        + std::to_string(narSize) + ";"
-        + concatStringsSep(",", store.printStorePathSet(referencesPossiblyToSelf()));
-}
-
-
-void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
-{
-    sigs.insert(secretKey.signDetached(fingerprint(store)));
-}
-
-std::optional<StorePathDescriptor> ValidPathInfo::fullStorePathDescriptorOpt() const
-{
-    if (! ca)
-        return std::nullopt;
-
-    return StorePathDescriptor {
-        .name = std::string { path.name() },
-        .info = std::visit(overloaded {
-            [&](const TextHash & th) -> ContentAddressWithReferences {
-                assert(!references.self);
-                return TextInfo {
-                    th,
-                    .references = references.others,
-                };
-            },
-            [&](const FixedOutputHash & foh) -> ContentAddressWithReferences {
-                return FixedOutputInfo {
-                    foh,
-                    .references = references,
-                };
-            },
-        }, *ca),
-    };
-}
-
-bool ValidPathInfo::isContentAddressed(const Store & store) const
-{
-    auto fullCaOpt = fullStorePathDescriptorOpt();
-
-    if (! fullCaOpt)
-        return false;
-
-    auto caPath = store.makeFixedOutputPathFromCA(*fullCaOpt);
-
-    bool res = caPath == path;
-
-    if (!res)
-        printError("warning: path '%s' claims to be content-addressed but isn't", store.printStorePath(path));
-
-    return res;
-}
-
-
-size_t ValidPathInfo::checkSignatures(const Store & store, const PublicKeys & publicKeys) const
-{
-    if (isContentAddressed(store)) return maxSigs;
-
-    size_t good = 0;
-    for (auto & sig : sigs)
-        if (checkSignature(store, publicKeys, sig))
-            good++;
-    return good;
-}
-
-
-bool ValidPathInfo::checkSignature(const Store & store, const PublicKeys & publicKeys, const std::string & sig) const
-{
-    return verifyDetached(fingerprint(store), sig, publicKeys);
-}
-
-
-Strings ValidPathInfo::shortRefs() const
-{
-    Strings refs;
-    for (auto & r : referencesPossiblyToSelf())
-        refs.push_back(std::string(r.to_string()));
-    return refs;
-}
-
-
-ValidPathInfo::ValidPathInfo(
-    const Store & store,
-    StorePathDescriptor && info,
-    Hash narHash)
-      : path(store.makeFixedOutputPathFromCA(info))
-      , narHash(narHash)
-{
-    std::visit(overloaded {
-        [this](TextInfo && ti) {
-            this->references = {
-                .others = std::move(ti.references),
-                .self = false,
-            };
-            this->ca = std::move((TextHash &&) ti);
-        },
-        [this](FixedOutputInfo && foi) {
-            this->references = std::move(foi.references);
-            this->ca = std::move((FixedOutputHash &&) foi);
-        },
-    }, std::move(info.info));
-}
-
 
 Derivation Store::derivationFromPath(const StorePath & drvPath)
 {
@@ -1370,6 +1248,34 @@ Derivation readDerivationCommon(Store& store, const StorePath& drvPath, bool req
     } catch (FormatError & e) {
         throw Error("error parsing derivation '%s': %s", store.printStorePath(drvPath), e.msg());
     }
+}
+
+std::optional<StorePath> Store::getBuildDerivationPath(const StorePath & path)
+{
+
+    if (!path.isDerivation()) {
+        try {
+            auto info = queryPathInfo(path);
+            if (!info->deriver) return std::nullopt;
+            return *info->deriver;
+        } catch (InvalidPath &) {
+            return std::nullopt;
+        }
+    }
+
+    if (!settings.isExperimentalFeatureEnabled(Xp::CaDerivations) || !isValidPath(path))
+        return path;
+
+    auto drv = readDerivation(path);
+    if (!drv.type().hasKnownOutputPaths()) {
+        // The build log is actually attached to the corresponding
+        // resolved derivation, so we need to get it first
+        auto resolvedDrv = drv.tryResolve(*this);
+        if (resolvedDrv)
+            return writeDerivation(*this, *resolvedDrv, NoRepair, true);
+    }
+
+    return path;
 }
 
 Derivation Store::readDerivation(const StorePath & drvPath)

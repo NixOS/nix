@@ -110,7 +110,7 @@ SV * queryPathInfo(char * path, int base32)
             mXPUSHi(info->registrationTime);
             mXPUSHi(info->narSize);
             AV * refs = newAV();
-            for (auto & i : info->referencesPossiblyToSelf())
+            for (auto & i : info->references)
                 av_push(refs, newSVpv(store()->printStorePath(i).c_str(), 0));
             XPUSHs(sv_2mortal(newRV((SV *) refs)));
             AV * sigs = newAV();

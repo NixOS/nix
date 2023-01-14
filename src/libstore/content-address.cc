@@ -208,6 +208,16 @@ Hash getContentAddressHash(const ContentAddress & ca)
     }, ca);
 }
 
+bool StoreReferences::empty() const
+{
+    return !self && others.empty();
+}
+
+size_t StoreReferences::size() const
+{
+    return (self ? 1 : 0) + others.size();
+}
+
 ContentAddressWithReferences caWithoutRefs(const ContentAddress & ca) {
     return std::visit(overloaded {
         [&](const TextHash & h) -> ContentAddressWithReferences {

@@ -686,12 +686,6 @@ std::map<std::string, Hash> staticOutputHashes(Store & store, const Derivation &
 }
 
 
-bool wantOutput(const std::string & output, const std::set<std::string> & wanted)
-{
-    return wanted.empty() || wanted.find(output) != wanted.end();
-}
-
-
 static DerivationOutput readDerivationOutput(Source & in, const Store & store)
 {
     const auto pathS = readString(in);

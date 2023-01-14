@@ -45,7 +45,7 @@ void Store::exportPath(const StorePath & path, Sink & sink)
     teeSink
         << exportMagic
         << printStorePath(path);
-    worker_proto::write(*this, teeSink, info->referencesPossiblyToSelf());
+    worker_proto::write(*this, teeSink, info->references);
     teeSink
         << (info->deriver ? printStorePath(*info->deriver) : "")
         << 0;
@@ -80,7 +80,7 @@ StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
         ValidPathInfo info { path, narHash };
         if (deriver != "")
             info.deriver = parseStorePath(deriver);
-        info.setReferencesPossiblyToSelf(std::move(references));
+        info.references = references;
         info.narSize = saved.s.size();
 
         // Ignore optional legacy signature.

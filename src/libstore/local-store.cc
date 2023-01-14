@@ -938,8 +938,7 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
     auto useQueryReferences(state.stmts->QueryReferences.use()(info->id));
 
     while (useQueryReferences.next())
-        info->insertReferencePossiblyToSelf(
-            parseStorePath(useQueryReferences.getStr(0)));
+        info->references.insert(parseStorePath(useQueryReferences.getStr(0)));
 
     return info;
 }
@@ -1206,7 +1205,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 
         for (auto & [_, i] : infos) {
             auto referrer = queryValidPathId(*state, i.path);
-            for (auto & j : i.referencesPossiblyToSelf())
+            for (auto & j : i.references)
                 state->stmts->AddReference.use()(referrer)(queryValidPathId(*state, j)).exec();
         }
 
@@ -1227,7 +1226,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         topoSort(paths,
             {[&](const StorePath & path) {
                 auto i = infos.find(path);
-                return i == infos.end() ? StorePathSet() : i->second.references.others;
+                return i == infos.end() ? StorePathSet() : i->second.references;
             }},
             {[&](const StorePath & path, const StorePath & parent) {
                 return BuildError(
@@ -1525,8 +1524,7 @@ StorePath LocalStore::addTextToStore(
 
             ValidPathInfo info { dstPath, narHash };
             info.narSize = sink.s.size();
-            // No self reference allowed with text-hashing
-            info.references.others = references;
+            info.references = references;
             info.ca = TextHash { .hash = hash };
             registerValidPath(info);
         }

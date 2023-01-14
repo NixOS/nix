@@ -294,8 +294,6 @@ typedef std::map<StorePath, DrvHash> DrvHashes;
 // FIXME: global, though at least thread-safe.
 extern Sync<DrvHashes> drvHashes;
 
-bool wantOutput(const std::string & output, const std::set<std::string> & wanted);
-
 struct Source;
 struct Sink;
 

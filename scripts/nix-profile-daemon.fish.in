@@ -1,3 +1,15 @@
+function add_path --argument-names new_path
+    if type -q fish_add_path
+        # fish 3.2.0 or newer
+	fish_add_path --prepend --global $new_path
+    else
+        # older versions of fish
+        if not contains $new_path $fish_user_paths
+            set --global fish_user_paths $new_path $fish_user_paths
+        end
+    end
+end
+
 # Only execute this file once per shell.
 if test -n "$__ETC_PROFILE_NIX_SOURCED"
   exit
@@ -31,5 +43,7 @@ else
   end
 end
 
-fish_add_path --prepend --global "@localstatedir@/nix/profiles/default/bin"
-fish_add_path --prepend --global "$HOME/.nix-profile/bin"
+add_path "@localstatedir@/nix/profiles/default/bin"
+add_path "$HOME/.nix-profile/bin"
+
+functions -e add_path

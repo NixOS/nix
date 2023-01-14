@@ -3,6 +3,7 @@
 #include "util.hh"
 #include "path.hh"
 #include "realisation.hh"
+#include "outputs-spec.hh"
 
 #include <optional>
 #include <variant>
@@ -45,7 +46,7 @@ struct DerivedPathOpaque {
  */
 struct DerivedPathBuilt {
     StorePath drvPath;
-    std::set<std::string> outputs;
+    OutputsSpec outputs;
 
     std::string to_string(const Store & store) const;
     static DerivedPathBuilt parse(const Store & store, std::string_view, std::string_view);

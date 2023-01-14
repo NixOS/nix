@@ -180,11 +180,11 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
         duration);
 
     /* Verify that all references are valid. This may do some .narinfo
-       reads, but typically they'll already be cached. Note that
-       self-references are always valid. */
-    for (auto & ref : info.references.others)
+       reads, but typically they'll already be cached. */
+    for (auto & ref : info.references)
         try {
-            queryPathInfo(ref);
+            if (ref != info.path)
+                queryPathInfo(ref);
         } catch (InvalidPath &) {
             throw Error("cannot add '%s' to the binary cache because the reference '%s' is not valid",
                 printStorePath(info.path), printStorePath(ref));
@@ -530,22 +530,9 @@ void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSe
     writeNarInfo(narInfo);
 }
 
-std::optional<std::string> BinaryCacheStore::getBuildLog(const StorePath & path)
+std::optional<std::string> BinaryCacheStore::getBuildLogExact(const StorePath & path)
 {
-    auto drvPath = path;
-
-    if (!path.isDerivation()) {
-        try {
-            auto info = queryPathInfo(path);
-            // FIXME: add a "Log" field to .narinfo
-            if (!info->deriver) return std::nullopt;
-            drvPath = *info->deriver;
-        } catch (InvalidPath &) {
-            return std::nullopt;
-        }
-    }
-
-    auto logPath = "log/" + std::string(baseNameOf(printStorePath(drvPath)));
+    auto logPath = "log/" + std::string(baseNameOf(printStorePath(path)));
 
     debug("fetching build log from binary cache '%s/%s'", getUri(), logPath);
 

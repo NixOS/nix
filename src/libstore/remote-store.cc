@@ -402,7 +402,7 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info.deriver = parseStorePath(deriver);
-            info.references.setPossiblyToSelf(i.first, worker_proto::read(*this, conn->from, Phantom<StorePathSet> {}));
+            info.references = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
             infos.insert_or_assign(i.first, std::move(info));
@@ -421,12 +421,11 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
         conn.processStderr();
         size_t count = readNum<size_t>(conn->from);
         for (size_t n = 0; n < count; n++) {
-            auto path = parseStorePath(readString(conn->from));
-            SubstitutablePathInfo & info { infos[path] };
+            SubstitutablePathInfo & info(infos[parseStorePath(readString(conn->from))]);
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info.deriver = parseStorePath(deriver);
-            info.references.setPossiblyToSelf(path, worker_proto::read(*this, conn->from, Phantom<StorePathSet> {}));
+            info.references = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
         }
@@ -638,7 +637,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
             sink
                 << exportMagic
                 << printStorePath(info.path);
-            worker_proto::write(*this, sink, info.referencesPossiblyToSelf());
+            worker_proto::write(*this, sink, info.references);
             sink
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << 0 // == no legacy signature
@@ -649,7 +648,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
         conn.processStderr(0, source2.get());
 
         auto importedPaths = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
-        assert(importedPaths.empty() == 0); // doesn't include possible self reference
+        assert(importedPaths.size() <= 1);
     }
 
     else {
@@ -657,7 +656,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
                  << printStorePath(info.path)
                  << (info.deriver ? printStorePath(*info.deriver) : "")
                  << info.narHash.to_string(Base16, false);
-        worker_proto::write(*this, conn->to, info.referencesPossiblyToSelf());
+        worker_proto::write(*this, conn->to, info.references);
         conn->to << info.registrationTime << info.narSize
                  << info.ultimate << info.sigs << renderContentAddress(info.ca)
                  << repair << !checkSigs;
@@ -872,8 +871,8 @@ std::vector<BuildResult> RemoteStore::buildPathsWithResults(
                         OutputPathMap outputs;
                         auto drv = evalStore->readDerivation(bfd.drvPath);
                         const auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
-                        const auto drvOutputs = drv.outputsAndOptPaths(*this);
-                        for (auto & output : bfd.outputs) {
+                        auto built = resolveDerivedPath(*this, bfd, &*evalStore);
+                        for (auto & [output, outputPath] : built) {
                             auto outputHash = get(outputHashes, output);
                             if (!outputHash)
                                 throw Error(
@@ -887,16 +886,11 @@ std::vector<BuildResult> RemoteStore::buildPathsWithResults(
                                     throw MissingRealisation(outputId);
                                 res.builtOutputs.emplace(realisation->id, *realisation);
                             } else {
-                                // If ca-derivations isn't enabled, assume that
-                                // the output path is statically known.
-                                const auto drvOutput = get(drvOutputs, output);
-                                assert(drvOutput);
-                                assert(drvOutput->second);
                                 res.builtOutputs.emplace(
                                     outputId,
                                     Realisation {
                                         .id = outputId,
-                                        .outPath = *drvOutput->second,
+                                        .outPath = outputPath,
                                     });
                             }
                         }
@@ -920,7 +914,12 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     writeDerivation(conn->to, *this, drv);
     conn->to << buildMode;
     conn.processStderr();
-    BuildResult res { .path = DerivedPath::Built { .drvPath = drvPath } };
+    BuildResult res {
+        .path = DerivedPath::Built {
+            .drvPath = drvPath,
+            .outputs = OutputsSpec::All { },
+        },
+    };
     res.status = (BuildResult::Status) readInt(conn->from);
     conn->from >> res.errorMsg;
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 29) {
