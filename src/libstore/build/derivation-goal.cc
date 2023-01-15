@@ -380,7 +380,12 @@ void DerivationGoal::gaveUpOnSubstitution()
                         worker.store.printStorePath(i.first));
             }
 
-            addWaitee(worker.makeDerivationGoal(i.first, i.second, buildMode == bmRepair ? bmRepair : bmNormal));
+            addWaitee(worker.makeGoal(
+                DerivedPath::Built {
+                    .drvPath = makeConstantStorePathRef(i.first),
+                    .outputs = i.second,
+                },
+                buildMode == bmRepair ? bmRepair : bmNormal));
         }
 
     /* Copy the input sources from the eval store to the build
@@ -452,7 +457,12 @@ void DerivationGoal::repairClosure()
         if (drvPath2 == outputsToDrv.end())
             addWaitee(upcast_goal(worker.makePathSubstitutionGoal(i, Repair)));
         else
-            addWaitee(worker.makeDerivationGoal(drvPath2->second, OutputsSpec::All(), bmRepair));
+            addWaitee(worker.makeGoal(
+                DerivedPath::Built {
+                    .drvPath = makeConstantStorePathRef(drvPath2->second),
+                    .outputs = OutputsSpec::All { },
+                },
+                bmRepair));
     }
 
     if (waitees.empty()) {

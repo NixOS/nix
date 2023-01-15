@@ -124,8 +124,11 @@ void Store::repairPath(const StorePath & path)
         auto info = queryPathInfo(path);
         if (info->deriver && isValidPath(*info->deriver)) {
             goals.clear();
-            // FIXME: Should just build the specific output we need.
-            goals.insert(worker.makeDerivationGoal(*info->deriver, OutputsSpec::All { }, bmRepair));
+            goals.insert(worker.makeGoal(DerivedPath::Built {
+                .drvPath = makeConstantStorePathRef(*info->deriver),
+                // FIXME: Should just build the specific output we need.
+                .outputs = OutputsSpec::All { },
+            }, bmRepair));
             worker.run(goals);
         } else
             throw Error(worker.failingExitStatus(), "cannot repair path '%s'", printStorePath(path));
