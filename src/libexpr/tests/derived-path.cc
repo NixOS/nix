@@ -21,12 +21,12 @@ TEST_F(DerivedPathExpressionTest, force_init)
 RC_GTEST_FIXTURE_PROP(
     DerivedPathExpressionTest,
     prop_opaque_path_round_trip,
-    (const DerivedPath::Opaque & o))
+    (const SingleDerivedPath::Opaque & o))
 {
     auto * v = state.allocValue();
     state.mkStorePathString(o.path, *v);
-    auto d = state.coerceToDerivedPath(noPos, *v, "");
-    RC_ASSERT(DerivedPath { o } == d);
+    auto d = state.coerceToSingleDerivedPath(noPos, *v, "");
+    RC_ASSERT(SingleDerivedPath { o } == d);
 }
 
 // TODO use DerivedPath::Built for parameter once it supports a single output
@@ -46,12 +46,12 @@ RC_GTEST_FIXTURE_PROP(
 
     auto * v = state.allocValue();
     state.mkOutputString(*v, drvPath, outputName.name, std::nullopt, mockXpSettings);
-    auto [d, _] = state.coerceToDerivedPathUnchecked(noPos, *v, "");
-    DerivedPath::Built b {
-        .drvPath = drvPath,
-        .outputs = OutputsSpec::Names { outputName.name },
+    auto [d, _] = state.coerceToSingleDerivedPathUnchecked(noPos, *v, "");
+    SingleDerivedPath::Built b {
+        .drvPath = makeConstantStorePathRef(drvPath),
+        .output = outputName.name,
     };
-    RC_ASSERT(DerivedPath { b } == d);
+    RC_ASSERT(SingleDerivedPath { b } == d);
 }
 
 RC_GTEST_FIXTURE_PROP(
@@ -61,12 +61,12 @@ RC_GTEST_FIXTURE_PROP(
 {
     auto * v = state.allocValue();
     state.mkOutputString(*v, drvPath, outputName.name, outPath);
-    auto [d, _] = state.coerceToDerivedPathUnchecked(noPos, *v, "");
-    DerivedPath::Built b {
-        .drvPath = drvPath,
-        .outputs = OutputsSpec::Names { outputName.name },
+    auto [d, _] = state.coerceToSingleDerivedPathUnchecked(noPos, *v, "");
+    SingleDerivedPath::Built b {
+        .drvPath = makeConstantStorePathRef(drvPath),
+        .output = outputName.name,
     };
-    RC_ASSERT(DerivedPath { b } == d);
+    RC_ASSERT(SingleDerivedPath { b } == d);
 }
 
 } /* namespace nix */

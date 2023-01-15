@@ -3,7 +3,7 @@
 
 #include "util.hh"
 #include "comparator.hh"
-#include "path.hh"
+#include "derived-path.hh"
 
 #include <variant>
 
@@ -31,11 +31,7 @@ public:
  *
  * Encoded as just the path: ‘<path>’.
  */
-struct NixStringContextElem_Opaque {
-    StorePath path;
-
-    GENERATE_CMP(NixStringContextElem_Opaque, me->path);
-};
+typedef SingleDerivedPath::Opaque NixStringContextElem_Opaque;
 
 /**
  * Path to a derivation and its entire build closure.
@@ -57,12 +53,7 @@ struct NixStringContextElem_DrvDeep {
  *
  * Encoded in the form ‘!<output>!<drvPath>’.
  */
-struct NixStringContextElem_Built {
-    StorePath drvPath;
-    std::string output;
-
-    GENERATE_CMP(NixStringContextElem_Built, me->drvPath, me->output);
-};
+typedef SingleDerivedPath::Built NixStringContextElem_Built;
 
 using _NixStringContextElem_Raw = std::variant<
     NixStringContextElem_Opaque,
@@ -93,8 +84,12 @@ struct NixStringContextElem : _NixStringContextElem_Raw {
      * - ‘<path>’
      * - ‘=<path>’
      * - ‘!<name>!<path>’
+     *
+     * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
-    static NixStringContextElem parse(std::string_view s);
+    static NixStringContextElem parse(
+        std::string_view s,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     std::string to_string() const;
 };
 

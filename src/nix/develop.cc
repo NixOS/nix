@@ -235,7 +235,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     /* Build the derivation. */
     store->buildPaths(
         { DerivedPath::Built {
-            .drvPath = shellDrvPath,
+            .drvPath = makeConstantStorePathRef(shellDrvPath),
             .outputs = OutputsSpec::All { },
         }},
         bmNormal, evalStore);

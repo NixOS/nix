@@ -109,7 +109,7 @@ struct CmdBundle : InstallableValueCommand
 
         store->buildPaths({
             DerivedPath::Built {
-                .drvPath = drvPath,
+                .drvPath = makeConstantStorePathRef(drvPath),
                 .outputs = OutputsSpec::All { },
             },
         });

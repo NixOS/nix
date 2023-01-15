@@ -393,7 +393,7 @@ static void main_nix_build(int argc, char * * argv)
 
                 auto bashDrv = drv->requireDrvPath();
                 pathsToBuild.push_back(DerivedPath::Built {
-                    .drvPath = bashDrv,
+                    .drvPath = makeConstantStorePathRef(bashDrv),
                     .outputs = OutputsSpec::Names {"out"},
                 });
                 pathsToCopy.insert(bashDrv);
@@ -417,7 +417,7 @@ static void main_nix_build(int argc, char * * argv)
                     }))
             {
                 pathsToBuild.push_back(DerivedPath::Built {
-                    .drvPath = inputDrv,
+                    .drvPath = makeConstantStorePathRef(inputDrv),
                     .outputs = OutputsSpec::Names { inputOutputs },
                 });
                 pathsToCopy.insert(inputDrv);
@@ -590,7 +590,10 @@ static void main_nix_build(int argc, char * * argv)
             if (outputName == "")
                 throw Error("derivation '%s' lacks an 'outputName' attribute", store->printStorePath(drvPath));
 
-            pathsToBuild.push_back(DerivedPath::Built{drvPath, OutputsSpec::Names{outputName}});
+            pathsToBuild.push_back(DerivedPath::Built{
+                .drvPath = makeConstantStorePathRef(drvPath),
+                .outputs = OutputsSpec::Names{outputName},
+            });
             pathsToBuildOrdered.push_back({drvPath, {outputName}});
             drvsToCopy.insert(drvPath);
 

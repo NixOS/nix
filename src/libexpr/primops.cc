@@ -56,7 +56,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
                     .drvPath = b.drvPath,
                     .outputs = OutputsSpec::Names { b.output },
                 });
-                ensureValid(b.drvPath);
+                ensureValid(b.drvPath->getBaseStorePath());
             },
             [&](const NixStringContextElem::Opaque & o) {
                 auto ctxS = store->printStorePath(o.path);
@@ -77,7 +77,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
     if (!evalSettings.enableImportFromDerivation)
         debugThrowLastTrace(Error(
             "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
-            store->printStorePath(drvs.begin()->drvPath)));
+            drvs.begin()->to_string(*store)));
 
     /* Build/substitute the context. */
     std::vector<DerivedPath> buildReqs;
@@ -95,7 +95,11 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
             /* Get all the output paths corresponding to the placeholders we had */
             if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
                 res.insert_or_assign(
-                    DownstreamPlaceholder::unknownCaOutput(drv.drvPath, outputName).render(),
+                    DownstreamPlaceholder::fromSingleDerivedPathBuilt(
+                        SingleDerivedPath::Built {
+                            .drvPath = drv.drvPath,
+                            .output = outputName,
+                        }).render(),
                     store->printStorePath(outputPath)
                 );
             }
@@ -1251,7 +1255,10 @@ drvName, Bindings * attrs, Value & v)
                 }
             },
             [&](const NixStringContextElem::Built & b) {
-                drv.inputDrvs[b.drvPath].insert(b.output);
+                if (auto * p = std::get_if<DerivedPath::Opaque>(&*b.drvPath))
+                    drv.inputDrvs[p->path].insert(b.output);
+                else
+                    throw UnimplementedError("Dependencies on the outputs of dynamic derivations are not yet supported");
             },
             [&](const NixStringContextElem::Opaque & o) {
                 drv.inputSrcs.insert(o.path);

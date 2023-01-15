@@ -12,8 +12,18 @@ namespace rc {
 using namespace nix;
 
 template<>
-struct Arbitrary<DerivedPath::Opaque> {
-    static Gen<DerivedPath::Opaque> arbitrary();
+struct Arbitrary<SingleDerivedPath::Opaque> {
+    static Gen<SingleDerivedPath::Opaque> arbitrary();
+};
+
+template<>
+struct Arbitrary<SingleDerivedPath::Built> {
+    static Gen<SingleDerivedPath::Built> arbitrary();
+};
+
+template<>
+struct Arbitrary<SingleDerivedPath> {
+    static Gen<SingleDerivedPath> arbitrary();
 };
 
 template<>

@@ -77,7 +77,7 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
     try {
         worker.run(Goals{goal});
         return goal->getBuildResult(DerivedPath::Built {
-            .drvPath = drvPath,
+            .drvPath = makeConstantStorePathRef(drvPath),
             .outputs = OutputsSpec::All {},
         });
     } catch (Error & e) {

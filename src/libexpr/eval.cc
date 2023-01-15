@@ -1042,7 +1042,7 @@ void EvalState::mkOutputString(
             : DownstreamPlaceholder::unknownCaOutput(drvPath, outputName, xpSettings).render(),
         NixStringContext {
             NixStringContextElem::Built {
-                .drvPath = drvPath,
+                .drvPath = makeConstantStorePathRef(drvPath),
                 .output = outputName,
             }
         });
@@ -2299,7 +2299,7 @@ StorePath EvalState::coerceToStorePath(const PosIdx pos, Value & v, NixStringCon
 }
 
 
-std::pair<DerivedPath, std::string_view> EvalState::coerceToDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx)
+std::pair<SingleDerivedPath, std::string_view> EvalState::coerceToSingleDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx)
 {
     NixStringContext context;
     auto s = forceString(v, context, pos, errorCtx);
@@ -2310,21 +2310,16 @@ std::pair<DerivedPath, std::string_view> EvalState::coerceToDerivedPathUnchecked
             s, csize)
             .withTrace(pos, errorCtx).debugThrow<EvalError>();
     auto derivedPath = std::visit(overloaded {
-        [&](NixStringContextElem::Opaque && o) -> DerivedPath {
-            return DerivedPath::Opaque {
-                .path = std::move(o.path),
-            };
+        [&](NixStringContextElem::Opaque && o) -> SingleDerivedPath {
+            return std::move(o);
         },
-        [&](NixStringContextElem::DrvDeep &&) -> DerivedPath {
+        [&](NixStringContextElem::DrvDeep &&) -> SingleDerivedPath {
             error(
                 "string '%s' has a context which refers to a complete source and binary closure. This is not supported at this time",
                 s).withTrace(pos, errorCtx).debugThrow<EvalError>();
         },
-        [&](NixStringContextElem::Built && b) -> DerivedPath {
-            return DerivedPath::Built {
-                .drvPath = std::move(b.drvPath),
-                .outputs = OutputsSpec::Names { std::move(b.output) },
-            };
+        [&](NixStringContextElem::Built && b) -> SingleDerivedPath {
+            return std::move(b);
         },
     }, ((NixStringContextElem &&) *context.begin()).raw());
     return {
@@ -2334,12 +2329,12 @@ std::pair<DerivedPath, std::string_view> EvalState::coerceToDerivedPathUnchecked
 }
 
 
-DerivedPath EvalState::coerceToDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx)
+SingleDerivedPath EvalState::coerceToSingleDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx)
 {
-    auto [derivedPath, s_] = coerceToDerivedPathUnchecked(pos, v, errorCtx);
+    auto [derivedPath, s_] = coerceToSingleDerivedPathUnchecked(pos, v, errorCtx);
     auto s = s_;
     std::visit(overloaded {
-        [&](const DerivedPath::Opaque & o) {
+        [&](const SingleDerivedPath::Opaque & o) {
             auto sExpected = store->printStorePath(o.path);
             if (s != sExpected)
                 error(
@@ -2347,25 +2342,27 @@ DerivedPath EvalState::coerceToDerivedPath(const PosIdx pos, Value & v, std::str
                     s, sExpected)
                     .withTrace(pos, errorCtx).debugThrow<EvalError>();
         },
-        [&](const DerivedPath::Built & b) {
-            // TODO need derived path with single output to make this
-            // total. Will add as part of RFC 92 work and then this is
-            // cleaned up.
-            auto output = *std::get<OutputsSpec::Names>(b.outputs).begin();
-
-            auto drv = store->readDerivation(b.drvPath);
-            auto i = drv.outputs.find(output);
-            if (i == drv.outputs.end())
-                throw Error("derivation '%s' does not have output '%s'", store->printStorePath(b.drvPath), output);
-            auto optOutputPath = i->second.path(*store, drv.name, output);
-            // This is testing for the case of CA derivations
-            auto sExpected = optOutputPath
-                ? store->printStorePath(*optOutputPath)
-                : DownstreamPlaceholder::unknownCaOutput(b.drvPath, output).render();
+        [&](const SingleDerivedPath::Built & b) {
+            auto sExpected = std::visit(overloaded {
+                [&](const SingleDerivedPath::Opaque & o) {
+                    auto drv = store->readDerivation(o.path);
+                    auto i = drv.outputs.find(b.output);
+                    if (i == drv.outputs.end())
+                        throw Error("derivation '%s' does not have output '%s'", b.drvPath->to_string(*store), b.output);
+                    auto optOutputPath = i->second.path(*store, drv.name, b.output);
+                    // This is testing for the case of CA derivations
+                    return optOutputPath
+                        ? store->printStorePath(*optOutputPath)
+                        : DownstreamPlaceholder::fromSingleDerivedPathBuilt(b).render();
+                },
+                [&](const SingleDerivedPath::Built & o) {
+                    return DownstreamPlaceholder::fromSingleDerivedPathBuilt(b).render();
+                },
+            }, b.drvPath->raw());
             if (s != sExpected)
                 error(
                     "string '%s' has context with the output '%s' from derivation '%s', but the string is not the right placeholder for this derivation output. It should be '%s'",
-                    s, output, store->printStorePath(b.drvPath), sExpected)
+                    s, b.output, b.drvPath->to_string(*store), sExpected)
                     .withTrace(pos, errorCtx).debugThrow<EvalError>();
         }
     }, derivedPath.raw());
