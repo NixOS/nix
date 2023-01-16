@@ -18,6 +18,10 @@ struct CmdStore : virtual NixMultiCommand
     {
         if (!command)
             throw UsageError("'nix store' requires a sub-command.");
+
+        if (command->first != "gc")
+            settings.requireExperimentalFeature(Xp::NixCommand);
+
         command->second->prepare();
         command->second->run();
     }
