@@ -195,12 +195,15 @@ public:
 
     bool overridden = false;
 
+    std::optional<ExperimentalFeature> experimentalFeature;
+
 protected:
 
     AbstractSetting(
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases);
+        const std::set<std::string> & aliases,
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt);
 
     virtual ~AbstractSetting()
     {
@@ -241,8 +244,9 @@ public:
         const bool documentDefault,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : AbstractSetting(name, description, aliases)
+        const std::set<std::string> & aliases = {},
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
+        : AbstractSetting(name, description, aliases, experimentalFeature)
         , value(def)
         , defaultValue(def)
         , documentDefault(documentDefault)
@@ -297,8 +301,9 @@ public:
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {},
-        const bool documentDefault = true)
-        : BaseSetting<T>(def, documentDefault, name, description, aliases)
+        const bool documentDefault = true,
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
+        : BaseSetting<T>(def, documentDefault, name, description, aliases, experimentalFeature)
     {
         options->addSetting(this);
     }
