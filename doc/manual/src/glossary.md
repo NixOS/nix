@@ -118,9 +118,9 @@
     A [store object] `O` is said to have a *reference* to a store object `P` if the [store path] of `P` appears in the contents of `O`.
     The *references* of a store object `O` are the set of store objects to which `O` has a reference.
 
-    Source files have no references.
-    A [store derivation] can only reference source files and other store derivations, including itself.
-    In contrast, a store object that was produced from a [derivation] can only reference other "derived" store objects.
+    Store objects can refer to both other store objects and themselves.
+    References from a store object to itself are called *self-references*.
+    References other than a self-reference must not form a cycle.
 
     [reference]: #gloss-reference
 
