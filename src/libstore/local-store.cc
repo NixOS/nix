@@ -1306,11 +1306,11 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             auto hashResult = hashSink.finish();
 
             if (hashResult.first != info.narHash)
-                throw Error("hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+                throw Error("hash mismatch importing path '%s' (try `nix store repair`);\n  specified: %s\n  got:       %s",
                     printStorePath(info.path), info.narHash.to_string(Base32, true), hashResult.first.to_string(Base32, true));
 
             if (hashResult.second != info.narSize)
-                throw Error("size mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+                throw Error("size mismatch importing path '%s' (try `nix store repair`);\n  specified: %s\n  got:       %s",
                     printStorePath(info.path), info.narSize, hashResult.second);
 
             if (info.ca) {
