@@ -423,10 +423,8 @@ void mainWrapped(int argc, char * * argv)
     if (!args.command)
         throw UsageError("no subcommand specified");
 
-    if (args.command->first != "repl"
-        && args.command->first != "doctor"
-        && args.command->first != "upgrade-nix")
-        experimentalFeatureSettings.require(Xp::NixCommand);
+    experimentalFeatureSettings.require(
+        args.command->second->experimentalFeature());
 
     if (args.useNet && !haveInternet()) {
         warn("you don't have Internet access; disabling some network-dependent features");

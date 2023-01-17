@@ -12,6 +12,14 @@ struct CmdRepl : RawInstallablesCommand
         evalSettings.pureEval = false;
     }
 
+    /**
+     * This command is stable before the others
+     */
+    std::optional<ExperimentalFeature> experimentalFeature() override
+    {
+        return std::nullopt;
+    }
+
     std::vector<std::string> files;
 
     Strings getDefaultFlakeAttrPaths() override

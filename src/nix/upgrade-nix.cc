@@ -32,6 +32,14 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         });
     }
 
+    /**
+     * This command is stable before the others
+     */
+    std::optional<ExperimentalFeature> experimentalFeature() override
+    {
+        return std::nullopt;
+    }
+
     std::string description() override
     {
         return "upgrade Nix to the stable version declared in Nixpkgs";

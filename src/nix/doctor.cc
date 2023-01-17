@@ -39,6 +39,14 @@ struct CmdDoctor : StoreCommand
 {
     bool success = true;
 
+    /**
+     * This command is stable before the others
+     */
+    std::optional<ExperimentalFeature> experimentalFeature() override
+    {
+        return std::nullopt;
+    }
+
     std::string description() override
     {
         return "check your system for potential problems and print a PASS or FAIL for each check";
