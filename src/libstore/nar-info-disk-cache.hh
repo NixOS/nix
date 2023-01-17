@@ -13,7 +13,7 @@ public:
 
     virtual ~NarInfoDiskCache() { }
 
-    virtual void createCache(const std::string & uri, const Path & storeDir,
+    virtual int createCache(const std::string & uri, const Path & storeDir,
         bool wantMassQuery, int priority) = 0;
 
     struct CacheInfo
