@@ -170,9 +170,13 @@ std::string Config::toKeyValue()
 
 void Config::convertToArgs(Args & args, const std::string & category)
 {
-    for (auto & s : _settings)
-        if (applicable(s.second))
+    for (auto & s : _settings) {
+        /* We do include args for settings gated on disabled
+           experimental-features. The args themselves however will also be
+           gated on any experimental feature the underlying setting is. */
+        if (!s.second.isAlias)
             s.second.setting->convertToArg(args, category);
+    }
 }
 
 AbstractSetting::AbstractSetting(
@@ -219,6 +223,7 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
         .category = category,
         .labels = {"value"},
         .handler = {[this](std::string s) { overridden = true; set(s); }},
+        .experimentalFeature = experimentalFeature,
     });
 
     if (isAppendable())
@@ -228,6 +233,7 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
             .category = category,
             .labels = {"value"},
             .handler = {[this](std::string s) { overridden = true; set(s, true); }},
+            .experimentalFeature = experimentalFeature,
         });
 }
 
@@ -279,13 +285,15 @@ template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string &
         .longName = name,
         .description = fmt("Enable the `%s` setting.", name),
         .category = category,
-        .handler = {[this]() { override(true); }}
+        .handler = {[this]() { override(true); }},
+        .experimentalFeature = experimentalFeature,
     });
     args.addFlag({
         .longName = "no-" + name,
         .description = fmt("Disable the `%s` setting.", name),
         .category = category,
-        .handler = {[this]() { override(false); }}
+        .handler = {[this]() { override(false); }},
+        .experimentalFeature = experimentalFeature,
     });
 }
 

@@ -117,6 +117,8 @@ protected:
         Handler handler;
         std::function<void(size_t, std::string_view)> completer;
 
+        std::optional<ExperimentalFeature> experimentalFeature;
+
         static Flag mkHashTypeFlag(std::string && longName, HashType * ht);
         static Flag mkHashTypeOptFlag(std::string && longName, std::optional<HashType> * oht);
     };
@@ -188,6 +190,16 @@ public:
     friend class MultiCommand;
 
     MultiCommand * parent = nullptr;
+
+private:
+
+    /**
+     * Experimental features needed when parsing args. These are checked
+     * after flag parsing is completed in order to support enabling
+     * experimental features coming after the flag that needs the
+     * experimental feature.
+     */
+    std::set<ExperimentalFeature> flagExperimentalFeatures;
 };
 
 /* A command is an argument parser that can be executed by calling its
@@ -252,8 +264,6 @@ enum CompletionType {
     ctAttrs
 };
 extern CompletionType completionType;
-
-std::optional<std::string> needsCompletion(std::string_view s);
 
 void completePath(size_t, std::string_view prefix);
 
