@@ -97,7 +97,7 @@ public:
         state->db.exec(schema);
 
         state->insertCache.create(state->db,
-            "insert or replace into BinaryCaches(url, timestamp, storeDir, wantMassQuery, priority) values (?, ?, ?, ?, ?)");
+            "insert into BinaryCaches(url, timestamp, storeDir, wantMassQuery, priority) values (?1, ?2, ?3, ?4, ?5) on conflict (url) do update set timestamp = ?2, storeDir = ?3, wantMassQuery = ?4, priority = ?5 returning id;");
 
         state->queryCache.create(state->db,
             "select id, storeDir, wantMassQuery, priority from BinaryCaches where url = ? and timestamp > ?");
@@ -165,6 +165,8 @@ public:
         return i->second;
     }
 
+private:
+
     std::optional<Cache> queryCacheRaw(State & state, const std::string & uri)
     {
         auto i = state.caches.find(uri);
@@ -172,15 +174,21 @@ public:
             auto queryCache(state.queryCache.use()(uri)(time(0) - cacheInfoTtl));
             if (!queryCache.next())
                 return std::nullopt;
-            state.caches.emplace(uri,
-                Cache{(int) queryCache.getInt(0), queryCache.getStr(1), queryCache.getInt(2) != 0, (int) queryCache.getInt(3)});
+            auto cache = Cache {
+                .id = (int) queryCache.getInt(0),
+                .storeDir = queryCache.getStr(1),
+                .wantMassQuery = queryCache.getInt(2) != 0,
+                .priority = (int) queryCache.getInt(3),
+            };
+            state.caches.emplace(uri, cache);
         }
         return getCache(state, uri);
     }
 
-    void createCache(const std::string & uri, const Path & storeDir, bool wantMassQuery, int priority) override
+public:
+    int createCache(const std::string & uri, const Path & storeDir, bool wantMassQuery, int priority) override
     {
-        retrySQLite<void>([&]() {
+        return retrySQLite<int>([&]() {
             auto state(_state.lock());
             SQLiteTxn txn(state->db);
 
@@ -189,13 +197,25 @@ public:
             auto cache(queryCacheRaw(*state, uri));
 
             if (cache)
-                return;
+                return cache->id;
 
-            state->insertCache.use()(uri)(time(0))(storeDir)(wantMassQuery)(priority).exec();
-            assert(sqlite3_changes(state->db) == 1);
-            state->caches[uri] = Cache{(int) sqlite3_last_insert_rowid(state->db), storeDir, wantMassQuery, priority};
+            Cache ret {
+                .id = -1, // set below
+                .storeDir = storeDir,
+                .wantMassQuery = wantMassQuery,
+                .priority = priority,
+            };
+
+            {
+                auto r(state->insertCache.use()(uri)(time(0))(storeDir)(wantMassQuery)(priority));
+                assert(r.next());
+                ret.id = (int) r.getInt(0);
+            }
+
+            state->caches[uri] = ret;
 
             txn.commit();
+            return ret.id;
         });
     }
 
