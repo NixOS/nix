@@ -292,30 +292,9 @@ Path getDefaultProfile()
 {
     Path profileLink = getHome() + "/.nix-profile";
     try {
-        // Migrate from the “old-style” profiles stored under `/nix/var`:
-        // If the link exists and points to the old location, then:
-        // - Rewrite it to point to the new location
-        // - For every generation of the old default profile, create a symlink
-        //   from the new directory to it (so that all the previous profiles
-        //   and generations are still available).
-        auto legacyProfile = getuid() == 0
-            ? settings.nixStateDir + "/profiles/default"
-            : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName());
-        auto newProfile = profilesDir() + "/profile";
-        if (!pathExists(profileLink)
-            || (isLink(profileLink)
-                && readLink(profileLink) == legacyProfile)) {
-            warn("Migrating the default profile");
-            replaceSymlink(newProfile, profileLink);
-            replaceSymlink(legacyProfile, newProfile);
-            if (pathExists(legacyProfile)) {
-                for (auto & oldGen : findGenerations(legacyProfile).first) {
-                    replaceSymlink(
-                        oldGen.path,
-                        dirOf(newProfile) + "/"
-                            + std::string(baseNameOf(oldGen.path)));
-                }
-            }
+        auto profile = profilesDir() + "/profile";
+        if (!pathExists(profileLink)) {
+            replaceSymlink(profile, profileLink);
         }
         return absPath(readLink(profileLink), dirOf(profileLink));
     } catch (Error &) {
