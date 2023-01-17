@@ -56,7 +56,7 @@ public:
     void init() override
     {
         // FIXME: do this lazily?
-        if (auto cacheInfo = diskCache->cacheExists(cacheUri)) {
+        if (auto cacheInfo = diskCache->upToDateCacheExists(cacheUri)) {
             wantMassQuery.setDefault(cacheInfo->wantMassQuery);
             priority.setDefault(cacheInfo->priority);
         } else {
