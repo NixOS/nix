@@ -18,6 +18,7 @@ nix_tests = \
   gc.sh \
   remote-store.sh \
   lang.sh \
+  experimental-features.sh \
   fetchMercurial.sh \
   gc-auto.sh \
   user-envs.sh \
