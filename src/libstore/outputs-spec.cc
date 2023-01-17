@@ -163,7 +163,7 @@ void adl_serializer<OutputsSpec>::to_json(json & json, OutputsSpec t) {
         [&](const OutputsSpec::Names & names) {
             json = names;
         },
-    }, t);
+    }, t.raw());
 }
 
 
@@ -183,7 +183,7 @@ void adl_serializer<ExtendedOutputsSpec>::to_json(json & json, ExtendedOutputsSp
         [&](const ExtendedOutputsSpec::Explicit & e) {
             adl_serializer<OutputsSpec>::to_json(json, e);
         },
-    }, t);
+    }, t.raw());
 }
 
 }
