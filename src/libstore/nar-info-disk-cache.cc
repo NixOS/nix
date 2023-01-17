@@ -200,7 +200,7 @@ public:
         });
     }
 
-    std::optional<CacheInfo> cacheExists(const std::string & uri) override
+    std::optional<CacheInfo> upToDateCacheExists(const std::string & uri) override
     {
         return retrySQLite<std::optional<CacheInfo>>([&]() -> std::optional<CacheInfo> {
             auto state(_state.lock());
