@@ -292,7 +292,10 @@ Path getDefaultProfile()
 {
     Path profileLink = getHome() + "/.nix-profile";
     try {
-        auto profile = profilesDir() + "/profile";
+        auto profile =
+            getuid() == 0
+            ? settings.nixStateDir + "/profiles/default"
+            : profilesDir() + "/profile";
         if (!pathExists(profileLink)) {
             replaceSymlink(profile, profileLink);
         }
