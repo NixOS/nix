@@ -22,7 +22,7 @@ public:
         int priority;
     };
 
-    virtual std::optional<CacheInfo> cacheExists(const std::string & uri) = 0;
+    virtual std::optional<CacheInfo> upToDateCacheExists(const std::string & uri) = 0;
 
     virtual std::pair<Outcome, std::shared_ptr<NarInfo>> lookupNarInfo(
         const std::string & uri, const std::string & hashPart) = 0;
