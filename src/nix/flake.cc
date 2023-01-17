@@ -655,6 +655,19 @@ struct CmdFlakeCheck : FlakeCommand
                             }
                         }
 
+                        else if (
+                            name == "lib"
+                            || name == "darwinConfigurations"
+                            || name == "darwinModules"
+                            || name == "flakeModule"
+                            || name == "flakeModules"
+                            || name == "herculesCI"
+                            || name == "homeConfigurations"
+                            || name == "nixopsConfigurations"
+                            )
+                            // Known but unchecked community attribute
+                            ;
+
                         else
                             warn("unknown flake output '%s'", name);
 
