@@ -532,6 +532,12 @@
               mkdir $out
             '';
 
+        tests.nixpkgsLibTests =
+          nixpkgs.lib.genAttrs systems (system:
+            import (nixpkgs + "/lib/tests/release.nix")
+              { pkgs = nixpkgsFor.${system}; }
+          );
+
         metrics.nixpkgs = import "${nixpkgs-regression}/pkgs/top-level/metrics.nix" {
           pkgs = nixpkgsFor.x86_64-linux;
           nixpkgs = nixpkgs-regression;
@@ -562,6 +568,7 @@
         binaryTarball = self.hydraJobs.binaryTarball.${system};
         perlBindings = self.hydraJobs.perlBindings.${system};
         installTests = self.hydraJobs.installTests.${system};
+        nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
       } // (nixpkgs.lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};
       });
