@@ -42,20 +42,21 @@ nix build -f multiple-outputs.nix --json 'a^*' --no-link | jq --exit-status '
 nix build -f multiple-outputs.nix --json e --no-link | jq --exit-status '
   (.[0] |
     (.drvPath | match(".*multiple-outputs-e.drv")) and
-    (.outputs | keys == ["a", "b"]))
+    (.outputs | keys == ["a_a", "b"]))
 '
 
 # But not when it's overriden.
-nix build -f multiple-outputs.nix --json e^a --no-link | jq --exit-status '
+nix build -f multiple-outputs.nix --json e^a_a --no-link
+nix build -f multiple-outputs.nix --json e^a_a --no-link | jq --exit-status '
   (.[0] |
     (.drvPath | match(".*multiple-outputs-e.drv")) and
-    (.outputs | keys == ["a"]))
+    (.outputs | keys == ["a_a"]))
 '
 
 nix build -f multiple-outputs.nix --json 'e^*' --no-link | jq --exit-status '
   (.[0] |
     (.drvPath | match(".*multiple-outputs-e.drv")) and
-    (.outputs | keys == ["a", "b", "c"]))
+    (.outputs | keys == ["a_a", "b", "c"]))
 '
 
 # Test building from raw store path to drv not expression.
@@ -104,7 +105,7 @@ nix build "$drv^*" --no-link --json | jq --exit-status '
 nix build --impure -f multiple-outputs.nix --json e --no-link | jq --exit-status '
   (.[0] |
     (.drvPath | match(".*multiple-outputs-e.drv")) and
-    (.outputs | keys == ["a", "b"]))
+    (.outputs | keys == ["a_a", "b"]))
 '
 
 testNormalization () {
