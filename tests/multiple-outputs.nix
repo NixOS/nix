@@ -117,4 +117,14 @@ rec {
       '';
   };
 
+  invalid-output-name-1 = mkDerivation {
+    name = "invalid-output-name-1";
+    outputs = [ "out/"];
+  };
+
+  invalid-output-name-2 = mkDerivation {
+    name = "invalid-output-name-2";
+    outputs = [ "x" "foo$"];
+  };
+
 }
