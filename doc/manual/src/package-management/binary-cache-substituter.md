@@ -32,13 +32,13 @@ which should print something like:
     Priority: 30
 
 On the client side, you can tell Nix to use your binary cache using
-`--option extra-binary-caches`, e.g.:
+`--substituters`, e.g.:
 
 ```console
-$ nix-env -iA nixpkgs.firefox --option extra-binary-caches http://avalon:8080/
+$ nix-env -iA nixpkgs.firefox --substituters http://avalon:8080/
 ```
 
-The option `extra-binary-caches` tells Nix to use this binary cache in
+The option `substituters` tells Nix to use this binary cache in
 addition to your default caches, such as <https://cache.nixos.org>.
 Thus, for any path in the closure of Firefox, Nix will first check if
 the path is available on the server `avalon` or another binary caches.
@@ -47,4 +47,4 @@ If not, it will fall back to building from source.
 You can also tell Nix to always use your binary cache by adding a line
 to the `nix.conf` configuration file like this:
 
-    binary-caches = http://avalon:8080/ https://cache.nixos.org/
+    substituters = http://avalon:8080/ https://cache.nixos.org/
