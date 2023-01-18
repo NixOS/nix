@@ -34,3 +34,7 @@
   for the development shell in the same way as the actual build of the
   derivation. This makes shells for `i686-linux` derivations work
   correctly on `x86_64-linux`.
+
+* You can now disable the global flake registry by setting the `flake-registry`
+  configuration option to an empty string. The same can be achieved at runtime with
+  `--flake-registry ""`.
