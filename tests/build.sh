@@ -89,7 +89,7 @@ nix build "$drv^first,second" --no-link --json | jq --exit-status '
     (.outputs |
       (keys | length == 2) and
       (.first | match(".*multiple-outputs-a-first")) and
-          (.second | match(".*multiple-outputs-a-second"))))
+      (.second | match(".*multiple-outputs-a-second"))))
 '
 
 nix build "$drv^*" --no-link --json | jq --exit-status '
@@ -98,7 +98,7 @@ nix build "$drv^*" --no-link --json | jq --exit-status '
     (.outputs |
       (keys | length == 2) and
       (.first | match(".*multiple-outputs-a-first")) and
-          (.second | match(".*multiple-outputs-a-second"))))
+      (.second | match(".*multiple-outputs-a-second"))))
 '
 
 # Make sure that `--impure` works (regression test for https://github.com/NixOS/nix/issues/6488)
