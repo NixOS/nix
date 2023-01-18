@@ -10,8 +10,11 @@ Most Nix commands interpret the following environment variables:
     A colon-separated list of directories used to look up the location of Nix
     expressions using [paths](../language/values.md#type-path)
     enclosed in angle brackets (i.e., `<path>`),
-    e.g. `/home/eelco/Dev:/etc/nixos`. It can be extended using the
-    [`-I` option](./opt-common.md#opt-I).
+    e.g. `nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixos:nixos-config=/etc/nixos/configuration.nix`
+    will enable to use `<nixpkgs>` and `<nixos-config>` as search path, for
+    example `"${(import <nixpkgs> {}).nodejs}/bin/node"`.
+    It can be extended using the
+    [`-I` option](./opt-common.md#opt-I) when invoking `nix` directly.
 
   - [`NIX_IGNORE_SYMLINK_STORE`]{#env-NIX_IGNORE_SYMLINK_STORE}\
     Normally, the Nix store directory (typically `/nix/store`) is not
