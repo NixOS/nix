@@ -21,7 +21,8 @@ bool OutputsSpec::contains(const std::string & outputName) const
 
 std::optional<OutputsSpec> OutputsSpec::parseOpt(std::string_view s)
 {
-    static std::regex regex(R"((\*)|([a-z]+(,[a-z]+)*))");
+    // See checkName() for valid output name characters.
+    static std::regex regex(R"((\*)|([a-zA-Z\+\-\._\?=]+(,[a-zA-Z\+\-\._\?=]+)*))");
 
     std::smatch match;
     std::string s2 { s }; // until some improves std::regex
@@ -42,7 +43,7 @@ OutputsSpec OutputsSpec::parse(std::string_view s)
 {
     std::optional spec = parseOpt(s);
     if (!spec)
-        throw Error("Invalid outputs specifier: '%s'", s);
+        throw Error("invalid outputs specifier '%s'", s);
     return *spec;
 }
 
@@ -65,7 +66,7 @@ std::pair<std::string_view, ExtendedOutputsSpec> ExtendedOutputsSpec::parse(std:
 {
     std::optional spec = parseOpt(s);
     if (!spec)
-        throw Error("Invalid extended outputs specifier: '%s'", s);
+        throw Error("invalid extended outputs specifier '%s'", s);
     return *spec;
 }
 
