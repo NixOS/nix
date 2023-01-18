@@ -18,10 +18,6 @@
 * Instead of "antiquotation", the more common term [string interpolation](../language/string-interpolation.md) is now used consistently.
   Historical release notes were not changed.
 
-* Error traces have been reworked to provide detailed explanations and more
-  accurate error locations. A short excerpt of the trace is now shown by
-  default when an error occurs.
-
 * Allow explicitly selecting outputs in a store derivation installable, just like we can do with other sorts of installables.
   For example,
   ```shell-session
