@@ -8,7 +8,7 @@ namespace nix {
 static void prim_unsafeDiscardStringContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     PathSet context;
-    auto s = state.coerceToString(pos, *args[0], context, "while evaluating the argument passed to builtins.unsafeDiscardStringContext");
+    auto s = state.coerceToString(pos, *args[0], context);
     v.mkString(*s);
 }
 
@@ -18,7 +18,7 @@ static RegisterPrimOp primop_unsafeDiscardStringContext("__unsafeDiscardStringCo
 static void prim_hasContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     PathSet context;
-    state.forceString(*args[0], context, pos, "while evaluating the argument passed to builtins.hasContext");
+    state.forceString(*args[0], context, pos);
     v.mkBool(!context.empty());
 }
 
@@ -34,7 +34,7 @@ static RegisterPrimOp primop_hasContext("__hasContext", 1, prim_hasContext);
 static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     PathSet context;
-    auto s = state.coerceToString(pos, *args[0], context, "while evaluating the argument passed to builtins.unsafeDiscardOutputDependency");
+    auto s = state.coerceToString(pos, *args[0], context);
 
     PathSet context2;
     for (auto && p : context) {
@@ -80,7 +80,7 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
         Strings outputs;
     };
     PathSet context;
-    state.forceString(*args[0], context, pos, "while evaluating the argument passed to builtins.getContext");
+    state.forceString(*args[0], context, pos);
     auto contextInfos = std::map<StorePath, ContextInfo>();
     for (const auto & p : context) {
         Path drv;
@@ -132,9 +132,9 @@ static RegisterPrimOp primop_getContext("__getContext", 1, prim_getContext);
 static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     PathSet context;
-    auto orig = state.forceString(*args[0], context, noPos, "while evaluating the first argument passed to builtins.appendContext");
+    auto orig = state.forceString(*args[0], context, pos);
 
-    state.forceAttrs(*args[1], pos, "while evaluating the second argument passed to builtins.appendContext");
+    state.forceAttrs(*args[1], pos);
 
     auto sPath = state.symbols.create("path");
     auto sAllOutputs = state.symbols.create("allOutputs");
@@ -142,24 +142,24 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
         const auto & name = state.symbols[i.name];
         if (!state.store->isStorePath(name))
             throw EvalError({
-                .msg = hintfmt("context key '%s' is not a store path", name),
+                .msg = hintfmt("Context key '%s' is not a store path", name),
                 .errPos = state.positions[i.pos]
             });
         if (!settings.readOnlyMode)
             state.store->ensurePath(state.store->parseStorePath(name));
-        state.forceAttrs(*i.value, i.pos, "while evaluating the value of a string context");
+        state.forceAttrs(*i.value, i.pos);
         auto iter = i.value->attrs->find(sPath);
         if (iter != i.value->attrs->end()) {
-            if (state.forceBool(*iter->value, iter->pos, "while evaluating the `path` attribute of a string context"))
+            if (state.forceBool(*iter->value, iter->pos))
                 context.emplace(name);
         }
 
         iter = i.value->attrs->find(sAllOutputs);
         if (iter != i.value->attrs->end()) {
-            if (state.forceBool(*iter->value, iter->pos, "while evaluating the `allOutputs` attribute of a string context")) {
+            if (state.forceBool(*iter->value, iter->pos)) {
                 if (!isDerivation(name)) {
                     throw EvalError({
-                        .msg = hintfmt("tried to add all-outputs context of %s, which is not a derivation, to a string", name),
+                        .msg = hintfmt("Tried to add all-outputs context of %s, which is not a derivation, to a string", name),
                         .errPos = state.positions[i.pos]
                     });
                 }
@@ -169,15 +169,15 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
 
         iter = i.value->attrs->find(state.sOutputs);
         if (iter != i.value->attrs->end()) {
-            state.forceList(*iter->value, iter->pos, "while evaluating the `outputs` attribute of a string context");
+            state.forceList(*iter->value, iter->pos);
             if (iter->value->listSize() && !isDerivation(name)) {
                 throw EvalError({
-                    .msg = hintfmt("tried to add derivation output context of %s, which is not a derivation, to a string", name),
+                    .msg = hintfmt("Tried to add derivation output context of %s, which is not a derivation, to a string", name),
                     .errPos = state.positions[i.pos]
                 });
             }
             for (auto elem : iter->value->listItems()) {
-                auto outputName = state.forceStringNoCtx(*elem, iter->pos, "while evaluating an output name within a string context");
+                auto outputName = state.forceStringNoCtx(*elem, iter->pos);
                 context.insert(concatStrings("!", outputName, "!", name));
             }
         }
