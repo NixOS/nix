@@ -220,6 +220,9 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
     } else
         url = state.forceStringNoCtx(*args[0], pos);
 
+    if (who == "fetchTarball")
+        url = evalSettings.resolvePseudoUrl(*url);
+
     state.checkURI(*url);
 
     if (name == "")
