@@ -120,7 +120,7 @@ The result is a string.
 
 ## Update
 
-> *attrset1* + *attrset2*
+> *attrset1* // *attrset2*
 
 Update [attribute set] *attrset1* with names and values from *attrset2*.
 
