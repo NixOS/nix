@@ -47,6 +47,13 @@ TEST(OutputsSpec, names_underscore) {
     ASSERT_EQ(expected.to_string(), str);
 }
 
+TEST(OutputsSpec, names_numberic) {
+    std::string_view str = "01";
+    OutputsSpec expected = OutputsSpec::Names { "01" };
+    ASSERT_EQ(OutputsSpec::parse(str), expected);
+    ASSERT_EQ(expected.to_string(), str);
+}
+
 TEST(OutputsSpec, names_out_bin) {
     OutputsSpec expected = OutputsSpec::Names { "out", "bin" };
     ASSERT_EQ(OutputsSpec::parse("out,bin"), expected);
