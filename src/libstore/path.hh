@@ -5,7 +5,6 @@
 
 namespace nix {
 
-class Store;
 struct Hash;
 
 class StorePath
