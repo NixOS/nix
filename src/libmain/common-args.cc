@@ -71,6 +71,15 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
         }}
     });
 
+    addFlag({
+        .longName = "color",
+        .aliases = {"colour"},
+        .description = "This flag controls when to use colors; one of `always`, `auto` or `never`.",
+        .category = loggingCategory,
+        .labels = {"mode"},
+        .handler = {[](std::string mode) { setColorMode(mode, false); }},
+    });
+
     std::string cat = "Options to override configuration settings";
     globalConfig.convertToArgs(*this, cat);
 

@@ -552,7 +552,22 @@ constexpr char treeNull[] = "    ";
 
 /* Determine whether ANSI escape sequences are appropriate for the
    present output. */
-bool shouldANSI();
+typedef enum {
+    colorDefault,
+    colorAlways,
+    colorAuto,
+    colorNever,
+} ColorMode;
+
+/* Whether or not to emit SGR-sequences (\e[…m)*/
+extern bool allowSelectGraphicRendition;
+
+/* Get name of current color mode. */
+std::string_view getColorMode();
+
+/* Set color mode by name. If `reset` is true (default), a previously set color
+    mode can be overwritten. Otherwise, it will throw an error. */
+void setColorMode(const std::string & colorModeStr, const bool reset = true);
 
 /* Truncate a string to 'width' printable characters. If 'filterAll'
    is true, all ANSI escape sequences are filtered out. Otherwise,

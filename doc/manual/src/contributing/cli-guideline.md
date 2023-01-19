@@ -385,9 +385,10 @@ the way of making beautiful CLI output. When needed, commands should offer a
 `--json` flag to allow users to easily parse and script the CLI.
 
 When TTY is not detected on STDOUT we should remove all design elements (no
-colors, no emojis and using ASCII instead of Unicode symbols). The same should
-happen when TTY is not detected on STDERR. We should not display progress /
-status section, but only print warnings and errors.
+colors, no emojis and using ASCII instead of Unicode symbols) unless a colorful
+output is explicitly requested with `--color always`. The same should happen
+when TTY is not detected on STDERR. We should not display progress / status
+section, but only print warnings and errors.
 
 ## Dialog with the user
 

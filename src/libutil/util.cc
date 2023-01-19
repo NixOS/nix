@@ -1417,16 +1417,51 @@ void ignoreException(Verbosity lvl)
     } catch (...) { }
 }
 
-bool shouldANSI()
-{
+bool determineAllowSelectGraphicRendition() {
     return isatty(STDERR_FILENO)
         && getEnv("TERM").value_or("dumb") != "dumb"
         && !getEnv("NO_COLOR").has_value();
 }
 
+bool allowSelectGraphicRendition = determineAllowSelectGraphicRendition();
+ColorMode colorMode = colorDefault;
+
+std::string_view getColorMode() {
+    switch (colorMode) {
+    case colorDefault:
+        return "default";
+    case colorAlways:
+        return "always";
+    case colorAuto:
+        return "auto";
+    case colorNever:
+        return "never";
+    default:
+        throw Error("unexpected color mode %d", colorMode);
+    }
+}
+
+void setColorMode(const std::string & colorModeStr, const bool reset) {
+    if (!reset && colorMode != colorDefault) {
+        throw Error("option 'color' was already set to: '%s'", getColorMode());
+    } else if (colorModeStr == "always") {
+        allowSelectGraphicRendition = true;
+        colorMode = colorAlways;
+    } else if (colorModeStr == "auto") {
+        allowSelectGraphicRendition = determineAllowSelectGraphicRendition();
+        colorMode = colorAuto;
+    } else if (colorModeStr == "never") {
+        allowSelectGraphicRendition = false;
+        colorMode = colorNever;
+    } else {
+        throw Error("option 'color' has an invalid value '%s'", colorModeStr);
+    }
+    debug("set color mode to '%s'", colorModeStr);
+}
+
 std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned int width)
 {
-    std::string t, e;
+    std::string t;
     size_t w = 0;
     auto i = s.begin();
 
@@ -1449,6 +1484,7 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
                 if (i != s.end() && *i >= 0x40 && *i <= 0x5f) e += *i++;
             }
 
+            // Select Graphic Rendition \e[…m
             if (!filterAll && last == 'm')
                 t += e;
         }

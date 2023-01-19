@@ -159,11 +159,11 @@ struct CmdSearch : InstallableCommand, MixJSON
                                 {"description", description},
                             };
                         } else {
-                            auto name2 = hiliteMatches(name.name, nameMatches, ANSI_GREEN, "\e[0;2m");
+                            auto name2 = hiliteMatches(name.name, nameMatches, ANSI_GREEN, ANSI_NORMAL_FAINT);
                             if (results > 1) logger->cout("");
                             logger->cout(
                                 "* %s%s",
-                                wrap("\e[0;1m", hiliteMatches(attrPath2, attrPathMatches, ANSI_GREEN, "\e[0;1m")),
+                                wrap(ANSI_NORMAL_BOLD, hiliteMatches(attrPath2, attrPathMatches, ANSI_GREEN, ANSI_NORMAL_BOLD)),
                                 name.version != "" ? " (" + name.version + ")" : "");
                             if (description != "")
                                 logger->cout(
