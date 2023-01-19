@@ -300,6 +300,14 @@ derivation):
 }
 ```
 
+
+
+`flake.nix` is written in a limited subset of the Nix language
+in order to prevent metadata lookups from hanging; values must
+be written directly and indirect evaluations such as `let..in`
+are not permitted. This does not apply to the body of
+the `outputs` function.
+
 The following attributes are supported in `flake.nix`:
 
 * `description`: A short, one-line description of the flake.

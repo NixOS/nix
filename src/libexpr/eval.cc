@@ -1248,7 +1248,9 @@ void EvalState::cacheFile(
         // computation.
         if (mustBeTrivial &&
             !(dynamic_cast<ExprAttrs *>(e)))
-            throw EvalError("file '%s' must be an attribute set", path);
+            throw EvalError("file '%s' must not require evaluation;"
+                            " see Nix issue #4945 or the"
+                            " \"Flake format\" section of `nix flake --help`", path);
         eval(e, v);
     } catch (Error & e) {
         addErrorTrace(e, "while evaluating the file '%1%':", resolvedPath);
