@@ -16,6 +16,8 @@ public:
     /* Size of the hash part of store paths, in base-32 characters. */
     constexpr static size_t HashLen = 32; // i.e. 160 bits
 
+    constexpr static size_t MaxPathLen = 211;
+
     StorePath() = delete;
 
     StorePath(std::string_view baseName);
