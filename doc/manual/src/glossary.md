@@ -19,6 +19,13 @@
 
     [store derivation]: #gloss-store-derivation
 
+  - [instantiate]{#gloss-instantiate}, instantiation\
+    Translate a [derivation] into a [store derivation].
+
+    See [`nix-instantiate`](./command-ref/nix-instantiate.md).
+
+    [instantiate]: #gloss-instantiate
+
   - [realise]{#gloss-realise}, realisation\
     Ensure a [store path] is [valid][validity].
 
