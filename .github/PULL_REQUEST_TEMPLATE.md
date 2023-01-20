@@ -13,7 +13,8 @@
 # Checklist for maintainers
 
 <!-- Contributors: please leave this as is -->
-<!-- Maintainers: tick if completed or explain if not relevant -->
+
+Maintainers: tick if completed or explain if not relevant
 
  - [ ] agreed on idea
  - [ ] agreed on implementation strategy
