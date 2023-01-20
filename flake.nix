@@ -475,37 +475,37 @@
           };
 
         # System tests.
-        tests.remoteBuilds = import ./tests/remote-builds.nix {
+        tests.remoteBuilds = import ./tests/nixos/remote-builds.nix {
           system = "x86_64-linux";
           inherit nixpkgs;
           overlay = self.overlays.default;
         };
 
-        tests.nix-copy-closure = import ./tests/nix-copy-closure.nix {
+        tests.nix-copy-closure = import ./tests/nixos/nix-copy-closure.nix {
           system = "x86_64-linux";
           inherit nixpkgs;
           overlay = self.overlays.default;
         };
 
-        tests.nssPreload = (import ./tests/nss-preload.nix rec {
+        tests.nssPreload = (import ./tests/nixos/nss-preload.nix rec {
           system = "x86_64-linux";
           inherit nixpkgs;
           overlay = self.overlays.default;
         });
 
-        tests.githubFlakes = (import ./tests/github-flakes.nix rec {
+        tests.githubFlakes = (import ./tests/nixos/github-flakes.nix rec {
           system = "x86_64-linux";
           inherit nixpkgs;
           overlay = self.overlays.default;
         });
 
-        tests.sourcehutFlakes = (import ./tests/sourcehut-flakes.nix rec {
+        tests.sourcehutFlakes = (import ./tests/nixos/sourcehut-flakes.nix rec {
           system = "x86_64-linux";
           inherit nixpkgs;
           overlay = self.overlays.default;
         });
 
-        tests.containers = (import ./tests/containers.nix rec {
+        tests.containers = (import ./tests/nixos/containers/containers.nix rec {
           system = "x86_64-linux";
           inherit nixpkgs;
           overlay = self.overlays.default;
@@ -514,7 +514,7 @@
         tests.setuid = nixpkgs.lib.genAttrs
           ["i686-linux" "x86_64-linux"]
           (system:
-            import ./tests/setuid.nix rec {
+            import ./tests/nixos/setuid.nix rec {
               inherit nixpkgs system;
               overlay = self.overlays.default;
             });
