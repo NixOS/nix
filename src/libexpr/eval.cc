@@ -2128,7 +2128,7 @@ std::optional<std::string> EvalState::tryAttrsToString(const PosIdx pos, Value &
         Value v1;
         callFunction(*i->value, v, v1, pos);
         return coerceToString(pos, v1, context,
-                "while evaluating the result of the `toString` attribute",
+                "while evaluating the result of the `__toString` attribute",
                 coerceMore, copyToStore).toOwned();
     }
 
