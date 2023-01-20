@@ -18,8 +18,10 @@ Maintainers: tick if completed or explain if not relevant
 
  - [ ] agreed on idea
  - [ ] agreed on implementation strategy
- - [ ] unit tests
- - [ ] functional tests (`tests/**.sh`)
+ - [ ] tests, as appropriate
+   - functional tests - `tests/**.sh`
+   - unit tests - `src/*/tests`
+   - integration tests
  - [ ] documentation in the manual
  - [ ] code and comments are self-explanatory
  - [ ] commit message explains why the change was made
