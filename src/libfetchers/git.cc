@@ -655,7 +655,7 @@ struct GitInputScheme : InputScheme
 
         printTalkative("using revision %s of repo '%s'", input.getRev()->gitRev(), repoInfo.url);
 
-        /* Now that we know the ref, check again whether we have it in
+        /* Now that we know the rev, check again whether we have it in
            the store. */
         if (auto res = getCache()->lookup(store, getLockedAttrs()))
             return makeResult(res->first, std::move(res->second));
