@@ -124,8 +124,8 @@ The result is a string.
 
 Update [attribute set] *attrset1* with names and values from *attrset2*.
 
-The returned attribute set will have of all the attributes in *e1* and *e2*.
-If an attribute name is present in both, the attribute value from the former is taken.
+The returned attribute set will have of all the attributes in *attrset1* and *attrset2*.
+If an attribute name is present in both, the attribute value from the latter is taken.
 
 [Update]: #update
 
