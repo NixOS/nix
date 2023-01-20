@@ -483,10 +483,21 @@ struct GitInputScheme : InputScheme
         return *head;
     }
 
-    StorePath fetchToStore(
+    static MakeNotAllowedError makeNotAllowedError(std::string url)
+    {
+        return [url{std::move(url)}](const CanonPath & path) -> RestrictedPathError
+        {
+            if (nix::pathExists(path.abs()))
+                return RestrictedPathError("access to path '%s' is forbidden because it is not under Git control; maybe you should 'git add' it to the repository '%s'?", path, url);
+            else
+                return RestrictedPathError("path '%s' does not exist in Git repository '%s'", path, url);
+        };
+    }
+
+    std::pair<ref<InputAccessor>, Input> getAccessorFromCommit(
         ref<Store> store,
         RepoInfo & repoInfo,
-        Input & input) const
+        Input && input) const
     {
         assert(!repoInfo.isDirty);
 
@@ -503,7 +514,7 @@ struct GitInputScheme : InputScheme
             });
         };
 
-        auto makeResult = [&](const Attrs & infoAttrs, const StorePath & storePath) -> StorePath
+        auto makeResult = [&](const Attrs & infoAttrs, const StorePath & storePath) -> std::pair<ref<InputAccessor>, Input>
         {
             assert(input.getRev());
             assert(!origRev || origRev == input.getRev());
@@ -516,7 +527,9 @@ struct GitInputScheme : InputScheme
             auto narHash = store->queryPathInfo(storePath)->narHash;
             input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
 
-            return storePath;
+            auto accessor = makeStorePathAccessor(store, storePath, makeNotAllowedError(repoInfo.url));
+            accessor->setPathDisplay("«" + input.to_string() + "»");
+            return {accessor, std::move(input)};
         };
 
         if (input.getRev()) {
@@ -733,30 +746,10 @@ struct GitInputScheme : InputScheme
         return makeResult(infoAttrs, std::move(storePath));
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<InputAccessor>, Input> getAccessorFromCheckout(
+        RepoInfo & repoInfo,
+        Input && input) const
     {
-        Input input(_input);
-
-        auto repoInfo = getRepoInfo(input);
-
-        auto makeNotAllowedError = [url{repoInfo.url}](const CanonPath & path) -> RestrictedPathError
-        {
-            if (nix::pathExists(path.abs()))
-                return RestrictedPathError("access to path '%s' is forbidden because it is not under Git control; maybe you should 'git add' it to the repository '%s'?", path, url);
-            else
-                return RestrictedPathError("path '%s' does not exist in Git repository '%s'", path, url);
-        };
-
-        /* Unless we're using the working tree, copy the tree into the
-           Nix store. TODO: We could have an accessor for fetching
-           files from the Git repository directly. */
-        if (input.getRef() || input.getRev() || !repoInfo.isLocal) {
-            auto storePath = fetchToStore(store, repoInfo, input);
-            auto accessor = makeStorePathAccessor(store, storePath, std::move(makeNotAllowedError));
-            accessor->setPathDisplay("«" + input.to_string() + "»");
-            return {accessor, input};
-        }
-
         if (!repoInfo.isDirty) {
             auto ref = getDefaultRef(repoInfo);
             input.attrs.insert_or_assign("ref", ref);
@@ -780,7 +773,23 @@ struct GitInputScheme : InputScheme
                 getLastModified(repoInfo, repoInfo.url, "HEAD"));
         }
 
-        return {makeFSInputAccessor(CanonPath(repoInfo.url), listFiles(repoInfo), std::move(makeNotAllowedError)), input};
+        return {
+            makeFSInputAccessor(CanonPath(repoInfo.url), listFiles(repoInfo), makeNotAllowedError(repoInfo.url)),
+            std::move(input)
+        };
+    }
+
+    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    {
+        Input input(_input);
+
+        auto repoInfo = getRepoInfo(input);
+
+        if (input.getRef() || input.getRev() || !repoInfo.isLocal)
+            return getAccessorFromCommit(store, repoInfo, std::move(input));
+        else
+            return getAccessorFromCheckout(repoInfo, std::move(input));
+
     }
 
     bool isLocked(const Input & input) const override
