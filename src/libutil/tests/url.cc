@@ -99,6 +99,27 @@ namespace nix {
         ASSERT_EQ(parsed, expected);
     }
 
+    TEST(parseURL, parsesFilePlusHttpsUrl) {
+        auto s = "file+https://www.example.org/video.mp4";
+        auto parsed = parseURL(s);
+
+        ParsedURL expected {
+            .url = "file+https://www.example.org/video.mp4",
+            .base = "https://www.example.org/video.mp4",
+            .scheme = "file+https",
+            .authority = "www.example.org",
+            .path = "/video.mp4",
+            .query = (StringMap) { },
+            .fragment = "",
+        };
+
+        ASSERT_EQ(parsed, expected);
+    }
+
+    TEST(parseURL, rejectsAuthorityInUrlsWithFileTransportation) {
+        auto s = "file://www.example.org/video.mp4";
+        ASSERT_THROW(parseURL(s), Error);
+    }
 
     TEST(parseURL, parseIPv4Address) {
         auto s = "http://127.0.0.1:8080/file.tar.gz?download=fast&when=now#hello";
