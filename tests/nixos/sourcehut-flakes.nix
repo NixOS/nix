@@ -1,12 +1,8 @@
-{ nixpkgs, system, overlay }:
-
-with import (nixpkgs + "/nixos/lib/testing-python.nix")
-{
-  inherit system;
-  extraConfigurations = [{ nixpkgs.overlays = [ overlay ]; }];
-};
+{ lib, config, hostPkgs, nixpkgs, ... }:
 
 let
+  pkgs = config.nodes.sourcehut.nixpkgs.pkgs;
+
   # Generate a fake root CA and a fake git.sr.ht certificate.
   cert = pkgs.runCommand "cert" { buildInputs = [ pkgs.openssl ]; }
     ''
@@ -63,8 +59,6 @@ let
     '';
 
 in
-
-makeTest (
 
   {
     name = "sourcehut-flakes";
@@ -164,4 +158,4 @@ makeTest (
       client.succeed("nix build nixpkgs#fuse --tarball-ttl 0")
     '';
 
-  })
+}
