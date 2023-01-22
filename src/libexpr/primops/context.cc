@@ -83,15 +83,13 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
     state.forceString(*args[0], context, pos);
     auto contextInfos = std::map<StorePath, ContextInfo>();
     for (const auto & p : context) {
-        Path drv;
-        std::string output;
         NixStringContextElem ctx = NixStringContextElem::parse(*state.store, p);
         std::visit(overloaded {
             [&](NixStringContextElem::DrvDeep & d) {
                 contextInfos[d.drvPath].allOutputs = true;
             },
             [&](NixStringContextElem::Built & b) {
-                contextInfos[b.drvPath].outputs.emplace_back(std::move(output));
+                contextInfos[b.drvPath].outputs.emplace_back(std::move(b.output));
             },
             [&](NixStringContextElem::Opaque & o) {
                 contextInfos[o.path].path = true;
