@@ -1646,23 +1646,73 @@ static RegisterPrimOp primop_hashFile({
     .fun = prim_hashFile,
 });
 
+
+/* Stringize a directory entry enum. Used by `readFileType' and `readDir'. */
+static const char * dirEntTypeToString(unsigned char dtType)
+{
+    /* Enum DT_(DIR|LNK|REG|UNKNOWN) */
+    switch(dtType) {
+        case DT_REG: return "regular";   break;
+        case DT_DIR: return "directory"; break;
+        case DT_LNK: return "symlink";   break;
+        default:     return "unknown";   break;
+    }
+    return "unknown";  /* Unreachable */
+}
+
+
+static void prim_readFileType(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    auto path = realisePath(state, pos, *args[0]);
+    /* Retrieve the directory entry type and stringize it. */
+    v.mkString(dirEntTypeToString(getFileType(path)));
+}
+
+static RegisterPrimOp primop_readFileType({
+    .name = "__readFileType",
+    .args = {"p"},
+    .doc = R"(
+      Determine the directory entry type of a filesystem node, being
+      one of "directory", "regular", "symlink", or "unknown".
+    )",
+    .fun = prim_readFileType,
+});
+
 /* Read a directory (without . or ..) */
 static void prim_readDir(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     auto path = realisePath(state, pos, *args[0]);
 
+    // Retrieve directory entries for all nodes in a directory.
+    // This is similar to `getFileType` but is optimized to reduce system calls
+    // on many systems.
     DirEntries entries = readDirectory(path);
 
     auto attrs = state.buildBindings(entries.size());
 
+    // If we hit unknown directory entry types we may need to fallback to
+    // using `getFileType` on some systems.
+    // In order to reduce system calls we make each lookup lazy by using
+    // `builtins.readFileType` application.
+    Value * readFileType = nullptr;
+
     for (auto & ent : entries) {
-        if (ent.type == DT_UNKNOWN)
-            ent.type = getFileType(path + "/" + ent.name);
-        attrs.alloc(ent.name).mkString(
-            ent.type == DT_REG ? "regular" :
-            ent.type == DT_DIR ? "directory" :
-            ent.type == DT_LNK ? "symlink" :
-            "unknown");
+        auto & attr = attrs.alloc(ent.name);
+        if (ent.type == DT_UNKNOWN) {
+            // Some filesystems or operating systems may not be able to return
+            // detailed node info quickly in this case we produce a thunk to
+            // query the file type lazily.
+            auto epath = state.allocValue();
+            Path path2 = path + "/" + ent.name;
+            epath->mkString(path2);
+            if (!readFileType)
+                readFileType = &state.getBuiltin("readFileType");
+            attr.mkApp(readFileType, epath);
+        } else {
+            // This branch of the conditional is much more likely.
+            // Here we just stringize the directory entry type.
+            attr.mkString(dirEntTypeToString(ent.type));
+        }
     }
 
     v.mkAttrs(attrs);
