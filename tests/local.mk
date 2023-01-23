@@ -71,6 +71,7 @@ nix_tests = \
   ca/recursive.sh \
   binary-cache-build-remote.sh \
   search.sh \
+  search-recurse.sh \
   logging.sh \
   export.sh \
   config.sh \
