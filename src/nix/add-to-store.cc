@@ -43,13 +43,15 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 
         ValidPathInfo info {
             *store,
-            std::move(*namePart),
-            FixedOutputInfo {
-                {
-                    .method = std::move(ingestionMethod),
-                    .hash = std::move(hash),
+            StorePathDescriptor {
+                .name = *namePart,
+                .info = FixedOutputInfo {
+                    {
+                        .method = std::move(ingestionMethod),
+                        .hash = std::move(hash),
+                    },
+                    .references = {},
                 },
-                .references = {},
             },
             narHash,
         };

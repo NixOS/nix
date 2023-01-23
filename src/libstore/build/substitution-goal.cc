@@ -95,9 +95,10 @@ void PathSubstitutionGoal::tryNext()
     subs.pop_front();
 
     if (ca) {
-        subPath = sub->makeFixedOutputPathFromCA(
-            std::string { storePath.name() },
-            caWithoutRefs(*ca));
+        subPath = sub->makeFixedOutputPathFromCA({
+            .name = std::string { storePath.name() },
+            .info = caWithoutRefs(*ca),
+        });
         if (sub->storeDir == worker.store.storeDir)
             assert(subPath == storePath);
     } else if (sub->storeDir != worker.store.storeDir) {

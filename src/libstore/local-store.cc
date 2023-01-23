@@ -1136,9 +1136,10 @@ void LocalStore::querySubstitutablePathInfos(const StorePathCAMap & paths, Subst
 
             // Recompute store path so that we can use a different store root.
             if (path.second) {
-                subPath = makeFixedOutputPathFromCA(
-                    path.first.name(),
-                    caWithoutRefs(*path.second));
+                subPath = makeFixedOutputPathFromCA({
+                    .name = std::string { path.first.name() },
+                    .info = caWithoutRefs(*path.second),
+                });
                 if (sub->storeDir == storeDir)
                     assert(subPath == path.first);
                 if (subPath != path.first)
@@ -1416,18 +1417,21 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
 
     auto [hash, size] = hashSink->finish();
 
-    ContentAddressWithReferences desc = FixedOutputInfo {
-        {
-            .method = method,
-            .hash = hash,
-        },
-        .references = {
-            .others = references,
-            .self = false,
+    auto desc = StorePathDescriptor {
+        std::string { name },
+        FixedOutputInfo {
+            {
+                .method = method,
+                .hash = hash,
+            },
+            .references = {
+                .others = references,
+                .self = false,
+            },
         },
     };
 
-    auto dstPath = makeFixedOutputPathFromCA(name, desc);
+    auto dstPath = makeFixedOutputPathFromCA(desc);
 
     addTempRoot(dstPath);
 
@@ -1471,12 +1475,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
 
             optimisePath(realPath, repair);
 
-            ValidPathInfo info {
-                *this,
-                name,
-                std::move(desc),
-                narHash.first
-            };
+            ValidPathInfo info { *this, std::move(desc), narHash.first };
             info.narSize = narHash.second;
             registerValidPath(info);
         }

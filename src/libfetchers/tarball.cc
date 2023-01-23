@@ -72,13 +72,15 @@ DownloadFileResult downloadFile(
         auto hash = hashString(htSHA256, res.data);
         ValidPathInfo info {
             *store,
-            name,
-            FixedOutputInfo {
-                {
-                    .method = FileIngestionMethod::Flat,
-                    .hash = hash,
+            {
+                .name = name,
+                .info = FixedOutputInfo {
+                    {
+                        .method = FileIngestionMethod::Flat,
+                        .hash = hash,
+                    },
+                    .references = {},
                 },
-                .references = {},
             },
             hashString(htSHA256, sink.s),
         };

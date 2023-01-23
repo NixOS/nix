@@ -49,13 +49,15 @@ std::map<StorePath, StorePath> makeContentAddressed(
 
         ValidPathInfo info {
             dstStore,
-            path.name(),
-            FixedOutputInfo {
-                {
-                    .method = FileIngestionMethod::Recursive,
-                    .hash = narModuloHash,
+            StorePathDescriptor {
+                .name = std::string { path.name() },
+                .info = FixedOutputInfo {
+                    {
+                        .method = FileIngestionMethod::Recursive,
+                        .hash = narModuloHash,
+                    },
+                    .references = std::move(refs),
                 },
-                .references = std::move(refs),
             },
             Hash::dummy,
         };

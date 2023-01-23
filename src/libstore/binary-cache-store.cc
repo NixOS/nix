@@ -307,15 +307,17 @@ StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, std::string_view n
     return addToStoreCommon(dump, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
             *this,
-            name,
-            FixedOutputInfo {
-                {
-                    .method = method,
-                    .hash = nar.first,
-                },
-                .references = {
-                    .others = references,
-                    .self = false,
+            {
+                .name = std::string { name },
+                .info = FixedOutputInfo {
+                    {
+                        .method = method,
+                        .hash = nar.first,
+                    },
+                    .references = {
+                        .others = references,
+                        .self = false,
+                    },
                 },
             },
             nar.first,
@@ -425,15 +427,17 @@ StorePath BinaryCacheStore::addToStore(
     return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
             *this,
-            name,
-            FixedOutputInfo {
-                {
-                    .method = method,
-                    .hash = h,
-                },
-                .references = {
-                    .others = references,
-                    .self = false,
+            {
+                .name = std::string { name },
+                .info = FixedOutputInfo {
+                    {
+                        .method = method,
+                        .hash = h,
+                    },
+                    .references = {
+                        .others = references,
+                        .self = false,
+                    },
                 },
             },
             nar.first,
@@ -461,10 +465,12 @@ StorePath BinaryCacheStore::addTextToStore(
     return addToStoreCommon(source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
             *this,
-            std::string { name },
-            TextInfo {
-                { .hash = textHash },
-                references,
+            {
+                .name = std::string { name },
+                .info = TextInfo {
+                    { .hash = textHash },
+                    references,
+                },
             },
             nar.first,
         };

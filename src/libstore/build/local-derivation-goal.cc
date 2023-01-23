@@ -2475,13 +2475,15 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             auto got = caSink.finish().first;
             ValidPathInfo newInfo0 {
                 worker.store,
-                outputPathName(drv->name, outputName),
-                FixedOutputInfo {
-                    {
-                        .method = outputHash.method,
-                        .hash = got,
+                {
+                    .name = outputPathName(drv->name, outputName),
+                    .info = FixedOutputInfo {
+                        {
+                            .method = outputHash.method,
+                            .hash = got,
+                        },
+                        .references = rewriteRefs(),
                     },
-                    .references = rewriteRefs(),
                 },
                 Hash::dummy,
             };

@@ -209,17 +209,17 @@ StorePath Store::makeTextPath(std::string_view name, const TextInfo & info) cons
 }
 
 
-StorePath Store::makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const
+StorePath Store::makeFixedOutputPathFromCA(const StorePathDescriptor & desc) const
 {
     // New template
     return std::visit(overloaded {
         [&](const TextInfo & ti) {
-            return makeTextPath(name, ti);
+            return makeTextPath(desc.name, ti);
         },
         [&](const FixedOutputInfo & foi) {
-            return makeFixedOutputPath(name, foi);
+            return makeFixedOutputPath(desc.name, foi);
         }
-    }, ca);
+    }, desc.info);
 }
 
 
@@ -437,13 +437,15 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
 
     ValidPathInfo info {
         *this,
-        name,
-        FixedOutputInfo {
-            {
-                .method = method,
-                .hash = hash,
+        StorePathDescriptor {
+            std::string { name },
+            FixedOutputInfo {
+                {
+                    .method = method,
+                    .hash = hash,
+                },
+                .references = {},
             },
-            .references = {},
         },
         narHash,
     };
@@ -995,8 +997,7 @@ void copyStorePath(
     if (info->ca && info->references.empty()) {
         auto info2 = make_ref<ValidPathInfo>(*info);
         info2->path = dstStore.makeFixedOutputPathFromCA(
-            info->path.name(),
-            info->contentAddressWithReferenences().value());
+            info->fullStorePathDescriptorOpt().value());
         if (dstStore.storeDir == srcStore.storeDir)
             assert(info->path == info2->path);
         info = info2;
@@ -1109,8 +1110,7 @@ std::map<StorePath, StorePath> copyPaths(
         auto storePathForDst = storePathForSrc;
         if (currentPathInfo.ca && currentPathInfo.references.empty()) {
             storePathForDst = dstStore.makeFixedOutputPathFromCA(
-                currentPathInfo.path.name(),
-                currentPathInfo.contentAddressWithReferenences().value());
+                currentPathInfo.fullStorePathDescriptorOpt().value());
             if (dstStore.storeDir == srcStore.storeDir)
                 assert(storePathForDst == storePathForSrc);
             if (storePathForDst != storePathForSrc)
