@@ -505,6 +505,26 @@ struct InstallableAttrPath : InstallableValue
 
         return res;
     }
+
+    std::vector<ref<eval_cache::AttrCursor>> getCursors(EvalState &state) override
+    {
+        auto loader = [&]() {
+            Value *vCalled = state.allocValue();
+            state.autoCallFunction(*cmd.getAutoArgs(state), **v, *vCalled);
+            return vCalled;
+        };
+        auto evalCache = std::make_shared<nix::eval_cache::EvalCache>(std::nullopt, state, loader);
+        auto root = evalCache->getRoot();
+        auto resultOrSuggestions = root->findAlongAttrPath(parseAttrPath(state, attrPath));
+        if (resultOrSuggestions) {
+            return {*resultOrSuggestions};
+        }
+
+        throw Error(
+            resultOrSuggestions.getSuggestions(),
+            "no such attribute %s",
+            attrPath);
+        }
 };
 
 std::vector<std::string> InstallableFlake::getActualAttrPaths()
