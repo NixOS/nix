@@ -44,3 +44,6 @@ e=$'\x1b' # grep doesn't support \e, \033 or even \x1b
 (( $(nix search -f search.nix foo --exclude 'foo|bar' | grep -Ec 'foo|bar') == 0 ))
 (( $(nix search -f search.nix foo -e foo --exclude bar | grep -Ec 'foo|bar') == 0 ))
 [[ $(nix search -f search.nix -e bar --json | jq -c 'keys') == '["foo","hello"]' ]]
+
+# When searching for nonexistent attrpath, the error message should mention the attrpath
+(! nix search -f search.nix nonexistent) |& grep -q 'nonexistent'

@@ -181,15 +181,21 @@ struct CmdSearch : InstallableCommand, MixJSON
                 else if (initialRecurse)
                     recurse();
 
-                else if (attrPathS[0] == "legacyPackages" && attrPath.size() > 2) {
+                else if (file || expr || (attrPathS[0] == "legacyPackages" && attrPath.size() > 2))
+                {
                     auto attr = cursor.maybeGetAttr(state->sRecurseForDerivations);
                     if (attr && attr->getBool())
                         recurse();
                 }
-
             } catch (EvalError & e) {
-                if (!(attrPath.size() > 0 && attrPathS[0] == "legacyPackages"))
-                    throw;
+                if (file || expr) {
+                    // For non-flake inputs, ignore non-top-level eval errors
+                    if (initialRecurse) throw;
+                } else {
+                    // For flakes, ignore eval errors under legacyPackages
+                    if (!(attrPath.size() > 0 && attrPathS[0] == "legacyPackages"))
+                        throw;
+                }
             }
         };
 
