@@ -198,10 +198,6 @@ struct InstallableFlake : InstallableValue
     std::vector<ref<eval_cache::AttrCursor>>
     getCursors(EvalState & state) override;
 
-    /* Get a cursor to the first attrpath in getActualAttrPaths() that
-       exists, or throw an exception with suggestions if none exists. */
-    ref<eval_cache::AttrCursor> getCursor(EvalState & state) override;
-
     std::shared_ptr<flake::LockedFlake> getLockedFlake() const;
 
     FlakeRef nixpkgsFlakeRef() const override;
