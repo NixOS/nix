@@ -331,7 +331,7 @@ OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd, 
         [&](const OutputsSpec::Names & names) {
             return static_cast<std::set<std::string>>(names);
         },
-    }, bfd.outputs);
+    }, bfd.outputs.raw());
     for (auto & output : outputNames) {
         auto outputHash = get(outputHashes, output);
         if (!outputHash)

@@ -147,11 +147,4 @@ Hash getContentAddressHash(const ContentAddressWithReferences & ca);
 
 std::string printMethodAlgo(const ContentAddressWithReferences &);
 
-struct StorePathDescriptor {
-    std::string name;
-    ContentAddressWithReferences info;
-
-    GENERATE_CMP(StorePathDescriptor, me->name, me->info);
-};
-
 }

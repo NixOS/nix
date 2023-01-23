@@ -35,10 +35,9 @@ std::optional<StorePath> DerivationOutput::path(const Store & store, std::string
 
 StorePath DerivationOutput::CAFixed::path(const Store & store, std::string_view drvName, std::string_view outputName) const
 {
-    return store.makeFixedOutputPathFromCA(StorePathDescriptor {
-        .name = outputPathName(drvName, outputName),
-        .info = ca,
-    });
+    return store.makeFixedOutputPathFromCA(
+        outputPathName(drvName, outputName),
+        ca);
 }
 
 

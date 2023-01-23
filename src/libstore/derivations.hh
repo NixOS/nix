@@ -13,6 +13,7 @@
 
 namespace nix {
 
+class Store;
 
 /* Abstract syntax of derivations. */
 

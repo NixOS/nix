@@ -203,6 +203,9 @@ public:
         throw std::move(error);
     }
 
+    // This is dangerous, but gets in line with the idea that error creation and
+    // throwing should not allocate on the stack of hot functions.
+    // as long as errors are immediately thrown, it works.
     ErrorBuilder * errorBuilder;
 
     template<typename... Args>
@@ -375,9 +378,9 @@ public:
        booleans and lists to a string.  If `copyToStore' is set,
        referenced paths are copied to the Nix store as a side effect. */
     BackedStringView coerceToString(const PosIdx pos, Value & v, PathSet & context,
+        std::string_view errorCtx,
         bool coerceMore = false, bool copyToStore = true,
-        bool canonicalizePath = true,
-        std::string_view errorCtx = "");
+        bool canonicalizePath = true);
 
     StorePath copyPathToStore(PathSet & context, const Path & path);
 

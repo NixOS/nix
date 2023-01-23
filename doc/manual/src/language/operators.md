@@ -24,7 +24,7 @@
 | [Equality]                             | *expr* `==` *expr*                         | none          | 11         |
 | Inequality                             | *expr* `!=` *expr*                         | none          | 11         |
 | Logical conjunction (`AND`)            | *bool* `&&` *bool*                         | left          | 12         |
-| Logical disjunction (`OR`)             | *bool* `||` *bool*                         | left          | 13         |
+| Logical disjunction (`OR`)             | *bool* `\|\|` *bool*                       | left          | 13         |
 | [Logical implication]                  | *bool* `->` *bool*                         | none          | 14         |
 
 [string]: ./values.md#type-string
@@ -120,12 +120,12 @@ The result is a string.
 
 ## Update
 
-> *attrset1* + *attrset2*
+> *attrset1* // *attrset2*
 
 Update [attribute set] *attrset1* with names and values from *attrset2*.
 
-The returned attribute set will have of all the attributes in *e1* and *e2*.
-If an attribute name is present in both, the attribute value from the former is taken.
+The returned attribute set will have of all the attributes in *attrset1* and *attrset2*.
+If an attribute name is present in both, the attribute value from the latter is taken.
 
 [Update]: #update
 

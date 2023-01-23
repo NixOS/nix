@@ -2484,13 +2484,11 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             auto got = caSink.finish().first;
             ValidPathInfo newInfo0 {
                 worker.store,
-                {
-                    .name = outputPathName(drv->name, outputName),
-                    .info = contentAddressFromMethodHashAndRefs(
-                        outputHash.method,
-                        std::move(got),
-                        rewriteRefs()),
-                },
+                outputPathName(drv->name, outputName),
+                contentAddressFromMethodHashAndRefs(
+                    outputHash.method,
+                    std::move(got),
+                    rewriteRefs()),
                 Hash::dummy,
             };
             if (*scratchPath != newInfo0.path) {

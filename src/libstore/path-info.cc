@@ -21,48 +21,45 @@ void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
     sigs.insert(secretKey.signDetached(fingerprint(store)));
 }
 
-std::optional<StorePathDescriptor> ValidPathInfo::fullStorePathDescriptorOpt() const
+std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithReferenences() const
 {
     if (! ca)
         return std::nullopt;
 
-    return StorePathDescriptor {
-        .name = std::string { path.name() },
-        .info = std::visit(overloaded {
-            [&](const TextHash & th) -> ContentAddressWithReferences {
-                assert(references.count(path) == 0);
-                return TextInfo {
-                    th,
-                    .references = references,
-                };
-            },
-            [&](const FixedOutputHash & foh) -> ContentAddressWithReferences {
-                auto refs = references;
-                bool hasSelfReference = false;
-                if (refs.count(path)) {
-                    hasSelfReference = true;
-                    refs.erase(path);
-                }
-                return FixedOutputInfo {
-                    foh,
-                    .references = {
-                        .others = std::move(refs),
-                        .self = hasSelfReference,
-                    },
-                };
-            },
-        }, *ca),
-    };
+    return std::visit(overloaded {
+        [&](const TextHash & th) -> ContentAddressWithReferences {
+            assert(references.count(path) == 0);
+            return TextInfo {
+                th,
+                .references = references,
+            };
+        },
+        [&](const FixedOutputHash & foh) -> ContentAddressWithReferences {
+            auto refs = references;
+            bool hasSelfReference = false;
+            if (refs.count(path)) {
+                hasSelfReference = true;
+                refs.erase(path);
+            }
+            return FixedOutputInfo {
+                foh,
+                .references = {
+                    .others = std::move(refs),
+                    .self = hasSelfReference,
+                },
+            };
+        },
+    }, *ca);
 }
 
 bool ValidPathInfo::isContentAddressed(const Store & store) const
 {
-    auto fullCaOpt = fullStorePathDescriptorOpt();
+    auto fullCaOpt = contentAddressWithReferenences();
 
     if (! fullCaOpt)
         return false;
 
-    auto caPath = store.makeFixedOutputPathFromCA(*fullCaOpt);
+    auto caPath = store.makeFixedOutputPathFromCA(path.name(), *fullCaOpt);
 
     bool res = caPath == path;
 
@@ -102,9 +99,10 @@ Strings ValidPathInfo::shortRefs() const
 
 ValidPathInfo::ValidPathInfo(
     const Store & store,
-    StorePathDescriptor && info,
+    std::string_view name,
+    ContentAddressWithReferences && ca,
     Hash narHash)
-      : path(store.makeFixedOutputPathFromCA(info))
+      : path(store.makeFixedOutputPathFromCA(name, ca))
       , narHash(narHash)
 {
     std::visit(overloaded {
@@ -118,7 +116,7 @@ ValidPathInfo::ValidPathInfo(
                 this->references.insert(path);
             this->ca = std::move((FixedOutputHash &&) foi);
         },
-    }, std::move(info.info));
+    }, std::move(ca));
 }
 
 

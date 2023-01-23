@@ -264,7 +264,7 @@ static Flake getFlake(
                 PathSet emptyContext = {};
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
-                    state.coerceToString(setting.pos, *setting.value, emptyContext, false, true, true, "") .toOwned());
+                    state.coerceToString(setting.pos, *setting.value, emptyContext, "", false, true, true) .toOwned());
             }
             else if (setting.value->type() == nInt)
                 flake.config.settings.emplace(
