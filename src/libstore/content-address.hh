@@ -132,11 +132,4 @@ typedef std::variant<
 
 ContentAddressWithReferences caWithoutRefs(const ContentAddress &);
 
-struct StorePathDescriptor {
-    std::string name;
-    ContentAddressWithReferences info;
-
-    GENERATE_CMP(StorePathDescriptor, me->name, me->info);
-};
-
 }
