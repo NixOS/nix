@@ -9,9 +9,9 @@ namespace nix {
 
 const std::string nativeSystem = SYSTEM;
 
-void BaseError::addTrace(std::shared_ptr<AbstractPos> && e, hintformat hint)
+void BaseError::addTrace(std::shared_ptr<AbstractPos> && e, hintformat hint, bool frame)
 {
-    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint });
+    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint, .frame = frame });
 }
 
 // c++ std::exception descendants must have a 'const char* what()' function.
@@ -200,13 +200,125 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
     auto noSource = ANSI_ITALIC " (source not available)" ANSI_NORMAL "\n";
 
-    // traces
-    if (showTrace && !einfo.traces.empty()) {
+    /*
+     * Traces
+     * ------
+     *
+     *  The semantics of traces is a bit weird. We have only one option to
+     *  print them and to make them verbose (--show-trace). In the code they
+     *  are always collected, but they are not printed by default. The code
+     *  also collects more traces when the option is on. This means that there
+     *  is no way to print the simplified traces at all.
+     *
+     *  I (layus) designed the code to attach positions to a restricted set of
+     *  messages. This means that we have  a lot of traces with no position at
+     *  all, including most of the base error messages. For example "type
+     *  error: found a string while a set was expected" has no position, but
+     *  will come with several traces detailing it's precise relation to the
+     *  closest know position. This makes erroring without printing traces
+     *  quite useless.
+     *
+     *  This is why I introduced the idea to always print a few traces on
+     *  error. The number 3 is quite arbitrary, and was selected so as not to
+     *  clutter the console on error. For the same reason, a trace with an
+     *  error position takes more space, and counts as two traces towards the
+     *  limit.
+     *
+     *  The rest is truncated, unless --show-trace is passed. This preserves
+     *  the same bad semantics of --show-trace to both show the trace and
+     *  augment it with new data. Not too sure what is the best course of
+     *  action.
+     *
+     *  The issue is that it is fundamentally hard to provide a trace for a
+     *  lazy language. The trace will only cover the current spine of the
+     *  evaluation, missing things that have been evaluated before. For
+     *  example, most type errors are hard to inspect because there is not
+     *  trace for the faulty value. These errors should really print the faulty
+     *  value itself.
+     *
+     *  In function calls, the --show-trace flag triggers extra traces for each
+     *  function invocation. These work as scopes, allowing to follow the
+     *  current spine of the evaluation graph. Without that flag, the error
+     *  trace should restrict itself to a restricted prefix of that trace,
+     *  until the first scope. If we ever get to such a precise error
+     *  reporting, there would be no need to add an arbitrary limit here. We
+     *  could always print the full trace, and it would just be small without
+     *  the flag.
+     *
+     *  One idea I had is for XxxError.addTrace() to perform nothing if one
+     *  scope has already been traced. Alternatively, we could stop here when
+     *  we encounter such a scope instead of after an arbitrary number of
+     *  traces. This however requires to augment traces with the notion of
+     *  "scope".
+     *
+     *  This is particularly visible in code like evalAttrs(...) where we have
+     *  to make a decision between the two following options.
+     *
+     *  ``` long traces
+     *  inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const Pos & pos, std::string_view errorCtx)
+     *  {
+     *      try {
+     *          e->eval(*this, env, v);
+     *          if (v.type() != nAttrs)
+     *              throwTypeError("value is %1% while a set was expected", v);
+     *      } catch (Error & e) {
+     *          e.addTrace(pos, errorCtx);
+     *          throw;
+     *      }
+     *  }
+     *  ```
+     *
+     *  ``` short traces
+     *  inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const Pos & pos, std::string_view errorCtx)
+     *  {
+     *      e->eval(*this, env, v);
+     *      try {
+     *          if (v.type() != nAttrs)
+     *              throwTypeError("value is %1% while a set was expected", v);
+     *      } catch (Error & e) {
+     *          e.addTrace(pos, errorCtx);
+     *          throw;
+     *      }
+     *  }
+     *  ```
+     *
+     *  The second example can be rewritten more concisely, but kept in this
+     *  form to highlight the symmetry. The first option adds more information,
+     *  because whatever caused an error down the line, in the generic eval
+     *  function, will get annotated with the code location that uses and
+     *  required it. The second option is less verbose, but does not provide
+     *  any context at all as to where and why a failing value was required.
+     *
+     *  Scopes would fix that, by adding context only when --show-trace is
+     *  passed, and keeping the trace terse otherwise.
+     *
+     */
+
+    // Enough indent to align with with the `... `
+    // prepended to each element of the trace
+    auto ellipsisIndent = "  ";
+
+    bool frameOnly = false;
+    if (!einfo.traces.empty()) {
+        size_t count = 0;
         for (const auto & trace : einfo.traces) {
+            if (!showTrace && count > 3) {
+                oss << "\n" << ANSI_WARNING "(stack trace truncated; use '--show-trace' to show the full trace)" ANSI_NORMAL << "\n";
+                break;
+            }
+
+            if (trace.hint.str().empty()) continue;
+            if (frameOnly && !trace.frame) continue;
+
+            count++;
+            frameOnly = trace.frame;
+
             oss << "\n" << "… " << trace.hint.str() << "\n";
 
             if (trace.pos) {
-                oss << "\n" << ANSI_BLUE << "at " ANSI_WARNING << *trace.pos << ANSI_NORMAL << ":";
+                count++;
+
+                oss << "\n" << ellipsisIndent << ANSI_BLUE << "at " ANSI_WARNING << *trace.pos << ANSI_NORMAL << ":";
 
                 if (auto loc = trace.pos->getCodeLines()) {
                     oss << "\n";

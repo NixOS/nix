@@ -554,7 +554,7 @@ ref<eval_cache::EvalCache> openEvalCache(
             auto vFlake = state.allocValue();
             flake::callFlake(state, *lockedFlake, *vFlake);
 
-            state.forceAttrs(*vFlake, noPos);
+            state.forceAttrs(*vFlake, noPos, "while parsing cached flake data");
 
             auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
             assert(aOutputs);
@@ -618,7 +618,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
 
         else if (v.type() == nString) {
             PathSet context;
-            auto s = state->forceString(v, context, noPos);
+            auto s = state->forceString(v, context, noPos, fmt("while evaluating the flake output attribute '%s'", attrPath));
             auto storePath = state->store->maybeParseStorePath(s);
             if (storePath && context.count(std::string(s))) {
                 return {{

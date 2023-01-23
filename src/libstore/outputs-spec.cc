@@ -1,8 +1,10 @@
-#include "util.hh"
-#include "outputs-spec.hh"
-#include "nlohmann/json.hpp"
-
 #include <regex>
+#include <nlohmann/json.hpp>
+
+#include "util.hh"
+#include "regex-combinators.hh"
+#include "outputs-spec.hh"
+#include "path-regex.hh"
 
 namespace nix {
 
@@ -18,11 +20,14 @@ bool OutputsSpec::contains(const std::string & outputName) const
     }, raw());
 }
 
+static std::string outputSpecRegexStr =
+    regex::either(
+        regex::group(R"(\*)"),
+        regex::group(regex::list(nameRegexStr)));
 
 std::optional<OutputsSpec> OutputsSpec::parseOpt(std::string_view s)
 {
-    // See checkName() for valid output name characters.
-    static std::regex regex(R"((\*)|([a-zA-Z\+\-\._\?=]+(,[a-zA-Z\+\-\._\?=]+)*))");
+    static std::regex regex(std::string { outputSpecRegexStr });
 
     std::smatch match;
     std::string s2 { s }; // until some improves std::regex
