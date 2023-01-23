@@ -82,7 +82,9 @@
         });
 
         configureFlags =
-          lib.optionals stdenv.isLinux [
+          [
+            "CXXFLAGS=-I${lib.getDev rapidcheck}/extras/gtest/include"
+          ] ++ lib.optionals stdenv.isLinux [
             "--with-boost=${boost}/lib"
             "--with-sandbox-shell=${sh}/bin/busybox"
           ]
@@ -116,6 +118,7 @@
             boost
             lowdown-nix
             gtest
+            rapidcheck
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
@@ -532,6 +535,12 @@
               mkdir $out
             '';
 
+        tests.nixpkgsLibTests =
+          nixpkgs.lib.genAttrs systems (system:
+            import (nixpkgs + "/lib/tests/release.nix")
+              { pkgs = nixpkgsFor.${system}; }
+          );
+
         metrics.nixpkgs = import "${nixpkgs-regression}/pkgs/top-level/metrics.nix" {
           pkgs = nixpkgsFor.x86_64-linux;
           nixpkgs = nixpkgs-regression;
@@ -562,6 +571,7 @@
         binaryTarball = self.hydraJobs.binaryTarball.${system};
         perlBindings = self.hydraJobs.perlBindings.${system};
         installTests = self.hydraJobs.installTests.${system};
+        nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
       } // (nixpkgs.lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};
       });

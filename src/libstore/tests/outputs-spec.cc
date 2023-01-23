@@ -40,6 +40,20 @@ TEST(OutputsSpec, names_out) {
     ASSERT_EQ(expected.to_string(), str);
 }
 
+TEST(OutputsSpec, names_underscore) {
+    std::string_view str = "a_b";
+    OutputsSpec expected = OutputsSpec::Names { "a_b" };
+    ASSERT_EQ(OutputsSpec::parse(str), expected);
+    ASSERT_EQ(expected.to_string(), str);
+}
+
+TEST(OutputsSpec, names_numberic) {
+    std::string_view str = "01";
+    OutputsSpec expected = OutputsSpec::Names { "01" };
+    ASSERT_EQ(OutputsSpec::parse(str), expected);
+    ASSERT_EQ(expected.to_string(), str);
+}
+
 TEST(OutputsSpec, names_out_bin) {
     OutputsSpec expected = OutputsSpec::Names { "out", "bin" };
     ASSERT_EQ(OutputsSpec::parse("out,bin"), expected);
