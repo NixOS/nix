@@ -131,9 +131,14 @@
           });
 
         propagatedDeps =
-          [ (boehmgc.override {
+          [ ((boehmgc.override {
               enableLargeConfig = true;
+            }).overrideAttrs(o: {
+              patches = (o.patches or []) ++ [
+                ./boehmgc-coroutine-sp-fallback.diff
+              ];
             })
+            )
             nlohmann_json
           ];
       };
