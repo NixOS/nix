@@ -465,6 +465,10 @@
 
             src = self;
 
+            configureFlags = [
+              "CXXFLAGS=-I${lib.getDev pkgs.rapidcheck}/extras/gtest/include"
+            ];
+
             enableParallelBuilding = true;
 
             nativeBuildInputs = nativeBuildDeps;
