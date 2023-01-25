@@ -332,12 +332,11 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <id> attr
 %token <id> ID ATTRPATH
 %token <str> STR IND_STR
-%token <n> INT
+%token <n> INT BIN OCT HEX
 %token <nf> FLOAT
 %token <path> PATH HPATH SPATH PATH_END
 %token <uri> URI
 %token IF THEN ELSE ASSERT WITH LET IN REC INHERIT EQ NEQ AND OR IMPL OR_KW
-%token BIN OCT HEX
 %token DOLLAR_CURLY /* == ${ */
 %token IND_STRING_OPEN IND_STRING_CLOSE
 %token ELLIPSIS
@@ -450,9 +449,9 @@ expr_simple
       else
           $$ = new ExprVar(CUR_POS, data->symbols.create($1));
   }
-  | BIN STR { $$ = new ExprInt(std::stoi(std::string($2), nullptr, 2)); }
-  | OCT STR { $$ = new ExprInt(std::stoi(std::string($2), nullptr, 8)); }
-  | HEX STR { $$ = new ExprInt(std::stoi(std::string($2), nullptr, 16)); }
+  | BIN { $$ = new ExprInt($1); }
+  | OCT { $$ = new ExprInt($1); }
+  | HEX { $$ = new ExprInt($1); }
   | INT { $$ = new ExprInt($1); }
   | FLOAT { $$ = new ExprFloat($1); }
   | '"' string_parts '"' { $$ = $2; }

@@ -113,6 +113,9 @@ static StringToken unescapeStr(SymbolTable & symbols, char * s, size_t length)
 ANY         .|\n
 ID          [a-zA-Z\_][a-zA-Z0-9\_\'\-]*
 INT         [0-9]+
+BIN         0b[01]+
+OCT         0o[0-7]+
+HEX         0x[0-9a-fA-F]+
 FLOAT       (([1-9][0-9]*\.[0-9]*)|(0?\.[0-9]+))([Ee][+-]?[0-9]+)?
 PATH_CHAR   [a-zA-Z0-9\.\_\-\+]
 PATH        {PATH_CHAR}*(\/{PATH_CHAR}+)+\/?
@@ -162,6 +165,33 @@ or          { return OR_KW; }
                   });
               }
               return INT;
+            }
+{BIN}       { errno = 0;
+              yylval->n = strtoll(yytext + 2, 0, 2);
+              if (errno != 0)
+                  throw ParseError({
+                      .msg = hintfmt("invalid binary integer '%1%'", yytext),
+                      .errPos = data->state.positions[CUR_POS],
+                  });
+              return BIN;
+            }
+{OCT}       { errno = 0;
+              yylval->n = strtoll(yytext + 2, 0, 8);
+              if (errno != 0)
+                  throw ParseError({
+                      .msg = hintfmt("invalid octal integer '%1%'", yytext),
+                      .errPos = data->state.positions[CUR_POS],
+                  });
+              return OCT;
+            }
+{HEX}       { errno = 0;
+              yylval->n = strtoll(yytext + 2, 0, 16);
+              if (errno != 0)
+                  throw ParseError({
+                      .msg = hintfmt("invalid hexadecimal integer '%1%'", yytext),
+                      .errPos = data->state.positions[CUR_POS],
+                  });
+              return HEX;
             }
 {FLOAT}     { errno = 0;
               yylval->nf = strtod(yytext, 0);
