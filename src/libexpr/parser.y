@@ -449,10 +449,10 @@ expr_simple
       else
           $$ = new ExprVar(CUR_POS, data->symbols.create($1));
   }
-  | INT { $$ = new ExprInt($1); }
   | "0b" STR { $$ = new ExprInt(std::stoi(std::string($2), nullptr, 2)); }
   | "0o" STR { $$ = new ExprInt(std::stoi(std::string($2), nullptr, 8)); }
   | "0x" STR { $$ = new ExprInt(std::stoi(std::string($2), nullptr, 16)); }
+  | INT { $$ = new ExprInt($1); }
   | FLOAT { $$ = new ExprFloat($1); }
   | '"' string_parts '"' { $$ = $2; }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
