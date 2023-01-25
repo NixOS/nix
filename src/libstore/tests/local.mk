@@ -12,4 +12,4 @@ libstore-tests_CXXFLAGS += -I src/libstore -I src/libutil
 
 libstore-tests_LIBS = libstore libutil
 
-libstore-tests_LDFLAGS := -lrapidcheck $(GTEST_LIBS)
+libstore-tests_LDFLAGS := $(GTEST_LIBS)

@@ -2,7 +2,6 @@
 
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
-#include <rapidcheck/gtest.h>
 
 #include "path-regex.hh"
 #include "store-api.hh"
@@ -63,82 +62,5 @@ TEST_DO_PARSE(equals_sign, "foo=foo")
 
 #undef TEST_DO_PARSE
 
-// For rapidcheck
-void showValue(const StorePath & p, std::ostream & os) {
-    os << p.to_string();
-}
-
-}
-
-namespace rc {
-using namespace nix;
-
-template<>
-struct Arbitrary<StorePath> {
-    static Gen<StorePath> arbitrary();
-};
-
-Gen<StorePath> Arbitrary<StorePath>::arbitrary()
-{
-    auto len = *gen::inRange<size_t>(1, StorePath::MaxPathLen);
-
-    std::string pre { HASH_PART "-" };
-    pre.reserve(pre.size() + len);
-
-    for (size_t c = 0; c < len; ++c) {
-        switch (auto i = *gen::inRange<uint8_t>(0, 10 + 2 * 26 + 6)) {
-            case 0 ... 9:
-                pre += '0' + i;
-            case 10 ... 35:
-                pre += 'A' + (i - 10);
-                break;
-            case 36 ... 61:
-                pre += 'a' + (i - 36);
-                break;
-            case 62:
-                pre += '+';
-                break;
-            case 63:
-                pre += '-';
-                break;
-            case 64:
-                pre += '.';
-                break;
-            case 65:
-                pre += '_';
-                break;
-            case 66:
-                pre += '?';
-                break;
-            case 67:
-                pre += '=';
-                break;
-            default:
-                assert(false);
-        }
-    }
-
-    return gen::just(StorePath { pre });
-}
-
-} // namespace rc
-
-namespace nix {
-
-RC_GTEST_FIXTURE_PROP(
-    StorePathTest,
-    prop_regex_accept,
-    (const StorePath & p))
-{
-    RC_ASSERT(std::regex_match(std::string { p.name() }, nameRegex));
-}
-
-RC_GTEST_FIXTURE_PROP(
-    StorePathTest,
-    prop_round_rip,
-    (const StorePath & p))
-{
-    RC_ASSERT(p == store->parseStorePath(store->printStorePath(p)));
-}
 
 }

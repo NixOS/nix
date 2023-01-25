@@ -82,9 +82,7 @@
         });
 
         configureFlags =
-          [
-            "CXXFLAGS=-I${lib.getDev rapidcheck}/extras/gtest/include"
-          ] ++ lib.optionals stdenv.isLinux [
+          lib.optionals stdenv.isLinux [
             "--with-boost=${boost}/lib"
             "--with-sandbox-shell=${sh}/bin/busybox"
           ]
@@ -118,7 +116,6 @@
             boost
             lowdown-nix
             gtest
-            rapidcheck
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
@@ -658,7 +655,6 @@
             inherit system crossSystem;
             overlays = [ self.overlays.default ];
           };
-          inherit (nixpkgsCross) lib;
         in with commonDeps { pkgs = nixpkgsCross; }; nixpkgsCross.stdenv.mkDerivation {
           name = "nix-${version}";
 
@@ -671,11 +667,7 @@
           nativeBuildInputs = nativeBuildDeps;
           buildInputs = buildDeps ++ propagatedDeps;
 
-          configureFlags = [
-            "CXXFLAGS=-I${lib.getDev nixpkgsCross.rapidcheck}/extras/gtest/include"
-            "--sysconfdir=/etc"
-            "--disable-doc-gen"
-          ];
+          configureFlags = [ "--sysconfdir=/etc" "--disable-doc-gen" ];
 
           enableParallelBuilding = true;
 
