@@ -655,7 +655,6 @@
             inherit system crossSystem;
             overlays = [ self.overlays.default ];
           };
-          inherit (nixpkgsCross) lib;
         in with commonDeps { pkgs = nixpkgsCross; }; nixpkgsCross.stdenv.mkDerivation {
           name = "nix-${version}";
 
@@ -668,11 +667,7 @@
           nativeBuildInputs = nativeBuildDeps;
           buildInputs = buildDeps ++ propagatedDeps;
 
-          configureFlags = [
-            "CXXFLAGS=-I${lib.getDev nixpkgsCross.rapidcheck}/extras/gtest/include"
-            "--sysconfdir=/etc"
-            "--disable-doc-gen"
-          ];
+          configureFlags = [ "--sysconfdir=/etc" "--disable-doc-gen" ];
 
           enableParallelBuilding = true;
 
