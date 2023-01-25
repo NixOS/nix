@@ -139,9 +139,6 @@ in          { return IN; }
 rec         { return REC; }
 inherit     { return INHERIT; }
 or          { return OR_KW; }
-0b          { return BIN; }
-0x          { return HEX; }
-0o          { return OCT; }
 \.\.\.      { return ELLIPSIS; }
 
 \=\=        { return EQ; }
