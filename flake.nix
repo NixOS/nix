@@ -120,6 +120,7 @@
               cmakeFlags = old.cmakeFlags or [] ++ [ "-DBUILD_REGRESS=0" ];
               patches = [ ./libzip-unix-time.patch ];
             }))
+            libgit2
             boost
             lowdown-nix
             gtest

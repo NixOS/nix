@@ -514,7 +514,7 @@ struct GitInputScheme : InputScheme
             });
         };
 
-        auto makeResult = [&](const Attrs & infoAttrs, const StorePath & storePath) -> std::pair<ref<InputAccessor>, Input>
+        auto makeResult2 = [&](const Attrs & infoAttrs, ref<InputAccessor> accessor) -> std::pair<ref<InputAccessor>, Input>
         {
             assert(input.getRev());
             assert(!origRev || origRev == input.getRev());
@@ -522,14 +522,20 @@ struct GitInputScheme : InputScheme
                 input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
             input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
 
+            accessor->setPathDisplay("«" + input.to_string() + "»");
+            return {accessor, std::move(input)};
+        };
+
+        auto makeResult = [&](const Attrs & infoAttrs, const StorePath & storePath) -> std::pair<ref<InputAccessor>, Input>
+        {
             // FIXME: remove?
             //input.attrs.erase("narHash");
             auto narHash = store->queryPathInfo(storePath)->narHash;
             input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
 
             auto accessor = makeStorePathAccessor(store, storePath, makeNotAllowedError(repoInfo.url));
-            accessor->setPathDisplay("«" + input.to_string() + "»");
-            return {accessor, std::move(input)};
+
+            return makeResult2(infoAttrs, accessor);
         };
 
         if (input.getRev()) {
@@ -653,12 +659,28 @@ struct GitInputScheme : InputScheme
 
         // FIXME: check whether rev is an ancestor of ref.
 
-        printTalkative("using revision %s of repo '%s'", input.getRev()->gitRev(), repoInfo.url);
+        auto rev = *input.getRev();
+
+        Attrs infoAttrs({
+            {"rev", rev.gitRev()},
+            {"lastModified", getLastModified(repoInfo, repoDir, rev)},
+        });
+
+        if (!repoInfo.shallow)
+            infoAttrs.insert_or_assign("revCount",
+                getRevCount(repoInfo, repoDir, rev));
+
+        printTalkative("using revision %s of repo '%s'", rev.gitRev(), repoInfo.url);
 
         /* Now that we know the rev, check again whether we have it in
            the store. */
         if (auto res = getCache()->lookup(store, getLockedAttrs()))
             return makeResult(res->first, std::move(res->second));
+
+        if (!repoInfo.submodules) {
+            auto accessor = makeGitInputAccessor(CanonPath(repoDir), rev);
+            return makeResult2(infoAttrs, accessor);
+        }
 
         Path tmpDir = createTempDir();
         AutoDelete delTmpDir(tmpDir, true);
@@ -666,7 +688,7 @@ struct GitInputScheme : InputScheme
 
         auto result = runProgram(RunOptions {
             .program = "git",
-            .args = { "-C", repoDir, "--git-dir", repoInfo.gitDir, "cat-file", "commit", input.getRev()->gitRev() },
+            .args = { "-C", repoDir, "--git-dir", repoInfo.gitDir, "cat-file", "commit", rev.gitRev() },
             .mergeStderrToStdout = true
         });
         if (WEXITSTATUS(result.first) == 128
@@ -677,7 +699,7 @@ struct GitInputScheme : InputScheme
                 "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the "
                 ANSI_BOLD "ref" ANSI_NORMAL " you've specified or add " ANSI_BOLD
                 "allRefs = true;" ANSI_NORMAL " to " ANSI_BOLD "fetchGit" ANSI_NORMAL ".",
-                input.getRev()->gitRev(),
+                rev.gitRev(),
                 ref,
                 repoInfo.url
             );
@@ -696,7 +718,7 @@ struct GitInputScheme : InputScheme
             runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
                                       "--update-head-ok", "--", repoDir, "refs/*:refs/*" });
 
-            runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", input.getRev()->gitRev() });
+            runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", rev.gitRev() });
             runProgram("git", true, { "-C", tmpDir, "remote", "add", "origin", repoInfo.url });
             runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
 
@@ -707,7 +729,7 @@ struct GitInputScheme : InputScheme
             auto source = sinkToSource([&](Sink & sink) {
                 runProgram2({
                     .program = "git",
-                    .args = { "-C", repoDir, "--git-dir", repoInfo.gitDir, "archive", input.getRev()->gitRev() },
+                    .args = { "-C", repoDir, "--git-dir", repoInfo.gitDir, "archive", rev.gitRev() },
                     .standardOut = &sink
                 });
             });
@@ -716,17 +738,6 @@ struct GitInputScheme : InputScheme
         }
 
         auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
-
-        auto rev = *input.getRev();
-
-        Attrs infoAttrs({
-            {"rev", rev.gitRev()},
-            {"lastModified", getLastModified(repoInfo, repoDir, rev)},
-        });
-
-        if (!repoInfo.shallow)
-            infoAttrs.insert_or_assign("revCount",
-                getRevCount(repoInfo, repoDir, rev));
 
         if (!origRev)
             getCache()->add(

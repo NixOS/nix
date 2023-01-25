@@ -117,6 +117,8 @@ ref<InputAccessor> makePatchingInputAccessor(
     ref<InputAccessor> next,
     const std::vector<std::string> & patches);
 
+ref<InputAccessor> makeGitInputAccessor(const CanonPath & path, const Hash & rev);
+
 struct SourcePath
 {
     ref<InputAccessor> accessor;
