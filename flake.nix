@@ -82,9 +82,7 @@
         });
 
         configureFlags =
-          [
-            "CXXFLAGS=-I${lib.getDev rapidcheck}/extras/gtest/include"
-          ] ++ lib.optionals stdenv.isLinux [
+          lib.optionals stdenv.isLinux [
             "--with-boost=${boost}/lib"
             "--with-sandbox-shell=${sh}/bin/busybox"
           ]
@@ -118,7 +116,6 @@
             boost
             lowdown-nix
             gtest
-            rapidcheck
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
