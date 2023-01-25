@@ -25,7 +25,7 @@
   ```
   now works just as
   ```shell-session
-  # nix build glibc^dev
+  # nix build nixpkgs#glibc^dev
   ```
   does already.
 
