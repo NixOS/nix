@@ -2213,11 +2213,16 @@ StorePath EvalState::copyPathToStore(PathSet & context, const SourcePath & path)
 
 SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, PathSet & context, std::string_view errorCtx)
 {
-    forceValue(v, pos);
+    try {
+        forceValue(v, pos);
 
-    if (v.type() == nString) {
-        copyContext(v, context);
-        return decodePath(v.str(), pos);
+        if (v.type() == nString) {
+            copyContext(v, context);
+            return decodePath(v.str(), pos);
+        }
+    } catch (Error & e) {
+        e.addTrace(positions[pos], errorCtx);
+        throw;
     }
 
     if (v.type() == nPath)
