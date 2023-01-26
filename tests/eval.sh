@@ -14,6 +14,7 @@ EOF
 nix eval --expr 'assert 1 + 2 == 3; true'
 
 [[ $(nix eval int -f "./eval.nix") == 123 ]]
+[[ $(nix eval int2 -f "./eval.nix") == 123 ]]
 [[ $(nix eval bin -f "./eval.nix") == 123 ]]
 [[ $(nix eval hex -f "./eval.nix") == 123 ]]
 [[ $(nix eval oct -f "./eval.nix") == 123 ]]
