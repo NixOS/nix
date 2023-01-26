@@ -116,7 +116,7 @@ The result is a string.
 [store path]: ../glossary.md#gloss-store-path
 [store]: ../glossary.md#gloss-store
 
-[Path and string concatenation]: #path-and-string-concatenation
+[String and path concatenation]: #string-and-path-concatenation
 
 ## Update
 
@@ -133,7 +133,7 @@ If an attribute name is present in both, the attribute value from the latter is 
 
 Comparison is
 
-- [arithmetic] for [number]s 
+- [arithmetic] for [number]s
 - lexicographic for [string]s and [path]s
 - item-wise lexicographic for [list]s:
   elements at the same index in both lists are compared according to their type and skipped if they are equal.
