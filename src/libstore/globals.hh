@@ -570,11 +570,15 @@ public:
         {"cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="},
         "trusted-public-keys",
         R"(
-          A whitespace-separated list of public keys. When paths are copied
-          from another Nix store (such as a binary cache), they must be
-          signed with one of these keys. For example:
-          `cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
-          hydra.nixos.org-1:CNHJZBh9K4tP3EKF6FkkgeVYsS3ohTl+oS0Qa8bezVs=`.
+          A whitespace-separated list of public keys.
+
+          At least one of the following condition must be met
+          for Nix to accept copying a store object from another
+          Nix store (such as a substituter):
+
+          - the store object has been signed using a key in the trusted keys list
+          - the [`require-sigs`](#conf-require-sigs) option has been set to `false`
+          - the store object is [output-addressed](@docroot@/glossary.md#gloss-output-addressed-store-object)
         )",
         {"binary-cache-public-keys"}};
 
@@ -670,13 +674,14 @@ public:
           independently. Lower value means higher priority.
           The default is `https://cache.nixos.org`, with a Priority of 40.
 
-          Nix will copy a store path from a remote store only if one
-          of the following is true:
+          At least one of the following conditions must be met for Nix to use
+          a substituter:
 
-          - the store object is signed by one of the [`trusted-public-keys`](#conf-trusted-public-keys)
           - the substituter is in the [`trusted-substituters`](#conf-trusted-substituters) list
-          - the [`require-sigs`](#conf-require-sigs) option has been set to `false`
-          - the store object is [output-addressed](@docroot@/glossary.md#gloss-output-addressed-store-object)
+          - the user calling Nix is in the [`trusted-users`](#conf-trusted-users) list
+
+          In addition, each store path should be trusted as described
+          in [`trusted-public-keys`](#conf-trusted-public-keys)
         )",
         {"binary-caches"}};
 
