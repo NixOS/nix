@@ -1459,7 +1459,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
             unknown, downloadSize, narSize);
     }
 
-    virtual std::optional<std::string> getBuildLog(const StorePath & path) override
+    virtual std::optional<std::string> getBuildLogExact(const StorePath & path) override
     { return std::nullopt; }
 
     virtual void addBuildLog(const StorePath & path, std::string_view log) override
@@ -2735,7 +2735,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             signRealisation(thisRealisation);
             worker.store.registerDrvOutput(thisRealisation);
         }
-        if (wantOutput(outputName, wantedOutputs))
+        if (wantedOutputs.contains(outputName))
             builtOutputs.emplace(thisRealisation.id, thisRealisation);
     }
 

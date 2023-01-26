@@ -140,7 +140,7 @@ static void fetchTree(
             state.forceValue(*attr.value, attr.pos);
 
             if (attr.value->type() == nPath || attr.value->type() == nString) {
-                auto s = state.coerceToString(attr.pos, *attr.value, context, false, false, "").toOwned();
+                auto s = state.coerceToString(attr.pos, *attr.value, context, "", false, false).toOwned();
                 attrs.emplace(state.symbols[attr.name],
                     state.symbols[attr.name] == "url"
                     ? type == "git"
@@ -166,7 +166,9 @@ static void fetchTree(
 
         input = fetchers::Input::fromAttrs(std::move(attrs));
     } else {
-        auto url = state.coerceToString(pos, *args[0], context, false, false, "while evaluating the first argument passed to the fetcher").toOwned();
+        auto url = state.coerceToString(pos, *args[0], context,
+                "while evaluating the first argument passed to the fetcher",
+                false, false).toOwned();
 
         if (type == "git") {
             fetchers::Attrs attrs;
@@ -254,6 +256,9 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
             }));
     } else
         url = state.forceStringNoCtx(*args[0], pos, "while evaluating the url we should fetch");
+
+    if (who == "fetchTarball")
+        url = evalSettings.resolvePseudoUrl(*url);
 
     state.checkURI(*url);
 

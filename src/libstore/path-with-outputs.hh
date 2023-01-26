@@ -2,7 +2,6 @@
 
 #include "path.hh"
 #include "derived-path.hh"
-#include "nlohmann/json_fwd.hpp"
 
 namespace nix {
 

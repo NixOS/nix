@@ -9,6 +9,7 @@
 #include "types.hh"
 #include "split.hh"
 #include "fs-input-accessor.hh"
+#include "store-api.hh"
 
 namespace nix::fetchers {
 

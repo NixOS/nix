@@ -3,6 +3,10 @@
 #include "types.hh"
 #include "path.hh"
 
+namespace nix {
+class Store;
+}
+
 namespace nix::fetchers {
 
 struct DownloadFileResult

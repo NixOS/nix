@@ -509,8 +509,12 @@ struct CmdFlakeCheck : FlakeCommand
                                     auto drvPath = checkDerivation(
                                         fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
                                         *attr2.value, attr2.pos);
-                                    if (drvPath && attr_name == settings.thisSystem.get())
-                                        drvPaths.push_back(DerivedPath::Built{*drvPath});
+                                    if (drvPath && attr_name == settings.thisSystem.get()) {
+                                        drvPaths.push_back(DerivedPath::Built {
+                                            .drvPath = *drvPath,
+                                            .outputs = OutputsSpec::All { },
+                                        });
+                                    }
                                 }
                             }
                         }
@@ -646,6 +650,19 @@ struct CmdFlakeCheck : FlakeCommand
                                 }
                             }
                         }
+
+                        else if (
+                            name == "lib"
+                            || name == "darwinConfigurations"
+                            || name == "darwinModules"
+                            || name == "flakeModule"
+                            || name == "flakeModules"
+                            || name == "herculesCI"
+                            || name == "homeConfigurations"
+                            || name == "nixopsConfigurations"
+                            )
+                            // Known but unchecked community attribute
+                            ;
 
                         else
                             warn("unknown flake output '%s'", name);

@@ -202,7 +202,7 @@ static Flake readFlake(
                 PathSet emptyContext = {};
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
-                    state.coerceToString(setting.pos, *setting.value, emptyContext, false, true, "").toOwned());
+                    state.coerceToString(setting.pos, *setting.value, emptyContext, "", false, true).toOwned());
             }
             else if (setting.value->type() == nInt)
                 flake.config.settings.emplace(

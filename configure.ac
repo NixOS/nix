@@ -277,6 +277,12 @@ fi
 PKG_CHECK_MODULES([GTEST], [gtest_main])
 
 
+# Look for rapidcheck.
+# No pkg-config yet, https://github.com/emil-e/rapidcheck/issues/302
+AC_CHECK_HEADERS([rapidcheck/gtest.h], [], [], [#include <gtest/gtest.h>])
+AC_CHECK_LIB([rapidcheck], [])
+
+
 # Look for nlohmann/json.
 PKG_CHECK_MODULES([NLOHMANN_JSON], [nlohmann_json >= 3.9])
 

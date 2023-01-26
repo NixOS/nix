@@ -19,11 +19,11 @@ nlohmann::json DerivedPath::Built::toJSON(ref<Store> store) const {
     res["drvPath"] = store->printStorePath(drvPath);
     // Fallback for the input-addressed derivation case: We expect to always be
     // able to print the output paths, so let’s do it
-    const auto knownOutputs = store->queryPartialDerivationOutputMap(drvPath);
-    for (const auto & output : outputs) {
-        auto knownOutput = get(knownOutputs, output);
-        if (knownOutput && *knownOutput)
-            res["outputs"][output] = store->printStorePath(**knownOutput);
+    const auto outputMap = store->queryPartialDerivationOutputMap(drvPath);
+    for (const auto & [output, outputPathOpt] : outputMap) {
+        if (!outputs.contains(output)) continue;
+        if (outputPathOpt)
+            res["outputs"][output] = store->printStorePath(*outputPathOpt);
         else
             res["outputs"][output] = nullptr;
     }
@@ -63,7 +63,7 @@ std::string DerivedPath::Built::to_string(const Store & store) const
 {
     return store.printStorePath(drvPath)
         + "!"
-        + (outputs.empty() ? std::string { "*" } : concatStringsSep(",", outputs));
+        + outputs.to_string();
 }
 
 std::string DerivedPath::to_string(const Store & store) const
@@ -81,15 +81,10 @@ DerivedPath::Opaque DerivedPath::Opaque::parse(const Store & store, std::string_
 
 DerivedPath::Built DerivedPath::Built::parse(const Store & store, std::string_view drvS, std::string_view outputsS)
 {
-    auto drvPath = store.parseStorePath(drvS);
-    std::set<std::string> outputs;
-    if (outputsS != "*") {
-        outputs = tokenizeString<std::set<std::string>>(outputsS, ",");
-        if (outputs.empty())
-            throw Error(
-                 "Explicit list of wanted outputs '%s' must not be empty. Consider using '*' as a wildcard meaning all outputs if no output in particular is wanted.", outputsS);
-	}
-    return {drvPath, outputs};
+    return {
+        .drvPath = store.parseStorePath(drvS),
+        .outputs = OutputsSpec::parse(outputsS),
+    };
 }
 
 DerivedPath DerivedPath::parse(const Store & store, std::string_view s)

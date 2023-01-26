@@ -2,6 +2,7 @@
 
 #include "parsed-derivations.hh"
 #include "lock.hh"
+#include "outputs-spec.hh"
 #include "store-api.hh"
 #include "pathlocks.hh"
 #include "goal.hh"
@@ -55,7 +56,7 @@ struct DerivationGoal : public Goal
 
     /* The specific outputs that we need to build.  Empty means all of
        them. */
-    StringSet wantedOutputs;
+    OutputsSpec wantedOutputs;
 
     /* Mapping from input derivations + output names to actual store
        paths. This is filled in by waiteeDone() as each dependency
@@ -128,10 +129,10 @@ struct DerivationGoal : public Goal
     std::string machineName;
 
     DerivationGoal(const StorePath & drvPath,
-        const StringSet & wantedOutputs, Worker & worker,
+        const OutputsSpec & wantedOutputs, Worker & worker,
         BuildMode buildMode = bmNormal);
     DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
-        const StringSet & wantedOutputs, Worker & worker,
+        const OutputsSpec & wantedOutputs, Worker & worker,
         BuildMode buildMode = bmNormal);
     virtual ~DerivationGoal();
 
@@ -142,7 +143,7 @@ struct DerivationGoal : public Goal
     void work() override;
 
     /* Add wanted outputs to an already existing derivation goal. */
-    void addWantedOutputs(const StringSet & outputs);
+    void addWantedOutputs(const OutputsSpec & outputs);
 
     /* The states. */
     void getDerivation();

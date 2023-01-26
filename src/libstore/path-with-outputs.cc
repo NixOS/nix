@@ -15,10 +15,14 @@ std::string StorePathWithOutputs::to_string(const Store & store) const
 
 DerivedPath StorePathWithOutputs::toDerivedPath() const
 {
-    if (!outputs.empty() || path.isDerivation())
-        return DerivedPath::Built { path, outputs };
-    else
+    if (!outputs.empty()) {
+        return DerivedPath::Built { path, OutputsSpec::Names { outputs } };
+    } else if (path.isDerivation()) {
+        assert(outputs.empty());
+        return DerivedPath::Built { path, OutputsSpec::All { } };
+    } else {
         return DerivedPath::Opaque { path };
+    }
 }
 
 
@@ -41,7 +45,18 @@ std::variant<StorePathWithOutputs, StorePath> StorePathWithOutputs::tryFromDeriv
             return StorePathWithOutputs { bo.path };
         },
         [&](const DerivedPath::Built & bfd) -> std::variant<StorePathWithOutputs, StorePath> {
-            return StorePathWithOutputs { bfd.drvPath, bfd.outputs };
+            return StorePathWithOutputs {
+                .path = bfd.drvPath,
+                // Use legacy encoding of wildcard as empty set
+                .outputs = std::visit(overloaded {
+                    [&](const OutputsSpec::All &) -> StringSet {
+                        return {};
+                    },
+                    [&](const OutputsSpec::Names & outputs) {
+                        return static_cast<StringSet>(outputs);
+                    },
+                }, bfd.outputs.raw()),
+            };
         },
     }, p.raw());
 }
@@ -52,8 +67,8 @@ std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s)
     size_t n = s.find("!");
     return n == s.npos
         ? std::make_pair(s, std::set<std::string>())
-        : std::make_pair(((std::string_view) s).substr(0, n),
-            tokenizeString<std::set<std::string>>(((std::string_view) s).substr(n + 1), ","));
+        : std::make_pair(s.substr(0, n),
+            tokenizeString<std::set<std::string>>(s.substr(n + 1), ","));
 }
 
 

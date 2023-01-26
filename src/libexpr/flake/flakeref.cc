@@ -239,15 +239,15 @@ std::pair<ref<InputAccessor>, FlakeRef> FlakeRef::lazyFetch(ref<Store> store) co
     return {accessor, FlakeRef(std::move(lockedInput), subdir)};
 }
 
-std::tuple<FlakeRef, std::string, OutputsSpec> parseFlakeRefWithFragmentAndOutputsSpec(
+std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragmentAndExtendedOutputsSpec(
     const std::string & url,
     const std::optional<Path> & baseDir,
     bool allowMissing,
     bool isFlake)
 {
-    auto [prefix, outputsSpec] = parseOutputsSpec(url);
-    auto [flakeRef, fragment] = parseFlakeRefWithFragment(prefix, baseDir, allowMissing, isFlake);
-    return {std::move(flakeRef), fragment, outputsSpec};
+    auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse(url);
+    auto [flakeRef, fragment] = parseFlakeRefWithFragment(std::string { prefix }, baseDir, allowMissing, isFlake);
+    return {std::move(flakeRef), fragment, extendedOutputsSpec};
 }
 
 }

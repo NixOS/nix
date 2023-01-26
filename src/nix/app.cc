@@ -86,13 +86,13 @@ UnresolvedApp Installable::toApp(EvalState & state)
                     /* We want all outputs of the drv */
                     return DerivedPath::Built {
                         .drvPath = d.drvPath,
-                        .outputs = {},
+                        .outputs = OutputsSpec::All {},
                     };
                 },
                 [&](const NixStringContextElem::Built & b) -> DerivedPath {
                     return DerivedPath::Built {
                         .drvPath = b.drvPath,
-                        .outputs = { b.output },
+                        .outputs = OutputsSpec::Names { b.output },
                     };
                 },
                 [&](const NixStringContextElem::Opaque & o) -> DerivedPath {
@@ -127,7 +127,7 @@ UnresolvedApp Installable::toApp(EvalState & state)
         return UnresolvedApp { App {
             .context = { DerivedPath::Built {
                 .drvPath = drvPath,
-                .outputs = {outputName},
+                .outputs = OutputsSpec::Names { outputName },
             } },
             .program = program,
         }};

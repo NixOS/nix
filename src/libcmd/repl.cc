@@ -397,7 +397,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             Expr * e = parseString(expr);
             Value v;
             e->eval(*state, *env, v);
-            state->forceAttrs(v, noPos, "nevermind, it is ignored anyway");
+            state->forceAttrs(v, noPos, "while evaluating an attrset for the purpose of completion (this error should not be displayed; file an issue?)");
 
             for (auto & i : *v.attrs) {
                 std::string_view name = state->symbols[i.name];
@@ -641,7 +641,12 @@ bool NixRepl::processLine(std::string line)
         Path drvPathRaw = state->store->printStorePath(drvPath);
 
         if (command == ":b" || command == ":bl") {
-            state->store->buildPaths({DerivedPath::Built{drvPath}});
+            state->store->buildPaths({
+                DerivedPath::Built {
+                    .drvPath = drvPath,
+                    .outputs = OutputsSpec::All { },
+                },
+            });
             auto drv = state->store->readDerivation(drvPath);
             logger->cout("\nThis derivation produced the following outputs:");
             for (auto & [outputName, outputPath] : state->store->queryDerivationOutputMap(drvPath)) {
