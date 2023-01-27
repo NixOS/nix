@@ -1,10 +1,10 @@
+#if __linux__
+
 #include "namespaces.hh"
 #include "util.hh"
 #include "finally.hh"
 
 #include <mntent.h>
-
-#if __linux__
 
 namespace nix {
 
