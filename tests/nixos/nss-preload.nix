@@ -1,11 +1,9 @@
-{ nixpkgs, system, overlay }:
-
-with import (nixpkgs + "/nixos/lib/testing-python.nix") {
-  inherit system;
-  extraConfigurations = [ { nixpkgs.overlays = [ overlay ]; } ];
-};
+{ lib, config, nixpkgs, ... }:
 
 let
+
+  pkgs = config.nodes.client.nixpkgs.pkgs;
+
   nix-fetch = pkgs.writeText "fetch.nix" ''
     derivation {
         # This derivation is an copy from what is available over at
@@ -41,9 +39,7 @@ let
   '';
 in
 
-makeTest (
-
-rec {
+{
   name = "nss-preload";
 
   nodes = {
@@ -122,4 +118,4 @@ rec {
           nix-build ${nix-fetch} >&2
           """)
   '';
-})
+}

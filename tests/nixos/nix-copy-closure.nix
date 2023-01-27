@@ -1,13 +1,16 @@
 # Test ‘nix-copy-closure’.
 
-{ nixpkgs, system, overlay }:
+{ lib, config, nixpkgs, hostPkgs, ... }:
 
-with import (nixpkgs + "/nixos/lib/testing-python.nix") {
-  inherit system;
-  extraConfigurations = [ { nixpkgs.overlays = [ overlay ]; } ];
-};
+let
+  pkgs = config.nodes.client.nixpkgs.pkgs;
 
-makeTest (let pkgA = pkgs.cowsay; pkgB = pkgs.wget; pkgC = pkgs.hello; pkgD = pkgs.tmux; in {
+  pkgA = pkgs.cowsay;
+  pkgB = pkgs.wget;
+  pkgC = pkgs.hello;
+  pkgD = pkgs.tmux;
+
+in {
   name = "nix-copy-closure";
 
   nodes =
@@ -74,4 +77,4 @@ makeTest (let pkgA = pkgs.cowsay; pkgB = pkgs.wget; pkgC = pkgs.hello; pkgD = pk
     # )
     # client.succeed("nix-store --check-validity ${pkgC}")
   '';
-})
+}

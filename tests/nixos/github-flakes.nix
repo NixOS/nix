@@ -1,14 +1,9 @@
-{ nixpkgs, system, overlay }:
-
-with import (nixpkgs + "/nixos/lib/testing-python.nix") {
-  inherit system;
-  extraConfigurations = [ { nixpkgs.overlays = [ overlay ]; } ];
-};
-
+{ lib, config, nixpkgs, ... }:
 let
+  pkgs = config.nodes.client.nixpkgs.pkgs;
 
   # Generate a fake root CA and a fake api.github.com / github.com / channels.nixos.org certificate.
-  cert = pkgs.runCommand "cert" { buildInputs = [ pkgs.openssl ]; }
+  cert = pkgs.runCommand "cert" { nativeBuildInputs = [ pkgs.openssl ]; }
     ''
       mkdir -p $out
 
@@ -91,8 +86,6 @@ let
       tar cfz $out/archive/${nixpkgs.rev}.tar.gz $dir --hard-dereference
     '';
 in
-
-makeTest (
 
 {
   name = "github-flakes";
@@ -207,4 +200,4 @@ makeTest (
     client.succeed("nix build nixpkgs#fuse --tarball-ttl 0")
   '';
 
-})
+}
