@@ -1,7 +1,7 @@
 # Derivations
 
 The most important built-in function is `derivation`, which is used to
-describe a single derivation (a build action). It takes as input a set,
+describe a single derivation (a build task). It takes as input a set,
 the attributes of which specify the inputs of the build.
 
   - There must be an attribute named [`system`]{#attr-system} whose value must be a

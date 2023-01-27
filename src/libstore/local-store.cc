@@ -91,6 +91,7 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
 
         if (!lockFile(lockFd.get(), ltWrite, false)) {
             printInfo("waiting for exclusive access to the Nix store for ca drvs...");
+            lockFile(lockFd.get(), ltNone, false); // We have acquired a shared lock; release it to prevent deadlocks
             lockFile(lockFd.get(), ltWrite, true);
         }
 
@@ -158,7 +159,7 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
             txn.commit();
         }
 
-        writeFile(schemaPath, fmt("%d", nixCASchemaVersion));
+        writeFile(schemaPath, fmt("%d", nixCASchemaVersion), 0666, true);
         lockFile(lockFd.get(), ltRead, true);
     }
 }
@@ -281,7 +282,7 @@ LocalStore::LocalStore(const Params & params)
     else if (curSchema == 0) { /* new store */
         curSchema = nixSchemaVersion;
         openDB(*state, true);
-        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
+        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str(), 0666, true);
     }
 
     else if (curSchema < nixSchemaVersion) {
@@ -299,6 +300,7 @@ LocalStore::LocalStore(const Params & params)
 
         if (!lockFile(globalLock.get(), ltWrite, false)) {
             printInfo("waiting for exclusive access to the Nix store...");
+            lockFile(globalLock.get(), ltNone, false); // We have acquired a shared lock; release it to prevent deadlocks
             lockFile(globalLock.get(), ltWrite, true);
         }
 
@@ -329,7 +331,7 @@ LocalStore::LocalStore(const Params & params)
             txn.commit();
         }
 
-        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str());
+        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str(), 0666, true);
 
         lockFile(globalLock.get(), ltRead, true);
     }
@@ -439,9 +441,9 @@ LocalStore::~LocalStore()
     }
 
     try {
-        auto state(_state.lock());
-        if (state->fdTempRoots) {
-            state->fdTempRoots = -1;
+        auto fdTempRoots(_fdTempRoots.lock());
+        if (*fdTempRoots) {
+            *fdTempRoots = -1;
             unlink(fnTempRoots.c_str());
         }
     } catch (...) {
@@ -583,7 +585,10 @@ void canonicaliseTimestampAndPermissions(const Path & path)
 }
 
 
-static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSeen & inodesSeen)
+static void canonicalisePathMetaData_(
+    const Path & path,
+    std::optional<std::pair<uid_t, uid_t>> uidRange,
+    InodesSeen & inodesSeen)
 {
     checkInterrupt();
 
@@ -630,7 +635,7 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
        However, ignore files that we chown'ed ourselves previously to
        ensure that we don't fail on hard links within the same build
        (i.e. "touch $out/foo; ln $out/foo $out/bar"). */
-    if (fromUid != (uid_t) -1 && st.st_uid != fromUid) {
+    if (uidRange && (st.st_uid < uidRange->first || st.st_uid > uidRange->second)) {
         if (S_ISDIR(st.st_mode) || !inodesSeen.count(Inode(st.st_dev, st.st_ino)))
             throw BuildError("invalid ownership on file '%1%'", path);
         mode_t mode = st.st_mode & ~S_IFMT;
@@ -663,14 +668,17 @@ static void canonicalisePathMetaData_(const Path & path, uid_t fromUid, InodesSe
     if (S_ISDIR(st.st_mode)) {
         DirEntries entries = readDirectory(path);
         for (auto & i : entries)
-            canonicalisePathMetaData_(path + "/" + i.name, fromUid, inodesSeen);
+            canonicalisePathMetaData_(path + "/" + i.name, uidRange, inodesSeen);
     }
 }
 
 
-void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen)
+void canonicalisePathMetaData(
+    const Path & path,
+    std::optional<std::pair<uid_t, uid_t>> uidRange,
+    InodesSeen & inodesSeen)
 {
-    canonicalisePathMetaData_(path, fromUid, inodesSeen);
+    canonicalisePathMetaData_(path, uidRange, inodesSeen);
 
     /* On platforms that don't have lchown(), the top-level path can't
        be a symlink, since we can't change its ownership. */
@@ -683,10 +691,11 @@ void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & ino
 }
 
 
-void canonicalisePathMetaData(const Path & path, uid_t fromUid)
+void canonicalisePathMetaData(const Path & path,
+    std::optional<std::pair<uid_t, uid_t>> uidRange)
 {
     InodesSeen inodesSeen;
-    canonicalisePathMetaData(path, fromUid, inodesSeen);
+    canonicalisePathMetaData(path, uidRange, inodesSeen);
 }
 
 
@@ -751,7 +760,7 @@ void LocalStore::registerDrvOutput(const Realisation & info, CheckSigsFlag check
     if (checkSigs == NoCheckSigs || !realisationIsUntrusted(info))
         registerDrvOutput(info);
     else
-        throw Error("cannot register realisation '%s' because it lacks a valid signature", info.outPath.to_string());
+        throw Error("cannot register realisation '%s' because it lacks a signature by a trusted key", info.outPath.to_string());
 }
 
 void LocalStore::registerDrvOutput(const Realisation & info)
@@ -1266,7 +1275,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     RepairFlag repair, CheckSigsFlag checkSigs)
 {
     if (checkSigs && pathInfoIsUntrusted(info))
-        throw Error("cannot add path '%s' because it lacks a valid signature", printStorePath(info.path));
+        throw Error("cannot add path '%s' because it lacks a signature by a trusted key", printStorePath(info.path));
 
     addTempRoot(info.path);
 
@@ -1331,7 +1340,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             autoGC();
 
-            canonicalisePathMetaData(realPath, -1);
+            canonicalisePathMetaData(realPath, {});
 
             optimisePath(realPath, repair); // FIXME: combine with hashPath()
 
@@ -1382,13 +1391,15 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
 
     std::unique_ptr<AutoDelete> delTempDir;
     Path tempPath;
+    Path tempDir;
+    AutoCloseFD tempDirFd;
 
     if (!inMemory) {
         /* Drain what we pulled so far, and then keep on pulling */
         StringSource dumpSource { dump };
         ChainSource bothSource { dumpSource, source };
 
-        auto tempDir = createTempDir(realStoreDir, "add");
+        std::tie(tempDir, tempDirFd) = createTempDirInStore();
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir + "/x";
 
@@ -1442,7 +1453,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
                 narHash = narSink.finish();
             }
 
-            canonicalisePathMetaData(realPath, -1); // FIXME: merge into restorePath
+            canonicalisePathMetaData(realPath, {}); // FIXME: merge into restorePath
 
             optimisePath(realPath, repair);
 
@@ -1484,7 +1495,7 @@ StorePath LocalStore::addTextToStore(
 
             writeFile(realPath, s);
 
-            canonicalisePathMetaData(realPath, -1);
+            canonicalisePathMetaData(realPath, {});
 
             StringSink sink;
             dumpString(s, sink);
@@ -1507,18 +1518,24 @@ StorePath LocalStore::addTextToStore(
 
 
 /* Create a temporary directory in the store that won't be
-   garbage-collected. */
-Path LocalStore::createTempDirInStore()
+   garbage-collected until the returned FD is closed. */
+std::pair<Path, AutoCloseFD> LocalStore::createTempDirInStore()
 {
-    Path tmpDir;
+    Path tmpDirFn;
+    AutoCloseFD tmpDirFd;
+    bool lockedByUs = false;
     do {
         /* There is a slight possibility that `tmpDir' gets deleted by
-           the GC between createTempDir() and addTempRoot(), so repeat
-           until `tmpDir' exists. */
-        tmpDir = createTempDir(realStoreDir);
-        addTempRoot(parseStorePath(tmpDir));
-    } while (!pathExists(tmpDir));
-    return tmpDir;
+           the GC between createTempDir() and when we acquire a lock on it.
+           We'll repeat until 'tmpDir' exists and we've locked it. */
+        tmpDirFn = createTempDir(realStoreDir, "tmp");
+        tmpDirFd = open(tmpDirFn.c_str(), O_RDONLY | O_DIRECTORY);
+        if (tmpDirFd.get() < 0) {
+            continue;
+        }
+        lockedByUs = lockFile(tmpDirFd.get(), ltWrite, true);
+    } while (!pathExists(tmpDirFn) || !lockedByUs);
+    return {tmpDirFn, std::move(tmpDirFd)};
 }
 
 

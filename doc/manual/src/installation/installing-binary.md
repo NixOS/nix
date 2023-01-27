@@ -88,19 +88,51 @@ extension. The installer will also create `/etc/profile.d/nix.sh`.
 
 ### Linux
 
-```console
-sudo rm -rf /etc/profile/nix.sh /etc/nix /nix ~root/.nix-profile ~root/.nix-defexpr ~root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
+If you are on Linux with systemd:
 
-# If you are on Linux with systemd, you will need to run:
-sudo systemctl stop nix-daemon.socket
-sudo systemctl stop nix-daemon.service
-sudo systemctl disable nix-daemon.socket
-sudo systemctl disable nix-daemon.service
-sudo systemctl daemon-reload
+1. Remove the Nix daemon service:
+
+   ```console
+   sudo systemctl stop nix-daemon.service
+   sudo systemctl disable nix-daemon.socket nix-daemon.service
+   sudo systemctl daemon-reload
+   ```
+
+1. Remove systemd service files:
+
+   ```console
+   sudo rm /etc/systemd/system/nix-daemon.service /etc/systemd/system/nix-daemon.socket
+   ```
+
+1. The installer script uses systemd-tmpfiles to create the socket directory.
+    You may also want to remove the configuration for that:
+
+   ```console
+   sudo rm /etc/tmpfiles.d/nix-daemon.conf
+   ```
+
+Remove files created by Nix:
+
+```console
+sudo rm -rf /nix /etc/nix /etc/profile/nix.sh ~root/.nix-profile ~root/.nix-defexpr ~root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
 ```
 
-There may also be references to Nix in `/etc/profile`, `/etc/bashrc`,
-and `/etc/zshrc` which you may remove.
+Remove build users and their group:
+
+```console
+for i in $(seq 1 32); do
+  sudo userdel nixbld$i
+done
+sudo groupdel nixbld
+```
+
+There may also be references to Nix in
+
+- `/etc/profile`
+- `/etc/bashrc`
+- `/etc/zshrc`
+
+which you may remove.
 
 ### macOS
 

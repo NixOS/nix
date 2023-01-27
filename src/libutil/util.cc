@@ -2,6 +2,7 @@
 #include "sync.hh"
 #include "finally.hh"
 #include "serialise.hh"
+#include "cgroup.hh"
 
 #include <array>
 #include <cctype>
@@ -36,7 +37,6 @@
 #include <sys/prctl.h>
 #include <sys/resource.h>
 
-#include <mntent.h>
 #include <cmath>
 #endif
 
@@ -353,7 +353,7 @@ void readFile(const Path & path, Sink & sink)
 }
 
 
-void writeFile(const Path & path, std::string_view s, mode_t mode)
+void writeFile(const Path & path, std::string_view s, mode_t mode, bool sync)
 {
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
@@ -364,10 +364,16 @@ void writeFile(const Path & path, std::string_view s, mode_t mode)
         e.addTrace({}, "writing file '%1%'", path);
         throw;
     }
+    if (sync)
+        fd.fsync();
+    // Explicitly close to make sure exceptions are propagated.
+    fd.close();
+    if (sync)
+        syncParent(path);
 }
 
 
-void writeFile(const Path & path, Source & source, mode_t mode)
+void writeFile(const Path & path, Source & source, mode_t mode, bool sync)
 {
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
@@ -386,6 +392,20 @@ void writeFile(const Path & path, Source & source, mode_t mode)
         e.addTrace({}, "writing file '%1%'", path);
         throw;
     }
+    if (sync)
+        fd.fsync();
+    // Explicitly close to make sure exceptions are propagated.
+    fd.close();
+    if (sync)
+        syncParent(path);
+}
+
+void syncParent(const Path & path)
+{
+    AutoCloseFD fd = open(dirOf(path).c_str(), O_RDONLY, 0);
+    if (!fd)
+        throw SysError("opening file '%1%'", path);
+    fd.fsync();
 }
 
 std::string readLine(int fd)
@@ -707,45 +727,22 @@ unsigned int getMaxCPU()
 {
     #if __linux__
     try {
-        FILE *fp = fopen("/proc/mounts", "r");
-        if (!fp)
-            return 0;
+        auto cgroupFS = getCgroupFS();
+        if (!cgroupFS) return 0;
 
-        Strings cgPathParts;
+        auto cgroups = getCgroups("/proc/self/cgroup");
+        auto cgroup = cgroups[""];
+        if (cgroup == "") return 0;
 
-        struct mntent *ent;
-        while ((ent = getmntent(fp))) {
-            std::string mountType, mountPath;
+        auto cpuFile = *cgroupFS + "/" + cgroup + "/cpu.max";
 
-            mountType = ent->mnt_type;
-            mountPath = ent->mnt_dir;
-
-            if (mountType == "cgroup2") {
-                cgPathParts.push_back(mountPath);
-                break;
-            }
-        }
-
-        fclose(fp);
-
-        if (cgPathParts.size() > 0 && pathExists("/proc/self/cgroup")) {
-            std::string currentCgroup = readFile("/proc/self/cgroup");
-            Strings cgValues = tokenizeString<Strings>(currentCgroup, ":");
-            cgPathParts.push_back(trim(cgValues.back(), "\n"));
-            cgPathParts.push_back("cpu.max");
-            std::string fullCgPath = canonPath(concatStringsSep("/", cgPathParts));
-
-            if (pathExists(fullCgPath)) {
-                std::string cpuMax = readFile(fullCgPath);
-                std::vector<std::string> cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " ");
-                std::string quota = cpuMaxParts[0];
-                std::string period = trim(cpuMaxParts[1], "\n");
-
-                if (quota != "max")
-                    return std::ceil(std::stoi(quota) / std::stof(period));
-            }
-        }
-    } catch (Error &) { ignoreException(); }
+        auto cpuMax = readFile(cpuFile);
+        auto cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " \n");
+        auto quota = cpuMaxParts[0];
+        auto period = cpuMaxParts[1];
+        if (quota != "max")
+                return std::ceil(std::stoi(quota) / std::stof(period));
+    } catch (Error &) { ignoreException(lvlDebug); }
     #endif
 
     return 0;
@@ -839,6 +836,20 @@ void AutoCloseFD::close()
             throw SysError("closing file descriptor %1%", fd);
         fd = -1;
     }
+}
+
+void AutoCloseFD::fsync()
+{
+  if (fd != -1) {
+      int result;
+#if __APPLE__
+      result = ::fcntl(fd, F_FULLFSYNC);
+#else
+      result = ::fsync(fd);
+#endif
+      if (result == -1)
+          throw SysError("fsync file descriptor %1%", fd);
+  }
 }
 
 
@@ -1393,7 +1404,7 @@ std::string shellEscape(const std::string_view s)
 }
 
 
-void ignoreException()
+void ignoreException(Verbosity lvl)
 {
     /* Make sure no exceptions leave this function.
        printError() also throws when remote is closed. */
@@ -1401,7 +1412,7 @@ void ignoreException()
         try {
             throw;
         } catch (std::exception & e) {
-            printError("error (ignored): %1%", e.what());
+            printMsg(lvl, "error (ignored): %1%", e.what());
         }
     } catch (...) { }
 }
@@ -1580,6 +1591,21 @@ std::string stripIndentation(std::string_view s)
     }
 
     return res;
+}
+
+
+std::pair<std::string_view, std::string_view> getLine(std::string_view s)
+{
+    auto newline = s.find('\n');
+
+    if (newline == s.npos) {
+        return {s, ""};
+    } else {
+        auto line = s.substr(0, newline);
+        if (!line.empty() && line[line.size() - 1] == '\r')
+            line = line.substr(0, line.size() - 1);
+        return {line, s.substr(newline + 1)};
+    }
 }
 
 

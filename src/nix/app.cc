@@ -19,12 +19,11 @@ struct InstallableDerivedPath : Installable
     {
     }
 
-
     std::string what() const override { return derivedPath.to_string(*store); }
 
-    DerivedPaths toDerivedPaths() override
+    DerivedPathsWithInfo toDerivedPaths() override
     {
-        return {derivedPath};
+        return {{derivedPath}};
     }
 
     std::optional<StorePath> getStorePath() override
@@ -37,11 +36,13 @@ struct InstallableDerivedPath : Installable
  * Return the rewrites that are needed to resolve a string whose context is
  * included in `dependencies`.
  */
-StringPairs resolveRewrites(Store & store, const BuiltPaths dependencies)
+StringPairs resolveRewrites(
+    Store & store,
+    const std::vector<BuiltPathWithResult> & dependencies)
 {
     StringPairs res;
     for (auto & dep : dependencies)
-        if (auto drvDep = std::get_if<BuiltPathBuilt>(&dep))
+        if (auto drvDep = std::get_if<BuiltPathBuilt>(&dep.path))
             for (auto & [ outputName, outputPath ] : drvDep->outputs)
                 res.emplace(
                     downstreamPlaceholder(store, drvDep->drvPath, outputName),
@@ -53,7 +54,10 @@ StringPairs resolveRewrites(Store & store, const BuiltPaths dependencies)
 /**
  * Resolve the given string assuming the given context.
  */
-std::string resolveString(Store & store, const std::string & toResolve, const BuiltPaths dependencies)
+std::string resolveString(
+    Store & store,
+    const std::string & toResolve,
+    const std::vector<BuiltPathWithResult> & dependencies)
 {
     auto rewrites = resolveRewrites(store, dependencies);
     return rewriteStrings(toResolve, rewrites);
@@ -66,16 +70,38 @@ UnresolvedApp Installable::toApp(EvalState & state)
 
     auto type = cursor->getAttr("type")->getString();
 
-    std::string expected = !attrPath.empty() && state.symbols[attrPath[0]] == "apps" ? "app" : "derivation";
+    std::string expected = !attrPath.empty() &&
+        (state.symbols[attrPath[0]] == "apps" || state.symbols[attrPath[0]] == "defaultApp")
+        ? "app" : "derivation";
     if (type != expected)
         throw Error("attribute '%s' should have type '%s'", cursor->getAttrPathStr(), expected);
 
     if (type == "app") {
         auto [program, context] = cursor->getAttr("program")->getStringWithContext();
 
-        std::vector<StorePathWithOutputs> context2;
-        for (auto & [path, name] : context)
-            context2.push_back({path, {name}});
+        std::vector<DerivedPath> context2;
+        for (auto & c : context) {
+            context2.emplace_back(std::visit(overloaded {
+                [&](const NixStringContextElem::DrvDeep & d) -> DerivedPath {
+                    /* We want all outputs of the drv */
+                    return DerivedPath::Built {
+                        .drvPath = d.drvPath,
+                        .outputs = OutputsSpec::All {},
+                    };
+                },
+                [&](const NixStringContextElem::Built & b) -> DerivedPath {
+                    return DerivedPath::Built {
+                        .drvPath = b.drvPath,
+                        .outputs = OutputsSpec::Names { b.output },
+                    };
+                },
+                [&](const NixStringContextElem::Opaque & o) -> DerivedPath {
+                    return DerivedPath::Opaque {
+                        .path = o.path,
+                    };
+                },
+            }, c.raw()));
+        }
 
         return UnresolvedApp{App {
             .context = std::move(context2),
@@ -99,7 +125,10 @@ UnresolvedApp Installable::toApp(EvalState & state)
             : DrvName(name).name;
         auto program = outPath + "/bin/" + mainProgram;
         return UnresolvedApp { App {
-            .context = { { drvPath, {outputName} } },
+            .context = { DerivedPath::Built {
+                .drvPath = drvPath,
+                .outputs = OutputsSpec::Names { outputName },
+            } },
             .program = program,
         }};
     }
@@ -117,7 +146,7 @@ App UnresolvedApp::resolve(ref<Store> evalStore, ref<Store> store)
 
     for (auto & ctxElt : unresolved.context)
         installableContext.push_back(
-            std::make_shared<InstallableDerivedPath>(store, ctxElt.toDerivedPath()));
+            std::make_shared<InstallableDerivedPath>(store, ctxElt));
 
     auto builtContext = Installable::build(evalStore, store, Realise::Outputs, installableContext);
     res.program = resolveString(*store, unresolved.program, builtContext);

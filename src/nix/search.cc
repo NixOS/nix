@@ -5,7 +5,6 @@
 #include "names.hh"
 #include "get-drvs.hh"
 #include "common-args.hh"
-#include "json.hh"
 #include "shared.hh"
 #include "eval-cache.hh"
 #include "attr-path.hh"
@@ -13,8 +12,10 @@
 
 #include <regex>
 #include <fstream>
+#include <nlohmann/json.hpp>
 
 using namespace nix;
+using json = nlohmann::json;
 
 std::string wrap(std::string prefix, std::string s)
 {
@@ -84,7 +85,8 @@ struct CmdSearch : InstallableCommand, MixJSON
 
         auto state = getEvalState();
 
-        auto jsonOut = json ? std::make_unique<JSONObject>(std::cout) : nullptr;
+        std::optional<nlohmann::json> jsonOut;
+        if (json) jsonOut = json::object();
 
         uint64_t results = 0;
 
@@ -151,10 +153,11 @@ struct CmdSearch : InstallableCommand, MixJSON
                     {
                         results++;
                         if (json) {
-                            auto jsonElem = jsonOut->object(attrPath2);
-                            jsonElem.attr("pname", name.name);
-                            jsonElem.attr("version", name.version);
-                            jsonElem.attr("description", description);
+                            (*jsonOut)[attrPath2] = {
+                                {"pname", name.name},
+                                {"version", name.version},
+                                {"description", description},
+                            };
                         } else {
                             auto name2 = hiliteMatches(name.name, nameMatches, ANSI_GREEN, "\e[0;2m");
                             if (results > 1) logger->cout("");
@@ -192,6 +195,10 @@ struct CmdSearch : InstallableCommand, MixJSON
 
         for (auto & cursor : installable->getCursors(*state))
             visit(*cursor, cursor->getAttrPath(), true);
+
+        if (json) {
+            std::cout << jsonOut->dump() << std::endl;
+        }
 
         if (!json && !results)
             throw Error("no results for the given search term(s)!");

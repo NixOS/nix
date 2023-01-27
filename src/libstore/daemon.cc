@@ -222,7 +222,8 @@ struct ClientSettings
                     else if (!hasSuffix(s, "/") && trusted.count(s + "/"))
                         subs.push_back(s + "/");
                     else
-                        warn("ignoring untrusted substituter '%s'", s);
+                        warn("ignoring untrusted substituter '%s', you are not a trusted user.\n"
+                             "Run `man nix.conf` for more information on the `substituters` configuration option.", s);
                 res = subs;
                 return true;
             };
@@ -238,7 +239,8 @@ struct ClientSettings
                 }
                 else if (trusted
                     || name == settings.buildTimeout.name
-                    || name == settings.buildRepeat.name
+                    || name == settings.maxSilentTime.name
+                    || name == settings.pollInterval.name
                     || name == "connect-timeout"
                     || (name == "builders" && value == ""))
                     settings.set(name, value);

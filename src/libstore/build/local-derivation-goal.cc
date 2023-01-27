@@ -8,13 +8,14 @@
 #include "finally.hh"
 #include "util.hh"
 #include "archive.hh"
-#include "json.hh"
 #include "compression.hh"
 #include "daemon.hh"
 #include "worker-protocol.hh"
 #include "topo-sort.hh"
 #include "callback.hh"
 #include "json-utils.hh"
+#include "cgroup.hh"
+#include "personality.hh"
 
 #include <regex>
 #include <queue>
@@ -24,7 +25,6 @@
 #include <termios.h>
 #include <unistd.h>
 #include <sys/mman.h>
-#include <sys/utsname.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 
@@ -37,7 +37,6 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <netinet/ip.h>
-#include <sys/personality.h>
 #include <sys/mman.h>
 #include <sched.h>
 #include <sys/param.h>
@@ -56,6 +55,7 @@
 
 #include <pwd.h>
 #include <grp.h>
+#include <iostream>
 
 namespace nix {
 
@@ -129,23 +129,41 @@ void LocalDerivationGoal::killChild()
     if (pid != -1) {
         worker.childTerminated(this);
 
-        if (buildUser) {
-            /* If we're using a build user, then there is a tricky
-               race condition: if we kill the build user before the
-               child has done its setuid() to the build user uid, then
-               it won't be killed, and we'll potentially lock up in
-               pid.wait().  So also send a conventional kill to the
-               child. */
-            ::kill(-pid, SIGKILL); /* ignore the result */
-            buildUser->kill();
-            pid.wait();
-        } else
-            pid.kill();
+        /* If we're using a build user, then there is a tricky race
+           condition: if we kill the build user before the child has
+           done its setuid() to the build user uid, then it won't be
+           killed, and we'll potentially lock up in pid.wait().  So
+           also send a conventional kill to the child. */
+        ::kill(-pid, SIGKILL); /* ignore the result */
 
-        assert(pid == -1);
+        killSandbox(true);
+
+        pid.wait();
     }
 
     DerivationGoal::killChild();
+}
+
+
+void LocalDerivationGoal::killSandbox(bool getStats)
+{
+    if (cgroup) {
+        #if __linux__
+        auto stats = destroyCgroup(*cgroup);
+        if (getStats) {
+            buildResult.cpuUser = stats.cpuUser;
+            buildResult.cpuSystem = stats.cpuSystem;
+        }
+        #else
+        abort();
+        #endif
+    }
+
+    else if (buildUser) {
+        auto uid = buildUser->getUID();
+        assert(uid != 0);
+        killUser(uid);
+    }
 }
 
 
@@ -158,28 +176,46 @@ void LocalDerivationGoal::tryLocalBuild() {
         return;
     }
 
-    /* If `build-users-group' is not empty, then we have to build as
-       one of the members of that group. */
-    if (settings.buildUsersGroup != "" && getuid() == 0) {
-#if defined(__linux__) || defined(__APPLE__)
-        if (!buildUser) buildUser = std::make_unique<UserLock>();
+    /* Are we doing a chroot build? */
+    {
+        auto noChroot = parsedDrv->getBoolAttr("__noChroot");
+        if (settings.sandboxMode == smEnabled) {
+            if (noChroot)
+                throw Error("derivation '%s' has '__noChroot' set, "
+                    "but that's not allowed when 'sandbox' is 'true'", worker.store.printStorePath(drvPath));
+#if __APPLE__
+            if (additionalSandboxProfile != "")
+                throw Error("derivation '%s' specifies a sandbox profile, "
+                    "but this is only allowed when 'sandbox' is 'relaxed'", worker.store.printStorePath(drvPath));
+#endif
+            useChroot = true;
+        }
+        else if (settings.sandboxMode == smDisabled)
+            useChroot = false;
+        else if (settings.sandboxMode == smRelaxed)
+            useChroot = derivationType.isSandboxed() && !noChroot;
+    }
 
-        if (buildUser->findFreeUser()) {
-            /* Make sure that no other processes are executing under this
-               uid. */
-            buildUser->kill();
-        } else {
+    auto & localStore = getLocalStore();
+    if (localStore.storeDir != localStore.realStoreDir.get()) {
+        #if __linux__
+            useChroot = true;
+        #else
+            throw Error("building using a diverted store is not supported on this platform");
+        #endif
+    }
+
+    if (useBuildUsers()) {
+        if (!buildUser)
+            buildUser = acquireUserLock(parsedDrv->useUidRange() ? 65536 : 1, useChroot);
+
+        if (!buildUser) {
             if (!actLock)
                 actLock = std::make_unique<Activity>(*logger, lvlWarn, actBuildWaiting,
                     fmt("waiting for UID to build '%s'", yellowtxt(worker.store.printStorePath(drvPath))));
             worker.waitForAWhile(shared_from_this());
             return;
         }
-#else
-        /* Don't know how to block the creation of setuid/setgid
-           binaries on this platform. */
-        throw Error("build users are not supported on this platform for security reasons");
-#endif
     }
 
     actLock.reset();
@@ -193,7 +229,7 @@ void LocalDerivationGoal::tryLocalBuild() {
         outputLocks.unlock();
         buildUser.reset();
         worker.permanentFailure = true;
-        done(BuildResult::InputRejected, {}, e);
+        done(BuildResult::InputRejected, {}, std::move(e));
         return;
     }
 
@@ -270,7 +306,7 @@ void LocalDerivationGoal::cleanupPostChildKill()
        malicious user from leaving behind a process that keeps files
        open and modifies them after they have been chown'ed to
        root. */
-    if (buildUser) buildUser->kill();
+    killSandbox(true);
 
     /* Terminate the recursive Nix daemon. */
     stopDaemon();
@@ -363,6 +399,64 @@ static void linkOrCopy(const Path & from, const Path & to)
 
 void LocalDerivationGoal::startBuilder()
 {
+    if ((buildUser && buildUser->getUIDCount() != 1)
+        #if __linux__
+        || settings.useCgroups
+        #endif
+        )
+    {
+        #if __linux__
+        settings.requireExperimentalFeature(Xp::Cgroups);
+
+        auto cgroupFS = getCgroupFS();
+        if (!cgroupFS)
+            throw Error("cannot determine the cgroups file system");
+
+        auto ourCgroups = getCgroups("/proc/self/cgroup");
+        auto ourCgroup = ourCgroups[""];
+        if (ourCgroup == "")
+            throw Error("cannot determine cgroup name from /proc/self/cgroup");
+
+        auto ourCgroupPath = canonPath(*cgroupFS + "/" + ourCgroup);
+
+        if (!pathExists(ourCgroupPath))
+            throw Error("expected cgroup directory '%s'", ourCgroupPath);
+
+        static std::atomic<unsigned int> counter{0};
+
+        cgroup = buildUser
+            ? fmt("%s/nix-build-uid-%d", ourCgroupPath, buildUser->getUID())
+            : fmt("%s/nix-build-pid-%d-%d", ourCgroupPath, getpid(), counter++);
+
+        debug("using cgroup '%s'", *cgroup);
+
+        /* When using a build user, record the cgroup we used for that
+           user so that if we got interrupted previously, we can kill
+           any left-over cgroup first. */
+        if (buildUser) {
+            auto cgroupsDir = settings.nixStateDir + "/cgroups";
+            createDirs(cgroupsDir);
+
+            auto cgroupFile = fmt("%s/%d", cgroupsDir, buildUser->getUID());
+
+            if (pathExists(cgroupFile)) {
+                auto prevCgroup = readFile(cgroupFile);
+                destroyCgroup(prevCgroup);
+            }
+
+            writeFile(cgroupFile, *cgroup);
+        }
+
+        #else
+        throw Error("cgroups are not supported on this platform");
+        #endif
+    }
+
+    /* Make sure that no other processes are executing under the
+       sandbox uids. This must be done before any chownToBuilder()
+       calls. */
+    killSandbox(false);
+
     /* Right platform? */
     if (!parsedDrv->canBuildLocally(worker.store))
         throw Error("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
@@ -375,35 +469,6 @@ void LocalDerivationGoal::startBuilder()
 #if __APPLE__
     additionalSandboxProfile = parsedDrv->getStringAttr("__sandboxProfile").value_or("");
 #endif
-
-    /* Are we doing a chroot build? */
-    {
-        auto noChroot = parsedDrv->getBoolAttr("__noChroot");
-        if (settings.sandboxMode == smEnabled) {
-            if (noChroot)
-                throw Error("derivation '%s' has '__noChroot' set, "
-                    "but that's not allowed when 'sandbox' is 'true'", worker.store.printStorePath(drvPath));
-#if __APPLE__
-            if (additionalSandboxProfile != "")
-                throw Error("derivation '%s' specifies a sandbox profile, "
-                    "but this is only allowed when 'sandbox' is 'relaxed'", worker.store.printStorePath(drvPath));
-#endif
-            useChroot = true;
-        }
-        else if (settings.sandboxMode == smDisabled)
-            useChroot = false;
-        else if (settings.sandboxMode == smRelaxed)
-            useChroot = derivationType.isSandboxed() && !noChroot;
-    }
-
-    auto & localStore = getLocalStore();
-    if (localStore.storeDir != localStore.realStoreDir.get()) {
-        #if __linux__
-            useChroot = true;
-        #else
-            throw Error("building using a diverted store is not supported on this platform");
-        #endif
-    }
 
     /* Create a temporary directory where the build will take
        place. */
@@ -580,10 +645,11 @@ void LocalDerivationGoal::startBuilder()
 
         printMsg(lvlChatty, format("setting up chroot environment in '%1%'") % chrootRootDir);
 
-        if (mkdir(chrootRootDir.c_str(), 0750) == -1)
+        // FIXME: make this 0700
+        if (mkdir(chrootRootDir.c_str(), buildUser && buildUser->getUIDCount() != 1 ? 0755 : 0750) == -1)
             throw SysError("cannot create '%1%'", chrootRootDir);
 
-        if (buildUser && chown(chrootRootDir.c_str(), 0, buildUser->getGID()) == -1)
+        if (buildUser && chown(chrootRootDir.c_str(), buildUser->getUIDCount() != 1 ? buildUser->getUID() : 0, buildUser->getGID()) == -1)
             throw SysError("cannot change ownership of '%1%'", chrootRootDir);
 
         /* Create a writable /tmp in the chroot.  Many builders need
@@ -597,6 +663,10 @@ void LocalDerivationGoal::startBuilder()
            nobody account.  The latter is kind of a hack to support
            Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
+        chownToBuilder(chrootRootDir + "/etc");
+
+        if (parsedDrv->useUidRange() && (!buildUser || buildUser->getUIDCount() < 65536))
+            throw Error("feature 'uid-range' requires the setting '%s' to be enabled", settings.autoAllocateUids.name);
 
         /* Declare the build user's group so that programs get a consistent
            view of the system (e.g., "id -gn"). */
@@ -647,12 +717,28 @@ void LocalDerivationGoal::startBuilder()
                 dirsInChroot.erase(worker.store.printStorePath(*i.second.second));
         }
 
-#elif __APPLE__
-        /* We don't really have any parent prep work to do (yet?)
-           All work happens in the child, instead. */
+        if (cgroup) {
+            if (mkdir(cgroup->c_str(), 0755) != 0)
+                throw SysError("creating cgroup '%s'", *cgroup);
+            chownToBuilder(*cgroup);
+            chownToBuilder(*cgroup + "/cgroup.procs");
+            chownToBuilder(*cgroup + "/cgroup.threads");
+            //chownToBuilder(*cgroup + "/cgroup.subtree_control");
+        }
+
 #else
-        throw Error("sandboxing builds is not supported on this platform");
+        if (parsedDrv->useUidRange())
+            throw Error("feature 'uid-range' is not supported on this platform");
+        #if __APPLE__
+            /* We don't really have any parent prep work to do (yet?)
+               All work happens in the child, instead. */
+        #else
+            throw Error("sandboxing builds is not supported on this platform");
+        #endif
 #endif
+    } else {
+        if (parsedDrv->useUidRange())
+            throw Error("feature 'uid-range' is only supported in sandboxed builds");
     }
 
     if (needsHashRewrite() && pathExists(homeDir))
@@ -913,14 +999,16 @@ void LocalDerivationGoal::startBuilder()
                the calling user (if build users are disabled). */
             uid_t hostUid = buildUser ? buildUser->getUID() : getuid();
             uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
+            uid_t nrIds = buildUser ? buildUser->getUIDCount() : 1;
 
             writeFile("/proc/" + std::to_string(pid) + "/uid_map",
-                fmt("%d %d 1", sandboxUid(), hostUid));
+                fmt("%d %d %d", sandboxUid(), hostUid, nrIds));
 
-            writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
+            if (!buildUser || buildUser->getUIDCount() == 1)
+                writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
 
             writeFile("/proc/" + std::to_string(pid) + "/gid_map",
-                fmt("%d %d 1", sandboxGid(), hostGid));
+                fmt("%d %d %d", sandboxGid(), hostGid, nrIds));
         } else {
             debug("note: not using a user namespace");
             if (!buildUser)
@@ -946,6 +1034,10 @@ void LocalDerivationGoal::startBuilder()
             if (sandboxUserNamespace.get() == -1)
                 throw SysError("getting sandbox user namespace");
         }
+
+        /* Move the child into its own cgroup. */
+        if (cgroup)
+            writeFile(*cgroup + "/cgroup.procs", fmt("%d", (pid_t) pid));
 
         /* Signal the builder that we've updated its user namespace. */
         writeFull(userNamespaceSync.writeSide.get(), "1");
@@ -1367,7 +1459,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
             unknown, downloadSize, narSize);
     }
 
-    virtual std::optional<std::string> getBuildLog(const StorePath & path) override
+    virtual std::optional<std::string> getBuildLogExact(const StorePath & path) override
     { return std::nullopt; }
 
     virtual void addBuildLog(const StorePath & path, std::string_view log) override
@@ -1552,6 +1644,22 @@ void setupSeccomp()
         seccomp_arch_add(ctx, SCMP_ARCH_ARM) != 0)
         printError("unable to add ARM seccomp architecture; this may result in spurious build failures if running 32-bit ARM processes");
 
+    if (nativeSystem == "mips64-linux" &&
+        seccomp_arch_add(ctx, SCMP_ARCH_MIPS) != 0)
+        printError("unable to add mips seccomp architecture");
+
+    if (nativeSystem == "mips64-linux" &&
+        seccomp_arch_add(ctx, SCMP_ARCH_MIPS64N32) != 0)
+        printError("unable to add mips64-*abin32 seccomp architecture");
+
+    if (nativeSystem == "mips64el-linux" &&
+        seccomp_arch_add(ctx, SCMP_ARCH_MIPSEL) != 0)
+        printError("unable to add mipsel seccomp architecture");
+
+    if (nativeSystem == "mips64el-linux" &&
+        seccomp_arch_add(ctx, SCMP_ARCH_MIPSEL64N32) != 0)
+        printError("unable to add mips64el-*abin32 seccomp architecture");
+
     /* Prevent builders from creating setuid/setgid binaries. */
     for (int perm : { S_ISUID, S_ISGID }) {
         if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(chmod), 1,
@@ -1593,6 +1701,8 @@ void LocalDerivationGoal::runChild()
 {
     /* Warning: in the child we should absolutely not make any SQLite
        calls! */
+
+    bool sendException = true;
 
     try { /* child */
 
@@ -1761,6 +1871,13 @@ void LocalDerivationGoal::runChild()
             if (mount("none", (chrootRootDir + "/proc").c_str(), "proc", 0, 0) == -1)
                 throw SysError("mounting /proc");
 
+            /* Mount sysfs on /sys. */
+            if (buildUser && buildUser->getUIDCount() != 1) {
+                createDirs(chrootRootDir + "/sys");
+                if (mount("none", (chrootRootDir + "/sys").c_str(), "sysfs", 0, 0) == -1)
+                    throw SysError("mounting /sys");
+            }
+
             /* Mount a new tmpfs on /dev/shm to ensure that whatever
                the builder puts in /dev/shm is cleaned up automatically. */
             if (pathExists("/dev/shm") && mount("none", (chrootRootDir + "/dev/shm").c_str(), "tmpfs", 0,
@@ -1803,6 +1920,12 @@ void LocalDerivationGoal::runChild()
             if (unshare(CLONE_NEWNS) == -1)
                 throw SysError("unsharing mount namespace");
 
+            /* Unshare the cgroup namespace. This means
+               /proc/self/cgroup will show the child's cgroup as '/'
+               rather than whatever it is in the parent. */
+            if (cgroup && unshare(CLONE_NEWCGROUP) == -1)
+                throw SysError("unsharing cgroup namespace");
+
             /* Do the chroot(). */
             if (chdir(chrootRootDir.c_str()) == -1)
                 throw SysError("cannot change directory to '%1%'", chrootRootDir);
@@ -1840,33 +1963,7 @@ void LocalDerivationGoal::runChild()
         /* Close all other file descriptors. */
         closeMostFDs({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO});
 
-#if __linux__
-        /* Change the personality to 32-bit if we're doing an
-           i686-linux build on an x86_64-linux machine. */
-        struct utsname utsbuf;
-        uname(&utsbuf);
-        if ((drv->platform == "i686-linux"
-                && (settings.thisSystem == "x86_64-linux"
-                    || (!strcmp(utsbuf.sysname, "Linux") && !strcmp(utsbuf.machine, "x86_64"))))
-            || drv->platform == "armv7l-linux"
-            || drv->platform == "armv6l-linux")
-        {
-            if (personality(PER_LINUX32) == -1)
-                throw SysError("cannot set 32-bit personality");
-        }
-
-        /* Impersonate a Linux 2.6 machine to get some determinism in
-           builds that depend on the kernel version. */
-        if ((drv->platform == "i686-linux" || drv->platform == "x86_64-linux") && settings.impersonateLinux26) {
-            int cur = personality(0xffffffff);
-            if (cur != -1) personality(cur | 0x0020000 /* == UNAME26 */);
-        }
-
-        /* Disable address space randomization for improved
-           determinism. */
-        int cur = personality(0xffffffff);
-        if (cur != -1) personality(cur | ADDR_NO_RANDOMIZE);
-#endif
+        setPersonality(drv->platform);
 
         /* Disable core dumps by default. */
         struct rlimit limit = { 0, RLIM_INFINITY };
@@ -1888,9 +1985,8 @@ void LocalDerivationGoal::runChild()
         if (setUser && buildUser) {
             /* Preserve supplementary groups of the build user, to allow
                admins to specify groups such as "kvm".  */
-            if (!buildUser->getSupplementaryGIDs().empty() &&
-                setgroups(buildUser->getSupplementaryGIDs().size(),
-                          buildUser->getSupplementaryGIDs().data()) == -1)
+            auto gids = buildUser->getSupplementaryGIDs();
+            if (setgroups(gids.size(), gids.data()) == -1)
                 throw SysError("cannot set supplementary groups of build user");
 
             if (setgid(buildUser->getGID()) == -1 ||
@@ -1954,10 +2050,14 @@ void LocalDerivationGoal::runChild()
                     sandboxProfile += "(deny default (with no-log))\n";
                 }
 
-                sandboxProfile += "(import \"sandbox-defaults.sb\")\n";
+                sandboxProfile +=
+                    #include "sandbox-defaults.sb"
+                    ;
 
                 if (!derivationType.isSandboxed())
-                    sandboxProfile += "(import \"sandbox-network.sb\")\n";
+                    sandboxProfile +=
+                        #include "sandbox-network.sb"
+                        ;
 
                 /* Add the output paths we'll use at build-time to the chroot */
                 sandboxProfile += "(allow file-read* file-write* process-exec\n";
@@ -2000,7 +2100,9 @@ void LocalDerivationGoal::runChild()
 
                 sandboxProfile += additionalSandboxProfile;
             } else
-                sandboxProfile += "(import \"sandbox-minimal.sb\")\n";
+                sandboxProfile +=
+                    #include "sandbox-minimal.sb"
+                    ;
 
             debug("Generated sandbox profile:");
             debug(sandboxProfile);
@@ -2025,8 +2127,6 @@ void LocalDerivationGoal::runChild()
                 args.push_back(sandboxFile);
                 args.push_back("-D");
                 args.push_back("_GLOBAL_TMP_DIR=" + globalTmpDir);
-                args.push_back("-D");
-                args.push_back("IMPORT_DIR=" + settings.nixDataDir + "/nix/sandbox/");
                 if (allowLocalNetworking) {
                     args.push_back("-D");
                     args.push_back(std::string("_ALLOW_LOCAL_NETWORKING=1"));
@@ -2049,6 +2149,8 @@ void LocalDerivationGoal::runChild()
 
         /* Indicate that we managed to set up the build environment. */
         writeFull(STDERR_FILENO, std::string("\2\n"));
+
+        sendException = false;
 
         /* Execute the program.  This should not return. */
         if (drv->isBuiltin()) {
@@ -2103,10 +2205,13 @@ void LocalDerivationGoal::runChild()
         throw SysError("executing '%1%'", drv->builder);
 
     } catch (Error & e) {
-        writeFull(STDERR_FILENO, "\1\n");
-        FdSink sink(STDERR_FILENO);
-        sink << e;
-        sink.flush();
+        if (sendException) {
+            writeFull(STDERR_FILENO, "\1\n");
+            FdSink sink(STDERR_FILENO);
+            sink << e;
+            sink.flush();
+        } else
+            std::cerr << e.msg();
         _exit(1);
     }
 }
@@ -2132,7 +2237,6 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
     InodesSeen inodesSeen;
 
     Path checkSuffix = ".check";
-    bool keepPreviousRound = settings.keepFailed || settings.runDiffHook;
 
     std::exception_ptr delayedException;
 
@@ -2214,7 +2318,10 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
         /* Canonicalise first.  This ensures that the path we're
            rewriting doesn't contain a hard link to /etc/shadow or
            something like that. */
-        canonicalisePathMetaData(actualPath, buildUser ? buildUser->getUID() : -1, inodesSeen);
+        canonicalisePathMetaData(
+            actualPath,
+            buildUser ? std::optional(buildUser->getUIDRange()) : std::nullopt,
+            inodesSeen);
 
         debug("scanning for references for output '%s' in temp location '%s'", outputName, actualPath);
 
@@ -2307,6 +2414,10 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 sink.s = rewriteStrings(sink.s, outputRewrites);
                 StringSource source(sink.s);
                 restorePath(actualPath, source);
+
+                /* FIXME: set proper permissions in restorePath() so
+                   we don't have to do another traversal. */
+                canonicalisePathMetaData(actualPath, {}, inodesSeen);
             }
         };
 
@@ -2469,7 +2580,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
 
         /* FIXME: set proper permissions in restorePath() so
             we don't have to do another traversal. */
-        canonicalisePathMetaData(actualPath, -1, inodesSeen);
+        canonicalisePathMetaData(actualPath, {}, inodesSeen);
 
         /* Calculate where we'll move the output files. In the checking case we
            will leave leave them where they are, for now, rather than move to
@@ -2553,10 +2664,8 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 debug("unreferenced input: '%1%'", worker.store.printStorePath(i));
         }
 
-        if (curRound == nrRounds) {
-            localStore.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
-            worker.markContentsGood(newInfo.path);
-        }
+        localStore.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
+        worker.markContentsGood(newInfo.path);
 
         newInfo.deriver = drvPath;
         newInfo.ultimate = true;
@@ -2584,61 +2693,6 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
 
     /* Apply output checks. */
     checkOutputs(infos);
-
-    /* Compare the result with the previous round, and report which
-       path is different, if any.*/
-    if (curRound > 1 && prevInfos != infos) {
-        assert(prevInfos.size() == infos.size());
-        for (auto i = prevInfos.begin(), j = infos.begin(); i != prevInfos.end(); ++i, ++j)
-            if (!(*i == *j)) {
-                buildResult.isNonDeterministic = true;
-                Path prev = worker.store.printStorePath(i->second.path) + checkSuffix;
-                bool prevExists = keepPreviousRound && pathExists(prev);
-                hintformat hint = prevExists
-                    ? hintfmt("output '%s' of '%s' differs from '%s' from previous round",
-                        worker.store.printStorePath(i->second.path), worker.store.printStorePath(drvPath), prev)
-                    : hintfmt("output '%s' of '%s' differs from previous round",
-                        worker.store.printStorePath(i->second.path), worker.store.printStorePath(drvPath));
-
-                handleDiffHook(
-                    buildUser ? buildUser->getUID() : getuid(),
-                    buildUser ? buildUser->getGID() : getgid(),
-                    prev, worker.store.printStorePath(i->second.path),
-                    worker.store.printStorePath(drvPath), tmpDir);
-
-                if (settings.enforceDeterminism)
-                    throw NotDeterministic(hint);
-
-                printError(hint);
-
-                curRound = nrRounds; // we know enough, bail out early
-            }
-    }
-
-    /* If this is the first round of several, then move the output out of the way. */
-    if (nrRounds > 1 && curRound == 1 && curRound < nrRounds && keepPreviousRound) {
-        for (auto & [_, outputStorePath] : finalOutputs) {
-            auto path = worker.store.printStorePath(outputStorePath);
-            Path prev = path + checkSuffix;
-            deletePath(prev);
-            Path dst = path + checkSuffix;
-            renameFile(path, dst);
-        }
-    }
-
-    if (curRound < nrRounds) {
-        prevInfos = std::move(infos);
-        return {};
-    }
-
-    /* Remove the .check directories if we're done. FIXME: keep them
-       if the result was not determistic? */
-    if (curRound == nrRounds) {
-        for (auto & [_, outputStorePath] : finalOutputs) {
-            Path prev = worker.store.printStorePath(outputStorePath) + checkSuffix;
-            deletePath(prev);
-        }
-    }
 
     /* Register each output path as valid, and register the sets of
        paths referenced by each of them.  If there are cycles in the
@@ -2681,7 +2735,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             signRealisation(thisRealisation);
             worker.store.registerDrvOutput(thisRealisation);
         }
-        if (wantOutput(outputName, wantedOutputs))
+        if (wantedOutputs.contains(outputName))
             builtOutputs.emplace(thisRealisation.id, thisRealisation);
     }
 

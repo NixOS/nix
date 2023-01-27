@@ -448,7 +448,7 @@ std::string Derivation::unparse(const Store & store, bool maskOutputs,
 
 
 // FIXME: remove
-bool isDerivation(const std::string & fileName)
+bool isDerivation(std::string_view fileName)
 {
     return hasSuffix(fileName, drvExtension);
 }
@@ -685,12 +685,6 @@ DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOut
 std::map<std::string, Hash> staticOutputHashes(Store & store, const Derivation & drv)
 {
     return hashDerivationModulo(store, drv, true).hashes;
-}
-
-
-bool wantOutput(const std::string & output, const std::set<std::string> & wanted)
-{
-    return wanted.empty() || wanted.find(output) != wanted.end();
 }
 
 

@@ -115,12 +115,11 @@ the Nix store. Here are the recognised types of installables:
 
 * **Store derivations**: `/nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv`
 
-  Store derivations are store paths with extension `.drv` and are a
-  low-level representation of a build-time dependency graph used
-  internally by Nix. By default, if you pass a store derivation to a
-  `nix` subcommand, it will operate on the *output paths* of the
-  derivation. For example, `nix path-info` prints information about
-  the output paths:
+  By default, if you pass a [store derivation] path to a `nix` subcommand, the command will operate on the [output path]s of the derivation.
+
+  [output path]: ../../glossary.md#gloss-output-path
+
+  For example, `nix path-info` prints information about the output paths:
 
   ```console
   # nix path-info --json /nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv
@@ -164,6 +163,13 @@ operate are determined as follows:
   …
   ```
 
+  and likewise, using a store path to a "drv" file to specify the derivation:
+
+  ```console
+  # nix build '/nix/store/gzaflydcr6sb3567hap9q6srzx8ggdgg-glibc-2.33-78.drv^dev,static'
+  …
+  ```
+
 * You can also specify that *all* outputs should be used using the
   syntax *installable*`^*`. For example, the following shows the size
   of all outputs of the `glibc` package in the binary cache:
@@ -177,6 +183,12 @@ operate are determined as follows:
   /nix/store/q6580lr01jpcsqs4r5arlh4ki2c1m9rv-glibc-2.33-123-dev             44200560
   ```
 
+  and likewise, using a store path to a "drv" file to specify the derivation:
+
+  ```console
+  # nix path-info -S '/nix/store/gzaflydcr6sb3567hap9q6srzx8ggdgg-glibc-2.33-78.drv^*'
+  …
+  ```
 * If you didn't specify the desired outputs, but the derivation has an
   attribute `meta.outputsToInstall`, Nix will use those outputs. For
   example, since the package `nixpkgs#libxml2` has this attribute:
@@ -188,6 +200,11 @@ operate are determined as follows:
 
   a command like `nix shell nixpkgs#libxml2` will provide only those
   two outputs by default.
+
+  Note that a [store derivation] (given by its `.drv` file store path) doesn't have
+  any attributes like `meta`, and thus this case doesn't apply to it.
+
+  [store derivation]: ../../glossary.md#gloss-store-derivation
 
 * Otherwise, Nix will use all outputs of the derivation.
 

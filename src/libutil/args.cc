@@ -216,7 +216,7 @@ nlohmann::json Args::toJSON()
         if (flag->shortName)
             j["shortName"] = std::string(1, flag->shortName);
         if (flag->description != "")
-            j["description"] = flag->description;
+            j["description"] = trim(flag->description);
         j["category"] = flag->category;
         if (flag->handler.arity != ArityAny)
             j["arity"] = flag->handler.arity;
@@ -237,7 +237,7 @@ nlohmann::json Args::toJSON()
     }
 
     auto res = nlohmann::json::object();
-    res["description"] = description();
+    res["description"] = trim(description());
     res["flags"] = std::move(flags);
     res["args"] = std::move(args);
     auto s = doc();
@@ -379,7 +379,7 @@ nlohmann::json MultiCommand::toJSON()
         auto j = command->toJSON();
         auto cat = nlohmann::json::object();
         cat["id"] = command->category();
-        cat["description"] = categories[command->category()];
+        cat["description"] = trim(categories[command->category()]);
         j["category"] = std::move(cat);
         cmds[name] = std::move(j);
     }

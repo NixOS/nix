@@ -18,51 +18,56 @@ values such as packages or NixOS modules provided by the flake).
 Flake references (*flakerefs*) are a way to specify the location of a
 flake. These have two different forms:
 
-* An attribute set representation, e.g.
 
-  ```nix
-  {
-    type = "github";
-    owner = "NixOS";
-    repo = "nixpkgs";
-  }
-  ```
+## Attribute set representation
 
-  The only required attribute is `type`. The supported types are
-  listed below.
+Example:
 
-* A URL-like syntax, e.g.
+```nix
+{
+  type = "github";
+  owner = "NixOS";
+  repo = "nixpkgs";
+}
+```
 
-  ```
-  github:NixOS/nixpkgs
-  ```
+The only required attribute is `type`. The supported types are
+listed below.
 
-  These are used on the command line as a more convenient alternative
-  to the attribute set representation. For instance, in the command
+## URL-like syntax
 
-  ```console
-  # nix build github:NixOS/nixpkgs#hello
-  ```
+Example:
 
-  `github:NixOS/nixpkgs` is a flake reference (while `hello` is an
-  output attribute). They are also allowed in the `inputs` attribute
-  of a flake, e.g.
+```
+github:NixOS/nixpkgs
+```
 
-  ```nix
-  inputs.nixpkgs.url = github:NixOS/nixpkgs;
-  ```
+These are used on the command line as a more convenient alternative
+to the attribute set representation. For instance, in the command
 
-  is equivalent to
+```console
+# nix build github:NixOS/nixpkgs#hello
+```
 
-  ```nix
-  inputs.nixpkgs = {
-    type = "github";
-    owner = "NixOS";
-    repo = "nixpkgs";
-  };
-  ```
+`github:NixOS/nixpkgs` is a flake reference (while `hello` is an
+output attribute). They are also allowed in the `inputs` attribute
+of a flake, e.g.
 
-## Examples
+```nix
+inputs.nixpkgs.url = github:NixOS/nixpkgs;
+```
+
+is equivalent to
+
+```nix
+inputs.nixpkgs = {
+  type = "github";
+  owner = "NixOS";
+  repo = "nixpkgs";
+};
+```
+
+### Examples
 
 Here are some examples of flake references in their URL-like representation:
 

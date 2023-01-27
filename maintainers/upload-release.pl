@@ -115,10 +115,6 @@ sub downloadFile {
 
     write_file("$tmpFile.sha256", $sha256_actual);
 
-    if (! -e "$tmpFile.asc") {
-        system("gpg2 --detach-sign --armor $tmpFile") == 0 or die "unable to sign $tmpFile\n";
-    }
-
     return $sha256_expected;
 }
 
@@ -194,7 +190,7 @@ for my $fn (glob "$tmpDir/*") {
         my $configuration = ();
         $configuration->{content_type} = "application/octet-stream";
 
-        if ($fn =~ /.sha256|.asc|install/) {
+        if ($fn =~ /.sha256|install/) {
             # Text files
             $configuration->{content_type} = "text/plain";
         }

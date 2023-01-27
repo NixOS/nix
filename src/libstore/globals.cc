@@ -131,6 +131,10 @@ StringSet Settings::getDefaultSystemFeatures()
     StringSet features{"nixos-test", "benchmark", "big-parallel"};
 
     #if __linux__
+    features.insert("uid-range");
+    #endif
+
+    #if __linux__
     if (access("/dev/kvm", R_OK | W_OK) == 0)
         features.insert("kvm");
     #endif
@@ -154,13 +158,9 @@ StringSet Settings::getDefaultExtraPlatforms()
     // machines. Note that we can’t force processes from executing
     // x86_64 in aarch64 environments or vice versa since they can
     // always exec with their own binary preferences.
-    if (pathExists("/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist") ||
-        pathExists("/System/Library/LaunchDaemons/com.apple.oahd.plist")) {
-        if (std::string{SYSTEM} == "x86_64-darwin")
-            extraPlatforms.insert("aarch64-darwin");
-        else if (std::string{SYSTEM} == "aarch64-darwin")
-            extraPlatforms.insert("x86_64-darwin");
-    }
+    if (std::string{SYSTEM} == "aarch64-darwin" &&
+        runProgram(RunOptions {.program = "arch", .args = {"-arch", "x86_64", "/usr/bin/true"}, .mergeStderrToStdout = true}).first == 0)
+        extraPlatforms.insert("x86_64-darwin");
 #endif
 
     return extraPlatforms;
@@ -290,5 +290,19 @@ void initPlugins()
     /* Tell the user if they try to set plugin-files after we've already loaded */
     settings.pluginFiles.pluginsLoaded = true;
 }
+
+static bool initLibStoreDone = false;
+
+void assertLibStoreInitialized() {
+    if (!initLibStoreDone) {
+        printError("The program must call nix::initNix() before calling any libstore library functions.");
+        abort();
+    };
+}
+
+void initLibStore() {
+    initLibStoreDone = true;
+}
+
 
 }

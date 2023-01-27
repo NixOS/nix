@@ -77,9 +77,7 @@ TarArchive::~TarArchive()
 
 static void extract_archive(TarArchive & archive, const Path & destDir)
 {
-    int flags = ARCHIVE_EXTRACT_FFLAGS
-        | ARCHIVE_EXTRACT_PERM
-        | ARCHIVE_EXTRACT_TIME
+    int flags = ARCHIVE_EXTRACT_TIME
         | ARCHIVE_EXTRACT_SECURE_SYMLINKS
         | ARCHIVE_EXTRACT_SECURE_NODOTDOT;
 
@@ -97,6 +95,10 @@ static void extract_archive(TarArchive & archive, const Path & destDir)
 
         archive_entry_copy_pathname(entry,
             (destDir + "/" + name).c_str());
+
+        // sources can and do contain dirs with no rx bits
+        if (archive_entry_filetype(entry) == AE_IFDIR && (archive_entry_mode(entry) & 0500) != 0500)
+            archive_entry_set_mode(entry, archive_entry_mode(entry) | 0500);
 
         // Patch hardlink path
         const char *original_hardlink = archive_entry_hardlink(entry);

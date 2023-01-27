@@ -6,32 +6,34 @@
 #include "util.hh"
 #include "nar-info-disk-cache.hh"
 #include "thread-pool.hh"
-#include "json.hh"
 #include "url.hh"
 #include "archive.hh"
 #include "callback.hh"
 #include "remote-store.hh"
 
+#include <nlohmann/json.hpp>
 #include <regex>
+
+using json = nlohmann::json;
 
 namespace nix {
 
 
-bool Store::isInStore(const Path & path) const
+bool Store::isInStore(PathView path) const
 {
     return isInDir(path, storeDir);
 }
 
 
-std::pair<StorePath, Path> Store::toStorePath(const Path & path) const
+std::pair<StorePath, Path> Store::toStorePath(PathView path) const
 {
     if (!isInStore(path))
         throw Error("path '%1%' is not in the Nix store", path);
-    Path::size_type slash = path.find('/', storeDir.size() + 1);
+    auto slash = path.find('/', storeDir.size() + 1);
     if (slash == Path::npos)
         return {parseStorePath(path), ""};
     else
-        return {parseStorePath(std::string_view(path).substr(0, slash)), path.substr(slash)};
+        return {parseStorePath(path.substr(0, slash)), (Path) path.substr(slash)};
 }
 
 
@@ -456,6 +458,7 @@ Store::Store(const Params & params)
     : StoreConfig(params)
     , state({(size_t) pathInfoCacheSize})
 {
+    assertLibStoreInitialized();
 }
 
 
@@ -838,56 +841,53 @@ StorePathSet Store::exportReferences(const StorePathSet & storePaths, const Stor
     return paths;
 }
 
-
-void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & storePaths,
+json Store::pathInfoToJSON(const StorePathSet & storePaths,
     bool includeImpureInfo, bool showClosureSize,
     Base hashBase,
     AllowInvalidFlag allowInvalid)
 {
-    auto jsonList = jsonOut.list();
+    json::array_t jsonList = json::array();
 
     for (auto & storePath : storePaths) {
-        auto jsonPath = jsonList.object();
+        auto& jsonPath = jsonList.emplace_back(json::object());
 
         try {
             auto info = queryPathInfo(storePath);
 
-            jsonPath.attr("path", printStorePath(info->path));
-            jsonPath
-                .attr("narHash", info->narHash.to_string(hashBase, true))
-                .attr("narSize", info->narSize);
+            jsonPath["path"] = printStorePath(info->path);
+            jsonPath["narHash"] = info->narHash.to_string(hashBase, true);
+            jsonPath["narSize"] = info->narSize;
 
             {
-                auto jsonRefs = jsonPath.list("references");
+                auto& jsonRefs = (jsonPath["references"] = json::array());
                 for (auto & ref : info->references)
-                    jsonRefs.elem(printStorePath(ref));
+                    jsonRefs.emplace_back(printStorePath(ref));
             }
 
             if (info->ca)
-                jsonPath.attr("ca", renderContentAddress(info->ca));
+                jsonPath["ca"] = renderContentAddress(info->ca);
 
             std::pair<uint64_t, uint64_t> closureSizes;
 
             if (showClosureSize) {
                 closureSizes = getClosureSize(info->path);
-                jsonPath.attr("closureSize", closureSizes.first);
+                jsonPath["closureSize"] = closureSizes.first;
             }
 
             if (includeImpureInfo) {
 
                 if (info->deriver)
-                    jsonPath.attr("deriver", printStorePath(*info->deriver));
+                    jsonPath["deriver"] = printStorePath(*info->deriver);
 
                 if (info->registrationTime)
-                    jsonPath.attr("registrationTime", info->registrationTime);
+                    jsonPath["registrationTime"] = info->registrationTime;
 
                 if (info->ultimate)
-                    jsonPath.attr("ultimate", info->ultimate);
+                    jsonPath["ultimate"] = info->ultimate;
 
                 if (!info->sigs.empty()) {
-                    auto jsonSigs = jsonPath.list("signatures");
                     for (auto & sig : info->sigs)
-                        jsonSigs.elem(sig);
+                        jsonPath["signatures"].push_back(sig);
                 }
 
                 auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
@@ -895,21 +895,22 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
 
                 if (narInfo) {
                     if (!narInfo->url.empty())
-                        jsonPath.attr("url", narInfo->url);
+                        jsonPath["url"] = narInfo->url;
                     if (narInfo->fileHash)
-                        jsonPath.attr("downloadHash", narInfo->fileHash->to_string(hashBase, true));
+                        jsonPath["downloadHash"] = narInfo->fileHash->to_string(hashBase, true);
                     if (narInfo->fileSize)
-                        jsonPath.attr("downloadSize", narInfo->fileSize);
+                        jsonPath["downloadSize"] = narInfo->fileSize;
                     if (showClosureSize)
-                        jsonPath.attr("closureDownloadSize", closureSizes.second);
+                        jsonPath["closureDownloadSize"] = closureSizes.second;
                 }
             }
 
         } catch (InvalidPath &) {
-            jsonPath.attr("path", printStorePath(storePath));
-            jsonPath.attr("valid", false);
+            jsonPath["path"] = printStorePath(storePath);
+            jsonPath["valid"] = false;
         }
     }
+    return jsonList;
 }
 
 
@@ -1209,79 +1210,6 @@ std::string showPaths(const PathSet & paths)
 }
 
 
-std::string ValidPathInfo::fingerprint(const Store & store) const
-{
-    if (narSize == 0)
-        throw Error("cannot calculate fingerprint of path '%s' because its size is not known",
-            store.printStorePath(path));
-    return
-        "1;" + store.printStorePath(path) + ";"
-        + narHash.to_string(Base32, true) + ";"
-        + std::to_string(narSize) + ";"
-        + concatStringsSep(",", store.printStorePathSet(references));
-}
-
-
-void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
-{
-    sigs.insert(secretKey.signDetached(fingerprint(store)));
-}
-
-bool ValidPathInfo::isContentAddressed(const Store & store) const
-{
-    if (! ca) return false;
-
-    auto caPath = std::visit(overloaded {
-        [&](const TextHash & th) {
-            return store.makeTextPath(path.name(), th.hash, references);
-        },
-        [&](const FixedOutputHash & fsh) {
-            auto refs = references;
-            bool hasSelfReference = false;
-            if (refs.count(path)) {
-                hasSelfReference = true;
-                refs.erase(path);
-            }
-            return store.makeFixedOutputPath(fsh.method, fsh.hash, path.name(), refs, hasSelfReference);
-        }
-    }, *ca);
-
-    bool res = caPath == path;
-
-    if (!res)
-        printError("warning: path '%s' claims to be content-addressed but isn't", store.printStorePath(path));
-
-    return res;
-}
-
-
-size_t ValidPathInfo::checkSignatures(const Store & store, const PublicKeys & publicKeys) const
-{
-    if (isContentAddressed(store)) return maxSigs;
-
-    size_t good = 0;
-    for (auto & sig : sigs)
-        if (checkSignature(store, publicKeys, sig))
-            good++;
-    return good;
-}
-
-
-bool ValidPathInfo::checkSignature(const Store & store, const PublicKeys & publicKeys, const std::string & sig) const
-{
-    return verifyDetached(fingerprint(store), sig, publicKeys);
-}
-
-
-Strings ValidPathInfo::shortRefs() const
-{
-    Strings refs;
-    for (auto & r : references)
-        refs.push_back(std::string(r.to_string()));
-    return refs;
-}
-
-
 Derivation Store::derivationFromPath(const StorePath & drvPath)
 {
     ensurePath(drvPath);
@@ -1298,6 +1226,34 @@ Derivation readDerivationCommon(Store& store, const StorePath& drvPath, bool req
     } catch (FormatError & e) {
         throw Error("error parsing derivation '%s': %s", store.printStorePath(drvPath), e.msg());
     }
+}
+
+std::optional<StorePath> Store::getBuildDerivationPath(const StorePath & path)
+{
+
+    if (!path.isDerivation()) {
+        try {
+            auto info = queryPathInfo(path);
+            if (!info->deriver) return std::nullopt;
+            return *info->deriver;
+        } catch (InvalidPath &) {
+            return std::nullopt;
+        }
+    }
+
+    if (!settings.isExperimentalFeatureEnabled(Xp::CaDerivations) || !isValidPath(path))
+        return path;
+
+    auto drv = readDerivation(path);
+    if (!drv.type().hasKnownOutputPaths()) {
+        // The build log is actually attached to the corresponding
+        // resolved derivation, so we need to get it first
+        auto resolvedDrv = drv.tryResolve(*this);
+        if (resolvedDrv)
+            return writeDerivation(*this, *resolvedDrv, NoRepair, true);
+    }
+
+    return path;
 }
 
 Derivation Store::readDerivation(const StorePath & drvPath)
@@ -1363,9 +1319,9 @@ std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Para
                 } catch (Error & e) {
                     return std::make_shared<LocalStore>(params);
                 }
-                warn("'/nix' does not exist, so Nix will use '%s' as a chroot store", chrootStore);
+                warn("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
             } else
-                debug("'/nix' does not exist, so Nix will use '%s' as a chroot store", chrootStore);
+                debug("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
             Store::Params params2;
             params2["root"] = chrootStore;
             return std::make_shared<LocalStore>(params2);

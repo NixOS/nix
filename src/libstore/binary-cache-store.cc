@@ -9,7 +9,6 @@
 #include "remote-fs-accessor.hh"
 #include "nar-info-disk-cache.hh"
 #include "nar-accessor.hh"
-#include "json.hh"
 #include "thread-pool.hh"
 #include "callback.hh"
 
@@ -194,19 +193,12 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     /* Optionally write a JSON file containing a listing of the
        contents of the NAR. */
     if (writeNARListing) {
-        std::ostringstream jsonOut;
+        nlohmann::json j = {
+            {"version", 1},
+            {"root", listNar(ref<FSAccessor>(narAccessor), "", true)},
+        };
 
-        {
-            JSONObject jsonRoot(jsonOut);
-            jsonRoot.attr("version", 1);
-
-            {
-                auto res = jsonRoot.placeholder("root");
-                listNar(res, ref<FSAccessor>(narAccessor), "", true);
-            }
-        }
-
-        upsertFile(std::string(info.path.hashPart()) + ".ls", jsonOut.str(), "application/json");
+        upsertFile(std::string(info.path.hashPart()) + ".ls", j.dump(), "application/json");
     }
 
     /* Optionally maintain an index of DWARF debug info files
@@ -331,6 +323,17 @@ bool BinaryCacheStore::isValidPathUncached(const StorePath & storePath)
     return fileExists(narInfoFileFor(storePath));
 }
 
+std::optional<StorePath> BinaryCacheStore::queryPathFromHashPart(const std::string & hashPart)
+{
+    auto pseudoPath = StorePath(hashPart + "-" + MissingName);
+    try {
+        auto info = queryPathInfo(pseudoPath);
+        return info->path;
+    } catch (InvalidPath &) {
+        return std::nullopt;
+    }
+}
+
 void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
 {
     auto info = queryPathInfo(storePath).cast<const NarInfo>();
@@ -343,7 +346,7 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
     try {
         getFile(info->url, *decompressor);
     } catch (NoSuchBinaryCacheFile & e) {
-        throw SubstituteGone(e.info());
+        throw SubstituteGone(std::move(e.info()));
     }
 
     decompressor->finish();
@@ -499,22 +502,9 @@ void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSe
     writeNarInfo(narInfo);
 }
 
-std::optional<std::string> BinaryCacheStore::getBuildLog(const StorePath & path)
+std::optional<std::string> BinaryCacheStore::getBuildLogExact(const StorePath & path)
 {
-    auto drvPath = path;
-
-    if (!path.isDerivation()) {
-        try {
-            auto info = queryPathInfo(path);
-            // FIXME: add a "Log" field to .narinfo
-            if (!info->deriver) return std::nullopt;
-            drvPath = *info->deriver;
-        } catch (InvalidPath &) {
-            return std::nullopt;
-        }
-    }
-
-    auto logPath = "log/" + std::string(baseNameOf(printStorePath(drvPath)));
+    auto logPath = "log/" + std::string(baseNameOf(printStorePath(path)));
 
     debug("fetching build log from binary cache '%s/%s'", getUri(), logPath);
 

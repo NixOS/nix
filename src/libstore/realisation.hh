@@ -7,6 +7,8 @@
 
 namespace nix {
 
+class Store;
+
 struct DrvOutput {
     // The hash modulo of the derivation
     Hash drvHash;
@@ -91,6 +93,16 @@ struct RealisedPath {
     Set closure(Store& store) const;
 
     GENERATE_CMP(RealisedPath, me->raw);
+};
+
+class MissingRealisation : public Error
+{
+public:
+    MissingRealisation(DrvOutput & outputId)
+        : Error( "cannot operate on an output of the "
+                "unbuilt derivation '%s'",
+                outputId.to_string())
+    {}
 };
 
 }

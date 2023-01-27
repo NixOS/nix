@@ -1,7 +1,7 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.05-small";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.11-small";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
 
@@ -9,13 +9,13 @@
 
     let
 
-      version = builtins.readFile ./.version + versionSuffix;
+      officialRelease = false;
+
+      version = nixpkgs.lib.fileContents ./.version + versionSuffix;
       versionSuffix =
         if officialRelease
         then ""
         else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
-
-      officialRelease = false;
 
       linux64BitSystems = [ "x86_64-linux" "aarch64-linux" ];
       linuxSystems = linux64BitSystems ++ [ "i686-linux" ];
@@ -23,7 +23,7 @@
 
       crossSystems = [ "armv6l-linux" "armv7l-linux" ];
 
-      stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" ];
+      stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" "ccacheStdenv" ];
 
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
       forAllSystemsAndStdenvs = f: forAllSystems (system:
@@ -82,7 +82,9 @@
         });
 
         configureFlags =
-          lib.optionals stdenv.isLinux [
+          [
+            "CXXFLAGS=-I${lib.getDev rapidcheck}/extras/gtest/include"
+          ] ++ lib.optionals stdenv.isLinux [
             "--with-boost=${boost}/lib"
             "--with-sandbox-shell=${sh}/bin/busybox"
           ]
@@ -96,6 +98,7 @@
             buildPackages.flex
             (lib.getBin buildPackages.lowdown-nix)
             buildPackages.mdbook
+            buildPackages.mdbook-linkcheck
             buildPackages.autoconf-archive
             buildPackages.autoreconfHook
             buildPackages.pkg-config
@@ -108,13 +111,14 @@
           ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)];
 
         buildDeps =
-          [ (curl.override { patchNetrcRegression = true; })
+          [ curl
             bzip2 xz brotli editline
             openssl sqlite
             libarchive
             boost
             lowdown-nix
             gtest
+            rapidcheck
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
@@ -133,7 +137,8 @@
               patches = (o.patches or []) ++ [
                 ./boehmgc-coroutine-sp-fallback.diff
               ];
-            }))
+            })
+            )
             nlohmann_json
           ];
       };
@@ -260,6 +265,7 @@
             echo "file binary-dist $fn" >> $out/nix-support/hydra-build-products
             tar cvfJ $fn \
               --owner=0 --group=0 --mode=u+rw,uga+r \
+              --mtime='1970-01-01' \
               --absolute-names \
               --hard-dereference \
               --transform "s,$TMPDIR/install,$dir/install," \
@@ -363,7 +369,7 @@
 
               buildInputs =
                 [ nix
-                  (curl.override { patchNetrcRegression = true; })
+                  curl
                   bzip2
                   xz
                   pkgs.perl
@@ -419,6 +425,8 @@
         buildCross = nixpkgs.lib.genAttrs crossSystems (crossSystem:
           nixpkgs.lib.genAttrs ["x86_64-linux"] (system: self.packages.${system}."nix-${crossSystem}"));
 
+        buildNoGc = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix.overrideAttrs (a: { configureFlags = (a.configureFlags or []) ++ ["--enable-gc=no"];}));
+
         # Perl bindings for various platforms.
         perlBindings = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix.perl-bindings);
 
@@ -456,6 +464,10 @@
             name = "nix-coverage-${version}";
 
             src = self;
+
+            configureFlags = [
+              "CXXFLAGS=-I${lib.getDev pkgs.rapidcheck}/extras/gtest/include"
+            ];
 
             enableParallelBuilding = true;
 
@@ -505,6 +517,12 @@
           overlay = self.overlays.default;
         });
 
+        tests.containers = (import ./tests/containers.nix rec {
+          system = "x86_64-linux";
+          inherit nixpkgs;
+          overlay = self.overlays.default;
+        });
+
         tests.setuid = nixpkgs.lib.genAttrs
           ["i686-linux" "x86_64-linux"]
           (system:
@@ -526,6 +544,12 @@
               mkdir $out
             '';
 
+        tests.nixpkgsLibTests =
+          nixpkgs.lib.genAttrs systems (system:
+            import (nixpkgs + "/lib/tests/release.nix")
+              { pkgs = nixpkgsFor.${system}; }
+          );
+
         metrics.nixpkgs = import "${nixpkgs-regression}/pkgs/top-level/metrics.nix" {
           pkgs = nixpkgsFor.x86_64-linux;
           nixpkgs = nixpkgs-regression;
@@ -545,12 +569,18 @@
             # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;
           } "touch $out");
 
+        installerTests = import ./tests/installer {
+          binaryTarballs = self.hydraJobs.binaryTarball;
+          inherit nixpkgsFor;
+        };
+
       };
 
       checks = forAllSystems (system: {
         binaryTarball = self.hydraJobs.binaryTarball.${system};
         perlBindings = self.hydraJobs.perlBindings.${system};
         installTests = self.hydraJobs.installTests.${system};
+        nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
       } // (nixpkgs.lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};
       });
@@ -632,6 +662,7 @@
             inherit system crossSystem;
             overlays = [ self.overlays.default ];
           };
+          inherit (nixpkgsCross) lib;
         in with commonDeps { pkgs = nixpkgsCross; }; nixpkgsCross.stdenv.mkDerivation {
           name = "nix-${version}";
 
@@ -644,7 +675,11 @@
           nativeBuildInputs = nativeBuildDeps;
           buildInputs = buildDeps ++ propagatedDeps;
 
-          configureFlags = [ "--sysconfdir=/etc" "--disable-doc-gen" ];
+          configureFlags = [
+            "CXXFLAGS=-I${lib.getDev nixpkgsCross.rapidcheck}/extras/gtest/include"
+            "--sysconfdir=/etc"
+            "--disable-doc-gen"
+          ];
 
           enableParallelBuilding = true;
 

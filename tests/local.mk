@@ -7,6 +7,9 @@ nix_tests = \
   flakes/follow-paths.sh \
   flakes/bundle.sh \
   flakes/check.sh \
+  flakes/unlocked-override.sh \
+  flakes/absolute-paths.sh \
+  flakes/build-paths.sh \
   ca/gc.sh \
   gc.sh \
   remote-store.sh \
@@ -90,6 +93,7 @@ nix_tests = \
   fmt.sh \
   eval-store.sh \
   why-depends.sh \
+  ca/why-depends.sh \
   import-derivation.sh \
   ca/import-derivation.sh \
   nix_path.sh \
@@ -109,15 +113,15 @@ nix_tests = \
   store-ping.sh \
   fetchClosure.sh \
   completions.sh \
-  impure-derivations.sh
+  impure-derivations.sh \
+  path-from-hash-part.sh \
+  toString-path.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh
 endif
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
-
-tests-environment = NIX_REMOTE= $(bash) -e
 
 clean-files += $(d)/common.sh $(d)/config.nix $(d)/ca/config.nix
 

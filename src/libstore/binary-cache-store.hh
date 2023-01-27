@@ -95,8 +95,7 @@ public:
     void queryPathInfoUncached(const StorePath & path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
-    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
-    { unsupported("queryPathFromHashPart"); }
+    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
     void addToStore(const ValidPathInfo & info, Source & narSource,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
@@ -130,7 +129,7 @@ public:
 
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
-    std::optional<std::string> getBuildLog(const StorePath & path) override;
+    std::optional<std::string> getBuildLogExact(const StorePath & path) override;
 
     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
