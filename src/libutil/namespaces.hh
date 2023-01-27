@@ -6,4 +6,6 @@ bool userNamespacesSupported();
 
 bool mountNamespacesSupported();
 
+bool pidNamespacesSupported();
+
 }

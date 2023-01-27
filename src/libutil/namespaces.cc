@@ -1,5 +1,8 @@
 #include "namespaces.hh"
 #include "util.hh"
+#include "finally.hh"
+
+#include <mntent.h>
 
 #if __linux__
 
@@ -7,10 +10,10 @@ namespace nix {
 
 bool userNamespacesSupported()
 {
-    static bool res = [&]() -> bool
+    static auto res = [&]() -> bool
     {
         if (!pathExists("/proc/self/ns/user")) {
-            notice("'/proc/self/ns/user' does not exist; your kernel was likely built without CONFIG_USER_NS=y, which is required for sandboxing");
+            debug("'/proc/self/ns/user' does not exist; your kernel was likely built without CONFIG_USER_NS=y");
             return false;
         }
 
@@ -18,7 +21,7 @@ bool userNamespacesSupported()
         if (!pathExists(maxUserNamespaces) ||
             trim(readFile(maxUserNamespaces)) == "0")
         {
-            notice("user namespaces appear to be disabled; they are required for sandboxing; check '/proc/sys/user/max_user_namespaces'");
+            debug("user namespaces appear to be disabled; check '/proc/sys/user/max_user_namespaces'");
             return false;
         }
 
@@ -26,7 +29,7 @@ bool userNamespacesSupported()
         if (pathExists(procSysKernelUnprivilegedUsernsClone)
             && trim(readFile(procSysKernelUnprivilegedUsernsClone)) == "0")
         {
-            notice("user namespaces appear to be disabled; they are required for sandboxing; check '/proc/sys/kernel/unprivileged_userns_clone'");
+            debug("user namespaces appear to be disabled; check '/proc/sys/kernel/unprivileged_userns_clone'");
             return false;
         }
 
@@ -43,7 +46,7 @@ bool userNamespacesSupported()
 
 bool mountNamespacesSupported()
 {
-    static bool res = [&]() -> bool
+    static auto res = [&]() -> bool
     {
         bool useUserNamespace = userNamespacesSupported();
 
@@ -54,6 +57,30 @@ bool mountNamespacesSupported()
         });
 
         return pid.wait() == 0;
+    }();
+    return res;
+}
+
+bool pidNamespacesSupported()
+{
+    static auto res = [&]() -> bool
+    {
+        /* Check whether /proc is fully visible, i.e. there are no
+           filesystems mounted on top of files inside /proc. If this
+           is not the case, then we cannot mount a new /proc inside
+           the sandbox that matches the sandbox's PID namespace.
+           See https://lore.kernel.org/lkml/87tvsrjai0.fsf@xmission.com/T/. */
+        auto fp = fopen("/proc/mounts", "r");
+        if (!fp) return false;
+        Finally delFP = [&]() { fclose(fp); };
+
+        while (auto ent = getmntent(fp))
+            if (hasPrefix(std::string_view(ent->mnt_dir), "/proc/")) {
+                debug("PID namespaces do not work because /proc is not fully visible; disabling sandboxing");
+                return false;
+            }
+
+        return true;
     }();
     return res;
 }

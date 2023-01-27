@@ -209,10 +209,10 @@ void LocalDerivationGoal::tryLocalBuild()
 
     #if __linux__
     if (useChroot) {
-        if (!mountNamespacesSupported()) {
+        if (!mountNamespacesSupported() || !pidNamespacesSupported()) {
             if (!settings.sandboxFallback)
-                throw Error("this system does not support mount namespaces, which are required for sandboxing");
-            debug("auto-disabling sandboxing because mount namespaces are not available");
+                throw Error("this system does not support the kernel namespaces that are required for sandboxing");
+            debug("auto-disabling sandboxing because the prerequisite namespaces are not available");
             useChroot = false;
         }
     }
