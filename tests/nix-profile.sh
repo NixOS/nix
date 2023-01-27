@@ -59,10 +59,24 @@ nix profile diff-closures | grep 'env-manifest.nix: ε → ∅'
 # Test XDG Base Directories support
 
 export NIX_CONFIG="use-xdg-base-directories = true"
+
+# Old profile should be migrated
+nix profile list 2>&1 | grep -q "Migrating"
+[ -e $TEST_HOME/.local/state/nix/profile ]
+[ ! -e $TEST_HOME/.nix-profile ]
+
+# Everything should still work
 nix profile remove 1
 nix profile install $flake1Dir
 [[ $($TEST_HOME/.local/state/nix/profile/bin/hello) = "Hello World" ]]
 unset NIX_CONFIG
+
+# And it should migrate back
+nix profile list 2>&1 | grep -q "Migrating"
+[ -e $TEST_HOME/.nix-profile ]
+[[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World" ]]
+[ ! -e $TEST_HOME/.local/share/nix/profile ]
+
 
 # Test upgrading a package.
 printf NixOS > $flake1Dir/who

@@ -949,7 +949,7 @@ public:
     Setting<bool> useXDGBaseDirectories{
         this, false, "use-xdg-base-directories",
         R"(
-          If set to `true`, Nix will conform to the [XDG Base Directory Specification] for files in `$HOME`.
+          If set to `true`, Nix will conform to the [XDG base directory specification] for all files in $HOME.
           The environment variables used to implement this are documented in the [Environment Variables section](@docroot@/installation/env-variables.md).
 
           [XDG Base Directory Specification]: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
@@ -964,6 +964,10 @@ public:
           | `~/.nix-profile`  | `$XDG_STATE_HOME/nix/profile`  |
           | `~/.nix-defexpr`  | `$XDG_STATE_HOME/nix/defexpr`  |
           | `~/.nix-channels` | `$XDG_STATE_HOME/nix/channels` |
+
+          If there is no file in the XDG location, but there is a file in the legacy location, it will be migrated automatically.
+          A reverse migration will happen if this setting is set to `false`.
+          If the file is present in both locations, no migration is done.
         )"
     };
 };

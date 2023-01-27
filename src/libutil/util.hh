@@ -164,6 +164,19 @@ Path getStateDir();
 /* Create the Nix state directory and return the path to it. */
 Path createNixStateDir();
 
+/* Get path to user's Nix profile symlink (~/.nix-profile if argument is false
+  or $XDG_STATE_HOME/ nix/profile), creating parent components if necessary */
+Path getUserNixProfile(bool xdg);
+
+/* Get path to user's Nix defexpr symlink (~/.nix-defexpr if argument is false
+  or $XDG_STATE_HOME/ nix/defexpr), creating parent components if necessary */
+Path getUserNixDefexpr(bool xdg);
+
+/* Get path to user's Nix channels symlink (~/.nix-channels if argument
+  is false or $XDG_STATE_HOME/nix/channels), creating parent components if
+  necessary */
+Path getUserNixChannels(bool xdg);
+
 /* Create a directory and all its parents, if necessary.  Returns the
    list of created directories, in order of creation. */
 Paths createDirs(const Path & path);

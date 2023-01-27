@@ -622,6 +622,58 @@ Path createNixStateDir()
     return dir;
 }
 
+void migrateIfNeeded(Path from, Path to) {
+    if (pathExists(from)) {
+        if (pathExists(to)) {
+            warn("Both %s and %s exist. Did you run an older version of Nix? I will use %s, but you should migrate manually.", from, to, to);
+        } else {
+            warn("Migrating %s to %s", from, to);
+            rename(from.c_str(), to.c_str());
+        }
+    }
+}
+
+Path getUserNixProfile(bool xdg)
+{
+    Path legacyProfile = getHome() + "/.nix-profile";
+    Path xdgProfile = getStateDir() + "/nix/profile";
+    if (xdg) {
+        createNixStateDir();
+        migrateIfNeeded(legacyProfile, xdgProfile);
+        return xdgProfile;
+    } else {
+        migrateIfNeeded(xdgProfile, legacyProfile);
+        return legacyProfile;
+    }
+}
+
+Path getUserNixDefexpr(bool xdg)
+{
+    Path legacyDefexpr = getHome() + "/.nix-defexpr";
+    Path xdgDefexpr = getStateDir() + "/nix/defexpr";
+    if (xdg) {
+        createNixStateDir();
+        migrateIfNeeded(legacyDefexpr, xdgDefexpr);
+        return xdgDefexpr;
+    } else {
+        migrateIfNeeded(xdgDefexpr, legacyDefexpr);
+        return legacyDefexpr;
+    }
+}
+
+Path getUserNixChannels(bool xdg)
+{
+    Path legacyChannels = getHome() + "/.nix-channels";
+    Path xdgChannels = getStateDir() + "/nix/channels";
+    if (xdg) {
+        createNixStateDir();
+        migrateIfNeeded(legacyChannels, xdgChannels);
+        return xdgChannels;
+    } else {
+        migrateIfNeeded(xdgChannels, legacyChannels);
+        return legacyChannels;
+    }
+}
 
 std::optional<Path> getSelfExe()
 {

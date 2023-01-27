@@ -290,7 +290,7 @@ Path profilesDir()
 
 Path getDefaultProfile()
 {
-    Path profileLink = settings.useXDGBaseDirectories ? createNixStateDir() + "/profile" : getHome() + "/.nix-profile";
+    Path profileLink = getUserNixProfile(settings.useXDGBaseDirectories);
     try {
         auto profile =
             getuid() == 0
