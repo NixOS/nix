@@ -456,6 +456,17 @@ static RegisterPrimOp primop_fetchGit({
           > **Note**
           >
           > This behavior is disabled in *Pure evaluation mode*.
+
+        - To fetch the content of a checked-out work directory:
+
+          ```nix
+          builtins.fetchGit ./work-dir
+          ```
+
+	  If the url points to a local directory, and no `ref` or `rev` is
+	  given, `fetchGit` will use the current content of the checked-out
+	  files, even if they are not committed or added to git's index, and it will
+	  only consider files added to the git repository (i.e. listed by `git ls-files`).
     )",
     .fun = prim_fetchGit,
 });
