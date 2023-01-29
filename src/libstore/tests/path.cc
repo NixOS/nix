@@ -7,6 +7,7 @@
 #include "path-regex.hh"
 #include "store-api.hh"
 
+#include "tests/hash.hh"
 #include "tests/libstore.hh"
 #include "tests/path.hh"
 
@@ -74,12 +75,14 @@ void showValue(const StorePath & p, std::ostream & os) {
 namespace rc {
 using namespace nix;
 
-Gen<StorePath> Arbitrary<StorePath>::arbitrary()
+Gen<StorePathName> Arbitrary<StorePathName>::arbitrary()
 {
-    auto len = *gen::inRange<size_t>(1, StorePath::MaxPathLen);
+    auto len = *gen::inRange<size_t>(
+        1,
+        StorePath::MaxPathLen - std::string_view { HASH_PART }.size());
 
-    std::string pre { HASH_PART "-" };
-    pre.reserve(pre.size() + len);
+    std::string pre;
+    pre.reserve(len);
 
     for (size_t c = 0; c < len; ++c) {
         switch (auto i = *gen::inRange<uint8_t>(0, 10 + 2 * 26 + 6)) {
@@ -114,7 +117,17 @@ Gen<StorePath> Arbitrary<StorePath>::arbitrary()
         }
     }
 
-    return gen::just(StorePath { pre });
+    return gen::just(StorePathName {
+        .name = std::move(pre),
+    });
+}
+
+Gen<StorePath> Arbitrary<StorePath>::arbitrary()
+{
+    return gen::just(StorePath {
+        *gen::arbitrary<Hash>(),
+        (*gen::arbitrary<StorePathName>()).name,
+    });
 }
 
 } // namespace rc

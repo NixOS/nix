@@ -24,6 +24,6 @@ libstore-tests_SOURCES := $(wildcard $(d)/*.cc)
 
 libstore-tests_CXXFLAGS += -I src/libstore -I src/libutil
 
-libstore-tests_LIBS = libstore libutil
+libstore-tests_LIBS = libutil-tests libstore libutil
 
 libstore-tests_LDFLAGS := -lrapidcheck $(GTEST_LIBS)
