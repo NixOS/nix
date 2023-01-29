@@ -101,6 +101,7 @@ struct curlFileTransfer : public FileTransfer
                     this->result.data.append(data);
               })
         {
+            requestHeaders = curl_slist_append(requestHeaders, "Accept-Encoding: zstd, br, gzip, deflate");
             if (!request.expectedETag.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
             if (!request.mimeType.empty())
