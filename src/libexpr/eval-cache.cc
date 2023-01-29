@@ -47,7 +47,7 @@ struct AttrDb
     {
         auto state(_state->lock());
 
-        Path cacheDir = getCacheDir() + "/nix/eval-cache-v4";
+        Path cacheDir = getCacheDir() + "/nix/eval-cache-v5";
         createDirs(cacheDir);
 
         Path dbPath = cacheDir + "/" + fingerprint.to_string(Base16, false) + ".sqlite";
@@ -300,7 +300,7 @@ struct AttrDb
                 NixStringContext context;
                 if (!queryAttribute.isNull(3))
                     for (auto & s : tokenizeString<std::vector<std::string>>(queryAttribute.getStr(3), ";"))
-                        context.push_back(NixStringContextElem::parse(cfg, s));
+                        context.insert(NixStringContextElem::parse(s));
                 return {{rowId, string_t{queryAttribute.getStr(2), context}}};
             }
             case AttrType::Bool:
@@ -619,9 +619,11 @@ string_t AttrCursor::getStringWithContext()
 
     auto & v = forceValue();
 
-    if (v.type() == nString)
-        return {v.string.s, v.getContext(*root->state.store)};
-    else if (v.type() == nPath)
+    if (v.type() == nString) {
+        NixStringContext context;
+        copyContext(v, context);
+        return {v.string.s, std::move(context)};
+    } else if (v.type() == nPath)
         return {v.path, {}};
     else
         root->state.error("'%s' is not a string but %s", getAttrPathStr()).debugThrow<TypeError>();

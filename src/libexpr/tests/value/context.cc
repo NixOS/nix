@@ -8,69 +8,62 @@
 
 namespace nix {
 
-// Testing of trivial expressions
-struct NixStringContextElemTest : public LibExprTest {
-   const Store & store() const {
-       return *LibExprTest::store;
-   }
-};
-
-TEST_F(NixStringContextElemTest, empty_invalid) {
+TEST(NixStringContextElemTest, empty_invalid) {
     EXPECT_THROW(
-        NixStringContextElem::parse(store(), ""),
+        NixStringContextElem::parse(""),
         BadNixStringContextElem);
 }
 
-TEST_F(NixStringContextElemTest, single_bang_invalid) {
+TEST(NixStringContextElemTest, single_bang_invalid) {
     EXPECT_THROW(
-        NixStringContextElem::parse(store(), "!"),
+        NixStringContextElem::parse("!"),
         BadNixStringContextElem);
 }
 
-TEST_F(NixStringContextElemTest, double_bang_invalid) {
+TEST(NixStringContextElemTest, double_bang_invalid) {
     EXPECT_THROW(
-        NixStringContextElem::parse(store(), "!!/"),
+        NixStringContextElem::parse("!!/"),
         BadStorePath);
 }
 
-TEST_F(NixStringContextElemTest, eq_slash_invalid) {
+TEST(NixStringContextElemTest, eq_slash_invalid) {
     EXPECT_THROW(
-        NixStringContextElem::parse(store(), "=/"),
+        NixStringContextElem::parse("=/"),
         BadStorePath);
 }
 
-TEST_F(NixStringContextElemTest, slash_invalid) {
+TEST(NixStringContextElemTest, slash_invalid) {
     EXPECT_THROW(
-        NixStringContextElem::parse(store(), "/"),
+        NixStringContextElem::parse("/"),
         BadStorePath);
 }
 
-TEST_F(NixStringContextElemTest, opaque) {
-    std::string_view opaque = "/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x";
-    auto elem = NixStringContextElem::parse(store(), opaque);
+TEST(NixStringContextElemTest, opaque) {
+    std::string_view opaque = "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x";
+    auto elem = NixStringContextElem::parse(opaque);
     auto * p = std::get_if<NixStringContextElem::Opaque>(&elem);
     ASSERT_TRUE(p);
-    ASSERT_EQ(p->path, store().parseStorePath(opaque));
-    ASSERT_EQ(elem.to_string(store()), opaque);
+    ASSERT_EQ(p->path, StorePath { opaque });
+    ASSERT_EQ(elem.to_string(), opaque);
 }
 
-TEST_F(NixStringContextElemTest, drvDeep) {
-    std::string_view drvDeep = "=/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv";
-    auto elem = NixStringContextElem::parse(store(), drvDeep);
+TEST(NixStringContextElemTest, drvDeep) {
+    std::string_view drvDeep = "=g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv";
+    auto elem = NixStringContextElem::parse(drvDeep);
     auto * p = std::get_if<NixStringContextElem::DrvDeep>(&elem);
     ASSERT_TRUE(p);
-    ASSERT_EQ(p->drvPath, store().parseStorePath(drvDeep.substr(1)));
-    ASSERT_EQ(elem.to_string(store()), drvDeep);
+    ASSERT_EQ(p->drvPath, StorePath { drvDeep.substr(1) });
+    ASSERT_EQ(elem.to_string(), drvDeep);
 }
 
-TEST_F(NixStringContextElemTest, built) {
-    std::string_view built = "!foo!/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv";
-    auto elem = NixStringContextElem::parse(store(), built);
+TEST(NixStringContextElemTest, built) {
+    std::string_view built = "!foo!g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv";
+    auto elem = NixStringContextElem::parse(built);
     auto * p = std::get_if<NixStringContextElem::Built>(&elem);
     ASSERT_TRUE(p);
     ASSERT_EQ(p->output, "foo");
-    ASSERT_EQ(p->drvPath, store().parseStorePath(built.substr(5)));
-    ASSERT_EQ(elem.to_string(store()), built);
+    ASSERT_EQ(p->drvPath, StorePath { built.substr(5) });
+    ASSERT_EQ(elem.to_string(), built);
 }
 
 }
@@ -116,12 +109,12 @@ Gen<NixStringContextElem> Arbitrary<NixStringContextElem>::arbitrary()
 
 namespace nix {
 
-RC_GTEST_FIXTURE_PROP(
+RC_GTEST_PROP(
     NixStringContextElemTest,
     prop_round_rip,
     (const NixStringContextElem & o))
 {
-    RC_ASSERT(o == NixStringContextElem::parse(store(), o.to_string(store())));
+    RC_ASSERT(o == NixStringContextElem::parse(o.to_string()));
 }
 
 }

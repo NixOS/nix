@@ -24,9 +24,8 @@ void emitTreeAttrs(
 
     auto attrs = state.buildBindings(8);
 
-    auto storePath = state.store->printStorePath(tree.storePath);
 
-    attrs.alloc(state.sOutPath).mkString(storePath, {storePath});
+    state.mkStorePathString(tree.storePath, attrs.alloc(state.sOutPath));
 
     // FIXME: support arbitrary input attributes.
 
@@ -107,7 +106,7 @@ static void fetchTree(
     const FetchTreeParams & params = FetchTreeParams{}
 ) {
     fetchers::Input input;
-    PathSet context;
+    NixStringContext context;
 
     state.forceValue(*args[0], pos);
 
