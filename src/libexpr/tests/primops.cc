@@ -1,7 +1,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "libexprtests.hh"
+#include "tests/libexpr.hh"
 
 namespace nix {
     class CaptureLogger : public Logger

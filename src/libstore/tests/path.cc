@@ -7,7 +7,8 @@
 #include "path-regex.hh"
 #include "store-api.hh"
 
-#include "libstoretests.hh"
+#include "tests/libstore.hh"
+#include "tests/path.hh"
 
 namespace nix {
 
@@ -72,11 +73,6 @@ void showValue(const StorePath & p, std::ostream & os) {
 
 namespace rc {
 using namespace nix;
-
-template<>
-struct Arbitrary<StorePath> {
-    static Gen<StorePath> arbitrary();
-};
 
 Gen<StorePath> Arbitrary<StorePath>::arbitrary()
 {

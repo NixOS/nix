@@ -1,6 +1,6 @@
 #include "value/context.hh"
 
-#include "libexprtests.hh"
+#include "tests/libexpr.hh"
 
 namespace nix {
 

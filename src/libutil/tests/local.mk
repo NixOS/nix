@@ -2,6 +2,8 @@ check: libutil-tests_RUN
 
 programs += libutil-tests
 
+libutil-tests_NAME := libnixutil-tests
+
 libutil-tests_DIR := $(d)
 
 libutil-tests_INSTALL_DIR :=
