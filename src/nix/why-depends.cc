@@ -185,7 +185,7 @@ struct CmdWhyDepends : SourceExprCommand
             if (precise) {
                 logger->cout("%s%s%s%s" ANSI_NORMAL,
                     firstPad,
-                    node.visited ? "\e[38;5;244m" : "",
+                    node.visited ? ANSI_GRAY : "",
                     firstPad != "" ? "→ " : "",
                     pathS);
             }
@@ -282,7 +282,7 @@ struct CmdWhyDepends : SourceExprCommand
                     auto pathS = store->printStorePath(ref.second->path);
                     logger->cout("%s%s%s%s" ANSI_NORMAL,
                         firstPad,
-                        ref.second->visited ? "\e[38;5;244m" : "",
+                        ref.second->visited ? ANSI_GRAY : "",
                         last ? treeLast : treeConn,
                         pathS);
                     node.visited = true;

@@ -1081,7 +1081,6 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         return;
     }
 
-    bool tty = isatty(STDOUT_FILENO);
     RunPager pager;
 
     Table table;
@@ -1160,7 +1159,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                     }
                 } else {
                     auto column = (std::string) "" + ch + " " + version;
-                    if (diff == cvGreater && tty)
+                    if (diff == cvGreater && allowSelectGraphicRendition)
                         column = ANSI_RED + column + ANSI_NORMAL;
                     columns.push_back(column);
                 }

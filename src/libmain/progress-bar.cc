@@ -82,14 +82,14 @@ private:
     std::condition_variable quitCV, updateCV;
 
     bool printBuildLogs = false;
-    bool isTTY;
 
 public:
 
-    ProgressBar(bool isTTY)
-        : isTTY(isTTY)
+    ProgressBar()
     {
-        state_.lock()->active = isTTY;
+        //  Whether or not printing the progress bar depends solely on stderr being a TTY or not.
+        //  Whether or not emiting a colorful output is orthogonal to this.
+        state_.lock()->active = isatty(STDERR_FILENO);
         updateThread = std::thread([&]() {
             auto state(state_.lock());
             auto nextWakeup = std::chrono::milliseconds::max();
@@ -113,7 +113,7 @@ public:
             auto state(state_.lock());
             if (!state->active) return;
             state->active = false;
-            writeToStderr("\r\e[K");
+            writeToStderr(ANSI_CLEAR_LINE);
             updateCV.notify_one();
             quitCV.notify_one();
         }
@@ -144,13 +144,12 @@ public:
 
     void log(State & state, Verbosity lvl, const std::string & s)
     {
+        auto out = filterANSIEscapes(s, !allowSelectGraphicRendition) + ANSI_NORMAL "\n";
         if (state.active) {
-            writeToStderr("\r\e[K" + filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n");
+            writeToStderr(ANSI_CLEAR_LINE + out);
             draw(state);
         } else {
-            auto s2 = s + ANSI_NORMAL "\n";
-            if (!isTTY) s2 = filterANSIEscapes(s2, true);
-            writeToStderr(s2);
+            writeToStderr(out);
         }
     }
 
@@ -387,7 +386,7 @@ public:
         auto width = getWindowSize().second;
         if (width <= 0) width = std::numeric_limits<decltype(width)>::max();
 
-        writeToStderr("\r" + filterANSIEscapes(line, false, width) + ANSI_NORMAL + "\e[K");
+        writeToStderr(ANSI_CLEAR_LINE + filterANSIEscapes(line, false, width) + ANSI_NORMAL);
 
         return nextWakeup;
     }
@@ -486,7 +485,7 @@ public:
     {
         auto state(state_.lock());
         if (state->active) {
-            std::cerr << "\r\e[K";
+            std::cerr << ANSI_CLEAR_LINE;
             Logger::writeToStdout(s);
             draw(*state);
         } else {
@@ -498,7 +497,7 @@ public:
     {
         auto state(state_.lock());
         if (!state->active || !isatty(STDIN_FILENO)) return {};
-        std::cerr << fmt("\r\e[K%s ", msg);
+        std::cerr << fmt(ANSI_CLEAR_LINE "%s ", msg);
         auto s = trim(readLine(STDIN_FILENO));
         if (s.size() != 1) return {};
         draw(*state);
@@ -513,7 +512,7 @@ public:
 
 Logger * makeProgressBar()
 {
-    return new ProgressBar(shouldANSI());
+    return new ProgressBar();
 }
 
 void startProgressBar()

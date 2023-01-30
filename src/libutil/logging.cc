@@ -39,14 +39,13 @@ class SimpleLogger : public Logger
 {
 public:
 
-    bool systemd, tty;
+    bool systemd;
     bool printBuildLogs;
 
     SimpleLogger(bool printBuildLogs)
         : printBuildLogs(printBuildLogs)
     {
         systemd = getEnv("IN_SYSTEMD") == "1";
-        tty = shouldANSI();
     }
 
     bool isVerbose() override {
@@ -71,7 +70,7 @@ public:
             prefix = std::string("<") + c + ">";
         }
 
-        writeToStderr(prefix + filterANSIEscapes(fs.s, !tty) + "\n");
+        writeToStderr(prefix + filterANSIEscapes(fs.s, !allowSelectGraphicRendition) + "\n");
     }
 
     void logEI(const ErrorInfo & ei) override

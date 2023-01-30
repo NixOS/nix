@@ -4,6 +4,8 @@ namespace nix {
 
 /* Some ANSI escape sequences. */
 #define ANSI_NORMAL "\e[0m"
+#define ANSI_NORMAL_BOLD "\e[0;1m"
+#define ANSI_NORMAL_FAINT "\e[0;2m"
 #define ANSI_BOLD "\e[1m"
 #define ANSI_FAINT "\e[2m"
 #define ANSI_ITALIC "\e[3m"
@@ -13,5 +15,7 @@ namespace nix {
 #define ANSI_BLUE "\e[34;1m"
 #define ANSI_MAGENTA "\e[35;1m"
 #define ANSI_CYAN "\e[36;1m"
+#define ANSI_GRAY "\e[38;5;244m"
+#define ANSI_CLEAR_LINE "\r\e[K"
 
 }
