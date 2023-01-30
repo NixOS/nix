@@ -18,6 +18,7 @@ public:
 
     struct CacheInfo
     {
+        int id;
         bool wantMassQuery;
         int priority;
     };
@@ -44,5 +45,7 @@ public:
 /* Return a singleton cache object that can be used concurrently by
    multiple threads. */
 ref<NarInfoDiskCache> getNarInfoDiskCache();
+
+ref<NarInfoDiskCache> getTestNarInfoDiskCache(Path dbPath);
 
 }
