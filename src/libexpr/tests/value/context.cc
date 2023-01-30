@@ -1,6 +1,10 @@
-#include "value/context.hh"
+#include <nlohmann/json.hpp>
+#include <gtest/gtest.h>
+#include <rapidcheck/gtest.h>
 
-#include "libexprtests.hh"
+#include "tests/path.hh"
+#include "tests/libexpr.hh"
+#include "tests/value/context.hh"
 
 namespace nix {
 
@@ -67,6 +71,57 @@ TEST_F(NixStringContextElemTest, built) {
     ASSERT_EQ(p->output, "foo");
     ASSERT_EQ(p->drvPath, store().parseStorePath(built.substr(5)));
     ASSERT_EQ(elem.to_string(store()), built);
+}
+
+}
+
+namespace rc {
+using namespace nix;
+
+Gen<NixStringContextElem::Opaque> Arbitrary<NixStringContextElem::Opaque>::arbitrary()
+{
+    return gen::just(NixStringContextElem::Opaque {
+        .path = *gen::arbitrary<StorePath>(),
+    });
+}
+
+Gen<NixStringContextElem::DrvDeep> Arbitrary<NixStringContextElem::DrvDeep>::arbitrary()
+{
+    return gen::just(NixStringContextElem::DrvDeep {
+        .drvPath = *gen::arbitrary<StorePath>(),
+    });
+}
+
+Gen<NixStringContextElem::Built> Arbitrary<NixStringContextElem::Built>::arbitrary()
+{
+    return gen::just(NixStringContextElem::Built {
+        .drvPath = *gen::arbitrary<StorePath>(),
+        .output = (*gen::arbitrary<StorePathName>()).name,
+    });
+}
+
+Gen<NixStringContextElem> Arbitrary<NixStringContextElem>::arbitrary()
+{
+    switch (*gen::inRange<uint8_t>(0, 2)) {
+    case 0:
+        return gen::just<NixStringContextElem>(*gen::arbitrary<NixStringContextElem::Opaque>());
+    case 1:
+        return gen::just<NixStringContextElem>(*gen::arbitrary<NixStringContextElem::DrvDeep>());
+    default:
+        return gen::just<NixStringContextElem>(*gen::arbitrary<NixStringContextElem::Built>());
+    }
+}
+
+}
+
+namespace nix {
+
+RC_GTEST_FIXTURE_PROP(
+    NixStringContextElemTest,
+    prop_round_rip,
+    (const NixStringContextElem & o))
+{
+    RC_ASSERT(o == NixStringContextElem::parse(store(), o.to_string(store())));
 }
 
 }

@@ -4,8 +4,8 @@
 #include "path.hh"
 #include "realisation.hh"
 #include "outputs-spec.hh"
+#include "comparator.hh"
 
-#include <optional>
 #include <variant>
 
 #include <nlohmann/json_fwd.hpp>
@@ -28,8 +28,7 @@ struct DerivedPathOpaque {
     std::string to_string(const Store & store) const;
     static DerivedPathOpaque parse(const Store & store, std::string_view);
 
-    bool operator < (const DerivedPathOpaque & b) const
-    { return path < b.path; }
+    GENERATE_CMP(DerivedPathOpaque, me->path);
 };
 
 /**
@@ -52,8 +51,7 @@ struct DerivedPathBuilt {
     static DerivedPathBuilt parse(const Store & store, std::string_view, std::string_view);
     nlohmann::json toJSON(ref<Store> store) const;
 
-    bool operator < (const DerivedPathBuilt & b) const
-    { return std::make_pair(drvPath, outputs) < std::make_pair(b.drvPath, b.outputs); }
+    GENERATE_CMP(DerivedPathBuilt, me->drvPath, me->outputs);
 };
 
 using _DerivedPathRaw = std::variant<
@@ -97,6 +95,8 @@ struct BuiltPathBuilt {
 
     nlohmann::json toJSON(ref<Store> store) const;
     static BuiltPathBuilt parse(const Store & store, std::string_view);
+
+    GENERATE_CMP(BuiltPathBuilt, me->drvPath, me->outputs);
 };
 
 using _BuiltPathRaw = std::variant<
