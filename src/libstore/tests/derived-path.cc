@@ -10,18 +10,28 @@
 namespace rc {
 using namespace nix;
 
+Gen<DerivedPath::Opaque> Arbitrary<DerivedPath::Opaque>::arbitrary()
+{
+    return gen::just(DerivedPath::Opaque {
+        .path = *gen::arbitrary<StorePath>(),
+    });
+}
+
+Gen<DerivedPath::Built> Arbitrary<DerivedPath::Built>::arbitrary()
+{
+    return gen::just(DerivedPath::Built {
+        .drvPath = *gen::arbitrary<StorePath>(),
+        .outputs = *gen::arbitrary<OutputsSpec>(),
+    });
+}
+
 Gen<DerivedPath> Arbitrary<DerivedPath>::arbitrary()
 {
     switch (*gen::inRange<uint8_t>(0, 1)) {
     case 0:
-        return gen::just((DerivedPath) DerivedPath::Opaque {
-            .path = *gen::arbitrary<StorePath>(),
-        });
+        return gen::just<DerivedPath>(*gen::arbitrary<DerivedPath::Opaque>());
     default:
-        return gen::just((DerivedPath) DerivedPath::Built {
-            .drvPath = *gen::arbitrary<StorePath>(),
-            .outputs = *gen::arbitrary<OutputsSpec>(),
-        });
+        return gen::just<DerivedPath>(*gen::arbitrary<DerivedPath::Built>());
     }
 }
 

@@ -78,22 +78,37 @@ TEST_F(NixStringContextElemTest, built) {
 namespace rc {
 using namespace nix;
 
+Gen<NixStringContextElem::Opaque> Arbitrary<NixStringContextElem::Opaque>::arbitrary()
+{
+    return gen::just(NixStringContextElem::Opaque {
+        .path = *gen::arbitrary<StorePath>(),
+    });
+}
+
+Gen<NixStringContextElem::DrvDeep> Arbitrary<NixStringContextElem::DrvDeep>::arbitrary()
+{
+    return gen::just(NixStringContextElem::DrvDeep {
+        .drvPath = *gen::arbitrary<StorePath>(),
+    });
+}
+
+Gen<NixStringContextElem::Built> Arbitrary<NixStringContextElem::Built>::arbitrary()
+{
+    return gen::just(NixStringContextElem::Built {
+        .drvPath = *gen::arbitrary<StorePath>(),
+        .output = (*gen::arbitrary<StorePathName>()).name,
+    });
+}
+
 Gen<NixStringContextElem> Arbitrary<NixStringContextElem>::arbitrary()
 {
     switch (*gen::inRange<uint8_t>(0, 2)) {
     case 0:
-        return gen::just((NixStringContextElem) NixStringContextElem::Opaque {
-            .path = *gen::arbitrary<StorePath>(),
-        });
+        return gen::just<NixStringContextElem>(*gen::arbitrary<NixStringContextElem::Opaque>());
     case 1:
-        return gen::just((NixStringContextElem) NixStringContextElem::DrvDeep {
-            .drvPath = *gen::arbitrary<StorePath>(),
-        });
+        return gen::just<NixStringContextElem>(*gen::arbitrary<NixStringContextElem::DrvDeep>());
     default:
-        return gen::just((NixStringContextElem) NixStringContextElem::Built {
-            .drvPath = *gen::arbitrary<StorePath>(),
-            .output = (*gen::arbitrary<StorePathName>()).name,
-        });
+        return gen::just<NixStringContextElem>(*gen::arbitrary<NixStringContextElem::Built>());
     }
 }
 
