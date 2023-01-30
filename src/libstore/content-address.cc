@@ -17,8 +17,9 @@ std::string makeFileIngestionPrefix(FileIngestionMethod m)
         return "";
     case FileIngestionMethod::Recursive:
         return "r:";
+    default:
+        throw Error("impossible, caught both cases");
     }
-    assert(false);
 }
 
 std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
