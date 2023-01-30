@@ -84,11 +84,10 @@ public:
 
     Sync<State> _state;
 
-    NarInfoDiskCacheImpl()
+    NarInfoDiskCacheImpl(Path dbPath = getCacheDir() + "/nix/binary-cache-v6.sqlite")
     {
         auto state(_state.lock());
 
-        Path dbPath = getCacheDir() + "/nix/binary-cache-v6.sqlite";
         createDirs(dirOf(dbPath));
 
         state->db = SQLite(dbPath);
