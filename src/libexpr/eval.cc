@@ -519,6 +519,7 @@ EvalState::EvalState(
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
 
     /* Initialise the Nix expression search path. */
+    evalSettings.nixPath.setDefault(evalSettings.getDefaultNixPath());
     if (!evalSettings.pureEval) {
         for (auto & i : _searchPath) addToSearchPath(i);
         for (auto & i : evalSettings.nixPath.get()) addToSearchPath(i);
@@ -2472,30 +2473,35 @@ std::ostream & operator << (std::ostream & str, const ExternalValueBase & v) {
 
 EvalSettings::EvalSettings()
 {
-    auto var = getEnv("NIX_PATH");
-    if (var) nixPath = parseNixPath(*var);
 }
 
+/* impure => NIX_PATH or a default path
+ * restrict-eval => NIX_PATH
+ * pure-eval => empty
+ */
 Strings EvalSettings::getDefaultNixPath()
 {
-    Strings res;
-    auto add = [&](const Path & p, const std::string & s = std::string()) {
-        if (pathExists(p)) {
-            if (s.empty()) {
-                res.push_back(p);
-            } else {
-                res.push_back(s + "=" + p);
-            }
-        }
-    };
+    if (pureEval)
+        return {};
 
-    if (!evalSettings.restrictEval && !evalSettings.pureEval) {
+    auto var = getEnv("NIX_PATH");
+    if (var) {
+        return parseNixPath(*var);
+    } else if (restrictEval) {
+        return {};
+    } else {
+        Strings res;
+        auto add = [&](const Path & p, const std::optional<std::string> & s = std::nullopt) {
+            if (pathExists(p))
+                res.push_back(s ? *s + "=" + p : p);
+        };
+
         add(getHome() + "/.nix-defexpr/channels");
         add(settings.nixStateDir + "/profiles/per-user/root/channels/nixpkgs", "nixpkgs");
         add(settings.nixStateDir + "/profiles/per-user/root/channels");
-    }
 
-    return res;
+        return res;
+    }
 }
 
 bool EvalSettings::isPseudoUrl(std::string_view s)
