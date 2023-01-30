@@ -207,6 +207,7 @@ public:
             if (!cache)
                 return std::nullopt;
             return CacheInfo {
+                .id = cache->id,
                 .wantMassQuery = cache->wantMassQuery,
                 .priority = cache->priority
             };
@@ -368,6 +369,11 @@ ref<NarInfoDiskCache> getNarInfoDiskCache()
 {
     static ref<NarInfoDiskCache> cache = make_ref<NarInfoDiskCacheImpl>();
     return cache;
+}
+
+ref<NarInfoDiskCache> getTestNarInfoDiskCache(Path dbPath)
+{
+    return make_ref<NarInfoDiskCacheImpl>(dbPath);
 }
 
 }
