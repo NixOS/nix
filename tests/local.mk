@@ -113,6 +113,7 @@ nix_tests = \
   store-ping.sh \
   fetchClosure.sh \
   completions.sh \
+  flakes/show.sh \
   impure-derivations.sh \
   path-from-hash-part.sh \
   toString-path.sh
