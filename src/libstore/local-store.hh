@@ -281,8 +281,6 @@ private:
     void signPathInfo(ValidPathInfo & info);
     void signRealisation(Realisation &);
 
-    void createUser(const std::string & userName, uid_t userId) override;
-
     // XXX: Make a generic `Store` method
     FixedOutputHash hashCAPath(
         const FileIngestionMethod & method,
