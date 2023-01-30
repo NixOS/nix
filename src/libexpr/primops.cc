@@ -145,10 +145,9 @@ static void mkOutputString(
     EvalState & state,
     BindingsBuilder & attrs,
     const StorePath & drvPath,
-    const BasicDerivation & drv,
     const std::pair<std::string, DerivationOutput> & o)
 {
-    auto optOutputPath = o.second.path(*state.store, drv.name, o.first);
+    auto optOutputPath = o.second.path(*state.store, Derivation::nameFromPath(drvPath), o.first);
     attrs.alloc(o.first).mkString(
         optOutputPath
             ? state.store->printStorePath(*optOutputPath)
@@ -193,7 +192,7 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
         state.mkList(outputsVal, drv.outputs.size());
 
         for (const auto & [i, o] : enumerate(drv.outputs)) {
-            mkOutputString(state, attrs, *storePath, drv, o);
+            mkOutputString(state, attrs, *storePath, o);
             (outputsVal.listElems()[i] = state.allocValue())->mkString(o.first);
         }
 
@@ -1405,7 +1404,7 @@ drvName, Bindings * attrs, Value & v)
         NixStringContextElem::DrvDeep { .drvPath = drvPath },
     });
     for (auto & i : drv.outputs)
-        mkOutputString(state, result, drvPath, drv, i);
+        mkOutputString(state, result, drvPath, i);
 
     v.mkAttrs(result);
 }
