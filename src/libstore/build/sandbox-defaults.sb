@@ -1,3 +1,5 @@
+R""(
+
 (define TMPDIR (param "_GLOBAL_TMP_DIR"))
 
 (deny default)
@@ -104,3 +106,5 @@
        (subpath "/System/Library/Apple/usr/libexec/oah")
        (subpath "/System/Library/LaunchDaemons/com.apple.oahd.plist")
        (subpath "/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist"))
+
+)""

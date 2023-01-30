@@ -82,7 +82,9 @@
         });
 
         configureFlags =
-          lib.optionals stdenv.isLinux [
+          [
+            "CXXFLAGS=-I${lib.getDev rapidcheck}/extras/gtest/include"
+          ] ++ lib.optionals stdenv.isLinux [
             "--with-boost=${boost}/lib"
             "--with-sandbox-shell=${sh}/bin/busybox"
           ]
@@ -96,6 +98,7 @@
             buildPackages.flex
             (lib.getBin buildPackages.lowdown-nix)
             buildPackages.mdbook
+            buildPackages.mdbook-linkcheck
             buildPackages.autoconf-archive
             buildPackages.autoreconfHook
             buildPackages.pkg-config
@@ -115,6 +118,7 @@
             boost
             lowdown-nix
             gtest
+            rapidcheck
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
@@ -127,9 +131,14 @@
           });
 
         propagatedDeps =
-          [ (boehmgc.override {
+          [ ((boehmgc.override {
               enableLargeConfig = true;
+            }).overrideAttrs(o: {
+              patches = (o.patches or []) ++ [
+                ./boehmgc-coroutine-sp-fallback.diff
+              ];
             })
+            )
             nlohmann_json
           ];
       };
@@ -400,6 +409,18 @@
           };
         };
 
+      nixos-lib = import (nixpkgs + "/nixos/lib") { };
+
+      # https://nixos.org/manual/nixos/unstable/index.html#sec-calling-nixos-tests
+      runNixOSTestFor = system: test: nixos-lib.runTest {
+        imports = [ test ];
+        hostPkgs = nixpkgsFor.${system};
+        defaults = {
+          nixpkgs.pkgs = nixpkgsFor.${system};
+        };
+        _module.args.nixpkgs = nixpkgs;
+      };
+
     in {
 
       # A Nixpkgs overlay that overrides the 'nix' and
@@ -456,6 +477,10 @@
 
             src = self;
 
+            configureFlags = [
+              "CXXFLAGS=-I${lib.getDev pkgs.rapidcheck}/extras/gtest/include"
+            ];
+
             enableParallelBuilding = true;
 
             nativeBuildInputs = nativeBuildDeps;
@@ -474,49 +499,22 @@
           };
 
         # System tests.
-        tests.remoteBuilds = import ./tests/remote-builds.nix {
-          system = "x86_64-linux";
-          inherit nixpkgs;
-          overlay = self.overlays.default;
-        };
+        tests.remoteBuilds = runNixOSTestFor "x86_64-linux" ./tests/nixos/remote-builds.nix;
 
-        tests.nix-copy-closure = import ./tests/nix-copy-closure.nix {
-          system = "x86_64-linux";
-          inherit nixpkgs;
-          overlay = self.overlays.default;
-        };
+        tests.nix-copy-closure = runNixOSTestFor "x86_64-linux" ./tests/nixos/nix-copy-closure.nix;
 
-        tests.nssPreload = (import ./tests/nss-preload.nix rec {
-          system = "x86_64-linux";
-          inherit nixpkgs;
-          overlay = self.overlays.default;
-        });
+        tests.nssPreload = runNixOSTestFor "x86_64-linux" ./tests/nixos/nss-preload.nix;
 
-        tests.githubFlakes = (import ./tests/github-flakes.nix rec {
-          system = "x86_64-linux";
-          inherit nixpkgs;
-          overlay = self.overlays.default;
-        });
+        tests.githubFlakes = runNixOSTestFor "x86_64-linux" ./tests/nixos/github-flakes.nix;
 
-        tests.sourcehutFlakes = (import ./tests/sourcehut-flakes.nix rec {
-          system = "x86_64-linux";
-          inherit nixpkgs;
-          overlay = self.overlays.default;
-        });
+        tests.sourcehutFlakes = runNixOSTestFor "x86_64-linux" ./tests/nixos/sourcehut-flakes.nix;
 
-        tests.containers = (import ./tests/containers.nix rec {
-          system = "x86_64-linux";
-          inherit nixpkgs;
-          overlay = self.overlays.default;
-        });
+        tests.containers = runNixOSTestFor "x86_64-linux" ./tests/nixos/containers/containers.nix;
 
         tests.setuid = nixpkgs.lib.genAttrs
           ["i686-linux" "x86_64-linux"]
-          (system:
-            import ./tests/setuid.nix rec {
-              inherit nixpkgs system;
-              overlay = self.overlays.default;
-            });
+          (system: runNixOSTestFor system ./tests/nixos/setuid.nix);
+
 
         # Make sure that nix-env still produces the exact same result
         # on a particular version of Nixpkgs.
@@ -530,6 +528,12 @@
               [[ $(sha1sum < packages | cut -c1-40) = ff451c521e61e4fe72bdbe2d0ca5d1809affa733 ]]
               mkdir $out
             '';
+
+        tests.nixpkgsLibTests =
+          nixpkgs.lib.genAttrs systems (system:
+            import (nixpkgs + "/lib/tests/release.nix")
+              { pkgs = nixpkgsFor.${system}; }
+          );
 
         metrics.nixpkgs = import "${nixpkgs-regression}/pkgs/top-level/metrics.nix" {
           pkgs = nixpkgsFor.x86_64-linux;
@@ -561,6 +565,7 @@
         binaryTarball = self.hydraJobs.binaryTarball.${system};
         perlBindings = self.hydraJobs.perlBindings.${system};
         installTests = self.hydraJobs.installTests.${system};
+        nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
       } // (nixpkgs.lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};
       });
@@ -642,6 +647,7 @@
             inherit system crossSystem;
             overlays = [ self.overlays.default ];
           };
+          inherit (nixpkgsCross) lib;
         in with commonDeps { pkgs = nixpkgsCross; }; nixpkgsCross.stdenv.mkDerivation {
           name = "nix-${version}";
 
@@ -654,7 +660,11 @@
           nativeBuildInputs = nativeBuildDeps;
           buildInputs = buildDeps ++ propagatedDeps;
 
-          configureFlags = [ "--sysconfdir=/etc" "--disable-doc-gen" ];
+          configureFlags = [
+            "CXXFLAGS=-I${lib.getDev nixpkgsCross.rapidcheck}/extras/gtest/include"
+            "--sysconfdir=/etc"
+            "--disable-doc-gen"
+          ];
 
           enableParallelBuilding = true;
 

@@ -1,15 +1,9 @@
 # Test Nix's remote build feature.
 
-{ nixpkgs, system, overlay }:
-
-with import (nixpkgs + "/nixos/lib/testing-python.nix") {
-  inherit system;
-  extraConfigurations = [ { nixpkgs.overlays = [ overlay ]; } ];
-};
-
-makeTest (
+{ config, lib, hostPkgs, ... }:
 
 let
+  pkgs = config.nodes.client.nixpkgs.pkgs;
 
   # The configuration of the remote builders.
   builder =
@@ -75,7 +69,7 @@ in
 
     # Create an SSH key on the client.
     subprocess.run([
-      "${pkgs.openssh}/bin/ssh-keygen", "-t", "ed25519", "-f", "key", "-N", ""
+      "${hostPkgs.openssh}/bin/ssh-keygen", "-t", "ed25519", "-f", "key", "-N", ""
     ], capture_output=True, check=True)
     client.succeed("mkdir -p -m 700 /root/.ssh")
     client.copy_from_host("key", "/root/.ssh/id_ed25519")
@@ -109,4 +103,4 @@ in
     builder1.block()
     client.succeed("nix-build ${expr nodes.client.config 4}")
   '';
-})
+}

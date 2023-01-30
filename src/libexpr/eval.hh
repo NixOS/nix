@@ -203,6 +203,9 @@ public:
         throw std::move(error);
     }
 
+    // This is dangerous, but gets in line with the idea that error creation and
+    // throwing should not allocate on the stack of hot functions.
+    // as long as errors are immediately thrown, it works.
     ErrorBuilder * errorBuilder;
 
     template<typename... Args>
@@ -375,11 +378,11 @@ public:
        booleans and lists to a string.  If `copyToStore' is set,
        referenced paths are copied to the Nix store as a side effect. */
     BackedStringView coerceToString(const PosIdx pos, Value & v, PathSet & context,
+        std::string_view errorCtx,
         bool coerceMore = false, bool copyToStore = true,
-        bool canonicalizePath = true,
-        std::string_view errorCtx = "");
+        bool canonicalizePath = true);
 
-    std::string copyPathToStore(PathSet & context, const Path & path);
+    StorePath copyPathToStore(PathSet & context, const Path & path);
 
     /* Path coercion.  Converts strings, paths and derivations to a
        path.  The result is guaranteed to be a canonicalised, absolute
@@ -551,10 +554,6 @@ struct DebugTraceStacker {
 std::string_view showType(ValueType type);
 std::string showType(const Value & v);
 
-/* Decode a context string ‘!<name>!<path>’ into a pair <path,
-   name>. */
-NixStringContextElem decodeContext(const Store & store, std::string_view s);
-
 /* If `path' refers to a directory, then append "/default.nix". */
 Path resolveExprPath(Path path);
 
@@ -571,7 +570,7 @@ struct EvalSettings : Config
 {
     EvalSettings();
 
-    static Strings getDefaultNixPath();
+    Strings getDefaultNixPath();
 
     static bool isPseudoUrl(std::string_view s);
 
@@ -581,8 +580,15 @@ struct EvalSettings : Config
         "Whether builtin functions that allow executing native code should be enabled."};
 
     Setting<Strings> nixPath{
-        this, getDefaultNixPath(), "nix-path",
-        "List of directories to be searched for `<...>` file references."};
+        this, {}, "nix-path",
+        R"(
+          List of directories to be searched for `<...>` file references.
+
+          If [pure evaluation](#conf-pure-eval) is disabled,
+          this is initialised using the [`NIX_PATH`](@docroot@/command-ref/env-common.md#env-NIX_PATH)
+          environment variable, or, if it is unset and [restricted evaluation](#conf-restrict-eval)
+          is disabled, a default search path including the user's and `root`'s channels.
+        )"};
 
     Setting<bool> restrictEval{
         this, false, "restrict-eval",

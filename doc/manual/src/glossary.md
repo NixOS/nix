@@ -19,6 +19,17 @@
 
     [store derivation]: #gloss-store-derivation
 
+  - [realise]{#gloss-realise}, realisation\
+    Ensure a [store path] is [valid][validity].
+
+    This means either running the `builder` executable as specified in the corresponding [derivation] or fetching a pre-built [store object] from a [substituter].
+
+    See [`nix-build`](./command-ref/nix-build.md) and [`nix-store --realise`](./command-ref/nix-store.md#operation---realise).
+
+    See [`nix build`](./command-ref/new-cli/nix3-build.md) (experimental).
+
+    [realise]: #gloss-realise
+
   - [content-addressed derivation]{#gloss-content-addressed-derivation}\
     A derivation which has the
     [`__contentAddressed`](./language/advanced-attributes.md#adv-attr-__contentAddressed)
@@ -101,6 +112,8 @@
     copy store objects it doesn't have.  For details, see the
     [`substituters` option](./command-ref/conf-file.md#conf-substituters).
 
+    [substituter]: #gloss-substituter
+
   - [purity]{#gloss-purity}\
     The assumption that equal Nix derivations when run always produce
     the same output. This cannot be guaranteed in general (e.g., a
@@ -143,19 +156,25 @@
     to path `Q`, then `Q` is in the closure of `P`. Further, if `Q`
     references `R` then `R` is also in the closure of `P`.
 
+    [closure]: #gloss-closure
+
   - [output path]{#gloss-output-path}\
     A [store path] produced by a [derivation].
 
     [output path]: #gloss-output-path
 
   - [deriver]{#gloss-deriver}\
-    The deriver of an *output path* is the store
-    derivation that built it.
+    The [store derivation] that produced an [output path].
 
   - [validity]{#gloss-validity}\
-    A store path is considered *valid* if it exists in the file system,
-    is listed in the Nix database as being valid, and if all paths in
-    its closure are also valid.
+    A store path is valid if all [store object]s in its [closure] can be read from the [store].
+
+    For a local store, this means:
+    - The store path leads to an existing [store object] in that [store].
+    - The store path is listed in the Nix database as being valid.
+    - All paths in the store path's [closure] are valid.
+
+    [validity]: #gloss-validity
 
   - [user environment]{#gloss-user-env}\
     An automatically generated store object that consists of a set of

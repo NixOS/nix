@@ -66,11 +66,11 @@ The operation `--realise` essentially “builds” the specified store
 paths. Realisation is a somewhat overloaded term:
 
   - If the store path is a *derivation*, realisation ensures that the
-    output paths of the derivation are [valid](../glossary.md) (i.e.,
+    output paths of the derivation are [valid] (i.e.,
     the output path and its closure exist in the file system). This
     can be done in several ways. First, it is possible that the
     outputs are already valid, in which case we are done
-    immediately. Otherwise, there may be [substitutes](../glossary.md)
+    immediately. Otherwise, there may be [substitutes]
     that produce the outputs (e.g., by downloading them). Finally, the
     outputs can be produced by running the build task described
     by the derivation.
@@ -81,6 +81,9 @@ paths. Realisation is a somewhat overloaded term:
     Otherwise, the path and any missing paths in its closure may be
     produced through substitutes. If there are no (successful)
     substitutes, realisation fails.
+
+[valid]: ../glossary.md#gloss-validity
+[substitutes]: ../glossary.md#gloss-substitute
 
 The output path of each derivation is printed on standard output. (For
 non-derivations argument, the argument itself is printed.)
@@ -153,6 +156,12 @@ To test whether a previously-built derivation is deterministic:
 
 ```console
 $ nix-build '<nixpkgs>' -A hello --check -K
+```
+
+Use [`--read-log`](#operation---read-log) to show the stderr and stdout of a build:
+
+```console
+$ nix-store --read-log $(nix-instantiate ./test.nix)
 ```
 
 # Operation `--serve`
@@ -289,8 +298,8 @@ error: cannot delete path `/nix/store/zq0h41l75vlb4z45kzgjjmsjxvcv1qk7-mesa-6.4'
 
 ## Description
 
-The operation `--query` displays various bits of information about the
-store paths . The queries are described below. At most one query can be
+The operation `--query` displays information about [store path]s.
+The queries are described below. At most one query can be
 specified. The default query is `--outputs`.
 
 The paths *paths* may also be symlinks from outside of the Nix store, to
@@ -310,12 +319,12 @@ symlink.
 ## Queries
 
   - `--outputs`\
-    Prints out the [output paths](../glossary.md) of the store
+    Prints out the [output path]s of the store
     derivations *paths*. These are the paths that will be produced when
     the derivation is built.
 
   - `--requisites`; `-R`\
-    Prints out the [closure](../glossary.md) of the store path *paths*.
+    Prints out the [closure] of the given *paths*.
 
     This query has one option:
 
@@ -332,9 +341,11 @@ symlink.
     derivation and specifying the option `--include-outputs`.
 
   - `--references`\
-    Prints the set of [references](../glossary.md) of the store paths
+    Prints the set of [references]s of the store paths
     *paths*, that is, their immediate dependencies. (For *all*
     dependencies, use `--requisites`.)
+
+    [reference]: ../glossary.md#gloss-reference
 
   - `--referrers`\
     Prints the set of *referrers* of the store paths *paths*, that is,
@@ -350,10 +361,12 @@ symlink.
     in the Nix store that are dependent on *paths*.
 
   - `--deriver`; `-d`\
-    Prints the [deriver](../glossary.md) of the store paths *paths*. If
+    Prints the [deriver] of the store paths *paths*. If
     the path has no deriver (e.g., if it is a source file), or if the
     deriver is not known (e.g., in the case of a binary-only
     deployment), the string `unknown-deriver` is printed.
+
+    [deriver]: ../glossary.md#gloss-deriver
 
   - `--graph`\
     Prints the references graph of the store paths *paths* in the format

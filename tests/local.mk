@@ -9,6 +9,7 @@ nix_tests = \
   flakes/check.sh \
   flakes/unlocked-override.sh \
   flakes/absolute-paths.sh \
+  flakes/build-paths.sh \
   ca/gc.sh \
   gc.sh \
   remote-store.sh \
@@ -92,6 +93,7 @@ nix_tests = \
   fmt.sh \
   eval-store.sh \
   why-depends.sh \
+  ca/why-depends.sh \
   import-derivation.sh \
   ca/import-derivation.sh \
   nix_path.sh \

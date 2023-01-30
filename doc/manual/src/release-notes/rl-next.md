@@ -1,27 +1,12 @@
-# Release X.Y (202?-??-??)
+* A new function `builtins.readFileType` is available. It is similar to
+  `builtins.readDir` but acts on a single file or directory.
 
-* The `repeat` and `enforce-determinism` options have been removed
-  since they had been broken under many circumstances for a long time.
-
-* You can now use [flake references] in the [old command line interface], e.g.
-
-   [flake references]: ../command-ref/new-cli/nix3-flake.md#flake-references
-   [old command line interface]: ../command-ref/main-commands.md
-
-  ```
-  # nix-build flake:nixpkgs -A hello
-  # nix-build -I nixpkgs=flake:github:NixOS/nixpkgs/nixos-22.05 \
-      '<nixpkgs>' -A hello
-  # NIX_PATH=nixpkgs=flake:nixpkgs nix-build '<nixpkgs>' -A hello
-  ```
-
-* Instead of "antiquotation", the more common term [string interpolation](../language/string-interpolation.md) is now used consistently.
-  Historical release notes were not changed.
-
-* Error traces have been reworked to provide detailed explanations and more
-  accurate error locations. A short excerpt of the trace is now shown by
-  default when an error occurs.
-
+* The `builtins.readDir` function has been optimized when encountering not-yet-known
+  file types from POSIX's `readdir`. In such cases the type of each file is/was
+  discovered by making multiple syscalls. This change makes these operations
+  lazy such that these lookups will only be performed if the attribute is used.
+  This optimization affects a minority of filesystems and operating systems.
+  
 * In derivations that use structured attributes, you can now use `unsafeDiscardReferences`
   to disable scanning a given output for runtime dependencies:
   ```nix

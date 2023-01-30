@@ -71,6 +71,9 @@ class NarInfoDiskCache;
 class Store;
 
 
+typedef std::map<std::string, StorePath> OutputPathMap;
+
+
 enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
 enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
 enum AllowInvalidFlag : bool { DisallowInvalid = false, AllowInvalid = true };
@@ -119,6 +122,8 @@ class Store : public std::enable_shared_from_this<Store>, public virtual StoreCo
 public:
 
     typedef std::map<std::string, std::string> Params;
+
+
 
 protected:
 
@@ -618,6 +623,13 @@ public:
      */
     StorePathSet exportReferences(const StorePathSet & storePaths, const StorePathSet & inputPaths);
 
+    /**
+     * Given a store path, return the realisation actually used in the realisation of this path:
+     * - If the path is a content-addressed derivation, try to resolve it
+     * - Otherwise, find one of its derivers
+     */
+    std::optional<StorePath> getBuildDerivationPath(const StorePath &);
+
     /* Hack to allow long-running processes like hydra-queue-runner to
        occasionally flush their path info cache. */
     void clearPathInfoCache()
@@ -717,6 +729,11 @@ void copyClosure(
    root becomes garbage after this point unless it has been registered
    as a (permanent) root. */
 void removeTempRoots();
+
+
+/* Resolve the derived path completely, failing if any derivation output
+   is unknown. */
+OutputPathMap resolveDerivedPath(Store &, const DerivedPath::Built &, Store * evalStore = nullptr);
 
 
 /* Return a Store object to access the Nix store denoted by

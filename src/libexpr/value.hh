@@ -3,6 +3,7 @@
 #include <cassert>
 
 #include "symbol-table.hh"
+#include "value/context.hh"
 
 #if HAVE_BOEHMGC
 #include <gc/gc_allocator.h>
@@ -67,8 +68,6 @@ class XMLWriter;
 
 typedef int64_t NixInt;
 typedef double NixFloat;
-typedef std::pair<StorePath, std::string> NixStringContextElem;
-typedef std::vector<NixStringContextElem> NixStringContext;
 
 /* External values must descend from ExternalValueBase, so that
  * type-agnostic nix functions (e.g. showType) can be implemented
@@ -90,7 +89,7 @@ class ExternalValueBase
     /* Coerce the value to a string. Defaults to uncoercable, i.e. throws an
      * error.
      */
-    virtual std::string coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore, std::string_view errorCtx) const;
+    virtual std::string coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore) const;
 
     /* Compare to another value of the same type. Defaults to uncomparable,
      * i.e. always false.

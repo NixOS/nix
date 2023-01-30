@@ -1,13 +1,12 @@
 # Verify that Linux builds cannot create setuid or setgid binaries.
 
-{ nixpkgs, system, overlay }:
+{ lib, config, nixpkgs, ... }:
 
-with import (nixpkgs + "/nixos/lib/testing-python.nix") {
-  inherit system;
-  extraConfigurations = [ { nixpkgs.overlays = [ overlay ]; } ];
-};
+let
+  pkgs = config.nodes.machine.nixpkgs.pkgs;
 
-makeTest {
+in
+{
   name = "setuid";
 
   nodes.machine =
@@ -15,7 +14,7 @@ makeTest {
     { virtualisation.writableStore = true;
       nix.settings.substituters = lib.mkForce [ ];
       nix.nixPath = [ "nixpkgs=${lib.cleanSource pkgs.path}" ];
-      virtualisation.additionalPaths = [ pkgs.stdenv pkgs.pkgsi686Linux.stdenv ];
+      virtualisation.additionalPaths = [ pkgs.stdenvNoCC pkgs.pkgsi686Linux.stdenvNoCC ];
     };
 
   testScript = { nodes }: ''

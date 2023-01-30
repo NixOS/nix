@@ -37,8 +37,15 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx p
     auto s = state.coerceToString(pos, *args[0], context, "while evaluating the argument passed to builtins.unsafeDiscardOutputDependency");
 
     PathSet context2;
-    for (auto & p : context)
-        context2.insert(p.at(0) == '=' ? std::string(p, 1) : p);
+    for (auto && p : context) {
+        auto c = NixStringContextElem::parse(*state.store, p);
+        if (auto * ptr = std::get_if<NixStringContextElem::DrvDeep>(&c)) {
+            context2.emplace(state.store->printStorePath(ptr->drvPath));
+        } else {
+            /* Can reuse original item */
+            context2.emplace(std::move(p));
+        }
+    }
 
     v.mkString(*s, context2);
 }
@@ -74,34 +81,20 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
     };
     PathSet context;
     state.forceString(*args[0], context, pos, "while evaluating the argument passed to builtins.getContext");
-    auto contextInfos = std::map<Path, ContextInfo>();
+    auto contextInfos = std::map<StorePath, ContextInfo>();
     for (const auto & p : context) {
-        Path drv;
-        std::string output;
-        const Path * path = &p;
-        if (p.at(0) == '=') {
-            drv = std::string(p, 1);
-            path = &drv;
-        } else if (p.at(0) == '!') {
-            NixStringContextElem ctx = decodeContext(*state.store, p);
-            drv = state.store->printStorePath(ctx.first);
-            output = ctx.second;
-            path = &drv;
-        }
-        auto isPath = drv.empty();
-        auto isAllOutputs = (!drv.empty()) && output.empty();
-
-        auto iter = contextInfos.find(*path);
-        if (iter == contextInfos.end()) {
-            contextInfos.emplace(*path, ContextInfo{isPath, isAllOutputs, output.empty() ? Strings{} : Strings{std::move(output)}});
-        } else {
-            if (isPath)
-                iter->second.path = true;
-            else if (isAllOutputs)
-                iter->second.allOutputs = true;
-            else
-                iter->second.outputs.emplace_back(std::move(output));
-        }
+        NixStringContextElem ctx = NixStringContextElem::parse(*state.store, p);
+        std::visit(overloaded {
+            [&](NixStringContextElem::DrvDeep & d) {
+                contextInfos[d.drvPath].allOutputs = true;
+            },
+            [&](NixStringContextElem::Built & b) {
+                contextInfos[b.drvPath].outputs.emplace_back(std::move(b.output));
+            },
+            [&](NixStringContextElem::Opaque & o) {
+                contextInfos[o.path].path = true;
+            },
+        }, ctx.raw());
     }
 
     auto attrs = state.buildBindings(contextInfos.size());
@@ -120,7 +113,7 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
             for (const auto & [i, output] : enumerate(info.second.outputs))
                 (outputsVal.listElems()[i] = state.allocValue())->mkString(output);
         }
-        attrs.alloc(info.first).mkAttrs(infoAttrs);
+        attrs.alloc(state.store->printStorePath(info.first)).mkAttrs(infoAttrs);
     }
 
     v.mkAttrs(attrs);
