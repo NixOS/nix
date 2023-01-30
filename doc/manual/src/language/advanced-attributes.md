@@ -207,13 +207,13 @@ Derivations can declare some infrequently used optional attributes.
     the hash in either hexadecimal or base-32 notation. (See the
     [`nix-hash` command](../command-ref/nix-hash.md) for information
     about converting to and from base-32 notation.)
-    
+
   - [`__contentAddressed`]{#adv-attr-__contentAddressed}
     If this **experimental** attribute is set to true, then the derivation
     outputs will be stored in a content-addressed location rather than the
     traditional input-addressed one.
-    This only has an effect if the `ca-derivation` experimental feature is enabled.
-    
+    This only has an effect if the `ca-derivations` experimental feature is enabled.
+
     Setting this attribute also requires setting `outputHashMode` and `outputHashAlgo` like for *fixed-output derivations* (see above).
 
   - [`passAsFile`]{#adv-attr-passAsFile}\
