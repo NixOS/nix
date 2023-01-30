@@ -379,10 +379,9 @@ Installable::getCursors(EvalState & state)
 ref<eval_cache::AttrCursor>
 Installable::getCursor(EvalState & state)
 {
-    auto cursors = getCursors(state);
-    if (cursors.empty())
-        throw Error("cannot find flake attribute '%s'", what());
-    return cursors[0];
+    /* Although getCursors should return at least one element, in case it doesn't,
+       bound check to avoid an undefined behavior for vector[0] */
+    return getCursors(state).at(0);
 }
 
 static StorePath getDeriver(
