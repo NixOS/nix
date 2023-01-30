@@ -966,6 +966,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 struct CmdFlakeShow : FlakeCommand, MixJSON
 {
     bool showLegacy = false;
+    bool showAllSystems = false;
 
     CmdFlakeShow()
     {
@@ -973,6 +974,11 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
             .longName = "legacy",
             .description = "Show the contents of the `legacyPackages` output.",
             .handler = {&showLegacy, true}
+        });
+        addFlag({
+            .longName = "all-systems",
+            .description = "Show the contents of outputs for all systems.",
+            .handler = {&showAllSystems, true}
         });
     }
 
@@ -994,6 +1000,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
         auto state = getEvalState();
         auto flake = std::make_shared<LockedFlake>(lockFlake());
+        auto localSystem = std::string(settings.thisSystem.get());
 
         std::function<nlohmann::json(
             eval_cache::AttrCursor & visitor,
@@ -1084,10 +1091,18 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     || (attrPath.size() == 3 && (attrPathS[0] == "checks" || attrPathS[0] == "packages" || attrPathS[0] == "devShells"))
                     )
                 {
-                    if (visitor.isDerivation())
-                        showDerivation();
-                    else
-                        throw Error("expected a derivation");
+                    if (!showAllSystems && std::string(attrPathS[1]) != localSystem) {
+                        if (!json)
+                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--all-systems' to show)", headerPrefix));
+                        else {
+                            logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
+                        }
+                    } else {
+                        if (visitor.isDerivation())
+                            showDerivation();
+                        else
+                            throw Error("expected a derivation");
+                    }
                 }
 
                 else if (attrPath.size() > 0 && attrPathS[0] == "hydraJobs") {
@@ -1105,6 +1120,12 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--legacy' to show)", headerPrefix));
                         else {
                             logger->warn(fmt("%s omitted (use '--legacy' to show)", concatStringsSep(".", attrPathS)));
+                        }
+                    } else if (!showAllSystems && std::string(attrPathS[1]) != localSystem) {
+                        if (!json)
+                            logger->cout(fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--all-systems' to show)", headerPrefix));
+                        else {
+                            logger->warn(fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
                         }
                     } else {
                         if (visitor.isDerivation())

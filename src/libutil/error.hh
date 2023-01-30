@@ -74,6 +74,8 @@ struct AbstractPos
     virtual void print(std::ostream & out) const = 0;
 
     std::optional<LinesOfCode> getCodeLines() const;
+
+    virtual ~AbstractPos() = default;
 };
 
 std::ostream & operator << (std::ostream & str, const AbstractPos & pos);

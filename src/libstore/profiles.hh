@@ -68,6 +68,10 @@ void lockProfile(PathLocks & lock, const Path & profile);
    rebuilt. */
 std::string optimisticLockProfile(const Path & profile);
 
+/* Creates and returns the path to a directory suitable for storing the user’s
+   profiles. */
+Path profilesDir();
+
 /* Resolve ~/.nix-profile. If ~/.nix-profile doesn't exist yet, create
    it. */
 Path getDefaultProfile();

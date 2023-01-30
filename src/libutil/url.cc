@@ -30,13 +30,13 @@ ParsedURL parseURL(const std::string & url)
         auto & query = match[6];
         auto & fragment = match[7];
 
-        auto isFile = scheme.find("file") != std::string::npos;
+        auto transportIsFile = parseUrlScheme(scheme).transport == "file";
 
-        if (authority && *authority != "" && isFile)
+        if (authority && *authority != "" && transportIsFile)
             throw BadURL("file:// URL '%s' has unexpected authority '%s'",
                 url, *authority);
 
-        if (isFile && path.empty())
+        if (transportIsFile && path.empty())
             path = "/";
 
         return ParsedURL{

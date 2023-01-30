@@ -1,12 +1,7 @@
 # Test whether we can run a NixOS container inside a Nix build using systemd-nspawn.
-{ nixpkgs, system, overlay }:
+{ lib, nixpkgs, ... }:
 
-with import (nixpkgs + "/nixos/lib/testing-python.nix") {
-  inherit system;
-  extraConfigurations = [ { nixpkgs.overlays = [ overlay ]; } ];
-};
-
-makeTest ({
+{
   name = "containers";
 
   nodes =
@@ -65,4 +60,4 @@ makeTest ({
     host.succeed("[[ $(cat ./result/msg) = 'Hello World' ]]")
   '';
 
-})
+}

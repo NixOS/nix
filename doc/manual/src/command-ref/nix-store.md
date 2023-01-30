@@ -82,8 +82,8 @@ paths. Realisation is a somewhat overloaded term:
     produced through substitutes. If there are no (successful)
     substitutes, realisation fails.
 
-[valid]: ../glossary.md#validity
-[substitutes]: ../glossary.md#substitute
+[valid]: ../glossary.md#gloss-validity
+[substitutes]: ../glossary.md#gloss-substitute
 
 The output path of each derivation is printed on standard output. (For
 non-derivations argument, the argument itself is printed.)
