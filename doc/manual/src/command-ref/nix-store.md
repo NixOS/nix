@@ -633,7 +633,7 @@ written to standard output.
 
 A NAR archive is like a TAR or Zip archive, but it contains only the
 information that Nix considers important. For instance, timestamps are
-elided because all files in the Nix store have their timestamp set to 0
+elided because all files in the Nix store have their timestamp set to 1
 anyway. Likewise, all permissions are left out except for the execute
 bit, because all files in the Nix store have 444 or 555 permission.
 
