@@ -1,6 +1,7 @@
 #include "command.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "finally.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -29,11 +30,13 @@ struct CmdPingStore : StoreCommand, MixJSON
                 notice("Version: %s", *version);
         } else {
             nlohmann::json res;
+            Finally printRes([&]() {
+                logger->cout("%s", res);
+            });
             res["url"] = store->getUri();
             store->connect();
             if (auto version = store->getVersion())
                 res["version"] = *version;
-            logger->cout("%s", res);
         }
     }
 };
