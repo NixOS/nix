@@ -233,9 +233,13 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                     bool last = i + 1 == node.inputs.size();
 
                     if (auto lockedNode = std::get_if<0>(&input.second)) {
-                        logger->cout("%s" ANSI_BOLD "%s" ANSI_NORMAL ": %s",
+                        std::string lastModifiedStr = "";
+                        if (auto lastModified = (*lockedNode)->lockedRef.input.getLastModified())
+                            lastModifiedStr = fmt(" (%s)", std::put_time(std::gmtime(&*lastModified), "%F %T"));
+                        logger->cout("%s" ANSI_BOLD "%s" ANSI_NORMAL ": %s%s",
                             prefix + (last ? treeLast : treeConn), input.first,
-                            (*lockedNode)->lockedRef);
+                            (*lockedNode)->lockedRef,
+                            lastModifiedStr);
 
                         bool firstVisit = visited.insert(*lockedNode).second;
 
