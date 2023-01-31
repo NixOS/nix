@@ -182,9 +182,6 @@ if test "$shared" != yes; then
     LIBARCHIVE_LIBS+=' -lz'
 fi
 
-# Look for libzip.
-PKG_CHECK_MODULES([LIBZIP], [libzip])
-
 # Look for SQLite, a required dependency.
 PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.6.19], [CXXFLAGS="$SQLITE3_CFLAGS $CXXFLAGS"])
 
