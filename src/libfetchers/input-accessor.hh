@@ -119,6 +119,10 @@ ref<InputAccessor> makePatchingInputAccessor(
 
 ref<InputAccessor> makeGitInputAccessor(const CanonPath & path, const Hash & rev);
 
+Hash importTarball(Source & source);
+
+ref<InputAccessor> makeTarballCacheAccessor(const Hash & rev);
+
 struct SourcePath
 {
     ref<InputAccessor> accessor;

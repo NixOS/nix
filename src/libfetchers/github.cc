@@ -180,7 +180,7 @@ struct GitArchiveInputScheme : InputScheme
 
     virtual DownloadUrl getDownloadUrl(const Input & input) const = 0;
 
-    std::pair<StorePath, Input> downloadArchive(ref<Store> store, Input input) const
+    std::pair<Input, Hash> downloadArchive(ref<Store> store, Input input) const
     {
         if (!maybeGetStrAttr(input.attrs, "ref")) input.attrs.insert_or_assign("ref", "HEAD");
 
@@ -190,62 +190,50 @@ struct GitArchiveInputScheme : InputScheme
         input.attrs.erase("ref");
         input.attrs.insert_or_assign("rev", rev->gitRev());
 
-        Attrs lockedAttrs({
-            {"type", "git-zipball"},
-            {"rev", rev->gitRev()},
-        });
-
-        if (auto res = getCache()->lookup(store, lockedAttrs))
-            return {std::move(res->second), std::move(input)};
-
-        auto url = getDownloadUrl(input);
-
-        auto res = downloadFile(store, url.url, input.getName(), true, url.headers);
-
-        getCache()->add(
-            store,
-            lockedAttrs,
-            {
-                {"rev", rev->gitRev()},
-            },
-            res.storePath,
-            true);
-
-        return {res.storePath, std::move(input)};
-    }
-
-    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const override
-    {
-        auto [storePath, input2] = downloadArchive(store, input);
-
-        auto accessor = makeZipInputAccessor(CanonPath(store->toRealPath(storePath)));
-
-        /* Compute the NAR hash of the contents of the zip file. This
-           is checked against the NAR hash in the lock file in
-           Input::checkLocks(). */
-        auto key = fmt("zip-nar-hash-%s", store->toRealPath(storePath.to_string()));
-
         auto cache = getCache();
 
-        auto narHash = [&]() {
-            if (auto narHashS = cache->queryFact(key)) {
-                return Hash::parseSRI(*narHashS);
-            } else {
-                auto narHash = accessor->hashPath(CanonPath::root);
-                cache->upsertFact(key, narHash.to_string(SRI, true));
-                return narHash;
-            }
-        }();
+        auto treeHashKey = fmt("git-rev-to-tree-hash-%s", rev->gitRev());
 
-        input2.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
+        if (auto treeHashS = cache->queryFact(treeHashKey)) {
+            auto treeHash = Hash::parseAny(*treeHashS, htSHA1);
+            // FIXME: verify that treeHash exists in the tarball cache.
+            return {std::move(input), treeHash};
+        }
 
+        /* Stream the tarball into the tarball cache. */
+        auto url = getDownloadUrl(input);
+
+        auto source = sinkToSource([&](Sink & sink) {
+            FileTransferRequest req(url.url);
+            req.headers = url.headers;
+            getFileTransfer()->download(std::move(req), sink);
+        });
+
+        auto treeHash = importTarball(*source);
+
+        // FIXME: verify against locked tree hash.
+        input.attrs.insert_or_assign("treeHash", treeHash.gitRev());
+
+        cache->upsertFact(treeHashKey, treeHash.gitRev());
+
+        return {std::move(input), treeHash};
+    }
+
+    std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    {
+        auto [input, treeHash] = downloadArchive(store, _input);
+
+        auto accessor = makeTarballCacheAccessor(treeHash);
+
+        #if 0
         auto lastModified = accessor->getLastModified();
         assert(lastModified);
-        input2.attrs.insert_or_assign("lastModified", uint64_t(*lastModified));
+        input.attrs.insert_or_assign("lastModified", uint64_t(*lastModified));
+        #endif
 
-        accessor->setPathDisplay("«" + input2.to_string() + "»");
+        accessor->setPathDisplay("«" + input.to_string() + "»");
 
-        return {accessor, input2};
+        return {accessor, input};
     }
 
     bool isLocked(const Input & input) const override
@@ -314,10 +302,10 @@ struct GitHubInputScheme : GitArchiveInputScheme
         // urls so we do not run into rate limits.
         const auto urlFmt =
             host != "github.com"
-            ? "https://%s/api/v3/repos/%s/%s/zipball/%s"
+            ? "https://%s/api/v3/repos/%s/%s/tarball/%s"
             : headers.empty()
-            ? "https://%s/%s/%s/archive/%s.zip"
-            : "https://api.%s/repos/%s/%s/zipball/%s";
+            ? "https://%s/%s/%s/archive/%s.tar.gz"
+            : "https://api.%s/repos/%s/%s/tarball/%s";
 
         const auto url = fmt(urlFmt, host, getOwner(input), getRepo(input),
             input.getRev()->to_string(Base16, false));
@@ -384,7 +372,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         // is 10 reqs/sec/ip-addr.  See
         // https://docs.gitlab.com/ee/user/gitlab_com/index.html#gitlabcom-specific-rate-limits
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
-        auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/archive.zip?sha=%s",
+        auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/archive.tar.gz?sha=%s",
             host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(Base16, false));
 

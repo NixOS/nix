@@ -1,5 +1,7 @@
 #include "input-accessor.hh"
 
+#include <span>
+
 #include <git2/blob.h>
 #include <git2/commit.h>
 #include <git2/errors.h>
@@ -7,6 +9,9 @@
 #include <git2/object.h>
 #include <git2/repository.h>
 #include <git2/tree.h>
+
+#include "tarfile.hh"
+#include <archive_entry.h>
 
 namespace nix {
 
@@ -17,26 +22,35 @@ struct Deleter
     void operator()(T * p) const { del(p); };
 };
 
+typedef std::unique_ptr<git_repository, Deleter<git_repository_free>> Repository;
+typedef std::unique_ptr<git_tree_entry, Deleter<git_tree_entry_free>> TreeEntry;
+typedef std::unique_ptr<git_tree, Deleter<git_tree_free>> Tree;
+typedef std::unique_ptr<git_treebuilder, Deleter<git_treebuilder_free>> TreeBuilder;
+typedef std::unique_ptr<git_blob, Deleter<git_blob_free>> Blob;
+
+static void initLibGit2()
+{
+    if (git_libgit2_init() < 0)
+        throw Error("initialising libgit2: %s", git_error_last()->message);
+}
+
+static Repository openRepo(const CanonPath & path)
+{
+    initLibGit2();
+    git_repository * _repo;
+    if (git_repository_open(&_repo, path.c_str()))
+        throw Error("opening Git repository '%s': %s", path, git_error_last()->message);
+    return Repository(_repo);
+}
+
 struct GitInputAccessor : InputAccessor
 {
-    typedef std::unique_ptr<git_repository, Deleter<git_repository_free>> Repository;
-    typedef std::unique_ptr<git_tree_entry, Deleter<git_tree_entry_free>> TreeEntry;
-    typedef std::unique_ptr<git_tree, Deleter<git_tree_free>> Tree;
-    typedef std::unique_ptr<git_blob, Deleter<git_blob_free>> Blob;
-
     Repository repo;
     Tree root;
 
-    GitInputAccessor(const CanonPath & path, const Hash & rev)
+    GitInputAccessor(Repository && repo_, const Hash & rev)
+        : repo(std::move(repo_))
     {
-        if (git_libgit2_init() < 0)
-            throw Error("initialising libgit2': %s", path, git_error_last()->message);
-
-        git_repository * _repo;
-        if (git_repository_open(&_repo, path.c_str()))
-            throw Error("opening Git repository '%s': %s", path, git_error_last()->message);
-        repo = Repository(_repo);
-
         git_oid oid;
         if (git_oid_fromstr(&oid, rev.gitRev().c_str()))
             throw Error("cannot convert '%s' to a Git OID", rev.gitRev());
@@ -203,8 +217,176 @@ struct GitInputAccessor : InputAccessor
 
 ref<InputAccessor> makeGitInputAccessor(const CanonPath & path, const Hash & rev)
 {
-    return make_ref<GitInputAccessor>(path, rev);
+    return make_ref<GitInputAccessor>(openRepo(path), rev);
 }
 
+static Repository openTarballCache()
+{
+    static CanonPath repoDir(getCacheDir() + "/nix/tarball-cache");
+
+    initLibGit2();
+
+    if (pathExists(repoDir.abs()))
+        return openRepo(repoDir);
+    else {
+        git_repository * _repo;
+        if (git_repository_init(&_repo, repoDir.c_str(), true))
+            throw Error("creating Git repository '%s': %s", repoDir, git_error_last()->message);
+        return Repository(_repo);
+    }
+}
+
+Hash importTarball(Source & source)
+{
+    auto repo = openTarballCache();
+
+    TarArchive archive(source);
+
+    struct PendingDir
+    {
+        std::string name;
+        TreeBuilder builder;
+    };
+
+    std::vector<PendingDir> pendingDirs;
+
+    auto pushBuilder = [&](std::string name)
+    {
+        git_treebuilder * b;
+        if (git_treebuilder_new(&b, repo.get(), nullptr))
+            throw Error("creating a tree builder: %s", git_error_last()->message);
+        pendingDirs.push_back({ .name = std::move(name), .builder = TreeBuilder(b) });
+    };
+
+    auto popBuilder = [&]() -> std::pair<git_oid, std::string>
+    {
+        assert(!pendingDirs.empty());
+        auto pending = std::move(pendingDirs.back());
+        git_oid oid;
+        if (git_treebuilder_write(&oid, pending.builder.get()))
+            throw Error("creating a tree object: %s", git_error_last()->message);
+        pendingDirs.pop_back();
+        return {oid, pending.name};
+    };
+
+    auto addToTree = [&](const std::string & name, const git_oid & oid, git_filemode_t mode)
+    {
+        assert(!pendingDirs.empty());
+        auto & pending = pendingDirs.back();
+        if (git_treebuilder_insert(nullptr, pending.builder.get(), name.c_str(), &oid, mode))
+            throw Error("adding a file to a tree builder: %s", git_error_last()->message);
+    };
+
+    auto updateBuilders = [&](std::span<const std::string> names)
+    {
+        // Find the common prefix of pendingDirs and names.
+        size_t prefixLen = 0;
+        for (; prefixLen < names.size() && prefixLen + 1 < pendingDirs.size(); ++prefixLen)
+            if (names[prefixLen] != pendingDirs[prefixLen + 1].name)
+                break;
+
+        // Finish the builders that are not part of the common prefix.
+        for (auto n = pendingDirs.size(); n > prefixLen + 1; --n) {
+            auto [oid, name] = popBuilder();
+            addToTree(name, oid, GIT_FILEMODE_TREE);
+        }
+
+        // Create builders for the new directories.
+        for (auto n = prefixLen; n < names.size(); ++n)
+            pushBuilder(names[n]);
+
+    };
+
+    pushBuilder("");
+
+    size_t componentsToStrip = 1;
+
+    for (;;) {
+        // FIXME: merge with extract_archive
+        struct archive_entry * entry;
+        int r = archive_read_next_header(archive.archive, &entry);
+        if (r == ARCHIVE_EOF) break;
+        auto path = archive_entry_pathname(entry);
+        if (!path)
+            throw Error("cannot get archive member name: %s", archive_error_string(archive.archive));
+        if (r == ARCHIVE_WARN)
+            warn(archive_error_string(archive.archive));
+        else
+            archive.check(r);
+
+        auto pathComponents = tokenizeString<std::vector<std::string>>(path, "/");
+
+        std::span<const std::string> pathComponents2{pathComponents};
+
+        if (pathComponents2.size() <= componentsToStrip) continue;
+        pathComponents2 = pathComponents2.subspan(componentsToStrip);
+
+        updateBuilders(
+            archive_entry_filetype(entry) == AE_IFDIR
+            ? pathComponents2
+            : pathComponents2.first(pathComponents2.size() - 1));
+
+        switch (archive_entry_filetype(entry)) {
+
+        case AE_IFDIR:
+            // Nothing to do right now.
+            break;
+
+        case AE_IFREG: {
+
+            git_writestream * stream = nullptr;
+            if (git_blob_create_from_stream(&stream, repo.get(), nullptr))
+                throw Error("creating a blob stream object: %s", git_error_last()->message);
+
+            while (true) {
+                std::vector<unsigned char> buf(128 * 1024);
+                auto n = archive_read_data(archive.archive, buf.data(), buf.size());
+                if (n < 0)
+                    throw Error("cannot read file '%s' from tarball", path);
+                if (n == 0) break;
+                if (stream->write(stream, (const char *) buf.data(), n))
+                    throw Error("writing a blob for tarball member '%s': %s", path, git_error_last()->message);
+            }
+
+            git_oid oid;
+            if (git_blob_create_from_stream_commit(&oid, stream))
+                throw Error("creating a blob object for tarball member '%s': %s", path, git_error_last()->message);
+
+            addToTree(*pathComponents.rbegin(), oid,
+                archive_entry_mode(entry) & S_IXUSR
+                ? GIT_FILEMODE_BLOB_EXECUTABLE
+                : GIT_FILEMODE_BLOB);
+
+            break;
+        }
+
+        case AE_IFLNK: {
+            auto target = archive_entry_symlink(entry);
+
+            git_oid oid;
+            if (git_blob_create_from_buffer(&oid, repo.get(), target, strlen(target)))
+                throw Error("creating a blob object for tarball symlink member '%s': %s", path, git_error_last()->message);
+
+            addToTree(*pathComponents.rbegin(), oid, GIT_FILEMODE_LINK);
+
+            break;
+        }
+
+        default:
+            throw Error("file '%s' in tarball has unsupported file type", path);
+        }
+    }
+
+    updateBuilders({});
+
+    auto [oid, _name] = popBuilder();
+
+    return Hash::parseAny(git_oid_tostr_s(&oid), htSHA1);
+}
+
+ref<InputAccessor> makeTarballCacheAccessor(const Hash & rev)
+{
+    return make_ref<GitInputAccessor>(openTarballCache(), rev);
+}
 
 }
