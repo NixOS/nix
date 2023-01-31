@@ -24,7 +24,7 @@
 | [Equality]                             | *expr* `==` *expr*                         | none          | 11         |
 | Inequality                             | *expr* `!=` *expr*                         | none          | 11         |
 | Logical conjunction (`AND`)            | *bool* `&&` *bool*                         | left          | 12         |
-| Logical disjunction (`OR`)             | *bool* `\|\|` *bool*                       | left          | 13         |
+| Logical disjunction (`OR`)             | *bool* <code>\|\|</code> *bool*            | left          | 13         |
 | [Logical implication]                  | *bool* `->` *bool*                         | none          | 14         |
 
 [string]: ./values.md#type-string
