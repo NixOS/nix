@@ -1275,6 +1275,15 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     if (checkSigs && pathInfoIsUntrusted(info))
         throw Error("cannot add path '%s' because it lacks a signature by a trusted key", printStorePath(info.path));
 
+    /* In case we are not interested in reading the NAR: discard it. */
+    bool narRead = false;
+    Finally cleanup = [&]() {
+        if (!narRead) {
+            ParseSink sink;
+            parseDump(sink, source);
+        }
+    };
+
     addTempRoot(info.path);
 
     if (repair || !isValidPath(info.path)) {
@@ -1299,6 +1308,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             TeeSource wrapperSource { source, hashSink };
 
+            narRead = true;
             restorePath(realPath, wrapperSource);
 
             auto hashResult = hashSink.finish();
