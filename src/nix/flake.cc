@@ -1002,6 +1002,61 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
         auto flake = std::make_shared<LockedFlake>(lockFlake());
         auto localSystem = std::string(settings.thisSystem.get());
 
+        std::function<bool(
+            eval_cache::AttrCursor & visitor,
+            const std::vector<Symbol> &attrPath,
+            const Symbol &attr)> hasContent;
+
+        // For frameworks it's important that structures are as lazy as possible
+        // to prevent infinite recursions, performance issues and errors that
+        // aren't related to the thing to evaluate. As a consequence, they have
+        // to emit more attributes than strictly (sic) necessary.
+        // However, these attributes with empty values are not useful to the user
+        // so we omit them.
+        hasContent = [&](
+            eval_cache::AttrCursor & visitor,
+            const std::vector<Symbol> &attrPath,
+            const Symbol &attr) -> bool
+        {
+            auto attrPath2(attrPath);
+            attrPath2.push_back(attr);
+            auto attrPathS = state->symbols.resolve(attrPath2);
+            const auto & attrName = state->symbols[attr];
+
+            auto visitor2 = visitor.getAttr(attrName);
+
+            if ((attrPathS[0] == "apps"
+                    || attrPathS[0] == "checks"
+                    || attrPathS[0] == "devShells"
+                    || attrPathS[0] == "legacyPackages"
+                    || attrPathS[0] == "packages")
+                && (attrPathS.size() == 1 || attrPathS.size() == 2)) {
+                for (const auto &subAttr : visitor2->getAttrs()) {
+                    if (hasContent(*visitor2, attrPath2, subAttr)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            if ((attrPathS.size() == 1)
+                && (attrPathS[0] == "formatter"
+                    || attrPathS[0] == "nixosConfigurations"
+                    || attrPathS[0] == "nixosModules"
+                    || attrPathS[0] == "overlays"
+                    )) {
+                for (const auto &subAttr : visitor2->getAttrs()) {
+                    if (hasContent(*visitor2, attrPath2, subAttr)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            // If we don't recognize it, it's probably content
+            return true;
+        };
+
         std::function<nlohmann::json(
             eval_cache::AttrCursor & visitor,
             const std::vector<Symbol> & attrPath,
@@ -1027,7 +1082,12 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 {
                     if (!json)
                         logger->cout("%s", headerPrefix);
-                    auto attrs = visitor.getAttrs();
+                    std::vector<Symbol> attrs;
+                    for (const auto &attr : visitor.getAttrs()) {
+                        if (hasContent(visitor, attrPath, attr))
+                            attrs.push_back(attr);
+                    }
+
                     for (const auto & [i, attr] : enumerate(attrs)) {
                         const auto & attrName = state->symbols[attr];
                         bool last = i + 1 == attrs.size();
