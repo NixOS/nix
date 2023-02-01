@@ -343,6 +343,14 @@ void initLibStore() {
 
     preloadNSS();
 
+    /* On macOS, don't use the per-session TMPDIR (as set e.g. by
+       sshd). This breaks build users because they don't have access
+       to the TMPDIR, in particular in ‘nix-store --serve’. */
+#if __APPLE__
+    if (hasPrefix(getEnv("TMPDIR").value_or("/tmp"), "/var/folders/"))
+        unsetenv("TMPDIR");
+#endif
+
     initLibStoreDone = true;
 }
 
