@@ -162,6 +162,7 @@ void initNix()
 #endif
 
     initLibUtil();
+    initLibStore();
 
     if (sodium_init() == -1)
         throw Error("could not initialise libsodium");
@@ -223,7 +224,6 @@ void initNix()
 #endif
 
     preloadNSS();
-    initLibStore();
 }
 
 
