@@ -206,7 +206,7 @@ struct ProfileManifest
                     .method = FileIngestionMethod::Recursive,
                     .hash = narHash,
                 },
-                .references = {
+                /* .references = */ {
                     .others = std::move(references),
                     .self = false,
                 },

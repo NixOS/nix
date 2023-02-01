@@ -234,7 +234,7 @@ std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
             .method = method,
             .hash = h,
         },
-        .references = {},
+        /* .references = */ {},
     };
     return std::make_pair(makeFixedOutputPath(name, caInfo), h);
 }
@@ -443,7 +443,7 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
                 .method = method,
                 .hash = hash,
             },
-            .references = {},
+            /* .references = */ {},
         },
         narHash,
     };
