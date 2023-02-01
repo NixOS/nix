@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstring>
 
+#include <openssl/crypto.h>
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 
@@ -16,6 +17,28 @@
 
 namespace nix {
 
+#if OPENSSL_VERSION_NUMBER < 0x10101000L
+/* OpenSSL is not thread-safe by default - it will randomly crash
+   unless the user supplies a mutex locking function. So let's do
+   that. */
+static std::vector<std::mutex> opensslLocks;
+
+static void opensslLockCallback(int mode, int type, const char * file, int line)
+{
+    if (mode & CRYPTO_LOCK)
+        opensslLocks[type].lock();
+    else
+        opensslLocks[type].unlock();
+}
+#endif
+
+void initOpenSSL() {
+#if OPENSSL_VERSION_NUMBER < 0x10101000L
+    /* Initialise OpenSSL locking. */
+    opensslLocks = std::vector<std::mutex>(CRYPTO_num_locks());
+    CRYPTO_set_locking_callback(opensslLockCallback);
+#endif
+}
 
 static size_t regularHashSize(HashType type) {
     switch (type) {

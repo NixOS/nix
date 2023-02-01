@@ -32,6 +32,9 @@ namespace nix {
 struct Sink;
 struct Source;
 
+void initLibUtil();
+
+void initOpenSSL();
 
 /**
  * The system for which Nix is compiled.
