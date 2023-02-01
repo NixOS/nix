@@ -156,7 +156,10 @@ void initNix()
     if (sigaction(SIGTRAP, &act, 0)) throw SysError("handling SIGTRAP");
 #endif
 
-    /* Register a SIGSEGV handler to detect stack overflows. */
+    /* Register a SIGSEGV handler to detect stack overflows.
+       Why not initLibExpr()? initGC() is essentially that, but
+       detectStackOverflow is not an instance of the init function concept, as
+       it may have to be invoked more than once per process. */
     detectStackOverflow();
 
     /* There is no privacy in the Nix system ;-)  At least not for
