@@ -118,7 +118,6 @@ void initNix()
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
 
-    initLibUtil();
     initLibStore();
 
     startSignalHandlerThread();
