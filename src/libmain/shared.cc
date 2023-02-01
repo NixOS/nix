@@ -28,8 +28,6 @@
 
 #include <openssl/crypto.h>
 
-#include <sodium.h>
-
 
 namespace nix {
 
@@ -163,9 +161,6 @@ void initNix()
 
     initLibUtil();
     initLibStore();
-
-    if (sodium_init() == -1)
-        throw Error("could not initialise libsodium");
 
     startSignalHandlerThread();
 

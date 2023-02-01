@@ -13,6 +13,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include <sodium/core.h>
+
 
 namespace nix {
 
@@ -291,6 +293,9 @@ void assertLibStoreInitialized() {
 }
 
 void initLibStore() {
+
+    if (sodium_init() == -1)
+        throw Error("could not initialise libsodium");
 
     loadConfFile();
 
