@@ -291,6 +291,9 @@ void assertLibStoreInitialized() {
 }
 
 void initLibStore() {
+
+    loadConfFile();
+
     initLibStoreDone = true;
 }
 

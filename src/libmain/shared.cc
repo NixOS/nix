@@ -166,8 +166,6 @@ void initNix()
     if (sodium_init() == -1)
         throw Error("could not initialise libsodium");
 
-    loadConfFile();
-
     startSignalHandlerThread();
 
     /* Reset SIGCHLD to its default. */
