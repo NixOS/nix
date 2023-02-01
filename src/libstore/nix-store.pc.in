@@ -7,3 +7,4 @@ Description: Nix Package Manager
 Version: @PACKAGE_VERSION@
 Libs: -L${libdir} -lnixstore -lnixutil
 Cflags: -I${includedir}/nix -std=c++17
+@LIBS_PRIVATE@
