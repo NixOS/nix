@@ -744,7 +744,7 @@ StorePathSet Store::queryValidPaths(const StorePathSet & paths, SubstituteFlag m
 
     auto doQuery = [&](const StorePath & path) {
         checkInterrupt();
-        queryPathInfo(path, {[path, this, &state_, &wakeup](std::future<ref<const ValidPathInfo>> fut) {
+        queryPathInfo(path, {[path, &state_, &wakeup](std::future<ref<const ValidPathInfo>> fut) {
             auto state(state_.lock());
             try {
                 auto info = fut.get();
