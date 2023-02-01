@@ -10,7 +10,6 @@
 #include <cctype>
 #include <exception>
 #include <iostream>
-#include <mutex>
 
 #include <cstdlib>
 #include <sys/time.h>
@@ -19,11 +18,6 @@
 #include <signal.h>
 #ifdef __linux__
 #include <features.h>
-#endif
-#ifdef __GLIBC__
-#include <gnu/lib-names.h>
-#include <nss.h>
-#include <dlfcn.h>
 #endif
 
 #include <openssl/crypto.h>
@@ -113,41 +107,6 @@ std::string getArg(const std::string & opt,
     return *i;
 }
 
-static std::once_flag dns_resolve_flag;
-
-static void preloadNSS() {
-    /* builtin:fetchurl can trigger a DNS lookup, which with glibc can trigger a dynamic library load of
-       one of the glibc NSS libraries in a sandboxed child, which will fail unless the library's already
-       been loaded in the parent. So we force a lookup of an invalid domain to force the NSS machinery to
-       load its lookup libraries in the parent before any child gets a chance to. */
-    std::call_once(dns_resolve_flag, []() {
-#ifdef __GLIBC__
-        /* On linux, glibc will run every lookup through the nss layer.
-         * That means every lookup goes, by default, through nscd, which acts as a local
-         * cache.
-         * Because we run builds in a sandbox, we also remove access to nscd otherwise
-         * lookups would leak into the sandbox.
-         *
-         * But now we have a new problem, we need to make sure the nss_dns backend that
-         * does the dns lookups when nscd is not available is loaded or available.
-         *
-         * We can't make it available without leaking nix's environment, so instead we'll
-         * load the backend, and configure nss so it does not try to run dns lookups
-         * through nscd.
-         *
-         * This is technically only used for builtins:fetch* functions so we only care
-         * about dns.
-         *
-         * All other platforms are unaffected.
-         */
-        if (!dlopen(LIBNSS_DNS_SO, RTLD_NOW))
-            warn("unable to load nss_dns backend");
-        // FIXME: get hosts entry from nsswitch.conf.
-        __nss_configure_lookup("hosts", "files dns");
-#endif
-    });
-}
-
 static void sigHandler(int signo) { }
 
 
@@ -218,7 +177,6 @@ void initNix()
         unsetenv("TMPDIR");
 #endif
 
-    preloadNSS();
 }
 
 
