@@ -87,6 +87,8 @@ enum BuildMode { bmNormal, bmRepair, bmCheck };
 struct BuildResult;
 
 
+typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
+
 struct StoreConfig : public Config
 {
     using Config::Config;

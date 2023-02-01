@@ -1,6 +1,7 @@
 #pragma once
 
-#include "content-address.hh"
+#include <string_view>
+
 #include "types.hh"
 
 namespace nix {
@@ -65,8 +66,6 @@ public:
 
 typedef std::set<StorePath> StorePathSet;
 typedef std::vector<StorePath> StorePaths;
-
-typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 
 /* Extension of derivations in the Nix store. */
 const std::string drvExtension = ".drv";
