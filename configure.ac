@@ -276,8 +276,11 @@ PKG_CHECK_MODULES([GTEST], [gtest_main])
 
 # Look for rapidcheck.
 # No pkg-config yet, https://github.com/emil-e/rapidcheck/issues/302
+AC_LANG_PUSH(C++)
 AC_CHECK_HEADERS([rapidcheck/gtest.h], [], [], [#include <gtest/gtest.h>])
-AC_CHECK_LIB([rapidcheck], [])
+dnl No good for C++ libs with mangled symbols
+dnl AC_CHECK_LIB([rapidcheck], [])
+AC_LANG_POP(C++)
 
 
 # Look for nlohmann/json.

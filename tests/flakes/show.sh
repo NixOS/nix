@@ -37,3 +37,30 @@ in
 assert show_output.legacyPackages.${builtins.currentSystem}.hello.name == "simple";
 true
 '
+
+# Test that attributes are only reported when they have actual content
+cat >flake.nix <<EOF
+{
+  description = "Bla bla";
+
+  outputs = inputs: rec {
+    apps.$system = { };
+    checks.$system = { };
+    devShells.$system = { };
+    legacyPackages.$system = { };
+    packages.$system = { };
+    packages.someOtherSystem = { };
+
+    formatter = { };
+    nixosConfigurations = { };
+    nixosModules = { };
+  };
+}
+EOF
+nix flake show --json --all-systems > show-output.json
+nix eval --impure --expr '
+let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
+in
+assert show_output == { };
+true
+'
