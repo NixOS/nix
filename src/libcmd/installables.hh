@@ -103,9 +103,13 @@ struct Installable
         return {};
     }
 
+    /* Get a cursor to each value this Installable could refer to. However
+       if none exists, throw exception instead of returning empty vector. */
     virtual std::vector<ref<eval_cache::AttrCursor>>
     getCursors(EvalState & state);
 
+    /* Get the first and most preferred cursor this Installable could refer
+       to, or throw an exception if none exists. */
     virtual ref<eval_cache::AttrCursor>
     getCursor(EvalState & state);
 
@@ -193,14 +197,10 @@ struct InstallableFlake : InstallableValue
 
     std::pair<Value *, PosIdx> toValue(EvalState & state) override;
 
-    /* Get a cursor to every attrpath in getActualAttrPaths() that
-       exists. */
+    /* Get a cursor to every attrpath in getActualAttrPaths()
+       that exists. However if none exists, throw an exception. */
     std::vector<ref<eval_cache::AttrCursor>>
     getCursors(EvalState & state) override;
-
-    /* Get a cursor to the first attrpath in getActualAttrPaths() that
-       exists, or throw an exception with suggestions if none exists. */
-    ref<eval_cache::AttrCursor> getCursor(EvalState & state) override;
 
     std::shared_ptr<flake::LockedFlake> getLockedFlake() const;
 

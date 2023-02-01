@@ -379,10 +379,9 @@ Installable::getCursors(EvalState & state)
 ref<eval_cache::AttrCursor>
 Installable::getCursor(EvalState & state)
 {
-    auto cursors = getCursors(state);
-    if (cursors.empty())
-        throw Error("cannot find flake attribute '%s'", what());
-    return cursors[0];
+    /* Although getCursors should return at least one element, in case it doesn't,
+       bound check to avoid an undefined behavior for vector[0] */
+    return getCursors(state).at(0);
 }
 
 static StorePath getDeriver(
@@ -696,46 +695,28 @@ InstallableFlake::getCursors(EvalState & state)
 
     std::vector<ref<eval_cache::AttrCursor>> res;
 
-    for (auto & attrPath : getActualAttrPaths()) {
-        auto attr = root->findAlongAttrPath(parseAttrPath(state, attrPath));
-        if (attr) res.push_back(ref(*attr));
-    }
-
-    return res;
-}
-
-ref<eval_cache::AttrCursor> InstallableFlake::getCursor(EvalState & state)
-{
-    auto lockedFlake = getLockedFlake();
-
-    auto cache = openEvalCache(state, lockedFlake);
-    auto root = cache->getRoot();
-
     Suggestions suggestions;
-
     auto attrPaths = getActualAttrPaths();
 
     for (auto & attrPath : attrPaths) {
         debug("trying flake output attribute '%s'", attrPath);
 
-        auto attrOrSuggestions = root->findAlongAttrPath(
-            parseAttrPath(state, attrPath),
-            true
-        );
-
-        if (!attrOrSuggestions) {
-            suggestions += attrOrSuggestions.getSuggestions();
-            continue;
+        auto attr = root->findAlongAttrPath(parseAttrPath(state, attrPath));
+        if (attr) {
+            res.push_back(ref(*attr));
+        } else {
+            suggestions += attr.getSuggestions();
         }
-
-        return *attrOrSuggestions;
     }
 
-    throw Error(
-        suggestions,
-        "flake '%s' does not provide attribute %s",
-        flakeRef,
-        showAttrPaths(attrPaths));
+    if (res.size() == 0)
+        throw Error(
+            suggestions,
+            "flake '%s' does not provide attribute %s",
+            flakeRef,
+            showAttrPaths(attrPaths));
+
+    return res;
 }
 
 std::shared_ptr<flake::LockedFlake> InstallableFlake::getLockedFlake() const
