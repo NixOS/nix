@@ -279,8 +279,8 @@ public:
           If the build users group is empty, builds will be performed under
           the uid of the Nix process (that is, the uid of the caller if
           `NIX_REMOTE` is empty, the uid under which the Nix daemon runs if
-          `NIX_REMOTE` is `daemon`). Obviously, this should not be used in
-          multi-user settings with untrusted users.
+          `NIX_REMOTE` is `daemon`). Obviously, this should not be used
+          with a nix daemon accessible to untrusted clients.
 
           Defaults to `nixbld` when running as root, *empty* otherwise.
         )",
@@ -696,24 +696,6 @@ public:
         )",
         {"trusted-binary-caches"}};
 
-    Setting<Strings> trustedUsers{
-        this, {"root"}, "trusted-users",
-        R"(
-          A list of names of users (separated by whitespace) that have
-          additional rights when connecting to the Nix daemon, such as the
-          ability to specify additional binary caches, or to import unsigned
-          NARs. You can also specify groups by prefixing them with `@`; for
-          instance, `@wheel` means all users in the `wheel` group. The default
-          is `root`.
-
-          > **Warning**
-          >
-          > Adding a user to `trusted-users` is essentially equivalent to
-          > giving that user root access to the system. For example, the user
-          > can set `sandbox-paths` and thereby obtain read access to
-          > directories that are otherwise inacessible to them.
-        )"};
-
     Setting<unsigned int> ttlNegativeNarInfoCache{
         this, 3600, "narinfo-cache-negative-ttl",
         R"(
@@ -734,18 +716,6 @@ public:
           collection, in which case having a more frequent cache invalidation
           would prevent trying to pull the path again and failing with a hash
           mismatch if the build isn't reproducible.
-        )"};
-
-    /* ?Who we trust to use the daemon in safe ways */
-    Setting<Strings> allowedUsers{
-        this, {"*"}, "allowed-users",
-        R"(
-          A list of names of users (separated by whitespace) that are allowed
-          to connect to the Nix daemon. As with the `trusted-users` option,
-          you can specify groups by prefixing them with `@`. Also, you can
-          allow all users by specifying `*`. The default is `*`.
-
-          Note that trusted users are always allowed to connect.
         )"};
 
     Setting<bool> printMissing{this, true, "print-missing",

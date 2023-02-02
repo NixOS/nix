@@ -529,7 +529,14 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             mode = (BuildMode) readInt(from);
 
             /* Repairing is not atomic, so disallowed for "untrusted"
-               clients.  */
+               clients.
+
+               FIXME: layer violation in this message: the daemon code (i.e.
+               this file) knows whether a client/connection is trusted, but it
+               does not how how the client was authenticated. The mechanism
+               need not be getting the UID of the other end of a Unix Domain
+               Socket.
+              */
             if (mode == bmRepair && !trusted)
                 throw Error("repairing is not allowed because you are not in 'trusted-users'");
         }
@@ -546,7 +553,9 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         mode = (BuildMode) readInt(from);
 
         /* Repairing is not atomic, so disallowed for "untrusted"
-           clients.  */
+           clients.
+
+           FIXME: layer violation; see above. */
         if (mode == bmRepair && !trusted)
             throw Error("repairing is not allowed because you are not in 'trusted-users'");
 
