@@ -985,8 +985,7 @@ void processConnection(
     FdSource & from,
     FdSink & to,
     TrustedFlag trusted,
-    RecursiveFlag recursive,
-    std::function<void(Store &)> authHook)
+    RecursiveFlag recursive)
 {
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
 
@@ -1028,10 +1027,6 @@ void processConnection(
     tunnelLogger->startWork();
 
     try {
-
-        /* If we can't accept clientVersion, then throw an error
-           *here* (not above). */
-        authHook(*store);
 
         tunnelLogger->stopWork();
         to.flush();
