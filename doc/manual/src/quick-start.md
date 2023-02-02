@@ -4,16 +4,16 @@ This chapter is for impatient people who don't like reading
 documentation.  For more in-depth information you are kindly referred
 to subsequent chapters.
 
-1. Install single-user Nix by running the following:
+1. Install Nix by running the following:
 
    ```console
-   $ bash <(curl -L https://nixos.org/nix/install)
+   $ bash <(curl -L https://nixos.org/nix/install) --daemon
    ```
 
-   This will install Nix in `/nix`. The install script will create
-   `/nix` using `sudo`, so make sure you have sufficient rights.  (For
-   other installation methods, see
-   [here](installation/installation.md).)
+   The install script will use `sudo`, so make sure you have sufficient rights.
+   On Linux, `--daemon` can be omitted for a single-user install.
+
+   For other installation methods, see [here](installation/installation.md).
 
 1. See what installable packages are currently available in the
    channel:
