@@ -251,7 +251,7 @@ void Worker::run(const Goals & _topGoals)
         checkInterrupt();
 
         // TODO GC interface?
-        if (auto localStore = dynamic_cast<LocalStore *>(&store))
+        if (auto * localStore = dynamic_cast<LocalStore *>(&store))
             localStore->autoGC(false);
 
         /* Call every wake goal (in the ordering established by
@@ -318,9 +318,11 @@ void Worker::waitForInput()
        is a build timeout, then wait for input until the first
        deadline for any child. */
     auto nearest = steady_time_point::max(); // nearest deadline
-    if (settings.minFree.get() != 0)
-        // Periodicallty wake up to see if we need to run the garbage collector.
-        nearest = before + std::chrono::seconds(10);
+    // TODO GC interface?
+    if (auto * localStore = dynamic_cast<const LocalStore *>(&store))
+        if (localStore->minFree.get() != 0)
+            // Periodicallty wake up to see if we need to run the garbage collector.
+            nearest = before + std::chrono::seconds(10);
     for (auto & i : children) {
         if (!i.respectTimeouts) continue;
         if (0 != settings.maxSilentTime)

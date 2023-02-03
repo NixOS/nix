@@ -164,6 +164,20 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
     }
 }
 
+static StringMap withRoot(const StringMap & params, std::string rootDir)
+{
+    StringMap params2 { params };
+    params2["root"] = rootDir;
+    return params2;
+}
+
+LocalStore::LocalStore(
+        const std::string scheme,
+        std::string rootDir,
+        const Params & params)
+    : LocalStore(withRoot(params, rootDir))
+{ }
+
 LocalStore::LocalStore(const Params & params)
     : StoreConfig(params)
     , LocalFSStoreConfig(params)
@@ -224,7 +238,7 @@ LocalStore::LocalStore(const Params & params)
     }
 
     /* Ensure that the store and its parents are not symlinks. */
-    if (!settings.allowSymlinkedStore) {
+    if (!allowSymlinkedStore) {
         Path path = realStoreDir;
         struct stat st;
         while (path != "/") {
@@ -1370,10 +1384,10 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
     /* Fill out buffer, and decide whether we are working strictly in
        memory based on whether we break out because the buffer is full
        or the original source is empty */
-    while (dump.size() < settings.narBufferSize) {
+    while (dump.size() < narBufferSize) {
         auto oldSize = dump.size();
         constexpr size_t chunkSize = 65536;
-        auto want = std::min(chunkSize, settings.narBufferSize - oldSize);
+        auto want = std::min(chunkSize, narBufferSize - oldSize);
         dump.resize(oldSize + want);
         auto got = 0;
         Finally cleanup([&]() {
@@ -1950,5 +1964,6 @@ std::optional<std::string> LocalStore::getVersion()
     return nixVersion;
 }
 
+static RegisterStoreImplementation<LocalStore, LocalStoreConfig> regLocalStoreStore;
 
 }  // namespace nix

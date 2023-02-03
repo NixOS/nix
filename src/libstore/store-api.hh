@@ -91,6 +91,8 @@ typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 
 struct StoreConfig : public Config
 {
+    typedef std::map<std::string, std::string> Params;
+
     using Config::Config;
 
     StoreConfig() = delete;
@@ -121,12 +123,6 @@ struct StoreConfig : public Config
 
 class Store : public std::enable_shared_from_this<Store>, public virtual StoreConfig
 {
-public:
-
-    typedef std::map<std::string, std::string> Params;
-
-
-
 protected:
 
     struct PathInfoCacheValue {
@@ -750,6 +746,9 @@ OutputPathMap resolveDerivedPath(Store &, const DerivedPath::Built &, Store * ev
    * ‘auto’ or ‘’: Equivalent to ‘local’ or ‘daemon’ depending on
      whether the user has write access to the local Nix
      store/database.
+
+   * ‘local://<path>’: A local filesystem store store at that location but
+	 (probably) mounted in the conventional location.
 
    * ‘file://<path>’: A binary cache stored in <path>.
 

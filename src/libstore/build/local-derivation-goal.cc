@@ -62,10 +62,11 @@ namespace nix {
 void handleDiffHook(
     uid_t uid, uid_t gid,
     const Path & tryA, const Path & tryB,
-    const Path & drvPath, const Path & tmpDir)
+    const Path & drvPath, const Path & tmpDir,
+    const LocalStore & store)
 {
-    auto diffHook = settings.diffHook;
-    if (diffHook != "" && settings.runDiffHook) {
+    auto diffHook = store.diffHook;
+    if (diffHook != "" && store.runDiffHook) {
         try {
             auto diffRes = runProgram(RunOptions {
                 .program = diffHook,
@@ -176,10 +177,12 @@ void LocalDerivationGoal::tryLocalBuild() {
         return;
     }
 
+    auto & localStore = getLocalStore();
+
     /* Are we doing a chroot build? */
     {
         auto noChroot = parsedDrv->getBoolAttr("__noChroot");
-        if (settings.sandboxMode == smEnabled) {
+        if (localStore.sandboxMode == smEnabled) {
             if (noChroot)
                 throw Error("derivation '%s' has '__noChroot' set, "
                     "but that's not allowed when 'sandbox' is 'true'", worker.store.printStorePath(drvPath));
@@ -190,13 +193,12 @@ void LocalDerivationGoal::tryLocalBuild() {
 #endif
             useChroot = true;
         }
-        else if (settings.sandboxMode == smDisabled)
+        else if (localStore.sandboxMode == smDisabled)
             useChroot = false;
-        else if (settings.sandboxMode == smRelaxed)
+        else if (localStore.sandboxMode == smRelaxed)
             useChroot = derivationType.isSandboxed() && !noChroot;
     }
 
-    auto & localStore = getLocalStore();
     if (localStore.storeDir != localStore.realStoreDir.get()) {
         #if __linux__
             useChroot = true;
@@ -399,6 +401,8 @@ static void linkOrCopy(const Path & from, const Path & to)
 
 void LocalDerivationGoal::startBuilder()
 {
+    auto & localStore = getLocalStore();
+
     if ((buildUser && buildUser->getUIDCount() != 1)
         #if __linux__
         || settings.useCgroups
@@ -573,7 +577,7 @@ void LocalDerivationGoal::startBuilder()
            host file system. */
         dirsInChroot.clear();
 
-        for (auto i : settings.sandboxPaths.get()) {
+        for (auto i : localStore.sandboxPaths.get()) {
             if (i.empty()) continue;
             bool optional = false;
             if (i[i.size() - 1] == '?') {
@@ -604,7 +608,7 @@ void LocalDerivationGoal::startBuilder()
             dirsInChroot.insert_or_assign(p, p);
         }
 
-        PathSet allowedPaths = settings.allowedImpureHostPrefixes;
+        PathSet allowedPaths = localStore.allowedImpureHostPrefixes;
 
         /* This works like the above, except on a per-derivation level */
         auto impurePaths = parsedDrv->getStringsAttr("__impureHostDeps").value_or(Strings());
@@ -744,9 +748,9 @@ void LocalDerivationGoal::startBuilder()
     if (needsHashRewrite() && pathExists(homeDir))
         throw Error("home directory '%1%' exists; please remove it to assure purity of builds without sandboxing", homeDir);
 
-    if (useChroot && settings.preBuildHook != "" && dynamic_cast<Derivation *>(drv.get())) {
+    if (useChroot && localStore.preBuildHook != "" && dynamic_cast<Derivation *>(drv.get())) {
         printMsg(lvlChatty, format("executing pre-build hook '%1%'")
-            % settings.preBuildHook);
+            % localStore.preBuildHook);
         auto args = useChroot ? Strings({worker.store.printStorePath(drvPath), chrootRootDir}) :
             Strings({ worker.store.printStorePath(drvPath) });
         enum BuildHookState {
@@ -754,7 +758,7 @@ void LocalDerivationGoal::startBuilder()
             stExtraChrootDirs
         };
         auto state = stBegin;
-        auto lines = runProgram(settings.preBuildHook, false, args);
+        auto lines = runProgram(localStore.preBuildHook, false, args);
         auto lastPos = std::string::size_type{0};
         for (auto nlPos = lines.find('\n'); nlPos != std::string::npos;
                 nlPos = lines.find('\n', lastPos))
@@ -956,7 +960,7 @@ void LocalDerivationGoal::startBuilder()
                         /* Otherwise exit with EPERM so we can handle this in the
                            parent. This is only done when sandbox-fallback is set
                            to true (the default). */
-                        if (settings.sandboxFallback)
+                        if (localStore.sandboxFallback)
                             _exit(1);
                         /* Mention sandbox-fallback in the error message so the user
                            knows that having it disabled contributed to the
@@ -973,7 +977,7 @@ void LocalDerivationGoal::startBuilder()
         });
 
         int res = helper.wait();
-        if (res != 0 && settings.sandboxFallback) {
+        if (res != 0 && localStore.sandboxFallback) {
             useChroot = false;
             initTmpDir();
             goto fallback;
@@ -1021,7 +1025,7 @@ void LocalDerivationGoal::startBuilder()
                 "root:x:0:0:Nix build user:%3%:/noshell\n"
                 "nixbld:x:%1%:%2%:Nix build user:%3%:/noshell\n"
                 "nobody:x:65534:65534:Nobody:/:/noshell\n",
-                sandboxUid(), sandboxGid(), settings.sandboxBuildDir));
+                sandboxUid(), sandboxGid(), localStore.sandboxBuildDir));
 
         /* Save the mount- and user namespace of the child. We have to do this
            *before* the child does a chroot. */
@@ -1090,7 +1094,8 @@ void LocalDerivationGoal::initTmpDir() {
     /* In a sandbox, for determinism, always use the same temporary
        directory. */
 #if __linux__
-    tmpDirInSandbox = useChroot ? settings.sandboxBuildDir : tmpDir;
+    const auto & localStore = getLocalStore();
+    tmpDirInSandbox = useChroot ? localStore.sandboxBuildDir : tmpDir;
 #else
     tmpDirInSandbox = tmpDir;
 #endif
@@ -1617,10 +1622,10 @@ void LocalDerivationGoal::chownToBuilder(const Path & path)
 }
 
 
-void setupSeccomp()
+void setupSeccomp(const LocalStoreConfig & localStore)
 {
 #if __linux__
-    if (!settings.filterSyscalls) return;
+    if (!localStore.filterSyscalls) return;
 #if HAVE_SECCOMP
     scmp_filter_ctx ctx;
 
@@ -1682,7 +1687,7 @@ void setupSeccomp()
         seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(fsetxattr), 0) != 0)
         throw SysError("unable to add seccomp rule");
 
-    if (seccomp_attr_set(ctx, SCMP_FLTATR_CTL_NNP, settings.allowNewPrivileges ? 0 : 1) != 0)
+    if (seccomp_attr_set(ctx, SCMP_FLTATR_CTL_NNP, localStore.allowNewPrivileges ? 0 : 1) != 0)
         throw SysError("unable to set 'no new privileges' seccomp attribute");
 
     if (seccomp_load(ctx) != 0)
@@ -1708,7 +1713,7 @@ void LocalDerivationGoal::runChild()
         commonChildInit(builderOut);
 
         try {
-            setupSeccomp();
+            setupSeccomp(getLocalStore());
         } catch (...) {
             if (buildUser) throw;
         }
@@ -1725,6 +1730,8 @@ void LocalDerivationGoal::runChild()
 
 #if __linux__
         if (useChroot) {
+
+            auto & localStore = getLocalStore();
 
             userNamespaceSync.writeSide = -1;
 
@@ -1880,7 +1887,7 @@ void LocalDerivationGoal::runChild()
             /* Mount a new tmpfs on /dev/shm to ensure that whatever
                the builder puts in /dev/shm is cleaned up automatically. */
             if (pathExists("/dev/shm") && mount("none", (chrootRootDir + "/dev/shm").c_str(), "tmpfs", 0,
-                    fmt("size=%s", settings.sandboxShmSize).c_str()) == -1)
+                    fmt("size=%s", localStore.sandboxShmSize).c_str()) == -1)
                 throw SysError("mounting /dev/shm");
 
             /* Mount a new devpts on /dev/pts.  Note that this
@@ -2645,7 +2652,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             ValidPathInfo oldInfo(*worker.store.queryPathInfo(newInfo.path));
             if (newInfo.narHash != oldInfo.narHash) {
                 worker.checkMismatch = true;
-                if (settings.runDiffHook || settings.keepFailed) {
+                if (localStore.runDiffHook || settings.keepFailed) {
                     auto dst = worker.store.toRealPath(finalDestPath + checkSuffix);
                     deletePath(dst);
                     movePath(actualPath, dst);
@@ -2653,7 +2660,8 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                     handleDiffHook(
                         buildUser ? buildUser->getUID() : getuid(),
                         buildUser ? buildUser->getGID() : getgid(),
-                        finalDestPath, dst, worker.store.printStorePath(drvPath), tmpDir);
+                        finalDestPath, dst, worker.store.printStorePath(drvPath), tmpDir,
+                        localStore);
 
                     throw NotDeterministic("derivation '%s' may not be deterministic: output '%s' differs from '%s'",
                         worker.store.printStorePath(drvPath), worker.store.toRealPath(finalDestPath), dst);

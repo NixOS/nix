@@ -459,6 +459,8 @@ Store::Store(const Params & params)
     , state({(size_t) pathInfoCacheSize})
 {
     assertLibStoreInitialized();
+    GlobalConfig::registerWeak(
+        std::static_ptr_cast<StoreConfig>(enable_weak_from_this()));
 }
 
 

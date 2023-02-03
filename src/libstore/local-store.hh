@@ -8,6 +8,7 @@
 #include "gc-store.hh"
 #include "sync.hh"
 #include "util.hh"
+#include "local-store/config.hh"
 
 #include <chrono>
 #include <future>
@@ -30,17 +31,6 @@ struct OptimiseStats
     unsigned long filesLinked = 0;
     uint64_t bytesFreed = 0;
     uint64_t blocksFreed = 0;
-};
-
-struct LocalStoreConfig : virtual LocalFSStoreConfig
-{
-    using LocalFSStoreConfig::LocalFSStoreConfig;
-
-    Setting<bool> requireSigs{(StoreConfig*) this,
-        settings.requireSigs,
-        "require-sigs", "whether store paths should have a trusted signature on import"};
-
-    const std::string name() override { return "Local Store"; }
 };
 
 
@@ -100,12 +90,16 @@ public:
     /* Initialise the local store, upgrading the schema if
        necessary. */
     LocalStore(const Params & params);
+    LocalStore(const std::string scheme, std::string path, const Params & params);
 
     ~LocalStore();
 
     /* Implementations of abstract store API methods. */
 
     std::string getUri() override;
+
+    static std::set<std::string> uriSchemes()
+    { return {"local"}; }
 
     bool isValidPathUncached(const StorePath & path) override;
 

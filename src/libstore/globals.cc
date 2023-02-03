@@ -42,7 +42,6 @@ Settings::Settings()
 {
     buildUsersGroup = getuid() == 0 ? "nixbld" : "";
     lockCPU = getEnv("NIX_AFFINITY_HACK") == "1";
-    allowSymlinkedStore = getEnv("NIX_IGNORE_SYMLINK_STORE") == "1";
 
     caFile = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
     if (caFile == "") {
@@ -61,10 +60,6 @@ Settings::Settings()
             ss.push_back("@" + p);
         builders = concatStringsSep(" ", ss);
     }
-
-#if defined(__linux__) && defined(SANDBOX_SHELL)
-    sandboxPaths = tokenizeString<StringSet>("/bin/sh=" SANDBOX_SHELL);
-#endif
 
     /* chroot-like behavior from Apple's sandbox */
 #if __APPLE__
@@ -188,55 +183,6 @@ bool Settings::isWSL1()
 }
 
 const std::string nixVersion = PACKAGE_VERSION;
-
-NLOHMANN_JSON_SERIALIZE_ENUM(SandboxMode, {
-    {SandboxMode::smEnabled, true},
-    {SandboxMode::smRelaxed, "relaxed"},
-    {SandboxMode::smDisabled, false},
-});
-
-template<> void BaseSetting<SandboxMode>::set(const std::string & str, bool append)
-{
-    if (str == "true") value = smEnabled;
-    else if (str == "relaxed") value = smRelaxed;
-    else if (str == "false") value = smDisabled;
-    else throw UsageError("option '%s' has invalid value '%s'", name, str);
-}
-
-template<> bool BaseSetting<SandboxMode>::isAppendable()
-{
-    return false;
-}
-
-template<> std::string BaseSetting<SandboxMode>::to_string() const
-{
-    if (value == smEnabled) return "true";
-    else if (value == smRelaxed) return "relaxed";
-    else if (value == smDisabled) return "false";
-    else abort();
-}
-
-template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & category)
-{
-    args.addFlag({
-        .longName = name,
-        .description = "Enable sandboxing.",
-        .category = category,
-        .handler = {[this]() { override(smEnabled); }}
-    });
-    args.addFlag({
-        .longName = "no-" + name,
-        .description = "Disable sandboxing.",
-        .category = category,
-        .handler = {[this]() { override(smDisabled); }}
-    });
-    args.addFlag({
-        .longName = "relaxed-" + name,
-        .description = "Enable sandboxing, but allow builds to disable it.",
-        .category = category,
-        .handler = {[this]() { override(smRelaxed); }}
-    });
-}
 
 void MaxBuildJobsSetting::set(const std::string & str, bool append)
 {

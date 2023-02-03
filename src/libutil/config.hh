@@ -336,6 +336,8 @@ struct GlobalConfig : public AbstractConfig
 {
     typedef std::vector<Config*> ConfigRegistrations;
     static ConfigRegistrations * configRegistrations;
+    typedef std::vector<std::weak_ptr<Config>> WeakConfigRegistrations;
+    static WeakConfigRegistrations * weakConfigRegistrations;
 
     bool set(const std::string & name, const std::string & value) override;
 
@@ -353,6 +355,8 @@ struct GlobalConfig : public AbstractConfig
     {
         Register(Config * config);
     };
+
+    static void registerWeak(std::weak_ptr<Config> config);
 };
 
 extern GlobalConfig globalConfig;
