@@ -4,7 +4,11 @@ libstore_NAME = libnixstore
 
 libstore_DIR := $(d)
 
-libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc $(d)/build/*.cc)
+libstore_SOURCES := \
+	$(wildcard $(d)/*.cc) \
+	$(wildcard $(d)/builtins/*.cc) \
+	$(wildcard $(d)/build/*.cc) \
+	$(wildcard $(d)/local-store/*.cc)
 
 libstore_LIBS = libutil
 
@@ -67,8 +71,6 @@ clean-files += $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh
 
 $(eval $(call install-file-in, $(d)/nix-store.pc, $(libdir)/pkgconfig, 0644))
 
-$(foreach i, $(wildcard src/libstore/builtins/*.hh), \
-  $(eval $(call install-file-in, $(i), $(includedir)/nix/builtins, 0644)))
-
-$(foreach i, $(wildcard src/libstore/build/*.hh), \
-  $(eval $(call install-file-in, $(i), $(includedir)/nix/build, 0644)))
+$(foreach sd, builtins build local-store, \
+  $(foreach i, $(wildcard src/libstore/$(sd)/*.hh), \
+    $(eval $(call install-file-in, $(i), $(includedir)/nix/$(sd), 0644))))

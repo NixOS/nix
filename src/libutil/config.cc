@@ -391,6 +391,9 @@ bool GlobalConfig::set(const std::string & name, const std::string & value)
 {
     for (auto & config : *configRegistrations)
         if (config->set(name, value)) return true;
+    for (auto & w : *weakConfigRegistrations)
+        if (auto config = w.lock())
+            if (config->set(name, value)) return true;
 
     unknownSettings.emplace(name, value);
 
@@ -401,12 +404,18 @@ void GlobalConfig::getSettings(std::map<std::string, SettingInfo> & res, bool ov
 {
     for (auto & config : *configRegistrations)
         config->getSettings(res, overriddenOnly);
+    for (auto & w : *weakConfigRegistrations)
+        if (auto config = w.lock())
+            config->getSettings(res, overriddenOnly);
 }
 
 void GlobalConfig::resetOverridden()
 {
     for (auto & config : *configRegistrations)
         config->resetOverridden();
+    for (auto & w : *weakConfigRegistrations)
+        if (auto config = w.lock())
+            config->resetOverridden();
 }
 
 nlohmann::json GlobalConfig::toJSON()
@@ -414,6 +423,9 @@ nlohmann::json GlobalConfig::toJSON()
     auto res = nlohmann::json::object();
     for (auto & config : *configRegistrations)
         res.update(config->toJSON());
+    for (auto & w : *weakConfigRegistrations)
+        if (auto config = w.lock())
+            res.update(config->toJSON());
     return res;
 }
 
@@ -431,17 +443,32 @@ void GlobalConfig::convertToArgs(Args & args, const std::string & category)
 {
     for (auto & config : *configRegistrations)
         config->convertToArgs(args, category);
+    for (auto & w : *weakConfigRegistrations)
+        if (auto config = w.lock())
+            config->convertToArgs(args, category);
 }
 
 GlobalConfig globalConfig;
 
 GlobalConfig::ConfigRegistrations * GlobalConfig::configRegistrations;
+GlobalConfig::WeakConfigRegistrations * GlobalConfig::weakConfigRegistrations;
 
 GlobalConfig::Register::Register(Config * config)
 {
     if (!configRegistrations)
         configRegistrations = new ConfigRegistrations;
+    if (!weakConfigRegistrations)
+        weakConfigRegistrations = new WeakConfigRegistrations;
     configRegistrations->emplace_back(config);
+}
+
+void GlobalConfig::registerWeak(std::weak_ptr<Config> config)
+{
+    if (!configRegistrations)
+        configRegistrations = new ConfigRegistrations;
+    if (!weakConfigRegistrations)
+        weakConfigRegistrations = new WeakConfigRegistrations;
+    weakConfigRegistrations->emplace_back(config);
 }
 
 }

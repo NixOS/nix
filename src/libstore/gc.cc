@@ -914,13 +914,13 @@ void LocalStore::autoGC(bool sync)
 
         auto now = std::chrono::steady_clock::now();
 
-        if (now < state->lastGCCheck + std::chrono::seconds(settings.minFreeCheckInterval)) return;
+        if (now < state->lastGCCheck + std::chrono::seconds(minFreeCheckInterval)) return;
 
         auto avail = getAvail();
 
         state->lastGCCheck = now;
 
-        if (avail >= settings.minFree || avail >= settings.maxFree) return;
+        if (avail >= minFree || avail >= maxFree) return;
 
         if (avail > state->availAfterGC * 0.97) return;
 
@@ -942,7 +942,7 @@ void LocalStore::autoGC(bool sync)
                 });
 
                 GCOptions options;
-                options.maxFreed = settings.maxFree - avail;
+                options.maxFreed = this->maxFree - avail;
 
                 printInfo("running auto-GC to free %d bytes", options.maxFreed);
 

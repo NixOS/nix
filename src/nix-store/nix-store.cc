@@ -820,7 +820,8 @@ static void opServe(Strings opFlags, Strings opArgs)
             // asked for.
             readInt(in);
 
-            settings.runDiffHook = true;
+            if (auto store2 = std::dynamic_pointer_cast<LocalStore>(store))
+                store2->runDiffHook = true;
         }
         if (GET_PROTOCOL_MINOR(clientVersion) >= 7) {
             settings.keepFailed = (bool) readInt(in);
