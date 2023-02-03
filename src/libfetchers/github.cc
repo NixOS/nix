@@ -9,6 +9,7 @@
 #include "fetch-settings.hh"
 #include "input-accessor.hh"
 #include "tarball.hh"
+#include "git-utils.hh"
 
 #include <optional>
 #include <nlohmann/json.hpp>
@@ -196,8 +197,10 @@ struct GitArchiveInputScheme : InputScheme
 
         if (auto treeHashS = cache->queryFact(treeHashKey)) {
             auto treeHash = Hash::parseAny(*treeHashS, htSHA1);
-            // FIXME: verify that treeHash exists in the tarball cache.
-            return {std::move(input), treeHash};
+            if (tarballCacheContains(treeHash))
+                return {std::move(input), treeHash};
+            else
+                debug("Git tree with hash '%s' has disappeared from the cache, refetching...", treeHash.gitRev());
         }
 
         /* Stream the tarball into the tarball cache. */
@@ -272,6 +275,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
         return getStrAttr(input.attrs, "repo");
     }
 
+    /* .commit.tree.sha, .commit.committer.date */
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
         auto host = getHost(input);

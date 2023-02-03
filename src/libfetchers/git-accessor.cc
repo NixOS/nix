@@ -1,3 +1,4 @@
+#include "git-utils.hh"
 #include "input-accessor.hh"
 
 #include <span>
@@ -43,6 +44,14 @@ static Repository openRepo(const CanonPath & path)
     return Repository(_repo);
 }
 
+git_oid hashToOID(const Hash & hash)
+{
+    git_oid oid;
+    if (git_oid_fromstr(&oid, hash.gitRev().c_str()))
+        throw Error("cannot convert '%s' to a Git OID", hash.gitRev());
+    return oid;
+}
+
 struct GitInputAccessor : InputAccessor
 {
     Repository repo;
@@ -51,9 +60,7 @@ struct GitInputAccessor : InputAccessor
     GitInputAccessor(Repository && repo_, const Hash & rev)
         : repo(std::move(repo_))
     {
-        git_oid oid;
-        if (git_oid_fromstr(&oid, rev.gitRev().c_str()))
-            throw Error("cannot convert '%s' to a Git OID", rev.gitRev());
+        auto oid = hashToOID(rev);
 
         git_object * obj = nullptr;
         if (git_object_lookup(&obj, repo.get(), &oid, GIT_OBJECT_ANY)) {
@@ -387,6 +394,22 @@ Hash importTarball(Source & source)
 ref<InputAccessor> makeTarballCacheAccessor(const Hash & rev)
 {
     return make_ref<GitInputAccessor>(openTarballCache(), rev);
+}
+
+bool tarballCacheContains(const Hash & treeHash)
+{
+    auto repo = openTarballCache();
+
+    auto oid = hashToOID(treeHash);
+
+    git_object * obj = nullptr;
+    if (auto errCode = git_object_lookup(&obj, repo.get(), &oid, GIT_OBJECT_TREE)) {
+        if (errCode == GIT_ENOTFOUND) return false;
+        auto err = git_error_last();
+        throw Error("getting Git object '%s': %s", treeHash.gitRev(), err->message);
+    }
+
+    return true;
 }
 
 }
