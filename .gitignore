@@ -130,3 +130,5 @@ nix-rust/target
 result
 
 .vscode/
+
+.pre-commit-config.yaml
