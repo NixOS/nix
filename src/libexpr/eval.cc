@@ -345,6 +345,20 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
 }
 
 
+class BoehmDisableGC : public DisableGC {
+public:
+    BoehmDisableGC() {
+#if HAVE_BOEHMGC
+        GC_disable();
+#endif
+    };
+    virtual ~BoehmDisableGC() override {
+#if HAVE_BOEHMGC
+        GC_enable();
+#endif
+    };
+};
+
 static bool gcInitialised = false;
 
 void initGC()
@@ -367,6 +381,12 @@ void initGC()
     GC_set_oom_fn(oomHandler);
 
     StackAllocator::defaultAllocator = &boehmGCStackAllocator;
+
+
+    /* Used to disable GC when entering coroutines on macOS */
+    DisableGC::create = []() {
+        return std::dynamic_pointer_cast<DisableGC>(std::make_shared<BoehmDisableGC>());
+    };
 
     /* Set the initial heap size to something fairly big (25% of
        physical RAM, up to a maximum of 384 MiB) so that in most cases
