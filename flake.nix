@@ -457,6 +457,12 @@
                   BINDIR=${placeholder "bin"}/bin
             '';
           };
+
+          # https://github.com/NixOS/nixpkgs/pull/214409
+          pre-commit =
+            if prev.stdenv.hostPlatform.system == "i686-linux"
+            then prev.pre-commit.overridePythonAttrs (o: { doCheck = false; })
+            else prev.pre-commit;
         };
 
       nixos-lib = import (nixpkgs + "/nixos/lib") { };
