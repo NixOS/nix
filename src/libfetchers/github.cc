@@ -199,7 +199,13 @@ struct GitArchiveInputScheme : InputScheme
         return headers;
     }
 
-    virtual Hash getRevFromRef(nix::ref<Store> store, const Input & input) const = 0;
+    struct RefInfo
+    {
+        Hash rev;
+        std::optional<Hash> treeHash;
+    };
+
+    virtual RefInfo getRevFromRef(nix::ref<Store> store, const Input & input) const = 0;
 
     virtual DownloadUrl getDownloadUrl(const Input & input) const = 0;
 
@@ -207,8 +213,15 @@ struct GitArchiveInputScheme : InputScheme
     {
         if (!maybeGetStrAttr(input.attrs, "ref")) input.attrs.insert_or_assign("ref", "HEAD");
 
+        std::optional<Hash> upstreamTreeHash;
+
         auto rev = input.getRev();
-        if (!rev) rev = getRevFromRef(store, input);
+        if (!rev) {
+            auto refInfo = getRevFromRef(store, input);
+            rev = refInfo.rev;
+            upstreamTreeHash = refInfo.treeHash;
+            debug("HEAD revision for '%s' is %s", input.to_string(), refInfo.rev.gitRev());
+        }
 
         input.attrs.erase("ref");
         input.attrs.insert_or_assign("rev", rev->gitRev());
@@ -242,6 +255,13 @@ struct GitArchiveInputScheme : InputScheme
 
         cache->upsertFact(treeHashKey, tarballInfo.treeHash.gitRev());
         cache->upsertFact(lastModifiedKey, std::to_string(tarballInfo.lastModified));
+
+        if (upstreamTreeHash != tarballInfo.treeHash)
+            warn(
+                "Git tree hash mismatch for revision '%s' of '%s': "
+                "expected '%s', got '%s'. "
+                "This can happen if the Git repository uses submodules.",
+                rev->gitRev(), input.to_string(), upstreamTreeHash->gitRev(), tarballInfo.treeHash.gitRev());
 
         return {std::move(input), tarballInfo};
     }
@@ -297,7 +317,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
     }
 
     /* .commit.tree.sha, .commit.committer.date */
-    Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
+    RefInfo getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
         auto host = getHost(input);
         auto url = fmt(
@@ -312,9 +332,10 @@ struct GitHubInputScheme : GitArchiveInputScheme
             readFile(
                 store->toRealPath(
                     downloadFile(store, url, "source", false, headers).storePath)));
-        auto rev = Hash::parseAny(std::string { json["sha"] }, htSHA1);
-        debug("HEAD revision for '%s' is %s", url, rev.gitRev());
-        return rev;
+        return RefInfo {
+            .rev = Hash::parseAny(std::string { json["sha"] }, htSHA1),
+            .treeHash = Hash::parseAny(std::string { json["commit"]["tree"]["sha"] }, htSHA1)
+        };
     }
 
     DownloadUrl getDownloadUrl(const Input & input) const override
@@ -371,7 +392,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         return std::make_pair(token.substr(0,fldsplit), token.substr(fldsplit+1));
     }
 
-    Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
+    RefInfo getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
         // See rate limiting note below
@@ -384,9 +405,9 @@ struct GitLabInputScheme : GitArchiveInputScheme
             readFile(
                 store->toRealPath(
                     downloadFile(store, url, "source", false, headers).storePath)));
-        auto rev = Hash::parseAny(std::string(json[0]["id"]), htSHA1);
-        debug("HEAD revision for '%s' is %s", url, rev.gitRev());
-        return rev;
+        return RefInfo {
+            .rev = Hash::parseAny(std::string(json[0]["id"]), htSHA1)
+        };
     }
 
     DownloadUrl getDownloadUrl(const Input & input) const override
@@ -430,7 +451,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         // Once it is implemented, however, should work as expected.
     }
 
-    Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
+    RefInfo getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
         // TODO: In the future, when the sourcehut graphql API is implemented for mercurial
         // and with anonymous access, this method should use it instead.
@@ -473,12 +494,12 @@ struct SourceHutInputScheme : GitArchiveInputScheme
                 id = parsedLine->target;
         }
 
-        if(!id)
+        if (!id)
             throw BadURL("in '%d', couldn't find ref '%d'", input.to_string(), ref);
 
-        auto rev = Hash::parseAny(*id, htSHA1);
-        debug("HEAD revision for '%s' is %s", fmt("%s/%s", base_url, ref), rev.gitRev());
-        return rev;
+        return RefInfo {
+            .rev = Hash::parseAny(*id, htSHA1)
+        };
     }
 
     DownloadUrl getDownloadUrl(const Input & input) const override
