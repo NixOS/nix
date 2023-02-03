@@ -1,5 +1,9 @@
 ifeq ($(doc_generate),yes)
 
+# Technically it will be defined by mk/programs.mk
+# but we can't use it as dependency of target unless we enable .SECONDEXPANSION:
+nix_PATH = $(buildprefix)src/nix/nix
+
 MANUAL_SRCS := \
   $(call rwildcard, $(d)/src, *.md) \
   $(call rwildcard, $(d)/src, */*.md)
@@ -24,7 +28,7 @@ dummy-env = env -i \
 	NIX_STATE_DIR=/dummy \
 	NIX_CONFIG='cores = 0'
 
-nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw
+nix-eval = $(dummy-env) $(nix_PATH) eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw
 
 $(d)/%.1: $(d)/src/command-ref/%.md
 	@printf "Title: %s\n\n" "$$(basename $@ .1)" > $^.tmp
@@ -48,29 +52,29 @@ $(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli
 	$(trace-gen) cat doc/manual/src/SUMMARY.md.in | while IFS= read line; do if [[ $$line = @manpages@ ]]; then cat doc/manual/src/command-ref/new-cli/SUMMARY.md; else echo "$$line"; fi; done > $@.tmp
 	@mv $@.tmp $@
 
-$(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/generate-manpage.nix $(bindir)/nix
+$(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/generate-manpage.nix $(nix_PATH)
 	@rm -rf $@
 	$(trace-gen) $(nix-eval) --write-to $@.tmp --expr 'import doc/manual/generate-manpage.nix { toplevel = builtins.readFile $<; }'
 	# @docroot@: https://nixos.org/manual/nix/unstable/contributing/hacking.html#docroot-variable
 	$(trace-gen) sed -i $@.tmp/*.md -e 's^@docroot@^../..^g'
 	@mv $@.tmp $@
 
-$(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/generate-options.nix $(d)/src/command-ref/conf-file-prefix.md $(bindir)/nix
+$(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/generate-options.nix $(d)/src/command-ref/conf-file-prefix.md $(nix_PATH)
 	@cat doc/manual/src/command-ref/conf-file-prefix.md > $@.tmp
 	# @docroot@: https://nixos.org/manual/nix/unstable/contributing/hacking.html#docroot-variable
 	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-options.nix (builtins.fromJSON (builtins.readFile $<))' \
 	  | sed -e 's^@docroot@^..^g'>> $@.tmp
 	@mv $@.tmp $@
 
-$(d)/nix.json: $(bindir)/nix
-	$(trace-gen) $(dummy-env) $(bindir)/nix __dump-args > $@.tmp
+$(d)/nix.json: $(nix_PATH)
+	$(trace-gen) $(dummy-env) $(nix_PATH) __dump-args > $@.tmp
 	@mv $@.tmp $@
 
-$(d)/conf-file.json: $(bindir)/nix
-	$(trace-gen) $(dummy-env) $(bindir)/nix show-config --json --experimental-features nix-command > $@.tmp
+$(d)/conf-file.json: $(nix_PATH)
+	$(trace-gen) $(dummy-env) $(nix_PATH) show-config --json --experimental-features nix-command > $@.tmp
 	@mv $@.tmp $@
 
-$(d)/src/language/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d)/src/language/builtins-prefix.md $(bindir)/nix
+$(d)/src/language/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d)/src/language/builtins-prefix.md $(nix_PATH)
 	@cat doc/manual/src/language/builtins-prefix.md > $@.tmp
 	# @docroot@: https://nixos.org/manual/nix/unstable/contributing/hacking.html#docroot-variable
 	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-builtins.nix (builtins.fromJSON (builtins.readFile $<))' \
@@ -78,8 +82,8 @@ $(d)/src/language/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d
 	@cat doc/manual/src/language/builtins-suffix.md >> $@.tmp
 	@mv $@.tmp $@
 
-$(d)/builtins.json: $(bindir)/nix
-	$(trace-gen) $(dummy-env) NIX_PATH=nix/corepkgs=corepkgs $(bindir)/nix __dump-builtins > $@.tmp
+$(d)/builtins.json: $(nix_PATH)
+	$(trace-gen) $(dummy-env) NIX_PATH=nix/corepkgs=corepkgs $(nix_PATH) __dump-builtins > $@.tmp
 	@mv $@.tmp $@
 
 # Generate the HTML manual.
