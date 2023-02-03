@@ -243,7 +243,7 @@ static Repository openTarballCache()
     }
 }
 
-Hash importTarball(Source & source)
+TarballInfo importTarball(Source & source)
 {
     auto repo = openTarballCache();
 
@@ -308,6 +308,8 @@ Hash importTarball(Source & source)
 
     size_t componentsToStrip = 1;
 
+    time_t lastModified = 0;
+
     for (;;) {
         // FIXME: merge with extract_archive
         struct archive_entry * entry;
@@ -320,6 +322,8 @@ Hash importTarball(Source & source)
             warn(archive_error_string(archive.archive));
         else
             archive.check(r);
+
+        lastModified = std::max(lastModified, archive_entry_mtime(entry));
 
         auto pathComponents = tokenizeString<std::vector<std::string>>(path, "/");
 
@@ -388,7 +392,10 @@ Hash importTarball(Source & source)
 
     auto [oid, _name] = popBuilder();
 
-    return Hash::parseAny(git_oid_tostr_s(&oid), htSHA1);
+    return TarballInfo {
+        .treeHash = Hash::parseAny(git_oid_tostr_s(&oid), htSHA1),
+        .lastModified = lastModified
+    };
 }
 
 ref<InputAccessor> makeTarballCacheAccessor(const Hash & rev)

@@ -168,6 +168,8 @@ struct GitArchiveInputScheme : InputScheme
 
     void checkLocks(const Input & specified, const Input & final) const override
     {
+        InputScheme::checkLocks(specified, final);
+
         if (auto prevTreeHash = getTreeHash(specified)) {
             if (getTreeHash(final) != prevTreeHash)
                 throw Error("Git tree hash mismatch in input '%s', expected '%s'",
@@ -201,7 +203,7 @@ struct GitArchiveInputScheme : InputScheme
 
     virtual DownloadUrl getDownloadUrl(const Input & input) const = 0;
 
-    std::pair<Input, Hash> downloadArchive(ref<Store> store, Input input) const
+    std::pair<Input, TarballInfo> downloadArchive(ref<Store> store, Input input) const
     {
         if (!maybeGetStrAttr(input.attrs, "ref")) input.attrs.insert_or_assign("ref", "HEAD");
 
@@ -214,13 +216,17 @@ struct GitArchiveInputScheme : InputScheme
         auto cache = getCache();
 
         auto treeHashKey = fmt("git-rev-to-tree-hash-%s", rev->gitRev());
+        auto lastModifiedKey = fmt("git-rev-to-last-modified-%s", rev->gitRev());
 
         if (auto treeHashS = cache->queryFact(treeHashKey)) {
-            auto treeHash = Hash::parseAny(*treeHashS, htSHA1);
-            if (tarballCacheContains(treeHash))
-                return {std::move(input), treeHash};
-            else
-                debug("Git tree with hash '%s' has disappeared from the cache, refetching...", treeHash.gitRev());
+            if (auto lastModifiedS = cache->queryFact(lastModifiedKey)) {
+                auto treeHash = Hash::parseAny(*treeHashS, htSHA1);
+                auto lastModified = string2Int<time_t>(*lastModifiedS).value();
+                if (tarballCacheContains(treeHash))
+                    return {std::move(input), TarballInfo { .treeHash = treeHash, .lastModified = lastModified }};
+                else
+                    debug("Git tree with hash '%s' has disappeared from the cache, refetching...", treeHash.gitRev());
+            }
         }
 
         /* Stream the tarball into the tarball cache. */
@@ -232,26 +238,22 @@ struct GitArchiveInputScheme : InputScheme
             getFileTransfer()->download(std::move(req), sink);
         });
 
-        auto treeHash = importTarball(*source);
+        auto tarballInfo = importTarball(*source);
 
-        cache->upsertFact(treeHashKey, treeHash.gitRev());
+        cache->upsertFact(treeHashKey, tarballInfo.treeHash.gitRev());
+        cache->upsertFact(lastModifiedKey, std::to_string(tarballInfo.lastModified));
 
-        return {std::move(input), treeHash};
+        return {std::move(input), tarballInfo};
     }
 
     std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
-        auto [input, treeHash] = downloadArchive(store, _input);
+        auto [input, tarballInfo] = downloadArchive(store, _input);
 
-        input.attrs.insert_or_assign("treeHash", treeHash.gitRev());
+        input.attrs.insert_or_assign("treeHash", tarballInfo.treeHash.gitRev());
+        input.attrs.insert_or_assign("lastModified", uint64_t(tarballInfo.lastModified));
 
-        auto accessor = makeTarballCacheAccessor(treeHash);
-
-        #if 0
-        auto lastModified = accessor->getLastModified();
-        assert(lastModified);
-        input.attrs.insert_or_assign("lastModified", uint64_t(*lastModified));
-        #endif
+        auto accessor = makeTarballCacheAccessor(tarballInfo.treeHash);
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 

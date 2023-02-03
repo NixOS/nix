@@ -6,7 +6,13 @@ namespace nix {
 
 ref<InputAccessor> makeGitInputAccessor(const CanonPath & path, const Hash & rev);
 
-Hash importTarball(Source & source);
+struct TarballInfo
+{
+    Hash treeHash;
+    time_t lastModified;
+};
+
+TarballInfo importTarball(Source & source);
 
 ref<InputAccessor> makeTarballCacheAccessor(const Hash & rev);
 
