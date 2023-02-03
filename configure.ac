@@ -184,7 +184,7 @@ fi
 
 # Look for OpenSSL, a required dependency. FIXME: this is only (maybe)
 # used by S3BinaryCacheStore.
-PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
+PKG_CHECK_MODULES([OPENSSL], [libcrypto >= 1.1.1], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
 
 
 # Look for libarchive.

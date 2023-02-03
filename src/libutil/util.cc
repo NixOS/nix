@@ -48,7 +48,6 @@ extern char * * environ __attribute__((weak));
 namespace nix {
 
 void initLibUtil() {
-    initOpenSSL();
 }
 
 std::optional<std::string> getEnv(const std::string & key)
