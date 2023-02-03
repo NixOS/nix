@@ -615,15 +615,24 @@ struct GitInputScheme : InputScheme
             AutoDelete delTmpGitDir(tmpGitDir, true);
 
             runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", tmpDir, "--separate-git-dir", tmpGitDir });
-            // TODO: repoDir might lack the ref (it only checks if rev
-            // exists, see FIXME above) so use a big hammer and fetch
-            // everything to ensure we get the rev.
-            runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
-                                      "--update-head-ok", "--", repoDir, "refs/*:refs/*" });
+
+            {
+                // TODO: repoDir might lack the ref (it only checks if rev
+                // exists, see FIXME above) so use a big hammer and fetch
+                // everything to ensure we get the rev.
+                Activity act(*logger, lvlTalkative, actUnknown, fmt("making temporary clone of '%s'", tmpDir));
+                runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
+                        "--update-head-ok", "--", repoDir, "refs/*:refs/*" });
+            }
 
             runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", input.getRev()->gitRev() });
+
             runProgram("git", true, { "-C", tmpDir, "remote", "add", "origin", actualUrl });
-            runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
+
+            {
+                Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching submodules of '%s'", tmpDir));
+                runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
+            }
 
             filter = isNotDotGitDirectory;
         } else {
