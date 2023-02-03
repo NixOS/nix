@@ -186,6 +186,10 @@ static DefaultStackAllocator defaultAllocatorSingleton;
 StackAllocator *StackAllocator::defaultAllocator = &defaultAllocatorSingleton;
 
 
+std::shared_ptr<DisableGC> (*DisableGC::create)() = []() {
+    return std::dynamic_pointer_cast<DisableGC>(std::make_shared<DisableGC>());
+};
+
 std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
 {
     struct SourceToSink : FinishSink
@@ -206,7 +210,11 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
             if (in.empty()) return;
             cur = in;
 
-            if (!coro)
+            if (!coro) {
+#if __APPLE__
+                /* Disable GC when entering the coroutine on macOS, since it doesn't find the main thread stack in this case */
+                auto disablegc = DisableGC::create();
+#endif
                 coro = coro_t::push_type(VirtualStackAllocator{}, [&](coro_t::pull_type & yield) {
                     LambdaSource source([&](char *out, size_t out_len) {
                         if (cur.empty()) {
@@ -223,17 +231,28 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
                     });
                     fun(source);
                 });
+            }
 
             if (!*coro) { abort(); }
 
-            if (!cur.empty()) (*coro)(false);
+            if (!cur.empty()) {
+#if __APPLE__
+                auto disablegc = DisableGC::create();
+#endif
+                (*coro)(false);
+            }
         }
 
         void finish() override
         {
             if (!coro) return;
             if (!*coro) abort();
-            (*coro)(true);
+            {
+#if __APPLE__
+                auto disablegc = DisableGC::create();
+#endif
+                (*coro)(true);
+            }
             if (*coro) abort();
         }
     };
@@ -264,18 +283,27 @@ std::unique_ptr<Source> sinkToSource(
 
         size_t read(char * data, size_t len) override
         {
-            if (!coro)
+            if (!coro) {
+#if __APPLE__
+                auto disablegc = DisableGC::create();
+#endif
                 coro = coro_t::pull_type(VirtualStackAllocator{}, [&](coro_t::push_type & yield) {
                     LambdaSink sink([&](std::string_view data) {
                         if (!data.empty()) yield(std::string(data));
                     });
                     fun(sink);
                 });
+            }
 
             if (!*coro) { eof(); abort(); }
 
             if (pos == cur.size()) {
-                if (!cur.empty()) (*coro)();
+                if (!cur.empty()) {
+#if __APPLE__
+                    auto disablegc = DisableGC::create();
+#endif
+                    (*coro)();
+                }
                 cur = coro->get();
                 pos = 0;
             }

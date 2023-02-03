@@ -25,6 +25,7 @@ namespace nix {
 
     // Generate 2 objects, discard one, run gc,
     // see if one got collected and the other didn't
+    // GC is disabled inside coroutines on __APPLE__
     static void testFinalizerCalls() {
         bool* do_collect_collected = uncollectable_bool();
         bool* dont_collect_collected = uncollectable_bool();
@@ -37,7 +38,9 @@ namespace nix {
         GC_gcollect();
         GC_invoke_finalizers();
 
+#if !__APPLE__
         ASSERT_TRUE(*do_collect_collected);
+#endif
         ASSERT_FALSE(*dont_collect_collected);
         ASSERT_NE(nullptr, dont_collect);
     }
@@ -58,6 +61,10 @@ namespace nix {
         }
 
         auto source = sinkToSource([&](Sink& sink) {
+
+#if __APPLE__
+            ASSERT_TRUE(GC_is_disabled());
+#endif
             testFinalizerCalls();
 
             bool* dont_collect_inner_collected = uncollectable_bool();
@@ -71,6 +78,9 @@ namespace nix {
             }
             // pass control to main
             writeString("foo", sink);
+#if __APPLE__
+            ASSERT_TRUE(GC_is_disabled());
+#endif
 
             ASSERT_TRUE(*do_collect_inner_collected);
             ASSERT_FALSE(*dont_collect_inner_collected);
@@ -84,6 +94,7 @@ namespace nix {
         std::string foo = readString(*source);
         ASSERT_EQ(foo, "foo");
 
+        ASSERT_FALSE(GC_is_disabled());
         GC_gcollect();
         GC_invoke_finalizers();
 
