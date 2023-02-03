@@ -107,8 +107,11 @@ struct GitArchiveInputScheme : InputScheme
     {
         if (maybeGetStrAttr(attrs, "type") != type()) return {};
 
+        static std::unordered_set<std::string> known =
+            {"type", "owner", "repo", "ref", "rev", "narHash", "lastModified", "host", "treeHash"};
+
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "owner" && name != "repo" && name != "ref" && name != "rev" && name != "narHash" && name != "lastModified" && name != "host")
+            if (!known.contains(name))
                 throw Error("unsupported input attribute '%s'", name);
 
         getStrAttr(attrs, "owner");
@@ -153,6 +156,23 @@ struct GitArchiveInputScheme : InputScheme
             input.attrs.erase("rev");
         }
         return input;
+    }
+
+    std::optional<Hash> getTreeHash(const Input & input) const
+    {
+        if (auto treeHash = maybeGetStrAttr(input.attrs, "treeHash"))
+            return Hash::parseAny(*treeHash, htSHA1);
+        else
+            return std::nullopt;
+    }
+
+    void checkLocks(const Input & specified, const Input & final) const override
+    {
+        if (auto prevTreeHash = getTreeHash(specified)) {
+            if (getTreeHash(final) != prevTreeHash)
+                throw Error("Git tree hash mismatch in input '%s', expected '%s'",
+                    specified.to_string(), prevTreeHash->gitRev());
+        }
     }
 
     std::optional<std::string> getAccessToken(const std::string & host) const
@@ -214,9 +234,6 @@ struct GitArchiveInputScheme : InputScheme
 
         auto treeHash = importTarball(*source);
 
-        // FIXME: verify against locked tree hash.
-        input.attrs.insert_or_assign("treeHash", treeHash.gitRev());
-
         cache->upsertFact(treeHashKey, treeHash.gitRev());
 
         return {std::move(input), treeHash};
@@ -225,6 +242,8 @@ struct GitArchiveInputScheme : InputScheme
     std::pair<ref<InputAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
     {
         auto [input, treeHash] = downloadArchive(store, _input);
+
+        input.attrs.insert_or_assign("treeHash", treeHash.gitRev());
 
         auto accessor = makeTarballCacheAccessor(treeHash);
 

@@ -132,24 +132,24 @@ std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
     return {std::move(storePath), input};
 }
 
-void Input::checkLocks(Input & input) const
+void InputScheme::checkLocks(const Input & specified, const Input & final) const
 {
-    if (auto prevNarHash = getNarHash()) {
-        if (input.getNarHash() != prevNarHash)
+    if (auto prevNarHash = specified.getNarHash()) {
+        if (final.getNarHash() != prevNarHash)
             throw Error((unsigned int) 102, "NAR hash mismatch in input '%s', expected '%s'",
-                to_string(), prevNarHash->to_string(SRI, true));
+                specified.to_string(), prevNarHash->to_string(SRI, true));
     }
 
-    if (auto prevLastModified = getLastModified()) {
-        if (input.getLastModified() != prevLastModified)
+    if (auto prevLastModified = specified.getLastModified()) {
+        if (final.getLastModified() != prevLastModified)
             throw Error("'lastModified' attribute mismatch in input '%s', expected %d",
-                input.to_string(), *prevLastModified);
+                final.to_string(), *prevLastModified);
     }
 
-    if (auto prevRevCount = getRevCount()) {
-        if (input.getRevCount() != prevRevCount)
+    if (auto prevRevCount = specified.getRevCount()) {
+        if (final.getRevCount() != prevRevCount)
             throw Error("'revCount' attribute mismatch in input '%s', expected %d",
-                input.to_string(), *prevRevCount);
+                final.to_string(), *prevRevCount);
     }
 }
 
@@ -163,7 +163,7 @@ std::pair<ref<InputAccessor>, Input> Input::getAccessor(ref<Store> store) const
     try {
         auto [accessor, final] = scheme->getAccessor(store, *this);
         accessor->fingerprint = scheme->getFingerprint(store, final);
-        checkLocks(final);
+        scheme->checkLocks(*this, final);
         return {accessor, std::move(final)};
     } catch (Error & e) {
         e.addTrace({}, "while fetching the input '%s'", to_string());

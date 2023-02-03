@@ -92,10 +92,6 @@ public:
     // For locked inputs, returns a string that uniquely specifies the
     // content of the input (typically a commit hash or content hash).
     std::optional<std::string> getFingerprint(ref<Store> store) const;
-
-private:
-
-    void checkLocks(Input & input) const;
 };
 
 /* The InputScheme represents a type of fetcher.  Each fetcher
@@ -142,6 +138,8 @@ struct InputScheme
     { return std::nullopt; }
 
     virtual std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const;
+
+    virtual void checkLocks(const Input & specified, const Input & final) const;
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
