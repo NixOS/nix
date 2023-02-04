@@ -708,8 +708,8 @@ void InstallablesCommand::prepare()
     installables = load();
 }
 
-Installables InstallablesCommand::load() {
-    Installables installables;
+Installables InstallablesCommand::load()
+{
     if (_installables.empty() && useDefaultInstallables())
         // FIXME: commands like "nix profile install" should not have a
         // default, probably.
@@ -719,11 +719,8 @@ Installables InstallablesCommand::load() {
 
 std::vector<std::string> InstallablesCommand::getFlakesForCompletion()
 {
-    if (_installables.empty()) {
-        if (useDefaultInstallables())
-            return {"."};
-        return {};
-    }
+    if (_installables.empty() && useDefaultInstallables())
+        return {"."};
     return _installables;
 }
 
