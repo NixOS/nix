@@ -5,24 +5,10 @@
 
 namespace nix {
 
-struct CmdRepl : InstallablesCommand
+struct CmdRepl : RawInstallablesCommand
 {
     CmdRepl() {
         evalSettings.pureEval = false;
-    }
-
-    void prepare() override
-    {
-        if (!settings.isExperimentalFeatureEnabled(Xp::ReplFlake) && !(file) && this->_installables.size() >= 1) {
-            warn("future versions of Nix will require using `--file` to load a file");
-            if (this->_installables.size() > 1)
-                warn("more than one input file is not currently supported");
-            auto filePath = this->_installables[0].data();
-            file = std::optional(filePath);
-            _installables.front() = _installables.back();
-            _installables.pop_back();
-        }
-        installables = InstallablesCommand::load();
     }
 
     std::vector<std::string> files;
@@ -30,11 +16,6 @@ struct CmdRepl : InstallablesCommand
     Strings getDefaultFlakeAttrPaths() override
     {
         return {""};
-    }
-
-    bool useDefaultInstallables() override
-    {
-        return file.has_value() or expr.has_value();
     }
 
     bool forceImpureByDefault() override
@@ -54,11 +35,27 @@ struct CmdRepl : InstallablesCommand
           ;
     }
 
-    void run(ref<Store> store) override
+    void applyDefaultInstallables(std::vector<std::string> & rawInstallables) override
+    {
+        if (!settings.isExperimentalFeatureEnabled(Xp::ReplFlake) && !(file) && rawInstallables.size() >= 1) {
+            warn("future versions of Nix will require using `--file` to load a file");
+            if (rawInstallables.size() > 1)
+                warn("more than one input file is not currently supported");
+            auto filePath = rawInstallables[0].data();
+            file = std::optional(filePath);
+            rawInstallables.front() = rawInstallables.back();
+            rawInstallables.pop_back();
+        }
+        if (rawInstallables.empty() && (file.has_value() || expr.has_value())) {
+            rawInstallables.push_back(".");
+        }
+    }
+
+    void run(ref<Store> store, std::vector<std::string> && rawInstallables) override
     {
         auto state = getEvalState();
         auto getValues = [&]()->AbstractNixRepl::AnnotatedValues{
-            auto installables = load();
+            auto installables = parseInstallables(store, rawInstallables);
             AbstractNixRepl::AnnotatedValues values;
             for (auto & installable: installables){
                 auto what = installable->what();

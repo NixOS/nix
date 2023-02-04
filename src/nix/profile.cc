@@ -256,11 +256,11 @@ struct ProfileManifest
 
 static std::map<Installable *, std::pair<BuiltPaths, ExtraPathInfo>>
 builtPathsPerInstallable(
-    const std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> & builtPaths)
+    const std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> & builtPaths)
 {
     std::map<Installable *, std::pair<BuiltPaths, ExtraPathInfo>> res;
     for (auto & [installable, builtPath] : builtPaths) {
-        auto & r = res[installable.get()];
+        auto & r = res[&*installable];
         /* Note that there could be conflicting info
            (e.g. meta.priority fields) if the installable returned
            multiple derivations. So pick one arbitrarily. FIXME:
@@ -296,7 +296,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
           ;
     }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, Installables && installables) override
     {
         ProfileManifest manifest(*getEvalState(), *profile);
 
@@ -307,7 +307,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
         for (auto & installable : installables) {
             ProfileElement element;
 
-            auto & [res, info] = builtPaths[installable.get()];
+            auto & [res, info] = builtPaths[&*installable];
 
             if (info.originalRef && info.resolvedRef && info.attrPath && info.extendedOutputsSpec) {
                 element.source = ProfileElementSource {
@@ -513,7 +513,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
 
         auto matchers = getMatchers(store);
 
-        std::vector<std::shared_ptr<Installable>> installables;
+        Installables installables;
         std::vector<size_t> indices;
 
         auto upgradedCount = 0;
@@ -529,7 +529,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                 Activity act(*logger, lvlChatty, actUnknown,
                     fmt("checking '%s' for updates", element.source->attrPath));
 
-                auto installable = std::make_shared<InstallableFlake>(
+                auto installable = make_ref<InstallableFlake>(
                     this,
                     getEvalState(),
                     FlakeRef(element.source->originalRef),
@@ -582,7 +582,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
         for (size_t i = 0; i < installables.size(); ++i) {
             auto & installable = installables.at(i);
             auto & element = manifest.elements[indices.at(i)];
-            element.updateStorePaths(getEvalStore(), store, builtPaths[installable.get()].first);
+            element.updateStorePaths(getEvalStore(), store, builtPaths[&*installable].first);
         }
 
         updateProfile(manifest.build(store));
@@ -798,7 +798,6 @@ struct CmdProfile : NixMultiCommand
     {
         if (!command)
             throw UsageError("'nix profile' requires a sub-command.");
-        command->second->prepare();
         command->second->run();
     }
 };

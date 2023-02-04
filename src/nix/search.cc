@@ -61,7 +61,7 @@ struct CmdSearch : InstallableCommand, MixJSON
         };
     }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<Installable> installable) override
     {
         settings.readOnlyMode = true;
         evalSettings.enableImportFromDerivation.setDefault(false);

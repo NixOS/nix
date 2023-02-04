@@ -21,7 +21,6 @@ struct CmdRealisation : virtual NixMultiCommand
     {
         if (!command)
             throw UsageError("'nix realisation' requires a sub-command.");
-        command->second->prepare();
         command->second->run();
     }
 };

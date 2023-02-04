@@ -28,7 +28,6 @@ struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand,
           ;
     }
 
-    using StorePathsCommand::run;
     void run(ref<Store> srcStore, StorePaths && storePaths) override
     {
         auto dstStore = dstUri.empty() ? openStore() : openStore(dstUri);

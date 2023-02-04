@@ -70,7 +70,7 @@ struct CmdBundle : InstallableCommand
         return res;
     }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<Installable> installable) override
     {
         auto evalState = getEvalState();
 
