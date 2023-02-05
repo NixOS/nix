@@ -45,13 +45,13 @@ To get a shell with a different compilation environment (e.g. stdenv,
 gccStdenv, clangStdenv, clang11Stdenv, ccacheStdenv):
 
 ```console
-$ nix-shell -A devShells.x86_64-linux.clang11StdenvPackages
+$ nix-shell -A devShells.x86_64-linux.clang11Stdenv
 ```
 
 or if you have a flake-enabled nix:
 
 ```console
-$ nix develop .#clang11StdenvPackages
+$ nix develop .#clang11Stdenv
 ```
 
 Note: you can use `ccacheStdenv` to drastically improve rebuild
