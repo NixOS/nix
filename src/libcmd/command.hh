@@ -94,9 +94,8 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
 {
     std::optional<Path> file;
     std::optional<std::string> expr;
-    bool readOnlyMode = false;
 
-    SourceExprCommand(bool supportReadOnlyMode = false);
+    SourceExprCommand();
 
     std::vector<std::shared_ptr<Installable>> parseInstallables(
         ref<Store> store, std::vector<std::string> ss);
@@ -109,6 +108,11 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
     virtual Strings getDefaultFlakeAttrPathPrefixes();
 
     void completeInstallable(std::string_view prefix);
+};
+
+struct MixReadOnlyOption : virtual Args
+{
+    MixReadOnlyOption();
 };
 
 /* A command that operates on a list of "installables", which can be
@@ -136,7 +140,7 @@ struct InstallableCommand : virtual Args, SourceExprCommand
 {
     std::shared_ptr<Installable> installable;
 
-    InstallableCommand(bool supportReadOnlyMode = false);
+    InstallableCommand();
 
     void prepare() override;
 

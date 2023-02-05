@@ -11,13 +11,13 @@
 
 using namespace nix;
 
-struct CmdEval : MixJSON, InstallableCommand
+struct CmdEval : MixJSON, InstallableCommand, MixReadOnlyOption
 {
     bool raw = false;
     std::optional<std::string> apply;
     std::optional<Path> writeTo;
 
-    CmdEval() : InstallableCommand(true /* supportReadOnlyMode */)
+    CmdEval() : InstallableCommand()
     {
         addFlag({
             .longName = "raw",
