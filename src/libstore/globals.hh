@@ -478,11 +478,6 @@ public:
         )",
         {"env-keep-derivations"}};
 
-    /**
-     * Whether to lock the Nix client and worker to the same CPU.
-     */
-    bool lockCPU;
-
     Setting<SandboxMode> sandboxMode{
         this,
         #if __linux__
