@@ -10,8 +10,10 @@ namespace nix {
  * An InstallableCommand where the single positional argument must be an
  * InstallableValue in particular.
  */
-struct InstallableValueCommand : InstallableCommand
+struct InstallableValueCommand : AbstractInstallableCommand, SourceExprCommand
 {
+    InstallableValueCommand();
+
     /**
      * Entry point to this command
      */

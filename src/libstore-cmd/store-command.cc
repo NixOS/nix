@@ -1,10 +1,8 @@
-#include "command.hh"
+#include "store-command.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "derivations.hh"
-#include "nixexpr.hh"
 #include "profiles.hh"
-#include "repl.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -34,18 +32,14 @@ nlohmann::json NixMultiCommand::toJSON()
     return MultiCommand::toJSON();
 }
 
-StoreCommand::StoreCommand()
-{
-}
-
-ref<Store> StoreCommand::getStore()
+ref<Store> HasStore::getStore()
 {
     if (!_store)
         _store = createStore();
     return ref<Store>(_store);
 }
 
-ref<Store> StoreCommand::createStore()
+ref<Store> HasStore::createStore()
 {
     return openStore();
 }
@@ -85,54 +79,16 @@ ref<Store> CopyCommand::getDstStore()
     return dstUri.empty() ? openStore() : openStore(dstUri);
 }
 
-EvalCommand::EvalCommand()
+ref<Store> HasDrvStore::getDrvStore()
 {
-    addFlag({
-        .longName = "debugger",
-        .description = "Start an interactive environment if evaluation fails.",
-        .category = MixEvalArgs::category,
-        .handler = {&startReplOnEvalErrors, true},
-    });
+    if (!drvStore)
+        drvStore = getStore();
+    return ref<Store>(drvStore);
 }
 
-EvalCommand::~EvalCommand()
+MixOperateOnOptions::MixOperateOnOptions(AbstractArgs & args)
 {
-    if (evalState)
-        evalState->maybePrintStats();
-}
-
-ref<Store> EvalCommand::getEvalStore()
-{
-    if (!evalStore)
-        evalStore = evalStoreUrl ? openStore(*evalStoreUrl) : getStore();
-    return ref<Store>(evalStore);
-}
-
-ref<EvalState> EvalCommand::getEvalState()
-{
-    if (!evalState) {
-        evalState =
-            #if HAVE_BOEHMGC
-            std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
-                searchPath, getEvalStore(), getStore())
-            #else
-            std::make_shared<EvalState>(
-                searchPath, getEvalStore(), getStore())
-            #endif
-            ;
-
-        evalState->repair = repair;
-
-        if (startReplOnEvalErrors) {
-            evalState->debugRepl = &AbstractNixRepl::runSimple;
-        };
-    }
-    return ref<EvalState>(evalState);
-}
-
-MixOperateOnOptions::MixOperateOnOptions()
-{
-    addFlag({
+    args.addFlag({
         .longName = "derivation",
         .description = "Operate on the [store derivation](../../glossary.md#gloss-store-derivation) rather than its outputs.",
         .category = installablesCategory,
@@ -141,7 +97,8 @@ MixOperateOnOptions::MixOperateOnOptions()
 }
 
 BuiltPathsCommand::BuiltPathsCommand(bool recursive)
-    : recursive(recursive)
+    : MixOperateOnOptions(static_cast<Command &>(*this))
+    , recursive(recursive)
 {
     if (recursive)
         addFlag({
@@ -177,7 +134,7 @@ void BuiltPathsCommand::run(ref<Store> store, Installables && installables)
         for (auto & p : store->queryAllValidPaths())
             paths.emplace_back(BuiltPath::Opaque{p});
     } else {
-        paths = Installable::toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);
+        paths = Installable::toBuiltPaths(getDrvStore(), store, realiseMode, operateOn, installables);
         if (recursive) {
             // XXX: This only computes the store path closure, ignoring
             // intermediate realisations
@@ -317,6 +274,15 @@ void MixEnvironment::setEnviron() {
         for (const auto & var : unset)
             unsetenv(var.c_str());
     }
+}
+
+ParseInstallableArgs::MakeDefaultFun * ParseInstallableArgs::makeDefault = nullptr;
+
+ParseInstallableArgs::RegisterDefault::RegisterDefault(MakeDefaultFun fun)
+{
+    if (ParseInstallableArgs::makeDefault)
+        throw Error("Default already registered!");
+    makeDefault = fun;
 }
 
 }

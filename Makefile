@@ -3,16 +3,16 @@ include mk/build-dir.mk
 -include $(buildprefix)Makefile.config
 clean-files += $(buildprefix)Makefile.config
 
+NIX_FULL ?= 1
+
 ifeq ($(ENABLE_BUILD), yes)
 makefiles = \
   mk/precompiled-headers.mk \
   local.mk \
   src/libutil/local.mk \
   src/libstore/local.mk \
-  src/libfetchers/local.mk \
   src/libmain/local.mk \
-  src/libexpr/local.mk \
-  src/libcmd/local.mk \
+  src/libstore-cmd/local.mk \
   src/nix/local.mk \
   src/resolve-system-dependencies/local.mk \
   scripts/local.mk \
@@ -22,6 +22,12 @@ makefiles = \
   misc/systemd/local.mk \
   misc/launchd/local.mk \
   misc/upstart/local.mk
+ifeq ($(NIX_FULL), 1)
+makefiles += \
+  src/libfetchers/local.mk \
+  src/libexpr/local.mk \
+  src/libcmd/local.mk
+endif
 endif
 
 ifeq ($(ENABLE_BUILD)_$(ENABLE_TESTS), yes_yes)
@@ -29,18 +35,23 @@ makefiles += \
   tests/unit/libutil/local.mk \
   tests/unit/libutil-support/local.mk \
   tests/unit/libstore/local.mk \
-  tests/unit/libstore-support/local.mk \
+  tests/unit/libstore-support/local.mk
+ifeq ($(NIX_FULL), 1)
+makefiles += \
   tests/unit/libexpr/local.mk \
   tests/unit/libexpr-support/local.mk
 endif
+endif
 
 ifeq ($(ENABLE_TESTS), yes)
+ifeq ($(NIX_FULL), 1)
 makefiles += \
   tests/functional/local.mk \
   tests/functional/ca/local.mk \
   tests/functional/dyn-drv/local.mk \
   tests/functional/test-libstoreconsumer/local.mk \
   tests/functional/plugins/local.mk
+endif
 else
 makefiles += \
   mk/disable-tests.mk

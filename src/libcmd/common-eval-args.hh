@@ -13,11 +13,11 @@ class EvalState;
 class Bindings;
 struct SourcePath;
 
-struct MixEvalArgs : virtual Args, virtual MixRepair
+struct MixEvalArgs : virtual MixRepair
 {
     static constexpr auto category = "Common evaluation options";
 
-    MixEvalArgs();
+    MixEvalArgs(AbstractArgs & args);
 
     Bindings * getAutoArgs(EvalState & state);
 

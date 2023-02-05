@@ -1,11 +1,9 @@
 #pragma once
 ///@file
 
-#include "installable-value.hh"
+#include "store-installables.hh"
 #include "args.hh"
-#include "common-eval-args.hh"
 #include "path.hh"
-#include "flake/lockfile.hh"
 
 #include <optional>
 
@@ -15,8 +13,6 @@ extern std::string programPath;
 
 extern char * * savedArgv;
 
-class EvalState;
-struct Pos;
 class Store;
 
 static constexpr Command::Category catHelp = -1;
@@ -34,22 +30,25 @@ struct NixMultiCommand : virtual MultiCommand, virtual Command
 // For the overloaded run methods
 #pragma GCC diagnostic ignored "-Woverloaded-virtual"
 
-/**
- * A command that requires a \ref Store "Nix store".
- */
-struct StoreCommand : virtual Command
+struct HasStore
 {
-    StoreCommand();
-    void run() override;
     ref<Store> getStore();
     virtual ref<Store> createStore();
-    /**
-     * Main entry point, with a `Store` provided
-     */
-    virtual void run(ref<Store>) = 0;
 
 private:
     std::shared_ptr<Store> _store;
+};
+
+/**
+ * A command that requires a \ref Store "Nix store".
+ */
+struct StoreCommand : virtual Command, virtual HasStore
+{
+    /**
+     * Main entry point, with a Store provided
+     */
+    void run() override;
+    virtual void run(ref<Store>) = 0;
 };
 
 /**
@@ -67,88 +66,94 @@ struct CopyCommand : virtual StoreCommand
     ref<Store> getDstStore();
 };
 
-/**
- * A command that needs to evaluate Nix language expressions.
- */
-struct EvalCommand : virtual StoreCommand, MixEvalArgs
+struct HasDrvStore : virtual HasStore
 {
-    bool startReplOnEvalErrors = false;
-    bool ignoreExceptionsDuringTry = false;
+    virtual ref<Store> getDrvStore();
 
-    EvalCommand();
-
-    ~EvalCommand();
-
-    ref<Store> getEvalStore();
-
-    ref<EvalState> getEvalState();
-
-private:
-    std::shared_ptr<Store> evalStore;
-
-    std::shared_ptr<EvalState> evalState;
+protected:
+    std::shared_ptr<Store> drvStore;
 };
 
-/**
- * A mixin class for commands that process flakes, adding a few standard
- * flake-related options/flags.
- */
-struct MixFlakeOptions : virtual Args, EvalCommand
+struct DrvCommand : virtual HasDrvStore, virtual StoreCommand
 {
-    flake::LockFlags lockFlags;
+};
 
-    MixFlakeOptions();
-
+struct GetRawInstallables : virtual AbstractArgs
+{
     /**
-     * The completion for some of these flags depends on the flake(s) in
-     * question.
+     * Get the unparsed installables allociated with this command
      *
-     * This method should be implemented to gather all flakerefs the
-     * command is operating with (presumably specified via some other
-     * arguments) so that the completions for these flags can use them.
+     * This is needed for the completions of *other* arguments that
+     * depends on these.
+     *
+     * @return A fresh vector, because the underlying command doesn't
+     * always store a vector of raw installables.
      */
-    virtual std::vector<FlakeRef> getFlakeRefsForCompletion()
-    { return {}; }
+    virtual std::vector<std::string> getRawInstallables() = 0;
 };
 
-struct SourceExprCommand : virtual Args, MixFlakeOptions
+struct ParseInstallableArgs
 {
-    std::optional<Path> file;
-    std::optional<std::string> expr;
+    virtual Installables parseInstallables(
+        ref<Store> store, std::vector<std::string> ss) = 0;
 
-    SourceExprCommand();
-
-    Installables parseInstallables(
-        ref<Store> store, std::vector<std::string> ss);
-
-    ref<Installable> parseInstallable(
-        ref<Store> store, const std::string & installable);
-
-    virtual Strings getDefaultFlakeAttrPaths();
-
-    virtual Strings getDefaultFlakeAttrPathPrefixes();
+    virtual ref<Installable> parseInstallable(
+        ref<Store> store, const std::string & installable) = 0;
 
     /**
      * Complete an installable from the given prefix.
      */
-    void completeInstallable(AddCompletions & completions, std::string_view prefix);
+    virtual void completeInstallable(AddCompletions & completions, std::string_view prefix)
+    { };
 
     /**
      * Convenience wrapper around the underlying function to make setting the
      * callback easier.
      */
-    CompleterClosure getCompleteInstallable();
+    AbstractArgs::CompleterClosure getCompleteInstallable();
+
+    // FIXME make const after CmdRepl's override is fixed up
+    virtual void applyDefaultInstallables(std::vector<std::string> & rawInstallables) = 0;
+
+    typedef ref<ParseInstallableArgs> MakeDefaultFun(GetRawInstallables &);
+
+    static MakeDefaultFun * makeDefault;
+
+    struct RegisterDefault
+    {
+        RegisterDefault(MakeDefaultFun);
+    };
 };
 
-/**
- * A mixin class for commands that need a read-only flag.
- *
- * What exactly is "read-only" is unspecified, but it will usually be
- * the \ref Store "Nix store".
- */
-struct MixReadOnlyOption : virtual Args
+struct MixDefaultParseInstallableArgs : virtual ParseInstallableArgs
 {
-    MixReadOnlyOption();
+    ref<ParseInstallableArgs> def;
+
+    MixDefaultParseInstallableArgs(GetRawInstallables & args)
+        : def(ParseInstallableArgs::makeDefault(args))
+    { }
+
+    Installables parseInstallables(
+        ref<Store> store, std::vector<std::string> ss) override
+    {
+        return def->parseInstallables(store, std::move(ss));
+    }
+
+    ref<Installable> parseInstallable(
+        ref<Store> store, const std::string & installable) override
+    {
+        return def->parseInstallable(store, installable);
+    }
+
+    void completeInstallable(AddCompletions & completions, std::string_view prefix) override
+    {
+        return def->completeInstallable(completions, prefix);
+    }
+
+    virtual void applyDefaultInstallables(std::vector<std::string> & rawInstallables) override
+    {
+        return def->applyDefaultInstallables(rawInstallables);
+    }
 };
 
 /**
@@ -157,7 +162,7 @@ struct MixReadOnlyOption : virtual Args
  * This is needed by `CmdRepl` which wants to load (and reload) the
  * installables itself.
  */
-struct RawInstallablesCommand : virtual Args, SourceExprCommand
+struct RawInstallablesCommand : virtual DrvCommand, virtual GetRawInstallables, virtual ParseInstallableArgs
 {
     RawInstallablesCommand();
 
@@ -165,12 +170,9 @@ struct RawInstallablesCommand : virtual Args, SourceExprCommand
 
     void run(ref<Store> store) override;
 
-    // FIXME make const after `CmdRepl`'s override is fixed up
-    virtual void applyDefaultInstallables(std::vector<std::string> & rawInstallables);
-
     bool readFromStdIn = false;
 
-    std::vector<FlakeRef> getFlakeRefsForCompletion() override;
+    std::vector<std::string> getRawInstallables() override;
 
 private:
 
@@ -181,7 +183,7 @@ private:
  * A command that operates on a list of "installables", which can be
  * store paths, attribute paths, Nix expressions, etc.
  */
-struct InstallablesCommand : RawInstallablesCommand
+struct AbstractInstallablesCommand : virtual RawInstallablesCommand
 {
     virtual void run(ref<Store> store, Installables && installables) = 0;
 
@@ -191,26 +193,41 @@ struct InstallablesCommand : RawInstallablesCommand
 /**
  * A command that operates on exactly one "installable".
  */
-struct InstallableCommand : virtual Args, SourceExprCommand
+struct InstallablesCommand : AbstractInstallablesCommand, MixDefaultParseInstallableArgs
 {
-    InstallableCommand();
+    InstallablesCommand()
+        : MixDefaultParseInstallableArgs(static_cast<GetRawInstallables &>(*this))
+    { }
+};
+
+/* A core command that operates on exactly one "installable" */
+struct AbstractInstallableCommand : virtual DrvCommand, virtual GetRawInstallables, virtual ParseInstallableArgs
+{
+    AbstractInstallableCommand();
 
     virtual void run(ref<Store> store, ref<Installable> installable) = 0;
 
     void run(ref<Store> store) override;
 
-    std::vector<FlakeRef> getFlakeRefsForCompletion() override;
+    std::vector<std::string> getRawInstallables() override final;
 
-private:
+protected:
 
     std::string _installable{"."};
 };
 
-struct MixOperateOnOptions : virtual Args
+struct InstallableCommand : AbstractInstallableCommand, MixDefaultParseInstallableArgs
+{
+    InstallableCommand()
+        : MixDefaultParseInstallableArgs(static_cast<GetRawInstallables &>(*this))
+    { }
+};
+
+struct MixOperateOnOptions
 {
     OperateOn operateOn = OperateOn::Output;
 
-    MixOperateOnOptions();
+    MixOperateOnOptions(AbstractArgs & args);
 };
 
 /**
@@ -219,7 +236,7 @@ struct MixOperateOnOptions : virtual Args
  * If the argument the user passes is a some sort of recipe for a path
  * not yet built, it must be built first.
  */
-struct BuiltPathsCommand : InstallablesCommand, virtual MixOperateOnOptions
+struct BuiltPathsCommand : InstallablesCommand, MixOperateOnOptions
 {
 private:
 
@@ -325,22 +342,6 @@ struct MixEnvironment : virtual Args {
      */
     void setEnviron();
 };
-
-void completeFlakeInputPath(
-    AddCompletions & completions,
-    ref<EvalState> evalState,
-    const std::vector<FlakeRef> & flakeRefs,
-    std::string_view prefix);
-
-void completeFlakeRef(AddCompletions & completions, ref<Store> store, std::string_view prefix);
-
-void completeFlakeRefWithFragment(
-    AddCompletions & completions,
-    ref<EvalState> evalState,
-    flake::LockFlags lockFlags,
-    Strings attrPathPrefixes,
-    const Strings & defaultFlakeAttrPaths,
-    std::string_view prefix);
 
 std::string showVersions(const std::set<std::string> & versions);
 

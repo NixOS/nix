@@ -3,10 +3,8 @@
 #include "args/root.hh"
 #include "current-process.hh"
 #include "namespaces.hh"
-#include "command.hh"
+#include "store-command.hh"
 #include "common-args.hh"
-#include "eval.hh"
-#include "eval-settings.hh"
 #include "globals.hh"
 #include "legacy.hh"
 #include "shared.hh"
@@ -15,7 +13,6 @@
 #include "finally.hh"
 #include "loggers.hh"
 #include "markdown.hh"
-#include "memory-input-accessor.hh"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -25,10 +22,6 @@
 #include <regex>
 
 #include <nlohmann/json.hpp>
-
-extern std::string chrootHelperName;
-
-void chrootHelper(int argc, char * * argv);
 
 namespace nix {
 
@@ -67,7 +60,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
     bool helpRequested = false;
     bool showVersion = false;
 
-    NixArgs() : MultiCommand(RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
+    NixArgs() : MultiCommand(RegisterCommand::getCommandsFor({})), MixCommonArgs("mini-nix")
     {
         categories.clear();
         categories[catHelp] = "Help commands";
@@ -193,7 +186,6 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
             j["experimentalFeature"] = storeConfig->experimentalFeature();
         }
         res["stores"] = std::move(stores);
-        res["fetchers"] = fetchers::dumpRegisterInputSchemeInfo();
 
         return res.dump();
     }
@@ -203,44 +195,11 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
    lowdown. */
 static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 {
-    auto mdName = subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand));
+    auto mdName = subcommand.empty() ? "mini-nix" : fmt("mini-nix3-%s", concatStringsSep("-", subcommand));
 
-    evalSettings.restrictEval = false;
-    evalSettings.pureEval = false;
-    EvalState state({}, openStore("dummy://"));
+    throw UsageError("Nix has no subcommand '%s'", concatStringsSep("", subcommand));
 
-    auto vGenerateManpage = state.allocValue();
-    state.eval(state.parseExprFromString(
-        #include "generate-manpage.nix.gen.hh"
-        , state.rootPath(CanonPath::root)), *vGenerateManpage);
-
-    state.corepkgsFS->addFile(
-        CanonPath("utils.nix"),
-        #include "utils.nix.gen.hh"
-        );
-
-    state.corepkgsFS->addFile(
-        CanonPath("/generate-settings.nix"),
-        #include "generate-settings.nix.gen.hh"
-        );
-
-    state.corepkgsFS->addFile(
-        CanonPath("/generate-store-info.nix"),
-        #include "generate-store-info.nix.gen.hh"
-        );
-
-    auto vDump = state.allocValue();
-    vDump->mkString(toplevel.dumpCli());
-
-    auto vRes = state.allocValue();
-    state.callFunction(*vGenerateManpage, state.getBuiltin("false"), *vRes, noPos);
-    state.callFunction(*vRes, *vDump, *vRes, noPos);
-
-    auto attr = vRes->attrs->get(state.symbols.create(mdName + ".md"));
-    if (!attr)
-        throw UsageError("Nix has no subcommand '%s'", concatStringsSep("", subcommand));
-
-    auto markdown = state.forceString(*attr->value, noPos, "while evaluating the lowdown help text");
+    auto markdown = "";
 
     RunPager pager;
     std::cout << renderMarkdownToTerminal(markdown) << "\n";
@@ -298,7 +257,7 @@ struct CmdHelpStores : Command
     std::string doc() override
     {
         return
-          #include "generated-doc/help-stores.md"
+          #include "../generated-doc/help-stores.md"
           ;
     }
 
@@ -316,15 +275,7 @@ void mainWrapped(int argc, char * * argv)
 {
     savedArgv = argv;
 
-    /* The chroot helper needs to be run before any threads have been
-       started. */
-    if (argc > 0 && argv[0] == chrootHelperName) {
-        chrootHelper(argc, argv);
-        return;
-    }
-
     initNix();
-    initGC();
 
     #if __linux__
     if (getuid() == 0) {
@@ -336,22 +287,13 @@ void mainWrapped(int argc, char * * argv)
     }
     #endif
 
-    Finally f([] { logger->stop(); });
-
     programPath = argv[0];
     auto programName = std::string(baseNameOf(programPath));
-
-    if (argc > 1 && std::string_view(argv[1]) == "__build-remote") {
-        programName = "build-remote";
-        argv++; argc--;
-    }
 
     {
         auto legacy = (*RegisterLegacyCommand::commands)[programName];
         if (legacy) return legacy(argc, argv);
     }
-
-    evalSettings.pureEval = true;
 
     setLogFormat("bar");
     settings.verboseBuild = false;
@@ -361,51 +303,12 @@ void mainWrapped(int argc, char * * argv)
         verbosity = lvlInfo;
     }
 
+    Finally f([] { logger->stop(); });
+
     NixArgs args;
 
     if (argc == 2 && std::string(argv[1]) == "__dump-cli") {
         logger->cout(args.dumpCli());
-        return;
-    }
-
-    if (argc == 2 && std::string(argv[1]) == "__dump-language") {
-        experimentalFeatureSettings.experimentalFeatures = {
-            Xp::Flakes,
-            Xp::FetchClosure,
-            Xp::DynamicDerivations,
-        };
-        evalSettings.pureEval = false;
-        EvalState state({}, openStore("dummy://"));
-        auto res = nlohmann::json::object();
-        res["builtins"] = ({
-            auto builtinsJson = nlohmann::json::object();
-            auto builtins = state.baseEnv.values[0]->attrs;
-            for (auto & builtin : *builtins) {
-                auto b = nlohmann::json::object();
-                if (!builtin.value->isPrimOp()) continue;
-                auto primOp = builtin.value->primOp;
-                if (!primOp->doc) continue;
-                b["arity"] = primOp->arity;
-                b["args"] = primOp->args;
-                b["doc"] = trim(stripIndentation(primOp->doc));
-                b["experimental-feature"] = primOp->experimentalFeature;
-                builtinsJson[state.symbols[builtin.name]] = std::move(b);
-            }
-            std::move(builtinsJson);
-        });
-        res["constants"] = ({
-            auto constantsJson = nlohmann::json::object();
-            for (auto & [name, info] : state.constantInfos) {
-                auto c = nlohmann::json::object();
-                if (!info.doc) continue;
-                c["doc"] = trim(stripIndentation(info.doc));
-                c["type"] = showType(info.type, false);
-                c["impure-only"] = info.impureOnly;
-                constantsJson[name] = std::move(c);
-            }
-            std::move(constantsJson);
-        });
-        logger->cout("%s", res);
         return;
     }
 
@@ -488,9 +391,6 @@ void mainWrapped(int argc, char * * argv)
         settings.ttlPositiveNarInfoCache = 0;
     }
 
-    if (args.command->second->forceImpureByDefault() && !evalSettings.pureEval.overridden) {
-        evalSettings.pureEval = false;
-    }
     args.command->second->run();
 }
 

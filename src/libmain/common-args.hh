@@ -50,13 +50,13 @@ struct MixJSON : virtual Args
     }
 };
 
-struct MixRepair : virtual Args
+struct MixRepair
 {
     RepairFlag repair = NoRepair;
 
-    MixRepair()
+    MixRepair(AbstractArgs & args)
     {
-        addFlag({
+        args.addFlag({
             .longName = "repair",
             .description =
                 "During evaluation, rewrite missing or corrupted files in the Nix store. "

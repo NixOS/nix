@@ -599,12 +599,12 @@ static void _completePath(AddCompletions & completions, std::string_view prefix,
     globfree(&globbuf);
 }
 
-void Args::completePath(AddCompletions & completions, size_t, std::string_view prefix)
+void AbstractArgs::completePath(AddCompletions & completions, size_t, std::string_view prefix)
 {
     _completePath(completions, prefix, false);
 }
 
-void Args::completeDir(AddCompletions & completions, size_t, std::string_view prefix)
+void AbstractArgs::completeDir(AddCompletions & completions, size_t, std::string_view prefix)
 {
     _completePath(completions, prefix, true);
 }

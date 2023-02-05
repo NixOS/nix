@@ -2,102 +2,53 @@
 ///@file
 
 #include "installable-value.hh"
-#include "args.hh"
+#include "store-command.hh"
 #include "common-eval-args.hh"
-#include "path.hh"
 #include "flake/lockfile.hh"
-
-#include <optional>
 
 namespace nix {
 
-extern std::string programPath;
-
-extern char * * savedArgv;
-
 class EvalState;
 struct Pos;
-class Store;
 
-static constexpr Command::Category catHelp = -1;
-static constexpr Command::Category catSecondary = 100;
-static constexpr Command::Category catUtility = 101;
-static constexpr Command::Category catNixInstallation = 102;
-
-static constexpr auto installablesCategory = "Options that change the interpretation of [installables](@docroot@/command-ref/new-cli/nix.md#installables)";
-
-struct NixMultiCommand : virtual MultiCommand, virtual Command
+struct HasEvalState : virtual HasDrvStore, MixEvalArgs
 {
-    nlohmann::json toJSON() override;
-};
+    bool startReplOnEvalErrors = false;
+    bool ignoreExceptionsDuringTry = false;
 
-// For the overloaded run methods
-#pragma GCC diagnostic ignored "-Woverloaded-virtual"
+    HasEvalState(AbstractArgs & args);
 
-/**
- * A command that requires a \ref Store "Nix store".
- */
-struct StoreCommand : virtual Command
-{
-    StoreCommand();
-    void run() override;
-    ref<Store> getStore();
-    virtual ref<Store> createStore();
-    /**
-     * Main entry point, with a `Store` provided
-     */
-    virtual void run(ref<Store>) = 0;
+    ~HasEvalState();
+
+    ref<Store> getDrvStore() override;
+
+    ref<EvalState> getEvalState();
 
 private:
-    std::shared_ptr<Store> _store;
-};
 
-/**
- * A command that copies something between `--from` and `--to` \ref
- * Store stores.
- */
-struct CopyCommand : virtual StoreCommand
-{
-    std::string srcUri, dstUri;
-
-    CopyCommand();
-
-    ref<Store> createStore() override;
-
-    ref<Store> getDstStore();
+    std::shared_ptr<EvalState> evalState;
 };
 
 /**
  * A command that needs to evaluate Nix language expressions.
  */
-struct EvalCommand : virtual StoreCommand, MixEvalArgs
+struct EvalCommand : virtual DrvCommand, virtual HasEvalState
 {
-    bool startReplOnEvalErrors = false;
-    bool ignoreExceptionsDuringTry = false;
-
-    EvalCommand();
-
-    ~EvalCommand();
-
-    ref<Store> getEvalStore();
-
-    ref<EvalState> getEvalState();
-
-private:
-    std::shared_ptr<Store> evalStore;
-
-    std::shared_ptr<EvalState> evalState;
+    EvalCommand()
+        : MixRepair(static_cast<Command &>(*this))
+        , HasEvalState(static_cast<DrvCommand &>(*this))
+    { }
 };
 
 /**
  * A mixin class for commands that process flakes, adding a few standard
  * flake-related options/flags.
  */
-struct MixFlakeOptions : virtual Args, EvalCommand
+struct MixFlakeOptions : virtual HasEvalState
 {
     flake::LockFlags lockFlags;
 
-    MixFlakeOptions();
+    MixFlakeOptions(AbstractArgs & args);
 
     /**
      * The completion for some of these flags depends on the flake(s) in
@@ -111,33 +62,45 @@ struct MixFlakeOptions : virtual Args, EvalCommand
     { return {}; }
 };
 
-struct SourceExprCommand : virtual Args, MixFlakeOptions
+/**
+ * A class for parsing all installable, both low level
+ * InstallableDerivedPath and high level InstallableValue and its
+ * subclassses.
+ */
+struct ParseInstallableValueArgs : virtual ParseInstallableArgs, virtual MixFlakeOptions
 {
+    GetRawInstallables & args;
+
+    ParseInstallableValueArgs(GetRawInstallables & args);
+
     std::optional<Path> file;
     std::optional<std::string> expr;
-
-    SourceExprCommand();
-
-    Installables parseInstallables(
-        ref<Store> store, std::vector<std::string> ss);
-
-    ref<Installable> parseInstallable(
-        ref<Store> store, const std::string & installable);
 
     virtual Strings getDefaultFlakeAttrPaths();
 
     virtual Strings getDefaultFlakeAttrPathPrefixes();
 
-    /**
-     * Complete an installable from the given prefix.
-     */
-    void completeInstallable(AddCompletions & completions, std::string_view prefix);
+    Installables parseInstallables(
+        ref<Store> store, std::vector<std::string> ss) override;
 
-    /**
-     * Convenience wrapper around the underlying function to make setting the
-     * callback easier.
-     */
-    CompleterClosure getCompleteInstallable();
+    ref<Installable> parseInstallable(
+        ref<Store> store, const std::string & s) override;
+
+    void applyDefaultInstallables(std::vector<std::string> & rawInstallables) override;
+
+    void completeInstallable(AddCompletions & completions, std::string_view prefix) override;
+
+    std::vector<FlakeRef> getFlakeRefsForCompletion() override;
+};
+
+struct SourceExprCommand : virtual EvalCommand, ParseInstallableValueArgs, virtual GetRawInstallables
+{
+    SourceExprCommand()
+        : MixRepair(static_cast<Command &>(*this))
+        , HasEvalState(static_cast<DrvCommand &>(*this))
+        , MixFlakeOptions(static_cast<EvalCommand &>(*this))
+        , ParseInstallableValueArgs(static_cast<GetRawInstallables &>(*this))
+    { }
 };
 
 /**
@@ -146,184 +109,9 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
  * What exactly is "read-only" is unspecified, but it will usually be
  * the \ref Store "Nix store".
  */
-struct MixReadOnlyOption : virtual Args
+struct MixReadOnlyOption
 {
-    MixReadOnlyOption();
-};
-
-/**
- * Like InstallablesCommand but the installables are not loaded.
- *
- * This is needed by `CmdRepl` which wants to load (and reload) the
- * installables itself.
- */
-struct RawInstallablesCommand : virtual Args, SourceExprCommand
-{
-    RawInstallablesCommand();
-
-    virtual void run(ref<Store> store, std::vector<std::string> && rawInstallables) = 0;
-
-    void run(ref<Store> store) override;
-
-    // FIXME make const after `CmdRepl`'s override is fixed up
-    virtual void applyDefaultInstallables(std::vector<std::string> & rawInstallables);
-
-    bool readFromStdIn = false;
-
-    std::vector<FlakeRef> getFlakeRefsForCompletion() override;
-
-private:
-
-    std::vector<std::string> rawInstallables;
-};
-
-/**
- * A command that operates on a list of "installables", which can be
- * store paths, attribute paths, Nix expressions, etc.
- */
-struct InstallablesCommand : RawInstallablesCommand
-{
-    virtual void run(ref<Store> store, Installables && installables) = 0;
-
-    void run(ref<Store> store, std::vector<std::string> && rawInstallables) override;
-};
-
-/**
- * A command that operates on exactly one "installable".
- */
-struct InstallableCommand : virtual Args, SourceExprCommand
-{
-    InstallableCommand();
-
-    virtual void run(ref<Store> store, ref<Installable> installable) = 0;
-
-    void run(ref<Store> store) override;
-
-    std::vector<FlakeRef> getFlakeRefsForCompletion() override;
-
-private:
-
-    std::string _installable{"."};
-};
-
-struct MixOperateOnOptions : virtual Args
-{
-    OperateOn operateOn = OperateOn::Output;
-
-    MixOperateOnOptions();
-};
-
-/**
- * A command that operates on zero or more extant store paths.
- *
- * If the argument the user passes is a some sort of recipe for a path
- * not yet built, it must be built first.
- */
-struct BuiltPathsCommand : InstallablesCommand, virtual MixOperateOnOptions
-{
-private:
-
-    bool recursive = false;
-    bool all = false;
-
-protected:
-
-    Realise realiseMode = Realise::Derivation;
-
-public:
-
-    BuiltPathsCommand(bool recursive = false);
-
-    virtual void run(ref<Store> store, BuiltPaths && paths) = 0;
-
-    void run(ref<Store> store, Installables && installables) override;
-
-    void applyDefaultInstallables(std::vector<std::string> & rawInstallables) override;
-};
-
-struct StorePathsCommand : public BuiltPathsCommand
-{
-    StorePathsCommand(bool recursive = false);
-
-    virtual void run(ref<Store> store, StorePaths && storePaths) = 0;
-
-    void run(ref<Store> store, BuiltPaths && paths) override;
-};
-
-/**
- * A command that operates on exactly one store path.
- */
-struct StorePathCommand : public StorePathsCommand
-{
-    virtual void run(ref<Store> store, const StorePath & storePath) = 0;
-
-    void run(ref<Store> store, StorePaths && storePaths) override;
-};
-
-/**
- * A helper class for registering \ref Command commands globally.
- */
-struct RegisterCommand
-{
-    typedef std::map<std::vector<std::string>, std::function<ref<Command>()>> Commands;
-    static Commands * commands;
-
-    RegisterCommand(std::vector<std::string> && name,
-        std::function<ref<Command>()> command)
-    {
-        if (!commands) commands = new Commands;
-        commands->emplace(name, command);
-    }
-
-    static nix::Commands getCommandsFor(const std::vector<std::string> & prefix);
-};
-
-template<class T>
-static RegisterCommand registerCommand(const std::string & name)
-{
-    return RegisterCommand({name}, [](){ return make_ref<T>(); });
-}
-
-template<class T>
-static RegisterCommand registerCommand2(std::vector<std::string> && name)
-{
-    return RegisterCommand(std::move(name), [](){ return make_ref<T>(); });
-}
-
-struct MixProfile : virtual StoreCommand
-{
-    std::optional<Path> profile;
-
-    MixProfile();
-
-    /* If 'profile' is set, make it point at 'storePath'. */
-    void updateProfile(const StorePath & storePath);
-
-    /* If 'profile' is set, make it point at the store path produced
-       by 'buildables'. */
-    void updateProfile(const BuiltPaths & buildables);
-};
-
-struct MixDefaultProfile : MixProfile
-{
-    MixDefaultProfile();
-};
-
-struct MixEnvironment : virtual Args {
-
-    StringSet keep, unset;
-    Strings stringsEnv;
-    std::vector<char*> vectorEnv;
-    bool ignoreEnvironment;
-
-    MixEnvironment();
-
-    /***
-     * Modify global environ based on `ignoreEnvironment`, `keep`, and
-     * `unset`. It's expected that exec will be called before this class
-     * goes out of scope, otherwise `environ` will become invalid.
-     */
-    void setEnviron();
+    MixReadOnlyOption(AbstractArgs & args);
 };
 
 void completeFlakeInputPath(
@@ -341,13 +129,5 @@ void completeFlakeRefWithFragment(
     Strings attrPathPrefixes,
     const Strings & defaultFlakeAttrPaths,
     std::string_view prefix);
-
-std::string showVersions(const std::set<std::string> & versions);
-
-void printClosureDiff(
-    ref<Store> store,
-    const StorePath & beforePath,
-    const StorePath & afterPath,
-    std::string_view indent);
 
 }

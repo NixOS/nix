@@ -16,3 +16,6 @@ $(foreach i, $(wildcard $(d)/args/*.hh), \
 ifeq ($(HAVE_LIBCPUID), 1)
 	libutil_LDFLAGS += -lcpuid
 endif
+
+$(foreach i, $(wildcard $(d)/*.hh), \
+  $(eval $(call install-file-in, $(i), $(includedir)/nix, 0644)))

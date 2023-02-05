@@ -29,6 +29,8 @@ struct ExtraPathInfoFlake : ExtraPathInfoValue
     { }
 };
 
+struct ParseInstallableValueArgs;
+
 struct InstallableFlake : InstallableValue
 {
     FlakeRef flakeRef;
@@ -39,7 +41,7 @@ struct InstallableFlake : InstallableValue
     mutable std::shared_ptr<flake::LockedFlake> _lockedFlake;
 
     InstallableFlake(
-        SourceExprCommand * cmd,
+        ParseInstallableValueArgs * cmd,
         ref<EvalState> state,
         FlakeRef && flakeRef,
         std::string_view fragment,
