@@ -1088,13 +1088,20 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
     return res;
 }
 
+std::string showProgram(const Path & program, const Strings & args)
+{
+    Strings ss{program};
+    for (auto & s : args) ss.push_back(s);
+    return concatStringsSep(" ", ss);
+}
+
 std::string runProgram(Path program, bool searchPath, const Strings & args,
     const std::optional<std::string> & input)
 {
     auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input});
 
     if (!statusOk(res.first))
-        throw ExecError(res.first, "program '%1%' %2%", program, statusToString(res.first));
+        throw ExecError(res.first, "program '%s' " + statusToString(res.first), showProgram(program, args));
 
     return res.second;
 }
@@ -1222,7 +1229,7 @@ void runProgram2(const RunOptions & options)
     if (source) promise.get_future().get();
 
     if (status)
-        throw ExecError(status, "program '%1%' %2%", options.program, statusToString(status));
+        throw ExecError(status, "program '%s' " + statusToString(status), showProgram(options.program, options.args));
 }
 
 
