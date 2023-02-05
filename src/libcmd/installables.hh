@@ -18,19 +18,6 @@ struct SourceExprCommand;
 
 namespace eval_cache { class EvalCache; class AttrCursor; }
 
-struct App
-{
-    std::vector<DerivedPath> context;
-    Path program;
-    // FIXME: add args, sandbox settings, metadata, ...
-};
-
-struct UnresolvedApp
-{
-    App unresolved;
-    App resolve(ref<Store> evalStore, ref<Store> store);
-};
-
 enum class Realise {
     /* Build the derivation. Postcondition: the
        derivation outputs exist. */
@@ -92,29 +79,12 @@ struct Installable
 
     DerivedPathWithInfo toDerivedPath();
 
-    UnresolvedApp toApp(EvalState & state);
-
-    virtual std::pair<Value *, PosIdx> toValue(EvalState & state)
-    {
-        throw Error("argument '%s' cannot be evaluated", what());
-    }
-
     /* Return a value only if this installable is a store path or a
        symlink to it. */
     virtual std::optional<StorePath> getStorePath()
     {
         return {};
     }
-
-    /* Get a cursor to each value this Installable could refer to. However
-       if none exists, throw exception instead of returning empty vector. */
-    virtual std::vector<ref<eval_cache::AttrCursor>>
-    getCursors(EvalState & state);
-
-    /* Get the first and most preferred cursor this Installable could refer
-       to, or throw an exception if none exists. */
-    virtual ref<eval_cache::AttrCursor>
-    getCursor(EvalState & state);
 
     virtual FlakeRef nixpkgsFlakeRef() const
     {

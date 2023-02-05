@@ -1,5 +1,5 @@
 #include "run.hh"
-#include "command.hh"
+#include "command-installable-value.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
@@ -137,7 +137,7 @@ struct CmdShell : InstallablesCommand, MixEnvironment
 
 static auto rCmdShell = registerCommand<CmdShell>("shell");
 
-struct CmdRun : InstallableCommand
+struct CmdRun : InstallableValueCommand
 {
     using InstallableCommand::run;
 
@@ -183,7 +183,7 @@ struct CmdRun : InstallableCommand
         return res;
     }
 
-    void run(ref<Store> store, ref<Installable> installable) override
+    void run(ref<Store> store, ref<InstallableValue> installable) override
     {
         auto state = getEvalState();
 
