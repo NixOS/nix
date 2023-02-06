@@ -1445,14 +1445,19 @@ static RegisterPrimOp primop_toPath({
    corner cases. */
 static void prim_storePath(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    if (evalSettings.pureEval)
-        state.debugThrowLastTrace(EvalError({
-            .msg = hintfmt("'%s' is not allowed in pure evaluation mode", "builtins.storePath"),
-            .errPos = state.positions[pos]
-        }));
-
     PathSet context;
-    Path path = state.checkSourcePath(state.coerceToPath(pos, *args[0], context, "while evaluating the first argument passed to builtins.storePath"));
+    Path uncheckedPath = state.coerceToPath(pos, *args[0], context, "while evaluating the first argument passed to builtins.storePath");
+
+    if (evalSettings.pureEval) {
+        // TODO feature flag?
+        //     state.debugThrowLastTrace(EvalError({
+        //         .msg = hintfmt("'%s' is not allowed in pure evaluation mode", "builtins.storePath"),
+        //         .errPos = state.positions[pos]
+        // }));'
+        state.allowPath(uncheckedPath);
+    }
+
+    Path path = state.checkSourcePath(uncheckedPath);
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
        directly in the store.  The latter condition is necessary so
        e.g. nix-push does the right thing. */
