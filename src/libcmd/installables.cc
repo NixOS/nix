@@ -517,7 +517,7 @@ std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build
 
     struct Aux
     {
-        ExtraPathInfo info;
+        ref<ExtraPathInfo> info;
         ref<Installable> installable;
     };
 

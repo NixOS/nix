@@ -10,7 +10,10 @@ std::string InstallableDerivedPath::what() const
 
 DerivedPathsWithInfo InstallableDerivedPath::toDerivedPaths()
 {
-    return {{.path = derivedPath, .info = {} }};
+    return {{
+        .path = derivedPath,
+        .info = make_ref<ExtraPathInfo>(),
+    }};
 }
 
 std::optional<StorePath> InstallableDerivedPath::getStorePath()
