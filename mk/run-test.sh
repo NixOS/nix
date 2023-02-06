@@ -12,7 +12,7 @@ test=$1
 dir="$(dirname "${BASH_SOURCE[0]}")"
 source "$dir/common-test.sh"
 
-post_run_msg="ran test $test..."
+post_run_msg="ran test $test"
 if [ -t 1 ]; then
     red="[31;1m"
     green="[32;1m"
