@@ -1,5 +1,7 @@
 source common.sh
 
+enableFeatures nix-command
+
 echo "building test path"
 storePath="$(nix-build nar-access.nix -A a --no-out-link)"
 

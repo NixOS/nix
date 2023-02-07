@@ -1,5 +1,7 @@
 source common.sh
 
+requireHackableStore
+
 clearStore
 
 # Ensure "fake ssh" remote store works just as legacy fake ssh would.

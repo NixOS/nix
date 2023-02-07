@@ -1,5 +1,7 @@
 source common.sh
 
+enableFeatures nix-command
+
 BINARY_CACHE=file://$cacheDir
 
 getHash() {

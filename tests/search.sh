@@ -1,5 +1,8 @@
 source common.sh
 
+# don't shoot the messenger
+enableFeatures nix-command
+
 clearStore
 clearCache
 

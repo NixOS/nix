@@ -4,6 +4,7 @@ source common.sh
 
 # XXX: This shouldn’t be, but #4813 cause this test to fail
 needLocalStore "see #4813"
+unknownFailsOnNixOS
 
 set +e
 messages=$(nix-build -Q timeout.nix -A infiniteLoop --timeout 2 2>&1)

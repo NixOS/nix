@@ -1,5 +1,7 @@
 source common.sh
 
+requireHackableStore
+
 clearStore
 
 outPath=$(nix-build --no-out-link readfile-context.nix)

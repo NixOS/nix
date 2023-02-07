@@ -1,5 +1,7 @@
 source common.sh
 
+requireHackableStore
+
 clearStore
 
 lockFifo1=$TEST_ROOT/test1.fifo

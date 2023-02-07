@@ -1,5 +1,8 @@
 source common.sh
 
+# shouldn't be
+enableFeatures nix-command
+
 clearStore
 
 nix eval --expr 'assert 1 + 2 == 3; true'

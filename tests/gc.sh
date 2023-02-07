@@ -1,5 +1,7 @@
 source common.sh
 
+requireHackableStore
+
 clearStore
 
 drvPath=$(nix-instantiate dependencies.nix)

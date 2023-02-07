@@ -1,6 +1,7 @@
 source common.sh
 
 needLocalStore "--dump-db requires a local store"
+needTrustedUser
 
 clearStore
 

@@ -1,5 +1,7 @@
 source common.sh
 
+unknownFailsOnNixOS
+
 clearStore
 
 # Test fetching a flat file.

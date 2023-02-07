@@ -1,5 +1,7 @@
 source common.sh
 
+enableFeatures nix-command flakes
+
 mkdir -p $TEST_ROOT/foo
 echo bla > $TEST_ROOT/foo/bar
 

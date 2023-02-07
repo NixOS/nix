@@ -4,10 +4,14 @@ source common.sh
 
 needLocalStore "the GC test needs a synchronisation point"
 
+requireHackableStore
+
 clearStore
 
 fifo=$TEST_ROOT/test.fifo
 mkfifo "$fifo"
+
+enableFeatures nix-command
 
 dummy=$(nix store add-path ./simple.nix)
 

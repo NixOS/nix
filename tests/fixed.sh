@@ -1,5 +1,7 @@
 source common.sh
 
+unknownFailsOnNixOS
+
 clearStore
 
 path=$(nix-store -q $(nix-instantiate fixed.nix -A good.0))

@@ -1,9 +1,13 @@
 source ../common.sh
 
+enableFeatures nix-command flakes
+
 clearStore
 rm -rf $TEST_HOME/.cache $TEST_HOME/.config $TEST_HOME/.local
 cp ../shell-hello.nix ../config.nix $TEST_HOME
 cd $TEST_HOME
+
+enableFeatures nix-command flakes
 
 cat <<EOF > flake.nix
 {

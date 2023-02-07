@@ -1,5 +1,7 @@
 source common.sh
 
+requireHackableStore
+
 clearStore
 
 rm -f $TEST_ROOT/result*

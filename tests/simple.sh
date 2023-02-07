@@ -1,5 +1,7 @@
 source common.sh
 
+requireHackableStore
+
 drvPath=$(nix-instantiate simple.nix)
 
 test "$(nix-store -q --binding system "$drvPath")" = "$system"

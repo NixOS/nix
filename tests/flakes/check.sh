@@ -1,5 +1,7 @@
 source common.sh
 
+enableFeatures nix-command flakes
+
 flakeDir=$TEST_ROOT/flake3
 mkdir -p $flakeDir
 

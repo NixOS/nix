@@ -1,5 +1,7 @@
 source common.sh
 
+requireHackableStore
+
 case $system in
     *linux*)
         ;;

@@ -1,5 +1,7 @@
 source common.sh
 
+enableFeatures nix-command
+
 set -u
 
 if [[ -z $(type -p git) ]]; then

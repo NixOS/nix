@@ -6,6 +6,8 @@ restartDaemon
 # FIXME
 if [[ $(uname) != Linux ]]; then exit 99; fi
 
+canEnable recursive-nix || exit 99
+
 clearStore
 
 rm -f $TEST_ROOT/result

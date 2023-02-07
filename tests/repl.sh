@@ -1,5 +1,8 @@
 source common.sh
 
+enableFeatures nix-command
+unknownFailsOnNixOS # actually the lack of a tty in the backdoor session; shouldn't be too hard to fix?
+
 testDir="$PWD"
 cd "$TEST_ROOT"
 

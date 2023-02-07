@@ -1,6 +1,7 @@
 source common.sh
 
-enableFeatures "fetch-closure"
+enableFeatures "fetch-closure nix-command"
+unknownFailsOnNixOS # error: 'fetchClosure' only supports http:// and https:// stores
 
 clearStore
 clearCacheCache
@@ -13,8 +14,8 @@ nix copy --to file://$cacheDir $nonCaPath
 # Test basic fetchClosure rewriting from non-CA to CA.
 clearStore
 
-[ ! -e $nonCaPath ]
-[ ! -e $caPath ]
+[ ! -e $nonCaPath ] || { nix-store --delete $nonCaPath && [ ! -e $nonCaPath ]; }
+[ ! -e $caPath ] || { nix-store --delete $caPath && [ ! -e $caPath ]; }
 
 [[ $(nix eval -v --raw --expr "
   builtins.fetchClosure {

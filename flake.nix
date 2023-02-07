@@ -517,6 +517,12 @@
 
         tests.containers = runNixOSTestFor "x86_64-linux" ./tests/nixos/containers/containers.nix;
 
+        tests.testsOnNixOS-user = runNixOSTestFor "x86_64-linux" ./tests/nixos/testsOnNixOS-user.nix;
+
+        tests.testsOnNixOS-trusted = runNixOSTestFor "x86_64-linux" ./tests/nixos/testsOnNixOS-trusted.nix;
+
+        tests.testsOnNixOS-root = runNixOSTestFor "x86_64-linux" ./tests/nixos/testsOnNixOS-root.nix;
+
         tests.setuid = nixpkgs.lib.genAttrs
           ["i686-linux" "x86_64-linux"]
           (system: runNixOSTestFor system ./tests/nixos/setuid.nix);

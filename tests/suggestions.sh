@@ -1,5 +1,7 @@
 source common.sh
 
+enableFeatures nix-command flakes
+
 clearStore
 
 cd "$TEST_HOME"

@@ -5,6 +5,8 @@ requireGit
 clearStore
 rm -rf $TEST_HOME/.cache $TEST_HOME/.config
 
+enableFeatures nix-command flakes
+
 flake1Dir=$TEST_ROOT/flake1
 flake2Dir=$TEST_ROOT/flake2
 flake3Dir=$TEST_ROOT/flake3
@@ -73,6 +75,8 @@ nix registry add --registry $registry flake2 git+file://$flake2Dir
 nix registry add --registry $registry flake3 git+file://$flake3Dir
 nix registry add --registry $registry flake4 flake3
 nix registry add --registry $registry nixpkgs flake1
+
+unknownFailsOnNixOS
 
 # Test 'nix registry list'.
 [[ $(nix registry list | wc -l) == 5 ]]

@@ -1,5 +1,8 @@
 source common.sh
 
+enableFeatures nix-command
+unknownBuiltinsStorePath
+
 clearStore
 
 rm -f $TEST_ROOT/result

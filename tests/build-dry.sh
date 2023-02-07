@@ -7,6 +7,9 @@ source common.sh
 clearStore
 clearCache
 
+enableFeatures nix-command
+requireHackableStore # a lot of this depends on having an exclusive store for the test. Use randomized derivations instead?
+
 # Ensure this builds successfully first
 nix build --no-link -f dependencies.nix
 

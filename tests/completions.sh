@@ -1,5 +1,7 @@
 source common.sh
 
+enableFeatures nix-command flakes
+
 cd "$TEST_ROOT"
 
 mkdir -p dep

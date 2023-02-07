@@ -1,5 +1,7 @@
 source common.sh
 
+unknownFailsOnNixOS
+
 cp ../simple.nix ../simple.builder.sh ../config.nix $TEST_HOME
 
 cd $TEST_HOME

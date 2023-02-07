@@ -19,6 +19,8 @@ echo utrecht > "$repo"/hello
 git -C "$repo" add hello
 git -C "$repo" commit -m 'Bla1'
 
+enableFeatures nix-command
+
 path=$(nix eval --raw --impure --expr "(builtins.fetchGit { url = $repo; ref = \"master\"; }).outPath")
 
 # Test various combinations of ref names

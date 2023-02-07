@@ -2,6 +2,8 @@ source ./common.sh
 
 requireDaemonNewerThan "2.4pre20210625"
 
+enableFeatures nix-command
+
 export REMOTE_STORE_DIR="$TEST_ROOT/remote_store"
 export REMOTE_STORE="file://$REMOTE_STORE_DIR"
 

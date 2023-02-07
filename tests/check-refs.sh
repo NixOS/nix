@@ -41,7 +41,7 @@ nix-build -o $RESULT check-refs.nix -A test7
 # test10 should succeed (no disallowed references).
 nix-build -o $RESULT check-refs.nix -A test10
 
-if isDaemonNewer 2.12pre20230103; then
+if isDaemonNewer 2.12pre20230103 && canEnable discard-references; then
     enableFeatures discard-references
     restartDaemon
 

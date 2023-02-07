@@ -1,5 +1,7 @@
 source common.sh
 
+enableFeatures nix-command
+
 if [[ -z $(type -p git) ]]; then
     echo "Git not installed; skipping Git tests"
     exit 99
@@ -36,6 +38,7 @@ git -C $repo tag -a tag2 -m tag2
 # Fetch a worktree
 unset _NIX_FORCE_HTTP
 path0=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$TEST_ROOT/worktree).outPath")
+enableFeatures flakes
 path0_=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; url = file://$TEST_ROOT/worktree; }).outPath")
 [[ $path0 = $path0_ ]]
 export _NIX_FORCE_HTTP=1

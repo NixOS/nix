@@ -1,5 +1,7 @@
 source common.sh
 
+enableFeatures nix-command
+
 clearStore
 
 set -o pipefail

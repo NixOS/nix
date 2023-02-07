@@ -1,5 +1,7 @@
 source common.sh
 
+enableFeatures nix-command
+
 clearProfiles
 
 rm -f $TEST_HOME/.nix-channels $TEST_HOME/.nix-profile

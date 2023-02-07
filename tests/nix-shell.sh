@@ -84,6 +84,8 @@ chmod a+rx $TEST_ROOT/spaced\ \\\'\"shell.shebang.rb
 output=$($TEST_ROOT/spaced\ \\\'\"shell.shebang.rb abc ruby)
 [ "$output" = '-e load(ARGV.shift) -- '"$TEST_ROOT"'/spaced \'\''"shell.shebang.rb abc ruby' ]
 
+enableFeatures nix-command
+
 # Test 'nix develop'.
 nix develop -f "$shellDotNix" shellDrv -c bash -c '[[ -n $stdenv ]]'
 

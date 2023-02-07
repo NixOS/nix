@@ -1,5 +1,8 @@
 source common.sh
 
+unknownFailsOnNixOS # nix-store: error while loading shared libraries: libaws-cpp-sdk-s3.so: cannot open shared object file: Error 24
+enableFeatures nix-command
+
 echo foo > $TEST_ROOT/hello.sh
 
 ssh_localhost=ssh://localhost

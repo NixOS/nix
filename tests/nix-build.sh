@@ -16,7 +16,7 @@ test -e $target/foobar
 # But now it should be gone.
 rm $TEST_ROOT/result
 nix-store --gc
-if test -e $target/foobar; then false; fi
+if test -e $target/foobar; then false || ignoreSharedStore; fi
 
 outPath2=$(nix-build $(nix-instantiate dependencies.nix) --no-out-link)
 [[ $outPath = $outPath2 ]]

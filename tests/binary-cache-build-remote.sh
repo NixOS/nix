@@ -1,5 +1,8 @@
 source common.sh
 
+enableFeatures nix-command
+unknownFailsOnNixOS # fails because of path may have been built and not gc-ed; generate unique derivation?
+
 clearStore
 clearCacheCache
 

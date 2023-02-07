@@ -1,5 +1,10 @@
 source common.sh
 
+enableFeatures nix-command
+if isTestOnSystemNix && ! isTrustedUser; then
+    exit 99
+fi
+
 clearStore
 clearCache
 

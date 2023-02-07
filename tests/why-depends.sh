@@ -1,5 +1,7 @@
 source common.sh
 
+enableFeatures nix-command
+
 clearStore
 
 cp ./dependencies.nix ./dependencies.builder0.sh ./config.nix $TEST_HOME

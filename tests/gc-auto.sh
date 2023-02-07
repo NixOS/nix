@@ -1,6 +1,10 @@
 source common.sh
 
+requireHackableStore
+
 needLocalStore "“min-free” and “max-free” are daemon options"
+
+enableFeatures nix-command
 
 clearStore
 

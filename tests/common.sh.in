@@ -5,6 +5,32 @@ if [[ -z "$COMMON_SH_SOURCED" ]]; then
 COMMON_SH_SOURCED=1
 
 export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)/${TEST_NAME:-default}
+
+unset NIX_PATH
+unset NIX_USER_CONF_FILES
+unset XDG_CONFIG_HOME
+unset XDG_CONFIG_DIRS
+unset XDG_CACHE_HOME
+export TEST_HOME="$TEST_ROOT/test-home"
+export HOME="$TEST_HOME"
+mkdir -p "$TEST_HOME"
+
+if [[ "${TEST_SYSTEM_NIX:-}" == 1 ]]; then
+  export NIX_STORE_DIR=/nix/store
+
+  export NIX_CONF_DIR="$HOME/.config/nix"
+  mkdir -p "$NIX_CONF_DIR"
+  echo "experimental-features =" > "$NIX_CONF_DIR/nix.conf"
+
+  # When we're doing everything in the same store, we need to bring
+  # dependencies into context.
+  sed -i "$(dirname "${BASH_SOURCE[0]}")"/config.nix \
+    -e 's^\(shell\) = "/nix/store/\([^/]*\)/\(.*\)";^\1 = builtins.storePath "/nix/store/\2" + "/\3";^' \
+    -e 's^\(path\) = "/nix/store/\([^/]*\)/\(.*\)";^\1 = builtins.storePath "/nix/store/\2" + "/\3";^' \
+    ;
+
+else
+
 export NIX_STORE_DIR
 if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store 2> /dev/null); then
     # Maybe the build directory is symlinked.
@@ -16,7 +42,6 @@ export NIX_LOG_DIR=$TEST_ROOT/var/log/nix
 export NIX_STATE_DIR=$TEST_ROOT/var/nix
 export NIX_CONF_DIR=$TEST_ROOT/etc
 export NIX_DAEMON_SOCKET_PATH=$TEST_ROOT/dSocket
-unset NIX_USER_CONF_FILES
 export _NIX_TEST_SHARED=$TEST_ROOT/shared
 if [[ -n $NIX_STORE ]]; then
     export _NIX_TEST_NO_SANDBOX=1
@@ -24,13 +49,6 @@ fi
 export _NIX_IN_TEST=$TEST_ROOT/shared
 export _NIX_TEST_NO_LSOF=1
 export NIX_REMOTE=$NIX_REMOTE_
-unset NIX_PATH
-export TEST_HOME=$TEST_ROOT/test-home
-export HOME=$TEST_HOME
-unset XDG_CONFIG_HOME
-unset XDG_CONFIG_DIRS
-unset XDG_CACHE_HOME
-mkdir -p $TEST_HOME
 
 export PATH=@bindir@:$PATH
 if [[ -n "${NIX_CLIENT_PACKAGE:-}" ]]; then
@@ -40,14 +58,18 @@ DAEMON_PATH="$PATH"
 if [[ -n "${NIX_DAEMON_PACKAGE:-}" ]]; then
   DAEMON_PATH="${NIX_DAEMON_PACKAGE}/bin:$DAEMON_PATH"
 fi
-coreutils=@coreutils@
+
+export version=@PACKAGE_VERSION@
+
+fi
+
+export coreutils=@coreutils@
 
 export dot=@dot@
 export SHELL="@bash@"
 export PAGER=cat
 export busybox="@sandbox_shell@"
 
-export version=@PACKAGE_VERSION@
 export system=@system@
 
 export BUILD_SHARED_LIBS=@BUILD_SHARED_LIBS@
@@ -180,7 +202,11 @@ buggyNeedLocalStore() {
 }
 
 enableFeatures() {
-    local features="$1"
+    local features="$*"
+    if ! grep experimental-features "$NIX_CONF_DIR"/nix.conf; then
+      mkdir -p "$NIX_CONF_DIR"
+      echo 'experimental-features =' >>"$NIX_CONF_DIR"/nix.conf
+    fi
     sed -i 's/experimental-features .*/& '"$features"'/' "$NIX_CONF_DIR"/nix.conf
 }
 
@@ -200,5 +226,82 @@ onError() {
 }
 
 trap onError ERR
+
+isTestOnSystemNix() {
+  [[ "${TEST_SYSTEM_NIX:-}" = 1 ]]
+}
+
+requireHackableStore() {
+  if isTestOnSystemNix; then
+    return 99
+  fi
+}
+
+needTrustedUser() {
+  return 0
+}
+
+canEnable() {
+  local feature="$1"
+  true
+}
+
+unknownFailsOnNixOS() {
+  return 0
+}
+
+isTestTrustedUser() {
+  true
+}
+
+if [[ "${TEST_SYSTEM_NIX:-}" = 1 ]]; then
+
+  clearStore() {
+    echo "clearStore may not work: can only gc..."
+    nix-collect-garbage
+  }
+
+  canUseSandbox() {
+    true
+  }
+
+  canEnable() {
+    false
+  }
+
+  isTestTrustedUser() {
+    [[ "${TEST_TRUSTED_USER:-}" == 1 ]]
+  }
+
+  needTrustedUser() {
+    # FIXME use this
+    if ! isTestTrustedUser; then
+      return 99
+    fi
+  }
+
+  unknownFailsOnNixOS() {
+    return 99
+  }
+
+fi
+
+requireUnsandboxedBuild() {
+  if isTestOnSystemNix; then
+    exit 99
+  fi
+}
+
+unknownBuiltinsStorePath() {
+  unknownFailsOnNixOS
+}
+
+ignoreSharedStore() {
+  if isTestOnSystemNix; then
+    echo 1>&2 "ignoring result because store is shared and likely spoiled by unrelated usage"
+  else
+    return 1
+  fi
+}
 
 fi # COMMON_SH_SOURCED

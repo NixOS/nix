@@ -1,5 +1,7 @@
 source common.sh
 
+requireHackableStore
+
 clearStore
 
 outPath=$(nix-build dependencies.nix --no-out-link)

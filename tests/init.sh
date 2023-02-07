@@ -1,5 +1,15 @@
 source common.sh
 
+if isTestOnSystemNix then
+    # The test framework is written to work with a single store, of which the
+    # details depend on the environment where the tests run.
+    # That makes reconfiguring just this test to init a _different_ store when
+    # running on NixOS harder than necessary; not currently worthwhile; tech debt.
+    # So, we rely on the regular in-derivation package tests to test the ability
+    # to initialize a store.
+    exit 99
+fi
+
 test -n "$TEST_ROOT"
 if test -d "$TEST_ROOT"; then
     chmod -R u+w "$TEST_ROOT"

@@ -9,6 +9,8 @@ NIX_STORE_DIR=$TEST_ROOT/x
 
 CORRECT_PATH=$(nix-store --store ./x --add example.txt)
 
+enableFeatures nix-command
+
 PATH1=$(nix path-info --store ./x $CORRECT_PATH)
 [ $CORRECT_PATH == $PATH1 ]
 

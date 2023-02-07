@@ -8,6 +8,10 @@ source common.sh
 #nix-instantiate --help | grep -q eval
 #nix-hash --help | grep -q base32
 
+# debug:
+nix-env --version
+which nix-env
+
 # Can we ask for the version number?
 nix-env --version | grep "$version"
 

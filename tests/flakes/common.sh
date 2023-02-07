@@ -1,5 +1,7 @@
 source ../common.sh
 
+enableFeatures nix-command flakes
+
 registry=$TEST_ROOT/registry.json
 
 requireGit() {

@@ -1,5 +1,7 @@
 source common.sh
 
+enableFeatures nix-command
+
 try () {
     printf "%s" "$2" > $TEST_ROOT/vector
     hash=$(nix hash file --base16 $EXTRA --type "$1" $TEST_ROOT/vector)

@@ -1,5 +1,7 @@
 source common.sh
 
+enableFeatures nix-command
+
 clearStore
 
 testStdinHeredoc=$(nix eval -f - <<EOF

@@ -2,6 +2,13 @@ source common.sh
 
 clearStore
 
+# On NixOS the test suite uses builtins.storePath to add a bash and coreutils to
+# mkDerivation. This solution is technically the right solution, but it does
+# extend the evaluation inputs in a way that restricted mode should prevent.
+# Hence, we only test restricted mode with an unsandboxed build, so that we can
+# hack the dependencies in out of sight of the evaluator and nix store.
+requireUnsandboxedBuild
+
 nix-instantiate --restrict-eval --eval -E '1 + 2'
 (! nix-instantiate --eval --restrict-eval ./restricted.nix)
 (! nix-instantiate --eval --restrict-eval <(echo '1 + 2'))
@@ -19,6 +26,8 @@ nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; p
 
 # no default NIX_PATH
 (unset NIX_PATH; ! nix-instantiate --restrict-eval --find-file .)
+
+enableFeatures nix-command
 
 p=$(nix eval --raw --expr "builtins.fetchurl file://$(pwd)/restricted.sh" --impure --restrict-eval --allowed-uris "file://$(pwd)")
 cmp $p restricted.sh
@@ -40,7 +49,7 @@ ln -sfn $(pwd)/restricted.nix $TEST_ROOT/restricted.nix
 (! nix-instantiate --eval --restrict-eval $TEST_ROOT/restricted.nix -I .)
 nix-instantiate --eval --restrict-eval $TEST_ROOT/restricted.nix -I $TEST_ROOT -I .
 
-[[ $(nix eval --raw --impure --restrict-eval -I . --expr 'builtins.readFile "${import ./simple.nix}/hello"') == 'Hello World!' ]]
+[[ $(nix eval --raw --impure --restrict-eval -Iallow1=$SHELL -I allow2=$coreutils -I . --expr 'builtins.readFile "${import ./simple.nix}/hello"') == 'Hello World!' ]]
 
 # Check whether we can leak symlink information through directory traversal.
 traverseDir="$(pwd)/restricted-traverse-me"

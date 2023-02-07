@@ -1,5 +1,7 @@
 source common.sh
 
+enableFeatures nix-command
+
 path=$(nix build --no-link --print-out-paths -f simple.nix)
 
 hash_part=$(basename $path)

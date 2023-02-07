@@ -4,9 +4,15 @@
 
 source common.sh
 
-clearStore
+if isTestOnSystemNix; then
+    if isTrustedUser; then
+        exit 99
+    fi
+else
+    clearStore
 
-startDaemon
+    startDaemon
+fi
 
 # Determine the output path of the "good" derivation.
 goodOut=$(nix-store -q $(nix-instantiate ./secure-drv-outputs.nix -A good))

@@ -2,6 +2,8 @@ source common.sh
 
 needLocalStore "--repair needs a local store"
 
+requireHackableStore
+
 clearStore
 
 path=$(nix-build dependencies.nix -o $TEST_ROOT/result)

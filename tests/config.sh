@@ -1,5 +1,7 @@
 source common.sh
 
+enableFeatures nix-command flakes
+
 # Isolate the home for this test.
 # Other tests (e.g. flake registry tests) could be writing to $HOME in parallel.
 export HOME=$TEST_ROOT/userhome
@@ -16,6 +18,7 @@ nix registry remove userhome-without-xdg
 [ -e "$HOME/.config" ]
 # Remove the directory it created
 rm -rf "$HOME/.config"
+
 # Run the same test, but with XDG_CONFIG_HOME
 export XDG_CONFIG_HOME=$TEST_ROOT/confighome
 # Assert the XDG_CONFIG_HOME/nix path does not exist yet.

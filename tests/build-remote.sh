@@ -1,6 +1,8 @@
 if ! canUseSandbox; then exit 99; fi
 if ! [[ $busybox =~ busybox ]]; then exit 99; fi
 
+enableFeatures nix-command
+
 unset NIX_STORE_DIR
 unset NIX_STATE_DIR
 

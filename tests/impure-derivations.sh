@@ -2,7 +2,12 @@ source common.sh
 
 requireDaemonNewerThan "2.8pre20220311"
 
-enableFeatures "ca-derivations impure-derivations"
+if ! canEnable "ca-derivations"; then
+    exit 99
+fi
+
+enableFeatures "ca-derivations impure-derivations nix-command"
+
 restartDaemon
 
 set -o pipefail
