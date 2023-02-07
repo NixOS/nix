@@ -39,7 +39,12 @@ bool userNamespacesSupported()
             _exit(res ? 1 : 0);
         });
 
-        return pid.wait() == 0;
+        bool supported = pid.wait() == 0;
+
+        if (!supported)
+            debug("user namespaces do not work on this system");
+
+        return supported;
     }();
     return res;
 }
@@ -56,7 +61,12 @@ bool mountNamespacesSupported()
             _exit(res ? 1 : 0);
         });
 
-        return pid.wait() == 0;
+        bool supported = pid.wait() == 0;
+
+        if (!supported)
+            debug("mount namespaces do not work on this system");
+
+        return supported;
     }();
     return res;
 }
