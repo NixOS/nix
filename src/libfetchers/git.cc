@@ -620,7 +620,7 @@ struct GitInputScheme : InputScheme
                 // TODO: repoDir might lack the ref (it only checks if rev
                 // exists, see FIXME above) so use a big hammer and fetch
                 // everything to ensure we get the rev.
-                Activity act(*logger, lvlTalkative, actUnknown, fmt("making temporary clone of '%s'", tmpDir));
+                Activity act(*logger, lvlTalkative, actUnknown, fmt("making temporary clone of '%s'", repoDir));
                 runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
                         "--update-head-ok", "--", repoDir, "refs/*:refs/*" });
             }
@@ -648,7 +648,7 @@ struct GitInputScheme : InputScheme
             }
 
             {
-                Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching submodules of '%s'", tmpDir));
+                Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching submodules of '%s'", repoDir));
                 runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
             }
 
