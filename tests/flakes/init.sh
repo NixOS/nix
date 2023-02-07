@@ -41,8 +41,8 @@ cat > $templatesDir/trivial/flake.nix <<EOF
   description = "A flake for building Hello World";
 
   outputs = { self, nixpkgs }: {
-    packages.x86_64-linux = rec {
-      hello = nixpkgs.legacyPackages.x86_64-linux.hello;
+    packages.$system = rec {
+      hello = nixpkgs.legacyPackages.$system.hello;
       default = hello;
     };
   };

@@ -215,17 +215,15 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
     out << dt.hint.str() << "\n";
 
     // prefer direct pos, but if noPos then try the expr.
-    auto pos = *dt.pos
-        ? *dt.pos
-        : positions[dt.expr.getPos() ? dt.expr.getPos() : noPos];
+    auto pos = dt.pos
+        ? dt.pos
+        : static_cast<std::shared_ptr<AbstractPos>>(positions[dt.expr.getPos() ? dt.expr.getPos() : noPos]);
 
     if (pos) {
-        printAtPos(pos, out);
-
-        auto loc = getCodeLines(pos);
-        if (loc.has_value()) {
+        out << pos;
+        if (auto loc = pos->getCodeLines()) {
             out << "\n";
-            printCodeLines(out, "", pos, *loc);
+            printCodeLines(out, "", *pos, *loc);
             out << "\n";
         }
     }
@@ -399,7 +397,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             Expr * e = parseString(expr);
             Value v;
             e->eval(*state, *env, v);
-            state->forceAttrs(v, noPos);
+            state->forceAttrs(v, noPos, "while evaluating an attrset for the purpose of completion (this error should not be displayed; file an issue?)");
 
             for (auto & i : *v.attrs) {
                 std::string_view name = state->symbols[i.name];
@@ -589,15 +587,17 @@ bool NixRepl::processLine(std::string line)
         Value v;
         evalString(arg, v);
 
-        const auto [file, line] = [&] () -> std::pair<std::string, uint32_t> {
+        const auto [path, line] = [&] () -> std::pair<Path, uint32_t> {
             if (v.type() == nPath || v.type() == nString) {
                 PathSet context;
-                auto filename = state->coerceToString(noPos, v, context).toOwned();
-                state->symbols.create(filename);
-                return {filename, 0};
+                auto path = state->coerceToPath(noPos, v, context, "while evaluating the filename to edit");
+                return {path, 0};
             } else if (v.isLambda()) {
                 auto pos = state->positions[v.lambda.fun->pos];
-                return {pos.file, pos.line};
+                if (auto path = std::get_if<Path>(&pos.origin))
+                    return {*path, pos.line};
+                else
+                    throw Error("'%s' cannot be shown in an editor", pos);
             } else {
                 // assume it's a derivation
                 return findPackageFilename(*state, v, arg);
@@ -605,7 +605,7 @@ bool NixRepl::processLine(std::string line)
         }();
 
         // Open in EDITOR
-        auto args = editorFor(file, line);
+        auto args = editorFor(path, line);
         auto editor = args.front();
         args.pop_front();
 
@@ -641,7 +641,12 @@ bool NixRepl::processLine(std::string line)
         Path drvPathRaw = state->store->printStorePath(drvPath);
 
         if (command == ":b" || command == ":bl") {
-            state->store->buildPaths({DerivedPath::Built{drvPath}});
+            state->store->buildPaths({
+                DerivedPath::Built {
+                    .drvPath = drvPath,
+                    .outputs = OutputsSpec::All { },
+                },
+            });
             auto drv = state->store->readDerivation(drvPath);
             logger->cout("\nThis derivation produced the following outputs:");
             for (auto & [outputName, outputPath] : state->store->queryDerivationOutputMap(drvPath)) {
@@ -834,7 +839,7 @@ void NixRepl::loadFiles()
 
 void NixRepl::addAttrsToScope(Value & attrs)
 {
-    state->forceAttrs(attrs, [&]() { return attrs.determinePos(noPos); });
+    state->forceAttrs(attrs, [&]() { return attrs.determinePos(noPos); }, "while evaluating an attribute set to be merged in the global scope");
     if (displ + attrs.attrs->size() >= envSize)
         throw Error("environment full; cannot add more variables");
 
@@ -939,7 +944,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
             Bindings::iterator i = v.attrs->find(state->sDrvPath);
             PathSet context;
             if (i != v.attrs->end())
-                str << state->store->printStorePath(state->coerceToStorePath(i->pos, *i->value, context));
+                str << state->store->printStorePath(state->coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation"));
             else
                 str << "???";
             str << "»";

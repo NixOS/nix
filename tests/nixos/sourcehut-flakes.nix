@@ -1,12 +1,8 @@
-{ nixpkgs, system, overlay }:
-
-with import (nixpkgs + "/nixos/lib/testing-python.nix")
-{
-  inherit system;
-  extraConfigurations = [{ nixpkgs.overlays = [ overlay ]; }];
-};
+{ lib, config, hostPkgs, nixpkgs, ... }:
 
 let
+  pkgs = config.nodes.sourcehut.nixpkgs.pkgs;
+
   # Generate a fake root CA and a fake git.sr.ht certificate.
   cert = pkgs.runCommand "cert" { buildInputs = [ pkgs.openssl ]; }
     ''
@@ -64,8 +60,6 @@ let
 
 in
 
-makeTest (
-
   {
     name = "sourcehut-flakes";
 
@@ -108,7 +102,7 @@ makeTest (
             virtualisation.diskSize = 2048;
             virtualisation.additionalPaths = [ pkgs.hello pkgs.fuse ];
             virtualisation.memorySize = 4096;
-            nix.binaryCaches = lib.mkForce [ ];
+            nix.settings.substituters = lib.mkForce [ ];
             nix.extraOptions = ''
               experimental-features = nix-command flakes
               flake-registry = https://git.sr.ht/~NixOS/flake-registry/blob/master/flake-registry.json
@@ -164,4 +158,4 @@ makeTest (
       client.succeed("nix build nixpkgs#fuse --tarball-ttl 0")
     '';
 
-  })
+}

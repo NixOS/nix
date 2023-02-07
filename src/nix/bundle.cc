@@ -75,10 +75,10 @@ struct CmdBundle : InstallableCommand
 
         auto val = installable->toValue(*evalState).first;
 
-        auto [bundlerFlakeRef, bundlerName, outputsSpec] = parseFlakeRefWithFragmentAndOutputsSpec(bundler, absPath("."));
+        auto [bundlerFlakeRef, bundlerName, extendedOutputsSpec] = parseFlakeRefWithFragmentAndExtendedOutputsSpec(bundler, absPath("."));
         const flake::LockFlags lockFlags{ .writeLockFile = false };
         InstallableFlake bundler{this,
-            evalState, std::move(bundlerFlakeRef), bundlerName, outputsSpec,
+            evalState, std::move(bundlerFlakeRef), bundlerName, extendedOutputsSpec,
             {"bundlers." + settings.thisSystem.get() + ".default",
              "defaultBundler." + settings.thisSystem.get()
             },
@@ -97,15 +97,20 @@ struct CmdBundle : InstallableCommand
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
         PathSet context2;
-        auto drvPath = evalState->coerceToStorePath(attr1->pos, *attr1->value, context2);
+        auto drvPath = evalState->coerceToStorePath(attr1->pos, *attr1->value, context2, "");
 
         auto attr2 = vRes->attrs->get(evalState->sOutPath);
         if (!attr2)
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
-        auto outPath = evalState->coerceToStorePath(attr2->pos, *attr2->value, context2);
+        auto outPath = evalState->coerceToStorePath(attr2->pos, *attr2->value, context2, "");
 
-        store->buildPaths({ DerivedPath::Built { drvPath } });
+        store->buildPaths({
+            DerivedPath::Built {
+                .drvPath = drvPath,
+                .outputs = OutputsSpec::All { },
+            },
+        });
 
         auto outPathS = store->printStorePath(outPath);
 
@@ -113,7 +118,7 @@ struct CmdBundle : InstallableCommand
             auto * attr = vRes->attrs->get(evalState->sName);
             if (!attr)
                 throw Error("attribute 'name' missing");
-            outLink = evalState->forceStringNoCtx(*attr->value, attr->pos);
+            outLink = evalState->forceStringNoCtx(*attr->value, attr->pos, "");
         }
 
         // TODO: will crash if not a localFSStore?

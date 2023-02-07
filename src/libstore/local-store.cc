@@ -91,6 +91,7 @@ void migrateCASchema(SQLite& db, Path schemaPath, AutoCloseFD& lockFd)
 
         if (!lockFile(lockFd.get(), ltWrite, false)) {
             printInfo("waiting for exclusive access to the Nix store for ca drvs...");
+            lockFile(lockFd.get(), ltNone, false); // We have acquired a shared lock; release it to prevent deadlocks
             lockFile(lockFd.get(), ltWrite, true);
         }
 
@@ -200,8 +201,6 @@ LocalStore::LocalStore(const Params & params)
             throw SysError("could not set permissions on '%s' to 755", perUserDir);
     }
 
-    createUser(getUserName(), getuid());
-
     /* Optionally, create directories and set permissions for a
        multi-user install. */
     if (getuid() == 0 && settings.buildUsersGroup != "") {
@@ -299,6 +298,7 @@ LocalStore::LocalStore(const Params & params)
 
         if (!lockFile(globalLock.get(), ltWrite, false)) {
             printInfo("waiting for exclusive access to the Nix store...");
+            lockFile(globalLock.get(), ltNone, false); // We have acquired a shared lock; release it to prevent deadlocks
             lockFile(globalLock.get(), ltWrite, true);
         }
 
@@ -439,9 +439,9 @@ LocalStore::~LocalStore()
     }
 
     try {
-        auto state(_state.lock());
-        if (state->fdTempRoots) {
-            state->fdTempRoots = -1;
+        auto fdTempRoots(_fdTempRoots.lock());
+        if (*fdTempRoots) {
+            *fdTempRoots = -1;
             unlink(fnTempRoots.c_str());
         }
     } catch (...) {
@@ -1821,20 +1821,6 @@ void LocalStore::signPathInfo(ValidPathInfo & info)
     }
 }
 
-
-void LocalStore::createUser(const std::string & userName, uid_t userId)
-{
-    for (auto & dir : {
-        fmt("%s/profiles/per-user/%s", stateDir, userName),
-        fmt("%s/gcroots/per-user/%s", stateDir, userName)
-    }) {
-        createDirs(dir);
-        if (chmod(dir.c_str(), 0755) == -1)
-            throw SysError("changing permissions of directory '%s'", dir);
-        if (chown(dir.c_str(), userId, getgid()) == -1)
-            throw SysError("changing owner of directory '%s'", dir);
-    }
-}
 
 std::optional<std::pair<int64_t, Realisation>> LocalStore::queryRealisationCore_(
         LocalStore::State & state,

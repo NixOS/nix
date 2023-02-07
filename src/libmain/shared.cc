@@ -235,6 +235,7 @@ void initNix()
 #endif
 
     preloadNSS();
+    initLibStore();
 }
 
 
@@ -362,6 +363,7 @@ void printVersion(const std::string & programName)
             << "\n";
         std::cout << "Store directory: " << settings.nixStore << "\n";
         std::cout << "State directory: " << settings.nixStateDir << "\n";
+        std::cout << "Data directory: " << settings.nixDataDir << "\n";
     }
     throw Exit();
 }
@@ -402,8 +404,6 @@ int handleExceptions(const std::string & programName, std::function<void()> fun)
         return 1;
     } catch (BaseError & e) {
         logError(e.info());
-        if (e.hasTrace() && !loggerSettings.showTrace.get())
-            printError("(use '--show-trace' to show detailed location information)");
         return e.status;
     } catch (std::bad_alloc & e) {
         printError(error + "out of memory");

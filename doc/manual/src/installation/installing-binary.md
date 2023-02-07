@@ -120,10 +120,10 @@ sudo rm -rf /nix /etc/nix /etc/profile/nix.sh ~root/.nix-profile ~root/.nix-defe
 Remove build users and their group:
 
 ```console
-for i in $(seq 30001 30032); do
-  sudo userdel $i
+for i in $(seq 1 32); do
+  sudo userdel nixbld$i
 done
-sudo groupdel 30000
+sudo groupdel nixbld
 ```
 
 There may also be references to Nix in

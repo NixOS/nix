@@ -34,11 +34,6 @@ namespace nix {
         Path basePath;
         PosTable::Origin origin;
         std::optional<ErrorInfo> error;
-        ParseData(EvalState & state, PosTable::Origin origin)
-            : state(state)
-            , symbols(state.symbols)
-            , origin(std::move(origin))
-            { };
     };
 
     struct ParserFormals {
@@ -405,21 +400,21 @@ expr_op
   | '-' expr_op %prec NEGATE { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__sub")), {new ExprInt(0), $2}); }
   | expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
   | expr_op NEQ expr_op { $$ = new ExprOpNEq($1, $3); }
-  | expr_op '<' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$1, $3}); }
-  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$3, $1})); }
-  | expr_op '>' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$3, $1}); }
-  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$1, $3})); }
-  | expr_op AND expr_op { $$ = new ExprOpAnd(CUR_POS, $1, $3); }
-  | expr_op OR expr_op { $$ = new ExprOpOr(CUR_POS, $1, $3); }
-  | expr_op IMPL expr_op { $$ = new ExprOpImpl(CUR_POS, $1, $3); }
-  | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(CUR_POS, $1, $3); }
+  | expr_op '<' expr_op { $$ = new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__lessThan")), {$1, $3}); }
+  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__lessThan")), {$3, $1})); }
+  | expr_op '>' expr_op { $$ = new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__lessThan")), {$3, $1}); }
+  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__lessThan")), {$1, $3})); }
+  | expr_op AND expr_op { $$ = new ExprOpAnd(makeCurPos(@2, data), $1, $3); }
+  | expr_op OR expr_op { $$ = new ExprOpOr(makeCurPos(@2, data), $1, $3); }
+  | expr_op IMPL expr_op { $$ = new ExprOpImpl(makeCurPos(@2, data), $1, $3); }
+  | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(makeCurPos(@2, data), $1, $3); }
   | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, *$3); }
   | expr_op '+' expr_op
-    { $$ = new ExprConcatStrings(CUR_POS, false, new std::vector<std::pair<PosIdx, Expr *>>({{makeCurPos(@1, data), $1}, {makeCurPos(@3, data), $3}})); }
-  | expr_op '-' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__sub")), {$1, $3}); }
-  | expr_op '*' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__mul")), {$1, $3}); }
-  | expr_op '/' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__div")), {$1, $3}); }
-  | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(CUR_POS, $1, $3); }
+    { $$ = new ExprConcatStrings(makeCurPos(@2, data), false, new std::vector<std::pair<PosIdx, Expr *> >({{makeCurPos(@1, data), $1}, {makeCurPos(@3, data), $3}})); }
+  | expr_op '-' expr_op { $$ = new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__sub")), {$1, $3}); }
+  | expr_op '*' expr_op { $$ = new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__mul")), {$1, $3}); }
+  | expr_op '/' expr_op { $$ = new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__div")), {$1, $3}); }
+  | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(makeCurPos(@2, data), $1, $3); }
   | expr_app
   ;
 
@@ -649,24 +644,20 @@ formal
 namespace nix {
 
 
-Expr * EvalState::parse(char * text, size_t length, FileOrigin origin,
-    const PathView path, const PathView basePath, std::shared_ptr<StaticEnv> & staticEnv)
+Expr * EvalState::parse(
+    char * text,
+    size_t length,
+    Pos::Origin origin,
+    Path basePath,
+    std::shared_ptr<StaticEnv> & staticEnv)
 {
     yyscan_t scanner;
-    std::string file;
-    switch (origin) {
-        case foFile:
-            file = path;
-            break;
-        case foStdin:
-        case foString:
-            file = text;
-            break;
-        default:
-            assert(false);
-    }
-    ParseData data(*this, {file, origin});
-    data.basePath = basePath;
+    ParseData data {
+        .state = *this,
+        .symbols = symbols,
+        .basePath = std::move(basePath),
+        .origin = {origin},
+    };
 
     yylex_init(&scanner);
     yy_scan_buffer(text, length, scanner);
@@ -718,14 +709,15 @@ Expr * EvalState::parseExprFromFile(const Path & path, std::shared_ptr<StaticEnv
     auto buffer = readFile(path);
     // readFile should have left some extra space for terminators
     buffer.append("\0\0", 2);
-    return parse(buffer.data(), buffer.size(), foFile, path, dirOf(path), staticEnv);
+    return parse(buffer.data(), buffer.size(), path, dirOf(path), staticEnv);
 }
 
 
-Expr * EvalState::parseExprFromString(std::string s, const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv)
+Expr * EvalState::parseExprFromString(std::string s_, const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv)
 {
-    s.append("\0\0", 2);
-    return parse(s.data(), s.size(), foString, "", basePath, staticEnv);
+    auto s = make_ref<std::string>(std::move(s_));
+    s->append("\0\0", 2);
+    return parse(s->data(), s->size(), Pos::String{.source = s}, basePath, staticEnv);
 }
 
 
@@ -741,7 +733,8 @@ Expr * EvalState::parseStdin()
     auto buffer = drainFD(0);
     // drainFD should have left some extra space for terminators
     buffer.append("\0\0", 2);
-    return parse(buffer.data(), buffer.size(), foStdin, "", absPath("."), staticBaseEnv);
+    auto s = make_ref<std::string>(std::move(buffer));
+    return parse(s->data(), s->size(), Pos::Stdin{.source = s}, absPath("."), staticBaseEnv);
 }
 
 
@@ -789,13 +782,13 @@ Path EvalState::findFile(SearchPath & searchPath, const std::string_view path, c
     if (hasPrefix(path, "nix/"))
         return concatStrings(corepkgsPrefix, path.substr(4));
 
-    debugThrowLastTrace(ThrownError({
+    debugThrow(ThrownError({
         .msg = hintfmt(evalSettings.pureEval
             ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"
             : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)",
             path),
         .errPos = positions[pos]
-    }));
+    }), 0, 0);
 }
 
 

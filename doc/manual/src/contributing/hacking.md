@@ -45,13 +45,13 @@ To get a shell with a different compilation environment (e.g. stdenv,
 gccStdenv, clangStdenv, clang11Stdenv, ccacheStdenv):
 
 ```console
-$ nix-shell -A devShells.x86_64-linux.clang11StdenvPackages
+$ nix-shell -A devShells.x86_64-linux.clang11Stdenv
 ```
 
 or if you have a flake-enabled nix:
 
 ```console
-$ nix develop .#clang11StdenvPackages
+$ nix develop .#clang11Stdenv
 ```
 
 Note: you can use `ccacheStdenv` to drastically improve rebuild
@@ -92,15 +92,87 @@ $ nix develop
 
 The unit-tests for each Nix library (`libexpr`, `libstore`, etc..) are defined
 under `src/{library_name}/tests` using the
-[googletest](https://google.github.io/googletest/) framework.
+[googletest](https://google.github.io/googletest/) and
+[rapidcheck](https://github.com/emil-e/rapidcheck) frameworks.
 
 You can run the whole testsuite with `make check`, or the tests for a specific component with `make libfoo-tests_RUN`. Finer-grained filtering is also possible using the [--gtest_filter](https://google.github.io/googletest/advanced.html#running-a-subset-of-the-tests) command-line option.
 
 ### Functional tests
 
 The functional tests reside under the `tests` directory and are listed in `tests/local.mk`.
-The whole testsuite can be run with `make install && make installcheck`.
-Individual tests can be run with `make tests/{testName}.sh.test`.
+Each test is a bash script.
+
+The whole test suite can be run with:
+
+```shell-session
+$ make install && make installcheck
+ran test tests/foo.sh... [PASS]
+ran test tests/bar.sh... [PASS]
+...
+```
+
+Individual tests can be run with `make`:
+
+```shell-session
+$ make tests/${testName}.sh.test
+ran test tests/${testName}.sh... [PASS]
+```
+
+or without `make`:
+
+```shell-session
+$ ./mk/run-test.sh tests/${testName}.sh
+ran test tests/${testName}.sh... [PASS]
+```
+
+To see the complete output, one can also run:
+
+```shell-session
+$ ./mk/debug-test.sh tests/${testName}.sh
++ foo
+output from foo
++ bar
+output from bar
+...
+```
+
+The test script will then be traced with `set -x` and the output displayed as it happens, regardless of whether the test succeeds or fails.
+
+#### Debugging failing functional tests
+
+When a functional test fails, it usually does so somewhere in the middle of the script.
+
+To figure out what's wrong, it is convenient to run the test regularly up to the failing `nix` command, and then run that command with a debugger like GDB.
+
+For example, if the script looks like:
+
+```bash
+foo
+nix blah blub
+bar
+```
+edit it like so:
+
+```diff
+ foo
+-nix blah blub
++gdb --args nix blah blub
+ bar
+```
+
+Then, running the test with `./mk/debug-test.sh` will drop you into GDB once the script reaches that point:
+
+```shell-session
+$ ./mk/debug-test.sh tests/${testName}.sh
+...
++ gdb blash blub
+GNU gdb (GDB) 12.1
+...
+(gdb)
+```
+
+One can debug the Nix invocation in all the usual ways.
+For example, enter `run` to start the Nix invocation.
 
 ### Integration tests
 
@@ -178,3 +250,36 @@ search/replaced in it for each new build.
 The installer now supports a `--tarball-url-prefix` flag which _may_ have
 solved this need?
 -->
+
+### Checking links in the manual
+
+The build checks for broken internal links.
+This happens late in the process, so `nix build` is not suitable for iterating.
+To build the manual incrementally, run:
+
+```console
+make html -j $NIX_BUILD_CORES
+```
+
+In order to reflect changes to the [Makefile], clear all generated files before re-building:
+
+[Makefile]: https://github.com/NixOS/nix/blob/master/doc/manual/local.mk
+
+```console
+rm $(git ls-files doc/manual/ -o | grep -F '.md') && rmdir doc/manual/src/command-ref/new-cli && make html -j $NIX_BUILD_CORES
+```
+
+[`mdbook-linkcheck`] does not implement checking [URI fragments] yet.
+
+[`mdbook-linkcheck`]: https://github.com/Michael-F-Bryan/mdbook-linkcheck
+[URI fragments]: https://en.m.wikipedia.org/wiki/URI_fragment
+
+#### `@docroot@` variable
+
+`@docroot@` provides a base path for links that occur in reusable snippets or other documentation that doesn't have a base path of its own.
+
+If a broken link occurs in a snippet that was inserted into multiple generated files in different directories, use `@docroot@` to reference the `doc/manual/src` directory.
+
+If the `@docroot@` literal appears in an error message from the `mdbook-linkcheck` tool, the `@docroot@` replacement needs to be applied to the generated source file that mentions it.
+See existing `@docroot@` logic in the [Makefile].
+Regular markdown files used for the manual have a base path of their own and they can use relative paths instead of `@docroot@`.

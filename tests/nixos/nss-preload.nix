@@ -1,11 +1,9 @@
-{ nixpkgs, system, overlay }:
-
-with import (nixpkgs + "/nixos/lib/testing-python.nix") {
-  inherit system;
-  extraConfigurations = [ { nixpkgs.overlays = [ overlay ]; } ];
-};
+{ lib, config, nixpkgs, ... }:
 
 let
+
+  pkgs = config.nodes.client.nixpkgs.pkgs;
+
   nix-fetch = pkgs.writeText "fetch.nix" ''
     derivation {
         # This derivation is an copy from what is available over at
@@ -41,9 +39,7 @@ let
   '';
 in
 
-makeTest (
-
-rec {
+{
   name = "nss-preload";
 
   nodes = {
@@ -98,9 +94,9 @@ rec {
         { address = "192.168.0.10"; prefixLength = 24; }
       ];
 
-      nix.sandboxPaths = lib.mkForce [];
-      nix.binaryCaches = lib.mkForce [];
-      nix.useSandbox = lib.mkForce true;
+      nix.settings.extra-sandbox-paths = lib.mkForce [];
+      nix.settings.substituters = lib.mkForce [];
+      nix.settings.sandbox = lib.mkForce true;
     };
   };
 
@@ -122,4 +118,4 @@ rec {
           nix-build ${nix-fetch} >&2
           """)
   '';
-})
+}

@@ -34,6 +34,43 @@
 using namespace nix;
 using namespace nix::daemon;
 
+struct UserSettings : Config {
+
+    Setting<Strings> trustedUsers{
+        this, {"root"}, "trusted-users",
+        R"(
+          A list of names of users (separated by whitespace) that have
+          additional rights when connecting to the Nix daemon, such as the
+          ability to specify additional binary caches, or to import unsigned
+          NARs. You can also specify groups by prefixing them with `@`; for
+          instance, `@wheel` means all users in the `wheel` group. The default
+          is `root`.
+
+          > **Warning**
+          >
+          > Adding a user to `trusted-users` is essentially equivalent to
+          > giving that user root access to the system. For example, the user
+          > can set `sandbox-paths` and thereby obtain read access to
+          > directories that are otherwise inacessible to them.
+        )"};
+
+    /* ?Who we trust to use the daemon in safe ways */
+    Setting<Strings> allowedUsers{
+        this, {"*"}, "allowed-users",
+        R"(
+          A list of names of users (separated by whitespace) that are allowed
+          to connect to the Nix daemon. As with the `trusted-users` option,
+          you can specify groups by prefixing them with `@`. Also, you can
+          allow all users by specifying `*`. The default is `*`.
+
+          Note that trusted users are always allowed to connect.
+        )"};
+};
+
+UserSettings userSettings;
+
+static GlobalConfig::Register rSettings(&userSettings);
+
 #ifndef __linux__
 #define SPLICE_F_MOVE 0
 static ssize_t splice(int fd_in, void *off_in, int fd_out, void *off_out, size_t len, unsigned int flags)
@@ -203,8 +240,8 @@ static void daemonLoop()
             struct group * gr = peer.gidKnown ? getgrgid(peer.gid) : 0;
             std::string group = gr ? gr->gr_name : std::to_string(peer.gid);
 
-            Strings trustedUsers = settings.trustedUsers;
-            Strings allowedUsers = settings.allowedUsers;
+            Strings trustedUsers = userSettings.trustedUsers;
+            Strings allowedUsers = userSettings.allowedUsers;
 
             if (matchUser(user, group, trustedUsers))
                 trusted = Trusted;
@@ -241,15 +278,7 @@ static void daemonLoop()
                 //  Handle the connection.
                 FdSource from(remote.get());
                 FdSink to(remote.get());
-                processConnection(openUncachedStore(), from, to, trusted, NotRecursive, [&](Store & store) {
-#if 0
-                    /* Prevent users from doing something very dangerous. */
-                    if (geteuid() == 0 &&
-                        querySetting("build-users-group", "") == "")
-                        throw Error("if you run 'nix-daemon' as root, then you MUST set 'build-users-group'!");
-#endif
-                    store.createUser(user, peer.uid);
-                });
+                processConnection(openUncachedStore(), from, to, trusted, NotRecursive);
 
                 exit(0);
             }, options);
@@ -302,7 +331,7 @@ static void runDaemon(bool stdio)
             /* Auth hook is empty because in this mode we blindly trust the
                standard streams. Limiting access to those is explicitly
                not `nix-daemon`'s responsibility. */
-            processConnection(openUncachedStore(), from, to, Trusted, NotRecursive, [&](Store & _){});
+            processConnection(openUncachedStore(), from, to, Trusted, NotRecursive);
         }
     } else
         daemonLoop();

@@ -279,8 +279,8 @@ public:
           If the build users group is empty, builds will be performed under
           the uid of the Nix process (that is, the uid of the caller if
           `NIX_REMOTE` is empty, the uid under which the Nix daemon runs if
-          `NIX_REMOTE` is `daemon`). Obviously, this should not be used in
-          multi-user settings with untrusted users.
+          `NIX_REMOTE` is `daemon`). Obviously, this should not be used
+          with a nix daemon accessible to untrusted clients.
 
           Defaults to `nixbld` when running as root, *empty* otherwise.
         )",
@@ -329,7 +329,7 @@ public:
           Whether to execute builds inside cgroups.
           This is only supported on Linux.
 
-          Cgroups are required and enabled automatically for derivations 
+          Cgroups are required and enabled automatically for derivations
           that require the `uid-range` system feature.
 
           > **Warning**
@@ -491,6 +491,9 @@ public:
           for example, `/dev/nvidiactl?` specifies that `/dev/nvidiactl` will
           only be mounted in the sandbox if it exists in the host filesystem.
 
+          If the source is in the Nix store, then its closure will be added to
+          the sandbox as well.
+
           Depending on how Nix was built, the default value for this option
           may be empty or provide `/bin/sh` as a bind-mount of `bash`.
         )",
@@ -567,11 +570,15 @@ public:
         {"cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="},
         "trusted-public-keys",
         R"(
-          A whitespace-separated list of public keys. When paths are copied
-          from another Nix store (such as a binary cache), they must be
-          signed with one of these keys. For example:
-          `cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
-          hydra.nixos.org-1:CNHJZBh9K4tP3EKF6FkkgeVYsS3ohTl+oS0Qa8bezVs=`.
+          A whitespace-separated list of public keys.
+
+          At least one of the following condition must be met
+          for Nix to accept copying a store object from another
+          Nix store (such as a substituter):
+
+          - the store object has been signed using a key in the trusted keys list
+          - the [`require-sigs`](#conf-require-sigs) option has been set to `false`
+          - the store object is [output-addressed](@docroot@/glossary.md#gloss-output-addressed-store-object)
         )",
         {"binary-cache-public-keys"}};
 
@@ -667,13 +674,14 @@ public:
           independently. Lower value means higher priority.
           The default is `https://cache.nixos.org`, with a Priority of 40.
 
-          Nix will copy a store path from a remote store only if one
-          of the following is true:
+          At least one of the following conditions must be met for Nix to use
+          a substituter:
 
-          - the store object is signed by one of the [`trusted-public-keys`](#conf-trusted-public-keys)
           - the substituter is in the [`trusted-substituters`](#conf-trusted-substituters) list
-          - the [`require-sigs`](#conf-require-sigs) option has been set to `false`
-          - the store object is [output-addressed](glossary.md#gloss-output-addressed-store-object)
+          - the user calling Nix is in the [`trusted-users`](#conf-trusted-users) list
+
+          In addition, each store path should be trusted as described
+          in [`trusted-public-keys`](#conf-trusted-public-keys)
         )",
         {"binary-caches"}};
 
@@ -687,24 +695,6 @@ public:
           URLs listed in `substituters` and `trusted-substituters`.
         )",
         {"trusted-binary-caches"}};
-
-    Setting<Strings> trustedUsers{
-        this, {"root"}, "trusted-users",
-        R"(
-          A list of names of users (separated by whitespace) that have
-          additional rights when connecting to the Nix daemon, such as the
-          ability to specify additional binary caches, or to import unsigned
-          NARs. You can also specify groups by prefixing them with `@`; for
-          instance, `@wheel` means all users in the `wheel` group. The default
-          is `root`.
-
-          > **Warning**
-          >
-          > Adding a user to `trusted-users` is essentially equivalent to
-          > giving that user root access to the system. For example, the user
-          > can set `sandbox-paths` and thereby obtain read access to
-          > directories that are otherwise inacessible to them.
-        )"};
 
     Setting<unsigned int> ttlNegativeNarInfoCache{
         this, 3600, "narinfo-cache-negative-ttl",
@@ -726,18 +716,6 @@ public:
           collection, in which case having a more frequent cache invalidation
           would prevent trying to pull the path again and failing with a hash
           mismatch if the build isn't reproducible.
-        )"};
-
-    /* ?Who we trust to use the daemon in safe ways */
-    Setting<Strings> allowedUsers{
-        this, {"*"}, "allowed-users",
-        R"(
-          A list of names of users (separated by whitespace) that are allowed
-          to connect to the Nix daemon. As with the `trusted-users` option,
-          you can specify groups by prefixing them with `@`. Also, you can
-          allow all users by specifying `*`. The default is `*`.
-
-          Note that trusted users are always allowed to connect.
         )"};
 
     Setting<bool> printMissing{this, true, "print-missing",
@@ -983,5 +961,13 @@ void loadConfFile();
 std::vector<Path> getUserConfigFiles();
 
 extern const std::string nixVersion;
+
+/* NB: This is not sufficient. You need to call initNix() */
+void initLibStore();
+
+/* It's important to initialize before doing _anything_, which is why we
+   call upon the programmer to handle this correctly. However, we only add
+   this in a key locations, so as not to litter the code. */
+void assertLibStoreInitialized();
 
 }

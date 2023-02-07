@@ -478,9 +478,14 @@ static void printMissing(EvalState & state, DrvInfos & elems)
     std::vector<DerivedPath> targets;
     for (auto & i : elems)
         if (auto drvPath = i.queryDrvPath())
-            targets.push_back(DerivedPath::Built{*drvPath});
+            targets.push_back(DerivedPath::Built{
+                .drvPath = *drvPath,
+                .outputs = OutputsSpec::All { },
+            });
         else
-            targets.push_back(DerivedPath::Opaque{i.queryOutPath()});
+            targets.push_back(DerivedPath::Opaque{
+                .path = i.queryOutPath(),
+            });
 
     printMissing(state.store, targets);
 }
@@ -647,7 +652,7 @@ static void upgradeDerivations(Globals & globals,
                 } else newElems.push_back(i);
 
             } catch (Error & e) {
-                e.addTrace(std::nullopt, "while trying to find an upgrade for '%s'", i.queryName());
+                e.addTrace(nullptr, "while trying to find an upgrade for '%s'", i.queryName());
                 throw;
             }
         }
@@ -751,8 +756,13 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     auto drvPath = drv.queryDrvPath();
     std::vector<DerivedPath> paths {
         drvPath
-        ? (DerivedPath) (DerivedPath::Built { *drvPath })
-        : (DerivedPath) (DerivedPath::Opaque { drv.queryOutPath() }),
+        ? (DerivedPath) (DerivedPath::Built {
+            .drvPath = *drvPath,
+            .outputs = OutputsSpec::All { },
+        })
+        : (DerivedPath) (DerivedPath::Opaque {
+            .path = drv.queryOutPath(),
+        }),
     };
     printMissing(globals.state->store, paths);
     if (globals.dryRun) return;
@@ -958,7 +968,7 @@ static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool prin
         } catch (AssertionError & e) {
             printMsg(lvlTalkative, "skipping derivation named '%1%' which gives an assertion failure", i.queryName());
         } catch (Error & e) {
-            e.addTrace(std::nullopt, "while querying the derivation named '%1%'", i.queryName());
+            e.addTrace(nullptr, "while querying the derivation named '%1%'", i.queryName());
             throw;
         }
     }
@@ -1262,7 +1272,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         } catch (AssertionError & e) {
             printMsg(lvlTalkative, "skipping derivation named '%1%' which gives an assertion failure", i.queryName());
         } catch (Error & e) {
-            e.addTrace(std::nullopt, "while querying the derivation named '%1%'", i.queryName());
+            e.addTrace(nullptr, "while querying the derivation named '%1%'", i.queryName());
             throw;
         }
     }

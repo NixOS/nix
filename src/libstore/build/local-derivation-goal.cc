@@ -15,6 +15,7 @@
 #include "callback.hh"
 #include "json-utils.hh"
 #include "cgroup.hh"
+#include "personality.hh"
 
 #include <regex>
 #include <queue>
@@ -24,7 +25,6 @@
 #include <termios.h>
 #include <unistd.h>
 #include <sys/mman.h>
-#include <sys/utsname.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 
@@ -37,7 +37,6 @@
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <netinet/ip.h>
-#include <sys/personality.h>
 #include <sys/mman.h>
 #include <sched.h>
 #include <sys/param.h>
@@ -1460,7 +1459,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
             unknown, downloadSize, narSize);
     }
 
-    virtual std::optional<std::string> getBuildLog(const StorePath & path) override
+    virtual std::optional<std::string> getBuildLogExact(const StorePath & path) override
     { return std::nullopt; }
 
     virtual void addBuildLog(const StorePath & path, std::string_view log) override
@@ -1517,8 +1516,7 @@ void LocalDerivationGoal::startDaemon()
                 FdSink to(remote.get());
                 try {
                     daemon::processConnection(store, from, to,
-                        daemon::NotTrusted, daemon::Recursive,
-                        [&](Store & store) { store.createUser("nobody", 65535); });
+                        daemon::NotTrusted, daemon::Recursive);
                     debug("terminated daemon connection");
                 } catch (SysError &) {
                     ignoreException();
@@ -1964,33 +1962,7 @@ void LocalDerivationGoal::runChild()
         /* Close all other file descriptors. */
         closeMostFDs({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO});
 
-#if __linux__
-        /* Change the personality to 32-bit if we're doing an
-           i686-linux build on an x86_64-linux machine. */
-        struct utsname utsbuf;
-        uname(&utsbuf);
-        if ((drv->platform == "i686-linux"
-                && (settings.thisSystem == "x86_64-linux"
-                    || (!strcmp(utsbuf.sysname, "Linux") && !strcmp(utsbuf.machine, "x86_64"))))
-            || drv->platform == "armv7l-linux"
-            || drv->platform == "armv6l-linux")
-        {
-            if (personality(PER_LINUX32) == -1)
-                throw SysError("cannot set 32-bit personality");
-        }
-
-        /* Impersonate a Linux 2.6 machine to get some determinism in
-           builds that depend on the kernel version. */
-        if ((drv->platform == "i686-linux" || drv->platform == "x86_64-linux") && settings.impersonateLinux26) {
-            int cur = personality(0xffffffff);
-            if (cur != -1) personality(cur | 0x0020000 /* == UNAME26 */);
-        }
-
-        /* Disable address space randomization for improved
-           determinism. */
-        int cur = personality(0xffffffff);
-        if (cur != -1) personality(cur | ADDR_NO_RANDOMIZE);
-#endif
+        setPersonality(drv->platform);
 
         /* Disable core dumps by default. */
         struct rlimit limit = { 0, RLIM_INFINITY };
@@ -2077,10 +2049,14 @@ void LocalDerivationGoal::runChild()
                     sandboxProfile += "(deny default (with no-log))\n";
                 }
 
-                sandboxProfile += "(import \"sandbox-defaults.sb\")\n";
+                sandboxProfile +=
+                    #include "sandbox-defaults.sb"
+                    ;
 
                 if (!derivationType.isSandboxed())
-                    sandboxProfile += "(import \"sandbox-network.sb\")\n";
+                    sandboxProfile +=
+                        #include "sandbox-network.sb"
+                        ;
 
                 /* Add the output paths we'll use at build-time to the chroot */
                 sandboxProfile += "(allow file-read* file-write* process-exec\n";
@@ -2123,7 +2099,9 @@ void LocalDerivationGoal::runChild()
 
                 sandboxProfile += additionalSandboxProfile;
             } else
-                sandboxProfile += "(import \"sandbox-minimal.sb\")\n";
+                sandboxProfile +=
+                    #include "sandbox-minimal.sb"
+                    ;
 
             debug("Generated sandbox profile:");
             debug(sandboxProfile);
@@ -2148,8 +2126,6 @@ void LocalDerivationGoal::runChild()
                 args.push_back(sandboxFile);
                 args.push_back("-D");
                 args.push_back("_GLOBAL_TMP_DIR=" + globalTmpDir);
-                args.push_back("-D");
-                args.push_back("IMPORT_DIR=" + settings.nixDataDir + "/nix/sandbox/");
                 if (allowLocalNetworking) {
                     args.push_back("-D");
                     args.push_back(std::string("_ALLOW_LOCAL_NETWORKING=1"));
@@ -2346,11 +2322,28 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             buildUser ? std::optional(buildUser->getUIDRange()) : std::nullopt,
             inodesSeen);
 
-        debug("scanning for references for output '%s' in temp location '%s'", outputName, actualPath);
+        bool discardReferences = false;
+        if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
+            if (auto udr = get(*structuredAttrs, "unsafeDiscardReferences")) {
+                settings.requireExperimentalFeature(Xp::DiscardReferences);
+                if (auto output = get(*udr, outputName)) {
+                    if (!output->is_boolean())
+                        throw Error("attribute 'unsafeDiscardReferences.\"%s\"' of derivation '%s' must be a Boolean", outputName, drvPath.to_string());
+                    discardReferences = output->get<bool>();
+                }
+            }
+        }
 
-        /* Pass blank Sink as we are not ready to hash data at this stage. */
-        NullSink blank;
-        auto references = scanForReferences(blank, actualPath, referenceablePaths);
+        StorePathSet references;
+        if (discardReferences)
+            debug("discarding references of output '%s'", outputName);
+        else {
+            debug("scanning for references for output '%s' in temp location '%s'", outputName, actualPath);
+
+            /* Pass blank Sink as we are not ready to hash data at this stage. */
+            NullSink blank;
+            references = scanForReferences(blank, actualPath, referenceablePaths);
+        }
 
         outputReferencesIfUnregistered.insert_or_assign(
             outputName,
@@ -2758,7 +2751,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             signRealisation(thisRealisation);
             worker.store.registerDrvOutput(thisRealisation);
         }
-        if (wantOutput(outputName, wantedOutputs))
+        if (wantedOutputs.contains(outputName))
             builtOutputs.emplace(thisRealisation.id, thisRealisation);
     }
 

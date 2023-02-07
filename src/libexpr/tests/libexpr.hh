@@ -7,17 +7,19 @@
 #include "eval-inline.hh"
 #include "store-api.hh"
 
+#include "tests/libstore.hh"
 
 namespace nix {
-    class LibExprTest : public ::testing::Test {
+    class LibExprTest : public LibStoreTest {
         public:
             static void SetUpTestSuite() {
+                LibStoreTest::SetUpTestSuite();
                 initGC();
             }
 
         protected:
             LibExprTest()
-                : store(openStore("dummy://"))
+                : LibStoreTest()
                 , state({}, store)
             {
             }
@@ -35,7 +37,6 @@ namespace nix {
                 return state.symbols.create(value);
             }
 
-            ref<Store> store;
             EvalState state;
     };
 
@@ -123,7 +124,7 @@ namespace nix {
 
     MATCHER_P(IsAttrsOfSize, n, fmt("Is a set of size [%1%]", n)) {
         if (arg.type() != nAttrs) {
-            *result_listener << "Expexted set got " << arg.type();
+            *result_listener << "Expected set got " << arg.type();
             return false;
         } else if (arg.attrs->size() != (size_t)n) {
             *result_listener << "Expected a set with " << n << " attributes but got " << arg.attrs->size();
