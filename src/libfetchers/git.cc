@@ -627,7 +627,17 @@ struct GitInputScheme : InputScheme
 
             runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", input.getRev()->gitRev() });
 
-            runProgram("git", true, { "-C", tmpDir, "remote", "add", "origin", actualUrl });
+            /* Ensure that we use the correct origin for fetching
+               submodules. This matters for submodules with relative
+               URLs. */
+            if (isLocal) {
+                writeFile(tmpGitDir + "/config", readFile(repoDir + "/" + gitDir + "/config"));
+
+                /* Restore the config.bare setting we may have just
+                   nuked. */
+                runProgram("git", true, { "-C", tmpDir, "config", "core.bare", "false" });
+            } else
+                runProgram("git", true, { "-C", tmpDir, "config", "remote.origin.url", actualUrl });
 
             {
                 Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching submodules of '%s'", tmpDir));
