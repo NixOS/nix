@@ -293,7 +293,13 @@
             name = "nix-${version}";
             inherit version;
 
-            src = self;
+            src = lib.cleanSourceWith {
+              src = ./.;
+              filter = path: type:
+                toString path != toString ./tests/nixos
+                && toString path != toString ./flake.nix
+                ;
+            };
 
             VERSION_SUFFIX = versionSuffix;
 
