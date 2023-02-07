@@ -115,7 +115,7 @@
     then be built.
 
   - [reference]{#gloss-reference}\
-    A [store object] `O` is said to have a *reference* to a store object `P` if the [store path] of `P` appears in the contents of `O`.
+    A [store object] `O` is said to have a *reference* to a store object `P` if a [store path] to `P` appears in the contents of `O`.
     The *references* of a store object `O` are the set of store objects to which `O` has a reference.
 
     Store objects can refer to both other store objects and themselves.
