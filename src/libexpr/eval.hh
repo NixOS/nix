@@ -581,7 +581,31 @@ struct EvalSettings : Config
 
     Setting<Strings> nixPath{
         this, getDefaultNixPath(), "nix-path",
-        "List of directories to be searched for `<...>` file references."};
+        R"(
+          List of directories to be searched for file references in `<...>` search path expressions.
+
+          - The configuration setting is overridden by the [`NIX_PATH`](@docroot@/command-ref/env-common.md#env-NIX_PATH)
+          environment variable.
+          - `NIX_PATH` be extended using the [`-I` option](@docroot@/command-ref/opt-common.md#opt-I).
+          - `NIX_PATH` is overridden by specifying the setting as the option `--nix-path`.
+          - Any current value is extended with `--extra-nix-path`.
+
+          If nothing is specified:
+
+          - If [restricted evaluation](#conf-restrict-eval) is enabled, use the values in `NIX_PATH`.
+
+          - Otherwise, and if `NIX_PATH` is not set, use a fallback:
+
+            ```
+            $HOME/.nix-defexpr/channels"
+            nixpkgs=$NIX_STATE_DIR/profiles/per-user/root/channels/nixpkgs
+            $NIX_STATE_DIR/profiles/per-user/root/channels
+            ```
+
+            See [`NIX_STATE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STATE_DIR) for details.
+
+          If [pure evaluation](#conf-pure-eval) is enabled, search path expressions are not resolved at all.
+        )"};
 
     Setting<bool> restrictEval{
         this, false, "restrict-eval",
@@ -593,7 +617,10 @@ struct EvalSettings : Config
         )"};
 
     Setting<bool> pureEval{this, false, "pure-eval",
-        "Whether to restrict file system and network access to files specified by cryptographic hash."};
+        R"(
+          If set to `true`, restrict file system and network access to files specified by cryptographic hash,
+          and do not resolve `<...>` search path expressions.
+        )"};
 
     Setting<bool> enableImportFromDerivation{
         this, true, "allow-import-from-derivation",
