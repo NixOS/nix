@@ -639,6 +639,14 @@ struct GitInputScheme : InputScheme
             } else
                 runProgram("git", true, { "-C", tmpDir, "config", "remote.origin.url", actualUrl });
 
+            /* As an optimisation, copy the modules directory of the
+               source repo if it exists. */
+            auto modulesPath = repoDir + "/" + gitDir + "/modules";
+            if (pathExists(modulesPath)) {
+                Activity act(*logger, lvlTalkative, actUnknown, fmt("copying submodules of '%s'", actualUrl));
+                runProgram("cp", true, { "-R", "--", modulesPath, tmpGitDir + "/modules" });
+            }
+
             {
                 Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching submodules of '%s'", tmpDir));
                 runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
