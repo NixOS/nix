@@ -587,9 +587,9 @@ struct EvalSettings : Config
         this, false, "restrict-eval",
         R"(
           If set to `true`, the Nix evaluator will not allow access to any
-          files outside of the Nix search path (as set via the `NIX_PATH`
-          environment variable or the `-I` option), or to URIs outside of
-          `allowed-uri`. The default is `false`.
+          files outside of the Nix search path (as set via the [`NIX_PATH`](@docroot@/command-ref/env-common.md#env-NIX_PATH)
+          environment variable or the [`-I` option](@docroot@/command-ref/opt-common.md#opt-I)), or to URIs outside of
+          [`allowed-uris`](#conf-allowed-uris). The default is `false`.
         )"};
 
     Setting<bool> pureEval{this, false, "pure-eval",
@@ -607,10 +607,9 @@ struct EvalSettings : Config
 
     Setting<Strings> allowedUris{this, {}, "allowed-uris",
         R"(
-          A list of URI prefixes to which access is allowed in restricted
-          evaluation mode. For example, when set to
-          `https://github.com/NixOS`, builtin functions such as `fetchGit` are
-          allowed to access `https://github.com/NixOS/patchelf.git`.
+          A list of URI prefixes to which access is allowed in [restricted evaluation mode](#conf-restrict-eval).
+          For example, when set to `https://github.com/NixOS`, [built-in functions](@docroot@/language/builtins.md) such as
+          [`fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit) are allowed to access `https://github.com/NixOS/patchelf.git`.
         )"};
 
     Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",
