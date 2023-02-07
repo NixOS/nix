@@ -72,6 +72,7 @@ static int main_build_remote(int argc, char * * argv)
             settings.set(name, value);
         }
 
+        auto maxBuildJobs = settings.maxBuildJobs;
         settings.maxBuildJobs.set("1"); // hack to make tests with local?root= work
 
         initPlugins();
@@ -114,7 +115,7 @@ static int main_build_remote(int argc, char * * argv)
 
             /* It would be possible to build locally after some builds clear out,
                so don't show the warning now: */
-            bool couldBuildLocally = settings.maxBuildJobs > 0
+            bool couldBuildLocally = maxBuildJobs > 0
                  &&  (  neededSystem == settings.thisSystem
                      || settings.extraPlatforms.get().count(neededSystem) > 0)
                  &&  allSupportedLocally(*store, requiredFeatures);
