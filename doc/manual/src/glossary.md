@@ -140,7 +140,7 @@
     closures of store paths.
 
     As an example, if the store object at path `P` contains a [reference]
-    to path `Q`, then `Q` is in the closure of `P`. Further, if `Q`
+    to store object `Q`, then `Q` is in the closure of `P`. Further, if `Q`
     references `R` then `R` is also in the closure of `P`.
 
   - [output path]{#gloss-output-path}\
