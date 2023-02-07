@@ -7,7 +7,7 @@ to subsequent chapters.
 1. Install Nix by running the following:
 
    ```console
-   $ bash <(curl -L https://nixos.org/nix/install) --daemon
+   $ curl -L https://nixos.org/nix/install | sh
    ```
 
    The install script will use `sudo`, so make sure you have sufficient rights.
