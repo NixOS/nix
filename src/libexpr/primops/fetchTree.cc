@@ -463,10 +463,10 @@ static RegisterPrimOp primop_fetchGit({
           builtins.fetchGit ./work-dir
           ```
 
-	  If the url points to a local directory, and no `ref` or `rev` is
+	  If the URL points to a local directory, and no `ref` or `rev` is
 	  given, `fetchGit` will use the current content of the checked-out
-	  files, even if they are not committed or added to git's index, and it will
-	  only consider files added to the git repository (i.e. listed by `git ls-files`).
+	  files, even if they are not committed or added to Git's index. It will
+	  only consider files added to the git repository, as listed by `git ls-files`.
     )",
     .fun = prim_fetchGit,
 });
