@@ -75,7 +75,7 @@ To install it in `$(pwd)/outputs` and test it:
 nix (Nix) 3.0
 ```
 
-To iterate on for example `libexpr`, prioritizing the most relevant checks:
+For example, to run specific checks first when developing `libexpr`:
 
 ```console
 [nix-shell]$ J="-j $NIX_BUILD_CORES"
