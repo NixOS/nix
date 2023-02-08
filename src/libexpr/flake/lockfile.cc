@@ -208,7 +208,7 @@ std::optional<FlakeRef> LockFile::isUnlocked() const
     visit(root);
 
     for (auto & i : nodes) {
-        if (i == root) continue;
+        if (i == ref<const Node>(root)) continue;
         auto node = i.dynamic_pointer_cast<const LockedNode>();
         if (node
             && !node->lockedRef.input.isLocked()

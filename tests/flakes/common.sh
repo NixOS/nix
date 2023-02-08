@@ -20,6 +20,10 @@ writeSimpleFlake() {
       foo = import ./simple.nix;
       default = foo;
     };
+    packages.someOtherSystem = rec {
+      foo = import ./simple.nix;
+      default = foo;
+    };
 
     # To test "nix flake init".
     legacyPackages.x86_64-linux.hello = import ./simple.nix;

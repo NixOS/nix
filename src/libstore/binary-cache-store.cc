@@ -370,7 +370,7 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
     getFile(narInfoFile,
-        {[=](std::future<std::optional<std::string>> fut) {
+        {[=,this](std::future<std::optional<std::string>> fut) {
             try {
                 auto data = fut.get();
 

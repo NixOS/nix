@@ -45,13 +45,13 @@ To get a shell with a different compilation environment (e.g. stdenv,
 gccStdenv, clangStdenv, clang11Stdenv, ccacheStdenv):
 
 ```console
-$ nix-shell -A devShells.x86_64-linux.clang11StdenvPackages
+$ nix-shell -A devShells.x86_64-linux.clang11Stdenv
 ```
 
 or if you have a flake-enabled nix:
 
 ```console
-$ nix develop .#clang11StdenvPackages
+$ nix develop .#clang11Stdenv
 ```
 
 Note: you can use `ccacheStdenv` to drastically improve rebuild
@@ -219,7 +219,7 @@ After the CI run completes, you can check the output to extract the installer UR
 5. To generate an install command, plug this `install_url` and your GitHub username into this template:
 
     ```console
-    sh <(curl -L <install_url>) --tarball-url-prefix https://<github-username>-nix-install-tests.cachix.org/serve
+    curl -L <install_url> | sh -s -- --tarball-url-prefix https://<github-username>-nix-install-tests.cachix.org/serve
     ```
 
 <!-- #### Manually generating test installers

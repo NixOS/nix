@@ -87,6 +87,8 @@ enum BuildMode { bmNormal, bmRepair, bmCheck };
 struct BuildResult;
 
 
+typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
+
 struct StoreConfig : public Config
 {
     using Config::Config;
@@ -658,9 +660,6 @@ public:
     {
         return toRealPath(printStorePath(storePath));
     }
-
-    virtual void createUser(const std::string & userName, uid_t userId)
-    { }
 
     /*
      * Synchronises the options of the client with those of the daemon

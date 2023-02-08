@@ -250,11 +250,15 @@ public:
     operator const T &() const { return value; }
     operator T &() { return value; }
     const T & get() const { return value; }
-    bool operator ==(const T & v2) const { return value == v2; }
-    bool operator !=(const T & v2) const { return value != v2; }
-    void operator =(const T & v) { assign(v); }
+    template<typename U>
+    bool operator ==(const U & v2) const { return value == v2; }
+    template<typename U>
+    bool operator !=(const U & v2) const { return value != v2; }
+    template<typename U>
+    void operator =(const U & v) { assign(v); }
     virtual void assign(const T & v) { value = v; }
-    void setDefault(const T & v) { if (!overridden) value = v; }
+    template<typename U>
+    void setDefault(const U & v) { if (!overridden) value = v; }
 
     void set(const std::string & str, bool append = false) override;
 

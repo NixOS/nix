@@ -1,5 +1,8 @@
 #pragma once
 
+#include <variant>
+
+#include "hash.hh"
 #include "path.hh"
 #include <nlohmann/json_fwd.hpp>
 #include "comparator.hh"

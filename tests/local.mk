@@ -18,6 +18,7 @@ nix_tests = \
   fetchMercurial.sh \
   gc-auto.sh \
   user-envs.sh \
+  user-envs-migration.sh \
   binary-cache.sh \
   multiple-outputs.sh \
   ca/build.sh \
@@ -114,6 +115,7 @@ nix_tests = \
   store-ping.sh \
   fetchClosure.sh \
   completions.sh \
+  flakes/show.sh \
   impure-derivations.sh \
   path-from-hash-part.sh \
   toString-path.sh

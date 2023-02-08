@@ -16,6 +16,7 @@
 #include "json-utils.hh"
 #include "cgroup.hh"
 #include "personality.hh"
+#include "namespaces.hh"
 
 #include <regex>
 #include <queue>
@@ -167,7 +168,8 @@ void LocalDerivationGoal::killSandbox(bool getStats)
 }
 
 
-void LocalDerivationGoal::tryLocalBuild() {
+void LocalDerivationGoal::tryLocalBuild()
+{
     unsigned int curBuilds = worker.getNrLocalBuilds();
     if (curBuilds >= settings.maxBuildJobs) {
         state = &DerivationGoal::tryToBuild;
@@ -204,6 +206,17 @@ void LocalDerivationGoal::tryLocalBuild() {
             throw Error("building using a diverted store is not supported on this platform");
         #endif
     }
+
+    #if __linux__
+    if (useChroot) {
+        if (!mountNamespacesSupported() || !pidNamespacesSupported()) {
+            if (!settings.sandboxFallback)
+                throw Error("this system does not support the kernel namespaces that are required for sandboxing; use '--no-sandbox' to disable sandboxing");
+            debug("auto-disabling sandboxing because the prerequisite namespaces are not available");
+            useChroot = false;
+        }
+    }
+    #endif
 
     if (useBuildUsers()) {
         if (!buildUser)
@@ -888,12 +901,7 @@ void LocalDerivationGoal::startBuilder()
 
         userNamespaceSync.create();
 
-        Path maxUserNamespaces = "/proc/sys/user/max_user_namespaces";
-        static bool userNamespacesEnabled =
-            pathExists(maxUserNamespaces)
-            && trim(readFile(maxUserNamespaces)) != "0";
-
-        usingUserNamespace = userNamespacesEnabled;
+        usingUserNamespace = userNamespacesSupported();
 
         Pid helper = startProcess([&]() {
 
@@ -920,64 +928,15 @@ void LocalDerivationGoal::startBuilder()
                 flags |= CLONE_NEWUSER;
 
             pid_t child = clone(childEntry, stack + stackSize, flags, this);
-            if (child == -1 && errno == EINVAL) {
-                /* Fallback for Linux < 2.13 where CLONE_NEWPID and
-                   CLONE_PARENT are not allowed together. */
-                flags &= ~CLONE_NEWPID;
-                child = clone(childEntry, stack + stackSize, flags, this);
-            }
-            if (usingUserNamespace && child == -1 && (errno == EPERM || errno == EINVAL)) {
-                /* Some distros patch Linux to not allow unprivileged
-                 * user namespaces. If we get EPERM or EINVAL, try
-                 * without CLONE_NEWUSER and see if that works.
-                 * Details: https://salsa.debian.org/kernel-team/linux/-/commit/d98e00eda6bea437e39b9e80444eee84a32438a6
-                 */
-                usingUserNamespace = false;
-                flags &= ~CLONE_NEWUSER;
-                child = clone(childEntry, stack + stackSize, flags, this);
-            }
-            if (child == -1) {
-                switch(errno) {
-                    case EPERM:
-                    case EINVAL: {
-                        int errno_ = errno;
-                        if (!userNamespacesEnabled && errno==EPERM)
-                            notice("user namespaces appear to be disabled; they are required for sandboxing; check /proc/sys/user/max_user_namespaces");
-                        if (userNamespacesEnabled) {
-                            Path procSysKernelUnprivilegedUsernsClone = "/proc/sys/kernel/unprivileged_userns_clone";
-                            if (pathExists(procSysKernelUnprivilegedUsernsClone)
-                                && trim(readFile(procSysKernelUnprivilegedUsernsClone)) == "0") {
-                                notice("user namespaces appear to be disabled; they are required for sandboxing; check /proc/sys/kernel/unprivileged_userns_clone");
-                            }
-                        }
-                        Path procSelfNsUser = "/proc/self/ns/user";
-                        if (!pathExists(procSelfNsUser))
-                            notice("/proc/self/ns/user does not exist; your kernel was likely built without CONFIG_USER_NS=y, which is required for sandboxing");
-                        /* Otherwise exit with EPERM so we can handle this in the
-                           parent. This is only done when sandbox-fallback is set
-                           to true (the default). */
-                        if (settings.sandboxFallback)
-                            _exit(1);
-                        /* Mention sandbox-fallback in the error message so the user
-                           knows that having it disabled contributed to the
-                           unrecoverability of this failure */
-                        throw SysError(errno_, "creating sandboxed builder process using clone(), without sandbox-fallback");
-                    }
-                    default:
-                        throw SysError("creating sandboxed builder process using clone()");
-                }
-            }
+
+            if (child == -1)
+                throw SysError("creating sandboxed builder process using clone()");
             writeFull(builderOut.writeSide.get(),
                 fmt("%d %d\n", usingUserNamespace, child));
             _exit(0);
         });
 
-        int res = helper.wait();
-        if (res != 0 && settings.sandboxFallback) {
-            useChroot = false;
-            initTmpDir();
-            goto fallback;
-        } else if (res != 0)
+        if (helper.wait() != 0)
             throw Error("unable to start build process");
 
         userNamespaceSync.readSide = -1;
@@ -1045,9 +1004,6 @@ void LocalDerivationGoal::startBuilder()
     } else
 #endif
     {
-#if __linux__
-    fallback:
-#endif
         pid = startProcess([&]() {
             runChild();
         });
@@ -1516,8 +1472,7 @@ void LocalDerivationGoal::startDaemon()
                 FdSink to(remote.get());
                 try {
                     daemon::processConnection(store, from, to,
-                        daemon::NotTrusted, daemon::Recursive,
-                        [&](Store & store) { store.createUser("nobody", 65535); });
+                        daemon::NotTrusted, daemon::Recursive);
                     debug("terminated daemon connection");
                 } catch (SysError &) {
                     ignoreException();
@@ -2323,11 +2278,28 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             buildUser ? std::optional(buildUser->getUIDRange()) : std::nullopt,
             inodesSeen);
 
-        debug("scanning for references for output '%s' in temp location '%s'", outputName, actualPath);
+        bool discardReferences = false;
+        if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
+            if (auto udr = get(*structuredAttrs, "unsafeDiscardReferences")) {
+                settings.requireExperimentalFeature(Xp::DiscardReferences);
+                if (auto output = get(*udr, outputName)) {
+                    if (!output->is_boolean())
+                        throw Error("attribute 'unsafeDiscardReferences.\"%s\"' of derivation '%s' must be a Boolean", outputName, drvPath.to_string());
+                    discardReferences = output->get<bool>();
+                }
+            }
+        }
 
-        /* Pass blank Sink as we are not ready to hash data at this stage. */
-        NullSink blank;
-        auto references = scanForReferences(blank, actualPath, referenceablePaths);
+        StorePathSet references;
+        if (discardReferences)
+            debug("discarding references of output '%s'", outputName);
+        else {
+            debug("scanning for references for output '%s' in temp location '%s'", outputName, actualPath);
+
+            /* Pass blank Sink as we are not ready to hash data at this stage. */
+            NullSink blank;
+            references = scanForReferences(blank, actualPath, referenceablePaths);
+        }
 
         outputReferencesIfUnregistered.insert_or_assign(
             outputName,

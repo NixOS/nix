@@ -3,7 +3,7 @@
 The easiest way to install Nix is to run the following command:
 
 ```console
-$ sh <(curl -L https://nixos.org/nix/install)
+$ curl -L https://nixos.org/nix/install | sh
 ```
 
 This will run the installer interactively (causing it to explain what
@@ -27,7 +27,7 @@ you can authenticate with `sudo`.
 To explicitly select a single-user installation on your system:
 
 ```console
-$ sh <(curl -L https://nixos.org/nix/install) --no-daemon
+$ curl -L https://nixos.org/nix/install | sh -s -- --no-daemon
 ```
 
 This will perform a single-user installation of Nix, meaning that `/nix`
@@ -66,7 +66,7 @@ You can instruct the installer to perform a multi-user installation on
 your system:
 
 ```console
-$ sh <(curl -L https://nixos.org/nix/install) --daemon
+$ curl -L https://nixos.org/nix/install | sh -s -- --daemon
 ```
 
 The multi-user installation of Nix will create build users between the
@@ -287,7 +287,7 @@ These install scripts can be used the same as the main NixOS.org
 installation script:
 
 ```console
-$ sh <(curl -L https://nixos.org/nix/install)
+$ curl -L https://nixos.org/nix/install | sh
 ```
 
 In the same directory of the install script are sha256 sums, and gpg

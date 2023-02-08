@@ -27,6 +27,6 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           github_workspace: ${{ github.workspace }}
           pull_description: |-
-            Bot-based backport to `${target_branch}`, triggered by a label in #${pull_number}.
+            Automatic backport to `${target_branch}`, triggered by a label in #${pull_number}.
           # should be kept in sync with `uses`
           version: v0.0.5

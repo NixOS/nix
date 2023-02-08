@@ -222,19 +222,19 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
         .longName = name,
         .description = "Enable sandboxing.",
         .category = category,
-        .handler = {[=]() { override(smEnabled); }}
+        .handler = {[this]() { override(smEnabled); }}
     });
     args.addFlag({
         .longName = "no-" + name,
         .description = "Disable sandboxing.",
         .category = category,
-        .handler = {[=]() { override(smDisabled); }}
+        .handler = {[this]() { override(smDisabled); }}
     });
     args.addFlag({
         .longName = "relaxed-" + name,
         .description = "Enable sandboxing, but allow builds to disable it.",
         .category = category,
-        .handler = {[=]() { override(smRelaxed); }}
+        .handler = {[this]() { override(smRelaxed); }}
     });
 }
 

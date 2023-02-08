@@ -410,6 +410,18 @@
           };
         };
 
+      nixos-lib = import (nixpkgs + "/nixos/lib") { };
+
+      # https://nixos.org/manual/nixos/unstable/index.html#sec-calling-nixos-tests
+      runNixOSTestFor = system: test: nixos-lib.runTest {
+        imports = [ test ];
+        hostPkgs = nixpkgsFor.${system};
+        defaults = {
+          nixpkgs.pkgs = nixpkgsFor.${system};
+        };
+        _module.args.nixpkgs = nixpkgs;
+      };
+
     in {
 
       # A Nixpkgs overlay that overrides the 'nix' and
@@ -488,49 +500,22 @@
           };
 
         # System tests.
-        tests.remoteBuilds = import ./tests/remote-builds.nix {
-          system = "x86_64-linux";
-          inherit nixpkgs;
-          overlay = self.overlays.default;
-        };
+        tests.remoteBuilds = runNixOSTestFor "x86_64-linux" ./tests/nixos/remote-builds.nix;
 
-        tests.nix-copy-closure = import ./tests/nix-copy-closure.nix {
-          system = "x86_64-linux";
-          inherit nixpkgs;
-          overlay = self.overlays.default;
-        };
+        tests.nix-copy-closure = runNixOSTestFor "x86_64-linux" ./tests/nixos/nix-copy-closure.nix;
 
-        tests.nssPreload = (import ./tests/nss-preload.nix rec {
-          system = "x86_64-linux";
-          inherit nixpkgs;
-          overlay = self.overlays.default;
-        });
+        tests.nssPreload = runNixOSTestFor "x86_64-linux" ./tests/nixos/nss-preload.nix;
 
-        tests.githubFlakes = (import ./tests/github-flakes.nix rec {
-          system = "x86_64-linux";
-          inherit nixpkgs;
-          overlay = self.overlays.default;
-        });
+        tests.githubFlakes = runNixOSTestFor "x86_64-linux" ./tests/nixos/github-flakes.nix;
 
-        tests.sourcehutFlakes = (import ./tests/sourcehut-flakes.nix rec {
-          system = "x86_64-linux";
-          inherit nixpkgs;
-          overlay = self.overlays.default;
-        });
+        tests.sourcehutFlakes = runNixOSTestFor "x86_64-linux" ./tests/nixos/sourcehut-flakes.nix;
 
-        tests.containers = (import ./tests/containers.nix rec {
-          system = "x86_64-linux";
-          inherit nixpkgs;
-          overlay = self.overlays.default;
-        });
+        tests.containers = runNixOSTestFor "x86_64-linux" ./tests/nixos/containers/containers.nix;
 
         tests.setuid = nixpkgs.lib.genAttrs
           ["i686-linux" "x86_64-linux"]
-          (system:
-            import ./tests/setuid.nix rec {
-              inherit nixpkgs system;
-              overlay = self.overlays.default;
-            });
+          (system: runNixOSTestFor system ./tests/nixos/setuid.nix);
+
 
         # Make sure that nix-env still produces the exact same result
         # on a particular version of Nixpkgs.
