@@ -4,6 +4,8 @@ if [[ -z "$COMMON_SH_SOURCED" ]]; then
 
 COMMON_SH_SOURCED=1
 
+export PS4='+(${BASH_SOURCE[0]}:$LINENO) '
+
 export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)/${TEST_NAME:-default}
 export NIX_STORE_DIR
 if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store 2> /dev/null); then
