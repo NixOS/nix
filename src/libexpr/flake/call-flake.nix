@@ -9,14 +9,18 @@ let
       (key: node:
         let
 
-          sourceInfo =
+          rawSourceInfo =
             if key == lockFile.root
             then rootSrc
             else fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
 
           subdir = if key == lockFile.root then rootSubdir else node.locked.dir or "";
 
-          flake = import (sourceInfo + (if subdir != "" then "/" else "") + subdir + "/flake.nix");
+          outPath = rawSourceInfo + ((if subdir == "" then "" else "/") + subdir);
+
+          sourceInfo = rawSourceInfo // { inherit outPath; };
+
+          flake = import (outPath + "/flake.nix");
 
           inputs = builtins.mapAttrs
             (inputName: inputSpec: allNodes.${resolveInput inputSpec})
