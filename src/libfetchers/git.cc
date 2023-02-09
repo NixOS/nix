@@ -648,7 +648,7 @@ struct GitInputScheme : InputScheme
             }
 
             {
-                Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching submodules of '%s'", repoDir));
+                Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching submodules of '%s'", actualUrl));
                 runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
             }
 
