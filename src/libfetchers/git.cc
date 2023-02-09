@@ -634,7 +634,7 @@ struct GitInputScheme : InputScheme
                 writeFile(tmpGitDir + "/config", readFile(repoDir + "/" + gitDir + "/config"));
 
                 /* Restore the config.bare setting we may have just
-                   nuked. */
+                   copied erroneously from the user's repo. */
                 runProgram("git", true, { "-C", tmpDir, "config", "core.bare", "false" });
             } else
                 runProgram("git", true, { "-C", tmpDir, "config", "remote.origin.url", actualUrl });
