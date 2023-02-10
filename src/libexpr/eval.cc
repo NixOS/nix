@@ -325,20 +325,22 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
     }
 }
 
-
-class BoehmDisableGC : public DisableGC {
+#if HAVE_BOEHMGC
+/* Disable GC while this object lives. Used by CoroutineContext.
+ *
+ * Boehm keeps a count of GC_disable() and GC_enable() calls,
+ * and only enables GC when the count matches.
+ */
+class BoehmDisableGC {
 public:
     BoehmDisableGC() {
-#if HAVE_BOEHMGC
         GC_disable();
-#endif
     };
-    virtual ~BoehmDisableGC() override {
-#if HAVE_BOEHMGC
+    ~BoehmDisableGC() {
         GC_enable();
-#endif
     };
 };
+#endif
 
 static bool gcInitialised = false;
 
@@ -365,8 +367,8 @@ void initGC()
 
 
     /* Used to disable GC when entering coroutines on macOS */
-    DisableGC::create = []() {
-        return std::dynamic_pointer_cast<DisableGC>(std::make_shared<BoehmDisableGC>());
+    create_disable_gc = []() -> std::shared_ptr<void> {
+        return std::make_shared<BoehmDisableGC>();
     };
 
     /* Set the initial heap size to something fairly big (25% of

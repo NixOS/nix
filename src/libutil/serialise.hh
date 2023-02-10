@@ -502,13 +502,9 @@ struct StackAllocator {
 };
 
 /* Disabling GC when entering a coroutine (on macos).
-   ::create is to avoid boehm gc dependency in libutil.
+   mutable to avoid boehm gc dependency in libutil.
  */
-class DisableGC {
-public:
-    DisableGC() {};
-    virtual ~DisableGC() {};
-    static std::shared_ptr<DisableGC> (*create)();
-};
+extern std::shared_ptr<void> (*create_disable_gc)();
+
 
 }
