@@ -29,8 +29,7 @@ void Args::removeFlag(const std::string & longName)
 
 void Completions::add(std::string completion, std::string description)
 {
-    // strip whitespace/empty lines from the front of the description
-    description.erase(0, description.find_first_not_of(" \t\n"));
+    description = trim(description);
     // ellipsize overflowing content on the back of the description
     auto end_index = description.find_first_of(".\n");
     if (end_index != std::string::npos) {
