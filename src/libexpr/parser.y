@@ -268,7 +268,7 @@ static Expr * stripIndentation(const PosIdx pos, SymbolTable & symbols,
                 s2 = std::string(s2, 0, p + 1);
         }
 
-        es2->emplace_back(i->first, new ExprString(s2));
+        es2->emplace_back(i->first, new ExprString(std::move(s2)));
     };
     for (; i != es.end(); ++i, --n) {
         std::visit(overloaded { trimExpr, trimString }, i->second);
@@ -465,7 +465,7 @@ expr_simple
       $$ = new ExprCall(CUR_POS,
           new ExprVar(data->symbols.create("__findFile")),
           {new ExprVar(data->symbols.create("__nixPath")),
-           new ExprString(path)});
+           new ExprString(std::move(path))});
   }
   | URI {
       static bool noURLLiterals = settings.isExperimentalFeatureEnabled(Xp::NoUrlLiterals);

@@ -186,7 +186,7 @@ struct ExprString : Expr
 {
     std::string s;
     Value v;
-    ExprString(std::string s) : s(std::move(s)) { v.mkString(this->s.data()); };
+    ExprString(std::string &&s) : s(std::move(s)) { v.mkString(this->s.data()); };
     Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };
