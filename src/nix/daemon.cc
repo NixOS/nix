@@ -34,7 +34,7 @@
 using namespace nix;
 using namespace nix::daemon;
 
-struct UserSettings : Config {
+struct AuthorizationSettings : Config {
 
     Setting<Strings> trustedUsers{
         this, {"root"}, "trusted-users",
@@ -67,9 +67,9 @@ struct UserSettings : Config {
         )"};
 };
 
-UserSettings userSettings;
+AuthorizationSettings authorizationSettings;
 
-static GlobalConfig::Register rSettings(&userSettings);
+static GlobalConfig::Register rSettings(&authorizationSettings);
 
 #ifndef __linux__
 #define SPLICE_F_MOVE 0
@@ -240,8 +240,8 @@ static void daemonLoop()
             struct group * gr = peer.gidKnown ? getgrgid(peer.gid) : 0;
             std::string group = gr ? gr->gr_name : std::to_string(peer.gid);
 
-            Strings trustedUsers = userSettings.trustedUsers;
-            Strings allowedUsers = userSettings.allowedUsers;
+            Strings trustedUsers = authorizationSettings.trustedUsers;
+            Strings allowedUsers = authorizationSettings.allowedUsers;
 
             if (matchUser(user, group, trustedUsers))
                 trusted = Trusted;
