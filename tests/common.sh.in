@@ -27,6 +27,8 @@ export NIX_REMOTE=$NIX_REMOTE_
 unset NIX_PATH
 export TEST_HOME=$TEST_ROOT/test-home
 export HOME=$TEST_HOME
+unset XDG_STATE_HOME
+unset XDG_DATA_HOME
 unset XDG_CONFIG_HOME
 unset XDG_CONFIG_DIRS
 unset XDG_CACHE_HOME
@@ -62,8 +64,8 @@ readLink() {
 }
 
 clearProfiles() {
-    profiles="$HOME"/.local/share/nix/profiles
-    rm -rf $profiles
+    profiles="$HOME"/.local/state/nix/profiles
+    rm -rf "$profiles"
 }
 
 clearStore() {
