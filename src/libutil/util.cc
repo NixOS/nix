@@ -1085,6 +1085,7 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
     pid_t pid = -1;
 
     if (options.cloneFlags) {
+        #ifdef __linux__
         // Not supported, since then we don't know when to free the stack.
         assert(!(options.cloneFlags & CLONE_VM));
 
@@ -1096,6 +1097,9 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
         Finally freeStack([&]() { munmap(stack, stackSize); });
 
         pid = clone(childEntry, stack + stackSize, options.cloneFlags | SIGCHLD, &wrapper);
+        #else
+        throw Error("clone flags are only supported on Linux");
+        #endif
     } else
         pid = doFork(options.allowVfork, wrapper);
 
