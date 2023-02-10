@@ -307,6 +307,7 @@ struct ProcessOptions
     bool dieWithParent = true;
     bool runExitHandlers = false;
     bool allowVfork = false;
+    int cloneFlags = 0; // use clone() with the specified flags (Linux only)
 };
 
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
