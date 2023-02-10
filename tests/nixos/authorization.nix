@@ -51,8 +51,8 @@
         set -x
         cd ~
         echo 5mgtDj0ohrWkT50TLR0f4tIIxY > four;
-        (! diff $(nix store add-file four) four 2>&1) | grep -F "cannot open connection to remote store"
-        (! diff $(nix store add-file four) four 2>&1) | grep -F "Connection reset by peer"
+        (! nix store add-file four 2>&1) | grep -F "cannot open connection to remote store"
+        (! nix store add-file four 2>&1) | grep -F "Connection reset by peer"
         ! [[ -e ${pathFour} ]]
       ' 1>&2
     """)
