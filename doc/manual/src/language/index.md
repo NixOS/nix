@@ -91,7 +91,7 @@ This is an incomplete overview of language features, by example.
  <tr>
   <td>
 
-   `"hello ${ { a = "world" }.a }"`
+   `"hello ${ { a = "world"; }.a }"`
 
    `"1 2 ${toString 3}"`
 
