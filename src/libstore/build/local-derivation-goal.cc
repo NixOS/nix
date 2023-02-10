@@ -209,7 +209,7 @@ void LocalDerivationGoal::tryLocalBuild()
 
     #if __linux__
     if (useChroot) {
-        if (!mountNamespacesSupported() || !pidNamespacesSupported()) {
+        if (!mountNamespacesSupported()) {
             if (!settings.sandboxFallback)
                 throw Error("this system does not support the kernel namespaces that are required for sandboxing; use '--no-sandbox' to disable sandboxing");
             debug("auto-disabling sandboxing because the prerequisite namespaces are not available");

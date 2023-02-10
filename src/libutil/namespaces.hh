@@ -11,5 +11,4 @@ bool mountNamespacesSupported();
 bool pidNamespacesSupported();
 
 #endif
-
 }
