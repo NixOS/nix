@@ -4,7 +4,7 @@
 #include "util.hh"
 #include "finally.hh"
 
-#include <mntent.h>
+#include <sys/mount.h>
 
 namespace nix {
 
@@ -33,62 +33,59 @@ bool userNamespacesSupported()
             return false;
         }
 
-        Pid pid = startProcess([&]()
-        {
-            auto res = unshare(CLONE_NEWUSER);
-            _exit(res ? 1 : 0);
-        });
+        try {
+            Pid pid = startProcess([&]()
+            {
+                _exit(0);
+            }, {
+                .cloneFlags = CLONE_NEWUSER
+            });
 
-        bool supported = pid.wait() == 0;
+            auto r = pid.wait();
+            assert(!r);
+        } catch (SysError & e) {
+            debug("user namespaces do not work on this system: %s", e.msg());
+            return false;
+        }
 
-        if (!supported)
-            debug("user namespaces do not work on this system");
-
-        return supported;
+        return true;
     }();
     return res;
 }
 
-bool mountNamespacesSupported()
+bool mountAndPidNamespacesSupported()
 {
     static auto res = [&]() -> bool
     {
-        bool useUserNamespace = userNamespacesSupported();
+        try {
 
-        Pid pid = startProcess([&]()
-        {
-            auto res = unshare(CLONE_NEWNS | (useUserNamespace ? CLONE_NEWUSER : 0));
-            _exit(res ? 1 : 0);
-        });
+            Pid pid = startProcess([&]()
+            {
+                /* Make sure we don't remount the parent's /proc. */
+                if (mount(0, "/", 0, MS_PRIVATE | MS_REC, 0) == -1)
+                    _exit(1);
 
-        bool supported = pid.wait() == 0;
+                /* Test whether we can remount /proc. The kernel disallows
+                   this if /proc is not fully visible, i.e. if there are
+                   filesystems mounted on top of files inside /proc.  See
+                   https://lore.kernel.org/lkml/87tvsrjai0.fsf@xmission.com/T/. */
+                if (mount("none", "/proc", "proc", 0, 0) == -1)
+                    _exit(2);
 
-        if (!supported)
-            debug("mount namespaces do not work on this system");
+                _exit(0);
+            }, {
+                .cloneFlags = CLONE_NEWNS | CLONE_NEWPID | (userNamespacesSupported() ? CLONE_NEWUSER : 0)
+            });
 
-        return supported;
-    }();
-    return res;
-}
-
-bool pidNamespacesSupported()
-{
-    static auto res = [&]() -> bool
-    {
-        /* Check whether /proc is fully visible, i.e. there are no
-           filesystems mounted on top of files inside /proc. If this
-           is not the case, then we cannot mount a new /proc inside
-           the sandbox that matches the sandbox's PID namespace.
-           See https://lore.kernel.org/lkml/87tvsrjai0.fsf@xmission.com/T/. */
-        auto fp = fopen("/proc/mounts", "r");
-        if (!fp) return false;
-        Finally delFP = [&]() { fclose(fp); };
-
-        while (auto ent = getmntent(fp))
-            if (hasPrefix(std::string_view(ent->mnt_dir), "/proc/")) {
-                debug("PID namespaces do not work because /proc is not fully visible; disabling sandboxing");
+            if (pid.wait()) {
+                debug("PID namespaces do not work on this system: cannot remount /proc");
                 return false;
             }
+
+        } catch (SysError & e) {
+            debug("mount namespaces do not work on this system: %s", e.msg());
+            return false;
+        }
 
         return true;
     }();
