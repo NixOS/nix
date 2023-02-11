@@ -13,11 +13,6 @@ void processConnection(
     FdSource & from,
     FdSink & to,
     TrustedFlag trusted,
-    RecursiveFlag recursive,
-    /* Arbitrary hook to check authorization / initialize user data / whatever
-       after the protocol has been negotiated. The idea is that this function
-       and everything it calls doesn't know about this stuff, and the
-       `nix-daemon` handles that instead. */
-    std::function<void(Store &)> authHook);
+    RecursiveFlag recursive);
 
 }

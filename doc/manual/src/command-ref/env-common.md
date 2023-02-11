@@ -7,42 +7,11 @@ Most Nix commands interpret the following environment variables:
     `nix-shell`. It can have the values `pure` or `impure`.
 
   - [`NIX_PATH`]{#env-NIX_PATH}\
-    A colon-separated list of directories used to look up Nix
-    expressions enclosed in angle brackets (i.e., `<path>`). For
-    instance, the value
-
-        /home/eelco/Dev:/etc/nixos
-
-    will cause Nix to look for paths relative to `/home/eelco/Dev` and
-    `/etc/nixos`, in this order. It is also possible to match paths
-    against a prefix. For example, the value
-
-        nixpkgs=/home/eelco/Dev/nixpkgs-branch:/etc/nixos
-
-    will cause Nix to search for `<nixpkgs/path>` in
-    `/home/eelco/Dev/nixpkgs-branch/path` and `/etc/nixos/nixpkgs/path`.
-
-    If a path in the Nix search path starts with `http://` or
-    `https://`, it is interpreted as the URL of a tarball that will be
-    downloaded and unpacked to a temporary location. The tarball must
-    consist of a single top-level directory. For example, setting
-    `NIX_PATH` to
-
-        nixpkgs=https://github.com/NixOS/nixpkgs/archive/master.tar.gz
-
-    tells Nix to download and use the current contents of the
-    `master` branch in the `nixpkgs` repository.
-
-    The URLs of the tarballs from the official nixos.org channels (see
-    [the manual for `nix-channel`](nix-channel.md)) can be abbreviated
-    as `channel:<channel-name>`.  For instance, the following two
-    values of `NIX_PATH` are equivalent:
-
-        nixpkgs=channel:nixos-21.05
-        nixpkgs=https://nixos.org/channels/nixos-21.05/nixexprs.tar.xz
-
-    The Nix search path can also be extended using the `-I` option to
-    many Nix commands, which takes precedence over `NIX_PATH`.
+    A colon-separated list of directories used to look up the location of Nix
+    expressions using [paths](../language/values.md#type-path)
+    enclosed in angle brackets (i.e., `<path>`),
+    e.g. `/home/eelco/Dev:/etc/nixos`. It can be extended using the
+    [`-I` option](./opt-common.md#opt-I).
 
   - [`NIX_IGNORE_SYMLINK_STORE`]{#env-NIX_IGNORE_SYMLINK_STORE}\
     Normally, the Nix store directory (typically `/nix/store`) is not
@@ -122,3 +91,16 @@ Most Nix commands interpret the following environment variables:
     variable sets the initial size of the heap in bytes. It defaults to
     384 MiB. Setting it to a low value reduces memory consumption, but
     will increase runtime due to the overhead of garbage collection.
+
+## XDG Base Directory
+
+New Nix commands conform to the [XDG Base Directory Specification], and use the following environment variables to determine locations of various state and configuration files:
+
+- [`XDG_CONFIG_HOME`]{#env-XDG_CONFIG_HOME} (default `~/.config`)
+- [`XDG_STATE_HOME`]{#env-XDG_STATE_HOME} (default `~/.local/state`)
+- [`XDG_CACHE_HOME`]{#env-XDG_CACHE_HOME} (default `~/.cache`)
+
+Classic Nix commands can also be made to follow this standard using the [`use-xdg-base-directories`] configuration option.
+
+[XDG Base Directory Specification]: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
+[`use-xdg-base-directories`]: ../command-ref/conf-file.md#conf-use-xdg-base-directories

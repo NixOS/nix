@@ -6,6 +6,7 @@ namespace nix {
 
 void runProgramInStore(ref<Store> store,
     const std::string & program,
-    const Strings & args);
+    const Strings & args,
+    std::optional<std::string_view> system = std::nullopt);
 
 }

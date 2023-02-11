@@ -33,11 +33,16 @@ distribute the public key for verifying the authenticity of the paths.
 example-nix-cache-1:1/cKDz3QCCOmwcztD2eV6Coggp6rqc9DGjWv7C0G+rM=
 ```
 
-Then, add the public key and the cache URL to your `nix.conf`'s
-`trusted-public-keys` and `substituters` options:
+Then update [`nix.conf`](../command-ref/conf-file.md) on any machine that will access the cache.
+Add the cache URL to [`substituters`](../command-ref/conf-file.md#conf-substituters) and the public key to [`trusted-public-keys`](../command-ref/conf-file.md#conf-trusted-public-keys):
 
     substituters = https://cache.nixos.org/ s3://example-nix-cache
     trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= example-nix-cache-1:1/cKDz3QCCOmwcztD2eV6Coggp6rqc9DGjWv7C0G+rM=
+
+Machines that build for the cache must sign derivations using the private key.
+On those machines, add the path to the key file to the [`secret-key-files`](../command-ref/conf-file.md#conf-secret-key-files) field in their [`nix.conf`](../command-ref/conf-file.md):
+
+    secret-key-files = /etc/nix/key.private
 
 We will restart the Nix daemon in a later step.
 
@@ -52,14 +57,12 @@ set -eu
 set -f # disable globbing
 export IFS=' '
 
-echo "Signing paths" $OUT_PATHS
-nix store sign --key-file /etc/nix/key.private $OUT_PATHS
 echo "Uploading paths" $OUT_PATHS
-exec nix copy --to 's3://example-nix-cache' $OUT_PATHS
+exec nix copy --to "s3://example-nix-cache" $OUT_PATHS
 ```
 
 > **Note**
-> 
+>
 > The `$OUT_PATHS` variable is a space-separated list of Nix store
 > paths. In this case, we expect and want the shell to perform word
 > splitting to make each output path its own argument to `nix

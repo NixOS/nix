@@ -331,17 +331,9 @@ T readNum(Source & source)
     unsigned char buf[8];
     source((char *) buf, sizeof(buf));
 
-    uint64_t n =
-        ((uint64_t) buf[0]) |
-        ((uint64_t) buf[1] << 8) |
-        ((uint64_t) buf[2] << 16) |
-        ((uint64_t) buf[3] << 24) |
-        ((uint64_t) buf[4] << 32) |
-        ((uint64_t) buf[5] << 40) |
-        ((uint64_t) buf[6] << 48) |
-        ((uint64_t) buf[7] << 56);
+    auto n = readLittleEndian<uint64_t>(buf);
 
-    if (n > (uint64_t)std::numeric_limits<T>::max())
+    if (n > (uint64_t) std::numeric_limits<T>::max())
         throw SerialisationError("serialised integer %d is too large for type '%s'", n, typeid(T).name());
 
     return (T) n;

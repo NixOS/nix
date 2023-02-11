@@ -1,0 +1,1 @@
+[ "stdenv" "fetchurl" "aterm-stdenv" "aterm-stdenv2" "libX11" "libXv" "mplayer-stdenv2.libXv-libX11" "mplayer-stdenv2.libXv-libX11_2" "nix-stdenv-aterm-stdenv" "nix-stdenv2-aterm2-stdenv2" ]

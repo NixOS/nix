@@ -338,7 +338,7 @@ Sink & operator << (Sink & sink, const StringSet & s)
 
 Sink & operator << (Sink & sink, const Error & ex)
 {
-    auto info = ex.info();
+    auto & info = ex.info();
     sink
         << "Error"
         << info.level

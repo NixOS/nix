@@ -5,7 +5,7 @@
 
 #include <string>
 #include <chrono>
-
+#include <optional>
 
 namespace nix {
 
@@ -77,6 +77,9 @@ struct BuildResult
     /* The start/stop times of the build (or one of the rounds, if it
        was repeated). */
     time_t startTime = 0, stopTime = 0;
+
+    /* User and system CPU time the build took. */
+    std::optional<std::chrono::microseconds> cpuUser, cpuSystem;
 
     bool success()
     {

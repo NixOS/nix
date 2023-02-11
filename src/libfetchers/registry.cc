@@ -153,6 +153,9 @@ static std::shared_ptr<Registry> getGlobalRegistry(ref<Store> store)
 {
     static auto reg = [&]() {
         auto path = fetchSettings.flakeRegistry.get();
+        if (path == "") {
+            return std::make_shared<Registry>(Registry::Global); // empty registry
+        }
 
         if (!hasPrefix(path, "/")) {
             auto storePath = downloadFile(store, path, "flake-registry.json", false).storePath;

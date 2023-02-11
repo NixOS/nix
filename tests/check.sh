@@ -40,14 +40,6 @@ nix-build check.nix -A deterministic --argstr checkBuildId $checkBuildId \
 if grep -q 'may not be deterministic' $TEST_ROOT/log; then false; fi
 checkBuildTempDirRemoved $TEST_ROOT/log
 
-nix build -f check.nix deterministic --rebuild --repeat 1 \
-    --argstr checkBuildId $checkBuildId --keep-failed --no-link \
-    2> $TEST_ROOT/log
-if grep -q 'checking is not possible' $TEST_ROOT/log; then false; fi
-# Repeat is set to 1, ie. nix should build deterministic twice.
-if [ "$(grep "checking outputs" $TEST_ROOT/log | wc -l)" -ne 2 ]; then false; fi
-checkBuildTempDirRemoved $TEST_ROOT/log
-
 nix-build check.nix -A nondeterministic --argstr checkBuildId $checkBuildId \
     --no-out-link 2> $TEST_ROOT/log
 checkBuildTempDirRemoved $TEST_ROOT/log
@@ -58,12 +50,6 @@ grep 'may not be deterministic' $TEST_ROOT/log
 [ "$status" = "104" ]
 checkBuildTempDirRemoved $TEST_ROOT/log
 
-nix build -f check.nix nondeterministic --rebuild --repeat 1 \
-    --argstr checkBuildId $checkBuildId --keep-failed --no-link \
-    2> $TEST_ROOT/log || status=$?
-grep 'may not be deterministic' $TEST_ROOT/log
-checkBuildTempDirRemoved $TEST_ROOT/log
-
 nix-build check.nix -A nondeterministic --argstr checkBuildId $checkBuildId \
     --no-out-link --check --keep-failed 2> $TEST_ROOT/log || status=$?
 grep 'may not be deterministic' $TEST_ROOT/log
@@ -71,12 +57,6 @@ grep 'may not be deterministic' $TEST_ROOT/log
 if checkBuildTempDirRemoved $TEST_ROOT/log; then false; fi
 
 clearStore
-
-nix-build dependencies.nix --no-out-link --repeat 3
-
-nix-build check.nix -A nondeterministic --no-out-link --repeat 1 2> $TEST_ROOT/log || status=$?
-[ "$status" = "1" ]
-grep 'differs from previous round' $TEST_ROOT/log
 
 path=$(nix-build check.nix -A fetchurl --no-out-link)
 
@@ -91,13 +71,13 @@ nix-build check.nix -A fetchurl --no-out-link --check
 nix-build check.nix -A fetchurl --no-out-link --repair
 [[ $(cat $path) != foo ]]
 
-echo 'Hello World' > $TMPDIR/dummy
+echo 'Hello World' > $TEST_ROOT/dummy
 nix-build check.nix -A hashmismatch --no-out-link || status=$?
 [ "$status" = "102" ]
 
-echo -n > $TMPDIR/dummy
+echo -n > $TEST_ROOT/dummy
 nix-build check.nix -A hashmismatch --no-out-link
-echo 'Hello World' > $TMPDIR/dummy
+echo 'Hello World' > $TEST_ROOT/dummy
 
 nix-build check.nix -A hashmismatch --no-out-link --check || status=$?
 [ "$status" = "102" ]

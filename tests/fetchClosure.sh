@@ -1,7 +1,6 @@
 source common.sh
 
 enableFeatures "fetch-closure"
-needLocalStore "'--no-require-sigs' can’t be used with the daemon"
 
 clearStore
 clearCacheCache
@@ -28,15 +27,19 @@ clearStore
 [ ! -e $nonCaPath ]
 [ -e $caPath ]
 
-# In impure mode, we can use non-CA paths.
-[[ $(nix eval --raw --no-require-sigs --impure --expr "
-  builtins.fetchClosure {
-    fromStore = \"file://$cacheDir\";
-    fromPath = $nonCaPath;
-  }
-") = $nonCaPath ]]
+if [[ "$NIX_REMOTE" != "daemon" ]]; then
 
-[ -e $nonCaPath ]
+    # In impure mode, we can use non-CA paths.
+    [[ $(nix eval --raw --no-require-sigs --impure --expr "
+      builtins.fetchClosure {
+        fromStore = \"file://$cacheDir\";
+        fromPath = $nonCaPath;
+      }
+    ") = $nonCaPath ]]
+
+    [ -e $nonCaPath ]
+
+fi
 
 # 'toPath' set to empty string should fail but print the expected path.
 nix eval -v --json --expr "

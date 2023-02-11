@@ -1,6 +1,5 @@
 #include "nar-accessor.hh"
 #include "archive.hh"
-#include "json.hh"
 
 #include <map>
 #include <stack>
@@ -243,42 +242,43 @@ ref<FSAccessor> makeLazyNarAccessor(const std::string & listing,
     return make_ref<NarAccessor>(listing, getNarBytes);
 }
 
-void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor,
-    const Path & path, bool recurse)
+using nlohmann::json;
+json listNar(ref<FSAccessor> accessor, const Path & path, bool recurse)
 {
     auto st = accessor->stat(path);
 
-    auto obj = res.object();
+    json obj = json::object();
 
     switch (st.type) {
     case FSAccessor::Type::tRegular:
-        obj.attr("type", "regular");
-        obj.attr("size", st.fileSize);
+        obj["type"] = "regular";
+        obj["size"] = st.fileSize;
         if (st.isExecutable)
-            obj.attr("executable", true);
+            obj["executable"] = true;
         if (st.narOffset)
-            obj.attr("narOffset", st.narOffset);
+            obj["narOffset"] = st.narOffset;
         break;
     case FSAccessor::Type::tDirectory:
-        obj.attr("type", "directory");
+        obj["type"] = "directory";
         {
-            auto res2 = obj.object("entries");
+            obj["entries"] = json::object();
+            json &res2 = obj["entries"];
             for (auto & name : accessor->readDirectory(path)) {
                 if (recurse) {
-                    auto res3 = res2.placeholder(name);
-                    listNar(res3, accessor, path + "/" + name, true);
+                    res2[name] = listNar(accessor, path + "/" + name, true);
                 } else
-                    res2.object(name);
+                    res2[name] = json::object();
             }
         }
         break;
     case FSAccessor::Type::tSymlink:
-        obj.attr("type", "symlink");
-        obj.attr("target", accessor->readLink(path));
+        obj["type"] = "symlink";
+        obj["target"] = accessor->readLink(path);
         break;
     default:
         throw Error("path '%s' does not exist in NAR", path);
     }
+    return obj;
 }
 
 }

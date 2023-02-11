@@ -71,7 +71,12 @@ struct FetchSettings : public Config
         "Whether to warn about dirty Git/Mercurial trees."};
 
     Setting<std::string> flakeRegistry{this, "https://channels.nixos.org/flake-registry.json", "flake-registry",
-        "Path or URI of the global flake registry."};
+        R"(
+          Path or URI of the global flake registry.
+
+          When empty, disables the global flake registry.
+        )"};
+
 
     Setting<bool> useRegistries{this, true, "use-registries",
         "Whether to use flake registries to resolve flake references."};

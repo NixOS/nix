@@ -1,4 +1,4 @@
-#include "libexprtests.hh"
+#include "tests/libexpr.hh"
 #include "value-to-json.hh"
 
 namespace nix {

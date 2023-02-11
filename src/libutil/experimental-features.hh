@@ -23,6 +23,9 @@ enum struct ExperimentalFeature
     NoUrlLiterals,
     FetchClosure,
     ReplFlake,
+    AutoAllocateUids,
+    Cgroups,
+    DiscardReferences,
 };
 
 /**

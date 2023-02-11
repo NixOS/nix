@@ -71,6 +71,8 @@ while [ $# -gt 0 ]; do
         #     # intentional tail space
         #     ACTIONS="${ACTIONS}uninstall "
         #     ;;
+        --yes)
+            export NIX_INSTALLER_YES=1;;
         --no-channel-add)
             export NIX_INSTALLER_NO_CHANNEL_ADD=1;;
         --daemon-user-count)
@@ -90,7 +92,7 @@ while [ $# -gt 0 ]; do
             shift;;
         *)
             {
-                echo "Nix Installer [--daemon|--no-daemon] [--daemon-user-count INT] [--no-channel-add] [--no-modify-profile] [--nix-extra-conf-file FILE]"
+                echo "Nix Installer [--daemon|--no-daemon] [--daemon-user-count INT] [--yes] [--no-channel-add] [--no-modify-profile] [--nix-extra-conf-file FILE]"
 
                 echo "Choose installation method."
                 echo ""
@@ -103,6 +105,8 @@ while [ $# -gt 0 ]; do
                 echo " --no-daemon: Simple, single-user installation that does not require root and is"
                 echo "              trivial to uninstall."
                 echo "              (default)"
+                echo ""
+                echo " --yes:               Run the script non-interactively, accepting all prompts."
                 echo ""
                 echo " --no-channel-add:    Don't add any channels. nixpkgs-unstable is installed by default."
                 echo ""
@@ -184,6 +188,8 @@ fi
 # shellcheck source=./nix-profile.sh.in
 . "$nix/etc/profile.d/nix.sh"
 
+NIX_LINK="$HOME/.nix-profile"
+
 if ! "$nix/bin/nix-env" -i "$nix"; then
     echo "$0: unable to install Nix into your default profile" >&2
     exit 1
@@ -192,7 +198,7 @@ fi
 # Install an SSL certificate bundle.
 if [ -z "$NIX_SSL_CERT_FILE" ] || ! [ -f "$NIX_SSL_CERT_FILE" ]; then
     "$nix/bin/nix-env" -i "$cacert"
-    export NIX_SSL_CERT_FILE="$HOME/.nix-profile/etc/ssl/certs/ca-bundle.crt"
+    export NIX_SSL_CERT_FILE="$NIX_LINK/etc/ssl/certs/ca-bundle.crt"
 fi
 
 # Subscribe the user to the Nixpkgs channel and fetch it.
@@ -210,8 +216,8 @@ fi
 
 added=
 p=
-p_sh=$HOME/.nix-profile/etc/profile.d/nix.sh
-p_fish=$HOME/.nix-profile/etc/profile.d/nix.fish
+p_sh=$NIX_LINK/etc/profile.d/nix.sh
+p_fish=$NIX_LINK/etc/profile.d/nix.fish
 if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
     # Make the shell source nix.sh during login.
     for i in .bash_profile .bash_login .profile; do

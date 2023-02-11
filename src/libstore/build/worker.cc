@@ -42,7 +42,7 @@ Worker::~Worker()
 
 std::shared_ptr<DerivationGoal> Worker::makeDerivationGoalCommon(
     const StorePath & drvPath,
-    const StringSet & wantedOutputs,
+    const OutputsSpec & wantedOutputs,
     std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal)
 {
     std::weak_ptr<DerivationGoal> & goal_weak = derivationGoals[drvPath];
@@ -59,7 +59,7 @@ std::shared_ptr<DerivationGoal> Worker::makeDerivationGoalCommon(
 
 
 std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(const StorePath & drvPath,
-    const StringSet & wantedOutputs, BuildMode buildMode)
+    const OutputsSpec & wantedOutputs, BuildMode buildMode)
 {
     return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
         return !dynamic_cast<LocalStore *>(&store)
@@ -70,7 +70,7 @@ std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(const StorePath & drv
 
 
 std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath & drvPath,
-    const BasicDerivation & drv, const StringSet & wantedOutputs, BuildMode buildMode)
+    const BasicDerivation & drv, const OutputsSpec & wantedOutputs, BuildMode buildMode)
 {
     return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
         return !dynamic_cast<LocalStore *>(&store)
@@ -276,7 +276,7 @@ void Worker::run(const Goals & _topGoals)
         if (!children.empty() || !waitingForAWhile.empty())
             waitForInput();
         else {
-            if (awake.empty() && 0 == settings.maxBuildJobs)
+            if (awake.empty() && 0U == settings.maxBuildJobs)
             {
                 if (getMachines().empty())
                    throw Error("unable to start any build; either increase '--max-jobs' "

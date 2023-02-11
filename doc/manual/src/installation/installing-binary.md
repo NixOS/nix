@@ -3,7 +3,7 @@
 The easiest way to install Nix is to run the following command:
 
 ```console
-$ sh <(curl -L https://nixos.org/nix/install)
+$ curl -L https://nixos.org/nix/install | sh
 ```
 
 This will run the installer interactively (causing it to explain what
@@ -27,7 +27,7 @@ you can authenticate with `sudo`.
 To explicitly select a single-user installation on your system:
 
 ```console
-$ sh <(curl -L https://nixos.org/nix/install) --no-daemon
+$ curl -L https://nixos.org/nix/install | sh -s -- --no-daemon
 ```
 
 This will perform a single-user installation of Nix, meaning that `/nix`
@@ -66,7 +66,7 @@ You can instruct the installer to perform a multi-user installation on
 your system:
 
 ```console
-$ sh <(curl -L https://nixos.org/nix/install) --daemon
+$ curl -L https://nixos.org/nix/install | sh -s -- --daemon
 ```
 
 The multi-user installation of Nix will create build users between the
@@ -88,19 +88,51 @@ extension. The installer will also create `/etc/profile.d/nix.sh`.
 
 ### Linux
 
-```console
-sudo rm -rf /etc/profile/nix.sh /etc/nix /nix ~root/.nix-profile ~root/.nix-defexpr ~root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
+If you are on Linux with systemd:
 
-# If you are on Linux with systemd, you will need to run:
-sudo systemctl stop nix-daemon.socket
-sudo systemctl stop nix-daemon.service
-sudo systemctl disable nix-daemon.socket
-sudo systemctl disable nix-daemon.service
-sudo systemctl daemon-reload
+1. Remove the Nix daemon service:
+
+   ```console
+   sudo systemctl stop nix-daemon.service
+   sudo systemctl disable nix-daemon.socket nix-daemon.service
+   sudo systemctl daemon-reload
+   ```
+
+1. Remove systemd service files:
+
+   ```console
+   sudo rm /etc/systemd/system/nix-daemon.service /etc/systemd/system/nix-daemon.socket
+   ```
+
+1. The installer script uses systemd-tmpfiles to create the socket directory.
+    You may also want to remove the configuration for that:
+
+   ```console
+   sudo rm /etc/tmpfiles.d/nix-daemon.conf
+   ```
+
+Remove files created by Nix:
+
+```console
+sudo rm -rf /nix /etc/nix /etc/profile/nix.sh ~root/.nix-profile ~root/.nix-defexpr ~root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
 ```
 
-There may also be references to Nix in `/etc/profile`, `/etc/bashrc`,
-and `/etc/zshrc` which you may remove.
+Remove build users and their group:
+
+```console
+for i in $(seq 1 32); do
+  sudo userdel nixbld$i
+done
+sudo groupdel nixbld
+```
+
+There may also be references to Nix in
+
+- `/etc/profile`
+- `/etc/bashrc`
+- `/etc/zshrc`
+
+which you may remove.
 
 ### macOS
 
@@ -255,7 +287,7 @@ These install scripts can be used the same as the main NixOS.org
 installation script:
 
 ```console
-$ sh <(curl -L https://nixos.org/nix/install)
+$ curl -L https://nixos.org/nix/install | sh
 ```
 
 In the same directory of the install script are sha256 sums, and gpg

@@ -207,13 +207,13 @@ Derivations can declare some infrequently used optional attributes.
     the hash in either hexadecimal or base-32 notation. (See the
     [`nix-hash` command](../command-ref/nix-hash.md) for information
     about converting to and from base-32 notation.)
-    
+
   - [`__contentAddressed`]{#adv-attr-__contentAddressed}
     If this **experimental** attribute is set to true, then the derivation
     outputs will be stored in a content-addressed location rather than the
     traditional input-addressed one.
-    This only has an effect if the `ca-derivation` experimental feature is enabled.
-    
+    This only has an effect if the `ca-derivations` experimental feature is enabled.
+
     Setting this attribute also requires setting `outputHashMode` and `outputHashAlgo` like for *fixed-output derivations* (see above).
 
   - [`passAsFile`]{#adv-attr-passAsFile}\
@@ -255,3 +255,78 @@ Derivations can declare some infrequently used optional attributes.
     > substituted. Thus it is usually a good idea to align `system` with
     > `builtins.currentSystem` when setting `allowSubstitutes` to
     > `false`. For most trivial derivations this should be the case.
+
+  - [`__structuredAttrs`]{#adv-attr-structuredAttrs}\
+    If the special attribute `__structuredAttrs` is set to `true`, the other derivation
+    attributes are serialised in JSON format and made available to the
+    builder via the file `.attrs.json` in the builder’s temporary
+    directory. This obviates the need for [`passAsFile`](#adv-attr-passAsFile) since JSON files
+    have no size restrictions, unlike process environments.
+
+    It also makes it possible to tweak derivation settings in a structured way; see
+    [`outputChecks`](#adv-attr-outputChecks) for example.
+
+    As a convenience to Bash builders,
+    Nix writes a script named `.attrs.sh` to the builder’s directory
+    that initialises shell variables corresponding to all attributes
+    that are representable in Bash. This includes non-nested
+    (associative) arrays. For example, the attribute `hardening.format = true`
+    ends up as the Bash associative array element `${hardening[format]}`.
+
+  - [`outputChecks`]{#adv-attr-outputChecks}\
+    When using [structured attributes](#adv-attr-structuredAttrs), the `outputChecks`
+    attribute allows defining checks per-output.
+
+    In addition to
+    [`allowedReferences`](#adv-attr-allowedReferences), [`allowedRequisites`](#adv-attr-allowedRequisites),
+    [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites),
+    the following attributes are available:
+
+    - `maxSize` defines the maximum size of the resulting [store object](../glossary.md#gloss-store-object).
+    - `maxClosureSize` defines the maximum size of the output's closure.
+    - `ignoreSelfRefs` controls whether self-references should be considered when
+      checking for allowed references/requisites.
+
+    Example:
+
+    ```nix
+    __structuredAttrs = true;
+
+    outputChecks.out = {
+      # The closure of 'out' must not be larger than 256 MiB.
+      maxClosureSize = 256 * 1024 * 1024;
+
+      # It must not refer to the C compiler or to the 'dev' output.
+      disallowedRequisites = [ stdenv.cc "dev" ];
+    };
+
+    outputChecks.dev = {
+      # The 'dev' output must not be larger than 128 KiB.
+      maxSize = 128 * 1024;
+    };
+    ```
+
+  - [`unsafeDiscardReferences`]{#adv-attr-unsafeDiscardReferences}\
+    > **Warning**
+    > This is an experimental feature.
+    >
+    > To enable it, add the following to [nix.conf](../command-ref/conf-file.md):
+    >
+    > ```
+    > extra-experimental-features = discard-references
+    > ```
+
+    When using [structured attributes](#adv-attr-structuredAttrs), the
+    attribute `unsafeDiscardReferences` is an attribute set with a boolean value for each output name.
+    If set to `true`, it disables scanning the output for runtime dependencies.
+
+    Example:
+
+    ```nix
+    __structuredAttrs = true;
+    unsafeDiscardReferences.out = true;
+    ```
+
+    This is useful, for example, when generating self-contained filesystem images with
+    their own embedded Nix store: hashes found inside such an image refer
+    to the embedded store and not to the host's Nix store.

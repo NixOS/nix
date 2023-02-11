@@ -30,7 +30,3 @@ NIX_REMOTE= nix-store --dump-db > $TEST_ROOT/d2
 cmp $TEST_ROOT/d1 $TEST_ROOT/d2
 
 killDaemon
-
-user=$(whoami)
-[ -e $NIX_STATE_DIR/gcroots/per-user/$user ]
-[ -e $NIX_STATE_DIR/profiles/per-user/$user ]

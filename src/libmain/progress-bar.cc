@@ -132,7 +132,7 @@ public:
         log(*state, lvl, fs.s);
     }
 
-    void logEI(const ErrorInfo &ei) override
+    void logEI(const ErrorInfo & ei) override
     {
         auto state(state_.lock());
 
@@ -180,10 +180,12 @@ public:
             auto machineName = getS(fields, 1);
             if (machineName != "")
                 i->s += fmt(" on " ANSI_BOLD "%s" ANSI_NORMAL, machineName);
-            auto curRound = getI(fields, 2);
-            auto nrRounds = getI(fields, 3);
-            if (nrRounds != 1)
-                i->s += fmt(" (round %d/%d)", curRound, nrRounds);
+
+            // Used to be curRound and nrRounds, but the
+            // implementation was broken for a long time.
+            if (getI(fields, 2) != 1 || getI(fields, 3) != 1) {
+                throw Error("log message indicated repeating builds, but this is not currently implemented");
+            }
             i->name = DrvName(name).name;
         }
 

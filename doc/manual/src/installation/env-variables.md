@@ -27,7 +27,7 @@ Set the environment variable and install Nix
 
 ```console
 $ export NIX_SSL_CERT_FILE=/etc/ssl/my-certificate-bundle.crt
-$ sh <(curl -L https://nixos.org/nix/install)
+$ curl -L https://nixos.org/nix/install | sh
 ```
 
 In the shell profile and rc files (for example, `/etc/bashrc`,
@@ -38,7 +38,7 @@ export NIX_SSL_CERT_FILE=/etc/ssl/my-certificate-bundle.crt
 ```
 
 > **Note**
-> 
+>
 > You must not add the export and then do the install, as the Nix
 > installer will detect the presence of Nix configuration, and abort.
 

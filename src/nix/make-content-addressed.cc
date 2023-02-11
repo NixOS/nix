@@ -2,9 +2,12 @@
 #include "store-api.hh"
 #include "make-content-addressed.hh"
 #include "common-args.hh"
-#include "json.hh"
+
+#include <nlohmann/json.hpp>
 
 using namespace nix;
+
+using nlohmann::json;
 
 struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand, MixJSON
 {
@@ -25,6 +28,7 @@ struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand,
           ;
     }
 
+    using StorePathsCommand::run;
     void run(ref<Store> srcStore, StorePaths && storePaths) override
     {
         auto dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
@@ -33,13 +37,15 @@ struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand,
             StorePathSet(storePaths.begin(), storePaths.end()));
 
         if (json) {
-            JSONObject jsonRoot(std::cout);
-            JSONObject jsonRewrites(jsonRoot.object("rewrites"));
+            auto jsonRewrites = json::object();
             for (auto & path : storePaths) {
                 auto i = remappings.find(path);
                 assert(i != remappings.end());
-                jsonRewrites.attr(srcStore->printStorePath(path), srcStore->printStorePath(i->second));
+                jsonRewrites[srcStore->printStorePath(path)] = srcStore->printStorePath(i->second);
             }
+            auto json = json::object();
+            json["rewrites"] = jsonRewrites;
+            std::cout << json.dump();
         } else {
             for (auto & path : storePaths) {
                 auto i = remappings.find(path);

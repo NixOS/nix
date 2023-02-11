@@ -1,11 +1,11 @@
 #pragma once
 
-#include "content-address.hh"
+#include <string_view>
+
 #include "types.hh"
 
 namespace nix {
 
-class Store;
 struct Hash;
 
 class StorePath
@@ -16,6 +16,8 @@ public:
 
     /* Size of the hash part of store paths, in base-32 characters. */
     constexpr static size_t HashLen = 32; // i.e. 160 bits
+
+    constexpr static size_t MaxPathLen = 211;
 
     StorePath() = delete;
 
@@ -64,9 +66,6 @@ public:
 
 typedef std::set<StorePath> StorePathSet;
 typedef std::vector<StorePath> StorePaths;
-typedef std::map<std::string, StorePath> OutputPathMap;
-
-typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 
 /* Extension of derivations in the Nix store. */
 const std::string drvExtension = ".drv";

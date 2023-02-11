@@ -1,6 +1,6 @@
 makefiles = local.mk
 
-GLOBAL_CXXFLAGS += -g -Wall -std=c++17 -I ../src
+GLOBAL_CXXFLAGS += -g -Wall -std=c++2a -I ../src
 
 -include Makefile.config
 

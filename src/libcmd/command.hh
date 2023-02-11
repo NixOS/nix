@@ -96,9 +96,6 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
     std::optional<std::string> expr;
     bool readOnlyMode = false;
 
-    // FIXME: move this; not all commands (e.g. 'nix run') use it.
-    OperateOn operateOn = OperateOn::Output;
-
     SourceExprCommand(bool supportReadOnlyMode = false);
 
     std::vector<std::shared_ptr<Installable>> parseInstallables(
@@ -153,8 +150,15 @@ private:
     std::string _installable{"."};
 };
 
+struct MixOperateOnOptions : virtual Args
+{
+    OperateOn operateOn = OperateOn::Output;
+
+    MixOperateOnOptions();
+};
+
 /* A command that operates on zero or more store paths. */
-struct BuiltPathsCommand : public InstallablesCommand
+struct BuiltPathsCommand : InstallablesCommand, virtual MixOperateOnOptions
 {
 private:
 

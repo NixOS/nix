@@ -12,7 +12,6 @@
 #include "local-fs-store.hh"
 #include "user-env.hh"
 #include "util.hh"
-#include "json.hh"
 #include "value-to-json.hh"
 #include "xml-writer.hh"
 #include "legacy.hh"
@@ -26,6 +25,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <nlohmann/json.hpp>
 
 using namespace nix;
 using std::cout;
@@ -478,9 +478,14 @@ static void printMissing(EvalState & state, DrvInfos & elems)
     std::vector<DerivedPath> targets;
     for (auto & i : elems)
         if (auto drvPath = i.queryDrvPath())
-            targets.push_back(DerivedPath::Built{*drvPath});
+            targets.push_back(DerivedPath::Built{
+                .drvPath = *drvPath,
+                .outputs = OutputsSpec::All { },
+            });
         else
-            targets.push_back(DerivedPath::Opaque{i.queryOutPath()});
+            targets.push_back(DerivedPath::Opaque{
+                .path = i.queryOutPath(),
+            });
 
     printMissing(state.store, targets);
 }
@@ -647,7 +652,7 @@ static void upgradeDerivations(Globals & globals,
                 } else newElems.push_back(i);
 
             } catch (Error & e) {
-                e.addTrace(std::nullopt, "while trying to find an upgrade for '%s'", i.queryName());
+                e.addTrace(nullptr, "while trying to find an upgrade for '%s'", i.queryName());
                 throw;
             }
         }
@@ -751,8 +756,13 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     auto drvPath = drv.queryDrvPath();
     std::vector<DerivedPath> paths {
         drvPath
-        ? (DerivedPath) (DerivedPath::Built { *drvPath })
-        : (DerivedPath) (DerivedPath::Opaque { drv.queryOutPath() }),
+        ? (DerivedPath) (DerivedPath::Built {
+            .drvPath = *drvPath,
+            .outputs = OutputsSpec::All { },
+        })
+        : (DerivedPath) (DerivedPath::Opaque {
+            .path = drv.queryOutPath(),
+        }),
     };
     printMissing(globals.state->store, paths);
     if (globals.dryRun) return;
@@ -911,53 +921,58 @@ static VersionDiff compareVersionAgainstSet(
 
 static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool printOutPath, bool printMeta)
 {
-    JSONObject topObj(cout, true);
+    using nlohmann::json;
+    json topObj = json::object();
     for (auto & i : elems) {
         try {
             if (i.hasFailed()) continue;
 
-            JSONObject pkgObj = topObj.object(i.attrPath);
 
             auto drvName = DrvName(i.queryName());
-            pkgObj.attr("name", drvName.fullName);
-            pkgObj.attr("pname", drvName.name);
-            pkgObj.attr("version", drvName.version);
-            pkgObj.attr("system", i.querySystem());
-            pkgObj.attr("outputName", i.queryOutputName());
+            json &pkgObj = topObj[i.attrPath];
+            pkgObj = {
+                {"name", drvName.fullName},
+                {"pname", drvName.name},
+                {"version", drvName.version},
+                {"system", i.querySystem()},
+                {"outputName", i.queryOutputName()},
+            };
 
             {
                 DrvInfo::Outputs outputs = i.queryOutputs(printOutPath);
-                JSONObject outputObj = pkgObj.object("outputs");
+                json &outputObj = pkgObj["outputs"];
+                outputObj = json::object();
                 for (auto & j : outputs) {
                     if (j.second)
-                        outputObj.attr(j.first, globals.state->store->printStorePath(*j.second));
+                        outputObj[j.first] = globals.state->store->printStorePath(*j.second);
                     else
-                        outputObj.attr(j.first, nullptr);
+                        outputObj[j.first] = nullptr;
                 }
             }
 
             if (printMeta) {
-                JSONObject metaObj = pkgObj.object("meta");
+                json &metaObj = pkgObj["meta"];
+                metaObj = json::object();
                 StringSet metaNames = i.queryMetaNames();
                 for (auto & j : metaNames) {
                     Value * v = i.queryMeta(j);
                     if (!v) {
                         printError("derivation '%s' has invalid meta attribute '%s'", i.queryName(), j);
-                        metaObj.attr(j, nullptr);
+                        metaObj[j] = nullptr;
                     } else {
-                        auto placeholder = metaObj.placeholder(j);
                         PathSet context;
-                        printValueAsJSON(*globals.state, true, *v, noPos, placeholder, context);
+                        metaObj[j] = printValueAsJSON(*globals.state, true, *v, noPos, context);
                     }
                 }
             }
         } catch (AssertionError & e) {
             printMsg(lvlTalkative, "skipping derivation named '%1%' which gives an assertion failure", i.queryName());
         } catch (Error & e) {
-            e.addTrace(std::nullopt, "while querying the derivation named '%1%'", i.queryName());
+            e.addTrace(nullptr, "while querying the derivation named '%1%'", i.queryName());
             throw;
         }
     }
+    std::cout << topObj.dump(2);
 }
 
 
@@ -1257,7 +1272,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         } catch (AssertionError & e) {
             printMsg(lvlTalkative, "skipping derivation named '%1%' which gives an assertion failure", i.queryName());
         } catch (Error & e) {
-            e.addTrace(std::nullopt, "while querying the derivation named '%1%'", i.queryName());
+            e.addTrace(nullptr, "while querying the derivation named '%1%'", i.queryName());
             throw;
         }
     }
@@ -1274,7 +1289,7 @@ static void opSwitchProfile(Globals & globals, Strings opFlags, Strings opArgs)
         throw UsageError("exactly one argument expected");
 
     Path profile = absPath(opArgs.front());
-    Path profileLink = getHome() + "/.nix-profile";
+    Path profileLink = settings.useXDGBaseDirectories ? createNixStateDir() + "/profile" : getHome() + "/.nix-profile";
 
     switchLink(profileLink, profile);
 }
@@ -1378,7 +1393,10 @@ static int main_nix_env(int argc, char * * argv)
         Globals globals;
 
         globals.instSource.type = srcUnknown;
-        globals.instSource.nixExprPath = getHome() + "/.nix-defexpr";
+        {
+            Path nixExprPath = settings.useXDGBaseDirectories ? createNixStateDir() + "/defexpr" : getHome() + "/.nix-defexpr";
+            globals.instSource.nixExprPath = nixExprPath;
+        }
         globals.instSource.systemFilter = "*";
 
         if (!pathExists(globals.instSource.nixExprPath)) {

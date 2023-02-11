@@ -12,6 +12,19 @@ nix-channel --remove xyzzy
 [ -e $TEST_HOME/.nix-channels ]
 [ "$(cat $TEST_HOME/.nix-channels)" = '' ]
 
+# Test the XDG Base Directories support
+
+export NIX_CONFIG="use-xdg-base-directories = true"
+
+nix-channel --add http://foo/bar xyzzy
+nix-channel --list | grep -q http://foo/bar
+nix-channel --remove xyzzy
+
+unset NIX_CONFIG
+
+[ -e $TEST_HOME/.local/state/nix/channels ]
+[ "$(cat $TEST_HOME/.local/state/nix/channels)" = '' ]
+
 # Create a channel.
 rm -rf $TEST_ROOT/foo
 mkdir -p $TEST_ROOT/foo

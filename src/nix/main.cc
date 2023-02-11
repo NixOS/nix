@@ -53,7 +53,6 @@ static bool haveInternet()
 }
 
 std::string programPath;
-char * * savedArgv;
 
 struct HelpRequested { };
 
@@ -200,7 +199,7 @@ static void showHelp(std::vector<std::string> subcommand, MultiCommand & topleve
     if (!attr)
         throw UsageError("Nix has no subcommand '%s'", concatStringsSep("", subcommand));
 
-    auto markdown = state.forceString(*attr->value);
+    auto markdown = state.forceString(*attr->value, noPos, "while evaluating the lowdown help text");
 
     RunPager pager;
     std::cout << renderMarkdownToTerminal(markdown) << "\n";

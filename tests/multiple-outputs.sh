@@ -83,3 +83,6 @@ nix-store --gc --keep-derivations --keep-outputs
 nix-store --gc --print-roots
 rm -rf $NIX_STORE_DIR/.links
 rmdir $NIX_STORE_DIR
+
+nix build -f multiple-outputs.nix invalid-output-name-1 2>&1 | grep 'contains illegal character'
+nix build -f multiple-outputs.nix invalid-output-name-2 2>&1 | grep 'contains illegal character'

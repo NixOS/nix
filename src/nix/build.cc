@@ -10,6 +10,37 @@
 
 using namespace nix;
 
+nlohmann::json derivedPathsToJSON(const DerivedPaths & paths, ref<Store> store)
+{
+    auto res = nlohmann::json::array();
+    for (auto & t : paths) {
+        std::visit([&res, store](const auto & t) {
+            res.push_back(t.toJSON(store));
+        }, t.raw());
+    }
+    return res;
+}
+
+nlohmann::json builtPathsWithResultToJSON(const std::vector<BuiltPathWithResult> & buildables, ref<Store> store)
+{
+    auto res = nlohmann::json::array();
+    for (auto & b : buildables) {
+        std::visit([&](const auto & t) {
+            auto j = t.toJSON(store);
+            if (b.result) {
+                j["startTime"] = b.result->startTime;
+                j["stopTime"] = b.result->stopTime;
+                if (b.result->cpuUser)
+                    j["cpuUser"] = ((double) b.result->cpuUser->count()) / 1000000;
+                if (b.result->cpuSystem)
+                    j["cpuSystem"] = ((double) b.result->cpuSystem->count()) / 1000000;
+            }
+            res.push_back(j);
+        }, b.path.raw());
+    }
+    return res;
+}
+
 struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 {
     Path outLink = "result";
@@ -63,13 +94,15 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
         if (dryRun) {
             std::vector<DerivedPath> pathsToBuild;
 
-            for (auto & i : installables) {
-                auto b = i->toDerivedPaths();
-                pathsToBuild.insert(pathsToBuild.end(), b.begin(), b.end());
-            }
+            for (auto & i : installables)
+                for (auto & b : i->toDerivedPaths())
+                    pathsToBuild.push_back(b.path);
+
             printMissing(store, pathsToBuild, lvlError);
+
             if (json)
                 logger->cout("%s", derivedPathsToJSON(pathsToBuild, store).dump());
+
             return;
         }
 
@@ -78,7 +111,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
             Realise::Outputs,
             installables, buildMode);
 
-        if (json) logger->cout("%s", derivedPathsWithHintsToJSON(buildables, store).dump());
+        if (json) logger->cout("%s", builtPathsWithResultToJSON(buildables, store).dump());
 
         if (outLink != "")
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
@@ -98,7 +131,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
                                 store2->addPermRoot(output.second, absPath(symlink));
                             }
                         },
-                    }, buildable.raw());
+                    }, buildable.path.raw());
                 }
 
         if (printOutputPaths) {
@@ -113,11 +146,14 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
                             std::cout << store->printStorePath(output.second) << std::endl;
                         }
                     },
-                }, buildable.raw());
+                }, buildable.path.raw());
             }
         }
 
-        updateProfile(buildables);
+        BuiltPaths buildables2;
+        for (auto & b : buildables)
+            buildables2.push_back(b.path);
+        updateProfile(buildables2);
     }
 };
 

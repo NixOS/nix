@@ -134,7 +134,6 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             /* Hash will be set below. FIXME construct ValidPathInfo at end. */
             auto info = std::make_shared<ValidPathInfo>(path, Hash::dummy);
 
-            PathSet references;
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info->deriver = parseStorePath(deriver);
@@ -255,8 +254,8 @@ private:
                 << settings.maxLogSize;
         if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 3)
             conn.to
-                << settings.buildRepeat
-                << settings.enforceDeterminism;
+                << 0 // buildRepeat hasn't worked for ages anyway
+                << 0;
 
         if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 7) {
             conn.to << ((int) settings.keepFailed);
@@ -279,7 +278,12 @@ public:
 
         conn->to.flush();
 
-        BuildResult status { .path = DerivedPath::Built { .drvPath = drvPath } };
+        BuildResult status {
+            .path = DerivedPath::Built {
+                .drvPath = drvPath,
+                .outputs = OutputsSpec::All { },
+            },
+        };
         status.status = (BuildResult::Status) readInt(conn->from);
         conn->from >> status.errorMsg;
 

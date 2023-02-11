@@ -37,9 +37,11 @@ directory containing at least a file named `default.nix`.
 
 `nix-build` is essentially a wrapper around
 [`nix-instantiate`](nix-instantiate.md) (to translate a high-level Nix
-expression to a low-level store derivation) and [`nix-store
+expression to a low-level [store derivation]) and [`nix-store
 --realise`](nix-store.md#operation---realise) (to build the store
 derivation).
+
+[store derivation]: ../glossary.md#gloss-store-derivation
 
 > **Warning**
 >
@@ -53,16 +55,18 @@ All options not listed here are passed to `nix-store
 --realise`, except for `--arg` and `--attr` / `-A` which are passed to
 `nix-instantiate`.
 
-  - [`--no-out-link`]{#opt-no-out-link}\
+  - <span id="opt-no-out-link">[`--no-out-link`](#opt-no-out-link)<span>
+
     Do not create a symlink to the output path. Note that as a result
     the output does not become a root of the garbage collector, and so
-    might be deleted by `nix-store
-                    --gc`.
+    might be deleted by `nix-store --gc`.
 
-  - [`--dry-run`]{#opt-dry-run}\
+  - <span id="opt-dry-run">[`--dry-run`](#opt-dry-run)</span>
+
     Show what store paths would be built or downloaded.
 
-  - [`--out-link`]{#opt-out-link} / `-o` *outlink*\
+  - <span id="opt-out-link">[`--out-link`](#opt-out-link)</span> / `-o` *outlink*
+
     Change the name of the symlink to the output path created from
     `result` to *outlink*.
 

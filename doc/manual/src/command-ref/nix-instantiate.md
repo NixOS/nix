@@ -17,12 +17,13 @@
 
 # Description
 
-The command `nix-instantiate` generates [store
-derivations](../glossary.md) from (high-level) Nix expressions. It
-evaluates the Nix expressions in each of *files* (which defaults to
+The command `nix-instantiate` produces [store derivation]s from (high-level) Nix expressions.
+It evaluates the Nix expressions in each of *files* (which defaults to
 *./default.nix*). Each top-level expression should evaluate to a
 derivation, a list of derivations, or a set of derivations. The paths
 of the resulting store derivations are printed on standard output.
+
+[store derivation]: ../glossary.md#gloss-store-derivation
 
 If *files* is the character `-`, then a Nix expression will be read from
 standard input.
@@ -79,8 +80,7 @@ standard input.
 
 # Examples
 
-Instantiating store derivations from a Nix expression, and building them
-using `nix-store`:
+Instantiate [store derivation]s from a Nix expression, and build them using `nix-store`:
 
 ```console
 $ nix-instantiate test.nix (instantiate)

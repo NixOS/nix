@@ -20,11 +20,11 @@ following fields:
 * An integer that can be used to unambiguously identify the package in
   invocations of `nix profile remove` and `nix profile upgrade`.
 
-* The original ("mutable") flake reference and output attribute path
+* The original ("unlocked") flake reference and output attribute path
   used at installation time.
 
-* The immutable flake reference to which the mutable flake reference
-  was resolved.
+* The locked flake reference to which the unlocked flake reference was
+  resolved.
 
 * The store path(s) of the package.
 

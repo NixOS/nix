@@ -1,7 +1,21 @@
+[book]
+title = "Nix Reference Manual"
+
 [output.html]
 additional-css = ["custom.css"]
 additional-js = ["redirects.js"]
+edit-url-template = "https://github.com/NixOS/nix/tree/master/doc/manual/{path}"
+git-repository-url = "https://github.com/NixOS/nix"
 
 [preprocessor.anchors]
 renderers = ["html"]
 command = "jq --from-file doc/manual/anchors.jq"
+
+[output.linkcheck]
+# no Internet during the build (in the sandbox)
+follow-web-links = false
+
+# mdbook-linkcheck does not understand [foo]{#bar} style links, resulting in
+# excessive "Potential incomplete link" warnings. No other kind of warning was
+# produced at the time of writing.
+warning-policy = "ignore"

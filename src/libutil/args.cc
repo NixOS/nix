@@ -324,7 +324,7 @@ MultiCommand::MultiCommand(const Commands & commands_)
     expectArgs({
         .label = "subcommand",
         .optional = true,
-        .handler = {[=](std::string s) {
+        .handler = {[=,this](std::string s) {
             assert(!command);
             auto i = commands.find(s);
             if (i == commands.end()) {

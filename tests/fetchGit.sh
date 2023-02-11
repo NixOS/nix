@@ -122,6 +122,7 @@ git -C $repo commit -m 'Bla3' -a
 path4=$(nix eval --impure --refresh --raw --expr "(builtins.fetchGit file://$repo).outPath")
 [[ $path2 = $path4 ]]
 
+status=0
 nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; rev = \"$rev2\"; narHash = \"sha256-B5yIPHhEm0eysJKEsO7nqxprh9vcblFxpJG11gXJus1=\"; }).outPath" || status=$?
 [[ "$status" = "102" ]]
 

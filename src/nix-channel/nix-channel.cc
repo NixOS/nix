@@ -1,9 +1,11 @@
+#include "profiles.hh"
 #include "shared.hh"
 #include "globals.hh"
 #include "filetransfer.hh"
 #include "store-api.hh"
 #include "legacy.hh"
 #include "fetchers.hh"
+#include "util.hh"
 
 #include <fcntl.h>
 #include <regex>
@@ -162,11 +164,11 @@ static int main_nix_channel(int argc, char ** argv)
     {
         // Figure out the name of the `.nix-channels' file to use
         auto home = getHome();
-        channelsList = home + "/.nix-channels";
-        nixDefExpr = home + "/.nix-defexpr";
+        channelsList = settings.useXDGBaseDirectories ? createNixStateDir() + "/channels" : home + "/.nix-channels";
+        nixDefExpr = settings.useXDGBaseDirectories ? createNixStateDir() + "/defexpr" : home + "/.nix-defexpr";
 
         // Figure out the name of the channels profile.
-        profile = fmt("%s/profiles/per-user/%s/channels", settings.nixStateDir, getUserName());
+        profile = profilesDir() + "/channels";
 
         enum {
             cNone,

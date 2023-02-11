@@ -125,9 +125,4 @@ public:
     FileTransferError(FileTransfer::Error error, std::optional<std::string> response, const Args & ... args);
 };
 
-bool isUri(std::string_view s);
-
-/* Resolve deprecated 'channel:<foo>' URLs. */
-std::string resolveUri(std::string_view uri);
-
 }

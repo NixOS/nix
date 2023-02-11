@@ -105,14 +105,6 @@ public:
 
 Verbosity verbosity = lvlInfo;
 
-void warnOnce(bool & haveWarned, const FormatOrString & fs)
-{
-    if (!haveWarned) {
-        warn(fs.s);
-        haveWarned = true;
-    }
-}
-
 void writeToStderr(std::string_view s)
 {
     try {
@@ -130,13 +122,28 @@ Logger * makeSimpleLogger(bool printBuildLogs)
     return new SimpleLogger(printBuildLogs);
 }
 
-std::atomic<uint64_t> nextId{(uint64_t) getpid() << 32};
+std::atomic<uint64_t> nextId{0};
 
 Activity::Activity(Logger & logger, Verbosity lvl, ActivityType type,
     const std::string & s, const Logger::Fields & fields, ActivityId parent)
-    : logger(logger), id(nextId++)
+    : logger(logger), id(nextId++ + (((uint64_t) getpid()) << 32))
 {
     logger.startActivity(id, lvl, type, s, fields, parent);
+}
+
+void to_json(nlohmann::json & json, std::shared_ptr<AbstractPos> pos)
+{
+    if (pos) {
+        json["line"] = pos->line;
+        json["column"] = pos->column;
+        std::ostringstream str;
+        pos->print(str);
+        json["file"] = str.str();
+    } else {
+        json["line"] = nullptr;
+        json["column"] = nullptr;
+        json["file"] = nullptr;
+    }
 }
 
 struct JSONLogger : Logger {
@@ -185,27 +192,14 @@ struct JSONLogger : Logger {
         json["level"] = ei.level;
         json["msg"] = oss.str();
         json["raw_msg"] = ei.msg.str();
-
-        if (ei.errPos.has_value() && (*ei.errPos)) {
-            json["line"] = ei.errPos->line;
-            json["column"] = ei.errPos->column;
-            json["file"] = ei.errPos->file;
-        } else {
-            json["line"] = nullptr;
-            json["column"] = nullptr;
-            json["file"] = nullptr;
-        }
+        to_json(json, ei.errPos);
 
         if (loggerSettings.showTrace.get() && !ei.traces.empty()) {
             nlohmann::json traces = nlohmann::json::array();
             for (auto iter = ei.traces.rbegin(); iter != ei.traces.rend(); ++iter) {
                 nlohmann::json stackFrame;
                 stackFrame["raw_msg"] = iter->hint.str();
-                if (iter->pos.has_value() && (*iter->pos)) {
-                    stackFrame["line"] = iter->pos->line;
-                    stackFrame["column"] = iter->pos->column;
-                    stackFrame["file"] = iter->pos->file;
-                }
+                to_json(stackFrame, iter->pos);
                 traces.push_back(stackFrame);
             }
 

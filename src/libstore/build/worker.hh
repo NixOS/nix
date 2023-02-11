@@ -140,15 +140,15 @@ public:
     /* derivation goal */
 private:
     std::shared_ptr<DerivationGoal> makeDerivationGoalCommon(
-        const StorePath & drvPath, const StringSet & wantedOutputs,
+        const StorePath & drvPath, const OutputsSpec & wantedOutputs,
         std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal);
 public:
     std::shared_ptr<DerivationGoal> makeDerivationGoal(
         const StorePath & drvPath,
-        const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
+        const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
     std::shared_ptr<DerivationGoal> makeBasicDerivationGoal(
         const StorePath & drvPath, const BasicDerivation & drv,
-        const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
+        const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
 
     /* substitution goal */
     std::shared_ptr<PathSubstitutionGoal> makePathSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);

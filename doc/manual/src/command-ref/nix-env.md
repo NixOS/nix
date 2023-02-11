@@ -205,9 +205,11 @@ a number of possible ways:
     unambiguous way, which is necessary if there are multiple
     derivations with the same name.
 
-  - If *args* are store derivations, then these are
+  - If *args* are [store derivation]s, then these are
     [realised](nix-store.md#operation---realise), and the resulting output paths
     are installed.
+
+    [store derivation]: ../glossary.md#gloss-store-derivation
 
   - If *args* are store paths that are not store derivations, then these
     are [realised](nix-store.md#operation---realise) and installed.
@@ -280,7 +282,7 @@ To copy the store path with symbolic name `gcc` from another profile:
 $ nix-env -i --from-profile /nix/var/nix/profiles/foo gcc
 ```
 
-To install a specific store derivation (typically created by
+To install a specific [store derivation] (typically created by
 `nix-instantiate`):
 
 ```console
@@ -665,7 +667,7 @@ derivation is shown unless `--no-name` is specified.
     Print the `system` attribute of the derivation.
 
   - `--drv-path`\
-    Print the path of the store derivation.
+    Print the path of the [store derivation].
 
   - `--out-path`\
     Print the output path of the derivation.

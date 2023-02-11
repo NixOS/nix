@@ -148,7 +148,7 @@ inline hintformat hintfmt(const std::string & fs, const Args & ... args)
     return f;
 }
 
-inline hintformat hintfmt(std::string plain_string)
+inline hintformat hintfmt(const std::string & plain_string)
 {
     // we won't be receiving any args in this case, so just print the original string
     return hintfmt("%s", normaltxt(plain_string));

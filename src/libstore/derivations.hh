@@ -13,6 +13,7 @@
 
 namespace nix {
 
+class Store;
 
 /* Abstract syntax of derivations. */
 
@@ -224,7 +225,7 @@ StorePath writeDerivation(Store & store,
 Derivation parseDerivation(const Store & store, std::string && s, std::string_view name);
 
 // FIXME: remove
-bool isDerivation(const std::string & fileName);
+bool isDerivation(std::string_view fileName);
 
 /* Calculate the name that will be used for the store path for this
    output.
@@ -293,8 +294,6 @@ typedef std::map<StorePath, DrvHash> DrvHashes;
 
 // FIXME: global, though at least thread-safe.
 extern Sync<DrvHashes> drvHashes;
-
-bool wantOutput(const std::string & output, const std::set<std::string> & wanted);
 
 struct Source;
 struct Sink;

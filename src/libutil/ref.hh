@@ -83,6 +83,11 @@ public:
         return p != other.p;
     }
 
+    bool operator < (const ref<T> & other) const
+    {
+        return p < other.p;
+    }
+
 private:
 
     template<typename T2, typename... Args>
