@@ -1,6 +1,6 @@
 #ifdef HAVE_RYML
 
-#include "libexprtests.hh"
+#include "libexpr.hh"
 
 // Ugly, however direct access to the SAX parser is required in order to parse multiple JSON objects from a stream
 #include "json-to-value.cc"
@@ -108,9 +108,9 @@ namespace nix {
                         if (name == "json") {
                             json = attr->value;
                         } else if (name == "yaml") {
-                            yamlRaw = state.forceStringNoCtx(*attr->value);
+                            yamlRaw = state.forceStringNoCtx(*attr->value, noPos, "while interpreting the \"yaml\" field as string");
                         } else if (name == "fail") {
-                            fail = state.forceBool(*attr->value, noPos);
+                            fail = state.forceBool(*attr->value, noPos, "while interpreting the \"fail\" field as bool");
                         }
                     }
                     fail |= !json;
@@ -126,7 +126,7 @@ namespace nix {
                             jsonStr = "null";
                             jsonVal.mkNull();
                         } else {
-                            jsonStr = state.forceStringNoCtx(*json);
+                            jsonStr = state.forceStringNoCtx(*json, noPos, "while interpreting the \"json\" field as string");
                         }
                         if (!(emptyJSON = jsonStr.empty())) {
                             if (json->type() != nNull) {
