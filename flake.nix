@@ -107,6 +107,32 @@
           ]
           ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)];
 
+        rapidyaml = callPackage (
+          { cmake
+          , fetchFromGitHub
+          , git
+          , stdenv
+          , enableStatic ? true
+          }:
+          stdenv.mkDerivation rec {
+            pname = "rapidyaml";
+            version = "0.5.0";
+
+            src = fetchFromGitHub {
+              owner = "biojppm";
+              repo = pname;
+              rev = "v${version}";
+              fetchSubmodules = true;
+              hash = "sha256-1/P6Szgng94UU8cPFAtOKMS+EmiwfW/IJl2UTolDU5s=";
+            };
+
+            nativeBuildInputs = [ cmake git ];
+            cmakeFlags = [
+              "-DRYML_WITH_TAB_TOKENS=ON"
+              "-DBUILD_SHARED_LIBS=${if enableStatic then "OFF" else "ON"}"
+            ];
+          }) { };
+
         buildDeps =
           [ (curl.override { patchNetrcRegression = true; })
             bzip2 xz brotli editline
@@ -115,6 +141,7 @@
             boost
             lowdown-nix
             gtest
+            rapidyaml
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium

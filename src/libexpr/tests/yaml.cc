@@ -1,3 +1,5 @@
+#ifdef HAVE_RYML
+
 #include "libexprtests.hh"
 
 // Ugly, however direct access to the SAX parser is required in order to parse multiple JSON objects from a stream
@@ -155,3 +157,5 @@ namespace nix {
 
 // include auto-generated header
 #include "./yaml-test-suite.hh"
+
+#endif

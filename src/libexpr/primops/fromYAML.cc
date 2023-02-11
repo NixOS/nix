@@ -1,12 +1,11 @@
-// RYML: workaround for bug in amalgamate script - nix requires at least C++17
-#include <charconv>
-// enabling this macro has a performance penalty
-#define RYML_WITH_TAB_TOKENS
-#define RYML_SINGLE_HDR_DEFINE_NOW
-#include "../../rapidyaml/ryml_all.hpp"
+#ifdef HAVE_RYML
 
 #include "primops.hh"
 #include "eval-inline.hh"
+
+#include <ryml.hpp>
+#include <c4/format.hpp>
+#include <c4/std/string.hpp>
 
 
 namespace nix {
@@ -121,7 +120,7 @@ static RegisterPrimOp primop_fromYAML({
 
       returns the value `{ x = [ 1 2 3 ]; y = "null"; z = null; }`.
 
-      Maps are converted to attribute sets, but attribute sets require String keys, so that no other key data types are sypported.
+      Maps are converted to attribute sets, but attribute sets require String keys, so that no other key data types are supported.
 
       Scalars are converted to the type specified by their optional value tag and parsing fails, if a conversion is not possible.
       Not all YAML types are supported by Nix, e.g. Nix has no binary and timestamp data types, so that parsing of YAML with any of these types fails.
@@ -153,3 +152,5 @@ static RegisterPrimOp primop_fromYAML({
 });
 
 }
+
+#endif
