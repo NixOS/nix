@@ -16,6 +16,7 @@
 , boost
 , boehmgc
 , nlohmann_json
+, rapidyaml
 , toml11
 
 # Configuration Options
@@ -70,6 +71,7 @@ mkMesonDerivation (finalAttrs: {
   ];
 
   buildInputs = [
+    rapidyaml
     toml11
   ];
 

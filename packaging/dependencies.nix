@@ -164,6 +164,25 @@ scope: {
     '';
   });
 
+  rapidyaml = pkgs.rapidyaml.overrideAttrs(old: let
+    pname = "rapidyaml";
+    version = "0.5.0";
+  in {
+    src = pkgs.fetchFromGitHub {
+      owner = "biojppm";
+      repo = pname;
+      rev = "v${version}";
+      fetchSubmodules = true;
+      hash = "sha256-1/P6Szgng94UU8cPFAtOKMS+EmiwfW/IJl2UTolDU5s=";
+    };
+
+      cmakeFlags = [
+        "-DRYML_WITH_TAB_TOKENS=ON"
+        "-DBUILD_SHARED_LIBS=ON"
+      ];
+  });
+
+
   # TODO change in Nixpkgs, Windows works fine. First commit of
   # https://github.com/NixOS/nixpkgs/pull/322977 backported will fix.
   toml11 = pkgs.toml11.overrideAttrs (old: {
