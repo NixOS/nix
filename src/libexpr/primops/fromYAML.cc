@@ -127,7 +127,7 @@ static RegisterPrimOp primop_fromYAML({
       Custom tags are ignored and a stream with multiple documents is mapped to a list except when the stream contains a single document.
     )",
     .fun = [] (EvalState & state, const PosIdx pos, Value * * args, Value & val) {
-        auto yaml = state.forceStringNoCtx(*args[0], pos);
+        auto yaml = state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.fromYAML");
 
         NixContext context{
             .state = state,
