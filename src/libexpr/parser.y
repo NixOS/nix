@@ -438,7 +438,7 @@ expr_select
        function named ‘or’, allow stuff like ‘map or [...]’. */
     expr_simple OR_KW
     { $$ = new ExprCall(CUR_POS, $1, {new ExprVar(CUR_POS, data->symbols.create("or"))}); }
-  | expr_simple { $$ = $1; }
+  | expr_simple
   ;
 
 expr_simple
@@ -455,7 +455,7 @@ expr_simple
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = stripIndentation(CUR_POS, data->symbols, *$2);
   }
-  | path_start PATH_END { $$ = $1; }
+  | path_start PATH_END
   | path_start string_parts_interpolated PATH_END {
       $2->insert($2->begin(), {makeCurPos(@1, data), $1});
       $$ = new ExprConcatStrings(CUR_POS, false, $2);
@@ -596,7 +596,7 @@ attrpath
   ;
 
 attr
-  : ID { $$ = $1; }
+  : ID
   | OR_KW { $$ = {"or", 2}; }
   ;
 
