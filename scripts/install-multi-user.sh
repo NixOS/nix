@@ -67,7 +67,7 @@
 
 	readonly ROOT_HOME=~root
 
-	if [ -t 0 ]; then
+	if [ -t 0 ] && [ -z "${NIX_INSTALLER_YES:-}" ]; then
 		readonly IS_HEADLESS='no'
 	else
 		readonly IS_HEADLESS='yes'
@@ -346,13 +346,10 @@
 	trap finish_fail EXIT
 
 	contact_us() {
-		echo "You can open an issue at https://github.com/nixos/nix/issues"
+		echo "You can open an issue at"
+		echo "https://github.com/NixOS/nix/issues/new?labels=installer&template=installer.md"
 		echo ""
-		echo "Or feel free to contact the team:"
-		echo " - Matrix: #nix:nixos.org"
-		echo " - IRC: in #nixos on irc.libera.chat"
-		echo " - twitter: @nixos_org"
-		echo " - forum: https://discourse.nixos.org"
+		echo "Or get in touch with the community: https://nixos.org/community"
 	}
 
 	get_help() {
@@ -908,7 +905,7 @@
 		# to extract _just_ the user's note, instead it is prefixed with
 		# some plist junk. This was causing the user note to always be set,
 		# even if there was no reason for it.
-		if ! poly_user_note_get "$username" | grep -q "Nix build user $coreid"; then
+		if poly_user_note_get "$username" | grep -q "Nix build user $coreid"; then
 			row "              Note" "Nix build user $coreid"
 		else
 			poly_user_note_set "$username" "Nix build user $coreid"
