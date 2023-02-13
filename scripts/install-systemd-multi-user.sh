@@ -33,13 +33,18 @@
 		$1
 		EOF
 	}
+    
+	escape_systemd_env() {
+		temp_var="${1//\'/\\\'}"
+		echo "${temp_var//\%/%%}"
+	}
 
 	# Gather all non-empty proxy environment variables into a string
 	create_systemd_proxy_env() {
 		vars="http_proxy https_proxy ftp_proxy no_proxy HTTP_PROXY HTTPS_PROXY FTP_PROXY NO_PROXY"
 		for v in $vars; do
 			if [ "x${!v:-}" != "x" ]; then
-				echo "Environment=${v}=${!v}"
+				echo "Environment=${v}=$(escape_systemd_env ${!v})"
 			fi
 		done
 	}
@@ -116,7 +121,7 @@
 		cat <<-EOF
 		$step. Delete the files Nix added to your system:
 
-		sudo rm -rf /etc/nix $NIX_ROOT $ROOT_HOME/.nix-profile $ROOT_HOME/.nix-defexpr $ROOT_HOME/.nix-channels $HOME/.nix-profile $HOME/.nix-defexpr $HOME/.nix-channels
+		sudo rm -rf '/etc/nix' '$NIX_ROOT' '$ROOT_HOME/.nix-profile' '$ROOT_HOME/.nix-defexpr' '$ROOT_HOME/.nix-channels' '$HOME/.nix-profile' '$HOME/.nix-defexpr' '$HOME/.nix-channels'
 
 		and that is it.
 
