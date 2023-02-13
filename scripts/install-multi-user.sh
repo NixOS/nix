@@ -91,6 +91,15 @@
 			return 1
 		fi
 	}
+	
+	is_os_selinux() {
+		if command -v getenforce > /dev/null 2>&1; then
+			if [ "$(getenforce)" = "Enforcing" ]; then
+				return 0
+			fi
+		fi
+		return 1
+	}
 
 	is_os_linux() {
 		if [ "$(uname -s)" = "Linux" ]; then
@@ -575,8 +584,12 @@
 		#     poly_user_primary_group_set
 		#     poly_user_shell_get
 		#     poly_user_shell_set
-		check_selinux
-		if is_os_darwin; then
+		if is_os_selinux; then
+			failure <<-EOF
+			Nix does not work with selinux enabled yet!
+			see https://github.com/NixOS/nix/issues/2374
+			EOF
+		elif is_os_darwin; then
 			# shellcheck source=./install-darwin-multi-user.sh
 			. "$EXTRACTED_NIX_PATH/install-darwin-multi-user.sh"
 		elif is_os_linux; then
@@ -635,17 +648,6 @@
 # 
 # main helpers
 # 
-	check_selinux() {
-		if command -v getenforce > /dev/null 2>&1; then
-			if [ "$(getenforce)" = "Enforcing" ]; then
-				failure <<-EOF
-				Nix does not work with selinux enabled yet!
-				see https://github.com/NixOS/nix/issues/2374
-				EOF
-			fi
-		fi
-	}
-
 	welcome_to_nix() {
 		ok "Welcome to the Multi-User Nix Installation"
 
