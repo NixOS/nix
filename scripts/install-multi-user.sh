@@ -855,44 +855,6 @@
 		fi
 	}
 
-	extract_nix_profile_injection() {
-		profile="$1"
-		start_line_number="$(cat "$profile" | grep -n "$PROFILE_NIX_START_DELIMETER"'$' | cut -f1 -d: | head -n1)"
-		end_line_number="$(cat "$profile" | grep -n "$PROFILE_NIX_END_DELIMETER"'$' | cut -f1 -d: | head -n1)"
-		if [ -n "$start_line_number" ] && [ -n "$end_line_number" ]; then
-			if [ $start_line_number -gt $end_line_number ]; then
-				line_number_before=$(( $start_line_number - 1 ))
-				line_number_after=$(( $end_line_number + 1))
-				new_top_half="$(head -n$line_number_before)
-				"
-				new_profile="$new_top_half$(tail -n "+$line_number_after")"
-				# overwrite existing profile, but with only Nix removed
-				printf '%s' "$new_profile" | _sudo "" tee "$profile" 1>/dev/null
-				return 0
-			else 
-				unsetup_profiles_needs_manual_editing "$profile"
-				return 1
-			fi
-		elif [ -n "$start_line_number" ] || [ -n "$end_line_number" ]; then
-			unsetup_profiles_needs_manual_editing "$profile"
-			return 1
-		fi
-	}
-	
-	restore_profile() {
-		profile="$1"
-		
-		# check if file exists
-		if [ -f "$profile" ]; then
-			if extract_nix_profile_injection "$profile"; then
-				# the extraction is done in-place. 
-				# this is safer than restoring a backup because its possible
-				# other non-nix tools have added things, and restoring the backup would remove those
-				# if the extraction was successful, remove the backup-before-nix
-				_sudo "" rm -f "$profile.backup-before-nix"
-			fi
-		fi
-	}
 # 
 # main
 # 
