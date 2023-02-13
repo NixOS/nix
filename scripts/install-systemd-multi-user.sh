@@ -273,7 +273,8 @@
 		local nixenv_check_failed=""
 		local backup_profiles_check_failed=""
 		check_nixenv_command_doesnt_exist || nixenv_check_failed="true"
-		check_backup_profiles_exist  || backup_profiles_check_failed="true"
+		backup_profiles_exist_message="$(shell_backup_profiles_exist_message)"
+		
 		# <<<could insert Linux specific checks here>>>
 		
 		# 
@@ -282,7 +283,7 @@
 		if [ -n "$nixenv_check_failed$backup_profiles_check_failed" ]
 		then
 			[ "$nixenv_check_failed"          = "true" ] && message_nixenv_command_doesnt_exist
-			[ "$backup_profiles_check_failed" = "true" ] && message_backup_profiles_exist
+			[ -n "$backup_profiles_exist_message"      ] && shell_backup_profiles_exist_message
 			
 			return 1
 		else
@@ -339,7 +340,7 @@
 		# restoring any shell files
 		# 
 		subheader "Restoring all shell files" 
-			unsetup_profiles
+			shell_unsetup_profiles
 		
 		set -e # go back to all uncaught errors failing
 	}

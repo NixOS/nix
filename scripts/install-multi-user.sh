@@ -40,25 +40,10 @@
 	readonly NIX_ROOT="/nix"
 	readonly NIX_EXTRA_CONF=${NIX_EXTRA_CONF:-}
 
-	readonly PROFILE_TARGETS=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/zshrc" "/etc/bash.bashrc" "/etc/zsh/zshrc")
-	readonly PROFILE_BACKUP_SUFFIX=".backup-before-nix"
-	readonly PROFILE_NIX_FILE="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
 	readonly PROFILE_NIX_START_DELIMETER="# Nix"
 	readonly PROFILE_NIX_END_DELIMETER="# End Nix" # Caution, used both as a comment and inside grep argument (so $ or \+, etc would break things)
-
-	# Fish has different syntax than zsh/bash, treat it separate
-	readonly PROFILE_FISH_SUFFIX="conf.d/nix.fish"
-	readonly PROFILE_FISH_PREFIXES=(
-		# each of these are common values of $__fish_sysconf_dir,
-		# under which Fish will look for a file named
-		# $PROFILE_FISH_SUFFIX.
-		"/etc/fish"              # standard
-		"/usr/local/etc/fish"    # their installer .pkg for macOS
-		"/opt/homebrew/etc/fish" # homebrew
-		"/opt/local/etc/fish"    # macports
-	)
-	readonly PROFILE_NIX_FILE_FISH="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.fish"
-
+	readonly PROFILE_BACKUP_SUFFIX=".backup-before-nix"
+	
 	readonly NIX_INSTALLED_NIX="@nix@"
 	readonly NIX_INSTALLED_CACERT="@cacert@"
 	#readonly NIX_INSTALLED_NIX="/nix/store/j8dbv5w6jl34caywh2ygdy88knx1mdf7-nix-2.3.6"
@@ -72,6 +57,374 @@
 	else
 		readonly IS_HEADLESS='yes'
 	fi
+
+# 
+# shell support
+# 
+	# 
+	# to add a shell
+	# 
+		# 1. fill out the api (shell name at end of each function)
+			# shell_list_targets_SHELLNAME # tells user what files might be edited
+			# shell_configure_profile_SHELLNAME
+			# shell_check_backup_profile_exists_message_SHELLNAME
+			# shell_unsetup_profiles_SHELLNAME
+		# 2. update the "aggregated shell API" below to call the new functions
+		
+	# 
+	# bash
+	# 
+		readonly PROFILE_TARGETS_BASH=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/bash.bashrc")
+		readonly PROFILE_NIX_FILE_BASH="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
+		
+		shell_list_targets_bash() {
+			for profile_target in "${PROFILE_TARGETS_BASH[@]}"; do
+				if [ -e "$profile_target" ]; then
+					cat <<-EOF
+					- back up $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX
+					- update $profile_target to include some Nix configuration
+					EOF
+				fi
+			done
+		}
+		
+		_helper_source_lines_bash() {
+			cat <<-EOF
+
+			$PROFILE_NIX_START_DELIMETER
+			if [ -e '$PROFILE_NIX_FILE_BASH' ]; then
+			. '$PROFILE_NIX_FILE_BASH'
+			fi
+			$PROFILE_NIX_END_DELIMETER
+
+			EOF
+		}
+		
+		shell_configure_profile_bash() {
+			task "Setting up shell profiles for Bash"
+			for profile_target in "${PROFILE_TARGETS_BASH[@]}"; do
+				if [ -e "$profile_target" ]; then
+					_sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
+						cp "$profile_target" "$profile_target$PROFILE_BACKUP_SUFFIX"
+				else
+					# try to create the file if its directory exists
+					target_dir="$(dirname "$profile_target")"
+					if [ -d "$target_dir" ]; then
+						_sudo "to create a stub $profile_target which will be updated" \
+							touch "$profile_target"
+					fi
+				fi
+
+				if [ -e "$profile_target" ]; then
+					_helper_source_lines_bash \
+						| _sudo "extend your $profile_target with nix-daemon settings" \
+								tee -a "$profile_target"
+				fi
+			done
+		}
+		
+		shell_check_backup_profile_exists_message_bash() {
+			local at_least_one_failed="false"
+			for profile_target in "${PROFILE_TARGETS_BASH[@]}"; do
+				if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
+					# this backup process first released in Nix 2.1
+					at_least_one_failed="true"
+					failed_check "$profile_target$PROFILE_BACKUP_SUFFIX already exists"
+				else
+					passed_check "$profile_target$PROFILE_BACKUP_SUFFIX does not exist yet"
+				fi
+			done
+			
+			if [ "$at_least_one_failed" = "true" ]; then
+				subheader "For Bash"
+				profiles=""
+				profile_backups=""
+				for profile_target in "${PROFILE_TARGETS_BASH[@]}"; do
+					if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
+						profiles="$profiles, $profile_target"
+						profile_backups="$profile_backups, $profile_target$PROFILE_BACKUP_SUFFIX"
+					fi
+				done
+				
+				cat <<-EOF
+				I need to back up each of these profiles: $profiles
+				To their respective backups: $profile_backups
+				But those backup files already exist.
+
+				Here's how to clean up the old bash backup files:
+
+				1. Open each of these profiles, and look for something similar to the following
+				$(_helper_source_lines_bash)
+
+				2. Remove those lines that mention Nix, and save the file
+
+				3. Move these backup files to a new location: $profile_backups
+				(ideally a location you will remember encase you need to rollback to them)
+				
+				
+				EOF
+			fi
+		}
+		
+		shell_unsetup_profiles_bash() {
+			for profile_target in "${PROFILE_TARGETS_BASH[@]}"; do
+				# removes everything between $PROFILE_NIX_START_DELIMETER and $PROFILE_NIX_END_DELIMETER
+				# also has "something seems weird" checks that prompt manual editing
+				restore_profile "$profile_target"
+			done
+		}
+		
+	# 
+	# zsh
+	# 
+		readonly PROFILE_ZSH_TARGETS=("/etc/zshrc" "/etc/zsh/zshrc")
+		readonly PROFILE_NIX_FILE_ZSH="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
+		shell_list_targets_zsh() {
+			for profile_target in "${PROFILE_TARGETS_ZSH[@]}"; do
+				if [ -e "$profile_target" ]; then
+					cat <<-EOF
+					- back up $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX
+					- update $profile_target to include some Nix configuration
+					EOF
+				fi
+			done
+		}
+		
+		_helper_source_lines_zsh() {
+			cat <<-EOF
+
+			$PROFILE_NIX_START_DELIMETER
+			if [ -e '$PROFILE_NIX_FILE_ZSH' ]; then
+			. '$PROFILE_NIX_FILE_ZSH'
+			fi
+			$PROFILE_NIX_END_DELIMETER
+
+			EOF
+		}
+		
+		shell_configure_profile_zsh() {
+			task "Setting up shell profiles for Zsh"
+			for profile_target in "${PROFILE_TARGETS_ZSH[@]}"; do
+				if [ -e "$profile_target" ]; then
+					_sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
+						cp "$profile_target" "$profile_target$PROFILE_BACKUP_SUFFIX"
+				else
+					# try to create the file if its directory exists
+					target_dir="$(dirname "$profile_target")"
+					if [ -d "$target_dir" ]; then
+						_sudo "to create a stub $profile_target which will be updated" \
+							touch "$profile_target"
+					fi
+				fi
+
+				if [ -e "$profile_target" ]; then
+					_helper_source_lines_zsh \
+						| _sudo "extend your $profile_target with nix-daemon settings" \
+								tee -a "$profile_target"
+				fi
+			done
+		}
+		
+		shell_check_backup_profile_exists_message_zsh() {
+			local at_least_one_failed="false"
+			for profile_target in "${PROFILE_TARGETS_ZSH[@]}"; do
+				if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
+					# this backup process first released in Nix 2.1
+					at_least_one_failed="true"
+					failed_check "$profile_target$PROFILE_BACKUP_SUFFIX already exists"
+				else
+					passed_check "$profile_target$PROFILE_BACKUP_SUFFIX does not exist yet"
+				fi
+			done
+			
+			if [ "$at_least_one_failed" = "true" ]; then
+				subheader "For Zsh"
+				profiles=""
+				profile_backups=""
+				for profile_target in "${PROFILE_TARGETS_ZSH[@]}"; do
+					if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
+						profiles="$profiles, $profile_target"
+						profile_backups="$profile_backups, $profile_target$PROFILE_BACKUP_SUFFIX"
+					fi
+				done
+				
+				cat <<-EOF
+				I need to back up each of these profiles: $profiles
+				To their respective backups: $profile_backups
+				But those backup files already exist.
+
+				Here's how to clean up the old zsh backup files:
+
+				1. Open each of these profiles, and look for something similar to the following
+				$(_helper_source_lines_zsh)
+
+				2. Remove those lines that mention Nix, and save the file
+
+				3. Move these backup files to a new location: $profile_backups
+				(ideally a location you will remember encase you need to rollback to them)
+				
+				
+				EOF
+			fi
+		}
+		
+		shell_unsetup_profiles_zsh() {
+			for profile_target in "${PROFILE_TARGETS_ZSH[@]}"; do
+				# removes everything between $PROFILE_NIX_START_DELIMETER and $PROFILE_NIX_END_DELIMETER
+				# also has "something seems weird" checks that prompt manual editing
+				restore_profile "$profile_target"
+			done
+		}
+	
+	# 
+	# fish
+	# 
+		readonly PROFILE_SUFFIX_FISH="conf.d/nix.fish"
+		readonly PROFILE_PREFIXES_FISH=(
+			# each of these are common values of $__fish_sysconf_dir,
+			# under which Fish will look for a file named
+			# $PROFILE_SUFFIX_FISH.
+			"/etc/fish"              # standard
+			"/usr/local/etc/fish"    # their installer .pkg for macOS
+			"/opt/homebrew/etc/fish" # homebrew
+			"/opt/local/etc/fish"    # macports
+		)
+		readonly PROFILE_TARGETS_FISH=(
+			"/etc/fish/conf.d/nix.fish"              
+			"/usr/local/etc/fish/conf.d/nix.fish"    
+			"/opt/homebrew/etc/fish/conf.d/nix.fish" 
+			"/opt/local/etc/fish/conf.d/nix.fish"    
+		)
+		readonly PROFILE_NIX_FILE_FISH="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.fish"
+		
+		shell_list_targets_fish() {
+			for profile_target in "${PROFILE_NIX_FILE_FISH[@]}"; do
+				if [ -e "$profile_target" ]; then
+					cat <<-EOF
+					- back up $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX
+					- update $profile_target to include some Nix configuration
+					EOF
+				fi
+			done
+		}
+		
+		_helper_source_lines_fish() {
+			cat <<-EOF
+			
+			$PROFILE_NIX_START_DELIMETER
+			if test -e '$PROFILE_NIX_FILE_FISH'
+			. '$PROFILE_NIX_FILE_FISH'
+			end
+			$PROFILE_NIX_END_DELIMETER
+			
+			EOF
+		}
+		
+		shell_configure_profile_fish() {
+			task "Setting up shell profiles for Fish with with ${PROFILE_SUFFIX_FISH} inside ${PROFILE_PREFIXES_FISH[*]}"
+			for fish_prefix in "${PROFILE_PREFIXES_FISH[@]}"; do
+				if [ ! -d "$fish_prefix" ]; then
+					# this specific prefix (ie: /etc/fish) is very likely to exist
+					# if Fish is installed with this sysconfdir.
+					continue
+				fi
+
+				profile_target="${fish_prefix}/${PROFILE_SUFFIX_FISH}"
+				conf_dir=$(dirname "$profile_target")
+				if [ ! -d "$conf_dir" ]; then
+					_sudo "create $conf_dir for our Fish hook" \
+						mkdir "$conf_dir"
+				fi
+
+				_helper_source_lines_fish \
+					| _sudo "write nix-daemon settings to $profile_target" \
+							tee "$profile_target"
+			done
+		}
+		
+		shell_check_backup_profile_exists_message_fish() {
+			local at_least_one_failed="false"
+			for profile_target in "${PROFILE_TARGETS_FISH[@]}"; do
+				if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
+					# this backup process first released in Nix 2.1
+					at_least_one_failed="true"
+					failed_check "$profile_target$PROFILE_BACKUP_SUFFIX already exists"
+				else
+					passed_check "$profile_target$PROFILE_BACKUP_SUFFIX does not exist yet"
+				fi
+			done
+			
+			if [ "$at_least_one_failed" = "true" ]; then
+				subheader "For Zsh"
+				profiles=""
+				profile_backups=""
+				for profile_target in "${PROFILE_TARGETS_FISH[@]}"; do
+					if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
+						profiles="$profiles, $profile_target"
+						profile_backups="$profile_backups, $profile_target$PROFILE_BACKUP_SUFFIX"
+					fi
+				done
+				
+				cat <<-EOF
+				I need to back up each of these profiles: $profiles
+				To their respective backups: $profile_backups
+				But those backup files already exist.
+
+				Here's how to clean up the old bash backup files:
+
+				1. Open each of these profiles, and look for something similar to the following
+				$(_helper_source_lines_fish)
+
+				2. Remove those lines that mention Nix, and save the file
+
+				3. Move these backup files to a new location: $profile_backups
+				(ideally a location you will remember encase you need to rollback to them)
+				
+				
+				EOF
+			fi
+		}
+		
+		shell_unsetup_profiles_fish() {
+			for profile_target in "${PROFILE_TARGETS_FISH[@]}"; do
+				# removes everything between $PROFILE_NIX_START_DELIMETER and $PROFILE_NIX_END_DELIMETER
+				# also has "something seems weird" checks that prompt manual editing
+				restore_profile "$profile_target"
+			done
+		}
+		
+	# 
+	# aggregated shell API
+	# 
+		shell_list_targets() {
+			shell_list_targets_bash
+			shell_list_targets_zsh
+			shell_list_targets_fish
+		}
+		
+		shell_configure_profile() {
+			shell_configure_profile_bash
+			shell_configure_profile_zsh
+			shell_configure_profile_fish
+		}
+		
+		shell_backup_profiles_exist_message() {
+			aggregated_message=""
+			aggregated_message="$aggregated_message$(shell_check_backup_profile_exists_message_bash)"
+			aggregated_message="$aggregated_message$(shell_check_backup_profile_exists_message_zsh)"
+			aggregated_message="$aggregated_message$(shell_check_backup_profile_exists_message_fish)"
+			# if any of them error, report it
+			if [ -n "$aggregated_message" ]
+			then
+				echo "$aggregated_message" | error
+			fi
+		}
+		
+		shell_unsetup_profiles() {
+			shell_unsetup_profiles_bash
+			shell_unsetup_profiles_zsh
+			shell_unsetup_profiles_fish
+		}
 
 # 
 # generic global helpers
@@ -475,12 +828,6 @@
 		fi
 	}
 
-	unsetup_profiles() {
-		for profile_target in "${PROFILE_TARGETS[@]}"; do
-			restore_profile "$profile_target"
-		done
-	}
-
 	check_nixenv_command_doesnt_exist() {
 		if command_exists "nix-env"; then
 			failed_check "nix-env command already exists"
@@ -497,54 +844,55 @@
 		EOF
 	}
 
-	check_backup_profiles_exist() {
-		local at_least_one_failed="false"
-		for profile_target in "${PROFILE_TARGETS[@]}"; do
-			# TODO: I think it would be good to accumulate a list of all
-			#       of the copies so that people don't hit this 2 or 3x in
-			#       a row for different files.
-			if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
-				# this backup process first released in Nix 2.1
-				at_least_one_failed="true"
-				failed_check "$profile_target$PROFILE_BACKUP_SUFFIX already exists"
-			else
-				passed_check "$profile_target$PROFILE_BACKUP_SUFFIX does not exist yet"
-			fi
-		done
-		if [ "$at_least_one_failed" = "true" ]; then
-			return 1
+	unsetup_profiles_needs_manual_editing() {
+		local profile="$1"
+		echo "Something is really messed up with your $profile file"
+		echo "I think you need to manually edit it to remove everything related to Nix"
+		# check backup exists
+		if [ -f "$profile.backup-before-nix" ]; then
+			echo "NOTE: you do have a backup file $profile.backup-before-nix"
+			echo "So you might want to use that for reference"
 		fi
 	}
 
-	message_backup_profiles_exist() {
-		echo
-		profiles=""
-		profile_backups=""
-		for profile_target in "${PROFILE_TARGETS[@]}"; do
-			if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
-				profiles="$profiles, $profile_target"
-				profile_backups="$profile_backups, $profile_target$PROFILE_BACKUP_SUFFIX"
+	extract_nix_profile_injection() {
+		profile="$1"
+		start_line_number="$(cat "$profile" | grep -n "$PROFILE_NIX_START_DELIMETER"'$' | cut -f1 -d: | head -n1)"
+		end_line_number="$(cat "$profile" | grep -n "$PROFILE_NIX_END_DELIMETER"'$' | cut -f1 -d: | head -n1)"
+		if [ -n "$start_line_number" ] && [ -n "$end_line_number" ]; then
+			if [ $start_line_number -gt $end_line_number ]; then
+				line_number_before=$(( $start_line_number - 1 ))
+				line_number_after=$(( $end_line_number + 1))
+				new_top_half="$(head -n$line_number_before)
+				"
+				new_profile="$new_top_half$(tail -n "+$line_number_after")"
+				# overwrite existing profile, but with only Nix removed
+				printf '%s' "$new_profile" | _sudo "" tee "$profile" 1>/dev/null
+				return 0
+			else 
+				unsetup_profiles_needs_manual_editing "$profile"
+				return 1
 			fi
-		done
-		
-		error <<-EOF
-		I back up shell profile/rc scripts before I add Nix to them.
-		I need to back up each of these profiles: $profiles
-		To their respective backups: $profile_backups
-		But those backup files already exist.
-
-		Here's how to clean up the old backup files:
-
-		1. Open each of these profiles, and look for something similar to the following
-		$(shell_source_lines)
-
-		2. Remove those lines that mention Nix, and save the file
-
-		3. Move these backup files to a new location: $profile_backups
-		(ideally a location you will remember encase you need to rollback to them)
-		EOF
+		elif [ -n "$start_line_number" ] || [ -n "$end_line_number" ]; then
+			unsetup_profiles_needs_manual_editing "$profile"
+			return 1
+		fi
 	}
-
+	
+	restore_profile() {
+		profile="$1"
+		
+		# check if file exists
+		if [ -f "$profile" ]; then
+			if extract_nix_profile_injection "$profile"; then
+				# the extraction is done in-place. 
+				# this is safer than restoring a backup because its possible
+				# other non-nix tools have added things, and restoring the backup would remove those
+				# if the extraction was successful, remove the backup-before-nix
+				_sudo "" rm -f "$profile.backup-before-nix"
+			fi
+		fi
+	}
 # 
 # main
 # 
@@ -633,7 +981,7 @@
 		create_directories
 		place_channel_configuration
 		install_from_extracted_nix
-		configure_shell_profile
+		shell_configure_profile
 		set +eu # allow errors when sourcing the profile
 		# shellcheck disable=SC1091
 		. /etc/profile
@@ -689,14 +1037,7 @@
 			- set up the "default profile" by creating some Nix-related files in
 			  $ROOT_HOME
 			EOF
-			for profile_target in "${PROFILE_TARGETS[@]}"; do
-				if [ -e "$profile_target" ]; then
-					cat <<-EOF
-					- back up $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX
-					- update $profile_target to include some Nix configuration
-					EOF
-				fi
-			done
+			shell_list_targets
 		fi
 	}
 
@@ -1038,79 +1379,6 @@
 
 			echo "      Just finished getting the nix database ready."
 		)
-	}
-
-	shell_source_lines() {
-		cat <<-EOF
-
-		$PROFILE_NIX_START_DELIMETER
-		if [ -e '$PROFILE_NIX_FILE' ]; then
-		. '$PROFILE_NIX_FILE'
-		fi
-		$PROFILE_NIX_END_DELIMETER
-
-		EOF
-	}
-
-	# Fish has differing syntax
-	fish_source_lines() {
-		cat <<-EOF
-
-		$PROFILE_NIX_START_DELIMETER
-		if test -e '$PROFILE_NIX_FILE_FISH'
-		. '$PROFILE_NIX_FILE_FISH'
-		end
-		$PROFILE_NIX_END_DELIMETER
-
-		EOF
-	}
-
-	configure_shell_profile() {
-		task "Setting up shell profiles: ${PROFILE_TARGETS[*]}"
-		for profile_target in "${PROFILE_TARGETS[@]}"; do
-			if [ -e "$profile_target" ]; then
-				_sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
-					cp "$profile_target" "$profile_target$PROFILE_BACKUP_SUFFIX"
-			else
-				# try to create the file if its directory exists
-				target_dir="$(dirname "$profile_target")"
-				if [ -d "$target_dir" ]; then
-					_sudo "to create a stub $profile_target which will be updated" \
-						touch "$profile_target"
-				fi
-			fi
-
-			if [ -e "$profile_target" ]; then
-				shell_source_lines \
-					| _sudo "extend your $profile_target with nix-daemon settings" \
-							tee -a "$profile_target"
-			fi
-		done
-
-		task "Setting up shell profiles for Fish with with ${PROFILE_FISH_SUFFIX} inside ${PROFILE_FISH_PREFIXES[*]}"
-		for fish_prefix in "${PROFILE_FISH_PREFIXES[@]}"; do
-			if [ ! -d "$fish_prefix" ]; then
-				# this specific prefix (ie: /etc/fish) is very likely to exist
-				# if Fish is installed with this sysconfdir.
-				continue
-			fi
-
-			profile_target="${fish_prefix}/${PROFILE_FISH_SUFFIX}"
-			conf_dir=$(dirname "$profile_target")
-			if [ ! -d "$conf_dir" ]; then
-				_sudo "create $conf_dir for our Fish hook" \
-					mkdir "$conf_dir"
-			fi
-
-			fish_source_lines \
-				| _sudo "write nix-daemon settings to $profile_target" \
-						tee "$profile_target"
-		done
-
-		# TODO: should we suggest '. $PROFILE_NIX_FILE'? It would get them on
-		# their way less disruptively, but a counter-argument is that they won't
-		# immediately notice if something didn't get set up right?
-		reminder "Nix won't work in active shell sessions until you restart them."
 	}
 
 	cert_in_store() {

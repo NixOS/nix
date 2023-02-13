@@ -249,15 +249,18 @@
 		# gather information
 		# 
 		check_nixenv_command_doesnt_exist || nixenv_check_failed="true"
-		check_backup_profiles_exist  || backup_profiles_check_failed="true"
+		backup_profiles_exist_message="$(shell_backup_profiles_exist_message)"
+		
 		# <<<could insert MacOS specific checks here>>>
 		
 		# 
 		# aggregate & echo any issues
 		# 
-		if [ -n "$nixenv_check_failed$backup_profiles_check_failed" ]; then
+		if [ -n "$nixenv_check_failed$backup_profiles_check_failed" ]
+		then
 			[ "$nixenv_check_failed"          = "true" ] && message_nixenv_command_doesnt_exist
-			[ "$backup_profiles_check_failed" = "true" ] && check_backup_profiles_exist
+			[ -n "$backup_profiles_exist_message"      ] && shell_backup_profiles_exist_message
+			
 			return 1
 		else
 			return 0
@@ -369,7 +372,7 @@
 		# restoring any shell files
 		# 
 		subheader "Restoring all shell files" 
-			unsetup_profiles
+			shell_unsetup_profiles
 		
 		set -eu # go back to all uncaught errors failing
 		
