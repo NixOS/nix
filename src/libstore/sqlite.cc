@@ -8,12 +8,15 @@
 
 namespace nix {
 
-SQLiteError::SQLiteError(const char *path, int errNo, int extendedErrNo, hintformat && hf)
-  : Error(""), path(path), errNo(errNo), extendedErrNo(extendedErrNo)
+SQLiteError::SQLiteError(const char *path, const char *errMsg, int errNo, int extendedErrNo, int offset, hintformat && hf)
+  : Error(""), path(path), errMsg(errMsg), errNo(errNo), extendedErrNo(extendedErrNo), offset(offset)
 {
-    err.msg = hintfmt("%s: %s (in '%s')",
+    auto offsetStr = (offset == -1) ? "" : "at offset " + std::to_string(offset) + ": ";
+    err.msg = hintfmt("%s: %s%s, %s (in '%s')",
         normaltxt(hf.str()),
+        offsetStr,
         sqlite3_errstr(extendedErrNo),
+        errMsg,
         path ? path : "(in-memory)");
 }
 
@@ -21,11 +24,13 @@ SQLiteError::SQLiteError(const char *path, int errNo, int extendedErrNo, hintfor
 {
     int err = sqlite3_errcode(db);
     int exterr = sqlite3_extended_errcode(db);
+    int offset = sqlite3_error_offset(db);
 
     auto path = sqlite3_db_filename(db, nullptr);
+    auto errMsg = sqlite3_errmsg(db);
 
     if (err == SQLITE_BUSY || err == SQLITE_PROTOCOL) {
-        auto exp = SQLiteBusy(path, err, exterr, std::move(hf));
+        auto exp = SQLiteBusy(path, errMsg, err, exterr, offset, std::move(hf));
         exp.err.msg = hintfmt(
             err == SQLITE_PROTOCOL
                 ? "SQLite database '%s' is busy (SQLITE_PROTOCOL)"
@@ -33,8 +38,17 @@ SQLiteError::SQLiteError(const char *path, int errNo, int extendedErrNo, hintfor
             path ? path : "(in-memory)");
         throw exp;
     } else
-        throw SQLiteError(path, err, exterr, std::move(hf));
+        throw SQLiteError(path, errMsg, err, exterr, offset, std::move(hf));
 }
+
+static void traceSQL(void * x, const char * sql)
+{
+    // wacky delimiters:
+    //   so that we're quite unambiguous without escaping anything
+    // notice instead of trace:
+    //   so that this can be enabled without getting the firehose in our face.
+    notice("SQL<[%1%]>", sql);
+};
 
 SQLite::SQLite(const Path & path, bool create)
 {
@@ -42,12 +56,21 @@ SQLite::SQLite(const Path & path, bool create)
     // `unix-dotfile` is needed on NFS file systems and on Windows' Subsystem
     // for Linux (WSL) where useSQLiteWAL should be false by default.
     const char *vfs = settings.useSQLiteWAL ? 0 : "unix-dotfile";
-    if (sqlite3_open_v2(path.c_str(), &db,
-            SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0), vfs) != SQLITE_OK)
-        throw Error("cannot open SQLite database '%s'", path);
+    int flags = SQLITE_OPEN_READWRITE;
+    if (create) flags |= SQLITE_OPEN_CREATE;
+    int ret = sqlite3_open_v2(path.c_str(), &db, flags, vfs);
+    if (ret != SQLITE_OK) {
+        const char * err = sqlite3_errstr(ret);
+        throw Error("cannot open SQLite database '%s': %s", path, err);
+    }
 
     if (sqlite3_busy_timeout(db, 60 * 60 * 1000) != SQLITE_OK)
         SQLiteError::throw_(db, "setting timeout");
+
+    if (getEnv("NIX_DEBUG_SQLITE_TRACES") == "1") {
+        // To debug sqlite statements; trace all of them
+        sqlite3_trace(db, &traceSQL, nullptr);
+    }
 
     exec("pragma foreign_keys = 1");
 }

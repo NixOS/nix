@@ -131,6 +131,10 @@ StringSet Settings::getDefaultSystemFeatures()
     StringSet features{"nixos-test", "benchmark", "big-parallel"};
 
     #if __linux__
+    features.insert("uid-range");
+    #endif
+
+    #if __linux__
     if (access("/dev/kvm", R_OK | W_OK) == 0)
         features.insert("kvm");
     #endif
@@ -218,19 +222,19 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
         .longName = name,
         .description = "Enable sandboxing.",
         .category = category,
-        .handler = {[=]() { override(smEnabled); }}
+        .handler = {[this]() { override(smEnabled); }}
     });
     args.addFlag({
         .longName = "no-" + name,
         .description = "Disable sandboxing.",
         .category = category,
-        .handler = {[=]() { override(smDisabled); }}
+        .handler = {[this]() { override(smDisabled); }}
     });
     args.addFlag({
         .longName = "relaxed-" + name,
         .description = "Enable sandboxing, but allow builds to disable it.",
         .category = category,
-        .handler = {[=]() { override(smRelaxed); }}
+        .handler = {[this]() { override(smRelaxed); }}
     });
 }
 
@@ -286,5 +290,19 @@ void initPlugins()
     /* Tell the user if they try to set plugin-files after we've already loaded */
     settings.pluginFiles.pluginsLoaded = true;
 }
+
+static bool initLibStoreDone = false;
+
+void assertLibStoreInitialized() {
+    if (!initLibStoreDone) {
+        printError("The program must call nix::initNix() before calling any libstore library functions.");
+        abort();
+    };
+}
+
+void initLibStore() {
+    initLibStoreDone = true;
+}
+
 
 }

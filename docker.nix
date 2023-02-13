@@ -36,6 +36,17 @@ let
       shell = "${pkgs.bashInteractive}/bin/bash";
       home = "/root";
       gid = 0;
+      groups = [ "root" ];
+      description = "System administrator";
+    };
+
+    nobody = {
+      uid = 65534;
+      shell = "${pkgs.shadow}/bin/nologin";
+      home = "/var/empty";
+      gid = 65534;
+      groups = [ "nobody" ];
+      description = "Unprivileged account (don't use!)";
     };
 
   } // lib.listToAttrs (
@@ -57,6 +68,7 @@ let
   groups = {
     root.gid = 0;
     nixbld.gid = 30000;
+    nobody.gid = 65534;
   };
 
   userToPasswd = (

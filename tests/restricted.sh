@@ -3,7 +3,7 @@ source common.sh
 clearStore
 
 nix-instantiate --restrict-eval --eval -E '1 + 2'
-(! nix-instantiate --restrict-eval ./restricted.nix)
+(! nix-instantiate --eval --restrict-eval ./restricted.nix)
 (! nix-instantiate --eval --restrict-eval <(echo '1 + 2'))
 nix-instantiate --restrict-eval ./simple.nix -I src=.
 nix-instantiate --restrict-eval ./simple.nix -I src1=simple.nix -I src2=config.nix -I src3=./simple.builder.sh
@@ -16,6 +16,9 @@ nix-instantiate --restrict-eval --eval -E 'builtins.readDir ../src/nix-channel' 
 
 (! nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in <foo>')
 nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in <foo>' -I src=.
+
+# no default NIX_PATH
+(unset NIX_PATH; ! nix-instantiate --restrict-eval --find-file .)
 
 p=$(nix eval --raw --expr "builtins.fetchurl file://$(pwd)/restricted.sh" --impure --restrict-eval --allowed-uris "file://$(pwd)")
 cmp $p restricted.sh

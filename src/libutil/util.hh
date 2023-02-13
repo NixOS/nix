@@ -137,6 +137,9 @@ void deletePath(const Path & path, uint64_t & bytesFreed);
 
 std::string getUserName();
 
+/* Return the given user's home directory from /etc/passwd. */
+Path getHomeOf(uid_t userId);
+
 /* Return $HOME or the user's home directory from /etc/passwd. */
 Path getHome();
 
@@ -154,6 +157,12 @@ Path getDataDir();
 
 /* Return the path of the current executable. */
 std::optional<Path> getSelfExe();
+
+/* Return $XDG_STATE_HOME or $HOME/.local/state. */
+Path getStateDir();
+
+/* Create the Nix state directory and return the path to it. */
+Path createNixStateDir();
 
 /* Create a directory and all its parents, if necessary.  Returns the
    list of created directories, in order of creation. */
@@ -298,6 +307,7 @@ struct ProcessOptions
     bool dieWithParent = true;
     bool runExitHandlers = false;
     bool allowVfork = false;
+    int cloneFlags = 0; // use clone() with the specified flags (Linux only)
 };
 
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
@@ -510,6 +520,18 @@ std::optional<N> string2Float(const std::string_view s)
 }
 
 
+/* Convert a little-endian integer to host order. */
+template<typename T>
+T readLittleEndian(unsigned char * p)
+{
+    T x = 0;
+    for (size_t i = 0; i < sizeof(x); ++i, ++p) {
+        x |= ((T) *p) << (i * 8);
+    }
+    return x;
+}
+
+
 /* Return true iff `s' starts with `prefix'. */
 bool hasPrefix(std::string_view s, std::string_view prefix);
 
@@ -528,7 +550,7 @@ std::string shellEscape(const std::string_view s);
 
 /* Exception handling in destructors: print an error message, then
    ignore the exception. */
-void ignoreException();
+void ignoreException(Verbosity lvl = lvlError);
 
 
 
@@ -561,6 +583,12 @@ std::string base64Decode(std::string_view s);
    's'. For example, if every line is indented by at least 3 spaces,
    then we remove 3 spaces from the start of every line. */
 std::string stripIndentation(std::string_view s);
+
+
+/* Get the prefix of 's' up to and excluding the next line break (LF
+   optionally preceded by CR), and the remainder following the line
+   break. */
+std::pair<std::string_view, std::string_view> getLine(std::string_view s);
 
 
 /* Get a value for the specified key from an associate container. */
@@ -735,6 +763,15 @@ inline std::string operator + (std::string && s, std::string_view s2)
 {
     s.append(s2);
     return std::move(s);
+}
+
+inline std::string operator + (std::string_view s1, const char * s2)
+{
+    std::string s;
+    s.reserve(s1.size() + strlen(s2));
+    s.append(s1);
+    s.append(s2);
+    return s;
 }
 
 }

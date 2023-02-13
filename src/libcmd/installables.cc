@@ -1,5 +1,7 @@
 #include "globals.hh"
 #include "installables.hh"
+#include "installable-derived-path.hh"
+#include "outputs-spec.hh"
 #include "util.hh"
 #include "command.hh"
 #include "attr-path.hh"
@@ -166,13 +168,6 @@ SourceExprCommand::SourceExprCommand(bool supportReadOnlyMode)
         .handler = {&expr}
     });
 
-    addFlag({
-        .longName = "derivation",
-        .description = "Operate on the store derivation rather than its outputs.",
-        .category = installablesCategory,
-        .handler = {&operateOn, OperateOn::Derivation},
-    });
-
     if (supportReadOnlyMode) {
         addFlag({
             .longName = "read-only",
@@ -207,55 +202,59 @@ Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
 
 void SourceExprCommand::completeInstallable(std::string_view prefix)
 {
-    if (file) {
-        completionType = ctAttrs;
+    try {
+        if (file) {
+            completionType = ctAttrs;
 
-        evalSettings.pureEval = false;
-        auto state = getEvalState();
-        Expr *e = state->parseExprFromFile(
-            resolveExprPath(state->checkSourcePath(lookupFileArg(*state, *file)))
-        );
+            evalSettings.pureEval = false;
+            auto state = getEvalState();
+            Expr *e = state->parseExprFromFile(
+                resolveExprPath(state->checkSourcePath(lookupFileArg(*state, *file)))
+                );
 
-        Value root;
-        state->eval(e, root);
+            Value root;
+            state->eval(e, root);
 
-        auto autoArgs = getAutoArgs(*state);
+            auto autoArgs = getAutoArgs(*state);
 
-        std::string prefix_ = std::string(prefix);
-        auto sep = prefix_.rfind('.');
-        std::string searchWord;
-        if (sep != std::string::npos) {
-            searchWord = prefix_.substr(sep + 1, std::string::npos);
-            prefix_ = prefix_.substr(0, sep);
-        } else {
-            searchWord = prefix_;
-            prefix_ = "";
-        }
+            std::string prefix_ = std::string(prefix);
+            auto sep = prefix_.rfind('.');
+            std::string searchWord;
+            if (sep != std::string::npos) {
+                searchWord = prefix_.substr(sep + 1, std::string::npos);
+                prefix_ = prefix_.substr(0, sep);
+            } else {
+                searchWord = prefix_;
+                prefix_ = "";
+            }
 
-        auto [v, pos] = findAlongAttrPath(*state, prefix_, *autoArgs, root);
-        Value &v1(*v);
-        state->forceValue(v1, pos);
-        Value v2;
-        state->autoCallFunction(*autoArgs, v1, v2);
+            auto [v, pos] = findAlongAttrPath(*state, prefix_, *autoArgs, root);
+            Value &v1(*v);
+            state->forceValue(v1, pos);
+            Value v2;
+            state->autoCallFunction(*autoArgs, v1, v2);
 
-        if (v2.type() == nAttrs) {
-            for (auto & i : *v2.attrs) {
-                std::string name = state->symbols[i.name];
-                if (name.find(searchWord) == 0) {
-                    if (prefix_ == "")
-                        completions->add(name);
-                    else
-                        completions->add(prefix_ + "." + name);
+            if (v2.type() == nAttrs) {
+                for (auto & i : *v2.attrs) {
+                    std::string name = state->symbols[i.name];
+                    if (name.find(searchWord) == 0) {
+                        if (prefix_ == "")
+                            completions->add(name);
+                        else
+                            completions->add(prefix_ + "." + name);
+                    }
                 }
             }
+        } else {
+            completeFlakeRefWithFragment(
+                getEvalState(),
+                lockFlags,
+                getDefaultFlakeAttrPathPrefixes(),
+                getDefaultFlakeAttrPaths(),
+                prefix);
         }
-    } else {
-        completeFlakeRefWithFragment(
-            getEvalState(),
-            lockFlags,
-            getDefaultFlakeAttrPathPrefixes(),
-            getDefaultFlakeAttrPaths(),
-            prefix);
+    } catch (EvalError&) {
+        // Don't want eval errors to mess-up with the completion engine, so let's just swallow them
     }
 }
 
@@ -354,7 +353,7 @@ void completeFlakeRef(ref<Store> store, std::string_view prefix)
     }
 }
 
-DerivedPath Installable::toDerivedPath()
+DerivedPathWithInfo Installable::toDerivedPath()
 {
     auto buildables = toDerivedPaths();
     if (buildables.size() != 1)
@@ -374,10 +373,9 @@ Installable::getCursors(EvalState & state)
 ref<eval_cache::AttrCursor>
 Installable::getCursor(EvalState & state)
 {
-    auto cursors = getCursors(state);
-    if (cursors.empty())
-        throw Error("cannot find flake attribute '%s'", what());
-    return cursors[0];
+    /* Although getCursors should return at least one element, in case it doesn't,
+       bound check to avoid an undefined behavior for vector[0] */
+    return getCursors(state).at(0);
 }
 
 static StorePath getDeriver(
@@ -392,96 +390,24 @@ static StorePath getDeriver(
     return *derivers.begin();
 }
 
-struct InstallableStorePath : Installable
-{
-    ref<Store> store;
-    StorePath storePath;
-
-    InstallableStorePath(ref<Store> store, StorePath && storePath)
-        : store(store), storePath(std::move(storePath)) { }
-
-    std::string what() const override { return store->printStorePath(storePath); }
-
-    DerivedPaths toDerivedPaths() override
-    {
-        if (storePath.isDerivation()) {
-            auto drv = store->readDerivation(storePath);
-            return {
-                DerivedPath::Built {
-                    .drvPath = storePath,
-                    .outputs = drv.outputNames(),
-                }
-            };
-        } else {
-            return {
-                DerivedPath::Opaque {
-                    .path = storePath,
-                }
-            };
-        }
-    }
-
-    StorePathSet toDrvPaths(ref<Store> store) override
-    {
-        if (storePath.isDerivation()) {
-            return {storePath};
-        } else {
-            return {getDeriver(store, *this, storePath)};
-        }
-    }
-
-    std::optional<StorePath> getStorePath() override
-    {
-        return storePath;
-    }
-};
-
-DerivedPaths InstallableValue::toDerivedPaths()
-{
-    DerivedPaths res;
-
-    std::map<StorePath, std::set<std::string>> drvsToOutputs;
-    RealisedPath::Set drvsToCopy;
-
-    // Group by derivation, helps with .all in particular
-    for (auto & drv : toDerivations()) {
-        for (auto & outputName : drv.outputsToInstall)
-            drvsToOutputs[drv.drvPath].insert(outputName);
-        drvsToCopy.insert(drv.drvPath);
-    }
-
-    for (auto & i : drvsToOutputs)
-        res.push_back(DerivedPath::Built { i.first, i.second });
-
-    return res;
-}
-
-StorePathSet InstallableValue::toDrvPaths(ref<Store> store)
-{
-    StorePathSet res;
-    for (auto & drv : toDerivations())
-        res.insert(drv.drvPath);
-    return res;
-}
-
 struct InstallableAttrPath : InstallableValue
 {
     SourceExprCommand & cmd;
     RootValue v;
     std::string attrPath;
-    OutputsSpec outputsSpec;
+    ExtendedOutputsSpec extendedOutputsSpec;
 
     InstallableAttrPath(
         ref<EvalState> state,
         SourceExprCommand & cmd,
         Value * v,
         const std::string & attrPath,
-        OutputsSpec outputsSpec)
+        ExtendedOutputsSpec extendedOutputsSpec)
         : InstallableValue(state)
         , cmd(cmd)
         , v(allocRootValue(v))
         , attrPath(attrPath)
-        , outputsSpec(std::move(outputsSpec))
+        , extendedOutputsSpec(std::move(extendedOutputsSpec))
     { }
 
     std::string what() const override { return attrPath; }
@@ -493,40 +419,54 @@ struct InstallableAttrPath : InstallableValue
         return {vRes, pos};
     }
 
-    virtual std::vector<InstallableValue::DerivationInfo> toDerivations() override;
-};
+    DerivedPathsWithInfo toDerivedPaths() override
+    {
+        auto v = toValue(*state).first;
 
-std::vector<InstallableValue::DerivationInfo> InstallableAttrPath::toDerivations()
-{
-    auto v = toValue(*state).first;
+        Bindings & autoArgs = *cmd.getAutoArgs(*state);
 
-    Bindings & autoArgs = *cmd.getAutoArgs(*state);
+        DrvInfos drvInfos;
+        getDerivations(*state, *v, "", autoArgs, drvInfos, false);
 
-    DrvInfos drvInfos;
-    getDerivations(*state, *v, "", autoArgs, drvInfos, false);
+        // Backward compatibility hack: group results by drvPath. This
+        // helps keep .all output together.
+        std::map<StorePath, OutputsSpec> byDrvPath;
 
-    std::vector<DerivationInfo> res;
-    for (auto & drvInfo : drvInfos) {
-        auto drvPath = drvInfo.queryDrvPath();
-        if (!drvPath)
-            throw Error("'%s' is not a derivation", what());
+        for (auto & drvInfo : drvInfos) {
+            auto drvPath = drvInfo.queryDrvPath();
+            if (!drvPath)
+                throw Error("'%s' is not a derivation", what());
 
-        std::set<std::string> outputsToInstall;
+            auto newOutputs = std::visit(overloaded {
+                [&](const ExtendedOutputsSpec::Default & d) -> OutputsSpec {
+                    std::set<std::string> outputsToInstall;
+                    for (auto & output : drvInfo.queryOutputs(false, true))
+                        outputsToInstall.insert(output.first);
+                    return OutputsSpec::Names { std::move(outputsToInstall) };
+                },
+                [&](const ExtendedOutputsSpec::Explicit & e) -> OutputsSpec {
+                    return e;
+                },
+            }, extendedOutputsSpec.raw());
 
-        if (auto outputNames = std::get_if<OutputNames>(&outputsSpec))
-            outputsToInstall = *outputNames;
-        else
-            for (auto & output : drvInfo.queryOutputs(false, std::get_if<DefaultOutputs>(&outputsSpec)))
-                outputsToInstall.insert(output.first);
+            auto [iter, didInsert] = byDrvPath.emplace(*drvPath, newOutputs);
 
-        res.push_back(DerivationInfo {
-            .drvPath = *drvPath,
-            .outputsToInstall = std::move(outputsToInstall)
-        });
+            if (!didInsert)
+                iter->second = iter->second.union_(newOutputs);
+        }
+
+        DerivedPathsWithInfo res;
+        for (auto & [drvPath, outputs] : byDrvPath)
+            res.push_back({
+                .path = DerivedPath::Built {
+                    .drvPath = drvPath,
+                    .outputs = outputs,
+                },
+            });
+
+        return res;
     }
-
-    return res;
-}
+};
 
 std::vector<std::string> InstallableFlake::getActualAttrPaths()
 {
@@ -575,7 +515,7 @@ ref<eval_cache::EvalCache> openEvalCache(
             auto vFlake = state.allocValue();
             flake::callFlake(state, *lockedFlake, *vFlake);
 
-            state.forceAttrs(*vFlake, noPos);
+            state.forceAttrs(*vFlake, noPos, "while parsing cached flake data");
 
             auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
             assert(aOutputs);
@@ -599,7 +539,7 @@ InstallableFlake::InstallableFlake(
     ref<EvalState> state,
     FlakeRef && flakeRef,
     std::string_view fragment,
-    OutputsSpec outputsSpec,
+    ExtendedOutputsSpec extendedOutputsSpec,
     Strings attrPaths,
     Strings prefixes,
     const flake::LockFlags & lockFlags)
@@ -607,14 +547,14 @@ InstallableFlake::InstallableFlake(
       flakeRef(flakeRef),
       attrPaths(fragment == "" ? attrPaths : Strings{(std::string) fragment}),
       prefixes(fragment == "" ? Strings{} : prefixes),
-      outputsSpec(std::move(outputsSpec)),
+      extendedOutputsSpec(std::move(extendedOutputsSpec)),
       lockFlags(lockFlags)
 {
     if (cmd && cmd->getAutoArgs(*state)->size())
         throw UsageError("'--arg' and '--argstr' are incompatible with flakes");
 }
 
-std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableFlake::toDerivation()
+DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
 {
     Activity act(*logger, lvlTalkative, actUnknown, fmt("evaluating derivation '%s'", what()));
 
@@ -622,56 +562,84 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
 
     auto attrPath = attr->getAttrPathStr();
 
-    if (!attr->isDerivation())
-        throw Error("flake output attribute '%s' is not a derivation", attrPath);
+    if (!attr->isDerivation()) {
+
+        // FIXME: use eval cache?
+        auto v = attr->forceValue();
+
+        if (v.type() == nPath) {
+            PathSet context;
+            auto storePath = state->copyPathToStore(context, Path(v.path));
+            return {{
+                .path = DerivedPath::Opaque {
+                    .path = std::move(storePath),
+                }
+            }};
+        }
+
+        else if (v.type() == nString) {
+            PathSet context;
+            auto s = state->forceString(v, context, noPos, fmt("while evaluating the flake output attribute '%s'", attrPath));
+            auto storePath = state->store->maybeParseStorePath(s);
+            if (storePath && context.count(std::string(s))) {
+                return {{
+                    .path = DerivedPath::Opaque {
+                        .path = std::move(*storePath),
+                    }
+                }};
+            } else
+                throw Error("flake output attribute '%s' evaluates to the string '%s' which is not a store path", attrPath, s);
+        }
+
+        else
+            throw Error("flake output attribute '%s' is not a derivation or path", attrPath);
+    }
 
     auto drvPath = attr->forceDerivation();
 
-    std::set<std::string> outputsToInstall;
     std::optional<NixInt> priority;
 
-    if (auto aOutputSpecified = attr->maybeGetAttr(state->sOutputSpecified)) {
-        if (aOutputSpecified->getBool()) {
-            if (auto aOutputName = attr->maybeGetAttr("outputName"))
-                outputsToInstall = { aOutputName->getString() };
-        }
-    }
-
-    else if (auto aMeta = attr->maybeGetAttr(state->sMeta)) {
-        if (auto aOutputsToInstall = aMeta->maybeGetAttr("outputsToInstall"))
-            for (auto & s : aOutputsToInstall->getListOfStrings())
-                outputsToInstall.insert(s);
+    if (attr->maybeGetAttr(state->sOutputSpecified)) {
+    } else if (auto aMeta = attr->maybeGetAttr(state->sMeta)) {
         if (auto aPriority = aMeta->maybeGetAttr("priority"))
             priority = aPriority->getInt();
     }
 
-    if (outputsToInstall.empty() || std::get_if<AllOutputs>(&outputsSpec)) {
-        outputsToInstall.clear();
-        if (auto aOutputs = attr->maybeGetAttr(state->sOutputs))
-            for (auto & s : aOutputs->getListOfStrings())
-                outputsToInstall.insert(s);
-    }
+    return {{
+        .path = DerivedPath::Built {
+            .drvPath = std::move(drvPath),
+            .outputs = std::visit(overloaded {
+                [&](const ExtendedOutputsSpec::Default & d) -> OutputsSpec {
+                    std::set<std::string> outputsToInstall;
+                    if (auto aOutputSpecified = attr->maybeGetAttr(state->sOutputSpecified)) {
+                        if (aOutputSpecified->getBool()) {
+                            if (auto aOutputName = attr->maybeGetAttr("outputName"))
+                                outputsToInstall = { aOutputName->getString() };
+                        }
+                    } else if (auto aMeta = attr->maybeGetAttr(state->sMeta)) {
+                        if (auto aOutputsToInstall = aMeta->maybeGetAttr("outputsToInstall"))
+                            for (auto & s : aOutputsToInstall->getListOfStrings())
+                                outputsToInstall.insert(s);
+                    }
 
-    if (outputsToInstall.empty())
-        outputsToInstall.insert("out");
+                    if (outputsToInstall.empty())
+                        outputsToInstall.insert("out");
 
-    if (auto outputNames = std::get_if<OutputNames>(&outputsSpec))
-        outputsToInstall = *outputNames;
-
-    auto drvInfo = DerivationInfo {
-        .drvPath = std::move(drvPath),
-        .outputsToInstall = std::move(outputsToInstall),
-        .priority = priority,
-    };
-
-    return {attrPath, getLockedFlake()->flake.lockedRef, std::move(drvInfo)};
-}
-
-std::vector<InstallableValue::DerivationInfo> InstallableFlake::toDerivations()
-{
-    std::vector<DerivationInfo> res;
-    res.push_back(std::get<2>(toDerivation()));
-    return res;
+                    return OutputsSpec::Names { std::move(outputsToInstall) };
+                },
+                [&](const ExtendedOutputsSpec::Explicit & e) -> OutputsSpec {
+                    return e;
+                },
+            }, extendedOutputsSpec.raw()),
+        },
+        .info = {
+            .priority = priority,
+            .originalRef = flakeRef,
+            .resolvedRef = getLockedFlake()->flake.lockedRef,
+            .attrPath = attrPath,
+            .extendedOutputsSpec = extendedOutputsSpec,
+        }
+    }};
 }
 
 std::pair<Value *, PosIdx> InstallableFlake::toValue(EvalState & state)
@@ -689,46 +657,28 @@ InstallableFlake::getCursors(EvalState & state)
 
     std::vector<ref<eval_cache::AttrCursor>> res;
 
-    for (auto & attrPath : getActualAttrPaths()) {
-        auto attr = root->findAlongAttrPath(parseAttrPath(state, attrPath));
-        if (attr) res.push_back(ref(*attr));
-    }
-
-    return res;
-}
-
-ref<eval_cache::AttrCursor> InstallableFlake::getCursor(EvalState & state)
-{
-    auto lockedFlake = getLockedFlake();
-
-    auto cache = openEvalCache(state, lockedFlake);
-    auto root = cache->getRoot();
-
     Suggestions suggestions;
-
     auto attrPaths = getActualAttrPaths();
 
     for (auto & attrPath : attrPaths) {
         debug("trying flake output attribute '%s'", attrPath);
 
-        auto attrOrSuggestions = root->findAlongAttrPath(
-            parseAttrPath(state, attrPath),
-            true
-        );
-
-        if (!attrOrSuggestions) {
-            suggestions += attrOrSuggestions.getSuggestions();
-            continue;
+        auto attr = root->findAlongAttrPath(parseAttrPath(state, attrPath));
+        if (attr) {
+            res.push_back(ref(*attr));
+        } else {
+            suggestions += attr.getSuggestions();
         }
-
-        return *attrOrSuggestions;
     }
 
-    throw Error(
-        suggestions,
-        "flake '%s' does not provide attribute %s",
-        flakeRef,
-        showAttrPaths(attrPaths));
+    if (res.size() == 0)
+        throw Error(
+            suggestions,
+            "flake '%s' does not provide attribute %s",
+            flakeRef,
+            showAttrPaths(attrPaths));
+
+    return res;
 }
 
 std::shared_ptr<flake::LockedFlake> InstallableFlake::getLockedFlake() const
@@ -777,7 +727,8 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         if (file == "-") {
             auto e = state->parseStdin();
             state->eval(e, *vFile);
-        } else if (file)
+        }
+        else if (file)
             state->evalFile(lookupFileArg(*state, *file), *vFile);
         else {
             auto e = state->parseExprFromString(*expr, absPath("."));
@@ -785,12 +736,12 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         }
 
         for (auto & s : ss) {
-            auto [prefix, outputsSpec] = parseOutputsSpec(s);
+            auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse(s);
             result.push_back(
                 std::make_shared<InstallableAttrPath>(
                     state, *this, vFile,
-                    prefix == "." ? "" : prefix,
-                    outputsSpec));
+                    prefix == "." ? "" : std::string { prefix },
+                    extendedOutputsSpec));
         }
 
     } else {
@@ -798,9 +749,15 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         for (auto & s : ss) {
             std::exception_ptr ex;
 
-            if (s.find('/') != std::string::npos) {
+            auto [prefix_, extendedOutputsSpec_] = ExtendedOutputsSpec::parse(s);
+            // To avoid clang's pedantry
+            auto prefix = std::move(prefix_);
+            auto extendedOutputsSpec = std::move(extendedOutputsSpec_);
+
+            if (prefix.find('/') != std::string::npos) {
                 try {
-                    result.push_back(std::make_shared<InstallableStorePath>(store, store->followLinksToStorePath(s)));
+                    result.push_back(std::make_shared<InstallableDerivedPath>(
+                        InstallableDerivedPath::parse(store, prefix, extendedOutputsSpec)));
                     continue;
                 } catch (BadStorePath &) {
                 } catch (...) {
@@ -810,13 +767,13 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
             }
 
             try {
-                auto [flakeRef, fragment, outputsSpec] = parseFlakeRefWithFragmentAndOutputsSpec(s, absPath("."));
+                auto [flakeRef, fragment] = parseFlakeRefWithFragment(std::string { prefix }, absPath("."));
                 result.push_back(std::make_shared<InstallableFlake>(
                         this,
                         getEvalState(),
                         std::move(flakeRef),
                         fragment,
-                        outputsSpec,
+                        extendedOutputsSpec,
                         getDefaultFlakeAttrPaths(),
                         getDefaultFlakeAttrPathPrefixes(),
                         lockFlags));
@@ -840,20 +797,20 @@ std::shared_ptr<Installable> SourceExprCommand::parseInstallable(
     return installables.front();
 }
 
-BuiltPaths Installable::build(
+std::vector<BuiltPathWithResult> Installable::build(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode,
     const std::vector<std::shared_ptr<Installable>> & installables,
     BuildMode bMode)
 {
-    BuiltPaths res;
-    for (auto & [_, builtPath] : build2(evalStore, store, mode, installables, bMode))
-        res.push_back(builtPath);
+    std::vector<BuiltPathWithResult> res;
+    for (auto & [_, builtPathWithResult] : build2(evalStore, store, mode, installables, bMode))
+        res.push_back(builtPathWithResult);
     return res;
 }
 
-std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::build2(
+std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> Installable::build2(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode,
@@ -863,17 +820,23 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::bui
     if (mode == Realise::Nothing)
         settings.readOnlyMode = true;
 
+    struct Aux
+    {
+        ExtraPathInfo info;
+        std::shared_ptr<Installable> installable;
+    };
+
     std::vector<DerivedPath> pathsToBuild;
-    std::map<DerivedPath, std::vector<std::shared_ptr<Installable>>> backmap;
+    std::map<DerivedPath, std::vector<Aux>> backmap;
 
     for (auto & i : installables) {
         for (auto b : i->toDerivedPaths()) {
-            pathsToBuild.push_back(b);
-            backmap[b].push_back(i);
+            pathsToBuild.push_back(b.path);
+            backmap[b.path].push_back({.info = b.info, .installable = i});
         }
     }
 
-    std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> res;
+    std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> res;
 
     switch (mode) {
 
@@ -882,42 +845,18 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::bui
         printMissing(store, pathsToBuild, lvlError);
 
         for (auto & path : pathsToBuild) {
-            for (auto & installable : backmap[path]) {
+            for (auto & aux : backmap[path]) {
                 std::visit(overloaded {
                     [&](const DerivedPath::Built & bfd) {
-                        OutputPathMap outputs;
-                        auto drv = evalStore->readDerivation(bfd.drvPath);
-                        auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
-                        auto drvOutputs = drv.outputsAndOptPaths(*store);
-                        for (auto & output : bfd.outputs) {
-                            auto outputHash = get(outputHashes, output);
-                            if (!outputHash)
-                                throw Error(
-                                    "the derivation '%s' doesn't have an output named '%s'",
-                                    store->printStorePath(bfd.drvPath), output);
-                            if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
-                                DrvOutput outputId { *outputHash, output };
-                                auto realisation = store->queryRealisation(outputId);
-                                if (!realisation)
-                                    throw Error(
-                                        "cannot operate on an output of the "
-                                        "unbuilt derivation '%s'",
-                                        outputId.to_string());
-                                outputs.insert_or_assign(output, realisation->outPath);
-                            } else {
-                                // If ca-derivations isn't enabled, assume that
-                                // the output path is statically known.
-                                auto drvOutput = get(drvOutputs, output);
-                                assert(drvOutput);
-                                assert(drvOutput->second);
-                                outputs.insert_or_assign(
-                                    output, *drvOutput->second);
-                            }
-                        }
-                        res.push_back({installable, BuiltPath::Built { bfd.drvPath, outputs }});
+                        auto outputs = resolveDerivedPath(*store, bfd, &*evalStore);
+                        res.push_back({aux.installable, {
+                            .path = BuiltPath::Built { bfd.drvPath, outputs },
+                            .info = aux.info}});
                     },
                     [&](const DerivedPath::Opaque & bo) {
-                        res.push_back({installable, BuiltPath::Opaque { bo.path }});
+                        res.push_back({aux.installable, {
+                            .path = BuiltPath::Opaque { bo.path },
+                            .info = aux.info}});
                     },
                 }, path.raw());
             }
@@ -927,22 +866,28 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::bui
 
     case Realise::Outputs: {
         if (settings.printMissing)
-          printMissing(store, pathsToBuild, lvlInfo);
+            printMissing(store, pathsToBuild, lvlInfo);
 
         for (auto & buildResult : store->buildPathsWithResults(pathsToBuild, bMode, evalStore)) {
             if (!buildResult.success())
                 buildResult.rethrow();
 
-            for (auto & installable : backmap[buildResult.path]) {
+            for (auto & aux : backmap[buildResult.path]) {
                 std::visit(overloaded {
                     [&](const DerivedPath::Built & bfd) {
                         std::map<std::string, StorePath> outputs;
                         for (auto & path : buildResult.builtOutputs)
                             outputs.emplace(path.first.outputName, path.second.outPath);
-                        res.push_back({installable, BuiltPath::Built { bfd.drvPath, outputs }});
+                        res.push_back({aux.installable, {
+                            .path = BuiltPath::Built { bfd.drvPath, outputs },
+                            .info = aux.info,
+                            .result = buildResult}});
                     },
                     [&](const DerivedPath::Opaque & bo) {
-                        res.push_back({installable, BuiltPath::Opaque { bo.path }});
+                        res.push_back({aux.installable, {
+                            .path = BuiltPath::Opaque { bo.path },
+                            .info = aux.info,
+                            .result = buildResult}});
                     },
                 }, buildResult.path.raw());
             }
@@ -965,9 +910,12 @@ BuiltPaths Installable::toBuiltPaths(
     OperateOn operateOn,
     const std::vector<std::shared_ptr<Installable>> & installables)
 {
-    if (operateOn == OperateOn::Output)
-        return Installable::build(evalStore, store, mode, installables);
-    else {
+    if (operateOn == OperateOn::Output) {
+        BuiltPaths res;
+        for (auto & p : Installable::build(evalStore, store, mode, installables))
+            res.push_back(p.path);
+        return res;
+    } else {
         if (mode == Realise::Nothing)
             settings.readOnlyMode = true;
 
@@ -1024,7 +972,7 @@ StorePathSet Installable::toDerivations(
                 [&](const DerivedPath::Built & bfd) {
                     drvPaths.insert(bfd.drvPath);
                 },
-            }, b.raw());
+            }, b.path.raw());
 
     return drvPaths;
 }

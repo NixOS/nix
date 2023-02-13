@@ -29,19 +29,19 @@ nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -
 $(d)/%.1: $(d)/src/command-ref/%.md
 	@printf "Title: %s\n\n" "$$(basename $@ .1)" > $^.tmp
 	@cat $^ >> $^.tmp
-	$(trace-gen) lowdown -sT man -M section=1 $^.tmp -o $@
+	$(trace-gen) lowdown -sT man --nroff-nolinks -M section=1 $^.tmp -o $@
 	@rm $^.tmp
 
 $(d)/%.8: $(d)/src/command-ref/%.md
 	@printf "Title: %s\n\n" "$$(basename $@ .8)" > $^.tmp
 	@cat $^ >> $^.tmp
-	$(trace-gen) lowdown -sT man -M section=8 $^.tmp -o $@
+	$(trace-gen) lowdown -sT man --nroff-nolinks -M section=8 $^.tmp -o $@
 	@rm $^.tmp
 
 $(d)/nix.conf.5: $(d)/src/command-ref/conf-file.md
 	@printf "Title: %s\n\n" "$$(basename $@ .5)" > $^.tmp
 	@cat $^ >> $^.tmp
-	$(trace-gen) lowdown -sT man -M section=5 $^.tmp -o $@
+	$(trace-gen) lowdown -sT man --nroff-nolinks -M section=5 $^.tmp -o $@
 	@rm $^.tmp
 
 $(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli
@@ -50,11 +50,16 @@ $(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli
 
 $(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/generate-manpage.nix $(bindir)/nix
 	@rm -rf $@
-	$(trace-gen) $(nix-eval) --write-to $@ --expr 'import doc/manual/generate-manpage.nix { toplevel = builtins.readFile $<; }'
+	$(trace-gen) $(nix-eval) --write-to $@.tmp --expr 'import doc/manual/generate-manpage.nix { toplevel = builtins.readFile $<; }'
+	@# @docroot@: https://nixos.org/manual/nix/unstable/contributing/hacking.html#docroot-variable
+	$(trace-gen) sed -i $@.tmp/*.md -e 's^@docroot@^../..^g'
+	@mv $@.tmp $@
 
 $(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/generate-options.nix $(d)/src/command-ref/conf-file-prefix.md $(bindir)/nix
 	@cat doc/manual/src/command-ref/conf-file-prefix.md > $@.tmp
-	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-options.nix (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp
+	@# @docroot@: https://nixos.org/manual/nix/unstable/contributing/hacking.html#docroot-variable
+	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-options.nix (builtins.fromJSON (builtins.readFile $<))' \
+	  | sed -e 's^@docroot@^..^g'>> $@.tmp
 	@mv $@.tmp $@
 
 $(d)/nix.json: $(bindir)/nix
@@ -67,7 +72,9 @@ $(d)/conf-file.json: $(bindir)/nix
 
 $(d)/src/language/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d)/src/language/builtins-prefix.md $(bindir)/nix
 	@cat doc/manual/src/language/builtins-prefix.md > $@.tmp
-	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-builtins.nix (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp
+	@# @docroot@: https://nixos.org/manual/nix/unstable/contributing/hacking.html#docroot-variable
+	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-builtins.nix (builtins.fromJSON (builtins.readFile $<))' \
+	  | sed -e 's^@docroot@^..^g' >> $@.tmp
 	@cat doc/manual/src/language/builtins-suffix.md >> $@.tmp
 	@mv $@.tmp $@
 
@@ -102,6 +109,12 @@ doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
 	@touch $@
 
 $(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/command-ref/conf-file.md $(d)/src/language/builtins.md
-	$(trace-gen) RUST_LOG=warn mdbook build doc/manual -d $(DESTDIR)$(docdir)/manual
+	$(trace-gen) \
+	  set -euo pipefail; \
+	  RUST_LOG=warn mdbook build doc/manual -d $(DESTDIR)$(docdir)/manual.tmp 2>&1 \
+		  | { grep -Fv "because fragment resolution isn't implemented" || :; }
+	@rm -rf $(DESTDIR)$(docdir)/manual
+	@mv $(DESTDIR)$(docdir)/manual.tmp/html $(DESTDIR)$(docdir)/manual
+	@rm -rf $(DESTDIR)$(docdir)/manual.tmp
 
 endif

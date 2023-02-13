@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include <nlohmann/json_fwd.hpp>
 #include "fs-accessor.hh"
 
 namespace nix {
@@ -24,11 +25,8 @@ ref<FSAccessor> makeLazyNarAccessor(
     const std::string & listing,
     GetNarBytes getNarBytes);
 
-class JSONPlaceholder;
-
 /* Write a JSON representation of the contents of a NAR (except file
    contents). */
-void listNar(JSONPlaceholder & res, ref<FSAccessor> accessor,
-    const Path & path, bool recurse);
+nlohmann::json listNar(ref<FSAccessor> accessor, const Path & path, bool recurse);
 
 }

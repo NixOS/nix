@@ -8,6 +8,58 @@
 
 namespace nix {
 
+struct PosAdapter : AbstractPos
+{
+    Pos::Origin origin;
+
+    PosAdapter(Pos::Origin origin)
+        : origin(std::move(origin))
+    {
+    }
+
+    std::optional<std::string> getSource() const override
+    {
+        return std::visit(overloaded {
+            [](const Pos::none_tag &) -> std::optional<std::string> {
+                return std::nullopt;
+            },
+            [](const Pos::Stdin & s) -> std::optional<std::string> {
+                // Get rid of the null terminators added by the parser.
+                return std::string(s.source->c_str());
+            },
+            [](const Pos::String & s) -> std::optional<std::string> {
+                // Get rid of the null terminators added by the parser.
+                return std::string(s.source->c_str());
+            },
+            [](const Path & path) -> std::optional<std::string> {
+                try {
+                    return readFile(path);
+                } catch (Error &) {
+                    return std::nullopt;
+                }
+            }
+        }, origin);
+    }
+
+    void print(std::ostream & out) const override
+    {
+        std::visit(overloaded {
+            [&](const Pos::none_tag &) { out << "«none»"; },
+            [&](const Pos::Stdin &) { out << "«stdin»"; },
+            [&](const Pos::String & s) { out << "«string»"; },
+            [&](const Path & path) { out << path; }
+        }, origin);
+    }
+};
+
+Pos::operator std::shared_ptr<AbstractPos>() const
+{
+    auto pos = std::make_shared<PosAdapter>(origin);
+    pos->line = line;
+    pos->column = column;
+    return pos;
+}
+
 /* Displaying abstract syntax trees. */
 
 static void showString(std::ostream & str, std::string_view s)
@@ -248,24 +300,10 @@ void ExprPos::show(const SymbolTable & symbols, std::ostream & str) const
 
 std::ostream & operator << (std::ostream & str, const Pos & pos)
 {
-    if (!pos)
+    if (auto pos2 = (std::shared_ptr<AbstractPos>) pos) {
+        str << *pos2;
+    } else
         str << "undefined position";
-    else
-    {
-        auto f = format(ANSI_BOLD "%1%" ANSI_NORMAL ":%2%:%3%");
-        switch (pos.origin) {
-            case foFile:
-                f % (const std::string &) pos.file;
-                break;
-            case foStdin:
-            case foString:
-                f % "(string)";
-                break;
-            default:
-                throw Error("unhandled Pos origin!");
-        }
-        str << (f % pos.line % pos.column).str();
-    }
 
     return str;
 }
@@ -287,7 +325,6 @@ std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
     }
     return out.str();
 }
-
 
 
 /* Computing levels/displacements for variables. */

@@ -41,9 +41,9 @@ nix flake check $flakeDir
 cat > $flakeDir/flake.nix <<EOF
 {
   outputs = { self }: {
-    nixosModules.foo = {
+    nixosModules.foo = assert false; {
       a.b.c = 123;
-      foo = assert false; true;
+      foo = true;
     };
   };
 }
@@ -62,18 +62,6 @@ cat > $flakeDir/flake.nix <<EOF
 EOF
 
 nix flake check $flakeDir
-
-cat > $flakeDir/flake.nix <<EOF
-{
-  outputs = { self }: {
-    nixosModule = { config, pkgs }: {
-      a.b.c = 123;
-    };
-  };
-}
-EOF
-
-(! nix flake check $flakeDir)
 
 cat > $flakeDir/flake.nix <<EOF
 {

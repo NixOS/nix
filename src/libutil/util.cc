@@ -2,6 +2,7 @@
 #include "sync.hh"
 #include "finally.hh"
 #include "serialise.hh"
+#include "cgroup.hh"
 
 #include <array>
 #include <cctype>
@@ -35,8 +36,8 @@
 #ifdef __linux__
 #include <sys/prctl.h>
 #include <sys/resource.h>
+#include <sys/mman.h>
 
-#include <mntent.h>
 #include <cmath>
 #endif
 
@@ -537,6 +538,16 @@ std::string getUserName()
     return name;
 }
 
+Path getHomeOf(uid_t userId)
+{
+    std::vector<char> buf(16384);
+    struct passwd pwbuf;
+    struct passwd * pw;
+    if (getpwuid_r(userId, &pwbuf, buf.data(), buf.size(), &pw) != 0
+        || !pw || !pw->pw_dir || !pw->pw_dir[0])
+        throw Error("cannot determine user's home directory");
+    return pw->pw_dir;
+}
 
 Path getHome()
 {
@@ -558,13 +569,7 @@ Path getHome()
             }
         }
         if (!homeDir) {
-            std::vector<char> buf(16384);
-            struct passwd pwbuf;
-            struct passwd * pw;
-            if (getpwuid_r(geteuid(), &pwbuf, buf.data(), buf.size(), &pw) != 0
-                || !pw || !pw->pw_dir || !pw->pw_dir[0])
-                throw Error("cannot determine user's home directory");
-            homeDir = pw->pw_dir;
+            homeDir = getHomeOf(geteuid());
             if (unownedUserHomeDir.has_value() && unownedUserHomeDir != homeDir) {
                 warn("$HOME ('%s') is not owned by you, falling back to the one defined in the 'passwd' file ('%s')", *unownedUserHomeDir, *homeDir);
             }
@@ -602,6 +607,19 @@ Path getDataDir()
 {
     auto dataDir = getEnv("XDG_DATA_HOME");
     return dataDir ? *dataDir : getHome() + "/.local/share";
+}
+
+Path getStateDir()
+{
+    auto stateDir = getEnv("XDG_STATE_HOME");
+    return stateDir ? *stateDir : getHome() + "/.local/state";
+}
+
+Path createNixStateDir()
+{
+    Path dir = getStateDir() + "/nix";
+    createDirs(dir);
+    return dir;
 }
 
 
@@ -727,45 +745,22 @@ unsigned int getMaxCPU()
 {
     #if __linux__
     try {
-        FILE *fp = fopen("/proc/mounts", "r");
-        if (!fp)
-            return 0;
+        auto cgroupFS = getCgroupFS();
+        if (!cgroupFS) return 0;
 
-        Strings cgPathParts;
+        auto cgroups = getCgroups("/proc/self/cgroup");
+        auto cgroup = cgroups[""];
+        if (cgroup == "") return 0;
 
-        struct mntent *ent;
-        while ((ent = getmntent(fp))) {
-            std::string mountType, mountPath;
+        auto cpuFile = *cgroupFS + "/" + cgroup + "/cpu.max";
 
-            mountType = ent->mnt_type;
-            mountPath = ent->mnt_dir;
-
-            if (mountType == "cgroup2") {
-                cgPathParts.push_back(mountPath);
-                break;
-            }
-        }
-
-        fclose(fp);
-
-        if (cgPathParts.size() > 0 && pathExists("/proc/self/cgroup")) {
-            std::string currentCgroup = readFile("/proc/self/cgroup");
-            Strings cgValues = tokenizeString<Strings>(currentCgroup, ":");
-            cgPathParts.push_back(trim(cgValues.back(), "\n"));
-            cgPathParts.push_back("cpu.max");
-            std::string fullCgPath = canonPath(concatStringsSep("/", cgPathParts));
-
-            if (pathExists(fullCgPath)) {
-                std::string cpuMax = readFile(fullCgPath);
-                std::vector<std::string> cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " ");
-                std::string quota = cpuMaxParts[0];
-                std::string period = trim(cpuMaxParts[1], "\n");
-
-                if (quota != "max")
-                    return std::ceil(std::stoi(quota) / std::stof(period));
-            }
-        }
-    } catch (Error &) { ignoreException(); }
+        auto cpuMax = readFile(cpuFile);
+        auto cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " \n");
+        auto quota = cpuMaxParts[0];
+        auto period = cpuMaxParts[1];
+        if (quota != "max")
+                return std::ceil(std::stoi(quota) / std::stof(period));
+    } catch (Error &) { ignoreException(lvlDebug); }
     #endif
 
     return 0;
@@ -1070,9 +1065,17 @@ static pid_t doFork(bool allowVfork, std::function<void()> fun)
 }
 
 
+static int childEntry(void * arg)
+{
+    auto main = (std::function<void()> *) arg;
+    (*main)();
+    return 1;
+}
+
+
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 {
-    auto wrapper = [&]() {
+    std::function<void()> wrapper = [&]() {
         if (!options.allowVfork)
             logger = makeSimpleLogger();
         try {
@@ -1092,7 +1095,27 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
             _exit(1);
     };
 
-    pid_t pid = doFork(options.allowVfork, wrapper);
+    pid_t pid = -1;
+
+    if (options.cloneFlags) {
+        #ifdef __linux__
+        // Not supported, since then we don't know when to free the stack.
+        assert(!(options.cloneFlags & CLONE_VM));
+
+        size_t stackSize = 1 * 1024 * 1024;
+        auto stack = (char *) mmap(0, stackSize,
+            PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
+        if (stack == MAP_FAILED) throw SysError("allocating stack");
+
+        Finally freeStack([&]() { munmap(stack, stackSize); });
+
+        pid = clone(childEntry, stack + stackSize, options.cloneFlags | SIGCHLD, &wrapper);
+        #else
+        throw Error("clone flags are only supported on Linux");
+        #endif
+    } else
+        pid = doFork(options.allowVfork, wrapper);
+
     if (pid == -1) throw SysError("unable to fork");
 
     return pid;
@@ -1427,7 +1450,7 @@ std::string shellEscape(const std::string_view s)
 }
 
 
-void ignoreException()
+void ignoreException(Verbosity lvl)
 {
     /* Make sure no exceptions leave this function.
        printError() also throws when remote is closed. */
@@ -1435,7 +1458,7 @@ void ignoreException()
         try {
             throw;
         } catch (std::exception & e) {
-            printError("error (ignored): %1%", e.what());
+            printMsg(lvl, "error (ignored): %1%", e.what());
         }
     } catch (...) { }
 }
@@ -1614,6 +1637,21 @@ std::string stripIndentation(std::string_view s)
     }
 
     return res;
+}
+
+
+std::pair<std::string_view, std::string_view> getLine(std::string_view s)
+{
+    auto newline = s.find('\n');
+
+    if (newline == s.npos) {
+        return {s, ""};
+    } else {
+        auto line = s.substr(0, newline);
+        if (!line.empty() && line[line.size() - 1] == '\r')
+            line = line.substr(0, line.size() - 1);
+        return {line, s.substr(newline + 1)};
+    }
 }
 
 

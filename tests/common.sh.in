@@ -4,6 +4,8 @@ if [[ -z "$COMMON_SH_SOURCED" ]]; then
 
 COMMON_SH_SOURCED=1
 
+export PS4='+(${BASH_SOURCE[0]}:$LINENO) '
+
 export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)/${TEST_NAME:-default}
 export NIX_STORE_DIR
 if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store 2> /dev/null); then
@@ -27,6 +29,8 @@ export NIX_REMOTE=$NIX_REMOTE_
 unset NIX_PATH
 export TEST_HOME=$TEST_ROOT/test-home
 export HOME=$TEST_HOME
+unset XDG_STATE_HOME
+unset XDG_DATA_HOME
 unset XDG_CONFIG_HOME
 unset XDG_CONFIG_DIRS
 unset XDG_CACHE_HOME
@@ -62,8 +66,8 @@ readLink() {
 }
 
 clearProfiles() {
-    profiles="$NIX_STATE_DIR"/profiles
-    rm -rf $profiles
+    profiles="$HOME"/.local/state/nix/profiles
+    rm -rf "$profiles"
 }
 
 clearStore() {

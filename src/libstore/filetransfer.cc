@@ -33,14 +33,6 @@ FileTransferSettings fileTransferSettings;
 
 static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
 
-std::string resolveUri(std::string_view uri)
-{
-    if (uri.compare(0, 8, "channel:") == 0)
-        return "https://nixos.org/channels/" + std::string(uri.substr(8)) + "/nixexprs.tar.xz";
-    else
-        return std::string(uri);
-}
-
 struct curlFileTransfer : public FileTransfer
 {
     CURLM * curlm = 0;
@@ -109,6 +101,7 @@ struct curlFileTransfer : public FileTransfer
                     this->result.data.append(data);
               })
         {
+            requestHeaders = curl_slist_append(requestHeaders, "Accept-Encoding: zstd, br, gzip, deflate, bzip2, xz");
             if (!request.expectedETag.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
             if (!request.mimeType.empty())
@@ -142,9 +135,9 @@ struct curlFileTransfer : public FileTransfer
         }
 
         template<class T>
-        void fail(const T & e)
+        void fail(T && e)
         {
-            failEx(std::make_exception_ptr(e));
+            failEx(std::make_exception_ptr(std::move(e)));
         }
 
         LambdaSink finalSink;
@@ -472,7 +465,7 @@ struct curlFileTransfer : public FileTransfer
                     fileTransfer.enqueueItem(shared_from_this());
                 }
                 else
-                    fail(exc);
+                    fail(std::move(exc));
             }
         }
     };
@@ -872,15 +865,5 @@ FileTransferError::FileTransferError(FileTransfer::Error error, std::optional<st
     else
         err.msg = hf;
 }
-
-bool isUri(std::string_view s)
-{
-    if (s.compare(0, 8, "channel:") == 0) return true;
-    size_t pos = s.find("://");
-    if (pos == std::string::npos) return false;
-    std::string scheme(s, 0, pos);
-    return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "channel" || scheme == "git" || scheme == "s3" || scheme == "ssh";
-}
-
 
 }
