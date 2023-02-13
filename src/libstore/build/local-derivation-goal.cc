@@ -1134,6 +1134,9 @@ void LocalDerivationGoal::initEnv()
 
     /* Trigger colored output in various tools. */
     env["TERM"] = "xterm-256color";
+
+    /* Git needs access to system SSL certificats */
+    env["GIT_SSL_CAINFO"] = "/etc/ssl/certs/ca-certificates.crt";
 }
 
 
@@ -1763,7 +1766,7 @@ void LocalDerivationGoal::runChild()
                 /* N.B. it is realistic that these paths might not exist. It
                    happens when testing Nix building fixed-output derivations
                    within a pure derivation. */
-                for (auto & path : { "/etc/resolv.conf", "/etc/services", "/etc/hosts" })
+                for (auto & path : { "/etc/resolv.conf", "/etc/services", "/etc/hosts", "/etc/ssl/certs/ca-certificates.crt" })
                     if (pathExists(path))
                         ss.push_back(path);
             }
