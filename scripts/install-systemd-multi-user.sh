@@ -240,16 +240,6 @@
 		_sudo "" userdel --remove "$user" 2>/dev/null # non-debian
 	}
 
-	poly_commands_needed_before_init_nix_shell() {
-		if [ -e /run/systemd/system ]; then
-			:
-		else
-			cat <<-EOF
-			$ sudo nix-daemon
-			EOF
-		fi
-	}
-
 # 
 # 
 # main poly methods (in chronological order)
@@ -407,5 +397,15 @@
 					systemctl restart $NIX_DAEMON_SERVICE_BASE
 		else
 			reminder "I don't support your init system yet; you may want to add nix-daemon manually."
+		fi
+	}
+	
+	poly_8_commands_needed_before_init_nix_shell() {
+		if [ -e /run/systemd/system ]; then
+			:
+		else
+			cat <<-EOF
+			$ sudo nix-daemon
+			EOF
 		fi
 	}

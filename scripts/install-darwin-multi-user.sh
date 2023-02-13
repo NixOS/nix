@@ -212,10 +212,6 @@
 		_sudo "" userdel --remove "$user" 2>/dev/null # non-debian
 	}
 
-	poly_commands_needed_before_init_nix_shell() {
-		:
-	}	
-
 # 
 # 
 # main poly methods (in chronological order)
@@ -417,4 +413,8 @@
 
 		_sudo "to start the nix-daemon" \
 				launchctl kickstart -k system/$NIX_DAEMON_BASE
+	}
+
+	poly_8_commands_needed_before_init_nix_shell() {
+		:
 	}
