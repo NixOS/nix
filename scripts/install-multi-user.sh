@@ -1050,56 +1050,56 @@
 	}
 
 	chat_about_sudo_if_needed() {
-	if ! is_root; then
-		header "let's talk about sudo"
+		if ! is_root; then
+			header "let's talk about sudo"
 
-		if headless; then
+			if headless; then
+				cat <<-EOF
+				This script is going to call sudo a lot. Normally, it would show you
+				exactly what commands it is running and why. However, the script is
+				run in a headless fashion, like this:
+
+				$ curl -L https://nixos.org/nix/install | sh
+
+				or maybe in a CI pipeline. Because of that, I'm going to skip the
+				verbose output in the interest of brevity.
+
+				If you would like to
+				see the output, try like this:
+
+				$ curl -L -o install-nix https://nixos.org/nix/install
+				$ sh ./install-nix
+
+				EOF
+				return 0
+			fi
+
 			cat <<-EOF
-			This script is going to call sudo a lot. Normally, it would show you
-			exactly what commands it is running and why. However, the script is
-			run in a headless fashion, like this:
+			This script is going to call sudo a lot. Every time I do, it'll
+			output exactly what it'll do, and why.
 
-			$ curl -L https://nixos.org/nix/install | sh
+			Just like this:
+			EOF
 
-			or maybe in a CI pipeline. Because of that, I'm going to skip the
-			verbose output in the interest of brevity.
+			__sudo "to demonstrate how our sudo prompts look" \
+				echo "this is a sudo prompt"
 
-			If you would like to
-			see the output, try like this:
+			cat <<-EOF
 
-			$ curl -L -o install-nix https://nixos.org/nix/install
-			$ sh ./install-nix
+			This might look scary, but everything can be undone by running just a
+			few commands. I used to ask you to confirm each time sudo ran, but it
+			was too many times. Instead, I'll just ask you this one time:
 
 			EOF
-			return 0
+			if ui_confirm "Can I use sudo?"; then
+				ok "Yay! Thanks! Let's get going!"
+			else
+				failure <<-EOF
+				That is okay, but I can't install.
+				EOF
+			fi
 		fi
-
-		cat <<-EOF
-		This script is going to call sudo a lot. Every time I do, it'll
-		output exactly what it'll do, and why.
-
-		Just like this:
-		EOF
-
-		__sudo "to demonstrate how our sudo prompts look" \
-			echo "this is a sudo prompt"
-
-		cat <<-EOF
-
-		This might look scary, but everything can be undone by running just a
-		few commands. I used to ask you to confirm each time sudo ran, but it
-		was too many times. Instead, I'll just ask you this one time:
-
-		EOF
-		if ui_confirm "Can I use sudo?"; then
-			ok "Yay! Thanks! Let's get going!"
-		else
-			failure <<-EOF
-			That is okay, but I can't install.
-			EOF
-		fi
-	fi
-}
+	}
 
 	message_about_artifacts() {
 		task "Checking for artifacts of previous installs"
