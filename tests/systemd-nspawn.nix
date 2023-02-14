@@ -62,6 +62,7 @@ runCommand "test"
 
     mkdir -p $out
 
+    chmod +w /etc
     touch /etc/os-release
     echo a5ea3f98dedc0278b6f3cc8c37eeaeac > /etc/machine-id
 
