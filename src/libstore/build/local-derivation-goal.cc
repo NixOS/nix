@@ -663,7 +663,6 @@ void LocalDerivationGoal::startBuilder()
            nobody account.  The latter is kind of a hack to support
            Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
-        chownToBuilder(chrootRootDir + "/etc");
 
         if (parsedDrv->useUidRange() && (!buildUser || buildUser->getUIDCount() < 65536))
             throw Error("feature 'uid-range' requires the setting '%s' to be enabled", settings.autoAllocateUids.name);
@@ -1022,6 +1021,9 @@ void LocalDerivationGoal::startBuilder()
                 "nixbld:x:%1%:%2%:Nix build user:%3%:/noshell\n"
                 "nobody:x:65534:65534:Nobody:/:/noshell\n",
                 sandboxUid(), sandboxGid(), settings.sandboxBuildDir));
+
+        /* Make /etc unwritable */
+        chmod_(chrootRootDir + "/etc", 0555);
 
         /* Save the mount- and user namespace of the child. We have to do this
            *before* the child does a chroot. */
