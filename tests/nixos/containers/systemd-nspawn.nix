@@ -56,7 +56,6 @@ runCommand "test"
     # Make /run a tmpfs to shut up a systemd warning.
     mkdir /run
     mount -t tmpfs none /run
-    chmod 0700 /run
 
     mount -t cgroup2 none /sys/fs/cgroup
 
