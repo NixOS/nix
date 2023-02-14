@@ -56,12 +56,12 @@ runCommand "test"
     # Make /run a tmpfs to shut up a systemd warning.
     mkdir /run
     mount -t tmpfs none /run
-    chmod 0700 /run
 
     mount -t cgroup2 none /sys/fs/cgroup
 
     mkdir -p $out
 
+    chmod +w /etc
     touch /etc/os-release
     echo a5ea3f98dedc0278b6f3cc8c37eeaeac > /etc/machine-id
 
