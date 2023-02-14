@@ -145,8 +145,20 @@ void DerivationGoal::work()
 void DerivationGoal::addWantedOutputs(const OutputsSpec & outputs)
 {
     auto newWanted = wantedOutputs.union_(outputs);
-    if (!newWanted.isSubsetOf(wantedOutputs))
-        needRestart = true;
+    switch (needRestart) {
+    case NeedRestartForMoreOutputs::OutputsUnmodifedDontNeed:
+        if (!newWanted.isSubsetOf(wantedOutputs))
+            needRestart = NeedRestartForMoreOutputs::OutputsAddedDoNeed;
+        break;
+    case NeedRestartForMoreOutputs::OutputsAddedDoNeed:
+        /* No need to check whether we added more outputs, because a
+           restart is already queued up. */
+        break;
+    case NeedRestartForMoreOutputs::BuildInProgressWillNotNeed:
+        /* We are already building all outputs, so it doesn't matter if
+           we now want more. */
+        break;
+    };
     wantedOutputs = newWanted;
 }
 
@@ -297,12 +309,29 @@ void DerivationGoal::outputsSubstitutionTried()
         In particular, it may be the case that the hole in the closure is
         an output of the current derivation, which causes a loop if retried.
      */
-    if (nrIncompleteClosure > 0 && nrIncompleteClosure == nrFailed) retrySubstitution = true;
+    {
+        bool substitutionFailed =
+            nrIncompleteClosure > 0 &&
+            nrIncompleteClosure == nrFailed;
+        switch (retrySubstitution) {
+        case RetrySubstitution::NoNeed:
+            if (substitutionFailed)
+                retrySubstitution = RetrySubstitution::YesNeed;
+            break;
+        case RetrySubstitution::YesNeed:
+            // Should not be able to reach this state from here.
+            assert(false);
+            break;
+        case RetrySubstitution::AlreadyRetried:
+            debug("substitution failed again, but we already retried once. Not retrying again.");
+            break;
+        }
+    }
 
     nrFailed = nrNoSubstituters = nrIncompleteClosure = 0;
 
-    if (needRestart) {
-        needRestart = false;
+    if (needRestart == NeedRestartForMoreOutputs::OutputsAddedDoNeed) {
+        needRestart = NeedRestartForMoreOutputs::OutputsUnmodifedDontNeed;
         haveDerivation();
         return;
     }
@@ -330,9 +359,9 @@ void DerivationGoal::outputsSubstitutionTried()
    produced using a substitute.  So we have to build instead. */
 void DerivationGoal::gaveUpOnSubstitution()
 {
-    /* Make sure checkPathValidity() from now on checks all
-       outputs. */
-    wantedOutputs = OutputsSpec::All { };
+    /* At this point we are building all outputs, so if more are wanted there
+       is no need to restart. */
+    needRestart = NeedRestartForMoreOutputs::BuildInProgressWillNotNeed;
 
     /* The inputs must be built before we can build this goal. */
     inputDrvOutputs.clear();
@@ -455,8 +484,8 @@ void DerivationGoal::inputsRealised()
         return;
     }
 
-    if (retrySubstitution && !retriedSubstitution) {
-        retriedSubstitution = true;
+    if (retrySubstitution == RetrySubstitution::YesNeed) {
+        retrySubstitution = RetrySubstitution::AlreadyRetried;
         haveDerivation();
         return;
     }

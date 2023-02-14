@@ -79,21 +79,57 @@ struct DerivationGoal : public Goal
     std::map<std::pair<StorePath, std::string>, StorePath> inputDrvOutputs;
 
     /**
+     * See `needRestart`; just for that field.
+     */
+    enum struct NeedRestartForMoreOutputs {
+        /**
+         * The goal state machine is progressing based on the current value of
+         * `wantedOutputs. No actions are needed.
+         */
+        OutputsUnmodifedDontNeed,
+        /**
+         * `wantedOutputs` has been extended, but the state machine is
+         * proceeding according to its old value, so we need to restart.
+         */
+        OutputsAddedDoNeed,
+        /**
+         * The goal state machine has progressed to the point of doing a build,
+         * in which case all outputs will be produced, so extensions to
+         * `wantedOutputs` no longer require a restart.
+         */
+        BuildInProgressWillNotNeed,
+    };
+
+    /**
      * Whether additional wanted outputs have been added.
      */
-    bool needRestart = false;
+    NeedRestartForMoreOutputs needRestart = NeedRestartForMoreOutputs::OutputsUnmodifedDontNeed;
+
+    /**
+     * See `retrySubstitution`; just for that field.
+     */
+    enum RetrySubstitution {
+        /**
+         * No issues have yet arose, no need to restart.
+         */
+        NoNeed,
+        /**
+         * Something failed and there is an incomplete closure. Let's retry
+         * substituting.
+         */
+        YesNeed,
+        /**
+         * We are current or have already retried substitution, and whether or
+         * not something goes wrong we will not retry again.
+         */
+        AlreadyRetried,
+    };
 
     /**
      * Whether to retry substituting the outputs after building the
      * inputs. This is done in case of an incomplete closure.
      */
-    bool retrySubstitution = false;
-
-    /**
-     * Whether we've retried substitution, in which case we won't try
-     * again.
-     */
-    bool retriedSubstitution = false;
+    RetrySubstitution retrySubstitution = RetrySubstitution::NoNeed;
 
     /**
      * The derivation stored at drvPath.
