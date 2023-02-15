@@ -7,18 +7,10 @@
 
 using namespace nix;
 
-struct CmdStoreGC : StoreCommand, MixDryRun
+struct CmdStoreGC : StoreCommand
 {
-    GCOptions options;
-
     CmdStoreGC()
     {
-        addFlag({
-            .longName = "max",
-            .description = "Stop after freeing *n* bytes of disk space.",
-            .labels = {"n"},
-            .handler = {&options.maxFreed}
-        });
     }
 
     std::string description() override
@@ -35,12 +27,13 @@ struct CmdStoreGC : StoreCommand, MixDryRun
 
     void run(ref<Store> store) override
     {
+        /* The default threshold of 0 makes sense for auto-GC, but not
+           when the garbage collector is invoked manually. */
+        settings.minFree.setDefault(std::numeric_limits<uint64_t>::max());
+
         auto & gcStore = require<GcStore>(*store);
 
-        options.action = dryRun ? GCOptions::gcReturnDead : GCOptions::gcDeleteDead;
-        GCResults results;
-        PrintFreed freed(options.action == GCOptions::gcDeleteDead, results);
-        gcStore.collectGarbage(options, results);
+        gcStore.autoGC(true);
     }
 };
 

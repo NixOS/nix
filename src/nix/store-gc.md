@@ -11,7 +11,7 @@ R""(
 * Delete up to 1 gigabyte of garbage:
 
   ```console
-  # nix store gc --max 1G
+  # nix store gc --max-free 1G
   ```
 
 # Description
