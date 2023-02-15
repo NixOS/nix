@@ -434,6 +434,16 @@ expr_select
     { $$ = new ExprSelect(CUR_POS, $1, *$3, 0); }
   | expr_simple '.' attrpath OR_KW expr_select
     { $$ = new ExprSelect(CUR_POS, $1, *$3, $5); }
+  | expr_simple '.' '[' attrs ']'
+    {
+      auto lst = new ExprList;
+      lst->elems.reserve($4->size());
+      for (auto & i : *$4) {
+          /* !!! Should ensure sharing of the expression in $4. */
+          lst->elems.push_back(new ExprSelect(makeCurPos(@4, data), $1, i.symbol));
+      }
+      $$ = lst;
+    }
   | /* Backwards compatibility: because Nixpkgs has a rarely used
        function named ‘or’, allow stuff like ‘map or [...]’. */
     expr_simple OR_KW
