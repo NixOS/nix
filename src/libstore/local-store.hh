@@ -10,7 +10,6 @@
 #include "util.hh"
 
 #include <chrono>
-#include <future>
 #include <string>
 #include <unordered_set>
 
@@ -58,21 +57,6 @@ private:
 
         struct Stmts;
         std::unique_ptr<Stmts> stmts;
-
-        /* The last time we checked whether to do an auto-GC, or an
-           auto-GC finished. */
-        std::chrono::time_point<std::chrono::steady_clock> lastGCCheck;
-
-        /* Whether auto-GC is running. If so, get gcFuture to wait for
-           the GC to finish. */
-        bool gcRunning = false;
-        std::shared_future<void> gcFuture;
-
-        /* How much disk space was available after the previous
-           auto-GC. If the current available disk space is below
-           minFree but not much below availAfterGC, then there is no
-           point in starting a new GC. */
-        uint64_t availAfterGC = std::numeric_limits<uint64_t>::max();
 
         std::unique_ptr<PublicKeys> publicKeys;
     };
@@ -170,6 +154,8 @@ private:
 
     AutoCloseFD openGCLock();
 
+    uint64_t getAvailableSpace() override;
+
 public:
 
     Roots findRoots(bool censor) override;
@@ -205,10 +191,6 @@ public:
     void repairPath(const StorePath & path) override;
 
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
-
-    /* If free disk space in /nix/store if below minFree, delete
-       garbage until it exceeds maxFree. */
-    void autoGC(bool sync = true);
 
     /* Register the store path 'output' as the output named 'outputName' of
        derivation 'deriver'. */
