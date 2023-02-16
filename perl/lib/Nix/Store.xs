@@ -1,4 +1,4 @@
-#include "config.h"
+#include "nix/config.h"
 
 #include "EXTERN.h"
 #include "perl.h"
@@ -8,11 +8,11 @@
 #undef do_open
 #undef do_close
 
-#include "derivations.hh"
-#include "globals.hh"
-#include "store-api.hh"
-#include "util.hh"
-#include "crypto.hh"
+#include "nix/derivations.hh"
+#include "nix/globals.hh"
+#include "nix/store-api.hh"
+#include "nix/util.hh"
+#include "nix/crypto.hh"
 
 #include <sodium.h>
 #include <nlohmann/json.hpp>
