@@ -27,13 +27,9 @@ struct CmdStoreGC : StoreCommand
 
     void run(ref<Store> store) override
     {
-        /* The default threshold of 0 makes sense for auto-GC, but not
-           when the garbage collector is invoked manually. */
-        settings.minFree.setDefault(std::numeric_limits<uint64_t>::max());
-
         auto & gcStore = require<GcStore>(*store);
 
-        gcStore.autoGC(true);
+        gcStore.doGC(true);
     }
 };
 

@@ -84,8 +84,11 @@ struct GcStore : public virtual Store
     /* Perform a garbage collection. */
     virtual void collectGarbage(const GCOptions & options, GCResults & results) = 0;
 
-    /* If free disk space in /nix/store if below minFree, delete
-       garbage until it exceeds maxFree. */
+    /* Do a garbage collection that observes the policy configured by
+       `min-free` etc.  */
+    void doGC(bool sync = true);
+
+    /* Perform an automatic garbage collection, if enabled. */
     void autoGC(bool sync = true);
 
     /* Return the amount of available disk space in this store. Used

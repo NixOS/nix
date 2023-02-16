@@ -20,3 +20,8 @@
   to the embedded store and not to the host's Nix store.
 
   This requires the `discard-references` experimental feature.
+
+* Automatic garbage collection is now only enabled if you set `auto-gc
+  = true` in `nix.conf`. You will probably also want to set `min-free`
+  to configure when the garbage collector kicks in, e.g. `1G` to make
+  it run when free space drops below 1 gigabyte.

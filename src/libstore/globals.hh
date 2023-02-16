@@ -877,25 +877,33 @@ public:
           first. If it is not available there, if will try the original URI.
         )"};
 
-    Setting<uint64_t> minFree{
-        this, 0, "min-free",
+    Setting<bool> autoGC{
+        this, false, "auto-gc",
         R"(
-          When free disk space in `/nix/store` drops below `min-free` during a
-          build, Nix performs a garbage-collection until `max-free` bytes are
-          available or there is no more garbage. A value of `0` (the default)
-          disables this feature.
+          Whether to perform automatic garbage collections during builds.
+        )"};
+
+    Setting<uint64_t> minFree{
+        this, std::numeric_limits<uint64_t>::max(), "min-free",
+        R"(
+          The amount of free disk space in `/nix/store` below which
+          Nix will start a garbage collection when `auto-gc` is
+          enabled or when you manually run `nix store gc`. The default
+          value is infinity, meaning Nix will start collecting garbage
+          regardless of the amount of free space.
         )"};
 
     Setting<uint64_t> maxFree{
         this, std::numeric_limits<uint64_t>::max(), "max-free",
         R"(
-          When a garbage collection is triggered by the `min-free` option, it
-          stops as soon as `max-free` bytes are available. The default is
-          infinity (i.e. delete all garbage).
+          During garbage collection, Nix will stop collecting when the
+          amount of free space in `/nix/store` gets above this
+          value. The default value is infinity, meaning that Nix will
+          delete all garbage regardless of free space.
         )"};
 
     Setting<uint64_t> minFreeCheckInterval{this, 5, "min-free-check-interval",
-        "Number of seconds between checking free disk space."};
+        "Number of seconds between checking free disk space, if `auto-gc` is enabled."};
 
     PluginFilesSetting pluginFiles{
         this, {}, "plugin-files",

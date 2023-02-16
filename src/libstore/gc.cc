@@ -903,7 +903,7 @@ GcStore::~GcStore()
 }
 
 
-void GcStore::autoGC(bool sync)
+void GcStore::doGC(bool sync)
 {
     std::shared_future<void> future;
 
@@ -968,6 +968,13 @@ void GcStore::autoGC(bool sync)
  sync:
     // Wait for the future outside of the state lock.
     if (sync) future.get();
+}
+
+
+void GcStore::autoGC(bool sync)
+{
+    if (settings.autoGC)
+        doGC(sync);
 }
 
 

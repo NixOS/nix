@@ -62,11 +62,11 @@ EOF
 )
 
 nix build --impure -v -o $TEST_ROOT/result-A -L --expr "$expr" \
-    --min-free 1K --max-free 2K --min-free-check-interval 1 &
+    --auto-gc --min-free 1K --max-free 2K --min-free-check-interval 1 &
 pid1=$!
 
 nix build --impure -v -o $TEST_ROOT/result-B -L --expr "$expr2" \
-    --min-free 1K --max-free 2K --min-free-check-interval 1 &
+    --auto-gc --min-free 1K --max-free 2K --min-free-check-interval 1 &
 pid2=$!
 
 # Once the first build is done, unblock the second one.
