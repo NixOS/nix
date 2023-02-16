@@ -250,9 +250,8 @@ void Worker::run(const Goals & _topGoals)
 
         checkInterrupt();
 
-        // TODO GC interface?
-        if (auto localStore = dynamic_cast<LocalStore *>(&store))
-            localStore->autoGC(false);
+        if (auto gcStore = dynamic_cast<GcStore *>(&store))
+            gcStore->autoGC(false);
 
         /* Call every wake goal (in the ordering established by
            CompareGoalPtrs). */
