@@ -317,9 +317,9 @@ void Worker::waitForInput()
        is a build timeout, then wait for input until the first
        deadline for any child. */
     auto nearest = steady_time_point::max(); // nearest deadline
-    if (settings.minFree.get() != 0)
-        // Periodicallty wake up to see if we need to run the garbage collector.
-        nearest = before + std::chrono::seconds(10);
+    if (settings.autoGC)
+        // Periodically wake up to see if we need to run the garbage collector.
+        nearest = before + std::chrono::seconds(settings.autoGCCheckInterval);
     for (auto & i : children) {
         if (!i.respectTimeouts) continue;
         if (0 != settings.maxSilentTime)

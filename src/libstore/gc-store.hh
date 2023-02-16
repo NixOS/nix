@@ -85,7 +85,7 @@ struct GcStore : public virtual Store
     virtual void collectGarbage(const GCOptions & options, GCResults & results) = 0;
 
     /* Do a garbage collection that observes the policy configured by
-       `min-free` etc.  */
+       `gc-threshold`, `gc-limit`, etc.  */
     void doGC(bool sync = true);
 
     /* Perform an automatic garbage collection, if enabled. */

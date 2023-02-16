@@ -918,13 +918,13 @@ void GcStore::doGC(bool sync)
 
         auto now = std::chrono::steady_clock::now();
 
-        if (now < state->lastGCCheck + std::chrono::seconds(settings.minFreeCheckInterval)) return;
+        if (now < state->lastGCCheck + std::chrono::seconds(settings.autoGCCheckInterval)) return;
 
         auto avail = getAvailableSpace();
 
         state->lastGCCheck = now;
 
-        if (avail >= settings.minFree || avail >= settings.maxFree) return;
+        if (avail >= settings.gcThreshold || avail >= settings.gcLimit) return;
 
         if (avail > state->availAfterGC * 0.97) return;
 
@@ -946,7 +946,7 @@ void GcStore::doGC(bool sync)
                 });
 
                 GCOptions options;
-                options.maxFreed = settings.maxFree - avail;
+                options.maxFreed = settings.gcLimit - avail;
 
                 printInfo("running auto-GC to free %d bytes", options.maxFreed);
 

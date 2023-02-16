@@ -1,6 +1,6 @@
 source common.sh
 
-needLocalStore "“min-free” and “max-free” are daemon options"
+needLocalStore "'gc-threshold' and 'gc-limit' are daemon options"
 
 clearStore
 
@@ -62,11 +62,11 @@ EOF
 )
 
 nix build --impure -v -o $TEST_ROOT/result-A -L --expr "$expr" \
-    --auto-gc --min-free 1K --max-free 2K --min-free-check-interval 1 &
+    --auto-gc --gc-threshold 1K --gc-limit 2K --auto-gc-check-interval 1 &
 pid1=$!
 
 nix build --impure -v -o $TEST_ROOT/result-B -L --expr "$expr2" \
-    --auto-gc --min-free 1K --max-free 2K --min-free-check-interval 1 &
+    --auto-gc --gc-threshold 1K --gc-limit 2K --auto-gc-check-interval 1 &
 pid2=$!
 
 # Once the first build is done, unblock the second one.
