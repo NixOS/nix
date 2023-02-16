@@ -67,3 +67,8 @@ exp_features=$(nix config show | grep '^experimental-features' | cut -d '=' -f 2
 val=$(nix config show | grep '^warn-dirty' | cut -d '=' -f  2 | xargs)
 val2=$(nix config show warn-dirty)
 [[ $val == $val2 ]]
+
+# Test unit prefixes.
+[[ $(nix config show --min-free 64K min-free) = 65536 ]]
+[[ $(nix config show --min-free 1M min-free) = 1048576 ]]
+[[ $(nix config show --min-free 2G min-free) = 2147483648 ]]
