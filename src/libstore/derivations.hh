@@ -318,6 +318,4 @@ std::string hashPlaceholder(const std::string_view outputName);
    dependency which is a CA derivation. */
 std::string downstreamPlaceholder(const Store & store, const StorePath & drvPath, std::string_view outputName);
 
-extern const Hash impureOutputHash;
-
 }
