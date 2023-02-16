@@ -491,7 +491,7 @@ std::optional<N> string2Int(const std::string_view s)
 template<class N>
 N string2IntWithUnitPrefix(std::string_view s)
 {
-    N multiplier = 1;
+    uint64_t multiplier = 1;
     if (!s.empty()) {
         char u = std::toupper(*s.rbegin());
         if (std::isalpha(u)) {
