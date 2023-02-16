@@ -16,7 +16,6 @@
 #include <poll.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <sys/statvfs.h>
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
