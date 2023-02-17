@@ -2,7 +2,7 @@
 
 #include <Python.h>
 
-#include <nix/config.h>
+#include <config.h>
 
 #include <eval.hh>
 

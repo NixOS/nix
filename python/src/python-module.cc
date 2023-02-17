@@ -3,7 +3,7 @@
 #include "internal/eval.hh"
 #include "internal/ptr.hh"
 
-#include <nix/config.h>
+#include <config.h>
 
 #include <eval.hh>
 #include <globals.hh>
