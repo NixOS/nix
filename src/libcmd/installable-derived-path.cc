@@ -1,4 +1,4 @@
-#include "installable-derived-path.hh"
+#include "nix/cmd/installable-derived-path.hh"
 #include "derivations.hh"
 
 namespace nix {

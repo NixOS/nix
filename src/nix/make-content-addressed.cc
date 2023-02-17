@@ -1,4 +1,4 @@
-#include "command.hh"
+#include "nix/cmd/command.hh"
 #include "store-api.hh"
 #include "make-content-addressed.hh"
 #include "common-args.hh"

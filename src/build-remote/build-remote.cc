@@ -18,7 +18,7 @@
 #include "store-api.hh"
 #include "derivations.hh"
 #include "local-store.hh"
-#include "legacy.hh"
+#include "nix/cmd/legacy.hh"
 #include "nix/util/experimental-features.hh"
 
 using namespace nix;

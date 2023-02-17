@@ -1,16 +1,16 @@
 #include <algorithm>
 
-#include "command.hh"
+#include "nix/cmd/command.hh"
 #include "common-args.hh"
 #include "eval.hh"
 #include "globals.hh"
-#include "legacy.hh"
+#include "nix/cmd/legacy.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "filetransfer.hh"
 #include "nix/util/finally.hh"
 #include "loggers.hh"
-#include "markdown.hh"
+#include "nix/cmd/markdown.hh"
 
 #include <sys/types.h>
 #include <sys/socket.h>

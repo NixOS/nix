@@ -3,7 +3,7 @@
 #include "globals.hh"
 #include "filetransfer.hh"
 #include "store-api.hh"
-#include "legacy.hh"
+#include "nix/cmd/legacy.hh"
 #include "fetchers.hh"
 #include "nix/util/util.hh"
 

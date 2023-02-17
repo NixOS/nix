@@ -1,10 +1,10 @@
-#include "installables.hh"
-#include "installable-derived-path.hh"
+#include "nix/cmd/installables.hh"
+#include "nix/cmd/installable-derived-path.hh"
 #include "store-api.hh"
 #include "eval-inline.hh"
 #include "eval-cache.hh"
 #include "names.hh"
-#include "command.hh"
+#include "nix/cmd/command.hh"
 #include "derivations.hh"
 
 namespace nix {

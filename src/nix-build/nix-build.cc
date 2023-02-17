@@ -20,9 +20,9 @@
 #include "eval.hh"
 #include "eval-inline.hh"
 #include "get-drvs.hh"
-#include "common-eval-args.hh"
+#include "nix/cmd/common-eval-args.hh"
 #include "attr-path.hh"
-#include "legacy.hh"
+#include "nix/cmd/legacy.hh"
 
 using namespace nix;
 using namespace std::string_literals;

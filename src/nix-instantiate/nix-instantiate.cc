@@ -9,8 +9,8 @@
 #include "nix/util/util.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
-#include "common-eval-args.hh"
-#include "legacy.hh"
+#include "nix/cmd/common-eval-args.hh"
+#include "nix/cmd/legacy.hh"
 
 #include <map>
 #include <iostream>

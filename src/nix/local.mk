@@ -15,13 +15,13 @@ nix_SOURCES := \
   $(wildcard src/nix-store/*.cc) \
 
 nix_CXXFLAGS += \
-	-Isrc/libutil/include \
-	-Isrc/libstore \
-	-Isrc/libfetchers \
+	-Idoc/manual \
+	-Isrc/libcmd/include \
 	-Isrc/libexpr \
+	-Isrc/libfetchers \
 	-Isrc/libmain \
-	-Isrc/libcmd \
-	-Idoc/manual
+	-Isrc/libstore \
+	-Isrc/libutil/include
 
 nix_LIBS = libexpr libmain libfetchers libstore libutil libcmd
 

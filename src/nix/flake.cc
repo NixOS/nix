@@ -1,4 +1,4 @@
-#include "command.hh"
+#include "nix/cmd/command.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "eval.hh"
@@ -12,7 +12,7 @@
 #include "fetchers.hh"
 #include "registry.hh"
 #include "eval-cache.hh"
-#include "markdown.hh"
+#include "nix/cmd/markdown.hh"
 
 #include <nlohmann/json.hpp>
 #include <queue>

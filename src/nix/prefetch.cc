@@ -1,4 +1,4 @@
-#include "command.hh"
+#include "nix/cmd/command.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
@@ -8,7 +8,7 @@
 #include "nix/util/tarfile.hh"
 #include "attr-path.hh"
 #include "eval-inline.hh"
-#include "legacy.hh"
+#include "nix/cmd/legacy.hh"
 
 #include <nlohmann/json.hpp>
 

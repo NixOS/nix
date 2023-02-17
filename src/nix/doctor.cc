@@ -1,6 +1,6 @@
 #include <sstream>
 
-#include "command.hh"
+#include "nix/cmd/command.hh"
 #include "nix/util/logging.hh"
 #include "serve-protocol.hh"
 #include "shared.hh"

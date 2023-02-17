@@ -1,4 +1,4 @@
-#include "common-eval-args.hh"
+#include "nix/cmd/common-eval-args.hh"
 #include "shared.hh"
 #include "filetransfer.hh"
 #include "nix/util/util.hh"
@@ -7,7 +7,7 @@
 #include "registry.hh"
 #include "flake/flakeref.hh"
 #include "store-api.hh"
-#include "command.hh"
+#include "nix/cmd/command.hh"
 
 namespace nix {
 

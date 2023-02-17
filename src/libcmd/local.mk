@@ -7,11 +7,12 @@ libcmd_DIR := $(d)
 libcmd_SOURCES := $(wildcard $(d)/*.cc)
 
 libcmd_CXXFLAGS += \
-	-Isrc/libutil/include \
-	-Isrc/libstore \
+	-Isrc/libcmd/include \
 	-Isrc/libexpr \
-	-Isrc/libmain \
 	-Isrc/libfetchers \
+	-Isrc/libmain \
+	-Isrc/libstore \
+	-Isrc/libutil/include \
 	-Isrc/nix
 
 libcmd_LDFLAGS = $(EDITLINE_LIBS) $(LOWDOWN_LIBS) -pthread

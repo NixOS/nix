@@ -1,5 +1,5 @@
 #include "attr-path.hh"
-#include "common-eval-args.hh"
+#include "nix/cmd/common-eval-args.hh"
 #include "derivations.hh"
 #include "eval.hh"
 #include "get-drvs.hh"
@@ -14,7 +14,7 @@
 #include "nix/util/util.hh"
 #include "value-to-json.hh"
 #include "nix/util/xml-writer.hh"
-#include "legacy.hh"
+#include "nix/cmd/legacy.hh"
 
 #include <cerrno>
 #include <ctime>

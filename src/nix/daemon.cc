@@ -1,4 +1,4 @@
-#include "command.hh"
+#include "nix/cmd/command.hh"
 #include "shared.hh"
 #include "local-store.hh"
 #include "remote-store.hh"
@@ -8,7 +8,7 @@
 #include "globals.hh"
 #include "derivations.hh"
 #include "nix/util/finally.hh"
-#include "legacy.hh"
+#include "nix/cmd/legacy.hh"
 #include "daemon.hh"
 
 #include <algorithm>

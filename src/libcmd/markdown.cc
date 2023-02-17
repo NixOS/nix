@@ -1,4 +1,4 @@
-#include "markdown.hh"
+#include "nix/cmd/markdown.hh"
 #include "nix/util/util.hh"
 #include "nix/util/finally.hh"
 

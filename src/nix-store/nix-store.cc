@@ -13,7 +13,7 @@
 #include "nix/util/util.hh"
 #include "worker-protocol.hh"
 #include "graphml.hh"
-#include "legacy.hh"
+#include "nix/cmd/legacy.hh"
 #include "path-with-outputs.hh"
 
 #include <iostream>

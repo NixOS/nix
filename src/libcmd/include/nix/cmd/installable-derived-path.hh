@@ -1,6 +1,6 @@
 #pragma once
 
-#include "installables.hh"
+#include "nix/cmd/installables.hh"
 
 namespace nix {
 

@@ -1,4 +1,4 @@
-#include "command.hh"
+#include "nix/cmd/command.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "eval.hh"

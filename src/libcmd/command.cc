@@ -1,4 +1,4 @@
-#include "command.hh"
+#include "nix/cmd/command.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "derivations.hh"
