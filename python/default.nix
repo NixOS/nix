@@ -36,10 +36,13 @@ python.pkgs.buildPythonPackage {
   doInstallCheck = true;
   installCheckPhase = "meson test -v";
 
-  passthru.shell = mkShell {
-    inputsFrom = [
-      self.devShells.${system}.default
-      (nix.python-bindings.override { nix = null; })
-    ];
+  passthru = {
+    exampleEnv = python.withPackages (p: [ nix.python-bindings ]);
+    shell = mkShell {
+      inputsFrom = [
+        self.devShells.${system}.default
+        (nix.python-bindings.override { nix = null; })
+      ];
+    };
   };
 }
