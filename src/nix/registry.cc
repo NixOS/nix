@@ -4,8 +4,8 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/flake/flake.hh"
 #include "store-api.hh"
-#include "fetchers.hh"
-#include "registry.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/registry.hh"
 
 using namespace nix;
 using namespace nix::flake;

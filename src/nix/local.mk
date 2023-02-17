@@ -18,7 +18,7 @@ nix_CXXFLAGS += \
 	-Idoc/manual \
 	-Isrc/libcmd/include \
 	-Isrc/libexpr/include \
-	-Isrc/libfetchers \
+	-Isrc/libfetchers/include \
 	-Isrc/libmain \
 	-Isrc/libstore \
 	-Isrc/libutil/include

@@ -1,9 +1,9 @@
 #include "nix/expr/primops.hh"
 #include "nix/expr/eval-inline.hh"
 #include "store-api.hh"
-#include "fetchers.hh"
+#include "nix/fetchers/fetchers.hh"
 #include "filetransfer.hh"
-#include "registry.hh"
+#include "nix/fetchers/registry.hh"
 
 #include <ctime>
 #include <iomanip>

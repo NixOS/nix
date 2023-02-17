@@ -1,7 +1,7 @@
 #pragma once
 
 #include "nix/util/types.hh"
-#include "fetchers.hh"
+#include "nix/fetchers/fetchers.hh"
 
 namespace nix { class Store; }
 

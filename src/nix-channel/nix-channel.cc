@@ -4,7 +4,7 @@
 #include "filetransfer.hh"
 #include "store-api.hh"
 #include "nix/cmd/legacy.hh"
-#include "fetchers.hh"
+#include "nix/fetchers/fetchers.hh"
 #include "nix/util/util.hh"
 
 #include <fcntl.h>

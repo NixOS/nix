@@ -1,11 +1,11 @@
-#include "registry.hh"
-#include "fetchers.hh"
+#include "nix/fetchers/registry.hh"
+#include "nix/fetchers/fetchers.hh"
 #include "nix/util/util.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 
-#include "fetch-settings.hh"
+#include "nix/fetchers/fetch-settings.hh"
 
 #include <nlohmann/json.hpp>
 

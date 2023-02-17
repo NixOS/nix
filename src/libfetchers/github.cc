@@ -1,12 +1,12 @@
 #include "filetransfer.hh"
-#include "cache.hh"
+#include "nix/fetchers/cache.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "nix/util/types.hh"
 #include "nix/util/url-parts.hh"
 #include "nix/util/git.hh"
-#include "fetchers.hh"
-#include "fetch-settings.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/fetch-settings.hh"
 
 #include <optional>
 #include <nlohmann/json.hpp>

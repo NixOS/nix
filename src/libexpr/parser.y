@@ -636,7 +636,7 @@ formal
 
 #include "nix/expr/eval.hh"
 #include "filetransfer.hh"
-#include "fetchers.hh"
+#include "nix/fetchers/fetchers.hh"
 #include "store-api.hh"
 #include "nix/expr/flake/flake.hh"
 

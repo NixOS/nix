@@ -1,5 +1,5 @@
-#include "fetchers.hh"
-#include "cache.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/cache.hh"
 #include "globals.hh"
 #include "nix/util/tarfile.hh"
 #include "store-api.hh"
@@ -8,7 +8,7 @@
 #include "nix/util/util.hh"
 #include "nix/util/git.hh"
 
-#include "fetch-settings.hh"
+#include "nix/fetchers/fetch-settings.hh"
 
 #include <regex>
 #include <string.h>

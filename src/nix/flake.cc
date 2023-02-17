@@ -9,8 +9,8 @@
 #include "derivations.hh"
 #include "outputs-spec.hh"
 #include "nix/expr/attr-path.hh"
-#include "fetchers.hh"
-#include "registry.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/registry.hh"
 #include "nix/expr/eval-cache.hh"
 #include "nix/cmd/markdown.hh"
 

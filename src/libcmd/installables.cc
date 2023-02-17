@@ -15,7 +15,7 @@
 #include "nix/expr/flake/flake.hh"
 #include "nix/expr/eval-cache.hh"
 #include "nix/util/url.hh"
-#include "registry.hh"
+#include "nix/fetchers/registry.hh"
 #include "build-result.hh"
 
 #include <regex>

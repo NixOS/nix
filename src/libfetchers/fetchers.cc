@@ -1,4 +1,4 @@
-#include "fetchers.hh"
+#include "nix/fetchers/fetchers.hh"
 #include "store-api.hh"
 
 #include <nlohmann/json.hpp>

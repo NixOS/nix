@@ -1,4 +1,4 @@
-#include "fetch-settings.hh"
+#include "nix/fetchers/fetch-settings.hh"
 
 namespace nix {
 

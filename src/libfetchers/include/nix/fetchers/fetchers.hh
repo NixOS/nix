@@ -3,7 +3,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/hash.hh"
 #include "path.hh"
-#include "attrs.hh"
+#include "nix/fetchers/attrs.hh"
 #include "nix/util/url.hh"
 
 #include <memory>

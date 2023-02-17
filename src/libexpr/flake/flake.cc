@@ -4,9 +4,9 @@
 #include "nix/expr/primops.hh"
 #include "nix/expr/eval-inline.hh"
 #include "store-api.hh"
-#include "fetchers.hh"
+#include "nix/fetchers/fetchers.hh"
 #include "nix/util/finally.hh"
-#include "fetch-settings.hh"
+#include "nix/fetchers/fetch-settings.hh"
 
 namespace nix {
 

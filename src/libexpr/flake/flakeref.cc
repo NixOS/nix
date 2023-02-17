@@ -2,8 +2,8 @@
 #include "store-api.hh"
 #include "nix/util/url.hh"
 #include "nix/util/url-parts.hh"
-#include "fetchers.hh"
-#include "registry.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/registry.hh"
 
 namespace nix {
 

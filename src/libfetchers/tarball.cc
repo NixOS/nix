@@ -1,5 +1,5 @@
-#include "fetchers.hh"
-#include "cache.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/cache.hh"
 #include "filetransfer.hh"
 #include "globals.hh"
 #include "store-api.hh"

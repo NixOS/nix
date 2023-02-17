@@ -2,7 +2,7 @@
 
 #include "nix/util/types.hh"
 #include "nix/util/hash.hh"
-#include "fetchers.hh"
+#include "nix/fetchers/fetchers.hh"
 #include "outputs-spec.hh"
 
 #include <variant>

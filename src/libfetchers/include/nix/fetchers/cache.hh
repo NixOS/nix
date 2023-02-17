@@ -1,6 +1,6 @@
 #pragma once
 
-#include "fetchers.hh"
+#include "nix/fetchers/fetchers.hh"
 
 namespace nix::fetchers {
 
