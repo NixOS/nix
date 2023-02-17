@@ -91,7 +91,10 @@
 {{#include ./command-ref/new-cli/SUMMARY.md}}
   - [Files](command-ref/files.md)
     - [nix.conf](command-ref/conf-file.md)
-- [Architecture](architecture/architecture.md)
+    - [User profiles](command-ref/files/user-profiles.md)
+    - [Channels](command-ref/files/channels.md)
+    - [Default Nix expression](command-ref/files/default-nix-expression.md)
+- [Archititecture](architecture.md)
 - [Glossary](glossary.md)
 - [Contributing](contributing/contributing.md)
   - [Hacking](contributing/hacking.md)
