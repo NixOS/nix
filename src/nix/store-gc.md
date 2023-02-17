@@ -19,9 +19,9 @@ R""(
 # Description
 
 This command deletes unreachable paths in the Nix store, observing the
-GC policy configured by the
-[`gc-threshold`](../conf-file.md#conf-gc-threshold) and
-[`gc-limit`](../conf-file.md#conf-gc-limit) configuration
+garbage collection policy configured by the
+[`gc-threshold`](@docroot@/command-ref/conf-file.md#conf-gc-threshold) and
+[`gc-limit`](@docroot@/command-ref/conf-file.md#conf-gc-limit) configuration
 settings. By default, all unreachable paths will be deleted.
 
 )""
