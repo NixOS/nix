@@ -6,7 +6,10 @@ resolve-system-dependencies_DIR := $(d)
 
 resolve-system-dependencies_INSTALL_DIR := $(libexecdir)/nix
 
-resolve-system-dependencies_CXXFLAGS += -I src/libutil -I src/libstore -I src/libmain
+resolve-system-dependencies_CXXFLAGS += \
+	-Isrc/libmain/include \
+	-Isrc/libstore/include \
+	-Isrc/libutil/include
 
 resolve-system-dependencies_LIBS := libstore libmain libutil
 
