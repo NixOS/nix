@@ -6,9 +6,9 @@
 #include <eval.hh>
 #include <optional>
 
-namespace pythonnix {
+namespace nix::python {
 
 nix::Value * pythonToNixValue(nix::EvalState & state, PyObject * obj);
 
 std::optional<nix::StaticEnv> pythonToNixEnv(nix::EvalState & state, PyObject * vars, nix::Env ** env);
-} // namespace pythonnix
+} // namespace nix::python

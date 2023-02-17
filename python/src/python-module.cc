@@ -9,7 +9,7 @@
 #include <globals.hh>
 #include <shared.hh>
 
-namespace pythonnix {
+namespace nix::python {
 
 #define _public_ __attribute__((visibility("default")))
 
@@ -58,4 +58,4 @@ extern "C" _public_ PyObject * PyInit_nix(void)
 
     return m.release();
 }
-} // namespace pythonnix
+} // namespace nix::python

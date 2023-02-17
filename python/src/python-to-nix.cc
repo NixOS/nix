@@ -6,7 +6,7 @@
 
 #include <optional>
 
-namespace pythonnix {
+namespace nix::python {
 
 static const char * checkNullByte(const char * str, const Py_ssize_t size)
 {
@@ -161,4 +161,4 @@ std::optional<nix::StaticEnv> pythonToNixEnv(nix::EvalState & state, PyObject * 
 
     return staticEnv;
 }
-} // namespace pythonnix
+} // namespace nix::python

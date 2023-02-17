@@ -6,7 +6,7 @@
 
 #include <eval.hh>
 
-namespace pythonnix {
+namespace nix::python {
 
 PyObject * nixToPythonObject(nix::EvalState & state, nix::Value & v, nix::PathSet & context);
-} // namespace pythonnix
+} // namespace nix::python

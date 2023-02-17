@@ -7,7 +7,7 @@
 #include <cxxabi.h>
 #include <store-api.hh>
 
-namespace pythonnix {
+namespace nix::python {
 
 const char * currentExceptionTypeName()
 {
@@ -58,4 +58,4 @@ PyObject * eval(PyObject * self, PyObject * args, PyObject * keywds)
         return PyErr_Format(NixError, "unexpected C++ exception: '%s'", currentExceptionTypeName());
     }
 }
-} // namespace pythonnix
+} // namespace nix::python

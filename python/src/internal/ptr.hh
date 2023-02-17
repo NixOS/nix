@@ -3,7 +3,7 @@
 #include <Python.h>
 #include <memory>
 
-namespace pythonnix {
+namespace nix::python {
 
 struct PyObjectDeleter
 {
@@ -14,4 +14,4 @@ struct PyObjectDeleter
 };
 
 typedef std::unique_ptr<PyObject, PyObjectDeleter> PyObjPtr;
-} // namespace pythonnix
+} // namespace nix::python

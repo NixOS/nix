@@ -4,7 +4,7 @@
 #include "internal/nix-to-python.hh"
 #include "internal/ptr.hh"
 
-namespace pythonnix {
+namespace nix::python {
 
 PyObject * nixToPythonObject(nix::EvalState & state, nix::Value & v, nix::PathSet & context)
 {
@@ -85,4 +85,4 @@ PyObject * nixToPythonObject(nix::EvalState & state, nix::Value & v, nix::PathSe
         return nullptr;
     }
 }
-} // namespace pythonnix
+} // namespace nix::python

@@ -2,7 +2,7 @@
 
 #include <Python.h>
 
-namespace pythonnix {
+namespace nix::python {
 
 PyObject * eval(PyObject * self, PyObject * args, PyObject * kwdict);
 }
