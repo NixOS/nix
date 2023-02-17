@@ -70,16 +70,16 @@ nix::Value *pythonToNixValue(nix::EvalState &state, PyObject *obj) {
   auto v = state.allocValue();
 
   if (obj == Py_True && obj == Py_False) {
-    nix::mkBool(*v, obj == Py_True);
+    v->mkBool(obj == Py_True);
   } else if (obj == Py_None) {
-    nix::mkNull(*v);
+    v->mkNull();
   } else if (PyBytes_Check(obj)) {
     auto str = checkNullByte(PyBytes_AS_STRING(obj), PyBytes_GET_SIZE(obj));
     if (!str) {
       return nullptr;
     }
 
-    nix::mkString(*v, str);
+    v->mkString(str);
   } else if (PyUnicode_Check(obj)) {
     Py_ssize_t size;
     const char *utf8 = PyUnicode_AsUTF8AndSize(obj, &size);
@@ -88,13 +88,13 @@ nix::Value *pythonToNixValue(nix::EvalState &state, PyObject *obj) {
       return nullptr;
     }
 
-    nix::mkString(*v, utf8);
+    v->mkString(utf8);
   } else if (PyFloat_Check(obj)) {
-    nix::mkFloat(*v, PyFloat_AS_DOUBLE(obj));
+    v->mkFloat(PyFloat_AS_DOUBLE(obj));
   } else if (PyLong_Check(obj)) {
-    nix::mkInt(*v, PyLong_AsLong(obj));
+    v->mkInt(PyLong_AsLong(obj));
   } else if (PyList_Check(obj)) {
-    state.mkList(*v, PyList_GET_SIZE(obj));
+    v->mkList(PyList_GET_SIZE(obj));
     for (Py_ssize_t i = 0; i < PyList_GET_SIZE(obj); i++) {
       auto val = pythonToNixValue(state, PyList_GET_ITEM(obj, i));
       if (!val) {
@@ -103,7 +103,7 @@ nix::Value *pythonToNixValue(nix::EvalState &state, PyObject *obj) {
       v->listElems()[i] = val;
     }
   } else if (PyTuple_Check(obj)) {
-    state.mkList(*v, PyTuple_GET_SIZE(obj));
+    v->mkList(PyTuple_GET_SIZE(obj));
     for (Py_ssize_t i = 0; i < PyTuple_GET_SIZE(obj); i++) {
       auto val = pythonToNixValue(state, PyTuple_GET_ITEM(obj, i));
       if (!val) {
@@ -116,11 +116,12 @@ nix::Value *pythonToNixValue(nix::EvalState &state, PyObject *obj) {
     if (!attrs) {
       return nullptr;
     }
-    state.mkAttrs(*v, attrs->size());
-    for (auto &attr : *attrs) {
-      v->attrs->push_back(nix::Attr(attr.first, attr.second));
+    auto attrsValue = attrs.value();
+    auto bindings = state.buildBindings(attrsValue.size());
+    for (auto &attr : attrsValue) {
+      bindings.insert(attr.first, attr.second);
     }
-    v->attrs->sort();
+    v->mkAttrs(bindings);
   }
   return v;
 }
@@ -133,7 +134,7 @@ std::optional<nix::StaticEnv> pythonToNixEnv(nix::EvalState &state,
   *env = &state.allocEnv(vars ? PyDict_Size(vars) : 0);
   (*env)->up = &state.baseEnv;
 
-  nix::StaticEnv staticEnv(false, &state.staticBaseEnv);
+  nix::StaticEnv staticEnv(false, state.staticBaseEnv.get());
 
   if (!vars) {
     return staticEnv;
@@ -150,7 +151,7 @@ std::optional<nix::StaticEnv> pythonToNixEnv(nix::EvalState &state,
     if (!attrVal) {
       return {};
     }
-    staticEnv.vars[state.symbols.create(name)] = displ;
+    staticEnv.vars.emplace_back(state.symbols.create(name), displ);
     (*env)->values[displ++] = attrVal;
   }
 

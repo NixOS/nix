@@ -6,6 +6,8 @@
 #include <nix/config.h>
 
 #include <eval.hh>
+#include <globals.hh>
+#include <shared.hh>
 
 namespace pythonnix {
 
@@ -25,6 +27,7 @@ static struct PyModuleDef nixmodule = {
     NixMethods};
 
 extern "C" _public_ PyObject *PyInit_nix(void) {
+  nix::initNix();
   nix::initGC();
 
   PyObjPtr m(PyModule_Create(&nixmodule));

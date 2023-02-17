@@ -22,8 +22,10 @@ PyObject *nixToPythonObject(nix::EvalState &state, nix::Value &v,
     copyContext(v, context);
     return PyUnicode_FromString(v.string.s);
 
-  case nix::nPath:
-    return PyUnicode_FromString(state.copyPathToStore(context, v.path).c_str());
+  case nix::nPath: {
+    auto p = state.copyPathToStore(context, v.path).to_string();
+    return PyUnicode_FromStringAndSize(p.data(), p.length());
+  }
 
   case nix::nNull:
     Py_RETURN_NONE;
@@ -36,19 +38,13 @@ PyObject *nixToPythonObject(nix::EvalState &state, nix::Value &v,
         return (PyObject *)nullptr;
       }
 
-      nix::StringSet names;
-
       for (auto &j : *v.attrs) {
-        names.insert(j.name);
-      }
-      for (auto &j : names) {
-        nix::Attr &a(*v.attrs->find(state.symbols.create(j)));
-
-        auto value = nixToPythonObject(state, *a.value, context);
+        const std::string & name = state.symbols[j.name];
+        auto value = nixToPythonObject(state, *j.value, context);
         if (!value) {
           return nullptr;
         }
-        PyDict_SetItemString(dict.get(), j.c_str(), value);
+        PyDict_SetItemString(dict.get(), name.c_str(), value);
       }
       return dict.release();
     } else {
