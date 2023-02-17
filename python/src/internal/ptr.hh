@@ -5,8 +5,12 @@
 
 namespace pythonnix {
 
-struct PyObjectDeleter {
-  void operator()(PyObject *const obj) { Py_DECREF(obj); }
+struct PyObjectDeleter
+{
+    void operator()(PyObject * const obj)
+    {
+        Py_DECREF(obj);
+    }
 };
 
 typedef std::unique_ptr<PyObject, PyObjectDeleter> PyObjPtr;

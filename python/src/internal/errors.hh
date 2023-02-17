@@ -4,5 +4,5 @@
 
 namespace pythonnix {
 
-extern PyObject *NixError;
+extern PyObject * NixError;
 }

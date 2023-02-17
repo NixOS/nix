@@ -4,5 +4,5 @@
 
 namespace pythonnix {
 
-PyObject *eval(PyObject *self, PyObject *args, PyObject *kwdict);
+PyObject * eval(PyObject * self, PyObject * args, PyObject * kwdict);
 }
