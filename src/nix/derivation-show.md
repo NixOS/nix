@@ -39,10 +39,11 @@ R""(
 # Description
 
 This command prints on standard output a JSON representation of the
-[store derivation]s to which [*installables*](./nix.md#installables) evaluate. Store derivations
-are used internally by Nix. They are store paths with extension `.drv`
-that represent the build-time dependency graph to which a Nix
-expression evaluates.
+[store derivation]s to which [*installables*](./nix.md#installables) evaluate.
+
+Store derivations are used internally by Nix. They are store paths with
+extension `.drv` that represent the build-time dependency graph to which
+a Nix expression evaluates.
 
 By default, this command only shows top-level derivations, but with
 `--recursive`, it also shows their dependencies.
