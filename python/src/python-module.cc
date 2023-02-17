@@ -27,6 +27,11 @@ static struct PyModuleDef nixmodule = {
     NixMethods};
 
 extern "C" _public_ PyObject *PyInit_nix(void) {
+  // By default, Nix sets the build-hook to be "$(readlink /proc/self/exe) __build-remote", expecting the current binary to be Nix itself.
+  // But when we call the Nix library from Python this isn't the case, the current binary is Python then
+  // So we need to change this default, pointing it to the Nix binary instead
+  nix::settings.buildHook = nix::settings.nixBinDir + "/nix __build-remote";
+  // And by setting buildHook before calling initNix, we can override the defaults without overriding the user-provided options from the config files
   nix::initNix();
   nix::initGC();
 

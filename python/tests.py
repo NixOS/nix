@@ -16,5 +16,16 @@ class TestPythonNix(unittest.TestCase):
     def test_none(self):
         self.assertEqual(nix.eval("a", vars=dict(a=None)), None)
 
+    def test_ifd(self):
+        expression = """
+        builtins.readFile (derivation {
+          name = "test";
+          args = [ "-c" "printf \\"%s\\" test > $out" ];
+          builder = "/bin/sh";
+          system = builtins.currentSystem;
+        })
+        """
+        self.assertEqual(nix.eval(expression, vars=dict()), "test")
+
 if __name__ == '__main__':
     unittest.main()
