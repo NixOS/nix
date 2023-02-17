@@ -11,6 +11,11 @@ let
     { services.openssh.enable = true;
       virtualisation.writableStore = true;
       nix.settings.sandbox = true;
+
+      # Regression test for use of PID namespaces when /proc has
+      # filesystems mounted on top of it
+      # (i.e. /proc/sys/fs/binfmt_misc).
+      boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
     };
 
   # Trivial Nix expression to build remotely.

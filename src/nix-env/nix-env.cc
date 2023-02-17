@@ -1291,7 +1291,7 @@ static void opSwitchProfile(Globals & globals, Strings opFlags, Strings opArgs)
         throw UsageError("exactly one argument expected");
 
     Path profile = absPath(opArgs.front());
-    Path profileLink = getHome() + "/.nix-profile";
+    Path profileLink = settings.useXDGBaseDirectories ? createNixStateDir() + "/profile" : getHome() + "/.nix-profile";
 
     switchLink(profileLink, profile);
 }
@@ -1391,13 +1391,13 @@ static int main_nix_env(int argc, char * * argv)
         Operation op = 0;
         RepairFlag repair = NoRepair;
         std::string file;
-        Path nixExprPath;
 
         Globals globals;
 
         globals.instSource.type = srcUnknown;
-        nixExprPath = getHome() + "/.nix-defexpr";
         globals.instSource.systemFilter = "*";
+
+        Path nixExprPath = settings.useXDGBaseDirectories ? createNixStateDir() + "/defexpr" : getHome() + "/.nix-defexpr";
 
         if (!pathExists(nixExprPath)) {
             try {

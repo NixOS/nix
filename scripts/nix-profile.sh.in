@@ -2,11 +2,35 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
 
     # Set up the per-user profile.
 
-    NIX_LINK=$HOME/.nix-profile
+    NIX_LINK="$HOME/.nix-profile"
+    if [ -n "$XDG_STATE_HOME" ]; then
+        NIX_LINK_NEW="$XDG_STATE_HOME/nix/profile"
+    else
+        NIX_LINK_NEW="$HOME/.local/state/nix/profile"
+    fi
+    if ! [ -e "$NIX_LINK" ]; then
+        NIX_LINK="$NIX_LINK_NEW"
+    else
+        if [ -t 2 ] && [ -e "$NIX_LINK_NEW" ]; then
+            warning="\033[1;35mwarning:\033[0m"
+            printf "$warning Both %s and legacy %s exist; using the latter.\n" "$NIX_LINK_NEW" "$NIX_LINK" 1>&2
+            if [ "$(realpath "$NIX_LINK")" = "$(realpath "$NIX_LINK_NEW")" ]; then
+                printf "         Since the profiles match, you can safely delete either of them.\n" 1>&2
+            else
+                # This should be an exceptionally rare occasion: the only way to get it would be to
+                # 1. Update to newer Nix;
+                # 2. Remove .nix-profile;
+                # 3. Set the $NIX_LINK_NEW to something other than the default user profile;
+                # 4. Roll back to older Nix.
+                # If someone did all that, they can probably figure out how to migrate the profile.
+                printf "$warning Profiles do not match. You should manually migrate from %s to %s.\n" "$NIX_LINK" "$NIX_LINK_NEW" 1>&2
+            fi
+        fi
+    fi
 
     # Set up environment.
     # This part should be kept in sync with nixpkgs:nixos/modules/programs/environment.nix
-    export NIX_PROFILES="@localstatedir@/nix/profiles/default $HOME/.nix-profile"
+    export NIX_PROFILES="@localstatedir@/nix/profiles/default $NIX_LINK"
 
     # Set $NIX_SSL_CERT_FILE so that Nixpkgs applications like curl work.
     if [ -e /etc/ssl/certs/ca-certificates.crt ]; then # NixOS, Ubuntu, Debian, Gentoo, Arch
@@ -31,5 +55,5 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
     fi
 
     export PATH="$NIX_LINK/bin:$PATH"
-    unset NIX_LINK
+    unset NIX_LINK NIX_LINK_NEW
 fi

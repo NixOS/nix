@@ -41,6 +41,15 @@ SQLiteError::SQLiteError(const char *path, const char *errMsg, int errNo, int ex
         throw SQLiteError(path, errMsg, err, exterr, offset, std::move(hf));
 }
 
+static void traceSQL(void * x, const char * sql)
+{
+    // wacky delimiters:
+    //   so that we're quite unambiguous without escaping anything
+    // notice instead of trace:
+    //   so that this can be enabled without getting the firehose in our face.
+    notice("SQL<[%1%]>", sql);
+};
+
 SQLite::SQLite(const Path & path, bool create)
 {
     // useSQLiteWAL also indicates what virtual file system we need.  Using
@@ -57,6 +66,11 @@ SQLite::SQLite(const Path & path, bool create)
 
     if (sqlite3_busy_timeout(db, 60 * 60 * 1000) != SQLITE_OK)
         SQLiteError::throw_(db, "setting timeout");
+
+    if (getEnv("NIX_DEBUG_SQLITE_TRACES") == "1") {
+        // To debug sqlite statements; trace all of them
+        sqlite3_trace(db, &traceSQL, nullptr);
+    }
 
     exec("pragma foreign_keys = 1");
 }

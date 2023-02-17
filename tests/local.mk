@@ -22,6 +22,7 @@ nix_tests = \
   binary-cache.sh \
   multiple-outputs.sh \
   ca/build.sh \
+  ca/new-build-cmd.sh \
   nix-build.sh \
   gc-concurrent.sh \
   repair.sh \
@@ -104,6 +105,8 @@ nix_tests = \
   ssh-relay.sh \
   plugins.sh \
   build.sh \
+  build-delete.sh \
+  output-normalization.sh \
   ca/nix-run.sh \
   selfref-gc.sh ca/selfref-gc.sh \
   db-migration.sh \

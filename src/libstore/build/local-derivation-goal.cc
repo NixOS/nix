@@ -209,7 +209,7 @@ void LocalDerivationGoal::tryLocalBuild()
 
     #if __linux__
     if (useChroot) {
-        if (!mountNamespacesSupported() || !pidNamespacesSupported()) {
+        if (!mountAndPidNamespacesSupported()) {
             if (!settings.sandboxFallback)
                 throw Error("this system does not support the kernel namespaces that are required for sandboxing; use '--no-sandbox' to disable sandboxing");
             debug("auto-disabling sandboxing because the prerequisite namespaces are not available");
@@ -384,12 +384,6 @@ void LocalDerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
     cleanupPostOutputsRegisteredModeCheck();
 }
 
-
-int childEntry(void * arg)
-{
-    ((LocalDerivationGoal *) arg)->runChild();
-    return 1;
-}
 
 #if __linux__
 static void linkOrCopy(const Path & from, const Path & to)
@@ -676,7 +670,8 @@ void LocalDerivationGoal::startBuilder()
            nobody account.  The latter is kind of a hack to support
            Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
-        chownToBuilder(chrootRootDir + "/etc");
+        if (parsedDrv->useUidRange())
+            chownToBuilder(chrootRootDir + "/etc");
 
         if (parsedDrv->useUidRange() && (!buildUser || buildUser->getUIDCount() < 65536))
             throw Error("feature 'uid-range' requires the setting '%s' to be enabled", settings.autoAllocateUids.name);
@@ -916,21 +911,15 @@ void LocalDerivationGoal::startBuilder()
             if (getuid() == 0 && setgroups(0, 0) == -1)
                 throw SysError("setgroups failed");
 
-            size_t stackSize = 1 * 1024 * 1024;
-            char * stack = (char *) mmap(0, stackSize,
-                PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
-            if (stack == MAP_FAILED) throw SysError("allocating stack");
-
-            int flags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
+            ProcessOptions options;
+            options.cloneFlags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
             if (privateNetwork)
-                flags |= CLONE_NEWNET;
+                options.cloneFlags |= CLONE_NEWNET;
             if (usingUserNamespace)
-                flags |= CLONE_NEWUSER;
+                options.cloneFlags |= CLONE_NEWUSER;
 
-            pid_t child = clone(childEntry, stack + stackSize, flags, this);
+            pid_t child = startProcess([&]() { runChild(); }, options);
 
-            if (child == -1)
-                throw SysError("creating sandboxed builder process using clone()");
             writeFull(builderOut.writeSide.get(),
                 fmt("%d %d\n", usingUserNamespace, child));
             _exit(0);
@@ -981,6 +970,10 @@ void LocalDerivationGoal::startBuilder()
                 "nixbld:x:%1%:%2%:Nix build user:%3%:/noshell\n"
                 "nobody:x:65534:65534:Nobody:/:/noshell\n",
                 sandboxUid(), sandboxGid(), settings.sandboxBuildDir));
+
+        /* Make /etc unwritable */
+        if (!parsedDrv->useUidRange())
+            chmod_(chrootRootDir + "/etc", 0555);
 
         /* Save the mount- and user namespace of the child. We have to do this
            *before* the child does a chroot. */

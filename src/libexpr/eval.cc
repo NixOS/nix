@@ -2491,7 +2491,7 @@ Strings EvalSettings::getDefaultNixPath()
                 res.push_back(s ? *s + "=" + p : p);
         };
 
-        add(getHome() + "/.nix-defexpr/channels");
+        add(settings.useXDGBaseDirectories ? getStateDir() + "/nix/defexpr/channels" : getHome() + "/.nix-defexpr/channels");
         add(settings.nixStateDir + "/profiles/per-user/root/channels/nixpkgs", "nixpkgs");
         add(settings.nixStateDir + "/profiles/per-user/root/channels");
 

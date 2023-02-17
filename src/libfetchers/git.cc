@@ -713,15 +713,42 @@ struct GitInputScheme : InputScheme
             AutoDelete delTmpGitDir(tmpGitDir, true);
 
             runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", tmpDir, "--separate-git-dir", tmpGitDir });
-            // TODO: repoDir might lack the ref (it only checks if rev
-            // exists, see FIXME above) so use a big hammer and fetch
-            // everything to ensure we get the rev.
-            runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
-                                      "--update-head-ok", "--", repoDir, "refs/*:refs/*" });
+
+            {
+                // TODO: repoDir might lack the ref (it only checks if rev
+                // exists, see FIXME above) so use a big hammer and fetch
+                // everything to ensure we get the rev.
+                Activity act(*logger, lvlTalkative, actUnknown, fmt("making temporary clone of '%s'", repoDir));
+                runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
+                        "--update-head-ok", "--", repoDir, "refs/*:refs/*" });
+            }
 
             runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", rev.gitRev() });
-            runProgram("git", true, { "-C", tmpDir, "remote", "add", "origin", repoInfo.url });
-            runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
+
+            /* Ensure that we use the correct origin for fetching
+               submodules. This matters for submodules with relative
+               URLs. */
+            if (repoInfo.isLocal) {
+                writeFile(tmpGitDir + "/config", readFile(repoDir + "/" + repoInfo.gitDir + "/config"));
+
+                /* Restore the config.bare setting we may have just
+                   copied erroneously from the user's repo. */
+                runProgram("git", true, { "-C", tmpDir, "config", "core.bare", "false" });
+            } else
+                runProgram("git", true, { "-C", tmpDir, "config", "remote.origin.url", repoInfo.url });
+
+            /* As an optimisation, copy the modules directory of the
+               source repo if it exists. */
+            auto modulesPath = repoDir + "/" + repoInfo.gitDir + "/modules";
+            if (pathExists(modulesPath)) {
+                Activity act(*logger, lvlTalkative, actUnknown, fmt("copying submodules of '%s'", repoInfo.url));
+                runProgram("cp", true, { "-R", "--", modulesPath, tmpGitDir + "/modules" });
+            }
+
+            {
+                Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching submodules of '%s'", repoInfo.url));
+                runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
+            }
 
             filter = isNotDotGitDirectory;
         } else {

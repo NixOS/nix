@@ -164,8 +164,8 @@ static int main_nix_channel(int argc, char ** argv)
     {
         // Figure out the name of the `.nix-channels' file to use
         auto home = getHome();
-        channelsList = home + "/.nix-channels";
-        nixDefExpr = home + "/.nix-defexpr";
+        channelsList = settings.useXDGBaseDirectories ? createNixStateDir() + "/channels" : home + "/.nix-channels";
+        nixDefExpr = settings.useXDGBaseDirectories ? createNixStateDir() + "/defexpr" : home + "/.nix-defexpr";
 
         // Figure out the name of the channels profile.
         profile = profilesDir() + "/channels";

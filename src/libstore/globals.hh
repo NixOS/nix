@@ -945,6 +945,27 @@ public:
           resolves to a different location from that of the build machine. You
           can enable this setting if you are sure you're not going to do that.
         )"};
+
+    Setting<bool> useXDGBaseDirectories{
+        this, false, "use-xdg-base-directories",
+        R"(
+          If set to `true`, Nix will conform to the [XDG Base Directory Specification] for files in `$HOME`.
+          The environment variables used to implement this are documented in the [Environment Variables section](@docroot@/installation/env-variables.md).
+
+          [XDG Base Directory Specification]: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
+
+          > **Warning**
+          > This changes the location of some well-known symlinks that Nix creates, which might break tools that rely on the old, non-XDG-conformant locations.
+
+          In particular, the following locations change:
+
+          | Old               | New                            |
+          |-------------------|--------------------------------|
+          | `~/.nix-profile`  | `$XDG_STATE_HOME/nix/profile`  |
+          | `~/.nix-defexpr`  | `$XDG_STATE_HOME/nix/defexpr`  |
+          | `~/.nix-channels` | `$XDG_STATE_HOME/nix/channels` |
+        )"
+    };
 };
 
 

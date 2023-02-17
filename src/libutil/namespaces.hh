@@ -6,9 +6,7 @@ namespace nix {
 
 bool userNamespacesSupported();
 
-bool mountNamespacesSupported();
-
-bool pidNamespacesSupported();
+bool mountAndPidNamespacesSupported();
 
 #endif
 

@@ -158,6 +158,12 @@ Path getDataDir();
 /* Return the path of the current executable. */
 std::optional<Path> getSelfExe();
 
+/* Return $XDG_STATE_HOME or $HOME/.local/state. */
+Path getStateDir();
+
+/* Create the Nix state directory and return the path to it. */
+Path createNixStateDir();
+
 /* Create a directory and all its parents, if necessary.  Returns the
    list of created directories, in order of creation. */
 Paths createDirs(const Path & path);
@@ -301,6 +307,7 @@ struct ProcessOptions
     bool dieWithParent = true;
     bool runExitHandlers = false;
     bool allowVfork = false;
+    int cloneFlags = 0; // use clone() with the specified flags (Linux only)
 };
 
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
