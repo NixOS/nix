@@ -40,7 +40,6 @@ SourcePath EvalState::decodePath(std::string_view s, PosIdx pos)
 
         try {
             auto slash = s.find('/');
-            if (slash > 20) throw std::invalid_argument("");
             size_t number = std::stoi(std::string(s.substr(0, slash)), nullptr, 16);
             s = slash == s.npos ? "" : s.substr(slash);
 
