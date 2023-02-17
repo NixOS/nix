@@ -2,7 +2,7 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "derivations.hh"
-#include "nixexpr.hh"
+#include "nix/expr/nixexpr.hh"
 #include "profiles.hh"
 
 #include <nlohmann/json.hpp>

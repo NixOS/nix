@@ -1,7 +1,7 @@
 #pragma once
 
-#include "nixexpr.hh"
-#include "eval.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/expr/eval.hh"
 
 #include <string>
 #include <map>

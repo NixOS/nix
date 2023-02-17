@@ -1,10 +1,10 @@
 #pragma once
 
-#include "attr-set.hh"
+#include "nix/expr/attr-set.hh"
 #include "nix/util/types.hh"
-#include "value.hh"
-#include "nixexpr.hh"
-#include "symbol-table.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/expr/symbol-table.hh"
 #include "nix/util/config.hh"
 #include "nix/util/experimental-features.hh"
 
@@ -664,4 +664,4 @@ void ErrorBuilder::debugThrow()
 
 }
 
-#include "eval-inline.hh"
+#include "nix/expr/eval-inline.hh"

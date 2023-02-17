@@ -8,7 +8,7 @@ libcmd_SOURCES := $(wildcard $(d)/*.cc)
 
 libcmd_CXXFLAGS += \
 	-Isrc/libcmd/include \
-	-Isrc/libexpr \
+	-Isrc/libexpr/include \
 	-Isrc/libfetchers \
 	-Isrc/libmain \
 	-Isrc/libstore \

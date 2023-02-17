@@ -1,4 +1,4 @@
-#include "flake.hh"
+#include "nix/expr/flake/flake.hh"
 #include "globals.hh"
 #include "fetch-settings.hh"
 

@@ -3,8 +3,8 @@
 #include <map>
 #include <vector>
 
-#include "value.hh"
-#include "symbol-table.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/symbol-table.hh"
 #include "nix/util/error.hh"
 #include "nix/util/chunked-vector.hh"
 

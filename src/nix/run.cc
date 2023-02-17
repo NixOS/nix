@@ -8,7 +8,7 @@
 #include "nix/util/finally.hh"
 #include "fs-accessor.hh"
 #include "progress-bar.hh"
-#include "eval.hh"
+#include "nix/expr/eval.hh"
 #include "build/personality.hh"
 
 #if __linux__

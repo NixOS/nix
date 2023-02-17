@@ -13,7 +13,7 @@ libexpr_SOURCES := \
   $(d)/parser-tab.cc
 
 libexpr_CXXFLAGS += \
-	-Isrc/libexpr \
+	-Isrc/libexpr/include \
 	-Isrc/libfetchers \
 	-Isrc/libmain \
 	-Isrc/libstore \

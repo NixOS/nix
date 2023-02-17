@@ -1,16 +1,16 @@
 #include "nix/util/archive.hh"
 #include "derivations.hh"
-#include "eval-inline.hh"
-#include "eval.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/expr/eval.hh"
 #include "globals.hh"
-#include "json-to-value.hh"
+#include "nix/expr/json-to-value.hh"
 #include "names.hh"
 #include "references.hh"
 #include "store-api.hh"
 #include "nix/util/util.hh"
-#include "value-to-json.hh"
-#include "value-to-xml.hh"
-#include "primops.hh"
+#include "nix/expr/value-to-json.hh"
+#include "nix/expr/value-to-xml.hh"
+#include "nix/expr/primops.hh"
 
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>

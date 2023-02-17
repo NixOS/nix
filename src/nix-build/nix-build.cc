@@ -17,11 +17,11 @@
 #include "nix/util/util.hh"
 #include "shared.hh"
 #include "path-with-outputs.hh"
-#include "eval.hh"
-#include "eval-inline.hh"
-#include "get-drvs.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/expr/get-drvs.hh"
 #include "nix/cmd/common-eval-args.hh"
-#include "attr-path.hh"
+#include "nix/expr/attr-path.hh"
 #include "nix/cmd/legacy.hh"
 
 using namespace nix;

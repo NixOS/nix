@@ -1,4 +1,4 @@
-#include "primops.hh"
+#include "nix/expr/primops.hh"
 #include "store-api.hh"
 #include "make-content-addressed.hh"
 #include "nix/util/url.hh"

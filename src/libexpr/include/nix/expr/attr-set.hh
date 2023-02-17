@@ -1,7 +1,7 @@
 #pragma once
 
-#include "nixexpr.hh"
-#include "symbol-table.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/expr/symbol-table.hh"
 
 #include <algorithm>
 #include <optional>

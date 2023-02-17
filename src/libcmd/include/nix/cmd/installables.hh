@@ -4,9 +4,9 @@
 #include "path.hh"
 #include "outputs-spec.hh"
 #include "derived-path.hh"
-#include "eval.hh"
+#include "nix/expr/eval.hh"
 #include "store-api.hh"
-#include "flake/flake.hh"
+#include "nix/expr/flake/flake.hh"
 #include "build-result.hh"
 
 #include <optional>

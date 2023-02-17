@@ -1,6 +1,6 @@
-#include "value-to-xml.hh"
+#include "nix/expr/value-to-xml.hh"
 #include "nix/util/xml-writer.hh"
-#include "eval-inline.hh"
+#include "nix/expr/eval-inline.hh"
 #include "nix/util/util.hh"
 
 #include <cstdlib>

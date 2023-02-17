@@ -1,13 +1,13 @@
 #include "nix/cmd/command.hh"
 #include "globals.hh"
-#include "eval.hh"
-#include "eval-inline.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-inline.hh"
 #include "names.hh"
-#include "get-drvs.hh"
+#include "nix/expr/get-drvs.hh"
 #include "common-args.hh"
 #include "shared.hh"
-#include "eval-cache.hh"
-#include "attr-path.hh"
+#include "nix/expr/eval-cache.hh"
+#include "nix/expr/attr-path.hh"
 #include "nix/util/hilite.hh"
 
 #include <regex>

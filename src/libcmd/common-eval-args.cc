@@ -2,10 +2,10 @@
 #include "shared.hh"
 #include "filetransfer.hh"
 #include "nix/util/util.hh"
-#include "eval.hh"
+#include "nix/expr/eval.hh"
 #include "fetchers.hh"
 #include "registry.hh"
-#include "flake/flakeref.hh"
+#include "nix/expr/flake/flakeref.hh"
 #include "store-api.hh"
 #include "nix/cmd/command.hh"
 

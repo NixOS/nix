@@ -6,8 +6,8 @@
 #include "nix/util/finally.hh"
 #include "progress-bar.hh"
 #include "nix/util/tarfile.hh"
-#include "attr-path.hh"
-#include "eval-inline.hh"
+#include "nix/expr/attr-path.hh"
+#include "nix/expr/eval-inline.hh"
 #include "nix/cmd/legacy.hh"
 
 #include <nlohmann/json.hpp>

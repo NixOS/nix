@@ -1,6 +1,6 @@
 #pragma once
 
-#include "eval.hh"
+#include "nix/expr/eval.hh"
 
 #include <tuple>
 #include <vector>

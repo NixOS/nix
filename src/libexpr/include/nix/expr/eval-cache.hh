@@ -2,7 +2,7 @@
 
 #include "nix/util/sync.hh"
 #include "nix/util/hash.hh"
-#include "eval.hh"
+#include "nix/expr/eval.hh"
 
 #include <functional>
 #include <variant>

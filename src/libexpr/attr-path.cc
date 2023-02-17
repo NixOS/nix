@@ -1,5 +1,5 @@
-#include "attr-path.hh"
-#include "eval-inline.hh"
+#include "nix/expr/attr-path.hh"
+#include "nix/expr/eval-inline.hh"
 #include "nix/util/util.hh"
 
 

@@ -2,8 +2,8 @@
 
 #include <cassert>
 
-#include "symbol-table.hh"
-#include "value/context.hh"
+#include "nix/expr/symbol-table.hh"
+#include "nix/expr/value/context.hh"
 
 #if HAVE_BOEHMGC
 #include <gc/gc_allocator.h>

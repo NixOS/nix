@@ -21,7 +21,7 @@
 
 #include <boost/lexical_cast.hpp>
 
-#include "nixexpr.hh"
+#include "nix/expr/nixexpr.hh"
 #include "parser-tab.hh"
 
 using namespace nix;

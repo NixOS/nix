@@ -2,7 +2,7 @@
 
 #include "nix/cmd/command.hh"
 #include "common-args.hh"
-#include "eval.hh"
+#include "nix/expr/eval.hh"
 #include "globals.hh"
 #include "nix/cmd/legacy.hh"
 #include "shared.hh"

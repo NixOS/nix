@@ -1,13 +1,13 @@
-#include "eval.hh"
+#include "nix/expr/eval.hh"
 #include "nix/util/hash.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
 #include "store-api.hh"
 #include "derivations.hh"
 #include "globals.hh"
-#include "eval-inline.hh"
+#include "nix/expr/eval-inline.hh"
 #include "filetransfer.hh"
-#include "function-trace.hh"
+#include "nix/expr/function-trace.hh"
 
 #include <algorithm>
 #include <chrono>

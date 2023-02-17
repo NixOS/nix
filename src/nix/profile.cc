@@ -5,7 +5,7 @@
 #include "derivations.hh"
 #include "nix/util/archive.hh"
 #include "builtins/buildenv.hh"
-#include "flake/flakeref.hh"
+#include "nix/expr/flake/flakeref.hh"
 #include "../nix-env/user-env.hh"
 #include "profiles.hh"
 #include "names.hh"

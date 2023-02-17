@@ -14,7 +14,7 @@ libexpr-tests_SOURCES := \
 
 libexpr-tests_CXXFLAGS += \
 	-Isrc/libexpr \
-	-Isrc/libexpr/tests \
+	-Isrc/libexpr/include \
 	-Isrc/libstore \
 	-Isrc/libutil/include
 

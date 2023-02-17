@@ -17,7 +17,7 @@ nix_SOURCES := \
 nix_CXXFLAGS += \
 	-Idoc/manual \
 	-Isrc/libcmd/include \
-	-Isrc/libexpr \
+	-Isrc/libexpr/include \
 	-Isrc/libfetchers \
 	-Isrc/libmain \
 	-Isrc/libstore \

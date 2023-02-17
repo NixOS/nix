@@ -2,9 +2,9 @@
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "eval.hh"
-#include "eval-inline.hh"
-#include "value-to-json.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/expr/value-to-json.hh"
 #include "progress-bar.hh"
 
 #include <nlohmann/json.hpp>

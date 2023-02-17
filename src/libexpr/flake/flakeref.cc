@@ -1,4 +1,4 @@
-#include "flakeref.hh"
+#include "nix/expr/flake/flakeref.hh"
 #include "store-api.hh"
 #include "nix/util/url.hh"
 #include "nix/util/url-parts.hh"

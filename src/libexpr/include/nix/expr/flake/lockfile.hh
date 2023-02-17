@@ -1,6 +1,6 @@
 #pragma once
 
-#include "flakeref.hh"
+#include "nix/expr/flake/flakeref.hh"
 
 #include <nlohmann/json_fwd.hpp>
 

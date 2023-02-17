@@ -1,9 +1,9 @@
 #pragma once
 
 #include "nix/util/types.hh"
-#include "flakeref.hh"
-#include "lockfile.hh"
-#include "value.hh"
+#include "nix/expr/flake/flakeref.hh"
+#include "nix/expr/flake/lockfile.hh"
+#include "nix/expr/value.hh"
 
 namespace nix {
 

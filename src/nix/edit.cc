@@ -1,7 +1,7 @@
 #include "nix/cmd/command.hh"
 #include "shared.hh"
-#include "eval.hh"
-#include "attr-path.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/attr-path.hh"
 #include "progress-bar.hh"
 
 #include <unistd.h>

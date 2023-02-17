@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include "value.hh"
-#include "nixexpr.hh"
-#include "eval.hh"
-#include "eval-inline.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-inline.hh"
 #include "store-api.hh"
 
 #include "tests/libstore.hh"

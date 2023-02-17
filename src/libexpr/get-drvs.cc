@@ -1,6 +1,6 @@
-#include "get-drvs.hh"
+#include "nix/expr/get-drvs.hh"
 #include "nix/util/util.hh"
-#include "eval-inline.hh"
+#include "nix/expr/eval-inline.hh"
 #include "derivations.hh"
 #include "store-api.hh"
 #include "path-with-outputs.hh"

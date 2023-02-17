@@ -1,4 +1,4 @@
-#include "lockfile.hh"
+#include "nix/expr/flake/lockfile.hh"
 #include "store-api.hh"
 #include "nix/util/url-parts.hh"
 

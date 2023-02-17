@@ -2,8 +2,8 @@
 #include "common-args.hh"
 #include "store-api.hh"
 #include "filetransfer.hh"
-#include "eval.hh"
-#include "attr-path.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/attr-path.hh"
 #include "names.hh"
 #include "progress-bar.hh"
 

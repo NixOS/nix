@@ -6,8 +6,8 @@
 #include "local-fs-store.hh"
 #include "globals.hh"
 #include "shared.hh"
-#include "eval.hh"
-#include "eval-inline.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-inline.hh"
 #include "profiles.hh"
 
 

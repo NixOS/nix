@@ -1,7 +1,7 @@
-#include "nixexpr.hh"
+#include "nix/expr/nixexpr.hh"
 #include "derivations.hh"
-#include "eval.hh"
-#include "symbol-table.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/symbol-table.hh"
 #include "nix/util/util.hh"
 
 #include <cstdlib>

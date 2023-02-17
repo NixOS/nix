@@ -1,4 +1,4 @@
-#include "function-trace.hh"
+#include "nix/expr/function-trace.hh"
 #include "nix/util/logging.hh"
 
 namespace nix {

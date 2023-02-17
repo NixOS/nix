@@ -9,6 +9,6 @@ libplugintest_ALLOW_UNDEFINED := 1
 libplugintest_EXCLUDE_FROM_LIBRARY_LIST := 1
 
 libplugintest_CXXFLAGS := \
-	-Isrc/libexpr \
+	-Isrc/libexpr/include \
 	-Isrc/libstore \
 	-Isrc/libutil/include

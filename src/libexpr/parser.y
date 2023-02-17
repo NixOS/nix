@@ -20,8 +20,8 @@
 
 #include "nix/util/util.hh"
 
-#include "nixexpr.hh"
-#include "eval.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/expr/eval.hh"
 #include "globals.hh"
 
 namespace nix {
@@ -634,11 +634,11 @@ formal
 #include <fcntl.h>
 #include <unistd.h>
 
-#include "eval.hh"
+#include "nix/expr/eval.hh"
 #include "filetransfer.hh"
 #include "fetchers.hh"
 #include "store-api.hh"
-#include "flake/flake.hh"
+#include "nix/expr/flake/flake.hh"
 
 
 namespace nix {
