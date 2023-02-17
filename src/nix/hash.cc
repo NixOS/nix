@@ -1,10 +1,10 @@
 #include "command.hh"
-#include "hash.hh"
+#include "nix/util/hash.hh"
 #include "content-address.hh"
 #include "legacy.hh"
 #include "shared.hh"
 #include "references.hh"
-#include "archive.hh"
+#include "nix/util/archive.hh"
 
 using namespace nix;
 

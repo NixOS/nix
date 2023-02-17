@@ -1,11 +1,11 @@
 #pragma once
 
 #include "path.hh"
-#include "types.hh"
-#include "hash.hh"
+#include "nix/util/types.hh"
+#include "nix/util/hash.hh"
 #include "content-address.hh"
 #include "repair-flag.hh"
-#include "sync.hh"
+#include "nix/util/sync.hh"
 
 #include <map>
 #include <variant>

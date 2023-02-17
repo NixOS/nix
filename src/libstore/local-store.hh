@@ -6,8 +6,8 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "gc-store.hh"
-#include "sync.hh"
-#include "util.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/util.hh"
 
 #include <chrono>
 #include <future>

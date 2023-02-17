@@ -1,5 +1,5 @@
 #include "nar-info-disk-cache.hh"
-#include "sync.hh"
+#include "nix/util/sync.hh"
 #include "sqlite.hh"
 #include "globals.hh"
 

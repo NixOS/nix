@@ -1,8 +1,8 @@
 #pragma once
 
-#include "suggestions.hh"
-#include "ref.hh"
-#include "types.hh"
+#include "nix/util/suggestions.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
 #include "fmt.hh"
 
 #include <cstring>

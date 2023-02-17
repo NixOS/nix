@@ -1,6 +1,6 @@
 #include "pathlocks.hh"
-#include "util.hh"
-#include "sync.hh"
+#include "nix/util/util.hh"
+#include "nix/util/sync.hh"
 
 #include <cerrno>
 #include <cstdlib>

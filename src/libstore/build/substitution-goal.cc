@@ -1,7 +1,7 @@
 #include "worker.hh"
 #include "substitution-goal.hh"
 #include "nar-info.hh"
-#include "finally.hh"
+#include "nix/util/finally.hh"
 
 namespace nix {
 

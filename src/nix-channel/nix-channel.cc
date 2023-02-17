@@ -5,7 +5,7 @@
 #include "store-api.hh"
 #include "legacy.hh"
 #include "fetchers.hh"
-#include "util.hh"
+#include "nix/util/util.hh"
 
 #include <fcntl.h>
 #include <regex>

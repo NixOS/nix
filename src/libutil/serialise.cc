@@ -1,5 +1,5 @@
-#include "serialise.hh"
-#include "util.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/util.hh"
 
 #include <cstring>
 #include <cerrno>

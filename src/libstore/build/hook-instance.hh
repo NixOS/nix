@@ -1,7 +1,7 @@
 #pragma once
 
-#include "logging.hh"
-#include "serialise.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/serialise.hh"
 
 namespace nix {
 

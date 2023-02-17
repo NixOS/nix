@@ -18,7 +18,7 @@
 
 #include <variant>
 
-#include "util.hh"
+#include "nix/util/util.hh"
 
 #include "nixexpr.hh"
 #include "eval.hh"

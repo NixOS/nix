@@ -1,5 +1,5 @@
-#include "args.hh"
-#include "hash.hh"
+#include "nix/util/args.hh"
+#include "nix/util/hash.hh"
 
 #include <glob.h>
 

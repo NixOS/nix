@@ -1,8 +1,8 @@
 #include "drv-output-substitution-goal.hh"
-#include "finally.hh"
+#include "nix/util/finally.hh"
 #include "worker.hh"
 #include "substitution-goal.hh"
-#include "callback.hh"
+#include "nix/util/callback.hh"
 
 namespace nix {
 

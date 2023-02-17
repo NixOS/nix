@@ -19,7 +19,7 @@ extern "C" {
 }
 #endif
 
-#include "ansicolor.hh"
+#include "nix/util/ansicolor.hh"
 #include "shared.hh"
 #include "eval.hh"
 #include "eval-cache.hh"
@@ -32,7 +32,7 @@ extern "C" {
 #include "derivations.hh"
 #include "globals.hh"
 #include "command.hh"
-#include "finally.hh"
+#include "nix/util/finally.hh"
 #include "markdown.hh"
 #include "local-fs-store.hh"
 #include "progress-bar.hh"

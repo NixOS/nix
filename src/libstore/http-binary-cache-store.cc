@@ -2,7 +2,7 @@
 #include "filetransfer.hh"
 #include "globals.hh"
 #include "nar-info-disk-cache.hh"
-#include "callback.hh"
+#include "nix/util/callback.hh"
 
 namespace nix {
 

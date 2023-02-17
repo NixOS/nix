@@ -1,6 +1,6 @@
 #pragma once
 
-#include "hash.hh"
+#include "nix/util/hash.hh"
 #include "path.hh"
 
 namespace nix {

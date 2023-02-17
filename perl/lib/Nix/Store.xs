@@ -11,7 +11,7 @@
 #include "nix/derivations.hh"
 #include "nix/globals.hh"
 #include "nix/store-api.hh"
-#include "nix/util.hh"
+#include "nix/util/util.hh"
 #include "nix/crypto.hh"
 
 #include <sodium.h>

@@ -12,7 +12,11 @@ libexpr-tests_SOURCES := \
     $(wildcard $(d)/*.cc) \
     $(wildcard $(d)/value/*.cc)
 
-libexpr-tests_CXXFLAGS += -I src/libexpr -I src/libutil -I src/libstore -I src/libexpr/tests
+libexpr-tests_CXXFLAGS += \
+	-Isrc/libexpr \
+	-Isrc/libexpr/tests \
+	-Isrc/libstore \
+	-Isrc/libutil/include
 
 libexpr-tests_LIBS = libstore-tests libutils-tests libexpr libutil libstore libfetchers
 

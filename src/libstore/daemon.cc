@@ -1,5 +1,5 @@
 #include "daemon.hh"
-#include "monitor-fd.hh"
+#include "nix/util/monitor-fd.hh"
 #include "worker-protocol.hh"
 #include "build-result.hh"
 #include "store-api.hh"
@@ -7,10 +7,10 @@
 #include "gc-store.hh"
 #include "log-store.hh"
 #include "path-with-outputs.hh"
-#include "finally.hh"
-#include "archive.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/archive.hh"
 #include "derivations.hh"
-#include "args.hh"
+#include "nix/util/args.hh"
 
 namespace nix::daemon {
 

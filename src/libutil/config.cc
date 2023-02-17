@@ -1,7 +1,7 @@
-#include "config.hh"
-#include "args.hh"
-#include "abstract-setting-to-json.hh"
-#include "experimental-features.hh"
+#include "nix/util/config.hh"
+#include "nix/util/args.hh"
+#include "nix/util/abstract-setting-to-json.hh"
+#include "nix/util/experimental-features.hh"
 
 #include <nlohmann/json.hpp>
 

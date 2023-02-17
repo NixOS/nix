@@ -2,7 +2,7 @@
 
 #include <string_view>
 
-#include "types.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

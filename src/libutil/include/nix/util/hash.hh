@@ -1,7 +1,7 @@
 #pragma once
 
-#include "types.hh"
-#include "serialise.hh"
+#include "nix/util/types.hh"
+#include "nix/util/serialise.hh"
 
 
 namespace nix {

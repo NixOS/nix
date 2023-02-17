@@ -1,6 +1,6 @@
-#include "logging.hh"
-#include "util.hh"
-#include "config.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/util.hh"
+#include "nix/util/config.hh"
 
 #include <atomic>
 #include <nlohmann/json.hpp>

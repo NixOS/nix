@@ -2,7 +2,7 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "gc-store.hh"
-#include "util.hh"
+#include "nix/util/util.hh"
 #include "loggers.hh"
 #include "progress-bar.hh"
 

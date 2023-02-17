@@ -1,7 +1,7 @@
 #include "command.hh"
 #include "common-args.hh"
 #include "store-api.hh"
-#include "archive.hh"
+#include "nix/util/archive.hh"
 
 using namespace nix;
 

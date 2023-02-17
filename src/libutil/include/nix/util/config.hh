@@ -2,7 +2,7 @@
 #include <map>
 #include <set>
 
-#include "types.hh"
+#include "nix/util/types.hh"
 
 #include <nlohmann/json_fwd.hpp>
 

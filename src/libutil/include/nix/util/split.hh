@@ -3,7 +3,7 @@
 #include <optional>
 #include <string_view>
 
-#include "util.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 

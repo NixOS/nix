@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "types.hh"
-#include "util.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 namespace boost::context { struct stack_context; }
 

@@ -1,4 +1,4 @@
-#include "thread-pool.hh"
+#include "nix/util/thread-pool.hh"
 
 namespace nix {
 

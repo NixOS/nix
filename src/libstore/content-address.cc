@@ -1,6 +1,6 @@
-#include "args.hh"
+#include "nix/util/args.hh"
 #include "content-address.hh"
-#include "split.hh"
+#include "nix/util/split.hh"
 
 namespace nix {
 

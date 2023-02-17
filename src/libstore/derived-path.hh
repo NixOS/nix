@@ -1,10 +1,10 @@
 #pragma once
 
-#include "util.hh"
+#include "nix/util/util.hh"
 #include "path.hh"
 #include "realisation.hh"
 #include "outputs-spec.hh"
-#include "comparator.hh"
+#include "nix/util/comparator.hh"
 
 #include <variant>
 

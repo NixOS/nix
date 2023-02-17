@@ -2,7 +2,7 @@
 
 #if ENABLE_S3
 
-#include "ref.hh"
+#include "nix/util/ref.hh"
 
 #include <optional>
 #include <string>

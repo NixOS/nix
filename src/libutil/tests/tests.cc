@@ -1,5 +1,5 @@
-#include "util.hh"
-#include "types.hh"
+#include "nix/util/util.hh"
+#include "nix/util/types.hh"
 
 #include <limits.h>
 #include <gtest/gtest.h>

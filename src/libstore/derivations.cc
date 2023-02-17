@@ -1,7 +1,7 @@
 #include "derivations.hh"
 #include "store-api.hh"
 #include "globals.hh"
-#include "util.hh"
+#include "nix/util/util.hh"
 #include "worker-protocol.hh"
 #include "fs-accessor.hh"
 #include <boost/container/small_vector.hpp>

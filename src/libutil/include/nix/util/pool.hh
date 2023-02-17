@@ -6,8 +6,8 @@
 #include <memory>
 #include <cassert>
 
-#include "sync.hh"
-#include "ref.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/ref.hh"
 
 namespace nix {
 

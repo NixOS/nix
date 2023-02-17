@@ -1,8 +1,8 @@
 #if __linux__
 
-#include "namespaces.hh"
-#include "util.hh"
-#include "finally.hh"
+#include "nix/util/namespaces.hh"
+#include "nix/util/util.hh"
+#include "nix/util/finally.hh"
 
 #include <sys/mount.h>
 

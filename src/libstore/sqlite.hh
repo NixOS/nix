@@ -3,7 +3,7 @@
 #include <functional>
 #include <string>
 
-#include "error.hh"
+#include "nix/util/error.hh"
 
 struct sqlite3;
 struct sqlite3_stmt;

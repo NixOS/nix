@@ -22,7 +22,7 @@ libutil-tests_INSTALL_DIR :=
 
 libutil-tests_SOURCES := $(wildcard $(d)/*.cc)
 
-libutil-tests_CXXFLAGS += -I src/libutil
+libutil-tests_CXXFLAGS += -I src/libutil/include
 
 libutil-tests_LIBS = libutil
 

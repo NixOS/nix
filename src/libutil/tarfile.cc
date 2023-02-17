@@ -1,8 +1,8 @@
 #include <archive.h>
 #include <archive_entry.h>
 
-#include "serialise.hh"
-#include "tarfile.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/tarfile.hh"
 
 namespace nix {
 

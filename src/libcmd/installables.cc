@@ -2,7 +2,7 @@
 #include "installables.hh"
 #include "installable-derived-path.hh"
 #include "outputs-spec.hh"
-#include "util.hh"
+#include "nix/util/util.hh"
 #include "command.hh"
 #include "attr-path.hh"
 #include "common-eval-args.hh"
@@ -14,7 +14,7 @@
 #include "shared.hh"
 #include "flake/flake.hh"
 #include "eval-cache.hh"
-#include "url.hh"
+#include "nix/util/url.hh"
 #include "registry.hh"
 #include "build-result.hh"
 

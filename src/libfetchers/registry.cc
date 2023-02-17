@@ -1,6 +1,6 @@
 #include "registry.hh"
 #include "fetchers.hh"
-#include "util.hh"
+#include "nix/util/util.hh"
 #include "globals.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"

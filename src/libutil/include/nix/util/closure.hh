@@ -1,6 +1,6 @@
 #include <set>
 #include <future>
-#include "sync.hh"
+#include "nix/util/sync.hh"
 
 using std::set;
 

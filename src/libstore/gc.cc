@@ -2,7 +2,7 @@
 #include "globals.hh"
 #include "local-store.hh"
 #include "local-fs-store.hh"
-#include "finally.hh"
+#include "nix/util/finally.hh"
 
 #include <functional>
 #include <queue>

@@ -1,8 +1,8 @@
 #if 0
 
-#include "logging.hh"
+#include "nix/util/logging.hh"
 #include "nixexpr.hh"
-#include "util.hh"
+#include "nix/util/util.hh"
 #include <fstream>
 
 #include <gtest/gtest.h>

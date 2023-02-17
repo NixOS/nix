@@ -1,6 +1,6 @@
 #include "realisation.hh"
 #include "store-api.hh"
-#include "closure.hh"
+#include "nix/util/closure.hh"
 #include <nlohmann/json.hpp>
 
 namespace nix {

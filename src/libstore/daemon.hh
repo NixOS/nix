@@ -1,6 +1,6 @@
 #pragma once
 
-#include "serialise.hh"
+#include "nix/util/serialise.hh"
 #include "store-api.hh"
 
 namespace nix::daemon {

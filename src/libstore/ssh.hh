@@ -1,7 +1,7 @@
 #pragma once
 
-#include "util.hh"
-#include "sync.hh"
+#include "nix/util/util.hh"
+#include "nix/util/sync.hh"
 
 namespace nix {
 

@@ -11,9 +11,9 @@
 #include <dirent.h>
 #include <fcntl.h>
 
-#include "archive.hh"
-#include "util.hh"
-#include "config.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/util.hh"
+#include "nix/util/config.hh"
 
 namespace nix {
 

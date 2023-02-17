@@ -3,8 +3,8 @@
 #include "store-api.hh"
 #include "store-cast.hh"
 #include "log-store.hh"
-#include "sync.hh"
-#include "thread-pool.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/thread-pool.hh"
 
 #include <atomic>
 

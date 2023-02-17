@@ -5,7 +5,7 @@
 #include "eval-inline.hh"
 #include "store-api.hh"
 #include "fetchers.hh"
-#include "finally.hh"
+#include "nix/util/finally.hh"
 #include "fetch-settings.hh"
 
 namespace nix {

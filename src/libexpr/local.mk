@@ -12,7 +12,12 @@ libexpr_SOURCES := \
   $(d)/lexer-tab.cc \
   $(d)/parser-tab.cc
 
-libexpr_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libmain -I src/libexpr
+libexpr_CXXFLAGS += \
+	-Isrc/libexpr \
+	-Isrc/libfetchers \
+	-Isrc/libmain \
+	-Isrc/libstore \
+	-Isrc/libutil/include
 
 libexpr_LIBS = libutil libstore libfetchers
 

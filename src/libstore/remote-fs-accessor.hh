@@ -1,7 +1,7 @@
 #pragma once
 
 #include "fs-accessor.hh"
-#include "ref.hh"
+#include "nix/util/ref.hh"
 #include "store-api.hh"
 
 namespace nix {

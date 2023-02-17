@@ -5,7 +5,7 @@
 #include "store-api.hh"
 #include "derivations.hh"
 #include "local-store.hh"
-#include "finally.hh"
+#include "nix/util/finally.hh"
 #include "fs-accessor.hh"
 #include "progress-bar.hh"
 #include "eval.hh"

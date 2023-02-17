@@ -1,6 +1,6 @@
 #include "sqlite.hh"
 #include "globals.hh"
-#include "util.hh"
+#include "nix/util/util.hh"
 
 #include <sqlite3.h>
 

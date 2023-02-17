@@ -1,7 +1,7 @@
 #include "references.hh"
-#include "hash.hh"
-#include "util.hh"
-#include "archive.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/util.hh"
+#include "nix/util/archive.hh"
 
 #include <map>
 #include <cstdlib>

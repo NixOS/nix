@@ -1,8 +1,8 @@
 #include <regex>
 #include <nlohmann/json.hpp>
 
-#include "util.hh"
-#include "regex-combinators.hh"
+#include "nix/util/util.hh"
+#include "nix/util/regex-combinators.hh"
 #include "outputs-spec.hh"
 #include "path-regex.hh"
 

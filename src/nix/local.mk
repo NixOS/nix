@@ -14,7 +14,14 @@ nix_SOURCES := \
   $(wildcard src/nix-instantiate/*.cc) \
   $(wildcard src/nix-store/*.cc) \
 
-nix_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libexpr -I src/libmain -I src/libcmd -I doc/manual
+nix_CXXFLAGS += \
+	-Isrc/libutil/include \
+	-Isrc/libstore \
+	-Isrc/libfetchers \
+	-Isrc/libexpr \
+	-Isrc/libmain \
+	-Isrc/libcmd \
+	-Idoc/manual
 
 nix_LIBS = libexpr libmain libfetchers libstore libutil libcmd
 

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "types.hh"
-#include "error.hh"
-#include "config.hh"
+#include "nix/util/types.hh"
+#include "nix/util/error.hh"
+#include "nix/util/config.hh"
 
 #include <nlohmann/json_fwd.hpp>
 

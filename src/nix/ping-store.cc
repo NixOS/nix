@@ -1,7 +1,7 @@
 #include "command.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "finally.hh"
+#include "nix/util/finally.hh"
 
 #include <nlohmann/json.hpp>
 

@@ -1,8 +1,8 @@
 #include "command.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "sync.hh"
-#include "thread-pool.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/thread-pool.hh"
 #include "references.hh"
 
 #include <atomic>

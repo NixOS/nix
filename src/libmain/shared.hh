@@ -1,7 +1,7 @@
 #pragma once
 
-#include "util.hh"
-#include "args.hh"
+#include "nix/util/util.hh"
+#include "nix/util/args.hh"
 #include "common-args.hh"
 #include "path.hh"
 #include "derived-path.hh"

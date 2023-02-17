@@ -6,7 +6,9 @@ libfetchers_DIR := $(d)
 
 libfetchers_SOURCES := $(wildcard $(d)/*.cc)
 
-libfetchers_CXXFLAGS += -I src/libutil -I src/libstore
+libfetchers_CXXFLAGS += \
+	-Isrc/libutil/include \
+  -Isrc/libstore
 
 libfetchers_LDFLAGS += -pthread
 

@@ -5,8 +5,8 @@
 
 #include "value.hh"
 #include "symbol-table.hh"
-#include "error.hh"
-#include "chunked-vector.hh"
+#include "nix/util/error.hh"
+#include "nix/util/chunked-vector.hh"
 
 namespace nix {
 

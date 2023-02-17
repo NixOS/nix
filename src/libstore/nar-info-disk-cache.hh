@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ref.hh"
+#include "nix/util/ref.hh"
 #include "nar-info.hh"
 #include "realisation.hh"
 

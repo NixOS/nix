@@ -1,6 +1,6 @@
 #include "value-to-json.hh"
 #include "eval-inline.hh"
-#include "util.hh"
+#include "nix/util/util.hh"
 #include "store-api.hh"
 
 #include <cstdlib>

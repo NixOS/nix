@@ -1,4 +1,4 @@
-#include "serialise.hh"
+#include "nix/util/serialise.hh"
 #include <archive.h>
 
 namespace nix {

@@ -1,6 +1,6 @@
 #include "progress-bar.hh"
-#include "util.hh"
-#include "sync.hh"
+#include "nix/util/util.hh"
+#include "nix/util/sync.hh"
 #include "store-api.hh"
 #include "names.hh"
 

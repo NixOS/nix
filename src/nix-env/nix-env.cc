@@ -11,9 +11,9 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "user-env.hh"
-#include "util.hh"
+#include "nix/util/util.hh"
 #include "value-to-json.hh"
-#include "xml-writer.hh"
+#include "nix/util/xml-writer.hh"
 #include "legacy.hh"
 
 #include <cerrno>

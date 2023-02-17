@@ -1,6 +1,6 @@
 #include "lockfile.hh"
 #include "store-api.hh"
-#include "url-parts.hh"
+#include "nix/util/url-parts.hh"
 
 #include <iomanip>
 

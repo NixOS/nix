@@ -1,7 +1,7 @@
 #include "primops.hh"
 #include "store-api.hh"
 #include "make-content-addressed.hh"
-#include "url.hh"
+#include "nix/util/url.hh"
 
 namespace nix {
 

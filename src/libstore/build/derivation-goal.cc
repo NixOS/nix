@@ -4,13 +4,13 @@
 #include "builtins.hh"
 #include "builtins/buildenv.hh"
 #include "references.hh"
-#include "finally.hh"
-#include "util.hh"
-#include "archive.hh"
-#include "compression.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/util.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/compression.hh"
 #include "worker-protocol.hh"
-#include "topo-sort.hh"
-#include "callback.hh"
+#include "nix/util/topo-sort.hh"
+#include "nix/util/callback.hh"
 #include "local-store.hh" // TODO remove, along with remaining downcasts
 
 #include <regex>

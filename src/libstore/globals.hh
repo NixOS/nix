@@ -1,9 +1,9 @@
 #pragma once
 
-#include "types.hh"
-#include "config.hh"
-#include "util.hh"
-#include "experimental-features.hh"
+#include "nix/util/types.hh"
+#include "nix/util/config.hh"
+#include "nix/util/util.hh"
+#include "nix/util/experimental-features.hh"
 
 #include <map>
 #include <limits>

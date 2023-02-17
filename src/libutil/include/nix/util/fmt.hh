@@ -2,7 +2,7 @@
 
 #include <boost/format.hpp>
 #include <string>
-#include "ansicolor.hh"
+#include "nix/util/ansicolor.hh"
 
 
 namespace nix {

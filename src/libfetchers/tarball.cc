@@ -3,10 +3,10 @@
 #include "filetransfer.hh"
 #include "globals.hh"
 #include "store-api.hh"
-#include "archive.hh"
-#include "tarfile.hh"
-#include "types.hh"
-#include "split.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/tarfile.hh"
+#include "nix/util/types.hh"
+#include "nix/util/split.hh"
 
 namespace nix::fetchers {
 

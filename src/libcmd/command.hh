@@ -1,7 +1,7 @@
 #pragma once
 
 #include "installables.hh"
-#include "args.hh"
+#include "nix/util/args.hh"
 #include "common-eval-args.hh"
 #include "path.hh"
 #include "flake/lockfile.hh"

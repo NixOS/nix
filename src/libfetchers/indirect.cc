@@ -1,5 +1,5 @@
 #include "fetchers.hh"
-#include "url-parts.hh"
+#include "nix/util/url-parts.hh"
 
 namespace nix::fetchers {
 

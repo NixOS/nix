@@ -4,7 +4,7 @@
 #include "store-api.hh"
 #include "log-store.hh"
 
-#include "pool.hh"
+#include "nix/util/pool.hh"
 
 #include <atomic>
 

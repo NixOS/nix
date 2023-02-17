@@ -8,7 +8,7 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "filetransfer.hh"
-#include "finally.hh"
+#include "nix/util/finally.hh"
 #include "loggers.hh"
 #include "markdown.hh"
 

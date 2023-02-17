@@ -1,5 +1,5 @@
 #include "user-env.hh"
-#include "util.hh"
+#include "nix/util/util.hh"
 #include "derivations.hh"
 #include "store-api.hh"
 #include "path-with-outputs.hh"

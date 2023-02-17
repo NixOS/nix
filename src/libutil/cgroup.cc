@@ -1,8 +1,8 @@
 #if __linux__
 
-#include "cgroup.hh"
-#include "util.hh"
-#include "finally.hh"
+#include "nix/util/cgroup.hh"
+#include "nix/util/util.hh"
+#include "nix/util/finally.hh"
 
 #include <chrono>
 #include <cmath>

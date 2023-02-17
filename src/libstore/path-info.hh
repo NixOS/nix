@@ -2,7 +2,7 @@
 
 #include "crypto.hh"
 #include "path.hh"
-#include "hash.hh"
+#include "nix/util/hash.hh"
 #include "content-address.hh"
 
 #include <string>

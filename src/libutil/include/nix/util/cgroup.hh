@@ -5,7 +5,7 @@
 #include <chrono>
 #include <optional>
 
-#include "types.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

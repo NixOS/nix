@@ -1,4 +1,4 @@
-#include "git.hh"
+#include "nix/util/git.hh"
 #include <gtest/gtest.h>
 
 namespace nix {

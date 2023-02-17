@@ -4,8 +4,8 @@
 #include <map>
 #include <unordered_map>
 
-#include "types.hh"
-#include "chunked-vector.hh"
+#include "nix/util/types.hh"
+#include "nix/util/chunked-vector.hh"
 
 namespace nix {
 

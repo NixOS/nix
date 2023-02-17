@@ -5,7 +5,7 @@
 #include "nar-info.hh"
 #include "nar-info-disk-cache.hh"
 #include "globals.hh"
-#include "compression.hh"
+#include "nix/util/compression.hh"
 #include "filetransfer.hh"
 
 #include <aws/core/Aws.h>

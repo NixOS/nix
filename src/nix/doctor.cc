@@ -1,12 +1,12 @@
 #include <sstream>
 
 #include "command.hh"
-#include "logging.hh"
+#include "nix/util/logging.hh"
 #include "serve-protocol.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
-#include "util.hh"
+#include "nix/util/util.hh"
 #include "worker-protocol.hh"
 
 using namespace nix;

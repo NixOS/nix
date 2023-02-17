@@ -1,7 +1,7 @@
 #pragma once
 
-#include "sync.hh"
-#include "util.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/util.hh"
 
 #include <queue>
 #include <functional>

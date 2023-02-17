@@ -1,9 +1,9 @@
 #include "store-api.hh"
 #include "remote-store.hh"
 #include "remote-fs-accessor.hh"
-#include "archive.hh"
+#include "nix/util/archive.hh"
 #include "worker-protocol.hh"
-#include "pool.hh"
+#include "nix/util/pool.hh"
 #include "ssh.hh"
 
 namespace nix {

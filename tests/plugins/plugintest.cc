@@ -1,4 +1,4 @@
-#include "config.hh"
+#include "nix/util/config.hh"
 #include "primops.hh"
 
 using namespace nix;

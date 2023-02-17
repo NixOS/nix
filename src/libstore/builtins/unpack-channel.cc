@@ -1,5 +1,5 @@
 #include "builtins.hh"
-#include "tarfile.hh"
+#include "nix/util/tarfile.hh"
 
 namespace nix {
 

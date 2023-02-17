@@ -2,7 +2,7 @@
 
 #include <rapidcheck/gen/Arbitrary.h>
 
-#include <hash.hh>
+#include "nix/util/hash.hh"
 
 namespace rc {
 using namespace nix;

@@ -5,7 +5,7 @@
 #include <set>
 #include <variant>
 
-#include "json-impls.hh"
+#include "nix/util/json-impls.hh"
 
 namespace nix {
 

@@ -1,6 +1,6 @@
 #include "loggers.hh"
 #include "progress-bar.hh"
-#include "util.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 

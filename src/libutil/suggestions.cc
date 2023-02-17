@@ -1,6 +1,6 @@
-#include "suggestions.hh"
-#include "ansicolor.hh"
-#include "util.hh"
+#include "nix/util/suggestions.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/util.hh"
 #include <algorithm>
 
 namespace nix {

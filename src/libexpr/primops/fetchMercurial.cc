@@ -2,8 +2,8 @@
 #include "eval-inline.hh"
 #include "store-api.hh"
 #include "fetchers.hh"
-#include "url.hh"
-#include "url-parts.hh"
+#include "nix/util/url.hh"
+#include "nix/util/url-parts.hh"
 
 namespace nix {
 

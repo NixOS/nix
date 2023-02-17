@@ -3,10 +3,10 @@
 #include "globals.hh"
 #include "local-store.hh"
 #include "store-api.hh"
-#include "thread-pool.hh"
-#include "topo-sort.hh"
-#include "callback.hh"
-#include "closure.hh"
+#include "nix/util/thread-pool.hh"
+#include "nix/util/topo-sort.hh"
+#include "nix/util/callback.hh"
+#include "nix/util/closure.hh"
 #include "filetransfer.hh"
 
 namespace nix {

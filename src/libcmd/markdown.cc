@@ -1,6 +1,6 @@
 #include "markdown.hh"
-#include "util.hh"
-#include "finally.hh"
+#include "nix/util/util.hh"
+#include "nix/util/finally.hh"
 
 #include <sys/queue.h>
 #include <lowdown.h>

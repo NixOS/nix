@@ -1,6 +1,6 @@
-#include "serialise.hh"
+#include "nix/util/serialise.hh"
 #include "store-api.hh"
-#include "archive.hh"
+#include "nix/util/archive.hh"
 #include "worker-protocol.hh"
 
 #include <algorithm>

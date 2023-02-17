@@ -1,8 +1,8 @@
 #include "builtins.hh"
 #include "filetransfer.hh"
 #include "store-api.hh"
-#include "archive.hh"
-#include "compression.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/compression.hh"
 
 namespace nix {
 

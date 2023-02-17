@@ -22,7 +22,10 @@ libstore-tests_INSTALL_DIR :=
 
 libstore-tests_SOURCES := $(wildcard $(d)/*.cc)
 
-libstore-tests_CXXFLAGS += -I src/libstore -I src/libutil
+libstore-tests_CXXFLAGS += \
+	-Isrc/libstore \
+	-Isrc/libutil/include \
+	-Isrc/libutil
 
 libstore-tests_LIBS = libutil-tests libstore libutil
 

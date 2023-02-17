@@ -1,5 +1,5 @@
 #include "graphml.hh"
-#include "util.hh"
+#include "nix/util/util.hh"
 #include "store-api.hh"
 #include "derivations.hh"
 

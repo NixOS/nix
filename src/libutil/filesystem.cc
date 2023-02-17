@@ -2,9 +2,9 @@
 #include <filesystem>
 #include <atomic>
 
-#include "finally.hh"
-#include "util.hh"
-#include "types.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/util.hh"
+#include "nix/util/types.hh"
 
 namespace fs = std::filesystem;
 

@@ -1,7 +1,7 @@
 #include "command.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "thread-pool.hh"
+#include "nix/util/thread-pool.hh"
 
 #include <atomic>
 

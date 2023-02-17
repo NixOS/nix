@@ -1,9 +1,9 @@
 #pragma once
 
-#include "comparator.hh"
-#include "error.hh"
+#include "nix/util/comparator.hh"
+#include "nix/util/error.hh"
 #include "nlohmann/json_fwd.hpp"
-#include "types.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 

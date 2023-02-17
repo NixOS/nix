@@ -1,8 +1,8 @@
-#include "util.hh"
-#include "sync.hh"
-#include "finally.hh"
-#include "serialise.hh"
-#include "cgroup.hh"
+#include "nix/util/util.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/cgroup.hh"
 
 #include <array>
 #include <cctype>

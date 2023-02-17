@@ -1,5 +1,5 @@
-#include "archive.hh"
-#include "pool.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/pool.hh"
 #include "remote-store.hh"
 #include "serve-protocol.hh"
 #include "build-result.hh"
@@ -8,7 +8,7 @@
 #include "worker-protocol.hh"
 #include "ssh.hh"
 #include "derivations.hh"
-#include "callback.hh"
+#include "nix/util/callback.hh"
 
 namespace nix {
 

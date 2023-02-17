@@ -1,7 +1,7 @@
 #pragma once
 
 #include <variant>
-#include "hash.hh"
+#include "nix/util/hash.hh"
 
 namespace nix {
 

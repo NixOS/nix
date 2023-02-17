@@ -1,6 +1,6 @@
 #include "cache.hh"
 #include "sqlite.hh"
-#include "sync.hh"
+#include "nix/util/sync.hh"
 #include "store-api.hh"
 
 #include <nlohmann/json.hpp>

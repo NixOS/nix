@@ -4,11 +4,11 @@
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 
-#include "args.hh"
-#include "hash.hh"
-#include "archive.hh"
-#include "split.hh"
-#include "util.hh"
+#include "nix/util/args.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/split.hh"
+#include "nix/util/util.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>

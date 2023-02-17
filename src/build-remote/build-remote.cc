@@ -13,13 +13,13 @@
 #include "shared.hh"
 #include "pathlocks.hh"
 #include "globals.hh"
-#include "serialise.hh"
+#include "nix/util/serialise.hh"
 #include "build-result.hh"
 #include "store-api.hh"
 #include "derivations.hh"
 #include "local-store.hh"
 #include "legacy.hh"
-#include "experimental-features.hh"
+#include "nix/util/experimental-features.hh"
 
 using namespace nix;
 using std::cin;

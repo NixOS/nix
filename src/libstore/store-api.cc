@@ -3,12 +3,12 @@
 #include "globals.hh"
 #include "derivations.hh"
 #include "store-api.hh"
-#include "util.hh"
+#include "nix/util/util.hh"
 #include "nar-info-disk-cache.hh"
-#include "thread-pool.hh"
-#include "url.hh"
-#include "archive.hh"
-#include "callback.hh"
+#include "nix/util/thread-pool.hh"
+#include "nix/util/url.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/callback.hh"
 #include "remote-store.hh"
 
 #include <nlohmann/json.hpp>

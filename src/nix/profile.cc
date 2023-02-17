@@ -3,7 +3,7 @@
 #include "shared.hh"
 #include "store-api.hh"
 #include "derivations.hh"
-#include "archive.hh"
+#include "nix/util/archive.hh"
 #include "builtins/buildenv.hh"
 #include "flake/flakeref.hh"
 #include "../nix-env/user-env.hh"

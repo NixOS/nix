@@ -1,16 +1,16 @@
-#include "archive.hh"
+#include "nix/util/archive.hh"
 #include "binary-cache-store.hh"
-#include "compression.hh"
+#include "nix/util/compression.hh"
 #include "derivations.hh"
 #include "fs-accessor.hh"
 #include "globals.hh"
 #include "nar-info.hh"
-#include "sync.hh"
+#include "nix/util/sync.hh"
 #include "remote-fs-accessor.hh"
 #include "nar-info-disk-cache.hh"
 #include "nar-accessor.hh"
-#include "thread-pool.hh"
-#include "callback.hh"
+#include "nix/util/thread-pool.hh"
+#include "nix/util/callback.hh"
 
 #include <chrono>
 #include <future>

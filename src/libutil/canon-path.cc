@@ -1,5 +1,5 @@
-#include "canon-path.hh"
-#include "util.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 

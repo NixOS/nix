@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util.hh"
+#include "nix/util/util.hh"
 #include "path.hh"
 #include "outputs-spec.hh"
 #include "derived-path.hh"

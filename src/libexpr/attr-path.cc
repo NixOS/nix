@@ -1,6 +1,6 @@
 #include "attr-path.hh"
 #include "eval-inline.hh"
-#include "util.hh"
+#include "nix/util/util.hh"
 
 
 namespace nix {

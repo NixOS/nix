@@ -1,5 +1,5 @@
-#include "experimental-features.hh"
-#include "util.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/util.hh"
 
 #include "nlohmann/json.hpp"
 

@@ -2,7 +2,7 @@
 #include "derivations.hh"
 #include "eval.hh"
 #include "symbol-table.hh"
-#include "util.hh"
+#include "nix/util/util.hh"
 
 #include <cstdlib>
 

@@ -2,10 +2,10 @@
 
 #include <variant>
 
-#include "hash.hh"
+#include "nix/util/hash.hh"
 #include "path.hh"
 #include <nlohmann/json_fwd.hpp>
-#include "comparator.hh"
+#include "nix/util/comparator.hh"
 #include "crypto.hh"
 
 namespace nix {

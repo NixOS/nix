@@ -1,7 +1,7 @@
 #pragma once
 
-#include "util.hh"
-#include "comparator.hh"
+#include "nix/util/util.hh"
+#include "nix/util/comparator.hh"
 #include "path.hh"
 
 #include <variant>

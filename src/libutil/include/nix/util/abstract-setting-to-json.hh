@@ -1,7 +1,7 @@
 #pragma once
 
 #include <nlohmann/json.hpp>
-#include "config.hh"
+#include "nix/util/config.hh"
 
 namespace nix {
 template<typename T>

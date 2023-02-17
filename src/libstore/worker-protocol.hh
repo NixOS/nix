@@ -1,7 +1,7 @@
 #pragma once
 
 #include "store-api.hh"
-#include "serialise.hh"
+#include "nix/util/serialise.hh"
 
 namespace nix {
 

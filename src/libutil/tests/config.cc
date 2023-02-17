@@ -1,5 +1,5 @@
-#include "config.hh"
-#include "args.hh"
+#include "nix/util/config.hh"
+#include "nix/util/args.hh"
 
 #include <sstream>
 #include <gtest/gtest.h>

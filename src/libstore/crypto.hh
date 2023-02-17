@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types.hh"
+#include "nix/util/types.hh"
 
 #include <map>
 

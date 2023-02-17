@@ -1,9 +1,9 @@
 #pragma once
 
-#include "types.hh"
-#include "error.hh"
-#include "logging.hh"
-#include "ansicolor.hh"
+#include "nix/util/types.hh"
+#include "nix/util/error.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ansicolor.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>

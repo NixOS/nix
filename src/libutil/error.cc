@@ -1,8 +1,8 @@
-#include "error.hh"
+#include "nix/util/error.hh"
 
 #include <iostream>
 #include <optional>
-#include "serialise.hh"
+#include "nix/util/serialise.hh"
 #include <sstream>
 
 namespace nix {

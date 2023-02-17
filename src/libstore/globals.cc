@@ -1,9 +1,9 @@
 #include "globals.hh"
-#include "util.hh"
-#include "archive.hh"
-#include "args.hh"
-#include "abstract-setting-to-json.hh"
-#include "compute-levels.hh"
+#include "nix/util/util.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/args.hh"
+#include "nix/util/abstract-setting-to-json.hh"
+#include "nix/util/compute-levels.hh"
 
 #include <algorithm>
 #include <map>

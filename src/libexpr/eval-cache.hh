@@ -1,7 +1,7 @@
 #pragma once
 
-#include "sync.hh"
-#include "hash.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/hash.hh"
 #include "eval.hh"
 
 #include <functional>

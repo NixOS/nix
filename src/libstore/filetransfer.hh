@@ -1,8 +1,8 @@
 #pragma once
 
-#include "types.hh"
-#include "hash.hh"
-#include "config.hh"
+#include "nix/util/types.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/config.hh"
 
 #include <string>
 #include <future>

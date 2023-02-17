@@ -2,9 +2,9 @@
 #include "cache.hh"
 #include "globals.hh"
 #include "store-api.hh"
-#include "types.hh"
-#include "url-parts.hh"
-#include "git.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url-parts.hh"
+#include "nix/util/git.hh"
 #include "fetchers.hh"
 #include "fetch-settings.hh"
 

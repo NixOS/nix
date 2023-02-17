@@ -1,6 +1,6 @@
 #include "fetchers.hh"
 #include "store-api.hh"
-#include "archive.hh"
+#include "nix/util/archive.hh"
 
 namespace nix::fetchers {
 

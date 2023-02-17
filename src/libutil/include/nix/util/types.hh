@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ref.hh"
+#include "nix/util/ref.hh"
 
 #include <list>
 #include <set>

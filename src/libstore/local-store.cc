@@ -1,15 +1,15 @@
 #include "local-store.hh"
 #include "globals.hh"
-#include "archive.hh"
+#include "nix/util/archive.hh"
 #include "pathlocks.hh"
 #include "worker-protocol.hh"
 #include "derivations.hh"
 #include "nar-info.hh"
 #include "references.hh"
-#include "callback.hh"
-#include "topo-sort.hh"
-#include "finally.hh"
-#include "compression.hh"
+#include "nix/util/callback.hh"
+#include "nix/util/topo-sort.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/compression.hh"
 
 #include <iostream>
 #include <algorithm>

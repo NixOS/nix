@@ -1,7 +1,7 @@
 #pragma once
 
-#include "comparator.hh"
-#include "types.hh"
+#include "nix/util/comparator.hh"
+#include "nix/util/types.hh"
 #include <set>
 
 namespace nix {

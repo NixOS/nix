@@ -1,4 +1,4 @@
-#include "error.hh"
+#include "nix/util/error.hh"
 #include "shared.hh"
 
 #include <cstring>
