@@ -39,7 +39,9 @@ EOF
 git -C $flake2Dir add flake.nix
 git -C $flake2Dir commit -m 'Initial'
 
-cat > $flake3Dir/flake.nix <<EOF
+# Test symlink handling.
+ln -s _flake.nix $flake3Dir/flake.nix
+cat > $flake3Dir/_flake.nix <<EOF
 {
   description = "Fnord";
 
@@ -57,7 +59,7 @@ cat > $flake3Dir/default.nix <<EOF
 { x = 123; }
 EOF
 
-git -C $flake3Dir add flake.nix default.nix
+git -C $flake3Dir add flake.nix _flake.nix default.nix
 git -C $flake3Dir commit -m 'Initial'
 
 cat > $nonFlakeDir/README.md <<EOF
@@ -166,7 +168,7 @@ nix build -o $TEST_ROOT/result --no-registries git+file://$flake2Dir#bar --refre
 nix build -o $TEST_ROOT/result --no-use-registries git+file://$flake2Dir#bar --refresh
 
 # Test whether indirect dependencies work.
-nix build -o $TEST_ROOT/result $flake3Dir#xyzzy
+nix build -o $TEST_ROOT/result git+file://$flake3Dir?ref=master#xyzzy
 git -C $flake3Dir add flake.lock
 
 # Add dependency to flake3.

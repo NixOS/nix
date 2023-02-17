@@ -74,13 +74,18 @@ struct GitInputAccessor : InputAccessor
         }
     }
 
-    std::string readFile(const CanonPath & path) override
+    std::string readBlob(const CanonPath & path, bool symlink)
     {
-        auto blob = getBlob(path);
+        auto blob = getBlob(path, symlink);
 
         auto data = std::string_view((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
 
         return std::string(data);
+    }
+
+    std::string readFile(const CanonPath & path) override
+    {
+        return readBlob(path, false);
     }
 
     bool pathExists(const CanonPath & path) override
@@ -142,7 +147,7 @@ struct GitInputAccessor : InputAccessor
 
     std::string readLink(const CanonPath & path) override
     {
-        throw UnimplementedError("GitInputAccessor::readLink");
+        return readBlob(path, true);
     }
 
     std::map<CanonPath, TreeEntry> lookupCache;
@@ -200,23 +205,36 @@ struct GitInputAccessor : InputAccessor
         return Tree(tree);
     }
 
-    Blob getBlob(const CanonPath & path)
+    Blob getBlob(const CanonPath & path, bool expectSymlink)
     {
-        auto notRegular = [&]()
+        auto notExpected = [&]()
         {
-            throw Error("'%s' is not a regular file", showPath(path));
+            throw Error(
+                expectSymlink
+                ? "'%s' is not a symlink"
+                : "'%s' is not a regular file",
+                showPath(path));
         };
 
-        if (path.isRoot()) notRegular();
+        if (path.isRoot()) notExpected();
 
         auto entry = need(path);
 
         if (git_tree_entry_type(entry) != GIT_OBJECT_BLOB)
-            notRegular();
+            notExpected();
+
+        auto mode = git_tree_entry_filemode(entry);
+        if (expectSymlink) {
+            if (mode != GIT_FILEMODE_LINK)
+                notExpected();
+        } else {
+            if (mode != GIT_FILEMODE_BLOB && mode != GIT_FILEMODE_BLOB_EXECUTABLE)
+                notExpected();
+        }
 
         git_blob * blob = nullptr;
         if (git_tree_entry_to_object((git_object * *) &blob, repo.get(), entry))
-            throw Error("looking up regular file '%s': %s", showPath(path), git_error_last()->message);
+            throw Error("looking up file '%s': %s", showPath(path), git_error_last()->message);
 
         return Blob(blob);
     }
