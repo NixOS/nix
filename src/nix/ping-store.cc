@@ -1,5 +1,5 @@
 #include "nix/cmd/command.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 #include "store-api.hh"
 #include "nix/util/finally.hh"
 

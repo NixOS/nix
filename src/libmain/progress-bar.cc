@@ -1,4 +1,4 @@
-#include "progress-bar.hh"
+#include "nix/main/progress-bar.hh"
 #include "nix/util/util.hh"
 #include "nix/util/sync.hh"
 #include "store-api.hh"

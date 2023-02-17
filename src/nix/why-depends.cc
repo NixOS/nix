@@ -1,8 +1,8 @@
 #include "nix/cmd/command.hh"
 #include "store-api.hh"
-#include "progress-bar.hh"
+#include "nix/main/progress-bar.hh"
 #include "fs-accessor.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 
 #include <queue>
 

@@ -7,7 +7,7 @@
 #include "names.hh"
 #include "profiles.hh"
 #include "path-with-outputs.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "user-env.hh"

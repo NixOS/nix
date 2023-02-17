@@ -5,7 +5,7 @@
 #include "path-with-outputs.hh"
 #include "local-fs-store.hh"
 #include "globals.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-inline.hh"
 #include "profiles.hh"

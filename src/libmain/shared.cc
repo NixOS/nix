@@ -1,10 +1,10 @@
 #include "globals.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 #include "store-api.hh"
 #include "gc-store.hh"
 #include "nix/util/util.hh"
-#include "loggers.hh"
-#include "progress-bar.hh"
+#include "nix/main/loggers.hh"
+#include "nix/main/progress-bar.hh"
 
 #include <algorithm>
 #include <cctype>

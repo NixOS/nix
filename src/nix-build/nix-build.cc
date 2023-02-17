@@ -15,7 +15,7 @@
 #include "globals.hh"
 #include "derivations.hh"
 #include "nix/util/util.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 #include "path-with-outputs.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-inline.hh"

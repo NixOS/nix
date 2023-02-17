@@ -1,5 +1,5 @@
 #include "profiles.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 #include "globals.hh"
 #include "filetransfer.hh"
 #include "store-api.hh"

@@ -2,7 +2,7 @@
 #include "store-cast.hh"
 #include "gc-store.hh"
 #include "profiles.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 #include "globals.hh"
 #include "nix/cmd/legacy.hh"
 

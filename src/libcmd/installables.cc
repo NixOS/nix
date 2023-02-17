@@ -11,7 +11,7 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/get-drvs.hh"
 #include "store-api.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 #include "nix/expr/flake/flake.hh"
 #include "nix/expr/eval-cache.hh"
 #include "nix/util/url.hh"

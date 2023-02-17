@@ -2,7 +2,7 @@
 #include "nix/util/hash.hh"
 #include "content-address.hh"
 #include "nix/cmd/legacy.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 #include "references.hh"
 #include "nix/util/archive.hh"
 

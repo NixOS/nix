@@ -1,6 +1,6 @@
 #include "derivations.hh"
 #include "globals.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 #include "store-api.hh"
 #include <sys/utsname.h>
 #include <algorithm>

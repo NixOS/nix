@@ -1,4 +1,4 @@
-#include "shared.hh"
+#include "nix/main/shared.hh"
 #include "store-api.hh"
 #include "nix/cmd/legacy.hh"
 

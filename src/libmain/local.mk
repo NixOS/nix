@@ -7,8 +7,9 @@ libmain_DIR := $(d)
 libmain_SOURCES := $(wildcard $(d)/*.cc)
 
 libmain_CXXFLAGS += \
-	-Isrc/libutil/include \
-	-Isrc/libstore
+	-Isrc/libmain/include \
+	-Isrc/libstore \
+	-Isrc/libutil/include
 
 libmain_LDFLAGS += $(OPENSSL_LIBS)
 

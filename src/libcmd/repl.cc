@@ -20,7 +20,7 @@ extern "C" {
 #endif
 
 #include "nix/util/ansicolor.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-cache.hh"
 #include "nix/expr/eval-inline.hh"
@@ -35,7 +35,7 @@ extern "C" {
 #include "nix/util/finally.hh"
 #include "nix/cmd/markdown.hh"
 #include "local-fs-store.hh"
-#include "progress-bar.hh"
+#include "nix/main/progress-bar.hh"
 
 #if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW

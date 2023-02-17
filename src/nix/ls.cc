@@ -2,7 +2,7 @@
 #include "store-api.hh"
 #include "fs-accessor.hh"
 #include "nar-accessor.hh"
-#include "common-args.hh"
+#include "nix/main/common-args.hh"
 #include <nlohmann/json.hpp>
 
 using namespace nix;

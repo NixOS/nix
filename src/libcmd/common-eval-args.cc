@@ -1,5 +1,5 @@
 #include "nix/cmd/common-eval-args.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 #include "filetransfer.hh"
 #include "nix/util/util.hh"
 #include "nix/expr/eval.hh"

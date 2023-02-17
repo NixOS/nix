@@ -1,6 +1,6 @@
 #include "nix/cmd/command.hh"
-#include "common-args.hh"
-#include "shared.hh"
+#include "nix/main/common-args.hh"
+#include "nix/main/shared.hh"
 #include "store-api.hh"
 
 #include <nlohmann/json.hpp>

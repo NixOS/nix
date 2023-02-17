@@ -1,11 +1,11 @@
 #include "nix/cmd/command.hh"
-#include "common-args.hh"
+#include "nix/main/common-args.hh"
 #include "store-api.hh"
 #include "filetransfer.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/attr-path.hh"
 #include "names.hh"
-#include "progress-bar.hh"
+#include "nix/main/progress-bar.hh"
 
 using namespace nix;
 

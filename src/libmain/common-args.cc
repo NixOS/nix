@@ -1,6 +1,6 @@
-#include "common-args.hh"
+#include "nix/main/common-args.hh"
 #include "globals.hh"
-#include "loggers.hh"
+#include "nix/main/loggers.hh"
 
 namespace nix {
 

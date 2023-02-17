@@ -9,7 +9,7 @@
 #include "local-store.hh"
 #include "nix/util/monitor-fd.hh"
 #include "serve-protocol.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 #include "nix/util/util.hh"
 #include "worker-protocol.hh"
 #include "graphml.hh"

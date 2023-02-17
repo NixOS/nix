@@ -1,5 +1,5 @@
 #include "globals.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/get-drvs.hh"

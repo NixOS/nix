@@ -1,5 +1,5 @@
 #include "nix/util/error.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 
 #include <cstring>
 #include <cstddef>

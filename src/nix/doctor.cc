@@ -3,7 +3,7 @@
 #include "nix/cmd/command.hh"
 #include "nix/util/logging.hh"
 #include "serve-protocol.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "nix/util/util.hh"

@@ -1,5 +1,5 @@
 #include "nix/cmd/command.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 #include "local-store.hh"
 #include "remote-store.hh"
 #include "nix/util/util.hh"

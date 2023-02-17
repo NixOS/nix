@@ -10,7 +10,7 @@
 #endif
 
 #include "machines.hh"
-#include "shared.hh"
+#include "nix/main/shared.hh"
 #include "pathlocks.hh"
 #include "globals.hh"
 #include "nix/util/serialise.hh"
