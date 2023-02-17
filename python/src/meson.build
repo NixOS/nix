@@ -5,10 +5,10 @@ src = [
   'python-module.cc',
 ]
 
-pythonix = python_mod.extension_module('nix', src,
-    dependencies : [python_dep, nix_expr_dep, nix_main_dep],
+nix_bindings = py_installation.extension_module('nix', src,
+    dependencies : [nix_expr_dep, nix_main_dep],
     install: true,
-    install_dir: python_mod.sysconfig_path('platlib'),
+    subdir: 'nix',
     cpp_args: [
       '-std=c++17',
       # -Wnon-virtual-dtor is unnecessarily turned on by Meson
