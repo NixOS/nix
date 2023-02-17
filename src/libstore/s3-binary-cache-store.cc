@@ -238,7 +238,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
     void init() override
     {
-        if (auto cacheInfo = diskCache->cacheExists(getUri())) {
+        if (auto cacheInfo = diskCache->upToDateCacheExists(getUri())) {
             wantMassQuery.setDefault(cacheInfo->wantMassQuery);
             priority.setDefault(cacheInfo->priority);
         } else {

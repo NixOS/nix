@@ -13,16 +13,17 @@ public:
 
     virtual ~NarInfoDiskCache() { }
 
-    virtual void createCache(const std::string & uri, const Path & storeDir,
+    virtual int createCache(const std::string & uri, const Path & storeDir,
         bool wantMassQuery, int priority) = 0;
 
     struct CacheInfo
     {
+        int id;
         bool wantMassQuery;
         int priority;
     };
 
-    virtual std::optional<CacheInfo> cacheExists(const std::string & uri) = 0;
+    virtual std::optional<CacheInfo> upToDateCacheExists(const std::string & uri) = 0;
 
     virtual std::pair<Outcome, std::shared_ptr<NarInfo>> lookupNarInfo(
         const std::string & uri, const std::string & hashPart) = 0;
@@ -44,5 +45,7 @@ public:
 /* Return a singleton cache object that can be used concurrently by
    multiple threads. */
 ref<NarInfoDiskCache> getNarInfoDiskCache();
+
+ref<NarInfoDiskCache> getTestNarInfoDiskCache(Path dbPath);
 
 }
