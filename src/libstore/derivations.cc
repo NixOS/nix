@@ -889,6 +889,7 @@ std::optional<BasicDerivation> Derivation::tryResolve(
     return resolved;
 }
 
+
 const Hash impureOutputHash = hashString(htSHA256, "impure");
 
 nlohmann::json DerivationOutput::toJSON(
@@ -915,6 +916,73 @@ nlohmann::json DerivationOutput::toJSON(
     }, raw());
     return res;
 }
+
+
+DerivationOutput DerivationOutput::fromJSON(
+    const Store & store, std::string_view drvName, std::string_view outputName,
+    const nlohmann::json & _json)
+{
+    std::set<std::string_view> keys;
+    auto json = (std::map<std::string, nlohmann::json>) _json;
+
+    for (const auto & [key, _] : json)
+        keys.insert(key);
+
+    auto methodAlgo = [&]() -> std::pair<FileIngestionMethod, HashType> {
+        std::string hashAlgo = json["hashAlgo"];
+        auto method = FileIngestionMethod::Flat;
+        if (hashAlgo.substr(0, 2) == "r:") {
+            method = FileIngestionMethod::Recursive;
+            hashAlgo = hashAlgo.substr(2);
+        }
+        auto hashType = parseHashType(hashAlgo);
+        return { method, hashType };
+    };
+
+    if (keys == (std::set<std::string_view> { "path" })) {
+        return DerivationOutput::InputAddressed {
+            .path = store.parseStorePath((std::string) json["path"]),
+        };
+    }
+
+    else if (keys == (std::set<std::string_view> { "path", "hashAlgo", "hash" })) {
+        auto [method, hashType] = methodAlgo();
+        auto dof = DerivationOutput::CAFixed {
+            .hash = {
+                .method = method,
+                .hash = Hash::parseNonSRIUnprefixed((std::string) json["hash"], hashType),
+            },
+        };
+        if (dof.path(store, drvName, outputName) != store.parseStorePath((std::string) json["path"]))
+            throw Error("Path doesn't match derivation output");
+        return dof;
+    }
+
+    else if (keys == (std::set<std::string_view> { "hashAlgo" })) {
+        auto [method, hashType] = methodAlgo();
+        return DerivationOutput::CAFloating {
+            .method = method,
+            .hashType = hashType,
+        };
+    }
+
+    else if (keys == (std::set<std::string_view> { })) {
+        return DerivationOutput::Deferred {};
+    }
+
+    else if (keys == (std::set<std::string_view> { "hashAlgo", "impure" })) {
+        auto [method, hashType] = methodAlgo();
+        return DerivationOutput::Impure {
+            .method = method,
+            .hashType = hashType,
+        };
+    }
+
+    else {
+        throw Error("invalid JSON for derivation output");
+    }
+}
+
 
 nlohmann::json Derivation::toJSON(const Store & store) const
 {
@@ -946,6 +1014,43 @@ nlohmann::json Derivation::toJSON(const Store & store) const
     res["builder"] = builder;
     res["args"] = args;
     res["env"] = env;
+
+    return res;
+}
+
+
+Derivation Derivation::fromJSON(
+    const Store & store, std::string_view drvName,
+    const nlohmann::json & json)
+{
+    Derivation res;
+
+    {
+        auto & outputsObj = json["outputs"];
+        for (auto & [outputName, output] : outputsObj.items()) {
+            res.outputs.insert_or_assign(
+                outputName,
+                DerivationOutput::fromJSON(store, drvName, outputName, output));
+        }
+    }
+
+    {
+        auto & inputsList = json["inputSrcs"];
+        for (auto & input : inputsList)
+            res.inputSrcs.insert(store.parseStorePath(static_cast<const std::string &>(input)));
+    }
+
+    {
+        auto & inputDrvsObj = json["inputDrvs"];
+        for (auto & [inputDrvPath, inputOutputs] : inputDrvsObj.items())
+            res.inputDrvs[store.parseStorePath(inputDrvPath)] =
+                static_cast<const StringSet &>(inputOutputs);
+    }
+
+    res.platform = json["system"];
+    res.builder = json["builder"];
+    res.args = json["args"];
+    res.env = json["env"];
 
     return res;
 }

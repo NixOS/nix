@@ -11,15 +11,29 @@ class DerivationTest : public LibStoreTest
 {
 };
 
-#define TEST_JSON(TYPE, NAME, STR, VAL, ...)                           \
-    TEST_F(DerivationTest, TYPE ## _ ## NAME ## _to_json) {            \
-        using nlohmann::literals::operator "" _json;                   \
-        ASSERT_EQ(                                                     \
-            STR ## _json,                                              \
-            (TYPE { VAL }).toJSON(*store __VA_OPT__(,) __VA_ARGS__));  \
+#define TEST_JSON(NAME, STR, VAL, DRV_NAME, OUTPUT_NAME) \
+    TEST_F(DerivationTest, DerivationOutput_ ## NAME ## _to_json) {    \
+        using nlohmann::literals::operator "" _json;           \
+        ASSERT_EQ(                                             \
+            STR ## _json,                                      \
+            (DerivationOutput { VAL }).toJSON(                 \
+                *store,                                        \
+                DRV_NAME,                                      \
+                OUTPUT_NAME));                                 \
+    }                                                          \
+                                                               \
+    TEST_F(DerivationTest, DerivationOutput_ ## NAME ## _from_json) {  \
+        using nlohmann::literals::operator "" _json;           \
+        ASSERT_EQ(                                             \
+            DerivationOutput { VAL },                          \
+            DerivationOutput::fromJSON(                        \
+                *store,                                        \
+                DRV_NAME,                                      \
+                OUTPUT_NAME,                                   \
+                STR ## _json));                                \
     }
 
-TEST_JSON(DerivationOutput, inputAddressed,
+TEST_JSON(inputAddressed,
     R"({
         "path": "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-drv-name-output-name"
     })",
@@ -28,7 +42,7 @@ TEST_JSON(DerivationOutput, inputAddressed,
     }),
     "drv-name", "output-name")
 
-TEST_JSON(DerivationOutput, caFixed,
+TEST_JSON(caFixed,
     R"({
         "hashAlgo": "r:sha256",
         "hash": "894517c9163c896ec31a2adbd33c0681fd5f45b2c0ef08a64c92a03fb97f390f",
@@ -42,7 +56,7 @@ TEST_JSON(DerivationOutput, caFixed,
     }),
     "drv-name", "output-name")
 
-TEST_JSON(DerivationOutput, caFloating,
+TEST_JSON(caFloating,
     R"({
         "hashAlgo": "r:sha256"
     })",
@@ -52,12 +66,12 @@ TEST_JSON(DerivationOutput, caFloating,
     }),
     "drv-name", "output-name")
 
-TEST_JSON(DerivationOutput, deferred,
+TEST_JSON(deferred,
     R"({ })",
     DerivationOutput::Deferred { },
     "drv-name", "output-name")
 
-TEST_JSON(DerivationOutput, impure,
+TEST_JSON(impure,
     R"({
         "hashAlgo": "r:sha256",
         "impure": true
@@ -68,7 +82,27 @@ TEST_JSON(DerivationOutput, impure,
     }),
     "drv-name", "output-name")
 
-TEST_JSON(Derivation, impure,
+#undef TEST_JSON
+
+#define TEST_JSON(NAME, STR, VAL, DRV_NAME)                     \
+    TEST_F(DerivationTest, Derivation_ ## NAME ## _to_json) {   \
+        using nlohmann::literals::operator "" _json;            \
+        ASSERT_EQ(                                              \
+            STR ## _json,                                       \
+            (Derivation { VAL }).toJSON(*store));               \
+    }                                                           \
+                                                                \
+    TEST_F(DerivationTest, Derivation_ ## NAME ## _from_json) { \
+        using nlohmann::literals::operator "" _json;            \
+        ASSERT_EQ(                                              \
+            Derivation { VAL },                                 \
+            Derivation::fromJSON(                               \
+                *store,                                         \
+                DRV_NAME,                                       \
+                STR ## _json));                                 \
+    }
+
+TEST_JSON(simple,
     R"({
       "inputSrcs": [
         "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"
@@ -117,7 +151,8 @@ TEST_JSON(Derivation, impure,
             },
         };
         drv;
-    }))
+    }),
+    "drv-name")
 
 #undef TEST_JSON
 

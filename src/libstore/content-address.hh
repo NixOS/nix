@@ -3,6 +3,7 @@
 
 #include <variant>
 #include "hash.hh"
+#include "comparator.hh"
 
 namespace nix {
 
@@ -30,6 +31,8 @@ struct TextHash {
      * Hash of the contents of the text/file.
      */
     Hash hash;
+
+    GENERATE_CMP(TextHash, me->hash);
 };
 
 /**
@@ -46,6 +49,8 @@ struct FixedOutputHash {
     Hash hash;
 
     std::string printMethodAlgo() const;
+
+    GENERATE_CMP(FixedOutputHash, me->method, me->hash);
 };
 
 /**
