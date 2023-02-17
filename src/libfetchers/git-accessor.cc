@@ -1,7 +1,7 @@
 #include "git-utils.hh"
 #include "input-accessor.hh"
 
-#include <span>
+#include <boost/core/span.hpp>
 
 #include <git2/blob.h>
 #include <git2/commit.h>
@@ -284,7 +284,7 @@ TarballInfo importTarball(Source & source)
             throw Error("adding a file to a tree builder: %s", git_error_last()->message);
     };
 
-    auto updateBuilders = [&](std::span<const std::string> names)
+    auto updateBuilders = [&](boost::span<const std::string> names)
     {
         // Find the common prefix of pendingDirs and names.
         size_t prefixLen = 0;
@@ -327,7 +327,7 @@ TarballInfo importTarball(Source & source)
 
         auto pathComponents = tokenizeString<std::vector<std::string>>(path, "/");
 
-        std::span<const std::string> pathComponents2{pathComponents};
+        boost::span<const std::string> pathComponents2{pathComponents};
 
         if (pathComponents2.size() <= componentsToStrip) continue;
         pathComponents2 = pathComponents2.subspan(componentsToStrip);
