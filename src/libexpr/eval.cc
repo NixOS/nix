@@ -2,11 +2,11 @@
 #include "nix/util/hash.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
-#include "store-api.hh"
-#include "derivations.hh"
-#include "globals.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/globals.hh"
 #include "nix/expr/eval-inline.hh"
-#include "filetransfer.hh"
+#include "nix/store/filetransfer.hh"
 #include "nix/expr/function-trace.hh"
 
 #include <algorithm>

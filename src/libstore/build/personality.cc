@@ -1,5 +1,5 @@
-#include "personality.hh"
-#include "globals.hh"
+#include "nix/store/build/personality.hh"
+#include "nix/store/globals.hh"
 
 #if __linux__
 #include <sys/utsname.h>

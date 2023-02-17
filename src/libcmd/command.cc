@@ -1,9 +1,9 @@
 #include "nix/cmd/command.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
-#include "derivations.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/store/derivations.hh"
 #include "nix/expr/nixexpr.hh"
-#include "profiles.hh"
+#include "nix/store/profiles.hh"
 
 #include <nlohmann/json.hpp>
 

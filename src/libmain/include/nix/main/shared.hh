@@ -3,8 +3,8 @@
 #include "nix/util/util.hh"
 #include "nix/util/args.hh"
 #include "nix/main/common-args.hh"
-#include "path.hh"
-#include "derived-path.hh"
+#include "nix/store/path.hh"
+#include "nix/store/derived-path.hh"
 
 #include <signal.h>
 

@@ -1,5 +1,5 @@
-#include "realisation.hh"
-#include "store-api.hh"
+#include "nix/store/realisation.hh"
+#include "nix/store/store-api.hh"
 #include "nix/util/closure.hh"
 #include <nlohmann/json.hpp>
 

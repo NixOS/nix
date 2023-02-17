@@ -22,7 +22,7 @@
 
 #include "nix/expr/nixexpr.hh"
 #include "nix/expr/eval.hh"
-#include "globals.hh"
+#include "nix/store/globals.hh"
 
 namespace nix {
 
@@ -635,9 +635,9 @@ formal
 #include <unistd.h>
 
 #include "nix/expr/eval.hh"
-#include "filetransfer.hh"
+#include "nix/store/filetransfer.hh"
 #include "nix/fetchers/fetchers.hh"
-#include "store-api.hh"
+#include "nix/store/store-api.hh"
 #include "nix/expr/flake/flake.hh"
 
 

@@ -1,6 +1,6 @@
-#include "worker.hh"
-#include "substitution-goal.hh"
-#include "nar-info.hh"
+#include "nix/store/build/worker.hh"
+#include "nix/store/build/substitution-goal.hh"
+#include "nix/store/nar-info.hh"
 #include "nix/util/finally.hh"
 
 namespace nix {

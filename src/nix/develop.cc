@@ -2,9 +2,9 @@
 #include "nix/cmd/command.hh"
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
-#include "store-api.hh"
-#include "outputs-spec.hh"
-#include "derivations.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/derivations.hh"
 #include "nix/main/progress-bar.hh"
 #include "run.hh"
 

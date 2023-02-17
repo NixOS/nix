@@ -3,8 +3,8 @@
 
 #include "nix/util/util.hh"
 #include "nix/util/regex-combinators.hh"
-#include "outputs-spec.hh"
-#include "path-regex.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/path-regex.hh"
 
 namespace nix {
 

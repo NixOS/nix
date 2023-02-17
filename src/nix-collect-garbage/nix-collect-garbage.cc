@@ -1,9 +1,9 @@
-#include "store-api.hh"
-#include "store-cast.hh"
-#include "gc-store.hh"
-#include "profiles.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-cast.hh"
+#include "nix/store/gc-store.hh"
+#include "nix/store/profiles.hh"
 #include "nix/main/shared.hh"
-#include "globals.hh"
+#include "nix/store/globals.hh"
 #include "nix/cmd/legacy.hh"
 
 #include <iostream>

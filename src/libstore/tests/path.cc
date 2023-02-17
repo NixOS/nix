@@ -4,8 +4,8 @@
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
 
-#include "path-regex.hh"
-#include "store-api.hh"
+#include "nix/store/path-regex.hh"
+#include "nix/store/store-api.hh"
 
 #include "tests/hash.hh"
 #include "tests/libstore.hh"

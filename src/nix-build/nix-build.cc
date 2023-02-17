@@ -9,14 +9,14 @@
 
 #include <nlohmann/json.hpp>
 
-#include "parsed-derivations.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
-#include "globals.hh"
-#include "derivations.hh"
+#include "nix/store/parsed-derivations.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/derivations.hh"
 #include "nix/util/util.hh"
 #include "nix/main/shared.hh"
-#include "path-with-outputs.hh"
+#include "nix/store/path-with-outputs.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/get-drvs.hh"

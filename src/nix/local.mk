@@ -20,7 +20,7 @@ nix_CXXFLAGS += \
 	-Isrc/libexpr/include \
 	-Isrc/libfetchers/include \
 	-Isrc/libmain/include \
-	-Isrc/libstore \
+	-Isrc/libstore/include \
 	-Isrc/libutil/include
 
 nix_LIBS = libexpr libmain libfetchers libstore libutil libcmd

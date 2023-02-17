@@ -1,5 +1,5 @@
-#include "path-info.hh"
-#include "worker-protocol.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/worker-protocol.hh"
 
 namespace nix {
 

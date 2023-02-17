@@ -9,15 +9,15 @@
 #include <sys/time.h>
 #endif
 
-#include "machines.hh"
+#include "nix/store/machines.hh"
 #include "nix/main/shared.hh"
-#include "pathlocks.hh"
-#include "globals.hh"
+#include "nix/store/pathlocks.hh"
+#include "nix/store/globals.hh"
 #include "nix/util/serialise.hh"
-#include "build-result.hh"
-#include "store-api.hh"
-#include "derivations.hh"
-#include "local-store.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/local-store.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/util/experimental-features.hh"
 

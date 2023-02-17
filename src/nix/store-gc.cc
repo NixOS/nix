@@ -1,9 +1,9 @@
 #include "nix/cmd/command.hh"
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
-#include "store-api.hh"
-#include "store-cast.hh"
-#include "gc-store.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-cast.hh"
+#include "nix/store/gc-store.hh"
 
 using namespace nix;
 

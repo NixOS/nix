@@ -1,15 +1,15 @@
-#include "crypto.hh"
-#include "fs-accessor.hh"
-#include "globals.hh"
-#include "derivations.hh"
-#include "store-api.hh"
+#include "nix/store/crypto.hh"
+#include "nix/store/fs-accessor.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/store-api.hh"
 #include "nix/util/util.hh"
-#include "nar-info-disk-cache.hh"
+#include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/thread-pool.hh"
 #include "nix/util/url.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/callback.hh"
-#include "remote-store.hh"
+#include "nix/store/remote-store.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>
@@ -1265,8 +1265,8 @@ Derivation Store::readInvalidDerivation(const StorePath & drvPath)
 }
 
 
-#include "local-store.hh"
-#include "uds-remote-store.hh"
+#include "nix/store/local-store.hh"
+#include "nix/store/uds-remote-store.hh"
 
 
 namespace nix {

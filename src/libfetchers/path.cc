@@ -1,5 +1,5 @@
 #include "nix/fetchers/fetchers.hh"
-#include "store-api.hh"
+#include "nix/store/store-api.hh"
 #include "nix/util/archive.hh"
 
 namespace nix::fetchers {

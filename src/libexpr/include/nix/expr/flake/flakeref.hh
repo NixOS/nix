@@ -3,7 +3,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/hash.hh"
 #include "nix/fetchers/fetchers.hh"
-#include "outputs-spec.hh"
+#include "nix/store/outputs-spec.hh"
 
 #include <variant>
 

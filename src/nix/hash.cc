@@ -1,9 +1,9 @@
 #include "nix/cmd/command.hh"
 #include "nix/util/hash.hh"
-#include "content-address.hh"
+#include "nix/store/content-address.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/main/shared.hh"
-#include "references.hh"
+#include "nix/store/references.hh"
 #include "nix/util/archive.hh"
 
 using namespace nix;

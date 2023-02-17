@@ -1,4 +1,4 @@
-#include "globals.hh"
+#include "nix/store/globals.hh"
 #include "nix/main/shared.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-inline.hh"
@@ -7,8 +7,8 @@
 #include "nix/expr/value-to-xml.hh"
 #include "nix/expr/value-to-json.hh"
 #include "nix/util/util.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/local-fs-store.hh"
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/cmd/legacy.hh"
 

@@ -1,9 +1,9 @@
 #include "nix/fetchers/registry.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/util/util.hh"
-#include "globals.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/local-fs-store.hh"
 
 #include "nix/fetchers/fetch-settings.hh"
 

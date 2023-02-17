@@ -1,15 +1,15 @@
 #include "nix/cmd/command.hh"
 #include "nix/main/shared.hh"
-#include "local-store.hh"
-#include "remote-store.hh"
+#include "nix/store/local-store.hh"
+#include "nix/store/remote-store.hh"
 #include "nix/util/util.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/archive.hh"
-#include "globals.hh"
-#include "derivations.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/derivations.hh"
 #include "nix/util/finally.hh"
 #include "nix/cmd/legacy.hh"
-#include "daemon.hh"
+#include "nix/store/daemon.hh"
 
 #include <algorithm>
 #include <climits>

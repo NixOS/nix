@@ -1,6 +1,6 @@
-#include "binary-cache-store.hh"
-#include "globals.hh"
-#include "nar-info-disk-cache.hh"
+#include "nix/store/binary-cache-store.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/nar-info-disk-cache.hh"
 
 #include <atomic>
 

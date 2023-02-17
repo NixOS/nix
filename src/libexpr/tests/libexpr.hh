@@ -5,7 +5,7 @@
 #include "nix/expr/nixexpr.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-inline.hh"
-#include "store-api.hh"
+#include "nix/store/store-api.hh"
 
 #include "tests/libstore.hh"
 

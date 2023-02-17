@@ -1,13 +1,13 @@
-#include "derivations.hh"
-#include "parsed-derivations.hh"
-#include "globals.hh"
-#include "local-store.hh"
-#include "store-api.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/parsed-derivations.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/local-store.hh"
+#include "nix/store/store-api.hh"
 #include "nix/util/thread-pool.hh"
 #include "nix/util/topo-sort.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/closure.hh"
-#include "filetransfer.hh"
+#include "nix/store/filetransfer.hh"
 
 namespace nix {
 

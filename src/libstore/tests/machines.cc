@@ -1,5 +1,5 @@
-#include "machines.hh"
-#include "globals.hh"
+#include "nix/store/machines.hh"
+#include "nix/store/globals.hh"
 
 #include <gmock/gmock-matchers.h>
 

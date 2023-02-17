@@ -1,7 +1,7 @@
 #include "nix/cmd/command.hh"
-#include "store-api.hh"
-#include "fs-accessor.hh"
-#include "nar-accessor.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/fs-accessor.hh"
+#include "nix/store/nar-accessor.hh"
 #include "nix/main/common-args.hh"
 #include <nlohmann/json.hpp>
 

@@ -1,4 +1,4 @@
-#include "store-api.hh"
+#include "nix/store/store-api.hh"
 
 #include <sodium.h>
 

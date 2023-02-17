@@ -1,5 +1,5 @@
 #include "nix/expr/flake/flake.hh"
-#include "globals.hh"
+#include "nix/store/globals.hh"
 #include "nix/fetchers/fetch-settings.hh"
 
 #include <nlohmann/json.hpp>

@@ -1,7 +1,7 @@
-#include "worker.hh"
-#include "substitution-goal.hh"
-#include "derivation-goal.hh"
-#include "local-store.hh"
+#include "nix/store/build/worker.hh"
+#include "nix/store/build/substitution-goal.hh"
+#include "nix/store/build/derivation-goal.hh"
+#include "nix/store/local-store.hh"
 
 namespace nix {
 

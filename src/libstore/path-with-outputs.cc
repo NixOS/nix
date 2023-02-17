@@ -1,5 +1,5 @@
-#include "path-with-outputs.hh"
-#include "store-api.hh"
+#include "nix/store/path-with-outputs.hh"
+#include "nix/store/store-api.hh"
 
 #include <regex>
 

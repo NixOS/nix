@@ -1,6 +1,6 @@
 #include "nix/util/util.hh"
-#include "local-store.hh"
-#include "globals.hh"
+#include "nix/store/local-store.hh"
+#include "nix/store/globals.hh"
 
 #include <cstdlib>
 #include <cstring>

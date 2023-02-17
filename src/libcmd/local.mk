@@ -11,7 +11,7 @@ libcmd_CXXFLAGS += \
 	-Isrc/libexpr/include \
 	-Isrc/libfetchers/include \
 	-Isrc/libmain/include \
-	-Isrc/libstore \
+	-Isrc/libstore/include \
 	-Isrc/libutil/include \
 	-Isrc/nix
 

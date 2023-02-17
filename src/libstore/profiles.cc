@@ -1,6 +1,6 @@
-#include "profiles.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
+#include "nix/store/profiles.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/local-fs-store.hh"
 #include "nix/util/util.hh"
 
 #include <sys/types.h>

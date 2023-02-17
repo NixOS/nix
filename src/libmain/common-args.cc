@@ -1,5 +1,5 @@
 #include "nix/main/common-args.hh"
-#include "globals.hh"
+#include "nix/store/globals.hh"
 #include "nix/main/loggers.hh"
 
 namespace nix {

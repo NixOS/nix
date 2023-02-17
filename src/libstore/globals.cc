@@ -1,4 +1,4 @@
-#include "globals.hh"
+#include "nix/store/globals.hh"
 #include "nix/util/util.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/args.hh"

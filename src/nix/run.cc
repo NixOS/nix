@@ -2,14 +2,14 @@
 #include "nix/cmd/command.hh"
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
-#include "store-api.hh"
-#include "derivations.hh"
-#include "local-store.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/local-store.hh"
 #include "nix/util/finally.hh"
-#include "fs-accessor.hh"
+#include "nix/store/fs-accessor.hh"
 #include "nix/main/progress-bar.hh"
 #include "nix/expr/eval.hh"
-#include "build/personality.hh"
+#include "nix/store/build/personality.hh"
 
 #if __linux__
 #include <sys/mount.h>

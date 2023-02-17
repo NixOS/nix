@@ -1,7 +1,7 @@
 #include "nix/util/serialise.hh"
-#include "store-api.hh"
+#include "nix/store/store-api.hh"
 #include "nix/util/archive.hh"
-#include "worker-protocol.hh"
+#include "nix/store/worker-protocol.hh"
 
 #include <algorithm>
 

@@ -1,5 +1,5 @@
 #include "nix/expr/value/context.hh"
-#include "store-api.hh"
+#include "nix/store/store-api.hh"
 
 #include <optional>
 

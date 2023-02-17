@@ -1,17 +1,17 @@
-#include "derivation-goal.hh"
-#include "hook-instance.hh"
-#include "worker.hh"
-#include "builtins.hh"
-#include "builtins/buildenv.hh"
-#include "references.hh"
+#include "nix/store/build/derivation-goal.hh"
+#include "nix/store/build/hook-instance.hh"
+#include "nix/store/build/worker.hh"
+#include "nix/store/builtins.hh"
+#include "nix/store/builtins/buildenv.hh"
+#include "nix/store/references.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/util.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/compression.hh"
-#include "worker-protocol.hh"
+#include "nix/store/worker-protocol.hh"
 #include "nix/util/topo-sort.hh"
 #include "nix/util/callback.hh"
-#include "local-store.hh" // TODO remove, along with remaining downcasts
+#include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
 
 #include <regex>
 #include <queue>

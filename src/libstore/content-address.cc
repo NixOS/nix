@@ -1,5 +1,5 @@
 #include "nix/util/args.hh"
-#include "content-address.hh"
+#include "nix/store/content-address.hh"
 #include "nix/util/split.hh"
 
 namespace nix {

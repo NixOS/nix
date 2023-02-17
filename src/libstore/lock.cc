@@ -1,6 +1,6 @@
-#include "lock.hh"
-#include "globals.hh"
-#include "pathlocks.hh"
+#include "nix/store/lock.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/pathlocks.hh"
 
 #include <pwd.h>
 #include <grp.h>

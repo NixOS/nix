@@ -3,7 +3,7 @@
 #include "nix/cmd/installables.hh"
 #include "nix/util/args.hh"
 #include "nix/cmd/common-eval-args.hh"
-#include "path.hh"
+#include "nix/store/path.hh"
 #include "nix/expr/flake/lockfile.hh"
 
 #include <optional>

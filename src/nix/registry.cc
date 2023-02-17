@@ -3,7 +3,7 @@
 #include "nix/main/shared.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/flake/flake.hh"
-#include "store-api.hh"
+#include "nix/store/store-api.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/registry.hh"
 

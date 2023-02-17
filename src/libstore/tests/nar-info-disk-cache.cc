@@ -1,8 +1,8 @@
-#include "nar-info-disk-cache.hh"
+#include "nix/store/nar-info-disk-cache.hh"
 
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
-#include "sqlite.hh"
+#include "nix/store/sqlite.hh"
 #include <sqlite3.h>
 
 

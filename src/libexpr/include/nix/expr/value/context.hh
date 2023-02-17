@@ -2,7 +2,7 @@
 
 #include "nix/util/util.hh"
 #include "nix/util/comparator.hh"
-#include "path.hh"
+#include "nix/store/path.hh"
 
 #include <variant>
 

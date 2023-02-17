@@ -2,7 +2,7 @@
 
 #include <rapidcheck/gen/Arbitrary.h>
 
-#include <derived-path.hh>
+#include "nix/store/derived-path.hh"
 
 #include "tests/path.hh"
 #include "tests/outputs-spec.hh"

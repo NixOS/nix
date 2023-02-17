@@ -1,5 +1,5 @@
 #include "nix/expr/flake/lockfile.hh"
-#include "store-api.hh"
+#include "nix/store/store-api.hh"
 #include "nix/util/url-parts.hh"
 
 #include <iomanip>

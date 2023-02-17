@@ -1,13 +1,13 @@
 #pragma once
 
 #include "nix/util/util.hh"
-#include "path.hh"
-#include "outputs-spec.hh"
-#include "derived-path.hh"
+#include "nix/store/path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/store/derived-path.hh"
 #include "nix/expr/eval.hh"
-#include "store-api.hh"
+#include "nix/store/store-api.hh"
 #include "nix/expr/flake/flake.hh"
-#include "build-result.hh"
+#include "nix/store/build-result.hh"
 
 #include <optional>
 

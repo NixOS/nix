@@ -1,10 +1,10 @@
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/cache.hh"
-#include "globals.hh"
+#include "nix/store/globals.hh"
 #include "nix/util/tarfile.hh"
-#include "store-api.hh"
+#include "nix/store/store-api.hh"
 #include "nix/util/url-parts.hh"
-#include "pathlocks.hh"
+#include "nix/store/pathlocks.hh"
 #include "nix/util/util.hh"
 #include "nix/util/git.hh"
 

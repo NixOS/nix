@@ -1,5 +1,5 @@
-#include "globals.hh"
-#include "hook-instance.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/build/hook-instance.hh"
 
 namespace nix {
 

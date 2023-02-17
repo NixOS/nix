@@ -1,6 +1,6 @@
-#include "globals.hh"
-#include "nar-info.hh"
-#include "store-api.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/nar-info.hh"
+#include "nix/store/store-api.hh"
 
 namespace nix {
 

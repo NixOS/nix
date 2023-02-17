@@ -1,6 +1,6 @@
-#include "crypto.hh"
+#include "nix/store/crypto.hh"
 #include "nix/util/util.hh"
-#include "globals.hh"
+#include "nix/store/globals.hh"
 
 #include <sodium.h>
 

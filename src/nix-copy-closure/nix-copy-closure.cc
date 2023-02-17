@@ -1,5 +1,5 @@
 #include "nix/main/shared.hh"
-#include "store-api.hh"
+#include "nix/store/store-api.hh"
 #include "nix/cmd/legacy.hh"
 
 using namespace nix;

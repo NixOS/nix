@@ -1,8 +1,8 @@
 #include "nix/expr/primops.hh"
 #include "nix/expr/eval-inline.hh"
-#include "store-api.hh"
+#include "nix/store/store-api.hh"
 #include "nix/fetchers/fetchers.hh"
-#include "filetransfer.hh"
+#include "nix/store/filetransfer.hh"
 #include "nix/fetchers/registry.hh"
 
 #include <ctime>

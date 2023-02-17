@@ -1,7 +1,7 @@
-#include "derivations.hh"
-#include "globals.hh"
-#include "local-store.hh"
-#include "local-fs-store.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/local-store.hh"
+#include "nix/store/local-fs-store.hh"
 #include "nix/util/finally.hh"
 
 #include <functional>

@@ -1,9 +1,9 @@
 #include "nix/cmd/command.hh"
 #include "nix/main/shared.hh"
-#include "store-api.hh"
+#include "nix/store/store-api.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/thread-pool.hh"
-#include "references.hh"
+#include "nix/store/references.hh"
 
 #include <atomic>
 

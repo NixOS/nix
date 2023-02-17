@@ -2,7 +2,7 @@
 
 #include "nix/util/types.hh"
 #include "nix/util/hash.hh"
-#include "path.hh"
+#include "nix/store/path.hh"
 #include "nix/fetchers/attrs.hh"
 #include "nix/util/url.hh"
 

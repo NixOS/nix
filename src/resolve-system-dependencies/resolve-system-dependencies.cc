@@ -1,7 +1,7 @@
-#include "derivations.hh"
-#include "globals.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/globals.hh"
 #include "nix/main/shared.hh"
-#include "store-api.hh"
+#include "nix/store/store-api.hh"
 #include <sys/utsname.h>
 #include <algorithm>
 #include <iostream>

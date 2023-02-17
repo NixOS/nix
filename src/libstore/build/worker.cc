@@ -1,9 +1,9 @@
-#include "machines.hh"
-#include "worker.hh"
-#include "substitution-goal.hh"
-#include "drv-output-substitution-goal.hh"
-#include "local-derivation-goal.hh"
-#include "hook-instance.hh"
+#include "nix/store/machines.hh"
+#include "nix/store/build/worker.hh"
+#include "nix/store/build/substitution-goal.hh"
+#include "nix/store/build/drv-output-substitution-goal.hh"
+#include "nix/store/build/local-derivation-goal.hh"
+#include "nix/store/build/hook-instance.hh"
 
 #include <poll.h>
 

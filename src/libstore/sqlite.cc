@@ -1,5 +1,5 @@
-#include "sqlite.hh"
-#include "globals.hh"
+#include "nix/store/sqlite.hh"
+#include "nix/store/globals.hh"
 #include "nix/util/util.hh"
 
 #include <sqlite3.h>

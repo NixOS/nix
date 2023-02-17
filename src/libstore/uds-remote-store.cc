@@ -1,4 +1,4 @@
-#include "uds-remote-store.hh"
+#include "nix/store/uds-remote-store.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>

@@ -1,9 +1,9 @@
 #include "nix/expr/get-drvs.hh"
 #include "nix/util/util.hh"
 #include "nix/expr/eval-inline.hh"
-#include "derivations.hh"
-#include "store-api.hh"
-#include "path-with-outputs.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/path-with-outputs.hh"
 
 #include <cstring>
 #include <regex>

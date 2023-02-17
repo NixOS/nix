@@ -1,6 +1,6 @@
 #include "dotgraph.hh"
 #include "nix/util/util.hh"
-#include "store-api.hh"
+#include "nix/store/store-api.hh"
 
 #include <iostream>
 

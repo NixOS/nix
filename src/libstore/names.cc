@@ -1,4 +1,4 @@
-#include "names.hh"
+#include "nix/store/names.hh"
 #include "nix/util/util.hh"
 
 #include <regex>

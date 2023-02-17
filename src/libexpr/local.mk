@@ -15,8 +15,7 @@ libexpr_SOURCES := \
 libexpr_CXXFLAGS += \
 	-Isrc/libexpr/include \
 	-Isrc/libfetchers/include \
-	-Isrc/libmain \
-	-Isrc/libstore \
+	-Isrc/libstore/include \
 	-Isrc/libutil/include
 
 libexpr_LIBS = libutil libstore libfetchers

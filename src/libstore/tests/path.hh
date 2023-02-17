@@ -2,7 +2,7 @@
 
 #include <rapidcheck/gen/Arbitrary.h>
 
-#include <path.hh>
+#include "nix/store/path.hh"
 
 namespace nix {
 

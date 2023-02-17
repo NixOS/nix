@@ -1,7 +1,7 @@
 #include "nix/fetchers/cache.hh"
-#include "sqlite.hh"
+#include "nix/store/sqlite.hh"
 #include "nix/util/sync.hh"
-#include "store-api.hh"
+#include "nix/store/store-api.hh"
 
 #include <nlohmann/json.hpp>
 

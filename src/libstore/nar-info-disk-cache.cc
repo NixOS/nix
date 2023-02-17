@@ -1,7 +1,7 @@
-#include "nar-info-disk-cache.hh"
+#include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/sync.hh"
-#include "sqlite.hh"
-#include "globals.hh"
+#include "nix/store/sqlite.hh"
+#include "nix/store/globals.hh"
 
 #include <sqlite3.h>
 #include <nlohmann/json.hpp>

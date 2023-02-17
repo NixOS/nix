@@ -1,12 +1,12 @@
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/main/shared.hh"
-#include "filetransfer.hh"
+#include "nix/store/filetransfer.hh"
 #include "nix/util/util.hh"
 #include "nix/expr/eval.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/registry.hh"
 #include "nix/expr/flake/flakeref.hh"
-#include "store-api.hh"
+#include "nix/store/store-api.hh"
 #include "nix/cmd/command.hh"
 
 namespace nix {

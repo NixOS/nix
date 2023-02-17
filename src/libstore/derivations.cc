@@ -1,9 +1,9 @@
-#include "derivations.hh"
-#include "store-api.hh"
-#include "globals.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/globals.hh"
 #include "nix/util/util.hh"
-#include "worker-protocol.hh"
-#include "fs-accessor.hh"
+#include "nix/store/worker-protocol.hh"
+#include "nix/store/fs-accessor.hh"
 #include <boost/container/small_vector.hpp>
 
 namespace nix {

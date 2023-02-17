@@ -1,14 +1,14 @@
 #include "nix/cmd/command.hh"
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
-#include "store-api.hh"
-#include "derivations.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/derivations.hh"
 #include "nix/util/archive.hh"
-#include "builtins/buildenv.hh"
+#include "nix/store/builtins/buildenv.hh"
 #include "nix/expr/flake/flakeref.hh"
 #include "../nix-env/user-env.hh"
-#include "profiles.hh"
-#include "names.hh"
+#include "nix/store/profiles.hh"
+#include "nix/store/names.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>

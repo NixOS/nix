@@ -1,4 +1,4 @@
-#include "ssh.hh"
+#include "nix/store/ssh.hh"
 
 namespace nix {
 

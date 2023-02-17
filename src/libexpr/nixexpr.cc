@@ -1,5 +1,5 @@
 #include "nix/expr/nixexpr.hh"
-#include "derivations.hh"
+#include "nix/store/derivations.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/symbol-table.hh"
 #include "nix/util/util.hh"
