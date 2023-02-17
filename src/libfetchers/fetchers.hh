@@ -8,7 +8,7 @@
 
 #include <memory>
 
-namespace nix { class Store; class StorePath; class InputAccessor; }
+namespace nix { class Store; class StorePath; struct InputAccessor; }
 
 namespace nix::fetchers {
 

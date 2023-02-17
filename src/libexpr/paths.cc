@@ -21,7 +21,7 @@ std::string EvalState::encodePath(const SourcePath & path)
        to /nix/store/virtual000...<N>) and we should deprecate it
        eventually. So print a warning about use of an encoded path in
        decodePath(). */
-    return path.accessor == rootFS
+    return path.accessor == ref<InputAccessor>(rootFS)
         ? path.path.abs()
         : fmt("%s%08x-source%s", virtualPathMarker, path.accessor->number, path.path.absOrEmpty());
 }
