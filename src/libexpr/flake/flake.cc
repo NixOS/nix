@@ -104,6 +104,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
     auto sUrl = state.symbols.create("url");
     auto sFlake = state.symbols.create("flake");
     auto sFollows = state.symbols.create("follows");
+    auto sSubmodules = state.symbols.create("submodules");
 
     fetchers::Attrs attrs;
     std::optional<std::string> url;
@@ -117,6 +118,9 @@ static FlakeInput parseFlakeInput(EvalState & state,
             } else if (attr.name == sFlake) {
                 expectType(state, nBool, *attr.value, attr.pos);
                 input.isFlake = attr.value->boolean;
+            } else if (attr.name == sSubmodules) {
+                expectType(state, nBool, *attr.value, attr.pos);
+                input.hasSubmodules = attr.value->boolean;
             } else if (attr.name == sInputs) {
                 input.overrides = parseFlakeInputs(state, attr.value, attr.pos, baseDir, lockRootPath);
             } else if (attr.name == sFollows) {
@@ -229,8 +233,20 @@ static Flake getFlake(
 
     auto sInputs = state.symbols.create("inputs");
 
-    if (auto inputs = vInfo.attrs->get(sInputs))
+    if (auto inputs = vInfo.attrs->get(sInputs)) {
         flake.inputs = parseFlakeInputs(state, inputs->value, inputs->pos, flakeDir, lockRootPath);
+        if (originalRef.input.attrs.count("submodules") == 0) {
+            auto self = flake.inputs.find("self");
+            if (self != flake.inputs.end() && self->second.hasSubmodules) {
+                auto newRef = originalRef;
+                newRef.input.attrs["submodules"] = nix::Explicit<bool>{true};
+                // note: Called twice due to submodule handling in src/libfetcher (55cefd41d6)
+                warn("Loading submodules for %s because 'inputs.self.submodule' is true at %s",
+                        originalRef.input.to_string(),state.positions[inputs->pos]);
+                return getFlake(state,newRef,allowLookup,flakeCache,lockRootPath);
+            }
+        }
+    }
 
     auto sOutputs = state.symbols.create("outputs");
 
@@ -405,6 +421,7 @@ LockedFlake lockFlake(
                necessary (i.e. if they're new or the flakeref changed
                from what's in the lock file). */
             for (auto & [id, input2] : flakeInputs) {
+                if (id == "self") continue;
                 auto inputPath(inputPathPrefix);
                 inputPath.push_back(id);
                 auto inputPathS = printInputPath(inputPath);
