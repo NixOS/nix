@@ -1223,7 +1223,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     }
                 }
 
-                else {
+                // Ignore 'systems' and 'perSystem' attributes
+                else if (!(attrPathS[0] == "systems" || attrPathS[0] == "perSystem")) {
                     auto [type, description] =
                         (attrPath.size() == 1 && attrPathS[0] == "overlay")
                         || (attrPath.size() == 2 && attrPathS[0] == "overlays") ? std::make_pair("nixpkgs-overlay", "Nixpkgs overlay") :

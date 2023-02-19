@@ -726,5 +726,15 @@
         // { default = self.devShells.${system}.stdenv; }
       );
 
+
+
+
+      perSystem = {system}: {
+        packages.a = nixpkgsFor.${system}.bash;
+        packages.default = nixpkgsFor.${system}.bash; # Overwrites default package
+      };
+
+      #systems = linuxSystems ++ [ "x86_64-darwin"  ];
+      inherit systems;
   };
 }
