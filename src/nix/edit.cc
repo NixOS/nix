@@ -3,6 +3,7 @@
 #include "eval.hh"
 #include "attr-path.hh"
 #include "progress-bar.hh"
+#include "editor-for.hh"
 
 #include <unistd.h>
 
