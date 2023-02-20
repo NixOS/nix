@@ -127,5 +127,6 @@ compile_commands.json
 nix-rust/target
 
 result
+result-*
 
 .vscode/
