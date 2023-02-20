@@ -945,6 +945,7 @@ nlohmann::json Derivation::toJSON(const Store & store) const
     res["system"] = platform;
     res["builder"] = builder;
     res["args"] = args;
+    res["env"] = env;
 
     return res;
 }
