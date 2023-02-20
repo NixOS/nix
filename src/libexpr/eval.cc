@@ -1666,14 +1666,16 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
         }
 
         else {
-            error_hf(buildFnTypeError(vCur, nrArgs, args)).atPos(pos).debugThrow<TypeError>();
+            auto hf = buildFnTypeError(vCur, nrArgs, args); 
+            error_hf(hf).atPos(pos).debugThrow<TypeError>();
         }
     }
 
     vRes = vCur;
 }
 
-hintformat  EvalState::buildFnTypeError(const Value & v, size_t nrArgs, Value * * args)
+// return a unique ptr to avoid putting a hintformat on the stack.
+std::unique_ptr<hintformat> EvalState::buildFnTypeError(const Value & v, size_t nrArgs, Value * * args)
 {
     std::ostringstream hintstr;
 
@@ -1683,16 +1685,16 @@ hintformat  EvalState::buildFnTypeError(const Value & v, size_t nrArgs, Value * 
         hintstr << std::endl << "%" << i*2 + 3 << "%: %" << i*2 + 1 + 3 << "%";
     }
 
-    auto hf = hintformat(hintstr.str().c_str());
+    auto hf = std::unique_ptr<hintformat>(new hintformat(hintstr.str().c_str()));
 
     std::ostringstream ps;
     v.printCompact(symbols, ps);
-    hf % showType(v) % ps.str();
+    *hf % showType(v) % ps.str();
 
     for (size_t i = 0; i < nrArgs; ++i) {
         std::ostringstream ps;
         args[i]->printCompact(symbols, ps);
-        hf % showType(*(args[i])) % ps.str().c_str();
+        *hf % showType(*(args[i])) % ps.str().c_str();
     }
 
     return hf;
