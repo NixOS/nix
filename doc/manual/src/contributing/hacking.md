@@ -110,7 +110,7 @@ $ nix-build
 
 You can also build Nix for one of the [supported target platforms](#target-platforms).
 
-## Target platforms
+## Platforms
 
 As specified in [`flake.nix`], Nix can be built for various platforms:
 
@@ -122,14 +122,15 @@ As specified in [`flake.nix`], Nix can be built for various platforms:
 [`flake.nix`]: https://github.com/nixos/nix/blob/master/flake.nix
 
 In order to build Nix for a different platform than the one you're currently
-one, you need to have some way for your system Nix to build code for that
+on, you need to have some way for your system Nix to build code for that
 platform. Common solutions include [remote builders] and [binfmt emulation]
 (only supported on NixOS).
 
 [remote builders]: ../advanced-topics/distributed-builds.md
 [binfmt emulation]: https://nixos.org/manual/nixos/stable/options.html#opt-boot.binfmt.emulatedSystems
 
-Once you are able to build for different platforms, executing the build is as simple as
+These solutions let Nix perform builds as if you're on the native platform, so
+executing the build is as simple as
 
 ```console
 $ nix build .#packages.aarch64-linux.default
@@ -144,6 +145,8 @@ $ nix-build -A packages.aarch64-linux.default
 for classic Nix.
 
 You can use any of the other supported platforms in place of `aarch64-linux`.
+
+Cross-compiled builds are available for ARMv6 and ARMv7, and Nix on unsupported platforms can be bootstrapped by adding more `crossSystems` in `flake.nix`.
 
 ## Compilation environments
 
