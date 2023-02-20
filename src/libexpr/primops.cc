@@ -171,7 +171,7 @@ static I forceIntChecked(EvalState & state, Value & v, const PosIdx pos, std::st
     try {
         return boost::numeric_cast<I>(result);
     } catch(boost::bad_numeric_cast&) {
-        state.error("integer %1% out of range", result)
+        state.error("integer %1% is out of bounds", result)
             .withTrace(pos, errorCtx)
             .debugThrow<TypeError>();
     }
@@ -2809,7 +2809,7 @@ static RegisterPrimOp primop_isList({
 
 static void elemAt(EvalState & state, const PosIdx pos, Value & list, int n, Value & v)
 {
-    state.forceList(list, pos, "while evaluating the first argument passed to builtins.elemAt");
+    state.forceList(list, pos, "while evaluating the first argument (the list) passed to builtins.elemAt");
     if (n < 0 || (unsigned int) n >= list.listSize())
         state.debugThrowLastTrace(Error({
             .msg = hintfmt("list index %1% is out of bounds", n),
@@ -2822,7 +2822,7 @@ static void elemAt(EvalState & state, const PosIdx pos, Value & list, int n, Val
 /* Return the n-1'th element of a list. */
 static void prim_elemAt(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    elemAt(state, pos, *args[0], forceIntChecked<size_t>(state, *args[1], pos, "while evaluating the second argument passed to builtins.elemAt"), v);
+    elemAt(state, pos, *args[0], forceIntChecked<size_t>(state, *args[1], pos, "while evaluating the second argument (the list index) passed to builtins.elemAt"), v);
 }
 
 static RegisterPrimOp primop_elemAt({
