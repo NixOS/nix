@@ -10,5 +10,5 @@ libplugintest_EXCLUDE_FROM_LIBRARY_LIST := 1
 
 libplugintest_CXXFLAGS := \
 	-Isrc/libexpr/include \
-	-Isrc/libstore \
+	-Isrc/libstore/include \
 	-Isrc/libutil/include
