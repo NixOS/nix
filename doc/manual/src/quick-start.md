@@ -55,7 +55,7 @@ to subsequent chapters.
 1. You can also test a package without installing it:
 
    ```console
-   $ nix-shell --profile hello
+   $ nix-shell --packages hello
    ```
 
    This builds or downloads GNU Hello and its dependencies, then drops
