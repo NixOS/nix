@@ -89,15 +89,16 @@
         });
 
         configureFlags =
-          [
-            "CXXFLAGS=-I${lib.getDev rapidcheck}/extras/gtest/include"
-          ] ++ lib.optionals stdenv.isLinux [
+          lib.optionals stdenv.isLinux [
             "--with-boost=${boost}/lib"
             "--with-sandbox-shell=${sh}/bin/busybox"
           ]
           ++ lib.optionals (stdenv.isLinux && !(isStatic && stdenv.system == "aarch64-linux")) [
             "LDFLAGS=-fuse-ld=gold"
           ];
+        testConfigureFlags = [
+          "CXXFLAGS=-I${lib.getDev rapidcheck}/extras/gtest/include"
+        ];
 
         nativeBuildDeps =
           [
@@ -124,12 +125,15 @@
             libarchive
             boost
             lowdown-nix
-            gtest
-            rapidcheck
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
           ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
+
+        checkDeps = [
+          gtest
+          rapidcheck
+        ];
 
         awsDeps = lib.optional (stdenv.isLinux || stdenv.isDarwin)
           (aws-sdk-cpp.override {
@@ -200,7 +204,7 @@
         VERSION_SUFFIX = versionSuffix;
 
         nativeBuildInputs = nativeBuildDeps;
-        buildInputs = buildDeps ++ awsDeps;
+        buildInputs = buildDeps ++ awsDeps ++ checkDeps;
         propagatedBuildInputs = propagatedDeps;
 
         enableParallelBuilding = true;
@@ -305,7 +309,7 @@
           };
           let
             canRunInstalled = currentStdenv.buildPlatform.canExecute currentStdenv.hostPlatform;
-          in currentStdenv.mkDerivation {
+          in currentStdenv.mkDerivation (finalAttrs: {
             name = "nix-${version}";
             inherit version;
 
@@ -318,7 +322,8 @@
             nativeBuildInputs = nativeBuildDeps;
             buildInputs = buildDeps
               # There have been issues building these dependencies
-              ++ lib.optionals (currentStdenv.hostPlatform == currentStdenv.buildPlatform) awsDeps;
+              ++ lib.optionals (currentStdenv.hostPlatform == currentStdenv.buildPlatform) awsDeps
+              ++ lib.optionals finalAttrs.doCheck checkDeps;
 
             propagatedBuildInputs = propagatedDeps;
 
@@ -348,6 +353,7 @@
             configureFlags = configureFlags ++
               [ "--sysconfdir=/etc" ] ++
               lib.optional stdenv.hostPlatform.isStatic "--enable-embedded-sandbox-shell" ++
+              (if finalAttrs.doCheck then testConfigureFlags else [ "--disable-tests" ]) ++
               lib.optional (!canRunInstalled) "--disable-doc-gen";
 
             enableParallelBuilding = true;
@@ -369,7 +375,7 @@
               ''}
             '';
 
-            doInstallCheck = true;
+            doInstallCheck = finalAttrs.doCheck;
             installCheckFlags = "sysconfdir=$(out)/etc";
 
             separateDebugInfo = !currentStdenv.hostPlatform.isStatic;
@@ -411,7 +417,7 @@
             });
 
             meta.platforms = lib.platforms.unix;
-          };
+          });
 
           lowdown-nix = with final; currentStdenv.mkDerivation rec {
             name = "lowdown-0.9.0";
@@ -461,6 +467,14 @@
           lib.genAttrs ["x86_64-linux"] (system: self.packages.${system}."nix-${crossSystem}"));
 
         buildNoGc = forAllSystems (system: self.packages.${system}.nix.overrideAttrs (a: { configureFlags = (a.configureFlags or []) ++ ["--enable-gc=no"];}));
+
+        buildNoTests = forAllSystems (system:
+          self.packages.${system}.nix.overrideAttrs (a: {
+            doCheck =
+              assert ! a?dontCheck;
+              false;
+          })
+        );
 
         # Perl bindings for various platforms.
         perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nix.perl-bindings);
@@ -634,7 +648,7 @@
             nativeBuildInputs = nativeBuildDeps
                                 ++ (lib.optionals stdenv.cc.isClang [ pkgs.bear pkgs.clang-tools ]);
 
-            buildInputs = buildDeps ++ propagatedDeps ++ awsDeps;
+            buildInputs = buildDeps ++ propagatedDeps ++ awsDeps ++ checkDeps;
 
             inherit configureFlags;
 
