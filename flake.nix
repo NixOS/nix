@@ -703,7 +703,10 @@
 
             outputs = [ "out" "dev" "doc" ];
 
-            nativeBuildInputs = nativeBuildDeps;
+            nativeBuildInputs = nativeBuildDeps
+                                ++ (lib.optionals
+                                      nixpkgsFor.${system}.${stdenv}.cc.isClang
+                                      [ bear clang-tools ]);
             buildInputs = buildDeps ++ propagatedDeps ++ awsDeps;
 
             inherit configureFlags;
