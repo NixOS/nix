@@ -85,6 +85,9 @@ TEST_JSON(Derivation, impure,
         "bar",
         "baz"
       ],
+      "env": {
+        "BIG_BAD": "WOLF"
+      },
       "outputs": {}
     })",
     ({
@@ -106,6 +109,12 @@ TEST_JSON(Derivation, impure,
         drv.args = {
             "bar",
             "baz",
+        };
+        drv.env = {
+            {
+                "BIG_BAD",
+                "WOLF",
+            },
         };
         drv;
     }))
