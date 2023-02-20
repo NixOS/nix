@@ -229,7 +229,7 @@ public:
 
 private:
     SrcToStore srcToStore;
-    std::unique_ptr<hintformat> buildFnTypeError(const Value & v, size_t nrArgs, Value * * args);
+    std::unique_ptr<hintformat> buildFnTypeHint(const Value & v, size_t nrArgs, Value * * args);
 
     /* A cache from path names to parse trees. */
 #if HAVE_BOEHMGC

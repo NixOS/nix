@@ -1666,7 +1666,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
         }
 
         else {
-            auto hf = buildFnTypeError(vCur, nrArgs, args); 
+            auto hf = buildFnTypeHint(vCur, nrArgs, args);
             error_hf(hf).atPos(pos).debugThrow<TypeError>();
         }
     }
@@ -1675,7 +1675,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 }
 
 // return a unique ptr to avoid putting a hintformat on the stack.
-std::unique_ptr<hintformat> EvalState::buildFnTypeError(const Value & v, size_t nrArgs, Value * * args)
+std::unique_ptr<hintformat> EvalState::buildFnTypeHint(const Value & v, size_t nrArgs, Value * * args)
 {
     std::ostringstream hintstr;
 
