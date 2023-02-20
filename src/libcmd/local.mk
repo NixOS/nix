@@ -21,5 +21,12 @@ libcmd_LIBS = libstore libutil libexpr libmain libfetchers
 
 $(eval $(call install-file-in, $(d)/nix-cmd.pc, $(libdir)/pkgconfig, 0644))
 
+# old include paths
+
+$(foreach i, $(wildcard src/libcmd/include/nix/*.hh), \
+  $(eval $(call install-file-in, $(i), $(includedir)/nix, 0644)))
+
+# new include paths
+
 $(foreach i, $(wildcard src/libcmd/include/nix/cmd/*.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix/cmd, 0644)))

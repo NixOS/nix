@@ -14,5 +14,12 @@ ifeq ($(HAVE_LIBCPUID), 1)
 	libutil_LDFLAGS += -lcpuid
 endif
 
+# old include paths
+
+$(foreach i, $(wildcard src/libutil/include/nix/*.hh), \
+  $(eval $(call install-file-in, $(i), $(includedir)/nix, 0644)))
+
+# new include paths
+
 $(foreach i, $(wildcard src/libutil/include/nix/util/*.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix/util, 0644)))

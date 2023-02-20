@@ -42,6 +42,19 @@ clean-files += $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexe
 
 $(eval $(call install-file-in, $(d)/nix-expr.pc, $(libdir)/pkgconfig, 0644))
 
+# old include paths
+
+$(foreach i, $(wildcard src/libexpr/include/nix/*.hh), \
+  $(eval $(call install-file-in, $(i), $(includedir)/nix, 0644)))
+
+$(foreach i, $(wildcard src/libexpr/include/nix/value/*.hh), \
+  $(eval $(call install-file-in, $(i), $(includedir)/nix/value, 0644)))
+
+$(foreach i, $(wildcard src/libexpr/include/nix/flake/*.hh), \
+  $(eval $(call install-file-in, $(i), $(includedir)/nix/flake, 0644)))
+
+# new include paths
+
 $(foreach i, $(wildcard src/libexpr/include/nix/expr/*.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix/expr, 0644)))
 

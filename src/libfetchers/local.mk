@@ -15,5 +15,12 @@ libfetchers_LDFLAGS += -pthread
 
 libfetchers_LIBS = libutil libstore
 
+# old include paths
+
+$(foreach i, $(wildcard src/libfetchers/include/nix/*.hh), \
+  $(eval $(call install-file-in, $(i), $(includedir)/nix, 0644)))
+
+# new include paths
+
 $(foreach i, $(wildcard src/libfetchers/include/nix/fetchers/*.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix/fetchers, 0644)))
