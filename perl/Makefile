@@ -1,6 +1,6 @@
 makefiles = local.mk
 
-GLOBAL_CXXFLAGS += -g -Wall -std=c++2a -I../src -I../src/libutil/include
+GLOBAL_CXXFLAGS += -g -Wall -std=c++2a
 
 -include Makefile.config
 
