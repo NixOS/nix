@@ -519,33 +519,40 @@ EvalState::EvalState(
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
 
     /* Initialise the Nix expression search path. */
-    evalSettings.nixPath.setDefault(evalSettings.getDefaultNixPath());
     if (!evalSettings.pureEval) {
         for (auto & i : _searchPath) addToSearchPath(i);
-        for (auto & i : evalSettings.nixPath.get()) addToSearchPath(i);
-    }
 
-    if (evalSettings.restrictEval || evalSettings.pureEval) {
-        allowedPaths = PathSet();
-
-        for (auto & i : searchPath) {
-            auto r = resolveSearchPathElem(i);
-            if (!r.first) continue;
-
-            auto path = r.second;
-
-            if (store->isInStore(r.second)) {
-                try {
-                    StorePathSet closure;
-                    store->computeFSClosure(store->toStorePath(r.second).first, closure);
-                    for (auto & path : closure)
-                        allowPath(path);
-                } catch (InvalidPath &) {
-                    allowPath(r.second);
-                }
-            } else
-                allowPath(r.second);
+        if (auto var = getEnv("NIX_PATH")) {
+            for (auto & i : parseNixPath(*var)) addToSearchPath(i);
+        } else {
+            if (!evalSettings.restrictEval)
+                for (auto & i : evalSettings.nixPath.get()) addToSearchPath(i);
         }
+
+        if (evalSettings.restrictEval) {
+            /* In restricted mode, only allow access to the paths in
+               the closure of the search path entries. */
+            for (auto & i : searchPath) {
+                auto r = resolveSearchPathElem(i);
+                if (!r.first) continue;
+
+                auto path = r.second;
+
+                if (store->isInStore(r.second)) {
+                    try {
+                        StorePathSet closure;
+                        store->computeFSClosure(store->toStorePath(r.second).first, closure);
+                        for (auto & path : closure)
+                            allowPath(path);
+                    } catch (InvalidPath &) {
+                        allowPath(r.second);
+                    }
+                } else
+                    allowPath(r.second);
+            }
+        } else
+            /* Otherwsie, allow access to everything. */
+            allowedPaths = std::nullopt;
     }
 
     createBaseEnv();
@@ -2475,33 +2482,20 @@ EvalSettings::EvalSettings()
 {
 }
 
-/* impure => NIX_PATH or a default path
- * restrict-eval => NIX_PATH
- * pure-eval => empty
- */
 Strings EvalSettings::getDefaultNixPath()
 {
-    if (pureEval)
-        return {};
+    Strings res;
 
-    auto var = getEnv("NIX_PATH");
-    if (var) {
-        return parseNixPath(*var);
-    } else if (restrictEval) {
-        return {};
-    } else {
-        Strings res;
-        auto add = [&](const Path & p, const std::optional<std::string> & s = std::nullopt) {
-            if (pathExists(p))
-                res.push_back(s ? *s + "=" + p : p);
-        };
+    auto add = [&](const Path & p, const std::optional<std::string> & s = std::nullopt) {
+        if (pathExists(p))
+            res.push_back(s ? *s + "=" + p : p);
+    };
 
-        add(settings.useXDGBaseDirectories ? getStateDir() + "/nix/defexpr/channels" : getHome() + "/.nix-defexpr/channels");
-        add(settings.nixStateDir + "/profiles/per-user/root/channels/nixpkgs", "nixpkgs");
-        add(settings.nixStateDir + "/profiles/per-user/root/channels");
+    add(settings.useXDGBaseDirectories ? getStateDir() + "/nix/defexpr/channels" : getHome() + "/.nix-defexpr/channels");
+    add(settings.nixStateDir + "/profiles/per-user/root/channels/nixpkgs", "nixpkgs");
+    add(settings.nixStateDir + "/profiles/per-user/root/channels");
 
-        return res;
-    }
+    return res;
 }
 
 bool EvalSettings::isPseudoUrl(std::string_view s)

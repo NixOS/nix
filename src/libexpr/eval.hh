@@ -149,7 +149,7 @@ public:
 
     /* The allowed filesystem paths in restricted or pure evaluation
        mode. */
-    std::optional<PathSet> allowedPaths;
+    std::optional<PathSet> allowedPaths = PathSet();
 
     Bindings emptyBindings;
 
@@ -580,23 +580,24 @@ struct EvalSettings : Config
         "Whether builtin functions that allow executing native code should be enabled."};
 
     Setting<Strings> nixPath{
-        this, {}, "nix-path",
+        this, getDefaultNixPath(), "nix-path",
         R"(
-          List of directories to be searched for `<...>` file references.
-
-          If [pure evaluation](#conf-pure-eval) is disabled,
-          this is initialised using the [`NIX_PATH`](@docroot@/command-ref/env-common.md#env-NIX_PATH)
-          environment variable, or, if it is unset and [restricted evaluation](#conf-restrict-eval)
-          is disabled, a default search path including the user's and `root`'s channels.
+          List of directories to be searched for `<...>` file
+          references. It defaults to the user's and `root`'s channels.
+          It can be overriden using the
+          [`NIX_PATH`](@docroot@/command-ref/env-common.md#env-NIX_PATH)
+          environment variable and extended using the `-I` option. It
+          is ignored if [pure evaluation](#conf-pure-eval) or
+          [restricted evaluation](#conf-restrict-eval) is enabled.
         )"};
 
     Setting<bool> restrictEval{
         this, false, "restrict-eval",
         R"(
-          If set to `true`, the Nix evaluator will not allow access to any
-          files outside of the Nix search path (as set via the `NIX_PATH`
-          environment variable or the `-I` option), or to URIs outside of
-          `allowed-uri`. The default is `false`.
+          If set to `true`, the Nix evaluator will not allow access to
+          any files outside of the paths specified by the `NIX_PATH`
+          environment variable or the `-I` option, or to URIs outside
+          of `allowed-uri`. The default is `false`.
         )"};
 
     Setting<bool> pureEval{this, false, "pure-eval",
