@@ -620,14 +620,15 @@ namespace nix {
 
 
     TEST_F(ErrorTraceTest, elemAt) {
-        ASSERT_TRACE2("elemAt \"foo\" (-1)",
+        ASSERT_TRACE2("elemAt \"foo\" 1",
                       TypeError,
                       hintfmt("value is %s while a list was expected", "a string"),
-                      hintfmt("while evaluating the first argument passed to builtins.elemAt"));
+                      hintfmt("while evaluating the first argument (the list) passed to builtins.elemAt"));
 
-        ASSERT_TRACE1("elemAt [] (-1)",
-                      Error,
-                      hintfmt("list index %d is out of bounds", -1));
+        ASSERT_TRACE2("elemAt [] (-1)",
+                      TypeError,
+                      hintfmt("integer %d is out of bounds", -1),
+                      hintfmt("while evaluating the second argument (the list index) passed to builtins.elemAt"));
 
         ASSERT_TRACE1("elemAt [\"foo\"] 3",
                       Error,
@@ -640,7 +641,7 @@ namespace nix {
         ASSERT_TRACE2("head 1",
                       TypeError,
                       hintfmt("value is %s while a list was expected", "an integer"),
-                      hintfmt("while evaluating the first argument passed to builtins.elemAt"));
+                      hintfmt("while evaluating the first argument (the list) passed to builtins.elemAt"));
 
         ASSERT_TRACE1("head []",
                       Error,
@@ -815,9 +816,10 @@ namespace nix {
         //               hintfmt("cannot add %s to an integer", "a string"),
         //               hintfmt("while evaluating anonymous lambda"));
 
-        ASSERT_TRACE1("genList false (-3)",
-                      EvalError,
-                      hintfmt("cannot create list of size %d", -3));
+        ASSERT_TRACE2("genList false (-3)",
+                      TypeError,
+                      hintfmt("integer %d is out of bounds", -3),
+                      hintfmt("while evaluating the second argument passed to builtins.genList"));
 
     }
 
@@ -1060,9 +1062,10 @@ namespace nix {
                       hintfmt("cannot coerce %s to a string", "a set"),
                       hintfmt("while evaluating the third argument (the string) passed to builtins.substring"));
 
-        ASSERT_TRACE1("substring (-3) 3 \"sometext\"",
-                      EvalError,
-                      hintfmt("negative start position in 'substring'"));
+        ASSERT_TRACE2("substring (-3) 3 \"sometext\"",
+                      TypeError,
+                      hintfmt("integer %d is out of bounds", -3),
+                      hintfmt("while evaluating the first argument (the start offset) passed to builtins.substring"));
 
     }
 
