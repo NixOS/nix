@@ -103,6 +103,12 @@ class ErrorBuilder
         }
 
         [[nodiscard, gnu::noinline]]
+        static ErrorBuilder * create_hf(EvalState & s, hintformat hf)
+        {
+            return new ErrorBuilder(s, ErrorInfo { .msg = hf });
+        }
+
+        [[nodiscard, gnu::noinline]]
         ErrorBuilder & atPos(PosIdx pos);
 
         [[nodiscard, gnu::noinline]]
@@ -215,8 +221,15 @@ public:
         return *errorBuilder;
     }
 
+    [[nodiscard, gnu::noinline]]
+    ErrorBuilder & error_hf(hintformat hf) {
+        errorBuilder = ErrorBuilder::create_hf(*this, hf);
+        return *errorBuilder;
+    }
+
 private:
     SrcToStore srcToStore;
+    hintformat buildFnTypeError(const Value & v, size_t nrArgs, Value * * args);
 
     /* A cache from path names to parse trees. */
 #if HAVE_BOEHMGC
