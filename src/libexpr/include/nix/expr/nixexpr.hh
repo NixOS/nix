@@ -186,7 +186,7 @@ struct ExprString : Expr
 {
     std::string s;
     Value v;
-    ExprString(std::string s) : s(std::move(s)) { v.mkString(this->s.data()); };
+    ExprString(std::string &&s) : s(std::move(s)) { v.mkString(this->s.data()); };
     Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };
@@ -233,7 +233,7 @@ struct ExprSelect : Expr
     PosIdx pos;
     Expr * e, * def;
     AttrPath attrPath;
-    ExprSelect(const PosIdx & pos, Expr * e, const AttrPath & attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(attrPath) { };
+    ExprSelect(const PosIdx & pos, Expr * e, const AttrPath && attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(std::move(attrPath)) { };
     ExprSelect(const PosIdx & pos, Expr * e, Symbol name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
@@ -243,7 +243,7 @@ struct ExprOpHasAttr : Expr
 {
     Expr * e;
     AttrPath attrPath;
-    ExprOpHasAttr(Expr * e, const AttrPath & attrPath) : e(e), attrPath(attrPath) { };
+    ExprOpHasAttr(Expr * e, const AttrPath && attrPath) : e(e), attrPath(std::move(attrPath)) { };
     PosIdx getPos() const override { return e->getPos(); }
     COMMON_METHODS
 };

@@ -90,7 +90,7 @@ static void dupAttr(const EvalState & state, Symbol attr, const PosIdx pos, cons
 }
 
 
-static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
+static void addAttr(ExprAttrs * attrs, AttrPath && attrPath,
     Expr * e, const PosIdx pos, const nix::EvalState & state)
 {
     AttrPath::iterator i;
@@ -188,7 +188,7 @@ static Formals * toFormals(ParseData & data, ParserFormals * formals,
 
 
 static Expr * stripIndentation(const PosIdx pos, SymbolTable & symbols,
-    std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> & es)
+    std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> && es)
 {
     if (es.empty()) return new ExprString("");
 
@@ -268,7 +268,7 @@ static Expr * stripIndentation(const PosIdx pos, SymbolTable & symbols,
                 s2 = std::string(s2, 0, p + 1);
         }
 
-        es2->emplace_back(i->first, new ExprString(s2));
+        es2->emplace_back(i->first, new ExprString(std::move(s2)));
     };
     for (; i != es.end(); ++i, --n) {
         std::visit(overloaded { trimExpr, trimString }, i->second);
@@ -408,7 +408,7 @@ expr_op
   | expr_op OR expr_op { $$ = new ExprOpOr(makeCurPos(@2, data), $1, $3); }
   | expr_op IMPL expr_op { $$ = new ExprOpImpl(makeCurPos(@2, data), $1, $3); }
   | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(makeCurPos(@2, data), $1, $3); }
-  | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, *$3); }
+  | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, std::move(*$3)); delete $3; }
   | expr_op '+' expr_op
     { $$ = new ExprConcatStrings(makeCurPos(@2, data), false, new std::vector<std::pair<PosIdx, Expr *> >({{makeCurPos(@1, data), $1}, {makeCurPos(@3, data), $3}})); }
   | expr_op '-' expr_op { $$ = new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__sub")), {$1, $3}); }
@@ -431,14 +431,14 @@ expr_app
 
 expr_select
   : expr_simple '.' attrpath
-    { $$ = new ExprSelect(CUR_POS, $1, *$3, 0); }
+    { $$ = new ExprSelect(CUR_POS, $1, std::move(*$3), nullptr); delete $3; }
   | expr_simple '.' attrpath OR_KW expr_select
-    { $$ = new ExprSelect(CUR_POS, $1, *$3, $5); }
+    { $$ = new ExprSelect(CUR_POS, $1, std::move(*$3), $5); delete $3; }
   | /* Backwards compatibility: because Nixpkgs has a rarely used
        function named ‘or’, allow stuff like ‘map or [...]’. */
     expr_simple OR_KW
     { $$ = new ExprCall(CUR_POS, $1, {new ExprVar(CUR_POS, data->symbols.create("or"))}); }
-  | expr_simple { $$ = $1; }
+  | expr_simple
   ;
 
 expr_simple
@@ -453,9 +453,10 @@ expr_simple
   | FLOAT { $$ = new ExprFloat($1); }
   | '"' string_parts '"' { $$ = $2; }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
-      $$ = stripIndentation(CUR_POS, data->symbols, *$2);
+      $$ = stripIndentation(CUR_POS, data->symbols, std::move(*$2));
+      delete $2;
   }
-  | path_start PATH_END { $$ = $1; }
+  | path_start PATH_END
   | path_start string_parts_interpolated PATH_END {
       $2->insert($2->begin(), {makeCurPos(@1, data), $1});
       $$ = new ExprConcatStrings(CUR_POS, false, $2);
@@ -465,7 +466,7 @@ expr_simple
       $$ = new ExprCall(CUR_POS,
           new ExprVar(data->symbols.create("__findFile")),
           {new ExprVar(data->symbols.create("__nixPath")),
-           new ExprString(path)});
+           new ExprString(std::move(path))});
   }
   | URI {
       static bool noURLLiterals = settings.isExperimentalFeatureEnabled(Xp::NoUrlLiterals);
@@ -533,7 +534,7 @@ ind_string_parts
   ;
 
 binds
-  : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, *$2, $4, makeCurPos(@2, data), data->state); }
+  : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, std::move(*$2), $4, makeCurPos(@2, data), data->state); delete $2; }
   | binds INHERIT attrs ';'
     { $$ = $1;
       for (auto & i : *$3) {
@@ -542,6 +543,7 @@ binds
           auto pos = makeCurPos(@3, data);
           $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, true));
       }
+      delete $3;
     }
   | binds INHERIT '(' expr ')' attrs ';'
     { $$ = $1;
@@ -551,6 +553,7 @@ binds
               dupAttr(data->state, i.symbol, makeCurPos(@6, data), $$->attrs[i.symbol].pos);
           $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), makeCurPos(@6, data)));
       }
+      delete $6;
     }
   | { $$ = new ExprAttrs(makeCurPos(@0, data)); }
   ;
@@ -596,7 +599,7 @@ attrpath
   ;
 
 attr
-  : ID { $$ = $1; }
+  : ID
   | OR_KW { $$ = {"or", 2}; }
   ;
 
@@ -612,9 +615,9 @@ expr_list
 
 formals
   : formal ',' formals
-    { $$ = $3; $$->formals.push_back(*$1); }
+    { $$ = $3; $$->formals.emplace_back(*$1); delete $1; }
   | formal
-    { $$ = new ParserFormals; $$->formals.push_back(*$1); $$->ellipsis = false; }
+    { $$ = new ParserFormals; $$->formals.emplace_back(*$1); $$->ellipsis = false; delete $1; }
   |
     { $$ = new ParserFormals; $$->ellipsis = false; }
   | ELLIPSIS
