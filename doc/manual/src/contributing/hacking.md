@@ -68,10 +68,18 @@ To build Nix itself in this shell:
 To install it in `$(pwd)/outputs` and test it:
 
 ```console
+[nix-shell]$ make check
 [nix-shell]$ make install
 [nix-shell]$ make installcheck -j $NIX_BUILD_CORES
 [nix-shell]$ ./outputs/out/bin/nix --version
 nix (Nix) 3.0
+```
+
+For example, to run specific checks first when developing `libexpr`:
+
+```console
+[nix-shell]$ J="-j $NIX_BUILD_CORES"
+[nix-shell]$ make $J libexpr-tests_RUN && make $J && make check && make install && make installcheck $J
 ```
 
 If you have a flakes-enabled Nix you can replace:
