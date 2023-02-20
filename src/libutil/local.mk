@@ -13,3 +13,6 @@ libutil_LDFLAGS += -pthread $(OPENSSL_LIBS) $(LIBBROTLI_LIBS) $(LIBARCHIVE_LIBS)
 ifeq ($(HAVE_LIBCPUID), 1)
 	libutil_LDFLAGS += -lcpuid
 endif
+
+$(foreach i, $(wildcard src/libutil/include/nix/util/*.hh), \
+  $(eval $(call install-file-in, $(i), $(includedir)/nix/util, 0644)))

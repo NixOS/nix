@@ -14,3 +14,6 @@ libfetchers_CXXFLAGS += \
 libfetchers_LDFLAGS += -pthread
 
 libfetchers_LIBS = libutil libstore
+
+$(foreach i, $(wildcard src/libfetchers/include/nix/fetchers/*.hh), \
+  $(eval $(call install-file-in, $(i), $(includedir)/nix/fetchers, 0644)))
