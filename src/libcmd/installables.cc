@@ -147,7 +147,7 @@ void MixFlakeOptions::completionHook()
         completeFlakeInput(*prefix);
 }
 
-SourceExprCommand::SourceExprCommand(bool supportReadOnlyMode)
+SourceExprCommand::SourceExprCommand()
 {
     addFlag({
         .longName = "file",
@@ -169,17 +169,18 @@ SourceExprCommand::SourceExprCommand(bool supportReadOnlyMode)
         .labels = {"expr"},
         .handler = {&expr}
     });
+}
 
-    if (supportReadOnlyMode) {
-        addFlag({
-            .longName = "read-only",
-            .description =
-                "Do not instantiate each evaluated derivation. "
-                "This improves performance, but can cause errors when accessing "
-                "store paths of derivations during evaluation.",
-            .handler = {&readOnlyMode, true},
-        });
-    }
+MixReadOnlyOption::MixReadOnlyOption()
+{
+    addFlag({
+        .longName = "read-only",
+        .description =
+            "Do not instantiate each evaluated derivation. "
+            "This improves performance, but can cause errors when accessing "
+            "store paths of derivations during evaluation.",
+        .handler = {&settings.readOnlyMode, true},
+    });
 }
 
 Strings SourceExprCommand::getDefaultFlakeAttrPaths()
@@ -425,10 +426,6 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
     ref<Store> store, std::vector<std::string> ss)
 {
     std::vector<std::shared_ptr<Installable>> result;
-
-    if (readOnlyMode) {
-        settings.readOnlyMode = true;
-    }
 
     if (file || expr) {
         if (file && expr)
@@ -724,8 +721,8 @@ std::vector<std::string> InstallablesCommand::getFlakesForCompletion()
     return _installables;
 }
 
-InstallableCommand::InstallableCommand(bool supportReadOnlyMode)
-    : SourceExprCommand(supportReadOnlyMode)
+InstallableCommand::InstallableCommand()
+    : SourceExprCommand()
 {
     expectArgs({
         .label = "installable",
