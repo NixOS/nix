@@ -57,7 +57,11 @@
           cross = forAllCrossSystems (crossSystem: make-pkgs crossSystem "stdenv");
         });
 
-      commonDeps = { pkgs, isStatic ? false }: with pkgs; rec {
+      commonDeps =
+        { pkgs
+        , isStatic ? pkgs.stdenv.hostPlatform.isStatic
+        }:
+        with pkgs; rec {
         # Use "busybox-sandbox-shell" if present,
         # if not (legacy) fallback and hope it's sufficient.
         sh = pkgs.busybox-sandbox-shell or (busybox.override {
@@ -293,7 +297,13 @@
           # Forward from the previous stage as we don’t want it to pick the lowdown override
           nixUnstable = prev.nixUnstable;
 
-          nix = with final; with commonDeps { inherit pkgs; }; let
+          nix =
+          with final;
+          with commonDeps {
+            inherit pkgs;
+            inherit (currentStdenv.hostPlatform) isStatic;
+          };
+          let
             canRunInstalled = currentStdenv.buildPlatform.canExecute currentStdenv.hostPlatform;
           in currentStdenv.mkDerivation {
             name = "nix-${version}";
