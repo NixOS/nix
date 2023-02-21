@@ -49,9 +49,9 @@ extern "C" {
 namespace nix {
 
 struct NixRepl
-    : AbstractNixRepl,
+    : AbstractNixRepl
     #if HAVE_BOEHMGC
-    gc
+    , gc
     #endif
 {
     std::string curDir;
