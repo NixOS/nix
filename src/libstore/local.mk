@@ -68,19 +68,6 @@ clean-files += $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh
 
 $(eval $(call install-file-in, $(d)/nix-store.pc, $(libdir)/pkgconfig, 0644))
 
-# old include paths
-
-$(foreach i, $(wildcard src/libstore/include/nix/*.hh), \
-	$(eval $(call install-file-in, $(i), $(includedir)/nix, 0644)))
-
-$(foreach i, $(wildcard src/libstore/include/nix/builtins/*.hh), \
-	$(eval $(call install-file-in, $(i), $(includedir)/nix/builtins, 0644)))
-
-$(foreach i, $(wildcard src/libstore/include/nix/build/*.hh), \
-	$(eval $(call install-file-in, $(i), $(includedir)/nix/build, 0644)))
-
-# new include paths
-
 $(foreach i, $(wildcard src/libstore/include/nix/store/*.hh), \
 	$(eval $(call install-file-in, $(i), $(includedir)/nix/store, 0644)))
 
