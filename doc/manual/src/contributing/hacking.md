@@ -8,25 +8,64 @@ $ git clone https://github.com/NixOS/nix.git
 $ cd nix
 ```
 
-To build Nix for the current operating system/architecture use
+The following instructions assume you already have some version of Nix installed locally, so that you can use it to set up the development environment. If you don't have it installed, follow the [installation instructions].
+
+[installation instructions]: ../installation/installation.md
+
+## Nix with flakes
+
+This section assumes you are using Nix with [flakes] enabled. See the [next section](#classic-nix) for equivalent instructions which don't require flakes.
+
+[flakes]: ../command-ref/new-cli/nix3-flake.md#description
+
+To build all dependencies and start a shell in which all environment
+variables are set up so that those dependencies can be found:
 
 ```console
-$ nix-build
+$ nix develop
 ```
 
-or if you have a flake-enabled nix:
+This shell also adds `./outputs/bin/nix` to your `$PATH` so you can run `nix` immediately after building it.
+
+To get a shell with one of the other [supported compilation environments](#compilation-environments):
+
+```console
+$ nix develop .#native-clang11StdenvPackages
+```
+
+> **Note**
+>
+> Use `ccacheStdenv` to drastically improve rebuild time.
+> By default, [ccache](https://ccache.dev) keeps artifacts in `~/.cache/ccache/`.
+
+To build Nix itself in this shell:
+
+```console
+[nix-shell]$ ./bootstrap.sh
+[nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
+[nix-shell]$ make -j $NIX_BUILD_CORES
+```
+
+To install it in `$(pwd)/outputs` and test it:
+
+```console
+[nix-shell]$ make install
+[nix-shell]$ make installcheck -j $NIX_BUILD_CORES
+[nix-shell]$ nix --version
+nix (Nix) 2.12
+```
+
+To build a release version of Nix:
 
 ```console
 $ nix build
 ```
 
-This will build `defaultPackage` attribute defined in the `flake.nix`
-file. To build for other platforms add one of the following suffixes to
-it: aarch64-linux, i686-linux, x86\_64-darwin, x86\_64-linux. i.e.
+You can also build Nix for one of the [supported target platforms](#target-platforms).
 
-```console
-$ nix-build -A defaultPackage.x86_64-linux
-```
+## Classic Nix
+
+This section is for Nix without [flakes].
 
 To build all dependencies and start a shell in which all environment
 variables are set up so that those dependencies can be found:
@@ -35,27 +74,16 @@ variables are set up so that those dependencies can be found:
 $ nix-shell
 ```
 
-or if you have a flake-enabled nix:
+To get a shell with one of the other [supported compilation environments](#compilation-environments):
 
 ```console
-$ nix develop
+$ nix-shell -A devShells.x86_64-linux.native-clang11StdenvPackages
 ```
 
-To get a shell with a different compilation environment (e.g. stdenv,
-gccStdenv, clangStdenv, clang11Stdenv, ccacheStdenv):
-
-```console
-$ nix-shell -A devShells.x86_64-linux.clang11Stdenv
-```
-
-or if you have a flake-enabled nix:
-
-```console
-$ nix develop .#clang11Stdenv
-```
-
-Note: you can use `ccacheStdenv` to drastically improve rebuild
-time. By default, ccache keeps artifacts in `~/.cache/ccache/`.
+> **Note**
+>
+> You can use `native-ccacheStdenvPackages` to drastically improve rebuild time.
+> By default, [ccache](https://ccache.dev) keeps artifacts in `~/.cache/ccache/`.
 
 To build Nix itself in this shell:
 
@@ -71,20 +99,98 @@ To install it in `$(pwd)/outputs` and test it:
 [nix-shell]$ make install
 [nix-shell]$ make installcheck -j $NIX_BUILD_CORES
 [nix-shell]$ ./outputs/out/bin/nix --version
-nix (Nix) 3.0
+nix (Nix) 2.12
 ```
 
-If you have a flakes-enabled Nix you can replace:
+To build Nix for the current operating system and CPU architecture use
 
 ```console
-$ nix-shell
+$ nix-build
 ```
 
-by:
+You can also build Nix for one of the [supported target platforms](#target-platforms).
+
+## Platforms
+
+As specified in [`flake.nix`], Nix can be built for various platforms:
+
+- `aarch64-linux`
+- `i686-linux`
+- `x86_64-darwin`
+- `x86_64-linux`
+
+[`flake.nix`]: https://github.com/nixos/nix/blob/master/flake.nix
+
+In order to build Nix for a different platform than the one you're currently
+on, you need to have some way for your system Nix to build code for that
+platform. Common solutions include [remote builders] and [binfmt emulation]
+(only supported on NixOS).
+
+[remote builders]: ../advanced-topics/distributed-builds.md
+[binfmt emulation]: https://nixos.org/manual/nixos/stable/options.html#opt-boot.binfmt.emulatedSystems
+
+These solutions let Nix perform builds as if you're on the native platform, so
+executing the build is as simple as
 
 ```console
-$ nix develop
+$ nix build .#packages.aarch64-linux.default
 ```
+
+for flake-enabled Nix, or
+
+```console
+$ nix-build -A packages.aarch64-linux.default
+```
+
+for classic Nix.
+
+You can use any of the other supported platforms in place of `aarch64-linux`.
+
+Cross-compiled builds are available for ARMv6 and ARMv7, and Nix on unsupported platforms can be bootstrapped by adding more `crossSystems` in `flake.nix`.
+
+## Compilation environments
+
+Nix can be compiled using multiple environments:
+
+- `stdenv`: default;
+- `gccStdenv`: force the use of `gcc` compiler;
+- `clangStdenv`: force the use of `clang` compiler;
+- `ccacheStdenv`: enable [ccache], a compiler cache to speed up compilation.
+
+To build with one of those environments, you can use
+
+```console
+$ nix build .#nix-ccacheStdenv
+```
+
+for flake-enabled Nix, or
+
+```console
+$ nix-build -A nix-ccacheStdenv
+```
+
+for classic Nix.
+
+You can use any of the other supported environments in place of `nix-ccacheStdenv`.
+
+## Editor integration
+
+The `clangd` LSP server is installed by default on the `clang`-based `devShell`s.
+See [supported compilation environments](#compilation-environments) and instructions how to set up a shell [with flakes](#nix-with-flakes) or in [classic Nix](#classic-nix).
+
+To use the LSP with your editor, you first need to [set up `clangd`](https://clangd.llvm.org/installation#project-setup) by running:
+
+```console
+make clean && bear -- make -j$NIX_BUILD_CORES install
+```
+
+Configure your editor to use the `clangd` from the shell, either by running it inside the development shell, or by using [nix-direnv](https://github.com/nix-community/nix-direnv) and [the appropriate editor plugin](https://github.com/direnv/direnv/wiki#editor-integration).
+
+> **Note**
+>
+> For some editors (e.g. Visual Studio Code), you may need to install a [special extension](https://open-vsx.org/extension/llvm-vs-code-extensions/vscode-clangd) for the editor to interact with `clangd`.
+> Some other editors (e.g. Emacs, Vim) need a plugin to support LSP servers in general (e.g. [lsp-mode](https://github.com/emacs-lsp/lsp-mode) for Emacs and [vim-lsp](https://github.com/prabirshrestha/vim-lsp) for vim).
+> Editor-specific setup is typically opinionated, so we will not cover it here in more detail.
 
 ## Running tests
 

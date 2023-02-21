@@ -231,10 +231,6 @@ static RegisterCommand registerCommand2(std::vector<std::string> && name)
     return RegisterCommand(std::move(name), [](){ return make_ref<T>(); });
 }
 
-/* Helper function to generate args that invoke $EDITOR on
-   filename:lineno. */
-Strings editorFor(const SourcePath & file, uint32_t line);
-
 struct MixProfile : virtual StoreCommand
 {
     std::optional<Path> profile;
@@ -284,8 +280,4 @@ void printClosureDiff(
     const StorePath & afterPath,
     std::string_view indent);
 
-
-void runRepl(
-    ref<EvalState> evalState,
-    const ValMap & extraEnv);
 }

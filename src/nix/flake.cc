@@ -1,4 +1,5 @@
 #include "command.hh"
+#include "installable-flake.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "eval.hh"
