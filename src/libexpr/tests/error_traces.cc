@@ -750,7 +750,10 @@ namespace nix {
 
         ASSERT_TRACE1("foldl' (_: 1) \"foo\" [ true ]",
                       TypeError,
-                      hintfmt("attempt to call something which is not a function but %s", "an integer"));
+                      hintfmt("attempt to call something which is not a function but %s: %s\n"
+                             "function arguments:\n"
+                             "%s: %s", "an integer", "1", "a Boolean", "true"));
+
 
         ASSERT_TRACE2("foldl' (a: b: a && b) \"foo\" [ true ]",
                       TypeError,
@@ -835,7 +838,9 @@ namespace nix {
 
         ASSERT_TRACE1("sort (_: 1) [ \"foo\" \"bar\" ]",
                       TypeError,
-                      hintfmt("attempt to call something which is not a function but %s", "an integer"));
+                      hintfmt("attempt to call something which is not a function but %s: %s\n"
+                             "function arguments:\n"
+                             "%s: %s", "an integer", "1", "a string", "\"foo\""));
 
         ASSERT_TRACE2("sort (_: _: 1) [ \"foo\" \"bar\" ]",
                       TypeError,
