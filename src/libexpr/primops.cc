@@ -795,7 +795,7 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * 
         PathSet context;
         e.addTrace(nullptr, state.decodePaths(*state.coerceToString(pos, *args[0], context,
                     "while evaluating the error message passed to 'builtins.addErrorContext'",
-                    false, false)));
+                    false, false)), true);
         throw;
     }
 }
