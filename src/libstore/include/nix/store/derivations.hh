@@ -83,6 +83,11 @@ struct DerivationOutput : _DerivationOutputRaw
     inline const Raw & raw() const {
         return static_cast<const Raw &>(*this);
     }
+
+    nlohmann::json toJSON(
+        const Store & store,
+        std::string_view drvName,
+        std::string_view outputName) const;
 };
 
 typedef std::map<std::string, DerivationOutput> DerivationOutputs;
@@ -210,6 +215,8 @@ struct Derivation : BasicDerivation
     Derivation() = default;
     Derivation(const BasicDerivation & bd) : BasicDerivation(bd) { }
     Derivation(BasicDerivation && bd) : BasicDerivation(std::move(bd)) { }
+
+    nlohmann::json toJSON(const Store & store) const;
 };
 
 

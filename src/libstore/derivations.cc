@@ -5,6 +5,7 @@
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/fs-accessor.hh"
 #include <boost/container/small_vector.hpp>
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -889,5 +890,64 @@ std::optional<BasicDerivation> Derivation::tryResolve(
 }
 
 const Hash impureOutputHash = hashString(htSHA256, "impure");
+
+nlohmann::json DerivationOutput::toJSON(
+    const Store & store, std::string_view drvName, std::string_view outputName) const
+{
+    nlohmann::json res = nlohmann::json::object();
+    std::visit(overloaded {
+        [&](const DerivationOutput::InputAddressed & doi) {
+            res["path"] = store.printStorePath(doi.path);
+        },
+        [&](const DerivationOutput::CAFixed & dof) {
+            res["path"] = store.printStorePath(dof.path(store, drvName, outputName));
+            res["hashAlgo"] = dof.hash.printMethodAlgo();
+            res["hash"] = dof.hash.hash.to_string(Base16, false);
+        },
+        [&](const DerivationOutput::CAFloating & dof) {
+            res["hashAlgo"] = makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType);
+        },
+        [&](const DerivationOutput::Deferred &) {},
+        [&](const DerivationOutput::Impure & doi) {
+            res["hashAlgo"] = makeFileIngestionPrefix(doi.method) + printHashType(doi.hashType);
+            res["impure"] = true;
+        },
+    }, raw());
+    return res;
+}
+
+nlohmann::json Derivation::toJSON(const Store & store) const
+{
+    nlohmann::json res = nlohmann::json::object();
+
+    {
+        nlohmann::json & outputsObj = res["outputs"];
+        outputsObj = nlohmann::json::object();
+        for (auto & [outputName, output] : outputs) {
+            outputsObj[outputName] = output.toJSON(store, name, outputName);
+        }
+    }
+
+    {
+        auto& inputsList = res["inputSrcs"];
+        inputsList = nlohmann::json ::array();
+        for (auto & input : inputSrcs)
+            inputsList.emplace_back(store.printStorePath(input));
+    }
+
+    {
+        auto& inputDrvsObj = res["inputDrvs"];
+        inputDrvsObj = nlohmann::json ::object();
+        for (auto & input : inputDrvs)
+            inputDrvsObj[store.printStorePath(input.first)] = input.second;
+    }
+
+    res["system"] = platform;
+    res["builder"] = builder;
+    res["args"] = args;
+    res["env"] = env;
+
+    return res;
+}
 
 }

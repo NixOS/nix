@@ -1,4 +1,5 @@
 #include "nix/cmd/command.hh"
+#include "nix/cmd/installable-flake.hh"
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
 #include "nix/expr/eval.hh"

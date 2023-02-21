@@ -3,6 +3,7 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/attr-path.hh"
 #include "nix/main/progress-bar.hh"
+#include "nix/cmd/editor-for.hh"
 
 #include <unistd.h>
 

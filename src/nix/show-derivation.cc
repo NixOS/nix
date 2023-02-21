@@ -54,56 +54,8 @@ struct CmdShowDerivation : InstallablesCommand
         for (auto & drvPath : drvPaths) {
             if (!drvPath.isDerivation()) continue;
 
-            json& drvObj = jsonRoot[store->printStorePath(drvPath)];
-
-            auto drv = store->readDerivation(drvPath);
-
-            {
-                json& outputsObj = drvObj["outputs"];
-                outputsObj = json::object();
-                for (auto & [_outputName, output] : drv.outputs) {
-                    auto & outputName = _outputName; // work around clang bug
-                    auto& outputObj = outputsObj[outputName];
-                    outputObj = json::object();
-                    std::visit(overloaded {
-                        [&](const DerivationOutput::InputAddressed & doi) {
-                            outputObj["path"] = store->printStorePath(doi.path);
-                        },
-                        [&](const DerivationOutput::CAFixed & dof) {
-                            outputObj["path"] = store->printStorePath(dof.path(*store, drv.name, outputName));
-                            outputObj["hashAlgo"] = dof.hash.printMethodAlgo();
-                            outputObj["hash"] = dof.hash.hash.to_string(Base16, false);
-                        },
-                        [&](const DerivationOutput::CAFloating & dof) {
-                            outputObj["hashAlgo"] = makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType);
-                        },
-                        [&](const DerivationOutput::Deferred &) {},
-                        [&](const DerivationOutput::Impure & doi) {
-                            outputObj["hashAlgo"] = makeFileIngestionPrefix(doi.method) + printHashType(doi.hashType);
-                            outputObj["impure"] = true;
-                        },
-                    }, output.raw());
-                }
-            }
-
-            {
-                auto& inputsList = drvObj["inputSrcs"];
-                inputsList = json::array();
-                for (auto & input : drv.inputSrcs)
-                    inputsList.emplace_back(store->printStorePath(input));
-            }
-
-            {
-                auto& inputDrvsObj = drvObj["inputDrvs"];
-                inputDrvsObj = json::object();
-                for (auto & input : drv.inputDrvs)
-                    inputDrvsObj[store->printStorePath(input.first)] = input.second;
-            }
-
-            drvObj["system"] = drv.platform;
-            drvObj["builder"] = drv.builder;
-            drvObj["args"] = drv.args;
-            drvObj["env"] = drv.env;
+            jsonRoot[store->printStorePath(drvPath)] =
+                store->readDerivation(drvPath).toJSON(*store);
         }
         std::cout << jsonRoot.dump(2) << std::endl;
     }

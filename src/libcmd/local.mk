@@ -12,8 +12,7 @@ libcmd_CXXFLAGS += \
 	-Isrc/libfetchers/include \
 	-Isrc/libmain/include \
 	-Isrc/libstore/include \
-	-Isrc/libutil/include \
-	-Isrc/nix
+	-Isrc/libutil/include 
 
 libcmd_LDFLAGS = $(EDITLINE_LIBS) $(LOWDOWN_LIBS) -pthread
 

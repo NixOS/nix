@@ -19,6 +19,7 @@ extern "C" {
 }
 #endif
 
+#include "nix/cmd/repl.hh"
 #include "nix/util/ansicolor.hh"
 #include "nix/main/shared.hh"
 #include "nix/expr/eval.hh"
@@ -31,7 +32,9 @@ extern "C" {
 #include "nix/expr/get-drvs.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/globals.hh"
-#include "nix/cmd/command.hh"
+#include "nix/expr/flake/flake.hh"
+#include "nix/expr/flake/lockfile.hh"
+#include "nix/cmd/editor-for.hh"
 #include "nix/util/finally.hh"
 #include "nix/cmd/markdown.hh"
 #include "nix/store/local-fs-store.hh"
@@ -45,18 +48,16 @@ extern "C" {
 namespace nix {
 
 struct NixRepl
+    : AbstractNixRepl,
     #if HAVE_BOEHMGC
-    : gc
+    gc
     #endif
 {
     std::string curDir;
-    ref<EvalState> state;
-    Bindings * autoArgs;
 
     size_t debugTraceIndex;
 
     Strings loadedFiles;
-    typedef std::vector<std::pair<Value*,std::string>> AnnotatedValues;
     std::function<AnnotatedValues()> getValues;
 
     const static int envSize = 32768;
@@ -69,8 +70,11 @@ struct NixRepl
 
     NixRepl(const Strings & searchPath, nix::ref<Store> store,ref<EvalState> state,
             std::function<AnnotatedValues()> getValues);
-    ~NixRepl();
-    void mainLoop();
+    virtual ~NixRepl();
+
+    void mainLoop() override;
+    void initEnv() override;
+
     StringSet completePrefix(const std::string & prefix);
     bool getLine(std::string & input, const std::string & prompt);
     StorePath getDerivationPath(Value & v);
@@ -78,7 +82,6 @@ struct NixRepl
 
     void loadFile(const Path & path);
     void loadFlake(const std::string & flakeRef);
-    void initEnv();
     void loadFiles();
     void reloadFiles();
     void addAttrsToScope(Value & attrs);
@@ -92,7 +95,6 @@ struct NixRepl
     std::ostream & printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen);
 };
 
-
 std::string removeWhitespace(std::string s)
 {
     s = chomp(s);
@@ -104,7 +106,7 @@ std::string removeWhitespace(std::string s)
 
 NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store, ref<EvalState> state,
             std::function<NixRepl::AnnotatedValues()> getValues)
-    : state(state)
+    : AbstractNixRepl(state)
     , debugTraceIndex(0)
     , getValues(getValues)
     , staticEnv(new StaticEnv(false, state->staticBaseEnv.get()))
@@ -1029,8 +1031,22 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
     return str;
 }
 
-void runRepl(
-    ref<EvalState>evalState,
+
+std::unique_ptr<AbstractNixRepl> AbstractNixRepl::create(
+   const Strings & searchPath, nix::ref<Store> store, ref<EvalState> state,
+   std::function<AnnotatedValues()> getValues)
+{
+    return std::make_unique<NixRepl>(
+        searchPath,
+        openStore(),
+        state,
+        getValues
+    );
+}
+
+
+void AbstractNixRepl::runSimple(
+    ref<EvalState> evalState,
     const ValMap & extraEnv)
 {
     auto getValues = [&]()->NixRepl::AnnotatedValues{
@@ -1053,92 +1069,5 @@ void runRepl(
 
     repl->mainLoop();
 }
-
-struct CmdRepl : InstallablesCommand
-{
-    CmdRepl() {
-        evalSettings.pureEval = false;
-    }
-
-    void prepare() override
-    {
-        if (!settings.isExperimentalFeatureEnabled(Xp::ReplFlake) && !(file) && this->_installables.size() >= 1) {
-            warn("future versions of Nix will require using `--file` to load a file");
-            if (this->_installables.size() > 1)
-                warn("more than one input file is not currently supported");
-            auto filePath = this->_installables[0].data();
-            file = std::optional(filePath);
-            _installables.front() = _installables.back();
-            _installables.pop_back();
-        }
-        installables = InstallablesCommand::load();
-    }
-
-    std::vector<std::string> files;
-
-    Strings getDefaultFlakeAttrPaths() override
-    {
-        return {""};
-    }
-
-    bool useDefaultInstallables() override
-    {
-        return file.has_value() or expr.has_value();
-    }
-
-    bool forceImpureByDefault() override
-    {
-        return true;
-    }
-
-    std::string description() override
-    {
-        return "start an interactive environment for evaluating Nix expressions";
-    }
-
-    std::string doc() override
-    {
-        return
-          #include "repl.md"
-          ;
-    }
-
-    void run(ref<Store> store) override
-    {
-        auto state = getEvalState();
-        auto getValues = [&]()->NixRepl::AnnotatedValues{
-            auto installables = load();
-            NixRepl::AnnotatedValues values;
-            for (auto & installable: installables){
-                auto what = installable->what();
-                if (file){
-                    auto [val, pos] = installable->toValue(*state);
-                    auto what = installable->what();
-                    state->forceValue(*val, pos);
-                    auto autoArgs = getAutoArgs(*state);
-                    auto valPost = state->allocValue();
-                    state->autoCallFunction(*autoArgs, *val, *valPost);
-                    state->forceValue(*valPost, pos);
-                    values.push_back( {valPost, what });
-                } else {
-                    auto [val, pos] = installable->toValue(*state);
-                    values.push_back( {val, what} );
-                }
-            }
-            return values;
-        };
-        auto repl = std::make_unique<NixRepl>(
-            searchPath,
-            openStore(),
-            state,
-            getValues
-        );
-        repl->autoArgs = getAutoArgs(*repl->state);
-        repl->initEnv();
-        repl->mainLoop();
-    }
-};
-
-static auto rCmdRepl = registerCommand<CmdRepl>("repl");
 
 }
