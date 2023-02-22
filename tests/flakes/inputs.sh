@@ -46,6 +46,7 @@ test_git_subdir_self_path() {
       default =
         assert builtins.readFile ./message == "all good\n";
         assert builtins.readFile (inputs.self + "/message") == "all good\n";
+        assert inputs.self.outPath == inputs.self.sourceInfo.outPath + "/b-low";
         import ./simple.nix;
     };
   };
