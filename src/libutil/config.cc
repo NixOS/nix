@@ -94,7 +94,7 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
         if (tokens.empty()) continue;
 
         if (tokens.size() < 2)
-            throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+            throw ConfigError("illegal configuration line '%1%' in '%2%'", line, path);
 
         auto include = false;
         auto ignoreMissing = false;
@@ -107,7 +107,7 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
 
         if (include) {
             if (tokens.size() != 2)
-                throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+                throw ConfigError("illegal configuration line '%1%' in '%2%'", line, path);
             auto p = absPath(tokens[1], dirOf(path));
             if (pathExists(p)) {
                 applyConfigFile(p);
@@ -118,7 +118,7 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
         }
 
         if (tokens[1] != "=")
-            throw UsageError("illegal configuration line '%1%' in '%2%'", line, path);
+            throw ConfigError("illegal configuration line '%1%' in '%2%'", line, path);
 
         std::string name = tokens[0];
 
@@ -239,7 +239,7 @@ void BaseSetting<T>::set(const std::string & str, bool append)
     if (auto n = string2Int<T>(str))
         value = *n;
     else
-        throw UsageError("setting '%s' has invalid value '%s'", name, str);
+        throw ConfigError("setting '%s' has invalid value '%s'", name, str);
 }
 
 template<typename T>
@@ -256,7 +256,7 @@ template<> void BaseSetting<bool>::set(const std::string & str, bool append)
     else if (str == "false" || str == "no" || str == "0")
         value = false;
     else
-        throw UsageError("Boolean setting '%s' has invalid value '%s'", name, str);
+        throw ConfigError("Boolean setting '%s' has invalid value '%s'", name, str);
 }
 
 template<> std::string BaseSetting<bool>::to_string() const
@@ -382,7 +382,7 @@ void PathSetting::set(const std::string & str, bool append)
         if (allowEmpty)
             value = "";
         else
-            throw UsageError("setting '%s' cannot be empty", name);
+            throw ConfigError("setting '%s' cannot be empty", name);
     } else
         value = canonPath(str);
 }

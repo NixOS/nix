@@ -3,6 +3,7 @@
 #include <set>
 
 #include "types.hh"
+#include "error.hh"
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -356,5 +357,7 @@ struct GlobalConfig : public AbstractConfig
 };
 
 extern GlobalConfig globalConfig;
+
+MakeError(ConfigError, Error);
 
 }
