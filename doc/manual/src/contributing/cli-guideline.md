@@ -389,6 +389,110 @@ colors, no emojis and using ASCII instead of Unicode symbols). The same should
 happen when TTY is not detected on STDERR. We should not display progress /
 status section, but only print warnings and errors.
 
+## Returning future proof JSON
+
+The machine-readable JSON output should be extensible. This means that the
+structure of the JSON should support the addition of extra information in many
+places.
+
+Two definitions are helpful here, because while JSON only defines one "key-value"
+object, we use it to cover two use cases:
+
+ - **dictionary**: a map from names to things that all have the same type. In
+   C++ this would be a `std::map` with string keys.
+ - **record**: a fixed set of attributes each with their own type. In C++, this
+   would be represented by a struct.
+
+It is best not to mix these use cases, as that leads to incompatibilities and
+other bugs. For example, adding a record field to a dictionary breaks consumers
+that assume all JSON object fields to have the same meaning and type.
+
+This leads to the following guidelines:
+
+ - **The top-level value** (or **root** of the returned data structure) **must be a record**.
+   Without this rule, it would be impossible to add per-invocation metadata in
+   a manner that doesn't break existing consumers.
+
+ - **The value of a dictionary item must always be a record**. As an example,
+   suppose a command returns a dictionary where each key is the name of a store
+   type and each value is itself a dictionary representing settings.
+
+ - **List items should be records**. For example, a list of strings is not an
+   extensible type, as any additions will break code that expects a list of
+   strings.
+   If the list is unordered and it has a unique key that is a string, consider
+   a dictionary instead of a list. If the order of the items needs to be
+   preserved, return a list of records.
+
+ - **Streaming JSON should return records**. An example of a streaming JSON
+   format is "JSON lines", where multiple JSON values are streamed by putting
+   each on its own line in a text stream. These JSON values can be considered
+   top-level values or list items, and they must be records.
+
+Examples:
+
+```javascript
+// bad: all keys must be assumed to be store implementations
+{
+  "local": { ... },
+  "remote": { ... },
+  "http": { ... }
+}
+// good: extensible and a little bit self-documenting.
+{
+  "storeTypes": { "local": { ... }, ... },
+  // While the dictionary of store types seemed like a complete response,
+  // this little bit of info tells the consumer how to proceed if a store type
+  // is missing. It's not always easy to predict how something will be used, so
+  // let's keep it open.
+  "pluginSupport": true
+}
+```
+
+```javascript
+// bad: a store type can only hold configuration items
+{
+  "storeTypes": {
+    "Local Daemon Store": {
+      "max-connections": {
+        "defaultValue": 1
+        "value": 1
+      },
+      "trusted": {
+        "defaultValue": false,
+        "value": true
+      },
+      ...
+    }
+  }
+}
+// good: a store type can be extended with other metadata, such as its URI scheme
+{
+  "storeTypes": {
+    "Local Daemon Store": {
+      "uriScheme": "daemon",
+      "settings": {
+        "max-connections": {
+          "defaultValue": 1
+          "value": 1
+        },
+        ...
+      },
+    ...
+  },
+  ...
+}
+```
+
+```javascript
+// bad: not extensible
+{ "outputs": [ "out" "bin" ] }
+// bad: order matters but is lost, as many JSON parsers don't preserve item order.
+{ "outputs": { "bin": {}, "out": {} } }
+// good:
+{ "outputs": [ { "outputName": "out" }, { "outputName": "bin" } ] }
+```
+
 ## Dialog with the user
 
 CLIs don't always make it clear when an action has taken place. For every
