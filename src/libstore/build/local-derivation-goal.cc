@@ -1024,10 +1024,6 @@ void LocalDerivationGoal::startBuilder()
                 "nobody:x:65534:65534:Nobody:/:/noshell\n",
                 sandboxUid(), sandboxGid(), settings.sandboxBuildDir));
 
-        /* Make /etc unwritable */
-        if (!parsedDrv->useUidRange())
-            chmod_(chrootRootDir + "/etc", 0555);
-
         /* Save the mount- and user namespace of the child. We have to do this
            *before* the child does a chroot. */
         sandboxMountNamespace = open(fmt("/proc/%d/ns/mnt", (pid_t) pid).c_str(), O_RDONLY);
@@ -1911,6 +1907,10 @@ void LocalDerivationGoal::runChild()
                     doBind("/dev/ptmx", chrootRootDir + "/dev/ptmx");
                 }
             }
+
+            /* Make /etc unwritable */
+            if (!parsedDrv->useUidRange())
+                chmod_(chrootRootDir + "/etc", 0555);
 
             /* Unshare this mount namespace. This is necessary because
                pivot_root() below changes the root of the mount
