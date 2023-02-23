@@ -42,4 +42,18 @@ management framework such as `systemd` on Linux, or `launchctl` on Darwin.
 
 Note that this daemon does not fork into the background.
 
+# Systemd socket activation
+
+`nix daemon` supports systemd socket-based activation using the
+`nix-daemon.socket` unit in the Nix distribution. It supports
+listening on multiple addresses; for example, the following stanza in
+`nix-daemon.socket` makes the daemon listen on two Unix domain
+sockets:
+
+```
+[Socket]
+ListenStream=/nix/var/nix/unix/daemon-socket/socket
+ListenStream=/nix/var/nix/unix/daemon-socket/socket-2
+```
+
 )""
