@@ -73,6 +73,16 @@ struct Setter
     operator T::pointer * () { return &p; }
 };
 
+Hash toHash(const git_oid & oid)
+{
+    #ifdef GIT_EXPERIMENTAL_SHA256
+    assert(oid.type == GIT_OID_SHA1);
+    #endif
+    Hash hash(htSHA1);
+    memcpy(hash.hash, oid.id, hash.hashSize);
+    return hash;
+}
+
 static void initLibGit2()
 {
     if (git_libgit2_init() < 0)
@@ -465,7 +475,7 @@ TarballInfo importTarball(Source & source)
     auto [oid, _name] = popBuilder();
 
     return TarballInfo {
-        .treeHash = Hash::parseAny(git_oid_tostr_s(&oid), htSHA1),
+        .treeHash = toHash(oid),
         .lastModified = lastModified
     };
 }
@@ -538,7 +548,7 @@ struct GitRepoImpl : GitRepo
         {
             git_oid oid;
             if (git_oid_fromstr(&oid, ref.c_str()) == 0)
-                return Hash::parseAny(git_oid_tostr_s(&oid), htSHA1);
+                return toHash(oid);
         }
 
         // Resolve short names like 'master'.
@@ -557,7 +567,7 @@ struct GitRepoImpl : GitRepo
         if (!oid)
             throw Error("cannot get OID for Git reference '%s'", git_reference_name(ref3.get()));
 
-        return Hash::parseAny(git_oid_tostr_s(oid), htSHA1);
+        return toHash(*oid);
     }
 };
 
