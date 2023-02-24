@@ -534,6 +534,13 @@ struct GitRepoImpl : GitRepo
 
     Hash resolveRef(std::string ref) override
     {
+        // Handle revisions used as refs.
+        {
+            git_oid oid;
+            if (git_oid_fromstr(&oid, ref.c_str()) == 0)
+                return Hash::parseAny(git_oid_tostr_s(&oid), htSHA1);
+        }
+
         // Resolve short names like 'master'.
         Reference ref2;
         if (!git_reference_dwim(Setter(ref2), repo.get(), ref.c_str()))
