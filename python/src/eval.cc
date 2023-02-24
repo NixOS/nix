@@ -27,19 +27,20 @@ static PyObject * _eval(const char * expression, PyObject * vars)
         return nullptr;
     }
     auto staticEnvPointer = std::make_shared<nix::StaticEnv>(*staticEnv);
+    nix::Value v;
 
+
+    // FIXME: Doing this would breaks the test_GIL_case test case
     // Release the GIL, so that other Python threads can be running in parallel
     // while the potentially expensive Nix evaluation happens. This is safe
     // because we don't operate on Python objects or call the Python/C API in
     // this block
     // See https://docs.python.org/3/c-api/init.html#thread-state-and-the-global-interpreter-lock
-    Py_BEGIN_ALLOW_THREADS
+    // Py_BEGIN_ALLOW_THREADS
     auto e = state.parseExprFromString(expression, ".", staticEnvPointer);
-    nix::Value v;
-
     e->eval(state, *env, v);
     state.forceValueDeep(v);
-    Py_END_ALLOW_THREADS
+    // Py_END_ALLOW_THREADS
 
     nix::PathSet context;
     return nixToPythonObject(state, v, context);

@@ -27,5 +27,10 @@ class TestPythonNix(unittest.TestCase):
         """
         self.assertEqual(nix.eval(expression, vars=dict()), "test")
 
+    # This test case fails if you uncomment the `Py_{BEGIN,END}_ALLOW_THREADS`
+    # macros in src/eval.cc
+    def test_GIL_case(self):
+        nix.eval("{ a = throw \"nope\"; }")
+
 if __name__ == '__main__':
     unittest.main()
