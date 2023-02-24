@@ -154,6 +154,10 @@ public:
         : err(e)
     { }
 
+    std::string message() {
+        return err.msg.str();
+    }
+
 #ifdef EXCEPTION_NEEDS_THROW_SPEC
     ~BaseError() throw () { };
     const char * what() const throw () { return calcWhat().c_str(); }

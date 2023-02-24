@@ -27,10 +27,20 @@ class TestPythonNix(unittest.TestCase):
         """
         self.assertEqual(nix.eval(expression, vars=dict()), "test")
 
+    def test_throw(self):
+        errorString = "hello hi there\ntest"
+        try:
+            nix.eval("throw str", vars=dict(str=errorString))
+        except nix.NixError as e:
+            self.assertEqual(e.args[0], errorString)
+
     # This test case fails if you uncomment the `Py_{BEGIN,END}_ALLOW_THREADS`
     # macros in src/eval.cc
     def test_GIL_case(self):
-        nix.eval("{ a = throw \"nope\"; }")
+        try:
+            nix.eval("{ a = throw \"nope\"; }")
+        except nix.NixError as e:
+            self.assertEqual(e.args[0], "nope")
 
 if __name__ == '__main__':
     unittest.main()
