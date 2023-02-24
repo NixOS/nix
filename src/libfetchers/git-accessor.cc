@@ -59,6 +59,20 @@ typedef std::unique_ptr<git_object, Deleter<git_object_free>> Object;
 typedef std::unique_ptr<git_commit, Deleter<git_commit_free>> Commit;
 typedef std::unique_ptr<git_reference, Deleter<git_reference_free>> Reference;
 
+// A helper to ensure that we don't leak objects returned by libgit2.
+template<typename T>
+struct Setter
+{
+    T & t;
+    typename T::pointer p = nullptr;
+
+    Setter(T & t) : t(t) { }
+
+    ~Setter() { if (p) t = T(p); }
+
+    operator T::pointer * () { return &p; }
+};
+
 static void initLibGit2()
 {
     if (git_libgit2_init() < 0)
@@ -84,25 +98,23 @@ git_oid hashToOID(const Hash & hash)
 
 Object lookupObject(git_repository * repo, const git_oid & oid)
 {
-    git_object * obj = nullptr;
-    if (git_object_lookup(&obj, repo, &oid, GIT_OBJECT_ANY)) {
+    Object obj;
+    if (git_object_lookup(Setter(obj), repo, &oid, GIT_OBJECT_ANY)) {
         auto err = git_error_last();
         throw Error("getting Git object '%s': %s", oid, err->message);
     }
-
-    return Object(obj);
+    return obj;
 }
 
 template<typename T>
 T peelObject(git_repository * repo, git_object * obj, git_object_t type)
 {
-    typename T::pointer obj2 = nullptr;
-    if (git_object_peel((git_object * *) &obj2, obj, type)) {
+    T obj2;
+    if (git_object_peel((git_object * *) (typename T::pointer *) Setter(obj2), obj, type)) {
         auto err = git_error_last();
         throw Error("peeling Git object '%s': %s", git_object_id(obj), err->message);
     }
-
-    return T(obj2);
+    return obj2;
 }
 
 struct GitInputAccessor : InputAccessor
@@ -201,13 +213,13 @@ struct GitInputAccessor : InputAccessor
 
         auto i = lookupCache.find(path);
         if (i == lookupCache.end()) {
-            git_tree_entry * entry = nullptr;
-            if (auto err = git_tree_entry_bypath(&entry, root.get(), std::string(path.rel()).c_str())) {
+            TreeEntry entry;
+            if (auto err = git_tree_entry_bypath(Setter(entry), root.get(), std::string(path.rel()).c_str())) {
                 if (err != GIT_ENOTFOUND)
                     throw Error("looking up '%s': %s", showPath(path), git_error_last()->message);
             }
 
-            i = lookupCache.emplace(path, TreeEntry(entry)).first;
+            i = lookupCache.emplace(path, std::move(entry)).first;
         }
 
         return &*i->second;
@@ -226,10 +238,10 @@ struct GitInputAccessor : InputAccessor
     std::variant<Tree, Submodule> getTree(const CanonPath & path)
     {
         if (path.isRoot()) {
-            git_tree * tree = nullptr;
-            if (git_tree_dup(&tree, root.get()))
+            Tree tree;
+            if (git_tree_dup(Setter(tree), root.get()))
                 throw Error("duplicating directory '%s': %s", showPath(path), git_error_last()->message);
-            return Tree(tree);
+            return tree;
         }
 
         auto entry = need(path);
@@ -240,11 +252,11 @@ struct GitInputAccessor : InputAccessor
         if (git_tree_entry_type(entry) != GIT_OBJECT_TREE)
             throw Error("'%s' is not a directory", showPath(path));
 
-        git_tree * tree = nullptr;
-        if (git_tree_entry_to_object((git_object * *) &tree, repo.get(), entry))
+        Tree tree;
+        if (git_tree_entry_to_object((git_object * *) (git_tree * *) Setter(tree), repo.get(), entry))
             throw Error("looking up directory '%s': %s", showPath(path), git_error_last()->message);
 
-        return Tree(tree);
+        return tree;
     }
 
     Blob getBlob(const CanonPath & path, bool expectSymlink)
@@ -274,11 +286,11 @@ struct GitInputAccessor : InputAccessor
                 notExpected();
         }
 
-        git_blob * blob = nullptr;
-        if (git_tree_entry_to_object((git_object * *) &blob, repo.get(), entry))
+        Blob blob;
+        if (git_tree_entry_to_object((git_object * *) (git_blob * *) Setter(blob), repo.get(), entry))
             throw Error("looking up file '%s': %s", showPath(path), git_error_last()->message);
 
-        return Blob(blob);
+        return blob;
     }
 };
 
@@ -469,8 +481,8 @@ bool tarballCacheContains(const Hash & treeHash)
 
     auto oid = hashToOID(treeHash);
 
-    git_object * obj = nullptr;
-    if (auto errCode = git_object_lookup(&obj, repo.get(), &oid, GIT_OBJECT_TREE)) {
+    Object obj;
+    if (auto errCode = git_object_lookup(Setter(obj), repo.get(), &oid, GIT_OBJECT_TREE)) {
         if (errCode == GIT_ENOTFOUND) return false;
         auto err = git_error_last();
         throw Error("getting Git object '%s': %s", treeHash.gitRev(), err->message);
@@ -523,21 +535,20 @@ struct GitRepoImpl : GitRepo
     Hash resolveRef(std::string ref) override
     {
         // Resolve short names like 'master'.
-        // FIXME: LEAK
-        git_reference * ref2 = nullptr;
-        if (!git_reference_dwim(&ref2, repo.get(), ref.c_str()))
-            ref = git_reference_name(ref2);
+        Reference ref2;
+        if (!git_reference_dwim(Setter(ref2), repo.get(), ref.c_str()))
+            ref = git_reference_name(ref2.get());
 
         // Resolve full references like 'refs/heads/master'.
-        git_reference * ref3 = nullptr;
-        if (git_reference_lookup(&ref3, repo.get(), ref.c_str())) {
+        Reference ref3;
+        if (git_reference_lookup(Setter(ref3), repo.get(), ref.c_str())) {
             auto err = git_error_last();
             throw Error("resolving Git reference '%s': %s", ref, err->message);
         }
 
-        auto oid = git_reference_target(ref3);
+        auto oid = git_reference_target(ref3.get());
         if (!oid)
-            throw Error("cannot get OID for Git reference '%s'", git_reference_name(ref3));
+            throw Error("cannot get OID for Git reference '%s'", git_reference_name(ref3.get()));
 
         return Hash::parseAny(git_oid_tostr_s(oid), htSHA1);
     }
