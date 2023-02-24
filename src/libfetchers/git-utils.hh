@@ -13,6 +13,9 @@ struct GitRepo
     virtual uint64_t getLastModified(const Hash & rev) = 0;
 
     virtual bool isShallow() = 0;
+
+    /* Return the commit hash to which a ref points. */
+    virtual Hash resolveRef(std::string ref) = 0;
 };
 
 ref<InputAccessor> makeGitInputAccessor(const CanonPath & path, const Hash & rev);

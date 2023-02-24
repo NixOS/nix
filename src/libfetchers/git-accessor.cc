@@ -8,6 +8,7 @@
 #include <git2/errors.h>
 #include <git2/global.h>
 #include <git2/object.h>
+#include <git2/refs.h>
 #include <git2/repository.h>
 #include <git2/tree.h>
 
@@ -56,6 +57,7 @@ typedef std::unique_ptr<git_treebuilder, Deleter<git_treebuilder_free>> TreeBuil
 typedef std::unique_ptr<git_blob, Deleter<git_blob_free>> Blob;
 typedef std::unique_ptr<git_object, Deleter<git_object_free>> Object;
 typedef std::unique_ptr<git_commit, Deleter<git_commit_free>> Commit;
+typedef std::unique_ptr<git_reference, Deleter<git_reference_free>> Reference;
 
 static void initLibGit2()
 {
@@ -516,6 +518,28 @@ struct GitRepoImpl : GitRepo
     bool isShallow() override
     {
         return git_repository_is_shallow(repo.get());
+    }
+
+    Hash resolveRef(std::string ref) override
+    {
+        // Resolve short names like 'master'.
+        // FIXME: LEAK
+        git_reference * ref2 = nullptr;
+        if (!git_reference_dwim(&ref2, repo.get(), ref.c_str()))
+            ref = git_reference_name(ref2);
+
+        // Resolve full references like 'refs/heads/master'.
+        git_reference * ref3 = nullptr;
+        if (git_reference_lookup(&ref3, repo.get(), ref.c_str())) {
+            auto err = git_error_last();
+            throw Error("resolving Git reference '%s': %s", ref, err->message);
+        }
+
+        auto oid = git_reference_target(ref3);
+        if (!oid)
+            throw Error("cannot get OID for Git reference '%s'", git_reference_name(ref3));
+
+        return Hash::parseAny(git_oid_tostr_s(oid), htSHA1);
     }
 };
 

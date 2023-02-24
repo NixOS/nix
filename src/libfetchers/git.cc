@@ -412,7 +412,7 @@ struct GitInputScheme : InputScheme
         if (auto r = input.getRev())
             return *r;
         else {
-            auto rev = Hash::parseAny(chomp(runProgram("git", true, { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "rev-parse", ref })), htSHA1);
+            auto rev = GitRepo::openRepo(CanonPath(repoInfo.url))->resolveRef(ref);
             input.attrs.insert_or_assign("rev", rev.gitRev());
             return rev;
         }
