@@ -35,7 +35,10 @@
   - The [Boehm garbage collector](http://www.hboehm.info/gc/) to reduce
     the evaluator’s memory consumption (optional). To enable it, install
     `pkgconfig` and the Boehm garbage collector, and pass the flag
-    `--enable-gc` to `configure`.
+    `--enable-gc` to `configure`. Nix relies on a patch to support the
+    necessary interactions between coroutines and the collector; please
+    apply `boehmgc-coroutine-sp-fallback.diff` to your Boehm garbage collector
+    library. This file is available in the Nix project root.
 
   - The `boost` library of version 1.66.0 or higher. It can be obtained
     from the official web site <https://www.boost.org/>.
