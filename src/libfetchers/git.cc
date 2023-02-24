@@ -418,6 +418,7 @@ struct GitInputScheme : InputScheme
         }
     }
 
+    // FIXME: remove
     uint64_t getLastModified(const RepoInfo & repoInfo, const std::string & repoDir, const std::string & ref) const
     {
         return
@@ -441,7 +442,7 @@ struct GitInputScheme : InputScheme
                 return *lastModified;
         }
 
-        auto lastModified = getLastModified(repoInfo, repoDir, rev.gitRev());
+        auto lastModified = GitRepo::openRepo(CanonPath(repoDir))->getLastModified(rev);
 
         cache->upsertFact(key, std::to_string(lastModified));
 

@@ -505,6 +505,13 @@ struct GitRepoImpl : GitRepo
 
         return done.size();
     }
+
+    uint64_t getLastModified(const Hash & rev) override
+    {
+        auto commit = peelObject<Commit>(repo.get(), lookupObject(repo.get(), hashToOID(rev)).get(), GIT_OBJECT_COMMIT);
+
+        return git_commit_time(commit.get());
+    }
 };
 
 ref<GitRepo> GitRepo::openRepo(const CanonPath & path)
