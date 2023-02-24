@@ -512,6 +512,11 @@ struct GitRepoImpl : GitRepo
 
         return git_commit_time(commit.get());
     }
+
+    bool isShallow() override
+    {
+        return git_repository_is_shallow(repo.get());
+    }
 };
 
 ref<GitRepo> GitRepo::openRepo(const CanonPath & path)

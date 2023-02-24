@@ -652,7 +652,7 @@ struct GitInputScheme : InputScheme
             // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
         }
 
-        bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "--git-dir", repoInfo.gitDir, "rev-parse", "--is-shallow-repository" })) == "true";
+        auto isShallow = GitRepo::openRepo(CanonPath(repoDir))->isShallow();
 
         if (isShallow && !repoInfo.shallow)
             throw Error("'%s' is a shallow Git repository, but shallow repositories are only allowed when `shallow = true;` is specified", repoInfo.url);
@@ -827,7 +827,6 @@ struct GitInputScheme : InputScheme
             return getAccessorFromCommit(store, repoInfo, std::move(input));
         else
             return getAccessorFromCheckout(repoInfo, std::move(input));
-
     }
 
     bool isLocked(const Input & input) const override
