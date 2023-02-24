@@ -1,1 +1,3 @@
 build
+# For clang-tools
+.cache
