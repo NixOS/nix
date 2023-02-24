@@ -2,7 +2,9 @@
 
 ## Motivation
 
-In order to attract more maintainers and thereby scale the development process to match user needs, the main goal of this team is to improve the Nix contributor experience.
+The team's main responsibility is to set a direction for the development of Nix and ensure that the code is in good shape.
+
+We aim to achieve this by improving the contributor experience and attracting more maintainers – that is, by helping other people contributing to Nix and eventually taking responsibility – in order to scale the development process to match users' needs.
 
 ### Objectives
 
@@ -13,10 +15,16 @@ In order to attract more maintainers and thereby scale the development process t
 
 ### Tasks
 
-- Elaborate contribution guides and abide to them
-- Improve documentation targeted to contributors
+- Establish, communicate, and maintain a technical roadmap
+- Improve documentation targeted at contributors
+  - Record architecture and design decisions
+  - Elaborate contribution guides and abide to them
+  - Define and assert quality criteria for contributions
 - Maintain the issue tracker and triage pull requests
-- Help competent contributors succeed with their pull requests
+- Help contributors succeed with pull requests that address roadmap milestones
+- Manage the release lifecycle
+- Regularly publish reports on work done
+- Engage with third parties in the interest of the project
 - Ensure the required maintainer capacity for all of the above
 
 ## Members
