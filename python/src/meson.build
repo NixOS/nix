@@ -14,5 +14,6 @@ nix_bindings = py_installation.extension_module('nix', src,
       # -Wnon-virtual-dtor is unnecessarily turned on by Meson
       # This is fixed in Meson 1.0.0 with https://github.com/mesonbuild/meson/pull/10339
       '-Wno-non-virtual-dtor',
-      '-fvisibility=hidden'
+      '-fvisibility=hidden',
+      '-include', 'config.h'
     ])

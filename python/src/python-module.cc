@@ -3,8 +3,6 @@
 #include "internal/eval.hh"
 #include "internal/ptr.hh"
 
-#include <config.h>
-
 #include <eval.hh>
 #include <globals.hh>
 #include <shared.hh>

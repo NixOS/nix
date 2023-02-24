@@ -2,8 +2,6 @@
 
 #include <Python.h>
 
-#include <config.h>
-
 #include <eval.hh>
 
 namespace nix::python {
