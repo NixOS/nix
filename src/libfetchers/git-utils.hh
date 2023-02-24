@@ -4,6 +4,13 @@
 
 namespace nix {
 
+struct GitRepo
+{
+    static ref<GitRepo> openRepo(const CanonPath & path);
+
+    virtual uint64_t getRevCount(const Hash & rev) = 0;
+};
+
 ref<InputAccessor> makeGitInputAccessor(const CanonPath & path, const Hash & rev);
 
 struct TarballInfo

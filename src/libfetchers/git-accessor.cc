@@ -14,6 +14,32 @@
 #include "tarfile.hh"
 #include <archive_entry.h>
 
+#include <unordered_set>
+#include <queue>
+
+namespace std {
+
+template<> struct hash<git_oid>
+{
+    size_t operator()(const git_oid & oid) const
+    {
+        return * (size_t *) oid.id;
+    }
+};
+
+std::ostream & operator << (std::ostream & str, const git_oid & oid)
+{
+    str << git_oid_tostr_s(&oid);
+    return str;
+}
+
+bool operator == (const git_oid & oid1, const git_oid & oid2)
+{
+    return git_oid_equal(&oid1, &oid2);
+}
+
+}
+
 namespace nix {
 
 template<auto del>
@@ -28,6 +54,8 @@ typedef std::unique_ptr<git_tree_entry, Deleter<git_tree_entry_free>> TreeEntry;
 typedef std::unique_ptr<git_tree, Deleter<git_tree_free>> Tree;
 typedef std::unique_ptr<git_treebuilder, Deleter<git_treebuilder_free>> TreeBuilder;
 typedef std::unique_ptr<git_blob, Deleter<git_blob_free>> Blob;
+typedef std::unique_ptr<git_object, Deleter<git_object_free>> Object;
+typedef std::unique_ptr<git_commit, Deleter<git_commit_free>> Commit;
 
 static void initLibGit2()
 {
@@ -52,6 +80,29 @@ git_oid hashToOID(const Hash & hash)
     return oid;
 }
 
+Object lookupObject(git_repository * repo, const git_oid & oid)
+{
+    git_object * obj = nullptr;
+    if (git_object_lookup(&obj, repo, &oid, GIT_OBJECT_ANY)) {
+        auto err = git_error_last();
+        throw Error("getting Git object '%s': %s", oid, err->message);
+    }
+
+    return Object(obj);
+}
+
+template<typename T>
+T peelObject(git_repository * repo, git_object * obj, git_object_t type)
+{
+    typename T::pointer obj2 = nullptr;
+    if (git_object_peel((git_object * *) &obj2, obj, type)) {
+        auto err = git_error_last();
+        throw Error("peeling Git object '%s': %s", git_object_id(obj), err->message);
+    }
+
+    return T(obj2);
+}
+
 struct GitInputAccessor : InputAccessor
 {
     Repository repo;
@@ -59,19 +110,8 @@ struct GitInputAccessor : InputAccessor
 
     GitInputAccessor(Repository && repo_, const Hash & rev)
         : repo(std::move(repo_))
+        , root(peelObject<Tree>(repo.get(), lookupObject(repo.get(), hashToOID(rev)).get(), GIT_OBJECT_TREE))
     {
-        auto oid = hashToOID(rev);
-
-        git_object * obj = nullptr;
-        if (git_object_lookup(&obj, repo.get(), &oid, GIT_OBJECT_ANY)) {
-            auto err = git_error_last();
-            throw Error("getting Git object '%s': %s", rev.gitRev(), err->message);
-        }
-
-        if (git_object_peel((git_object * *) &root, obj, GIT_OBJECT_TREE)) {
-            auto err = git_error_last();
-            throw Error("peeling Git object '%s': %s", rev.gitRev(), err->message);
-        }
     }
 
     std::string readBlob(const CanonPath & path, bool symlink)
@@ -435,6 +475,41 @@ bool tarballCacheContains(const Hash & treeHash)
     }
 
     return true;
+}
+
+struct GitRepoImpl : GitRepo
+{
+    Repository repo;
+
+    GitRepoImpl(const CanonPath & path)
+        : repo(std::move(nix::openRepo(path)))
+    { }
+
+    uint64_t getRevCount(const Hash & rev) override
+    {
+        std::unordered_set<git_oid> done;
+        std::queue<Commit> todo;
+
+        todo.push(peelObject<Commit>(repo.get(), lookupObject(repo.get(), hashToOID(rev)).get(), GIT_OBJECT_COMMIT));
+
+        while (auto commit = pop(todo)) {
+            if (!done.insert(*git_commit_id(commit->get())).second) continue;
+
+            for (size_t n = 0; n < git_commit_parentcount(commit->get()); ++n) {
+                git_commit * parent;
+                if (git_commit_parent(&parent, commit->get(), n))
+                    throw Error("getting parent of Git commit '%s': %s", *git_commit_id(commit->get()), git_error_last()->message);
+                todo.push(Commit(parent));
+            }
+        }
+
+        return done.size();
+    }
+};
+
+ref<GitRepo> GitRepo::openRepo(const CanonPath & path)
+{
+    return make_ref<GitRepoImpl>(path);
 }
 
 }

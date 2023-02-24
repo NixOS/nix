@@ -463,9 +463,7 @@ struct GitInputScheme : InputScheme
 
         Activity act(*logger, lvlChatty, actUnknown, fmt("getting Git revision count of '%s'", repoInfo.url));
 
-        auto revCount = std::stoull(
-            runProgram("git", true,
-                { "-C", repoDir, "--git-dir", repoInfo.gitDir, "rev-list", "--count", rev.gitRev() }));
+        auto revCount = GitRepo::openRepo(CanonPath(repoDir))->getRevCount(rev);
 
         cache->upsertFact(key, std::to_string(revCount));
 
