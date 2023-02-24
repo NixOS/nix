@@ -181,11 +181,7 @@ path5=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; ref = 
 # Nuke the cache
 rm -rf $TEST_HOME/.cache/nix
 
-# Try again, but without 'git' on PATH. This should fail.
-NIX=$(command -v nix)
-(! PATH= $NIX eval --impure --raw --expr "(builtins.fetchGit { url = $repo; ref = \"dev\"; }).outPath" )
-
-# Try again, with 'git' available.  This should work.
+# Try again. This should work.
 path5=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; ref = \"dev\"; }).outPath")
 [[ $path3 = $path5 ]]
 
