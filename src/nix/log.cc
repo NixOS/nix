@@ -4,6 +4,7 @@
 #include "store-api.hh"
 #include "log-store.hh"
 #include "progress-bar.hh"
+#include "util.hh"
 
 using namespace nix;
 
@@ -53,6 +54,9 @@ struct CmdLog : InstallableCommand
             if (!log) continue;
             stopProgressBar();
             printInfo("got build log for '%s' from '%s'", installable->what(), logSub.getUri());
+            if (!shouldANSI()) {
+                log = filterANSIEscapes(*log, true);
+            }
             std::cout << *log;
             return;
         }
