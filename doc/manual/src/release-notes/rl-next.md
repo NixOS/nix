@@ -3,6 +3,12 @@
 * A new function `builtins.readFileType` is available. It is similar to
   `builtins.readDir` but acts on a single file or directory.
 
+* In flakes, the `.outPath` attribute of a flake now always refers to the
+  directory containing the `flake.nix`. This was not the case for when
+  `flake.nix` was in a subdirectory of e.g. a git repository.
+  The root of the source of a flake in a subdirectory is still available in
+  `.sourceInfo.outPath`.
+
 * The `builtins.readDir` function has been optimized when encountering not-yet-known
   file types from POSIX's `readdir`. In such cases the type of each file is/was
   discovered by making multiple syscalls. This change makes these operations
