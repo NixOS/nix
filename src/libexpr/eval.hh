@@ -570,7 +570,7 @@ struct EvalSettings : Config
 {
     EvalSettings();
 
-    Strings getDefaultNixPath();
+    static Strings getDefaultNixPath();
 
     static bool isPseudoUrl(std::string_view s);
 
@@ -580,7 +580,7 @@ struct EvalSettings : Config
         "Whether builtin functions that allow executing native code should be enabled."};
 
     Setting<Strings> nixPath{
-        this, {}, "nix-path",
+        this, getDefaultNixPath(), "nix-path",
         "List of directories to be searched for `<...>` file references."};
 
     Setting<bool> restrictEval{
