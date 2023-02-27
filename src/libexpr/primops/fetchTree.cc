@@ -4,6 +4,7 @@
 #include "fetchers.hh"
 #include "filetransfer.hh"
 #include "registry.hh"
+#include "url.hh"
 
 #include <ctime>
 #include <iomanip>
@@ -68,7 +69,16 @@ void emitTreeAttrs(
 std::string fixURI(std::string uri, EvalState & state, const std::string & defaultScheme = "file")
 {
     state.checkURI(uri);
-    return uri.find("://") != std::string::npos ? uri : defaultScheme + "://" + uri;
+    if (uri.find("://") == std::string::npos) {
+        const auto p = ParsedURL {
+            .scheme = defaultScheme,
+            .authority = "",
+            .path = uri
+        };
+        return p.to_string();
+    } else {
+        return uri;
+    }
 }
 
 std::string fixURIForGit(std::string uri, EvalState & state)
