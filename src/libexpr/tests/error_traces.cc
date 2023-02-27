@@ -627,7 +627,7 @@ namespace nix {
 
         ASSERT_TRACE2("elemAt [] (-1)",
                       TypeError,
-                      hintfmt("integer %d is out of bounds", -1),
+                      hintfmt("integer %d is too low", -1),
                       hintfmt("while evaluating the second argument (the list index) passed to builtins.elemAt"));
 
         ASSERT_TRACE1("elemAt [\"foo\"] 3",
@@ -818,7 +818,7 @@ namespace nix {
 
         ASSERT_TRACE2("genList false (-3)",
                       TypeError,
-                      hintfmt("integer %d is out of bounds", -3),
+                      hintfmt("integer %d is too low", -3),
                       hintfmt("while evaluating the second argument passed to builtins.genList"));
 
     }
@@ -1064,7 +1064,7 @@ namespace nix {
 
         ASSERT_TRACE2("substring (-3) 3 \"sometext\"",
                       TypeError,
-                      hintfmt("integer %d is out of bounds", -3),
+                      hintfmt("integer %d is too low", -3),
                       hintfmt("while evaluating the first argument (the start offset) passed to builtins.substring"));
 
     }
