@@ -31,8 +31,16 @@ class TestPythonNix(unittest.TestCase):
         errorString = "hello hi there\ntest"
         try:
             nix.eval("throw str", vars=dict(str=errorString))
-        except nix.NixError as e:
+        except nix.ThrownNixError as e:
             self.assertEqual(e.args[0], errorString)
+
+    def test_syntax_error(self):
+        try:
+            nix.eval("{")
+        except nix.ThrownNixError as e:
+            self.assertTrue(False)
+        except nix.NixError as e:
+            self.assertTrue(True)
 
     # This test case fails if you uncomment the `Py_{BEGIN,END}_ALLOW_THREADS`
     # macros in src/eval.cc

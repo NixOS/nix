@@ -61,8 +61,7 @@ PyObject * eval(PyObject * self, PyObject * args, PyObject * keywds)
     try {
         return _eval(expression, vars);
     } catch (nix::ThrownError & e) {
-        return PyErr_Format(NixError, "%s", e.message().c_str());
-
+        return PyErr_Format(ThrownNixError, "%s", e.message().c_str());
     } catch (nix::Error & e) {
         return PyErr_Format(NixError, "%s", e.what());
     } catch (...) {

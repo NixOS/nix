@@ -11,6 +11,7 @@ namespace nix::python {
 
 #define _public_ __attribute__((visibility("default")))
 
+PyObject * ThrownNixError = nullptr;
 PyObject * NixError = nullptr;
 
 static PyMethodDef NixMethods[] = {
@@ -51,6 +52,21 @@ extern "C" _public_ PyObject * PyInit_nix(void)
     }
 
     if (PyModule_AddObject(m.get(), "NixError", NixError) == -1) {
+        return nullptr;
+    }
+
+    ThrownNixError = PyErr_NewExceptionWithDoc(
+        "nix.ThrownNixError",                       /* char *name */
+        "Base exception class for the nix module.", /* char *doc */
+        NixError,                                   /* PyObject *base */
+        NULL                                        /* PyObject *dict */
+    );
+
+    if (!ThrownNixError) {
+        return nullptr;
+    }
+
+    if (PyModule_AddObject(m.get(), "ThrownNixError", ThrownNixError) == -1) {
         return nullptr;
     }
 

@@ -5,4 +5,5 @@
 namespace nix::python {
 
 extern PyObject * NixError;
+extern PyObject * ThrownNixError;
 }
