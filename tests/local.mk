@@ -5,6 +5,7 @@ nix_tests = \
   flakes/mercurial.sh \
   flakes/circular.sh \
   flakes/init.sh \
+  flakes/inputs.sh \
   flakes/follow-paths.sh \
   flakes/bundle.sh \
   flakes/check.sh \
