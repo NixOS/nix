@@ -86,6 +86,36 @@ struct BuildResult
         return status == Built || status == Substituted || status == AlreadyValid || status == ResolvesToAlreadyValid;
     }
 
+    int severity()
+    {
+        switch (status) {
+            case Built:
+            case Substituted:
+            case AlreadyValid:
+            case ResolvesToAlreadyValid:
+                return 0;
+            case TransientFailure:
+                return 1;
+            case LogLimitExceeded:
+                return 2;
+            case InputRejected:
+            case OutputRejected:
+            case CachedFailure:
+                return 3;
+            case TimedOut:
+            case MiscFailure:
+                return 4;
+            case DependencyFailed:
+                return 5;
+            case NotDeterministic:
+            case NoSubstituters:
+                return 6;
+            case PermanentFailure:
+                return 7;
+        }
+        throw Error("Unrecognized BuildResult status: %d", status);
+    }
+
     void rethrow()
     {
         throw Error("%s", errorMsg);
