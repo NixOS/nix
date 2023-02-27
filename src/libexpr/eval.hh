@@ -581,14 +581,7 @@ struct EvalSettings : Config
 
     Setting<Strings> nixPath{
         this, {}, "nix-path",
-        R"(
-          List of directories to be searched for `<...>` file references.
-
-          If [pure evaluation](#conf-pure-eval) is disabled,
-          this is initialised using the [`NIX_PATH`](@docroot@/command-ref/env-common.md#env-NIX_PATH)
-          environment variable, or, if it is unset and [restricted evaluation](#conf-restrict-eval)
-          is disabled, a default search path including the user's and `root`'s channels.
-        )"};
+        "List of directories to be searched for `<...>` file references."};
 
     Setting<bool> restrictEval{
         this, false, "restrict-eval",
