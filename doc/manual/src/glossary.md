@@ -138,7 +138,7 @@
     files could be missing. The command `nix-store -qR` prints out
     closures of store paths.
 
-    As an example, if the store object at path `P` contains a [reference]
+    As an example, if the [store object] at path `P` contains a [reference]
     to store object `Q`, then `Q` is in the closure of `P`. Further, if `Q`
     references `R` then `R` is also in the closure of `P`.
 
