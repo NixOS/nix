@@ -425,65 +425,49 @@ This leads to the following guidelines:
 
 ### Examples
 
-```javascript
-// bad: all keys must be assumed to be store implementations
+
+This is bad, because all keys must be assumed to be store implementations:
+
+```json
 {
   "local": { ... },
   "remote": { ... },
   "http": { ... }
 }
-// good: extensible and a little bit self-documenting.
+```
+
+This is good, because the it is extensible at the root, and is somewhat self-documenting:
+
+```json
 {
   "storeTypes": { "local": { ... }, ... },
-  // While the dictionary of store types seemed like a complete response,
-  // this little bit of info tells the consumer how to proceed if a store type
-  // is missing. It's not always easy to predict how something will be used, so
-  // let's keep it open.
   "pluginSupport": true
 }
 ```
 
-```javascript
-// bad: a store type can only hold configuration items
-{
-  "storeTypes": {
-    "Local Daemon Store": {
-      "max-connections": {
-        "defaultValue": 1
-        "value": 1
-      },
-      "trusted": {
-        "defaultValue": false,
-        "value": true
-      },
-      ...
-    }
-  }
-}
-// good: a store type can be extended with other metadata, such as its URI scheme
-{
-  "storeTypes": {
-    "Local Daemon Store": {
-      "uriScheme": "daemon",
-      "settings": {
-        "max-connections": {
-          "defaultValue": 1
-          "value": 1
-        },
-        ...
-      },
-    ...
-  },
-  ...
-}
+While the dictionary of store types seems like a very complete response at first, a use case may arise that warrants returning additional information.
+For example, the presence of plugin support may be crucial information for a client to proceed when their desired store type is missing.
+
+
+
+The following representation is bad because it is not extensible:
+
+```json
+{ "outputs": [ "out" "bin" ] }
 ```
 
-```javascript
-// bad: not extensible
-{ "outputs": [ "out" "bin" ] }
-// bad: order matters but is lost, as many JSON parsers don't preserve item order.
+However, simply converting everything to records is not enough, because the order of outputs must be preserved:
+
+```json
 { "outputs": { "bin": {}, "out": {} } }
-// good:
+```
+
+The first item is the default output. Deriving this information from the outputs ordering is not great, but this is how Nix currently happens to work.
+While it is possible for a JSON parser to preserve the order of fields, we can not rely on this capability to be present in all JSON libraries.
+
+This representation is extensible and preserves the ordering:
+
+```json
 { "outputs": [ { "outputName": "out" }, { "outputName": "bin" } ] }
 ```
 
