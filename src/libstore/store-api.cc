@@ -99,10 +99,12 @@ StorePath Store::followLinksToStorePath(std::string_view path) const
        silly, but it's done that way for compatibility).  <id> is the
        name of the output (usually, "out").
 
-   <h2> = base-16 representation of a SHA-256 hash of:
+   <h2> = base-16 representation of a SHA-256 hash of <s2>
+
+   <s2> =
      if <type> = "text:...":
        the string written to the resulting store path
-     if <type> = "source":
+     if <type> = "source:...":
        the serialisation of the path from which this store path is
        copied, as returned by hashPath()
      if <type> = "output:<id>":
@@ -164,8 +166,8 @@ StorePath Store::makeOutputPath(std::string_view id,
 
 
 /* Stuff the references (if any) into the type.  This is a bit
-   hacky, but we can't put them in `s' since that would be
-   ambiguous. */
+   hacky, but we can't put them in, say, <s2> (per the grammar above)
+   since that would be ambiguous. */
 static std::string makeType(
     const Store & store,
     std::string && type,
