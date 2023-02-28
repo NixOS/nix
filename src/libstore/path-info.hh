@@ -78,7 +78,7 @@ struct ValidPathInfo
 
     void sign(const Store & store, const SecretKey & secretKey);
 
-    std::optional<ContentAddressWithReferences> contentAddressWithReferenences() const;
+    std::optional<ContentAddressWithReferences> contentAddressWithReferences() const;
 
     /* Return true iff the path is verifiably content-addressed. */
     bool isContentAddressed(const Store & store) const;

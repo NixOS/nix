@@ -996,7 +996,7 @@ void copyStorePath(
         auto info2 = make_ref<ValidPathInfo>(*info);
         info2->path = dstStore.makeFixedOutputPathFromCA(
             info->path.name(),
-            info->contentAddressWithReferenences().value());
+            info->contentAddressWithReferences().value());
         if (dstStore.storeDir == srcStore.storeDir)
             assert(info->path == info2->path);
         info = info2;
@@ -1110,7 +1110,7 @@ std::map<StorePath, StorePath> copyPaths(
         if (currentPathInfo.ca && currentPathInfo.references.empty()) {
             storePathForDst = dstStore.makeFixedOutputPathFromCA(
                 currentPathInfo.path.name(),
-                currentPathInfo.contentAddressWithReferenences().value());
+                currentPathInfo.contentAddressWithReferences().value());
             if (dstStore.storeDir == srcStore.storeDir)
                 assert(storePathForDst == storePathForSrc);
             if (storePathForDst != storePathForSrc)
