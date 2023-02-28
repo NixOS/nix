@@ -10,8 +10,9 @@ Most Nix commands interpret the following environment variables:
     A colon-separated list of directories used to look up the location of Nix
     expressions using [paths](../language/values.md#type-path)
     enclosed in angle brackets (i.e., `<path>`),
-    e.g. `/home/eelco/Dev:/etc/nixos`. It can be extended using the
-    [`-I` option](./opt-common.md#opt-I).
+    e.g. `/home/eelco/Dev:/etc/nixos`. It overrides the
+    [`nix-path` setting](./conf-file.md#conf-nix-path).
+    It can be extended using the [`-I` option](./opt-common.md#opt-I).
 
   - [`NIX_IGNORE_SYMLINK_STORE`]{#env-NIX_IGNORE_SYMLINK_STORE}\
     Normally, the Nix store directory (typically `/nix/store`) is not
