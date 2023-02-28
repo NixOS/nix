@@ -23,7 +23,7 @@ nix log $outPath 2>&1 | grep 'is not available'
 nix log --substituters file://$cacheDir $outPath | grep FOO
 
 # Test copying build logs from the binary cache.
-nix store copy-log --from file://$cacheDir $(nix-store -qd $outPath)
+nix store copy-log --from file://$cacheDir $(nix-store -qd $outPath)^'*'
 nix log $outPath | grep FOO
 
 basicDownloadTests() {

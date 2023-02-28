@@ -677,9 +677,12 @@ StorePathSet Installable::toDerivations(
         for (const auto & b : i->toDerivedPaths())
             std::visit(overloaded {
                 [&](const DerivedPath::Opaque & bo) {
-                    if (!useDeriver)
-                        throw Error("argument '%s' did not evaluate to a derivation", i->what());
-                    drvPaths.insert(getDeriver(store, *i, bo.path));
+                    drvPaths.insert(
+                        bo.path.isDerivation()
+                            ? bo.path
+                        : useDeriver
+                            ? getDeriver(store, *i, bo.path)
+                        : throw Error("argument '%s' did not evaluate to a derivation", i->what()));
                 },
                 [&](const DerivedPath::Built & bfd) {
                     drvPaths.insert(bfd.drvPath);
