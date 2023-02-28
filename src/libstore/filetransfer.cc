@@ -829,7 +829,7 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
         {
             auto state(_state->lock());
 
-            while (state->data.empty()) {
+            if (state->data.empty()) {
 
                 if (state->quit) {
                     if (state->exc) std::rethrow_exception(state->exc);
@@ -837,6 +837,8 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
                 }
 
                 state.wait(state->avail);
+
+                if (state->data.empty()) continue;
             }
 
             chunk = std::move(state->data);
