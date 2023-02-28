@@ -18,7 +18,7 @@ fi
 # Build the dependencies and push them to the remote store.
 nix-build -o $TEST_ROOT/result dependencies.nix --post-build-hook "$pushToStore"
 # See if all outputs are passed to the post-build hook by only specifying one
-# TODO: BUILD_HOOK_ONLY_OUT_PATHS does not work with CA tests
+# We're not able to test CA tests this way
 export BUILD_HOOK_ONLY_OUT_PATHS=$([ ! $NIX_TESTS_CA_BY_DEFAULT ])
 nix-build -o $TEST_ROOT/result-mult multiple-outputs.nix -A a.first --post-build-hook "$pushToStore"
 
