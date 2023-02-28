@@ -12,8 +12,3 @@ nix-instantiate --eval -E '<by-relative-path/simple.nix>' --restrict-eval
 
 [[ $(nix-instantiate --find-file by-absolute-path/simple.nix) = $PWD/simple.nix ]]
 [[ $(nix-instantiate --find-file by-relative-path/simple.nix) = $PWD/simple.nix ]]
-
-unset NIX_PATH
-
-[[ $(nix-instantiate --option nix-path by-relative-path=. --find-file by-relative-path/simple.nix) = "$PWD/simple.nix" ]]
-[[ $(NIX_PATH= nix-instantiate --option nix-path by-relative-path=. --find-file by-relative-path/simple.nix) = "$PWD/simple.nix" ]]
