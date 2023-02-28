@@ -3,7 +3,7 @@
 source common.sh
 
 drv=$(nix-instantiate --experimental-features ca-derivations ./content-addressed.nix -A rootCA --arg seed 1)
-nix --experimental-features 'nix-command ca-derivations' show-derivation --derivation "$drv" --arg seed 1
+nix --experimental-features 'nix-command ca-derivations' show-derivation "$drv" --arg seed 1
 
 buildAttr () {
     local derivationPath=$1

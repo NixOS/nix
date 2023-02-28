@@ -36,6 +36,7 @@
 #ifdef __linux__
 #include <sys/prctl.h>
 #include <sys/resource.h>
+#include <sys/mman.h>
 
 #include <cmath>
 #endif
@@ -608,6 +609,19 @@ Path getDataDir()
     return dataDir ? *dataDir : getHome() + "/.local/share";
 }
 
+Path getStateDir()
+{
+    auto stateDir = getEnv("XDG_STATE_HOME");
+    return stateDir ? *stateDir : getHome() + "/.local/state";
+}
+
+Path createNixStateDir()
+{
+    Path dir = getStateDir() + "/nix";
+    createDirs(dir);
+    return dir;
+}
+
 
 std::optional<Path> getSelfExe()
 {
@@ -1051,9 +1065,17 @@ static pid_t doFork(bool allowVfork, std::function<void()> fun)
 }
 
 
+static int childEntry(void * arg)
+{
+    auto main = (std::function<void()> *) arg;
+    (*main)();
+    return 1;
+}
+
+
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 {
-    auto wrapper = [&]() {
+    std::function<void()> wrapper = [&]() {
         if (!options.allowVfork)
             logger = makeSimpleLogger();
         try {
@@ -1073,7 +1095,27 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
             _exit(1);
     };
 
-    pid_t pid = doFork(options.allowVfork, wrapper);
+    pid_t pid = -1;
+
+    if (options.cloneFlags) {
+        #ifdef __linux__
+        // Not supported, since then we don't know when to free the stack.
+        assert(!(options.cloneFlags & CLONE_VM));
+
+        size_t stackSize = 1 * 1024 * 1024;
+        auto stack = (char *) mmap(0, stackSize,
+            PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
+        if (stack == MAP_FAILED) throw SysError("allocating stack");
+
+        Finally freeStack([&]() { munmap(stack, stackSize); });
+
+        pid = clone(childEntry, stack + stackSize, options.cloneFlags | SIGCHLD, &wrapper);
+        #else
+        throw Error("clone flags are only supported on Linux");
+        #endif
+    } else
+        pid = doFork(options.allowVfork, wrapper);
+
     if (pid == -1) throw SysError("unable to fork");
 
     return pid;

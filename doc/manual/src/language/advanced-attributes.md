@@ -260,7 +260,7 @@ Derivations can declare some infrequently used optional attributes.
     If the special attribute `__structuredAttrs` is set to `true`, the other derivation
     attributes are serialised in JSON format and made available to the
     builder via the file `.attrs.json` in the builder’s temporary
-    directory. This obviates the need for `passAsFile` since JSON files
+    directory. This obviates the need for [`passAsFile`](#adv-attr-passAsFile) since JSON files
     have no size restrictions, unlike process environments.
 
     It also makes it possible to tweak derivation settings in a structured way; see
@@ -282,10 +282,12 @@ Derivations can declare some infrequently used optional attributes.
     [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites),
     the following attributes are available:
 
-    - `maxSize` defines the maximum size of the output path.
+    - `maxSize` defines the maximum size of the resulting [store object](../glossary.md#gloss-store-object).
     - `maxClosureSize` defines the maximum size of the output's closure.
     - `ignoreSelfRefs` controls whether self-references should be considered when
       checking for allowed references/requisites.
+
+    Example:
 
     ```nix
     __structuredAttrs = true;
@@ -305,9 +307,20 @@ Derivations can declare some infrequently used optional attributes.
     ```
 
   - [`unsafeDiscardReferences`]{#adv-attr-unsafeDiscardReferences}\
-    When using [structured attributes](#adv-attr-structuredAttrs), the **experimental**
-    attribute `unsafeDiscardReferences` is a per-output boolean which, if set to `true`,
-    disables scanning the build output for runtime dependencies altogether.
+    > **Warning**
+    > This is an experimental feature.
+    >
+    > To enable it, add the following to [nix.conf](../command-ref/conf-file.md):
+    >
+    > ```
+    > extra-experimental-features = discard-references
+    > ```
+
+    When using [structured attributes](#adv-attr-structuredAttrs), the
+    attribute `unsafeDiscardReferences` is an attribute set with a boolean value for each output name.
+    If set to `true`, it disables scanning the output for runtime dependencies.
+
+    Example:
 
     ```nix
     __structuredAttrs = true;
@@ -317,5 +330,3 @@ Derivations can declare some infrequently used optional attributes.
     This is useful, for example, when generating self-contained filesystem images with
     their own embedded Nix store: hashes found inside such an image refer
     to the embedded store and not to the host's Nix store.
-
-    This is only allowed if the `discard-references` experimental feature is enabled.

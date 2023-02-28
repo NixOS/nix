@@ -75,7 +75,7 @@ perl/Makefile.config
 
 # /tests/
 /tests/test-tmp
-/tests/common.sh
+/tests/common/vars-and-functions.sh
 /tests/result*
 /tests/restricted-innocent
 /tests/shell
@@ -103,6 +103,7 @@ outputs/
 
 *.a
 *.o
+*.o.tmp
 *.so
 *.dylib
 *.dll

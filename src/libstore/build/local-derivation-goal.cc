@@ -16,6 +16,7 @@
 #include "json-utils.hh"
 #include "cgroup.hh"
 #include "personality.hh"
+#include "namespaces.hh"
 
 #include <regex>
 #include <queue>
@@ -167,7 +168,8 @@ void LocalDerivationGoal::killSandbox(bool getStats)
 }
 
 
-void LocalDerivationGoal::tryLocalBuild() {
+void LocalDerivationGoal::tryLocalBuild()
+{
     unsigned int curBuilds = worker.getNrLocalBuilds();
     if (curBuilds >= settings.maxBuildJobs) {
         state = &DerivationGoal::tryToBuild;
@@ -204,6 +206,17 @@ void LocalDerivationGoal::tryLocalBuild() {
             throw Error("building using a diverted store is not supported on this platform");
         #endif
     }
+
+    #if __linux__
+    if (useChroot) {
+        if (!mountAndPidNamespacesSupported()) {
+            if (!settings.sandboxFallback)
+                throw Error("this system does not support the kernel namespaces that are required for sandboxing; use '--no-sandbox' to disable sandboxing");
+            debug("auto-disabling sandboxing because the prerequisite namespaces are not available");
+            useChroot = false;
+        }
+    }
+    #endif
 
     if (useBuildUsers()) {
         if (!buildUser)
@@ -371,12 +384,6 @@ void LocalDerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
     cleanupPostOutputsRegisteredModeCheck();
 }
 
-
-int childEntry(void * arg)
-{
-    ((LocalDerivationGoal *) arg)->runChild();
-    return 1;
-}
 
 #if __linux__
 static void linkOrCopy(const Path & from, const Path & to)
@@ -663,7 +670,8 @@ void LocalDerivationGoal::startBuilder()
            nobody account.  The latter is kind of a hack to support
            Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
-        chownToBuilder(chrootRootDir + "/etc");
+        if (parsedDrv->useUidRange())
+            chownToBuilder(chrootRootDir + "/etc");
 
         if (parsedDrv->useUidRange() && (!buildUser || buildUser->getUIDCount() < 65536))
             throw Error("feature 'uid-range' requires the setting '%s' to be enabled", settings.autoAllocateUids.name);
@@ -888,12 +896,7 @@ void LocalDerivationGoal::startBuilder()
 
         userNamespaceSync.create();
 
-        Path maxUserNamespaces = "/proc/sys/user/max_user_namespaces";
-        static bool userNamespacesEnabled =
-            pathExists(maxUserNamespaces)
-            && trim(readFile(maxUserNamespaces)) != "0";
-
-        usingUserNamespace = userNamespacesEnabled;
+        usingUserNamespace = userNamespacesSupported();
 
         Pid helper = startProcess([&]() {
 
@@ -908,76 +911,21 @@ void LocalDerivationGoal::startBuilder()
             if (getuid() == 0 && setgroups(0, 0) == -1)
                 throw SysError("setgroups failed");
 
-            size_t stackSize = 1 * 1024 * 1024;
-            char * stack = (char *) mmap(0, stackSize,
-                PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
-            if (stack == MAP_FAILED) throw SysError("allocating stack");
-
-            int flags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
+            ProcessOptions options;
+            options.cloneFlags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
             if (privateNetwork)
-                flags |= CLONE_NEWNET;
+                options.cloneFlags |= CLONE_NEWNET;
             if (usingUserNamespace)
-                flags |= CLONE_NEWUSER;
+                options.cloneFlags |= CLONE_NEWUSER;
 
-            pid_t child = clone(childEntry, stack + stackSize, flags, this);
-            if (child == -1 && errno == EINVAL) {
-                /* Fallback for Linux < 2.13 where CLONE_NEWPID and
-                   CLONE_PARENT are not allowed together. */
-                flags &= ~CLONE_NEWPID;
-                child = clone(childEntry, stack + stackSize, flags, this);
-            }
-            if (usingUserNamespace && child == -1 && (errno == EPERM || errno == EINVAL)) {
-                /* Some distros patch Linux to not allow unprivileged
-                 * user namespaces. If we get EPERM or EINVAL, try
-                 * without CLONE_NEWUSER and see if that works.
-                 * Details: https://salsa.debian.org/kernel-team/linux/-/commit/d98e00eda6bea437e39b9e80444eee84a32438a6
-                 */
-                usingUserNamespace = false;
-                flags &= ~CLONE_NEWUSER;
-                child = clone(childEntry, stack + stackSize, flags, this);
-            }
-            if (child == -1) {
-                switch(errno) {
-                    case EPERM:
-                    case EINVAL: {
-                        int errno_ = errno;
-                        if (!userNamespacesEnabled && errno==EPERM)
-                            notice("user namespaces appear to be disabled; they are required for sandboxing; check /proc/sys/user/max_user_namespaces");
-                        if (userNamespacesEnabled) {
-                            Path procSysKernelUnprivilegedUsernsClone = "/proc/sys/kernel/unprivileged_userns_clone";
-                            if (pathExists(procSysKernelUnprivilegedUsernsClone)
-                                && trim(readFile(procSysKernelUnprivilegedUsernsClone)) == "0") {
-                                notice("user namespaces appear to be disabled; they are required for sandboxing; check /proc/sys/kernel/unprivileged_userns_clone");
-                            }
-                        }
-                        Path procSelfNsUser = "/proc/self/ns/user";
-                        if (!pathExists(procSelfNsUser))
-                            notice("/proc/self/ns/user does not exist; your kernel was likely built without CONFIG_USER_NS=y, which is required for sandboxing");
-                        /* Otherwise exit with EPERM so we can handle this in the
-                           parent. This is only done when sandbox-fallback is set
-                           to true (the default). */
-                        if (settings.sandboxFallback)
-                            _exit(1);
-                        /* Mention sandbox-fallback in the error message so the user
-                           knows that having it disabled contributed to the
-                           unrecoverability of this failure */
-                        throw SysError(errno_, "creating sandboxed builder process using clone(), without sandbox-fallback");
-                    }
-                    default:
-                        throw SysError("creating sandboxed builder process using clone()");
-                }
-            }
+            pid_t child = startProcess([&]() { runChild(); }, options);
+
             writeFull(builderOut.writeSide.get(),
                 fmt("%d %d\n", usingUserNamespace, child));
             _exit(0);
         });
 
-        int res = helper.wait();
-        if (res != 0 && settings.sandboxFallback) {
-            useChroot = false;
-            initTmpDir();
-            goto fallback;
-        } else if (res != 0)
+        if (helper.wait() != 0)
             throw Error("unable to start build process");
 
         userNamespaceSync.readSide = -1;
@@ -1045,9 +993,6 @@ void LocalDerivationGoal::startBuilder()
     } else
 #endif
     {
-#if __linux__
-    fallback:
-#endif
         pid = startProcess([&]() {
             runChild();
         });
@@ -1516,8 +1461,7 @@ void LocalDerivationGoal::startDaemon()
                 FdSink to(remote.get());
                 try {
                     daemon::processConnection(store, from, to,
-                        daemon::NotTrusted, daemon::Recursive,
-                        [&](Store & store) {});
+                        daemon::NotTrusted, daemon::Recursive);
                     debug("terminated daemon connection");
                 } catch (SysError &) {
                     ignoreException();
@@ -1906,6 +1850,10 @@ void LocalDerivationGoal::runChild()
                     doBind("/dev/ptmx", chrootRootDir + "/dev/ptmx");
                 }
             }
+
+            /* Make /etc unwritable */
+            if (!parsedDrv->useUidRange())
+                chmod_(chrootRootDir + "/etc", 0555);
 
             /* Unshare this mount namespace. This is necessary because
                pivot_root() below changes the root of the mount

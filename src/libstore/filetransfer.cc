@@ -101,6 +101,7 @@ struct curlFileTransfer : public FileTransfer
                     this->result.data.append(data);
               })
         {
+            requestHeaders = curl_slist_append(requestHeaders, "Accept-Encoding: zstd, br, gzip, deflate, bzip2, xz");
             if (!request.expectedETag.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
             if (!request.mimeType.empty())
@@ -828,7 +829,7 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
         {
             auto state(_state->lock());
 
-            while (state->data.empty()) {
+            if (state->data.empty()) {
 
                 if (state->quit) {
                     if (state->exc) std::rethrow_exception(state->exc);
@@ -836,6 +837,8 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
                 }
 
                 state.wait(state->avail);
+
+                if (state->data.empty()) continue;
             }
 
             chunk = std::move(state->data);

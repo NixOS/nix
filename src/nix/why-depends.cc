@@ -27,7 +27,7 @@ static std::string filterPrintable(const std::string & s)
     return res;
 }
 
-struct CmdWhyDepends : SourceExprCommand
+struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
 {
     std::string _package, _dependency;
     bool all = false;

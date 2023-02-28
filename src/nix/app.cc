@@ -1,4 +1,5 @@
 #include "installables.hh"
+#include "installable-derived-path.hh"
 #include "store-api.hh"
 #include "eval-inline.hh"
 #include "eval-cache.hh"
@@ -7,30 +8,6 @@
 #include "derivations.hh"
 
 namespace nix {
-
-struct InstallableDerivedPath : Installable
-{
-    ref<Store> store;
-    const DerivedPath derivedPath;
-
-    InstallableDerivedPath(ref<Store> store, const DerivedPath & derivedPath)
-        : store(store)
-        , derivedPath(derivedPath)
-    {
-    }
-
-    std::string what() const override { return derivedPath.to_string(*store); }
-
-    DerivedPathsWithInfo toDerivedPaths() override
-    {
-        return {{derivedPath}};
-    }
-
-    std::optional<StorePath> getStorePath() override
-    {
-        return std::nullopt;
-    }
-};
 
 /**
  * Return the rewrites that are needed to resolve a string whose context is
@@ -146,7 +123,7 @@ App UnresolvedApp::resolve(ref<Store> evalStore, ref<Store> store)
 
     for (auto & ctxElt : unresolved.context)
         installableContext.push_back(
-            std::make_shared<InstallableDerivedPath>(store, ctxElt));
+            std::make_shared<InstallableDerivedPath>(store, DerivedPath { ctxElt }));
 
     auto builtContext = Installable::build(evalStore, store, Realise::Outputs, installableContext);
     res.program = resolveString(*store, unresolved.program, builtContext);

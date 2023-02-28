@@ -201,7 +201,16 @@ public:
         {"build-timeout"}};
 
     PathSetting buildHook{this, true, "", "build-hook",
-        "The path of the helper program that executes builds to remote machines."};
+        R"(
+          The path to the helper program that executes remote builds.
+
+          Nix communicates with the build hook over `stdio` using a custom protocol to request builds that cannot be performed directly by the Nix daemon.
+          The default value is the internal Nix binary that implements remote building.
+
+          > **Important**
+          >
+          > Change this setting only if you really know what you’re doing.
+        )"};
 
     Setting<std::string> builders{
         this, "@" + nixConfDir + "/machines", "builders",
@@ -279,8 +288,8 @@ public:
           If the build users group is empty, builds will be performed under
           the uid of the Nix process (that is, the uid of the caller if
           `NIX_REMOTE` is empty, the uid under which the Nix daemon runs if
-          `NIX_REMOTE` is `daemon`). Obviously, this should not be used in
-          multi-user settings with untrusted users.
+          `NIX_REMOTE` is `daemon`). Obviously, this should not be used
+          with a nix daemon accessible to untrusted clients.
 
           Defaults to `nixbld` when running as root, *empty* otherwise.
         )",
@@ -696,24 +705,6 @@ public:
         )",
         {"trusted-binary-caches"}};
 
-    Setting<Strings> trustedUsers{
-        this, {"root"}, "trusted-users",
-        R"(
-          A list of names of users (separated by whitespace) that have
-          additional rights when connecting to the Nix daemon, such as the
-          ability to specify additional binary caches, or to import unsigned
-          NARs. You can also specify groups by prefixing them with `@`; for
-          instance, `@wheel` means all users in the `wheel` group. The default
-          is `root`.
-
-          > **Warning**
-          >
-          > Adding a user to `trusted-users` is essentially equivalent to
-          > giving that user root access to the system. For example, the user
-          > can set `sandbox-paths` and thereby obtain read access to
-          > directories that are otherwise inacessible to them.
-        )"};
-
     Setting<unsigned int> ttlNegativeNarInfoCache{
         this, 3600, "narinfo-cache-negative-ttl",
         R"(
@@ -734,18 +725,6 @@ public:
           collection, in which case having a more frequent cache invalidation
           would prevent trying to pull the path again and failing with a hash
           mismatch if the build isn't reproducible.
-        )"};
-
-    /* ?Who we trust to use the daemon in safe ways */
-    Setting<Strings> allowedUsers{
-        this, {"*"}, "allowed-users",
-        R"(
-          A list of names of users (separated by whitespace) that are allowed
-          to connect to the Nix daemon. As with the `trusted-users` option,
-          you can specify groups by prefixing them with `@`. Also, you can
-          allow all users by specifying `*`. The default is `*`.
-
-          Note that trusted users are always allowed to connect.
         )"};
 
     Setting<bool> printMissing{this, true, "print-missing",
@@ -975,6 +954,27 @@ public:
           resolves to a different location from that of the build machine. You
           can enable this setting if you are sure you're not going to do that.
         )"};
+
+    Setting<bool> useXDGBaseDirectories{
+        this, false, "use-xdg-base-directories",
+        R"(
+          If set to `true`, Nix will conform to the [XDG Base Directory Specification] for files in `$HOME`.
+          The environment variables used to implement this are documented in the [Environment Variables section](@docroot@/installation/env-variables.md).
+
+          [XDG Base Directory Specification]: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
+
+          > **Warning**
+          > This changes the location of some well-known symlinks that Nix creates, which might break tools that rely on the old, non-XDG-conformant locations.
+
+          In particular, the following locations change:
+
+          | Old               | New                            |
+          |-------------------|--------------------------------|
+          | `~/.nix-profile`  | `$XDG_STATE_HOME/nix/profile`  |
+          | `~/.nix-defexpr`  | `$XDG_STATE_HOME/nix/defexpr`  |
+          | `~/.nix-channels` | `$XDG_STATE_HOME/nix/channels` |
+        )"
+    };
 };
 
 

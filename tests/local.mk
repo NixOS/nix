@@ -1,9 +1,11 @@
 nix_tests = \
+  init.sh \
   flakes/flakes.sh \
   flakes/run.sh \
   flakes/mercurial.sh \
   flakes/circular.sh \
   flakes/init.sh \
+  flakes/inputs.sh \
   flakes/follow-paths.sh \
   flakes/bundle.sh \
   flakes/check.sh \
@@ -21,6 +23,7 @@ nix_tests = \
   binary-cache.sh \
   multiple-outputs.sh \
   ca/build.sh \
+  ca/new-build-cmd.sh \
   nix-build.sh \
   gc-concurrent.sh \
   repair.sh \
@@ -103,6 +106,8 @@ nix_tests = \
   ssh-relay.sh \
   plugins.sh \
   build.sh \
+  build-delete.sh \
+  output-normalization.sh \
   ca/nix-run.sh \
   selfref-gc.sh ca/selfref-gc.sh \
   db-migration.sh \
@@ -125,9 +130,9 @@ endif
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
 
-clean-files += $(d)/common.sh $(d)/config.nix $(d)/ca/config.nix
+clean-files += $(d)/tests/common/vars-and-functions.sh $(d)/config.nix $(d)/ca/config.nix
 
-test-deps += tests/common.sh tests/config.nix tests/ca/config.nix
+test-deps += tests/common/vars-and-functions.sh tests/config.nix tests/ca/config.nix tests/plugins/libplugintest.$(SO_EXT)
 
 ifeq ($(BUILD_SHARED_LIBS), 1)
   test-deps += tests/plugins/libplugintest.$(SO_EXT)

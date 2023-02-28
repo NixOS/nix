@@ -25,4 +25,4 @@ Maintainers: tick if completed or explain if not relevant
  - [ ] documentation in the manual
  - [ ] code and comments are self-explanatory
  - [ ] commit message explains why the change was made
- - [ ] new feature or bug fix: updated release notes
+ - [ ] new feature or incompatible change: updated release notes

@@ -94,12 +94,8 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
 {
     std::optional<Path> file;
     std::optional<std::string> expr;
-    bool readOnlyMode = false;
 
-    // FIXME: move this; not all commands (e.g. 'nix run') use it.
-    OperateOn operateOn = OperateOn::Output;
-
-    SourceExprCommand(bool supportReadOnlyMode = false);
+    SourceExprCommand();
 
     std::vector<std::shared_ptr<Installable>> parseInstallables(
         ref<Store> store, std::vector<std::string> ss);
@@ -112,6 +108,11 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
     virtual Strings getDefaultFlakeAttrPathPrefixes();
 
     void completeInstallable(std::string_view prefix);
+};
+
+struct MixReadOnlyOption : virtual Args
+{
+    MixReadOnlyOption();
 };
 
 /* A command that operates on a list of "installables", which can be
@@ -139,7 +140,7 @@ struct InstallableCommand : virtual Args, SourceExprCommand
 {
     std::shared_ptr<Installable> installable;
 
-    InstallableCommand(bool supportReadOnlyMode = false);
+    InstallableCommand();
 
     void prepare() override;
 
@@ -153,8 +154,15 @@ private:
     std::string _installable{"."};
 };
 
+struct MixOperateOnOptions : virtual Args
+{
+    OperateOn operateOn = OperateOn::Output;
+
+    MixOperateOnOptions();
+};
+
 /* A command that operates on zero or more store paths. */
-struct BuiltPathsCommand : public InstallablesCommand
+struct BuiltPathsCommand : InstallablesCommand, virtual MixOperateOnOptions
 {
 private:
 
@@ -227,10 +235,6 @@ static RegisterCommand registerCommand2(std::vector<std::string> && name)
     return RegisterCommand(std::move(name), [](){ return make_ref<T>(); });
 }
 
-/* Helper function to generate args that invoke $EDITOR on
-   filename:lineno. */
-Strings editorFor(const Path & file, uint32_t line);
-
 struct MixProfile : virtual StoreCommand
 {
     std::optional<Path> profile;
@@ -280,8 +284,4 @@ void printClosureDiff(
     const StorePath & afterPath,
     std::string_view indent);
 
-
-void runRepl(
-    ref<EvalState> evalState,
-    const ValMap & extraEnv);
 }
