@@ -31,7 +31,7 @@ std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithRef
             assert(references.count(path) == 0);
             return TextInfo {
                 th,
-                /* .references = */ references,
+                .references = references,
             };
         },
         [&](const FixedOutputHash & foh) -> ContentAddressWithReferences {
@@ -43,7 +43,7 @@ std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithRef
             }
             return FixedOutputInfo {
                 foh,
-                /* .references = */ {
+                .references = {
                     .others = std::move(refs),
                     .self = hasSelfReference,
                 },

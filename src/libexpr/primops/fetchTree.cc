@@ -250,7 +250,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
                     .method = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat,
                     .hash = *expectedHash,
                 },
-                /* .references = */ {}
+                .references = {}
             });
 
         if (state.store->isValidPath(expectedPath)) {

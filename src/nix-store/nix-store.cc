@@ -220,7 +220,7 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
             .method = method,
             .hash = Hash::parseAny(hash, hashAlgo),
         },
-        /* .references = */ {},
+        .references = {},
     })));
 }
 

@@ -167,13 +167,13 @@ ContentAddressWithReferences caWithoutRefs(const ContentAddress & ca) {
         [&](const TextHash & h) -> ContentAddressWithReferences {
             return TextInfo {
                 h,
-                /* .references = */ {},
+                .references = {},
             };
         },
         [&](const FixedOutputHash & h) -> ContentAddressWithReferences {
             return FixedOutputInfo {
                 h,
-                /* .references = */ {},
+                .references = {},
             };
         },
     }, ca);

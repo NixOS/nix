@@ -1287,7 +1287,7 @@ drvName, Bindings * attrs, Value & v)
                 .method = method,
                 .hash = h,
             },
-            /* .references = */ {},
+            .references = {},
         });
         drv.env["out"] = state.store->printStorePath(outPath);
         drv.outputs.insert_or_assign("out",
@@ -2103,7 +2103,7 @@ static void addPath(
                     .method = method,
                     .hash = *expectedHash,
                 },
-                /* .references = */ {},
+                .references = {},
             });
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
