@@ -103,9 +103,13 @@ struct Installable
         return {};
     }
 
+    /* Get a cursor to each value this Installable could refer to. However
+       if none exists, throw exception instead of returning empty vector. */
     virtual std::vector<ref<eval_cache::AttrCursor>>
     getCursors(EvalState & state);
 
+    /* Get the first and most preferred cursor this Installable could refer
+       to, or throw an exception if none exists. */
     virtual ref<eval_cache::AttrCursor>
     getCursor(EvalState & state);
 
@@ -156,59 +160,5 @@ struct Installable
 };
 
 typedef std::vector<std::shared_ptr<Installable>> Installables;
-
-struct InstallableValue : Installable
-{
-    ref<EvalState> state;
-
-    InstallableValue(ref<EvalState> state) : state(state) {}
-};
-
-struct InstallableFlake : InstallableValue
-{
-    FlakeRef flakeRef;
-    Strings attrPaths;
-    Strings prefixes;
-    ExtendedOutputsSpec extendedOutputsSpec;
-    const flake::LockFlags & lockFlags;
-    mutable std::shared_ptr<flake::LockedFlake> _lockedFlake;
-
-    InstallableFlake(
-        SourceExprCommand * cmd,
-        ref<EvalState> state,
-        FlakeRef && flakeRef,
-        std::string_view fragment,
-        ExtendedOutputsSpec extendedOutputsSpec,
-        Strings attrPaths,
-        Strings prefixes,
-        const flake::LockFlags & lockFlags);
-
-    std::string what() const override { return flakeRef.to_string() + "#" + *attrPaths.begin(); }
-
-    std::vector<std::string> getActualAttrPaths();
-
-    Value * getFlakeOutputs(EvalState & state, const flake::LockedFlake & lockedFlake);
-
-    DerivedPathsWithInfo toDerivedPaths() override;
-
-    std::pair<Value *, PosIdx> toValue(EvalState & state) override;
-
-    /* Get a cursor to every attrpath in getActualAttrPaths() that
-       exists. */
-    std::vector<ref<eval_cache::AttrCursor>>
-    getCursors(EvalState & state) override;
-
-    /* Get a cursor to the first attrpath in getActualAttrPaths() that
-       exists, or throw an exception with suggestions if none exists. */
-    ref<eval_cache::AttrCursor> getCursor(EvalState & state) override;
-
-    std::shared_ptr<flake::LockedFlake> getLockedFlake() const;
-
-    FlakeRef nixpkgsFlakeRef() const override;
-};
-
-ref<eval_cache::EvalCache> openEvalCache(
-    EvalState & state,
-    std::shared_ptr<flake::LockedFlake> lockedFlake);
 
 }

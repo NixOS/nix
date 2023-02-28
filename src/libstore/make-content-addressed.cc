@@ -31,11 +31,12 @@ std::map<StorePath, StorePath> makeContentAddressed(
         for (auto & ref : oldInfo->references) {
             if (ref == path)
                 refs.self = true;
-            auto i = remappings.find(ref);
-            auto replacement = i != remappings.end() ? i->second : ref;
-            // FIXME: warn about unremapped paths?
-            if (replacement != ref) {
-                rewrites.insert_or_assign(srcStore.printStorePath(ref), srcStore.printStorePath(replacement));
+            else {
+                auto i = remappings.find(ref);
+                auto replacement = i != remappings.end() ? i->second : ref;
+                // FIXME: warn about unremapped paths?
+                if (replacement != ref)
+                    rewrites.insert_or_assign(srcStore.printStorePath(ref), srcStore.printStorePath(replacement));
                 refs.others.insert(std::move(replacement));
             }
         }
@@ -51,7 +52,7 @@ std::map<StorePath, StorePath> makeContentAddressed(
             dstStore,
             path.name(),
             FixedOutputInfo {
-                {
+                .hash = {
                     .method = FileIngestionMethod::Recursive,
                     .hash = narModuloHash,
                 },

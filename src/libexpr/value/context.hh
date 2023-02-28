@@ -1,9 +1,10 @@
 #pragma once
 
 #include "util.hh"
+#include "comparator.hh"
 #include "path.hh"
 
-#include <optional>
+#include <variant>
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -31,7 +32,9 @@ class Store;
    Encoded as just the path: ‘<path>’.
 */
 struct NixStringContextElem_Opaque {
-   StorePath path;
+    StorePath path;
+
+    GENERATE_CMP(NixStringContextElem_Opaque, me->path);
 };
 
 /* Path to a derivation and its entire build closure.
@@ -43,7 +46,9 @@ struct NixStringContextElem_Opaque {
    Encoded in the form ‘=<drvPath>’.
 */
 struct NixStringContextElem_DrvDeep {
-   StorePath drvPath;
+    StorePath drvPath;
+
+    GENERATE_CMP(NixStringContextElem_DrvDeep, me->drvPath);
 };
 
 /* Derivation output.
@@ -51,8 +56,10 @@ struct NixStringContextElem_DrvDeep {
    Encoded in the form ‘!<output>!<drvPath>’.
 */
 struct NixStringContextElem_Built {
-   StorePath drvPath;
-   std::string output;
+    StorePath drvPath;
+    std::string output;
+
+    GENERATE_CMP(NixStringContextElem_Built, me->drvPath, me->output);
 };
 
 using _NixStringContextElem_Raw = std::variant<

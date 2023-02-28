@@ -24,7 +24,7 @@
 | [Equality]                             | *expr* `==` *expr*                         | none          | 11         |
 | Inequality                             | *expr* `!=` *expr*                         | none          | 11         |
 | Logical conjunction (`AND`)            | *bool* `&&` *bool*                         | left          | 12         |
-| Logical disjunction (`OR`)             | *bool* `\|\|` *bool*                       | left          | 13         |
+| Logical disjunction (`OR`)             | *bool* <code>\|\|</code> *bool*            | left          | 13         |
 | [Logical implication]                  | *bool* `->` *bool*                         | none          | 14         |
 
 [string]: ./values.md#type-string
@@ -116,7 +116,7 @@ The result is a string.
 [store path]: ../glossary.md#gloss-store-path
 [store]: ../glossary.md#gloss-store
 
-[Path and string concatenation]: #path-and-string-concatenation
+[String and path concatenation]: #string-and-path-concatenation
 
 ## Update
 
@@ -133,7 +133,7 @@ If an attribute name is present in both, the attribute value from the latter is 
 
 Comparison is
 
-- [arithmetic] for [number]s 
+- [arithmetic] for [number]s
 - lexicographic for [string]s and [path]s
 - item-wise lexicographic for [list]s:
   elements at the same index in both lists are compared according to their type and skipped if they are equal.

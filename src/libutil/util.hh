@@ -137,6 +137,9 @@ void deletePath(const Path & path, uint64_t & bytesFreed);
 
 std::string getUserName();
 
+/* Return the given user's home directory from /etc/passwd. */
+Path getHomeOf(uid_t userId);
+
 /* Return $HOME or the user's home directory from /etc/passwd. */
 Path getHome();
 
@@ -154,6 +157,12 @@ Path getDataDir();
 
 /* Return the path of the current executable. */
 std::optional<Path> getSelfExe();
+
+/* Return $XDG_STATE_HOME or $HOME/.local/state. */
+Path getStateDir();
+
+/* Create the Nix state directory and return the path to it. */
+Path createNixStateDir();
 
 /* Create a directory and all its parents, if necessary.  Returns the
    list of created directories, in order of creation. */
@@ -298,6 +307,7 @@ struct ProcessOptions
     bool dieWithParent = true;
     bool runExitHandlers = false;
     bool allowVfork = false;
+    int cloneFlags = 0; // use clone() with the specified flags (Linux only)
 };
 
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());

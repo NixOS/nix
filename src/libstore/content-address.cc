@@ -17,8 +17,9 @@ std::string makeFileIngestionPrefix(FileIngestionMethod m)
         return "";
     case FileIngestionMethod::Recursive:
         return "r:";
+    default:
+        throw Error("impossible, caught both cases");
     }
-    assert(false);
 }
 
 std::string makeContentAddressingPrefix(ContentAddressMethod m) {
@@ -168,13 +169,13 @@ ContentAddressWithReferences contentAddressFromMethodHashAndRefs(
             if (refs.self)
                 throw UsageError("Cannot have a self reference with text hashing scheme");
             return TextInfo {
-                { .hash = std::move(hash) },
+                .hash = { .hash = std::move(hash) },
                 .references = std::move(refs.others),
             };
         },
         [&](FileIngestionMethod m2) -> ContentAddressWithReferences {
             return FixedOutputInfo {
-                {
+                .hash = {
                     .method = m2,
                     .hash = std::move(hash),
                 },
@@ -191,7 +192,7 @@ ContentAddressMethod getContentAddressMethod(const ContentAddressWithReferences 
             return TextHashMethod {};
         },
         [](const FixedOutputInfo & fsh) -> ContentAddressMethod {
-            return fsh.method;
+            return fsh.hash.method;
         },
     }, ca);
 }
@@ -222,13 +223,13 @@ ContentAddressWithReferences caWithoutRefs(const ContentAddress & ca) {
     return std::visit(overloaded {
         [&](const TextHash & h) -> ContentAddressWithReferences {
             return TextInfo {
-                h,
+                .hash = h,
                 .references = {},
             };
         },
         [&](const FixedOutputHash & h) -> ContentAddressWithReferences {
             return FixedOutputInfo {
-                h,
+                .hash = h,
                 .references = {},
             };
         },
@@ -239,10 +240,10 @@ Hash getContentAddressHash(const ContentAddressWithReferences & ca)
 {
     return std::visit(overloaded {
         [](const TextInfo & th) {
-            return th.hash;
+            return th.hash.hash;
         },
         [](const FixedOutputInfo & fsh) {
-            return fsh.hash;
+            return fsh.hash.hash;
         },
     }, ca);
 }

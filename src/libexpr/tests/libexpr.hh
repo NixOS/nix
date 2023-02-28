@@ -7,18 +7,19 @@
 #include "eval-inline.hh"
 #include "store-api.hh"
 
+#include "tests/libstore.hh"
 
 namespace nix {
-    class LibExprTest : public ::testing::Test {
+    class LibExprTest : public LibStoreTest {
         public:
             static void SetUpTestSuite() {
-                initLibStore();
+                LibStoreTest::SetUpTestSuite();
                 initGC();
             }
 
         protected:
             LibExprTest()
-                : store(openStore("dummy://"))
+                : LibStoreTest()
                 , state({}, store)
             {
             }
@@ -36,7 +37,6 @@ namespace nix {
                 return state.symbols.create(value);
             }
 
-            ref<Store> store;
             EvalState state;
     };
 

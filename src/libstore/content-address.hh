@@ -118,18 +118,20 @@ struct StoreReferences {
  */
 
 // This matches the additional info that we need for makeTextPath
-struct TextInfo : TextHash {
+struct TextInfo {
+    TextHash hash;
     // References for the paths, self references disallowed
     StorePathSet references;
 
-    GENERATE_CMP(TextInfo, *(const TextHash *)me, me->references);
+    GENERATE_CMP(TextInfo, me->hash, me->references);
 };
 
-struct FixedOutputInfo : FixedOutputHash {
+struct FixedOutputInfo {
+    FixedOutputHash hash;
     // References for the paths
     StoreReferences references;
 
-    GENERATE_CMP(FixedOutputInfo, *(const FixedOutputHash *)me, me->references);
+    GENERATE_CMP(FixedOutputInfo, me->hash, me->references);
 };
 
 typedef std::variant<

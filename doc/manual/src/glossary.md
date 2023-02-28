@@ -19,6 +19,13 @@
 
     [store derivation]: #gloss-store-derivation
 
+  - [instantiate]{#gloss-instantiate}, instantiation\
+    Translate a [derivation] into a [store derivation].
+
+    See [`nix-instantiate`](./command-ref/nix-instantiate.md).
+
+    [instantiate]: #gloss-instantiate
+
   - [realise]{#gloss-realise}, realisation\
     Ensure a [store path] is [valid][validity].
 
@@ -156,6 +163,8 @@
     to path `Q`, then `Q` is in the closure of `P`. Further, if `Q`
     references `R` then `R` is also in the closure of `P`.
 
+    [closure]: #gloss-closure
+
   - [output path]{#gloss-output-path}\
     A [store path] produced by a [derivation].
 
@@ -171,6 +180,8 @@
     - The store path leads to an existing [store object] in that [store].
     - The store path is listed in the Nix database as being valid.
     - All paths in the store path's [closure] are valid.
+
+    [validity]: #gloss-validity
 
   - [user environment]{#gloss-user-env}\
     An automatically generated store object that consists of a set of

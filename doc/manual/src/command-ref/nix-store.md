@@ -82,8 +82,8 @@ paths. Realisation is a somewhat overloaded term:
     produced through substitutes. If there are no (successful)
     substitutes, realisation fails.
 
-[valid]: ../glossary.md#validity
-[substitutes]: ../glossary.md#substitute
+[valid]: ../glossary.md#gloss-validity
+[substitutes]: ../glossary.md#gloss-substitute
 
 The output path of each derivation is printed on standard output. (For
 non-derivations argument, the argument itself is printed.)
@@ -633,7 +633,7 @@ written to standard output.
 
 A NAR archive is like a TAR or Zip archive, but it contains only the
 information that Nix considers important. For instance, timestamps are
-elided because all files in the Nix store have their timestamp set to 0
+elided because all files in the Nix store have their timestamp set to 1
 anyway. Likewise, all permissions are left out except for the execute
 bit, because all files in the Nix store have 444 or 555 permission.
 

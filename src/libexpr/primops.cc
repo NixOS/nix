@@ -2093,7 +2093,7 @@ static void addPath(
         std::optional<StorePath> expectedStorePath;
         if (expectedHash)
             expectedStorePath = state.store->makeFixedOutputPath(name, FixedOutputInfo {
-                {
+                .hash = {
                     .method = method,
                     .hash = *expectedHash,
                 },
@@ -3038,9 +3038,9 @@ static RegisterPrimOp primop_foldlStrict({
     .doc = R"(
       Reduce a list by applying a binary operator, from left to right,
       e.g. `foldl' op nul [x0 x1 x2 ...] = op (op (op nul x0) x1) x2)
-      ...`. The operator is applied strictly, i.e., its arguments are
-      evaluated first. For example, `foldl' (x: y: x + y) 0 [1 2 3]`
-      evaluates to 6.
+      ...`. For example, `foldl' (x: y: x + y) 0 [1 2 3]` evaluates to 6.
+      The return value of each application of `op` is evaluated immediately,
+      even for intermediate values.
     )",
     .fun = prim_foldlStrict,
 });

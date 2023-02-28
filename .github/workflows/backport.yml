@@ -21,12 +21,12 @@ jobs:
           fetch-depth: 0
       - name: Create backport PRs
         # should be kept in sync with `version`
-        uses: zeebe-io/backport-action@v1.0.1
+        uses: zeebe-io/backport-action@v1.2.0
         with:
           # Config README: https://github.com/zeebe-io/backport-action#backport-action
           github_token: ${{ secrets.GITHUB_TOKEN }}
           github_workspace: ${{ github.workspace }}
           pull_description: |-
-            Bot-based backport to `${target_branch}`, triggered by a label in #${pull_number}.
+            Automatic backport to `${target_branch}`, triggered by a label in #${pull_number}.
           # should be kept in sync with `uses`
           version: v0.0.5

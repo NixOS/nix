@@ -1,4 +1,5 @@
 #include "command.hh"
+#include "installable-flake.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
@@ -202,7 +203,7 @@ struct ProfileManifest
             *store,
             "profile",
             FixedOutputInfo {
-                {
+                .hash = {
                     .method = FileIngestionMethod::Recursive,
                     .hash = narHash,
                 },

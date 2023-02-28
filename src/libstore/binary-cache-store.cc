@@ -309,7 +309,7 @@ StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, std::string_view n
             *this,
             name,
             FixedOutputInfo {
-                {
+                .hash = {
                     .method = method,
                     .hash = nar.first,
                 },
@@ -380,7 +380,7 @@ void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
     getFile(narInfoFile,
-        {[=](std::future<std::optional<std::string>> fut) {
+        {[=,this](std::future<std::optional<std::string>> fut) {
             try {
                 auto data = fut.get();
 
@@ -427,7 +427,7 @@ StorePath BinaryCacheStore::addToStore(
             *this,
             name,
             FixedOutputInfo {
-                {
+                .hash = {
                     .method = method,
                     .hash = h,
                 },

@@ -106,7 +106,7 @@ void printClosureDiff(
 
 using namespace nix;
 
-struct CmdDiffClosures : SourceExprCommand
+struct CmdDiffClosures : SourceExprCommand, MixOperateOnOptions
 {
     std::string _before, _after;
 

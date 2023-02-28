@@ -21,16 +21,16 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
             StorePathSet res;
             StorePathSet referrers;
             queryReferrers(path, referrers);
-            for (auto & ref : referrers)
+            for (auto& ref : referrers)
                 if (ref != path)
                     res.insert(ref);
 
             if (includeOutputs)
-                for (auto & i : queryValidDerivers(path))
+                for (auto& i : queryValidDerivers(path))
                     res.insert(i);
 
             if (includeDerivers && path.isDerivation())
-                for (auto & [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
+                for (auto& [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
                     if (maybeOutPath && isValidPath(*maybeOutPath))
                         res.insert(*maybeOutPath);
             return res;
@@ -40,12 +40,12 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
                         std::future<ref<const ValidPathInfo>> & fut) {
             StorePathSet res;
             auto info = fut.get();
-            for (auto & ref : info->references)
+            for (auto& ref : info->references)
                 if (ref != path)
                     res.insert(ref);
 
             if (includeOutputs && path.isDerivation())
-                for (auto & [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
+                for (auto& [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
                     if (maybeOutPath && isValidPath(*maybeOutPath))
                         res.insert(*maybeOutPath);
 
@@ -93,12 +93,12 @@ std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv)
             [&](const TextInfo & ti) -> std::optional<ContentAddress> {
                 if (!ti.references.empty())
                     return std::nullopt;
-                return static_cast<TextHash>(ti);
+                return ti.hash;
             },
             [&](const FixedOutputInfo & fi) -> std::optional<ContentAddress> {
                 if (!fi.references.empty())
                     return std::nullopt;
-                return static_cast<FixedOutputHash>(fi);
+                return fi.hash;
             },
         }, dof->ca);
     }

@@ -74,7 +74,7 @@ DownloadFileResult downloadFile(
             *store,
             name,
             FixedOutputInfo {
-                {
+                .hash = {
                     .method = FileIngestionMethod::Flat,
                     .hash = hash,
                 },

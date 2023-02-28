@@ -99,10 +99,12 @@ StorePath Store::followLinksToStorePath(std::string_view path) const
        silly, but it's done that way for compatibility).  <id> is the
        name of the output (usually, "out").
 
-   <h2> = base-16 representation of a SHA-256 hash of:
+   <h2> = base-16 representation of a SHA-256 hash of <s2>
+
+   <s2> =
      if <type> = "text:...":
        the string written to the resulting store path
-     if <type> = "source":
+     if <type> = "source:...":
        the serialisation of the path from which this store path is
        copied, as returned by hashPath()
      if <type> = "output:<id>":
@@ -164,8 +166,8 @@ StorePath Store::makeOutputPath(std::string_view id,
 
 
 /* Stuff the references (if any) into the type.  This is a bit
-   hacky, but we can't put them in `s' since that would be
-   ambiguous. */
+   hacky, but we can't put them in, say, <s2> (per the grammar above)
+   since that would be ambiguous. */
 static std::string makeType(
     const Store & store,
     std::string && type,
@@ -182,15 +184,15 @@ static std::string makeType(
 
 StorePath Store::makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const
 {
-    if (info.hash.type == htSHA256 && info.method == FileIngestionMethod::Recursive) {
-        return makeStorePath(makeType(*this, "source", info.references), info.hash, name);
+    if (info.hash.hash.type == htSHA256 && info.hash.method == FileIngestionMethod::Recursive) {
+        return makeStorePath(makeType(*this, "source", info.references), info.hash.hash, name);
     } else {
         assert(info.references.size() == 0);
         return makeStorePath("output:out",
             hashString(htSHA256,
                 "fixed:out:"
-                + makeFileIngestionPrefix(info.method)
-                + info.hash.to_string(Base16, true) + ":"),
+                + makeFileIngestionPrefix(info.hash.method)
+                + info.hash.hash.to_string(Base16, true) + ":"),
             name);
     }
 }
@@ -198,13 +200,13 @@ StorePath Store::makeFixedOutputPath(std::string_view name, const FixedOutputInf
 
 StorePath Store::makeTextPath(std::string_view name, const TextInfo & info) const
 {
-    assert(info.hash.type == htSHA256);
+    assert(info.hash.hash.type == htSHA256);
     return makeStorePath(
         makeType(*this, "text", StoreReferences {
             .others = info.references,
             .self = false,
         }),
-        info.hash,
+        info.hash.hash,
         name);
 }
 
@@ -230,7 +232,7 @@ std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
         ? hashPath(hashAlgo, srcPath, filter).first
         : hashFile(hashAlgo, srcPath);
     FixedOutputInfo caInfo {
-        {
+        .hash = {
             .method = method,
             .hash = h,
         },
@@ -439,7 +441,7 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
         *this,
         name,
         FixedOutputInfo {
-            {
+            .hash = {
                 .method = method,
                 .hash = hash,
             },
@@ -762,7 +764,7 @@ StorePathSet Store::queryValidPaths(const StorePathSet & paths, SubstituteFlag m
 
     auto doQuery = [&](const StorePath & path) {
         checkInterrupt();
-        queryPathInfo(path, {[path, this, &state_, &wakeup](std::future<ref<const ValidPathInfo>> fut) {
+        queryPathInfo(path, {[path, &state_, &wakeup](std::future<ref<const ValidPathInfo>> fut) {
             auto state(state_.lock());
             try {
                 auto info = fut.get();
@@ -996,7 +998,7 @@ void copyStorePath(
         auto info2 = make_ref<ValidPathInfo>(*info);
         info2->path = dstStore.makeFixedOutputPathFromCA(
             info->path.name(),
-            info->contentAddressWithReferenences().value());
+            info->contentAddressWithReferences().value());
         if (dstStore.storeDir == srcStore.storeDir)
             assert(info->path == info2->path);
         info = info2;
@@ -1110,7 +1112,7 @@ std::map<StorePath, StorePath> copyPaths(
         if (currentPathInfo.ca && currentPathInfo.references.empty()) {
             storePathForDst = dstStore.makeFixedOutputPathFromCA(
                 currentPathInfo.path.name(),
-                currentPathInfo.contentAddressWithReferenences().value());
+                currentPathInfo.contentAddressWithReferences().value());
             if (dstStore.storeDir == srcStore.storeDir)
                 assert(storePathForDst == storePathForSrc);
             if (storePathForDst != storePathForSrc)

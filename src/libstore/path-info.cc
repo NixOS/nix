@@ -21,7 +21,7 @@ void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
     sigs.insert(secretKey.signDetached(fingerprint(store)));
 }
 
-std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithReferenences() const
+std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithReferences() const
 {
     if (! ca)
         return std::nullopt;
@@ -30,7 +30,7 @@ std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithRef
         [&](const TextHash & th) -> ContentAddressWithReferences {
             assert(references.count(path) == 0);
             return TextInfo {
-                th,
+                .hash = th,
                 .references = references,
             };
         },
@@ -42,7 +42,7 @@ std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithRef
                 refs.erase(path);
             }
             return FixedOutputInfo {
-                foh,
+                .hash = foh,
                 .references = {
                     .others = std::move(refs),
                     .self = hasSelfReference,
@@ -54,7 +54,7 @@ std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithRef
 
 bool ValidPathInfo::isContentAddressed(const Store & store) const
 {
-    auto fullCaOpt = contentAddressWithReferenences();
+    auto fullCaOpt = contentAddressWithReferences();
 
     if (! fullCaOpt)
         return false;

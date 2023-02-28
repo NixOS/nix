@@ -16,10 +16,10 @@ sed -i 's/experimental-features = .*/& ca-derivations ca-references/' "$NIX_CONF
 # - check that the path of the output coincides with that of the original derivation
 
 drv=$(nix-instantiate --experimental-features ca-derivations ./text-hashed-output.nix -A root)
-nix show-derivation --derivation "$drv"
+nix show-derivation "$drv"
 
 drvDep=$(nix-instantiate --experimental-features ca-derivations ./text-hashed-output.nix -A dependent)
-nix show-derivation --derivation "$drvDep"
+nix show-derivation "$drvDep"
 
 out1=$(nix-build --experimental-features ca-derivations ./text-hashed-output.nix -A dependent --no-out-link)
 
