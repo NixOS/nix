@@ -141,7 +141,11 @@ printf World2 > $flake2Dir/who
 nix profile install $flake1Dir
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World" ]]
 expect 1 nix profile install $flake2Dir
-diff -u <(nix profile install $flake2Dir 2>&1 1> /dev/null || true) <(cat << EOF
+diff -u <(
+    nix --offline profile install $flake2Dir 2>&1 1> /dev/null \
+        | grep -vE "^warning: " \
+        || true
+) <(cat << EOF
 error: An existing package already provides the following file:
 
          $(nix build --no-link --print-out-paths ${flake1Dir}"#default.out")/bin/hello
