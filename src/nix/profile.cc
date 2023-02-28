@@ -203,7 +203,7 @@ struct ProfileManifest
             *store,
             "profile",
             FixedOutputInfo {
-                {
+                .hash = {
                     .method = FileIngestionMethod::Recursive,
                     .hash = narHash,
                 },

@@ -52,7 +52,7 @@ std::map<StorePath, StorePath> makeContentAddressed(
             dstStore,
             path.name(),
             FixedOutputInfo {
-                {
+                .hash = {
                     .method = FileIngestionMethod::Recursive,
                     .hash = narModuloHash,
                 },

@@ -216,7 +216,7 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
     std::string name = *i++;
 
     cout << fmt("%s\n", store->printStorePath(store->makeFixedOutputPath(name, FixedOutputInfo {
-        {
+        .hash = {
             .method = method,
             .hash = Hash::parseAny(hash, hashAlgo),
         },

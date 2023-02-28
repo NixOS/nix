@@ -309,7 +309,7 @@ StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, std::string_view n
             *this,
             name,
             FixedOutputInfo {
-                {
+                .hash = {
                     .method = method,
                     .hash = nar.first,
                 },
@@ -427,7 +427,7 @@ StorePath BinaryCacheStore::addToStore(
             *this,
             name,
             FixedOutputInfo {
-                {
+                .hash = {
                     .method = method,
                     .hash = h,
                 },

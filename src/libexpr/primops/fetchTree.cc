@@ -246,7 +246,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
         auto expectedPath = state.store->makeFixedOutputPath(
             name,
             FixedOutputInfo {
-                {
+                .hash = {
                     .method = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat,
                     .hash = *expectedHash,
                 },

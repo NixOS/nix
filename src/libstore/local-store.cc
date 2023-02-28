@@ -1415,7 +1415,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
     auto [hash, size] = hashSink->finish();
 
     ContentAddressWithReferences desc = FixedOutputInfo {
-        {
+        .hash = {
             .method = method,
             .hash = hash,
         },

@@ -166,13 +166,13 @@ ContentAddressWithReferences caWithoutRefs(const ContentAddress & ca) {
     return std::visit(overloaded {
         [&](const TextHash & h) -> ContentAddressWithReferences {
             return TextInfo {
-                h,
+                .hash = h,
                 .references = {},
             };
         },
         [&](const FixedOutputHash & h) -> ContentAddressWithReferences {
             return FixedOutputInfo {
-                h,
+                .hash = h,
                 .references = {},
             };
         },

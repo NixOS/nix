@@ -296,7 +296,7 @@ SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
             auto h = Hash::parseAny(hash, parseHashType(algo));
             auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
             auto path = store()->makeFixedOutputPath(name, FixedOutputInfo {
-                {
+                .hash = {
                     .method = method,
                     .hash = h,
                 },

@@ -1283,7 +1283,7 @@ drvName, Bindings * attrs, Value & v)
 
         auto method = ingestionMethod.value_or(FileIngestionMethod::Flat);
         auto outPath = state.store->makeFixedOutputPath(drvName, FixedOutputInfo {
-            {
+            .hash = {
                 .method = method,
                 .hash = h,
             },
@@ -2099,7 +2099,7 @@ static void addPath(
         std::optional<StorePath> expectedStorePath;
         if (expectedHash)
             expectedStorePath = state.store->makeFixedOutputPath(name, FixedOutputInfo {
-                {
+                .hash = {
                     .method = method,
                     .hash = *expectedHash,
                 },

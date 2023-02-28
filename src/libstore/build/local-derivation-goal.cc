@@ -2442,7 +2442,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 worker.store,
                 outputPathName(drv->name, outputName),
                 FixedOutputInfo {
-                    {
+                    .hash = {
                         .method = outputHash.method,
                         .hash = got,
                     },
