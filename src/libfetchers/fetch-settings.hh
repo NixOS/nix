@@ -57,7 +57,7 @@ struct FetchSettings : public Config
           ```
 
           This example specifies three tokens, one each for accessing
-          github.com, gitlab.mycompany.com, and sourceforge.net.
+          github.com, gitlab.mycompany.com, and gitlab.com.
 
           The `input.foo` uses the "gitlab" fetcher, which might
           requires specifying the token type along with the token
