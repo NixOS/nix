@@ -353,7 +353,8 @@
             configureFlags = configureFlags ++
               [ "--sysconfdir=/etc" ] ++
               lib.optional stdenv.hostPlatform.isStatic "--enable-embedded-sandbox-shell" ++
-              (if finalAttrs.doCheck then testConfigureFlags else [ "--disable-tests" ]) ++
+              [ (lib.enableFeature finalAttrs.doCheck "tests") ] ++
+              lib.optionals finalAttrs.doCheck testConfigureFlags ++
               lib.optional (!canRunInstalled) "--disable-doc-gen";
 
             enableParallelBuilding = true;
