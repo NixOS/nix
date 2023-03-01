@@ -589,32 +589,32 @@ struct GitInputScheme : InputScheme
             return makeResult2(infoAttrs, accessor);
         }
 
-        Path tmpDir = createTempDir();
-        AutoDelete delTmpDir(tmpDir, true);
-        PathFilter filter = defaultPathFilter;
+        else {
+            Path tmpDir = createTempDir();
+            AutoDelete delTmpDir(tmpDir, true);
+            PathFilter filter = defaultPathFilter;
 
-        auto result = runProgram(RunOptions {
-            .program = "git",
-            .args = { "-C", repoDir, "--git-dir", repoInfo.gitDir, "cat-file", "commit", rev.gitRev() },
-            .mergeStderrToStdout = true
-        });
-        if (WEXITSTATUS(result.first) == 128
-            && result.second.find("bad file") != std::string::npos)
-        {
-            throw Error(
-                "Cannot find Git revision '%s' in ref '%s' of repository '%s'! "
-                "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the "
-                ANSI_BOLD "ref" ANSI_NORMAL " you've specified or add " ANSI_BOLD
-                "allRefs = true;" ANSI_NORMAL " to " ANSI_BOLD "fetchGit" ANSI_NORMAL ".",
-                rev.gitRev(),
-                ref,
-                repoInfo.url
-            );
-        }
+            auto result = runProgram(RunOptions {
+                .program = "git",
+                .args = { "-C", repoDir, "--git-dir", repoInfo.gitDir, "cat-file", "commit", rev.gitRev() },
+                .mergeStderrToStdout = true
+            });
+            if (WEXITSTATUS(result.first) == 128
+                && result.second.find("bad file") != std::string::npos)
+            {
+                throw Error(
+                    "Cannot find Git revision '%s' in ref '%s' of repository '%s'! "
+                    "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the "
+                    ANSI_BOLD "ref" ANSI_NORMAL " you've specified or add " ANSI_BOLD
+                    "allRefs = true;" ANSI_NORMAL " to " ANSI_BOLD "fetchGit" ANSI_NORMAL ".",
+                    rev.gitRev(),
+                    ref,
+                    repoInfo.url
+                    );
+            }
 
-        Activity act(*logger, lvlChatty, actUnknown, fmt("copying Git tree '%s' to the store", input.to_string()));
+            Activity act(*logger, lvlChatty, actUnknown, fmt("copying Git tree '%s' to the store", input.to_string()));
 
-        if (repoInfo.submodules) {
             Path tmpGitDir = createTempDir();
             AutoDelete delTmpGitDir(tmpGitDir, true);
 
@@ -657,38 +657,26 @@ struct GitInputScheme : InputScheme
             }
 
             filter = isNotDotGitDirectory;
-        } else {
-            // FIXME: should pipe this, or find some better way to extract a
-            // revision.
-            auto source = sinkToSource([&](Sink & sink) {
-                runProgram2({
-                    .program = "git",
-                    .args = { "-C", repoDir, "--git-dir", repoInfo.gitDir, "archive", rev.gitRev() },
-                    .standardOut = &sink
-                });
-            });
 
-            unpackTarfile(*source, tmpDir);
-        }
+            auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
 
-        auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
+            if (!origRev)
+                getCache()->add(
+                    store,
+                    unlockedAttrs,
+                    infoAttrs,
+                    storePath,
+                    false);
 
-        if (!origRev)
             getCache()->add(
                 store,
-                unlockedAttrs,
+                getLockedAttrs(),
                 infoAttrs,
                 storePath,
-                false);
+                true);
 
-        getCache()->add(
-            store,
-            getLockedAttrs(),
-            infoAttrs,
-            storePath,
-            true);
-
-        return makeResult(infoAttrs, std::move(storePath));
+            return makeResult(infoAttrs, std::move(storePath));
+        }
     }
 
     std::pair<ref<InputAccessor>, Input> getAccessorFromWorkdir(
