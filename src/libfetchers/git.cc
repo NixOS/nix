@@ -480,11 +480,9 @@ struct GitInputScheme : InputScheme
             repoInfo.gitDir = ".";
 
             createDirs(dirOf(cacheDir));
-            PathLocks cacheDirLock({cacheDir + ".lock"});
+            PathLocks cacheDirLock({cacheDir});
 
-            if (!pathExists(cacheDir)) {
-                runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", "--bare", repoDir });
-            }
+            GitRepo::openRepo(CanonPath(cacheDir), true, true);
 
             Path localRefFile =
                 ref.compare(0, 5, "refs/") == 0

@@ -94,13 +94,21 @@ static void initLibGit2()
         throw Error("initialising libgit2: %s", git_error_last()->message);
 }
 
-static Repository openRepo(const CanonPath & path)
+static Repository openRepo(const CanonPath & path, bool create = false, bool bare = false)
 {
     initLibGit2();
-    git_repository * _repo;
-    if (git_repository_open(&_repo, path.c_str()))
-        throw Error("opening Git repository '%s': %s", path, git_error_last()->message);
-    return Repository(_repo);
+
+    Repository repo;
+
+    if (pathExists(path.abs())) {
+        if (git_repository_open(Setter(repo), path.c_str()))
+            throw Error("opening Git repository '%s': %s", path, git_error_last()->message);
+    } else {
+        if (git_repository_init(Setter(repo), path.c_str(), bare))
+            throw Error("creating Git repository '%s': %s", path, git_error_last()->message);
+    }
+
+    return repo;
 }
 
 git_oid hashToOID(const Hash & hash)
@@ -318,16 +326,7 @@ static Repository openTarballCache()
 {
     static CanonPath repoDir(getCacheDir() + "/nix/tarball-cache");
 
-    initLibGit2();
-
-    if (pathExists(repoDir.abs()))
-        return openRepo(repoDir);
-    else {
-        git_repository * _repo;
-        if (git_repository_init(&_repo, repoDir.c_str(), true))
-            throw Error("creating Git repository '%s': %s", repoDir, git_error_last()->message);
-        return Repository(_repo);
-    }
+    return openRepo(repoDir, true, true);
 }
 
 TarballInfo importTarball(Source & source)
@@ -515,8 +514,8 @@ struct GitRepoImpl : GitRepo
 {
     Repository repo;
 
-    GitRepoImpl(const CanonPath & path)
-        : repo(std::move(nix::openRepo(path)))
+    GitRepoImpl(const CanonPath & path, bool create, bool bare)
+        : repo(std::move(nix::openRepo(path, create, bare)))
     { }
 
     uint64_t getRevCount(const Hash & rev) override
@@ -620,9 +619,9 @@ struct GitRepoImpl : GitRepo
     }
 };
 
-ref<GitRepo> GitRepo::openRepo(const CanonPath & path)
+ref<GitRepo> GitRepo::openRepo(const CanonPath & path, bool create, bool bare)
 {
-    return make_ref<GitRepoImpl>(path);
+    return make_ref<GitRepoImpl>(path, create, bare);
 }
 
 }

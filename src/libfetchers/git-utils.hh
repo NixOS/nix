@@ -6,7 +6,7 @@ namespace nix {
 
 struct GitRepo
 {
-    static ref<GitRepo> openRepo(const CanonPath & path);
+    static ref<GitRepo> openRepo(const CanonPath & path, bool create = false, bool bare = false);
 
     virtual uint64_t getRevCount(const Hash & rev) = 0;
 
