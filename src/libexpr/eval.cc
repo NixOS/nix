@@ -364,10 +364,12 @@ void initGC()
     StackAllocator::defaultAllocator = &boehmGCStackAllocator;
 
 
+#if NIX_BOEHM_PATCH_VERSION != 1
     /* Used to disable GC when entering coroutines on macOS */
-    create_disable_gc = []() -> std::shared_ptr<void> {
+    create_coro_gc_hook = []() -> std::shared_ptr<void> {
         return std::make_shared<BoehmDisableGC>();
     };
+#endif
 
     /* Set the initial heap size to something fairly big (25% of
        physical RAM, up to a maximum of 384 MiB) so that in most cases
