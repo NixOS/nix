@@ -34,20 +34,20 @@ struct GitRepo
     };
 
     virtual WorkdirInfo getWorkdirInfo() = 0;
+
+    struct TarballInfo
+    {
+        Hash treeHash;
+        time_t lastModified;
+    };
+
+    virtual TarballInfo importTarball(Source & source) = 0;
+
+    virtual bool hasObject(const Hash & oid) = 0;
+
+    virtual ref<InputAccessor> getAccessor(const Hash & rev) = 0;
 };
 
-ref<InputAccessor> makeGitInputAccessor(const CanonPath & path, const Hash & rev);
-
-struct TarballInfo
-{
-    Hash treeHash;
-    time_t lastModified;
-};
-
-TarballInfo importTarball(Source & source);
-
-ref<InputAccessor> makeTarballCacheAccessor(const Hash & rev);
-
-bool tarballCacheContains(const Hash & treeHash);
+ref<GitRepo> getTarballCache();
 
 }

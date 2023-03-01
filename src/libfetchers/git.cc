@@ -583,7 +583,7 @@ struct GitInputScheme : InputScheme
             return makeResult(res->first, std::move(res->second));
 
         if (!repoInfo.submodules) {
-            auto accessor = makeGitInputAccessor(CanonPath(repoDir), rev);
+            auto accessor = GitRepo::openRepo(CanonPath(repoDir))->getAccessor(rev);
             return makeResult2(infoAttrs, accessor);
         }
 

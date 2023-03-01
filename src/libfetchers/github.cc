@@ -209,7 +209,7 @@ struct GitArchiveInputScheme : InputScheme
 
     virtual DownloadUrl getDownloadUrl(const Input & input) const = 0;
 
-    std::pair<Input, TarballInfo> downloadArchive(ref<Store> store, Input input) const
+    std::pair<Input, GitRepo::TarballInfo> downloadArchive(ref<Store> store, Input input) const
     {
         if (!maybeGetStrAttr(input.attrs, "ref")) input.attrs.insert_or_assign("ref", "HEAD");
 
@@ -235,8 +235,8 @@ struct GitArchiveInputScheme : InputScheme
             if (auto lastModifiedS = cache->queryFact(lastModifiedKey)) {
                 auto treeHash = Hash::parseAny(*treeHashS, htSHA1);
                 auto lastModified = string2Int<time_t>(*lastModifiedS).value();
-                if (tarballCacheContains(treeHash))
-                    return {std::move(input), TarballInfo { .treeHash = treeHash, .lastModified = lastModified }};
+                if (getTarballCache()->hasObject(treeHash))
+                    return {std::move(input), GitRepo::TarballInfo { .treeHash = treeHash, .lastModified = lastModified }};
                 else
                     debug("Git tree with hash '%s' has disappeared from the cache, refetching...", treeHash.gitRev());
             }
@@ -251,7 +251,7 @@ struct GitArchiveInputScheme : InputScheme
             getFileTransfer()->download(std::move(req), sink);
         });
 
-        auto tarballInfo = importTarball(*source);
+        auto tarballInfo = getTarballCache()->importTarball(*source);
 
         cache->upsertFact(treeHashKey, tarballInfo.treeHash.gitRev());
         cache->upsertFact(lastModifiedKey, std::to_string(tarballInfo.lastModified));
@@ -273,7 +273,7 @@ struct GitArchiveInputScheme : InputScheme
         input.attrs.insert_or_assign("treeHash", tarballInfo.treeHash.gitRev());
         input.attrs.insert_or_assign("lastModified", uint64_t(tarballInfo.lastModified));
 
-        auto accessor = makeTarballCacheAccessor(tarballInfo.treeHash);
+        auto accessor = getTarballCache()->getAccessor(tarballInfo.treeHash);
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 
