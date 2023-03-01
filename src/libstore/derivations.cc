@@ -890,6 +890,66 @@ std::optional<BasicDerivation> Derivation::tryResolve(
 }
 
 
+void Derivation::checkInvariants(Store & store, const StorePath & drvPath) const
+{
+    assert(drvPath.isDerivation());
+    std::string drvName(drvPath.name());
+    drvName = drvName.substr(0, drvName.size() - drvExtension.size());
+
+    if (drvName != name) {
+        throw Error("Derivation '%s' has name '%s' which does not match its path", store.printStorePath(drvPath), name);
+    }
+
+    auto envHasRightPath = [&](const StorePath & actual, const std::string & varName)
+    {
+        auto j = env.find(varName);
+        if (j == env.end() || store.parseStorePath(j->second) != actual)
+            throw Error("derivation '%s' has incorrect environment variable '%s', should be '%s'",
+                store.printStorePath(drvPath), varName, store.printStorePath(actual));
+    };
+
+
+    // Don't need the answer, but do this anyways to assert is proper
+    // combination. The code below is more general and naturally allows
+    // combinations that are currently prohibited.
+    type();
+
+    std::optional<DrvHash> hashesModulo;
+    for (auto & i : outputs) {
+        std::visit(overloaded {
+            [&](const DerivationOutput::InputAddressed & doia) {
+                if (!hashesModulo) {
+                    // somewhat expensive so we do lazily
+                    hashesModulo = hashDerivationModulo(store, *this, true);
+                }
+                auto currentOutputHash = get(hashesModulo->hashes, i.first);
+                if (!currentOutputHash)
+                    throw Error("derivation '%s' has unexpected output '%s' (local-store / hashesModulo) named '%s'",
+                        store.printStorePath(drvPath), store.printStorePath(doia.path), i.first);
+                StorePath recomputed = store.makeOutputPath(i.first, *currentOutputHash, drvName);
+                if (doia.path != recomputed)
+                    throw Error("derivation '%s' has incorrect output '%s', should be '%s'",
+                        store.printStorePath(drvPath), store.printStorePath(doia.path), store.printStorePath(recomputed));
+                envHasRightPath(doia.path, i.first);
+            },
+            [&](const DerivationOutput::CAFixed & dof) {
+                StorePath path = store.makeFixedOutputPath(dof.hash.method, dof.hash.hash, drvName);
+                envHasRightPath(path, i.first);
+            },
+            [&](const DerivationOutput::CAFloating &) {
+                /* Nothing to check */
+            },
+            [&](const DerivationOutput::Deferred &) {
+                /* Nothing to check */
+            },
+            [&](const DerivationOutput::Impure &) {
+                /* Nothing to check */
+            },
+        }, i.second.raw());
+    }
+}
+
+
 const Hash impureOutputHash = hashString(htSHA256, "impure");
 
 nlohmann::json DerivationOutput::toJSON(
