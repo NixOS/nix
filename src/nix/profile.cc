@@ -332,6 +332,8 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
         try {
             updateProfile(manifest.build(store));
         } catch (BuildEnvFileConflictError & conflictError) {
+            // FIXME use C++20 std::ranges once macOS has it
+            //       See https://github.com/NixOS/nix/compare/3efa476c5439f8f6c1968a6ba20a31d1239c2f04..1fe5d172ece51a619e879c4b86f603d9495cc102
             auto findRefByFilePath = [&]<typename Iterator>(Iterator begin, Iterator end) {
                 for (auto it = begin; it != end; it++) {
                     auto profileElement = *it;
