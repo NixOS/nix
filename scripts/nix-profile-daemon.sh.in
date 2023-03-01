@@ -8,7 +8,7 @@ if [ -n "$XDG_STATE_HOME" ]; then
 else
     NIX_LINK_NEW=$HOME/.local/state/nix/profile
 fi
-if ! [ -e "$NIX_LINK" ]; then
+if [ -e "$NIX_LINK_NEW" ]; then
     NIX_LINK="$NIX_LINK_NEW"
 else
     if [ -t 2 ] && [ -e "$NIX_LINK_NEW" ]; then
