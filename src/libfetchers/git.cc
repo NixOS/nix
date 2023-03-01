@@ -482,7 +482,7 @@ struct GitInputScheme : InputScheme
             createDirs(dirOf(cacheDir));
             PathLocks cacheDirLock({cacheDir});
 
-            GitRepo::openRepo(CanonPath(cacheDir), true, true);
+            auto repo = GitRepo::openRepo(CanonPath(cacheDir), true, true);
 
             Path localRefFile =
                 ref.compare(0, 5, "refs/") == 0
@@ -494,17 +494,8 @@ struct GitInputScheme : InputScheme
 
             /* If a rev was specified, we need to fetch if it's not in the
                repo. */
-            if (input.getRev()) {
-                try {
-                    runProgram("git", true, { "-C", repoDir, "--git-dir", repoInfo.gitDir, "cat-file", "-e", input.getRev()->gitRev() });
-                    doFetch = false;
-                } catch (ExecError & e) {
-                    if (WIFEXITED(e.status)) {
-                        doFetch = true;
-                    } else {
-                        throw;
-                    }
-                }
+            if (auto rev = input.getRev()) {
+                doFetch = !repo->hasObject(*rev);
             } else {
                 if (repoInfo.allRefs) {
                     doFetch = true;
