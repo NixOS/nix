@@ -1,17 +1,17 @@
 ifeq ($(doc_generate),yes)
 
 MANUAL_SRCS := \
-  $(call rwildcard, $(d)/src, *.md) \
-  $(call rwildcard, $(d)/src, */*.md)
+	$(call rwildcard, $(d)/src, *.md) \
+	$(call rwildcard, $(d)/src, */*.md)
 
-# Generate man pages.
 man-pages := $(foreach n, \
-  nix-env.1 nix-build.1 nix-shell.1 nix-store.1 nix-instantiate.1 \
-  nix-collect-garbage.1 \
-  nix-prefetch-url.1 nix-channel.1 \
-  nix-hash.1 nix-copy-closure.1 \
-  nix.conf.5 nix-daemon.8, \
-  $(d)/$(n))
+	nix-env.1 nix-store.1 \
+	nix-build.1 nix-shell.1 nix-instantiate.1 \
+	nix-collect-garbage.1 \
+	nix-prefetch-url.1 nix-channel.1 \
+	nix-hash.1 nix-copy-closure.1 \
+	nix.conf.5 nix-daemon.8 \
+, $(d)/$(n))
 
 clean-files += $(d)/*.1 $(d)/*.5 $(d)/*.8
 
@@ -98,13 +98,13 @@ $(mandir)/man1/nix3-manpages: doc/manual/generated/man1/nix3-manpages
 doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
 	@mkdir -p $(DESTDIR)$$(dirname $@)
 	$(trace-gen) for i in doc/manual/src/command-ref/new-cli/*.md; do \
-	  name=$$(basename $$i .md); \
-	  tmpFile=$$(mktemp); \
-	  if [[ $$name = SUMMARY ]]; then continue; fi; \
-	  printf "Title: %s\n\n" "$$name" > $$tmpFile; \
-	  cat $$i >> $$tmpFile; \
-	  lowdown -sT man --nroff-nolinks -M section=1 $$tmpFile -o $(DESTDIR)$$(dirname $@)/$$name.1; \
-	  rm $$tmpFile; \
+		name=$$(basename $$i .md); \
+		tmpFile=$$(mktemp); \
+		if [[ $$name = SUMMARY ]]; then continue; fi; \
+		printf "Title: %s\n\n" "$$name" > $$tmpFile; \
+		cat $$i >> $$tmpFile; \
+		lowdown -sT man --nroff-nolinks -M section=1 $$tmpFile -o $(DESTDIR)$$(dirname $@)/$$name.1; \
+		rm $$tmpFile; \
 	done
 	@touch $@
 
