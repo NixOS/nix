@@ -273,18 +273,16 @@ struct GitInputScheme : InputScheme
         /* Whether this is a local, non-bare repository. */
         bool isLocal = false;
 
-        /* Whether this is a local, non-bare, dirty repository. */
-        bool isDirty = false;
-
-        /* Whether this repository has any commits. */
-        bool hasHead = true;
+        /* Working directory info: the complete list of files, and
+           whether the working directory is dirty compared to HEAD. */
+        GitRepo::WorkdirInfo workdirInfo;
 
         /* URL of the repo, or its path if isLocal. */
         std::string url;
 
         void warnDirty() const
         {
-            if (isDirty) {
+            if (workdirInfo.isDirty) {
                 if (!fetchSettings.allowDirty)
                     throw Error("Git tree '%s' is dirty", url);
 
@@ -335,104 +333,14 @@ struct GitInputScheme : InputScheme
 
         // If this is a local directory and no ref or revision is
         // given, then allow the use of an unclean working tree.
-        if (!input.getRef() && !input.getRev() && repoInfo.isLocal) {
-            repoInfo.isDirty = true;
-
-            auto env = getEnv();
-            /* Set LC_ALL to C: because we rely on the error messages
-               from git rev-parse to determine what went wrong that
-               way unknown errors can lead to a failure instead of
-               continuing through the wrong code path. */
-            env["LC_ALL"] = "C";
-
-            /* Check whether HEAD points to something that looks like
-               a commit, since that is the ref we want to use later
-               on. */
-            auto result = runProgram(RunOptions {
-                .program = "git",
-                .args = { "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "rev-parse", "--verify", "--no-revs", "HEAD^{commit}" },
-                .environment = env,
-                .mergeStderrToStdout = true
-            });
-            auto exitCode = WEXITSTATUS(result.first);
-            auto errorMessage = result.second;
-
-            if (errorMessage.find("fatal: not a git repository") != std::string::npos) {
-                throw Error("'%s' is not a Git repository", repoInfo.url);
-            } else if (errorMessage.find("fatal: Needed a single revision") != std::string::npos) {
-                // indicates that the repo does not have any commits
-                // we want to proceed and will consider it dirty later
-            } else if (exitCode != 0) {
-                // any other errors should lead to a failure
-                throw Error("getting the HEAD of the Git tree '%s' failed with exit code %d:\n%s", repoInfo.url, exitCode, errorMessage);
-            }
-
-            repoInfo.hasHead = exitCode == 0;
-
-            try {
-                if (repoInfo.hasHead) {
-                    // Using git diff is preferrable over lower-level operations here,
-                    // because it's conceptually simpler and we only need the exit code anyways.
-                    auto gitDiffOpts = Strings({ "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "diff", "HEAD", "--quiet"});
-                    if (!repoInfo.submodules) {
-                        // Changes in submodules should only make the tree dirty
-                        // when those submodules will be copied as well.
-                        gitDiffOpts.emplace_back("--ignore-submodules");
-                    }
-                    gitDiffOpts.emplace_back("--");
-                    runProgram("git", true, gitDiffOpts);
-
-                    repoInfo.isDirty = false;
-                }
-            } catch (ExecError & e) {
-                if (!WIFEXITED(e.status) || WEXITSTATUS(e.status) != 1) throw;
-            }
-        }
+        if (!input.getRef() && !input.getRev() && repoInfo.isLocal)
+            repoInfo.workdirInfo = GitRepo::openRepo(CanonPath(repoInfo.url))->getWorkdirInfo();
 
         return repoInfo;
     }
 
-    std::set<CanonPath> listFiles(const RepoInfo & repoInfo) const
-    {
-        auto gitOpts = Strings({ "-C", repoInfo.url, "--git-dir", repoInfo.gitDir, "ls-files", "-z" });
-        if (repoInfo.submodules)
-            gitOpts.emplace_back("--recurse-submodules");
-
-        std::set<CanonPath> res;
-
-        for (auto & p : tokenizeString<std::set<std::string>>(
-                runProgram("git", true, gitOpts), "\0"s))
-            res.insert(CanonPath(p));
-
-        return res;
-    }
-
-    Hash updateRev(Input & input, const RepoInfo & repoInfo, const std::string & ref) const
-    {
-        if (auto r = input.getRev())
-            return *r;
-        else {
-            auto rev = GitRepo::openRepo(CanonPath(repoInfo.url))->resolveRef(ref);
-            input.attrs.insert_or_assign("rev", rev.gitRev());
-            return rev;
-        }
-    }
-
-    // FIXME: remove
-    uint64_t getLastModified(const RepoInfo & repoInfo, const std::string & repoDir, const std::string & ref) const
-    {
-        return
-            repoInfo.hasHead
-            ? std::stoull(
-                runProgram("git", true,
-                    { "-C", repoDir, "--git-dir", repoInfo.gitDir, "log", "-1", "--format=%ct", "--no-show-signature", ref }))
-            : 0;
-    }
-
     uint64_t getLastModified(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
     {
-        if (!repoInfo.hasHead) return 0;
-
         auto key = fmt("git-%s-last-modified", rev.gitRev());
 
         auto cache = getCache();
@@ -451,8 +359,6 @@ struct GitInputScheme : InputScheme
 
     uint64_t getRevCount(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
     {
-        if (!repoInfo.hasHead) return 0;
-
         auto key = fmt("git-%s-revcount", rev.gitRev());
 
         auto cache = getCache();
@@ -499,7 +405,7 @@ struct GitInputScheme : InputScheme
         RepoInfo & repoInfo,
         Input && input) const
     {
-        assert(!repoInfo.isDirty);
+        assert(!repoInfo.workdirInfo.isDirty);
 
         auto origRev = input.getRev();
 
@@ -557,8 +463,9 @@ struct GitInputScheme : InputScheme
         Path repoDir;
 
         if (repoInfo.isLocal) {
-            updateRev(input, repoInfo, ref);
             repoDir = repoInfo.url;
+            if (!input.getRev())
+                input.attrs.insert_or_assign("rev", GitRepo::openRepo(CanonPath(repoDir))->resolveRef(ref).gitRev());
         } else {
             if (auto res = getCache()->lookup(store, unlockedAttrs)) {
                 auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
@@ -784,35 +691,30 @@ struct GitInputScheme : InputScheme
         return makeResult(infoAttrs, std::move(storePath));
     }
 
-    std::pair<ref<InputAccessor>, Input> getAccessorFromCheckout(
+    std::pair<ref<InputAccessor>, Input> getAccessorFromWorkdir(
         RepoInfo & repoInfo,
         Input && input) const
     {
-        if (!repoInfo.isDirty) {
-            auto ref = getDefaultRef(repoInfo);
-            input.attrs.insert_or_assign("ref", ref);
+        if (!repoInfo.workdirInfo.isDirty) {
+            if (repoInfo.workdirInfo.ref)
+                input.attrs.insert_or_assign("ref", *repoInfo.workdirInfo.ref);
 
-            auto rev = updateRev(input, repoInfo, ref);
+            auto rev = repoInfo.workdirInfo.headRev.value();
 
-            input.attrs.insert_or_assign(
-                "revCount",
-                getRevCount(repoInfo, repoInfo.url, rev));
+            input.attrs.insert_or_assign("rev", rev.gitRev());
 
-            input.attrs.insert_or_assign(
-                "lastModified",
-                getLastModified(repoInfo, repoInfo.url, rev));
-        } else {
+            input.attrs.insert_or_assign("revCount", getRevCount(repoInfo, repoInfo.url, rev));
+        } else
             repoInfo.warnDirty();
 
-            // FIXME: maybe we should use the timestamp of the last
-            // modified dirty file?
-            input.attrs.insert_or_assign(
-                "lastModified",
-                getLastModified(repoInfo, repoInfo.url, "HEAD"));
-        }
+        input.attrs.insert_or_assign(
+            "lastModified",
+            repoInfo.workdirInfo.headRev
+            ? getLastModified(repoInfo, repoInfo.url, *repoInfo.workdirInfo.headRev)
+            : 0);
 
         return {
-            makeFSInputAccessor(CanonPath(repoInfo.url), listFiles(repoInfo), makeNotAllowedError(repoInfo.url)),
+            makeFSInputAccessor(CanonPath(repoInfo.url), repoInfo.workdirInfo.files, makeNotAllowedError(repoInfo.url)),
             std::move(input)
         };
     }
@@ -826,7 +728,7 @@ struct GitInputScheme : InputScheme
         if (input.getRef() || input.getRev() || !repoInfo.isLocal)
             return getAccessorFromCommit(store, repoInfo, std::move(input));
         else
-            return getAccessorFromCheckout(repoInfo, std::move(input));
+            return getAccessorFromWorkdir(repoInfo, std::move(input));
     }
 
     bool isLocked(const Input & input) const override

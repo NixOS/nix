@@ -10,7 +10,9 @@
 #include <git2/object.h>
 #include <git2/refs.h>
 #include <git2/repository.h>
+#include <git2/status.h>
 #include <git2/tree.h>
+#include <git2/describe.h>
 
 #include "tarfile.hh"
 #include <archive_entry.h>
@@ -58,6 +60,9 @@ typedef std::unique_ptr<git_blob, Deleter<git_blob_free>> Blob;
 typedef std::unique_ptr<git_object, Deleter<git_object_free>> Object;
 typedef std::unique_ptr<git_commit, Deleter<git_commit_free>> Commit;
 typedef std::unique_ptr<git_reference, Deleter<git_reference_free>> Reference;
+typedef std::unique_ptr<git_describe_result, Deleter<git_describe_result_free>> DescribeResult;
+typedef std::unique_ptr<git_status_list, Deleter<git_status_list_free>> StatusList;
+typedef std::unique_ptr<git_buf, Deleter<git_buf_dispose>> Buf;
 
 // A helper to ensure that we don't leak objects returned by libgit2.
 template<typename T>
@@ -501,6 +506,11 @@ bool tarballCacheContains(const Hash & treeHash)
     return true;
 }
 
+int statusCallbackTrampoline(const char * path, unsigned int statusFlags, void * payload)
+{
+    return (*((std::function<int(const char * path, unsigned int statusFlags)> *) payload))(path, statusFlags);
+}
+
 struct GitRepoImpl : GitRepo
 {
     Repository repo;
@@ -558,16 +568,55 @@ struct GitRepoImpl : GitRepo
 
         // Resolve full references like 'refs/heads/master'.
         Reference ref3;
-        if (git_reference_lookup(Setter(ref3), repo.get(), ref.c_str())) {
-            auto err = git_error_last();
-            throw Error("resolving Git reference '%s': %s", ref, err->message);
-        }
+        if (git_reference_lookup(Setter(ref3), repo.get(), ref.c_str()))
+            throw Error("resolving Git reference '%s': %s", ref, git_error_last()->message);
 
         auto oid = git_reference_target(ref3.get());
         if (!oid)
             throw Error("cannot get OID for Git reference '%s'", git_reference_name(ref3.get()));
 
         return toHash(*oid);
+    }
+
+    WorkdirInfo getWorkdirInfo() override
+    {
+        WorkdirInfo info;
+
+        /* Get the ref that HEAD points to. */
+        Reference ref;
+        if (git_reference_lookup(Setter(ref), repo.get(), "HEAD"))
+            throw Error("looking up HEAD: %s", git_error_last()->message);
+
+        if (auto target = git_reference_symbolic_target(ref.get()))
+            info.ref = target;
+
+        /* Get the head revision, if any. */
+        git_oid headRev;
+        if (auto err = git_reference_name_to_id(&headRev, repo.get(), "HEAD")) {
+            if (err != GIT_ENOTFOUND)
+                throw Error("resolving HEAD: %s", git_error_last()->message);
+        } else
+            info.headRev = toHash(headRev);
+
+        /* Get all tracked files and determine whether the working
+           directory is dirty. */
+        std::function<int(const char * path, unsigned int statusFlags)> statusCallback = [&](const char * path, unsigned int statusFlags)
+        {
+            if (!(statusFlags & GIT_STATUS_INDEX_DELETED) &&
+                !(statusFlags & GIT_STATUS_WT_DELETED))
+                info.files.insert(CanonPath(path));
+            if (statusFlags != GIT_STATUS_CURRENT)
+                info.isDirty = true;
+            return 0;
+        };
+
+        git_status_options options = GIT_STATUS_OPTIONS_INIT;
+        options.flags |= GIT_STATUS_OPT_INCLUDE_UNMODIFIED;
+        options.flags |= GIT_STATUS_OPT_EXCLUDE_SUBMODULES;
+        if (git_status_foreach_ext(repo.get(), &options, &statusCallbackTrampoline, &statusCallback))
+            throw Error("getting working directory status: %s", git_error_last()->message);
+
+        return info;
     }
 };
 
