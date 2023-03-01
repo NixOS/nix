@@ -39,6 +39,10 @@ extern const std::string nativeSystem;
 /* Return an environment variable. */
 std::optional<std::string> getEnv(const std::string & key);
 
+/* Return a non empty environment variable. Returns nullopt if the env
+variable is set to "" */
+std::optional<std::string> getEnvNonEmpty(const std::string & key);
+
 /* Get the entire environment. */
 std::map<std::string, std::string> getEnv();
 
