@@ -38,8 +38,6 @@ class RemoteStore : public virtual RemoteStoreConfig,
 {
 public:
 
-    virtual bool sameMachine() = 0;
-
     RemoteStore(const Params & params);
 
     /* Implementations of abstract store API methods. */

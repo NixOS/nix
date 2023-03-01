@@ -29,9 +29,6 @@ public:
     static std::set<std::string> uriSchemes()
     { return {"unix"}; }
 
-    bool sameMachine() override
-    { return true; }
-
     ref<FSAccessor> getFSAccessor() override
     { return LocalFSStore::getFSAccessor(); }
 
