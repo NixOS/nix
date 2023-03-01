@@ -3,7 +3,7 @@ if [ -n "${__ETC_PROFILE_NIX_SOURCED:-}" ]; then return; fi
 __ETC_PROFILE_NIX_SOURCED=1
 
 NIX_LINK=$HOME/.nix-profile
-if [ -n "$XDG_STATE_HOME" ]; then
+if [ -n "${XDG_STATE_HOME-}" ]; then
     NIX_LINK_NEW="$XDG_STATE_HOME/nix/profile"
 else
     NIX_LINK_NEW=$HOME/.local/state/nix/profile
