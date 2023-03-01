@@ -186,18 +186,17 @@ static DefaultStackAllocator defaultAllocatorSingleton;
 StackAllocator *StackAllocator::defaultAllocator = &defaultAllocatorSingleton;
 
 
-std::shared_ptr<void> (*create_disable_gc)() = []() -> std::shared_ptr<void> {
+std::shared_ptr<void> (*create_coro_gc_hook)() = []() -> std::shared_ptr<void> {
     return {};
 };
 
 /* This class is used for entry and exit hooks on coroutines */
 class CoroutineContext {
-#if __APPLE__
-    /* Disable GC when entering the coroutine on macOS, since it doesn't find the main thread stack in this case.
+    /* Disable GC when entering the coroutine without the boehm patch,
+     * since it doesn't find the main thread stack in this case.
      * std::shared_ptr<void> performs type-erasure, so it will call the right
      * deleter. */
-    const std::shared_ptr<void> disable_gc = create_disable_gc();
-#endif
+    const std::shared_ptr<void> coro_gc_hook = create_coro_gc_hook();
 public:
     CoroutineContext() {};
     ~CoroutineContext() {};

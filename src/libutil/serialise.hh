@@ -501,10 +501,10 @@ struct StackAllocator {
     static StackAllocator *defaultAllocator;
 };
 
-/* Disabling GC when entering a coroutine (on macos).
+/* Disabling GC when entering a coroutine (without the boehm patch).
    mutable to avoid boehm gc dependency in libutil.
  */
-extern std::shared_ptr<void> (*create_disable_gc)();
+extern std::shared_ptr<void> (*create_coro_gc_hook)();
 
 
 }
