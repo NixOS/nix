@@ -96,6 +96,7 @@
           ++ lib.optionals (stdenv.isLinux && !(isStatic && stdenv.system == "aarch64-linux")) [
             "LDFLAGS=-fuse-ld=gold"
           ];
+
         testConfigureFlags = [
           "CXXFLAGS=-I${lib.getDev rapidcheck}/extras/gtest/include"
         ];
@@ -651,7 +652,7 @@
 
             buildInputs = buildDeps ++ propagatedDeps ++ awsDeps ++ checkDeps;
 
-            inherit configureFlags;
+            configureFlags = configureFlags ++ testConfigureFlags;
 
             enableParallelBuilding = true;
 
