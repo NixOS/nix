@@ -63,6 +63,11 @@ public:
        one that contains a commit hash or content hash. */
     bool isLocked() const { return locked; }
 
+    /* Check whether the input carries all necessary info required
+       for cache insertion and substitution.
+       These fields are used to uniquely identify cached trees
+       within the "tarball TTL" window without necessarily
+       indicating that the input's origin is unchanged. */
     bool hasAllInfo() const;
 
     bool operator ==(const Input & other) const;

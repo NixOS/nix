@@ -57,7 +57,7 @@ struct CmdShowDerivation : InstallablesCommand
             jsonRoot[store->printStorePath(drvPath)] =
                 store->readDerivation(drvPath).toJSON(*store);
         }
-        std::cout << jsonRoot.dump(2) << std::endl;
+        logger->cout(jsonRoot.dump(2));
     }
 };
 

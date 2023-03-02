@@ -88,6 +88,10 @@ struct curlFileTransfer : public FileTransfer
                 {request.uri}, request.parentAct)
             , callback(std::move(callback))
             , finalSink([this](std::string_view data) {
+                if (errorSink) {
+                    (*errorSink)(data);
+                }
+
                 if (this->request.dataCallback) {
                     auto httpStatus = getHTTPStatus();
 
@@ -163,8 +167,6 @@ struct curlFileTransfer : public FileTransfer
                     }
                 }
 
-                if (errorSink)
-                    (*errorSink)({(char *) contents, realSize});
                 (*decompressionSink)({(char *) contents, realSize});
 
                 return realSize;
