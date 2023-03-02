@@ -128,6 +128,8 @@ struct InstallablesCommand : virtual Args, SourceExprCommand
 
     virtual bool useDefaultInstallables() { return true; }
 
+    bool readFromStdIn;
+
     std::vector<std::string> getFlakesForCompletion() override;
 
 protected:

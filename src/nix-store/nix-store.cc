@@ -1020,6 +1020,7 @@ static int main_nix_store(int argc, char * * argv)
     {
         Strings opFlags, opArgs;
         Operation op = 0;
+        bool readFromStdIn;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             Operation oldOp = op;
@@ -1078,6 +1079,8 @@ static int main_nix_store(int argc, char * * argv)
                 op = opGenerateBinaryCacheKey;
             else if (*arg == "--add-root")
                 gcRoot = absPath(getArg(*arg, arg, end));
+            else if (*arg == "--stdin" && !isatty(STDIN_FILENO))
+                readFromStdIn = true;
             else if (*arg == "--indirect")
                 ;
             else if (*arg == "--no-output")
@@ -1089,6 +1092,13 @@ static int main_nix_store(int argc, char * * argv)
             }
             else
                 opArgs.push_back(*arg);
+
+            if (readFromStdIn && op != opImport && op != opRestore && op != opServe) {
+                 std::string word;
+                 while (std::cin >> word) {
+                       opArgs.emplace_back(std::move(word));
+                 };
+            }
 
             if (oldOp && oldOp != op)
                 throw UsageError("only one operation may be specified");
