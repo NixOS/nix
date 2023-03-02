@@ -102,11 +102,9 @@ public:
     virtual void writeToStdout(std::string_view s);
 
     template<typename... Args>
-    inline void cout(const std::string & fs, const Args & ... args)
+    inline void cout(const Args & ... args)
     {
-        boost::format f(fs);
-        formatHelper(f, args...);
-        writeToStdout(f.str());
+        writeToStdout(fmt(args...));
     }
 
     virtual std::optional<char> ask(std::string_view s)
