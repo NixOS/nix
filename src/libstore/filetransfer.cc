@@ -183,7 +183,7 @@ struct curlFileTransfer : public FileTransfer
         {
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
-            printMsg(lvlVomit, format("got header for '%s': %s") % request.uri % trim(line));
+            printMsg(lvlVomit, "got header for '%s': %s", request.uri, trim(line));
             static std::regex statusLine("HTTP/[^ ]+ +[0-9]+(.*)", std::regex::extended | std::regex::icase);
             std::smatch match;
             if (std::regex_match(line, match, statusLine)) {
@@ -207,7 +207,7 @@ struct curlFileTransfer : public FileTransfer
                         long httpStatus = 0;
                         curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
                         if (result.etag == request.expectedETag && httpStatus == 200) {
-                            debug(format("shutting down on 200 HTTP response with expected ETag"));
+                            debug("shutting down on 200 HTTP response with expected ETag");
                             return 0;
                         }
                     } else if (name == "content-encoding")

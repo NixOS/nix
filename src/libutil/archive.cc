@@ -87,7 +87,7 @@ static time_t dump(const Path & path, Sink & sink, PathFilter & filter)
                 std::string name(i.name);
                 size_t pos = i.name.find(caseHackSuffix);
                 if (pos != std::string::npos) {
-                    debug(format("removing case hack suffix from '%1%'") % (path + "/" + i.name));
+                    debug("removing case hack suffix from '%1%'", path + "/" + i.name);
                     name.erase(pos);
                 }
                 if (!unhacked.emplace(name, i.name).second)
@@ -262,7 +262,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
                     if (archiveSettings.useCaseHack) {
                         auto i = names.find(name);
                         if (i != names.end()) {
-                            debug(format("case collision between '%1%' and '%2%'") % i->first % name);
+                            debug("case collision between '%1%' and '%2%'", i->first, name);
                             name += caseHackSuffix;
                             name += std::to_string(++i->second);
                         } else

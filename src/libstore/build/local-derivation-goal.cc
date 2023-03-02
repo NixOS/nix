@@ -650,7 +650,7 @@ void LocalDerivationGoal::startBuilder()
         /* Clean up the chroot directory automatically. */
         autoDelChroot = std::make_shared<AutoDelete>(chrootRootDir);
 
-        printMsg(lvlChatty, format("setting up chroot environment in '%1%'") % chrootRootDir);
+        printMsg(lvlChatty, "setting up chroot environment in '%1%'", chrootRootDir);
 
         // FIXME: make this 0700
         if (mkdir(chrootRootDir.c_str(), buildUser && buildUser->getUIDCount() != 1 ? 0755 : 0750) == -1)
@@ -753,8 +753,7 @@ void LocalDerivationGoal::startBuilder()
         throw Error("home directory '%1%' exists; please remove it to assure purity of builds without sandboxing", homeDir);
 
     if (useChroot && settings.preBuildHook != "" && dynamic_cast<Derivation *>(drv.get())) {
-        printMsg(lvlChatty, format("executing pre-build hook '%1%'")
-            % settings.preBuildHook);
+        printMsg(lvlChatty, "executing pre-build hook '%1%'", settings.preBuildHook);
         auto args = useChroot ? Strings({worker.store.printStorePath(drvPath), chrootRootDir}) :
             Strings({ worker.store.printStorePath(drvPath) });
         enum BuildHookState {
@@ -1104,7 +1103,7 @@ void LocalDerivationGoal::initEnv()
     env["NIX_STORE"] = worker.store.storeDir;
 
     /* The maximum number of cores to utilize for parallel building. */
-    env["NIX_BUILD_CORES"] = (format("%d") % settings.buildCores).str();
+    env["NIX_BUILD_CORES"] = fmt("%d", settings.buildCores);
 
     initTmpDir();
 

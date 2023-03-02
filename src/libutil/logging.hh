@@ -75,11 +75,11 @@ public:
     // Whether the logger prints the whole build log
     virtual bool isVerbose() { return false; }
 
-    virtual void log(Verbosity lvl, const FormatOrString & fs) = 0;
+    virtual void log(Verbosity lvl, std::string_view s) = 0;
 
-    void log(const FormatOrString & fs)
+    void log(std::string_view s)
     {
-        log(lvlInfo, fs);
+        log(lvlInfo, s);
     }
 
     virtual void logEI(const ErrorInfo & ei) = 0;

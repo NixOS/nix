@@ -40,12 +40,12 @@ struct S3Error : public Error
 /* Helper: given an Outcome<R, E>, return R in case of success, or
    throw an exception in case of an error. */
 template<typename R, typename E>
-R && checkAws(const FormatOrString & fs, Aws::Utils::Outcome<R, E> && outcome)
+R && checkAws(std::string_view s, Aws::Utils::Outcome<R, E> && outcome)
 {
     if (!outcome.IsSuccess())
         throw S3Error(
             outcome.GetError().GetErrorType(),
-            fs.s + ": " + outcome.GetError().GetMessage());
+            s + ": " + outcome.GetError().GetMessage());
     return outcome.GetResultWithOwnership();
 }
 
@@ -430,9 +430,9 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         std::string marker;
 
         do {
-            debug(format("listing bucket 's3://%s' from key '%s'...") % bucketName % marker);
+            debug("listing bucket 's3://%s' from key '%s'...", bucketName, marker);
 
-            auto res = checkAws(format("AWS error listing bucket '%s'") % bucketName,
+            auto res = checkAws(fmt("AWS error listing bucket '%s'", bucketName),
                 s3Helper.client->ListObjects(
                     Aws::S3::Model::ListObjectsRequest()
                     .WithBucket(bucketName)
@@ -441,8 +441,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
             auto & contents = res.GetContents();
 
-            debug(format("got %d keys, next marker '%s'")
-                % contents.size() % res.GetNextMarker());
+            debug("got %d keys, next marker '%s'",
+                contents.size(), res.GetNextMarker());
 
             for (auto object : contents) {
                 auto & key = object.GetKey();

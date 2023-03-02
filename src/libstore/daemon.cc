@@ -67,12 +67,12 @@ struct TunnelLogger : public Logger
             state->pendingMsgs.push_back(s);
     }
 
-    void log(Verbosity lvl, const FormatOrString & fs) override
+    void log(Verbosity lvl, std::string_view s) override
     {
         if (lvl > verbosity) return;
 
         StringSink buf;
-        buf << STDERR_NEXT << (fs.s + "\n");
+        buf << STDERR_NEXT << (s + "\n");
         enqueueMsg(buf.s);
     }
 

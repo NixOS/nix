@@ -790,13 +790,13 @@ std::string Store::makeValidityRegistration(const StorePathSet & paths,
 
         if (showHash) {
             s += info->narHash.to_string(Base16, false) + "\n";
-            s += (format("%1%\n") % info->narSize).str();
+            s += fmt("%1%\n", info->narSize);
         }
 
         auto deriver = showDerivers && info->deriver ? printStorePath(*info->deriver) : "";
         s += deriver + "\n";
 
-        s += (format("%1%\n") % info->references.size()).str();
+        s += fmt("%1%\n", info->references.size());
 
         for (auto & j : info->references)
             s += printStorePath(j) + "\n";

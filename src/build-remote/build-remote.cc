@@ -219,7 +219,7 @@ static int main_build_remote(int argc, char * * argv)
                                 % concatStringsSep<StringSet>(", ", m.supportedFeatures)
                                 % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);
 
-                        printMsg(couldBuildLocally ? lvlChatty : lvlWarn, error);
+                        printMsg(couldBuildLocally ? lvlChatty : lvlWarn, error.str());
 
                         std::cerr << "# decline\n";
                     }

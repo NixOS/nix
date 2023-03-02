@@ -157,13 +157,9 @@ int main(int argc, char ** argv)
 
         uname(&_uname);
 
-        auto cacheParentDir = (format("%1%/dependency-maps") % settings.nixStateDir).str();
+        auto cacheParentDir = fmt("%1%/dependency-maps", settings.nixStateDir);
 
-        cacheDir = (format("%1%/%2%-%3%-%4%")
-                % cacheParentDir
-                % _uname.machine
-                % _uname.sysname
-                % _uname.release).str();
+        cacheDir = fmt("%1%/%2%-%3%-%4%", cacheParentDir, _uname.machine, _uname.sysname, _uname.release);
 
         mkdir(cacheParentDir.c_str(), 0755);
         mkdir(cacheDir.c_str(), 0755);

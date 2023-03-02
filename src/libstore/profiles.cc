@@ -64,7 +64,7 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path pro
 static void makeName(const Path & profile, GenerationNumber num,
     Path & outLink)
 {
-    Path prefix = (format("%1%-%2%") % profile % num).str();
+    Path prefix = fmt("%1%-%2%", profile, num);
     outLink = prefix + "-link";
 }
 
@@ -269,7 +269,7 @@ void switchGeneration(
 
 void lockProfile(PathLocks & lock, const Path & profile)
 {
-    lock.lockPaths({profile}, (format("waiting for lock on profile '%1%'") % profile).str());
+    lock.lockPaths({profile}, fmt("waiting for lock on profile '%1%'", profile));
     lock.setDeletion(true);
 }
 
