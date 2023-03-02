@@ -16,8 +16,8 @@ namespace {
 std::string formatProtocol(unsigned int proto)
 {
     if (proto) {
-        auto major = GET_PROTOCOL_MAJOR(proto) >> 8;
-        auto minor = GET_PROTOCOL_MINOR(proto);
+        auto major = PROTOCOL_MAJOR(proto);
+        auto minor = PROTOCOL_MINOR(proto);
         return (format("%1%.%2%") % major % minor).str();
     }
     return "unknown";
@@ -114,7 +114,7 @@ struct CmdDoctor : StoreCommand
 
     bool checkStoreProtocol(unsigned int storeProto)
     {
-        unsigned int clientProto = GET_PROTOCOL_MAJOR(SERVE_PROTOCOL_VERSION) == GET_PROTOCOL_MAJOR(storeProto)
+        unsigned int clientProto = PROTOCOL_MAJOR(SERVE_PROTOCOL_VERSION) == PROTOCOL_MAJOR(storeProto)
             ? SERVE_PROTOCOL_VERSION
             : PROTOCOL_VERSION;
 

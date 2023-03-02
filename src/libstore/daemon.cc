@@ -114,7 +114,7 @@ struct TunnelLogger : public Logger
         if (!ex)
             to << STDERR_LAST;
         else {
-            if (GET_PROTOCOL_MINOR(clientVersion) >= 26) {
+            if (PROTOCOL_MINOR(clientVersion) >= 26) {
                 to << STDERR_ERROR << *ex;
             } else {
                 to << STDERR_ERROR << ex->what() << ex->status;
@@ -125,7 +125,7 @@ struct TunnelLogger : public Logger
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
         const std::string & s, const Fields & fields, ActivityId parent) override
     {
-        if (GET_PROTOCOL_MINOR(clientVersion) < 20) {
+        if (PROTOCOL_MINOR(clientVersion) < 20) {
             if (!s.empty())
                 log(lvl, s + "...");
             return;
@@ -138,7 +138,7 @@ struct TunnelLogger : public Logger
 
     void stopActivity(ActivityId act) override
     {
-        if (GET_PROTOCOL_MINOR(clientVersion) < 20) return;
+        if (PROTOCOL_MINOR(clientVersion) < 20) return;
         StringSink buf;
         buf << STDERR_STOP_ACTIVITY << act;
         enqueueMsg(buf.s);
@@ -146,7 +146,7 @@ struct TunnelLogger : public Logger
 
     void result(ActivityId act, ResultType type, const Fields & fields) override
     {
-        if (GET_PROTOCOL_MINOR(clientVersion) < 20) return;
+        if (PROTOCOL_MINOR(clientVersion) < 20) return;
         StringSink buf;
         buf << STDERR_RESULT << act << type << fields;
         enqueueMsg(buf.s);
@@ -262,7 +262,7 @@ struct ClientSettings
 static std::vector<DerivedPath> readDerivedPaths(Store & store, unsigned int clientVersion, Source & from)
 {
     std::vector<DerivedPath> reqs;
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 30) {
+    if (PROTOCOL_MINOR(clientVersion) >= 30) {
         reqs = worker_proto::read(store, from, Phantom<std::vector<DerivedPath>> {});
     } else {
         for (auto & s : readStrings<Strings>(from))
@@ -290,7 +290,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto paths = worker_proto::read(*store, from, Phantom<StorePathSet> {});
 
         SubstituteFlag substitute = NoSubstitute;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 27) {
+        if (PROTOCOL_MINOR(clientVersion) >= 27) {
             substitute = readInt(from) ? Substitute : NoSubstitute;
         }
 
@@ -390,7 +390,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case wopAddToStore: {
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 25) {
+        if (PROTOCOL_MINOR(clientVersion) >= 25) {
             auto name = readString(from);
             auto camStr = readString(from);
             auto refs = worker_proto::read(*store, from, Phantom<StorePathSet> {});
@@ -419,7 +419,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             }();
             logger->stopWork();
 
-            pathInfo->write(to, *store, GET_PROTOCOL_MINOR(clientVersion));
+            pathInfo->write(to, *store, PROTOCOL_MINOR(clientVersion));
         } else {
             HashType hashAlgo;
             std::string baseName;
@@ -525,7 +525,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopBuildPaths: {
         auto drvs = readDerivedPaths(*store, clientVersion, from);
         BuildMode mode = bmNormal;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 15) {
+        if (PROTOCOL_MINOR(clientVersion) >= 15) {
             mode = (BuildMode) readInt(from);
 
             /* Repairing is not atomic, so disallowed for "untrusted"
@@ -633,10 +633,10 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto res = store->buildDerivation(drvPath, drv, buildMode);
         logger->stopWork();
         to << res.status << res.errorMsg;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 29) {
+        if (PROTOCOL_MINOR(clientVersion) >= 29) {
             to << res.timesBuilt << res.isNonDeterministic << res.startTime << res.stopTime;
         }
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 28) {
+        if (PROTOCOL_MINOR(clientVersion) >= 28) {
             worker_proto::write(*store, to, res.builtOutputs);
         }
         break;
@@ -740,7 +740,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         clientSettings.buildCores = readInt(from);
         clientSettings.useSubstitutes = readInt(from);
 
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 12) {
+        if (PROTOCOL_MINOR(clientVersion) >= 12) {
             unsigned int n = readInt(from);
             for (unsigned int i = 0; i < n; i++) {
                 auto name = readString(from);
@@ -782,7 +782,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     case wopQuerySubstitutablePathInfos: {
         SubstitutablePathInfos infos;
         StorePathCAMap pathsMap = {};
-        if (GET_PROTOCOL_MINOR(clientVersion) < 22) {
+        if (PROTOCOL_MINOR(clientVersion) < 22) {
             auto paths = worker_proto::read(*store, from, Phantom<StorePathSet> {});
             for (auto & path : paths)
                 pathsMap.emplace(path, std::nullopt);
@@ -816,15 +816,15 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         try {
             info = store->queryPathInfo(path);
         } catch (InvalidPath &) {
-            if (GET_PROTOCOL_MINOR(clientVersion) < 17) throw;
+            if (PROTOCOL_MINOR(clientVersion) < 17) throw;
         }
         logger->stopWork();
         if (info) {
-            if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
+            if (PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
-            info->write(to, *store, GET_PROTOCOL_MINOR(clientVersion), false);
+            info->write(to, *store, PROTOCOL_MINOR(clientVersion), false);
         } else {
-            assert(GET_PROTOCOL_MINOR(clientVersion) >= 17);
+            assert(PROTOCOL_MINOR(clientVersion) >= 17);
             to << 0;
         }
         break;
@@ -887,7 +887,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (!trusted)
             info.ultimate = false;
 
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 23) {
+        if (PROTOCOL_MINOR(clientVersion) >= 23) {
             logger->startWork();
             {
                 FramedSource source(from);
@@ -900,7 +900,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         else {
             std::unique_ptr<Source> source;
             StringSink saved;
-            if (GET_PROTOCOL_MINOR(clientVersion) >= 21)
+            if (PROTOCOL_MINOR(clientVersion) >= 21)
                 source = std::make_unique<TunnelSource>(from, to);
             else {
                 TeeSource tee { from, saved };
@@ -937,7 +937,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopRegisterDrvOutput: {
         logger->startWork();
-        if (GET_PROTOCOL_MINOR(clientVersion) < 31) {
+        if (PROTOCOL_MINOR(clientVersion) < 31) {
             auto outputId = DrvOutput::parse(readString(from));
             auto outputPath = StorePath(readString(from));
             store->registerDrvOutput(Realisation{
@@ -955,7 +955,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto outputId = DrvOutput::parse(readString(from));
         auto info = store->queryRealisation(outputId);
         logger->stopWork();
-        if (GET_PROTOCOL_MINOR(clientVersion) < 31) {
+        if (PROTOCOL_MINOR(clientVersion) < 31) {
             std::set<StorePath> outPaths;
             if (info) outPaths.insert(info->outPath);
             worker_proto::write(*store, to, outPaths);
@@ -1021,15 +1021,15 @@ void processConnection(
         printMsgUsing(prevLogger, lvlDebug, "%d operations", opCount);
     });
 
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from)) {
+    if (PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from)) {
         // Obsolete CPU affinity.
         readInt(from);
     }
 
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 11)
+    if (PROTOCOL_MINOR(clientVersion) >= 11)
         readInt(from); // obsolete reserveSpace
 
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 33)
+    if (PROTOCOL_MINOR(clientVersion) >= 33)
         to << nixVersion;
 
     /* Send startup error messages to the client. */

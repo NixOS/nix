@@ -6,6 +6,9 @@ namespace nix {
 #define SERVE_MAGIC_2 0x5452eecb
 
 #define SERVE_PROTOCOL_VERSION (2 << 8 | 7)
+#define PROTOCOL_MAJOR(x) (((x) & 0xff00) >> 8)
+#define PROTOCOL_MINOR(x) ((x) & 0x00ff)
+// Deprecated:
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 

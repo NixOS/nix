@@ -10,6 +10,9 @@ namespace nix {
 #define WORKER_MAGIC_2 0x6478696f
 
 #define PROTOCOL_VERSION (1 << 8 | 34)
+#define PROTOCOL_MAJOR(x) (((x) & 0xff00) >> 8)
+#define PROTOCOL_MINOR(x) ((x) & 0x00ff)
+// Deprecated:
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
