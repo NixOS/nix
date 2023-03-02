@@ -160,7 +160,7 @@ struct GitInputScheme : InputScheme
         for (auto & [name, value] : url.query) {
             if (name == "rev" || name == "ref")
                 attrs.emplace(name, value);
-            else if (name == "shallow" || name == "submodules")
+            else if (name == "shallow" || name == "submodules" || name == "allRefs")
                 attrs.emplace(name, Explicit<bool> { value == "1" });
             else
                 url2.query.emplace(name, value);
