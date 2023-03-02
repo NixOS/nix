@@ -93,7 +93,7 @@ struct MixLs : virtual Args, MixJSON
         if (json) {
             if (showDirectory)
                 throw UsageError("'--directory' is useless with '--json'");
-            std::cout << listNar(accessor, path, recursive);
+            logger->cout("%s", listNar(accessor, path, recursive));
         } else
             listText(accessor);
     }

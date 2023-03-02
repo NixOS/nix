@@ -228,12 +228,12 @@ struct ProfileManifest
 
         while (i != prevElems.end() || j != curElems.end()) {
             if (j != curElems.end() && (i == prevElems.end() || i->describe() > j->describe())) {
-                std::cout << fmt("%s%s: ∅ -> %s\n", indent, j->describe(), j->versions());
+                logger->cout("%s%s: ∅ -> %s", indent, j->describe(), j->versions());
                 changes = true;
                 ++j;
             }
             else if (i != prevElems.end() && (j == curElems.end() || i->describe() < j->describe())) {
-                std::cout << fmt("%s%s: %s -> ∅\n", indent, i->describe(), i->versions());
+                logger->cout("%s%s: %s -> ∅", indent, i->describe(), i->versions());
                 changes = true;
                 ++i;
             }
@@ -241,7 +241,7 @@ struct ProfileManifest
                 auto v1 = i->versions();
                 auto v2 = j->versions();
                 if (v1 != v2) {
-                    std::cout << fmt("%s%s: %s -> %s\n", indent, i->describe(), v1, v2);
+                    logger->cout("%s%s: %s -> %s", indent, i->describe(), v1, v2);
                     changes = true;
                 }
                 ++i;
@@ -250,7 +250,7 @@ struct ProfileManifest
         }
 
         if (!changes)
-            std::cout << fmt("%sNo changes.\n", indent);
+            logger->cout("%sNo changes.", indent);
     }
 };
 
@@ -640,9 +640,9 @@ struct CmdProfileDiffClosures : virtual StoreCommand, MixDefaultProfile
 
         for (auto & gen : gens) {
             if (prevGen) {
-                if (!first) std::cout << "\n";
+                if (!first) logger->cout("");
                 first = false;
-                std::cout << fmt("Version %d -> %d:\n", prevGen->number, gen.number);
+                logger->cout("Version %d -> %d:", prevGen->number, gen.number);
                 printClosureDiff(store,
                     store->followLinksToStorePath(prevGen->path),
                     store->followLinksToStorePath(gen.path),
@@ -678,10 +678,10 @@ struct CmdProfileHistory : virtual StoreCommand, EvalCommand, MixDefaultProfile
         for (auto & gen : gens) {
             ProfileManifest manifest(*getEvalState(), gen.path);
 
-            if (!first) std::cout << "\n";
+            if (!first) logger->cout("");
             first = false;
 
-            std::cout << fmt("Version %s%d" ANSI_NORMAL " (%s)%s:\n",
+            logger->cout("Version %s%d" ANSI_NORMAL " (%s)%s:",
                 gen.number == curGen ? ANSI_GREEN : ANSI_BOLD,
                 gen.number,
                 std::put_time(std::gmtime(&gen.creationTime), "%Y-%m-%d"),

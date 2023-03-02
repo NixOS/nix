@@ -65,18 +65,16 @@ struct CmdRealisationInfo : BuiltPathsCommand, MixJSON
 
                 res.push_back(currentPath);
             }
-            std::cout << res.dump();
+            logger->cout("%s", res);
         }
         else {
             for (auto & path : realisations) {
                 if (auto realisation = std::get_if<Realisation>(&path.raw)) {
-                    std::cout <<
-                        realisation->id.to_string() << " " <<
-                        store->printStorePath(realisation->outPath);
+                    logger->cout("%s %s",
+                        realisation->id.to_string(),
+                        store->printStorePath(realisation->outPath));
                 } else
-                    std::cout << store->printStorePath(path.path());
-
-                std::cout << std::endl;
+                    logger->cout("%s", store->printStorePath(path.path()));
             }
         }
     }

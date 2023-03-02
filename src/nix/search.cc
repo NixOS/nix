@@ -196,9 +196,8 @@ struct CmdSearch : InstallableCommand, MixJSON
         for (auto & cursor : installable->getCursors(*state))
             visit(*cursor, cursor->getAttrPath(), true);
 
-        if (json) {
-            std::cout << jsonOut->dump() << std::endl;
-        }
+        if (json)
+            logger->cout("%s", *jsonOut);
 
         if (!json && !results)
             throw Error("no results for the given search term(s)!");

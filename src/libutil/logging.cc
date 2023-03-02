@@ -32,7 +32,8 @@ void Logger::warn(const std::string & msg)
 
 void Logger::writeToStdout(std::string_view s)
 {
-    std::cout << s << "\n";
+    writeFull(STDOUT_FILENO, s);
+    writeFull(STDOUT_FILENO, "\n");
 }
 
 class SimpleLogger : public Logger
@@ -84,7 +85,7 @@ public:
 
     void startActivity(ActivityId act, Verbosity lvl, ActivityType type,
         const std::string & s, const Fields & fields, ActivityId parent)
-    override
+        override
     {
         if (lvl <= verbosity && !s.empty())
             log(lvl, s + "...");
