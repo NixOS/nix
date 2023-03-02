@@ -855,6 +855,7 @@ json Store::pathInfoToJSON(const StorePathSet & storePaths,
             auto info = queryPathInfo(storePath);
 
             jsonPath["path"] = printStorePath(info->path);
+            jsonPath["valid"] = true;
             jsonPath["narHash"] = info->narHash.to_string(hashBase, true);
             jsonPath["narSize"] = info->narSize;
 
