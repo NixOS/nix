@@ -952,7 +952,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
                 {"path", store->printStorePath(flake.flake.sourceInfo->storePath)},
                 {"inputs", traverse(*flake.lockFile.root)},
             };
-            std::cout << jsonRoot.dump() << std::endl;
+            logger->cout("%s", jsonRoot);
         } else {
             traverse(*flake.lockFile.root);
         }

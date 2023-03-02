@@ -112,11 +112,11 @@ struct CmdEval : MixJSON, InstallableCommand, MixReadOnlyOption
 
         else if (raw) {
             stopProgressBar();
-            std::cout << *state->coerceToString(noPos, *v, context, "while generating the eval command output");
+            writeFull(STDOUT_FILENO, *state->coerceToString(noPos, *v, context, "while generating the eval command output"));
         }
 
         else if (json) {
-            std::cout << printValueAsJSON(*state, true, *v, pos, context, false).dump() << std::endl;
+            logger->cout("%s", printValueAsJSON(*state, true, *v, pos, context, false));
         }
 
         else {
