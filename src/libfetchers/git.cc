@@ -511,26 +511,16 @@ struct GitInputScheme : InputScheme
             if (doFetch) {
                 Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", repoInfo.url));
 
-                // FIXME: git stderr messes up our progress indicator, so
-                // we're using --quiet for now. Should process its stderr.
                 try {
                     auto fetchRef = repoInfo.allRefs
                         ? "refs/*"
                         : ref.compare(0, 5, "refs/") == 0
-                            ? ref
-                            : ref == "HEAD"
-                                ? ref
-                                : "refs/heads/" + ref;
-                    runProgram("git", true,
-                        { "-C", repoDir,
-                          "--git-dir", repoInfo.gitDir,
-                          "fetch",
-                          "--quiet",
-                          "--force",
-                          "--",
-                          repoInfo.url,
-                          fmt("%s:%s", fetchRef, fetchRef)
-                        });
+                        ? ref
+                        : ref == "HEAD"
+                        ? ref
+                        : "refs/heads/" + ref;
+
+                    repo->fetch(repoInfo.url, fmt("%s:%s", fetchRef, fetchRef));
                 } catch (Error & e) {
                     if (!pathExists(localRefFile)) throw;
                     warn("could not update local clone of Git repository '%s'; continuing with the most recent version", repoInfo.url);
@@ -542,7 +532,18 @@ struct GitInputScheme : InputScheme
                     warn("could not update cached head '%s' for '%s'", ref, repoInfo.url);
             }
 
-            if (!input.getRev())
+            if (auto rev = input.getRev()) {
+                if (!repo->hasObject(*rev))
+                    throw Error(
+                        "Cannot find Git revision '%s' in ref '%s' of repository '%s'! "
+                        "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the "
+                        ANSI_BOLD "ref" ANSI_NORMAL " you've specified or add " ANSI_BOLD
+                        "allRefs = true;" ANSI_NORMAL " to " ANSI_BOLD "fetchGit" ANSI_NORMAL ".",
+                        rev->gitRev(),
+                        ref,
+                        repoInfo.url
+                        );
+            } else
                 input.attrs.insert_or_assign("rev", Hash::parseAny(chomp(readFile(localRefFile)), htSHA1).gitRev());
 
             // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
@@ -553,7 +554,7 @@ struct GitInputScheme : InputScheme
         if (isShallow && !repoInfo.shallow)
             throw Error("'%s' is a shallow Git repository, but shallow repositories are only allowed when `shallow = true;` is specified", repoInfo.url);
 
-        // FIXME: check whether rev is an ancestor of ref.
+        // FIXME: check whether rev is an ancestor of ref?
 
         auto rev = *input.getRev();
 
@@ -582,25 +583,6 @@ struct GitInputScheme : InputScheme
             Path tmpDir = createTempDir();
             AutoDelete delTmpDir(tmpDir, true);
             PathFilter filter = defaultPathFilter;
-
-            auto result = runProgram(RunOptions {
-                .program = "git",
-                .args = { "-C", repoDir, "--git-dir", repoInfo.gitDir, "cat-file", "commit", rev.gitRev() },
-                .mergeStderrToStdout = true
-            });
-            if (WEXITSTATUS(result.first) == 128
-                && result.second.find("bad file") != std::string::npos)
-            {
-                throw Error(
-                    "Cannot find Git revision '%s' in ref '%s' of repository '%s'! "
-                    "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the "
-                    ANSI_BOLD "ref" ANSI_NORMAL " you've specified or add " ANSI_BOLD
-                    "allRefs = true;" ANSI_NORMAL " to " ANSI_BOLD "fetchGit" ANSI_NORMAL ".",
-                    rev.gitRev(),
-                    ref,
-                    repoInfo.url
-                    );
-            }
 
             Activity act(*logger, lvlChatty, actUnknown, fmt("copying Git tree '%s' to the store", input.to_string()));
 

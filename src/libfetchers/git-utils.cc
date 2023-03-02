@@ -5,14 +5,15 @@
 
 #include <git2/blob.h>
 #include <git2/commit.h>
+#include <git2/describe.h>
 #include <git2/errors.h>
 #include <git2/global.h>
 #include <git2/object.h>
 #include <git2/refs.h>
+#include <git2/remote.h>
 #include <git2/repository.h>
 #include <git2/status.h>
 #include <git2/tree.h>
-#include <git2/describe.h>
 
 #include "tarfile.hh"
 #include <archive_entry.h>
@@ -63,7 +64,7 @@ typedef std::unique_ptr<git_commit, Deleter<git_commit_free>> Commit;
 typedef std::unique_ptr<git_reference, Deleter<git_reference_free>> Reference;
 typedef std::unique_ptr<git_describe_result, Deleter<git_describe_result_free>> DescribeResult;
 typedef std::unique_ptr<git_status_list, Deleter<git_status_list_free>> StatusList;
-typedef std::unique_ptr<git_buf, Deleter<git_buf_dispose>> Buf;
+typedef std::unique_ptr<git_remote, Deleter<git_remote_free>> Remote;
 
 // A helper to ensure that we don't leak objects returned by libgit2.
 template<typename T>
@@ -419,6 +420,24 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     }
 
     ref<InputAccessor> getAccessor(const Hash & rev) override;
+
+    void fetch(
+        const std::string & url,
+        const std::string & refspec) override
+    {
+        Remote remote;
+
+        if (git_remote_create_anonymous(Setter(remote), *this, url.c_str()))
+            throw Error("cannot create Git remote '%s': %s", url, git_error_last()->message);
+
+        char * refspecs[] = {(char *) refspec.c_str()};
+        git_strarray refspecs2 {
+            .strings = refspecs,
+            .count = 1
+        };
+
+        git_remote_fetch(remote.get(), &refspecs2, nullptr, nullptr);
+    }
 };
 
 ref<GitRepo> GitRepo::openRepo(const CanonPath & path, bool create, bool bare)

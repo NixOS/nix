@@ -46,6 +46,10 @@ struct GitRepo
     virtual bool hasObject(const Hash & oid) = 0;
 
     virtual ref<InputAccessor> getAccessor(const Hash & rev) = 0;
+
+    virtual void fetch(
+        const std::string & url,
+        const std::string & refspec) = 0;
 };
 
 ref<GitRepo> getTarballCache();
