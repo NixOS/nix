@@ -17,7 +17,7 @@ const char * currentExceptionTypeName()
     return res ? res : "(null)";
 }
 
-static PyObject * _eval(const char * expression, PyObject * vars)
+static PyObject * _eval(const std::string & expression, PyObject * vars)
 {
     nix::Strings storePath;
     nix::EvalState state(storePath, nix::openStore());
@@ -55,15 +55,24 @@ static PyObject * _eval(const char * expression, PyObject * vars)
 
 PyObject * eval(PyObject * self, PyObject * args, PyObject * keywds)
 {
-    const char * expression = nullptr;
+    PyObject * expressionObject;
     PyObject * vars = nullptr;
 
     const char * kwlist[] = {"expression", "vars", nullptr};
 
+    // See https://docs.python.org/3/c-api/arg.html for the magic string
     if (!PyArg_ParseTupleAndKeywords(
-            args, keywds, "s|O!", const_cast<char **>(kwlist), &expression, &PyDict_Type, &vars)) {
+            args, keywds, "U|O!", const_cast<char **>(kwlist), &expressionObject, &PyDict_Type, &vars)) {
         return nullptr;
     }
+
+    // This handles null bytes in expressions correctly
+    Py_ssize_t expressionSize;
+    auto expressionBase = PyUnicode_AsUTF8AndSize(expressionObject, &expressionSize);
+    if (!expressionBase) {
+        return nullptr;
+    }
+    std::string expression(expressionBase, expressionSize);
 
     try {
         return _eval(expression, vars);

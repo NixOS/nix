@@ -54,5 +54,17 @@ class TestPythonNix(unittest.TestCase):
         except nix.NixError as e:
             self.assertTrue(True)
 
+    def test_null_expression(self):
+        # Null characters should be allowed in expressions, even if they aren't
+        # very useful really, though at least null's should be supported in
+        # strings in the future https://github.com/NixOS/nix/issues/1307)
+        self.assertEqual(nix.eval("\"ab\x00cd\""), "ab")
+
+    def test_throw_null(self):
+        try:
+            nix.eval("throw \"hello\x00there\"")
+        except nix.ThrownNixError as e:
+            self.assertEqual(e.args[0], "hello")
+
 if __name__ == '__main__':
     unittest.main()
