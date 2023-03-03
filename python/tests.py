@@ -70,5 +70,8 @@ class TestPythonNix(unittest.TestCase):
         self.assertIs(nix.eval("assert a == true; a", vars=dict(a=True)), True)
         self.assertIs(nix.eval("assert a == false; a", vars=dict(a=False)), False)
 
+    def test_null(self):
+        self.assertIs(nix.eval("assert a == null; a", vars=dict(a=None)), None)
+
 if __name__ == '__main__':
     unittest.main()
