@@ -57,8 +57,6 @@ std::optional<std::string> getEnv(const std::string & key)
 std::optional<std::string> getEnvNonEmpty(const std::string & key) {
     auto value = getEnv(key);
     if (value == "") {
-        // TODO: determine whether this should be a warning or an error.
-        warn("ignoring the '%1%' env variable, its value has been set to \"\"", key);
         return std::nullopt;
     } else {
         return value;
