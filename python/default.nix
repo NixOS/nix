@@ -1,4 +1,4 @@
-{ self, system, lib, python, ninja, meson, nix, mkShell }:
+{ self, system, lib, python, clang-tools, ninja, meson, nix, mkShell }:
 python.pkgs.buildPythonPackage {
   name = "nix";
   format = "other";
@@ -39,6 +39,9 @@ python.pkgs.buildPythonPackage {
   passthru = {
     exampleEnv = python.withPackages (p: [ nix.python-bindings ]);
     shell = mkShell {
+      packages = [
+        clang-tools
+      ];
       inputsFrom = [
         self.devShells.${system}.default
         (nix.python-bindings.override { nix = null; })
