@@ -42,9 +42,9 @@ public:
     /* Register a permanent GC root. */
     Path addPermRoot(const StorePath & storePath, const Path & gcRoot);
 
-    virtual Path getRealStoreDir() { return realStoreDir; }
+    virtual Path getRealStoreDir() const { return realStoreDir; }
 
-    Path toRealPath(const Path & storePath) override
+    Path toRealPath(const Path & storePath) const override
     {
         assert(isInStore(storePath));
         return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);

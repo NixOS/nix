@@ -14,9 +14,9 @@ struct SimpleUserLock : UserLock
     gid_t gid;
     std::vector<gid_t> supplementaryGIDs;
 
-    uid_t getUID() override { assert(uid); return uid; }
-    uid_t getUIDCount() override { return 1; }
-    gid_t getGID() override { assert(gid); return gid; }
+    uid_t getUID() const override { assert(uid); return uid; }
+    uid_t getUIDCount() const override { return 1; }
+    gid_t getGID() const override { assert(gid); return gid; }
 
     std::vector<gid_t> getSupplementaryGIDs() override { return supplementaryGIDs; }
 
@@ -115,11 +115,11 @@ struct AutoUserLock : UserLock
     gid_t firstGid = 0;
     uid_t nrIds = 1;
 
-    uid_t getUID() override { assert(firstUid); return firstUid; }
+    uid_t getUID() const override { assert(firstUid); return firstUid; }
 
-    gid_t getUIDCount() override { return nrIds; }
+    gid_t getUIDCount() const override { return nrIds; }
 
-    gid_t getGID() override { assert(firstGid); return firstGid; }
+    gid_t getGID() const override { assert(firstGid); return firstGid; }
 
     std::vector<gid_t> getSupplementaryGIDs() override { return {}; }
 

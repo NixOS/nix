@@ -649,12 +649,12 @@ public:
         return 0;
     };
 
-    virtual Path toRealPath(const Path & storePath)
+    virtual Path toRealPath(const Path & storePath) const
     {
         return storePath;
     }
 
-    Path toRealPath(const StorePath & storePath)
+    Path toRealPath(const StorePath & storePath) const
     {
         return toRealPath(printStorePath(storePath));
     }

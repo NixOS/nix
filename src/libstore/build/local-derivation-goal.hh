@@ -5,18 +5,18 @@
 
 namespace nix {
 
+class Sandbox;
+
 struct LocalDerivationGoal : public DerivationGoal
 {
     LocalStore & getLocalStore();
 
     /* User selected for running the builder. */
     std::unique_ptr<UserLock> buildUser;
+    std::unique_ptr<Sandbox> sandbox;
 
     /* The process ID of the builder. */
     Pid pid;
-
-    /* The cgroup of the builder, if any. */
-    std::optional<Path> cgroup;
 
     /* The temporary directory. */
     Path tmpDir;
@@ -27,28 +27,8 @@ struct LocalDerivationGoal : public DerivationGoal
     /* Pipe for the builder's standard output/error. */
     Pipe builderOut;
 
-    /* Pipe for synchronising updates to the builder namespaces. */
-    Pipe userNamespaceSync;
-
-    /* The mount namespace and user namespace of the builder, used to add additional
-       paths to the sandbox as a result of recursive Nix calls. */
-    AutoCloseFD sandboxMountNamespace;
-    AutoCloseFD sandboxUserNamespace;
-
-    /* On Linux, whether we're doing the build in its own user
-       namespace. */
-    bool usingUserNamespace = true;
-
     /* Whether we're currently doing a chroot build. */
     bool useChroot = false;
-
-    Path chrootRootDir;
-
-    /* RAII object to delete the chroot directory. */
-    std::shared_ptr<AutoDelete> autoDelChroot;
-
-    /* Whether to run the build in a private network namespace. */
-    bool privateNetwork = false;
 
     /* Stuff we need to pass to initChild(). */
     struct ChrootPath {
@@ -95,9 +75,6 @@ struct LocalDerivationGoal : public DerivationGoal
        result. */
     std::map<Path, ValidPathInfo> prevInfos;
 
-    uid_t sandboxUid() { return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 1000 : 0) : buildUser->getUID(); }
-    gid_t sandboxGid() { return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 100  : 0) : buildUser->getGID(); }
-
     const static Path homeDir;
 
     /* The recursive Nix daemon socket. */
@@ -134,6 +111,12 @@ struct LocalDerivationGoal : public DerivationGoal
 
     using DerivationGoal::DerivationGoal;
 
+    LocalDerivationGoal(const StorePath & drvPath,
+        const OutputsSpec & wantedOutputs, Worker & worker,
+        BuildMode buildMode = bmNormal);
+    LocalDerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
+        const OutputsSpec & wantedOutputs, Worker & worker,
+        BuildMode buildMode = bmNormal);
     virtual ~LocalDerivationGoal() override;
 
     /* Whether we need to perform hash rewriting if there are valid output paths. */

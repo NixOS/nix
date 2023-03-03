@@ -20,11 +20,11 @@ struct UserLock
     }
 
     /* Get the first UID. */
-    virtual uid_t getUID() = 0;
+    virtual uid_t getUID() const = 0;
 
-    virtual uid_t getUIDCount() = 0;
+    virtual uid_t getUIDCount() const = 0;
 
-    virtual gid_t getGID() = 0;
+    virtual gid_t getGID() const = 0;
 
     virtual std::vector<gid_t> getSupplementaryGIDs() = 0;
 };
