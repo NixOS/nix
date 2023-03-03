@@ -368,7 +368,7 @@ void initGC()
             size = (pageSize * pages) / 4; // 25% of RAM
         if (size > maxSize) size = maxSize;
 #endif
-        debug(format("setting initial heap size to %1% bytes") % size);
+        debug("setting initial heap size to %1% bytes", size);
         GC_expand_hp(size);
     }
 
@@ -609,7 +609,7 @@ Path EvalState::checkSourcePath(const Path & path_)
     }
 
     /* Resolve symlinks. */
-    debug(format("checking access to '%s'") % abspath);
+    debug("checking access to '%s'", abspath);
     Path path = canonPath(abspath, true);
 
     for (auto & i : *allowedPaths) {

@@ -15,9 +15,9 @@ static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
 {
     tmpRoot = canonPath(tmpRoot.empty() ? getEnv("TMPDIR").value_or("/tmp") : tmpRoot, true);
     if (includePid)
-        return (format("%1%/%2%-%3%-%4%") % tmpRoot % prefix % getpid() % counter++).str();
+        return fmt("%1%/%2%-%3%-%4%", tmpRoot, prefix, getpid(), counter++);
     else
-        return (format("%1%/%2%-%3%") % tmpRoot % prefix % counter++).str();
+        return fmt("%1%/%2%-%3%", tmpRoot, prefix, counter++);
 }
 
 Path createTempDir(const Path & tmpRoot, const Path & prefix,

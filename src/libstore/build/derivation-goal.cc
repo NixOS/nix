@@ -732,7 +732,7 @@ void replaceValidPath(const Path & storePath, const Path & tmpPath)
        tmpPath (the replacement), so we have to move it out of the
        way first.  We'd better not be interrupted here, because if
        we're repairing (say) Glibc, we end up with a broken system. */
-    Path oldPath = (format("%1%.old-%2%-%3%") % storePath % getpid() % random()).str();
+    Path oldPath = fmt("%1%.old-%2%-%3%", storePath, getpid(), random());
     if (pathExists(storePath))
         movePath(storePath, oldPath);
 

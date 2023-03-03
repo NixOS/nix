@@ -54,7 +54,7 @@ public:
         return printBuildLogs;
     }
 
-    void log(Verbosity lvl, const FormatOrString & fs) override
+    void log(Verbosity lvl, std::string_view s) override
     {
         if (lvl > verbosity) return;
 
@@ -72,7 +72,7 @@ public:
             prefix = std::string("<") + c + ">";
         }
 
-        writeToStderr(prefix + filterANSIEscapes(fs.s, !tty) + "\n");
+        writeToStderr(prefix + filterANSIEscapes(s, !tty) + "\n");
     }
 
     void logEI(const ErrorInfo & ei) override
@@ -174,12 +174,12 @@ struct JSONLogger : Logger {
         prevLogger.log(lvlError, "@nix " + json.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace));
     }
 
-    void log(Verbosity lvl, const FormatOrString & fs) override
+    void log(Verbosity lvl, std::string_view s) override
     {
         nlohmann::json json;
         json["action"] = "msg";
         json["level"] = lvl;
-        json["msg"] = fs.s;
+        json["msg"] = s;
         write(json);
     }
 

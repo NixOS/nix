@@ -280,7 +280,7 @@ LocalStore::LocalStore(const Params & params)
     else if (curSchema == 0) { /* new store */
         curSchema = nixSchemaVersion;
         openDB(*state, true);
-        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str(), 0666, true);
+        writeFile(schemaPath, fmt("%1%", nixSchemaVersion), 0666, true);
     }
 
     else if (curSchema < nixSchemaVersion) {
@@ -329,7 +329,7 @@ LocalStore::LocalStore(const Params & params)
             txn.commit();
         }
 
-        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str(), 0666, true);
+        writeFile(schemaPath, fmt("%1%", nixSchemaVersion), 0666, true);
 
         lockFile(globalLock.get(), ltRead, true);
     }
@@ -1560,7 +1560,7 @@ void LocalStore::invalidatePathChecked(const StorePath & path)
 
 bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 {
-    printInfo(format("reading the Nix store..."));
+    printInfo("reading the Nix store...");
 
     bool errors = false;
 

@@ -17,16 +17,6 @@ using boost::format;
 struct nop { template<typename... T> nop(T...) {} };
 
 
-struct FormatOrString
-{
-    std::string s;
-    FormatOrString(std::string s) : s(std::move(s)) { };
-    template<class F>
-    FormatOrString(const F & f) : s(f.str()) { };
-    FormatOrString(const char * s) : s(s) { };
-};
-
-
 /* A helper for formatting strings. ‘fmt(format, a_0, ..., a_n)’ is
    equivalent to ‘boost::format(format) % a_0 % ... %
    ... a_n’. However, ‘fmt(s)’ is equivalent to ‘s’ (so no %-expansion
@@ -51,11 +41,6 @@ inline std::string fmt(const std::string & s)
 inline std::string fmt(const char * s)
 {
     return s;
-}
-
-inline std::string fmt(const FormatOrString & fs)
-{
-    return fs.s;
 }
 
 template<typename... Args>

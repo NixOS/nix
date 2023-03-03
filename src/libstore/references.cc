@@ -39,8 +39,7 @@ static void search(
         if (!match) continue;
         std::string ref(s.substr(i, refLength));
         if (hashes.erase(ref)) {
-            debug(format("found reference to '%1%' at offset '%2%'")
-                  % ref % i);
+            debug("found reference to '%1%' at offset '%2%'", ref, i);
             seen.insert(ref);
         }
         ++i;

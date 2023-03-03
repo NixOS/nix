@@ -732,7 +732,7 @@ Expr * EvalState::parseExprFromString(std::string s, const Path & basePath)
 
 Expr * EvalState::parseStdin()
 {
-    //Activity act(*logger, lvlTalkative, format("parsing standard input"));
+    //Activity act(*logger, lvlTalkative, "parsing standard input");
     auto buffer = drainFD(0);
     // drainFD should have left some extra space for terminators
     buffer.append("\0\0", 2);
@@ -835,7 +835,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
         }
     }
 
-    debug(format("resolved search path element '%s' to '%s'") % elem.second % res.second);
+    debug("resolved search path element '%s' to '%s'", elem.second, res.second);
 
     searchPathResolved[elem.second] = res;
     return res;
