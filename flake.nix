@@ -369,6 +369,10 @@
             postInstall = ''
               mkdir -p $doc/nix-support
               echo "doc manual $doc/share/doc/nix/manual" >> $doc/nix-support/hydra-build-products
+              ${lib.optionalString currentStdenv.hostPlatform.isStatic ''
+              mkdir -p $out/nix-support
+              echo "file binary-dist $out/bin/nix" >> $out/nix-support/hydra-build-products
+              ''}
               ${lib.optionalString currentStdenv.isDarwin ''
               install_name_tool \
                 -change ${boost}/lib/libboost_context.dylib \
