@@ -33,7 +33,7 @@ define process-includes
 		matchline=$$(sed 's|/|\\/|g' <<< $$line); \
 		sed -i "/$$matchline/r $$(dirname $(2))/$$filename" $(2); \
 		sed -i "s/$$matchline//" $(2); \
-		done < <(grep '{{#include' $(1))
+	done < <(grep '{{#include' $(1))
 endef
 
 $(d)/%.1: $(d)/src/command-ref/%.md
