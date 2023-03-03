@@ -42,8 +42,6 @@ class TestPythonNix(unittest.TestCase):
         except nix.NixError as e:
             self.assertTrue(True)
 
-    # This test case fails if you uncomment the `Py_{BEGIN,END}_ALLOW_THREADS`
-    # macros in src/eval.cc
     def test_GIL_case(self):
         try:
             nix.eval("{ a = throw \"nope\"; }")
