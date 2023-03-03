@@ -48,5 +48,11 @@ class TestPythonNix(unittest.TestCase):
         except nix.NixError as e:
             self.assertEqual(e.args[0], "nope")
 
+    def test_infinity(self):
+        try:
+            nix.eval("let x = { inherit x; }; in x")
+        except nix.NixError as e:
+            self.assertTrue(True)
+
 if __name__ == '__main__':
     unittest.main()
