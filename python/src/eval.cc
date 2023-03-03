@@ -43,6 +43,7 @@ static PyObject * _eval(const char * expression, PyObject * vars)
             PyEval_RestoreThread(_save);
         });
 
+        // TODO: Should the "." be something else here?
         auto e = state.parseExprFromString(expression, ".", staticEnvPointer);
         e->eval(state, *env, v);
         state.forceValueDeep(v);

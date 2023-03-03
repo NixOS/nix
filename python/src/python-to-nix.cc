@@ -78,6 +78,7 @@ nix::Value * pythonToNixValue(nix::EvalState & state, PyObject * obj)
     } else if (obj == Py_None) {
         v->mkNull();
     } else if (PyBytes_Check(obj)) {
+        // TODO: Bytes should probably not be coerced to strings
         auto str = checkNullByte(PyBytes_AS_STRING(obj), PyBytes_GET_SIZE(obj));
         if (!str) {
             return nullptr;
