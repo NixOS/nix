@@ -4,6 +4,7 @@
 #include "gc-store.hh"
 #include "util.hh"
 #include "loggers.hh"
+#include "progress-bar.hh"
 
 #include <algorithm>
 #include <cctype>
@@ -409,6 +410,8 @@ RunPager::RunPager()
     char * pager = getenv("NIX_PAGER");
     if (!pager) pager = getenv("PAGER");
     if (pager && ((std::string) pager == "" || (std::string) pager == "cat")) return;
+
+    stopProgressBar();
 
     Pipe toPager;
     toPager.create();
