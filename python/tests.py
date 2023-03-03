@@ -29,30 +29,22 @@ class TestPythonNix(unittest.TestCase):
 
     def test_throw(self):
         errorString = "hello hi there\ntest"
-        try:
+        with self.assertRaises(nix.ThrownNixError) as cm:
             nix.eval("throw str", vars=dict(str=errorString))
-        except nix.ThrownNixError as e:
-            self.assertEqual(e.args[0], errorString)
+        self.assertEquals(cm.exception.args[0], errorString)
 
     def test_syntax_error(self):
-        try:
+        with self.assertRaises(nix.NixError) as cm:
             nix.eval("{")
-        except nix.ThrownNixError as e:
-            self.assertTrue(False)
-        except nix.NixError as e:
-            self.assertTrue(True)
 
     def test_GIL_case(self):
-        try:
+        with self.assertRaises(nix.ThrownNixError) as cm:
             nix.eval("{ a = throw \"nope\"; }")
-        except nix.NixError as e:
-            self.assertEqual(e.args[0], "nope")
+        self.assertEqual(cm.exception.args[0], "nope")
 
     def test_infinity(self):
-        try:
+        with self.assertRaises(nix.NixError):
             nix.eval("let x = { inherit x; }; in x")
-        except nix.NixError as e:
-            self.assertTrue(True)
 
     def test_null_expression(self):
         # Null characters should be allowed in expressions, even if they aren't
@@ -61,10 +53,9 @@ class TestPythonNix(unittest.TestCase):
         self.assertEqual(nix.eval("\"ab\x00cd\""), "ab")
 
     def test_throw_null(self):
-        try:
+        with self.assertRaises(nix.ThrownNixError) as cm:
             nix.eval("throw \"hello\x00there\"")
-        except nix.ThrownNixError as e:
-            self.assertEqual(e.args[0], "hello")
+        self.assertEqual(cm.exception.args[0], "hello")
 
     def test_booleans(self):
         self.assertIs(nix.eval("assert a == true; a", vars=dict(a=True)), True)
