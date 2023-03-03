@@ -56,11 +56,8 @@ std::optional<std::string> getEnv(const std::string & key)
 
 std::optional<std::string> getEnvNonEmpty(const std::string & key) {
     auto value = getEnv(key);
-    if (value == "") {
-        return std::nullopt;
-    } else {
-        return value;
-    }
+    if (value == "") return {};
+    return value;
 }
 
 std::map<std::string, std::string> getEnv()
