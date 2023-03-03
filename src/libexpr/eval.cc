@@ -386,6 +386,7 @@ void initGC()
 
 
 #if NIX_BOEHM_PATCH_VERSION != 1
+    printTalkative("Unpatched BoehmGC, disabling GC inside coroutines");
     /* Used to disable GC when entering coroutines on macOS */
     create_coro_gc_hook = []() -> std::shared_ptr<void> {
         return std::make_shared<BoehmDisableGC>();
