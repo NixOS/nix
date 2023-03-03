@@ -66,5 +66,9 @@ class TestPythonNix(unittest.TestCase):
         except nix.ThrownNixError as e:
             self.assertEqual(e.args[0], "hello")
 
+    def test_booleans(self):
+        self.assertIs(nix.eval("assert a == true; a", vars=dict(a=True)), True)
+        self.assertIs(nix.eval("assert a == false; a", vars=dict(a=False)), False)
+
 if __name__ == '__main__':
     unittest.main()

@@ -73,7 +73,7 @@ nix::Value * pythonToNixValue(nix::EvalState & state, PyObject * obj)
 {
     auto v = state.allocValue();
 
-    if (obj == Py_True && obj == Py_False) {
+    if (obj == Py_True || obj == Py_False) {
         v->mkBool(obj == Py_True);
     } else if (obj == Py_None) {
         v->mkNull();
