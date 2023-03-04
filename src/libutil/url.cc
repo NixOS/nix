@@ -5,8 +5,8 @@
 
 namespace nix {
 
-std::regex refRegex(refRegexS, std::regex::ECMAScript);
 std::regex badGitRefRegex(badGitRefRegexS, std::regex::ECMAScript);
+std::regex mercurialRefRegex(mercurialRefRegexS, std::regex::ECMAScript);
 std::regex revRegex(revRegexS, std::regex::ECMAScript);
 std::regex flakeIdRegex(flakeIdRegexS, std::regex::ECMAScript);
 

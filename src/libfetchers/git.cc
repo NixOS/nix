@@ -548,6 +548,8 @@ struct GitInputScheme : InputScheme
                 // we're using --quiet for now. Should process its stderr.
                 try {
                     auto ref = input.getRef();
+                    if (std::regex_match(*ref, badGitRefRegex))
+                        throw BadURL("in input '%s', '%s' is not a branch/tag name", input.to_string(), *ref);
                     auto fetchRef = allRefs
                         ? "refs/*"
                         : ref->compare(0, 5, "refs/") == 0

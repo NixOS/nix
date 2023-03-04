@@ -22,9 +22,8 @@ const static std::string segmentRegex = "(?:" + pcharRegex + "*)";
 const static std::string absPathRegex = "(?:(?:/" + segmentRegex + ")*/?)";
 const static std::string pathRegex = "(?:" + segmentRegex + "(?:/" + segmentRegex + ")*/?)";
 
-// A Git ref (i.e. branch or tag name).
-const static std::string refRegexS = "[a-zA-Z0-9][a-zA-Z0-9_.\\/-]*"; // FIXME: check
-extern std::regex refRegex;
+static const std::string mercurialRefRegexS = "[a-zA-Z0-9][a-zA-Z0-9_.\\/-]*"; // FIXME: check
+extern std::regex mercurialRefRegex;
 
 // Instead of defining what a good Git Ref is, we define what a bad Git Ref is
 // This is because of the definition of a ref in refs.c in https://github.com/git/git
@@ -36,8 +35,9 @@ extern std::regex badGitRefRegex;
 const static std::string revRegexS = "[0-9a-fA-F]{40}";
 extern std::regex revRegex;
 
-// A ref or revision, or a ref followed by a revision.
-const static std::string refAndOrRevRegex = "(?:(" + revRegexS + ")|(?:(" + refRegexS + ")(?:/(" + revRegexS + "))?))";
+// A ref or revision, or a ref followed by a revision. Ref is thus a bare
+// minimum and it is up to fetchers to do more-specific checks.
+const static std::string refAndOrRevRegex = "(?:(" + revRegexS + ")|(?:([^ #]*)(?:/(" + revRegexS + "))?))";
 
 const static std::string flakeIdRegexS = "[a-zA-Z][a-zA-Z0-9_-]*";
 extern std::regex flakeIdRegex;

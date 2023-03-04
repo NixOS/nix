@@ -44,7 +44,7 @@ struct GitArchiveInputScheme : InputScheme
         if (size == 3) {
             if (std::regex_match(path[2], revRegex))
                 rev = Hash::parseAny(path[2], htSHA1);
-            else if (std::regex_match(path[2], refRegex))
+            else if (!std::regex_match(path[2], badGitRefRegex))
                 ref = path[2];
             else
                 throw BadURL("in URL '%s', '%s' is not a commit hash or branch/tag name", url.url, path[2]);
@@ -56,8 +56,7 @@ struct GitArchiveInputScheme : InputScheme
                     rs += "/";
                 }
             }
-
-            if (std::regex_match(rs, refRegex)) {
+            if (!std::regex_match(rs, badGitRefRegex)) {
                 ref = rs;
             } else {
                 throw BadURL("in URL '%s', '%s' is not a branch/tag name", url.url, rs);
@@ -72,8 +71,8 @@ struct GitArchiveInputScheme : InputScheme
                 rev = Hash::parseAny(value, htSHA1);
             }
             else if (name == "ref") {
-                if (!std::regex_match(value, refRegex))
-                    throw BadURL("URL '%s' contains an invalid branch/tag name", url.url);
+                if (std::regex_match(value, badGitRefRegex))
+                    throw BadURL("in URL '%s', '%s' is not a branch/tag name", url.url, value);
                 if (ref)
                     throw BadURL("URL '%s' contains multiple branch/tag names", url.url);
                 ref = value;
