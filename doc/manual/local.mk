@@ -24,7 +24,13 @@ dummy-env = env -i \
 	NIX_STATE_DIR=/dummy \
 	NIX_CONFIG='cores = 0'
 
-nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw
+ifneq (,$(findstring qemu,$(CROSS_EMULATOR)))
+  _nix-emu := QEMU_LD_PREFIX=${QEMU_LD_PREFIX} $(CROSS_EMULATOR)
+else
+  _nix-emu := $(CROSS_EMULATOR)
+endif
+
+nix-eval = $(dummy-env) $(_nix-emu) $(nix_DIR)/nix eval --experimental-features nix-command -I nix/corepkgs=corepkgs --store dummy:// --impure --raw
 
 $(d)/%.1: $(d)/src/command-ref/%.md
 	@printf "Title: %s\n\n" "$$(basename $@ .1)" > $^.tmp
@@ -48,29 +54,29 @@ $(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli
 	$(trace-gen) cat doc/manual/src/SUMMARY.md.in | while IFS= read line; do if [[ $$line = @manpages@ ]]; then cat doc/manual/src/command-ref/new-cli/SUMMARY.md; else echo "$$line"; fi; done > $@.tmp
 	@mv $@.tmp $@
 
-$(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/generate-manpage.nix $(bindir)/nix
+$(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/generate-manpage.nix $(nix_DIR)/nix
 	@rm -rf $@
 	$(trace-gen) $(nix-eval) --write-to $@.tmp --expr 'import doc/manual/generate-manpage.nix { toplevel = builtins.readFile $<; }'
 	@# @docroot@: https://nixos.org/manual/nix/unstable/contributing/hacking.html#docroot-variable
 	$(trace-gen) sed -i $@.tmp/*.md -e 's^@docroot@^../..^g'
 	@mv $@.tmp $@
 
-$(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/generate-options.nix $(d)/src/command-ref/conf-file-prefix.md $(bindir)/nix
+$(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/generate-options.nix $(d)/src/command-ref/conf-file-prefix.md $(nix_DIR)/nix
 	@cat doc/manual/src/command-ref/conf-file-prefix.md > $@.tmp
 	@# @docroot@: https://nixos.org/manual/nix/unstable/contributing/hacking.html#docroot-variable
 	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-options.nix (builtins.fromJSON (builtins.readFile $<))' \
 	  | sed -e 's^@docroot@^..^g'>> $@.tmp
 	@mv $@.tmp $@
 
-$(d)/nix.json: $(bindir)/nix
-	$(trace-gen) $(dummy-env) $(bindir)/nix __dump-args > $@.tmp
+$(d)/nix.json: $(nix_DIR)/nix
+	$(trace-gen) $(dummy-env) $(_nix-emu) $(nix_DIR)/nix __dump-args > $@.tmp
 	@mv $@.tmp $@
 
-$(d)/conf-file.json: $(bindir)/nix
-	$(trace-gen) $(dummy-env) $(bindir)/nix show-config --json --experimental-features nix-command > $@.tmp
+$(d)/conf-file.json: $(nix_DIR)/nix
+	$(trace-gen) $(dummy-env) $(_nix-emu) $(nix_DIR)/nix show-config --json --experimental-features nix-command > $@.tmp
 	@mv $@.tmp $@
 
-$(d)/src/language/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d)/src/language/builtins-prefix.md $(bindir)/nix
+$(d)/src/language/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d)/src/language/builtins-prefix.md $(nix_DIR)/nix
 	@cat doc/manual/src/language/builtins-prefix.md > $@.tmp
 	@# @docroot@: https://nixos.org/manual/nix/unstable/contributing/hacking.html#docroot-variable
 	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-builtins.nix (builtins.fromJSON (builtins.readFile $<))' \
@@ -78,8 +84,8 @@ $(d)/src/language/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d
 	@cat doc/manual/src/language/builtins-suffix.md >> $@.tmp
 	@mv $@.tmp $@
 
-$(d)/builtins.json: $(bindir)/nix
-	$(trace-gen) $(dummy-env) NIX_PATH=nix/corepkgs=corepkgs $(bindir)/nix __dump-builtins > $@.tmp
+$(d)/builtins.json: $(nix_DIR)/nix
+	$(trace-gen) $(dummy-env) NIX_PATH=nix/corepkgs=corepkgs $(_nix-emu) $(nix_DIR)/nix __dump-builtins > $@.tmp
 	@mv $@.tmp $@
 
 # Generate the HTML manual.
@@ -96,14 +102,14 @@ $(mandir)/man1/nix3-manpages: doc/manual/generated/man1/nix3-manpages
 	$(trace-install) install -m 0644 $$(dirname $<)/* $(DESTDIR)$$(dirname $@)
 
 doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
-	@mkdir -p $(DESTDIR)$$(dirname $@)
+	@mkdir -p $$(dirname $@)
 	$(trace-gen) for i in doc/manual/src/command-ref/new-cli/*.md; do \
 	  name=$$(basename $$i .md); \
 	  tmpFile=$$(mktemp); \
 	  if [[ $$name = SUMMARY ]]; then continue; fi; \
 	  printf "Title: %s\n\n" "$$name" > $$tmpFile; \
 	  cat $$i >> $$tmpFile; \
-	  lowdown -sT man --nroff-nolinks -M section=1 $$tmpFile -o $(DESTDIR)$$(dirname $@)/$$name.1; \
+	  lowdown -sT man --nroff-nolinks -M section=1 $$tmpFile -o $$(dirname $@)/$$name.1; \
 	  rm $$tmpFile; \
 	done
 	@touch $@
