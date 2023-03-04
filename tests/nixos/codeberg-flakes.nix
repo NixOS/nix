@@ -59,16 +59,12 @@
 
   private-flake-rev = "9f1dd0df5b54a7dc75b618034482ed42ce34383d";
 
-  private-flake-info =
-    pkgs.runCommand "private-flake-info" {}
-    ''
-      echo '{"default_branch": "main"}' > $out
-    '';
-
   private-flake-api =
     pkgs.runCommand "private-flake" {}
     ''
       mkdir -p $out/{archive,branches}
+
+      echo '{"default_branch": "main"}' > $out/index.json
 
       # Setup https://codeberg.org/api/swagger#/repository/repoListBranches
       # This is simulating the use of the default HEAD ref
@@ -147,7 +143,9 @@ in {
             dir = archive;
           }
         ];
-        locations."/api/v1/repos/fancy-enterprise/private-flake".alias = private-flake-info;
+        # NOTE: while this works well to emulate this endpoint, it technically isn't identical,
+        # as httpd will redirect and add a trailing / first.
+        locations."/api/v1/repos/fancy-enterprise/private-flake".index = "index.json";
       };
     };
 
@@ -196,7 +194,7 @@ in {
     cat_log()
 
     # ... otherwise it should use the API
-    out = client.succeed("nix flake metadata private-flake --json --debug --access-tokens codeberg.org=65eaa9c8ef52460d22a93307fe0aee76289dc675 --tarball-ttl 0")
+    out = client.succeed("nix flake metadata private-flake --json --access-tokens codeberg.org=65eaa9c8ef52460d22a93307fe0aee76289dc675 --tarball-ttl 0")
     print(out)
     info = json.loads(out)
     assert info["revision"] == "${private-flake-rev}", f"revision mismatch: {info['revision']} != ${private-flake-rev}"
