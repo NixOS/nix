@@ -550,6 +550,8 @@
 
         tests.sourcehutFlakes = runNixOSTestFor "x86_64-linux" ./tests/nixos/sourcehut-flakes.nix;
 
+        tests.codebergFlakes = runNixOSTestFor "x86_64-linux" ./tests/nixos/codeberg-flakes.nix;
+
         tests.containers = runNixOSTestFor "x86_64-linux" ./tests/nixos/containers/containers.nix;
 
         tests.setuid = lib.genAttrs

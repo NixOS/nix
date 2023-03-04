@@ -460,8 +460,93 @@ struct SourceHutInputScheme : GitArchiveInputScheme
     }
 };
 
+struct CodebergInputScheme : GitArchiveInputScheme
+{
+    std::string type() const override { return "codeberg"; }
+
+    std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
+    {
+        // Codeberg supports http and OAuth2 authentication
+        // https://docs.gitea.io/en-us/api-usage/#authentication
+        return std::pair<std::string, std::string>("Authorization", fmt("token %s", token));
+    }
+
+    std::string getHost(const Input & input) const
+    {
+        return maybeGetStrAttr(input.attrs, "host").value_or("codeberg.org");
+    }
+
+    std::string getOwner(const Input & input) const
+    {
+        return getStrAttr(input.attrs, "owner");
+    }
+
+    std::string getRepo(const Input & input) const
+    {
+        return getStrAttr(input.attrs, "repo");
+    }
+
+    auto getJson(nix::ref<Store> store, const auto url, const auto headers) const
+    {
+        return nlohmann::json::parse(
+            readFile(
+                store->toRealPath(
+                    downloadFile(store, url, "source", false, headers).storePath)));
+    }
+
+    Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
+    {
+        auto host = getHost(input);
+        auto ref = *input.getRef();
+        Headers headers = makeHeadersWithAuthTokens(host);
+
+        // The `/branches/<name>` endpoint doesn't work for HEAD, so we need to find
+        // the default branch here
+        auto api_url = fmt("https://%s/api/v1/repos/%s/%s",
+            host, getOwner(input), getRepo(input));
+
+        auto branch = ref == "HEAD" ? std::string { getJson(store, api_url, headers)["default_branch"] } : ref;
+
+        auto url = fmt(api_url + "/branches/%s", branch);
+        auto json = getJson(store, url, headers);
+
+        auto rev = Hash::parseAny(std::string { json["commit"]["id"] }, htSHA1);
+        debug("HEAD revision for '%s' is %s", url, rev.gitRev());
+        return rev;
+    }
+
+    DownloadUrl getDownloadUrl(const Input & input) const override
+    {
+        auto host = getHost(input);
+
+        Headers headers = makeHeadersWithAuthTokens(host);
+
+        // If we have no auth headers then we default to the public archive
+        // urls so we do not run into rate limits.
+        const auto urlFmt =
+            headers.empty()
+            ? "https://%s/%s/%s/archive/%s.tar.gz"
+            : "https://%s/api/v1/repos/%s/%s/archive/%s.tar.gz";
+
+        const auto url = fmt(urlFmt, host, getOwner(input), getRepo(input),
+            input.getRev()->to_string(Base16, false));
+
+        return DownloadUrl { url, headers };
+    }
+
+    void clone(const Input & input, const Path & destDir) const override
+    {
+        auto host = getHost(input);
+        Input::fromURL(fmt("git+https://%s/%s/%s.git",
+                host, getOwner(input), getRepo(input)))
+            .applyOverrides(input.getRef(), input.getRev())
+            .clone(destDir);
+    }
+};
+
 static auto rGitHubInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GitHubInputScheme>()); });
 static auto rGitLabInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GitLabInputScheme>()); });
 static auto rSourceHutInputScheme = OnStartup([] { registerInputScheme(std::make_unique<SourceHutInputScheme>()); });
+static auto rCodebergInputScheme = OnStartup([] { registerInputScheme(std::make_unique<CodebergInputScheme>()); });
 
 }
