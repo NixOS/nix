@@ -17,9 +17,8 @@ the build loop.
 
 # Prerequisites
 
-This tutorial assumes you have [configured an S3-compatible binary
-cache](../package-management/s3-substituter.md), and that the `root`
-user's default AWS profile can upload to the bucket.
+This tutorial assumes you have configured an [S3-compatible binary cache](../command-ref/conf-file.md#conf-substituters),
+and that the `root` user's default AWS profile can upload to the bucket.
 
 # Set up a Signing Key
 
