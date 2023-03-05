@@ -55,19 +55,16 @@ struct AuthorizationSettings : Config {
     Setting<Strings> trustedUsers{
         this, {"root"}, "trusted-users",
         R"(
-          A list of names of users (separated by whitespace) that have
-          additional rights when connecting to the Nix daemon, such as the
-          ability to specify additional binary caches, or to import unsigned
-          NARs. You can also specify groups by prefixing them with `@`; for
-          instance, `@wheel` means all users in the `wheel` group. The default
-          is `root`.
+          A list of user names, separated by whitespace.
+          These users will have additional rights when connecting to the Nix daemon, such as the ability to specify additional [substituters](#conf-substituters), or to import unsigned [NAR](@docroot@/glossary.md#gloss-nar)s.
+
+          You can also specify groups by prefixing names with `@`.
+          For instance, `@wheel` means all users in the `wheel` group.
 
           > **Warning**
           >
-          > Adding a user to `trusted-users` is essentially equivalent to
-          > giving that user root access to the system. For example, the user
-          > can set `sandbox-paths` and thereby obtain read access to
-          > directories that are otherwise inacessible to them.
+          > Adding a user to `trusted-users` is essentially equivalent to giving that user root access to the system.
+          > For example, the user can set [`sandbox-paths`](#conf-sandbox-paths) and thereby obtain read access to directories that are otherwise inacessible to them.
         )"};
 
     /**
@@ -76,12 +73,15 @@ struct AuthorizationSettings : Config {
     Setting<Strings> allowedUsers{
         this, {"*"}, "allowed-users",
         R"(
-          A list of names of users (separated by whitespace) that are allowed
-          to connect to the Nix daemon. As with the `trusted-users` option,
-          you can specify groups by prefixing them with `@`. Also, you can
-          allow all users by specifying `*`. The default is `*`.
+          A list user names, separated by whitespace.
+          These users are allowed to connect to the Nix daemon.
 
-          Note that trusted users are always allowed to connect.
+          As with the [`trusted-users`](#conf-trusted-users) option, you can specify groups by prefixing names with `@`.
+          Also, you can allow all users by specifying `*`.
+
+          > **Note**
+          >
+          > Trusted users are always allowed to connect to the Nix daemon.
         )"};
 };
 
