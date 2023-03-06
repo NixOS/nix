@@ -50,6 +50,11 @@ let pkgs = rec {
     VAR_FROM_NIX = "bar";
     ASCII_PERCENT = "%";
     ASCII_AT = "@";
+    MULTILINE_SCRIPT = ''
+      # should not be in derivation environment
+      declare -x MULTILINE_VALUE_1=1
+      declare -x MULTILINE_VALUE_$INVALID=2
+    '';
     TEST_inNixShell = if inNixShell then "true" else "false";
     inherit stdenv;
     outputs = ["dev" "out"];

@@ -38,9 +38,18 @@ __dumpEnv() {
     printf '  "variables": {\n'
     local __first=1
     while read __line; do
-        if ! [[ $__line =~ ^declare\ (-[^ ])\ ([^=]*) ]]; then continue; fi
+        if ! [[ $__line =~ ^declare\ (-[^ ])\ ([^=]*)(=(.*))?$ ]]; then continue; fi
         local type="${BASH_REMATCH[1]}"
         local __var_name="${BASH_REMATCH[2]}"
+        local __value="${BASH_REMATCH[4]}"
+
+        # Eat any string values (not arrays) that might span over multiple lines.
+        if [[ $__value == \"* ]]; then
+            __value="${__value:1}"
+            while ! [[ $__value =~ (^|[^\\])(\\\\)*\"$ ]]; do
+                IFS= read -r __value
+            done
+        fi
 
         if [[ $__var_name =~ ^BASH_ || \
               $__var_name =~ ^COMP_ || \

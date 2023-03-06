@@ -94,7 +94,9 @@ echo foo | nix develop -f "$shellDotNix" shellDrv -c cat | grep -q foo
 nix develop -f "$shellDotNix" shellDrv -c echo foo |& grep -q foo
 
 # Test 'nix print-dev-env'.
-[[ $(nix print-dev-env -f "$shellDotNix" shellDrv --json | jq -r .variables.arr1.value[2]) = '3 4' ]]
+output="$(nix print-dev-env -f "$shellDotNix" shellDrv --json)"
+[[ $(jq -nr --argjson output "$output" '$output.variables.arr1.value[2]') = '3 4' ]]
+[[ $(jq -nr --argjson output "$output" '$output.variables | has("MULTILINE_VALUE_1")') = false ]]
 
 source <(nix print-dev-env -f "$shellDotNix" shellDrv)
 [[ -n $stdenv ]]
