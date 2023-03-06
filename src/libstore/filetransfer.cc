@@ -88,6 +88,10 @@ struct curlFileTransfer : public FileTransfer
                 {request.uri}, request.parentAct)
             , callback(std::move(callback))
             , finalSink([this](std::string_view data) {
+                if (errorSink) {
+                    (*errorSink)(data);
+                }
+
                 if (this->request.dataCallback) {
                     auto httpStatus = getHTTPStatus();
 
@@ -163,8 +167,6 @@ struct curlFileTransfer : public FileTransfer
                     }
                 }
 
-                if (errorSink)
-                    (*errorSink)({(char *) contents, realSize});
                 (*decompressionSink)({(char *) contents, realSize});
 
                 return realSize;
@@ -183,7 +185,7 @@ struct curlFileTransfer : public FileTransfer
         {
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
-            printMsg(lvlVomit, format("got header for '%s': %s") % request.uri % trim(line));
+            printMsg(lvlVomit, "got header for '%s': %s", request.uri, trim(line));
             static std::regex statusLine("HTTP/[^ ]+ +[0-9]+(.*)", std::regex::extended | std::regex::icase);
             std::smatch match;
             if (std::regex_match(line, match, statusLine)) {
@@ -207,7 +209,7 @@ struct curlFileTransfer : public FileTransfer
                         long httpStatus = 0;
                         curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
                         if (result.etag == request.expectedETag && httpStatus == 200) {
-                            debug(format("shutting down on 200 HTTP response with expected ETag"));
+                            debug("shutting down on 200 HTTP response with expected ETag");
                             return 0;
                         }
                     } else if (name == "content-encoding")
@@ -829,7 +831,7 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
         {
             auto state(_state->lock());
 
-            while (state->data.empty()) {
+            if (state->data.empty()) {
 
                 if (state->quit) {
                     if (state->exc) std::rethrow_exception(state->exc);
@@ -837,6 +839,8 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
                 }
 
                 state.wait(state->avail);
+
+                if (state->data.empty()) continue;
             }
 
             chunk = std::move(state->data);

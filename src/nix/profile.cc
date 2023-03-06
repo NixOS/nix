@@ -228,12 +228,12 @@ struct ProfileManifest
 
         while (i != prevElems.end() || j != curElems.end()) {
             if (j != curElems.end() && (i == prevElems.end() || i->describe() > j->describe())) {
-                std::cout << fmt("%s%s: ∅ -> %s\n", indent, j->describe(), j->versions());
+                logger->cout("%s%s: ∅ -> %s", indent, j->describe(), j->versions());
                 changes = true;
                 ++j;
             }
             else if (i != prevElems.end() && (j == curElems.end() || i->describe() < j->describe())) {
-                std::cout << fmt("%s%s: %s -> ∅\n", indent, i->describe(), i->versions());
+                logger->cout("%s%s: %s -> ∅", indent, i->describe(), i->versions());
                 changes = true;
                 ++i;
             }
@@ -241,7 +241,7 @@ struct ProfileManifest
                 auto v1 = i->versions();
                 auto v2 = j->versions();
                 if (v1 != v2) {
-                    std::cout << fmt("%s%s: %s -> %s\n", indent, i->describe(), v1, v2);
+                    logger->cout("%s%s: %s -> %s", indent, i->describe(), v1, v2);
                     changes = true;
                 }
                 ++i;
@@ -250,7 +250,7 @@ struct ProfileManifest
         }
 
         if (!changes)
-            std::cout << fmt("%sNo changes.\n", indent);
+            logger->cout("%sNo changes.", indent);
     }
 };
 
@@ -330,7 +330,63 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
             manifest.elements.push_back(std::move(element));
         }
 
-        updateProfile(manifest.build(store));
+        try {
+            updateProfile(manifest.build(store));
+        } catch (BuildEnvFileConflictError & conflictError) {
+            // FIXME use C++20 std::ranges once macOS has it
+            //       See https://github.com/NixOS/nix/compare/3efa476c5439f8f6c1968a6ba20a31d1239c2f04..1fe5d172ece51a619e879c4b86f603d9495cc102
+            auto findRefByFilePath = [&]<typename Iterator>(Iterator begin, Iterator end) {
+                for (auto it = begin; it != end; it++) {
+                    auto profileElement = *it;
+                    for (auto & storePath : profileElement.storePaths) {
+                        if (conflictError.fileA.starts_with(store->printStorePath(storePath))) {
+                            return std::pair(conflictError.fileA, profileElement.source->originalRef);
+                        }
+                        if (conflictError.fileB.starts_with(store->printStorePath(storePath))) {
+                            return std::pair(conflictError.fileB, profileElement.source->originalRef);
+                        }
+                    }
+                }
+                throw conflictError;
+            };
+            // There are 2 conflicting files. We need to find out which one is from the already installed package and
+            // which one is the package that is the new package that is being installed.
+            // The first matching package is the one that was already installed (original).
+            auto [originalConflictingFilePath, originalConflictingRef] = findRefByFilePath(manifest.elements.begin(), manifest.elements.end());
+            // The last matching package is the one that was going to be installed (new).
+            auto [newConflictingFilePath, newConflictingRef] = findRefByFilePath(manifest.elements.rbegin(), manifest.elements.rend());
+
+            throw Error(
+                "An existing package already provides the following file:\n"
+                "\n"
+                "  %1%\n"
+                "\n"
+                "This is the conflicting file from the new package:\n"
+                "\n"
+                "  %2%\n"
+                "\n"
+                "To remove the existing package:\n"
+                "\n"
+                "  nix profile remove %3%\n"
+                "\n"
+                "The new package can also be installed next to the existing one by assigning a different priority.\n"
+                "The conflicting packages have a priority of %5%.\n"
+                "To prioritise the new package:\n"
+                "\n"
+                "  nix profile install %4% --priority %6%\n"
+                "\n"
+                "To prioritise the existing package:\n"
+                "\n"
+                "  nix profile install %4% --priority %7%\n",
+                originalConflictingFilePath,
+                newConflictingFilePath,
+                originalConflictingRef.to_string(),
+                newConflictingRef.to_string(),
+                conflictError.priority,
+                conflictError.priority - 1,
+                conflictError.priority + 1
+            );
+        }
     }
 };
 
@@ -584,9 +640,9 @@ struct CmdProfileDiffClosures : virtual StoreCommand, MixDefaultProfile
 
         for (auto & gen : gens) {
             if (prevGen) {
-                if (!first) std::cout << "\n";
+                if (!first) logger->cout("");
                 first = false;
-                std::cout << fmt("Version %d -> %d:\n", prevGen->number, gen.number);
+                logger->cout("Version %d -> %d:", prevGen->number, gen.number);
                 printClosureDiff(store,
                     store->followLinksToStorePath(prevGen->path),
                     store->followLinksToStorePath(gen.path),
@@ -622,10 +678,10 @@ struct CmdProfileHistory : virtual StoreCommand, EvalCommand, MixDefaultProfile
         for (auto & gen : gens) {
             ProfileManifest manifest(*getEvalState(), gen.path);
 
-            if (!first) std::cout << "\n";
+            if (!first) logger->cout("");
             first = false;
 
-            std::cout << fmt("Version %s%d" ANSI_NORMAL " (%s)%s:\n",
+            logger->cout("Version %s%d" ANSI_NORMAL " (%s)%s:",
                 gen.number == curGen ? ANSI_GREEN : ANSI_BOLD,
                 gen.number,
                 std::put_time(std::gmtime(&gen.creationTime), "%Y-%m-%d"),

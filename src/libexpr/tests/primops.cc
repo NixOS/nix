@@ -15,8 +15,8 @@ namespace nix {
                 return oss.str();
             }
 
-            void log(Verbosity lvl, const FormatOrString & fs) override {
-                oss << fs.s << std::endl;
+            void log(Verbosity lvl, std::string_view s) override {
+                oss << s << std::endl;
             }
 
             void logEI(const ErrorInfo & ei) override {

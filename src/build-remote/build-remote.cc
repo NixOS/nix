@@ -72,6 +72,7 @@ static int main_build_remote(int argc, char * * argv)
             settings.set(name, value);
         }
 
+        auto maxBuildJobs = settings.maxBuildJobs;
         settings.maxBuildJobs.set("1"); // hack to make tests with local?root= work
 
         initPlugins();
@@ -112,10 +113,14 @@ static int main_build_remote(int argc, char * * argv)
             drvPath = store->parseStorePath(readString(source));
             auto requiredFeatures = readStrings<std::set<std::string>>(source);
 
-            auto canBuildLocally = amWilling
+            /* It would be possible to build locally after some builds clear out,
+               so don't show the warning now: */
+            bool couldBuildLocally = maxBuildJobs > 0
                  &&  (  neededSystem == settings.thisSystem
                      || settings.extraPlatforms.get().count(neededSystem) > 0)
                  &&  allSupportedLocally(*store, requiredFeatures);
+            /* It's possible to build this locally right now: */
+            bool canBuildLocally = amWilling && couldBuildLocally;
 
             /* Error ignored here, will be caught later */
             mkdir(currentLoad.c_str(), 0777);
@@ -214,7 +219,7 @@ static int main_build_remote(int argc, char * * argv)
                                 % concatStringsSep<StringSet>(", ", m.supportedFeatures)
                                 % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);
 
-                        printMsg(canBuildLocally ? lvlChatty : lvlWarn, error);
+                        printMsg(couldBuildLocally ? lvlChatty : lvlWarn, error.str());
 
                         std::cerr << "# decline\n";
                     }

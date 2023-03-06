@@ -48,7 +48,7 @@ R""(
 # Description
 
 `nix shell` runs a command in an environment in which the `$PATH` variable
-provides the specified *installables*. If no command is specified, it starts the
+provides the specified [*installables*](./nix.md#installable). If no command is specified, it starts the
 default shell of your user account specified by `$SHELL`.
 
 )""

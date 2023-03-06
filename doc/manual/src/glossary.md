@@ -193,6 +193,11 @@
     A symlink to the current *user environment* of a user, e.g.,
     `/nix/var/nix/profiles/default`.
 
+  - [installable]{#gloss-installable}\
+    Something that can be realised in the Nix store.
+
+    See [installables](./command-ref/new-cli/nix.md#installables) for [`nix` commands](./command-ref/new-cli/nix.md) (experimental) for details.
+
   - [NAR]{#gloss-nar}\
     A *N*ix *AR*chive. This is a serialisation of a path in the Nix
     store. It can contain regular files, directories and symbolic

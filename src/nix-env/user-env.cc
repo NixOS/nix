@@ -41,7 +41,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
         if (auto drvPath = i.queryDrvPath())
             drvsToBuild.push_back({*drvPath});
 
-    debug(format("building user environment dependencies"));
+    debug("building user environment dependencies");
     state.store->buildPaths(
         toDerivedPaths(drvsToBuild),
         state.repair ? bmRepair : bmNormal);
@@ -159,7 +159,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
             return false;
         }
 
-        debug(format("switching to new user environment"));
+        debug("switching to new user environment");
         Path generation = createGeneration(ref<LocalFSStore>(store2), profile, topLevelOut);
         switchLink(profile, generation);
     }

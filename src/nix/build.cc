@@ -141,11 +141,11 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
             for (auto & buildable : buildables) {
                 std::visit(overloaded {
                     [&](const BuiltPath::Opaque & bo) {
-                        std::cout << store->printStorePath(bo.path) << std::endl;
+                        logger->cout(store->printStorePath(bo.path));
                     },
                     [&](const BuiltPath::Built & bfd) {
                         for (auto & output : bfd.outputs) {
-                            std::cout << store->printStorePath(output.second) << std::endl;
+                            logger->cout(store->printStorePath(output.second));
                         }
                     },
                 }, buildable.path.raw());

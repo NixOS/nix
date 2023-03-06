@@ -235,3 +235,17 @@ rm -rf $repo/.git
 git init $repo
 git -C $repo add hello # need to add at least one file to cause the root of the repo to be visible
 path10=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
+
+# should succeed for a path with a space
+# regression test for #7707
+repo="$TEST_ROOT/a b"
+git init "$repo"
+git -C "$repo" config user.email "foobar@example.com"
+git -C "$repo" config user.name "Foobar"
+
+echo utrecht > "$repo/hello"
+touch "$repo/.gitignore"
+git -C "$repo" add hello .gitignore
+git -C "$repo" commit -m 'Bla1'
+cd "$repo"
+path11=$(nix eval --impure --raw --expr "(builtins.fetchGit ./.).outPath")

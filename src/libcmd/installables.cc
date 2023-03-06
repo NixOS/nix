@@ -153,7 +153,7 @@ SourceExprCommand::SourceExprCommand()
         .longName = "file",
         .shortName = 'f',
         .description =
-            "Interpret installables as attribute paths relative to the Nix expression stored in *file*. "
+            "Interpret [*installables*](@docroot@/command-ref/new-cli/nix.md#installables) as attribute paths relative to the Nix expression stored in *file*. "
             "If *file* is the character -, then a Nix expression will be read from standard input. "
             "Implies `--impure`.",
         .category = installablesCategory,
@@ -164,7 +164,7 @@ SourceExprCommand::SourceExprCommand()
 
     addFlag({
         .longName = "expr",
-        .description = "Interpret installables as attribute paths relative to the Nix expression *expr*.",
+        .description = "Interpret [*installables*](@docroot@/command-ref/new-cli/nix.md#installables) as attribute paths relative to the Nix expression *expr*.",
         .category = installablesCategory,
         .labels = {"expr"},
         .handler = {&expr}
@@ -678,9 +678,12 @@ StorePathSet Installable::toDerivations(
         for (const auto & b : i->toDerivedPaths())
             std::visit(overloaded {
                 [&](const DerivedPath::Opaque & bo) {
-                    if (!useDeriver)
-                        throw Error("argument '%s' did not evaluate to a derivation", i->what());
-                    drvPaths.insert(getDeriver(store, *i, bo.path));
+                    drvPaths.insert(
+                        bo.path.isDerivation()
+                            ? bo.path
+                        : useDeriver
+                            ? getDeriver(store, *i, bo.path)
+                        : throw Error("argument '%s' did not evaluate to a derivation", i->what()));
                 },
                 [&](const DerivedPath::Built & bfd) {
                     drvPaths.insert(bfd.drvPath);
@@ -692,6 +695,13 @@ StorePathSet Installable::toDerivations(
 
 InstallablesCommand::InstallablesCommand()
 {
+
+    addFlag({
+        .longName = "stdin",
+        .description = "Read installables from the standard input.",
+        .handler = {&readFromStdIn, true}
+    });
+
     expectArgs({
         .label = "installables",
         .handler = {&_installables},
@@ -708,10 +718,18 @@ void InstallablesCommand::prepare()
 
 Installables InstallablesCommand::load()
 {
-    if (_installables.empty() && useDefaultInstallables())
+    if (_installables.empty() && useDefaultInstallables() && !readFromStdIn)
         // FIXME: commands like "nix profile install" should not have a
         // default, probably.
         _installables.push_back(".");
+
+    if (readFromStdIn && !isatty(STDIN_FILENO)) {
+        std::string word;
+        while (std::cin >> word) {
+            _installables.emplace_back(std::move(word));
+        }
+    }
+
     return parseInstallables(getStore(), _installables);
 }
 

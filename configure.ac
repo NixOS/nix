@@ -145,6 +145,13 @@ if test "x$GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC" = xyes; then
     LDFLAGS="-latomic $LDFLAGS"
 fi
 
+# Building without tests is useful for bootstrapping with a smaller footprint
+# or running the tests in a separate derivation. Otherwise, we do compile and
+# run them.
+AC_ARG_ENABLE(tests, AS_HELP_STRING([--disable-tests],[Do not build the tests]),
+  tests=$enableval, tests=yes)
+AC_SUBST(tests)
+
 # LTO is currently broken with clang for unknown reasons; ld segfaults in the llvm plugin
 AC_ARG_ENABLE(lto, AS_HELP_STRING([--enable-lto],[Enable LTO (only supported with GCC) [default=no]]),
   lto=$enableval, lto=no)
@@ -270,6 +277,8 @@ if test "$gc" = yes; then
 fi
 
 
+if test "$tests" = yes; then
+
 # Look for gtest.
 PKG_CHECK_MODULES([GTEST], [gtest_main])
 
@@ -282,6 +291,7 @@ dnl No good for C++ libs with mangled symbols
 dnl AC_CHECK_LIB([rapidcheck], [])
 AC_LANG_POP(C++)
 
+fi
 
 # Look for nlohmann/json.
 PKG_CHECK_MODULES([NLOHMANN_JSON], [nlohmann_json >= 3.9])

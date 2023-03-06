@@ -26,3 +26,7 @@ Maintainers: tick if completed or explain if not relevant
  - [ ] code and comments are self-explanatory
  - [ ] commit message explains why the change was made
  - [ ] new feature or incompatible change: updated release notes
+
+# Priorities
+
+Add :+1: to [pull requests you find important](https://github.com/NixOS/nix/pulls?q=is%3Aopen+sort%3Areactions-%2B1-desc).

@@ -947,7 +947,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON
                 {"path", store->printStorePath(storePath)},
                 {"inputs", res},
             };
-            std::cout << jsonRoot.dump() << std::endl;
+            logger->cout("%s", jsonRoot);
         }
     }
 };

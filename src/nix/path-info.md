@@ -80,7 +80,7 @@ R""(
 # Description
 
 This command shows information about the store paths produced by
-*installables*, or about all paths in the store if you pass `--all`.
+[*installables*](./nix.md#installables), or about all paths in the store if you pass `--all`.
 
 By default, this command only prints the store paths. You can get
 additional information by passing flags such as `--closure-size`,

@@ -201,7 +201,16 @@ public:
         {"build-timeout"}};
 
     PathSetting buildHook{this, true, "", "build-hook",
-        "The path of the helper program that executes builds to remote machines."};
+        R"(
+          The path to the helper program that executes remote builds.
+
+          Nix communicates with the build hook over `stdio` using a custom protocol to request builds that cannot be performed directly by the Nix daemon.
+          The default value is the internal Nix binary that implements remote building.
+
+          > **Important**
+          >
+          > Change this setting only if you really know what you’re doing.
+        )"};
 
     Setting<std::string> builders{
         this, "@" + nixConfDir + "/machines", "builders",
