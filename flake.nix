@@ -4,8 +4,10 @@
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.11-small";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
+  inputs.nix-2_3-src = { url = "github:nixos/nix/2.3-maintenance"; flake = false; };
+  inputs.nix-2_4 = { url = "github:nixos/nix/2.4-maintenance"; };
 
-  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src }:
+  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, nix-2_3-src, nix-2_4 }:
 
     let
       inherit (nixpkgs) lib;
@@ -192,12 +194,7 @@
       testNixVersions = pkgs: client: daemon: with commonDeps { inherit pkgs; }; with pkgs.lib; pkgs.stdenv.mkDerivation {
         NIX_DAEMON_PACKAGE = daemon;
         NIX_CLIENT_PACKAGE = client;
-        name =
-          "nix-tests"
-          + optionalString
-            (versionAtLeast daemon.version "2.4pre20211005" &&
-             versionAtLeast client.version "2.4pre20211005")
-            "-${client.version}-against-${daemon.version}";
+        name = "nix-tests-${client.version}-against-${daemon.version}";
         inherit version;
 
         src = self;
@@ -581,31 +578,50 @@
           nixpkgs = nixpkgs-regression;
         };
 
-        installTests = forAllSystems (system:
-          let pkgs = nixpkgsFor.${system}.native; in
-          pkgs.runCommand "install-tests" {
-            againstSelf = testNixVersions pkgs pkgs.nix pkgs.pkgs.nix;
-            againstCurrentUnstable =
-              # FIXME: temporarily disable this on macOS because of #3605.
-              if system == "x86_64-linux"
-              then testNixVersions pkgs pkgs.nix pkgs.nixUnstable
-              else null;
-            # Disabled because the latest stable version doesn't handle
-            # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
-            # againstLatestStable = testNixVersions pkgs pkgs.nix pkgs.nixStable;
-          } "touch $out");
+        installTests = let
+          inherit (nixpkgs) lib;
+          forAllPkgs = f: forAllSystems (system: f nixpkgsFor.${system});
+          allTests = rec {
+            againstSelf = forAllPkgs (pkgs: testNixVersions pkgs pkgs.nix pkgs.pkgs.nix);
+
+            # FIXME: temporarily disable this on macOS because of
+            # #3605. We used to null platforms other than
+            # x86_64-linux, but that broke nix flake check when we
+            # exposed these as standalone hydra jobs.
+            againstCurrentUnstable.x86_64-linux = let
+              pkgs = nixpkgsFor.x86_64-linux.native;
+            in testNixVersions pkgs pkgs.nix pkgs.nixUnstable;
+
+            againstStable_2_3 = forAllPkgs (pkgs: testNixVersions pkgs pkgs.nix
+              (let
+                pkg = (import "${nix-2_3-src}/release.nix" {
+                  nix = nix-2_3-src;
+                  inherit nixpkgs;
+                  officialRelease = true;
+                }).build.${pkgs.stdenv.hostPlatform.system};
+              in pkg // {
+                inherit (lib.strings.parseDrvName pkg.name) version;
+              }));
+            againstStable_2_4 = forAllPkgs (pkgs: testNixVersions pkgs pkgs.nix
+              nix-2_4.packages.${pkgs.stdenv.hostPlatform.system}.nix);
+          };
+          all = forAllSystems (system:
+            nixpkgsFor.${system}.runCommand
+              "install-tests"
+              (lib.mapAttrs (_: v: v.${system} or null) allTests)
+              "touch $out");
+        in allTests // { inherit all; };
 
         installerTests = import ./tests/installer {
           binaryTarballs = self.hydraJobs.binaryTarball;
           inherit nixpkgsFor;
         };
-
       };
 
       checks = forAllSystems (system: {
         binaryTarball = self.hydraJobs.binaryTarball.${system};
         perlBindings = self.hydraJobs.perlBindings.${system};
-        installTests = self.hydraJobs.installTests.${system};
+        installTests = self.hydraJobs.installTests.all.${system};
         nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};

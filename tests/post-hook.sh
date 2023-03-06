@@ -1,10 +1,13 @@
 source common.sh
 
+# TODO debug failure with 2.3
+requireDaemonVersionAtleast "2.4pre"
+
 clearStore
 
 rm -f $TEST_ROOT/result
 
-export REMOTE_STORE=file:$TEST_ROOT/remote_store
+export REMOTE_STORE=file://$TEST_ROOT/remote_store
 echo 'require-sigs = false' >> $NIX_CONF_DIR/nix.conf
 
 restartDaemon
