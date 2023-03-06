@@ -1289,7 +1289,7 @@ static void opSwitchProfile(Globals & globals, Strings opFlags, Strings opArgs)
         throw UsageError("exactly one argument expected");
 
     Path profile = absPath(opArgs.front());
-    Path profileLink = settings.useXDGBaseDirectories ? createNixStateDir() + "/profile" : getHome() + "/.nix-profile";
+    Path profileLink = getUserNixProfile(settings.useXDGBaseDirectories);
 
     switchLink(profileLink, profile);
 }
@@ -1394,7 +1394,7 @@ static int main_nix_env(int argc, char * * argv)
 
         globals.instSource.type = srcUnknown;
         {
-            Path nixExprPath = settings.useXDGBaseDirectories ? createNixStateDir() + "/defexpr" : getHome() + "/.nix-defexpr";
+            Path nixExprPath = getUserNixDefexpr(settings.useXDGBaseDirectories);
             globals.instSource.nixExprPath = nixExprPath;
         }
         globals.instSource.systemFilter = "*";

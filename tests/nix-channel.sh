@@ -14,16 +14,34 @@ nix-channel --remove xyzzy
 
 # Test the XDG Base Directories support
 
-export NIX_CONFIG="use-xdg-base-directories = true"
-
 nix-channel --add http://foo/bar xyzzy
 nix-channel --list | grep -q http://foo/bar
-nix-channel --remove xyzzy
+
+export NIX_CONFIG="use-xdg-base-directories = true"
+
+# The legacy channels list should be migrated
+nix-channel --list 2>&1 | grep -q "Migrating"
+nix-channel --list | grep -q http://foo/bar
+[ -e $TEST_HOME/.local/state/nix/channels ]
+[ ! -e $TEST_HOME/.nix-channels ]
+
+# And we should be able to add new channels
+nix-channel --add http://goo/doo asdfg
+nix-channel --list | grep -q http://goo/doo
 
 unset NIX_CONFIG
 
-[ -e $TEST_HOME/.local/state/nix/channels ]
-[ "$(cat $TEST_HOME/.local/state/nix/channels)" = '' ]
+# And, after XDG support has been disabled, the channel list should be migrated back
+
+nix-channel --list 2>&1 | grep -q "Migrating"
+nix-channel --list | grep -q http://goo/doo
+nix-channel --remove xyzzy
+nix-channel --remove asdfg
+
+[ -e $TEST_HOME/.nix-channels ]
+[ ! -e $TEST_HOME/.local/state/nix/channels ]
+[ "$(cat $TEST_HOME/.nix-channels)" == '' ]
+
 
 # Create a channel.
 rm -rf $TEST_ROOT/foo

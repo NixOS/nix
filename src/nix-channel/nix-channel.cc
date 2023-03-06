@@ -162,10 +162,8 @@ static void update(const StringSet & channelNames)
 static int main_nix_channel(int argc, char ** argv)
 {
     {
-        // Figure out the name of the `.nix-channels' file to use
-        auto home = getHome();
-        channelsList = settings.useXDGBaseDirectories ? createNixStateDir() + "/channels" : home + "/.nix-channels";
-        nixDefExpr = settings.useXDGBaseDirectories ? createNixStateDir() + "/defexpr" : home + "/.nix-defexpr";
+        channelsList = getUserNixChannels(settings.useXDGBaseDirectories);
+        nixDefExpr = getUserNixDefexpr(settings.useXDGBaseDirectories);
 
         // Figure out the name of the channels profile.
         profile = profilesDir() + "/channels";
