@@ -55,7 +55,6 @@ The following types of installable are supported by most commands:
 
 - [Flake output attribute](#flake-output-attribute)
 - [Store path](#store-path)
-- [Store derivation](#store-derivation)
 - [Nix file](#nix-file), optionally qualified by an attribute path
 - [Nix expression](#nix-expression), optionally qualified by an attribute path
 
@@ -126,22 +125,17 @@ Example: `/nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10`
 
 These are paths inside the Nix store, or symlinks that resolve to a path in the Nix store.
 
-### Store derivation
+A [store derivation] is also addressed by store path.
 
 Example: `/nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv`
 
-By default, if you pass a [store derivation] path to a `nix` subcommand other than [`show-derivation`](./nix3-show-derivation.md), the command will operate on the [output path]s of the derivation.
+If you want to refer to an output path of that store derivation, add the output name preceded by a caret (`^`).
 
-[output path]: ../../glossary.md#gloss-output-path
+Example: `/nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv^out`
 
-For example, [`nix path-info`](./nix3-path-info.md) prints information about the output paths:
+All outputs can be referred to at once with the special syntax `^*`.
 
-```console
-# nix path-info --json /nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv
-[{"path":"/nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10",…}]
-```
-
-If you want to operate on the store derivation itself, pass the `--derivation` flag.
+Example: `/nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv^*`
 
 ### Nix file
 
