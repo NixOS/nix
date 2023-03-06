@@ -1893,7 +1893,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         } else if (firstType == nPath) {
             if (!first) {
                 auto part = state.coerceToString(i_pos, *vTmp, context, "while evaluating a path segment", false, false);
-                if (sSize <= 1 && !hasPrefix(*part, "/") && accessor != state.rootFS.get_ptr())
+                if (sSize <= 1 && !hasPrefix(*part, "/") && accessor != state.rootFS.get_ptr() && !part->empty())
                     state.error(
                         "cannot append non-absolute path '%1%' to '%2%' (hint: change it to '/%1%')",
                         (std::string) *part, accessor->root().to_string())
