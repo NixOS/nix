@@ -84,8 +84,18 @@ void printMissing(ref<Store> store, const StorePathSet & willBuild,
                 downloadSizeMiB,
                 narSizeMiB);
         }
-        for (auto & i : willSubstitute)
-            printMsg(lvl, "  %s", store->printStorePath(i));
+        std::vector<const StorePath *> willSubstituteSorted = {};
+        std::for_each(willSubstitute.begin(), willSubstitute.end(),
+                   [&](const StorePath &p) { willSubstituteSorted.push_back(&p); });
+        std::sort(willSubstituteSorted.begin(), willSubstituteSorted.end(),
+                  [](const StorePath *lhs, const StorePath *rhs) {
+                    if (lhs->name() == rhs->name())
+                      return lhs->to_string() < rhs->to_string();
+                    else
+                      return lhs->name() < rhs->name();
+                  });
+        for (auto p : willSubstituteSorted)
+            printMsg(lvl, "  %s", store->printStorePath(*p));
     }
 
     if (!unknown.empty()) {
