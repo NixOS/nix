@@ -4,6 +4,7 @@
 #include "fetchers.hh"
 #include "filetransfer.hh"
 #include "registry.hh"
+#include "url.hh"
 
 #include <ctime>
 #include <iomanip>
@@ -68,7 +69,16 @@ void emitTreeAttrs(
 std::string fixURI(std::string uri, EvalState & state, const std::string & defaultScheme = "file")
 {
     state.checkURI(uri);
-    return uri.find("://") != std::string::npos ? uri : defaultScheme + "://" + uri;
+    if (uri.find("://") == std::string::npos) {
+        const auto p = ParsedURL {
+            .scheme = defaultScheme,
+            .authority = "",
+            .path = uri
+        };
+        return p.to_string();
+    } else {
+        return uri;
+    }
 }
 
 std::string fixURIForGit(std::string uri, EvalState & state)
@@ -343,36 +353,44 @@ static RegisterPrimOp primop_fetchGit({
       of the repo at that URL is fetched. Otherwise, it can be an
       attribute with the following attributes (all except `url` optional):
 
-        - url\
-          The URL of the repo.
+      - `url`
 
-        - name\
-          The name of the directory the repo should be exported to in the
-          store. Defaults to the basename of the URL.
+        The URL of the repo.
 
-        - rev\
-          The git revision to fetch. Defaults to the tip of `ref`.
+      - `name` (default: *basename of the URL*)
 
-        - ref\
-          The git ref to look for the requested revision under. This is
-          often a branch or tag name. Defaults to `HEAD`.
+        The name of the directory the repo should be exported to in the store.
 
-          By default, the `ref` value is prefixed with `refs/heads/`. As
-          of Nix 2.3.0 Nix will not prefix `refs/heads/` if `ref` starts
-          with `refs/`.
+      - `rev` (default: *the tip of `ref`*)
 
-        - submodules\
-          A Boolean parameter that specifies whether submodules should be
-          checked out. Defaults to `false`.
+        The [Git revision] to fetch.
+        This is typically a commit hash.
 
-        - shallow\
-          A Boolean parameter that specifies whether fetching a shallow clone
-          is allowed. Defaults to `false`.
+        [Git revision]: https://git-scm.com/docs/git-rev-parse#_specifying_revisions
 
-        - allRefs\
-          Whether to fetch all refs of the repository. With this argument being
-          true, it's possible to load a `rev` from *any* `ref` (by default only
-          `rev`s from the specified `ref` are supported).
+      - `ref` (default: `HEAD`)
+
+        The [Git reference] under which to look for the requested revision.
+        This is often a branch or tag name.
+
+        [Git reference]: https://git-scm.com/book/en/v2/Git-Internals-Git-References
+
+        By default, the `ref` value is prefixed with `refs/heads/`.
+        As of 2.3.0, Nix will not prefix `refs/heads/` if `ref` starts with `refs/`.
+
+      - `submodules` (default: `false`)
+
+        A Boolean parameter that specifies whether submodules should be checked out.
+
+      - `shallow` (default: `false`)
+
+        A Boolean parameter that specifies whether fetching a shallow clone is allowed.
+
+      - `allRefs`
+
+        Whether to fetch all references of the repository.
+        With this argument being true, it's possible to load a `rev` from *any* `ref`
+        (by default only `rev`s from the specified `ref` are supported).
 
       Here are some examples of how to use `fetchGit`.
 

@@ -415,7 +415,7 @@ Error readError(Source & source)
     auto msg = readString(source);
     ErrorInfo info {
         .level = level,
-        .msg = hintformat(std::move(format("%s") % msg)),
+        .msg = hintformat(fmt("%s", msg)),
     };
     auto havePos = readNum<size_t>(source);
     assert(havePos == 0);
@@ -424,7 +424,7 @@ Error readError(Source & source)
         havePos = readNum<size_t>(source);
         assert(havePos == 0);
         info.traces.push_back(Trace {
-            .hint = hintformat(std::move(format("%s") % readString(source)))
+            .hint = hintformat(fmt("%s", readString(source)))
         });
     }
     return Error(std::move(info));

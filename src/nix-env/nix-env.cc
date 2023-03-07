@@ -500,7 +500,7 @@ static bool keep(DrvInfo & drv)
 static void installDerivations(Globals & globals,
     const Strings & args, const Path & profile)
 {
-    debug(format("installing derivations"));
+    debug("installing derivations");
 
     /* Get the set of user environment elements to be installed. */
     DrvInfos newElems, newElemsTmp;
@@ -579,7 +579,7 @@ typedef enum { utLt, utLeq, utEq, utAlways } UpgradeType;
 static void upgradeDerivations(Globals & globals,
     const Strings & args, UpgradeType upgradeType)
 {
-    debug(format("upgrading derivations"));
+    debug("upgrading derivations");
 
     /* Upgrade works as follows: we take all currently installed
        derivations, and for any derivation matching any selector, look
@@ -768,7 +768,7 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     if (globals.dryRun) return;
     globals.state->store->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
 
-    debug(format("switching to new user environment"));
+    debug("switching to new user environment");
     Path generation = createGeneration(
         ref<LocalFSStore>(store2),
         globals.profile,
@@ -1093,7 +1093,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         try {
             if (i.hasFailed()) continue;
 
-            //Activity act(*logger, lvlDebug, format("outputting query result '%1%'") % i.attrPath);
+            //Activity act(*logger, lvlDebug, "outputting query result '%1%'", i.attrPath);
 
             if (globals.prebuiltOnly &&
                 !validPaths.count(i.queryOutPath()) &&
@@ -1229,11 +1229,11 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nInt) {
                                 attrs2["type"] = "int";
-                                attrs2["value"] = (format("%1%") % v->integer).str();
+                                attrs2["value"] = fmt("%1%", v->integer);
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nFloat) {
                                 attrs2["type"] = "float";
-                                attrs2["value"] = (format("%1%") % v->fpoint).str();
+                                attrs2["value"] = fmt("%1%", v->fpoint);
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nBool) {
                                 attrs2["type"] = "bool";
@@ -1337,11 +1337,11 @@ static void opListGenerations(Globals & globals, Strings opFlags, Strings opArgs
     for (auto & i : gens) {
         tm t;
         if (!localtime_r(&i.creationTime, &t)) throw Error("cannot convert time");
-        cout << format("%|4|   %|4|-%|02|-%|02| %|02|:%|02|:%|02|   %||\n")
-            % i.number
-            % (t.tm_year + 1900) % (t.tm_mon + 1) % t.tm_mday
-            % t.tm_hour % t.tm_min % t.tm_sec
-            % (i.number == curGen ? "(current)" : "");
+        logger->cout("%|4|   %|4|-%|02|-%|02| %|02|:%|02|:%|02|   %||",
+            i.number,
+            t.tm_year + 1900, t.tm_mon + 1, t.tm_mday,
+            t.tm_hour, t.tm_min, t.tm_sec,
+            i.number == curGen ? "(current)" : "");
     }
 }
 

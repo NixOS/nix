@@ -39,6 +39,10 @@ extern const std::string nativeSystem;
 /* Return an environment variable. */
 std::optional<std::string> getEnv(const std::string & key);
 
+/* Return a non empty environment variable. Returns nullopt if the env
+variable is set to "" */
+std::optional<std::string> getEnvNonEmpty(const std::string & key);
+
 /* Get the entire environment. */
 std::map<std::string, std::string> getEnv();
 
@@ -569,7 +573,7 @@ bool shouldANSI();
    some escape sequences (such as colour setting) are copied but not
    included in the character count. Also, tabs are expanded to
    spaces. */
-std::string filterANSIEscapes(const std::string & s,
+std::string filterANSIEscapes(std::string_view s,
     bool filterAll = false,
     unsigned int width = std::numeric_limits<unsigned int>::max());
 

@@ -45,3 +45,4 @@ sandbox_shell = @sandbox_shell@
 storedir = @storedir@
 sysconfdir = @sysconfdir@
 system = @system@
+tests = @tests@

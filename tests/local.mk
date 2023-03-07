@@ -1,9 +1,11 @@
 nix_tests = \
+  init.sh \
   flakes/flakes.sh \
   flakes/run.sh \
   flakes/mercurial.sh \
   flakes/circular.sh \
   flakes/init.sh \
+  flakes/inputs.sh \
   flakes/follow-paths.sh \
   flakes/bundle.sh \
   flakes/check.sh \
@@ -128,9 +130,9 @@ endif
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
 
-clean-files += $(d)/common.sh $(d)/config.nix $(d)/ca/config.nix
+clean-files += $(d)/tests/common/vars-and-functions.sh $(d)/config.nix $(d)/ca/config.nix
 
-test-deps += tests/common.sh tests/config.nix tests/ca/config.nix
+test-deps += tests/common/vars-and-functions.sh tests/config.nix tests/ca/config.nix tests/plugins/libplugintest.$(SO_EXT)
 
 ifeq ($(BUILD_SHARED_LIBS), 1)
   test-deps += tests/plugins/libplugintest.$(SO_EXT)

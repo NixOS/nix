@@ -45,7 +45,7 @@ struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand,
             }
             auto json = json::object();
             json["rewrites"] = jsonRewrites;
-            std::cout << json.dump();
+            logger->cout("%s", json);
         } else {
             for (auto & path : storePaths) {
                 auto i = remappings.find(path);

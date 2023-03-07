@@ -18,7 +18,7 @@ std::string formatProtocol(unsigned int proto)
     if (proto) {
         auto major = GET_PROTOCOL_MAJOR(proto) >> 8;
         auto minor = GET_PROTOCOL_MINOR(proto);
-        return (format("%1%.%2%") % major % minor).str();
+        return fmt("%1%.%2%", major, minor);
     }
     return "unknown";
 }
