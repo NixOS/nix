@@ -13,6 +13,10 @@
 
 namespace nix {
 
+#if __APPLE__
+extern std::optional<std::string> savedTmpDir;
+#endif
+
 class Exit : public std::exception
 {
 public:

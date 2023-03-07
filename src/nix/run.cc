@@ -127,6 +127,10 @@ struct CmdShell : InstallablesCommand, MixEnvironment
         }
 
         setenv("PATH", concatStringsSep(":", unixPath).c_str(), 1);
+#if __APPLE__
+        if (savedTmpDir.has_value())
+            setenv("TMPDIR", savedTmpDir.value().c_str(), 1);
+#endif
 
         Strings args;
         for (auto & arg : command) args.push_back(arg);
