@@ -46,14 +46,14 @@ let
               let
                 parentNode = allNodes.${getInputByPath lockFile.root node.parent};
               in parentNode.sourceInfo // {
+                # FIXME
                 outPath = parentNode.sourceInfo.outPath + ("/" + node.locked.path);
               }
             else
               # FIXME: remove obsolete node.info.
               fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
 
-          # With overrides, the accessor already points to the right subdirectory.
-          subdir = if overrides ? ${key} then "" else node.locked.dir or "";
+          subdir = node.locked.dir or "";
 
           outPath = sourceInfo + ((if subdir == "" then "" else "/") + subdir);
 

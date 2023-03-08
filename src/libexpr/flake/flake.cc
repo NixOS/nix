@@ -725,7 +725,7 @@ void callFlake(EvalState & state,
 
         emitTreeAttrs(
             state,
-            sourcePath,
+            sourcePath.accessor->root(),
             lockedNode ? lockedNode->lockedRef.input : lockedFlake.flake.lockedRef.input,
             vSourceInfo,
             false,
