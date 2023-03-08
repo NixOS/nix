@@ -130,12 +130,17 @@ void Worker::removeGoal(GoalPtr goal)
     else
         assert(false);
 
-    if (topGoals.find(goal) != topGoals.end()) {
+    if (topGoals.contains(goal)) {
         topGoals.erase(goal);
         /* If a top-level goal failed, then kill all other goals
            (unless keepGoing was set). */
-        if (goal->exitCode == Goal::ecFailed && !settings.keepGoing)
+        if (goal->exitCode == Goal::ecFailed && !settings.keepGoing) {
+            for (auto & topGoal : topGoals) {
+                topGoal->buildResult.status = BuildResult::Status::Abandoned;
+                topGoal->buildResult.errorMsg = fmt("%s abandoned because another build or substitution failed, and 'keep-going' is set to 'false'", topGoal->getName());
+            }
             topGoals.clear();
+        }
     }
 
     /* Wake up goals waiting for any goal to finish. */
