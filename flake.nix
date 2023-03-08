@@ -383,6 +383,7 @@
 
             doInstallCheck = finalAttrs.doCheck;
             installCheckFlags = "sysconfdir=$(out)/etc";
+            installCheckTarget = "installcheck"; # work around buggy detection in stdenv
 
             separateDebugInfo = !currentStdenv.hostPlatform.isStatic;
 
