@@ -12,9 +12,10 @@ namespace nix {
 class SandboxDarwin : public Sandbox {
 public:
     void prepareChroot(const Store&, LocalDerivationGoal& goal) override {};
-    void enterChroot(const Store&, LocalDerivationGoal& goal) override {
+    bool enterChroot(const Store&, LocalDerivationGoal& goal) override {
         /* We don't really have any parent prep work to do (yet?)
            All work happens in the child, instead. */
+        return false;
     };
     virtual std::pair<std::string, Strings> getSandboxArgs(const Derivation& drv, bool useChroot, LocalDerivationGoal::DirsInChroot &dirsInChroot, const Store& store, const LocalDerivationGoal& goal) override {
         // FIXME passing LocalDerivationGoal is ugly
@@ -151,7 +152,7 @@ public:
        }
     };
 
-    void spawn(const std::string& builder, const Strings& args, const Strings& envStrs, std::string_view platform) override {
+    void spawn(const std::pair<std::string, Strings>& builderArgs, const nix::Strings& envStrs, std::string_view platform) override {
         posix_spawnattr_t attrp;
 
         if (posix_spawnattr_init(&attrp))
@@ -174,7 +175,7 @@ public:
         }
 
 #endif
-        posix_spawn(NULL, builder.c_str(), NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+        posix_spawn(NULL, builderArgs.first.c_str(), NULL, &attrp, stringsToCharPtrs(builderArgs.second).data(), stringsToCharPtrs(envStrs).data());
     };
     virtual ~SandboxDarwin() {};
 };

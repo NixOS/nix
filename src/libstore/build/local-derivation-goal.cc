@@ -1213,85 +1213,6 @@ void LocalDerivationGoal::chownToBuilder(const Path & path)
 }
 
 
-void setupSeccomp()
-{
-#if __linux__
-    if (!settings.filterSyscalls) return;
-#if HAVE_SECCOMP
-    scmp_filter_ctx ctx;
-
-    if (!(ctx = seccomp_init(SCMP_ACT_ALLOW)))
-        throw SysError("unable to initialize seccomp mode 2");
-
-    Finally cleanup([&]() {
-        seccomp_release(ctx);
-    });
-
-    if (nativeSystem == "x86_64-linux" &&
-        seccomp_arch_add(ctx, SCMP_ARCH_X86) != 0)
-        throw SysError("unable to add 32-bit seccomp architecture");
-
-    if (nativeSystem == "x86_64-linux" &&
-        seccomp_arch_add(ctx, SCMP_ARCH_X32) != 0)
-        throw SysError("unable to add X32 seccomp architecture");
-
-    if (nativeSystem == "aarch64-linux" &&
-        seccomp_arch_add(ctx, SCMP_ARCH_ARM) != 0)
-        printError("unable to add ARM seccomp architecture; this may result in spurious build failures if running 32-bit ARM processes");
-
-    if (nativeSystem == "mips64-linux" &&
-        seccomp_arch_add(ctx, SCMP_ARCH_MIPS) != 0)
-        printError("unable to add mips seccomp architecture");
-
-    if (nativeSystem == "mips64-linux" &&
-        seccomp_arch_add(ctx, SCMP_ARCH_MIPS64N32) != 0)
-        printError("unable to add mips64-*abin32 seccomp architecture");
-
-    if (nativeSystem == "mips64el-linux" &&
-        seccomp_arch_add(ctx, SCMP_ARCH_MIPSEL) != 0)
-        printError("unable to add mipsel seccomp architecture");
-
-    if (nativeSystem == "mips64el-linux" &&
-        seccomp_arch_add(ctx, SCMP_ARCH_MIPSEL64N32) != 0)
-        printError("unable to add mips64el-*abin32 seccomp architecture");
-
-    /* Prevent builders from creating setuid/setgid binaries. */
-    for (int perm : { S_ISUID, S_ISGID }) {
-        if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(chmod), 1,
-                SCMP_A1(SCMP_CMP_MASKED_EQ, (scmp_datum_t) perm, (scmp_datum_t) perm)) != 0)
-            throw SysError("unable to add seccomp rule");
-
-        if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(fchmod), 1,
-                SCMP_A1(SCMP_CMP_MASKED_EQ, (scmp_datum_t) perm, (scmp_datum_t) perm)) != 0)
-            throw SysError("unable to add seccomp rule");
-
-        if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), SCMP_SYS(fchmodat), 1,
-                SCMP_A2(SCMP_CMP_MASKED_EQ, (scmp_datum_t) perm, (scmp_datum_t) perm)) != 0)
-            throw SysError("unable to add seccomp rule");
-    }
-
-    /* Prevent builders from creating EAs or ACLs. Not all filesystems
-       support these, and they're not allowed in the Nix store because
-       they're not representable in the NAR serialisation. */
-    if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(setxattr), 0) != 0 ||
-        seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(lsetxattr), 0) != 0 ||
-        seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(fsetxattr), 0) != 0)
-        throw SysError("unable to add seccomp rule");
-
-    if (seccomp_attr_set(ctx, SCMP_FLTATR_CTL_NNP, settings.allowNewPrivileges ? 0 : 1) != 0)
-        throw SysError("unable to set 'no new privileges' seccomp attribute");
-
-    if (seccomp_load(ctx) != 0)
-        throw SysError("unable to load seccomp BPF program");
-#else
-    throw Error(
-        "seccomp is not supported on this platform; "
-        "you can bypass this error by setting the option 'filter-syscalls' to false, but note that untrusted builds can then create setuid binaries!");
-#endif
-#endif
-}
-
-
 void LocalDerivationGoal::runChild()
 {
     /* Warning: in the child we should absolutely not make any SQLite
@@ -1304,12 +1225,10 @@ void LocalDerivationGoal::runChild()
         commonChildInit(builderOut);
 
         try {
-            setupSeccomp();
+            sandbox->filterSyscalls();
         } catch (...) {
             if (buildUser) throw;
         }
-
-        bool setUser = true;
 
         /* Make the contents of netrc available to builtin:fetchurl
            (which may run under a different uid and/or in a sandbox). */
@@ -1319,12 +1238,7 @@ void LocalDerivationGoal::runChild()
                 netrcData = readFile(settings.netrcFile);
         } catch (SysError &) { }
 
-        if (useChroot) {
-            sandbox->enterChroot(worker.store, *this);
-#if __linux__
-            setUser = true;
-#endif
-        }
+        bool setUser = !(useChroot && sandbox->enterChroot(worker.store, *this));
 
         if (chdir(tmpDirInSandbox.c_str()) == -1)
             throw SysError("changing into '%1%'", tmpDir);
@@ -1397,16 +1311,10 @@ void LocalDerivationGoal::runChild()
             }
         } else {
             /* Fill in the arguments. */
-            Strings args;
-
-            std::string builder = "invalid";
-
-            if (!drv->isBuiltin()) {
-                std::tie(builder, args) = sandbox->getSandboxArgs(*drv, useChroot, dirsInChroot, worker.store, *this);
-            }
+            auto builderArgs = sandbox->getSandboxArgs(*drv, useChroot, dirsInChroot, worker.store, *this);
 
             for (auto & i : drv->args)
-                args.push_back(rewriteStrings(i, inputRewrites));
+                builderArgs.second.push_back(rewriteStrings(i, inputRewrites));
 
             /* Indicate that we managed to set up the build environment. */
             writeFull(STDERR_FILENO, std::string("\2\n"));
@@ -1414,7 +1322,7 @@ void LocalDerivationGoal::runChild()
             sendException = false;
 
             /* Execute the program.  This should not return. */
-            sandbox->spawn(builder, args, envStrs, drv->platform);
+            sandbox->spawn(builderArgs, envStrs, drv->platform);
         }
 
 

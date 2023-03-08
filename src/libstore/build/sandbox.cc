@@ -24,8 +24,8 @@ std::pair<std::string, Strings> Sandbox::getSandboxArgs(const Derivation& drv, b
     return {builder, args};
 };
 
-void Sandbox::spawn(const std::string& builder, const nix::Strings& args, const nix::Strings& envStrs, std::string_view platform) {
-    execve(builder.c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+void Sandbox::spawn(const std::pair<std::string, Strings>& builderArgs, const nix::Strings& envStrs, std::string_view platform) {
+    execve(builderArgs.first.c_str(), stringsToCharPtrs(builderArgs.second).data(), stringsToCharPtrs(envStrs).data());
 };
 
 void Sandbox::addToSandbox(const StorePath& path, const Store& store) {

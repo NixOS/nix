@@ -20,9 +20,9 @@ public:
     virtual Pid runInNamespaces(DerivationType& derivationType, LocalDerivationGoal& goal);
     virtual void moveOutOfChroot(Path& p) {};
     virtual void deleteChroot() {};
-    virtual void enterChroot(const Store&, LocalDerivationGoal& goal) = 0;
+    virtual bool enterChroot(const Store&, LocalDerivationGoal& goal) = 0;
     virtual std::pair<std::string, Strings> getSandboxArgs(const Derivation& drv, bool, LocalDerivationGoal::DirsInChroot&, const Store&, const LocalDerivationGoal&);
-    virtual void spawn(const std::string& builder, const Strings& args, const Strings& envStrs, std::string_view platform);
+    virtual void spawn(const std::pair<std::string, Strings>& builderArgs, const Strings& envStrs, std::string_view platform);
     virtual void addToSandbox(const StorePath& path, const Store& store);
     virtual void cleanupPreChildKill() {};
     virtual ~Sandbox() {};
@@ -31,6 +31,7 @@ public:
 
     UserLock* buildUser = nullptr;
     virtual std::optional<CgroupStats> killSandbox();
+    virtual void filterSyscalls() const { };
 };
 
 std::unique_ptr<Sandbox> createSandboxLinux();
