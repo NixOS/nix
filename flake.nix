@@ -523,18 +523,16 @@
             enableParallelBuilding = true;
 
             nativeBuildInputs = nativeBuildDeps;
-            buildInputs = buildDeps ++ propagatedDeps ++ awsDeps;
+            buildInputs = buildDeps ++ propagatedDeps ++ awsDeps ++ checkDeps;
 
             dontInstall = false;
 
             doInstallCheck = true;
+            installCheckTarget = "installcheck"; # work around buggy detection in stdenv
 
             lcovFilter = [ "*/boost/*" "*-tab.*" ];
 
-            # We call `dot', and even though we just use it to
-            # syntax-check generated dot files, it still requires some
-            # fonts.  So provide those.
-            FONTCONFIG_FILE = texFunctions.fontsConf;
+            hardeningDisable = ["fortify"];
           };
 
         # System tests.
