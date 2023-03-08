@@ -1,3 +1,4 @@
+#include "profiles.hh"
 #include "serialise.hh"
 #include "util.hh"
 #include "path-with-outputs.hh"
@@ -234,8 +235,18 @@ void RemoteStore::initConnection(Connection & conn)
     }
 
     setOptions(conn);
+    createLegacyProfileLink(conn);
 }
 
+void RemoteStore::createLegacyProfileLink(Connection & conn)
+{
+    if (GET_PROTOCOL_MINOR(conn.daemonVersion) <= 34) {
+        return;
+    }
+    conn.to << wopCreateProfilesLink << profilesDir(CreateDirsFlag::DontCreate);
+    auto ex = conn.processStderr();
+    if (ex) std::rethrow_exception(ex);
+}
 
 void RemoteStore::setOptions(Connection & conn)
 {
@@ -267,6 +278,7 @@ void RemoteStore::setOptions(Connection & conn)
         overrides.erase(loggerSettings.showTrace.name);
         overrides.erase(settings.experimentalFeatures.name);
         overrides.erase(settings.pluginFiles.name);
+        overrides.insert({"profiles-directory", {"value", ""}});
         conn.to << overrides.size();
         for (auto & i : overrides)
             conn.to << i.first << i.second.value;

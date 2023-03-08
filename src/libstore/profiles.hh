@@ -77,4 +77,5 @@ Path profilesDir(CreateDirsFlag create = CreateDirsFlag::Create);
    exist */
 Path getDefaultProfile();
 
+void createLegacyProfileLink(Path oldProfile, Path newProfile);
 }

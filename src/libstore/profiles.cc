@@ -308,5 +308,13 @@ Path getDefaultProfile()
     }
 }
 
+void createLegacyProfileLink(Path oldProfile, Path newProfile)
+{
+    if (pathExists(oldProfile))
+        return;
+    createDirs(dirOf(oldProfile));
+    replaceSymlink(newProfile, oldProfile);
+}
+
 
 }

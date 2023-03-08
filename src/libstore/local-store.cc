@@ -2,6 +2,7 @@
 #include "globals.hh"
 #include "archive.hh"
 #include "pathlocks.hh"
+#include "profiles.hh"
 #include "worker-protocol.hh"
 #include "derivations.hh"
 #include "nar-info.hh"
@@ -200,6 +201,8 @@ LocalStore::LocalStore(const Params & params)
         if (chmod(perUserDir.c_str(), 0755) == -1)
             throw SysError("could not set permissions on '%s' to 755", perUserDir);
     }
+
+    createUser(getUserName(), nix::profilesDir(CreateDirsFlag::DontCreate));
 
     /* Optionally, create directories and set permissions for a
        multi-user install. */
@@ -1948,6 +1951,13 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
 std::optional<std::string> LocalStore::getVersion()
 {
     return nixVersion;
+}
+
+void LocalStore::createUser(const std::string & userName, const std::string & profilesDir) {
+    createLegacyProfileLink(
+            fmt("%s/profiles/per-user/%s", settings.nixStateDir, userName),
+            profilesDir
+    );
 }
 
 

@@ -1460,7 +1460,7 @@ void LocalDerivationGoal::startDaemon()
                 FdSink to(remote.get());
                 try {
                     daemon::processConnection(store, from, to,
-                        daemon::NotTrusted, daemon::Recursive);
+                        daemon::NotTrusted, daemon::Recursive, std::nullopt);
                     debug("terminated daemon connection");
                 } catch (SysError &) {
                     ignoreException();
