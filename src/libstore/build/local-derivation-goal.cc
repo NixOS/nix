@@ -1369,25 +1369,12 @@ void LocalDerivationGoal::runChild()
                 throw SysError("setuid failed");
         }
 
-        /* Fill in the arguments. */
-        Strings args;
-
-        std::string builder = "invalid";
-
-        if (!drv->isBuiltin()) {
-            std::tie(builder, args) = sandbox->getSandboxArgs(*drv, useChroot, dirsInChroot, worker.store, *this);
-        }
-
-        for (auto & i : drv->args)
-            args.push_back(rewriteStrings(i, inputRewrites));
-
-        /* Indicate that we managed to set up the build environment. */
-        writeFull(STDERR_FILENO, std::string("\2\n"));
-
-        sendException = false;
-
-        /* Execute the program.  This should not return. */
         if (drv->isBuiltin()) {
+            /* Indicate that we managed to set up the build environment. */
+            writeFull(STDERR_FILENO, std::string("\2\n"));
+
+            sendException = false;
+
             try {
                 logger = makeJSONLogger(*logger);
 
@@ -1408,9 +1395,28 @@ void LocalDerivationGoal::runChild()
                 writeFull(STDERR_FILENO, e.what() + std::string("\n"));
                 _exit(1);
             }
+        } else {
+            /* Fill in the arguments. */
+            Strings args;
+
+            std::string builder = "invalid";
+
+            if (!drv->isBuiltin()) {
+                std::tie(builder, args) = sandbox->getSandboxArgs(*drv, useChroot, dirsInChroot, worker.store, *this);
+            }
+
+            for (auto & i : drv->args)
+                args.push_back(rewriteStrings(i, inputRewrites));
+
+            /* Indicate that we managed to set up the build environment. */
+            writeFull(STDERR_FILENO, std::string("\2\n"));
+
+            sendException = false;
+
+            /* Execute the program.  This should not return. */
+            sandbox->spawn(builder, args, envStrs, drv->platform);
         }
 
-        sandbox->spawn(builder, args, envStrs, drv->platform);
 
         throw SysError("executing '%1%'", drv->builder);
 
