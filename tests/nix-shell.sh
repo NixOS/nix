@@ -88,13 +88,15 @@ output=$($TEST_ROOT/spaced\ \\\'\"shell.shebang.rb abc ruby)
 nix develop -f "$shellDotNix" shellDrv -c bash -c '[[ -n $stdenv ]]'
 
 # Ensure `nix develop -c` preserves stdin
-echo foo | nix develop -f "$shellDotNix" shellDrv -c cat | grep -q foo
+echo foo | nix develop -f "$shellDotNix" shellDrv -c cat | grepQuiet foo
 
 # Ensure `nix develop -c` actually executes the command if stdout isn't a terminal
-nix develop -f "$shellDotNix" shellDrv -c echo foo |& grep -q foo
+nix develop -f "$shellDotNix" shellDrv -c echo foo |& grepQuiet foo
 
 # Test 'nix print-dev-env'.
 [[ $(nix print-dev-env -f "$shellDotNix" shellDrv --json | jq -r .variables.arr1.value[2]) = '3 4' ]]
+
+set +u # FIXME: Make print-dev-env `set -u` compliant (issue #7951)
 
 source <(nix print-dev-env -f "$shellDotNix" shellDrv)
 [[ -n $stdenv ]]

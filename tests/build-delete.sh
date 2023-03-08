@@ -2,8 +2,6 @@ source common.sh
 
 clearStore
 
-set -o pipefail
-
 # https://github.com/NixOS/nix/issues/6572
 issue_6572_independent_outputs() {
     nix build -f multiple-outputs.nix --json independent --no-link > $TEST_ROOT/independent.json

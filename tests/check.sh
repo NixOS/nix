@@ -37,7 +37,7 @@ checkBuildTempDirRemoved $TEST_ROOT/log
 
 nix-build check.nix -A deterministic --argstr checkBuildId $checkBuildId \
     --no-out-link --check --keep-failed 2> $TEST_ROOT/log
-if grep -q 'may not be deterministic' $TEST_ROOT/log; then false; fi
+if grepQuiet 'may not be deterministic' $TEST_ROOT/log; then false; fi
 checkBuildTempDirRemoved $TEST_ROOT/log
 
 nix-build check.nix -A nondeterministic --argstr checkBuildId $checkBuildId \

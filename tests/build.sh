@@ -2,8 +2,6 @@ source common.sh
 
 clearStore
 
-set -o pipefail
-
 # Make sure that 'nix build' returns all outputs by default.
 nix build -f multiple-outputs.nix --json a b --no-link | jq --exit-status '
   (.[0] |

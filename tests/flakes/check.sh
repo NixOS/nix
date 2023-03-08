@@ -73,5 +73,5 @@ cat > $flakeDir/flake.nix <<EOF
 EOF
 
 checkRes=$(nix flake check --keep-going $flakeDir 2>&1 && fail "nix flake check should have failed" || true)
-echo "$checkRes" | grep -q "packages.system-1.default"
-echo "$checkRes" | grep -q "packages.system-2.default"
+echo "$checkRes" | grepQuiet "packages.system-1.default"
+echo "$checkRes" | grepQuiet "packages.system-2.default"

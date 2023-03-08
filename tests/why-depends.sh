@@ -16,9 +16,9 @@ FAST_WHY_DEPENDS_OUTPUT=$(nix why-depends ./toplevel ./dep)
 PRECISE_WHY_DEPENDS_OUTPUT=$(nix why-depends ./toplevel ./dep --precise)
 
 # Both outputs should show that `input-2` is in the dependency chain
-echo "$FAST_WHY_DEPENDS_OUTPUT" | grep -q input-2
-echo "$PRECISE_WHY_DEPENDS_OUTPUT" | grep -q input-2
+echo "$FAST_WHY_DEPENDS_OUTPUT" | grepQuiet input-2
+echo "$PRECISE_WHY_DEPENDS_OUTPUT" | grepQuiet input-2
 
-# But only the “precise” one should refere to `reference-to-input-2`
-echo "$FAST_WHY_DEPENDS_OUTPUT" | (! grep -q reference-to-input-2)
-echo "$PRECISE_WHY_DEPENDS_OUTPUT" | grep -q reference-to-input-2
+# But only the “precise” one should refer to `reference-to-input-2`
+echo "$FAST_WHY_DEPENDS_OUTPUT" | grepQuietInverse reference-to-input-2
+echo "$PRECISE_WHY_DEPENDS_OUTPUT" | grepQuiet reference-to-input-2
