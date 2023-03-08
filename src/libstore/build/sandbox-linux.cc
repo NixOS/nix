@@ -1,3 +1,4 @@
+#if __linux__
 #include "sandbox.hh"
 #include "cgroup.hh"
 #include "worker.hh"
@@ -37,7 +38,6 @@
 
 namespace nix {
 
-#if __linux__
 static void linkOrCopy(const Path & from, const Path & to)
 {
     if (link(from.c_str(), to.c_str()) == -1) {
@@ -53,7 +53,6 @@ static void linkOrCopy(const Path & from, const Path & to)
         copyPath(from, to);
     }
 }
-#endif
 
 
 static void chmod_(const Path & path, mode_t mode)
@@ -391,7 +390,6 @@ public:
         writeFull(userNamespaceSync.writeSide.get(), "1");
 
         return goal.pid;
-
     };
     void enterChroot(const Store& store, LocalDerivationGoal& goal) override {
             userNamespaceSync.writeSide = -1;
@@ -513,8 +511,10 @@ public:
                     createDirs(dirOf(target));
                     writeFile(target, "");
                 }
+#if __linux__
                 if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
                     throw SysError("bind mount from '%1%' to '%2%' failed", source, target);
+#endif
             };
 
             for (auto & i : dirsInChroot) {
@@ -675,3 +675,4 @@ std::unique_ptr<Sandbox> createSandboxLinux(){
 
 }
 
+#endif

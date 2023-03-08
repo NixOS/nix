@@ -93,7 +93,7 @@ LocalDerivationGoal::LocalDerivationGoal(const StorePath &drvPath,
 
     : DerivationGoal(drvPath, wantedOutputs, worker, buildMode)
 #if __APPLE__
-    , platform(createSandboxDarwin())
+    , sandbox(createSandboxDarwin())
 #elif __linux__
     , sandbox(createSandboxLinux())
 #endif
@@ -105,7 +105,7 @@ LocalDerivationGoal::LocalDerivationGoal(const StorePath &drvPath,
                                          Worker &worker, BuildMode buildMode)
     : DerivationGoal(drvPath, drv, wantedOutputs, worker, buildMode)
 #if __APPLE__
-    , platform(createSandboxDarwin())
+    , sandbox(createSandboxDarwin())
 #elif __linux__
     , sandbox(createSandboxLinux())
 #endif
@@ -384,8 +384,10 @@ void LocalDerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
 void LocalDerivationGoal::startBuilder()
 {
     if ((buildUser && buildUser->getUIDCount() != 1)
-        || (__linux__ && settings.useCgroups))
-    {
+#if __linux__
+        || settings.useCgroups
+#endif
+        ) {
         settings.requireExperimentalFeature(Xp::Cgroups);
         sandbox->createCGroups(buildUser.get());
     }
