@@ -620,10 +620,11 @@ Path getStateDir()
     return stateDir ? *stateDir : getHome() + "/.local/state";
 }
 
-Path createNixStateDir()
+Path getNixStateDir(CreateDirsFlag create)
 {
     Path dir = getStateDir() + "/nix";
-    createDirs(dir);
+    if (create == CreateDirsFlag::Create)
+        createDirs(dir);
     return dir;
 }
 

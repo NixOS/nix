@@ -280,17 +280,20 @@ std::string optimisticLockProfile(const Path & profile)
 }
 
 
-Path profilesDir()
+Path profilesDir(CreateDirsFlag create)
 {
-    auto profileRoot = createNixStateDir() + "/profiles";
-    createDirs(profileRoot);
+    auto profileRoot = getNixStateDir(create) + "/profiles";
+    if (create == CreateDirsFlag::Create) {
+        createDirs(profileRoot);
+    }
+    Path dir = getStateDir() + "/nix";
     return profileRoot;
 }
 
 
 Path getDefaultProfile()
 {
-    Path profileLink = settings.useXDGBaseDirectories ? createNixStateDir() + "/profile" : getHome() + "/.nix-profile";
+    Path profileLink = settings.useXDGBaseDirectories ? getNixStateDir() + "/profile" : getHome() + "/.nix-profile";
     try {
         auto profile =
             getuid() == 0
