@@ -331,7 +331,7 @@
             name = "nix-${version}";
             inherit version;
 
-            src = sourceByRegexInverted [ "tests/nixos/.*" "tests/installer/.*" ] self;
+            src = sourceByRegexInverted [ "tests/nixos/.*" "tests/installer/.*" "python/*" "flake.nix" ] self;
             VERSION_SUFFIX = versionSuffix;
 
             outputs = [ "out" "dev" "doc" ];

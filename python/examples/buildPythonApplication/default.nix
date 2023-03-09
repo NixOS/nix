@@ -1,6 +1,6 @@
 {
   nixpkgsSrc ? fetchTarball "https://github.com/NixOS/nixpkgs/archive/545c7a31e5dedea4a6d372712a18e00ce097d462.tar.gz",
-  nixSrc ? fetchTarball "https://github.com/tweag/nix/archive/9b49f6902c5511e96a2a822bc36f245caf78de3f.tar.gz",
+  nixSrc ? ../../..,
 }: let
   pkgs = import nixpkgsSrc { overlays = []; config = {}; };
   nix = (import nixSrc).default;
