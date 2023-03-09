@@ -242,7 +242,7 @@ struct GitInputScheme : InputScheme
         const Input & input,
         const CanonPath & path,
         std::string_view contents,
-        std::optional<std::string> commitMsg) const
+        std::optional<std::string> commitMsg) const override
     {
         auto repoInfo = getRepoInfo(input);
         if (!repoInfo.isLocal)

@@ -77,7 +77,7 @@ struct Setter
 
     ~Setter() { if (p) t = T(p); }
 
-    operator T::pointer * () { return &p; }
+    operator typename T::pointer * () { return &p; }
 };
 
 Hash toHash(const git_oid & oid)
