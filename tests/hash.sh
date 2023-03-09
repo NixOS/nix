@@ -2,7 +2,7 @@ source common.sh
 
 try () {
     printf "%s" "$2" > $TEST_ROOT/vector
-    hash=$(nix hash file --base16 $EXTRA --type "$1" $TEST_ROOT/vector)
+    hash=$(nix hash file --base16 ${EXTRA-} --type "$1" $TEST_ROOT/vector)
     if test "$hash" != "$3"; then
         echo "hash $1, expected $3, got $hash"
         exit 1

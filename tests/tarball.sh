@@ -19,7 +19,7 @@ test_tarball() {
     tarball=$TEST_ROOT/tarball.tar$ext
     (cd $TEST_ROOT && tar cf - tarball) | $compressor > $tarball
 
-    nix-env -f file://$tarball -qa --out-path | grep -q dependencies
+    nix-env -f file://$tarball -qa --out-path | grepQuiet dependencies
 
     nix-build -o $TEST_ROOT/result file://$tarball
 
@@ -34,7 +34,7 @@ test_tarball() {
     nix-build  -o $TEST_ROOT/result -E "import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"$hash\"; })"
     # Do not re-fetch paths already present
     #nix-build  -o $TEST_ROOT/result -E "import (fetchTree { type = \"tarball\"; url = file:///does-not-exist/must-remain-unused/$tarball; narHash = \"$hash\"; })"
-    #nix-build  -o $TEST_ROOT/result -E "import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"sha256-xdKv2pq/IiwLSnBBJXW8hNowI4MrdZfW+SYqDQs7Tzc=\"; })" 2>&1 | grep 'NAR hash mismatch in input'
+    #expectStderr 102 nix-build  -o $TEST_ROOT/result -E "import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"sha256-xdKv2pq/IiwLSnBBJXW8hNowI4MrdZfW+SYqDQs7Tzc=\"; })" 2>&1 | grep 'NAR hash mismatch in input'
 
     nix-instantiate --strict --eval -E "!((import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"$hash\"; })) ? submodules)" >&2
     nix-instantiate --strict --eval -E "!((import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"$hash\"; })) ? submodules)" 2>&1 | grep 'true'

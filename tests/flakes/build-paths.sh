@@ -35,7 +35,7 @@ cat > $flake1Dir/flake.nix <<EOF
     a6 = flake2.outPath;
 
     # FIXME
-    a7 = "${flake2}/config.nix";
+    a7 = "\${flake2}/config.nix";
 
     # This is only allowed in impure mode.
     a8 = builtins.storePath $dep;

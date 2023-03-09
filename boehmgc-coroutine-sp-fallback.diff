@@ -1,8 +1,8 @@
 diff --git a/darwin_stop_world.c b/darwin_stop_world.c
-index 0468aaec..b348d869 100644
+index 3dbaa3fb..36a1d1f7 100644
 --- a/darwin_stop_world.c
 +++ b/darwin_stop_world.c
-@@ -356,6 +356,7 @@ GC_INNER void GC_push_all_stacks(void)
+@@ -352,6 +352,7 @@ GC_INNER void GC_push_all_stacks(void)
    int nthreads = 0;
    word total_size = 0;
    mach_msg_type_number_t listcount = (mach_msg_type_number_t)THREAD_TABLE_SZ;
@@ -10,7 +10,7 @@ index 0468aaec..b348d869 100644
    if (!EXPECT(GC_thr_initialized, TRUE))
      GC_thr_init();
  
-@@ -411,6 +412,19 @@ GC_INNER void GC_push_all_stacks(void)
+@@ -407,6 +408,19 @@ GC_INNER void GC_push_all_stacks(void)
              GC_push_all_stack_sections(lo, hi, p->traced_stack_sect);
            }
            if (altstack_lo) {
@@ -30,22 +30,6 @@ index 0468aaec..b348d869 100644
              total_size += altstack_hi - altstack_lo;
              GC_push_all_stack(altstack_lo, altstack_hi);
            }
-diff --git a/include/gc.h b/include/gc.h
-index edab6c22..f2c61282 100644
---- a/include/gc.h
-+++ b/include/gc.h
-@@ -2172,6 +2172,11 @@ GC_API void GC_CALL GC_win32_free_heap(void);
-         (*GC_amiga_allocwrapper_do)(a,GC_malloc_atomic_ignore_off_page)
- #endif /* _AMIGA && !GC_AMIGA_MAKINGLIB */
- 
-+#if !__APPLE__
-+/* Patch doesn't work on apple */
-+#define NIX_BOEHM_PATCH_VERSION 1
-+#endif
-+
- #ifdef __cplusplus
-   } /* extern "C" */
- #endif
 diff --git a/pthread_stop_world.c b/pthread_stop_world.c
 index b5d71e62..aed7b0bf 100644
 --- a/pthread_stop_world.c

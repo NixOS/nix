@@ -1,7 +1,5 @@
 source common.sh
 
-set -o pipefail
-
 if [[ $BUILD_SHARED_LIBS != 1 ]]; then
     echo "plugins are not supported"
     exit 99

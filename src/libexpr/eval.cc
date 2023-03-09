@@ -326,22 +326,6 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
     }
 }
 
-#if HAVE_BOEHMGC
-/* Disable GC while this object lives. Used by CoroutineContext.
- *
- * Boehm keeps a count of GC_disable() and GC_enable() calls,
- * and only enables GC when the count matches.
- */
-class BoehmDisableGC {
-public:
-    BoehmDisableGC() {
-        GC_disable();
-    };
-    ~BoehmDisableGC() {
-        GC_enable();
-    };
-};
-#endif
 
 static bool gcInitialised = false;
 
@@ -365,15 +349,6 @@ void initGC()
     GC_set_oom_fn(oomHandler);
 
     StackAllocator::defaultAllocator = &boehmGCStackAllocator;
-
-
-#if NIX_BOEHM_PATCH_VERSION != 1
-    printTalkative("Unpatched BoehmGC, disabling GC inside coroutines");
-    /* Used to disable GC when entering coroutines on macOS */
-    create_coro_gc_hook = []() -> std::shared_ptr<void> {
-        return std::make_shared<BoehmDisableGC>();
-    };
-#endif
 
     /* Set the initial heap size to something fairly big (25% of
        physical RAM, up to a maximum of 384 MiB) so that in most cases

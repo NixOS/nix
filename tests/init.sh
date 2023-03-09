@@ -1,5 +1,3 @@
-set -eu -o pipefail
-
 # Don't start the daemon
 source common/vars-and-functions.sh
 

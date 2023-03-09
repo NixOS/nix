@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -u
+set -eu -o pipefail
 
 red=""
 green=""
@@ -22,8 +22,7 @@ fi
 
 run_test () {
     (init_test 2>/dev/null > /dev/null)
-    log="$(run_test_proper 2>&1)"
-    status=$?
+    log="$(run_test_proper 2>&1)" && status=0 || status=$?
 }
 
 run_test
