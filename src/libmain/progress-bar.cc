@@ -72,6 +72,7 @@ private:
         uint64_t corruptedPaths = 0, untrustedPaths = 0;
 
         bool active = true;
+        bool paused = false;
         bool haveUpdate = true;
     };
 
@@ -118,6 +119,17 @@ public:
             quitCV.notify_one();
         }
         updateThread.join();
+    }
+
+    void pause() override {
+        state_.lock()->paused = true;
+        writeToStderr("\r\e[K");
+    }
+
+    void resume() override {
+        state_.lock()->paused = false;
+        writeToStderr("\r\e[K");
+        updateCV.notify_one();
     }
 
     bool isVerbose() override
@@ -338,6 +350,7 @@ public:
     {
         auto nextWakeup = std::chrono::milliseconds::max();
 
+        if (state.paused) return nextWakeup;
         state.haveUpdate = false;
         if (!state.active) return nextWakeup;
 
