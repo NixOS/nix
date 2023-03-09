@@ -9,5 +9,4 @@ setup(
             'hello-nix = hello:greet',
         ],
     },
-    #install_requires=['nix'],
 )

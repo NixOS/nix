@@ -506,6 +506,8 @@
         perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nix.perl-bindings);
 
         pythonBindings = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix.python-bindings);
+        # TODO: recurseIntoAttrs or combine multiple tests into a single one
+        pythonBindingsTests = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix.python-bindings.tests.example-buildPythonApplication);
 
         # Binary tarball for various platforms, containing a Nix store
         # with the closure of 'nix' package, and the second half of

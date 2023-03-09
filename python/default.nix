@@ -73,6 +73,11 @@ python.pkgs.buildPythonPackage {
 
   passthru = {
     exampleEnv = python.withPackages (p: [ nix.python-bindings ]);
+    tests = {
+      example-buildPythonApplication = import ./examples/buildPythonApplication {
+        inherit nix system testScripts;
+      };
+    };
     shell = mkShell {
       packages = [
         clang-tools
