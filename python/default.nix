@@ -1,4 +1,44 @@
-{ self, system, lib, python, clang-tools, ninja, meson, nix, mkShell }:
+{
+  self,
+  system,
+  lib,
+  python,
+  boost,
+  clang-tools,
+  pkg-config,
+  ninja,
+  meson,
+  nix,
+  mkShell,
+  recurseIntoAttrs,
+  isShell ? false,
+}:
+let
+  # Extracts tests/init.sh
+  testScripts = nix.overrideAttrs (old: {
+    name = "nix-test-scripts-${old.version}";
+    outputs = [ "out" ];
+    separateDebugInfo = false;
+    buildPhase = ''
+      make tests/{init.sh,common/vars-and-functions.sh}
+    '';
+    script = ''
+      pushd ${placeholder "out"}/libexec >/dev/null
+      source init.sh
+      popd >/dev/null
+    '';
+    passAsFile = [ "script" ];
+    installPhase = ''
+      rm -rf "$out"
+      mkdir -p "$out"/{libexec/common,share/bash}
+      cp tests/init.sh "$out"/libexec
+      cp tests/common/vars-and-functions.sh "$out"/libexec/common
+
+      cp "$scriptPath" "$out"/share/bash/nix-test.sh
+    '';
+    dontFixup = true;
+  });
+in
 python.pkgs.buildPythonPackage {
   name = "nix";
   format = "other";
@@ -7,33 +47,20 @@ python.pkgs.buildPythonPackage {
 
   strictDeps = true;
 
-  nativeBuildInputs = lib.optionals (nix != null) nix.nativeBuildInputs ++ [
+  nativeBuildInputs = [
     ninja
+    pkg-config
     (meson.override { python3 = python; })
-    nix
-  ];
+  ] ++ lib.optional (!isShell) nix;
 
-  buildInputs = lib.optionals (nix != null) nix.buildInputs ++ [
-    nix
-  ];
-
-  # We need to be able to generate tests/common.sh, which requires running
-  # `make`, which requires having run `autoreconf` and `./configure`.
-  # So we propagate `autoreconfHook` from nix.nativeBuildInputs for that to
-  # work, but after that we also need to cd into the python directory and run the
-  # meson configure phase for the python bindings.
-  # Can't use `postConfigure` for this because that would create a loop since
-  # `mesonConfigurePhase` calls `postConfigure` itself.
-  # A small problem with this is that `{pre,post}Configure` get run twice
-  dontUseMesonConfigure = true;
-  preBuild = ''
-    cd python
-    mesonConfigurePhase
-  '';
+  buildInputs = [
+    boost
+  ] ++ lib.optional (!isShell) nix;
 
   mesonBuildType = "release";
 
   doInstallCheck = true;
+  TEST_SCRIPTS = testScripts;
   installCheckPhase = "meson test -v";
 
   passthru = {
@@ -42,9 +69,9 @@ python.pkgs.buildPythonPackage {
       packages = [
         clang-tools
       ];
+      TEST_SCRIPTS = testScripts;
       inputsFrom = [
-        self.devShells.${system}.default
-        (nix.python-bindings.override { nix = null; })
+        (nix.python-bindings.override { isShell = true; })
       ];
     };
   };

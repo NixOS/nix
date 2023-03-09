@@ -13,10 +13,6 @@ subdir('src')
 
 fs = import('fs')
 
-nix_root = fs.parent(meson.project_source_root())
-run_command('make', '-C', nix_root, 'tests/common/vars-and-functions.sh', check: true)
-
 env = environment()
 env.prepend('PYTHONPATH', fs.parent(nix_bindings.full_path()))
-bash = find_program('bash')
-test('python test', bash, args : files('test.sh'), env : env)
+test('python test', find_program('bash'), args : files('test.sh'), env : env)
