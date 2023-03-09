@@ -8,7 +8,6 @@ src = [
 nix_bindings = py_installation.extension_module('nix', src,
     dependencies : [nix_expr_dep, nix_main_dep],
     install: true,
-    subdir: 'nix',
     cpp_args: [
       '-std=c++17',
       # -Wnon-virtual-dtor is unnecessarily turned on by Meson
