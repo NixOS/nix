@@ -2,8 +2,7 @@ ifeq ($(doc_generate),yes)
 
 MANUAL_SRCS := \
 	$(call rwildcard, $(d)/src, *.md) \
-	$(call rwildcard, $(d)/src, */*.md) \
-	$(call rwildcard, $(d)/../../python/doc, *.md)
+	$(call rwildcard, $(d)/src, */*.md)
 
 man-pages := $(foreach n, \
 	nix-env.1 nix-store.1 \
