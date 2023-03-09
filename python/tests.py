@@ -31,7 +31,7 @@ class TestPythonNix(unittest.TestCase):
         errorString = "hello hi there\ntest"
         with self.assertRaises(nix.ThrownNixError) as cm:
             nix.eval("throw str", vars=dict(str=errorString))
-        self.assertEquals(cm.exception.args[0], errorString)
+        self.assertEqual(cm.exception.args[0], errorString)
 
     def test_syntax_error(self):
         with self.assertRaises(nix.NixError) as cm:
