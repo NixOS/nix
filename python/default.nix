@@ -43,7 +43,15 @@ python.pkgs.buildPythonPackage {
   name = "nix";
   format = "other";
 
-  src = self;
+  src = builtins.path {
+    path = ./.;
+    filter = path: type:
+      path == toString ./meson.build
+      || path == toString ./tests.py
+      || path == toString ./test.sh
+      || lib.hasPrefix (toString ./src) path;
+  };
+
 
   strictDeps = true;
 
