@@ -44,10 +44,10 @@
   - [Common Options](command-ref/opt-common.md)
   - [Common Environment Variables](command-ref/env-common.md)
   - [Main Commands](command-ref/main-commands.md)
-    - [nix-env](command-ref/nix-env.md)
     - [nix-build](command-ref/nix-build.md)
     - [nix-shell](command-ref/nix-shell.md)
     - [nix-store](command-ref/nix-store.md)
+    - [nix-env](command-ref/nix-env.md)
   - [Utilities](command-ref/utilities.md)
     - [nix-channel](command-ref/nix-channel.md)
     - [nix-collect-garbage](command-ref/nix-collect-garbage.md)
@@ -57,7 +57,7 @@
     - [nix-instantiate](command-ref/nix-instantiate.md)
     - [nix-prefetch-url](command-ref/nix-prefetch-url.md)
   - [Experimental Commands](command-ref/experimental-commands.md)
-@manpages@
+{{#include ./command-ref/new-cli/SUMMARY.md}}
   - [Files](command-ref/files.md)
     - [nix.conf](command-ref/conf-file.md)
 - [Architecture](architecture/architecture.md)
