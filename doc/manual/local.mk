@@ -88,7 +88,8 @@ $(d)/builtins.json: $(bindir)/nix
 	@mv $@.tmp $@
 
 # Generate the HTML manual.
-html: $(docdir)/manual/index.html
+.PHONY: manual-html
+manual-html: $(docdir)/manual/index.html
 install: $(docdir)/manual/index.html
 
 # Generate 'nix' manpages.

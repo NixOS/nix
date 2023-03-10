@@ -98,7 +98,11 @@
           ];
 
         testConfigureFlags = [
-          "CXXFLAGS=-I${lib.getDev rapidcheck}/extras/gtest/include"
+          "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include"
+        ];
+
+        internalApiDocsConfigureFlags = [
+          "--enable-internal-api-docs"
         ];
 
         nativeBuildDeps =
@@ -134,6 +138,10 @@
         checkDeps = [
           gtest
           rapidcheck
+        ];
+
+        internalApiDocsDeps = [
+          buildPackages.doxygen
         ];
 
         awsDeps = lib.optional (stdenv.isLinux || stdenv.isDarwin)
@@ -517,9 +525,7 @@
 
             src = self;
 
-            configureFlags = [
-              "CXXFLAGS=-I${lib.getDev pkgs.rapidcheck}/extras/gtest/include"
-            ];
+            configureFlags = testConfigureFlags;
 
             enableParallelBuilding = true;
 
@@ -534,6 +540,33 @@
             lcovFilter = [ "*/boost/*" "*-tab.*" ];
 
             hardeningDisable = ["fortify"];
+          };
+
+        # API docs for Nix's unstable internal C++ interfaces.
+        internal-api-docs =
+          with nixpkgsFor.x86_64-linux.native;
+          with commonDeps { inherit pkgs; };
+
+          stdenv.mkDerivation {
+            pname = "nix-internal-api-docs";
+            inherit version;
+
+            src = self;
+
+            configureFlags = testConfigureFlags ++ internalApiDocsConfigureFlags;
+
+            nativeBuildInputs = nativeBuildDeps;
+            buildInputs = buildDeps ++ propagatedDeps
+              ++ awsDeps ++ checkDeps ++ internalApiDocsDeps;
+
+            dontBuild = true;
+
+            installTargets = [ "internal-api-html" ];
+
+            postInstall = ''
+              mkdir -p $out/nix-support
+              echo "doc internal-api-docs $out/share/doc/nix/internal-api" >> $out/nix-support/hydra-build-products
+            '';
           };
 
         # System tests.
@@ -653,9 +686,11 @@
             nativeBuildInputs = nativeBuildDeps
                                 ++ (lib.optionals stdenv.cc.isClang [ pkgs.bear pkgs.clang-tools ]);
 
-            buildInputs = buildDeps ++ propagatedDeps ++ awsDeps ++ checkDeps;
+            buildInputs = buildDeps ++ propagatedDeps
+              ++ awsDeps ++ checkDeps ++ internalApiDocsDeps;
 
-            configureFlags = configureFlags ++ testConfigureFlags;
+            configureFlags = configureFlags
+              ++ testConfigureFlags ++ internalApiDocsConfigureFlags;
 
             enableParallelBuilding = true;
 
