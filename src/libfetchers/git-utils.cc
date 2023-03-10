@@ -31,6 +31,8 @@ template<> struct hash<git_oid>
     }
 };
 
+}
+
 std::ostream & operator << (std::ostream & str, const git_oid & oid)
 {
     str << git_oid_tostr_s(&oid);
@@ -40,8 +42,6 @@ std::ostream & operator << (std::ostream & str, const git_oid & oid)
 bool operator == (const git_oid & oid1, const git_oid & oid2)
 {
     return git_oid_equal(&oid1, &oid2);
-}
-
 }
 
 namespace nix {
