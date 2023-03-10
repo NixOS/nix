@@ -15,7 +15,7 @@ PyObject * ThrownNixError = nullptr;
 PyObject * NixError = nullptr;
 
 static PyMethodDef NixMethods[] = {
-    {"eval", (PyCFunction) eval, METH_VARARGS | METH_KEYWORDS, "Eval nix expression"}, {NULL, NULL, 0, NULL}};
+    {"callExprString", (PyCFunction) eval, METH_VARARGS | METH_KEYWORDS, "Eval nix expression"}, {NULL, NULL, 0, NULL}};
 
 static struct PyModuleDef nixmodule = {
     PyModuleDef_HEAD_INIT, "nix", "Nix expression bindings",

@@ -130,36 +130,4 @@ nix::Value * pythonToNixValue(nix::EvalState & state, PyObject * obj)
     }
     return v;
 }
-
-std::optional<nix::StaticEnv> pythonToNixEnv(nix::EvalState & state, PyObject * vars, nix::Env ** env)
-{
-    Py_ssize_t pos = 0;
-    PyObject *key = nullptr, *val = nullptr;
-
-    *env = &state.allocEnv(vars ? PyDict_Size(vars) : 0);
-    (*env)->up = &state.baseEnv;
-
-    nix::StaticEnv staticEnv(false, state.staticBaseEnv.get());
-
-    if (!vars) {
-        return staticEnv;
-    }
-
-    auto displ = 0;
-    while (PyDict_Next(vars, &pos, &key, &val)) {
-        auto name = checkAttrKey(key);
-        if (!name) {
-            return {};
-        }
-
-        auto attrVal = pythonToNixValue(state, val);
-        if (!attrVal) {
-            return {};
-        }
-        staticEnv.vars.emplace_back(state.symbols.create(name), displ);
-        (*env)->values[displ++] = attrVal;
-    }
-
-    return staticEnv;
-}
 } // namespace nix::python

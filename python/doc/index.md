@@ -11,7 +11,7 @@ $ nix run github:NixOS/nix#nix.python-bindings.exampleEnv
 Python 3.10.8 (main, Oct 11 2022, 11:35:05) [GCC 11.3.0] on linux
 Type "help", "copyright", "credits" or "license" for more information.
 >>> import nix
->>> nix.eval('"Hello ${name}!"', vars=dict(name="Python"))
+>>> nix.callExprString('"Hello ${name}!"', arg={"name": "Python"}))
 'Hello Python!'
 ```
 

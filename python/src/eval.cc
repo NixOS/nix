@@ -17,17 +17,16 @@ const char * currentExceptionTypeName()
     return res ? res : "(null)";
 }
 
-static PyObject * _eval(const std::string & expression, PyObject * vars)
+static PyObject * _eval(const std::string & expression, PyObject * argument)
 {
     nix::Strings storePath;
     nix::EvalState state(storePath, nix::openStore());
 
-    nix::Env * env = nullptr;
-    auto staticEnv = pythonToNixEnv(state, vars, &env);
-    if (!staticEnv) {
+    auto nixArgument = pythonToNixValue(state, argument);
+    if (!nixArgument) {
         return nullptr;
     }
-    auto staticEnvPointer = std::make_shared<nix::StaticEnv>(*staticEnv);
+    nix::Value fun;
     nix::Value v;
 
 
@@ -44,8 +43,10 @@ static PyObject * _eval(const std::string & expression, PyObject * vars)
         });
 
         // TODO: Should the "." be something else here?
-        auto e = state.parseExprFromString(expression, ".", staticEnvPointer);
-        e->eval(state, *env, v);
+        auto e = state.parseExprFromString(expression, ".");
+        state.eval(e, fun);
+        // TODO: Add position
+        state.callFunction(fun, *nixArgument, v, noPos);
         state.forceValueDeep(v);
     }
 
@@ -53,16 +54,17 @@ static PyObject * _eval(const std::string & expression, PyObject * vars)
     return nixToPythonObject(state, v, context);
 }
 
+// TODO: Rename this function to callExprString, matching the Python name
 PyObject * eval(PyObject * self, PyObject * args, PyObject * keywds)
 {
     PyObject * expressionObject;
-    PyObject * vars = nullptr;
+    PyObject * argument = nullptr;
 
-    const char * kwlist[] = {"expression", "vars", nullptr};
+    const char * kwlist[] = {"expression", "arg", nullptr};
 
     // See https://docs.python.org/3/c-api/arg.html for the magic string
     if (!PyArg_ParseTupleAndKeywords(
-            args, keywds, "U|O!", const_cast<char **>(kwlist), &expressionObject, &PyDict_Type, &vars)) {
+            args, keywds, "UO", const_cast<char **>(kwlist), &expressionObject, &argument)) {
         return nullptr;
     }
 
@@ -75,7 +77,7 @@ PyObject * eval(PyObject * self, PyObject * args, PyObject * keywds)
     std::string expression(expressionBase, expressionSize);
 
     try {
-        return _eval(expression, vars);
+        return _eval(expression, argument);
     } catch (nix::ThrownError & e) {
         return PyErr_Format(ThrownNixError, "%s", e.message().c_str());
     } catch (nix::Error & e) {
