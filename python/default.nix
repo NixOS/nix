@@ -4,16 +4,22 @@
   lib,
   python,
   boost,
+  gdb,
   clang-tools,
   pkg-config,
   ninja,
   meson,
   nix,
   mkShell,
+  enableDebugging,
   recurseIntoAttrs,
   isShell ? false,
 }:
 let
+  _python = python;
+in
+let
+  python = _python.override { self = enableDebugging _python; };
   # Extracts tests/init.sh
   testScripts = nix.overrideAttrs (old: {
     name = "nix-test-scripts-${old.version}";
@@ -81,6 +87,7 @@ python.pkgs.buildPythonPackage {
     shell = mkShell {
       packages = [
         clang-tools
+        gdb
       ];
       TEST_SCRIPTS = testScripts;
       inputsFrom = [
