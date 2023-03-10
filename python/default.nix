@@ -61,7 +61,7 @@ python.pkgs.buildPythonPackage {
     (meson.override { python3 = python; })
   ] ++ lib.optional (!isShell) nix;
 
-  buildInputs = [
+  buildInputs = nix.propagatedBuildInputs ++ [
     boost
   ] ++ lib.optional (!isShell) nix;
 
