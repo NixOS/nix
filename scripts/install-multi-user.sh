@@ -640,7 +640,7 @@ place_channel_configuration() {
 
 check_selinux() {
     if command -v getenforce > /dev/null 2>&1; then
-        if ! [ "$(getenforce)" = "Disabled" ]; then
+        if [ "$(getenforce)" = "Enforcing" ]; then
             failure <<EOF
 Nix does not work with selinux enabled yet!
 see https://github.com/NixOS/nix/issues/2374

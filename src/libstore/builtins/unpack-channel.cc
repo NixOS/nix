@@ -22,8 +22,7 @@ void builtinUnpackChannel(const BasicDerivation & drv)
     auto entries = readDirectory(out);
     if (entries.size() != 1)
         throw Error("channel tarball '%s' contains more than one file", src);
-    if (rename((out + "/" + entries[0].name).c_str(), (out + "/" + channelName).c_str()) == -1)
-        throw SysError("renaming channel directory");
+    renameFile((out + "/" + entries[0].name), (out + "/" + channelName));
 }
 
 }

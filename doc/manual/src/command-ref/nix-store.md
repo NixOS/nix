@@ -121,7 +121,7 @@ Special exit codes:
   - `102`\
     Hash mismatch, the build output was rejected because it does not
     match the [`outputHash` attribute of the
-    derivation](../expressions/advanced-attributes.md).
+    derivation](../language/advanced-attributes.md).
 
   - `104`\
     Not deterministic, the build succeeded in check mode but the

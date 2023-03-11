@@ -343,7 +343,6 @@ LockedFlake lockFlake(
 
         debug("old lock file: %s", oldLockFile);
 
-        // FIXME: check whether all overrides are used.
         std::map<InputPath, FlakeInput> overrides;
         std::set<InputPath> overridesUsed, updatesUsed;
 
