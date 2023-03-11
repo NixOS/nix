@@ -11,7 +11,7 @@ nix_tests = \
   local-store.sh remote-store.sh export.sh export-graph.sh \
   db-migration.sh \
   timeout.sh secure-drv-outputs.sh nix-channel.sh \
-  multiple-outputs.sh import-derivation.sh fetchurl.sh optimise-store.sh \
+  multiple-outputs.sh import-derivation.sh ca/import-derivation.sh fetchurl.sh optimise-store.sh \
   binary-cache.sh \
   substitute-with-invalid-ca.sh \
   binary-cache-build-remote.sh \

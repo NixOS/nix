@@ -70,19 +70,19 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
     // FIXME: use name
     auto [tree, input2] = input.fetch(state.store);
 
-    state.mkAttrs(v, 8);
+    auto attrs2 = state.buildBindings(8);
     auto storePath = state.store->printStorePath(tree.storePath);
-    mkString(*state.allocAttr(v, state.sOutPath), storePath, PathSet({storePath}));
+    attrs2.alloc(state.sOutPath).mkString(storePath, {storePath});
     if (input2.getRef())
-        mkString(*state.allocAttr(v, state.symbols.create("branch")), *input2.getRef());
+        attrs2.alloc("branch").mkString(*input2.getRef());
     // Backward compatibility: set 'rev' to
     // 0000000000000000000000000000000000000000 for a dirty tree.
     auto rev2 = input2.getRev().value_or(Hash(htSHA1));
-    mkString(*state.allocAttr(v, state.symbols.create("rev")), rev2.gitRev());
-    mkString(*state.allocAttr(v, state.symbols.create("shortRev")), std::string(rev2.gitRev(), 0, 12));
+    attrs2.alloc("rev").mkString(rev2.gitRev());
+    attrs2.alloc("shortRev").mkString(rev2.gitRev().substr(0, 12));
     if (auto revCount = input2.getRevCount())
-        mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *revCount);
-    v.attrs->sort();
+        attrs2.alloc("revCount").mkInt(*revCount);
+    v.mkAttrs(attrs2);
 
     state.allowPath(tree.storePath);
 }

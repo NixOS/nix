@@ -28,7 +28,6 @@ extern "C" {
 #include "common-eval-args.hh"
 #include "get-drvs.hh"
 #include "derivations.hh"
-#include "affinity.hh"
 #include "globals.hh"
 #include "command.hh"
 #include "finally.hh"
@@ -431,7 +430,8 @@ bool NixRepl::processLine(string line)
              << "  :t <expr>     Describe result of evaluation\n"
              << "  :u <expr>     Build derivation, then start nix-shell\n"
              << "  :doc <expr>   Show documentation of a builtin function\n"
-             << "  :log <expr>   Show logs for a derivation\n";
+             << "  :log <expr>   Show logs for a derivation\n"
+             << "  :st [bool]    Enable, disable or toggle showing traces for errors\n";
     }
 
     else if (command == ":a" || command == ":add") {
@@ -573,6 +573,18 @@ bool NixRepl::processLine(string line)
             throw Error("value does not have documentation");
     }
 
+    else if (command == ":st" || command == ":show-trace") {
+        if (arg == "false" || (arg == "" && loggerSettings.showTrace)) {
+            std::cout << "not showing error traces\n";
+            loggerSettings.showTrace = false;
+        } else if (arg == "true" || (arg == "" && !loggerSettings.showTrace)) {
+            std::cout << "showing error traces\n";
+            loggerSettings.showTrace = true;
+        } else {
+            throw Error("unexpected argument '%s' to %s", arg, command);
+        };
+    }
+
     else if (command != "")
         throw Error("unknown command '%1%'", command);
 
@@ -662,8 +674,16 @@ void NixRepl::reloadFiles()
 void NixRepl::addAttrsToScope(Value & attrs)
 {
     state->forceAttrs(attrs);
-    for (auto & i : *attrs.attrs)
-        addVarToScope(i.name, *i.value);
+    if (displ + attrs.attrs->size() >= envSize)
+        throw Error("environment full; cannot add more variables");
+
+    for (auto & i : *attrs.attrs) {
+        staticEnv.vars.emplace_back(i.name, displ);
+        env->values[displ++] = i.value;
+        varNames.insert((string) i.name);
+    }
+    staticEnv.sort();
+    staticEnv.deduplicate();
     notice("Added %1% variables.", attrs.attrs->size());
 }
 

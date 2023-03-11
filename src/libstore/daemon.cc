@@ -4,7 +4,6 @@
 #include "store-api.hh"
 #include "path-with-outputs.hh"
 #include "finally.hh"
-#include "affinity.hh"
 #include "archive.hh"
 #include "derivations.hh"
 #include "args.hh"
@@ -960,8 +959,8 @@ void processConnection(
     });
 
     if (GET_PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from)) {
-        auto affinity = readInt(from);
-        setAffinityTo(affinity);
+        // Obsolete CPU affinity.
+        readInt(from);
     }
 
     readInt(from); // obsolete reserveSpace

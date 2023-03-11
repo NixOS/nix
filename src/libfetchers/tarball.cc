@@ -176,6 +176,7 @@ struct TarballInputScheme : InputScheme
 
         if (!hasSuffix(url.path, ".zip")
             && !hasSuffix(url.path, ".tar")
+            && !hasSuffix(url.path, ".tgz")
             && !hasSuffix(url.path, ".tar.gz")
             && !hasSuffix(url.path, ".tar.xz")
             && !hasSuffix(url.path, ".tar.bz2")

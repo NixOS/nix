@@ -78,20 +78,20 @@ struct CmdBundle : InstallableCommand
             Strings{bundlerName == "" ? "defaultBundler" : bundlerName},
             Strings({"bundlers."}), lockFlags);
 
-        Value * arg = evalState->allocValue();
-        evalState->mkAttrs(*arg, 2);
+        auto attrs = evalState->buildBindings(2);
 
         PathSet context;
         for (auto & i : app.context)
             context.insert("=" + store->printStorePath(i.path));
-        mkString(*evalState->allocAttr(*arg, evalState->symbols.create("program")), app.program, context);
+        attrs.alloc("program").mkString(app.program, context);
 
-        mkString(*evalState->allocAttr(*arg, evalState->symbols.create("system")), settings.thisSystem.get());
-
-        arg->attrs->sort();
+        attrs.alloc("system").mkString(settings.thisSystem.get());
 
         auto vRes = evalState->allocValue();
-        evalState->callFunction(*bundler.toValue(*evalState).first, *arg, *vRes, noPos);
+        evalState->callFunction(
+            *bundler.toValue(*evalState).first,
+            evalState->allocValue()->mkAttrs(attrs),
+            *vRes, noPos);
 
         if (!evalState->isDerivation(*vRes))
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());

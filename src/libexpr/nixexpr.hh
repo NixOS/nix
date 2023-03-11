@@ -94,7 +94,7 @@ struct ExprInt : Expr
 {
     NixInt n;
     Value v;
-    ExprInt(NixInt n) : n(n) { mkInt(v, n); };
+    ExprInt(NixInt n) : n(n) { v.mkInt(n); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
@@ -103,7 +103,7 @@ struct ExprFloat : Expr
 {
     NixFloat nf;
     Value v;
-    ExprFloat(NixFloat nf) : nf(nf) { mkFloat(v, nf); };
+    ExprFloat(NixFloat nf) : nf(nf) { v.mkFloat(nf); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
@@ -112,7 +112,7 @@ struct ExprString : Expr
 {
     Symbol s;
     Value v;
-    ExprString(const Symbol & s) : s(s) { mkString(v, s); };
+    ExprString(const Symbol & s) : s(s) { v.mkString(s); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
@@ -366,6 +366,13 @@ struct StaticEnv
     {
         std::sort(vars.begin(), vars.end(),
             [](const Vars::value_type & a, const Vars::value_type & b) { return a.first < b.first; });
+    }
+
+    void deduplicate()
+    {
+        const auto last = std::unique(vars.begin(), vars.end(),
+            [] (const Vars::value_type & a, const Vars::value_type & b) { return a.first == b.first; });
+        vars.erase(last, vars.end());
     }
 
     Vars::const_iterator find(const Symbol & name) const

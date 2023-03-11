@@ -96,7 +96,7 @@
             buildPackages.mdbook
             buildPackages.autoconf-archive
             buildPackages.autoreconfHook
-            buildPackages.pkgconfig
+            buildPackages.pkg-config
 
             # Tests
             buildPackages.git
@@ -343,7 +343,7 @@
             nativeBuildInputs =
               [ buildPackages.autoconf-archive
                 buildPackages.autoreconfHook
-                buildPackages.pkgconfig
+                buildPackages.pkg-config
               ];
 
             buildInputs =
@@ -667,6 +667,9 @@
               PATH=$prefix/bin:$PATH
               unset PYTHONPATH
               export MANPATH=$out/share/man:$MANPATH
+
+              # Make bash completion work.
+              XDG_DATA_DIRS+=:$out/share
             '';
         });
 

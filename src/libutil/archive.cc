@@ -93,13 +93,12 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
                     debug(format("removing case hack suffix from '%1%'") % (path + "/" + i.name));
                     name.erase(pos);
                 }
-                if (unhacked.find(name) != unhacked.end())
+                if (!unhacked.emplace(name, i.name).second)
                     throw Error("file name collision in between '%1%' and '%2%'",
                        (path + "/" + unhacked[name]),
                        (path + "/" + i.name));
-                unhacked[name] = i.name;
             } else
-                unhacked[i.name] = i.name;
+                unhacked.emplace(i.name, i.name);
 
         for (auto & i : unhacked)
             if (filter(path + "/" + i.first)) {

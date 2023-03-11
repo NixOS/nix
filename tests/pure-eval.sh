@@ -11,6 +11,9 @@ missingImpureErrorMsg=$(! nix eval --expr 'builtins.readFile ./pure-eval.sh' 2>&
 echo "$missingImpureErrorMsg" | grep -q -- --impure || \
     fail "The error message should mention the “--impure” flag to unblock users"
 
+[[ $(nix eval --expr 'builtins.pathExists ./pure-eval.sh') == false ]] || \
+    fail "Calling 'pathExists' on a non-authorised path should return false"
+
 (! nix eval --expr builtins.currentTime)
 (! nix eval --expr builtins.currentSystem)
 

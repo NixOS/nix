@@ -1,5 +1,4 @@
 #include "util.hh"
-#include "affinity.hh"
 #include "sync.hh"
 #include "finally.hh"
 #include "serialise.hh"
@@ -197,16 +196,16 @@ std::string_view baseNameOf(std::string_view path)
 }
 
 
-bool isInDir(const Path & path, const Path & dir)
+bool isInDir(std::string_view path, std::string_view dir)
 {
-    return path[0] == '/'
-        && string(path, 0, dir.size()) == dir
+    return path.substr(0, 1) == "/"
+        && path.substr(0, dir.size()) == dir
         && path.size() >= dir.size() + 2
         && path[dir.size()] == '/';
 }
 
 
-bool isDirOrInDir(const Path & path, const Path & dir)
+bool isDirOrInDir(std::string_view path, std::string_view dir)
 {
     return path == dir || isInDir(path, dir);
 }
@@ -1004,7 +1003,6 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
             if (options.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
                 throw SysError("setting death signal");
 #endif
-            restoreAffinity();
             fun();
         } catch (std::exception & e) {
             try {
@@ -1660,14 +1658,20 @@ void restoreMountNamespace()
 #endif
 }
 
+void unshareFilesystem()
+{
+#ifdef __linux__
+    if (unshare(CLONE_FS) != 0 && errno != EPERM)
+        throw SysError("unsharing filesystem state in download thread");
+#endif
+}
+
 void restoreProcessContext(bool restoreMounts)
 {
     restoreSignals();
     if (restoreMounts) {
         restoreMountNamespace();
     }
-
-    restoreAffinity();
 
     #if __linux__
     if (savedStackSize) {

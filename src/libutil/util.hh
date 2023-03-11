@@ -66,11 +66,13 @@ Path dirOf(const Path & path);
    following the final `/' (trailing slashes are removed). */
 std::string_view baseNameOf(std::string_view path);
 
-/* Check whether 'path' is a descendant of 'dir'. */
-bool isInDir(const Path & path, const Path & dir);
+/* Check whether 'path' is a descendant of 'dir'. Both paths must be
+   canonicalized. */
+bool isInDir(std::string_view path, std::string_view dir);
 
-/* Check whether 'path' is equal to 'dir' or a descendant of 'dir'. */
-bool isDirOrInDir(const Path & path, const Path & dir);
+/* Check whether 'path' is equal to 'dir' or a descendant of
+   'dir'. Both paths must be canonicalized. */
+bool isDirOrInDir(std::string_view path, std::string_view dir);
 
 /* Get status of `path'. */
 struct stat lstat(const Path & path);
@@ -300,7 +302,7 @@ void setStackSize(size_t stackSize);
 
 
 /* Restore the original inherited Unix process context (such as signal
-   masks, stack size, CPU affinity). */
+   masks, stack size). */
 void restoreProcessContext(bool restoreMounts = true);
 
 /* Save the current mount namespace. Ignored if called more than
@@ -310,6 +312,11 @@ void saveMountNamespace();
 /* Restore the mount namespace saved by saveMountNamespace(). Ignored
    if saveMountNamespace() was never called. */
 void restoreMountNamespace();
+
+/* Cause this thread to not share any FS attributes with the main
+   thread, because this causes setns() in restoreMountNamespace() to
+   fail. */
+void unshareFilesystem();
 
 
 class ExecError : public Error
