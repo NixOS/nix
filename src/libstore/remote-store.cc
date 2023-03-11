@@ -684,6 +684,14 @@ void RemoteStore::queryRealisationUncached(const DrvOutput & id,
     Callback<std::shared_ptr<const Realisation>> callback) noexcept
 {
     auto conn(getConnection());
+
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 27) {
+        warn("the daemon is too old to support content-addressed derivations, please upgrade it to 2.4");
+        try {
+            callback(nullptr);
+        } catch (...) { return callback.rethrow(); }
+    }
+
     conn->to << wopQueryRealisation;
     conn->to << id.to_string();
     conn.processStderr();

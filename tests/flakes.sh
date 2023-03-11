@@ -722,6 +722,7 @@ cat > $flakeFollowsB/flake.nix <<EOF
     inputs = {
         foobar.url = "path:$flakeFollowsA/flakeE";
         nonFlake.url = "path:$nonFlakeDir";
+        goodoo.follows = "C/goodoo";
         C = {
             url = "path:./flakeC";
             inputs.foobar.follows = "foobar";
@@ -736,6 +737,7 @@ cat > $flakeFollowsC/flake.nix <<EOF
     description = "Flake C";
     inputs = {
         foobar.url = "path:$flakeFollowsA/flakeE";
+        goodoo.follows = "foobar";
     };
     outputs = { ... }: {};
 }
@@ -760,7 +762,17 @@ EOF
 git -C $flakeFollowsA add flake.nix flakeB/flake.nix \
   flakeB/flakeC/flake.nix flakeD/flake.nix flakeE/flake.nix
 
+nix flake update $flakeFollowsA
+
+oldLock="$(cat "$flakeFollowsA/flake.lock")"
+
+# Ensure that locking twice doesn't change anything
+
 nix flake lock $flakeFollowsA
+
+newLock="$(cat "$flakeFollowsA/flake.lock")"
+
+diff <(echo "$newLock") <(echo "$oldLock")
 
 [[ $(jq -c .nodes.B.inputs.C $flakeFollowsA/flake.lock) = '"C"' ]]
 [[ $(jq -c .nodes.B.inputs.foobar $flakeFollowsA/flake.lock) = '["D"]' ]]

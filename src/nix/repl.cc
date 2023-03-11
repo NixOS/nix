@@ -279,6 +279,7 @@ bool NixRepl::getLine(string & input, const std::string &prompt)
     };
 
     setupSignals();
+    Finally resetTerminal([&]() { rl_deprep_terminal(); });
     char * s = readline(prompt.c_str());
     Finally doFree([&]() { free(s); });
     restoreSignals();
@@ -356,6 +357,8 @@ StringSet NixRepl::completePrefix(string prefix)
             // Quietly ignore evaluation errors.
         } catch (UndefinedVarError & e) {
             // Quietly ignore undefined variable errors.
+        } catch (BadURL & e) {
+            // Quietly ignore BadURL flake-related errors.
         }
     }
 
@@ -427,7 +430,8 @@ bool NixRepl::processLine(string line)
              << "  :s <expr>     Build dependencies of derivation, then start nix-shell\n"
              << "  :t <expr>     Describe result of evaluation\n"
              << "  :u <expr>     Build derivation, then start nix-shell\n"
-             << "  :doc <expr>   Show documentation of a builtin function\n";
+             << "  :doc <expr>   Show documentation of a builtin function\n"
+             << "  :log <expr>   Show logs for a derivation\n";
     }
 
     else if (command == ":a" || command == ":add") {
@@ -497,7 +501,7 @@ bool NixRepl::processLine(string line)
         runNix("nix-shell", {state->store->printStorePath(drvPath)});
     }
 
-    else if (command == ":b" || command == ":i" || command == ":s") {
+    else if (command == ":b" || command == ":i" || command == ":s" || command == ":log") {
         Value v;
         evalString(arg, v);
         StorePath drvPath = getDerivationPath(v);
@@ -511,6 +515,27 @@ bool NixRepl::processLine(string line)
                 logger->cout("  %s -> %s", outputName, state->store->printStorePath(outputPath));
         } else if (command == ":i") {
             runNix("nix-env", {"-i", drvPathRaw});
+        } else if (command == ":log") {
+            settings.readOnlyMode = true;
+            Finally roModeReset([&]() {
+                settings.readOnlyMode = false;
+            });
+            auto subs = getDefaultSubstituters();
+
+            subs.push_front(state->store);
+
+            bool foundLog = false;
+            RunPager pager;
+            for (auto & sub : subs) {
+                auto log = sub->getBuildLog(drvPath);
+                if (log) {
+                    printInfo("got build log for '%s' from '%s'", drvPathRaw, sub->getUri());
+                    logger->writeToStdout(*log);
+                    foundLog = true;
+                    break;
+                }
+            }
+            if (!foundLog) throw Error("build log of '%s' is not available", drvPathRaw);
         } else {
             runNix("nix-shell", {drvPathRaw});
         }

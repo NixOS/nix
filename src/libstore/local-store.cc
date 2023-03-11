@@ -8,6 +8,7 @@
 #include "references.hh"
 #include "callback.hh"
 #include "topo-sort.hh"
+#include "finally.hh"
 
 #include <iostream>
 #include <algorithm>
@@ -1333,13 +1334,15 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
         auto want = std::min(chunkSize, settings.narBufferSize - oldSize);
         dump.resize(oldSize + want);
         auto got = 0;
+        Finally cleanup([&]() {
+            dump.resize(oldSize + got);
+        });
         try {
             got = source.read(dump.data() + oldSize, want);
         } catch (EndOfFile &) {
             inMemory = true;
             break;
         }
-        dump.resize(oldSize + got);
     }
 
     std::unique_ptr<AutoDelete> delTempDir;

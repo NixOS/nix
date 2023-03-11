@@ -2928,6 +2928,56 @@ static RegisterPrimOp primop_partition({
     .fun = prim_partition,
 });
 
+static void prim_groupBy(EvalState & state, const Pos & pos, Value * * args, Value & v)
+{
+    state.forceFunction(*args[0], pos);
+    state.forceList(*args[1], pos);
+
+    ValueVectorMap attrs;
+
+    for (auto vElem : args[1]->listItems()) {
+        Value res;
+        state.callFunction(*args[0], *vElem, res, pos);
+        string name = state.forceStringNoCtx(res, pos);
+        Symbol sym = state.symbols.create(name);
+        auto vector = attrs.try_emplace(sym, ValueVector()).first;
+        vector->second.push_back(vElem);
+    }
+
+    state.mkAttrs(v, attrs.size());
+
+    for (auto & i : attrs) {
+        Value * list = state.allocAttr(v, i.first);
+        auto size = i.second.size();
+        state.mkList(*list, size);
+        memcpy(list->listElems(), i.second.data(), sizeof(Value *) * size);
+    }
+}
+
+static RegisterPrimOp primop_groupBy({
+    .name = "__groupBy",
+    .args = {"f", "list"},
+    .doc = R"(
+      Groups elements of *list* together by the string returned from the
+      function *f* called on each element. It returns an attribute set
+      where each attribute value contains the elements of *list* that are
+      mapped to the same corresponding attribute name returned by *f*.
+
+      For example,
+
+      ```nix
+      builtins.groupBy (builtins.substring 0 1) ["foo" "bar" "baz"]
+      ```
+
+      evaluates to
+
+      ```nix
+      { b = [ "bar" "baz" ]; f = [ "foo" ]; }
+      ```
+    )",
+    .fun = prim_groupBy,
+});
+
 static void prim_concatMap(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     state.forceFunction(*args[0], pos);
@@ -3732,7 +3782,7 @@ void EvalState::createBaseEnv()
                 .fun = primOp.fun,
                 .arity = std::max(primOp.args.size(), primOp.arity),
                 .name = symbols.create(primOp.name),
-                .args = std::move(primOp.args),
+                .args = primOp.args,
                 .doc = primOp.doc,
             });
 

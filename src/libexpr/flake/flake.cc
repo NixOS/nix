@@ -482,11 +482,16 @@ LockedFlake lockFlake(
                             }
                         }
 
+                        LockParent newParent {
+                            .path = inputPath,
+                            .absolute = false
+                        };
+
                         computeLocks(
                             mustRefetch
                             ? getFlake(state, oldLock->lockedRef, false, flakeCache).inputs
                             : fakeInputs,
-                            childNode, inputPath, oldLock, parent, parentPath);
+                            childNode, inputPath, oldLock, newParent, parentPath);
 
                     } else {
                         /* We need to create a new lock file entry. So fetch

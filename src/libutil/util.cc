@@ -512,6 +512,7 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
     AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
     if (!fd)
         throw SysError("creating temporary file '%s'", tmpl);
+    closeOnExec(fd.get());
     return {std::move(fd), tmpl};
 }
 

@@ -359,6 +359,7 @@ static void main_nix_build(int argc, char * * argv)
            is not set, then build bashInteractive from
            <nixpkgs>. */
         auto shell = getEnv("NIX_BUILD_SHELL");
+        std::optional<StorePath> shellDrv;
 
         if (!shell) {
 
@@ -375,8 +376,7 @@ static void main_nix_build(int argc, char * * argv)
                 auto bashDrv = store->parseStorePath(drv->queryDrvPath());
                 pathsToBuild.push_back({bashDrv});
                 pathsToCopy.insert(bashDrv);
-
-                shell = drv->queryOutPath() + "/bin/bash";
+                shellDrv = bashDrv;
 
             } catch (Error & e) {
                 logError(e.info());
@@ -401,6 +401,11 @@ static void main_nix_build(int argc, char * * argv)
         buildPaths(pathsToBuild);
 
         if (dryRun) return;
+
+        if (shellDrv) {
+            auto shellDrvOutputs = store->queryPartialDerivationOutputMap(shellDrv.value());
+            shell = store->printStorePath(shellDrvOutputs.at("out").value()) + "/bin/bash";
+        }
 
         if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
             auto resolvedDrv = drv.tryResolve(*store);

@@ -48,7 +48,6 @@ nix_tests = \
   flakes.sh \
   flake-local-settings.sh \
   build.sh \
-  compute-levels.sh \
   repl.sh ca/repl.sh \
   ca/build.sh \
   ca/build-with-garbage-path.sh \
@@ -62,6 +61,10 @@ nix_tests = \
   ca/nix-copy.sh \
   eval-store.sh
   # parallel.sh
+
+ifeq ($(HAVE_LIBCPUID), 1)
+	nix_tests += compute-levels.sh
+endif
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
 

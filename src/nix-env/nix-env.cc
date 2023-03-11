@@ -224,6 +224,91 @@ static void checkSelectorUse(DrvNames & selectors)
 }
 
 
+namespace {
+
+std::set<std::string> searchByPrefix(const DrvInfos & allElems, std::string_view prefix) {
+    constexpr std::size_t maxResults = 3;
+    std::set<std::string> result;
+    for (const auto & drvInfo : allElems) {
+        const auto drvName = DrvName { drvInfo.queryName() };
+        if (hasPrefix(drvName.name, prefix)) {
+            result.emplace(drvName.name);
+
+            if (result.size() >= maxResults) {
+                break;
+            }
+        }
+    }
+    return result;
+}
+
+struct Match
+{
+    DrvInfo drvInfo;
+    std::size_t index;
+
+    Match(DrvInfo drvInfo_, std::size_t index_)
+    : drvInfo{std::move(drvInfo_)}
+    , index{index_}
+    {}
+};
+
+/* If a selector matches multiple derivations
+   with the same name, pick the one matching the current
+   system.  If there are still multiple derivations, pick the
+   one with the highest priority.  If there are still multiple
+   derivations, pick the one with the highest version.
+   Finally, if there are still multiple derivations,
+   arbitrarily pick the first one. */
+std::vector<Match> pickNewestOnly(EvalState & state, std::vector<Match> matches) {
+    /* Map from package names to derivations. */
+    std::map<std::string, Match> newest;
+    StringSet multiple;
+
+    for (auto & match : matches) {
+        auto & oneDrv = match.drvInfo;
+
+        const auto drvName = DrvName { oneDrv.queryName() };
+        long comparison = 1;
+
+        const auto itOther = newest.find(drvName.name);
+
+        if (itOther != newest.end()) {
+            auto & newestDrv = itOther->second.drvInfo;
+
+            comparison =
+                oneDrv.querySystem() == newestDrv.querySystem() ? 0 :
+                oneDrv.querySystem() == settings.thisSystem ? 1 :
+                newestDrv.querySystem() == settings.thisSystem ? -1 : 0;
+            if (comparison == 0)
+                comparison = comparePriorities(state, oneDrv, newestDrv);
+            if (comparison == 0)
+                comparison = compareVersions(drvName.version, DrvName { newestDrv.queryName() }.version);
+        }
+
+        if (comparison > 0) {
+            newest.erase(drvName.name);
+            newest.emplace(drvName.name, match);
+            multiple.erase(drvName.fullName);
+        } else if (comparison == 0) {
+            multiple.insert(drvName.fullName);
+        }
+    }
+
+    matches.clear();
+    for (auto & [name, match] : newest) {
+        if (multiple.find(name) != multiple.end())
+            warn(
+                "there are multiple derivations named '%1%'; using the first one",
+                name);
+        matches.push_back(match);
+    }
+
+    return matches;
+}
+
+} // end namespace
+
 static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
     const Strings & args, bool newestOnly)
 {
@@ -232,79 +317,42 @@ static DrvInfos filterBySelector(EvalState & state, const DrvInfos & allElems,
         selectors.emplace_back("*");
 
     DrvInfos elems;
-    set<unsigned int> done;
+    std::set<std::size_t> done;
 
-    for (auto & i : selectors) {
-        typedef list<std::pair<DrvInfo, unsigned int> > Matches;
-        Matches matches;
-        unsigned int n = 0;
-        for (DrvInfos::const_iterator j = allElems.begin();
-             j != allElems.end(); ++j, ++n)
-        {
-            DrvName drvName(j->queryName());
-            if (i.matches(drvName)) {
-                i.hits++;
-                matches.push_back(std::pair<DrvInfo, unsigned int>(*j, n));
+    for (auto & selector : selectors) {
+        std::vector<Match> matches;
+        for (const auto & [index, drvInfo] : enumerate(allElems)) {
+            const auto drvName = DrvName { drvInfo.queryName() };
+            if (selector.matches(drvName)) {
+                ++selector.hits;
+                matches.emplace_back(drvInfo, index);
             }
         }
 
-        /* If `newestOnly', if a selector matches multiple derivations
-           with the same name, pick the one matching the current
-           system.  If there are still multiple derivations, pick the
-           one with the highest priority.  If there are still multiple
-           derivations, pick the one with the highest version.
-           Finally, if there are still multiple derivations,
-           arbitrarily pick the first one. */
         if (newestOnly) {
-
-            /* Map from package names to derivations. */
-            typedef map<string, std::pair<DrvInfo, unsigned int> > Newest;
-            Newest newest;
-            StringSet multiple;
-
-            for (auto & j : matches) {
-                DrvName drvName(j.first.queryName());
-                long d = 1;
-
-                Newest::iterator k = newest.find(drvName.name);
-
-                if (k != newest.end()) {
-                    d = j.first.querySystem() == k->second.first.querySystem() ? 0 :
-                        j.first.querySystem() == settings.thisSystem ? 1 :
-                        k->second.first.querySystem() == settings.thisSystem ? -1 : 0;
-                    if (d == 0)
-                        d = comparePriorities(state, j.first, k->second.first);
-                    if (d == 0)
-                        d = compareVersions(drvName.version, DrvName(k->second.first.queryName()).version);
-                }
-
-                if (d > 0) {
-                    newest.erase(drvName.name);
-                    newest.insert(Newest::value_type(drvName.name, j));
-                    multiple.erase(j.first.queryName());
-                } else if (d == 0) {
-                    multiple.insert(j.first.queryName());
-                }
-            }
-
-            matches.clear();
-            for (auto & j : newest) {
-                if (multiple.find(j.second.first.queryName()) != multiple.end())
-                    printInfo(
-                        "warning: there are multiple derivations named '%1%'; using the first one",
-                        j.second.first.queryName());
-                matches.push_back(j.second);
-            }
+            matches = pickNewestOnly(state, std::move(matches));
         }
 
         /* Insert only those elements in the final list that we
            haven't inserted before. */
-        for (auto & j : matches)
-            if (done.insert(j.second).second)
-                elems.push_back(j.first);
-    }
+        for (auto & match : matches)
+            if (done.insert(match.index).second)
+                elems.push_back(match.drvInfo);
 
-    checkSelectorUse(selectors);
+        if (selector.hits == 0 && selector.fullName != "*") {
+            const auto prefixHits = searchByPrefix(allElems, selector.name);
+            
+            if (prefixHits.empty()) {
+                throw Error("selector '%1%' matches no derivations", selector.fullName);    
+            } else {
+                std::string suggestionMessage = ", maybe you meant:";
+                for (const auto & drvName : prefixHits) {
+                    suggestionMessage += fmt("\n%s", drvName);
+                }
+                throw Error("selector '%1%' matches no derivations" + suggestionMessage, selector.fullName);
+            }
+        }
+    }
 
     return elems;
 }

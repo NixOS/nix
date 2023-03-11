@@ -44,6 +44,11 @@
     obtained from the its repository
     <https://github.com/troglobit/editline>.
 
+  - The `libsodium` library for verifying cryptographic signatures
+    of contents fetched from binary caches.
+    It can be obtained from the official web site
+    <https://libsodium.org>.
+
   - Recent versions of Bison and Flex to build the parser. (This is
     because Nix needs GLR support in Bison and reentrancy support in
     Flex.) For Bison, you need version 2.6, which can be obtained from
@@ -58,3 +63,11 @@
     `--disable-seccomp-sandboxing` option to the `configure` script (Not
     recommended unless your system doesn't support `libseccomp`). To get
     the library, visit <https://github.com/seccomp/libseccomp>.
+
+  - On 64-bit x86 machines only, `libcpuid` library
+    is used to determine which microarchitecture levels are supported
+    (e.g., as whether to have `x86_64-v2-linux` among additional system types).
+    The library is available from its homepage
+    <http://libcpuid.sourceforge.net>.
+    This is an optional dependency and can be disabled
+    by providing a `--disable-cpuid` to the `configure` script.

@@ -20,7 +20,7 @@ ProgressBarSettings progressBarSettings;
 
 static GlobalConfig::Register rProgressBarSettings(&progressBarSettings);
 
-static std::string getS(const std::vector<Logger::Field> & fields, size_t n)
+static std::string_view getS(const std::vector<Logger::Field> & fields, size_t n)
 {
     assert(n < fields.size());
     assert(fields[n].type == Logger::Field::tString);
