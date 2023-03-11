@@ -359,8 +359,6 @@ void mainWrapped(int argc, char * * argv)
 
     setLogFormat(LogFormat::bar);
 
-    Finally f([] { logger->stop(); });
-
     if (!args.command)
         throw UsageError("no subcommand specified");
 

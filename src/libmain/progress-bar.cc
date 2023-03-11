@@ -586,16 +586,16 @@ public:
         }
 
         else if (type == resExpectBuild)
-            actInfo.buildsRemaining.insert(getS(fields, 0));
+            actInfo.buildsRemaining.insert(std::string { getS(fields, 0) });
 
         else if (type == resUnexpectBuild)
-            actInfo.buildsRemaining.erase(getS(fields, 0));
+            actInfo.buildsRemaining.erase(std::string { getS(fields, 0) });
 
         else if (type == resExpectSubstitution)
-            actInfo.substitutionsRemaining.insert(getS(fields, 0));
+            actInfo.substitutionsRemaining.insert(std::string { getS(fields, 0) });
 
         else if (type == resUnexpectSubstitution)
-            actInfo.substitutionsRemaining.erase(getS(fields, 0));
+            actInfo.substitutionsRemaining.erase(std::string { getS(fields, 0) });
     }
 
     void update(State & state)
@@ -815,7 +815,7 @@ public:
         s += "\r\e[K";
 
         if (msg) {
-            s += replaceStrings(*msg, "\n", "\r\n");
+            s += replaceStrings(std::string { *msg }, "\n", "\r\n");
             s += ANSI_NORMAL "\e[K\n\r";
         }
 
