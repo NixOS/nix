@@ -1225,13 +1225,14 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
     // corresponds to an allowed derivation
     { throw Error("registerDrvOutput"); }
 
-    std::optional<const Realisation> queryRealisation(const DrvOutput & id) override
+    void queryRealisationUncached(const DrvOutput & id,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept override
     // XXX: This should probably be allowed if the realisation corresponds to
     // an allowed derivation
     {
         if (!goal.isAllowed(id))
-            throw InvalidPath("cannot query an unknown output id '%s' in recursive Nix", id.to_string());
-        return next->queryRealisation(id);
+            callback(nullptr);
+        next->queryRealisation(id, std::move(callback));
     }
 
     void buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override

@@ -985,8 +985,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
             }
 
             if (i->name == state.sContentAddressed) {
-                settings.requireExperimentalFeature(Xp::CaDerivations);
                 contentAddressed = state.forceBool(*i->value, pos);
+                if (contentAddressed)
+                    settings.requireExperimentalFeature(Xp::CaDerivations);
             }
 
             /* The `args' attribute is special: it supplies the

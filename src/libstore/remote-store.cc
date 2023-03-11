@@ -677,23 +677,33 @@ void RemoteStore::registerDrvOutput(const Realisation & info)
     conn.processStderr();
 }
 
-std::optional<const Realisation> RemoteStore::queryRealisation(const DrvOutput & id)
+void RemoteStore::queryRealisationUncached(const DrvOutput & id,
+    Callback<std::shared_ptr<const Realisation>> callback) noexcept
 {
     auto conn(getConnection());
     conn->to << wopQueryRealisation;
     conn->to << id.to_string();
     conn.processStderr();
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 31) {
-        auto outPaths = worker_proto::read(*this, conn->from, Phantom<std::set<StorePath>>{});
-        if (outPaths.empty())
-            return std::nullopt;
-        return {Realisation{.id = id, .outPath = *outPaths.begin()}};
-    } else {
-        auto realisations = worker_proto::read(*this, conn->from, Phantom<std::set<Realisation>>{});
-        if (realisations.empty())
-            return std::nullopt;
-        return *realisations.begin();
-    }
+
+    auto real = [&]() -> std::shared_ptr<const Realisation> {
+        if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 31) {
+            auto outPaths = worker_proto::read(
+                *this, conn->from, Phantom<std::set<StorePath>> {});
+            if (outPaths.empty())
+                return nullptr;
+            return std::make_shared<const Realisation>(Realisation { .id = id, .outPath = *outPaths.begin() });
+        } else {
+            auto realisations = worker_proto::read(
+                *this, conn->from, Phantom<std::set<Realisation>> {});
+            if (realisations.empty())
+                return nullptr;
+            return std::make_shared<const Realisation>(*realisations.begin());
+        }
+    }();
+
+    try {
+        callback(std::shared_ptr<const Realisation>(real));
+    } catch (...) { return callback.rethrow(); }
 }
 
 static void writeDerivedPaths(RemoteStore & store, ConnectionHandle & conn, const std::vector<DerivedPath> & reqs)

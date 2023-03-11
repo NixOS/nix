@@ -207,7 +207,8 @@ public:
 
     std::optional<const Realisation> queryRealisation_(State & state, const DrvOutput & id);
     std::optional<std::pair<int64_t, Realisation>> queryRealisationCore_(State & state, const DrvOutput & id);
-    std::optional<const Realisation> queryRealisation(const DrvOutput&) override;
+    void queryRealisationUncached(const DrvOutput&,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
 private:
 

@@ -369,6 +369,14 @@ public:
     void queryPathInfo(const StorePath & path,
         Callback<ref<const ValidPathInfo>> callback) noexcept;
 
+    /* Query the information about a realisation. */
+    std::shared_ptr<const Realisation> queryRealisation(const DrvOutput &);
+
+    /* Asynchronous version of queryRealisation(). */
+    void queryRealisation(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept;
+
+
     /* Check whether the given valid path info is sufficiently attested, by
        either being signed by a trusted public key or content-addressed, in
        order to be included in the given store.
@@ -393,10 +401,10 @@ protected:
 
     virtual void queryPathInfoUncached(const StorePath & path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept = 0;
+    virtual void queryRealisationUncached(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept = 0;
 
 public:
-
-    virtual std::optional<const Realisation> queryRealisation(const DrvOutput &) = 0;
 
     /* Queries the set of incoming FS references for a store path.
        The result is not cleared. */

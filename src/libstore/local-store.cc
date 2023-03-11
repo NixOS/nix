@@ -1838,13 +1838,24 @@ std::optional<const Realisation> LocalStore::queryRealisation_(
     return { res };
 }
 
-std::optional<const Realisation>
-LocalStore::queryRealisation(const DrvOutput & id)
+void LocalStore::queryRealisationUncached(const DrvOutput & id,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept
 {
-    return retrySQLite<std::optional<const Realisation>>([&]() {
-        auto state(_state.lock());
-        return queryRealisation_(*state, id);
-    });
+    try {
+        auto maybeRealisation
+            = retrySQLite<std::optional<const Realisation>>([&]() {
+                  auto state(_state.lock());
+                  return queryRealisation_(*state, id);
+              });
+        if (maybeRealisation)
+            callback(
+                std::make_shared<const Realisation>(maybeRealisation.value()));
+        else
+            callback(nullptr);
+
+    } catch (...) {
+        callback.rethrow();
+    }
 }
 
 FixedOutputHash LocalStore::hashCAPath(
