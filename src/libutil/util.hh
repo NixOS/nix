@@ -149,10 +149,14 @@ std::vector<Path> getConfigDirs();
 /* Return $XDG_DATA_HOME or $HOME/.local/share. */
 Path getDataDir();
 
+/* Return the path of the current executable. */
+std::optional<Path> getSelfExe();
+
 /* Create a directory and all its parents, if necessary.  Returns the
    list of created directories, in order of creation. */
 Paths createDirs(const Path & path);
-inline Paths createDirs(PathView path) {
+inline Paths createDirs(PathView path)
+{
     return createDirs(Path(path));
 }
 
@@ -178,6 +182,9 @@ std::string drainFD(int fd, bool block = true, const size_t reserveSize=0);
 
 void drainFD(int fd, Sink & sink, bool block = true);
 
+/* If cgroups are active, attempt to calculate the number of CPUs available.
+   If cgroups are unavailable or if cpu.max is set to "max", return 0. */
+unsigned int getMaxCPU();
 
 /* Automatic cleanup of resources. */
 
@@ -699,5 +706,20 @@ template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 std::string showBytes(uint64_t bytes);
 
+
+/* Provide an addition operator between strings and string_views
+   inexplicably omitted from the standard library. */
+inline std::string operator + (const std::string & s1, std::string_view s2)
+{
+    auto s = s1;
+    s.append(s2);
+    return s;
+}
+
+inline std::string operator + (std::string && s, std::string_view s2)
+{
+    s.append(s2);
+    return std::move(s);
+}
 
 }

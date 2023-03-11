@@ -5,6 +5,8 @@ export NIX_REMOTE=dummy://
 
 nix-instantiate --eval -E 'builtins.trace "Hello" 123' 2>&1 | grep -q Hello
 nix-instantiate --eval -E 'builtins.addErrorContext "Hello" 123' 2>&1
+nix-instantiate --trace-verbose --eval -E 'builtins.traceVerbose "Hello" 123' 2>&1 | grep -q Hello
+(! nix-instantiate --eval -E 'builtins.traceVerbose "Hello" 123' 2>&1 | grep -q Hello)
 (! nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" 123' 2>&1 | grep -q Hello)
 nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" (throw "Foo")' 2>&1 | grep -q Hello
 

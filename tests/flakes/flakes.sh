@@ -1,67 +1,30 @@
-source common.sh
+source ./common.sh
 
-if [[ -z $(type -p git) ]]; then
-    echo "Git not installed; skipping flake tests"
-    exit 99
-fi
+requireGit
 
 clearStore
 rm -rf $TEST_HOME/.cache $TEST_HOME/.config
-
-registry=$TEST_ROOT/registry.json
 
 flake1Dir=$TEST_ROOT/flake1
 flake2Dir=$TEST_ROOT/flake2
 flake3Dir=$TEST_ROOT/flake3
 flake5Dir=$TEST_ROOT/flake5
-flake6Dir=$TEST_ROOT/flake6
 flake7Dir=$TEST_ROOT/flake7
-templatesDir=$TEST_ROOT/templates
 nonFlakeDir=$TEST_ROOT/nonFlake
 badFlakeDir=$TEST_ROOT/badFlake
-flakeA=$TEST_ROOT/flakeA
-flakeB=$TEST_ROOT/flakeB
 flakeGitBare=$TEST_ROOT/flakeGitBare
-flakeFollowsA=$TEST_ROOT/follows/flakeA
-flakeFollowsB=$TEST_ROOT/follows/flakeA/flakeB
-flakeFollowsC=$TEST_ROOT/follows/flakeA/flakeB/flakeC
-flakeFollowsD=$TEST_ROOT/follows/flakeA/flakeD
-flakeFollowsE=$TEST_ROOT/follows/flakeA/flakeE
 
-for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $templatesDir $nonFlakeDir $flakeA $flakeB $flakeFollowsA; do
-    rm -rf $repo $repo.tmp
-    mkdir -p $repo
-
-    # Give one repo a non-master initial branch.
+for repo in $flake1Dir $flake2Dir $flake3Dir $flake7Dir $nonFlakeDir; do
+    # Give one repo a non-main initial branch.
     extraArgs=
     if [[ $repo == $flake2Dir ]]; then
       extraArgs="--initial-branch=main"
     fi
 
-    git -C $repo init $extraArgs
-    git -C $repo config user.email "foobar@example.com"
-    git -C $repo config user.name "Foobar"
+    createGitRepo "$repo" "$extraArgs"
 done
 
-cat > $flake1Dir/flake.nix <<EOF
-{
-  description = "Bla bla";
-
-  outputs = inputs: rec {
-    packages.$system = rec {
-      foo = import ./simple.nix;
-      default = foo;
-    };
-
-    # To test "nix flake init".
-    legacyPackages.x86_64-linux.hello = import ./simple.nix;
-  };
-}
-EOF
-
-cp ./simple.nix ./simple.builder.sh ./config.nix $flake1Dir/
-git -C $flake1Dir add flake.nix simple.nix simple.builder.sh config.nix
-git -C $flake1Dir commit -m 'Initial'
+createSimpleGitFlake $flake1Dir
 
 cat > $flake2Dir/flake.nix <<EOF
 {
@@ -105,12 +68,10 @@ nix registry add --registry $registry flake1 git+file://$flake1Dir
 nix registry add --registry $registry flake2 git+file://$flake2Dir
 nix registry add --registry $registry flake3 git+file://$flake3Dir
 nix registry add --registry $registry flake4 flake3
-nix registry add --registry $registry flake5 hg+file://$flake5Dir
 nix registry add --registry $registry nixpkgs flake1
-nix registry add --registry $registry templates git+file://$templatesDir
 
 # Test 'nix flake list'.
-[[ $(nix registry list | wc -l) == 7 ]]
+[[ $(nix registry list | wc -l) == 5 ]]
 
 # Test 'nix flake metadata'.
 nix flake metadata flake1
@@ -163,6 +124,7 @@ nix build -o $TEST_ROOT/result --expr "(builtins.getFlake \"git+file://$flake1Di
 # But should succeed in impure mode.
 (! nix build -o $TEST_ROOT/result flake2#bar --impure)
 nix build -o $TEST_ROOT/result flake2#bar --impure --no-write-lock-file
+nix eval --expr "builtins.getFlake \"$flake2Dir\"" --impure
 
 # Building a local flake with an unlocked dependency should fail with --no-update-lock-file.
 nix build -o $TEST_ROOT/result $flake2Dir#bar --no-update-lock-file 2>&1 | grep 'requires lock file changes'
@@ -172,11 +134,11 @@ nix build -o $TEST_ROOT/result $flake2Dir#bar --no-write-lock-file
 nix build -o $TEST_ROOT/result $flake2Dir#bar --no-update-lock-file 2>&1 | grep 'requires lock file changes'
 nix build -o $TEST_ROOT/result $flake2Dir#bar --commit-lock-file
 [[ -e $flake2Dir/flake.lock ]]
-[[ -z $(git -C $flake2Dir diff master) ]]
+[[ -z $(git -C $flake2Dir diff main || echo failed) ]]
 
 # Rerunning the build should not change the lockfile.
 nix build -o $TEST_ROOT/result $flake2Dir#bar
-[[ -z $(git -C $flake2Dir diff master) ]]
+[[ -z $(git -C $flake2Dir diff main || echo failed) ]]
 
 # Building with a lockfile should not require a fetch of the registry.
 nix build -o $TEST_ROOT/result --flake-registry file:///no-registry.json $flake2Dir#bar --refresh
@@ -185,7 +147,7 @@ nix build -o $TEST_ROOT/result --no-use-registries $flake2Dir#bar --refresh
 
 # Updating the flake should not change the lockfile.
 nix flake lock $flake2Dir
-[[ -z $(git -C $flake2Dir diff master) ]]
+[[ -z $(git -C $flake2Dir diff main || echo failed) ]]
 
 # Now we should be able to build the flake in pure mode.
 nix build -o $TEST_ROOT/result flake2#bar
@@ -220,7 +182,7 @@ nix build -o $TEST_ROOT/result $flake3Dir#"sth sth"
 nix build -o $TEST_ROOT/result $flake3Dir#"sth%20sth"
 
 # Check whether it saved the lockfile
-(! [[ -z $(git -C $flake3Dir diff master) ]])
+[[ -n $(git -C $flake3Dir diff master) ]]
 
 git -C $flake3Dir add flake.lock
 
@@ -290,7 +252,7 @@ cat > $flake3Dir/flake.nix <<EOF
 }
 EOF
 
-cp ./config.nix $flake3Dir
+cp ../config.nix $flake3Dir
 
 git -C $flake3Dir add flake.nix config.nix
 git -C $flake3Dir commit -m 'Add nonFlakeInputs'
@@ -320,10 +282,10 @@ nix build -o $TEST_ROOT/result flake4#xyzzy
 
 # Test 'nix flake update' and --override-flake.
 nix flake lock $flake3Dir
-[[ -z $(git -C $flake3Dir diff master) ]]
+[[ -z $(git -C $flake3Dir diff master || echo failed) ]]
 
 nix flake update $flake3Dir --override-flake flake2 nixpkgs
-[[ ! -z $(git -C $flake3Dir diff master) ]]
+[[ ! -z $(git -C $flake3Dir diff master || echo failed) ]]
 
 # Make branch "removeXyzzy" where flake3 doesn't have xyzzy anymore
 git -C $flake3Dir checkout -b removeXyzzy
@@ -365,160 +327,18 @@ nix build -o $TEST_ROOT/result flake4/removeXyzzy#sth
 
 # Testing the nix CLI
 nix registry add flake1 flake3
-[[ $(nix registry list | wc -l) == 8 ]]
+[[ $(nix registry list | wc -l) == 6 ]]
 nix registry pin flake1
-[[ $(nix registry list | wc -l) == 8 ]]
+[[ $(nix registry list | wc -l) == 6 ]]
 nix registry pin flake1 flake3
-[[ $(nix registry list | wc -l) == 8 ]]
+[[ $(nix registry list | wc -l) == 6 ]]
 nix registry remove flake1
-[[ $(nix registry list | wc -l) == 7 ]]
-
-# Test 'nix flake init'.
-cat > $templatesDir/flake.nix <<EOF
-{
-  description = "Some templates";
-
-  outputs = { self }: {
-    templates = rec {
-      trivial = {
-        path = ./trivial;
-        description = "A trivial flake";
-        welcomeText = ''
-            Welcome to my trivial flake
-        '';
-      };
-      default = trivial;
-    };
-  };
-}
-EOF
-
-mkdir $templatesDir/trivial
-
-cat > $templatesDir/trivial/flake.nix <<EOF
-{
-  description = "A flake for building Hello World";
-
-  outputs = { self, nixpkgs }: {
-    packages.x86_64-linux = rec {
-      hello = nixpkgs.legacyPackages.x86_64-linux.hello;
-      default = hello;
-    };
-  };
-}
-EOF
-
-git -C $templatesDir add flake.nix trivial/flake.nix
-git -C $templatesDir commit -m 'Initial'
-
-nix flake check templates
-nix flake show templates
-nix flake show templates --json | jq
-
-(cd $flake7Dir && nix flake init)
-(cd $flake7Dir && nix flake init) # check idempotence
-git -C $flake7Dir add flake.nix
-nix flake check $flake7Dir
-nix flake show $flake7Dir
-nix flake show $flake7Dir --json | jq
-git -C $flake7Dir commit -a -m 'Initial'
-
-# Test 'nix flake new'.
-rm -rf $flake6Dir
-nix flake new -t templates#trivial $flake6Dir
-nix flake new -t templates#trivial $flake6Dir # check idempotence
-nix flake check $flake6Dir
+[[ $(nix registry list | wc -l) == 5 ]]
 
 # Test 'nix flake clone'.
 rm -rf $TEST_ROOT/flake1-v2
 nix flake clone flake1 --dest $TEST_ROOT/flake1-v2
 [ -e $TEST_ROOT/flake1-v2/flake.nix ]
-
-# More 'nix flake check' tests.
-cat > $flake3Dir/flake.nix <<EOF
-{
-  outputs = { flake1, self }: {
-    overlay = final: prev: {
-    };
-  };
-}
-EOF
-
-nix flake check $flake3Dir
-
-cat > $flake3Dir/flake.nix <<EOF
-{
-  outputs = { flake1, self }: {
-    overlay = finalll: prev: {
-    };
-  };
-}
-EOF
-
-(! nix flake check $flake3Dir)
-
-cat > $flake3Dir/flake.nix <<EOF
-{
-  outputs = { flake1, self }: {
-    nixosModules.foo = {
-      a.b.c = 123;
-      foo = true;
-    };
-  };
-}
-EOF
-
-nix flake check $flake3Dir
-
-cat > $flake3Dir/flake.nix <<EOF
-{
-  outputs = { flake1, self }: {
-    nixosModules.foo = {
-      a.b.c = 123;
-      foo = assert false; true;
-    };
-  };
-}
-EOF
-
-(! nix flake check $flake3Dir)
-
-cat > $flake3Dir/flake.nix <<EOF
-{
-  outputs = { flake1, self }: {
-    nixosModule = { config, pkgs, ... }: {
-      a.b.c = 123;
-    };
-  };
-}
-EOF
-
-nix flake check $flake3Dir
-
-cat > $flake3Dir/flake.nix <<EOF
-{
-  outputs = { flake1, self }: {
-    nixosModule = { config, pkgs }: {
-      a.b.c = 123;
-    };
-  };
-}
-EOF
-
-(! nix flake check $flake3Dir)
-
-cat > $flake3Dir/flake.nix <<EOF
-{
-  outputs = { flake1, self }: {
-    packages.system-1.default = "foo";
-    packages.system-2.default = "bar";
-  };
-}
-EOF
-
-checkRes=$(nix flake check --keep-going $flake3Dir 2>&1 && fail "nix flake check should have failed" || true)
-echo "$checkRes" | grep -q "packages.system-1.default"
-echo "$checkRes" | grep -q "packages.system-2.default"
 
 # Test 'follows' inputs.
 cat > $flake3Dir/flake.nix <<EOF
@@ -562,6 +382,10 @@ nix flake lock $flake3Dir
 [[ $(jq -c .nodes.root.inputs.bar $flake3Dir/flake.lock) = '["flake2"]' ]]
 
 # Test overriding inputs of inputs.
+writeTrivialFlake $flake7Dir
+git -C $flake7Dir add flake.nix
+git -C $flake7Dir commit -m 'Initial'
+
 cat > $flake3Dir/flake.nix <<EOF
 {
   inputs.flake2.inputs.flake1 = {
@@ -596,50 +420,9 @@ rm -rf $flakeGitBare
 git clone --bare $flake1Dir $flakeGitBare
 nix build -o $TEST_ROOT/result git+file://$flakeGitBare
 
-# Test Mercurial flakes.
-rm -rf $flake5Dir
-mkdir $flake5Dir
-
-cat > $flake5Dir/flake.nix <<EOF
-{
-  outputs = { self, flake1 }: {
-    packages.$system.default = flake1.packages.$system.default;
-    expr = assert builtins.pathExists ./flake.lock; 123;
-  };
-}
-EOF
-
-if [[ -n $(type -p hg) ]]; then
-    hg init $flake5Dir
-
-    hg add $flake5Dir/flake.nix
-    hg commit --config ui.username=foobar@example.org $flake5Dir -m 'Initial commit'
-
-    nix build -o $TEST_ROOT/result hg+file://$flake5Dir
-    [[ -e $TEST_ROOT/result/hello ]]
-
-    (! nix flake metadata --json hg+file://$flake5Dir | jq -e -r .revision)
-
-    nix eval hg+file://$flake5Dir#expr
-
-    nix eval hg+file://$flake5Dir#expr
-
-    (! nix eval hg+file://$flake5Dir#expr --no-allow-dirty)
-
-    (! nix flake metadata --json hg+file://$flake5Dir | jq -e -r .revision)
-
-    hg commit --config ui.username=foobar@example.org $flake5Dir -m 'Add lock file'
-
-    nix flake metadata --json hg+file://$flake5Dir --refresh | jq -e -r .revision
-    nix flake metadata --json hg+file://$flake5Dir
-    [[ $(nix flake metadata --json hg+file://$flake5Dir | jq -e -r .revCount) = 1 ]]
-
-    nix build -o $TEST_ROOT/result hg+file://$flake5Dir --no-registries --no-allow-dirty
-    nix build -o $TEST_ROOT/result hg+file://$flake5Dir --no-use-registries --no-allow-dirty
-fi
-
 # Test path flakes.
-rm -rf $flake5Dir/.hg $flake5Dir/flake.lock
+mkdir -p $flake5Dir
+writeDependentFlake $flake5Dir
 nix flake lock path://$flake5Dir
 
 # Test tarball flakes.
@@ -676,165 +459,6 @@ nix flake lock $flake3Dir --update-input flake2/flake1
 
 # Test 'nix flake metadata --json'.
 nix flake metadata $flake3Dir --json | jq .
-
-# Test circular flake dependencies.
-cat > $flakeA/flake.nix <<EOF
-{
-  inputs.b.url = git+file://$flakeB;
-  inputs.b.inputs.a.follows = "/";
-
-  outputs = { self, nixpkgs, b }: {
-    foo = 123 + b.bar;
-    xyzzy = 1000;
-  };
-}
-EOF
-
-git -C $flakeA add flake.nix
-
-cat > $flakeB/flake.nix <<EOF
-{
-  inputs.a.url = git+file://$flakeA;
-
-  outputs = { self, nixpkgs, a }: {
-    bar = 456 + a.xyzzy;
-  };
-}
-EOF
-
-git -C $flakeB add flake.nix
-git -C $flakeB commit -a -m 'Foo'
-
-[[ $(nix eval $flakeA#foo) = 1579 ]]
-[[ $(nix eval $flakeA#foo) = 1579 ]]
-
-sed -i $flakeB/flake.nix -e 's/456/789/'
-git -C $flakeB commit -a -m 'Foo'
-
-[[ $(nix eval --update-input b $flakeA#foo) = 1912 ]]
-
-# Test list-inputs with circular dependencies
-nix flake metadata $flakeA
-
-# Test flake follow paths
-mkdir -p $flakeFollowsB
-mkdir -p $flakeFollowsC
-mkdir -p $flakeFollowsD
-mkdir -p $flakeFollowsE
-
-cat > $flakeFollowsA/flake.nix <<EOF
-{
-    description = "Flake A";
-    inputs = {
-        B = {
-            url = "path:./flakeB";
-            inputs.foobar.follows = "foobar";
-        };
-
-        foobar.url = "path:$flakeFollowsA/flakeE";
-    };
-    outputs = { ... }: {};
-}
-EOF
-
-cat > $flakeFollowsB/flake.nix <<EOF
-{
-    description = "Flake B";
-    inputs = {
-        foobar.url = "path:$flakeFollowsA/flakeE";
-        goodoo.follows = "C/goodoo";
-        C = {
-            url = "path:./flakeC";
-            inputs.foobar.follows = "foobar";
-        };
-    };
-    outputs = { ... }: {};
-}
-EOF
-
-cat > $flakeFollowsC/flake.nix <<EOF
-{
-    description = "Flake C";
-    inputs = {
-        foobar.url = "path:$flakeFollowsA/flakeE";
-        goodoo.follows = "foobar";
-    };
-    outputs = { ... }: {};
-}
-EOF
-
-cat > $flakeFollowsD/flake.nix <<EOF
-{
-    description = "Flake D";
-    inputs = {};
-    outputs = { ... }: {};
-}
-EOF
-
-cat > $flakeFollowsE/flake.nix <<EOF
-{
-    description = "Flake E";
-    inputs = {};
-    outputs = { ... }: {};
-}
-EOF
-
-git -C $flakeFollowsA add flake.nix flakeB/flake.nix \
-  flakeB/flakeC/flake.nix flakeD/flake.nix flakeE/flake.nix
-
-nix flake metadata $flakeFollowsA
-
-nix flake update $flakeFollowsA
-
-oldLock="$(cat "$flakeFollowsA/flake.lock")"
-
-# Ensure that locking twice doesn't change anything
-
-nix flake lock $flakeFollowsA
-
-newLock="$(cat "$flakeFollowsA/flake.lock")"
-
-diff <(echo "$newLock") <(echo "$oldLock")
-
-[[ $(jq -c .nodes.B.inputs.C $flakeFollowsA/flake.lock) = '"C"' ]]
-[[ $(jq -c .nodes.B.inputs.foobar $flakeFollowsA/flake.lock) = '["foobar"]' ]]
-[[ $(jq -c .nodes.C.inputs.foobar $flakeFollowsA/flake.lock) = '["B","foobar"]' ]]
-
-# Ensure removing follows from flake.nix removes them from the lockfile
-
-cat > $flakeFollowsA/flake.nix <<EOF
-{
-    description = "Flake A";
-    inputs = {
-        B = {
-            url = "path:./flakeB";
-            inputs.nonFlake.follows = "D";
-        };
-        D.url = "path:./flakeD";
-    };
-    outputs = { ... }: {};
-}
-EOF
-
-nix flake lock $flakeFollowsA
-
-[[ $(jq -c .nodes.B.inputs.foobar $flakeFollowsA/flake.lock) = '"foobar"' ]]
-jq -r -c '.nodes | keys | .[]' $flakeFollowsA/flake.lock | grep "^foobar$"
-
-# Ensure a relative path is not allowed to go outside the store path
-cat > $flakeFollowsA/flake.nix <<EOF
-{
-    description = "Flake A";
-    inputs = {
-        B.url = "path:../flakeB";
-    };
-    outputs = { ... }: {};
-}
-EOF
-
-git -C $flakeFollowsA add flake.nix
-
-nix flake lock $flakeFollowsA 2>&1 | grep 'points outside'
 
 # Test flake in store does not evaluate
 rm -rf $badFlakeDir

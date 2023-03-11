@@ -29,11 +29,15 @@
 
 #ifdef __APPLE__
 #include <sys/syscall.h>
+#include <mach-o/dyld.h>
 #endif
 
 #ifdef __linux__
 #include <sys/prctl.h>
 #include <sys/resource.h>
+
+#include <mntent.h>
+#include <cmath>
 #endif
 
 
@@ -574,6 +578,20 @@ Path getHome()
     static Path homeDir = []()
     {
         auto homeDir = getEnv("HOME");
+        if (homeDir) {
+            // Only use $HOME if doesn't exist or is owned by the current user.
+            struct stat st;
+            int result = stat(homeDir->c_str(), &st);
+            if (result != 0) {
+                if (errno != ENOENT) {
+                    warn("couldn't stat $HOME ('%s') for reason other than not existing ('%d'), falling back to the one defined in the 'passwd' file", *homeDir, errno);
+                    homeDir.reset();
+                }
+            } else if (st.st_uid != geteuid()) {
+                warn("$HOME ('%s') is not owned by you, falling back to the one defined in the 'passwd' file", *homeDir);
+                homeDir.reset();
+            }
+        }
         if (!homeDir) {
             std::vector<char> buf(16384);
             struct passwd pwbuf;
@@ -616,6 +634,27 @@ Path getDataDir()
 {
     auto dataDir = getEnv("XDG_DATA_HOME");
     return dataDir ? *dataDir : getHome() + "/.local/share";
+}
+
+
+std::optional<Path> getSelfExe()
+{
+    static auto cached = []() -> std::optional<Path>
+    {
+        #if __linux__
+        return readLink("/proc/self/exe");
+        #elif __APPLE__
+        char buf[1024];
+        uint32_t size = sizeof(buf);
+        if (_NSGetExecutablePath(buf, &size) == 0)
+            return buf;
+        else
+            return std::nullopt;
+        #else
+        return std::nullopt;
+        #endif
+    }();
+    return cached;
 }
 
 
@@ -752,7 +791,55 @@ void drainFD(int fd, Sink & sink, bool block)
     }
 }
 
+//////////////////////////////////////////////////////////////////////
 
+unsigned int getMaxCPU()
+{
+    #if __linux__
+    try {
+        FILE *fp = fopen("/proc/mounts", "r");
+        if (!fp)
+            return 0;
+
+        Strings cgPathParts;
+
+        struct mntent *ent;
+        while ((ent = getmntent(fp))) {
+            std::string mountType, mountPath;
+
+            mountType = ent->mnt_type;
+            mountPath = ent->mnt_dir;
+
+            if (mountType == "cgroup2") {
+                cgPathParts.push_back(mountPath);
+                break;
+            }
+        }
+
+        fclose(fp);
+
+        if (cgPathParts.size() > 0 && pathExists("/proc/self/cgroup")) {
+            std::string currentCgroup = readFile("/proc/self/cgroup");
+            Strings cgValues = tokenizeString<Strings>(currentCgroup, ":");
+            cgPathParts.push_back(trim(cgValues.back(), "\n"));
+            cgPathParts.push_back("cpu.max");
+            std::string fullCgPath = canonPath(concatStringsSep("/", cgPathParts));
+
+            if (pathExists(fullCgPath)) {
+                std::string cpuMax = readFile(fullCgPath);
+                std::vector<std::string> cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " ");
+                std::string quota = cpuMaxParts[0];
+                std::string period = trim(cpuMaxParts[1], "\n");
+
+                if (quota != "max")
+                    return std::ceil(std::stoi(quota) / std::stof(period));
+            }
+        }
+    } catch (Error &) { ignoreException(); }
+    #endif
+
+    return 0;
+}
 
 //////////////////////////////////////////////////////////////////////
 
@@ -1818,7 +1905,7 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
     if (chmod(path.c_str(), mode) == -1)
         throw SysError("changing permissions on '%1%'", path);
 
-    if (listen(fdSocket.get(), 5) == -1)
+    if (listen(fdSocket.get(), 100) == -1)
         throw SysError("cannot listen on socket '%1%'", path);
 
     return fdSocket;

@@ -4,7 +4,7 @@
 #include "store-api.hh"
 #include "types.hh"
 #include "url-parts.hh"
-#include "git-utils.hh"
+#include "git.hh"
 #include "fetchers.hh"
 #include "fetch-settings.hh"
 
@@ -243,7 +243,10 @@ struct GitHubInputScheme : GitArchiveInputScheme
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
-        auto url = fmt("https://api.%s/repos/%s/%s/commits/%s", // FIXME: check
+        auto url = fmt(
+            host == "github.com"
+            ? "https://api.%s/repos/%s/%s/commits/%s"
+            : "https://%s/api/v3/repos/%s/%s/commits/%s",
             host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
 
         Headers headers = makeHeadersWithAuthTokens(host);
@@ -262,7 +265,10 @@ struct GitHubInputScheme : GitArchiveInputScheme
         // FIXME: use regular /archive URLs instead? api.github.com
         // might have stricter rate limits.
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("github.com");
-        auto url = fmt("https://api.%s/repos/%s/%s/tarball/%s", // FIXME: check if this is correct for self hosted instances
+        auto url = fmt(
+            host == "github.com"
+            ? "https://api.%s/repos/%s/%s/tarball/%s"
+            : "https://%s/api/v3/repos/%s/%s/tarball/%s",
             host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
             input.getRev()->to_string(Base16, false));
 
@@ -375,7 +381,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
 
         Headers headers = makeHeadersWithAuthTokens(host);
 
-        std::string ref_uri;
+        std::string refUri;
         if (ref == "HEAD") {
             auto file = store->toRealPath(
                 downloadFile(store, fmt("%s/HEAD", base_url), "source", false, headers).storePath);
@@ -383,14 +389,15 @@ struct SourceHutInputScheme : GitArchiveInputScheme
             std::string line;
             getline(is, line);
 
-            auto r = parseListReferenceHeadRef(line);
-            if (!r) {
+            auto remoteLine = git::parseLsRemoteLine(line);
+            if (!remoteLine) {
                 throw BadURL("in '%d', couldn't resolve HEAD ref '%d'", input.to_string(), ref);
             }
-            ref_uri = *r;
+            refUri = remoteLine->target;
         } else {
-            ref_uri = fmt("refs/(heads|tags)/%s", ref);
+            refUri = fmt("refs/(heads|tags)/%s", ref);
         }
+        std::regex refRegex(refUri);
 
         auto file = store->toRealPath(
             downloadFile(store, fmt("%s/info/refs", base_url), "source", false, headers).storePath);
@@ -399,7 +406,9 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         std::string line;
         std::optional<std::string> id;
         while(!id && getline(is, line)) {
-            id = parseListReferenceForRev(ref_uri, line);
+            auto parsedLine = git::parseLsRemoteLine(line);
+            if (parsedLine && parsedLine->reference && std::regex_match(*parsedLine->reference, refRegex))
+                id = parsedLine->target;
         }
 
         if(!id)

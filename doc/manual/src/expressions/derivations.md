@@ -4,7 +4,7 @@ The most important built-in function is `derivation`, which is used to
 describe a single derivation (a build action). It takes as input a set,
 the attributes of which specify the inputs of the build.
 
-  - There must be an attribute named `system` whose value must be a
+  - There must be an attribute named [`system`]{#attr-system} whose value must be a
     string specifying a Nix system type, such as `"i686-linux"` or
     `"x86_64-darwin"`. (To figure out your system type, run `nix -vv
     --version`.) The build can only be performed on a machine and

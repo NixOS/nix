@@ -18,6 +18,7 @@
 #include <sys/resource.h>
 #include <iostream>
 #include <fstream>
+#include <functional>
 
 #include <sys/resource.h>
 
@@ -35,7 +36,6 @@
 #endif
 
 namespace nix {
-
 
 static char * allocString(size_t size)
 {
@@ -147,7 +147,10 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
         else {
             str << "[ ";
             for (auto v2 : listItems()) {
-                v2->print(symbols, str, seen);
+                if (v2)
+                    v2->print(symbols, str, seen);
+                else
+                    str << "(nullptr)";
                 str << " ";
             }
             str << "]";
@@ -184,6 +187,11 @@ void Value::print(const SymbolTable & symbols, std::ostream & str, bool showRepe
     print(symbols, str, showRepeated ? nullptr : &seen);
 }
 
+// Pretty print types for assertion errors
+std::ostream & operator << (std::ostream & os, const ValueType t) {
+    os << showType(t);
+    return os;
+}
 
 std::string printValue(const EvalState & state, const Value & v)
 {
@@ -451,10 +459,15 @@ EvalState::EvalState(
     , sKey(symbols.create("key"))
     , sPath(symbols.create("path"))
     , sPrefix(symbols.create("prefix"))
+    , sOutputSpecified(symbols.create("outputSpecified"))
     , repair(NoRepair)
     , emptyBindings(0)
     , store(store)
     , buildStore(buildStore ? buildStore : store)
+    , debugRepl(nullptr)
+    , debugStop(false)
+    , debugQuit(false)
+    , trylevel(0)
     , regexCache(makeRegexCache())
 #if HAVE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
@@ -464,7 +477,7 @@ EvalState::EvalState(
     , env1AllocCache(std::make_shared<void *>(nullptr))
 #endif
     , baseEnv(allocEnv(128))
-    , staticBaseEnv(false, 0)
+    , staticBaseEnv{std::make_shared<StaticEnv>(false, nullptr)}
 {
     countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
@@ -522,7 +535,7 @@ void EvalState::allowPath(const StorePath & storePath)
         allowedPaths->insert(store->toRealPath(storePath));
 }
 
-void EvalState::allowAndSetStorePathString(const StorePath &storePath, Value & v)
+void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & v)
 {
     allowPath(storePath);
 
@@ -630,7 +643,7 @@ Value * EvalState::addConstant(const std::string & name, Value & v)
 
 void EvalState::addConstant(const std::string & name, Value * v)
 {
-    staticBaseEnv.vars.emplace_back(symbols.create(name), baseEnvDispl);
+    staticBaseEnv->vars.emplace_back(symbols.create(name), baseEnvDispl);
     baseEnv.values[baseEnvDispl++] = v;
     auto name2 = name.substr(0, 2) == "__" ? name.substr(2) : name;
     baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v));
@@ -655,7 +668,7 @@ Value * EvalState::addPrimOp(const std::string & name,
 
     Value * v = allocValue();
     v->mkPrimOp(new PrimOp { .fun = primOp, .arity = arity, .name = name2 });
-    staticBaseEnv.vars.emplace_back(symbols.create(name), baseEnvDispl);
+    staticBaseEnv->vars.emplace_back(symbols.create(name), baseEnvDispl);
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(sym, v));
     return v;
@@ -681,7 +694,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
 
     Value * v = allocValue();
     v->mkPrimOp(new PrimOp(primOp));
-    staticBaseEnv.vars.emplace_back(envName, baseEnvDispl);
+    staticBaseEnv->vars.emplace_back(envName, baseEnvDispl);
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(symbols.create(primOp.name), v));
     return v;
@@ -711,128 +724,291 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 }
 
 
+// just for the current level of StaticEnv, not the whole chain.
+void printStaticEnvBindings(const SymbolTable & st, const StaticEnv & se)
+{
+    std::cout << ANSI_MAGENTA;
+    for (auto & i : se.vars)
+        std::cout << st[i.first] << " ";
+    std::cout << ANSI_NORMAL;
+    std::cout << std::endl;
+}
+
+// just for the current level of Env, not the whole chain.
+void printWithBindings(const SymbolTable & st, const Env & env)
+{
+    if (env.type == Env::HasWithAttrs) {
+        std::cout << "with: ";
+        std::cout << ANSI_MAGENTA;
+        Bindings::iterator j = env.values[0]->attrs->begin();
+        while (j != env.values[0]->attrs->end()) {
+            std::cout << st[j->name] << " ";
+            ++j;
+        }
+        std::cout << ANSI_NORMAL;
+        std::cout << std::endl;
+    }
+}
+
+void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, int lvl)
+{
+    std::cout << "Env level " << lvl << std::endl;
+
+    if (se.up && env.up) {
+        std::cout << "static: ";
+        printStaticEnvBindings(st, se);
+        printWithBindings(st, env);
+        std::cout << std::endl;
+        printEnvBindings(st, *se.up, *env.up, ++lvl);
+    } else {
+        std::cout << ANSI_MAGENTA;
+        // for the top level, don't print the double underscore ones;
+        // they are in builtins.
+        for (auto & i : se.vars)
+            if (!hasPrefix(st[i.first], "__"))
+                std::cout << st[i.first] << " ";
+        std::cout << ANSI_NORMAL;
+        std::cout << std::endl;
+        printWithBindings(st, env);  // probably nothing there for the top level.
+        std::cout << std::endl;
+
+    }
+}
+
+void printEnvBindings(const EvalState &es, const Expr & expr, const Env & env)
+{
+    // just print the names for now
+    auto se = es.getStaticEnv(expr);
+    if (se)
+        printEnvBindings(es.symbols, *se, env, 0);
+}
+
+void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, ValMap & vm)
+{
+    // add bindings for the next level up first, so that the bindings for this level
+    // override the higher levels.
+    // The top level bindings (builtins) are skipped since they are added for us by initEnv()
+    if (env.up && se.up) {
+        mapStaticEnvBindings(st, *se.up, *env.up, vm);
+
+        if (env.type == Env::HasWithAttrs) {
+            // add 'with' bindings.
+            Bindings::iterator j = env.values[0]->attrs->begin();
+            while (j != env.values[0]->attrs->end()) {
+                vm[st[j->name]] = j->value;
+                ++j;
+            }
+        } else {
+            // iterate through staticenv bindings and add them.
+            for (auto & i : se.vars)
+                vm[st[i.first]] = env.values[i.second];
+        }
+    }
+}
+
+std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env)
+{
+    auto vm = std::make_unique<ValMap>();
+    mapStaticEnvBindings(st, se, env, *vm);
+    return vm;
+}
+
+void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & expr)
+{
+    // double check we've got the debugRepl function pointer.
+    if (!debugRepl)
+        return;
+
+    auto dts =
+        error && expr.getPos()
+        ? std::make_unique<DebugTraceStacker>(
+            *this,
+            DebugTrace {
+                .pos = error->info().errPos ? *error->info().errPos : positions[expr.getPos()],
+                .expr = expr,
+                .env = env,
+                .hint = error->info().msg,
+                .isError = true
+            })
+        : nullptr;
+
+    if (error)
+    {
+        printError("%s\n\n", error->what());
+
+        if (trylevel > 0 && error->info().level != lvlInfo)
+            printError("This exception occurred in a 'tryEval' call. Use " ANSI_GREEN "--ignore-try" ANSI_NORMAL " to skip these.\n");
+
+        printError(ANSI_BOLD "Starting REPL to allow you to inspect the current state of the evaluator.\n" ANSI_NORMAL);
+    }
+
+    auto se = getStaticEnv(expr);
+    if (se) {
+        auto vm = mapStaticEnvBindings(symbols, *se.get(), env);
+        (debugRepl)(ref<EvalState>(shared_from_this()), *vm);
+    }
+}
+
 /* Every "format" object (even temporary) takes up a few hundred bytes
    of stack space, which is a real killer in the recursive
    evaluator.  So here are some helper functions for throwing
    exceptions. */
-
-void EvalState::throwEvalError(const PosIdx pos, const char * s) const
+void EvalState::throwEvalError(const PosIdx pos, const char * s, Env & env, Expr & expr)
 {
-    throw EvalError({
+    debugThrow(EvalError({
         .msg = hintfmt(s),
         .errPos = positions[pos]
-    });
+    }), env, expr);
 }
 
-void EvalState::throwTypeError(const PosIdx pos, const char * s, const Value & v) const
+void EvalState::throwEvalError(const PosIdx pos, const char * s)
 {
-    throw TypeError({
-        .msg = hintfmt(s, showType(v)),
+    debugThrowLastTrace(EvalError({
+        .msg = hintfmt(s),
         .errPos = positions[pos]
-    });
+    }));
 }
 
-void EvalState::throwEvalError(const char * s, const std::string & s2) const
+void EvalState::throwEvalError(const char * s, const std::string & s2)
 {
-    throw EvalError(s, s2);
+    debugThrowLastTrace(EvalError(s, s2));
 }
 
 void EvalState::throwEvalError(const PosIdx pos, const Suggestions & suggestions, const char * s,
-    const std::string & s2) const
+    const std::string & s2, Env & env, Expr & expr)
 {
-    throw EvalError(ErrorInfo {
+    debugThrow(EvalError(ErrorInfo{
         .msg = hintfmt(s, s2),
         .errPos = positions[pos],
         .suggestions = suggestions,
-    });
+    }), env, expr);
 }
 
-void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2) const
+void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2)
 {
-    throw EvalError(ErrorInfo {
+    debugThrowLastTrace(EvalError({
         .msg = hintfmt(s, s2),
         .errPos = positions[pos]
-    });
+    }));
 }
 
-void EvalState::throwEvalError(const char * s, const std::string & s2, const std::string & s3) const
+void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2, Env & env, Expr & expr)
 {
-    throw EvalError(s, s2, s3);
+    debugThrow(EvalError({
+        .msg = hintfmt(s, s2),
+        .errPos = positions[pos]
+    }), env, expr);
+}
+
+void EvalState::throwEvalError(const char * s, const std::string & s2,
+    const std::string & s3)
+{
+    debugThrowLastTrace(EvalError({
+        .msg = hintfmt(s, s2),
+        .errPos = positions[noPos]
+    }));
 }
 
 void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2,
-    const std::string & s3) const
+    const std::string & s3)
 {
-    throw EvalError({
-        .msg = hintfmt(s, s2, s3),
+    debugThrowLastTrace(EvalError({
+        .msg = hintfmt(s, s2),
         .errPos = positions[pos]
-    });
+    }));
 }
 
-void EvalState::throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2) const
+void EvalState::throwEvalError(const PosIdx pos, const char * s, const std::string & s2,
+    const std::string & s3, Env & env, Expr & expr)
+{
+    debugThrow(EvalError({
+        .msg = hintfmt(s, s2),
+        .errPos = positions[pos]
+    }), env, expr);
+}
+
+void EvalState::throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2, Env & env, Expr & expr)
 {
     // p1 is where the error occurred; p2 is a position mentioned in the message.
-    throw EvalError({
+    debugThrow(EvalError({
         .msg = hintfmt(s, symbols[sym], positions[p2]),
         .errPos = positions[p1]
-    });
+    }), env, expr);
 }
 
-void EvalState::throwTypeError(const PosIdx pos, const char * s) const
+void EvalState::throwTypeError(const PosIdx pos, const char * s, const Value & v)
 {
-    throw TypeError({
+    debugThrowLastTrace(TypeError({
+        .msg = hintfmt(s, showType(v)),
+        .errPos = positions[pos]
+    }));
+}
+
+void EvalState::throwTypeError(const PosIdx pos, const char * s, const Value & v, Env & env, Expr & expr)
+{
+    debugThrow(TypeError({
+        .msg = hintfmt(s, showType(v)),
+        .errPos = positions[pos]
+    }), env, expr);
+}
+
+void EvalState::throwTypeError(const PosIdx pos, const char * s)
+{
+    debugThrowLastTrace(TypeError({
         .msg = hintfmt(s),
         .errPos = positions[pos]
-    });
+    }));
 }
 
 void EvalState::throwTypeError(const PosIdx pos, const char * s, const ExprLambda & fun,
-    const Symbol s2) const
+    const Symbol s2, Env & env, Expr &expr)
 {
-    throw TypeError({
+    debugThrow(TypeError({
         .msg = hintfmt(s, fun.showNamePos(*this), symbols[s2]),
         .errPos = positions[pos]
-    });
+    }), env, expr);
 }
 
 void EvalState::throwTypeError(const PosIdx pos, const Suggestions & suggestions, const char * s,
-    const ExprLambda & fun, const Symbol s2) const
+    const ExprLambda & fun, const Symbol s2, Env & env, Expr &expr)
 {
-    throw TypeError(ErrorInfo {
+    debugThrow(TypeError(ErrorInfo {
         .msg = hintfmt(s, fun.showNamePos(*this), symbols[s2]),
         .errPos = positions[pos],
         .suggestions = suggestions,
-    });
+    }), env, expr);
 }
 
-
-void EvalState::throwTypeError(const char * s, const Value & v) const
+void EvalState::throwTypeError(const char * s, const Value & v, Env & env, Expr &expr)
 {
-    throw TypeError(s, showType(v));
+    debugThrow(TypeError({
+        .msg = hintfmt(s, showType(v)),
+        .errPos = positions[expr.getPos()],
+    }), env, expr);
 }
 
-void EvalState::throwAssertionError(const PosIdx pos, const char * s, const std::string & s1) const
+void EvalState::throwAssertionError(const PosIdx pos, const char * s, const std::string & s1, Env & env, Expr &expr)
 {
-    throw AssertionError({
+    debugThrow(AssertionError({
         .msg = hintfmt(s, s1),
         .errPos = positions[pos]
-    });
+    }), env, expr);
 }
 
-void EvalState::throwUndefinedVarError(const PosIdx pos, const char * s, const std::string & s1) const
+void EvalState::throwUndefinedVarError(const PosIdx pos, const char * s, const std::string & s1, Env & env, Expr &expr)
 {
-    throw UndefinedVarError({
+    debugThrow(UndefinedVarError({
         .msg = hintfmt(s, s1),
         .errPos = positions[pos]
-    });
+    }), env, expr);
 }
 
-void EvalState::throwMissingArgumentError(const PosIdx pos, const char * s, const std::string & s1) const
+void EvalState::throwMissingArgumentError(const PosIdx pos, const char * s, const std::string & s1, Env & env, Expr &expr)
 {
-    throw MissingArgumentError({
+    debugThrow(MissingArgumentError({
         .msg = hintfmt(s, s1),
         .errPos = positions[pos]
-    });
+    }), env, expr);
 }
 
 void EvalState::addErrorTrace(Error & e, const char * s, const std::string & s2) const
@@ -845,6 +1021,32 @@ void EvalState::addErrorTrace(Error & e, const PosIdx pos, const char * s, const
     e.addTrace(positions[pos], s, s2);
 }
 
+static std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(
+    EvalState & state,
+    Expr & expr,
+    Env & env,
+    std::optional<ErrPos> pos,
+    const char * s,
+    const std::string & s2)
+{
+    return std::make_unique<DebugTraceStacker>(state,
+        DebugTrace {
+            .pos = pos,
+            .expr = expr,
+            .env = env,
+            .hint = hintfmt(s, s2),
+            .isError = false
+        });
+}
+
+DebugTraceStacker::DebugTraceStacker(EvalState & evalState, DebugTrace t)
+    : evalState(evalState)
+    , trace(std::move(t))
+{
+    evalState.debugTraces.push_front(trace);
+    if (evalState.debugStop && evalState.debugRepl)
+        evalState.runDebugRepl(nullptr, trace.env, trace.expr);
+}
 
 void Value::mkString(std::string_view s)
 {
@@ -903,11 +1105,10 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             return j->value;
         }
         if (!env->prevWith)
-            throwUndefinedVarError(var.pos, "undefined variable '%1%'", symbols[var.name]);
+            throwUndefinedVarError(var.pos, "undefined variable '%1%'", symbols[var.name], *env, const_cast<ExprVar&>(var));
         for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
 }
-
 
 void EvalState::mkList(Value & v, size_t size)
 {
@@ -1041,6 +1242,15 @@ void EvalState::cacheFile(
     fileParseCache[resolvedPath] = e;
 
     try {
+        auto dts = debugRepl
+            ? makeDebugTraceStacker(
+                *this,
+                *e,
+                this->baseEnv,
+                e->getPos() ? std::optional(ErrPos(positions[e->getPos()])) : std::nullopt,
+                "while evaluating the file '%1%':", resolvedPath)
+            : nullptr;
+
         // Enforce that 'flake.nix' is a direct attrset, not a
         // computation.
         if (mustBeTrivial &&
@@ -1068,7 +1278,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e)
     Value v;
     e->eval(*this, env, v);
     if (v.type() != nBool)
-        throwTypeError("value is %1% while a Boolean was expected", v);
+        throwTypeError(noPos, "value is %1% while a Boolean was expected", v, env, *e);
     return v.boolean;
 }
 
@@ -1078,7 +1288,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const PosIdx pos)
     Value v;
     e->eval(*this, env, v);
     if (v.type() != nBool)
-        throwTypeError(pos, "value is %1% while a Boolean was expected", v);
+        throwTypeError(pos, "value is %1% while a Boolean was expected", v, env, *e);
     return v.boolean;
 }
 
@@ -1087,7 +1297,7 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v)
 {
     e->eval(*this, env, v);
     if (v.type() != nAttrs)
-        throwTypeError("value is %1% while a set was expected", v);
+        throwTypeError(noPos, "value is %1% while a set was expected", v, env, *e);
 }
 
 
@@ -1192,7 +1402,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         auto nameSym = state.symbols.create(nameVal.string.s);
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
-            state.throwEvalError(i.pos, "dynamic attribute '%1%' already defined at %2%", nameSym, j->pos);
+            state.throwEvalError(i.pos, "dynamic attribute '%1%' already defined at %2%", nameSym, j->pos, env, *this);
 
         i.valueExpr->setName(nameSym);
         /* Keep sorted order so find can catch duplicates */
@@ -1266,6 +1476,15 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     e->eval(state, env, vTmp);
 
     try {
+        auto dts = state.debugRepl
+            ? makeDebugTraceStacker(
+                state,
+                *this,
+                env,
+                state.positions[pos2],
+                "while evaluating the attribute '%1%'",
+                showAttrPath(state, env, attrPath))
+            : nullptr;
 
         for (auto & i : attrPath) {
             state.nrLookups++;
@@ -1288,7 +1507,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                     state.throwEvalError(
                         pos,
                         Suggestions::bestMatches(allAttrNames, state.symbols[name]),
-                        "attribute '%1%' missing", state.symbols[name]);
+                        "attribute '%1%' missing", state.symbols[name], env, *this);
                 }
             }
             vAttrs = j->value;
@@ -1379,7 +1598,6 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
             if (!lambda.hasFormals())
                 env2.values[displ++] = args[0];
-
             else {
                 forceAttrs(*args[0], pos);
 
@@ -1394,7 +1612,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     auto j = args[0]->attrs->get(i.name);
                     if (!j) {
                         if (!i.def) throwTypeError(pos, "%1% called without required argument '%2%'",
-                            lambda, i.name);
+                            lambda, i.name, *fun.lambda.env, lambda);
                         env2.values[displ++] = i.def->maybeThunk(*this, env2);
                     } else {
                         attrsUsed++;
@@ -1416,8 +1634,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                                 pos,
                                 Suggestions::bestMatches(formalNames, symbols[i.name]),
                                 "%1% called with unexpected argument '%2%'",
-                                lambda,
-                                i.name);
+                                lambda, i.name, *fun.lambda.env, lambda);
                         }
                     abort(); // can't happen
                 }
@@ -1428,6 +1645,15 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
 
             /* Evaluate the body. */
             try {
+                auto dts = debugRepl
+                    ? makeDebugTraceStacker(
+                        *this, *lambda.body, env2, positions[lambda.pos],
+                        "while evaluating %s",
+                        lambda.name
+                        ? concatStrings("'", symbols[lambda.name], "'")
+                        : "anonymous lambda")
+                    : nullptr;
+
                 lambda.body->eval(*this, env2, vCur);
             } catch (Error & e) {
                 if (loggerSettings.showTrace.get()) {
@@ -1582,8 +1808,8 @@ void EvalState::autoCallFunction(Bindings & args, Value & fun, Value & res)
 Nix attempted to evaluate a function as a top level expression; in
 this case it must have its arguments supplied either by default
 values, or passed explicitly with '--arg' or '--argstr'. See
-https://nixos.org/manual/nix/stable/#ss-functions.)", symbols[i.name]);
-
+https://nixos.org/manual/nix/stable/expressions/language-constructs.html#functions.)", symbols[i.name],                 
+                *fun.lambda.env, *fun.lambda.fun);
             }
         }
     }
@@ -1615,7 +1841,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
     if (!state.evalBool(env, cond, pos)) {
         std::ostringstream out;
         cond->show(state.symbols, out);
-        state.throwAssertionError(pos, "assertion '%1%' failed", out.str());
+        state.throwAssertionError(pos, "assertion '%1%' failed", out.str(), env, *this);
     }
     body->eval(state, env, v);
 }
@@ -1792,14 +2018,14 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 nf = n;
                 nf += vTmp.fpoint;
             } else
-                state.throwEvalError(i_pos, "cannot add %1% to an integer", showType(vTmp));
+                state.throwEvalError(i_pos, "cannot add %1% to an integer", showType(vTmp), env, *this);
         } else if (firstType == nFloat) {
             if (vTmp.type() == nInt) {
                 nf += vTmp.integer;
             } else if (vTmp.type() == nFloat) {
                 nf += vTmp.fpoint;
             } else
-                state.throwEvalError(i_pos, "cannot add %1% to a float", showType(vTmp));
+                state.throwEvalError(i_pos, "cannot add %1% to a float", showType(vTmp), env, *this);
         } else {
             if (s.empty()) s.reserve(es->size());
             /* skip canonization of first path, which would only be not
@@ -1819,7 +2045,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         v.mkFloat(nf);
     else if (firstType == nPath) {
         if (!context.empty())
-            state.throwEvalError(pos, "a string that refers to a store path cannot be appended to a path");
+            state.throwEvalError(pos, "a string that refers to a store path cannot be appended to a path", env, *this);
         v.mkPath(canonPath(str()));
     } else
         v.mkStringMove(c_str(), context);
@@ -1846,6 +2072,12 @@ void EvalState::forceValueDeep(Value & v)
         if (v.type() == nAttrs) {
             for (auto & i : *v.attrs)
                 try {
+                    // If the value is a thunk, we're evaling. Otherwise no trace necessary.
+                    auto dts = debugRepl && i.value->isThunk()
+                        ? makeDebugTraceStacker(*this, *i.value->thunk.expr, *i.value->thunk.env, positions[i.pos],
+                            "while evaluating the attribute '%1%'", symbols[i.name])
+                        : nullptr;
+
                     recurse(*i.value);
                 } catch (Error & e) {
                     addErrorTrace(e, i.pos, "while evaluating the attribute '%1%'", symbols[i.name]);
@@ -1868,6 +2100,7 @@ NixInt EvalState::forceInt(Value & v, const PosIdx pos)
     forceValue(v, pos);
     if (v.type() != nInt)
         throwTypeError(pos, "value is %1% while an integer was expected", v);
+
     return v.integer;
 }
 
@@ -1910,10 +2143,7 @@ std::string_view EvalState::forceString(Value & v, const PosIdx pos)
 {
     forceValue(v, pos);
     if (v.type() != nString) {
-        if (pos)
-            throwTypeError(pos, "value is %1% while a string was expected", v);
-        else
-            throwTypeError("value is %1% while a string was expected", v);
+        throwTypeError(pos, "value is %1% while a string was expected", v);
     }
     return v.string.s;
 }
@@ -2030,7 +2260,8 @@ BackedStringView EvalState::coerceToString(const PosIdx pos, Value & v, PathSet 
         if (maybeString)
             return std::move(*maybeString);
         auto i = v.attrs->find(sOutPath);
-        if (i == v.attrs->end()) throwTypeError(pos, "cannot coerce a set to a string");
+        if (i == v.attrs->end())
+            throwTypeError(pos, "cannot coerce a set to a string");
         return coerceToString(pos, *i->value, context, coerceMore, copyToStore);
     }
 
@@ -2038,7 +2269,6 @@ BackedStringView EvalState::coerceToString(const PosIdx pos, Value & v, PathSet 
         return v.external->coerceToString(positions[pos], context, coerceMore, copyToStore);
 
     if (coerceMore) {
-
         /* Note that `false' is represented as an empty string for
            shell scripting convenience, just like `null'. */
         if (v.type() == nBool && v.boolean) return "1";
@@ -2183,7 +2413,9 @@ bool EvalState::eqValues(Value & v1, Value & v2)
             return v1.fpoint == v2.fpoint;
 
         default:
-            throwEvalError("cannot compare %1% with %2%", showType(v1), showType(v2));
+            throwEvalError("cannot compare %1% with %2%",
+                showType(v1),
+                showType(v2));
     }
 }
 

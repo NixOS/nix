@@ -8,6 +8,7 @@ makefiles = \
   src/libfetchers/local.mk \
   src/libmain/local.mk \
   src/libexpr/local.mk \
+  src/libexpr/tests/local.mk \
   src/libcmd/local.mk \
   src/nix/local.mk \
   src/resolve-system-dependencies/local.mk \
@@ -27,7 +28,8 @@ makefiles = \
 OPTIMIZE = 1
 
 ifeq ($(OPTIMIZE), 1)
-  GLOBAL_CXXFLAGS += -O3
+  GLOBAL_CXXFLAGS += -O3 $(CXXLTO)
+  GLOBAL_LDFLAGS += $(CXXLTO)
 else
   GLOBAL_CXXFLAGS += -O0 -U_FORTIFY_SOURCE
 endif

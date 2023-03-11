@@ -132,6 +132,8 @@ struct Installable
         const std::vector<std::shared_ptr<Installable>> & installables);
 };
 
+typedef std::vector<std::shared_ptr<Installable>> Installables;
+
 struct InstallableValue : Installable
 {
     ref<EvalState> state;
@@ -142,6 +144,7 @@ struct InstallableValue : Installable
     {
         StorePath drvPath;
         std::set<std::string> outputsToInstall;
+        std::optional<NixInt> priority;
     };
 
     virtual std::vector<DerivationInfo> toDerivations() = 0;

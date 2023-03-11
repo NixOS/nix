@@ -1093,9 +1093,7 @@ static int main_nix_store(int argc, char * * argv)
         if (op != opDump && op != opRestore) /* !!! hack */
             store = openStore();
 
-        op(opFlags, opArgs);
-
-        logger->stop();
+        op(std::move(opFlags), std::move(opArgs));
 
         return 0;
     }

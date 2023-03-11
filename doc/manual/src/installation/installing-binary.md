@@ -186,7 +186,8 @@ and `/etc/zshrc` which you may remove.
 > read-only root will prevent you from manually deleting the empty `/nix`
 > mountpoint.
 
-# macOS Installation <a name="sect-macos-installation-change-store-prefix"></a><a name="sect-macos-installation-encrypted-volume"></a><a name="sect-macos-installation-symlink"></a><a name="sect-macos-installation-recommended-notes"></a>
+# macOS Installation
+[]{#sect-macos-installation-change-store-prefix}[]{#sect-macos-installation-encrypted-volume}[]{#sect-macos-installation-symlink}[]{#sect-macos-installation-recommended-notes}
 <!-- Note: anchors above to catch permalinks to old explanations -->
 
 We believe we have ironed out how to cleanly support the read-only root

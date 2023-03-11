@@ -23,17 +23,6 @@
 
 namespace nix {
 
-void completeFlakeInputPath(
-    ref<EvalState> evalState,
-    const FlakeRef & flakeRef,
-    std::string_view prefix)
-{
-    auto flake = flake::getFlake(*evalState, flakeRef, true);
-    for (auto & input : flake.inputs)
-        if (hasPrefix(input.first, prefix))
-            completions->add(input.first);
-}
-
 MixFlakeOptions::MixFlakeOptions()
 {
     auto category = "Common flake-related options";
@@ -86,8 +75,7 @@ MixFlakeOptions::MixFlakeOptions()
             lockFlags.inputUpdates.insert(flake::parseInputPath(s));
         }},
         .completer = {[&](size_t, std::string_view prefix) {
-            if (auto flakeRef = getFlakeRefForCompletion())
-                completeFlakeInputPath(getEvalState(), *flakeRef, prefix);
+            needsFlakeInputCompletion = {std::string(prefix)};
         }}
     });
 
@@ -103,12 +91,10 @@ MixFlakeOptions::MixFlakeOptions()
                 parseFlakeRef(flakeRef, absPath("."), true));
         }},
         .completer = {[&](size_t n, std::string_view prefix) {
-            if (n == 0) {
-                if (auto flakeRef = getFlakeRefForCompletion())
-                    completeFlakeInputPath(getEvalState(), *flakeRef, prefix);
-            } else if (n == 1) {
+            if (n == 0)
+                needsFlakeInputCompletion = {std::string(prefix)};
+            else if (n == 1)
                 completeFlakeRef(getEvalState()->store, prefix);
-            }
         }}
     });
 
@@ -139,6 +125,24 @@ MixFlakeOptions::MixFlakeOptions()
     });
 }
 
+void MixFlakeOptions::completeFlakeInput(std::string_view prefix)
+{
+    auto evalState = getEvalState();
+    for (auto & flakeRefS : getFlakesForCompletion()) {
+        auto flakeRef = parseFlakeRefWithFragment(expandTilde(flakeRefS), absPath(".")).first;
+        auto flake = flake::getFlake(*evalState, flakeRef, true);
+        for (auto & input : flake.inputs)
+            if (hasPrefix(input.first, prefix))
+                completions->add(input.first);
+    }
+}
+
+void MixFlakeOptions::completionHook()
+{
+    if (auto & prefix = needsFlakeInputCompletion)
+        completeFlakeInput(*prefix);
+}
+
 SourceExprCommand::SourceExprCommand(bool supportReadOnlyMode)
 {
     addFlag({
@@ -146,7 +150,8 @@ SourceExprCommand::SourceExprCommand(bool supportReadOnlyMode)
         .shortName = 'f',
         .description =
             "Interpret installables as attribute paths relative to the Nix expression stored in *file*. "
-            "If *file* is the character -, then a Nix expression will be read from standard input.",
+            "If *file* is the character -, then a Nix expression will be read from standard input. "
+            "Implies `--impure`.",
         .category = installablesCategory,
         .labels = {"file"},
         .handler = {&file},
@@ -623,11 +628,22 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
     auto drvPath = attr->forceDerivation();
 
     std::set<std::string> outputsToInstall;
+    std::optional<NixInt> priority;
 
-    if (auto aMeta = attr->maybeGetAttr(state->sMeta))
+    if (auto aOutputSpecified = attr->maybeGetAttr(state->sOutputSpecified)) {
+        if (aOutputSpecified->getBool()) {
+            if (auto aOutputName = attr->maybeGetAttr("outputName"))
+                outputsToInstall = { aOutputName->getString() };
+        }
+    }
+
+    else if (auto aMeta = attr->maybeGetAttr(state->sMeta)) {
         if (auto aOutputsToInstall = aMeta->maybeGetAttr("outputsToInstall"))
             for (auto & s : aOutputsToInstall->getListOfStrings())
                 outputsToInstall.insert(s);
+        if (auto aPriority = aMeta->maybeGetAttr("priority"))
+            priority = aPriority->getInt();
+    }
 
     if (outputsToInstall.empty() || std::get_if<AllOutputs>(&outputsSpec)) {
         outputsToInstall.clear();
@@ -645,6 +661,7 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
     auto drvInfo = DerivationInfo {
         .drvPath = std::move(drvPath),
         .outputsToInstall = std::move(outputsToInstall),
+        .priority = priority,
     };
 
     return {attrPath, getLockedFlake()->flake.lockedRef, std::move(drvInfo)};
@@ -909,6 +926,9 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> Installable::bui
         break;
 
     case Realise::Outputs: {
+        if (settings.printMissing)
+          printMissing(store, pathsToBuild, lvlInfo);
+
         for (auto & buildResult : store->buildPathsWithResults(pathsToBuild, bMode, evalStore)) {
             if (!buildResult.success())
                 buildResult.rethrow();
@@ -1022,21 +1042,26 @@ InstallablesCommand::InstallablesCommand()
 
 void InstallablesCommand::prepare()
 {
+    installables = load();
+}
+
+Installables InstallablesCommand::load() {
+    Installables installables;
     if (_installables.empty() && useDefaultInstallables())
         // FIXME: commands like "nix profile install" should not have a
         // default, probably.
         _installables.push_back(".");
-    installables = parseInstallables(getStore(), _installables);
+    return parseInstallables(getStore(), _installables);
 }
 
-std::optional<FlakeRef> InstallablesCommand::getFlakeRefForCompletion()
+std::vector<std::string> InstallablesCommand::getFlakesForCompletion()
 {
     if (_installables.empty()) {
         if (useDefaultInstallables())
-            return parseFlakeRefWithFragment(".", absPath(".")).first;
+            return {"."};
         return {};
     }
-    return parseFlakeRefWithFragment(_installables.front(), absPath(".")).first;
+    return _installables;
 }
 
 InstallableCommand::InstallableCommand(bool supportReadOnlyMode)

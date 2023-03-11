@@ -98,6 +98,15 @@ struct ErrPos {
     }
 };
 
+std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos);
+
+void printCodeLines(std::ostream & out,
+    const std::string & prefix,
+    const ErrPos & errPos,
+    const LinesOfCode & loc);
+
+void printAtPos(const ErrPos & pos, std::ostream & out);
+
 struct Trace {
     std::optional<ErrPos> pos;
     hintformat hint;
@@ -195,12 +204,18 @@ public:
     int errNo;
 
     template<typename... Args>
-    SysError(const Args & ... args)
+    SysError(int errNo_, const Args & ... args)
         : Error("")
     {
-        errNo = errno;
+        errNo = errNo_;
         auto hf = hintfmt(args...);
         err.msg = hintfmt("%1%: %2%", normaltxt(hf.str()), strerror(errNo));
+    }
+
+    template<typename... Args>
+    SysError(const Args & ... args)
+        : SysError(errno, args ...)
+    {
     }
 };
 

@@ -42,6 +42,11 @@ testRepl () {
     echo "$replOutput"
     echo "$replOutput" | grep -qs "while evaluating the file" \
       || fail "nix repl --show-trace doesn't show the trace"
+
+    nix repl "${nixArgs[@]}" --option pure-eval true 2>&1 <<< "builtins.currentSystem" \
+      | grep "attribute 'currentSystem' missing"
+    nix repl "${nixArgs[@]}" 2>&1 <<< "builtins.currentSystem" \
+      | grep "$(nix-instantiate --eval -E 'builtins.currentSystem')"
 }
 
 # Simple test, try building a drv
@@ -50,15 +55,17 @@ testRepl
 testRepl --store "$TEST_ROOT/store?real=$NIX_STORE_DIR"
 
 testReplResponse () {
-    local response="$(nix repl <<< "$1")"
-    echo "$response" | grep -qs "$2" \
+    local commands="$1"; shift
+    local expectedResponse="$1"; shift
+    local response="$(nix repl "$@" <<< "$commands")"
+    echo "$response" | grep -qs "$expectedResponse" \
       || fail "repl command set:
 
-$1
+$commands
 
 does not respond with:
 
-$2
+$expectedResponse
 
 but with:
 
@@ -71,3 +78,48 @@ testReplResponse '
 :a { a = "2"; }
 "result: ${a}"
 ' "result: 2"
+
+testReplResponse '
+drvPath
+' '".*-simple.drv"' \
+$testDir/simple.nix
+
+testReplResponse '
+drvPath
+' '".*-simple.drv"' \
+--file $testDir/simple.nix --experimental-features 'ca-derivations'
+
+testReplResponse '
+drvPath
+' '".*-simple.drv"' \
+--file $testDir/simple.nix --extra-experimental-features 'repl-flake ca-derivations'
+
+mkdir -p flake && cat <<EOF > flake/flake.nix
+{
+    outputs = { self }: {
+        foo = 1;
+        bar.baz = 2;
+
+        changingThing = "beforeChange";
+    };
+}
+EOF
+testReplResponse '
+foo + baz
+' "3" \
+    ./flake ./flake\#bar --experimental-features 'flakes repl-flake'
+
+# Test the `:reload` mechansim with flakes:
+# - Eval `./flake#changingThing`
+# - Modify the flake
+# - Re-eval it
+# - Check that the result has changed
+replResult=$( (
+echo "changingThing"
+sleep 1 # Leave the repl the time to eval 'foo'
+sed -i 's/beforeChange/afterChange/' flake/flake.nix
+echo ":reload"
+echo "changingThing"
+) | nix repl ./flake --experimental-features 'flakes repl-flake')
+echo "$replResult" | grep -qs beforeChange
+echo "$replResult" | grep -qs afterChange

@@ -12,6 +12,12 @@
   [`--dry-run`]
   [{`--out-link` | `-o`} *outlink*]
 
+# Disambiguation
+
+This man page describes the command `nix-build`, which is distinct from `nix
+build`. For documentation on the latter, run `nix build --help` or see `man
+nix3-build`.
+
 # Description
 
 The `nix-build` command builds the derivations described by the Nix
@@ -47,16 +53,16 @@ All options not listed here are passed to `nix-store
 --realise`, except for `--arg` and `--attr` / `-A` which are passed to
 `nix-instantiate`.
 
-  - `--no-out-link`\
+  - [`--no-out-link`]{#opt-no-out-link}\
     Do not create a symlink to the output path. Note that as a result
     the output does not become a root of the garbage collector, and so
     might be deleted by `nix-store
                     --gc`.
 
-  - `--dry-run`\
+  - [`--dry-run`]{#opt-dry-run}\
     Show what store paths would be built or downloaded.
 
-  - `--out-link` / `-o` *outlink*\
+  - [`--out-link`]{#opt-out-link} / `-o` *outlink*\
     Change the name of the symlink to the output path created from
     `result` to *outlink*.
 
