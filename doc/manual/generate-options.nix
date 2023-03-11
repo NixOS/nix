@@ -20,7 +20,7 @@ concatStrings (map
          # JSON, but that converts to "{ }" here.
          (if isAttrs option.value then "`\"\"`"
           else "`" + toString option.value + "`")) + "\n\n"
-       else "    **Default:** *machine-specific*")
+       else "    **Default:** *machine-specific*\n")
     + (if option.aliases != []
        then "    **Deprecated alias:** " + (concatStringsSep ", " (map (s: "`${s}`") option.aliases)) + "\n\n"
        else "")

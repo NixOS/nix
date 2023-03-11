@@ -352,7 +352,9 @@ public:
        simply yield a different store path, so other users wouldn't be
        affected), but it has some backwards compatibility issues (the
        hashing scheme changes), so I'm not doing that for now. */
-    StorePath computeStorePathForText(const string & name, const string & s,
+    StorePath computeStorePathForText(
+        std::string_view name,
+        std::string_view s,
         const StorePathSet & references) const;
 
     /* Check whether a path is valid. */
@@ -482,9 +484,14 @@ public:
        validity the resulting path.  The resulting path is returned.
        The function object `filter' can be used to exclude files (see
        libutil/archive.hh). */
-    virtual StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair, const StorePathSet & references = StorePathSet());
+    virtual StorePath addToStore(
+        std::string_view name,
+        const Path & srcPath,
+        FileIngestionMethod method = FileIngestionMethod::Recursive,
+        HashType hashAlgo = htSHA256,
+        PathFilter & filter = defaultPathFilter,
+        RepairFlag repair = NoRepair,
+        const StorePathSet & references = StorePathSet());
 
     /* Copy the contents of a path to the store and register the
        validity the resulting path, using a constant amount of
@@ -499,15 +506,18 @@ public:
        false).
        `dump` may be drained */
     // FIXME: remove?
-    virtual StorePath addToStoreFromDump(Source & dump, const string & name,
+    virtual StorePath addToStoreFromDump(Source & dump, std::string_view name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair,
         const StorePathSet & references = StorePathSet())
     { unsupported("addToStoreFromDump"); }
 
     /* Like addToStore, but the contents written to the output path is
        a regular file containing the given string. */
-    virtual StorePath addTextToStore(const string & name, const string & s,
-        const StorePathSet & references, RepairFlag repair = NoRepair) = 0;
+    virtual StorePath addTextToStore(
+        std::string_view name,
+        std::string_view s,
+        const StorePathSet & references,
+        RepairFlag repair = NoRepair) = 0;
 
     /**
      * Add a mapping indicating that `deriver!outputName` maps to the output path
@@ -608,7 +618,7 @@ public:
     /* Return a string representing information about the path that
        can be loaded into the database using `nix-store --load-db' or
        `nix-store --register-validity'. */
-    string makeValidityRegistration(const StorePathSet & paths,
+    std::string makeValidityRegistration(const StorePathSet & paths,
         bool showDerivers, bool showHash);
 
     /* Write a JSON representation of store path metadata, such as the
@@ -724,8 +734,11 @@ public:
 
     /* Return the build log of the specified store path, if available,
        or null otherwise. */
-    virtual std::shared_ptr<std::string> getBuildLog(const StorePath & path)
-    { return nullptr; }
+    virtual std::optional<std::string> getBuildLog(const StorePath & path)
+    { return std::nullopt; }
+
+    virtual void addBuildLog(const StorePath & path, std::string_view log)
+    { unsupported("addBuildLog"); }
 
     /* Hack to allow long-running processes like hydra-queue-runner to
        occasionally flush their path info cache. */
@@ -762,6 +775,9 @@ public:
      * (a no-op when there’s no daemon)
      */
     virtual void setOptions() { }
+
+    virtual std::optional<std::string> getVersion() { return {}; }
+
 protected:
 
     Stats stats;
@@ -808,6 +824,13 @@ std::map<StorePath, StorePath> copyPaths(
 void copyClosure(
     Store & srcStore, Store & dstStore,
     const RealisedPath::Set & paths,
+    RepairFlag repair = NoRepair,
+    CheckSigsFlag checkSigs = CheckSigs,
+    SubstituteFlag substitute = NoSubstitute);
+
+void copyClosure(
+    Store & srcStore, Store & dstStore,
+    const StorePathSet & paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
@@ -897,7 +920,7 @@ struct RegisterStoreImplementation
 
 /* Display a set of paths in human-readable form (i.e., between quotes
    and separated by commas). */
-string showPaths(const PathSet & paths);
+std::string showPaths(const PathSet & paths);
 
 
 std::optional<ValidPathInfo> decodeValidPathInfo(

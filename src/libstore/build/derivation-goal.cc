@@ -116,7 +116,7 @@ DerivationGoal::~DerivationGoal()
 }
 
 
-string DerivationGoal::key()
+std::string DerivationGoal::key()
 {
     /* Ensure that derivations get built in order of their name,
        i.e. a derivation named "aardvark" always comes before
@@ -278,7 +278,7 @@ void DerivationGoal::outputsSubstitutionTried()
 
     if (nrFailed > 0 && nrFailed > nrNoSubstituters + nrIncompleteClosure && !settings.tryFallback) {
         done(BuildResult::TransientFailure,
-            fmt("some substitutes for the outputs of derivation '%s' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ",
+            Error("some substitutes for the outputs of derivation '%s' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ",
                 worker.store.printStorePath(drvPath)));
         return;
     }
@@ -1024,7 +1024,7 @@ HookReply DerivationGoal::tryBuildHook()
 
         /* Read the first line of input, which should be a word indicating
            whether the hook wishes to perform the build. */
-        string reply;
+        std::string reply;
         while (true) {
             auto s = [&]() {
                 try {
@@ -1036,8 +1036,8 @@ HookReply DerivationGoal::tryBuildHook()
             }();
             if (handleJSONLogMessage(s, worker.act, worker.hook->activities, true))
                 ;
-            else if (string(s, 0, 2) == "# ") {
-                reply = string(s, 2);
+            else if (s.substr(0, 2) == "# ") {
+                reply = s.substr(2);
                 break;
             }
             else {
@@ -1102,7 +1102,7 @@ HookReply DerivationGoal::tryBuildHook()
     /* Create the log file and pipe. */
     Path logFile = openLogFile();
 
-    set<int> fds;
+    std::set<int> fds;
     fds.insert(hook->fromHook.readSide.get());
     fds.insert(hook->builderOut.readSide.get());
     worker.childStarted(shared_from_this(), fds, false, false);
@@ -1151,10 +1151,10 @@ Path DerivationGoal::openLogFile()
         logDir = localStore->logDir;
     else
         logDir = settings.nixLogDir;
-    Path dir = fmt("%s/%s/%s/", logDir, LocalFSStore::drvsLogDir, string(baseName, 0, 2));
+    Path dir = fmt("%s/%s/%s/", logDir, LocalFSStore::drvsLogDir, baseName.substr(0, 2));
     createDirs(dir);
 
-    Path logFileName = fmt("%s/%s%s", dir, string(baseName, 2),
+    Path logFileName = fmt("%s/%s%s", dir, baseName.substr(2),
         settings.compressLog ? ".bz2" : "");
 
     fdLogFile = open(logFileName.c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0666);
@@ -1187,7 +1187,7 @@ bool DerivationGoal::isReadDesc(int fd)
 }
 
 
-void DerivationGoal::handleChildOutput(int fd, const string & data)
+void DerivationGoal::handleChildOutput(int fd, std::string_view data)
 {
     if (isReadDesc(fd))
     {

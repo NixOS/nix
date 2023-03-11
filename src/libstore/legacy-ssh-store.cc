@@ -48,7 +48,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
     static std::set<std::string> uriSchemes() { return {"ssh"}; }
 
-    LegacySSHStore(const string & scheme, const string & host, const Params & params)
+    LegacySSHStore(const std::string & scheme, const std::string & host, const Params & params)
         : StoreConfig(params)
         , LegacySSHStoreConfig(params)
         , Store(params)
@@ -94,7 +94,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
                 conn->sshConn->in.close();
                 auto msg = conn->from.drain();
                 throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'",
-                    host, chomp(*saved.s + msg));
+                    host, chomp(saved.s + msg));
             }
             conn->remoteVersion = readInt(conn->from);
             if (GET_PROTOCOL_MAJOR(conn->remoteVersion) != 0x200)
@@ -107,7 +107,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         return conn;
     };
 
-    string getUri() override
+    std::string getUri() override
     {
         return *uriSchemes().begin() + "://" + host;
     }
@@ -225,13 +225,21 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
     { unsupported("queryPathFromHashPart"); }
 
-    StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method, HashType hashAlgo,
-        PathFilter & filter, RepairFlag repair, const StorePathSet & references) override
+    StorePath addToStore(
+        std::string_view name,
+        const Path & srcPath,
+        FileIngestionMethod method,
+        HashType hashAlgo,
+        PathFilter & filter,
+        RepairFlag repair,
+        const StorePathSet & references) override
     { unsupported("addToStore"); }
 
-    StorePath addTextToStore(const string & name, const string & s,
-        const StorePathSet & references, RepairFlag repair) override
+    StorePath addTextToStore(
+        std::string_view name,
+        std::string_view s,
+        const StorePathSet & references,
+        RepairFlag repair) override
     { unsupported("addTextToStore"); }
 
 private:

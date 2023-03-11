@@ -165,7 +165,7 @@ unsigned Worker::getNrLocalBuilds()
 }
 
 
-void Worker::childStarted(GoalPtr goal, const set<int> & fds,
+void Worker::childStarted(GoalPtr goal, const std::set<int> & fds,
     bool inBuildSlot, bool respectTimeouts)
 {
     Child child;
@@ -387,7 +387,7 @@ void Worker::waitForInput()
         GoalPtr goal = j->goal.lock();
         assert(goal);
 
-        set<int> fds2(j->fds);
+        std::set<int> fds2(j->fds);
         std::vector<unsigned char> buffer(4096);
         for (auto & k : fds2) {
             if (pollStatus.at(fdToPollStatus.at(k)).revents) {
@@ -404,7 +404,7 @@ void Worker::waitForInput()
                 } else {
                     printMsg(lvlVomit, "%1%: read %2% bytes",
                         goal->getName(), rd);
-                    string data((char *) buffer.data(), rd);
+                    std::string data((char *) buffer.data(), rd);
                     j->lastOutput = after;
                     goal->handleChildOutput(k, data);
                 }

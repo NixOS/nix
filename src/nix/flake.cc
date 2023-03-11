@@ -13,6 +13,7 @@
 #include "registry.hh"
 #include "json.hh"
 #include "eval-cache.hh"
+#include "markdown.hh"
 
 #include <nlohmann/json.hpp>
 #include <queue>
@@ -124,12 +125,13 @@ struct CmdFlakeLock : FlakeCommand
 static void enumerateOutputs(EvalState & state, Value & vFlake,
     std::function<void(const std::string & name, Value & vProvide, const Pos & pos)> callback)
 {
-    state.forceAttrs(vFlake);
+    auto pos = vFlake.determinePos(noPos);
+    state.forceAttrs(vFlake, pos);
 
     auto aOutputs = vFlake.attrs->get(state.symbols.create("outputs"));
     assert(aOutputs);
 
-    state.forceAttrs(*aOutputs->value);
+    state.forceAttrs(*aOutputs->value, pos);
 
     auto sHydraJobs = state.symbols.create("hydraJobs");
 
@@ -475,10 +477,7 @@ struct CmdFlakeCheck : FlakeCommand
                 state->forceValue(v, pos);
                 if (!v.isLambda())
                     throw Error("bundler must be a function");
-                if (!v.lambda.fun->formals ||
-                    !v.lambda.fun->formals->argNames.count(state->symbols.create("program")) ||
-                    !v.lambda.fun->formals->argNames.count(state->symbols.create("system")))
-                    throw Error("bundler must take formal arguments 'program' and 'system'");
+                // TODO: check types of inputs/outputs?
             } catch (Error & e) {
                 e.addTrace(pos, hintfmt("while checking the template '%s'", attrPath));
                 reportError(e);
@@ -501,6 +500,17 @@ struct CmdFlakeCheck : FlakeCommand
                         evalSettings.enableImportFromDerivation.setDefault(name != "hydraJobs");
 
                         state->forceValue(vOutput, pos);
+
+                        std::string_view replacement =
+                            name == "defaultPackage" ? "packages.<system>.default" :
+                            name == "defaultApps" ? "apps.<system>.default" :
+                            name == "defaultTemplate" ? "templates.default" :
+                            name == "defaultBundler" ? "bundlers.<system>.default" :
+                            name == "overlay" ? "overlays.default" :
+                            name == "devShell" ? "devShells.<system>.default" :
+                            "";
+                        if (replacement != "")
+                            warn("flake output attribute '%s' is deprecated; use '%s' instead", name, replacement);
 
                         if (name == "checks") {
                             state->forceAttrs(vOutput, pos);
@@ -609,14 +619,27 @@ struct CmdFlakeCheck : FlakeCommand
                                     *attr.value, *attr.pos);
                         }
 
-                        else if (name == "defaultBundler")
-                            checkBundler(name, vOutput, pos);
+                        else if (name == "defaultBundler") {
+                            state->forceAttrs(vOutput, pos);
+                            for (auto & attr : *vOutput.attrs) {
+                                checkSystemName(attr.name, *attr.pos);
+                                checkBundler(
+                                    fmt("%s.%s", name, attr.name),
+                                    *attr.value, *attr.pos);
+                            }
+                        }
 
                         else if (name == "bundlers") {
                             state->forceAttrs(vOutput, pos);
-                            for (auto & attr : *vOutput.attrs)
-                                checkBundler(fmt("%s.%s", name, attr.name),
-                                    *attr.value, *attr.pos);
+                            for (auto & attr : *vOutput.attrs) {
+                                checkSystemName(attr.name, *attr.pos);
+                                state->forceAttrs(*attr.value, *attr.pos);
+                                for (auto & attr2 : *attr.value->attrs) {
+                                    checkBundler(
+                                        fmt("%s.%s.%s", name, attr.name, attr2.name),
+                                        *attr2.value, *attr2.pos);
+                                }
+                            }
                         }
 
                         else
@@ -638,12 +661,14 @@ struct CmdFlakeCheck : FlakeCommand
     }
 };
 
+static Strings defaultTemplateAttrPathsPrefixes{"templates."};
+static Strings defaultTemplateAttrPaths = {"templates.default", "defaultTemplate"};
+
 struct CmdFlakeInitCommon : virtual Args, EvalCommand
 {
     std::string templateUrl = "templates";
     Path destDir;
 
-    const Strings attrsPathPrefixes{"templates."};
     const LockFlags lockFlags{ .writeLockFile = false };
 
     CmdFlakeInitCommon()
@@ -658,8 +683,8 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 completeFlakeRefWithFragment(
                     getEvalState(),
                     lockFlags,
-                    attrsPathPrefixes,
-                    {"defaultTemplate"},
+                    defaultTemplateAttrPathsPrefixes,
+                    defaultTemplateAttrPaths,
                     prefix);
             }}
         });
@@ -674,9 +699,10 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(templateUrl, absPath("."));
 
         auto installable = InstallableFlake(nullptr,
-            evalState, std::move(templateFlakeRef),
-            Strings{templateName == "" ? "defaultTemplate" : templateName},
-            Strings(attrsPathPrefixes), lockFlags);
+            evalState, std::move(templateFlakeRef), templateName,
+            defaultTemplateAttrPaths,
+            defaultTemplateAttrPathsPrefixes,
+            lockFlags);
 
         auto [cursor, attrPath] = installable.getCursor(*evalState);
 
@@ -717,6 +743,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 else
                     throw Error("file '%s' has unsupported type", from2);
                 files.push_back(to2);
+                notice("wrote: %s", to2);
             }
         };
 
@@ -726,6 +753,11 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             Strings args = { "-C", flakeDir, "add", "--intent-to-add", "--force", "--" };
             for (auto & s : files) args.push_back(s);
             runProgram("git", true, args);
+        }
+        auto welcomeText = cursor->maybeGetAttr("welcomeText");
+        if (welcomeText) {
+            notice("\n");
+            notice(renderMarkdownToTerminal(welcomeText->getString()));
         }
     }
 };

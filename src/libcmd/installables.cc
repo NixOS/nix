@@ -97,7 +97,7 @@ MixFlakeOptions::MixFlakeOptions()
             lockFlags.writeLockFile = false;
             lockFlags.inputOverrides.insert_or_assign(
                 flake::parseInputPath(inputPath),
-                parseFlakeRef(flakeRef, absPath(".")));
+                parseFlakeRef(flakeRef, absPath("."), true));
         }}
     });
 
@@ -158,7 +158,10 @@ SourceExprCommand::SourceExprCommand()
 
 Strings SourceExprCommand::getDefaultFlakeAttrPaths()
 {
-    return {"defaultPackage." + settings.thisSystem.get()};
+    return {
+        "packages." + settings.thisSystem.get() + ".default",
+        "defaultPackage." + settings.thisSystem.get()
+    };
 }
 
 Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
@@ -198,8 +201,9 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
             prefix_ = "";
         }
 
-        Value &v1(*findAlongAttrPath(*state, prefix_, *autoArgs, root).first);
-        state->forceValue(v1);
+        auto [v, pos] = findAlongAttrPath(*state, prefix_, *autoArgs, root);
+        Value &v1(*v);
+        state->forceValue(v1, pos);
         Value v2;
         state->autoCallFunction(*autoArgs, v1, v2);
 
@@ -345,6 +349,18 @@ Installable::getCursor(EvalState & state)
     return cursors[0];
 }
 
+static StorePath getDeriver(
+    ref<Store> store,
+    const Installable & i,
+    const StorePath & drvPath)
+{
+    auto derivers = store->queryValidDerivers(drvPath);
+    if (derivers.empty())
+        throw Error("'%s' does not have a known deriver", i.what());
+    // FIXME: use all derivers?
+    return *derivers.begin();
+}
+
 struct InstallableStorePath : Installable
 {
     ref<Store> store;
@@ -353,7 +369,7 @@ struct InstallableStorePath : Installable
     InstallableStorePath(ref<Store> store, StorePath && storePath)
         : store(store), storePath(std::move(storePath)) { }
 
-    std::string what() override { return store->printStorePath(storePath); }
+    std::string what() const override { return store->printStorePath(storePath); }
 
     DerivedPaths toDerivedPaths() override
     {
@@ -371,6 +387,15 @@ struct InstallableStorePath : Installable
                     .path = storePath,
                 }
             };
+        }
+    }
+
+    StorePathSet toDrvPaths(ref<Store> store) override
+    {
+        if (storePath.isDerivation()) {
+            return {storePath};
+        } else {
+            return {getDeriver(store, *this, storePath)};
         }
     }
 
@@ -402,6 +427,14 @@ DerivedPaths InstallableValue::toDerivedPaths()
     return res;
 }
 
+StorePathSet InstallableValue::toDrvPaths(ref<Store> store)
+{
+    StorePathSet res;
+    for (auto & drv : toDerivations())
+        res.insert(drv.drvPath);
+    return res;
+}
+
 struct InstallableAttrPath : InstallableValue
 {
     SourceExprCommand & cmd;
@@ -412,12 +445,12 @@ struct InstallableAttrPath : InstallableValue
         : InstallableValue(state), cmd(cmd), v(allocRootValue(v)), attrPath(attrPath)
     { }
 
-    std::string what() override { return attrPath; }
+    std::string what() const override { return attrPath; }
 
     std::pair<Value *, Pos> toValue(EvalState & state) override
     {
         auto [vRes, pos] = findAlongAttrPath(state, attrPath, *cmd.getAutoArgs(state), **v);
-        state.forceValue(*vRes);
+        state.forceValue(*vRes, pos);
         return {vRes, pos};
     }
 
@@ -467,7 +500,7 @@ Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::Locked
     auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
     assert(aOutputs);
 
-    state.forceValue(*aOutputs->value);
+    state.forceValue(*aOutputs->value, [&]() { return aOutputs->value->determinePos(noPos); });
 
     return aOutputs->value;
 }
@@ -492,7 +525,7 @@ ref<eval_cache::EvalCache> openEvalCache(
             auto vFlake = state.allocValue();
             flake::callFlake(state, *lockedFlake, *vFlake);
 
-            state.forceAttrs(*vFlake);
+            state.forceAttrs(*vFlake, noPos);
 
             auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
             assert(aOutputs);
@@ -515,13 +548,14 @@ InstallableFlake::InstallableFlake(
     SourceExprCommand * cmd,
     ref<EvalState> state,
     FlakeRef && flakeRef,
-    Strings && attrPaths,
-    Strings && prefixes,
+    std::string_view fragment,
+    Strings attrPaths,
+    Strings prefixes,
     const flake::LockFlags & lockFlags)
     : InstallableValue(state),
       flakeRef(flakeRef),
-      attrPaths(attrPaths),
-      prefixes(prefixes),
+      attrPaths(fragment == "" ? attrPaths : Strings{(std::string) fragment}),
+      prefixes(fragment == "" ? Strings{} : prefixes),
       lockFlags(lockFlags)
 {
     if (cmd && cmd->getAutoArgs(*state)->size())
@@ -538,6 +572,8 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
     auto root = cache->getRoot();
 
     for (auto & attrPath : getActualAttrPaths()) {
+        debug("trying flake output attribute '%s'", attrPath);
+
         auto attr = root->findAlongAttrPath(
             parseAttrPath(*state, attrPath),
             true
@@ -581,7 +617,7 @@ std::pair<Value *, Pos> InstallableFlake::toValue(EvalState & state)
     for (auto & attrPath : getActualAttrPaths()) {
         try {
             auto [v, pos] = findAlongAttrPath(state, attrPath, *emptyArgs, *vOutputs);
-            state.forceValue(*v);
+            state.forceValue(*v, pos);
             return {v, pos};
         } catch (AttrPathNotFound & e) {
         }
@@ -680,7 +716,8 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
                         this,
                         getEvalState(),
                         std::move(flakeRef),
-                        fragment == "" ? getDefaultFlakeAttrPaths() : Strings{fragment},
+                        fragment,
+                        getDefaultFlakeAttrPaths(),
                         getDefaultFlakeAttrPathPrefixes(),
                         lockFlags));
                 continue;
@@ -838,11 +875,7 @@ StorePathSet toDerivations(
                 [&](const DerivedPath::Opaque & bo) {
                     if (!useDeriver)
                         throw Error("argument '%s' did not evaluate to a derivation", i->what());
-                    auto derivers = store->queryValidDerivers(bo.path);
-                    if (derivers.empty())
-                        throw Error("'%s' does not have a known deriver", i->what());
-                    // FIXME: use all derivers?
-                    drvPaths.insert(*derivers.begin());
+                    drvPaths.insert(getDeriver(store, *i, bo.path));
                 },
                 [&](const DerivedPath::Built & bfd) {
                     drvPaths.insert(bfd.drvPath);

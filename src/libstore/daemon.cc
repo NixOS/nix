@@ -69,7 +69,7 @@ struct TunnelLogger : public Logger
 
         StringSink buf;
         buf << STDERR_NEXT << (fs.s + "\n");
-        enqueueMsg(*buf.s);
+        enqueueMsg(buf.s);
     }
 
     void logEI(const ErrorInfo & ei) override
@@ -81,7 +81,7 @@ struct TunnelLogger : public Logger
 
         StringSink buf;
         buf << STDERR_NEXT << oss.str();
-        enqueueMsg(*buf.s);
+        enqueueMsg(buf.s);
     }
 
     /* startWork() means that we're starting an operation for which we
@@ -129,7 +129,7 @@ struct TunnelLogger : public Logger
 
         StringSink buf;
         buf << STDERR_START_ACTIVITY << act << lvl << type << s << fields << parent;
-        enqueueMsg(*buf.s);
+        enqueueMsg(buf.s);
     }
 
     void stopActivity(ActivityId act) override
@@ -137,7 +137,7 @@ struct TunnelLogger : public Logger
         if (GET_PROTOCOL_MINOR(clientVersion) < 20) return;
         StringSink buf;
         buf << STDERR_STOP_ACTIVITY << act;
-        enqueueMsg(*buf.s);
+        enqueueMsg(buf.s);
     }
 
     void result(ActivityId act, ResultType type, const Fields & fields) override
@@ -145,7 +145,7 @@ struct TunnelLogger : public Logger
         if (GET_PROTOCOL_MINOR(clientVersion) < 20) return;
         StringSink buf;
         buf << STDERR_RESULT << act << type << fields;
-        enqueueMsg(*buf.s);
+        enqueueMsg(buf.s);
     }
 };
 
@@ -468,17 +468,19 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             dontCheckSigs = false;
 
         logger->startWork();
-        FramedSource source(from);
-        store->addMultipleToStore(source,
-            RepairFlag{repair},
-            dontCheckSigs ? NoCheckSigs : CheckSigs);
+        {
+            FramedSource source(from);
+            store->addMultipleToStore(source,
+                RepairFlag{repair},
+                dontCheckSigs ? NoCheckSigs : CheckSigs);
+        }
         logger->stopWork();
         break;
     }
 
     case wopAddTextToStore: {
-        string suffix = readString(from);
-        string s = readString(from);
+        std::string suffix = readString(from);
+        std::string s = readString(from);
         auto refs = worker_proto::read(*store, from, Phantom<StorePathSet> {});
         logger->startWork();
         auto path = store->addTextToStore(suffix, s, refs, NoRepair);
@@ -696,8 +698,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (GET_PROTOCOL_MINOR(clientVersion) >= 12) {
             unsigned int n = readInt(from);
             for (unsigned int i = 0; i < n; i++) {
-                string name = readString(from);
-                string value = readString(from);
+                auto name = readString(from);
+                auto value = readString(from);
                 clientSettings.overrides.emplace(name, value);
             }
         }
@@ -852,14 +854,14 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
         else {
             std::unique_ptr<Source> source;
+            StringSink saved;
             if (GET_PROTOCOL_MINOR(clientVersion) >= 21)
                 source = std::make_unique<TunnelSource>(from, to);
             else {
-                StringSink saved;
                 TeeSource tee { from, saved };
                 ParseSink ether;
                 parseDump(ether, tee);
-                source = std::make_unique<StringSource>(std::move(*saved.s));
+                source = std::make_unique<StringSource>(saved.s);
             }
 
             logger->startWork();
@@ -920,6 +922,22 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case wopAddBuildLog: {
+        StorePath path{readString(from)};
+        logger->startWork();
+        if (!trusted)
+            throw Error("you are not privileged to add logs");
+        {
+            FramedSource source(from);
+            StringSink sink;
+            source.drainInto(sink);
+            store->addBuildLog(path, sink.s);
+        }
+        logger->stopWork();
+        to << 1;
+        break;
+    }
+
     default:
         throw Error("invalid operation %1%", op);
     }
@@ -963,7 +981,11 @@ void processConnection(
         readInt(from);
     }
 
-    readInt(from); // obsolete reserveSpace
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 11)
+        readInt(from); // obsolete reserveSpace
+
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 33)
+        to << nixVersion;
 
     /* Send startup error messages to the client. */
     tunnelLogger->startWork();

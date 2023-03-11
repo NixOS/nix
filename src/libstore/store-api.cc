@@ -39,7 +39,7 @@ Path Store::followLinksToStore(std::string_view _path) const
     Path path = absPath(std::string(_path));
     while (!isInStore(path)) {
         if (!isLink(path)) break;
-        string target = readLink(path);
+        auto target = readLink(path);
         path = absPath(target, dirOf(path));
     }
     if (!isInStore(path))
@@ -138,8 +138,8 @@ StorePath Store::makeStorePath(std::string_view type,
     std::string_view hash, std::string_view name) const
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
-    string s = std::string { type } + ":" + std::string { hash }
-        + ":" + storeDir + ":" + std::string { name };
+    auto s = std::string(type) + ":" + std::string(hash)
+        + ":" + storeDir + ":" + std::string(name);
     auto h = compressHash(hashString(htSHA256, s), 20);
     return StorePath(h, name);
 }
@@ -161,7 +161,7 @@ StorePath Store::makeOutputPath(std::string_view id,
 
 static std::string makeType(
     const Store & store,
-    string && type,
+    std::string && type,
     const StorePathSet & references,
     bool hasSelfReference = false)
 {
@@ -229,15 +229,23 @@ std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
 }
 
 
-StorePath Store::computeStorePathForText(const string & name, const string & s,
+StorePath Store::computeStorePathForText(
+    std::string_view name,
+    std::string_view s,
     const StorePathSet & references) const
 {
     return makeTextPath(name, hashString(htSHA256, s), references);
 }
 
 
-StorePath Store::addToStore(const string & name, const Path & _srcPath,
-    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair, const StorePathSet & references)
+StorePath Store::addToStore(
+    std::string_view name,
+    const Path & _srcPath,
+    FileIngestionMethod method,
+    HashType hashAlgo,
+    PathFilter & filter,
+    RepairFlag repair,
+    const StorePathSet & references)
 {
     Path srcPath(absPath(_srcPath));
     auto source = sinkToSource([&](Sink & sink) {
@@ -688,10 +696,10 @@ StorePathSet Store::queryValidPaths(const StorePathSet & paths, SubstituteFlag m
 /* Return a string accepted by decodeValidPathInfo() that
    registers the specified paths as valid.  Note: it's the
    responsibility of the caller to provide a closure. */
-string Store::makeValidityRegistration(const StorePathSet & paths,
+std::string Store::makeValidityRegistration(const StorePathSet & paths,
     bool showDerivers, bool showHash)
 {
-    string s = "";
+    std::string s = "";
 
     for (auto & i : paths) {
         s += printStorePath(i) + "\n";
@@ -761,11 +769,11 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
 
     for (auto & storePath : storePaths) {
         auto jsonPath = jsonList.object();
-        jsonPath.attr("path", printStorePath(storePath));
 
         try {
             auto info = queryPathInfo(storePath);
 
+            jsonPath.attr("path", printStorePath(info->path));
             jsonPath
                 .attr("narHash", info->narHash.to_string(hashBase, true))
                 .attr("narSize", info->narSize);
@@ -819,6 +827,7 @@ void Store::pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & store
             }
 
         } catch (InvalidPath &) {
+            jsonPath.attr("path", printStorePath(storePath));
             jsonPath.attr("valid", false);
         }
     }
@@ -1109,13 +1118,28 @@ void copyClosure(
     copyPaths(srcStore, dstStore, closure, repair, checkSigs, substitute);
 }
 
+void copyClosure(
+    Store & srcStore,
+    Store & dstStore,
+    const StorePathSet & storePaths,
+    RepairFlag repair,
+    CheckSigsFlag checkSigs,
+    SubstituteFlag substitute)
+{
+    if (&srcStore == &dstStore) return;
+
+    StorePathSet closure;
+    srcStore.computeFSClosure(storePaths, closure);
+    copyPaths(srcStore, dstStore, closure, repair, checkSigs, substitute);
+}
+
 std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashResult> hashGiven)
 {
     std::string path;
     getline(str, path);
     if (str.eof()) { return {}; }
     if (!hashGiven) {
-        string s;
+        std::string s;
         getline(str, s);
         auto narHash = Hash::parseAny(s, htSHA256);
         getline(str, s);
@@ -1128,7 +1152,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istre
     std::string deriver;
     getline(str, deriver);
     if (deriver != "") info.deriver = store.parseStorePath(deriver);
-    string s;
+    std::string s;
     getline(str, s);
     auto n = string2Int<int>(s);
     if (!n) throw Error("number expected");
@@ -1152,7 +1176,7 @@ std::string Store::showPaths(const StorePathSet & paths)
 }
 
 
-string showPaths(const PathSet & paths)
+std::string showPaths(const PathSet & paths)
 {
     return concatStringsSep(", ", quoteStrings(paths));
 }

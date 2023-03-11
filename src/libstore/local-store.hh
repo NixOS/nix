@@ -144,11 +144,14 @@ public:
     void addToStore(const ValidPathInfo & info, Source & source,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
 
-    StorePath addToStoreFromDump(Source & dump, const string & name,
+    StorePath addToStoreFromDump(Source & dump, std::string_view name,
         FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references) override;
 
-    StorePath addTextToStore(const string & name, const string & s,
-        const StorePathSet & references, RepairFlag repair) override;
+    StorePath addTextToStore(
+        std::string_view name,
+        std::string_view s,
+        const StorePathSet & references,
+        RepairFlag repair) override;
 
     void addTempRoot(const StorePath & path) override;
 
@@ -172,8 +175,9 @@ public:
 
     void optimiseStore() override;
 
-    /* Optimise a single store path. */
-    void optimisePath(const Path & path);
+    /* Optimise a single store path. Optionally, test the encountered
+       symlinks for corruption. */
+    void optimisePath(const Path & path, RepairFlag repair);
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
@@ -203,12 +207,18 @@ public:
        derivation 'deriver'. */
     void registerDrvOutput(const Realisation & info) override;
     void registerDrvOutput(const Realisation & info, CheckSigsFlag checkSigs) override;
-    void cacheDrvOutputMapping(State & state, const uint64_t deriver, const string & outputName, const StorePath & output);
+    void cacheDrvOutputMapping(
+        State & state,
+        const uint64_t deriver,
+        const std::string & outputName,
+        const StorePath & output);
 
     std::optional<const Realisation> queryRealisation_(State & state, const DrvOutput & id);
     std::optional<std::pair<int64_t, Realisation>> queryRealisationCore_(State & state, const DrvOutput & id);
     void queryRealisationUncached(const DrvOutput&,
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
+
+    std::optional<std::string> getVersion() override;
 
 private:
 
@@ -253,7 +263,7 @@ private:
 
     InodeHash loadInodeHash();
     Strings readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash);
-    void optimisePath_(Activity * act, OptimiseStats & stats, const Path & path, InodeHash & inodeHash);
+    void optimisePath_(Activity * act, OptimiseStats & stats, const Path & path, InodeHash & inodeHash, RepairFlag repair);
 
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(State & state, const StorePath & path);
@@ -279,6 +289,8 @@ private:
         const std::string_view pathHash
     );
 
+    void addBuildLog(const StorePath & drvPath, std::string_view log) override;
+
     friend struct LocalDerivationGoal;
     friend struct PathSubstitutionGoal;
     friend struct SubstitutionGoal;
@@ -287,7 +299,7 @@ private:
 
 
 typedef std::pair<dev_t, ino_t> Inode;
-typedef set<Inode> InodesSeen;
+typedef std::set<Inode> InodesSeen;
 
 
 /* "Fix", or canonicalise, the meta-data of the files in a store path

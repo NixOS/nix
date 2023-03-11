@@ -74,7 +74,7 @@ PathLocks::PathLocks()
 }
 
 
-PathLocks::PathLocks(const PathSet & paths, const string & waitMsg)
+PathLocks::PathLocks(const PathSet & paths, const std::string & waitMsg)
     : deletePaths(false)
 {
     lockPaths(paths, waitMsg);
@@ -82,7 +82,7 @@ PathLocks::PathLocks(const PathSet & paths, const string & waitMsg)
 
 
 bool PathLocks::lockPaths(const PathSet & paths,
-    const string & waitMsg, bool wait)
+    const std::string & waitMsg, bool wait)
 {
     assert(fds.empty());
 

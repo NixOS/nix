@@ -76,13 +76,13 @@ void Args::parseCmdline(const Strings & _cmdline)
         /* Expand compound dash options (i.e., `-qlf' -> `-q -l -f',
            `-j3` -> `-j 3`). */
         if (!dashDash && arg.length() > 2 && arg[0] == '-' && arg[1] != '-' && isalpha(arg[1])) {
-            *pos = (string) "-" + arg[1];
+            *pos = (std::string) "-" + arg[1];
             auto next = pos; ++next;
             for (unsigned int j = 2; j < arg.length(); j++)
                 if (isalpha(arg[j]))
-                    cmdline.insert(next, (string) "-" + arg[j]);
+                    cmdline.insert(next, (std::string) "-" + arg[j]);
                 else {
-                    cmdline.insert(next, string(arg, j));
+                    cmdline.insert(next, std::string(arg, j));
                     break;
                 }
             arg = *pos;
@@ -139,7 +139,7 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
         return true;
     };
 
-    if (string(*pos, 0, 2) == "--") {
+    if (std::string(*pos, 0, 2) == "--") {
         if (auto prefix = needsCompletion(*pos)) {
             for (auto & [name, flag] : longFlags) {
                 if (!hiddenCategories.count(flag->category)
@@ -147,12 +147,12 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
                     completions->add("--" + name, flag->description);
             }
         }
-        auto i = longFlags.find(string(*pos, 2));
+        auto i = longFlags.find(std::string(*pos, 2));
         if (i == longFlags.end()) return false;
         return process("--" + i->first, *i->second);
     }
 
-    if (string(*pos, 0, 1) == "-" && pos->size() == 2) {
+    if (std::string(*pos, 0, 1) == "-" && pos->size() == 2) {
         auto c = (*pos)[1];
         auto i = shortFlags.find(c);
         if (i == shortFlags.end()) return false;

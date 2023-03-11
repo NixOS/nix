@@ -190,13 +190,13 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
     }
 };
 
-ref<std::string> decompress(const std::string & method, const std::string & in)
+std::string decompress(const std::string & method, std::string_view in)
 {
     StringSink ssink;
     auto sink = makeDecompressionSink(method, ssink);
     (*sink)(in);
     sink->finish();
-    return ssink.s;
+    return std::move(ssink.s);
 }
 
 std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Sink & nextSink)
@@ -281,13 +281,13 @@ ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & next
         throw UnknownCompressionMethod("unknown compression method '%s'", method);
 }
 
-ref<std::string> compress(const std::string & method, const std::string & in, const bool parallel, int level)
+std::string compress(const std::string & method, std::string_view in, const bool parallel, int level)
 {
     StringSink ssink;
     auto sink = makeCompressionSink(method, ssink, parallel, level);
     (*sink)(in);
     sink->finish();
-    return ssink.s;
+    return std::move(ssink.s);
 }
 
 }

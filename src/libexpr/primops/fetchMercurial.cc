@@ -12,7 +12,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
     std::string url;
     std::optional<Hash> rev;
     std::optional<std::string> ref;
-    std::string name = "source";
+    std::string_view name = "source";
     PathSet context;
 
     state.forceValue(*args[0], pos);
@@ -22,14 +22,14 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
         state.forceAttrs(*args[0], pos);
 
         for (auto & attr : *args[0]->attrs) {
-            string n(attr.name);
+            std::string_view n(attr.name);
             if (n == "url")
-                url = state.coerceToString(*attr.pos, *attr.value, context, false, false);
+                url = state.coerceToString(*attr.pos, *attr.value, context, false, false).toOwned();
             else if (n == "rev") {
                 // Ugly: unlike fetchGit, here the "rev" attribute can
                 // be both a revision or a branch/tag name.
                 auto value = state.forceStringNoCtx(*attr.value, *attr.pos);
-                if (std::regex_match(value, revRegex))
+                if (std::regex_match(value.begin(), value.end(), revRegex))
                     rev = Hash::parseAny(value, htSHA1);
                 else
                     ref = value;
@@ -50,7 +50,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
             });
 
     } else
-        url = state.coerceToString(pos, *args[0], context, false, false);
+        url = state.coerceToString(pos, *args[0], context, false, false).toOwned();
 
     // FIXME: git externals probably can be used to bypass the URI
     // whitelist. Ah well.
@@ -62,7 +62,7 @@ static void prim_fetchMercurial(EvalState & state, const Pos & pos, Value * * ar
     fetchers::Attrs attrs;
     attrs.insert_or_assign("type", "hg");
     attrs.insert_or_assign("url", url.find("://") != std::string::npos ? url : "file://" + url);
-    attrs.insert_or_assign("name", name);
+    attrs.insert_or_assign("name", std::string(name));
     if (ref) attrs.insert_or_assign("ref", *ref);
     if (rev) attrs.insert_or_assign("rev", rev->gitRev());
     auto input = fetchers::Input::fromAttrs(std::move(attrs));

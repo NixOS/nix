@@ -32,7 +32,7 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
 
 bool createUserEnv(EvalState & state, DrvInfos & elems,
     const Path & profile, bool keepDerivations,
-    const string & lockToken)
+    const std::string & lockToken)
 {
     /* Build the components in the user environment, if they don't
        exist already. */
@@ -129,7 +129,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
     /* Evaluate it. */
     debug("evaluating user environment builder");
-    state.forceValue(topLevel);
+    state.forceValue(topLevel, [&]() { return topLevel.determinePos(noPos); });
     PathSet context;
     Attr & aDrvPath(*topLevel.attrs->find(state.sDrvPath));
     auto topLevelDrv = state.store->parseStorePath(state.coerceToPath(*aDrvPath.pos, *aDrvPath.value, context));

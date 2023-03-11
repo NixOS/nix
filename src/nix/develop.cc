@@ -325,8 +325,15 @@ struct Common : InstallableCommand, MixProfile
 
     Strings getDefaultFlakeAttrPaths() override
     {
-        return {"devShell." + settings.thisSystem.get(), "defaultPackage." + settings.thisSystem.get()};
+        Strings paths{
+            "devShells." + settings.thisSystem.get() + ".default",
+            "devShell." + settings.thisSystem.get(),
+        };
+        for (auto & p : SourceExprCommand::getDefaultFlakeAttrPaths())
+            paths.push_back(p);
+        return paths;
     }
+
     Strings getDefaultFlakeAttrPathPrefixes() override
     {
         auto res = SourceExprCommand::getDefaultFlakeAttrPathPrefixes();
@@ -472,9 +479,11 @@ struct CmdDevelop : Common, MixEnvironment
         else {
             script = "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;\n" + script;
             if (developSettings.bashPrompt != "")
-                script += fmt("[ -n \"$PS1\" ] && PS1=%s;\n", shellEscape(developSettings.bashPrompt));
+                script += fmt("[ -n \"$PS1\" ] && PS1=%s;\n",
+                    shellEscape(developSettings.bashPrompt.get()));
             if (developSettings.bashPromptSuffix != "")
-                script += fmt("[ -n \"$PS1\" ] && PS1+=%s;\n", shellEscape(developSettings.bashPromptSuffix));
+                script += fmt("[ -n \"$PS1\" ] && PS1+=%s;\n",
+                    shellEscape(developSettings.bashPromptSuffix.get()));
         }
 
         writeFull(rcFileFd.get(), script);
@@ -496,7 +505,8 @@ struct CmdDevelop : Common, MixEnvironment
                 this,
                 state,
                 installable->nixpkgsFlakeRef(),
-                Strings{"bashInteractive"},
+                "bashInteractive",
+                Strings{},
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
                 nixpkgsLockFlags);
 

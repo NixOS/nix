@@ -17,7 +17,7 @@ BaseError & BaseError::addTrace(std::optional<ErrPos> e, hintformat hint)
 
 // c++ std::exception descendants must have a 'const char* what()' function.
 // This stringifies the error and caches it for use by what(), or similarly by msg().
-const string & BaseError::calcWhat() const
+const std::string & BaseError::calcWhat() const
 {
     if (what_.has_value())
         return *what_;
@@ -32,14 +32,14 @@ const string & BaseError::calcWhat() const
     }
 }
 
-std::optional<string> ErrorInfo::programName = std::nullopt;
+std::optional<std::string> ErrorInfo::programName = std::nullopt;
 
 std::ostream & operator<<(std::ostream & os, const hintformat & hf)
 {
     return os << hf.str();
 }
 
-string showErrPos(const ErrPos & errPos)
+std::string showErrPos(const ErrPos & errPos)
 {
     if (errPos.line > 0) {
         if (errPos.column > 0) {
@@ -68,7 +68,7 @@ std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos)
 
             // count the newlines.
             int count = 0;
-            string line;
+            std::string line;
             int pl = errPos.line - 1;
             do
             {
@@ -100,7 +100,7 @@ std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos)
         std::istringstream iss(errPos.file);
         // count the newlines.
         int count = 0;
-        string line;
+        std::string line;
         int pl = errPos.line - 1;
 
         LinesOfCode loc;
@@ -132,7 +132,7 @@ std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos)
 
 // print lines of code to the ostream, indicating the error column.
 void printCodeLines(std::ostream & out,
-    const string & prefix,
+    const std::string & prefix,
     const ErrPos & errPos,
     const LinesOfCode & loc)
 {

@@ -32,7 +32,7 @@ std::string escapeUri(std::string uri)
     return uri;
 }
 
-static string currentLoad;
+static std::string currentLoad;
 
 static AutoCloseFD openSlotLock(const Machine & m, uint64_t slot)
 {
@@ -97,7 +97,7 @@ static int main_build_remote(int argc, char * * argv)
         }
 
         std::optional<StorePath> drvPath;
-        string storeUri;
+        std::string storeUri;
 
         while (true) {
 
@@ -183,7 +183,7 @@ static int main_build_remote(int argc, char * * argv)
                     else
                     {
                         // build the hint template.
-                        string errorText =
+                        std::string errorText =
                             "Failed to find a machine for remote build!\n"
                             "derivation: %s\nrequired (system, features): (%s, %s)";
                         errorText += "\n%s available machines:";
@@ -193,7 +193,7 @@ static int main_build_remote(int argc, char * * argv)
                             errorText += "\n(%s, %s, %s, %s)";
 
                         // add the template values.
-                        string drvstr;
+                        std::string drvstr;
                         if (drvPath.has_value())
                             drvstr = drvPath->to_string();
                         else
@@ -208,7 +208,7 @@ static int main_build_remote(int argc, char * * argv)
 
                         for (auto & m : machines)
                             error
-                                % concatStringsSep<vector<string>>(", ", m.systemTypes)
+                                % concatStringsSep<std::vector<std::string>>(", ", m.systemTypes)
                                 % m.maxJobs
                                 % concatStringsSep<StringSet>(", ", m.supportedFeatures)
                                 % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);

@@ -19,7 +19,7 @@ void emitTreeAttrs(
     bool emptyRevFallback,
     bool forceDirty)
 {
-    assert(input.isImmutable());
+    assert(input.isLocked());
 
     auto attrs = state.buildBindings(8);
 
@@ -125,7 +125,7 @@ static void fetchTree(
             if (attr.name == state.sType) continue;
             state.forceValue(*attr.value, *attr.pos);
             if (attr.value->type() == nPath || attr.value->type() == nString) {
-                auto s = state.coerceToString(*attr.pos, *attr.value, context, false, false);
+                auto s = state.coerceToString(*attr.pos, *attr.value, context, false, false).toOwned();
                 attrs.emplace(attr.name,
                     attr.name == "url"
                     ? type == "git"
@@ -151,7 +151,7 @@ static void fetchTree(
 
         input = fetchers::Input::fromAttrs(std::move(attrs));
     } else {
-        auto url = state.coerceToString(pos, *args[0], context, false, false);
+        auto url = state.coerceToString(pos, *args[0], context, false, false).toOwned();
 
         if (type == "git") {
             fetchers::Attrs attrs;
@@ -166,8 +166,8 @@ static void fetchTree(
     if (!evalSettings.pureEval && !input.isDirect())
         input = lookupInRegistries(state.store, input).first;
 
-    if (evalSettings.pureEval && !input.isImmutable())
-        throw Error("in pure evaluation mode, 'fetchTree' requires an immutable input, at %s", pos);
+    if (evalSettings.pureEval && !input.isLocked())
+        throw Error("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", pos);
 
     auto [tree, input2] = input.fetch(state.store);
 
@@ -186,7 +186,7 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
 static RegisterPrimOp primop_fetchTree("fetchTree", 1, prim_fetchTree);
 
 static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
-    const string & who, bool unpack, std::string name)
+    const std::string & who, bool unpack, std::string name)
 {
     std::optional<std::string> url;
     std::optional<Hash> expectedHash;
@@ -198,7 +198,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
         state.forceAttrs(*args[0], pos);
 
         for (auto & attr : *args[0]->attrs) {
-            string n(attr.name);
+            std::string n(attr.name);
             if (n == "url")
                 url = state.forceStringNoCtx(*attr.value, *attr.pos);
             else if (n == "sha256")

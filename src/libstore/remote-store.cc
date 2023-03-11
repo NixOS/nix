@@ -172,7 +172,7 @@ void RemoteStore::initConnection(Connection & conn)
                it. */
             conn.closeWrite();
             auto msg = conn.from.drain();
-            throw Error("protocol mismatch, got '%s'", chomp(*saved.s + msg));
+            throw Error("protocol mismatch, got '%s'", chomp(saved.s + msg));
         }
 
         conn.from >> conn.daemonVersion;
@@ -188,7 +188,12 @@ void RemoteStore::initConnection(Connection & conn)
         }
 
         if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 11)
-            conn.to << false;
+            conn.to << false; // obsolete reserveSpace
+
+        if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 33) {
+            conn.to.flush();
+            conn.daemonNixVersion = readString(conn.from);
+        }
 
         auto ex = conn.processStderr();
         if (ex) std::rethrow_exception(ex);
@@ -495,7 +500,7 @@ std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & 
 
 ref<const ValidPathInfo> RemoteStore::addCAToStore(
     Source & dump,
-    const string & name,
+    std::string_view name,
     ContentAddressMethod caMethod,
     const StorePathSet & references,
     RepairFlag repair)
@@ -577,7 +582,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
 }
 
 
-StorePath RemoteStore::addToStoreFromDump(Source & dump, const string & name,
+StorePath RemoteStore::addToStoreFromDump(Source & dump, std::string_view name,
       FileIngestionMethod method, HashType hashType, RepairFlag repair, const StorePathSet & references)
 {
     return addCAToStore(dump, name, FixedOutputHashMethod{ .fileIngestionMethod = method, .hashType = hashType }, references, repair)->path;
@@ -656,8 +661,11 @@ void RemoteStore::addMultipleToStore(
 }
 
 
-StorePath RemoteStore::addTextToStore(const string & name, const string & s,
-    const StorePathSet & references, RepairFlag repair)
+StorePath RemoteStore::addTextToStore(
+    std::string_view name,
+    std::string_view s,
+    const StorePathSet & references,
+    RepairFlag repair)
 {
     StringSource source(s);
     return addCAToStore(source, name, TextHashMethod{}, references, repair)->path;
@@ -908,6 +916,25 @@ void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
 }
 
 
+void RemoteStore::addBuildLog(const StorePath & drvPath, std::string_view log)
+{
+    auto conn(getConnection());
+    conn->to << wopAddBuildLog << drvPath.to_string();
+    StringSource source(log);
+    conn.withFramedSink([&](Sink & sink) {
+        source.drainInto(sink);
+    });
+    readInt(conn->from);
+}
+
+
+std::optional<std::string> RemoteStore::getVersion()
+{
+    auto conn(getConnection());
+    return conn->daemonNixVersion;
+}
+
+
 void RemoteStore::connect()
 {
     auto conn(getConnection());
@@ -976,7 +1003,7 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
         auto msg = readNum<uint64_t>(from);
 
         if (msg == STDERR_WRITE) {
-            string s = readString(from);
+            auto s = readString(from);
             if (!sink) throw Error("no sink");
             (*sink)(s);
         }
@@ -993,7 +1020,7 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
             if (GET_PROTOCOL_MINOR(daemonVersion) >= 26) {
                 return std::make_exception_ptr(readError(from));
             } else {
-                string error = readString(from);
+                auto error = readString(from);
                 unsigned int status = readInt(from);
                 return std::make_exception_ptr(Error(status, error));
             }

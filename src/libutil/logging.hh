@@ -48,7 +48,7 @@ struct LoggerSettings : Config
     Setting<bool> showTrace{
         this, false, "show-trace",
         R"(
-          Where Nix should print out a stack trace in case of Nix
+          Whether Nix should print out a stack trace in case of Nix
           expression evaluation errors.
         )"};
 };
@@ -224,6 +224,6 @@ inline void warn(const std::string & fs, const Args & ... args)
 
 void warnOnce(bool & haveWarned, const FormatOrString & fs);
 
-void writeToStderr(const string & s);
+void writeToStderr(std::string_view s);
 
 }

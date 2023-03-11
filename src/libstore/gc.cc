@@ -47,9 +47,8 @@ static void makeSymlink(const Path & link, const Path & target)
 
 void LocalStore::addIndirectRoot(const Path & path)
 {
-    string hash = hashString(htSHA1, path).to_string(Base32, false);
-    Path realRoot = canonPath((format("%1%/%2%/auto/%3%")
-        % stateDir % gcRootsDir % hash).str());
+    std::string hash = hashString(htSHA1, path).to_string(Base32, false);
+    Path realRoot = canonPath(fmt("%1%/%2%/auto/%3%", stateDir, gcRootsDir, hash));
     makeSymlink(realRoot, path);
 }
 
@@ -162,7 +161,7 @@ void LocalStore::addTempRoot(const StorePath & path)
     }
 
     /* Append the store path to the temporary roots file. */
-    string s = printStorePath(path) + '\0';
+    auto s = printStorePath(path) + '\0';
     writeFull(state->fdTempRoots.get(), s);
 }
 
@@ -203,12 +202,12 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
         }
 
         /* Read the entire file. */
-        string contents = readFile(fd.get());
+        auto contents = readFile(fd.get());
 
         /* Extract the roots. */
-        string::size_type pos = 0, end;
+        std::string::size_type pos = 0, end;
 
-        while ((end = contents.find((char) 0, pos)) != string::npos) {
+        while ((end = contents.find((char) 0, pos)) != std::string::npos) {
             Path root(contents, pos, end - pos);
             debug("got temporary root '%s'", root);
             tempRoots[parseStorePath(root)].emplace(censor ? censored : fmt("{temp:%d}", pid));
@@ -305,7 +304,7 @@ Roots LocalStore::findRoots(bool censor)
 
 typedef std::unordered_map<Path, std::unordered_set<std::string>> UncheckedRoots;
 
-static void readProcLink(const string & file, UncheckedRoots & roots)
+static void readProcLink(const std::string & file, UncheckedRoots & roots)
 {
     /* 64 is the starting buffer size gnu readlink uses... */
     auto bufsiz = ssize_t{64};
@@ -328,7 +327,7 @@ try_again:
             .emplace(file);
 }
 
-static string quoteRegexChars(const string & raw)
+static std::string quoteRegexChars(const std::string & raw)
 {
     static auto specialRegex = std::regex(R"([.^$\\*+?()\[\]{}|])");
     return std::regex_replace(raw, specialRegex, R"(\$&)");
@@ -383,7 +382,7 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
 
                 try {
                     auto mapFile = fmt("/proc/%s/maps", ent->d_name);
-                    auto mapLines = tokenizeString<std::vector<string>>(readFile(mapFile), "\n");
+                    auto mapLines = tokenizeString<std::vector<std::string>>(readFile(mapFile), "\n");
                     for (const auto & line : mapLines) {
                         auto match = std::smatch{};
                         if (std::regex_match(line, match, mapRegex))
@@ -784,7 +783,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             struct dirent * dirent;
             while (errno = 0, dirent = readdir(dir.get())) {
                 checkInterrupt();
-                string name = dirent->d_name;
+                std::string name = dirent->d_name;
                 if (name == "." || name == ".." || name == linksName) continue;
 
                 if (auto storePath = maybeParseStorePath(storeDir + "/" + name))
@@ -825,7 +824,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         struct dirent * dirent;
         while (errno = 0, dirent = readdir(dir.get())) {
             checkInterrupt();
-            string name = dirent->d_name;
+            std::string name = dirent->d_name;
             if (name == "." || name == "..") continue;
             Path path = linksDir + "/" + name;
 

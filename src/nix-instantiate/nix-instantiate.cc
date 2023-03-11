@@ -40,7 +40,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
 
     for (auto & i : attrPaths) {
         Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot).first);
-        state.forceValue(v);
+        state.forceValue(v, [&]() { return v.determinePos(noPos); });
 
         PathSet context;
         if (evalOnly) {
@@ -64,7 +64,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
                 Path drvPath = i.queryDrvPath();
 
                 /* What output do we want? */
-                string outputName = i.queryOutputName();
+                std::string outputName = i.queryOutputName();
                 if (outputName == "")
                     throw Error("derivation '%1%' lacks an 'outputName' attribute ", drvPath);
 

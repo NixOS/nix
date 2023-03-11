@@ -9,7 +9,7 @@
 namespace nix {
 
 
-static XMLAttrs singletonAttrs(const string & name, const string & value)
+static XMLAttrs singletonAttrs(const std::string & name, const std::string & value)
 {
     XMLAttrs attrs;
     attrs[name] = value;
@@ -142,7 +142,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
                 if (!v.lambda.fun->arg.empty()) attrs["name"] = v.lambda.fun->arg;
                 if (v.lambda.fun->formals->ellipsis) attrs["ellipsis"] = "1";
                 XMLOpenElement _(doc, "attrspat", attrs);
-                for (auto & i : v.lambda.fun->formals->formals)
+                for (auto & i : v.lambda.fun->formals->lexicographicOrder())
                     doc.writeEmptyElement("attr", singletonAttrs("name", i.name));
             } else
                 doc.writeEmptyElement("varpat", singletonAttrs("name", v.lambda.fun->arg));

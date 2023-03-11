@@ -16,12 +16,17 @@ someBuildFailed=0
 for buildId in $BUILDS_FOR_LATEST_EVAL; do
   buildInfo=$(curl -sS -H 'Accept: application/json' "https://hydra.nixos.org/build/$buildId")
 
-  buildStatus=$(echo "$buildInfo" | \
-    jq -r '.buildstatus')
+  finished=$(echo "$buildInfo" | jq -r '.finished')
 
-  if [[ "$buildStatus" -ne 0 ]]; then
+  if [[ $finished = 0 ]]; then
+    continue
+  fi
+
+  buildStatus=$(echo "$buildInfo" | jq -r '.buildstatus')
+
+  if [[ $buildStatus != 0 ]]; then
     someBuildFailed=1
-    echo "Job “$(echo "$buildInfo" | jq -r '.job')” failed on hydra"
+    echo "Job “$(echo "$buildInfo" | jq -r '.job')” failed on hydra: $buildInfo"
   fi
 done
 

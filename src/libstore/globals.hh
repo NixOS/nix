@@ -113,7 +113,7 @@ public:
     bool verboseBuild = true;
 
     Setting<size_t> logLines{this, 10, "log-lines",
-        "If `verbose-build` is false, the number of lines of the tail of "
+        "The number of lines of the tail of "
         "the log to show if a build fails."};
 
     MaxBuildJobsSetting maxBuildJobs{
@@ -966,6 +966,13 @@ public:
 
     Setting<bool> acceptFlakeConfig{this, false, "accept-flake-config",
         "Whether to accept nix configuration from a flake without prompting."};
+
+    Setting<std::string> commitLockFileSummary{
+        this, "", "commit-lockfile-summary",
+        R"(
+          The commit summary to use when committing changed flake lock files. If
+          empty, the summary is generated based on the action performed.
+        )"};
 };
 
 
@@ -981,6 +988,6 @@ void loadConfFile();
 // Used by the Settings constructor
 std::vector<Path> getUserConfigFiles();
 
-extern const string nixVersion;
+extern const std::string nixVersion;
 
 }

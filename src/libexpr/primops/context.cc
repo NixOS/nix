@@ -7,7 +7,8 @@ namespace nix {
 static void prim_unsafeDiscardStringContext(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    v.mkString(state.coerceToString(pos, *args[0], context));
+    auto s = state.coerceToString(pos, *args[0], context);
+    v.mkString(*s);
 }
 
 static RegisterPrimOp primop_unsafeDiscardStringContext("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
@@ -32,13 +33,13 @@ static RegisterPrimOp primop_hasContext("__hasContext", 1, prim_hasContext);
 static void prim_unsafeDiscardOutputDependency(EvalState & state, const Pos & pos, Value * * args, Value & v)
 {
     PathSet context;
-    string s = state.coerceToString(pos, *args[0], context);
+    auto s = state.coerceToString(pos, *args[0], context);
 
     PathSet context2;
     for (auto & p : context)
-        context2.insert(p.at(0) == '=' ? string(p, 1) : p);
+        context2.insert(p.at(0) == '=' ? std::string(p, 1) : p);
 
-    v.mkString(s, context2);
+    v.mkString(*s, context2);
 }
 
 static RegisterPrimOp primop_unsafeDiscardOutputDependency("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
@@ -75,13 +76,13 @@ static void prim_getContext(EvalState & state, const Pos & pos, Value * * args, 
     auto contextInfos = std::map<Path, ContextInfo>();
     for (const auto & p : context) {
         Path drv;
-        string output;
+        std::string output;
         const Path * path = &p;
         if (p.at(0) == '=') {
-            drv = string(p, 1);
+            drv = std::string(p, 1);
             path = &drv;
         } else if (p.at(0) == '!') {
-            std::pair<string, string> ctx = decodeContext(p);
+            std::pair<std::string, std::string> ctx = decodeContext(p);
             drv = ctx.first;
             output = ctx.second;
             path = &drv;
@@ -165,7 +166,7 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
                         .errPos = *i.pos
                     });
                 }
-                context.insert("=" + string(i.name));
+                context.insert("=" + std::string(i.name));
             }
         }
 
@@ -180,7 +181,7 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
             }
             for (auto elem : iter->value->listItems()) {
                 auto name = state.forceStringNoCtx(*elem, *iter->pos);
-                context.insert("!" + name + "!" + string(i.name));
+                context.insert(concatStrings("!", name, "!", i.name));
             }
         }
     }
