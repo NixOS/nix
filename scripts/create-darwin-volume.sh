@@ -246,7 +246,8 @@ get_volume_pass() {
 verify_volume_pass() {
     local volume_special="$1" # (i.e., disk1s7)
     local volume_uuid="$2"
-    /usr/sbin/diskutil apfs unlockVolume "$volume_special" -verify -stdinpassphrase -user "$volume_uuid"
+    _sudo "to confirm the password actually unlocks the volume" \
+        /usr/sbin/diskutil apfs unlockVolume "$volume_special" -verify -stdinpassphrase -user "$volume_uuid"
 }
 
 volume_pass_works() {
@@ -685,22 +686,27 @@ encrypt_volume() {
     local volume_uuid="$1"
     local volume_label="$2"
     local password
+
+    task "Encrypt the Nix volume" >&2
+
     # Note: mount/unmount are late additions to support the right order
     # of operations for creating the volume and then baking its uuid into
     # other artifacts; not as well-trod wrt to potential errors, race
     # conditions, etc.
 
-    /usr/sbin/diskutil mount "$volume_label"
+    _sudo "to mount your Nix volume for encrypting" \
+        /usr/sbin/diskutil mount "$volume_label"
 
     password="$(/usr/bin/xxd -l 32 -p -c 256 /dev/random)"
     _sudo "to add your Nix volume's password to Keychain" \
         /usr/bin/security -i <<EOF
 add-generic-password -a "$volume_label" -s "$volume_uuid" -l "$volume_label encryption password" -D "Encrypted volume password" -j "Added automatically by the Nix installer for use by $NIX_VOLUME_MOUNTD_DEST" -w "$password" -T /System/Library/CoreServices/APFSUserAgent -T /System/Library/CoreServices/CSUserAgent -T /usr/bin/security "/Library/Keychains/System.keychain"
 EOF
-    builtin printf "%s" "$password" | _sudo "to encrypt your Nix volume" \
+    builtin printf "%s" "$password" | _sudo "to actually encrypt your Nix volume" \
         /usr/sbin/diskutil apfs encryptVolume "$volume_label" -user disk -stdinpassphrase
 
-    /usr/sbin/diskutil unmount force "$volume_label"
+    _sudo "to unmount the encrypted volume" \
+        /usr/sbin/diskutil unmount force "$volume_label"
 }
 
 create_volume() {

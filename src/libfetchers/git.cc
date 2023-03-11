@@ -6,6 +6,8 @@
 #include "url-parts.hh"
 #include "pathlocks.hh"
 
+#include "fetch-settings.hh"
+
 #include <sys/time.h>
 #include <sys/wait.h>
 
@@ -246,10 +248,10 @@ struct GitInputScheme : InputScheme
 
                 /* This is an unclean working tree. So copy all tracked files. */
 
-                if (!settings.allowDirty)
+                if (!fetchSettings.allowDirty)
                     throw Error("Git tree '%s' is dirty", actualUrl);
 
-                if (settings.warnDirty)
+                if (fetchSettings.warnDirty)
                     warn("Git tree '%s' is dirty", actualUrl);
 
                 auto gitOpts = Strings({ "-C", actualUrl, "ls-files", "-z" });

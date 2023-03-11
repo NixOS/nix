@@ -384,13 +384,12 @@ StorePath NixRepl::getDerivationPath(Value & v) {
     auto drvInfo = getDerivation(*state, v, false);
     if (!drvInfo)
         throw Error("expression does not evaluate to a derivation, so I can't build it");
-    Path drvPathRaw = drvInfo->queryDrvPath();
-    if (drvPathRaw == "")
-        throw Error("expression did not evaluate to a valid derivation (no drv path)");
-    StorePath drvPath = state->store->parseStorePath(drvPathRaw);
-    if (!state->store->isValidPath(drvPath))
-        throw Error("expression did not evaluate to a valid derivation (invalid drv path)");
-    return drvPath;
+    auto drvPath = drvInfo->queryDrvPath();
+    if (!drvPath)
+        throw Error("expression did not evaluate to a valid derivation (no 'drvPath' attribute)");
+    if (!state->store->isValidPath(*drvPath))
+        throw Error("expression evaluated to invalid derivation '%s'", state->store->printStorePath(*drvPath));
+    return *drvPath;
 }
 
 
@@ -780,8 +779,11 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
             str << "«derivation ";
             Bindings::iterator i = v.attrs->find(state->sDrvPath);
             PathSet context;
-            Path drvPath = i != v.attrs->end() ? state->coerceToPath(*i->pos, *i->value, context) : "???";
-            str << drvPath << "»";
+            if (i != v.attrs->end())
+                str << state->store->printStorePath(state->coerceToStorePath(*i->pos, *i->value, context));
+            else
+                str << "???";
+            str << "»";
         }
 
         else if (maxDepth > 0) {
@@ -798,7 +800,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                 else
                     printStringValue(str, i.first.c_str());
                 str << " = ";
-                if (seen.find(i.second) != seen.end())
+                if (seen.count(i.second))
                     str << "«repeated»";
                 else
                     try {

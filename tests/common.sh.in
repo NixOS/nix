@@ -87,15 +87,20 @@ startDaemon() {
     if [[ "$NIX_REMOTE" == daemon ]]; then
       return
     fi
-    # Start the daemon, wait for the socket to appear.  !!!
-    # ‘nix-daemon’ should have an option to fork into the background.
+    # Start the daemon, wait for the socket to appear.
     rm -f $NIX_DAEMON_SOCKET_PATH
-    PATH=$DAEMON_PATH nix daemon &
+    PATH=$DAEMON_PATH nix-daemon&
+    pidDaemon=$!
     for ((i = 0; i < 300; i++)); do
-        if [[ -S $NIX_DAEMON_SOCKET_PATH ]]; then break; fi
+        if [[ -S $NIX_DAEMON_SOCKET_PATH ]]; then
+          DAEMON_STARTED=1
+          break;
+        fi
         sleep 0.1
     done
-    pidDaemon=$!
+    if [[ -z ${DAEMON_STARTED+x} ]]; then
+      fail "Didn’t manage to start the daemon"
+    fi
     trap "killDaemon" EXIT
     export NIX_REMOTE=daemon
 }
@@ -103,10 +108,10 @@ startDaemon() {
 killDaemon() {
     kill $pidDaemon
     for i in {0..100}; do
-        kill -0 $pidDaemon || break
+        kill -0 $pidDaemon 2> /dev/null || break
         sleep 0.1
     done
-    kill -9 $pidDaemon || true
+    kill -9 $pidDaemon 2> /dev/null || true
     wait $pidDaemon || true
     trap "" EXIT
 }
@@ -167,8 +172,13 @@ needLocalStore() {
 }
 
 # Just to make it easy to find which tests should be fixed
-buggyNeedLocalStore () {
+buggyNeedLocalStore() {
   needLocalStore
+}
+
+enableFeatures() {
+    local features="$1"
+    sed -i 's/experimental-features .*/& '"$features"'/' "$NIX_CONF_DIR"/nix.conf
 }
 
 set -x

@@ -230,6 +230,21 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
     if (evalSettings.pureEval && !expectedHash)
         throw Error("in pure evaluation mode, '%s' requires a 'sha256' argument", who);
 
+    // early exit if pinned and already in the store
+    if (expectedHash && expectedHash->type == htSHA256) {
+        auto expectedPath =
+            unpack
+            ? state.store->makeFixedOutputPath(FileIngestionMethod::Recursive, *expectedHash, name, {})
+            : state.store->makeFixedOutputPath(FileIngestionMethod::Flat, *expectedHash, name, {});
+
+        if (state.store->isValidPath(expectedPath)) {
+            state.allowAndSetStorePathString(expectedPath, v);
+            return;
+        }
+    }
+
+    // TODO: fetching may fail, yet the path may be substitutable.
+    //       https://github.com/NixOS/nix/issues/4313
     auto storePath =
         unpack
         ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
@@ -244,10 +259,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
                 *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true));
     }
 
-    state.allowPath(storePath);
-
-    auto path = state.store->printStorePath(storePath);
-    v.mkString(path, PathSet({path}));
+    state.allowAndSetStorePathString(storePath, v);
 }
 
 static void prim_fetchurl(EvalState & state, const Pos & pos, Value * * args, Value & v)

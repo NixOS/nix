@@ -468,11 +468,10 @@ std::vector<InstallableValue::DerivationInfo> InstallableAttrPath::toDerivations
 
     std::vector<DerivationInfo> res;
     for (auto & drvInfo : drvInfos) {
-        res.push_back({
-            state->store->parseStorePath(drvInfo.queryDrvPath()),
-            state->store->maybeParseStorePath(drvInfo.queryOutPath()),
-            drvInfo.queryOutputName()
-        });
+        auto drvPath = drvInfo.queryDrvPath();
+        if (!drvPath)
+            throw Error("'%s' is not a derivation", what());
+        res.push_back({ *drvPath, drvInfo.queryOutputName() });
     }
 
     return res;
@@ -586,9 +585,8 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
 
         auto drvPath = attr->forceDerivation();
 
-        auto drvInfo = DerivationInfo{
+        auto drvInfo = DerivationInfo {
             std::move(drvPath),
-            state->store->maybeParseStorePath(attr->getAttr(state->sOutPath)->getString()),
             attr->getAttr(state->sOutputName)->getString()
         };
 
@@ -789,7 +787,7 @@ BuiltPaths getBuiltPaths(ref<Store> evalStore, ref<Store> store, const DerivedPa
     return res;
 }
 
-BuiltPaths build(
+BuiltPaths Installable::build(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode,
@@ -814,7 +812,7 @@ BuiltPaths build(
     return getBuiltPaths(evalStore, store, pathsToBuild);
 }
 
-BuiltPaths toBuiltPaths(
+BuiltPaths Installable::toBuiltPaths(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode,
@@ -822,19 +820,19 @@ BuiltPaths toBuiltPaths(
     const std::vector<std::shared_ptr<Installable>> & installables)
 {
     if (operateOn == OperateOn::Output)
-        return build(evalStore, store, mode, installables);
+        return Installable::build(evalStore, store, mode, installables);
     else {
         if (mode == Realise::Nothing)
             settings.readOnlyMode = true;
 
         BuiltPaths res;
-        for (auto & drvPath : toDerivations(store, installables, true))
+        for (auto & drvPath : Installable::toDerivations(store, installables, true))
             res.push_back(BuiltPath::Opaque{drvPath});
         return res;
     }
 }
 
-StorePathSet toStorePaths(
+StorePathSet Installable::toStorePaths(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode, OperateOn operateOn,
@@ -848,7 +846,7 @@ StorePathSet toStorePaths(
     return outPaths;
 }
 
-StorePath toStorePath(
+StorePath Installable::toStorePath(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode, OperateOn operateOn,
@@ -862,7 +860,7 @@ StorePath toStorePath(
     return *paths.begin();
 }
 
-StorePathSet toDerivations(
+StorePathSet Installable::toDerivations(
     ref<Store> store,
     const std::vector<std::shared_ptr<Installable>> & installables,
     bool useDeriver)

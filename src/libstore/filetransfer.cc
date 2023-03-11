@@ -197,7 +197,7 @@ struct curlFileTransfer : public FileTransfer
                 result.etag = "";
                 result.data.clear();
                 result.bodySize = 0;
-                statusMsg = trim((std::string &) match[1]);
+                statusMsg = trim(match.str(1));
                 acceptRanges = false;
                 encoding = "";
             } else {

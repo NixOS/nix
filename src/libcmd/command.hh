@@ -5,7 +5,6 @@
 #include "common-eval-args.hh"
 #include "path.hh"
 #include "flake/lockfile.hh"
-#include "store-api.hh"
 
 #include <optional>
 
@@ -82,14 +81,6 @@ struct MixFlakeOptions : virtual Args, EvalCommand
     { return {}; }
 };
 
-/* How to handle derivations in commands that operate on store paths. */
-enum class OperateOn {
-    /* Operate on the output path. */
-    Output,
-    /* Operate on the .drv path. */
-    Derivation
-};
-
 struct SourceExprCommand : virtual Args, MixFlakeOptions
 {
     std::optional<Path> file;
@@ -111,19 +102,6 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
     virtual Strings getDefaultFlakeAttrPathPrefixes();
 
     void completeInstallable(std::string_view prefix);
-};
-
-enum class Realise {
-    /* Build the derivation. Postcondition: the
-       derivation outputs exist. */
-    Outputs,
-    /* Don't build the derivation. Postcondition: the store derivation
-       exists. */
-    Derivation,
-    /* Evaluate in dry-run mode. Postcondition: nothing. */
-    // FIXME: currently unused, but could be revived if we can
-    // evaluate derivations in-memory.
-    Nothing
 };
 
 /* A command that operates on a list of "installables", which can be
@@ -237,38 +215,6 @@ static RegisterCommand registerCommand2(std::vector<std::string> && name)
 {
     return RegisterCommand(std::move(name), [](){ return make_ref<T>(); });
 }
-
-BuiltPaths build(
-    ref<Store> evalStore,
-    ref<Store> store, Realise mode,
-    const std::vector<std::shared_ptr<Installable>> & installables,
-    BuildMode bMode = bmNormal);
-
-std::set<StorePath> toStorePaths(
-    ref<Store> evalStore,
-    ref<Store> store,
-    Realise mode,
-    OperateOn operateOn,
-    const std::vector<std::shared_ptr<Installable>> & installables);
-
-StorePath toStorePath(
-    ref<Store> evalStore,
-    ref<Store> store,
-    Realise mode,
-    OperateOn operateOn,
-    std::shared_ptr<Installable> installable);
-
-std::set<StorePath> toDerivations(
-    ref<Store> store,
-    const std::vector<std::shared_ptr<Installable>> & installables,
-    bool useDeriver = false);
-
-BuiltPaths toBuiltPaths(
-    ref<Store> evalStore,
-    ref<Store> store,
-    Realise mode,
-    OperateOn operateOn,
-    const std::vector<std::shared_ptr<Installable>> & installables);
 
 /* Helper function to generate args that invoke $EDITOR on
    filename:lineno. */

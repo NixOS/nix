@@ -1263,9 +1263,9 @@ std::string chomp(std::string_view s)
 std::string trim(std::string_view s, std::string_view whitespace)
 {
     auto i = s.find_first_not_of(whitespace);
-    if (i == std::string_view::npos) return "";
+    if (i == s.npos) return "";
     auto j = s.find_last_not_of(whitespace);
-    return std::string(s, i, j == std::string::npos ? j : j - i + 1);
+    return std::string(s, i, j == s.npos ? j : j - i + 1);
 }
 
 
@@ -1412,7 +1412,7 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
             }
         }
 
-        else if (*i == '\r')
+        else if (*i == '\r' || *i == '\a')
             // do nothing for now
             i++;
 

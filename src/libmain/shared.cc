@@ -1,6 +1,7 @@
 #include "globals.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "gc-store.hh"
 #include "util.hh"
 #include "loggers.hh"
 
@@ -227,8 +228,6 @@ LegacyArgs::LegacyArgs(const std::string & programName,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
     : MixCommonArgs(programName), parseArg(parseArg)
 {
-    printError("FOO %s", programName);
-    
     addFlag({
         .longName = "no-build-output",
         .shortName = 'Q',

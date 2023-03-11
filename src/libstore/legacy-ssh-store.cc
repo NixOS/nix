@@ -2,6 +2,7 @@
 #include "pool.hh"
 #include "remote-store.hh"
 #include "serve-protocol.hh"
+#include "build-result.hh"
 #include "store-api.hh"
 #include "path-with-outputs.hh"
 #include "worker-protocol.hh"

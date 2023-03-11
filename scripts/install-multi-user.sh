@@ -23,10 +23,10 @@ readonly RED='\033[31m'
 # installer allows overriding build user count to speed up installation
 # as creating each user takes non-trivial amount of time on macos
 readonly NIX_USER_COUNT=${NIX_USER_COUNT:-32}
-readonly NIX_BUILD_GROUP_ID="30000"
+readonly NIX_BUILD_GROUP_ID="${NIX_BUILD_GROUP_ID:-30000}"
 readonly NIX_BUILD_GROUP_NAME="nixbld"
 # darwin installer needs to override these
-NIX_FIRST_BUILD_UID="30001"
+NIX_FIRST_BUILD_UID="${NIX_FIRST_BUILD_UID:-30001}"
 NIX_BUILD_USER_NAME_TEMPLATE="nixbld%d"
 # Please don't change this. We don't support it, because the
 # default shell profile that comes with Nix doesn't support it.

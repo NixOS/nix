@@ -6,6 +6,7 @@
 #include "store-api.hh"
 #include "fetchers.hh"
 #include "finally.hh"
+#include "fetch-settings.hh"
 
 namespace nix {
 
@@ -317,7 +318,7 @@ LockedFlake lockFlake(
 
     FlakeCache flakeCache;
 
-    auto useRegistries = lockFlags.useRegistries.value_or(settings.useRegistries);
+    auto useRegistries = lockFlags.useRegistries.value_or(fetchSettings.useRegistries);
 
     auto flake = getFlake(state, topRef, useRegistries, flakeCache);
 
@@ -593,7 +594,7 @@ LockedFlake lockFlake(
             if (lockFlags.writeLockFile) {
                 if (auto sourcePath = topRef.input.getSourcePath()) {
                     if (!newLockFile.isImmutable()) {
-                        if (settings.warnDirty)
+                        if (fetchSettings.warnDirty)
                             warn("will not write lock file of flake '%s' because it has a mutable input", topRef);
                     } else {
                         if (!lockFlags.updateLockFile)
@@ -620,7 +621,7 @@ LockedFlake lockFlake(
                         if (lockFlags.commitLockFile) {
                             std::string cm;
 
-                            cm = settings.commitLockFileSummary.get();
+                            cm = fetchSettings.commitLockFileSummary.get();
 
                             if (cm == "") {
                                 cm = fmt("%s: %s", relPath, lockFileExists ? "Update" : "Add");
@@ -718,7 +719,7 @@ static void prim_getFlake(EvalState & state, const Pos & pos, Value * * args, Va
         lockFlake(state, flakeRef,
             LockFlags {
                 .updateLockFile = false,
-                .useRegistries = !evalSettings.pureEval && settings.useRegistries,
+                .useRegistries = !evalSettings.pureEval && fetchSettings.useRegistries,
                 .allowMutable  = !evalSettings.pureEval,
             }),
         v);

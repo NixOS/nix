@@ -86,14 +86,9 @@ RootValue allocRootValue(Value * v)
 }
 
 
-void printValue(std::ostream & str, std::set<const Value *> & active, const Value & v)
+void printValue(std::ostream & str, std::set<const void *> & seen, const Value & v)
 {
     checkInterrupt();
-
-    if (!active.insert(&v).second) {
-        str << "<CYCLE>";
-        return;
-    }
 
     switch (v.internalType) {
     case tInt:
@@ -120,24 +115,32 @@ void printValue(std::ostream & str, std::set<const Value *> & active, const Valu
         str << "null";
         break;
     case tAttrs: {
-        str << "{ ";
-        for (auto & i : v.attrs->lexicographicOrder()) {
-            str << i->name << " = ";
-            printValue(str, active, *i->value);
-            str << "; ";
+        if (!v.attrs->empty() && !seen.insert(v.attrs).second)
+            str << "<REPEAT>";
+        else {
+            str << "{ ";
+            for (auto & i : v.attrs->lexicographicOrder()) {
+                str << i->name << " = ";
+                printValue(str, seen, *i->value);
+                str << "; ";
+            }
+            str << "}";
         }
-        str << "}";
         break;
     }
     case tList1:
     case tList2:
     case tListN:
-        str << "[ ";
-        for (auto v2 : v.listItems()) {
-            printValue(str, active, *v2);
-            str << " ";
+        if (v.listSize() && !seen.insert(v.listElems()).second)
+            str << "<REPEAT>";
+        else {
+            str << "[ ";
+            for (auto v2 : v.listItems()) {
+                printValue(str, seen, *v2);
+                str << " ";
+            }
+            str << "]";
         }
-        str << "]";
         break;
     case tThunk:
     case tApp:
@@ -161,15 +164,13 @@ void printValue(std::ostream & str, std::set<const Value *> & active, const Valu
     default:
         abort();
     }
-
-    active.erase(&v);
 }
 
 
 std::ostream & operator << (std::ostream & str, const Value & v)
 {
-    std::set<const Value *> active;
-    printValue(str, active, v);
+    std::set<const void *> seen;
+    printValue(str, seen, v);
     return str;
 }
 
@@ -515,6 +516,14 @@ void EvalState::allowPath(const StorePath & storePath)
 {
     if (allowedPaths)
         allowedPaths->insert(store->toRealPath(storePath));
+}
+
+void EvalState::allowAndSetStorePathString(const StorePath &storePath, Value & v)
+{
+    allowPath(storePath);
+
+    auto path = store->printStorePath(storePath);
+    v.mkString(path, PathSet({path}));
 }
 
 Path EvalState::checkSourcePath(const Path & path_)
@@ -2047,6 +2056,18 @@ Path EvalState::coerceToPath(const Pos & pos, Value & v, PathSet & context)
     if (path == "" || path[0] != '/')
         throwEvalError(pos, "string '%1%' doesn't represent an absolute path", path);
     return path;
+}
+
+
+StorePath EvalState::coerceToStorePath(const Pos & pos, Value & v, PathSet & context)
+{
+    auto path = coerceToString(pos, v, context, false, false).toOwned();
+    if (auto storePath = store->maybeParseStorePath(path))
+        return *storePath;
+    throw EvalError({
+        .msg = hintfmt("path '%1%' is not in the Nix store", path),
+        .errPos = pos
+    });
 }
 
 

@@ -5,6 +5,8 @@
 #include "store-api.hh"
 #include "url-parts.hh"
 
+#include "fetch-settings.hh"
+
 #include <sys/time.h>
 
 using namespace std::string_literals;
@@ -165,10 +167,10 @@ struct MercurialInputScheme : InputScheme
                 /* This is an unclean working tree. So copy all tracked
                    files. */
 
-                if (!settings.allowDirty)
+                if (!fetchSettings.allowDirty)
                     throw Error("Mercurial tree '%s' is unclean", actualUrl);
 
-                if (settings.warnDirty)
+                if (fetchSettings.warnDirty)
                     warn("Mercurial tree '%s' is unclean", actualUrl);
 
                 input.attrs.insert_or_assign("ref", chomp(runHg({ "branch", "-R", actualUrl })));
