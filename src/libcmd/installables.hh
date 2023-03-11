@@ -68,7 +68,7 @@ struct Installable
 
     UnresolvedApp toApp(EvalState & state);
 
-    virtual std::pair<Value *, Pos> toValue(EvalState & state)
+    virtual std::pair<Value *, PosIdx> toValue(EvalState & state)
     {
         throw Error("argument '%s' cannot be evaluated", what());
     }
@@ -80,10 +80,10 @@ struct Installable
         return {};
     }
 
-    virtual std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
+    virtual std::vector<ref<eval_cache::AttrCursor>>
     getCursors(EvalState & state);
 
-    std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>
+    virtual ref<eval_cache::AttrCursor>
     getCursor(EvalState & state);
 
     virtual FlakeRef nixpkgsFlakeRef() const
@@ -141,7 +141,7 @@ struct InstallableValue : Installable
     struct DerivationInfo
     {
         StorePath drvPath;
-        std::string outputName;
+        std::set<std::string> outputsToInstall;
     };
 
     virtual std::vector<DerivationInfo> toDerivations() = 0;
@@ -156,6 +156,7 @@ struct InstallableFlake : InstallableValue
     FlakeRef flakeRef;
     Strings attrPaths;
     Strings prefixes;
+    OutputsSpec outputsSpec;
     const flake::LockFlags & lockFlags;
     mutable std::shared_ptr<flake::LockedFlake> _lockedFlake;
 
@@ -164,6 +165,7 @@ struct InstallableFlake : InstallableValue
         ref<EvalState> state,
         FlakeRef && flakeRef,
         std::string_view fragment,
+        OutputsSpec outputsSpec,
         Strings attrPaths,
         Strings prefixes,
         const flake::LockFlags & lockFlags);
@@ -178,10 +180,16 @@ struct InstallableFlake : InstallableValue
 
     std::vector<DerivationInfo> toDerivations() override;
 
-    std::pair<Value *, Pos> toValue(EvalState & state) override;
+    std::pair<Value *, PosIdx> toValue(EvalState & state) override;
 
-    std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
+    /* Get a cursor to every attrpath in getActualAttrPaths() that
+       exists. */
+    std::vector<ref<eval_cache::AttrCursor>>
     getCursors(EvalState & state) override;
+
+    /* Get a cursor to the first attrpath in getActualAttrPaths() that
+       exists, or throw an exception with suggestions if none exists. */
+    ref<eval_cache::AttrCursor> getCursor(EvalState & state) override;
 
     std::shared_ptr<flake::LockedFlake> getLockedFlake() const;
 

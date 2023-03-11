@@ -127,11 +127,11 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
                 if (flag.handler.arity == ArityAny) break;
                 throw UsageError("flag '%s' requires %d argument(s)", name, flag.handler.arity);
             }
-            if (flag.completer)
-                if (auto prefix = needsCompletion(*pos)) {
-                    anyCompleted = true;
+            if (auto prefix = needsCompletion(*pos)) {
+                anyCompleted = true;
+                if (flag.completer)
                     flag.completer(n, *prefix);
-                }
+            }
             args.push_back(*pos++);
         }
         if (!anyCompleted)
@@ -146,6 +146,7 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
                     && hasPrefix(name, std::string(*prefix, 2)))
                     completions->add("--" + name, flag->description);
             }
+            return false;
         }
         auto i = longFlags.find(std::string(*pos, 2));
         if (i == longFlags.end()) return false;
@@ -187,10 +188,12 @@ bool Args::processArgs(const Strings & args, bool finish)
     {
         std::vector<std::string> ss;
         for (const auto &[n, s] : enumerate(args)) {
-            ss.push_back(s);
-            if (exp.completer)
-                if (auto prefix = needsCompletion(s))
+            if (auto prefix = needsCompletion(s)) {
+                ss.push_back(*prefix);
+                if (exp.completer)
                     exp.completer(n, *prefix);
+            } else
+                ss.push_back(s);
         }
         exp.handler.fun(ss);
         expectedArgs.pop_front();
@@ -279,21 +282,22 @@ static void _completePath(std::string_view prefix, bool onlyDirs)
 {
     completionType = ctFilenames;
     glob_t globbuf;
-    int flags = GLOB_NOESCAPE | GLOB_TILDE;
+    int flags = GLOB_NOESCAPE;
     #ifdef GLOB_ONLYDIR
     if (onlyDirs)
         flags |= GLOB_ONLYDIR;
     #endif
-    if (glob((std::string(prefix) + "*").c_str(), flags, nullptr, &globbuf) == 0) {
+    // using expandTilde here instead of GLOB_TILDE(_CHECK) so that ~<Tab> expands to /home/user/
+    if (glob((expandTilde(prefix) + "*").c_str(), flags, nullptr, &globbuf) == 0) {
         for (size_t i = 0; i < globbuf.gl_pathc; ++i) {
             if (onlyDirs) {
-                auto st = lstat(globbuf.gl_pathv[i]);
+                auto st = stat(globbuf.gl_pathv[i]);
                 if (!S_ISDIR(st.st_mode)) continue;
             }
             completions->add(globbuf.gl_pathv[i]);
         }
-        globfree(&globbuf);
     }
+    globfree(&globbuf);
 }
 
 void completePath(size_t, std::string_view prefix)
@@ -322,11 +326,6 @@ MultiCommand::MultiCommand(const Commands & commands_)
         .optional = true,
         .handler = {[=](std::string s) {
             assert(!command);
-            if (auto prefix = needsCompletion(s)) {
-                for (auto & [name, command] : commands)
-                    if (hasPrefix(name, *prefix))
-                        completions->add(name);
-            }
             auto i = commands.find(s);
             if (i == commands.end()) {
                 std::set<std::string> commandNames;
@@ -337,6 +336,11 @@ MultiCommand::MultiCommand(const Commands & commands_)
             }
             command = {s, i->second()};
             command->second->parent = this;
+        }},
+        .completer = {[&](size_t, std::string_view prefix) {
+            for (auto & [name, command] : commands)
+                if (hasPrefix(name, prefix))
+                    completions->add(name);
         }}
     });
 

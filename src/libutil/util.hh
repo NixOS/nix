@@ -68,6 +68,9 @@ Path dirOf(const PathView path);
    following the final `/' (trailing slashes are removed). */
 std::string_view baseNameOf(std::string_view path);
 
+/* Perform tilde expansion on a path. */
+std::string expandTilde(std::string_view path);
+
 /* Check whether 'path' is a descendant of 'dir'. Both paths must be
    canonicalized. */
 bool isInDir(std::string_view path, std::string_view dir);
@@ -77,6 +80,7 @@ bool isInDir(std::string_view path, std::string_view dir);
 bool isDirOrInDir(std::string_view path, std::string_view dir);
 
 /* Get status of `path'. */
+struct stat stat(const Path & path);
 struct stat lstat(const Path & path);
 
 /* Return true iff the given path exists. */
@@ -539,13 +543,31 @@ std::string stripIndentation(std::string_view s);
 
 /* Get a value for the specified key from an associate container. */
 template <class T>
-std::optional<typename T::mapped_type> get(const T & map, const typename T::key_type & key)
+const typename T::mapped_type * get(const T & map, const typename T::key_type & key)
 {
     auto i = map.find(key);
-    if (i == map.end()) return {};
-    return std::optional<typename T::mapped_type>(i->second);
+    if (i == map.end()) return nullptr;
+    return &i->second;
 }
 
+template <class T>
+typename T::mapped_type * get(T & map, const typename T::key_type & key)
+{
+    auto i = map.find(key);
+    if (i == map.end()) return nullptr;
+    return &i->second;
+}
+
+/* Get a value for the specified key from an associate container, or a default value if the key isn't present. */
+template <class T>
+const typename T::mapped_type & getOr(T & map,
+    const typename T::key_type & key,
+    const typename T::mapped_type & defaultValue)
+{
+    auto i = map.find(key);
+    if (i == map.end()) return defaultValue;
+    return i->second;
+}
 
 /* Remove and return the first item from a container. */
 template <class T>

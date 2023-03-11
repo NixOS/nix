@@ -1,29 +1,37 @@
 source common.sh
 
+testDir="$PWD"
+cd "$TEST_ROOT"
+
 replCmds="
 simple = 1
-simple = import ./simple.nix
-:b simple
+simple = import $testDir/simple.nix
+:bl simple
 :log simple
 "
 
 replFailingCmds="
-failing = import ./simple-failing.nix
+failing = import $testDir/simple-failing.nix
 :b failing
 :log failing
 "
 
 replUndefinedVariable="
-import ./undefined-variable.nix
+import $testDir/undefined-variable.nix
 "
 
 testRepl () {
     local nixArgs=("$@")
+    rm -rf repl-result-out || true # cleanup from other runs backed by a foreign nix store
     local replOutput="$(nix repl "${nixArgs[@]}" <<< "$replCmds")"
     echo "$replOutput"
     local outPath=$(echo "$replOutput" |&
         grep -o -E "$NIX_STORE_DIR/\w*-simple")
     nix path-info "${nixArgs[@]}" "$outPath"
+    [ "$(realpath ./repl-result-out)" == "$outPath" ] || fail "nix repl :bl doesn't make a symlink"
+    # run it again without checking the output to ensure the previously created symlink gets overwritten
+    nix repl "${nixArgs[@]}" <<< "$replCmds" || fail "nix repl does not work twice with the same inputs"
+
     # simple.nix prints a PATH during build
     echo "$replOutput" | grep -qs 'PATH=' || fail "nix repl :log doesn't output logs"
     local replOutput="$(nix repl "${nixArgs[@]}" <<< "$replFailingCmds" 2>&1)"

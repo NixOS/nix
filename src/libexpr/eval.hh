@@ -23,14 +23,14 @@ class StorePath;
 enum RepairFlag : bool;
 
 
-typedef void (* PrimOpFun) (EvalState & state, const Pos & pos, Value * * args, Value & v);
+typedef void (* PrimOpFun) (EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
 
 struct PrimOp
 {
     PrimOpFun fun;
     size_t arity;
-    Symbol name;
+    std::string name;
     std::vector<std::string> args;
     const char * doc = nullptr;
 };
@@ -53,7 +53,8 @@ void copyContext(const Value & v, PathSet & context);
 typedef std::map<Path, StorePath> SrcToStore;
 
 
-std::ostream & operator << (std::ostream & str, const Value & v);
+std::ostream & printValue(const EvalState & state, std::ostream & str, const Value & v);
+std::string printValue(const EvalState & state, const Value & v);
 
 
 typedef std::pair<std::string, std::string> SearchPathElem;
@@ -73,6 +74,9 @@ class EvalState
 {
 public:
     SymbolTable symbols;
+    PosTable positions;
+
+    static inline std::string derivationNixPath = "//builtin/derivation.nix";
 
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
@@ -205,7 +209,7 @@ public:
 
     /* Look up a file in the search path. */
     Path findFile(const std::string_view path);
-    Path findFile(SearchPath & searchPath, const std::string_view path, const Pos & pos = noPos);
+    Path findFile(SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
 
     /* If the specified search path element is a URI, download it. */
     std::pair<bool, std::string> resolveSearchPathElem(const SearchPathElem & elem);
@@ -217,14 +221,14 @@ public:
     /* Evaluation the expression, then verify that it has the expected
        type. */
     inline bool evalBool(Env & env, Expr * e);
-    inline bool evalBool(Env & env, Expr * e, const Pos & pos);
+    inline bool evalBool(Env & env, Expr * e, const PosIdx pos);
     inline void evalAttrs(Env & env, Expr * e, Value & v);
 
     /* If `v' is a thunk, enter it and overwrite `v' with the result
        of the evaluation of the thunk.  If `v' is a delayed function
        application, call the function and overwrite `v' with the
        result.  Otherwise, this is a no-op. */
-    inline void forceValue(Value & v, const Pos & pos);
+    inline void forceValue(Value & v, const PosIdx pos);
 
     template <typename Callable>
     inline void forceValue(Value & v, Callable getPos);
@@ -234,33 +238,72 @@ public:
     void forceValueDeep(Value & v);
 
     /* Force `v', and then verify that it has the expected type. */
-    NixInt forceInt(Value & v, const Pos & pos);
-    NixFloat forceFloat(Value & v, const Pos & pos);
-    bool forceBool(Value & v, const Pos & pos);
+    NixInt forceInt(Value & v, const PosIdx pos);
+    NixFloat forceFloat(Value & v, const PosIdx pos);
+    bool forceBool(Value & v, const PosIdx pos);
 
-    void forceAttrs(Value & v, const Pos & pos);
+    void forceAttrs(Value & v, const PosIdx pos);
 
     template <typename Callable>
     inline void forceAttrs(Value & v, Callable getPos);
 
-    inline void forceList(Value & v, const Pos & pos);
-    void forceFunction(Value & v, const Pos & pos); // either lambda or primop
-    std::string_view forceString(Value & v, const Pos & pos = noPos);
-    std::string_view forceString(Value & v, PathSet & context, const Pos & pos = noPos);
-    std::string_view forceStringNoCtx(Value & v, const Pos & pos = noPos);
+    inline void forceList(Value & v, const PosIdx pos);
+    void forceFunction(Value & v, const PosIdx pos); // either lambda or primop
+    std::string_view forceString(Value & v, const PosIdx pos = noPos);
+    std::string_view forceString(Value & v, PathSet & context, const PosIdx pos = noPos);
+    std::string_view forceStringNoCtx(Value & v, const PosIdx pos = noPos);
 
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const PosIdx pos, const char * s) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwTypeError(const PosIdx pos, const char * s, const Value & v) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const char * s, const std::string & s2) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const PosIdx pos, const Suggestions & suggestions, const char * s,
+        const std::string & s2) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const char * s, const std::string & s2, const std::string & s3) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const PosIdx pos, const char * s, const std::string & s2, const std::string & s3) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwEvalError(const PosIdx p1, const char * s, const Symbol sym, const PosIdx p2) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwTypeError(const PosIdx pos, const char * s) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwTypeError(const PosIdx pos, const char * s, const ExprLambda & fun, const Symbol s2) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwTypeError(const PosIdx pos, const Suggestions & suggestions, const char * s,
+        const ExprLambda & fun, const Symbol s2) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwTypeError(const char * s, const Value & v) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwAssertionError(const PosIdx pos, const char * s, const std::string & s1) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwUndefinedVarError(const PosIdx pos, const char * s, const std::string & s1) const;
+    [[gnu::noinline, gnu::noreturn]]
+    void throwMissingArgumentError(const PosIdx pos, const char * s, const std::string & s1) const;
+
+    [[gnu::noinline]]
+    void addErrorTrace(Error & e, const char * s, const std::string & s2) const;
+    [[gnu::noinline]]
+    void addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2) const;
+
+public:
     /* Return true iff the value `v' denotes a derivation (i.e. a
        set with attribute `type = "derivation"'). */
     bool isDerivation(Value & v);
 
-    std::optional<std::string> tryAttrsToString(const Pos & pos, Value & v,
+    std::optional<std::string> tryAttrsToString(const PosIdx pos, Value & v,
         PathSet & context, bool coerceMore = false, bool copyToStore = true);
 
     /* String coercion.  Converts strings, paths and derivations to a
        string.  If `coerceMore' is set, also converts nulls, integers,
        booleans and lists to a string.  If `copyToStore' is set,
        referenced paths are copied to the Nix store as a side effect. */
-    BackedStringView coerceToString(const Pos & pos, Value & v, PathSet & context,
+    BackedStringView coerceToString(const PosIdx pos, Value & v, PathSet & context,
         bool coerceMore = false, bool copyToStore = true,
         bool canonicalizePath = true);
 
@@ -269,10 +312,10 @@ public:
     /* Path coercion.  Converts strings, paths and derivations to a
        path.  The result is guaranteed to be a canonicalised, absolute
        path.  Nothing is copied to the store. */
-    Path coerceToPath(const Pos & pos, Value & v, PathSet & context);
+    Path coerceToPath(const PosIdx pos, Value & v, PathSet & context);
 
     /* Like coerceToPath, but the result must be a store path. */
-    StorePath coerceToStorePath(const Pos & pos, Value & v, PathSet & context);
+    StorePath coerceToStorePath(const PosIdx pos, Value & v, PathSet & context);
 
 public:
 
@@ -305,7 +348,7 @@ public:
     struct Doc
     {
         Pos pos;
-        std::optional<Symbol> name;
+        std::optional<std::string> name;
         size_t arity;
         std::vector<std::string> args;
         const char * doc;
@@ -333,9 +376,9 @@ public:
     bool isFunctor(Value & fun);
 
     // FIXME: use std::span
-    void callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const Pos & pos);
+    void callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const PosIdx pos);
 
-    void callFunction(Value & fun, Value & arg, Value & vRes, const Pos & pos)
+    void callFunction(Value & fun, Value & arg, Value & vRes, const PosIdx pos)
     {
         Value * args[] = {&arg};
         callFunction(fun, 1, args, vRes, pos);
@@ -349,7 +392,7 @@ public:
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
 
-    Value * allocAttr(Value & vAttrs, const Symbol & name);
+    Value * allocAttr(Value & vAttrs, Symbol name);
     Value * allocAttr(Value & vAttrs, std::string_view name);
 
     Bindings * allocBindings(size_t capacity);
@@ -361,9 +404,9 @@ public:
 
     void mkList(Value & v, size_t length);
     void mkThunk_(Value & v, Expr * expr);
-    void mkPos(Value & v, ptr<Pos> pos);
+    void mkPos(Value & v, PosIdx pos);
 
-    void concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos);
+    void concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos);
 
     /* Print statistics. */
     void printStats();
@@ -391,7 +434,7 @@ private:
 
     bool countCalls;
 
-    typedef std::map<Symbol, size_t> PrimOpCalls;
+    typedef std::map<std::string, size_t> PrimOpCalls;
     PrimOpCalls primOpCalls;
 
     typedef std::map<ExprLambda *, size_t> FunctionCalls;
@@ -399,7 +442,7 @@ private:
 
     void incrFunctionCall(ExprLambda * fun);
 
-    typedef std::map<Pos, size_t> AttrSelects;
+    typedef std::map<PosIdx, size_t> AttrSelects;
     AttrSelects attrSelects;
 
     friend struct ExprOpUpdate;
@@ -410,9 +453,9 @@ private:
     friend struct ExprFloat;
     friend struct ExprPath;
     friend struct ExprSelect;
-    friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
-    friend void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v);
-    friend void prim_split(EvalState & state, const Pos & pos, Value * * args, Value & v);
+    friend void prim_getAttr(EvalState & state, const PosIdx pos, Value * * args, Value & v);
+    friend void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v);
+    friend void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
     friend struct Value;
 };

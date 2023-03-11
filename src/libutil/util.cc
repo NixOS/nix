@@ -198,6 +198,17 @@ std::string_view baseNameOf(std::string_view path)
 }
 
 
+std::string expandTilde(std::string_view path)
+{
+    // TODO: expand ~user ?
+    auto tilde = path.substr(0, 2);
+    if (tilde == "~/" || tilde == "~")
+        return getHome() + std::string(path.substr(1));
+    else
+        return std::string(path);
+}
+
+
 bool isInDir(std::string_view path, std::string_view dir)
 {
     return path.substr(0, 1) == "/"
@@ -210,6 +221,15 @@ bool isInDir(std::string_view path, std::string_view dir)
 bool isDirOrInDir(std::string_view path, std::string_view dir)
 {
     return path == dir || isInDir(path, dir);
+}
+
+
+struct stat stat(const Path & path)
+{
+    struct stat st;
+    if (stat(path.c_str(), &st))
+        throw SysError("getting status of '%1%'", path);
+    return st;
 }
 
 
@@ -1062,7 +1082,7 @@ std::string runProgram(Path program, bool searchPath, const Strings & args,
     auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input});
 
     if (!statusOk(res.first))
-        throw ExecError(res.first, fmt("program '%1%' %2%", program, statusToString(res.first)));
+        throw ExecError(res.first, "program '%1%' %2%", program, statusToString(res.first));
 
     return res.second;
 }
@@ -1190,7 +1210,7 @@ void runProgram2(const RunOptions & options)
     if (source) promise.get_future().get();
 
     if (status)
-        throw ExecError(status, fmt("program '%1%' %2%", options.program, statusToString(status)));
+        throw ExecError(status, "program '%1%' %2%", options.program, statusToString(status));
 }
 
 
@@ -1567,7 +1587,6 @@ std::string stripIndentation(std::string_view s)
 
 
 //////////////////////////////////////////////////////////////////////
-
 
 static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
 
