@@ -524,8 +524,9 @@
         binaryTarball = self.hydraJobs.binaryTarball.${system};
         perlBindings = self.hydraJobs.perlBindings.${system};
         installTests = self.hydraJobs.installTests.${system};
+      } // (if system == "x86_64-linux" then {
         dockerImage = self.hydraJobs.dockerImage.${system};
-      });
+      } else {}));
 
       packages = forAllSystems (system: {
         inherit (nixpkgsFor.${system}) nix;

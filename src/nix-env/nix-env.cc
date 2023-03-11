@@ -1149,10 +1149,10 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                 } else if (v->type() == nList) {
                                     attrs2["type"] = "strings";
                                     XMLOpenElement m(xml, "meta", attrs2);
-                                    for (unsigned int j = 0; j < v->listSize(); ++j) {
-                                        if (v->listElems()[j]->type() != nString) continue;
+                                    for (auto elem : v->listItems()) {
+                                        if (elem->type() != nString) continue;
                                         XMLAttrs attrs3;
-                                        attrs3["value"] = v->listElems()[j]->string.s;
+                                        attrs3["value"] = elem->string.s;
                                         xml.writeEmptyElement("string", attrs3);
                                     }
                               } else if (v->type() == nAttrs) {
