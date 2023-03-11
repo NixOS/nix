@@ -1186,10 +1186,11 @@ bool DerivationGoal::isReadDesc(int fd)
     return fd == hook->builderOut.readSide.get();
 }
 
-
 void DerivationGoal::handleChildOutput(int fd, std::string_view data)
 {
-    if (isReadDesc(fd))
+    // local & `ssh://`-builds are dealt with here.
+    auto isWrittenToLog = isReadDesc(fd);
+    if (isWrittenToLog)
     {
         logSize += data.size();
         if (settings.maxLogSize && logSize > settings.maxLogSize) {
@@ -1218,7 +1219,16 @@ void DerivationGoal::handleChildOutput(int fd, std::string_view data)
     if (hook && fd == hook->fromHook.readSide.get()) {
         for (auto c : data)
             if (c == '\n') {
-                handleJSONLogMessage(currentHookLine, worker.act, hook->activities, true);
+                auto json = parseJSONMessage(currentHookLine);
+                if (json) {
+                    auto s = handleJSONLogMessage(*json, worker.act, hook->activities, true);
+                    // ensure that logs from a builder using `ssh-ng://` as protocol
+                    // are also available to `nix log`.
+                    if (s && !isWrittenToLog && logSink && (*json)["type"] == resBuildLogLine) {
+                        auto f = (*json)["fields"];
+                        (*logSink)((f.size() > 0 ? f.at(0).get<std::string>() : "") + "\n");
+                    }
+                }
                 currentHookLine.clear();
             } else
                 currentHookLine += c;
