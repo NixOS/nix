@@ -56,7 +56,10 @@ struct PathSubstitutionGoal : public Goal
     /* Time substitution started. */
     std::chrono::time_point<std::chrono::steady_clock> startTime;
 
-    void done(ExitCode result, BuildResult::Status status);
+    void done(
+        ExitCode result,
+        BuildResult::Status status,
+        std::optional<std::string> errorMsg = {});
 
 public:
     PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);

@@ -9,6 +9,8 @@ readonly SERVICE_DEST=/etc/systemd/system/nix-daemon.service
 readonly SOCKET_SRC=/lib/systemd/system/nix-daemon.socket
 readonly SOCKET_DEST=/etc/systemd/system/nix-daemon.socket
 
+readonly TMPFILES_SRC=/lib/tmpfiles.d/nix-daemon.conf
+readonly TMPFILES_DEST=/etc/tmpfiles.d/nix-daemon.conf
 
 # Path for the systemd override unit file to contain the proxy settings
 readonly SERVICE_OVERRIDE=${SERVICE_DEST}.d/override.conf
@@ -83,6 +85,13 @@ EOF
 poly_configure_nix_daemon_service() {
     if [ -e /run/systemd/system ]; then
         task "Setting up the nix-daemon systemd service"
+
+        _sudo "to create the nix-daemon tmpfiles config" \
+              ln -sfn /nix/var/nix/profiles/default/$TMPFILES_SRC $TMPFILES_DEST
+
+        _sudo "to run systemd-tmpfiles once to pick that path up" \
+             systemd-tmpfiles --create --prefix=/nix/var/nix
+
         _sudo "to set up the nix-daemon service" \
               systemctl link "/nix/var/nix/profiles/default$SERVICE_SRC"
 

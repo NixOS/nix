@@ -24,8 +24,8 @@ this attribute to the location of the definition of the
 `meta.description`, `version` or `name` derivation attributes.
 
 The editor to invoke is specified by the `EDITOR` environment
-variable. It defaults to `cat`. If the editor is `emacs`, `nano` or
-`vim`, it is passed the line number of the derivation using the
-argument `+<lineno>`.
+variable. It defaults to `cat`. If the editor is `emacs`, `nano`,
+`vim` or `kak`, it is passed the line number of the derivation using
+the argument `+<lineno>`.
 
 )""

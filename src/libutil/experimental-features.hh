@@ -16,10 +16,12 @@ namespace nix {
 enum struct ExperimentalFeature
 {
     CaDerivations,
+    ImpureDerivations,
     Flakes,
     NixCommand,
     RecursiveNix,
-    NoUrlLiterals
+    NoUrlLiterals,
+    FetchClosure,
 };
 
 /**
@@ -47,10 +49,6 @@ public:
     ExperimentalFeature missingFeature;
 
     MissingExperimentalFeature(ExperimentalFeature);
-    virtual const char * sname() const override
-    {
-        return "MissingExperimentalFeature";
-    }
 };
 
 }

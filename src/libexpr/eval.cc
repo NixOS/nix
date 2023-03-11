@@ -96,20 +96,20 @@ RootValue allocRootValue(Value * v)
 }
 
 
-void printValue(std::ostream & str, std::set<const void *> & seen, const Value & v)
+void Value::print(std::ostream & str, std::set<const void *> * seen) const
 {
     checkInterrupt();
 
-    switch (v.internalType) {
+    switch (internalType) {
     case tInt:
-        str << v.integer;
+        str << integer;
         break;
     case tBool:
-        str << (v.boolean ? "true" : "false");
+        str << (boolean ? "true" : "false");
         break;
     case tString:
         str << "\"";
-        for (const char * i = v.string.s; *i; i++)
+        for (const char * i = string.s; *i; i++)
             if (*i == '\"' || *i == '\\') str << "\\" << *i;
             else if (*i == '\n') str << "\\n";
             else if (*i == '\r') str << "\\r";
@@ -119,19 +119,19 @@ void printValue(std::ostream & str, std::set<const void *> & seen, const Value &
         str << "\"";
         break;
     case tPath:
-        str << v.path; // !!! escaping?
+        str << path; // !!! escaping?
         break;
     case tNull:
         str << "null";
         break;
     case tAttrs: {
-        if (!v.attrs->empty() && !seen.insert(v.attrs).second)
-            str << "<REPEAT>";
+        if (seen && !attrs->empty() && !seen->insert(attrs).second)
+            str << "«repeated»";
         else {
             str << "{ ";
-            for (auto & i : v.attrs->lexicographicOrder()) {
+            for (auto & i : attrs->lexicographicOrder()) {
                 str << i->name << " = ";
-                printValue(str, seen, *i->value);
+                i->value->print(str, seen);
                 str << "; ";
             }
             str << "}";
@@ -141,12 +141,12 @@ void printValue(std::ostream & str, std::set<const void *> & seen, const Value &
     case tList1:
     case tList2:
     case tListN:
-        if (v.listSize() && !seen.insert(v.listElems()).second)
-            str << "<REPEAT>";
+        if (seen && listSize() && !seen->insert(listElems()).second)
+            str << "«repeated»";
         else {
             str << "[ ";
-            for (auto v2 : v.listItems()) {
-                printValue(str, seen, *v2);
+            for (auto v2 : listItems()) {
+                v2->print(str, seen);
                 str << " ";
             }
             str << "]";
@@ -166,10 +166,10 @@ void printValue(std::ostream & str, std::set<const void *> & seen, const Value &
         str << "<PRIMOP-APP>";
         break;
     case tExternal:
-        str << *v.external;
+        str << *external;
         break;
     case tFloat:
-        str << v.fpoint;
+        str << fpoint;
         break;
     default:
         abort();
@@ -177,10 +177,16 @@ void printValue(std::ostream & str, std::set<const void *> & seen, const Value &
 }
 
 
-std::ostream & operator << (std::ostream & str, const Value & v)
+void Value::print(std::ostream & str, bool showRepeated) const
 {
     std::set<const void *> seen;
-    printValue(str, seen, v);
+    print(str, showRepeated ? nullptr : &seen);
+}
+
+
+std::ostream & operator << (std::ostream & str, const Value & v)
+{
+    v.print(str, false);
     return str;
 }
 
@@ -430,6 +436,7 @@ EvalState::EvalState(
     , sBuilder(symbols.create("builder"))
     , sArgs(symbols.create("args"))
     , sContentAddressed(symbols.create("__contentAddressed"))
+    , sImpure(symbols.create("__impure"))
     , sOutputHash(symbols.create("outputHash"))
     , sOutputHashAlgo(symbols.create("outputHashAlgo"))
     , sOutputHashMode(symbols.create("outputHashMode"))
@@ -500,23 +507,6 @@ EvalState::~EvalState()
 {
 }
 
-
-void EvalState::requireExperimentalFeatureOnEvaluation(
-    const ExperimentalFeature & feature,
-    const std::string_view fName,
-    const Pos & pos)
-{
-    if (!settings.isExperimentalFeatureEnabled(feature)) {
-        throw EvalError({
-            .msg = hintfmt(
-                "Cannot call '%2%' because experimental Nix feature '%1%' is disabled. You can enable it via '--extra-experimental-features %1%'.",
-                feature,
-                fName
-            ),
-            .errPos = pos
-        });
-    }
-}
 
 void EvalState::allowPath(const Path & path)
 {
@@ -1903,13 +1893,22 @@ std::string_view EvalState::forceString(Value & v, const Pos & pos)
 
 /* Decode a context string ‘!<name>!<path>’ into a pair <path,
    name>. */
-std::pair<std::string, std::string> decodeContext(std::string_view s)
+NixStringContextElem decodeContext(const Store & store, std::string_view s)
 {
     if (s.at(0) == '!') {
         size_t index = s.find("!", 1);
-        return {std::string(s.substr(index + 1)), std::string(s.substr(1, index - 1))};
+        return {
+            store.parseStorePath(s.substr(index + 1)),
+            std::string(s.substr(1, index - 1)),
+        };
     } else
-        return {s.at(0) == '/' ? std::string(s) : std::string(s.substr(1)), ""};
+        return {
+            store.parseStorePath(
+                s.at(0) == '/'
+                ? s
+                : s.substr(1)),
+            "",
+        };
 }
 
 
@@ -1921,13 +1920,13 @@ void copyContext(const Value & v, PathSet & context)
 }
 
 
-std::vector<std::pair<Path, std::string>> Value::getContext()
+NixStringContext Value::getContext(const Store & store)
 {
-    std::vector<std::pair<Path, std::string>> res;
+    NixStringContext res;
     assert(internalType == tString);
     if (string.context)
         for (const char * * p = string.context; *p; ++p)
-            res.push_back(decodeContext(*p));
+            res.push_back(decodeContext(store, *p));
     return res;
 }
 

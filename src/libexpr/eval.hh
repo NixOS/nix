@@ -78,7 +78,7 @@ public:
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
         sFile, sLine, sColumn, sFunctor, sToString,
         sRight, sWrong, sStructuredAttrs, sBuilder, sArgs,
-        sContentAddressed,
+        sContentAddressed, sImpure,
         sOutputHash, sOutputHashAlgo, sOutputHashMode,
         sRecurseForDerivations,
         sDescription, sSelf, sEpsilon, sStartSet, sOperator, sKey, sPath,
@@ -148,12 +148,6 @@ public:
         ref<Store> store,
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
-
-    void requireExperimentalFeatureOnEvaluation(
-        const ExperimentalFeature &,
-        const std::string_view fName,
-        const Pos & pos
-    );
 
     void addToSearchPath(const std::string & s);
 
@@ -430,7 +424,7 @@ std::string showType(const Value & v);
 
 /* Decode a context string ‘!<name>!<path>’ into a pair <path,
    name>. */
-std::pair<std::string, std::string> decodeContext(std::string_view s);
+NixStringContextElem decodeContext(const Store & store, std::string_view s);
 
 /* If `path' refers to a directory, then append "/default.nix". */
 Path resolveExprPath(Path path);

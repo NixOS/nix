@@ -71,7 +71,7 @@ UnresolvedApp Installable::toApp(EvalState & state)
 
         std::vector<StorePathWithOutputs> context2;
         for (auto & [path, name] : context)
-            context2.push_back({state.store->parseStorePath(path), {name}});
+            context2.push_back({path, {name}});
 
         return UnresolvedApp{App {
             .context = std::move(context2),

@@ -463,7 +463,7 @@ struct CmdFlakeCheck : FlakeCommand
 
                 for (auto & attr : *v.attrs) {
                     std::string name(attr.name);
-                    if (name != "path" && name != "description")
+                    if (name != "path" && name != "description" && name != "welcomeText")
                         throw Error("template '%s' has unsupported attribute '%s'", attrPath, name);
                 }
             } catch (Error & e) {
@@ -508,6 +508,7 @@ struct CmdFlakeCheck : FlakeCommand
                             name == "defaultBundler" ? "bundlers.<system>.default" :
                             name == "overlay" ? "overlays.default" :
                             name == "devShell" ? "devShells.<system>.default" :
+                            name == "nixosModule" ? "nixosModules.default" :
                             "";
                         if (replacement != "")
                             warn("flake output attribute '%s' is deprecated; use '%s' instead", name, replacement);

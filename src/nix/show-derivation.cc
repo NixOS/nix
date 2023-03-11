@@ -77,6 +77,10 @@ struct CmdShowDerivation : InstallablesCommand
                             outputObj.attr("hashAlgo", makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType));
                         },
                         [&](const DerivationOutput::Deferred &) {},
+                        [&](const DerivationOutput::Impure & doi) {
+                            outputObj.attr("hashAlgo", makeFileIngestionPrefix(doi.method) + printHashType(doi.hashType));
+                            outputObj.attr("impure", true);
+                        },
                     }, output.raw());
                 }
             }

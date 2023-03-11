@@ -98,6 +98,13 @@ struct Installable
         const std::vector<std::shared_ptr<Installable>> & installables,
         BuildMode bMode = bmNormal);
 
+    static std::vector<std::pair<std::shared_ptr<Installable>, BuiltPath>> build2(
+        ref<Store> evalStore,
+        ref<Store> store,
+        Realise mode,
+        const std::vector<std::shared_ptr<Installable>> & installables,
+        BuildMode bMode = bmNormal);
+
     static std::set<StorePath> toStorePaths(
         ref<Store> evalStore,
         ref<Store> store,
@@ -184,10 +191,5 @@ struct InstallableFlake : InstallableValue
 ref<eval_cache::EvalCache> openEvalCache(
     EvalState & state,
     std::shared_ptr<flake::LockedFlake> lockedFlake);
-
-BuiltPaths getBuiltPaths(
-    ref<Store> evalStore,
-    ref<Store> store,
-    const DerivedPaths & hopefullyBuiltPaths);
 
 }
