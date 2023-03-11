@@ -562,7 +562,7 @@ Path getConfigDir()
 std::vector<Path> getConfigDirs()
 {
     Path configHome = getConfigDir();
-    string configDirs = getEnv("XDG_CONFIG_DIRS").value_or("");
+    string configDirs = getEnv("XDG_CONFIG_DIRS").value_or("/etc/xdg");
     std::vector<Path> result = tokenizeString<std::vector<string>>(configDirs, ":");
     result.insert(result.begin(), configHome);
     return result;
@@ -1632,9 +1632,39 @@ void setStackSize(size_t stackSize)
     #endif
 }
 
-void restoreProcessContext()
+static AutoCloseFD fdSavedMountNamespace;
+
+void saveMountNamespace()
+{
+#if __linux__
+    static std::once_flag done;
+    std::call_once(done, []() {
+        AutoCloseFD fd = open("/proc/self/ns/mnt", O_RDONLY);
+        if (!fd)
+            throw SysError("saving parent mount namespace");
+        fdSavedMountNamespace = std::move(fd);
+    });
+#endif
+}
+
+void restoreMountNamespace()
+{
+#if __linux__
+    try {
+        if (fdSavedMountNamespace && setns(fdSavedMountNamespace.get(), CLONE_NEWNS) == -1)
+            throw SysError("restoring parent mount namespace");
+    } catch (Error & e) {
+        debug(e.msg());
+    }
+#endif
+}
+
+void restoreProcessContext(bool restoreMounts)
 {
     restoreSignals();
+    if (restoreMounts) {
+        restoreMountNamespace();
+    }
 
     restoreAffinity();
 
@@ -1774,7 +1804,7 @@ void commonChildInit(Pipe & logPipe)
     logger = makeSimpleLogger();
 
     const static string pathNullDevice = "/dev/null";
-    restoreProcessContext();
+    restoreProcessContext(false);
 
     /* Put the child in a separate session (and thus a separate
        process group) so that it has no controlling terminal (meaning

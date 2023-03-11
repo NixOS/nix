@@ -227,7 +227,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
     StorePath addToStore(const string & name, const Path & srcPath,
         FileIngestionMethod method, HashType hashAlgo,
-        PathFilter & filter, RepairFlag repair) override
+        PathFilter & filter, RepairFlag repair, const StorePathSet & references) override
     { unsupported("addToStore"); }
 
     StorePath addTextToStore(const string & name, const string & s,

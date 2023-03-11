@@ -260,6 +260,7 @@ void LocalDerivationGoal::cleanupHookFinally()
 void LocalDerivationGoal::cleanupPreChildKill()
 {
     sandboxMountNamespace = -1;
+    sandboxUserNamespace = -1;
 }
 
 
@@ -342,7 +343,7 @@ int childEntry(void * arg)
     return 1;
 }
 
-
+#if __linux__
 static void linkOrCopy(const Path & from, const Path & to)
 {
     if (link(from.c_str(), to.c_str()) == -1) {
@@ -358,6 +359,7 @@ static void linkOrCopy(const Path & from, const Path & to)
         copyPath(from, to);
     }
 }
+#endif
 
 
 void LocalDerivationGoal::startBuilder()
@@ -906,11 +908,14 @@ void LocalDerivationGoal::startBuilder()
                 "nobody:x:65534:65534:Nobody:/:/noshell\n",
                 sandboxUid(), sandboxGid(), settings.sandboxBuildDir));
 
-        /* Save the mount namespace of the child. We have to do this
+        /* Save the mount- and user namespace of the child. We have to do this
            *before* the child does a chroot. */
         sandboxMountNamespace = open(fmt("/proc/%d/ns/mnt", (pid_t) pid).c_str(), O_RDONLY);
         if (sandboxMountNamespace.get() == -1)
             throw SysError("getting sandbox mount namespace");
+        sandboxUserNamespace = open(fmt("/proc/%d/ns/user", (pid_t) pid).c_str(), O_RDONLY);
+        if (sandboxUserNamespace.get() == -1)
+            throw SysError("getting sandbox user namespace");
 
         /* Signal the builder that we've updated its user namespace. */
         writeFull(userNamespaceSync.writeSide.get(), "1");
@@ -918,7 +923,9 @@ void LocalDerivationGoal::startBuilder()
     } else
 #endif
     {
+#if __linux__
     fallback:
+#endif
         pid = startProcess([&]() {
             runChild();
         });
@@ -1180,7 +1187,8 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
 
     StorePath addToStore(const string & name, const Path & srcPath,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256,
-        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair) override
+        PathFilter & filter = defaultPathFilter, RepairFlag repair = NoRepair,
+        const StorePathSet & references = StorePathSet()) override
     { throw Error("addToStore"); }
 
     void addToStore(const ValidPathInfo & info, Source & narSource,
@@ -1199,9 +1207,10 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
     }
 
     StorePath addToStoreFromDump(Source & dump, const string & name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair,
+        const StorePathSet & references = StorePathSet()) override
     {
-        auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, repair);
+        auto path = next->addToStoreFromDump(dump, name, method, hashAlgo, repair, references);
         goal.addDependency(path);
         return path;
     }
@@ -1419,7 +1428,7 @@ void LocalDerivationGoal::addDependency(const StorePath & path)
 
             Path source = worker.store.Store::toRealPath(path);
             Path target = chrootRootDir + worker.store.printStorePath(path);
-            debug("bind-mounting %s -> %s", target, source);
+            debug("bind-mounting %s -> %s", source, target);
 
             if (pathExists(target))
                 throw Error("store path '%s' already exists in the sandbox", worker.store.printStorePath(path));
@@ -1433,6 +1442,9 @@ void LocalDerivationGoal::addDependency(const StorePath & path)
                    in multithreaded programs. So we do this in a
                    child process.*/
                 Pid child(startProcess([&]() {
+
+                    if (usingUserNamespace && (setns(sandboxUserNamespace.get(), 0) == -1))
+                        throw SysError("entering sandbox user namespace");
 
                     if (setns(sandboxMountNamespace.get(), 0) == -1)
                         throw SysError("entering sandbox mount namespace");
@@ -1993,7 +2005,7 @@ void LocalDerivationGoal::runChild()
                 else if (drv->builder == "builtin:unpack-channel")
                     builtinUnpackChannel(drv2);
                 else
-                    throw Error("unsupported builtin function '%1%'", string(drv->builder, 8));
+                    throw Error("unsupported builtin builder '%1%'", string(drv->builder, 8));
                 _exit(0);
             } catch (std::exception & e) {
                 writeFull(STDERR_FILENO, e.what() + std::string("\n"));

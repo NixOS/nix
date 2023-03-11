@@ -277,6 +277,8 @@ private:
 
     Value * addConstant(const string & name, Value & v);
 
+    void addConstant(const string & name, Value * v);
+
     Value * addPrimOp(const string & name,
         size_t arity, PrimOpFun primOp);
 
@@ -316,8 +318,14 @@ public:
 
     bool isFunctor(Value & fun);
 
-    void callFunction(Value & fun, Value & arg, Value & v, const Pos & pos);
-    void callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos);
+    // FIXME: use std::span
+    void callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const Pos & pos);
+
+    void callFunction(Value & fun, Value & arg, Value & vRes, const Pos & pos)
+    {
+        Value * args[] = {&arg};
+        callFunction(fun, 1, args, vRes, pos);
+    }
 
     /* Automatically call a function for which each argument has a
        default value or has a binding in the `args' map. */

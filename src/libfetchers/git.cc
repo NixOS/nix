@@ -51,7 +51,7 @@ struct GitInputScheme : InputScheme
         for (auto &[name, value] : url.query) {
             if (name == "rev" || name == "ref")
                 attrs.emplace(name, value);
-            else if (name == "shallow")
+            else if (name == "shallow" || name == "submodules")
                 attrs.emplace(name, Explicit<bool> { value == "1" });
             else
                 url2.query.emplace(name, value);
@@ -324,16 +324,12 @@ struct GitInputScheme : InputScheme
             Path cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, actualUrl).to_string(Base32, false);
             repoDir = cacheDir;
 
-            Path cacheDirLock = cacheDir + ".lock";
             createDirs(dirOf(cacheDir));
-            AutoCloseFD lock = openLockFile(cacheDirLock, true);
-            lockFile(lock.get(), ltWrite, true);
+            PathLocks cacheDirLock({cacheDir + ".lock"});
 
             if (!pathExists(cacheDir)) {
                 runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", "--bare", repoDir });
             }
-
-            deleteLockFile(cacheDirLock, lock.get());
 
             Path localRefFile =
                 input.getRef()->compare(0, 5, "refs/") == 0
@@ -399,6 +395,8 @@ struct GitInputScheme : InputScheme
 
             if (!input.getRev())
                 input.attrs.insert_or_assign("rev", Hash::parseAny(chomp(readFile(localRefFile)), htSHA1).gitRev());
+
+            // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
         }
 
         bool isShallow = chomp(runProgram("git", true, { "-C", repoDir, "rev-parse", "--is-shallow-repository" })) == "true";

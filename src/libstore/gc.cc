@@ -324,6 +324,7 @@ static string quoteRegexChars(const string & raw)
     return std::regex_replace(raw, specialRegex, R"(\$&)");
 }
 
+#if __linux__
 static void readFileRoots(const char * path, UncheckedRoots & roots)
 {
     try {
@@ -333,6 +334,7 @@ static void readFileRoots(const char * path, UncheckedRoots & roots)
             throw;
     }
 }
+#endif
 
 void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
 {
@@ -414,7 +416,7 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
     }
 #endif
 
-#if defined(__linux__)
+#if __linux__
     readFileRoots("/proc/sys/kernel/modprobe", unchecked);
     readFileRoots("/proc/sys/kernel/fbsplash", unchecked);
     readFileRoots("/proc/sys/kernel/poweroff_cmd", unchecked);

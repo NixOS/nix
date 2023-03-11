@@ -9,6 +9,7 @@
     - [Prerequisites](installation/prerequisites-source.md)
     - [Obtaining a Source Distribution](installation/obtaining-source.md)
     - [Building Nix from Source](installation/building-source.md)
+  - [Using Nix within Docker](installation/installing-docker.md)
   - [Security](installation/nix-security.md)
     - [Single-User Mode](installation/single-user.md)
     - [Multi-User Mode](installation/multi-user.md)

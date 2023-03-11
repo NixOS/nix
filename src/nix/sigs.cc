@@ -218,8 +218,7 @@ struct CmdKey : NixMultiCommand
     void run() override
     {
         if (!command)
-            throw UsageError("'nix flake' requires a sub-command.");
-        settings.requireExperimentalFeature(Xp::Flakes);
+            throw UsageError("'nix key' requires a sub-command.");
         command->second->prepare();
         command->second->run();
     }

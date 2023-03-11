@@ -471,7 +471,10 @@ bool NixRepl::processLine(string line)
         auto args = editorFor(pos);
         auto editor = args.front();
         args.pop_front();
-        runProgram(editor, true, args);
+
+        // runProgram redirects stdout to a StringSink,
+        // using runProgram2 to allow editors to display their UI
+        runProgram2(RunOptions { .program = editor, .searchPath = true, .args = args });
 
         // Reload right after exiting the editor
         state->resetFileCache();
@@ -504,8 +507,8 @@ bool NixRepl::processLine(string line)
             state->store->buildPaths({DerivedPath::Built{drvPath}});
             auto drv = state->store->readDerivation(drvPath);
             logger->cout("\nThis derivation produced the following outputs:");
-            for (auto & i : drv.outputsAndOptPaths(*state->store))
-                logger->cout("  %s -> %s", i.first, state->store->printStorePath(*i.second.second));
+            for (auto & [outputName, outputPath] : state->store->queryDerivationOutputMap(drvPath))
+                logger->cout("  %s -> %s", outputName, state->store->printStorePath(outputPath));
         } else if (command == ":i") {
             runNix("nix-env", {"-i", drvPathRaw});
         } else {
@@ -644,7 +647,8 @@ void NixRepl::addVarToScope(const Symbol & name, Value & v)
 {
     if (displ >= envSize)
         throw Error("environment full; cannot add more variables");
-    staticEnv.vars[name] = displ;
+    staticEnv.vars.emplace_back(name, displ);
+    staticEnv.sort();
     env->values[displ++] = &v;
     varNames.insert((string) name);
 }

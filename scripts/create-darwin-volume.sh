@@ -742,6 +742,9 @@ setup_volume() {
 
     use_special="${NIX_VOLUME_USE_SPECIAL:-$(create_volume)}"
 
+    _sudo "to ensure the Nix volume is not mounted" \
+        /usr/sbin/diskutil unmount force "$use_special" || true # might not be mounted
+
     use_uuid=${NIX_VOLUME_USE_UUID:-$(volume_uuid_from_special "$use_special")}
 
     setup_fstab "$use_uuid"

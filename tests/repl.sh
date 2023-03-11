@@ -7,7 +7,9 @@ simple = import ./simple.nix
 
 testRepl () {
     local nixArgs=("$@")
-    local outPath=$(nix repl "${nixArgs[@]}" <<< "$replCmds" |&
+    local replOutput="$(nix repl "${nixArgs[@]}" <<< "$replCmds")"
+    echo "$replOutput"
+    local outPath=$(echo "$replOutput" |&
         grep -o -E "$NIX_STORE_DIR/\w*-simple")
     nix path-info "${nixArgs[@]}" "$outPath"
 }

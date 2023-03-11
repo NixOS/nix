@@ -300,7 +300,15 @@ void setStackSize(size_t stackSize);
 
 /* Restore the original inherited Unix process context (such as signal
    masks, stack size, CPU affinity). */
-void restoreProcessContext();
+void restoreProcessContext(bool restoreMounts = true);
+
+/* Save the current mount namespace. Ignored if called more than
+   once. */
+void saveMountNamespace();
+
+/* Restore the mount namespace saved by saveMountNamespace(). Ignored
+   if saveMountNamespace() was never called. */
+void restoreMountNamespace();
 
 
 class ExecError : public Error

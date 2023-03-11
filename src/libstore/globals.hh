@@ -951,6 +951,9 @@ public:
 
     Setting<bool> useRegistries{this, true, "use-registries",
         "Whether to use flake registries to resolve flake references."};
+
+    Setting<bool> acceptFlakeConfig{this, false, "accept-flake-config",
+        "Whether to accept nix configuration from a flake without prompting."};
 };
 
 

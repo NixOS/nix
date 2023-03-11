@@ -300,7 +300,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         if ("PAT" == token.substr(0, fldsplit))
             return std::make_pair("Private-token", token.substr(fldsplit+1));
         warn("Unrecognized GitLab token type %s",  token.substr(0, fldsplit));
-        return std::nullopt;
+        return std::make_pair(token.substr(0,fldsplit), token.substr(fldsplit+1));
     }
 
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override

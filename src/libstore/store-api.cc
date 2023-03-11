@@ -237,7 +237,7 @@ StorePath Store::computeStorePathForText(const string & name, const string & s,
 
 
 StorePath Store::addToStore(const string & name, const Path & _srcPath,
-    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair)
+    FileIngestionMethod method, HashType hashAlgo, PathFilter & filter, RepairFlag repair, const StorePathSet & references)
 {
     Path srcPath(absPath(_srcPath));
     auto source = sinkToSource([&](Sink & sink) {
@@ -246,7 +246,7 @@ StorePath Store::addToStore(const string & name, const Path & _srcPath,
         else
             readFile(srcPath, sink);
     });
-    return addToStoreFromDump(*source, name, method, hashAlgo, repair);
+    return addToStoreFromDump(*source, name, method, hashAlgo, repair, references);
 }
 
 

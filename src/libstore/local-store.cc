@@ -504,9 +504,6 @@ void LocalStore::makeStoreWritable()
         throw SysError("getting info about the Nix store mount point");
 
     if (stat.f_flag & ST_RDONLY) {
-        if (unshare(CLONE_NEWNS) == -1)
-            throw SysError("setting up a private mount namespace");
-
         if (mount(0, realStoreDir.get().c_str(), "none", MS_REMOUNT | MS_BIND, 0) == -1)
             throw SysError("remounting %1% writable", realStoreDir);
     }
@@ -1311,7 +1308,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
 
 StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
-    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair)
+    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references)
 {
     /* For computing the store path. */
     auto hashSink = std::make_unique<HashSink>(hashAlgo);
@@ -1367,7 +1364,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
 
     auto [hash, size] = hashSink->finish();
 
-    auto dstPath = makeFixedOutputPath(method, hash, name);
+    auto dstPath = makeFixedOutputPath(method, hash, name, references);
 
     addTempRoot(dstPath);
 
@@ -1414,6 +1411,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, const string & name,
 
             ValidPathInfo info { dstPath, narHash.first };
             info.narSize = narHash.second;
+            info.references = references;
             info.ca = FixedOutputHash { .method = method, .hash = hash };
             registerValidPath(info);
         }

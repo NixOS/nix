@@ -520,7 +520,7 @@ Path EvalState::checkSourcePath(const Path & path_)
     }
 
     if (!found)
-        throw RestrictedPathError("access to path '%1%' is forbidden in restricted mode", abspath);
+        throw RestrictedPathError("access to absolute path '%1%' is forbidden in restricted mode", abspath);
 
     /* Resolve symlinks. */
     debug(format("checking access to '%s'") % abspath);
@@ -533,7 +533,7 @@ Path EvalState::checkSourcePath(const Path & path_)
         }
     }
 
-    throw RestrictedPathError("access to path '%1%' is forbidden in restricted mode", path);
+    throw RestrictedPathError("access to canonical path '%1%' is forbidden in restricted mode", path);
 }
 
 
@@ -583,11 +583,17 @@ Value * EvalState::addConstant(const string & name, Value & v)
 {
     Value * v2 = allocValue();
     *v2 = v;
-    staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
-    baseEnv.values[baseEnvDispl++] = v2;
-    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
-    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v2));
+    addConstant(name, v2);
     return v2;
+}
+
+
+void EvalState::addConstant(const string & name, Value * v)
+{
+    staticBaseEnv.vars.emplace_back(symbols.create(name), baseEnvDispl);
+    baseEnv.values[baseEnvDispl++] = v;
+    string name2 = string(name, 0, 2) == "__" ? string(name, 2) : name;
+    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v));
 }
 
 
@@ -609,7 +615,7 @@ Value * EvalState::addPrimOp(const string & name,
 
     Value * v = allocValue();
     v->mkPrimOp(new PrimOp { .fun = primOp, .arity = arity, .name = sym });
-    staticBaseEnv.vars[symbols.create(name)] = baseEnvDispl;
+    staticBaseEnv.vars.emplace_back(symbols.create(name), baseEnvDispl);
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(sym, v));
     return v;
@@ -635,7 +641,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
 
     Value * v = allocValue();
     v->mkPrimOp(new PrimOp(std::move(primOp)));
-    staticBaseEnv.vars[envName] = baseEnvDispl;
+    staticBaseEnv.vars.emplace_back(envName, baseEnvDispl);
     baseEnv.values[baseEnvDispl++] = v;
     baseEnv.values[0]->attrs->push_back(Attr(primOp.name, v));
     return v;
@@ -785,7 +791,7 @@ void mkPath(Value & v, const char * s)
 
 inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 {
-    for (size_t l = var.level; l; --l, env = env->up) ;
+    for (auto l = var.level; l; --l, env = env->up) ;
 
     if (!var.fromWith) return env->values[var.displ];
 
@@ -1058,7 +1064,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         /* The recursive attributes are evaluated in the new
            environment, while the inherited attributes are evaluated
            in the original environment. */
-        size_t displ = 0;
+        Displacement displ = 0;
         for (auto & i : attrs) {
             Value * vAttr;
             if (hasOverrides && !i.second.inherited) {
@@ -1134,7 +1140,7 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
     /* The recursive attributes are evaluated in the new environment,
        while the inherited attributes are evaluated in the original
        environment. */
-    size_t displ = 0;
+    Displacement displ = 0;
     for (auto & i : attrs->attrs)
         env2.values[displ++] = i.second.e->maybeThunk(state, i.second.inherited ? env : env2);
 
@@ -1251,144 +1257,184 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
 }
 
 
-void ExprApp::eval(EvalState & state, Env & env, Value & v)
-{
-    /* FIXME: vFun prevents GCC from doing tail call optimisation. */
-    Value vFun;
-    e1->eval(state, env, vFun);
-    state.callFunction(vFun, *(e2->maybeThunk(state, env)), v, pos);
-}
-
-
-void EvalState::callPrimOp(Value & fun, Value & arg, Value & v, const Pos & pos)
-{
-    /* Figure out the number of arguments still needed. */
-    size_t argsDone = 0;
-    Value * primOp = &fun;
-    while (primOp->isPrimOpApp()) {
-        argsDone++;
-        primOp = primOp->primOpApp.left;
-    }
-    assert(primOp->isPrimOp());
-    auto arity = primOp->primOp->arity;
-    auto argsLeft = arity - argsDone;
-
-    if (argsLeft == 1) {
-        /* We have all the arguments, so call the primop. */
-
-        /* Put all the arguments in an array. */
-        Value * vArgs[arity];
-        auto n = arity - 1;
-        vArgs[n--] = &arg;
-        for (Value * arg = &fun; arg->isPrimOpApp(); arg = arg->primOpApp.left)
-            vArgs[n--] = arg->primOpApp.right;
-
-        /* And call the primop. */
-        nrPrimOpCalls++;
-        if (countCalls) primOpCalls[primOp->primOp->name]++;
-        primOp->primOp->fun(*this, pos, vArgs, v);
-    } else {
-        Value * fun2 = allocValue();
-        *fun2 = fun;
-        v.mkPrimOpApp(fun2, &arg);
-    }
-}
-
-void EvalState::callFunction(Value & fun, Value & arg, Value & v, const Pos & pos)
+void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value & vRes, const Pos & pos)
 {
     auto trace = evalSettings.traceFunctionCalls ? std::make_unique<FunctionCallTrace>(pos) : nullptr;
 
     forceValue(fun, pos);
 
-    if (fun.isPrimOp() || fun.isPrimOpApp()) {
-        callPrimOp(fun, arg, v, pos);
-        return;
-    }
+    Value vCur(fun);
 
-    if (fun.type() == nAttrs) {
-      auto found = fun.attrs->find(sFunctor);
-      if (found != fun.attrs->end()) {
-        /* fun may be allocated on the stack of the calling function,
-         * but for functors we may keep a reference, so heap-allocate
-         * a copy and use that instead.
-         */
-        auto & fun2 = *allocValue();
-        fun2 = fun;
-        /* !!! Should we use the attr pos here? */
-        Value v2;
-        callFunction(*found->value, fun2, v2, pos);
-        return callFunction(v2, arg, v, pos);
-      }
-    }
+    auto makeAppChain = [&]()
+    {
+        vRes = vCur;
+        for (size_t i = 0; i < nrArgs; ++i) {
+            auto fun2 = allocValue();
+            *fun2 = vRes;
+            vRes.mkPrimOpApp(fun2, args[i]);
+        }
+    };
 
-    if (!fun.isLambda())
-        throwTypeError(pos, "attempt to call something which is not a function but %1%", fun);
+    Attr * functor;
 
-    ExprLambda & lambda(*fun.lambda.fun);
+    while (nrArgs > 0) {
 
-    auto size =
-        (lambda.arg.empty() ? 0 : 1) +
-        (lambda.hasFormals() ? lambda.formals->formals.size() : 0);
-    Env & env2(allocEnv(size));
-    env2.up = fun.lambda.env;
+        if (vCur.isLambda()) {
 
-    size_t displ = 0;
+            ExprLambda & lambda(*vCur.lambda.fun);
 
-    if (!lambda.hasFormals())
-        env2.values[displ++] = &arg;
+            auto size =
+                (lambda.arg.empty() ? 0 : 1) +
+                (lambda.hasFormals() ? lambda.formals->formals.size() : 0);
+            Env & env2(allocEnv(size));
+            env2.up = vCur.lambda.env;
 
-    else {
-        forceAttrs(arg, pos);
+            Displacement displ = 0;
 
-        if (!lambda.arg.empty())
-            env2.values[displ++] = &arg;
+            if (!lambda.hasFormals())
+                env2.values[displ++] = args[0];
 
-        /* For each formal argument, get the actual argument.  If
-           there is no matching actual argument but the formal
-           argument has a default, use the default. */
-        size_t attrsUsed = 0;
-        for (auto & i : lambda.formals->formals) {
-            Bindings::iterator j = arg.attrs->find(i.name);
-            if (j == arg.attrs->end()) {
-                if (!i.def) throwTypeError(pos, "%1% called without required argument '%2%'",
-                    lambda, i.name);
-                env2.values[displ++] = i.def->maybeThunk(*this, env2);
+            else {
+                forceAttrs(*args[0], pos);
+
+                if (!lambda.arg.empty())
+                    env2.values[displ++] = args[0];
+
+                /* For each formal argument, get the actual argument.  If
+                   there is no matching actual argument but the formal
+                   argument has a default, use the default. */
+                size_t attrsUsed = 0;
+                for (auto & i : lambda.formals->formals) {
+                    auto j = args[0]->attrs->get(i.name);
+                    if (!j) {
+                        if (!i.def) throwTypeError(pos, "%1% called without required argument '%2%'",
+                            lambda, i.name);
+                        env2.values[displ++] = i.def->maybeThunk(*this, env2);
+                    } else {
+                        attrsUsed++;
+                        env2.values[displ++] = j->value;
+                    }
+                }
+
+                /* Check that each actual argument is listed as a formal
+                   argument (unless the attribute match specifies a `...'). */
+                if (!lambda.formals->ellipsis && attrsUsed != args[0]->attrs->size()) {
+                    /* Nope, so show the first unexpected argument to the
+                       user. */
+                    for (auto & i : *args[0]->attrs)
+                        if (lambda.formals->argNames.find(i.name) == lambda.formals->argNames.end())
+                            throwTypeError(pos, "%1% called with unexpected argument '%2%'", lambda, i.name);
+                    abort(); // can't happen
+                }
+            }
+
+            nrFunctionCalls++;
+            if (countCalls) incrFunctionCall(&lambda);
+
+            /* Evaluate the body. */
+            try {
+                lambda.body->eval(*this, env2, vCur);
+            } catch (Error & e) {
+                if (loggerSettings.showTrace.get()) {
+                    addErrorTrace(e, lambda.pos, "while evaluating %s",
+                        (lambda.name.set()
+                            ? "'" + (string) lambda.name + "'"
+                            : "anonymous lambda"));
+                    addErrorTrace(e, pos, "from call site%s", "");
+                }
+                throw;
+            }
+
+            nrArgs--;
+            args += 1;
+        }
+
+        else if (vCur.isPrimOp()) {
+
+            size_t argsLeft = vCur.primOp->arity;
+
+            if (nrArgs < argsLeft) {
+                /* We don't have enough arguments, so create a tPrimOpApp chain. */
+                makeAppChain();
+                return;
             } else {
-                attrsUsed++;
-                env2.values[displ++] = j->value;
+                /* We have all the arguments, so call the primop. */
+                nrPrimOpCalls++;
+                if (countCalls) primOpCalls[vCur.primOp->name]++;
+                vCur.primOp->fun(*this, pos, args, vCur);
+
+                nrArgs -= argsLeft;
+                args += argsLeft;
             }
         }
 
-        /* Check that each actual argument is listed as a formal
-           argument (unless the attribute match specifies a `...'). */
-        if (!lambda.formals->ellipsis && attrsUsed != arg.attrs->size()) {
-            /* Nope, so show the first unexpected argument to the
-               user. */
-            for (auto & i : *arg.attrs)
-                if (lambda.formals->argNames.find(i.name) == lambda.formals->argNames.end())
-                    throwTypeError(pos, "%1% called with unexpected argument '%2%'", lambda, i.name);
-            abort(); // can't happen
+        else if (vCur.isPrimOpApp()) {
+            /* Figure out the number of arguments still needed. */
+            size_t argsDone = 0;
+            Value * primOp = &vCur;
+            while (primOp->isPrimOpApp()) {
+                argsDone++;
+                primOp = primOp->primOpApp.left;
+            }
+            assert(primOp->isPrimOp());
+            auto arity = primOp->primOp->arity;
+            auto argsLeft = arity - argsDone;
+
+            if (nrArgs < argsLeft) {
+                /* We still don't have enough arguments, so extend the tPrimOpApp chain. */
+                makeAppChain();
+                return;
+            } else {
+                /* We have all the arguments, so call the primop with
+                   the previous and new arguments. */
+
+                Value * vArgs[arity];
+                auto n = argsDone;
+                for (Value * arg = &vCur; arg->isPrimOpApp(); arg = arg->primOpApp.left)
+                    vArgs[--n] = arg->primOpApp.right;
+
+                for (size_t i = 0; i < argsLeft; ++i)
+                    vArgs[argsDone + i] = args[i];
+
+                nrPrimOpCalls++;
+                if (countCalls) primOpCalls[primOp->primOp->name]++;
+                primOp->primOp->fun(*this, pos, vArgs, vCur);
+
+                nrArgs -= argsLeft;
+                args += argsLeft;
+            }
         }
+
+        else if (vCur.type() == nAttrs && (functor = vCur.attrs->get(sFunctor))) {
+            /* 'vCur' may be allocated on the stack of the calling
+               function, but for functors we may keep a reference, so
+               heap-allocate a copy and use that instead. */
+            Value * args2[] = {allocValue(), args[0]};
+            *args2[0] = vCur;
+            /* !!! Should we use the attr pos here? */
+            callFunction(*functor->value, 2, args2, vCur, pos);
+            nrArgs--;
+            args++;
+        }
+
+        else
+            throwTypeError(pos, "attempt to call something which is not a function but %1%", vCur);
     }
 
-    nrFunctionCalls++;
-    if (countCalls) incrFunctionCall(&lambda);
+    vRes = vCur;
+}
 
-    /* Evaluate the body.  This is conditional on showTrace, because
-       catching exceptions makes this function not tail-recursive. */
-    if (loggerSettings.showTrace.get())
-        try {
-            lambda.body->eval(*this, env2, v);
-        } catch (Error & e) {
-            addErrorTrace(e, lambda.pos, "while evaluating %s",
-              (lambda.name.set()
-                  ? "'" + (string) lambda.name + "'"
-                  : "anonymous lambda"));
-            addErrorTrace(e, pos, "from call site%s", "");
-            throw;
-        }
-    else
-        fun.lambda.fun->body->eval(*this, env2, v);
+
+void ExprCall::eval(EvalState & state, Env & env, Value & v)
+{
+    Value vFun;
+    fun->eval(state, env, vFun);
+
+    Value * vArgs[args.size()];
+    for (size_t i = 0; i < args.size(); ++i)
+        vArgs[i] = args[i]->maybeThunk(state, env);
+
+    state.callFunction(vFun, args.size(), vArgs, v, pos);
 }
 
 

@@ -73,7 +73,7 @@ public:
 
     /* Add a content-addressable store path. Does not support references. `dump` will be drained. */
     StorePath addToStoreFromDump(Source & dump, const string & name,
-        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair) override;
+        FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair, const StorePathSet & references = StorePathSet()) override;
 
     void addToStore(const ValidPathInfo & info, Source & nar,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
@@ -147,6 +147,8 @@ protected:
     ref<Pool<Connection>> connections;
 
     virtual void setOptions(Connection & conn);
+
+    void setOptions() override;
 
     ConnectionHandle getConnection();
 

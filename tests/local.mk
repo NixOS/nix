@@ -46,9 +46,10 @@ nix_tests = \
   recursive.sh \
   describe-stores.sh \
   flakes.sh \
+  flake-local-settings.sh \
   build.sh \
   compute-levels.sh \
-  repl.sh \
+  repl.sh ca/repl.sh \
   ca/build.sh \
   ca/build-with-garbage-path.sh \
   ca/duplicate-realisation-in-closure.sh \
