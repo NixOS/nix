@@ -134,7 +134,9 @@ SourceExprCommand::SourceExprCommand()
     addFlag({
         .longName = "file",
         .shortName = 'f',
-        .description = "Interpret installables as attribute paths relative to the Nix expression stored in *file*.",
+        .description =
+            "Interpret installables as attribute paths relative to the Nix expression stored in *file*. "
+            "If *file* is the character -, then a Nix expression will be read from standard input.",
         .category = installablesCategory,
         .labels = {"file"},
         .handler = {&file},
@@ -697,7 +699,10 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         auto state = getEvalState();
         auto vFile = state->allocValue();
 
-        if (file)
+        if (file == "-") {
+            auto e = state->parseStdin();
+            state->eval(e, *vFile);
+        } else if (file)
             state->evalFile(lookupFileArg(*state, *file), *vFile);
         else {
             auto e = state->parseExprFromString(*expr, absPath("."));

@@ -4,6 +4,7 @@
 #include "eval-cache.hh"
 #include "names.hh"
 #include "command.hh"
+#include "derivations.hh"
 
 namespace nix {
 

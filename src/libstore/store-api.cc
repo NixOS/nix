@@ -1,6 +1,7 @@
 #include "crypto.hh"
 #include "fs-accessor.hh"
 #include "globals.hh"
+#include "derivations.hh"
 #include "store-api.hh"
 #include "util.hh"
 #include "nar-info-disk-cache.hh"

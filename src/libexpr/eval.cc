@@ -449,8 +449,10 @@ EvalState::EvalState(
     , regexCache(makeRegexCache())
 #if HAVE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
+    , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
 #else
     , valueAllocCache(std::make_shared<void *>(nullptr))
+    , env1AllocCache(std::make_shared<void *>(nullptr))
 #endif
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
@@ -727,9 +729,18 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const std::string & s2
     throw EvalError(s, s2);
 }
 
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const Suggestions & suggestions, const char * s, const std::string & s2))
+{
+    throw EvalError(ErrorInfo {
+        .msg = hintfmt(s, s2),
+        .errPos = pos,
+        .suggestions = suggestions,
+    });
+}
+
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const std::string & s2))
 {
-    throw EvalError({
+    throw EvalError(ErrorInfo {
         .msg = hintfmt(s, s2),
         .errPos = pos
     });
@@ -772,6 +783,16 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
         .errPos = pos
     });
 }
+
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const Suggestions & suggestions, const char * s, const ExprLambda & fun, const Symbol & s2))
+{
+    throw TypeError(ErrorInfo {
+        .msg = hintfmt(s, fun.showNamePos(), s2),
+        .errPos = pos,
+        .suggestions = suggestions,
+    });
+}
+
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v))
 {
@@ -873,42 +894,6 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name);
         for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
-}
-
-
-Value * EvalState::allocValue()
-{
-    /* We use the boehm batch allocator to speed up allocations of Values (of which there are many).
-       GC_malloc_many returns a linked list of objects of the given size, where the first word
-       of each object is also the pointer to the next object in the list. This also means that we
-       have to explicitly clear the first word of every object we take. */
-    if (!*valueAllocCache) {
-        *valueAllocCache = GC_malloc_many(sizeof(Value));
-        if (!*valueAllocCache) throw std::bad_alloc();
-    }
-
-    /* GC_NEXT is a convenience macro for accessing the first word of an object.
-       Take the first list item, advance the list to the next item, and clear the next pointer. */
-    void * p = *valueAllocCache;
-    GC_PTR_STORE_AND_DIRTY(&*valueAllocCache, GC_NEXT(p));
-    GC_NEXT(p) = nullptr;
-
-    nrValues++;
-    auto v = (Value *) p;
-    return v;
-}
-
-
-Env & EvalState::allocEnv(size_t size)
-{
-    nrEnvs++;
-    nrValuesInEnvs += size;
-    Env * env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
-    env->type = Env::Plain;
-
-    /* We assume that env->values has been cleared by the allocator; maybeThunk() and lookupVar fromWith expect this. */
-
-    return *env;
 }
 
 
@@ -1281,8 +1266,15 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                 }
             } else {
                 state.forceAttrs(*vAttrs, pos);
-                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-                    throwEvalError(pos, "attribute '%1%' missing", name);
+                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end()) {
+                    std::set<std::string> allAttrNames;
+                    for (auto & attr : *vAttrs->attrs)
+                        allAttrNames.insert(attr.name);
+                    throwEvalError(
+                        pos,
+                        Suggestions::bestMatches(allAttrNames, name),
+                        "attribute '%1%' missing", name);
+                }
             }
             vAttrs = j->value;
             pos2 = j->pos;
@@ -1398,8 +1390,17 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     /* Nope, so show the first unexpected argument to the
                        user. */
                     for (auto & i : *args[0]->attrs)
-                        if (!lambda.formals->has(i.name))
-                            throwTypeError(pos, "%1% called with unexpected argument '%2%'", lambda, i.name);
+                        if (!lambda.formals->has(i.name)) {
+                            std::set<std::string> formalNames;
+                            for (auto & formal : lambda.formals->formals)
+                                formalNames.insert(formal.name);
+                            throwTypeError(
+                                pos,
+                                Suggestions::bestMatches(formalNames, i.name),
+                                "%1% called with unexpected argument '%2%'",
+                                lambda,
+                                i.name);
+                        }
                     abort(); // can't happen
                 }
             }

@@ -204,7 +204,7 @@ void DerivationGoal::haveDerivation()
 {
     trace("have derivation");
 
-    if (drv->type() == DerivationType::CAFloating)
+    if (!drv->type().hasKnownOutputPaths())
         settings.requireExperimentalFeature(Xp::CaDerivations);
 
     retrySubstitution = false;
@@ -440,9 +440,28 @@ void DerivationGoal::inputsRealised()
     if (useDerivation) {
         auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
 
-        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations) &&
-            ((!fullDrv.inputDrvs.empty() && derivationIsCA(fullDrv.type()))
-            || fullDrv.type() == DerivationType::DeferredInputAddressed)) {
+        auto drvType = fullDrv.type();
+        bool resolveDrv = std::visit(overloaded {
+            [&](const DerivationType::InputAddressed & ia) {
+                /* must resolve if deferred. */
+                return ia.deferred;
+            },
+            [&](const DerivationType::ContentAddressed & ca) {
+                return !fullDrv.inputDrvs.empty() && (
+                    ca.fixed
+                    /* Can optionally resolve if fixed, which is good
+                       for avoiding unnecessary rebuilds. */
+                    ? settings.isExperimentalFeatureEnabled(Xp::CaDerivations)
+                    /* Must resolve if floating and there are any inputs
+                       drvs. */
+                    : true);
+            },
+        }, drvType.raw());
+
+        if (resolveDrv)
+        {
+            settings.requireExperimentalFeature(Xp::CaDerivations);
+
             /* We are be able to resolve this derivation based on the
                now-known results of dependencies. If so, we become a stub goal
                aliasing that resolved derivation goal */
@@ -501,7 +520,7 @@ void DerivationGoal::inputsRealised()
 
     /* Don't repeat fixed-output derivations since they're already
        verified by their output hash.*/
-    nrRounds = derivationIsFixed(derivationType) ? 1 : settings.buildRepeat + 1;
+    nrRounds = derivationType.isFixed() ? 1 : settings.buildRepeat + 1;
 
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
@@ -909,7 +928,7 @@ void DerivationGoal::buildDone()
             st =
                 dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
                 statusOk(status) ? BuildResult::OutputRejected :
-                derivationIsImpure(derivationType) || diskFull ? BuildResult::TransientFailure :
+                derivationType.isImpure() || diskFull ? BuildResult::TransientFailure :
                 BuildResult::PermanentFailure;
         }
 
@@ -1232,7 +1251,7 @@ void DerivationGoal::flushLine()
 
 std::map<std::string, std::optional<StorePath>> DerivationGoal::queryPartialDerivationOutputMap()
 {
-    if (!useDerivation || drv->type() != DerivationType::CAFloating) {
+    if (!useDerivation || drv->type().hasKnownOutputPaths()) {
         std::map<std::string, std::optional<StorePath>> res;
         for (auto & [name, output] : drv->outputs)
             res.insert_or_assign(name, output.path(worker.store, drv->name, name));
@@ -1244,7 +1263,7 @@ std::map<std::string, std::optional<StorePath>> DerivationGoal::queryPartialDeri
 
 OutputPathMap DerivationGoal::queryDerivationOutputMap()
 {
-    if (!useDerivation || drv->type() != DerivationType::CAFloating) {
+    if (!useDerivation || drv->type().hasKnownOutputPaths()) {
         OutputPathMap res;
         for (auto & [name, output] : drv->outputsAndOptPaths(worker.store))
             res.insert_or_assign(name, *output.second);
@@ -1335,7 +1354,6 @@ void DerivationGoal::done(
     DrvOutputs builtOutputs,
     std::optional<Error> ex)
 {
-    buildResult.drvPath = drvPath;
     buildResult.status = status;
     if (ex)
         // FIXME: strip: "error: "

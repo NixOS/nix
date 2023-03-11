@@ -1163,26 +1163,24 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
         auto outPath = state.store->makeFixedOutputPath(ingestionMethod, h, drvName);
         drv.env["out"] = state.store->printStorePath(outPath);
-        drv.outputs.insert_or_assign("out", DerivationOutput {
-                .output = DerivationOutputCAFixed {
-                    .hash = FixedOutputHash {
-                        .method = ingestionMethod,
-                        .hash = std::move(h),
-                    },
+        drv.outputs.insert_or_assign("out",
+            DerivationOutput::CAFixed {
+                .hash = FixedOutputHash {
+                    .method = ingestionMethod,
+                    .hash = std::move(h),
                 },
-        });
+            });
     }
 
     else if (contentAddressed) {
         HashType ht = parseHashType(outputHashAlgo);
         for (auto & i : outputs) {
             drv.env[i] = hashPlaceholder(i);
-            drv.outputs.insert_or_assign(i, DerivationOutput {
-                .output = DerivationOutputCAFloating {
+            drv.outputs.insert_or_assign(i,
+                DerivationOutput::CAFloating {
                     .method = ingestionMethod,
                     .hashType = ht,
-                },
-            });
+                });
         }
     }
 
@@ -1196,43 +1194,36 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
         for (auto & i : outputs) {
             drv.env[i] = "";
             drv.outputs.insert_or_assign(i,
-                DerivationOutput {
-                    .output = DerivationOutputInputAddressed {
-                        .path = StorePath::dummy,
-                    },
-                });
+                DerivationOutput::Deferred { });
         }
 
         // Regular, non-CA derivation should always return a single hash and not
         // hash per output.
-        auto hashModulo = hashDerivationModulo(*state.store, Derivation(drv), true);
+        auto hashModulo = hashDerivationModulo(*state.store, drv, true);
         std::visit(overloaded {
-            [&](Hash & h) {
-                for (auto & i : outputs) {
-                    auto outPath = state.store->makeOutputPath(i, h, drvName);
-                    drv.env[i] = state.store->printStorePath(outPath);
-                    drv.outputs.insert_or_assign(i,
-                        DerivationOutput {
-                            .output = DerivationOutputInputAddressed {
-                                .path = std::move(outPath),
-                            },
-                        });
+            [&](const DrvHash & drvHash) {
+                auto & h = drvHash.hash;
+                switch (drvHash.kind) {
+                case DrvHash::Kind::Deferred:
+                    /* Outputs already deferred, nothing to do */
+                    break;
+                case DrvHash::Kind::Regular:
+                    for (auto & [outputName, output] : drv.outputs) {
+                        auto outPath = state.store->makeOutputPath(outputName, h, drvName);
+                        drv.env[outputName] = state.store->printStorePath(outPath);
+                        output = DerivationOutput::InputAddressed {
+                            .path = std::move(outPath),
+                        };
+                    }
+                    break;
                 }
             },
-            [&](CaOutputHashes &) {
+            [&](const CaOutputHashes &) {
                 // Shouldn't happen as the toplevel derivation is not CA.
                 assert(false);
             },
-            [&](DeferredHash &) {
-                for (auto & i : outputs) {
-                    drv.outputs.insert_or_assign(i,
-                        DerivationOutput {
-                            .output = DerivationOutputDeferred{},
-                        });
-                }
-            },
         },
-        hashModulo);
+        hashModulo.raw());
 
     }
 
@@ -1244,12 +1235,9 @@ static void prim_derivationStrict(EvalState & state, const Pos & pos, Value * * 
 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store derivations, so we can't
-       read them later.
-
-       However, we don't bother doing this for floating CA derivations because
-       their "hash modulo" is indeterminate until built. */
-    if (drv.type() != DerivationType::CAFloating) {
-        auto h = hashDerivationModulo(*state.store, Derivation(drv), false);
+       read them later. */
+    {
+        auto h = hashDerivationModulo(*state.store, drv, false);
         drvHashes.lock()->insert_or_assign(drvPath, h);
     }
 
