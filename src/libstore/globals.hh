@@ -797,6 +797,15 @@ public:
           may be useful in certain scenarios (e.g. to spin up containers or
           set up userspace network interfaces in tests).
         )"};
+
+    Setting<StringSet> ignoredAcls{
+        this, {"security.selinux", "system.nfs4_acl"}, "ignored-acls",
+        R"(
+          A list of ACLs that should be ignored, normally Nix attempts to
+          remove all ACLs from files and directories in the Nix store, but
+          some ACLs like `security.selinux` or `system.nfs4_acl` can't be
+          removed even by root. Therefore it's best to just ignore them.
+        )"};
 #endif
 
     Setting<Strings> hashedMirrors{

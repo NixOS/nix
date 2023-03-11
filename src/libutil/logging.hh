@@ -197,13 +197,14 @@ extern Verbosity verbosity; /* suppress msgs > this */
 /* Print a string message if the current log level is at least the specified
    level. Note that this has to be implemented as a macro to ensure that the
    arguments are evaluated lazily. */
-#define printMsg(level, args...) \
+#define printMsgUsing(loggerParam, level, args...) \
     do { \
         auto __lvl = level; \
         if (__lvl <= nix::verbosity) { \
-            logger->log(__lvl, fmt(args)); \
+            loggerParam->log(__lvl, fmt(args)); \
         } \
     } while (0)
+#define printMsg(level, args...) printMsgUsing(logger, level, args)
 
 #define printError(args...) printMsg(lvlError, args)
 #define notice(args...) printMsg(lvlNotice, args)
