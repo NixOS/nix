@@ -2,7 +2,6 @@
 
 #include "parsed-derivations.hh"
 #include "lock.hh"
-#include "build-result.hh"
 #include "store-api.hh"
 #include "pathlocks.hh"
 #include "goal.hh"
@@ -105,19 +104,7 @@ struct DerivationGoal : public Goal
     typedef void (DerivationGoal::*GoalState)();
     GoalState state;
 
-    /* The final output paths of the build.
-
-       - For input-addressed derivations, always the precomputed paths
-
-       - For content-addressed derivations, calcuated from whatever the hash
-         ends up being. (Note that fixed outputs derivations that produce the
-         "wrong" output still install that data under its true content-address.)
-     */
-    OutputPathMap finalOutputs;
-
     BuildMode buildMode;
-
-    BuildResult result;
 
     /* Time the build started. 'result' also has a 'startTime' field,
        but that's wall clock time, so we can't use it to compute the
@@ -158,8 +145,6 @@ struct DerivationGoal : public Goal
     /* Add wanted outputs to an already existing derivation goal. */
     void addWantedOutputs(const StringSet & outputs);
 
-    BuildResult getResult() { return result; }
-
     /* The states. */
     void getDerivation();
     void loadDerivation();
@@ -181,7 +166,7 @@ struct DerivationGoal : public Goal
 
     /* Check that the derivation outputs all exist and register them
        as valid. */
-    virtual void registerOutputs();
+    virtual DrvOutputs registerOutputs();
 
     /* Open a log file and a pipe to it. */
     Path openLogFile();
@@ -216,8 +201,17 @@ struct DerivationGoal : public Goal
     std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap();
     OutputPathMap queryDerivationOutputMap();
 
-    /* Return the set of (in)valid paths. */
-    void checkPathValidity();
+    /* Update 'initialOutputs' to determine the current status of the
+       outputs of the derivation. Also returns a Boolean denoting
+       whether all outputs are valid and non-corrupt, and a
+       'DrvOutputs' structure containing the valid and wanted
+       outputs. */
+    std::pair<bool, DrvOutputs> checkPathValidity();
+
+    /* Aborts if any output is not valid or corrupt, and otherwise
+       returns a 'DrvOutputs' structure containing the wanted
+       outputs. */
+    DrvOutputs assertPathValidity();
 
     /* Forcibly kill the child process, if any. */
     virtual void killChild();
@@ -228,6 +222,7 @@ struct DerivationGoal : public Goal
 
     void done(
         BuildResult::Status status,
+        DrvOutputs builtOutputs = {},
         std::optional<Error> ex = {});
 
     StorePathSet exportReferences(const StorePathSet & storePaths);

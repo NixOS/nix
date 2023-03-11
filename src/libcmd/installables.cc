@@ -12,6 +12,7 @@
 #include "eval-cache.hh"
 #include "url.hh"
 #include "registry.hh"
+#include "build-result.hh"
 
 #include <regex>
 #include <queue>
@@ -272,9 +273,9 @@ void completeFlakeRefWithFragment(
                 auto attr = root->findAlongAttrPath(attrPath);
                 if (!attr) continue;
 
-                for (auto & attr2 : attr->getAttrs()) {
+                for (auto & attr2 : (*attr)->getAttrs()) {
                     if (hasPrefix(attr2, lastAttr)) {
-                        auto attrPath2 = attr->getAttrPath(attr2);
+                        auto attrPath2 = (*attr)->getAttrPath(attr2);
                         /* Strip the attrpath prefix. */
                         attrPath2.erase(attrPath2.begin(), attrPath2.begin() + attrPathPrefix.size());
                         completions->add(flakeRefS + "#" + concatStringsSep(".", attrPath2));
@@ -570,15 +571,22 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
     auto cache = openEvalCache(*state, lockedFlake);
     auto root = cache->getRoot();
 
+    Suggestions suggestions;
+
     for (auto & attrPath : getActualAttrPaths()) {
         debug("trying flake output attribute '%s'", attrPath);
 
-        auto attr = root->findAlongAttrPath(
+        auto attrOrSuggestions = root->findAlongAttrPath(
             parseAttrPath(*state, attrPath),
             true
         );
 
-        if (!attr) continue;
+        if (!attrOrSuggestions) {
+            suggestions += attrOrSuggestions.getSuggestions();
+            continue;
+        }
+
+        auto attr = *attrOrSuggestions;
 
         if (!attr->isDerivation())
             throw Error("flake output attribute '%s' is not a derivation", attrPath);
@@ -593,7 +601,7 @@ std::tuple<std::string, FlakeRef, InstallableValue::DerivationInfo> InstallableF
         return {attrPath, lockedFlake->flake.lockedRef, std::move(drvInfo)};
     }
 
-    throw Error("flake '%s' does not provide attribute %s",
+    throw Error(suggestions, "flake '%s' does not provide attribute %s",
         flakeRef, showAttrPaths(getActualAttrPaths()));
 }
 
@@ -612,17 +620,24 @@ std::pair<Value *, Pos> InstallableFlake::toValue(EvalState & state)
 
     auto emptyArgs = state.allocBindings(0);
 
+    Suggestions suggestions;
+
     for (auto & attrPath : getActualAttrPaths()) {
         try {
             auto [v, pos] = findAlongAttrPath(state, attrPath, *emptyArgs, *vOutputs);
             state.forceValue(*v, pos);
             return {v, pos};
         } catch (AttrPathNotFound & e) {
+            suggestions += e.info().suggestions;
         }
     }
 
-    throw Error("flake '%s' does not provide attribute %s",
-        flakeRef, showAttrPaths(getActualAttrPaths()));
+    throw Error(
+        suggestions,
+        "flake '%s' does not provide attribute %s",
+        flakeRef,
+        showAttrPaths(getActualAttrPaths())
+    );
 }
 
 std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
@@ -637,7 +652,7 @@ InstallableFlake::getCursors(EvalState & state)
 
     for (auto & attrPath : getActualAttrPaths()) {
         auto attr = root->findAlongAttrPath(parseAttrPath(state, attrPath));
-        if (attr) res.push_back({attr, attrPath});
+        if (attr) res.push_back({*attr, attrPath});
     }
 
     return res;
@@ -757,8 +772,7 @@ BuiltPaths getBuiltPaths(ref<Store> evalStore, ref<Store> store, const DerivedPa
                             throw Error(
                                 "the derivation '%s' doesn't have an output named '%s'",
                                 store->printStorePath(bfd.drvPath), output);
-                        if (settings.isExperimentalFeatureEnabled(
-                                Xp::CaDerivations)) {
+                        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
                             auto outputId =
                                 DrvOutput{outputHashes.at(output), output};
                             auto realisation =
@@ -804,12 +818,33 @@ BuiltPaths Installable::build(
         pathsToBuild.insert(pathsToBuild.end(), b.begin(), b.end());
     }
 
-    if (mode == Realise::Nothing || mode == Realise::Derivation)
+    switch (mode) {
+    case Realise::Nothing:
+    case Realise::Derivation:
         printMissing(store, pathsToBuild, lvlError);
-    else if (mode == Realise::Outputs)
-        store->buildPaths(pathsToBuild, bMode, evalStore);
-
-    return getBuiltPaths(evalStore, store, pathsToBuild);
+        return getBuiltPaths(evalStore, store, pathsToBuild);
+    case Realise::Outputs: {
+        BuiltPaths res;
+        for (auto & buildResult : store->buildPathsWithResults(pathsToBuild, bMode, evalStore)) {
+            if (!buildResult.success())
+                buildResult.rethrow();
+            std::visit(overloaded {
+                [&](const DerivedPath::Built & bfd) {
+                    std::map<std::string, StorePath> outputs;
+                    for (auto & path : buildResult.builtOutputs)
+                        outputs.emplace(path.first.outputName, path.second.outPath);
+                    res.push_back(BuiltPath::Built { bfd.drvPath, outputs });
+                },
+                [&](const DerivedPath::Opaque & bo) {
+                    res.push_back(BuiltPath::Opaque { bo.path });
+                },
+            }, buildResult.path.raw());
+        }
+        return res;
+    }
+    default:
+        assert(false);
+    }
 }
 
 BuiltPaths Installable::toBuiltPaths(

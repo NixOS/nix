@@ -2,6 +2,7 @@
 
 #include "types.hh"
 #include "store-api.hh"
+#include "build-result.hh"
 
 namespace nix {
 
@@ -55,10 +56,15 @@ struct Goal : public std::enable_shared_from_this<Goal>
     /* Whether the goal is finished. */
     ExitCode exitCode;
 
+    /* Build result. */
+    BuildResult buildResult;
+
     /* Exception containing an error message, if any. */
     std::optional<Error> ex;
 
-    Goal(Worker & worker) : worker(worker)
+    Goal(Worker & worker, DerivedPath path)
+        : worker(worker)
+        , buildResult { .path = std::move(path) }
     {
         nrFailed = nrNoSubstituters = nrIncompleteClosure = 0;
         exitCode = ecBusy;

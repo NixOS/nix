@@ -28,6 +28,7 @@ struct BuildResult
         LogLimitExceeded,
         NotDeterministic,
         ResolvesToAlreadyValid,
+        NoSubstituters,
     } status = MiscFailure;
     std::string errorMsg;
 
@@ -63,14 +64,25 @@ struct BuildResult
        non-determinism.) */
     bool isNonDeterministic = false;
 
+    /* The derivation we built or the store path we substituted. */
+    DerivedPath path;
+
+    /* For derivations, the derivation path and the wanted outputs. */
+    std::optional<StorePath> drvPath;
     DrvOutputs builtOutputs;
 
     /* The start/stop times of the build (or one of the rounds, if it
        was repeated). */
     time_t startTime = 0, stopTime = 0;
 
-    bool success() {
+    bool success()
+    {
         return status == Built || status == Substituted || status == AlreadyValid || status == ResolvesToAlreadyValid;
+    }
+
+    void rethrow()
+    {
+        throw Error("%s", errorMsg);
     }
 };
 
