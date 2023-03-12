@@ -365,6 +365,7 @@ void mainWrapped(int argc, char * * argv)
 
     if (args.command->first != "repl"
         && args.command->first != "doctor"
+        && args.command->first != "store"
         && args.command->first != "upgrade-nix")
         settings.requireExperimentalFeature(Xp::NixCommand);
 
