@@ -313,7 +313,7 @@ struct Common : InstallableCommand, MixProfile
         buildEnvironment.toBash(out, ignoreVars);
 
         for (auto & var : savedVars)
-            out << fmt("%s=\"$%s:$nix_saved_%s\"\n", var, var, var);
+            out << fmt("%s=\"$%s${nix_saved_%s:+:$nix_saved_%s}\"\n", var, var, var, var);
 
         out << "export NIX_BUILD_TOP=\"$(mktemp -d -t nix-shell.XXXXXX)\"\n";
         for (auto & i : {"TMP", "TMPDIR", "TEMP", "TEMPDIR"})
