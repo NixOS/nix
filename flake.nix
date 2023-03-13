@@ -476,7 +476,7 @@
         # Binary package for various platforms.
         build = forAllSystems (system: self.packages.${system}.nix);
 
-        buildStatic = lib.genAttrs linux64BitSystems (system: self.packages.${system}.nix-static);
+        buildStatic = lib.genAttrs (linux64BitSystems ++ ["x86_64-darwin"]) (system: self.packages.${system}.nix-static);
 
         buildCross = forAllCrossSystems (crossSystem:
           lib.genAttrs ["x86_64-linux"] (system: self.packages.${system}."nix-${crossSystem}"));
@@ -646,7 +646,7 @@
       packages = forAllSystems (system: rec {
         inherit (nixpkgsFor.${system}.native) nix;
         default = nix;
-      } // (lib.optionalAttrs (builtins.elem system linux64BitSystems) {
+      } // (lib.optionalAttrs (builtins.elem system (linux64BitSystems ++ ["x86_64-darwin"])) {
         nix-static = nixpkgsFor.${system}.static.nix;
         dockerImage =
           let

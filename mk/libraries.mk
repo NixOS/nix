@@ -126,8 +126,12 @@ define build-library
     $(1)_PATH := $$(_d)/$$($(1)_NAME).a
 
     $$($(1)_PATH): $$($(1)_OBJS) | $$(_d)/
-	+$$(trace-ld) $(LD) -Ur -o $$(_d)/$$($(1)_NAME).o $$^
-	$$(trace-ar) $(AR) crs $$@ $$(_d)/$$($(1)_NAME).o
+    ifeq ($(OS), Linux)
+	+$(trace-ld) $(LD) -Ur -o $$(_d)/$$($(1)_NAME).o $$^
+	$(trace-ar) $(AR) crs $$@ $$(_d)/$$($(1)_NAME).o
+    else
+	$(trace-ar) $(AR) crs $$@ $$^
+    endif
 
     $(1)_LDFLAGS_USE += $$($(1)_PATH) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
 
