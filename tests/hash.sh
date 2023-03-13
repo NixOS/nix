@@ -2,13 +2,14 @@ source common.sh
 
 try () {
     printf "%s" "$2" > $TEST_ROOT/vector
-    hash=$(nix hash file --base16 ${EXTRA-} --type "$1" $TEST_ROOT/vector)
+    hash="$(nix hash file ${FORMAT_FLAG-} --type "$1" "$TEST_ROOT/vector")"
     if test "$hash" != "$3"; then
         echo "hash $1, expected $3, got $hash"
         exit 1
     fi
 }
 
+FORMAT_FLAG=--base16
 try md5 "" "d41d8cd98f00b204e9800998ecf8427e"
 try md5 "a" "0cc175b9c0f1b6a831c399e269772661"
 try md5 "abc" "900150983cd24fb0d6963f7d28e17f72"
@@ -28,16 +29,20 @@ try sha256 "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" "248d6a61d
 try sha512 "" "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e"
 try sha512 "abc" "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f"
 try sha512 "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" "204a8fc6dda82f0a0ced7beb8e08a41657c16ef468b228a8279be331a703c33596fd15c13b1b07f9aa1d3bea57789ca031ad85c7a71dd70354ec631238ca3445"
+unset FORMAT_FLAG
 
-EXTRA=--base32
+FORMAT_FLAG=--base32
 try sha256 "abc" "1b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s"
-EXTRA=
+unset FORMAT_FLAG
 
-EXTRA=--sri
+FORMAT_FLAG=--sri
 try sha512 "" "sha512-z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg=="
 try sha512 "abc" "sha512-3a81oZNherrMQXNJriBBMRLm+k6JqX6iCp7u5ktV05ohkpkqJ0/BqDa6PCOj/uu9RU1EI2Q86A4qmslPpUyknw=="
 try sha512 "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" "sha512-IEqPxt2oLwoM7XvrjgikFlfBbvRosiioJ5vjMacDwzWW/RXBOxsH+aodO+pXeJygMa2Fx6cd1wNU7GMSOMo0RQ=="
 try sha256 "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" "sha256-JI1qYdIGOLjlwCaTDD5gOaM85Flk/yFn9uzt1BnbBsE="
+unset FORMAT_FLAG
+
+try sha512 "abc" "sha512-3a81oZNherrMQXNJriBBMRLm+k6JqX6iCp7u5ktV05ohkpkqJ0/BqDa6PCOj/uu9RU1EI2Q86A4qmslPpUyknw=="
 
 try2 () {
     hash=$(nix-hash --type "$1" $TEST_ROOT/hash-path)
