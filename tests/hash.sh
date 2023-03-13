@@ -80,6 +80,8 @@ try3() {
     [ "$sri" = "$1-$4" ]
     h32=$(nix-hash --type "$1" --to-base32 "$2")
     [ "$h32" = "$3" ]
+    h32=$(nix hash to-base32 --type "$1" "$2")
+    [ "$h32" = "$3" ]
     h16=$(nix-hash --type "$1" --to-base16 "$h32")
     [ "$h16" = "$2" ]
     h16=$(nix hash to-base16 --type "$1" "$h64")
