@@ -1070,12 +1070,14 @@ static pid_t doFork(bool allowVfork, std::function<void()> fun)
 }
 
 
+#if __linux__
 static int childEntry(void * arg)
 {
     auto main = (std::function<void()> *) arg;
     (*main)();
     return 1;
 }
+#endif
 
 
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
