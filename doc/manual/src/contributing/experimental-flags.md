@@ -16,7 +16,6 @@ Examples:
 
 - Changes to the Nix language, such as new built-ins, syntactic or semantic changes, etc.
 - Changes to the command-line interface
-- Some non-trivial internal changes that are likely to introduce bugs
 
 # Lifecycle of an experimental feature
 
