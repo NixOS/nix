@@ -94,16 +94,43 @@ echo foo | nix develop -f "$shellDotNix" shellDrv -c cat | grepQuiet foo
 nix develop -f "$shellDotNix" shellDrv -c echo foo |& grepQuiet foo
 
 # Test 'nix print-dev-env'.
-[[ $(nix print-dev-env -f "$shellDotNix" shellDrv --json | jq -r .variables.arr1.value[2]) = '3 4' ]]
+
+scratch=$(mktemp -d -t tmp.XXXXXXXXXX)
+function finish {
+    rm -rf "$scratch"
+}
+trap finish EXIT
+
+nix print-dev-env -f "$shellDotNix" shellDrv > "$scratch/dev-env.sh"
+nix print-dev-env -f "$shellDotNix" shellDrv --json > "$scratch/dev-env.json"
+
+# Ensure `nix print-dev-env --json` contains variable assignments.
+[[ $(jq -r .variables.arr1.value[2] "$scratch/dev-env.json") = '3 4' ]]
+
+# Run tests involving `source <(nix print-dev-inv)` in subshells to avoid modifying the current
+# environment.
 
 set +u # FIXME: Make print-dev-env `set -u` compliant (issue #7951)
 
-source <(nix print-dev-env -f "$shellDotNix" shellDrv)
-[[ -n $stdenv ]]
-[[ ${arr1[2]} = "3 4" ]]
-[[ ${arr2[1]} = $'\n' ]]
-[[ ${arr2[2]} = $'x\ny' ]]
-[[ $(fun) = blabla ]]
+# Ensure `source <(nix print-dev-env)` modifies the environment.
+(
+    path=$PATH
+    source "$scratch/dev-env.sh"
+    [[ -n $stdenv ]]
+    [[ ${arr1[2]} = "3 4" ]]
+    [[ ${arr2[1]} = $'\n' ]]
+    [[ ${arr2[2]} = $'x\ny' ]]
+    [[ $(fun) = blabla ]]
+    [[ $PATH = $(jq -r .variables.PATH.value "$scratch/dev-env.json"):$path ]]
+)
+
+# Ensure `source <(nix print-dev-env)` handles the case when PATH is empty.
+(
+    path=$PATH
+    PATH=
+    source "$scratch/dev-env.sh"
+    [[ $PATH = $(PATH=$path jq -r .variables.PATH.value "$scratch/dev-env.json") ]]
+)
 
 # Test nix-shell with ellipsis and no `inNixShell` argument (for backwards compat with old nixpkgs)
 cat >$TEST_ROOT/shell-ellipsis.nix <<EOF
