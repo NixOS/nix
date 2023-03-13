@@ -69,6 +69,7 @@ Issues on the board progress through the following states:
   2. [security](https://github.com/NixOS/nix/labels/security)
   3. [regression](https://github.com/NixOS/nix/labels/regression)
   4. [bug](https://github.com/NixOS/nix/issues?q=is%3Aopen+label%3Abug+sort%3Areactions-%2B1-desc)
+  5. [tests of existing functionality](https://github.com/NixOS/nix/issues?q=is%3Aopen+label%3Atests+-label%3Afeature+sort%3Areactions-%2B1-desc)
 
   - [oldest pull requests](https://github.com/NixOS/nix/pulls?q=is%3Apr+is%3Aopen+sort%3Acreated-asc)
   - [most popular pull requests](https://github.com/NixOS/nix/pulls?q=is%3Apr+is%3Aopen+sort%3Areactions-%2B1-desc)
@@ -91,7 +92,7 @@ Issues on the board progress through the following states:
 
     Contributors who took the time to implement concrete change proposals should not wait indefinitely.
 
-  - Prioritise fixing bugs over documentation, improvements or new features
+  - Prioritise fixing bugs and testing over documentation, improvements or new features
 
     The team values stability and accessibility higher than raw functionality.
 
