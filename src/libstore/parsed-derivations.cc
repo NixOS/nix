@@ -122,7 +122,7 @@ bool ParsedDerivation::willBuildLocally(Store & localStore) const
 
 bool ParsedDerivation::substitutesAllowed() const
 {
-    return getBoolAttr("allowSubstitutes", true);
+    return settings.alwaysAllowSubstitutes ? true : getBoolAttr("allowSubstitutes", true);
 }
 
 bool ParsedDerivation::useUidRange() const

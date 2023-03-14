@@ -255,6 +255,14 @@ public:
           For the exact format and examples, see [the manual chapter on remote builds](../advanced-topics/distributed-builds.md)
         )"};
 
+    Setting<bool> alwaysAllowSubstitutes{
+        this, false, "always-allow-substitutes",
+        R"(
+          If set to `true`, Nix will ignore the `allowSubstitutes` attribute in
+          derivations and always attempt to use available substituters.
+          For more information on `allowSubstitutes`, see [the manual chapter on advanced attributes](../language/advanced-attributes.md).
+        )"};
+
     Setting<bool> buildersUseSubstitutes{
         this, false, "builders-use-substitutes",
         R"(
