@@ -25,9 +25,12 @@ However, the standard workflow for an experimental feature is as follows:
 - The feature is implemented in a pull request.
 - It is merged under an experimental flag, and is disabled by default.
     - Being experimental, the feature can still be changed arbitrarily or removed again.
-- After at least one release cycle without any significant issues, the feature becomes enabled by default.
-    - If any blocking issue gets reported the feature can be disabled by default again.
-- After at least another release cycle, the feature flag is removed and the feature is considered stable.
+- The experimental feature flag can be removed and the feature is considered stable if:
+  - There is enough evidence of users having tried the feature, such as feedback, fixed bugs, demonstrations of how it is put to use
+  - Maintainers feel confident that
+    - The feature is designed and implemented sensibly, that it is fit for purpose
+    - Potential interactions are well-understood
+    - Stabilising the feature will not incur an outsized maintenance burden in the future
 
 The following diagram illustrates the process:
 
