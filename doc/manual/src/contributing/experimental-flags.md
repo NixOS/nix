@@ -10,7 +10,7 @@ This allows accessing new functionality that is not yet stable without unwitting
 
 # When should a new feature be marked experimental?
 
-A change in the Nix codebase should be guarded by an experimental feature flag if it is likely to either introduce a regression of any kind, or if it implies a non-trivial change to the external interface of Nix.
+A change in the Nix codebase should be guarded by an experimental feature flag if it is considered likely to be reverted or adapted in a backwards-incompatible manner after gathering more experience with it in practice.
 
 Examples:
 
