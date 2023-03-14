@@ -3,10 +3,8 @@ This section describes the notion of *experimental features*, and how it fits in
 # What are experimental features?
 
 [Since Nix 2.4](../release-notes/rl-2.4.md), some features of Nix can be flagged as experimental.
-Experimental features can be changed or removed at any time, and users must [explicitly enable them].
+Experimental features can be changed or removed at any time, and users must [explicitly enable them](../nix-conf.md#conf-expeirmental-features).
 This allows accessing new functionality that is not yet stable without unwittingly relying on them.
-
-[explicitly enable them]: ../nix-conf.md#conf-expeirmental-features
 
 # When should a new feature be marked experimental?
 
@@ -23,7 +21,7 @@ Experimental features have to be treated on a case-by-case basis.
 However, the standard workflow for an experimental feature is as follows:
 
 - The feature is implemented in a pull request.
-- It is merged under an experimental flag, and is disabled by default.
+- The feature is guarded by an experimental feature flag that is disabled by default, and the pull request is merged.
     - Being experimental, the feature can still be changed arbitrarily or removed again.
 - The experimental feature flag can be removed and the feature is considered stable if:
   - There is enough evidence of users having tried the feature, such as feedback, fixed bugs, demonstrations of how it is put to use
@@ -38,23 +36,14 @@ The following diagram illustrates the process:
 
 ```mermaid
 flowchart
-    xp_disabled[experimental, disabled by default]
-    xp_enabled[experimental, enabled by default]
-    stable([stable])
-    trunk([pull request])
-    dropped([removed])
+  idea([idea]) --> |discussion, design, implementation| pr([pull request])
+  experimental --> |"user feedback, (breaking) changes"| pr
 
-
-    trunk --> |merge into master| xp_disabled
-    xp_disabled --> |At least one release without significant issues| xp_enabled
-    xp_enabled --> |At least one release without significant issues| stable
-    xp_enabled --> |Blocking issue reported| xp_disabled
-    xp_disabled --> |"(breaking) changes"| xp_disabled
-    xp_disabled --> |Decision against adding the feature| dropped
+  pr --> |review| pr
+  pr --> |merge| experimental
+  experimental --> |decision to stabilise| stable
+  experimental --> |decision against keeping the feature| removed
 ```
-
-This is just indicative.
-For instance, some features have to be used deliberately anyway, such as an additional command-line flag: there's no point in making them experimental but enabled by default.
 
 # Relation to the RFC process
 
@@ -63,8 +52,8 @@ However they serve different purposes:
 
 - An experimental feature enables developers to iterate on and deliver a new idea without committing to it or requiring a costly long-running fork.
   It is primarily an issue of *implementation*, targeting Nix developers and early testers.
-- The goal of an RFC is to make explicit all the implications of a change: Explain why it is wanted, which new use-cases it enables, which interface changes it requires, etc.
+- The goal of an RFC is to make explicit all the implications of a change:
+  Explain why it is wanted, which new use-cases it enables, which interface changes it requires, etc.
   It is primarily an issue of *design* and *communication*, targeting the broader community.
-
 
 This means that experimental features and RFCs are orthogonal mechanisms, and can be used independently or together as needed.
