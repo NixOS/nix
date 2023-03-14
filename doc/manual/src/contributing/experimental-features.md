@@ -3,7 +3,7 @@ This section describes the notion of *experimental features*, and how it fits in
 # What are experimental features?
 
 [Since Nix 2.4](../release-notes/rl-2.4.md), some features of Nix can be flagged as experimental.
-Experimental features can be changed or removed at any time, and users must [explicitly enable them](../nix-conf.md#conf-expeirmental-features).
+Experimental features can be changed or removed at any time, and users must [explicitly enable them](../nix-conf.md#conf-experimental-features).
 This allows accessing new functionality that is not yet stable without unwittingly relying on them.
 
 # When should a new feature be marked experimental?
