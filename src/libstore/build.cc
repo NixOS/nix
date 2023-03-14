@@ -827,6 +827,10 @@ private:
     /* Pipe for the builder's standard output/error. */
     Pipe builderOut;
 
+    /* Slave side of the pseudoterminal used for the builder's
+       standard output/error. */
+    Path slaveName;
+
     /* Pipe for synchronising updates to the builder user namespace. */
     Pipe userNamespaceSync;
 
@@ -2238,14 +2242,12 @@ void DerivationGoal::startBuilder()
     /* Create the log file. */
     Path logFile = openLogFile();
 
-    /* Create a pipe to get the output of the builder. */
-    //builderOut.create();
-
+    /* Create a pseudoterminal to get the output of the builder. */
     builderOut.readSide = posix_openpt(O_RDWR | O_NOCTTY);
     if (!builderOut.readSide)
         throw SysError("opening pseudoterminal master");
 
-    std::string slaveName(ptsname(builderOut.readSide.get()));
+    slaveName = ptsname(builderOut.readSide.get());
 
     if (buildUser) {
         if (chmod(slaveName.c_str(), 0600))
@@ -2258,29 +2260,8 @@ void DerivationGoal::startBuilder()
             throw SysError("granting access to pseudoterminal slave");
     }
 
-    #if 0
-    // Mount the pt in the sandbox so that the "tty" command works.
-    // FIXME: this doesn't work with the new devpts in the sandbox.
-    if (useChroot)
-        dirsInChroot[slaveName] = {slaveName, false};
-    #endif
-
     if (unlockpt(builderOut.readSide.get()))
         throw SysError("unlocking pseudoterminal");
-
-    builderOut.writeSide = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
-    if (!builderOut.writeSide)
-        throw SysError("opening pseudoterminal slave");
-
-    // Put the pt into raw mode to prevent \n -> \r\n translation.
-    struct termios term;
-    if (tcgetattr(builderOut.writeSide.get(), &term))
-        throw SysError("getting pseudoterminal attributes");
-
-    cfmakeraw(&term);
-
-    if (tcsetattr(builderOut.writeSide.get(), TCSANOW, &term))
-        throw SysError("putting pseudoterminal into raw mode");
 
     result.startTime = time(0);
 
@@ -2330,7 +2311,11 @@ void DerivationGoal::startBuilder()
 
         options.allowVfork = false;
 
+        Pipe sendPid;
+        sendPid.create();
+
         Pid helper = startProcess([&]() {
+            sendPid.readSide.close();
 
             /* Drop additional groups here because we can't do it
                after we've created the new user namespace.  FIXME:
@@ -2374,9 +2359,11 @@ void DerivationGoal::startBuilder()
                 _exit(1);
             if (child == -1) throw SysError("cloning builder process");
 
-            writeFull(builderOut.writeSide.get(), std::to_string(child) + "\n");
+            writeFull(sendPid.writeSide.get(), std::to_string(child) + "\n");
             _exit(0);
         }, options);
+
+        sendPid.writeSide.close();
 
         int res = helper.wait();
         if (res != 0 && settings.sandboxFallback) {
@@ -2395,7 +2382,7 @@ void DerivationGoal::startBuilder()
         });
 
         pid_t tmp;
-        if (!string2Int<pid_t>(readLine(builderOut.readSide.get()), tmp)) abort();
+        if (!string2Int<pid_t>(readLine(sendPid.readSide.get()), tmp)) abort();
         pid = tmp;
 
         /* Set the UID/GID mapping of the builder's user namespace
@@ -2735,6 +2722,21 @@ void DerivationGoal::runChild()
        calls! */
 
     try { /* child */
+
+        /* Open the slave side of the pseudoterminal. */
+        builderOut.writeSide = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
+        if (!builderOut.writeSide)
+            throw SysError("opening pseudoterminal slave");
+
+        // Put the pt into raw mode to prevent \n -> \r\n translation.
+        struct termios term;
+        if (tcgetattr(builderOut.writeSide.get(), &term))
+            throw SysError("getting pseudoterminal attributes");
+
+        cfmakeraw(&term);
+
+        if (tcsetattr(builderOut.writeSide.get(), TCSANOW, &term))
+            throw SysError("putting pseudoterminal into raw mode");
 
         commonChildInit(builderOut.writeSide.get());
 
