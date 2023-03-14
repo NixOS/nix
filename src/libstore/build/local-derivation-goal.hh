@@ -27,6 +27,10 @@ struct LocalDerivationGoal : public DerivationGoal
     /* Pipe for the builder's standard output/error. */
     Pipe builderOut;
 
+    /* Slave side of the pseudoterminal used for the builder's
+       standard output/error. */
+    Path slaveName;
+
     /* Pipe for synchronising updates to the builder namespaces. */
     Pipe userNamespaceSync;
 
