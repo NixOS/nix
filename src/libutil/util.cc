@@ -1968,7 +1968,7 @@ std::string showBytes(uint64_t bytes)
 
 
 // FIXME: move to libstore/build
-void commonChildInit(Pipe & logPipe)
+void commonChildInit(int stderrFd)
 {
     logger = makeSimpleLogger();
 
@@ -1983,7 +1983,7 @@ void commonChildInit(Pipe & logPipe)
         throw SysError("creating a new session");
 
     /* Dup the write side of the logger pipe into stderr. */
-    if (dup2(logPipe.writeSide.get(), STDERR_FILENO) == -1)
+    if (dup2(stderrFd, STDERR_FILENO) == -1)
         throw SysError("cannot pipe standard error into log file");
 
     /* Dup stderr to stdout. */

@@ -1649,7 +1649,7 @@ void LocalDerivationGoal::runChild()
 
     try { /* child */
 
-        commonChildInit(builderOut);
+        commonChildInit(builderOut.writeSide.get());
 
         try {
             setupSeccomp();
