@@ -104,7 +104,7 @@ MixFlakeOptions::MixFlakeOptions()
 
     addFlag({
         .longName = "reference-lock-file",
-        .description = "Read the given lock file instead of `flake.lock` within the top-level flake",
+        .description = "Read the given lock file instead of `flake.lock` within the top-level flake.",
         .category = category,
         .labels = {"flake-lock-path"},
         .handler = {[&](std::string lockFilePath) {
@@ -115,7 +115,7 @@ MixFlakeOptions::MixFlakeOptions()
 
     addFlag({
         .longName = "output-lock-file",
-        .description = "Write the given lock file instead of `flake.lock` within the top-level flake",
+        .description = "Write the given lock file instead of `flake.lock` within the top-level flake.",
         .category = category,
         .labels = {"flake-lock-path"},
         .handler = {[&](std::string lockFilePath) {
