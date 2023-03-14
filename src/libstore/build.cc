@@ -442,7 +442,7 @@ void Goal::trace(const FormatOrString & fs)
 
 
 /* Common initialisation performed in child processes. */
-static void commonChildInit(Pipe & logPipe)
+static void commonChildInit(int stderrFd)
 {
     restoreSignals();
 
@@ -454,7 +454,7 @@ static void commonChildInit(Pipe & logPipe)
         throw SysError(format("creating a new session"));
 
     /* Dup the write side of the logger pipe into stderr. */
-    if (dup2(logPipe.writeSide.get(), STDERR_FILENO) == -1)
+    if (dup2(stderrFd, STDERR_FILENO) == -1)
         throw SysError("cannot pipe standard error into log file");
 
     /* Dup stderr to stdout. */
@@ -678,7 +678,7 @@ HookInstance::HookInstance()
     /* Fork the hook. */
     pid = startProcess([&]() {
 
-        commonChildInit(fromHook);
+        commonChildInit(fromHook.writeSide.get());
 
         if (chdir("/") == -1) throw SysError("changing into /");
 
@@ -2736,7 +2736,7 @@ void DerivationGoal::runChild()
 
     try { /* child */
 
-        commonChildInit(builderOut);
+        commonChildInit(builderOut.writeSide.get());
 
         try {
             setupSeccomp();
