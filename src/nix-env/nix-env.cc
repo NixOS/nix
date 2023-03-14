@@ -1498,9 +1498,6 @@ static int main_nix_env(int argc, char * * argv)
         globals.instSource.autoArgs = myArgs.getAutoArgs(*globals.state);
 
         if (globals.profile == "")
-            globals.profile = getEnv("NIX_PROFILE").value_or("");
-
-        if (globals.profile == "")
             globals.profile = getDefaultProfile();
 
         op(globals, std::move(opFlags), std::move(opArgs));

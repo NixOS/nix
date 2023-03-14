@@ -290,6 +290,8 @@ Path profilesDir()
 
 Path getDefaultProfile()
 {
+    if (auto profileLink = getEnv("NIX_PROFILE"))
+        return *profileLink;
     Path profileLink = settings.useXDGBaseDirectories ? createNixStateDir() + "/profile" : getHome() + "/.nix-profile";
     try {
         auto profile =

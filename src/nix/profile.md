@@ -14,7 +14,8 @@ which, if it does not exist, is created as a symlink to
 `/nix/var/nix/profiles/default` if Nix is invoked by the
 `root` user, or `/nix/var/nix/profiles/per-user/`*username* otherwise.
 
-You can specify another profile location using `--profile` *path*.
+You can specify another profile location using `--profile` *path* or the
+`NIX_PROFILE` environment variable.
 
 # Filesystem layout
 
