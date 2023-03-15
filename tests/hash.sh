@@ -2,9 +2,14 @@ source common.sh
 
 try () {
     printf "%s" "$2" > $TEST_ROOT/vector
+    hash="$(nix-hash --flat ${FORMAT_FLAG-} --type "$1" "$TEST_ROOT/vector")"
+    if ! (( "${NO_TEST_CLASSIC-}" )) && test "$hash" != "$3"; then
+        echo "try nix-hash: hash $1, expected $3, got $hash"
+        exit 1
+    fi
     hash="$(nix hash file ${FORMAT_FLAG-} --type "$1" "$TEST_ROOT/vector")"
-    if test "$hash" != "$3"; then
-        echo "hash $1, expected $3, got $hash"
+    if ! (( "${NO_TEST_NIX_COMMAND-}" )) && test "$hash" != "$3"; then
+        echo "try nix hash: hash $1, expected $3, got $hash"
         exit 1
     fi
 }
@@ -42,7 +47,11 @@ try sha512 "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" "sha512-IE
 try sha256 "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" "sha256-JI1qYdIGOLjlwCaTDD5gOaM85Flk/yFn9uzt1BnbBsE="
 unset FORMAT_FLAG
 
-try sha512 "abc" "sha512-3a81oZNherrMQXNJriBBMRLm+k6JqX6iCp7u5ktV05ohkpkqJ0/BqDa6PCOj/uu9RU1EI2Q86A4qmslPpUyknw=="
+# nix-hash [--flat] defaults to the Base16 format
+NO_TEST_NIX_COMMAND=1 try sha512 "abc" "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f"
+
+# nix hash [file|path] defaults to the SRI format
+NO_TEST_CLASSIC=1 try sha512 "abc" "sha512-3a81oZNherrMQXNJriBBMRLm+k6JqX6iCp7u5ktV05ohkpkqJ0/BqDa6PCOj/uu9RU1EI2Q86A4qmslPpUyknw=="
 
 try2 () {
     hash=$(nix-hash --type "$1" $TEST_ROOT/hash-path)
@@ -74,8 +83,12 @@ try2 md5 "f78b733a68f5edbdf9413899339eaa4a"
 
 # Conversion.
 try3() {
+    h64=$(nix-hash --type "$1" --to-base64 "$2")
+    [ "$h64" = "$4" ]
     h64=$(nix hash to-base64 --type "$1" "$2")
     [ "$h64" = "$4" ]
+    sri=$(nix-hash --type "$1" --to-sri "$2")
+    [ "$sri" = "$1-$4" ]
     sri=$(nix hash to-sri --type "$1" "$2")
     [ "$sri" = "$1-$4" ]
     h32=$(nix-hash --type "$1" --to-base32 "$2")
