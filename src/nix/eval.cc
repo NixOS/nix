@@ -54,7 +54,7 @@ struct CmdEval : MixJSON, InstallableCommand, MixReadOnlyOption
 
     Category category() override { return catSecondary; }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<Installable> installable) override
     {
         if (raw && json)
             throw UsageError("--raw and --json are mutually exclusive");

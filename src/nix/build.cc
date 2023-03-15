@@ -89,7 +89,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
           ;
     }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, Installables && installables) override
     {
         if (dryRun) {
             std::vector<DerivedPath> pathsToBuild;

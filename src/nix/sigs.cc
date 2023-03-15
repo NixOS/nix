@@ -219,7 +219,6 @@ struct CmdKey : NixMultiCommand
     {
         if (!command)
             throw UsageError("'nix key' requires a sub-command.");
-        command->second->prepare();
         command->second->run();
     }
 };

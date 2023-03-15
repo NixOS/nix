@@ -26,7 +26,7 @@ struct CmdCopyLog : virtual CopyCommand, virtual InstallablesCommand
 
     Category category() override { return catUtility; }
 
-    void run(ref<Store> srcStore) override
+    void run(ref<Store> srcStore, Installables && installables) override
     {
         auto & srcLogStore = require<LogStore>(*srcStore);
 

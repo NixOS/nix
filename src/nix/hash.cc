@@ -151,7 +151,6 @@ struct CmdHash : NixMultiCommand
     {
         if (!command)
             throw UsageError("'nix hash' requires a sub-command.");
-        command->second->prepare();
         command->second->run();
     }
 };
