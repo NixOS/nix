@@ -24,8 +24,9 @@ struct LocalDerivationGoal : public DerivationGoal
     /* The path of the temporary directory in the sandbox. */
     Path tmpDirInSandbox;
 
-    /* Pipe for the builder's standard output/error. */
-    Pipe builderOut;
+    /* Master side of the pseudoterminal used for the builder's
+       standard output/error. */
+    AutoCloseFD builderOut;
 
     /* Slave side of the pseudoterminal used for the builder's
        standard output/error. */

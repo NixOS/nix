@@ -292,7 +292,7 @@ void LocalDerivationGoal::closeReadPipes()
     if (hook) {
         DerivationGoal::closeReadPipes();
     } else
-        builderOut.readSide = -1;
+        builderOut.close();
 }
 
 
@@ -803,12 +803,12 @@ void LocalDerivationGoal::startBuilder()
     Path logFile = openLogFile();
 
     /* Create a pseudoterminal to get the output of the builder. */
-    builderOut.readSide = posix_openpt(O_RDWR | O_NOCTTY);
-    if (!builderOut.readSide)
+    builderOut = posix_openpt(O_RDWR | O_NOCTTY);
+    if (!builderOut)
         throw SysError("opening pseudoterminal master");
 
     // FIXME: not thread-safe, use ptsname_r
-    slaveName = ptsname(builderOut.readSide.get());
+    slaveName = ptsname(builderOut.get());
 
     if (buildUser) {
         if (chmod(slaveName.c_str(), 0600))
@@ -819,12 +819,12 @@ void LocalDerivationGoal::startBuilder()
     }
 #if __APPLE__
     else {
-        if (grantpt(builderOut.readSide.get()))
+        if (grantpt(builderOut.get()))
             throw SysError("granting access to pseudoterminal slave");
     }
 #endif
 
-    if (unlockpt(builderOut.readSide.get()))
+    if (unlockpt(builderOut.get()))
         throw SysError("unlocking pseudoterminal");
 
     buildResult.startTime = time(0);
@@ -980,15 +980,14 @@ void LocalDerivationGoal::startBuilder()
 
     /* parent */
     pid.setSeparatePG(true);
-    builderOut.writeSide = -1;
-    worker.childStarted(shared_from_this(), {builderOut.readSide.get()}, true, true);
+    worker.childStarted(shared_from_this(), {builderOut.get()}, true, true);
 
     /* Check if setting up the build environment failed. */
     std::vector<std::string> msgs;
     while (true) {
         std::string msg = [&]() {
             try {
-                return readLine(builderOut.readSide.get());
+                return readLine(builderOut.get());
             } catch (Error & e) {
                 auto status = pid.wait();
                 e.addTrace({}, "while waiting for the build environment for '%s' to initialize (%s, previous messages: %s)",
@@ -1000,7 +999,7 @@ void LocalDerivationGoal::startBuilder()
         }();
         if (msg.substr(0, 1) == "\2") break;
         if (msg.substr(0, 1) == "\1") {
-            FdSource source(builderOut.readSide.get());
+            FdSource source(builderOut.get());
             auto ex = readError(source);
             ex.addTrace({}, "while setting up the build environment");
             throw ex;
@@ -1631,21 +1630,21 @@ void LocalDerivationGoal::runChild()
     try { /* child */
 
         /* Open the slave side of the pseudoterminal. */
-        builderOut.writeSide = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
-        if (!builderOut.writeSide)
+        AutoCloseFD builderOut = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
+        if (!builderOut)
             throw SysError("opening pseudoterminal slave");
 
         // Put the pt into raw mode to prevent \n -> \r\n translation.
         struct termios term;
-        if (tcgetattr(builderOut.writeSide.get(), &term))
+        if (tcgetattr(builderOut.get(), &term))
             throw SysError("getting pseudoterminal attributes");
 
         cfmakeraw(&term);
 
-        if (tcsetattr(builderOut.writeSide.get(), TCSANOW, &term))
+        if (tcsetattr(builderOut.get(), TCSANOW, &term))
             throw SysError("putting pseudoterminal into raw mode");
 
-        commonChildInit(builderOut.writeSide.get());
+        commonChildInit(builderOut.get());
 
         try {
             setupSeccomp();
@@ -2887,7 +2886,7 @@ void LocalDerivationGoal::deleteTmpDir(bool force)
 bool LocalDerivationGoal::isReadDesc(int fd)
 {
     return (hook && DerivationGoal::isReadDesc(fd)) ||
-        (!hook && fd == builderOut.readSide.get());
+        (!hook && fd == builderOut.get());
 }
 
 
