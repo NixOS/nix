@@ -824,8 +824,9 @@ private:
 
     std::string currentHookLine;
 
-    /* Pipe for the builder's standard output/error. */
-    Pipe builderOut;
+    /* Master side of the pseudoterminal used for the builder's
+       standard output/error. */
+    AutoCloseFD builderOut;
 
     /* Slave side of the pseudoterminal used for the builder's
        standard output/error. */
@@ -1606,7 +1607,7 @@ void DerivationGoal::buildDone()
         hook->builderOut.readSide = -1;
         hook->fromHook.readSide = -1;
     } else
-        builderOut.readSide = -1;
+        builderOut.close();
 
     /* Close the log file. */
     closeLogFile();
@@ -2243,11 +2244,11 @@ void DerivationGoal::startBuilder()
     Path logFile = openLogFile();
 
     /* Create a pseudoterminal to get the output of the builder. */
-    builderOut.readSide = posix_openpt(O_RDWR | O_NOCTTY);
-    if (!builderOut.readSide)
+    builderOut = posix_openpt(O_RDWR | O_NOCTTY);
+    if (!builderOut)
         throw SysError("opening pseudoterminal master");
 
-    slaveName = ptsname(builderOut.readSide.get());
+    slaveName = ptsname(builderOut.get());
 
     if (buildUser) {
         if (chmod(slaveName.c_str(), 0600))
@@ -2256,11 +2257,11 @@ void DerivationGoal::startBuilder()
         if (chown(slaveName.c_str(), buildUser->getUID(), 0))
             throw SysError("changing owner of pseudoterminal slave");
     } else {
-        if (grantpt(builderOut.readSide.get()))
+        if (grantpt(builderOut.get()))
             throw SysError("granting access to pseudoterminal slave");
     }
 
-    if (unlockpt(builderOut.readSide.get()))
+    if (unlockpt(builderOut.get()))
         throw SysError("unlocking pseudoterminal");
 
     result.startTime = time(0);
@@ -2415,12 +2416,11 @@ void DerivationGoal::startBuilder()
 
     /* parent */
     pid.setSeparatePG(true);
-    builderOut.writeSide = -1;
-    worker.childStarted(shared_from_this(), {builderOut.readSide.get()}, true, true);
+    worker.childStarted(shared_from_this(), {builderOut.get()}, true, true);
 
     /* Check if setting up the build environment failed. */
     while (true) {
-        string msg = readLine(builderOut.readSide.get());
+        string msg = readLine(builderOut.get());
         if (string(msg, 0, 1) == "\1") {
             if (msg.size() == 1) break;
             throw Error(string(msg, 1));
@@ -2724,21 +2724,21 @@ void DerivationGoal::runChild()
     try { /* child */
 
         /* Open the slave side of the pseudoterminal. */
-        builderOut.writeSide = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
-        if (!builderOut.writeSide)
+        AutoCloseFD builderOut = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
+        if (!builderOut)
             throw SysError("opening pseudoterminal slave");
 
         // Put the pt into raw mode to prevent \n -> \r\n translation.
         struct termios term;
-        if (tcgetattr(builderOut.writeSide.get(), &term))
+        if (tcgetattr(builderOut.get(), &term))
             throw SysError("getting pseudoterminal attributes");
 
         cfmakeraw(&term);
 
-        if (tcsetattr(builderOut.writeSide.get(), TCSANOW, &term))
+        if (tcsetattr(builderOut.get(), TCSANOW, &term))
             throw SysError("putting pseudoterminal into raw mode");
 
-        commonChildInit(builderOut.writeSide.get());
+        commonChildInit(builderOut.get());
 
         try {
             setupSeccomp();
@@ -3730,7 +3730,7 @@ void DerivationGoal::deleteTmpDir(bool force)
 void DerivationGoal::handleChildOutput(int fd, const string & data)
 {
     if ((hook && fd == hook->builderOut.readSide.get()) ||
-        (!hook && fd == builderOut.readSide.get()))
+        (!hook && fd == builderOut.get()))
     {
         logSize += data.size();
         if (settings.maxLogSize && logSize > settings.maxLogSize) {
