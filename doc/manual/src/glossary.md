@@ -135,14 +135,13 @@
     then be built.
 
   - [reference]{#gloss-reference}\
-    A store path `P` is said to have a reference to a store path `Q` if
-    the store object at `P` contains the path `Q` somewhere. The
-    *references* of a store path are the set of store paths to which it
-    has a reference.
+    A [store object] `O` is said to have a *reference* to a store object `P` if a [store path] to `P` appears in the contents of `O`.
 
-    A derivation can reference other derivations and sources (but not
-    output paths), whereas an output path only references other output
-    paths.
+    Store objects can refer to both other store objects and themselves.
+    References from a store object to itself are called *self-references*.
+    References other than a self-reference must not form a cycle.
+
+    [reference]: #gloss-reference
 
   - [reachable]{#gloss-reachable}\
     A store path `Q` is reachable from another store path `P` if `Q`
@@ -159,8 +158,8 @@
     files could be missing. The command `nix-store -qR` prints out
     closures of store paths.
 
-    As an example, if the store object at path `P` contains a reference
-    to path `Q`, then `Q` is in the closure of `P`. Further, if `Q`
+    As an example, if the [store object] at path `P` contains a [reference]
+    to a store object at path `Q`, then `Q` is in the closure of `P`. Further, if `Q`
     references `R` then `R` is also in the closure of `P`.
 
     [closure]: #gloss-closure

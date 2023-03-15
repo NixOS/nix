@@ -371,29 +371,29 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
         while (errno = 0, ent = readdir(procDir.get())) {
             checkInterrupt();
             if (std::regex_match(ent->d_name, digitsRegex)) {
-                readProcLink(fmt("/proc/%s/exe" ,ent->d_name), unchecked);
-                readProcLink(fmt("/proc/%s/cwd", ent->d_name), unchecked);
-
-                auto fdStr = fmt("/proc/%s/fd", ent->d_name);
-                auto fdDir = AutoCloseDir(opendir(fdStr.c_str()));
-                if (!fdDir) {
-                    if (errno == ENOENT || errno == EACCES)
-                        continue;
-                    throw SysError("opening %1%", fdStr);
-                }
-                struct dirent * fd_ent;
-                while (errno = 0, fd_ent = readdir(fdDir.get())) {
-                    if (fd_ent->d_name[0] != '.')
-                        readProcLink(fmt("%s/%s", fdStr, fd_ent->d_name), unchecked);
-                }
-                if (errno) {
-                    if (errno == ESRCH)
-                        continue;
-                    throw SysError("iterating /proc/%1%/fd", ent->d_name);
-                }
-                fdDir.reset();
-
                 try {
+                    readProcLink(fmt("/proc/%s/exe" ,ent->d_name), unchecked);
+                    readProcLink(fmt("/proc/%s/cwd", ent->d_name), unchecked);
+
+                    auto fdStr = fmt("/proc/%s/fd", ent->d_name);
+                    auto fdDir = AutoCloseDir(opendir(fdStr.c_str()));
+                    if (!fdDir) {
+                        if (errno == ENOENT || errno == EACCES)
+                            continue;
+                        throw SysError("opening %1%", fdStr);
+                    }
+                    struct dirent * fd_ent;
+                    while (errno = 0, fd_ent = readdir(fdDir.get())) {
+                        if (fd_ent->d_name[0] != '.')
+                            readProcLink(fmt("%s/%s", fdStr, fd_ent->d_name), unchecked);
+                    }
+                    if (errno) {
+                        if (errno == ESRCH)
+                            continue;
+                        throw SysError("iterating /proc/%1%/fd", ent->d_name);
+                    }
+                    fdDir.reset();
+
                     auto mapFile = fmt("/proc/%s/maps", ent->d_name);
                     auto mapLines = tokenizeString<std::vector<std::string>>(readFile(mapFile), "\n");
                     for (const auto & line : mapLines) {

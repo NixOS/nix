@@ -1105,6 +1105,8 @@ std::map<StorePath, StorePath> copyPaths(
         return storePathForDst;
     };
 
+    uint64_t total = 0;
+
     for (auto & missingPath : sortedMissing) {
         auto info = srcStore.queryPathInfo(missingPath);
 
@@ -1125,7 +1127,13 @@ std::map<StorePath, StorePath> copyPaths(
                 {storePathS, srcUri, dstUri});
             PushActivity pact(act.id);
 
-            srcStore.narFromPath(missingPath, sink);
+            LambdaSink progressSink([&](std::string_view data) {
+                total += data.size();
+                act.progress(total, info->narSize);
+            });
+            TeeSink tee { sink, progressSink };
+
+            srcStore.narFromPath(missingPath, tee);
         });
         pathsToCopy.push_back(std::pair{infoForDst, std::move(source)});
     }
