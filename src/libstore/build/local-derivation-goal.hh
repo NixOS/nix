@@ -28,10 +28,6 @@ struct LocalDerivationGoal : public DerivationGoal
        standard output/error. */
     AutoCloseFD builderOut;
 
-    /* Slave side of the pseudoterminal used for the builder's
-       standard output/error. */
-    Path slaveName;
-
     /* Pipe for synchronising updates to the builder namespaces. */
     Pipe userNamespaceSync;
 
@@ -173,7 +169,7 @@ struct LocalDerivationGoal : public DerivationGoal
     int getChildStatus() override;
 
     /* Run the builder's process. */
-    void runChild();
+    void runChild(const std::string & slaveName);
 
     /* Check that the derivation outputs all exist and register them
        as valid. */

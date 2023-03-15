@@ -808,7 +808,7 @@ void LocalDerivationGoal::startBuilder()
         throw SysError("opening pseudoterminal master");
 
     // FIXME: not thread-safe, use ptsname_r
-    slaveName = ptsname(builderOut.get());
+    std::string slaveName = ptsname(builderOut.get());
 
     if (buildUser) {
         if (chmod(slaveName.c_str(), 0600))
@@ -898,7 +898,7 @@ void LocalDerivationGoal::startBuilder()
             if (usingUserNamespace)
                 options.cloneFlags |= CLONE_NEWUSER;
 
-            pid_t child = startProcess([&]() { runChild(); }, options);
+            pid_t child = startProcess([&]() { runChild(slaveName); }, options);
 
             writeFull(sendPid.writeSide.get(), fmt("%d\n", child));
             _exit(0);
@@ -974,7 +974,7 @@ void LocalDerivationGoal::startBuilder()
 #endif
     {
         pid = startProcess([&]() {
-            runChild();
+            runChild(slaveName);
         });
     }
 
@@ -1620,7 +1620,7 @@ void setupSeccomp()
 }
 
 
-void LocalDerivationGoal::runChild()
+void LocalDerivationGoal::runChild(const Path & slaveName)
 {
     /* Warning: in the child we should absolutely not make any SQLite
        calls! */
