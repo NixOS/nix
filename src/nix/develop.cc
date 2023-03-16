@@ -313,7 +313,7 @@ struct Common : InstallableCommand, MixProfile
         buildEnvironment.toBash(out, ignoreVars);
 
         for (auto & var : savedVars)
-            out << fmt("%s=\"$%s:$nix_saved_%s\"\n", var, var, var);
+            out << fmt("%s=\"$%s${nix_saved_%s:+:$nix_saved_%s}\"\n", var, var, var, var);
 
         out << "export NIX_BUILD_TOP=\"$(mktemp -d -t nix-shell.XXXXXX)\"\n";
         for (auto & i : {"TMP", "TMPDIR", "TEMP", "TEMPDIR"})
@@ -374,7 +374,7 @@ struct Common : InstallableCommand, MixProfile
         return res;
     }
 
-    StorePath getShellOutPath(ref<Store> store)
+    StorePath getShellOutPath(ref<Store> store, ref<Installable> installable)
     {
         auto path = installable->getStorePath();
         if (path && hasSuffix(path->to_string(), "-env"))
@@ -392,9 +392,10 @@ struct Common : InstallableCommand, MixProfile
         }
     }
 
-    std::pair<BuildEnvironment, std::string> getBuildEnvironment(ref<Store> store)
+    std::pair<BuildEnvironment, std::string>
+    getBuildEnvironment(ref<Store> store, ref<Installable> installable)
     {
-        auto shellOutPath = getShellOutPath(store);
+        auto shellOutPath = getShellOutPath(store, installable);
 
         auto strPath = store->printStorePath(shellOutPath);
 
@@ -480,9 +481,9 @@ struct CmdDevelop : Common, MixEnvironment
           ;
     }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<Installable> installable) override
     {
-        auto [buildEnvironment, gcroot] = getBuildEnvironment(store);
+        auto [buildEnvironment, gcroot] = getBuildEnvironment(store, installable);
 
         auto [rcFileFd, rcFilePath] = createTempFile("nix-shell");
 
@@ -537,7 +538,7 @@ struct CmdDevelop : Common, MixEnvironment
             nixpkgsLockFlags.inputOverrides = {};
             nixpkgsLockFlags.inputUpdates = {};
 
-            auto bashInstallable = std::make_shared<InstallableFlake>(
+            auto bashInstallable = make_ref<InstallableFlake>(
                 this,
                 state,
                 installable->nixpkgsFlakeRef(),
@@ -573,7 +574,7 @@ struct CmdDevelop : Common, MixEnvironment
         // Need to chdir since phases assume in flake directory
         if (phase) {
             // chdir if installable is a flake of type git+file or path
-            auto installableFlake = std::dynamic_pointer_cast<InstallableFlake>(installable);
+            auto installableFlake = installable.dynamic_pointer_cast<InstallableFlake>();
             if (installableFlake) {
                 auto sourcePath = installableFlake->getLockedFlake()->flake.resolvedRef.input.getSourcePath();
                 if (sourcePath) {
@@ -604,9 +605,9 @@ struct CmdPrintDevEnv : Common, MixJSON
 
     Category category() override { return catUtility; }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<Installable> installable) override
     {
-        auto buildEnvironment = getBuildEnvironment(store).first;
+        auto buildEnvironment = getBuildEnvironment(store, installable).first;
 
         stopProgressBar();
 

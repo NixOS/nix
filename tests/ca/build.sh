@@ -19,7 +19,7 @@ testRemoteCache () {
     local outPath=$(buildAttr dependentNonCA 1)
     nix copy --to file://$cacheDir $outPath
     clearStore
-    buildAttr dependentNonCA 1 --option substituters file://$cacheDir --no-require-sigs |& (! grep "building dependent-non-ca")
+    buildAttr dependentNonCA 1 --option substituters file://$cacheDir --no-require-sigs |& grepQuietInverse "building dependent-non-ca"
 }
 
 testDeterministicCA () {

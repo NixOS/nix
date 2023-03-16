@@ -2,7 +2,7 @@
 
 # Only run this if we have an older Nix available
 # XXX: This assumes that the `daemon` package is older than the `client` one
-if [[ -z "$NIX_DAEMON_PACKAGE" ]]; then
+if [[ -z "${NIX_DAEMON_PACKAGE-}" ]]; then
     exit 99
 fi
 
@@ -12,7 +12,7 @@ killDaemon
 
 # Fill the db using the older Nix
 PATH_WITH_NEW_NIX="$PATH"
-export PATH="$NIX_DAEMON_PACKAGE/bin:$PATH"
+export PATH="${NIX_DAEMON_PACKAGE}/bin:$PATH"
 clearStore
 nix-build simple.nix --no-out-link
 nix-store --generate-binary-cache-key cache1.example.org $TEST_ROOT/sk1 $TEST_ROOT/pk1

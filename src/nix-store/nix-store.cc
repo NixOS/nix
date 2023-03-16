@@ -1023,7 +1023,7 @@ static int main_nix_store(int argc, char * * argv)
     {
         Strings opFlags, opArgs;
         Operation op = 0;
-        bool readFromStdIn;
+        bool readFromStdIn = false;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             Operation oldOp = op;

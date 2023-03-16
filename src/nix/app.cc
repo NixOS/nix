@@ -119,11 +119,11 @@ App UnresolvedApp::resolve(ref<Store> evalStore, ref<Store> store)
 {
     auto res = unresolved;
 
-    std::vector<std::shared_ptr<Installable>> installableContext;
+    Installables installableContext;
 
     for (auto & ctxElt : unresolved.context)
         installableContext.push_back(
-            std::make_shared<InstallableDerivedPath>(store, DerivedPath { ctxElt }));
+            make_ref<InstallableDerivedPath>(store, DerivedPath { ctxElt }));
 
     auto builtContext = Installable::build(evalStore, store, Realise::Outputs, installableContext);
     res.program = resolveString(*store, unresolved.program, builtContext);

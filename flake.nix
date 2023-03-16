@@ -4,8 +4,9 @@
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.11-small";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
+  inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
 
-  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src }:
+  outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, flake-compat }:
 
     let
       inherit (nixpkgs) lib;
@@ -98,7 +99,11 @@
           ];
 
         testConfigureFlags = [
-          "CXXFLAGS=-I${lib.getDev rapidcheck}/extras/gtest/include"
+          "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include"
+        ];
+
+        internalApiDocsConfigureFlags = [
+          "--enable-internal-api-docs"
         ];
 
         nativeBuildDeps =
@@ -134,6 +139,10 @@
         checkDeps = [
           gtest
           rapidcheck
+        ];
+
+        internalApiDocsDeps = [
+          buildPackages.doxygen
         ];
 
         awsDeps = lib.optional (stdenv.isLinux || stdenv.isDarwin)
@@ -383,6 +392,7 @@
 
             doInstallCheck = finalAttrs.doCheck;
             installCheckFlags = "sysconfdir=$(out)/etc";
+            installCheckTarget = "installcheck"; # work around buggy detection in stdenv
 
             separateDebugInfo = !currentStdenv.hostPlatform.isStatic;
 
@@ -516,25 +526,48 @@
 
             src = self;
 
-            configureFlags = [
-              "CXXFLAGS=-I${lib.getDev pkgs.rapidcheck}/extras/gtest/include"
-            ];
+            configureFlags = testConfigureFlags;
 
             enableParallelBuilding = true;
 
             nativeBuildInputs = nativeBuildDeps;
-            buildInputs = buildDeps ++ propagatedDeps ++ awsDeps;
+            buildInputs = buildDeps ++ propagatedDeps ++ awsDeps ++ checkDeps;
 
             dontInstall = false;
 
             doInstallCheck = true;
+            installCheckTarget = "installcheck"; # work around buggy detection in stdenv
 
             lcovFilter = [ "*/boost/*" "*-tab.*" ];
 
-            # We call `dot', and even though we just use it to
-            # syntax-check generated dot files, it still requires some
-            # fonts.  So provide those.
-            FONTCONFIG_FILE = texFunctions.fontsConf;
+            hardeningDisable = ["fortify"];
+          };
+
+        # API docs for Nix's unstable internal C++ interfaces.
+        internal-api-docs =
+          with nixpkgsFor.x86_64-linux.native;
+          with commonDeps { inherit pkgs; };
+
+          stdenv.mkDerivation {
+            pname = "nix-internal-api-docs";
+            inherit version;
+
+            src = self;
+
+            configureFlags = testConfigureFlags ++ internalApiDocsConfigureFlags;
+
+            nativeBuildInputs = nativeBuildDeps;
+            buildInputs = buildDeps ++ propagatedDeps
+              ++ awsDeps ++ checkDeps ++ internalApiDocsDeps;
+
+            dontBuild = true;
+
+            installTargets = [ "internal-api-html" ];
+
+            postInstall = ''
+              mkdir -p $out/nix-support
+              echo "doc internal-api-docs $out/share/doc/nix/internal-api" >> $out/nix-support/hydra-build-products
+            '';
           };
 
         # System tests.
@@ -654,9 +687,11 @@
             nativeBuildInputs = nativeBuildDeps
                                 ++ (lib.optionals stdenv.cc.isClang [ pkgs.bear pkgs.clang-tools ]);
 
-            buildInputs = buildDeps ++ propagatedDeps ++ awsDeps ++ checkDeps;
+            buildInputs = buildDeps ++ propagatedDeps
+              ++ awsDeps ++ checkDeps ++ internalApiDocsDeps;
 
-            configureFlags = configureFlags ++ testConfigureFlags;
+            configureFlags = configureFlags
+              ++ testConfigureFlags ++ internalApiDocsConfigureFlags;
 
             enableParallelBuilding = true;
 

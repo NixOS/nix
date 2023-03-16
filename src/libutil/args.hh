@@ -198,7 +198,6 @@ struct Command : virtual public Args
 
     virtual ~Command() { }
 
-    virtual void prepare() { };
     virtual void run() = 0;
 
     typedef int Category;

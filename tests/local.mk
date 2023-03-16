@@ -1,4 +1,5 @@
 nix_tests = \
+  test-infra.sh \
   init.sh \
   flakes/flakes.sh \
   flakes/run.sh \
@@ -130,9 +131,9 @@ endif
 
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
 
-clean-files += $(d)/tests/common/vars-and-functions.sh $(d)/config.nix $(d)/ca/config.nix
+clean-files += $(d)/common/vars-and-functions.sh $(d)/config.nix $(d)/ca/config.nix
 
-test-deps += tests/common/vars-and-functions.sh tests/config.nix tests/ca/config.nix tests/plugins/libplugintest.$(SO_EXT)
+test-deps += tests/common/vars-and-functions.sh tests/config.nix tests/ca/config.nix
 
 ifeq ($(BUILD_SHARED_LIBS), 1)
   test-deps += tests/plugins/libplugintest.$(SO_EXT)

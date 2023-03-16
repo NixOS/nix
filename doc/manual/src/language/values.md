@@ -205,7 +205,7 @@ You can use arbitrary double-quoted strings as attribute names:
 ```
 
 ```nix
-let bar = "bar";
+let bar = "bar"; in
 { "foo ${bar}" = 123; }."foo ${bar}"
 ```
 

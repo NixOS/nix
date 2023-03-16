@@ -66,7 +66,7 @@ EOF
 
 createGitRepo() {
     local repo="$1"
-    local extraArgs="$2"
+    local extraArgs="${2-}"
 
     rm -rf $repo $repo.tmp
     mkdir -p $repo
