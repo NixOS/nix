@@ -292,7 +292,7 @@ void LocalDerivationGoal::closeReadPipes()
     if (hook) {
         DerivationGoal::closeReadPipes();
     } else
-        builderOut.readSide = -1;
+        builderOut.close();
 }
 
 
@@ -802,15 +802,13 @@ void LocalDerivationGoal::startBuilder()
     /* Create the log file. */
     Path logFile = openLogFile();
 
-    /* Create a pipe to get the output of the builder. */
-    //builderOut.create();
-
-    builderOut.readSide = posix_openpt(O_RDWR | O_NOCTTY);
-    if (!builderOut.readSide)
+    /* Create a pseudoterminal to get the output of the builder. */
+    builderOut = posix_openpt(O_RDWR | O_NOCTTY);
+    if (!builderOut)
         throw SysError("opening pseudoterminal master");
 
     // FIXME: not thread-safe, use ptsname_r
-    std::string slaveName(ptsname(builderOut.readSide.get()));
+    std::string slaveName = ptsname(builderOut.get());
 
     if (buildUser) {
         if (chmod(slaveName.c_str(), 0600))
@@ -821,34 +819,13 @@ void LocalDerivationGoal::startBuilder()
     }
 #if __APPLE__
     else {
-        if (grantpt(builderOut.readSide.get()))
+        if (grantpt(builderOut.get()))
             throw SysError("granting access to pseudoterminal slave");
     }
 #endif
 
-    #if 0
-    // Mount the pt in the sandbox so that the "tty" command works.
-    // FIXME: this doesn't work with the new devpts in the sandbox.
-    if (useChroot)
-        dirsInChroot[slaveName] = {slaveName, false};
-    #endif
-
-    if (unlockpt(builderOut.readSide.get()))
+    if (unlockpt(builderOut.get()))
         throw SysError("unlocking pseudoterminal");
-
-    builderOut.writeSide = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
-    if (!builderOut.writeSide)
-        throw SysError("opening pseudoterminal slave");
-
-    // Put the pt into raw mode to prevent \n -> \r\n translation.
-    struct termios term;
-    if (tcgetattr(builderOut.writeSide.get(), &term))
-        throw SysError("getting pseudoterminal attributes");
-
-    cfmakeraw(&term);
-
-    if (tcsetattr(builderOut.writeSide.get(), TCSANOW, &term))
-        throw SysError("putting pseudoterminal into raw mode");
 
     buildResult.startTime = time(0);
 
@@ -897,7 +874,11 @@ void LocalDerivationGoal::startBuilder()
 
         usingUserNamespace = userNamespacesSupported();
 
+        Pipe sendPid;
+        sendPid.create();
+
         Pid helper = startProcess([&]() {
+            sendPid.readSide.close();
 
             /* Drop additional groups here because we can't do it
                after we've created the new user namespace.  FIXME:
@@ -917,12 +898,13 @@ void LocalDerivationGoal::startBuilder()
             if (usingUserNamespace)
                 options.cloneFlags |= CLONE_NEWUSER;
 
-            pid_t child = startProcess([&]() { runChild(); }, options);
+            pid_t child = startProcess([&]() { runChild(slaveName); }, options);
 
-            writeFull(builderOut.writeSide.get(),
-                fmt("%d %d\n", usingUserNamespace, child));
+            writeFull(sendPid.writeSide.get(), fmt("%d\n", child));
             _exit(0);
         });
+
+        sendPid.writeSide.close();
 
         if (helper.wait() != 0)
             throw Error("unable to start build process");
@@ -935,10 +917,9 @@ void LocalDerivationGoal::startBuilder()
             userNamespaceSync.writeSide = -1;
         });
 
-        auto ss = tokenizeString<std::vector<std::string>>(readLine(builderOut.readSide.get()));
-        assert(ss.size() == 2);
-        usingUserNamespace = ss[0] == "1";
-        pid = string2Int<pid_t>(ss[1]).value();
+        auto ss = tokenizeString<std::vector<std::string>>(readLine(sendPid.readSide.get()));
+        assert(ss.size() == 1);
+        pid = string2Int<pid_t>(ss[0]).value();
 
         if (usingUserNamespace) {
             /* Set the UID/GID mapping of the builder's user namespace
@@ -993,21 +974,20 @@ void LocalDerivationGoal::startBuilder()
 #endif
     {
         pid = startProcess([&]() {
-            runChild();
+            runChild(slaveName);
         });
     }
 
     /* parent */
     pid.setSeparatePG(true);
-    builderOut.writeSide = -1;
-    worker.childStarted(shared_from_this(), {builderOut.readSide.get()}, true, true);
+    worker.childStarted(shared_from_this(), {builderOut.get()}, true, true);
 
     /* Check if setting up the build environment failed. */
     std::vector<std::string> msgs;
     while (true) {
         std::string msg = [&]() {
             try {
-                return readLine(builderOut.readSide.get());
+                return readLine(builderOut.get());
             } catch (Error & e) {
                 auto status = pid.wait();
                 e.addTrace({}, "while waiting for the build environment for '%s' to initialize (%s, previous messages: %s)",
@@ -1019,7 +999,7 @@ void LocalDerivationGoal::startBuilder()
         }();
         if (msg.substr(0, 1) == "\2") break;
         if (msg.substr(0, 1) == "\1") {
-            FdSource source(builderOut.readSide.get());
+            FdSource source(builderOut.get());
             auto ex = readError(source);
             ex.addTrace({}, "while setting up the build environment");
             throw ex;
@@ -1154,10 +1134,10 @@ void LocalDerivationGoal::writeStructuredAttrs()
 
         writeFile(tmpDir + "/.attrs.sh", rewriteStrings(jsonSh, inputRewrites));
         chownToBuilder(tmpDir + "/.attrs.sh");
-        env["NIX_ATTRS_SH_FILE"] = tmpDir + "/.attrs.sh";
+        env["NIX_ATTRS_SH_FILE"] = tmpDirInSandbox + "/.attrs.sh";
         writeFile(tmpDir + "/.attrs.json", rewriteStrings(json.dump(), inputRewrites));
         chownToBuilder(tmpDir + "/.attrs.json");
-        env["NIX_ATTRS_JSON_FILE"] = tmpDir + "/.attrs.json";
+        env["NIX_ATTRS_JSON_FILE"] = tmpDirInSandbox + "/.attrs.json";
     }
 }
 
@@ -1640,7 +1620,7 @@ void setupSeccomp()
 }
 
 
-void LocalDerivationGoal::runChild()
+void LocalDerivationGoal::runChild(const Path & slaveName)
 {
     /* Warning: in the child we should absolutely not make any SQLite
        calls! */
@@ -1649,7 +1629,22 @@ void LocalDerivationGoal::runChild()
 
     try { /* child */
 
-        commonChildInit(builderOut);
+        /* Open the slave side of the pseudoterminal. */
+        AutoCloseFD builderOut = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
+        if (!builderOut)
+            throw SysError("opening pseudoterminal slave");
+
+        // Put the pt into raw mode to prevent \n -> \r\n translation.
+        struct termios term;
+        if (tcgetattr(builderOut.get(), &term))
+            throw SysError("getting pseudoterminal attributes");
+
+        cfmakeraw(&term);
+
+        if (tcsetattr(builderOut.get(), TCSANOW, &term))
+            throw SysError("putting pseudoterminal into raw mode");
+
+        commonChildInit(builderOut.get());
 
         try {
             setupSeccomp();
@@ -2891,7 +2886,7 @@ void LocalDerivationGoal::deleteTmpDir(bool force)
 bool LocalDerivationGoal::isReadDesc(int fd)
 {
     return (hook && DerivationGoal::isReadDesc(fd)) ||
-        (!hook && fd == builderOut.readSide.get());
+        (!hook && fd == builderOut.get());
 }
 
 
