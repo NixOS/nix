@@ -151,7 +151,6 @@ struct CmdHash : NixMultiCommand
     {
         if (!command)
             throw UsageError("'nix hash' requires a sub-command.");
-        command->second->prepare();
         command->second->run();
     }
 };
@@ -161,11 +160,11 @@ static auto rCmdHash = registerCommand<CmdHash>("hash");
 /* Legacy nix-hash command. */
 static int compatNixHash(int argc, char * * argv)
 {
-    HashType ht = htMD5;
+    std::optional<HashType> ht;
     bool flat = false;
-    bool base32 = false;
+    Base base = Base16;
     bool truncate = false;
-    enum { opHash, opTo32, opTo16 } op = opHash;
+    enum { opHash, opTo } op = opHash;
     std::vector<std::string> ss;
 
     parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
@@ -174,14 +173,31 @@ static int compatNixHash(int argc, char * * argv)
         else if (*arg == "--version")
             printVersion("nix-hash");
         else if (*arg == "--flat") flat = true;
-        else if (*arg == "--base32") base32 = true;
+        else if (*arg == "--base16") base = Base16;
+        else if (*arg == "--base32") base = Base32;
+        else if (*arg == "--base64") base = Base64;
+        else if (*arg == "--sri") base = SRI;
         else if (*arg == "--truncate") truncate = true;
         else if (*arg == "--type") {
             std::string s = getArg(*arg, arg, end);
             ht = parseHashType(s);
         }
-        else if (*arg == "--to-base16") op = opTo16;
-        else if (*arg == "--to-base32") op = opTo32;
+        else if (*arg == "--to-base16") {
+            op = opTo;
+            base = Base16;
+        }
+        else if (*arg == "--to-base32") {
+            op = opTo;
+            base = Base32;
+        }
+        else if (*arg == "--to-base64") {
+            op = opTo;
+            base = Base64;
+        }
+        else if (*arg == "--to-sri") {
+            op = opTo;
+            base = SRI;
+        }
         else if (*arg != "" && arg->at(0) == '-')
             return false;
         else
@@ -191,17 +207,18 @@ static int compatNixHash(int argc, char * * argv)
 
     if (op == opHash) {
         CmdHashBase cmd(flat ? FileIngestionMethod::Flat : FileIngestionMethod::Recursive);
-        cmd.ht = ht;
-        cmd.base = base32 ? Base32 : Base16;
+        if (!ht.has_value()) ht = htMD5;
+        cmd.ht = ht.value();
+        cmd.base = base;
         cmd.truncate = truncate;
         cmd.paths = ss;
         cmd.run();
     }
 
     else {
-        CmdToBase cmd(op == opTo32 ? Base32 : Base16);
+        CmdToBase cmd(base);
         cmd.args = ss;
-        cmd.ht = ht;
+        if (ht.has_value()) cmd.ht = ht;
         cmd.run();
     }
 

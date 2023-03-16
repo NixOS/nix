@@ -79,6 +79,9 @@ struct BuiltPathWithResult
 
 typedef std::vector<DerivedPathWithInfo> DerivedPathsWithInfo;
 
+struct Installable;
+typedef std::vector<ref<Installable>> Installables;
+
 struct Installable
 {
     virtual ~Installable() { }
@@ -122,14 +125,14 @@ struct Installable
         ref<Store> evalStore,
         ref<Store> store,
         Realise mode,
-        const std::vector<std::shared_ptr<Installable>> & installables,
+        const Installables & installables,
         BuildMode bMode = bmNormal);
 
-    static std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> build2(
+    static std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> build2(
         ref<Store> evalStore,
         ref<Store> store,
         Realise mode,
-        const std::vector<std::shared_ptr<Installable>> & installables,
+        const Installables & installables,
         BuildMode bMode = bmNormal);
 
     static std::set<StorePath> toStorePaths(
@@ -137,18 +140,18 @@ struct Installable
         ref<Store> store,
         Realise mode,
         OperateOn operateOn,
-        const std::vector<std::shared_ptr<Installable>> & installables);
+        const Installables & installables);
 
     static StorePath toStorePath(
         ref<Store> evalStore,
         ref<Store> store,
         Realise mode,
         OperateOn operateOn,
-        std::shared_ptr<Installable> installable);
+        ref<Installable> installable);
 
     static std::set<StorePath> toDerivations(
         ref<Store> store,
-        const std::vector<std::shared_ptr<Installable>> & installables,
+        const Installables & installables,
         bool useDeriver = false);
 
     static BuiltPaths toBuiltPaths(
@@ -156,9 +159,7 @@ struct Installable
         ref<Store> store,
         Realise mode,
         OperateOn operateOn,
-        const std::vector<std::shared_ptr<Installable>> & installables);
+        const Installables & installables);
 };
-
-typedef std::vector<std::shared_ptr<Installable>> Installables;
 
 }
