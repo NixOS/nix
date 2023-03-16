@@ -43,6 +43,6 @@ $(foreach i, $(wildcard src/libexpr/value/*.hh), \
 $(foreach i, $(wildcard src/libexpr/flake/*.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix/flake, 0644)))
 
-$(d)/primops.cc: $(d)/imported-drv-to-derivation.nix.gen.hh $(d)/primops/derivation.nix.gen.hh $(d)/fetchurl.nix.gen.hh
+$(d)/primops.cc: $(d)/imported-drv-to-derivation.nix.gen.hh
 
-$(d)/flake/flake.cc: $(d)/flake/call-flake.nix.gen.hh
+$(d)/eval.cc: $(d)/primops/derivation.nix.gen.hh $(d)/flake/call-flake.nix.gen.hh $(d)/fetchurl.nix.gen.hh
