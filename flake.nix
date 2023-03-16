@@ -577,6 +577,8 @@
 
         tests.nix-copy-closure = runNixOSTestFor "x86_64-linux" ./tests/nixos/nix-copy-closure.nix;
 
+        tests.nix-copy = runNixOSTestFor "x86_64-linux" ./tests/nixos/nix-copy.nix;
+
         tests.nssPreload = runNixOSTestFor "x86_64-linux" ./tests/nixos/nss-preload.nix;
 
         tests.githubFlakes = runNixOSTestFor "x86_64-linux" ./tests/nixos/github-flakes.nix;

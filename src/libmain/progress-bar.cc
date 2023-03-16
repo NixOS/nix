@@ -129,6 +129,7 @@ public:
     void resume() override {
         state_.lock()->paused = false;
         writeToStderr("\r\e[K");
+        state_.lock()->haveUpdate = true;
         updateCV.notify_one();
     }
 
@@ -350,9 +351,8 @@ public:
     {
         auto nextWakeup = std::chrono::milliseconds::max();
 
-        if (state.paused) return nextWakeup;
         state.haveUpdate = false;
-        if (!state.active) return nextWakeup;
+        if (state.paused || !state.active) return nextWakeup;
 
         std::string line;
 
