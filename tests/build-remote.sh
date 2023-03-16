@@ -1,5 +1,5 @@
-if ! canUseSandbox; then exit 99; fi
-if ! [[ $busybox =~ busybox ]]; then exit 99; fi
+requireSandboxSupport
+[[ $busybox =~ busybox ]] || skipTest "no busybox"
 
 unset NIX_STORE_DIR
 unset NIX_STATE_DIR
