@@ -2,10 +2,7 @@ source common.sh
 
 set -u
 
-if [[ -z $(type -p git) ]]; then
-    echo "Git not installed; skipping Git submodule tests"
-    exit 99
-fi
+requireGit
 
 clearStore
 
