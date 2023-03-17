@@ -7,4 +7,4 @@ format:
 	  echo "make format: pre-commit not found. Please use \`nix develop\`."; \
 	  exit 1; \
 	fi; \
-	pre-commit run --all-files
+	pre-commit run --all-files --hook-stage manual
