@@ -318,7 +318,7 @@ struct curlFileTransfer : public FileTransfer
 
             if (request.verifyTLS) {
                 if (settings.caFile != "")
-                    curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.c_str());
+                    curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.get().c_str());
             } else {
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYPEER, 0);
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);
