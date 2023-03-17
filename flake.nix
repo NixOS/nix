@@ -10,6 +10,14 @@
   inputs.pre-commit-hooks.url = "github:hercules-ci/pre-commit-hooks.nix/optional-install";
   inputs.flake-parts.url = "github:hercules-ci/flake-parts";
 
+  # work around https://github.com/NixOS/nix/issues/7730
+  inputs.flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
+  inputs.pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.pre-commit-hooks.inputs.nixpkgs-stable.follows = "nixpkgs";
+  # work around 7730 and https://github.com/NixOS/nix/issues/7807
+  inputs.pre-commit-hooks.inputs.flake-compat.follows = "";
+  inputs.pre-commit-hooks.inputs.gitignore.follows = "";
+
   outputs = inputs@{ self, nixpkgs, nixpkgs-regression, lowdown-src, pre-commit-hooks, flake-parts, flake-compat }:
 
     let
