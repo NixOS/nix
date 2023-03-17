@@ -6,7 +6,7 @@
 #include "globals.hh"
 #include "json-to-value.hh"
 #include "names.hh"
-#include "references.hh"
+#include "path-references.hh"
 #include "store-api.hh"
 #include "util.hh"
 #include "value-to-json.hh"

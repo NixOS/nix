@@ -4,7 +4,7 @@
 #include "worker.hh"
 #include "builtins.hh"
 #include "builtins/buildenv.hh"
-#include "references.hh"
+#include "path-references.hh"
 #include "finally.hh"
 #include "util.hh"
 #include "archive.hh"
