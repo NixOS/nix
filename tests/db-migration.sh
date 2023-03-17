@@ -1,12 +1,12 @@
 # Test that we can successfully migrate from an older db schema
 
+source common.sh
+
 # Only run this if we have an older Nix available
 # XXX: This assumes that the `daemon` package is older than the `client` one
 if [[ -z "${NIX_DAEMON_PACKAGE-}" ]]; then
-    exit 99
+    skipTest "not using the Nix daemon"
 fi
-
-source common.sh
 
 killDaemon
 

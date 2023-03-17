@@ -152,21 +152,29 @@ isDaemonNewer () {
   [[ $(nix eval --expr "builtins.compareVersions ''$daemonVersion'' ''$requiredVersion''") -ge 0 ]]
 }
 
+skipTest () {
+    echo "$1, skipping this test..." >&2
+    exit 99
+}
+
 requireDaemonNewerThan () {
-  isDaemonNewer "$1" || exit 99
+    isDaemonNewer "$1" || skipTest "Daemon is too old"
 }
 
 canUseSandbox() {
-    if [[ ! ${_canUseSandbox-} ]]; then
-        echo "Sandboxing not supported, skipping this test..."
-        return 1
-    fi
+    [[ ${_canUseSandbox-} ]]
+}
 
-    return 0
+requireSandboxSupport () {
+    canUseSandbox || skipTest "Sandboxing not supported"
+}
+
+requireGit() {
+    [[ $(type -p git) ]] || skipTest "Git not installed"
 }
 
 fail() {
-    echo "$1"
+    echo "$1" >&2
     exit 1
 }
 
@@ -209,8 +217,7 @@ expectStderr() {
 
 needLocalStore() {
   if [[ "$NIX_REMOTE" == "daemon" ]]; then
-    echo "Can’t run through the daemon ($1), skipping this test..."
-    return 99
+    skipTest "Can’t run through the daemon ($1)"
   fi
 }
 

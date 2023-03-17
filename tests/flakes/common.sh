@@ -2,13 +2,6 @@ source ../common.sh
 
 registry=$TEST_ROOT/registry.json
 
-requireGit() {
-    if [[ -z $(type -p git) ]]; then
-        echo "Git not installed; skipping flake tests"
-        exit 99
-    fi
-}
-
 writeSimpleFlake() {
     local flakeDir="$1"
     cat > $flakeDir/flake.nix <<EOF
