@@ -411,15 +411,6 @@ struct GitInputScheme : InputScheme
 
         std::string name = input.getName();
 
-        auto getLockedAttrs = [&]()
-        {
-            return Attrs({
-                {"type", repoInfo.cacheType},
-                {"name", name},
-                {"rev", input.getRev()->gitRev()},
-            });
-        };
-
         auto makeResult2 = [&](const Attrs & infoAttrs, ref<InputAccessor> accessor) -> std::pair<ref<InputAccessor>, Input>
         {
             assert(input.getRev());
@@ -444,21 +435,9 @@ struct GitInputScheme : InputScheme
             return makeResult2(infoAttrs, accessor);
         };
 
-        if (input.getRev()) {
-            if (auto res = getCache()->lookup(store, getLockedAttrs()))
-                return makeResult(res->first, std::move(res->second));
-        }
-
         auto originalRef = input.getRef();
         auto ref = originalRef ? *originalRef : getDefaultRef(repoInfo);
         input.attrs.insert_or_assign("ref", ref);
-
-        Attrs unlockedAttrs({
-            {"type", repoInfo.cacheType},
-            {"name", name},
-            {"url", repoInfo.url},
-            {"ref", ref},
-        });
 
         Path repoDir;
 
@@ -467,14 +446,6 @@ struct GitInputScheme : InputScheme
             if (!input.getRev())
                 input.attrs.insert_or_assign("rev", GitRepo::openRepo(CanonPath(repoDir))->resolveRef(ref).gitRev());
         } else {
-            if (auto res = getCache()->lookup(store, unlockedAttrs)) {
-                auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
-                if (!input.getRev() || input.getRev() == rev2) {
-                    input.attrs.insert_or_assign("rev", rev2.gitRev());
-                    return makeResult(res->first, std::move(res->second));
-                }
-            }
-
             Path cacheDir = getCachePath(repoInfo.url);
             repoDir = cacheDir;
             repoInfo.gitDir = ".";
@@ -569,11 +540,6 @@ struct GitInputScheme : InputScheme
 
         printTalkative("using revision %s of repo '%s'", rev.gitRev(), repoInfo.url);
 
-        /* Now that we know the rev, check again whether we have it in
-           the store. */
-        if (auto res = getCache()->lookup(store, getLockedAttrs()))
-            return makeResult(res->first, std::move(res->second));
-
         if (!repoInfo.submodules) {
             auto accessor = GitRepo::openRepo(CanonPath(repoDir))->getAccessor(rev);
             return makeResult2(infoAttrs, accessor);
@@ -630,21 +596,6 @@ struct GitInputScheme : InputScheme
             filter = isNotDotGitDirectory;
 
             auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
-
-            if (!origRev)
-                getCache()->add(
-                    store,
-                    unlockedAttrs,
-                    infoAttrs,
-                    storePath,
-                    false);
-
-            getCache()->add(
-                store,
-                getLockedAttrs(),
-                infoAttrs,
-                storePath,
-                true);
 
             return makeResult(infoAttrs, std::move(storePath));
         }
