@@ -320,7 +320,7 @@ LockedFlake lockFlake(
     const FlakeRef & topRef,
     const LockFlags & lockFlags)
 {
-    settings.requireExperimentalFeature(Xp::Flakes);
+    experimentalFeatureSettings.require(Xp::Flakes);
 
     FlakeCache flakeCache;
 

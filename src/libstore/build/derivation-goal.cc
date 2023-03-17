@@ -199,10 +199,10 @@ void DerivationGoal::haveDerivation()
     parsedDrv = std::make_unique<ParsedDerivation>(drvPath, *drv);
 
     if (!drv->type().hasKnownOutputPaths())
-        settings.requireExperimentalFeature(Xp::CaDerivations);
+        experimentalFeatureSettings.require(Xp::CaDerivations);
 
     if (!drv->type().isPure()) {
-        settings.requireExperimentalFeature(Xp::ImpureDerivations);
+        experimentalFeatureSettings.require(Xp::ImpureDerivations);
 
         for (auto & [outputName, output] : drv->outputs) {
             auto randomPath = StorePath::random(outputPathName(drv->name, outputName));
@@ -336,7 +336,7 @@ void DerivationGoal::gaveUpOnSubstitution()
         for (auto & i : dynamic_cast<Derivation *>(drv.get())->inputDrvs) {
             /* Ensure that pure, non-fixed-output derivations don't
                depend on impure derivations. */
-            if (settings.isExperimentalFeatureEnabled(Xp::ImpureDerivations) && drv->type().isPure() && !drv->type().isFixed()) {
+            if (experimentalFeatureSettings.isEnabled(Xp::ImpureDerivations) && drv->type().isPure() && !drv->type().isFixed()) {
                 auto inputDrv = worker.evalStore.readDerivation(i.first);
                 if (!inputDrv.type().isPure())
                     throw Error("pure derivation '%s' depends on impure derivation '%s'",
@@ -477,7 +477,7 @@ void DerivationGoal::inputsRealised()
                     ca.fixed
                     /* Can optionally resolve if fixed, which is good
                        for avoiding unnecessary rebuilds. */
-                    ? settings.isExperimentalFeatureEnabled(Xp::CaDerivations)
+                    ? experimentalFeatureSettings.isEnabled(Xp::CaDerivations)
                     /* Must resolve if floating and there are any inputs
                        drvs. */
                     : true);
@@ -488,7 +488,7 @@ void DerivationGoal::inputsRealised()
         }, drvType.raw());
 
         if (resolveDrv && !fullDrv.inputDrvs.empty()) {
-            settings.requireExperimentalFeature(Xp::CaDerivations);
+            experimentalFeatureSettings.require(Xp::CaDerivations);
 
             /* We are be able to resolve this derivation based on the
                now-known results of dependencies. If so, we become a
@@ -1352,7 +1352,7 @@ std::pair<bool, DrvOutputs> DerivationGoal::checkPathValidity()
             };
         }
         auto drvOutput = DrvOutput{info.outputHash, i.first};
-        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
+        if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
             if (auto real = worker.store.queryRealisation(drvOutput)) {
                 info.known = {
                     .path = real->outPath,

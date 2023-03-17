@@ -3,7 +3,6 @@
 #include "types.hh"
 #include "config.hh"
 #include "util.hh"
-#include "experimental-features.hh"
 
 #include <map>
 #include <limits>
@@ -931,13 +930,6 @@ public:
           If an entry in the list is a directory, all files in the directory
           are loaded as plugins (non-recursively).
         )"};
-
-    Setting<std::set<ExperimentalFeature>> experimentalFeatures{this, {}, "experimental-features",
-        "Experimental Nix features to enable."};
-
-    bool isExperimentalFeatureEnabled(const ExperimentalFeature &);
-
-    void requireExperimentalFeature(const ExperimentalFeature &);
 
     Setting<size_t> narBufferSize{this, 32 * 1024 * 1024, "nar-buffer-size",
         "Maximum size of NARs before spilling them to disk."};

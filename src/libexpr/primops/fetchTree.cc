@@ -190,7 +190,7 @@ static void fetchTree(
 
 static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    settings.requireExperimentalFeature(Xp::Flakes);
+    experimentalFeatureSettings.require(Xp::Flakes);
     fetchTree(state, pos, args, v, std::nullopt, FetchTreeParams { .allowNameArgument = false });
 }
 

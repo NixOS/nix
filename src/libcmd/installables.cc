@@ -332,7 +332,7 @@ void completeFlakeRefWithFragment(
 
 void completeFlakeRef(ref<Store> store, std::string_view prefix)
 {
-    if (!settings.isExperimentalFeatureEnabled(Xp::Flakes))
+    if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))
         return;
 
     if (prefix == "")

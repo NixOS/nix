@@ -208,7 +208,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     drv.name += "-env";
     drv.env.emplace("name", drv.name);
     drv.inputSrcs.insert(std::move(getEnvShPath));
-    if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
+    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
         for (auto & output : drv.outputs) {
             output.second = DerivationOutput::Deferred {},
             drv.env[output.first] = hashPlaceholder(output.first);

@@ -166,18 +166,6 @@ StringSet Settings::getDefaultExtraPlatforms()
     return extraPlatforms;
 }
 
-bool Settings::isExperimentalFeatureEnabled(const ExperimentalFeature & feature)
-{
-    auto & f = experimentalFeatures.get();
-    return std::find(f.begin(), f.end(), feature) != f.end();
-}
-
-void Settings::requireExperimentalFeature(const ExperimentalFeature & feature)
-{
-    if (!isExperimentalFeatureEnabled(feature))
-        throw MissingExperimentalFeature(feature);
-}
-
 bool Settings::isWSL1()
 {
     struct utsname utsbuf;

@@ -1328,7 +1328,7 @@ struct CmdFlake : NixMultiCommand
     {
         if (!command)
             throw UsageError("'nix flake' requires a sub-command.");
-        settings.requireExperimentalFeature(Xp::Flakes);
+        experimentalFeatureSettings.require(Xp::Flakes);
         command->second->run();
     }
 };

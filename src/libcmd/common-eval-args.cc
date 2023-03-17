@@ -166,7 +166,7 @@ Path lookupFileArg(EvalState & state, std::string_view s)
     }
 
     else if (hasPrefix(s, "flake:")) {
-        settings.requireExperimentalFeature(Xp::Flakes);
+        experimentalFeatureSettings.require(Xp::Flakes);
         auto flakeRef = parseFlakeRef(std::string(s.substr(6)), {}, true, false);
         auto storePath = flakeRef.resolve(state.store).fetchTree(state.store).first.storePath;
         return state.store->toRealPath(storePath);

@@ -297,7 +297,10 @@ void mainWrapped(int argc, char * * argv)
     }
 
     if (argc == 2 && std::string(argv[1]) == "__dump-builtins") {
-        settings.experimentalFeatures = {Xp::Flakes, Xp::FetchClosure};
+        experimentalFeatureSettings.experimentalFeatures = {
+            Xp::Flakes,
+            Xp::FetchClosure,
+        };
         evalSettings.pureEval = false;
         EvalState state({}, openStore("dummy://"));
         auto res = nlohmann::json::object();
@@ -366,7 +369,7 @@ void mainWrapped(int argc, char * * argv)
     if (args.command->first != "repl"
         && args.command->first != "doctor"
         && args.command->first != "upgrade-nix")
-        settings.requireExperimentalFeature(Xp::NixCommand);
+        experimentalFeatureSettings.require(Xp::NixCommand);
 
     if (args.useNet && !haveInternet()) {
         warn("you don't have Internet access; disabling some network-dependent features");

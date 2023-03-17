@@ -413,7 +413,7 @@ void LocalDerivationGoal::startBuilder()
         )
     {
         #if __linux__
-        settings.requireExperimentalFeature(Xp::Cgroups);
+        experimentalFeatureSettings.require(Xp::Cgroups);
 
         auto cgroupFS = getCgroupFS();
         if (!cgroupFS)
@@ -1393,7 +1393,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
 
 void LocalDerivationGoal::startDaemon()
 {
-    settings.requireExperimentalFeature(Xp::RecursiveNix);
+    experimentalFeatureSettings.require(Xp::RecursiveNix);
 
     Store::Params params;
     params["path-info-cache-size"] = "0";
@@ -2268,7 +2268,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
         bool discardReferences = false;
         if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
             if (auto udr = get(*structuredAttrs, "unsafeDiscardReferences")) {
-                settings.requireExperimentalFeature(Xp::DiscardReferences);
+                experimentalFeatureSettings.require(Xp::DiscardReferences);
                 if (auto output = get(*udr, outputName)) {
                     if (!output->is_boolean())
                         throw Error("attribute 'unsafeDiscardReferences.\"%s\"' of derivation '%s' must be a Boolean", outputName, drvPath.to_string());
@@ -2688,7 +2688,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             },
             .outPath = newInfo.path
         };
-        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)
+        if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)
             && drv->type().isPure())
         {
             signRealisation(thisRealisation);

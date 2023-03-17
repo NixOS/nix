@@ -105,7 +105,7 @@ RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
                 auto drvHashes =
                     staticOutputHashes(store, store.readDerivation(p.drvPath));
                 for (auto& [outputName, outputPath] : p.outputs) {
-                    if (settings.isExperimentalFeatureEnabled(
+                    if (experimentalFeatureSettings.isEnabled(
                                 Xp::CaDerivations)) {
                         auto drvOutput = get(drvHashes, outputName);
                         if (!drvOutput)

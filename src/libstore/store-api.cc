@@ -445,10 +445,10 @@ StringSet StoreConfig::getDefaultSystemFeatures()
 {
     auto res = settings.systemFeatures.get();
 
-    if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations))
+    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
         res.insert("ca-derivations");
 
-    if (settings.isExperimentalFeatureEnabled(Xp::RecursiveNix))
+    if (experimentalFeatureSettings.isEnabled(Xp::RecursiveNix))
         res.insert("recursive-nix");
 
     return res;
@@ -1017,7 +1017,7 @@ std::map<StorePath, StorePath> copyPaths(
     for (auto & path : paths) {
         storePaths.insert(path.path());
         if (auto realisation = std::get_if<Realisation>(&path.raw)) {
-            settings.requireExperimentalFeature(Xp::CaDerivations);
+            experimentalFeatureSettings.require(Xp::CaDerivations);
             toplevelRealisations.insert(*realisation);
         }
     }
@@ -1250,7 +1250,7 @@ std::optional<StorePath> Store::getBuildDerivationPath(const StorePath & path)
         }
     }
 
-    if (!settings.isExperimentalFeatureEnabled(Xp::CaDerivations) || !isValidPath(path))
+    if (!experimentalFeatureSettings.isEnabled(Xp::CaDerivations) || !isValidPath(path))
         return path;
 
     auto drv = readDerivation(path);
