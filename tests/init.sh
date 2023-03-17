@@ -3,7 +3,7 @@ source common/vars-and-functions.sh
 
 test -n "$TEST_ROOT"
 if test -d "$TEST_ROOT"; then
-    chmod -R u+w "$TEST_ROOT"
+    chmod -R u+rw "$TEST_ROOT"
     # We would delete any daemon socket, so let's stop the daemon first.
     killDaemon
     rm -rf "$TEST_ROOT"
