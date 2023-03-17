@@ -114,6 +114,8 @@ reference types:
 
 * `ref`: A Git or Mercurial branch or tag name.
 
+* `submodules`: A boolean supporting Git submodules.
+
 Finally, some attribute are typically not specified by the user, but
 can occur in *locked* flake references and are available to Nix code:
 

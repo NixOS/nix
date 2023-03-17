@@ -41,6 +41,7 @@ typedef std::map<FlakeId, FlakeInput> FlakeInputs;
 struct FlakeInput
 {
     std::optional<FlakeRef> ref;
+    bool hasSubmodules = false;
     bool isFlake = true;  // true = process flake to get outputs, false = (fetched) static source path
     std::optional<InputPath> follows;
     FlakeInputs overrides;
