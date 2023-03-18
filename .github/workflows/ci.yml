@@ -119,6 +119,9 @@ jobs:
     - run: docker load -i ./result/image.tar.gz
     - run: docker tag nix:$NIX_VERSION nixos/nix:$NIX_VERSION
     - run: docker tag nix:$NIX_VERSION nixos/nix:master
+    # We'll deploy the newly built image to both Docker Hub and Github Container Registry.
+    #
+    # Push to Docker Hub first
     - name: Login to Docker Hub
       uses: docker/login-action@v2
       with:
@@ -126,3 +129,16 @@ jobs:
         password: ${{ secrets.DOCKERHUB_TOKEN }}
     - run: docker push nixos/nix:$NIX_VERSION
     - run: docker push nixos/nix:master
+    # Push to GitHub Container Registry as well
+    - name: Log in to registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+    - name: Push image
+      run: |
+        IMAGE_ID=ghcr.io/${{ github.repository_owner }}/nix
+        # Change all uppercase to lowercase
+        IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+
+        docker tag nix:$NIX_VERSION $IMAGE_ID:$NIX_VERSION
+        docker tag nix:$NIX_VERSION $IMAGE_ID:master
+        docker push $IMAGE_ID:$NIX_VERSION
+        docker push $IMAGE_ID:master
