@@ -60,5 +60,8 @@ else
   unset -f check_nix_profiles
 fi
 
-export PATH="$NIX_LINK/bin:@localstatedir@/nix/profiles/default/bin:$PATH"
+case ":$PATH:" in
+    *:"$NIX_LINK/bin:@localstatedir@/nix/profiles/default/bin":*) ;;
+    *) export PATH="$NIX_LINK/bin:@localstatedir@/nix/profiles/default/bin:$PATH" ;;
+esac
 unset NIX_LINK
