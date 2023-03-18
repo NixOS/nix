@@ -24,8 +24,9 @@ struct LocalDerivationGoal : public DerivationGoal
     /* The path of the temporary directory in the sandbox. */
     Path tmpDirInSandbox;
 
-    /* Pipe for the builder's standard output/error. */
-    Pipe builderOut;
+    /* Master side of the pseudoterminal used for the builder's
+       standard output/error. */
+    AutoCloseFD builderOut;
 
     /* Pipe for synchronising updates to the builder namespaces. */
     Pipe userNamespaceSync;
@@ -168,7 +169,7 @@ struct LocalDerivationGoal : public DerivationGoal
     int getChildStatus() override;
 
     /* Run the builder's process. */
-    void runChild();
+    void runChild(const std::string & slaveName);
 
     /* Check that the derivation outputs all exist and register them
        as valid. */

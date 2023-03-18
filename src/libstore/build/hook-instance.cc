@@ -35,7 +35,7 @@ HookInstance::HookInstance()
     /* Fork the hook. */
     pid = startProcess([&]() {
 
-        commonChildInit(fromHook);
+        commonChildInit(fromHook.writeSide.get());
 
         if (chdir("/") == -1) throw SysError("changing into /");
 
