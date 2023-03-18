@@ -24,8 +24,6 @@ git config --global protocol.file.allow always
 rootRepo=$TEST_ROOT/rootRepo
 subRepo=$TEST_ROOT/submodule
 
-rm -rf $rootRepo $subRepo $TEST_HOME/.cache/nix
-
 
 createGitRepo $subRepo
 cat > $subRepo/flake.nix <<EOF
