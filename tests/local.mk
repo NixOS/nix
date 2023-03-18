@@ -13,6 +13,7 @@ nix_tests = \
   flakes/unlocked-override.sh \
   flakes/absolute-paths.sh \
   flakes/build-paths.sh \
+  flakes/flake-in-submodule.sh \
   ca/gc.sh \
   gc.sh \
   remote-store.sh \
