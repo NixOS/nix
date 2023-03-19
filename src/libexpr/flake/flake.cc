@@ -334,6 +334,9 @@ LockedFlake lockFlake(
     }
 
     try {
+        if (!fetchSettings.allowDirty && lockFlags.referenceLockFilePath) {
+            throw Error("reference lock file was provided, but the `allow-dirty` setting is set to false");
+        }
 
         // FIXME: symlink attack
         auto oldLockFile = LockFile::read(
