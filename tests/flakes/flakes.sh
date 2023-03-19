@@ -495,12 +495,12 @@ nix store delete $(nix store add-path $badFlakeDir)
 [[ $(NIX_PATH=flake3=flake:flake3 nix-instantiate --eval '<flake3>' -A x) = 123 ]]
 
 # Test alternate lockfile paths.
-nix flake lock $flake2Dir --output-lock-file flake2.lock
-cmp $flake2Dir/flake.lock flake2.lock >/dev/null # lockfiles should be identical, since we're referencing flake2's original one
+nix flake lock $flake2Dir --output-lock-file $TEST_ROOT/flake2.lock
+cmp $flake2Dir/flake.lock $TEST_ROOT/flake2.lock >/dev/null # lockfiles should be identical, since we're referencing flake2's original one
 
-nix flake lock $flake2Dir --output-lock-file flake2-overridden.lock --override-input flake1 git+file://$flake1Dir?rev=$flake1OriginalCommit
-expectStderr 1 cmp $flake2Dir/flake.lock flake2-overridden.lock
-nix flake metadata $flake2Dir --reference-lock-file flake2-overridden.lock | grepQuiet $flake1OriginalCommit
+nix flake lock $flake2Dir --output-lock-file $TEST_ROOT/flake2-overridden.lock --override-input flake1 git+file://$flake1Dir?rev=$flake1OriginalCommit
+expectStderr 1 cmp $flake2Dir/flake.lock $TEST_ROOT/flake2-overridden.lock
+nix flake metadata $flake2Dir --reference-lock-file $TEST_ROOT/flake2-overridden.lock | grepQuiet $flake1OriginalCommit
 
 # reference-lock-file can only be used if allow-dirty is set.
-expectStderr 1 nix flake metadata $flake2Dir --no-allow-dirty --reference-lock-file flake2-overridden.lock
+expectStderr 1 nix flake metadata $flake2Dir --no-allow-dirty --reference-lock-file $TEST_ROOT/flake2-overridden.lock
