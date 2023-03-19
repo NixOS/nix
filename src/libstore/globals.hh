@@ -97,7 +97,145 @@ public:
     Path nixDaemonSocketFile;
 
     Setting<std::string> storeUri{this, getEnv("NIX_REMOTE").value_or("auto"), "store",
-        "The default Nix store to use."};
+        R"(
+          The default Nix store to use.
+
+          This option must be specified as a *store URI* which can be one of the following:
+          * `local`: The Nix store in /nix/store and database in
+          /nix/var/nix/db, accessed directly.
+
+          * `daemon`: The Nix store accessed via a Unix domain socket
+          connection to nix-daemon.
+
+          * `unix://<path>`: The Nix store accessed via a Unix domain socket
+          connection to nix-daemon, with the socket located at <path>.
+
+          * `auto` or empty: Equivalent to `local` or `daemon` depending on
+          whether the user has write access to the local Nix
+          store/database.
+
+          * `file://<path>`: A binary cache stored in <path>.
+
+          * `https://<path>`: A binary cache accessed via HTTP.
+
+          * `s3://<path>`: A writable binary cache stored on Amazon's Simple
+          Storage Service.
+
+          * `ssh://[user@]<host>`: A remote Nix store accessed by running
+          `nix-store --serve` via SSH.
+          an URL `scheme://location?option=value&option2=value2`.
+
+          Options can be passed to store implementations by appending `?option=value&option2=value2`.
+
+          Options for `local`, `daemon` and `unix://` stores are:
+          - `root`\
+          Directory prefixed to all other paths.
+          - `state`\
+          Directory where nix will store state (usually `/nix/var/nix`).
+          - `log`\
+          Directory where nix will store logs (usually `/nix/var/log/nix`).
+          - `real`\
+          Physical path to the Nix store. Can differ from the path in the URL in
+          the case of chroot stores.
+
+          All remote store implementations (`daemon`, `unix://`, `ssh-ng://`) accept the following options:
+          - `max-connections`\
+          Maximum number of concurrent SSH connnections.
+          - `max-connection-age`\
+          Number of seconds to reuse a connection.
+
+          `ssh://` stores only support `max-connections`.
+
+          `ssh://` and `ssh-ng://` stores accept the following options:
+          - `ssh-key`\
+          Path to a SSH private key. It must not be protected by a passphrase.
+          - `base64-ssh-public-host-key`\
+          The public half of the host's SSH key. Allows to replace the interactive prompt
+          about trusting the fingerprint of a server on first connection.
+          - `compress`\
+          Whether to enable compression on the SSH tunnel (like `ssh -C`). Trades CPU for network bandwidth.
+          - `remote-store`\
+          URI of the store on the remote system.
+
+          `ssh-ng://` additionnaly accepts the following option:
+          - `nix-daemon`\
+          Path to the `nix-daemon` executable on the remote system.
+
+          `ssh://` additionnaly accepts the following options:
+          - `nix-store`\
+          Path to the `nix-store` executable on the remote system.
+
+          The local store `local` additionally accepts the following option:
+          - `require-sigs`\
+          Whether store paths should have a trusted signature on import.
+
+          All binary cache URLs (`file://`, `http://`, `https://`, `s3://`) have the following common options:
+          - `compression`\
+          Compression method for derivation outputs. Does not apply to metadata files. Possible values are `xz`, `bzip2`, `gzip`, `zstd`, or `none`. Defaults to `xz`.
+          - `parallel-compression`\
+          If enabled, compression will be multithreaded. Only available with `xz` and `zstd` compression.
+          - `compression-level`\
+          A preset compression level. Possible values depend on the selected compression
+          algorithm. `-1` designates the Nix-chosen default value.
+          - `write-nar-listing`\
+          If true, a JSON file with a file listing for each NAR is additionally written on upload.
+          - `index-debug-info`\
+          If true, when a NAR containing a DWARF file in the form
+          `lib/debug/.build-id/some/thing` is uploaded, a JSON file `debuginfo/something` pointing
+          to it is created. This allows fast lookup of the derivation output
+          containing debug symbols for a given ELF build-ID.
+          - `secret-key`\
+          The path to a secret key used to sign uploaded packages.
+          - `local-nar-cache`\
+          The path to a local cache of NARs
+
+
+          `s3://` stores accept the following options:
+          - `profile`\
+          The name of the AWS configuration profile to use. By default Nix
+          will use the `default` profile.
+
+          - `region`\
+          The region of the S3 bucket. `us–east-1` by default.
+
+          If your bucket is not in `us–east-1`, you should always explicitly
+          specify the region parameter.
+
+          - `endpoint`\
+          The URL to your S3-compatible service, for when not using Amazon S3.
+          Do not specify this value if you're using Amazon S3.
+
+          > **Note**
+          >
+          > This endpoint must support HTTPS and will use path-based
+          > addressing instead of virtual host based addressing.
+
+          - `scheme`\
+          The scheme used for S3 requests, `https` (default) or `http`. This
+          option allows you to disable HTTPS for binary caches which don't
+          support it.
+
+          > **Note**
+          >
+          > HTTPS should be used if the cache might contain sensitive
+          > information.
+
+          - `narinfo-compression`\
+          Compression method for `.narinfo` files. Possible values are `none`, `br`,
+          `bzip2`, `compress`, `grzip`, `gzip`, `lrzip`, `lz4`, `lzip`, `lzma`, `lzop`, `xz`, `zstd`. Defaults to `none`.
+
+          - `ls-compression`\
+          Compression method for `.ls` files. Possible values are the same as `narinfo-compression`. Defaults to `none`.
+
+          - `log-compression`\
+          Compression method for build logs. Possible values are the same as `narinfo-compression`. Defaults to `none`.
+
+          - `multipart-uploads`\
+          Whether to use multipart uploads. Defaults to `false`.
+
+          - `buffer-size`\
+          Size (in bytes) of each part of multipart uploads, if `multipart-uploads` is set to `true`. Defaults to 5 MB.
+        )"};
 
     Setting<bool> keepFailed{this, false, "keep-failed",
         "Whether to keep temporary directories of failed builds."};
@@ -691,6 +829,9 @@ public:
 
           In addition, each store path should be trusted as described
           in [`trusted-public-keys`](#conf-trusted-public-keys)
+
+          Acceptable URLs are the same as *store URIs* as documented for the [`store`](#conf-store) setting.
+
         )",
         {"binary-caches"}};
 
