@@ -94,6 +94,9 @@ jobs:
 
   docker_push_image:
     needs: [check_secrets, tests]
+    permissions:
+      contents: read
+      packages: write
     if: >-
       github.event_name == 'push' &&
       github.ref_name == 'master' &&
