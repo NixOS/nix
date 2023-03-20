@@ -440,7 +440,8 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             .count = 1
         };
 
-        git_remote_fetch(remote.get(), &refspecs2, nullptr, nullptr);
+        if (git_remote_fetch(remote.get(), &refspecs2, nullptr, nullptr))
+            throw Error("fetching '%s' from '%s': %s", refspec, url, git_error_last()->message);
     }
 };
 
