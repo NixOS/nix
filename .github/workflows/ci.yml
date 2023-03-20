@@ -91,6 +91,8 @@ jobs:
     - run: exec sh -c "nix-instantiate -E 'builtins.currentTime' --eval"
     - run: exec zsh -c "nix-instantiate -E 'builtins.currentTime' --eval"
     - run: exec fish -c "nix-instantiate -E 'builtins.currentTime' --eval"
+    - run: exec bash -c "nix-channel --add https://releases.nixos.org/nixos/unstable/nixos-23.05pre466020.60c1d71f2ba nixpkgs"
+    - run: exec bash -c "nix-channel --update && nix-env -iA nixpkgs.hello && hello"
 
   docker_push_image:
     needs: [check_secrets, tests]
