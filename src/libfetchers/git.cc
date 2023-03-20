@@ -380,7 +380,7 @@ struct GitInputScheme : InputScheme
     std::string getDefaultRef(const RepoInfo & repoInfo) const
     {
         auto head = repoInfo.isLocal
-            ? readHead(repoInfo.url)
+            ? GitRepo::openRepo(CanonPath(repoInfo.url))->getWorkdirRef()
             : readHeadCached(repoInfo.url);
         if (!head) {
             warn("could not read HEAD ref from repo at '%s', using 'master'", repoInfo.url);
@@ -606,8 +606,8 @@ struct GitInputScheme : InputScheme
         Input && input) const
     {
         if (!repoInfo.workdirInfo.isDirty) {
-            if (repoInfo.workdirInfo.ref)
-                input.attrs.insert_or_assign("ref", *repoInfo.workdirInfo.ref);
+            if (auto ref = GitRepo::openRepo(CanonPath(repoInfo.url))->getWorkdirRef())
+                input.attrs.insert_or_assign("ref", *ref);
 
             auto rev = repoInfo.workdirInfo.headRev.value();
 

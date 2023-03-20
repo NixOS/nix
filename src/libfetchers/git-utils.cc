@@ -215,14 +215,6 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         WorkdirInfo info;
 
-        /* Get the ref that HEAD points to. */
-        Reference ref;
-        if (git_reference_lookup(Setter(ref), *this, "HEAD"))
-            throw Error("looking up HEAD: %s", git_error_last()->message);
-
-        if (auto target = git_reference_symbolic_target(ref.get()))
-            info.ref = target;
-
         /* Get the head revision, if any. */
         git_oid headRev;
         if (auto err = git_reference_name_to_id(&headRev, *this, "HEAD")) {
@@ -250,6 +242,18 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             throw Error("getting working directory status: %s", git_error_last()->message);
 
         return info;
+    }
+
+    std::optional<std::string> getWorkdirRef() override
+    {
+        Reference ref;
+        if (git_reference_lookup(Setter(ref), *this, "HEAD"))
+            throw Error("looking up HEAD: %s", git_error_last()->message);
+
+        if (auto target = git_reference_symbolic_target(ref.get()))
+            return target;
+
+        return std::nullopt;
     }
 
     TarballInfo importTarball(Source & source) override

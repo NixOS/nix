@@ -28,15 +28,15 @@ struct GitRepo
            in the repo yet. */
         std::optional<Hash> headRev;
 
-        /* The ref to which HEAD points, if any. */
-        std::optional<std::string> ref;
-
         /* All files in the working directory that are unchanged,
            modified or added, but excluding deleted files. */
         std::set<CanonPath> files;
     };
 
     virtual WorkdirInfo getWorkdirInfo() = 0;
+
+    /* Get the ref that HEAD points to. */
+    virtual std::optional<std::string> getWorkdirRef() = 0;
 
     struct TarballInfo
     {
