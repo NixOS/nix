@@ -28,7 +28,7 @@ nix-env -q # Trigger the migration
 
 # The nix profile should point to the new location
 [[ -L ~/.nix-profile ]]
-[[ $(readlink ~/.nix-profile) == ~/.local/share/nix/profiles/profile ]]
+[[ $(readlink ~/.nix-profile) == ~/.local/state/nix/profiles/profile ]]
 
 # The nix profile should have the same content as before the migration
 nix-env -q | grepQuiet foo
