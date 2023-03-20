@@ -8,7 +8,18 @@ This allows accessing new functionality that is not yet stable without unwitting
 
 # When should a new feature be marked experimental?
 
-A change in the Nix codebase should be guarded by an experimental feature flag if it is considered likely to be reverted or adapted in a backwards-incompatible manner after gathering more experience with it in practice.
+Experimental features are needed for high stakes changes to Nix that benefit from broad community feedback.
+
+Most of the time, experimentation happens prior to merging PRs; Nix maintainers merge changes when we are confident in those changes.
+Merging changes we are not confident and then regretting those decisions leads to either:
+ - Breaking our stability guarantee
+ - Sticking with a design we think is bad
+
+But for larger or highly visible changes, merging PRs only after we have become confident is not practical:
+  - The PR would have to be open for a very long period of time, past the point of being an acceptable burden to the PR author
+  - The barrier to installing an unofficial non-release version of Nix means we still wouldn't get enough community input.
+
+Experimental features are a middle ground which, via a little extra code, avoids all these bad outcomes.
 
 Examples:
 
