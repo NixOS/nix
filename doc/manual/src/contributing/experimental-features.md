@@ -10,21 +10,26 @@ This allows accessing new functionality that is not yet stable without unwitting
 
 Experimental features are needed for high stakes changes to Nix that benefit from broad community feedback.
 
-Most of the time, experimentation happens prior to merging PRs; Nix maintainers merge changes when we are confident in those changes.
-Merging changes we are not confident and then regretting those decisions leads to either:
- - Breaking our stability guarantee
- - Sticking with a design we think is bad
-
-But for larger or highly visible changes, merging PRs only after we have become confident is not practical:
-  - The PR would have to be open for a very long period of time, past the point of being an acceptable burden to the PR author
-  - The barrier to installing an unofficial non-release version of Nix means we still wouldn't get enough community input.
-
-Experimental features are a middle ground which, via a little extra code, avoids all these bad outcomes.
-
 Examples:
 
 - Changes to the Nix language, such as new built-ins, syntactic or semantic changes, etc.
 - Changes to the command-line interface
+
+# Why are experimental features needed?
+
+Most of the time, experimentation happens prior to merging PRs; Nix maintainers merge changes when we are confident in those changes.
+Merging changes we are not confident in and then regretting those decisions leads to either:
+
+- Breaking our stability guarantee
+- Sticking with the wrong design
+
+But for larger or highly visible changes, merging PRs only after we have become confident is not practical:
+
+- The PR would have to be open for a very long period of time, burdening the PR author more than is practical
+- We would still lack enough community input:
+  regular community members can not be expected to install an unofficial version of Nix from a PR branch.
+
+Experimental features are a middle ground which, via a little extra code, avoids all these bad outcomes:
 
 # Lifecycle of an experimental feature
 
@@ -38,7 +43,7 @@ However, the standard workflow for an experimental feature is as follows:
     - Being experimental, the feature can still be changed arbitrarily
 - The feature can be *removed*
   - The associated experimental feature flag is also removed
-- The feature can be made *stable*
+- The feature can be *stabilised*
   - The associated experimental feature flag is removed
   - There should be enough evidence of users having tried the feature, such as feedback, fixed bugs, demonstrations of how it is put to use
   - Maintainers must feel confident that:
