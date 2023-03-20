@@ -454,7 +454,7 @@ static void commonChildInit(int stderrFd)
         throw SysError(format("creating a new session"));
 
     /* Dup the write side of the logger pipe into stderr. */
-    if (dup2(stderrFd, STDERR_FILENO) == -1)
+    if (stderrFd != -1 && dup2(stderrFd, STDERR_FILENO) == -1)
         throw SysError("cannot pipe standard error into log file");
 
     /* Dup stderr to stdout. */
@@ -2264,6 +2264,27 @@ void DerivationGoal::startBuilder()
     if (unlockpt(builderOut.get()))
         throw SysError("unlocking pseudoterminal");
 
+    /* Open the slave side of the pseudoterminal and use it as stderr. */
+    auto openSlave = [&]()
+    {
+        AutoCloseFD builderOut = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
+        if (!builderOut)
+            throw SysError("opening pseudoterminal slave");
+
+        // Put the pt into raw mode to prevent \n -> \r\n translation.
+        struct termios term;
+        if (tcgetattr(builderOut.get(), &term))
+            throw SysError("getting pseudoterminal attributes");
+
+        cfmakeraw(&term);
+
+        if (tcsetattr(builderOut.get(), TCSANOW, &term))
+            throw SysError("putting pseudoterminal into raw mode");
+
+        if (dup2(builderOut.get(), STDERR_FILENO) == -1)
+            throw SysError("cannot pipe standard error into log file");
+    };
+
     result.startTime = time(0);
 
     /* Fork a child to build the package. */
@@ -2317,6 +2338,11 @@ void DerivationGoal::startBuilder()
 
         Pid helper = startProcess([&]() {
             sendPid.readSide.close();
+
+            /* We need to open the slave early, before
+               CLONE_NEWUSER. Otherwise we get EPERM when running as
+               root. */
+            openSlave();
 
             /* Drop additional groups here because we can't do it
                after we've created the new user namespace.  FIXME:
@@ -2410,6 +2436,7 @@ void DerivationGoal::startBuilder()
     fallback:
         options.allowVfork = !buildUser && !drv->isBuiltin();
         pid = startProcess([&]() {
+            openSlave();
             runChild();
         }, options);
     }
@@ -2723,22 +2750,7 @@ void DerivationGoal::runChild()
 
     try { /* child */
 
-        /* Open the slave side of the pseudoterminal. */
-        AutoCloseFD builderOut = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
-        if (!builderOut)
-            throw SysError("opening pseudoterminal slave");
-
-        // Put the pt into raw mode to prevent \n -> \r\n translation.
-        struct termios term;
-        if (tcgetattr(builderOut.get(), &term))
-            throw SysError("getting pseudoterminal attributes");
-
-        cfmakeraw(&term);
-
-        if (tcsetattr(builderOut.get(), TCSANOW, &term))
-            throw SysError("putting pseudoterminal into raw mode");
-
-        commonChildInit(builderOut.get());
+        commonChildInit(-1);
 
         try {
             setupSeccomp();
