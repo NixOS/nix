@@ -1656,7 +1656,7 @@ void LocalDerivationGoal::runChild()
 
     try { /* child */
 
-        commonChildInit(-1);
+        commonChildInit();
 
         try {
             setupSeccomp();

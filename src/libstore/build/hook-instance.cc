@@ -35,7 +35,10 @@ HookInstance::HookInstance()
     /* Fork the hook. */
     pid = startProcess([&]() {
 
-        commonChildInit(fromHook.writeSide.get());
+        if (dup2(fromHook.writeSide.get(), STDERR_FILENO) == -1)
+            throw SysError("cannot pipe standard error into log file");
+
+        commonChildInit();
 
         if (chdir("/") == -1) throw SysError("changing into /");
 
