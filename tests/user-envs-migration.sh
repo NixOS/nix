@@ -3,7 +3,7 @@
 
 source common.sh
 
-if isDaemonNewer "2.4pre20211005"; then
+if isDaemonNewer "2.14"; then
     skipTest "Daemon is too new"
 fi
 
