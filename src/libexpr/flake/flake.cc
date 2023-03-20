@@ -455,6 +455,10 @@ LockedFlake lockFlake(
                     {
                         debug("keeping existing input '%s'", inputPathS);
 
+                        if (((*input.ref).input.getType() == "path") ||
+                            ((*input.ref).input.toURL().scheme == "git+file"))
+                            warn("Using input '%s' from cache. Use '--update-input %s' to refresh", inputPathS, inputPathS);
+
                         /* Copy the input from the old lock since its flakeref
                            didn't change and there is no override from a
                            higher level flake. */
