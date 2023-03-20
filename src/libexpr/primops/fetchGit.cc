@@ -6,6 +6,7 @@
 #include "hash.hh"
 
 #include <sys/time.h>
+#include <sys/wait.h>
 
 #include <regex>
 
@@ -173,7 +174,7 @@ GitInfo exportGit(ref<Store> store, const std::string & uri,
     Path tmpDir = createTempDir();
     AutoDelete delTmpDir(tmpDir, true);
 
-    runProgram("tar", true, { "x", "-C", tmpDir }, tar);
+    runProgram("tar", true, { "-x", "-f", "-", "-C", tmpDir }, tar);
 
     gitInfo.storePath = store->addToStore(name, tmpDir);
 
