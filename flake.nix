@@ -566,7 +566,7 @@
 
             postInstall = ''
               mkdir -p $out/nix-support
-              echo "doc internal-api-docs $out/share/doc/nix/internal-api" >> $out/nix-support/hydra-build-products
+              echo "doc internal-api-docs $out/share/doc/nix/internal-api/html" >> $out/nix-support/hydra-build-products
             '';
           };
 
