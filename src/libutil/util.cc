@@ -1983,7 +1983,7 @@ void commonChildInit(int stderrFd)
         throw SysError("creating a new session");
 
     /* Dup the write side of the logger pipe into stderr. */
-    if (dup2(stderrFd, STDERR_FILENO) == -1)
+    if (stderrFd != -1 && dup2(stderrFd, STDERR_FILENO) == -1)
         throw SysError("cannot pipe standard error into log file");
 
     /* Dup stderr to stdout. */
