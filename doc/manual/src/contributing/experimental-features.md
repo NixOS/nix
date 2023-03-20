@@ -20,12 +20,17 @@ Examples:
 Experimental features have to be treated on a case-by-case basis.
 However, the standard workflow for an experimental feature is as follows:
 
-- The feature is implemented in a pull request.
-- The feature is guarded by an experimental feature flag that is disabled by default, and the pull request is merged.
-    - Being experimental, the feature can still be changed arbitrarily or removed again.
-- The experimental feature flag can be removed and the feature is considered stable if:
-  - There is enough evidence of users having tried the feature, such as feedback, fixed bugs, demonstrations of how it is put to use
-  - Maintainers feel confident that
+- A new feature is implemented in a *pull request*
+  - It is guarded by an experimental feature flag that is disabled by default
+- The pull request is merged, the *experimental* feature ends up in a release
+    - Using the feature requires explicitly enabling it, signifying awareness of the potential risks
+    - Being experimental, the feature can still be changed arbitrarily
+- The feature can be *removed*
+  - The associated experimental feature flag is also removed
+- The feature can be made *stable*
+  - The associated experimental feature flag is removed
+  - There should be enough evidence of users having tried the feature, such as feedback, fixed bugs, demonstrations of how it is put to use
+  - Maintainers must feel confident that:
     - The feature is designed and implemented sensibly, that it is fit for purpose
     - Potential interactions are well-understood
     - Stabilising the feature will not incur an outsized maintenance burden in the future
