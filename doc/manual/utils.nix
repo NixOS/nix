@@ -48,6 +48,7 @@ rec {
 
           ${indent "  " body}
         '';
+
       # separate body to cleanly handle indentation
       body = ''
           ${description}
@@ -56,6 +57,7 @@ rec {
 
           ${showAliases aliases}
         '';
+
       showDefault = documentDefault: defaultValue:
         if documentDefault then
           # a StringMap value type is specified as a string, but
@@ -67,12 +69,15 @@ rec {
               if defaultValue then "`true`" else "`false`"
             else "`${toString defaultValue}`"
         else "*machine-specific*";
+
       showAliases = aliases:
           if aliases == [] then "" else
             "**Deprecated alias:** ${(concatStringsSep ", " (map (s: "`${s}`") aliases))}";
+
       indent = prefix: s:
         concatStringsSep "\n" (map (x: if x == "" then x else "${prefix}${x}") (splitLines s));
-      in result;
+
+    in result;
 
   showSettings = useSpans: settingsInfo: concatStrings (attrValues (mapAttrs (showSetting useSpans) settingsInfo));
 }
