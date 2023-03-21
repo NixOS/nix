@@ -168,12 +168,7 @@ static int main_nix_channel(int argc, char ** argv)
         nixDefExpr = settings.useXDGBaseDirectories ? createNixStateDir() + "/defexpr" : home + "/.nix-defexpr";
 
         // Figure out the name of the channels profile.
-        // For backwards-compatibility, install the root channels under
-        // a custom location, as these are also used as "global" channeles, and
-        // their location is hardcoded in a number of places.
-        profile = getuid() == 0
-            ? settings.nixStateDir + "/profiles/per-user/root/channels"
-            : profilesDir() +  "/channels";
+        profile = profilesDir() +  "/channels";
         createDirs(dirOf(profile));
 
         enum {
