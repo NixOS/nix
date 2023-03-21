@@ -115,7 +115,6 @@ nix_tests = \
   db-migration.sh \
   bash-profile.sh \
   pass-as-file.sh \
-  describe-stores.sh \
   nix-profile.sh \
   suggestions.sh \
   store-ping.sh \
