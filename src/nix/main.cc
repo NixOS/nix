@@ -164,11 +164,28 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     {
         commands = RegisterCommand::getCommandsFor({});
     }
+
+    std::string dumpCli()
+    {
+        auto res = nlohmann::json::object();
+
+        res["args"] = toJSON();
+
+        auto stores = nlohmann::json::object();
+        for (auto & implem : *Implementations::registered) {
+            auto storeConfig = implem.getConfig();
+            auto storeName = storeConfig->name();
+            stores[storeName]["settings"] = storeConfig->toJSON();
+        }
+        res["stores"] = std::move(stores);
+
+        return res.dump();
+    }
 };
 
 /* Render the help for the specified subcommand to stdout using
    lowdown. */
-static void showHelp(std::vector<std::string> subcommand, MultiCommand & toplevel)
+static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 {
     auto mdName = subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand));
 
@@ -189,11 +206,11 @@ static void showHelp(std::vector<std::string> subcommand, MultiCommand & topleve
             , "/"),
         *vUtils);
 
-    auto attrs = state.buildBindings(16);
-    attrs.alloc("toplevel").mkString(toplevel.toJSON().dump());
+    auto vDump = state.allocValue();
+    vDump->mkString(toplevel.dumpCli());
 
     auto vRes = state.allocValue();
-    state.callFunction(*vGenerateManpage, state.allocValue()->mkAttrs(attrs), *vRes, noPos);
+    state.callFunction(*vGenerateManpage, *vDump, *vRes, noPos);
 
     auto attr = vRes->attrs->get(state.symbols.create(mdName + ".md"));
     if (!attr)
@@ -234,7 +251,7 @@ struct CmdHelp : Command
         assert(parent);
         MultiCommand * toplevel = parent;
         while (toplevel->parent) toplevel = toplevel->parent;
-        showHelp(subcommand, *toplevel);
+        showHelp(subcommand, dynamic_cast<NixArgs &>(*toplevel));
     }
 };
 
@@ -291,8 +308,8 @@ void mainWrapped(int argc, char * * argv)
 
     NixArgs args;
 
-    if (argc == 2 && std::string(argv[1]) == "__dump-args") {
-        logger->cout("%s", args.toJSON());
+    if (argc == 2 && std::string(argv[1]) == "__dump-cli") {
+        logger->cout(args.dumpCli());
         return;
     }
 

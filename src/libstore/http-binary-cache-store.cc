@@ -12,7 +12,7 @@ struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 {
     using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
 
-    const std::string name() override { return "Http Binary Cache Store"; }
+    const std::string name() override { return "HTTP Binary Cache Store"; }
 };
 
 class HttpBinaryCacheStore : public virtual HttpBinaryCacheStoreConfig, public virtual BinaryCacheStore

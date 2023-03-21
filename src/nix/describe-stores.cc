@@ -22,7 +22,7 @@ struct CmdDescribeStores : Command, MixJSON
         for (auto & implem : *Implementations::registered) {
             auto storeConfig = implem.getConfig();
             auto storeName = storeConfig->name();
-            res[storeName] = storeConfig->toJSON();
+            res[storeName]["settings"] = storeConfig->toJSON();
         }
         if (json) {
             logger->cout("%s", res);

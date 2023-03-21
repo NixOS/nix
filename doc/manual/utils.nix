@@ -38,4 +38,41 @@ rec {
 
   filterAttrs = pred: set:
     listToAttrs (concatMap (name: let v = set.${name}; in if pred name v then [(nameValuePair name v)] else []) (attrNames set));
+
+  showSetting = useSpans: name: { description, documentDefault, defaultValue, aliases, ... }:
+    let
+      result = squash ''
+          - ${if useSpans
+              then ''<span id="conf-${name}">[`${name}`](#conf-${name})</span>''
+              else ''[`${name}`](#conf-${name})''}
+
+          ${indent "  " body}
+        '';
+      # separate body to cleanly handle indentation
+      body = ''
+          ${description}
+
+          **Default:** ${showDefault documentDefault defaultValue}
+
+          ${showAliases aliases}
+        '';
+      showDefault = documentDefault: defaultValue:
+        if documentDefault then
+          # a StringMap value type is specified as a string, but
+          # this shows the value type. The empty stringmap is `null` in
+          # JSON, but that converts to `{ }` here.
+          if defaultValue == "" || defaultValue == [] || isAttrs defaultValue
+            then "*empty*"
+            else if isBool defaultValue then
+              if defaultValue then "`true`" else "`false`"
+            else "`${toString defaultValue}`"
+        else "*machine-specific*";
+      showAliases = aliases:
+          if aliases == [] then "" else
+            "**Deprecated alias:** ${(concatStringsSep ", " (map (s: "`${s}`") aliases))}";
+      indent = prefix: s:
+        concatStringsSep "\n" (map (x: if x == "" then x else "${prefix}${x}") (splitLines s));
+      in result;
+
+  showSettings = useSpans: settingsInfo: concatStrings (attrValues (mapAttrs (showSetting useSpans) settingsInfo));
 }
