@@ -41,8 +41,9 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
         "require-sigs", "whether store paths should have a trusted signature on import"};
 
     const std::string name() override { return "Local Store"; }
-};
 
+    std::string doc() override;
+};
 
 class LocalStore : public virtual LocalStoreConfig, public virtual LocalFSStore, public virtual GcStore
 {

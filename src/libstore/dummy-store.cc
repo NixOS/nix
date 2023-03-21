@@ -7,6 +7,13 @@ struct DummyStoreConfig : virtual StoreConfig {
     using StoreConfig::StoreConfig;
 
     const std::string name() override { return "Dummy Store"; }
+
+    std::string doc() override
+    {
+        return
+          #include "dummy-store.md"
+          ;
+    }
 };
 
 struct DummyStore : public virtual DummyStoreConfig, public virtual Store

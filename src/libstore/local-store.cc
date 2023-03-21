@@ -44,6 +44,13 @@
 
 namespace nix {
 
+std::string LocalStoreConfig::doc()
+{
+    return
+        #include "local-store.md"
+        ;
+}
+
 struct LocalStore::State::Stmts {
     /* Some precompiled SQLite statements. */
     SQLiteStmt RegisterValidPath;

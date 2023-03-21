@@ -22,7 +22,14 @@ struct LegacySSHStoreConfig : virtual StoreConfig
     const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-store", "remote-program", "path to the nix-store executable on the remote system"};
     const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
 
-    const std::string name() override { return "Legacy SSH Store"; }
+    const std::string name() override { return "SSH Store"; }
+
+    std::string doc() override
+    {
+        return
+          #include "legacy-ssh-store.md"
+          ;
+    }
 };
 
 struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Store

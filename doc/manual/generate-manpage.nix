@@ -129,9 +129,13 @@ let
 
   storeDocs =
     let
-      showStore = name: { settings }:
+      showStore = name: { settings, doc }:
         ''
           ## ${name}
+
+          ${doc}
+
+          **Settings**:
 
           ${showSettings false settings}
         '';

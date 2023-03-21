@@ -101,6 +101,11 @@ struct StoreConfig : public Config
 
     virtual const std::string name() = 0;
 
+    virtual std::string doc()
+    {
+        return "";
+    }
+
     const PathSetting storeDir_{this, false, settings.nixStore,
         "store", "path to the Nix store"};
     const Path storeDir = storeDir_;

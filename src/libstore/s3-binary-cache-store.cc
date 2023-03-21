@@ -205,6 +205,13 @@ struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
         (StoreConfig*) this, 5 * 1024 * 1024, "buffer-size", "size (in bytes) of each part in multi-part uploads"};
 
     const std::string name() override { return "S3 Binary Cache Store"; }
+
+    std::string doc() override
+    {
+        return
+          #include "s3-binary-cache-store.md"
+          ;
+    }
 };
 
 struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual S3BinaryCacheStore
