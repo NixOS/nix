@@ -310,7 +310,7 @@ namespace nix {
         ASSERT_TRACE2("storePath true",
                       TypeError,
                       hintfmt("cannot coerce %s to a string", "a Boolean"),
-                      hintfmt("while evaluating the first argument passed to builtins.storePath"));
+                      hintfmt("while evaluating the argument of builtins.storePath"));
 
     }
 

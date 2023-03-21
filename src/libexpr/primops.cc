@@ -1445,23 +1445,38 @@ static RegisterPrimOp primop_toPath({
    corner cases. */
 static void prim_storePath(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    if (evalSettings.pureEval)
-        state.debugThrowLastTrace(EvalError({
-            .msg = hintfmt("'%s' is not allowed in pure evaluation mode", "builtins.storePath"),
-            .errPos = state.positions[pos]
-        }));
-
     PathSet context;
-    Path path = state.checkSourcePath(state.coerceToPath(pos, *args[0], context, "while evaluating the first argument passed to builtins.storePath"));
-    /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
-       directly in the store.  The latter condition is necessary so
-       e.g. nix-push does the right thing. */
-    if (!state.store->isStorePath(path)) path = canonPath(path, true);
-    if (!state.store->isInStore(path))
-        state.debugThrowLastTrace(EvalError({
-            .msg = hintfmt("path '%1%' is not in the Nix store", path),
-            .errPos = state.positions[pos]
-        }));
+    Path path = state.coerceToPath(pos, *args[0], context, "while evaluating the argument of builtins.storePath");
+
+    /* The following branch permits a dependency on a store path to be declared,
+       but in restrict-eval, extending the allowed paths would not be desirable. */
+    if (evalSettings.pureEval && !evalSettings.restrictEval) {
+
+        /* Reading from the store behaves like a pure function, but we want to
+           be careful about symlink resolution, which would otherwise be done
+           shortly after. A mutable symlink maybe be present in the chain of
+           symlinks, so to keep it simple, we currently disallow store paths in
+           symlinks altogether when in pure mode. */
+        if (!state.store->isStorePath(path)) {
+            state.debugThrowLastTrace(EvalError({
+                .msg = hintfmt("'%s' is only allowed on store paths in pure evaluation mode", "builtins.storePath"),
+                .errPos = state.positions[pos]
+            }));
+        }
+        state.allowPath(path);
+    } else {
+        path = state.checkSourcePath(path);
+        /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
+        directly in the store.  The latter condition is necessary so
+        e.g. nix-push does the right thing. */
+        if (!state.store->isStorePath(path)) path = canonPath(path, true);
+        if (!state.store->isInStore(path))
+            state.debugThrowLastTrace(EvalError({
+                .msg = hintfmt("path '%1%' is not in the Nix store", path),
+                .errPos = state.positions[pos]
+            }));
+    }
+
     auto path2 = state.store->toStorePath(path).first;
     if (!settings.readOnlyMode)
         state.store->ensurePath(path2);
