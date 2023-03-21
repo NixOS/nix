@@ -97,7 +97,10 @@ public:
     Path nixDaemonSocketFile;
 
     Setting<std::string> storeUri{this, getEnv("NIX_REMOTE").value_or("auto"), "store",
-        "The default Nix store to use."};
+        R"(
+          The URL of the Nix store to use. See [`nix help-stores`](@docroot@/command-ref/new-cli/nix3-help-stores.md)
+          for supported store types and settings.
+        )"};
 
     Setting<bool> keepFailed{this, false, "keep-failed",
         "Whether to keep temporary directories of failed builds."};

@@ -223,6 +223,14 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
     std::cout << renderMarkdownToTerminal(markdown) << "\n";
 }
 
+static NixArgs & getNixArgs(Command & cmd)
+{
+    assert(cmd.parent);
+    MultiCommand * toplevel = cmd.parent;
+    while (toplevel->parent) toplevel = toplevel->parent;
+    return dynamic_cast<NixArgs &>(*toplevel);
+}
+
 struct CmdHelp : Command
 {
     std::vector<std::string> subcommand;
@@ -252,11 +260,33 @@ struct CmdHelp : Command
         assert(parent);
         MultiCommand * toplevel = parent;
         while (toplevel->parent) toplevel = toplevel->parent;
-        showHelp(subcommand, dynamic_cast<NixArgs &>(*toplevel));
+        showHelp(subcommand, getNixArgs(*this));
     }
 };
 
 static auto rCmdHelp = registerCommand<CmdHelp>("help");
+
+struct CmdHelpStores : Command
+{
+    std::string description() override
+    {
+        return "show help about store types and their settings";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "help-stores.md"
+          ;
+    }
+
+    void run() override
+    {
+        showHelp({"help-stores"}, getNixArgs(*this));
+    }
+};
+
+static auto rCmdHelpStores = registerCommand<CmdHelpStores>("help-stores");
 
 void mainWrapped(int argc, char * * argv)
 {

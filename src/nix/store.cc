@@ -12,13 +12,6 @@ struct CmdStore : virtual NixMultiCommand
         return "manipulate a Nix store";
     }
 
-    std::string doc() override
-    {
-        return
-          #include "store.md"
-          ;
-    }
-
     Category category() override { return catUtility; }
 
     void run() override
