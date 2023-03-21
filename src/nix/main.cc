@@ -65,6 +65,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     NixArgs() : MultiCommand(RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
     {
         categories.clear();
+        categories[catHelp] = "Help commands";
         categories[Command::catDefault] = "Main commands";
         categories[catSecondary] = "Infrequently used commands";
         categories[catUtility] = "Utility/scripting commands";
@@ -255,6 +256,8 @@ struct CmdHelp : Command
           ;
     }
 
+    Category category() override { return catHelp; }
+
     void run() override
     {
         assert(parent);
@@ -279,6 +282,8 @@ struct CmdHelpStores : Command
           #include "help-stores.md"
           ;
     }
+
+    Category category() override { return catHelp; }
 
     void run() override
     {
