@@ -1,3 +1,4 @@
+#include "ssh-store-config.hh"
 #include "archive.hh"
 #include "pool.hh"
 #include "remote-store.hh"
@@ -12,15 +13,12 @@
 
 namespace nix {
 
-struct LegacySSHStoreConfig : virtual StoreConfig
+struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 {
-    using StoreConfig::StoreConfig;
-    const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections", "maximum number of concurrent SSH connections"};
-    const Setting<Path> sshKey{(StoreConfig*) this, "", "ssh-key", "path to an SSH private key"};
-    const Setting<std::string> sshPublicHostKey{(StoreConfig*) this, "", "base64-ssh-public-host-key", "The public half of the host's SSH key"};
-    const Setting<bool> compress{(StoreConfig*) this, false, "compress", "whether to compress the connection"};
-    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-store", "remote-program", "path to the nix-store executable on the remote system"};
-    const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
+    using CommonSSHStoreConfig::CommonSSHStoreConfig;
+
+    const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections",
+        "Maximum number of concurrent SSH connections."};
 
     const std::string name() override { return "SSH Store"; }
 

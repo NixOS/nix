@@ -1,3 +1,4 @@
+#include "ssh-store-config.hh"
 #include "store-api.hh"
 #include "remote-store.hh"
 #include "remote-fs-accessor.hh"
@@ -8,15 +9,9 @@
 
 namespace nix {
 
-struct SSHStoreConfig : virtual RemoteStoreConfig
+struct SSHStoreConfig : virtual RemoteStoreConfig, virtual CommonSSHStoreConfig
 {
     using RemoteStoreConfig::RemoteStoreConfig;
-
-    const Setting<Path> sshKey{(StoreConfig*) this, "", "ssh-key", "path to an SSH private key"};
-    const Setting<std::string> sshPublicHostKey{(StoreConfig*) this, "", "base64-ssh-public-host-key", "The public half of the host's SSH key"};
-    const Setting<bool> compress{(StoreConfig*) this, false, "compress", "whether to compress the connection"};
-    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-daemon", "remote-program", "path to the nix-daemon executable on the remote system"};
-    const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
 
     const std::string name() override { return "Experimental SSH Store"; }
 
