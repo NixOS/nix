@@ -13,6 +13,17 @@ Most Nix commands interpret the following environment variables:
     e.g. `/home/eelco/Dev:/etc/nixos`. It can be extended using the
     [`-I` option](./opt-common.md#opt-I).
 
+    If `NIX_PATH` is not set at all, Nix will fall back to the following list in [impure](./conf-file.md#conf-pure-eval) and [unrestricted](./conf-file.md#conf-restrict-eval) evaluation mode:
+
+      1. `$HOME/.nix-defexpr/channels`
+      2. `nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixpkgs`
+      3. `/nix/var/nix/profiles/per-user/root/channels`
+
+    If `NIX_PATH` is set to an empty string, resolving search paths will always fail.
+    For example, attempting to use `<nixpkgs>` will produce:
+
+        error: file 'nixpkgs' was not found in the Nix search path
+
   - [`NIX_IGNORE_SYMLINK_STORE`]{#env-NIX_IGNORE_SYMLINK_STORE}\
     Normally, the Nix store directory (typically `/nix/store`) is not
     allowed to contain any symlink components. This is to prevent
