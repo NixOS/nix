@@ -39,12 +39,12 @@ rec {
   filterAttrs = pred: set:
     listToAttrs (concatMap (name: let v = set.${name}; in if pred name v then [(nameValuePair name v)] else []) (attrNames set));
 
-  showSetting = useSpans: name: { description, documentDefault, defaultValue, aliases, ... }:
+  showSetting = useAnchors: name: { description, documentDefault, defaultValue, aliases, ... }:
     let
       result = squash ''
-          - ${if useSpans
+          - ${if useAnchors
               then ''<span id="conf-${name}">[`${name}`](#conf-${name})</span>''
-              else ''[`${name}`](#conf-${name})''}
+              else ''`${name}`''}
 
           ${indent "  " body}
         '';
@@ -79,5 +79,5 @@ rec {
 
     in result;
 
-  showSettings = useSpans: settingsInfo: concatStrings (attrValues (mapAttrs (showSetting useSpans) settingsInfo));
+  showSettings = useAnchors: settingsInfo: concatStrings (attrValues (mapAttrs (showSetting useAnchors) settingsInfo));
 }
