@@ -1,5 +1,4 @@
-{ flake-registry
-, pkgs ? import <nixpkgs> { }
+{ pkgs ? import <nixpkgs> { }
 , lib ? pkgs.lib
 , name ? "nix"
 , tag ? "latest"
@@ -9,6 +8,7 @@
 , extraPkgs ? []
 , maxLayers ? 100
 , nixConf ? {}
+, flake-registry ? null
 }:
 let
   defaultPkgs = with pkgs; [
@@ -245,6 +245,11 @@ let
       ln -s $out/nix/var/nix/profiles/per-user/root/channels $out/root/.nix-defexpr/channels
       echo "${channelURL} ${channelName}" > $out/root/.nix-channels
 
+      mkdir -p $out/bin $out/usr/bin
+      ln -s ${pkgs.coreutils}/bin/env $out/usr/bin/env
+      ln -s ${pkgs.bashInteractive}/bin/bash $out/bin/sh
+
+    '' + (lib.optionalString (flake-registry != null) ''
       nixCacheDir="/root/.cache/nix"
       mkdir -p $out$nixCacheDir
       globalFlakeRegistryPath="$nixCacheDir/flake-registry.json"
@@ -252,11 +257,7 @@ let
       mkdir -p $out/nix/var/nix/gcroots/auto
       rootName=$(${pkgs.nix}/bin/nix --extra-experimental-features nix-command hash file --type sha1 --base32 <(echo -n $globalFlakeRegistryPath))
       ln -s $globalFlakeRegistryPath $out/nix/var/nix/gcroots/auto/$rootName
-
-      mkdir -p $out/bin $out/usr/bin
-      ln -s ${pkgs.coreutils}/bin/env $out/usr/bin/env
-      ln -s ${pkgs.bashInteractive}/bin/bash $out/bin/sh
-    '';
+    '');
 
 in
 pkgs.dockerTools.buildLayeredImageWithNixDb {
