@@ -44,7 +44,7 @@ Most Nix commands interpret the following environment variables:
     The Nix search path can also be extended using the `-I` option to
     many Nix commands, which takes precedence over `NIX_PATH`.
 
-    If `NIX_PATH` is not set at all, Nix will fall back to the following list in impure and unrestricted evaluation mode:
+    If `NIX_PATH` is not set at all, Nix will fall back to the following list in [impure](./conf-file.md#conf-pure-eval) and [unrestricted](./conf-file.md#conf-restrict-eval) evaluation mode:
 
       1. `$HOME/.nix-defexpr/channels`
       2. `nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixpkgs`
