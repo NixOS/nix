@@ -34,11 +34,6 @@ namespace nix {
         Path basePath;
         PosTable::Origin origin;
         std::optional<ErrorInfo> error;
-        ParseData(EvalState & state, PosTable::Origin origin)
-            : state(state)
-            , symbols(state.symbols)
-            , origin(std::move(origin))
-            { };
     };
 
     struct ParserFormals {
@@ -95,7 +90,7 @@ static void dupAttr(const EvalState & state, Symbol attr, const PosIdx pos, cons
 }
 
 
-static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
+static void addAttr(ExprAttrs * attrs, AttrPath && attrPath,
     Expr * e, const PosIdx pos, const nix::EvalState & state)
 {
     AttrPath::iterator i;
@@ -193,7 +188,7 @@ static Formals * toFormals(ParseData & data, ParserFormals * formals,
 
 
 static Expr * stripIndentation(const PosIdx pos, SymbolTable & symbols,
-    std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> & es)
+    std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> && es)
 {
     if (es.empty()) return new ExprString("");
 
@@ -273,7 +268,7 @@ static Expr * stripIndentation(const PosIdx pos, SymbolTable & symbols,
                 s2 = std::string(s2, 0, p + 1);
         }
 
-        es2->emplace_back(i->first, new ExprString(s2));
+        es2->emplace_back(i->first, new ExprString(std::move(s2)));
     };
     for (; i != es.end(); ++i, --n) {
         std::visit(overloaded { trimExpr, trimString }, i->second);
@@ -405,21 +400,21 @@ expr_op
   | '-' expr_op %prec NEGATE { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__sub")), {new ExprInt(0), $2}); }
   | expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
   | expr_op NEQ expr_op { $$ = new ExprOpNEq($1, $3); }
-  | expr_op '<' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$1, $3}); }
-  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$3, $1})); }
-  | expr_op '>' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$3, $1}); }
-  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$1, $3})); }
-  | expr_op AND expr_op { $$ = new ExprOpAnd(CUR_POS, $1, $3); }
-  | expr_op OR expr_op { $$ = new ExprOpOr(CUR_POS, $1, $3); }
-  | expr_op IMPL expr_op { $$ = new ExprOpImpl(CUR_POS, $1, $3); }
-  | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(CUR_POS, $1, $3); }
-  | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, *$3); }
+  | expr_op '<' expr_op { $$ = new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__lessThan")), {$1, $3}); }
+  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__lessThan")), {$3, $1})); }
+  | expr_op '>' expr_op { $$ = new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__lessThan")), {$3, $1}); }
+  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__lessThan")), {$1, $3})); }
+  | expr_op AND expr_op { $$ = new ExprOpAnd(makeCurPos(@2, data), $1, $3); }
+  | expr_op OR expr_op { $$ = new ExprOpOr(makeCurPos(@2, data), $1, $3); }
+  | expr_op IMPL expr_op { $$ = new ExprOpImpl(makeCurPos(@2, data), $1, $3); }
+  | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(makeCurPos(@2, data), $1, $3); }
+  | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, std::move(*$3)); delete $3; }
   | expr_op '+' expr_op
-    { $$ = new ExprConcatStrings(CUR_POS, false, new std::vector<std::pair<PosIdx, Expr *>>({{makeCurPos(@1, data), $1}, {makeCurPos(@3, data), $3}})); }
-  | expr_op '-' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__sub")), {$1, $3}); }
-  | expr_op '*' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__mul")), {$1, $3}); }
-  | expr_op '/' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__div")), {$1, $3}); }
-  | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(CUR_POS, $1, $3); }
+    { $$ = new ExprConcatStrings(makeCurPos(@2, data), false, new std::vector<std::pair<PosIdx, Expr *> >({{makeCurPos(@1, data), $1}, {makeCurPos(@3, data), $3}})); }
+  | expr_op '-' expr_op { $$ = new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__sub")), {$1, $3}); }
+  | expr_op '*' expr_op { $$ = new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__mul")), {$1, $3}); }
+  | expr_op '/' expr_op { $$ = new ExprCall(makeCurPos(@2, data), new ExprVar(data->symbols.create("__div")), {$1, $3}); }
+  | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(makeCurPos(@2, data), $1, $3); }
   | expr_app
   ;
 
@@ -436,14 +431,14 @@ expr_app
 
 expr_select
   : expr_simple '.' attrpath
-    { $$ = new ExprSelect(CUR_POS, $1, *$3, 0); }
+    { $$ = new ExprSelect(CUR_POS, $1, std::move(*$3), nullptr); delete $3; }
   | expr_simple '.' attrpath OR_KW expr_select
-    { $$ = new ExprSelect(CUR_POS, $1, *$3, $5); }
+    { $$ = new ExprSelect(CUR_POS, $1, std::move(*$3), $5); delete $3; }
   | /* Backwards compatibility: because Nixpkgs has a rarely used
        function named ‘or’, allow stuff like ‘map or [...]’. */
     expr_simple OR_KW
     { $$ = new ExprCall(CUR_POS, $1, {new ExprVar(CUR_POS, data->symbols.create("or"))}); }
-  | expr_simple { $$ = $1; }
+  | expr_simple
   ;
 
 expr_simple
@@ -458,9 +453,10 @@ expr_simple
   | FLOAT { $$ = new ExprFloat($1); }
   | '"' string_parts '"' { $$ = $2; }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
-      $$ = stripIndentation(CUR_POS, data->symbols, *$2);
+      $$ = stripIndentation(CUR_POS, data->symbols, std::move(*$2));
+      delete $2;
   }
-  | path_start PATH_END { $$ = $1; }
+  | path_start PATH_END
   | path_start string_parts_interpolated PATH_END {
       $2->insert($2->begin(), {makeCurPos(@1, data), $1});
       $$ = new ExprConcatStrings(CUR_POS, false, $2);
@@ -470,7 +466,7 @@ expr_simple
       $$ = new ExprCall(CUR_POS,
           new ExprVar(data->symbols.create("__findFile")),
           {new ExprVar(data->symbols.create("__nixPath")),
-           new ExprString(path)});
+           new ExprString(std::move(path))});
   }
   | URI {
       static bool noURLLiterals = settings.isExperimentalFeatureEnabled(Xp::NoUrlLiterals);
@@ -538,7 +534,7 @@ ind_string_parts
   ;
 
 binds
-  : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, *$2, $4, makeCurPos(@2, data), data->state); }
+  : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, std::move(*$2), $4, makeCurPos(@2, data), data->state); delete $2; }
   | binds INHERIT attrs ';'
     { $$ = $1;
       for (auto & i : *$3) {
@@ -547,6 +543,7 @@ binds
           auto pos = makeCurPos(@3, data);
           $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, true));
       }
+      delete $3;
     }
   | binds INHERIT '(' expr ')' attrs ';'
     { $$ = $1;
@@ -556,6 +553,7 @@ binds
               dupAttr(data->state, i.symbol, makeCurPos(@6, data), $$->attrs[i.symbol].pos);
           $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), makeCurPos(@6, data)));
       }
+      delete $6;
     }
   | { $$ = new ExprAttrs(makeCurPos(@0, data)); }
   ;
@@ -601,7 +599,7 @@ attrpath
   ;
 
 attr
-  : ID { $$ = $1; }
+  : ID
   | OR_KW { $$ = {"or", 2}; }
   ;
 
@@ -617,9 +615,9 @@ expr_list
 
 formals
   : formal ',' formals
-    { $$ = $3; $$->formals.push_back(*$1); }
+    { $$ = $3; $$->formals.emplace_back(*$1); delete $1; }
   | formal
-    { $$ = new ParserFormals; $$->formals.push_back(*$1); $$->ellipsis = false; }
+    { $$ = new ParserFormals; $$->formals.emplace_back(*$1); $$->ellipsis = false; delete $1; }
   |
     { $$ = new ParserFormals; $$->ellipsis = false; }
   | ELLIPSIS
@@ -643,29 +641,26 @@ formal
 #include "filetransfer.hh"
 #include "fetchers.hh"
 #include "store-api.hh"
+#include "flake/flake.hh"
 
 
 namespace nix {
 
 
-Expr * EvalState::parse(char * text, size_t length, FileOrigin origin,
-    const PathView path, const PathView basePath, std::shared_ptr<StaticEnv> & staticEnv)
+Expr * EvalState::parse(
+    char * text,
+    size_t length,
+    Pos::Origin origin,
+    Path basePath,
+    std::shared_ptr<StaticEnv> & staticEnv)
 {
     yyscan_t scanner;
-    std::string file;
-    switch (origin) {
-        case foFile:
-            file = path;
-            break;
-        case foStdin:
-        case foString:
-            file = text;
-            break;
-        default:
-            assert(false);
-    }
-    ParseData data(*this, {file, origin});
-    data.basePath = basePath;
+    ParseData data {
+        .state = *this,
+        .symbols = symbols,
+        .basePath = std::move(basePath),
+        .origin = {origin},
+    };
 
     yylex_init(&scanner);
     yy_scan_buffer(text, length, scanner);
@@ -717,14 +712,15 @@ Expr * EvalState::parseExprFromFile(const Path & path, std::shared_ptr<StaticEnv
     auto buffer = readFile(path);
     // readFile should have left some extra space for terminators
     buffer.append("\0\0", 2);
-    return parse(buffer.data(), buffer.size(), foFile, path, dirOf(path), staticEnv);
+    return parse(buffer.data(), buffer.size(), path, dirOf(path), staticEnv);
 }
 
 
-Expr * EvalState::parseExprFromString(std::string s, const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv)
+Expr * EvalState::parseExprFromString(std::string s_, const Path & basePath, std::shared_ptr<StaticEnv> & staticEnv)
 {
-    s.append("\0\0", 2);
-    return parse(s.data(), s.size(), foString, "", basePath, staticEnv);
+    auto s = make_ref<std::string>(std::move(s_));
+    s->append("\0\0", 2);
+    return parse(s->data(), s->size(), Pos::String{.source = s}, basePath, staticEnv);
 }
 
 
@@ -736,11 +732,12 @@ Expr * EvalState::parseExprFromString(std::string s, const Path & basePath)
 
 Expr * EvalState::parseStdin()
 {
-    //Activity act(*logger, lvlTalkative, format("parsing standard input"));
+    //Activity act(*logger, lvlTalkative, "parsing standard input");
     auto buffer = drainFD(0);
     // drainFD should have left some extra space for terminators
     buffer.append("\0\0", 2);
-    return parse(buffer.data(), buffer.size(), foStdin, "", absPath("."), staticBaseEnv);
+    auto s = make_ref<std::string>(std::move(buffer));
+    return parse(s->data(), s->size(), Pos::Stdin{.source = s}, absPath("."), staticBaseEnv);
 }
 
 
@@ -788,13 +785,13 @@ Path EvalState::findFile(SearchPath & searchPath, const std::string_view path, c
     if (hasPrefix(path, "nix/"))
         return concatStrings(corepkgsPrefix, path.substr(4));
 
-    debugThrowLastTrace(ThrownError({
+    debugThrow(ThrownError({
         .msg = hintfmt(evalSettings.pureEval
             ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"
             : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)",
             path),
         .errPos = positions[pos]
-    }));
+    }), 0, 0);
 }
 
 
@@ -805,17 +802,28 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
 
     std::pair<bool, std::string> res;
 
-    if (isUri(elem.second)) {
+    if (EvalSettings::isPseudoUrl(elem.second)) {
         try {
-            res = { true, store->toRealPath(fetchers::downloadTarball(
-                        store, resolveUri(elem.second), "source", false).first.storePath) };
+            auto storePath = fetchers::downloadTarball(
+                store, EvalSettings::resolvePseudoUrl(elem.second), "source", false).first.storePath;
+            res = { true, store->toRealPath(storePath) };
         } catch (FileTransferError & e) {
             logWarning({
                 .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second)
             });
             res = { false, "" };
         }
-    } else {
+    }
+
+    else if (hasPrefix(elem.second, "flake:")) {
+        settings.requireExperimentalFeature(Xp::Flakes);
+        auto flakeRef = parseFlakeRef(elem.second.substr(6), {}, true, false);
+        debug("fetching flake search path element '%s''", elem.second);
+        auto storePath = flakeRef.resolve(store).fetchTree(store).first.storePath;
+        res = { true, store->toRealPath(storePath) };
+    }
+
+    else {
         auto path = absPath(elem.second);
         if (pathExists(path))
             res = { true, path };
@@ -827,7 +835,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
         }
     }
 
-    debug(format("resolved search path element '%s' to '%s'") % elem.second % res.second);
+    debug("resolved search path element '%s' to '%s'", elem.second, res.second);
 
     searchPathResolved[elem.second] = res;
     return res;

@@ -1,5 +1,5 @@
-if ! canUseSandbox; then exit 99; fi
-if ! [[ $busybox =~ busybox ]]; then exit 99; fi
+requireSandboxSupport
+[[ $busybox =~ busybox ]] || skipTest "no busybox"
 
 unset NIX_STORE_DIR
 unset NIX_STATE_DIR
@@ -7,7 +7,7 @@ unset NIX_STATE_DIR
 function join_by { local d=$1; shift; echo -n "$1"; shift; printf "%s" "${@/#/$d}"; }
 
 EXTRA_SYSTEM_FEATURES=()
-if [[ -n "$CONTENT_ADDRESSED" ]]; then
+if [[ -n "${CONTENT_ADDRESSED-}" ]]; then
     EXTRA_SYSTEM_FEATURES=("ca-derivations")
 fi
 
@@ -42,33 +42,31 @@ testPrintOutPath=$(nix build -L -v -f $file --no-link --print-out-paths --max-jo
 
 [[ $testPrintOutPath =~ store.*build-remote ]]
 
-set -o pipefail
-
 # Ensure that input1 was built on store1 due to the required feature.
-nix path-info --store $TEST_ROOT/machine1 --all \
-  | grep builder-build-remote-input-1.sh \
-  | grep -v builder-build-remote-input-2.sh \
-  | grep -v builder-build-remote-input-3.sh
+output=$(nix path-info --store $TEST_ROOT/machine1 --all)
+echo "$output" | grepQuiet builder-build-remote-input-1.sh
+echo "$output" | grepQuietInverse builder-build-remote-input-2.sh
+echo "$output" | grepQuietInverse builder-build-remote-input-3.sh
+unset output
 
 # Ensure that input2 was built on store2 due to the required feature.
-nix path-info --store $TEST_ROOT/machine2 --all \
-  | grep -v builder-build-remote-input-1.sh \
-  | grep builder-build-remote-input-2.sh \
-  | grep -v builder-build-remote-input-3.sh
+output=$(nix path-info --store $TEST_ROOT/machine2 --all)
+echo "$output" | grepQuietInverse builder-build-remote-input-1.sh
+echo "$output" | grepQuiet builder-build-remote-input-2.sh
+echo "$output" | grepQuietInverse builder-build-remote-input-3.sh
+unset output
 
 # Ensure that input3 was built on store3 due to the required feature.
-nix path-info --store $TEST_ROOT/machine3 --all \
-  | grep -v builder-build-remote-input-1.sh \
-  | grep -v builder-build-remote-input-2.sh \
-  | grep builder-build-remote-input-3.sh
+output=$(nix path-info --store $TEST_ROOT/machine3 --all)
+echo "$output" | grepQuietInverse builder-build-remote-input-1.sh
+echo "$output" | grepQuietInverse builder-build-remote-input-2.sh
+echo "$output" | grepQuiet builder-build-remote-input-3.sh
+unset output
 
 
-# Temporarily disabled because of https://github.com/NixOS/nix/issues/6209
-if [[ -z "$CONTENT_ADDRESSED" ]]; then
-  for i in input1 input3; do
-    nix log --store $TEST_ROOT/machine0 --file "$file" --arg busybox $busybox passthru."$i" | grep hi-$i
-  done
-fi
+for i in input1 input3; do
+nix log --store $TEST_ROOT/machine0 --file "$file" --arg busybox $busybox passthru."$i" | grep hi-$i
+done
 
 # Behavior of keep-failed
 out="$(nix-build 2>&1 failing.nix \

@@ -18,51 +18,56 @@ values such as packages or NixOS modules provided by the flake).
 Flake references (*flakerefs*) are a way to specify the location of a
 flake. These have two different forms:
 
-* An attribute set representation, e.g.
 
-  ```nix
-  {
-    type = "github";
-    owner = "NixOS";
-    repo = "nixpkgs";
-  }
-  ```
+## Attribute set representation
 
-  The only required attribute is `type`. The supported types are
-  listed below.
+Example:
 
-* A URL-like syntax, e.g.
+```nix
+{
+  type = "github";
+  owner = "NixOS";
+  repo = "nixpkgs";
+}
+```
 
-  ```
-  github:NixOS/nixpkgs
-  ```
+The only required attribute is `type`. The supported types are
+listed below.
 
-  These are used on the command line as a more convenient alternative
-  to the attribute set representation. For instance, in the command
+## URL-like syntax
 
-  ```console
-  # nix build github:NixOS/nixpkgs#hello
-  ```
+Example:
 
-  `github:NixOS/nixpkgs` is a flake reference (while `hello` is an
-  output attribute). They are also allowed in the `inputs` attribute
-  of a flake, e.g.
+```
+github:NixOS/nixpkgs
+```
 
-  ```nix
-  inputs.nixpkgs.url = github:NixOS/nixpkgs;
-  ```
+These are used on the command line as a more convenient alternative
+to the attribute set representation. For instance, in the command
 
-  is equivalent to
+```console
+# nix build github:NixOS/nixpkgs#hello
+```
 
-  ```nix
-  inputs.nixpkgs = {
-    type = "github";
-    owner = "NixOS";
-    repo = "nixpkgs";
-  };
-  ```
+`github:NixOS/nixpkgs` is a flake reference (while `hello` is an
+output attribute). They are also allowed in the `inputs` attribute
+of a flake, e.g.
 
-## Examples
+```nix
+inputs.nixpkgs.url = "github:NixOS/nixpkgs";
+```
+
+is equivalent to
+
+```nix
+inputs.nixpkgs = {
+  type = "github";
+  owner = "NixOS";
+  repo = "nixpkgs";
+};
+```
+
+### Examples
 
 Here are some examples of flake references in their URL-like representation:
 
@@ -270,14 +275,14 @@ Currently the `type` attribute can be one of the following:
 # Flake format
 
 As an example, here is a simple `flake.nix` that depends on the
-Nixpkgs flake and provides a single package (i.e. an installable
-derivation):
+Nixpkgs flake and provides a single package (i.e. an
+[installable](./nix.md#installables) derivation):
 
 ```nix
 {
   description = "A flake for building Hello World";
 
-  inputs.nixpkgs.url = github:NixOS/nixpkgs/nixos-20.03;
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-20.03";
 
   outputs = { self, nixpkgs }: {
 
@@ -369,7 +374,7 @@ inputs.nixpkgs = {
 Alternatively, you can use the URL-like syntax:
 
 ```nix
-inputs.import-cargo.url = github:edolstra/import-cargo;
+inputs.import-cargo.url = "github:edolstra/import-cargo";
 inputs.nixpkgs.url = "nixpkgs";
 ```
 

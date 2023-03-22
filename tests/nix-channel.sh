@@ -6,11 +6,24 @@ rm -f $TEST_HOME/.nix-channels $TEST_HOME/.nix-profile
 
 # Test add/list/remove.
 nix-channel --add http://foo/bar xyzzy
-nix-channel --list | grep -q http://foo/bar
+nix-channel --list | grepQuiet http://foo/bar
 nix-channel --remove xyzzy
 
 [ -e $TEST_HOME/.nix-channels ]
 [ "$(cat $TEST_HOME/.nix-channels)" = '' ]
+
+# Test the XDG Base Directories support
+
+export NIX_CONFIG="use-xdg-base-directories = true"
+
+nix-channel --add http://foo/bar xyzzy
+nix-channel --list | grepQuiet http://foo/bar
+nix-channel --remove xyzzy
+
+unset NIX_CONFIG
+
+[ -e $TEST_HOME/.local/state/nix/channels ]
+[ "$(cat $TEST_HOME/.local/state/nix/channels)" = '' ]
 
 # Create a channel.
 rm -rf $TEST_ROOT/foo
@@ -28,8 +41,8 @@ nix-channel --update
 
 # Do a query.
 nix-env -qa \* --meta --xml --out-path > $TEST_ROOT/meta.xml
-grep -q 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
-grep -q 'item.*attrPath="foo".*name="dependencies-top"' $TEST_ROOT/meta.xml
+grepQuiet 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
+grepQuiet 'item.*attrPath="foo".*name="dependencies-top"' $TEST_ROOT/meta.xml
 
 # Do an install.
 nix-env -i dependencies-top
@@ -41,9 +54,9 @@ nix-channel --update
 
 # Do a query.
 nix-env -qa \* --meta --xml --out-path > $TEST_ROOT/meta.xml
-grep -q 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
-grep -q 'item.*attrPath="bar".*name="dependencies-top"' $TEST_ROOT/meta.xml
-grep -q 'item.*attrPath="foo".*name="dependencies-top"' $TEST_ROOT/meta.xml
+grepQuiet 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
+grepQuiet 'item.*attrPath="bar".*name="dependencies-top"' $TEST_ROOT/meta.xml
+grepQuiet 'item.*attrPath="foo".*name="dependencies-top"' $TEST_ROOT/meta.xml
 
 # Do an install.
 nix-env -i dependencies-top

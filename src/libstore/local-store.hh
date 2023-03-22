@@ -59,15 +59,6 @@ private:
         struct Stmts;
         std::unique_ptr<Stmts> stmts;
 
-        /* The global GC lock  */
-        AutoCloseFD fdGCLock;
-
-        /* The file to which we write our temporary roots. */
-        AutoCloseFD fdTempRoots;
-
-        /* Connection to the garbage collector. */
-        AutoCloseFD fdRootsSocket;
-
         /* The last time we checked whether to do an auto-GC, or an
            auto-GC finished. */
         std::chrono::time_point<std::chrono::steady_clock> lastGCCheck;
@@ -155,6 +146,21 @@ public:
         RepairFlag repair) override;
 
     void addTempRoot(const StorePath & path) override;
+
+private:
+
+    void createTempRootsFile();
+
+    /* The file to which we write our temporary roots. */
+    Sync<AutoCloseFD> _fdTempRoots;
+
+    /* The global GC lock. */
+    Sync<AutoCloseFD> _fdGCLock;
+
+    /* Connection to the garbage collector. */
+    Sync<AutoCloseFD> _fdRootsSocket;
+
+public:
 
     void addIndirectRoot(const Path & path) override;
 
@@ -256,7 +262,7 @@ private:
 
     void findRuntimeRoots(Roots & roots, bool censor);
 
-    Path createTempDirInStore();
+    std::pair<Path, AutoCloseFD> createTempDirInStore();
 
     void checkDerivationOutputs(const StorePath & drvPath, const Derivation & drv);
 
@@ -274,8 +280,6 @@ private:
        specified by the ‘secret-key-files’ option. */
     void signPathInfo(ValidPathInfo & info);
     void signRealisation(Realisation &);
-
-    void createUser(const std::string & userName, uid_t userId) override;
 
     // XXX: Make a generic `Store` method
     FixedOutputHash hashCAPath(
@@ -310,9 +314,18 @@ typedef std::set<Inode> InodesSeen;
    - the permissions are set of 444 or 555 (i.e., read-only with or
      without execute permission; setuid bits etc. are cleared)
    - the owner and group are set to the Nix user and group, if we're
-     running as root. */
-void canonicalisePathMetaData(const Path & path, uid_t fromUid, InodesSeen & inodesSeen);
-void canonicalisePathMetaData(const Path & path, uid_t fromUid);
+     running as root.
+   If uidRange is not empty, this function will throw an error if it
+   encounters files owned by a user outside of the closed interval
+   [uidRange->first, uidRange->second].
+*/
+void canonicalisePathMetaData(
+    const Path & path,
+    std::optional<std::pair<uid_t, uid_t>> uidRange,
+    InodesSeen & inodesSeen);
+void canonicalisePathMetaData(
+    const Path & path,
+    std::optional<std::pair<uid_t, uid_t>> uidRange);
 
 void canonicaliseTimestampAndPermissions(const Path & path);
 

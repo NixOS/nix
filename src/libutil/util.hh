@@ -39,6 +39,10 @@ extern const std::string nativeSystem;
 /* Return an environment variable. */
 std::optional<std::string> getEnv(const std::string & key);
 
+/* Return a non empty environment variable. Returns nullopt if the env
+variable is set to "" */
+std::optional<std::string> getEnvNonEmpty(const std::string & key);
+
 /* Get the entire environment. */
 std::map<std::string, std::string> getEnv();
 
@@ -115,9 +119,12 @@ std::string readFile(const Path & path);
 void readFile(const Path & path, Sink & sink);
 
 /* Write a string to a file. */
-void writeFile(const Path & path, std::string_view s, mode_t mode = 0666);
+void writeFile(const Path & path, std::string_view s, mode_t mode = 0666, bool sync = false);
 
-void writeFile(const Path & path, Source & source, mode_t mode = 0666);
+void writeFile(const Path & path, Source & source, mode_t mode = 0666, bool sync = false);
+
+/* Flush a file's parent directory to disk */
+void syncParent(const Path & path);
 
 /* Read a line from a file descriptor. */
 std::string readLine(int fd);
@@ -133,6 +140,9 @@ void deletePath(const Path & path);
 void deletePath(const Path & path, uint64_t & bytesFreed);
 
 std::string getUserName();
+
+/* Return the given user's home directory from /etc/passwd. */
+Path getHomeOf(uid_t userId);
 
 /* Return $HOME or the user's home directory from /etc/passwd. */
 Path getHome();
@@ -151,6 +161,12 @@ Path getDataDir();
 
 /* Return the path of the current executable. */
 std::optional<Path> getSelfExe();
+
+/* Return $XDG_STATE_HOME or $HOME/.local/state. */
+Path getStateDir();
+
+/* Create the Nix state directory and return the path to it. */
+Path createNixStateDir();
 
 /* Create a directory and all its parents, if necessary.  Returns the
    list of created directories, in order of creation. */
@@ -231,6 +247,7 @@ public:
     explicit operator bool() const;
     int release();
     void close();
+    void fsync();
 };
 
 
@@ -294,6 +311,7 @@ struct ProcessOptions
     bool dieWithParent = true;
     bool runExitHandlers = false;
     bool allowVfork = false;
+    int cloneFlags = 0; // use clone() with the specified flags (Linux only)
 };
 
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
@@ -506,6 +524,18 @@ std::optional<N> string2Float(const std::string_view s)
 }
 
 
+/* Convert a little-endian integer to host order. */
+template<typename T>
+T readLittleEndian(unsigned char * p)
+{
+    T x = 0;
+    for (size_t i = 0; i < sizeof(x); ++i, ++p) {
+        x |= ((T) *p) << (i * 8);
+    }
+    return x;
+}
+
+
 /* Return true iff `s' starts with `prefix'. */
 bool hasPrefix(std::string_view s, std::string_view prefix);
 
@@ -524,7 +554,7 @@ std::string shellEscape(const std::string_view s);
 
 /* Exception handling in destructors: print an error message, then
    ignore the exception. */
-void ignoreException();
+void ignoreException(Verbosity lvl = lvlError);
 
 
 
@@ -543,7 +573,7 @@ bool shouldANSI();
    some escape sequences (such as colour setting) are copied but not
    included in the character count. Also, tabs are expanded to
    spaces. */
-std::string filterANSIEscapes(const std::string & s,
+std::string filterANSIEscapes(std::string_view s,
     bool filterAll = false,
     unsigned int width = std::numeric_limits<unsigned int>::max());
 
@@ -557,6 +587,12 @@ std::string base64Decode(std::string_view s);
    's'. For example, if every line is indented by at least 3 spaces,
    then we remove 3 spaces from the start of every line. */
 std::string stripIndentation(std::string_view s);
+
+
+/* Get the prefix of 's' up to and excluding the next line break (LF
+   optionally preceded by CR), and the remainder following the line
+   break. */
+std::pair<std::string_view, std::string_view> getLine(std::string_view s);
 
 
 /* Get a value for the specified key from an associate container. */
@@ -668,7 +704,7 @@ typedef std::function<bool(const Path & path)> PathFilter;
 extern PathFilter defaultPathFilter;
 
 /* Common initialisation performed in child processes. */
-void commonChildInit(Pipe & logPipe);
+void commonChildInit();
 
 /* Create a Unix domain socket. */
 AutoCloseFD createUnixDomainSocket();
@@ -731,6 +767,15 @@ inline std::string operator + (std::string && s, std::string_view s2)
 {
     s.append(s2);
     return std::move(s);
+}
+
+inline std::string operator + (std::string_view s1, const char * s2)
+{
+    std::string s;
+    s.reserve(s1.size() + strlen(s2));
+    s.append(s1);
+    s.append(s2);
+    return s;
 }
 
 }

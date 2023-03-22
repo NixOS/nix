@@ -67,12 +67,12 @@ struct TunnelLogger : public Logger
             state->pendingMsgs.push_back(s);
     }
 
-    void log(Verbosity lvl, const FormatOrString & fs) override
+    void log(Verbosity lvl, std::string_view s) override
     {
         if (lvl > verbosity) return;
 
         StringSink buf;
-        buf << STDERR_NEXT << (fs.s + "\n");
+        buf << STDERR_NEXT << (s + "\n");
         enqueueMsg(buf.s);
     }
 
@@ -222,7 +222,8 @@ struct ClientSettings
                     else if (!hasSuffix(s, "/") && trusted.count(s + "/"))
                         subs.push_back(s + "/");
                     else
-                        warn("ignoring untrusted substituter '%s'", s);
+                        warn("ignoring untrusted substituter '%s', you are not a trusted user.\n"
+                             "Run `man nix.conf` for more information on the `substituters` configuration option.", s);
                 res = subs;
                 return true;
             };
@@ -235,10 +236,15 @@ struct ClientSettings
                     // the daemon, as that could cause some pretty weird stuff
                     if (parseFeatures(tokenizeString<StringSet>(value)) != settings.experimentalFeatures.get())
                         debug("Ignoring the client-specified experimental features");
+                } else if (name == settings.pluginFiles.name) {
+                    if (tokenizeString<Paths>(value) != settings.pluginFiles.get())
+                        warn("Ignoring the client-specified plugin-files.\n"
+                             "The client specifying plugins to the daemon never made sense, and was removed in Nix >=2.14.");
                 }
                 else if (trusted
                     || name == settings.buildTimeout.name
-                    || name == settings.buildRepeat.name
+                    || name == settings.maxSilentTime.name
+                    || name == settings.pollInterval.name
                     || name == "connect-timeout"
                     || (name == "builders" && value == ""))
                     settings.set(name, value);
@@ -523,7 +529,14 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             mode = (BuildMode) readInt(from);
 
             /* Repairing is not atomic, so disallowed for "untrusted"
-               clients.  */
+               clients.
+
+               FIXME: layer violation in this message: the daemon code (i.e.
+               this file) knows whether a client/connection is trusted, but it
+               does not how how the client was authenticated. The mechanism
+               need not be getting the UID of the other end of a Unix Domain
+               Socket.
+              */
             if (mode == bmRepair && !trusted)
                 throw Error("repairing is not allowed because you are not in 'trusted-users'");
         }
@@ -540,7 +553,9 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         mode = (BuildMode) readInt(from);
 
         /* Repairing is not atomic, so disallowed for "untrusted"
-           clients.  */
+           clients.
+
+           FIXME: layer violation; see above. */
         if (mode == bmRepair && !trusted)
             throw Error("repairing is not allowed because you are not in 'trusted-users'");
 
@@ -979,8 +994,7 @@ void processConnection(
     FdSource & from,
     FdSink & to,
     TrustedFlag trusted,
-    RecursiveFlag recursive,
-    std::function<void(Store &)> authHook)
+    RecursiveFlag recursive)
 {
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
 
@@ -1022,10 +1036,6 @@ void processConnection(
     tunnelLogger->startWork();
 
     try {
-
-        /* If we can't accept clientVersion, then throw an error
-           *here* (not above). */
-        authHook(*store);
 
         tunnelLogger->stopWork();
         to.flush();

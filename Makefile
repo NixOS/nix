@@ -2,13 +2,10 @@ makefiles = \
   mk/precompiled-headers.mk \
   local.mk \
   src/libutil/local.mk \
-  src/libutil/tests/local.mk \
   src/libstore/local.mk \
-  src/libstore/tests/local.mk \
   src/libfetchers/local.mk \
   src/libmain/local.mk \
   src/libexpr/local.mk \
-  src/libexpr/tests/local.mk \
   src/libcmd/local.mk \
   src/nix/local.mk \
   src/resolve-system-dependencies/local.mk \
@@ -20,10 +17,21 @@ makefiles = \
   misc/launchd/local.mk \
   misc/upstart/local.mk \
   doc/manual/local.mk \
-  tests/local.mk \
-  tests/plugins/local.mk
+  doc/internal-api/local.mk
 
 -include Makefile.config
+
+ifeq ($(tests), yes)
+makefiles += \
+  src/libutil/tests/local.mk \
+  src/libstore/tests/local.mk \
+  src/libexpr/tests/local.mk \
+  tests/local.mk \
+  tests/plugins/local.mk
+else
+makefiles += \
+  mk/disable-tests.mk
+endif
 
 OPTIMIZE = 1
 
@@ -36,4 +44,4 @@ endif
 
 include mk/lib.mk
 
-GLOBAL_CXXFLAGS += -g -Wall -include config.h -std=c++17 -I src
+GLOBAL_CXXFLAGS += -g -Wall -include config.h -std=c++2a -I src

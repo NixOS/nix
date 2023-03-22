@@ -25,7 +25,7 @@ struct CmdDescribeStores : Command, MixJSON
             res[storeName] = storeConfig->toJSON();
         }
         if (json) {
-            std::cout << res;
+            logger->cout("%s", res);
         } else {
             for (auto & [storeName, storeConfig] : res.items()) {
                 std::cout << "## " << storeName << std::endl << std::endl;

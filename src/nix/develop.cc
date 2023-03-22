@@ -1,9 +1,10 @@
 #include "eval.hh"
 #include "command.hh"
+#include "installable-flake.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "path-with-outputs.hh"
+#include "outputs-spec.hh"
 #include "derivations.hh"
 #include "progress-bar.hh"
 #include "run.hh"
@@ -164,6 +165,14 @@ struct BuildEnvironment
     {
         return vars == other.vars && bashFunctions == other.bashFunctions;
     }
+
+    std::string getSystem() const
+    {
+        if (auto v = get(vars, "system"))
+            return getString(*v);
+        else
+            return settings.thisSystem;
+    }
 };
 
 const static std::string getEnvSh =
@@ -192,10 +201,12 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     drv.env.erase("allowedRequisites");
     drv.env.erase("disallowedReferences");
     drv.env.erase("disallowedRequisites");
+    drv.env.erase("name");
 
     /* Rehash and write the derivation. FIXME: would be nice to use
        'buildDerivation', but that's privileged. */
     drv.name += "-env";
+    drv.env.emplace("name", drv.name);
     drv.inputSrcs.insert(std::move(getEnvShPath));
     if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
         for (auto & output : drv.outputs) {
@@ -222,7 +233,12 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     auto shellDrvPath = writeDerivation(*evalStore, drv);
 
     /* Build the derivation. */
-    store->buildPaths({DerivedPath::Built{shellDrvPath}}, bmNormal, evalStore);
+    store->buildPaths(
+        { DerivedPath::Built {
+            .drvPath = shellDrvPath,
+            .outputs = OutputsSpec::All { },
+        }},
+        bmNormal, evalStore);
 
     for (auto & [_0, optPath] : evalStore->queryPartialDerivationOutputMap(shellDrvPath)) {
         assert(optPath);
@@ -246,6 +262,7 @@ struct Common : InstallableCommand, MixProfile
         "NIX_LOG_FD",
         "NIX_REMOTE",
         "PPID",
+        "SHELL",
         "SHELLOPTS",
         "SSL_CERT_FILE", // FIXME: only want to ignore /no-cert-file.crt
         "TEMP",
@@ -296,7 +313,7 @@ struct Common : InstallableCommand, MixProfile
         buildEnvironment.toBash(out, ignoreVars);
 
         for (auto & var : savedVars)
-            out << fmt("%s=\"$%s:$nix_saved_%s\"\n", var, var, var);
+            out << fmt("%s=\"$%s${nix_saved_%s:+:$nix_saved_%s}\"\n", var, var, var, var);
 
         out << "export NIX_BUILD_TOP=\"$(mktemp -d -t nix-shell.XXXXXX)\"\n";
         for (auto & i : {"TMP", "TMPDIR", "TEMP", "TEMPDIR"})
@@ -357,7 +374,7 @@ struct Common : InstallableCommand, MixProfile
         return res;
     }
 
-    StorePath getShellOutPath(ref<Store> store)
+    StorePath getShellOutPath(ref<Store> store, ref<Installable> installable)
     {
         auto path = installable->getStorePath();
         if (path && hasSuffix(path->to_string(), "-env"))
@@ -375,9 +392,10 @@ struct Common : InstallableCommand, MixProfile
         }
     }
 
-    std::pair<BuildEnvironment, std::string> getBuildEnvironment(ref<Store> store)
+    std::pair<BuildEnvironment, std::string>
+    getBuildEnvironment(ref<Store> store, ref<Installable> installable)
     {
-        auto shellOutPath = getShellOutPath(store);
+        auto shellOutPath = getShellOutPath(store, installable);
 
         auto strPath = store->printStorePath(shellOutPath);
 
@@ -463,9 +481,9 @@ struct CmdDevelop : Common, MixEnvironment
           ;
     }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<Installable> installable) override
     {
-        auto [buildEnvironment, gcroot] = getBuildEnvironment(store);
+        auto [buildEnvironment, gcroot] = getBuildEnvironment(store, installable);
 
         auto [rcFileFd, rcFilePath] = createTempFile("nix-shell");
 
@@ -520,7 +538,7 @@ struct CmdDevelop : Common, MixEnvironment
             nixpkgsLockFlags.inputOverrides = {};
             nixpkgsLockFlags.inputUpdates = {};
 
-            auto bashInstallable = std::make_shared<InstallableFlake>(
+            auto bashInstallable = make_ref<InstallableFlake>(
                 this,
                 state,
                 installable->nixpkgsFlakeRef(),
@@ -556,7 +574,7 @@ struct CmdDevelop : Common, MixEnvironment
         // Need to chdir since phases assume in flake directory
         if (phase) {
             // chdir if installable is a flake of type git+file or path
-            auto installableFlake = std::dynamic_pointer_cast<InstallableFlake>(installable);
+            auto installableFlake = installable.dynamic_pointer_cast<InstallableFlake>();
             if (installableFlake) {
                 auto sourcePath = installableFlake->getLockedFlake()->flake.resolvedRef.input.getSourcePath();
                 if (sourcePath) {
@@ -567,7 +585,7 @@ struct CmdDevelop : Common, MixEnvironment
             }
         }
 
-        runProgramInStore(store, shell, args);
+        runProgramInStore(store, shell, args, buildEnvironment.getSystem());
     }
 };
 
@@ -587,9 +605,9 @@ struct CmdPrintDevEnv : Common, MixJSON
 
     Category category() override { return catUtility; }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<Installable> installable) override
     {
-        auto buildEnvironment = getBuildEnvironment(store).first;
+        auto buildEnvironment = getBuildEnvironment(store, installable).first;
 
         stopProgressBar();
 

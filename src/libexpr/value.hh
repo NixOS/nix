@@ -3,10 +3,12 @@
 #include <cassert>
 
 #include "symbol-table.hh"
+#include "value/context.hh"
 
 #if HAVE_BOEHMGC
 #include <gc/gc_allocator.h>
 #endif
+#include <nlohmann/json_fwd.hpp>
 
 namespace nix {
 
@@ -62,13 +64,10 @@ class StorePath;
 class Store;
 class EvalState;
 class XMLWriter;
-class JSONPlaceholder;
 
 
 typedef int64_t NixInt;
 typedef double NixFloat;
-typedef std::pair<StorePath, std::string> NixStringContextElem;
-typedef std::vector<NixStringContextElem> NixStringContext;
 
 /* External values must descend from ExternalValueBase, so that
  * type-agnostic nix functions (e.g. showType) can be implemented
@@ -98,8 +97,8 @@ class ExternalValueBase
     virtual bool operator ==(const ExternalValueBase & b) const;
 
     /* Print the value as JSON. Defaults to unconvertable, i.e. throws an error */
-    virtual void printValueAsJSON(EvalState & state, bool strict,
-        JSONPlaceholder & out, PathSet & context) const;
+    virtual nlohmann::json printValueAsJSON(EvalState & state, bool strict,
+        PathSet & context, bool copyToStore = true) const;
 
     /* Print the value as XML. Defaults to unevaluated */
     virtual void printValueAsXML(EvalState & state, bool strict, bool location,

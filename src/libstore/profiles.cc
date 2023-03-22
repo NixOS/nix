@@ -64,7 +64,7 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path pro
 static void makeName(const Path & profile, GenerationNumber num,
     Path & outLink)
 {
-    Path prefix = (format("%1%-%2%") % profile % num).str();
+    Path prefix = fmt("%1%-%2%", profile, num);
     outLink = prefix + "-link";
 }
 
@@ -269,7 +269,7 @@ void switchGeneration(
 
 void lockProfile(PathLocks & lock, const Path & profile)
 {
-    lock.lockPaths({profile}, (format("waiting for lock on profile '%1%'") % profile).str());
+    lock.lockPaths({profile}, fmt("waiting for lock on profile '%1%'", profile));
     lock.setDeletion(true);
 }
 
@@ -280,16 +280,24 @@ std::string optimisticLockProfile(const Path & profile)
 }
 
 
+Path profilesDir()
+{
+    auto profileRoot = createNixStateDir() + "/profiles";
+    createDirs(profileRoot);
+    return profileRoot;
+}
+
+
 Path getDefaultProfile()
 {
-    Path profileLink = getHome() + "/.nix-profile";
+    Path profileLink = settings.useXDGBaseDirectories ? createNixStateDir() + "/profile" : getHome() + "/.nix-profile";
     try {
+        auto profile =
+            getuid() == 0
+            ? settings.nixStateDir + "/profiles/default"
+            : profilesDir() + "/profile";
         if (!pathExists(profileLink)) {
-            replaceSymlink(
-                getuid() == 0
-                ? settings.nixStateDir + "/profiles/default"
-                : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName()),
-                profileLink);
+            replaceSymlink(profile, profileLink);
         }
         return absPath(readLink(profileLink), dirOf(profileLink));
     } catch (Error &) {

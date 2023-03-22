@@ -4,6 +4,7 @@
 #include "derivations.hh"
 #include "nixexpr.hh"
 #include "profiles.hh"
+#include "repl.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -88,7 +89,8 @@ EvalCommand::EvalCommand()
 {
     addFlag({
         .longName = "debugger",
-        .description = "start an interactive environment if evaluation fails",
+        .description = "Start an interactive environment if evaluation fails.",
+        .category = MixEvalArgs::category,
         .handler = {&startReplOnEvalErrors, true},
     });
 }
@@ -120,10 +122,20 @@ ref<EvalState> EvalCommand::getEvalState()
             ;
 
         if (startReplOnEvalErrors) {
-            evalState->debugRepl = &runRepl;
+            evalState->debugRepl = &AbstractNixRepl::runSimple;
         };
     }
     return ref<EvalState>(evalState);
+}
+
+MixOperateOnOptions::MixOperateOnOptions()
+{
+    addFlag({
+        .longName = "derivation",
+        .description = "Operate on the [store derivation](../../glossary.md#gloss-store-derivation) rather than its outputs.",
+        .category = installablesCategory,
+        .handler = {&operateOn, OperateOn::Derivation},
+    });
 }
 
 BuiltPathsCommand::BuiltPathsCommand(bool recursive)
@@ -153,7 +165,7 @@ BuiltPathsCommand::BuiltPathsCommand(bool recursive)
     });
 }
 
-void BuiltPathsCommand::run(ref<Store> store)
+void BuiltPathsCommand::run(ref<Store> store, Installables && installables)
 {
     BuiltPaths paths;
     if (all) {
@@ -199,7 +211,7 @@ void StorePathsCommand::run(ref<Store> store, BuiltPaths && paths)
     run(store, std::move(sorted));
 }
 
-void StorePathCommand::run(ref<Store> store, std::vector<StorePath> && storePaths)
+void StorePathCommand::run(ref<Store> store, StorePaths && storePaths)
 {
     if (storePaths.size() != 1)
         throw UsageError("this command requires exactly one store path");
@@ -207,25 +219,11 @@ void StorePathCommand::run(ref<Store> store, std::vector<StorePath> && storePath
     run(store, *storePaths.begin());
 }
 
-Strings editorFor(const Path & file, uint32_t line)
-{
-    auto editor = getEnv("EDITOR").value_or("cat");
-    auto args = tokenizeString<Strings>(editor);
-    if (line > 0 && (
-        editor.find("emacs") != std::string::npos ||
-        editor.find("nano") != std::string::npos ||
-        editor.find("vim") != std::string::npos ||
-        editor.find("kak") != std::string::npos))
-        args.push_back(fmt("+%d", line));
-    args.push_back(file);
-    return args;
-}
-
 MixProfile::MixProfile()
 {
     addFlag({
         .longName = "profile",
-        .description = "The profile to update.",
+        .description = "The profile to operate on.",
         .labels = {"path"},
         .handler = {&profile},
         .completer = completePath
@@ -248,7 +246,7 @@ void MixProfile::updateProfile(const BuiltPaths & buildables)
 {
     if (!profile) return;
 
-    std::vector<StorePath> result;
+    StorePaths result;
 
     for (auto & buildable : buildables) {
         std::visit(overloaded {

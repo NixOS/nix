@@ -49,12 +49,9 @@ public:
         return *uriSchemes().begin() + "://" + host;
     }
 
-    bool sameMachine() override
-    { return false; }
-
     // FIXME extend daemon protocol, move implementation to RemoteStore
-    std::optional<std::string> getBuildLog(const StorePath & path) override
-    { unsupported("getBuildLog"); }
+    std::optional<std::string> getBuildLogExact(const StorePath & path) override
+    { unsupported("getBuildLogExact"); }
 
 private:
 

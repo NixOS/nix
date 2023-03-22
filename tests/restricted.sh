@@ -3,7 +3,7 @@ source common.sh
 clearStore
 
 nix-instantiate --restrict-eval --eval -E '1 + 2'
-(! nix-instantiate --restrict-eval ./restricted.nix)
+(! nix-instantiate --eval --restrict-eval ./restricted.nix)
 (! nix-instantiate --eval --restrict-eval <(echo '1 + 2'))
 nix-instantiate --restrict-eval ./simple.nix -I src=.
 nix-instantiate --restrict-eval ./simple.nix -I src1=simple.nix -I src2=config.nix -I src3=./simple.builder.sh
@@ -48,4 +48,4 @@ output="$(nix eval --raw --restrict-eval -I "$traverseDir" \
     --expr "builtins.readFile \"$traverseDir/$goUp$(pwd)/restricted-innocent\"" \
     2>&1 || :)"
 echo "$output" | grep "is forbidden"
-! echo "$output" | grep -F restricted-secret
+echo "$output" | grepInverse -F restricted-secret

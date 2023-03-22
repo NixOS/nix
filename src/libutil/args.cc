@@ -29,7 +29,15 @@ void Args::removeFlag(const std::string & longName)
 
 void Completions::add(std::string completion, std::string description)
 {
-    assert(description.find('\n') == std::string::npos);
+    description = trim(description);
+    // ellipsize overflowing content on the back of the description
+    auto end_index = description.find_first_of(".\n");
+    if (end_index != std::string::npos) {
+        auto needs_ellipsis = end_index != description.size() - 1;
+        description.resize(end_index);
+        if (needs_ellipsis)
+            description.append(" [...]");
+    }
     insert(Completion {
         .completion = completion,
         .description = description
@@ -216,7 +224,7 @@ nlohmann::json Args::toJSON()
         if (flag->shortName)
             j["shortName"] = std::string(1, flag->shortName);
         if (flag->description != "")
-            j["description"] = flag->description;
+            j["description"] = trim(flag->description);
         j["category"] = flag->category;
         if (flag->handler.arity != ArityAny)
             j["arity"] = flag->handler.arity;
@@ -237,7 +245,7 @@ nlohmann::json Args::toJSON()
     }
 
     auto res = nlohmann::json::object();
-    res["description"] = description();
+    res["description"] = trim(description());
     res["flags"] = std::move(flags);
     res["args"] = std::move(args);
     auto s = doc();
@@ -324,7 +332,7 @@ MultiCommand::MultiCommand(const Commands & commands_)
     expectArgs({
         .label = "subcommand",
         .optional = true,
-        .handler = {[=](std::string s) {
+        .handler = {[=,this](std::string s) {
             assert(!command);
             auto i = commands.find(s);
             if (i == commands.end()) {
@@ -379,7 +387,7 @@ nlohmann::json MultiCommand::toJSON()
         auto j = command->toJSON();
         auto cat = nlohmann::json::object();
         cat["id"] = command->category();
-        cat["description"] = categories[command->category()];
+        cat["description"] = trim(categories[command->category()]);
         j["category"] = std::move(cat);
         cmds[name] = std::move(j);
     }

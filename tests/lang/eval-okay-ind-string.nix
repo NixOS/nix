@@ -110,7 +110,7 @@ let
     And finally to interpret \n etc. as in a string: ''\n, ''\r, ''\t.
   '';
 
-  # Regression test: antiquotation in '${x}' should work, but didn't.
+  # Regression test: string interpolation in '${x}' should work, but didn't.
   s15 = let x = "bla"; in ''
     foo
     '${x}'

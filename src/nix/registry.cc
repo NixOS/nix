@@ -183,14 +183,12 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
 
     void run(nix::ref<nix::Store> store) override
     {
-        if (locked.empty()) {
-            locked = url;
-        }
+        if (locked.empty()) locked = url;
         auto registry = getRegistry();
         auto ref = parseFlakeRef(url);
-        auto locked_ref = parseFlakeRef(locked);
+        auto lockedRef = parseFlakeRef(locked);
         registry->remove(ref.input);
-        auto [tree, resolved] = locked_ref.resolve(store).input.fetch(store);
+        auto [tree, resolved] = lockedRef.resolve(store).input.fetch(store);
         fetchers::Attrs extraAttrs;
         if (ref.subdir != "") extraAttrs["dir"] = ref.subdir;
         registry->add(ref.input, resolved, extraAttrs);
@@ -229,7 +227,6 @@ struct CmdRegistry : virtual NixMultiCommand
         settings.requireExperimentalFeature(Xp::Flakes);
         if (!command)
             throw UsageError("'nix registry' requires a sub-command.");
-        command->second->prepare();
         command->second->run();
     }
 };

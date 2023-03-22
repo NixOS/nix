@@ -8,6 +8,7 @@
 #include <map>
 #include <thread>
 #include <iostream>
+#include <chrono>
 
 namespace nix {
 
@@ -48,6 +49,7 @@ private:
         bool visible = true;
         ActivityId parent;
         std::optional<std::string> name;
+        std::chrono::time_point<std::chrono::steady_clock> startTime;
     };
 
     struct ActivitiesByType
@@ -79,22 +81,22 @@ private:
 
     std::condition_variable quitCV, updateCV;
 
-    bool printBuildLogs;
+    bool printBuildLogs = false;
     bool isTTY;
 
 public:
 
-    ProgressBar(bool printBuildLogs, bool isTTY)
-        : printBuildLogs(printBuildLogs)
-        , isTTY(isTTY)
+    ProgressBar(bool isTTY)
+        : isTTY(isTTY)
     {
         state_.lock()->active = isTTY;
         updateThread = std::thread([&]() {
             auto state(state_.lock());
+            auto nextWakeup = std::chrono::milliseconds::max();
             while (state->active) {
                 if (!state->haveUpdate)
-                    state.wait(updateCV);
-                draw(*state);
+                    state.wait_for(updateCV, nextWakeup);
+                nextWakeup = draw(*state);
                 state.wait_for(quitCV, std::chrono::milliseconds(50));
             }
         });
@@ -118,18 +120,19 @@ public:
         updateThread.join();
     }
 
-    bool isVerbose() override {
+    bool isVerbose() override
+    {
         return printBuildLogs;
     }
 
-    void log(Verbosity lvl, const FormatOrString & fs) override
+    void log(Verbosity lvl, std::string_view s) override
     {
         if (lvl > verbosity) return;
         auto state(state_.lock());
-        log(*state, lvl, fs.s);
+        log(*state, lvl, s);
     }
 
-    void logEI(const ErrorInfo &ei) override
+    void logEI(const ErrorInfo & ei) override
     {
         auto state(state_.lock());
 
@@ -139,7 +142,7 @@ public:
         log(*state, ei.level, oss.str());
     }
 
-    void log(State & state, Verbosity lvl, const std::string & s)
+    void log(State & state, Verbosity lvl, std::string_view s)
     {
         if (state.active) {
             writeToStderr("\r\e[K" + filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n");
@@ -159,11 +162,13 @@ public:
         if (lvl <= verbosity && !s.empty() && type != actBuildWaiting)
             log(*state, lvl, s + "...");
 
-        state->activities.emplace_back(ActInfo());
+        state->activities.emplace_back(ActInfo {
+            .s = s,
+            .type = type,
+            .parent = parent,
+            .startTime = std::chrono::steady_clock::now()
+        });
         auto i = std::prev(state->activities.end());
-        i->s = s;
-        i->type = type;
-        i->parent = parent;
         state->its.emplace(act, i);
         state->activitiesByType[type].its.emplace(act, i);
 
@@ -175,10 +180,12 @@ public:
             auto machineName = getS(fields, 1);
             if (machineName != "")
                 i->s += fmt(" on " ANSI_BOLD "%s" ANSI_NORMAL, machineName);
-            auto curRound = getI(fields, 2);
-            auto nrRounds = getI(fields, 3);
-            if (nrRounds != 1)
-                i->s += fmt(" (round %d/%d)", curRound, nrRounds);
+
+            // Used to be curRound and nrRounds, but the
+            // implementation was broken for a long time.
+            if (getI(fields, 2) != 1 || getI(fields, 3) != 1) {
+                throw Error("log message indicated repeating builds, but this is not currently implemented");
+            }
             i->name = DrvName(name).name;
         }
 
@@ -327,10 +334,12 @@ public:
         updateCV.notify_one();
     }
 
-    void draw(State & state)
+    std::chrono::milliseconds draw(State & state)
     {
+        auto nextWakeup = std::chrono::milliseconds::max();
+
         state.haveUpdate = false;
-        if (!state.active) return;
+        if (!state.active) return nextWakeup;
 
         std::string line;
 
@@ -341,12 +350,25 @@ public:
             line += "]";
         }
 
+        auto now = std::chrono::steady_clock::now();
+
         if (!state.activities.empty()) {
             if (!status.empty()) line += " ";
             auto i = state.activities.rbegin();
 
-            while (i != state.activities.rend() && (!i->visible || (i->s.empty() && i->lastLine.empty())))
+            while (i != state.activities.rend()) {
+                if (i->visible && (!i->s.empty() || !i->lastLine.empty())) {
+                    /* Don't show activities until some time has
+                       passed, to avoid displaying very short
+                       activities. */
+                    auto delay = std::chrono::milliseconds(10);
+                    if (i->startTime + delay < now)
+                        break;
+                    else
+                        nextWakeup = std::min(nextWakeup, std::chrono::duration_cast<std::chrono::milliseconds>(delay - (now - i->startTime)));
+                }
                 ++i;
+            }
 
             if (i != state.activities.rend()) {
                 line += i->s;
@@ -366,6 +388,8 @@ public:
         if (width <= 0) width = std::numeric_limits<decltype(width)>::max();
 
         writeToStderr("\r" + filterANSIEscapes(line, false, width) + ANSI_NORMAL + "\e[K");
+
+        return nextWakeup;
     }
 
     std::string getStatus(State & state)
@@ -480,19 +504,21 @@ public:
         draw(*state);
         return s[0];
     }
+
+    void setPrintBuildLogs(bool printBuildLogs) override
+    {
+        this->printBuildLogs = printBuildLogs;
+    }
 };
 
-Logger * makeProgressBar(bool printBuildLogs)
+Logger * makeProgressBar()
 {
-    return new ProgressBar(
-        printBuildLogs,
-        shouldANSI()
-    );
+    return new ProgressBar(shouldANSI());
 }
 
-void startProgressBar(bool printBuildLogs)
+void startProgressBar()
 {
-    logger = makeProgressBar(printBuildLogs);
+    logger = makeProgressBar();
 }
 
 void stopProgressBar()

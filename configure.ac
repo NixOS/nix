@@ -41,8 +41,6 @@ AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier ('cpu-os')])
 test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
 
 
-CFLAGS=
-CXXFLAGS=
 AC_PROG_CC
 AC_PROG_CXX
 AC_PROG_CPP
@@ -147,6 +145,18 @@ if test "x$GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC" = xyes; then
     LDFLAGS="-latomic $LDFLAGS"
 fi
 
+# Building without tests is useful for bootstrapping with a smaller footprint
+# or running the tests in a separate derivation. Otherwise, we do compile and
+# run them.
+AC_ARG_ENABLE(tests, AS_HELP_STRING([--disable-tests],[Do not build the tests]),
+  tests=$enableval, tests=yes)
+AC_SUBST(tests)
+
+# Building without API docs is the default as Nix' C++ interfaces are internal and unstable.
+AC_ARG_ENABLE(internal_api_docs, AS_HELP_STRING([--enable-internal-api-docs],[Build API docs for Nix's internal unstable C++ interfaces]),
+  internal_api_docs=$enableval, internal_api_docs=no)
+AC_SUBST(internal_api_docs)
+
 # LTO is currently broken with clang for unknown reasons; ld segfaults in the llvm plugin
 AC_ARG_ENABLE(lto, AS_HELP_STRING([--enable-lto],[Enable LTO (only supported with GCC) [default=no]]),
   lto=$enableval, lto=no)
@@ -177,7 +187,7 @@ fi
 PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
 
 
-# Checks for libarchive
+# Look for libarchive.
 PKG_CHECK_MODULES([LIBARCHIVE], [libarchive >= 3.1.2], [CXXFLAGS="$LIBARCHIVE_CFLAGS $CXXFLAGS"])
 # Workaround until https://github.com/libarchive/libarchive/issues/1446 is fixed
 if test "$shared" != yes; then
@@ -272,9 +282,23 @@ if test "$gc" = yes; then
 fi
 
 
+if test "$tests" = yes; then
+
 # Look for gtest.
 PKG_CHECK_MODULES([GTEST], [gtest_main])
 
+
+# Look for rapidcheck.
+# No pkg-config yet, https://github.com/emil-e/rapidcheck/issues/302
+AC_LANG_PUSH(C++)
+AC_SUBST(RAPIDCHECK_HEADERS)
+[CXXFLAGS="-I $RAPIDCHECK_HEADERS $CXXFLAGS"]
+AC_CHECK_HEADERS([rapidcheck/gtest.h], [], [], [#include <gtest/gtest.h>])
+dnl No good for C++ libs with mangled symbols
+dnl AC_CHECK_LIB([rapidcheck], [])
+AC_LANG_POP(C++)
+
+fi
 
 # Look for nlohmann/json.
 PKG_CHECK_MODULES([NLOHMANN_JSON], [nlohmann_json >= 3.9])

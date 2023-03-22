@@ -22,7 +22,8 @@ This section lists the options that are common to all operations. These
 options are allowed for every subcommand, though they may not always
 have an effect.
 
-  - [`--add-root`]{#opt-add-root} *path*\
+  - <span id="opt-add-root">[`--add-root`](#opt-add-root)</span> *path*
+
     Causes the result of a realisation (`--realise` and
     `--force-realise`) to be registered as a root of the garbage
     collector. *path* will be created as a symlink to the resulting
@@ -53,6 +54,11 @@ have an effect.
     created by sequentially numbering symlinks beyond the first one
     (e.g., `foo`, `foo-2`, `foo-3`, and so on).
 
+  - <span id="opt-stdin">[`--stdin`](#opt-stdin)</span>
+
+    Read *paths…* from the standard input.
+    Useful for chaining nix-store commands.
+
 # Operation `--realise`
 
 ## Synopsis
@@ -65,13 +71,13 @@ The operation `--realise` essentially “builds” the specified store
 paths. Realisation is a somewhat overloaded term:
 
   - If the store path is a *derivation*, realisation ensures that the
-    output paths of the derivation are [valid](../glossary.md) (i.e.,
+    output paths of the derivation are [valid] (i.e.,
     the output path and its closure exist in the file system). This
     can be done in several ways. First, it is possible that the
     outputs are already valid, in which case we are done
-    immediately. Otherwise, there may be [substitutes](../glossary.md)
+    immediately. Otherwise, there may be [substitutes]
     that produce the outputs (e.g., by downloading them). Finally, the
-    outputs can be produced by performing the build action described
+    outputs can be produced by running the build task described
     by the derivation.
 
   - If the store path is not a derivation, realisation ensures that the
@@ -80,6 +86,9 @@ paths. Realisation is a somewhat overloaded term:
     Otherwise, the path and any missing paths in its closure may be
     produced through substitutes. If there are no (successful)
     substitutes, realisation fails.
+
+[valid]: ../glossary.md#gloss-validity
+[substitutes]: ../glossary.md#gloss-substitute
 
 The output path of each derivation is printed on standard output. (For
 non-derivations argument, the argument itself is printed.)
@@ -103,10 +112,6 @@ The following flags are available:
     output path is not identical to the corresponding output from the
     previous build, the new output path is left in
     `/nix/store/name.check.`
-
-    See also the `build-repeat` configuration option, which repeats a
-    derivation a number of times and prevents its outputs from being
-    registered as “valid” in the Nix store unless they are identical.
 
 Special exit codes:
 
@@ -140,8 +145,10 @@ or.
 
 ## Examples
 
-This operation is typically used to build store derivations produced by
-[`nix-instantiate`](nix-instantiate.md):
+This operation is typically used to build [store derivation]s produced by
+[`nix-instantiate`](./nix-instantiate.md):
+
+[store derivation]: ../glossary.md#gloss-store-derivation
 
 ```console
 $ nix-store -r $(nix-instantiate ./test.nix)
@@ -154,6 +161,12 @@ To test whether a previously-built derivation is deterministic:
 
 ```console
 $ nix-build '<nixpkgs>' -A hello --check -K
+```
+
+Use [`--read-log`](#operation---read-log) to show the stderr and stdout of a build:
+
+```console
+$ nix-store --read-log $(nix-instantiate ./test.nix)
 ```
 
 # Operation `--serve`
@@ -290,8 +303,8 @@ error: cannot delete path `/nix/store/zq0h41l75vlb4z45kzgjjmsjxvcv1qk7-mesa-6.4'
 
 ## Description
 
-The operation `--query` displays various bits of information about the
-store paths . The queries are described below. At most one query can be
+The operation `--query` displays information about [store path]s.
+The queries are described below. At most one query can be
 specified. The default query is `--outputs`.
 
 The paths *paths* may also be symlinks from outside of the Nix store, to
@@ -301,7 +314,7 @@ symlink.
 ## Common query options
 
   - `--use-output`; `-u`\
-    For each argument to the query that is a store derivation, apply the
+    For each argument to the query that is a [store derivation], apply the
     query to the output path of the derivation instead.
 
   - `--force-realise`; `-f`\
@@ -311,17 +324,17 @@ symlink.
 ## Queries
 
   - `--outputs`\
-    Prints out the [output paths](../glossary.md) of the store
+    Prints out the [output path]s of the store
     derivations *paths*. These are the paths that will be produced when
     the derivation is built.
 
   - `--requisites`; `-R`\
-    Prints out the [closure](../glossary.md) of the store path *paths*.
+    Prints out the [closure] of the given *paths*.
 
     This query has one option:
 
       - `--include-outputs`
-        Also include the existing output paths of store derivations,
+        Also include the existing output paths of [store derivation]s,
         and their closures.
 
     This query can be used to implement various kinds of deployment. A
@@ -333,9 +346,11 @@ symlink.
     derivation and specifying the option `--include-outputs`.
 
   - `--references`\
-    Prints the set of [references](../glossary.md) of the store paths
+    Prints the set of [references]s of the store paths
     *paths*, that is, their immediate dependencies. (For *all*
     dependencies, use `--requisites`.)
+
+    [reference]: ../glossary.md#gloss-reference
 
   - `--referrers`\
     Prints the set of *referrers* of the store paths *paths*, that is,
@@ -351,10 +366,12 @@ symlink.
     in the Nix store that are dependent on *paths*.
 
   - `--deriver`; `-d`\
-    Prints the [deriver](../glossary.md) of the store paths *paths*. If
+    Prints the [deriver] of the store paths *paths*. If
     the path has no deriver (e.g., if it is a source file), or if the
     deriver is not known (e.g., in the case of a binary-only
     deployment), the string `unknown-deriver` is printed.
+
+    [deriver]: ../glossary.md#gloss-deriver
 
   - `--graph`\
     Prints the references graph of the store paths *paths* in the format
@@ -375,12 +392,12 @@ symlink.
     Prints the references graph of the store paths *paths* in the
     [GraphML](http://graphml.graphdrawing.org/) file format. This can be
     used to visualise dependency graphs. To obtain a build-time
-    dependency graph, apply this to a store derivation. To obtain a
+    dependency graph, apply this to a [store derivation]. To obtain a
     runtime dependency graph, apply it to an output path.
 
   - `--binding` *name*; `-b` *name*\
     Prints the value of the attribute *name* (i.e., environment
-    variable) of the store derivations *paths*. It is an error for a
+    variable) of the [store derivation]s *paths*. It is an error for a
     derivation to not have the specified attribute.
 
   - `--hash`\
@@ -621,7 +638,7 @@ written to standard output.
 
 A NAR archive is like a TAR or Zip archive, but it contains only the
 information that Nix considers important. For instance, timestamps are
-elided because all files in the Nix store have their timestamp set to 0
+elided because all files in the Nix store have their timestamp set to 1
 anyway. Likewise, all permissions are left out except for the execute
 bit, because all files in the Nix store have 444 or 555 permission.
 

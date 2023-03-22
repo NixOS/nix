@@ -72,11 +72,13 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
         Derivation drv = store->derivationFromPath(path.path);
         rootNr++;
 
+        /* FIXME: Encode this empty special case explicitly in the type. */
         if (path.outputs.empty())
             for (auto & i : drv.outputs) path.outputs.insert(i.first);
 
         PathSet outputs;
         for (auto & j : path.outputs) {
+            /* Match outputs of a store path with outputs of the derivation that produces it. */
             DerivationOutputs::iterator i = drv.outputs.find(j);
             if (i == drv.outputs.end())
                 throw Error("derivation '%s' does not have an output named '%s'",
@@ -141,6 +143,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
         toDerivedPaths(paths),
         willBuild, willSubstitute, unknown, downloadSize, narSize);
 
+    /* Filter out unknown paths from `paths`. */
     if (ignoreUnknown) {
         std::vector<StorePathWithOutputs> paths2;
         for (auto & i : paths)
@@ -457,7 +460,7 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
     /* Print each environment variable in the derivation in a format
      * that can be sourced by the shell. */
     for (auto & i : drv.env)
-        cout << format("export %1%; %1%=%2%\n") % i.first % shellEscape(i.second);
+        logger->cout("export %1%; %1%=%2%\n", i.first, shellEscape(i.second));
 
     /* Also output the arguments.  This doesn't preserve whitespace in
        arguments. */
@@ -516,7 +519,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         if (!store->isValidPath(info->path) || reregister) {
             /* !!! races */
             if (canonicalise)
-                canonicalisePathMetaData(store->printStorePath(info->path), -1);
+                canonicalisePathMetaData(store->printStorePath(info->path), {});
             if (!hashGiven) {
                 HashResult hash = hashPath(htSHA256, store->printStorePath(info->path));
                 info->narHash = hash.first;
@@ -808,14 +811,23 @@ static void opServe(Strings opFlags, Strings opArgs)
         if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
             settings.maxLogSize = readNum<unsigned long>(in);
         if (GET_PROTOCOL_MINOR(clientVersion) >= 3) {
-            settings.buildRepeat = readInt(in);
-            settings.enforceDeterminism = readInt(in);
+            auto nrRepeats = readInt(in);
+            if (nrRepeats != 0) {
+                throw Error("client requested repeating builds, but this is not currently implemented");
+            }
+            // Ignore 'enforceDeterminism'. It used to be true by
+            // default, but also only never had any effect when
+            // `nrRepeats == 0`.  We have already asserted that
+            // `nrRepeats` in fact is 0, so we can safely ignore this
+            // without doing something other than what the client
+            // asked for.
+            readInt(in);
+
             settings.runDiffHook = true;
         }
         if (GET_PROTOCOL_MINOR(clientVersion) >= 7) {
             settings.keepFailed = (bool) readInt(in);
         }
-        settings.printRepeatedBuilds = false;
     };
 
     while (true) {
@@ -922,10 +934,9 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 if (GET_PROTOCOL_MINOR(clientVersion) >= 3)
                     out << status.timesBuilt << status.isNonDeterministic << status.startTime << status.stopTime;
-                if (GET_PROTOCOL_MINOR(clientVersion >= 6)) {
+                if (GET_PROTOCOL_MINOR(clientVersion) >= 6) {
                     worker_proto::write(*store, out, status.builtOutputs);
                 }
-
 
                 break;
             }
@@ -1012,6 +1023,7 @@ static int main_nix_store(int argc, char * * argv)
     {
         Strings opFlags, opArgs;
         Operation op = 0;
+        bool readFromStdIn = false;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             Operation oldOp = op;
@@ -1070,6 +1082,8 @@ static int main_nix_store(int argc, char * * argv)
                 op = opGenerateBinaryCacheKey;
             else if (*arg == "--add-root")
                 gcRoot = absPath(getArg(*arg, arg, end));
+            else if (*arg == "--stdin" && !isatty(STDIN_FILENO))
+                readFromStdIn = true;
             else if (*arg == "--indirect")
                 ;
             else if (*arg == "--no-output")
@@ -1081,6 +1095,13 @@ static int main_nix_store(int argc, char * * argv)
             }
             else
                 opArgs.push_back(*arg);
+
+            if (readFromStdIn && op != opImport && op != opRestore && op != opServe) {
+                 std::string word;
+                 while (std::cin >> word) {
+                       opArgs.emplace_back(std::move(word));
+                 };
+            }
 
             if (oldOp && oldOp != op)
                 throw UsageError("only one operation may be specified");

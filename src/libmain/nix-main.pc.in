@@ -6,4 +6,4 @@ Name: Nix
 Description: Nix Package Manager
 Version: @PACKAGE_VERSION@
 Libs: -L${libdir} -lnixmain
-Cflags: -I${includedir}/nix -std=c++17
+Cflags: -I${includedir}/nix -std=c++2a

@@ -27,6 +27,8 @@ perl/Makefile.config
 # /scripts/
 /scripts/nix-profile.sh
 /scripts/nix-profile-daemon.sh
+/scripts/nix-profile.fish
+/scripts/nix-profile-daemon.fish
 
 # /src/libexpr/
 /src/libexpr/lexer-tab.cc
@@ -35,14 +37,14 @@ perl/Makefile.config
 /src/libexpr/parser-tab.hh
 /src/libexpr/parser-tab.output
 /src/libexpr/nix.tbl
-/src/libexpr/tests/libexpr-tests
+/src/libexpr/tests/libnixexpr-tests
 
 # /src/libstore/
 *.gen.*
-/src/libstore/tests/libstore-tests
+/src/libstore/tests/libnixstore-tests
 
 # /src/libutil/
-/src/libutil/tests/libutil-tests
+/src/libutil/tests/libnixutil-tests
 
 /src/nix/nix
 
@@ -73,7 +75,7 @@ perl/Makefile.config
 
 # /tests/
 /tests/test-tmp
-/tests/common.sh
+/tests/common/vars-and-functions.sh
 /tests/result*
 /tests/restricted-innocent
 /tests/shell
@@ -101,6 +103,7 @@ outputs/
 
 *.a
 *.o
+*.o.tmp
 *.so
 *.dylib
 *.dll

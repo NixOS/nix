@@ -18,7 +18,7 @@ std::string renderMarkdownToTerminal(std::string_view markdown)
         .hmargin = 0,
         .vmargin = 0,
         .feat = LOWDOWN_COMMONMARK | LOWDOWN_FENCED | LOWDOWN_DEFLIST | LOWDOWN_TABLES,
-        .oflags = 0,
+        .oflags = LOWDOWN_TERM_NOLINK,
     };
 
     auto doc = lowdown_doc_new(&opts);

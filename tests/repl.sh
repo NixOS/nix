@@ -33,14 +33,14 @@ testRepl () {
     nix repl "${nixArgs[@]}" <<< "$replCmds" || fail "nix repl does not work twice with the same inputs"
 
     # simple.nix prints a PATH during build
-    echo "$replOutput" | grep -qs 'PATH=' || fail "nix repl :log doesn't output logs"
+    echo "$replOutput" | grepQuiet -s 'PATH=' || fail "nix repl :log doesn't output logs"
     local replOutput="$(nix repl "${nixArgs[@]}" <<< "$replFailingCmds" 2>&1)"
     echo "$replOutput"
-    echo "$replOutput" | grep -qs 'This should fail' \
+    echo "$replOutput" | grepQuiet -s 'This should fail' \
       || fail "nix repl :log doesn't output logs for a failed derivation"
     local replOutput="$(nix repl --show-trace "${nixArgs[@]}" <<< "$replUndefinedVariable" 2>&1)"
     echo "$replOutput"
-    echo "$replOutput" | grep -qs "while evaluating the file" \
+    echo "$replOutput" | grepQuiet -s "while evaluating the file" \
       || fail "nix repl --show-trace doesn't show the trace"
 
     nix repl "${nixArgs[@]}" --option pure-eval true 2>&1 <<< "builtins.currentSystem" \
@@ -58,7 +58,7 @@ testReplResponse () {
     local commands="$1"; shift
     local expectedResponse="$1"; shift
     local response="$(nix repl "$@" <<< "$commands")"
-    echo "$response" | grep -qs "$expectedResponse" \
+    echo "$response" | grepQuiet -s "$expectedResponse" \
       || fail "repl command set:
 
 $commands
@@ -121,5 +121,5 @@ sed -i 's/beforeChange/afterChange/' flake/flake.nix
 echo ":reload"
 echo "changingThing"
 ) | nix repl ./flake --experimental-features 'flakes repl-flake')
-echo "$replResult" | grep -qs beforeChange
-echo "$replResult" | grep -qs afterChange
+echo "$replResult" | grepQuiet -s beforeChange
+echo "$replResult" | grepQuiet -s afterChange

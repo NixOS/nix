@@ -53,7 +53,6 @@ static bool haveInternet()
 }
 
 std::string programPath;
-char * * savedArgv;
 
 struct HelpRequested { };
 
@@ -74,6 +73,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         addFlag({
             .longName = "help",
             .description = "Show usage information.",
+            .category = miscCategory,
             .handler = {[&]() { throw HelpRequested(); }},
         });
 
@@ -82,12 +82,13 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .shortName = 'L',
             .description = "Print full build logs on standard error.",
             .category = loggingCategory,
-            .handler = {[&]() {setLogFormat(LogFormat::barWithLogs); }},
+            .handler = {[&]() { logger->setPrintBuildLogs(true); }},
         });
 
         addFlag({
             .longName = "version",
             .description = "Show version information.",
+            .category = miscCategory,
             .handler = {[&]() { showVersion = true; }},
         });
 
@@ -95,12 +96,14 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .longName = "offline",
             .aliases = {"no-net"}, // FIXME: remove
             .description = "Disable substituters and consider all previously downloaded files up-to-date.",
+            .category = miscCategory,
             .handler = {[&]() { useNet = false; }},
         });
 
         addFlag({
             .longName = "refresh",
             .description = "Consider all previously downloaded files out-of-date.",
+            .category = miscCategory,
             .handler = {[&]() { refresh = true; }},
         });
     }
@@ -187,7 +190,7 @@ static void showHelp(std::vector<std::string> subcommand, MultiCommand & topleve
         *vUtils);
 
     auto attrs = state.buildBindings(16);
-    attrs.alloc("command").mkString(toplevel.toJSON().dump());
+    attrs.alloc("toplevel").mkString(toplevel.toJSON().dump());
 
     auto vRes = state.allocValue();
     state.callFunction(*vGenerateManpage, state.allocValue()->mkAttrs(attrs), *vRes, noPos);
@@ -196,7 +199,7 @@ static void showHelp(std::vector<std::string> subcommand, MultiCommand & topleve
     if (!attr)
         throw UsageError("Nix has no subcommand '%s'", concatStringsSep("", subcommand));
 
-    auto markdown = state.forceString(*attr->value);
+    auto markdown = state.forceString(*attr->value, noPos, "while evaluating the lowdown help text");
 
     RunPager pager;
     std::cout << renderMarkdownToTerminal(markdown) << "\n";
@@ -266,7 +269,7 @@ void mainWrapped(int argc, char * * argv)
     programPath = argv[0];
     auto programName = std::string(baseNameOf(programPath));
 
-    if (argc > 0 && std::string_view(argv[0]) == "__build-remote") {
+    if (argc > 1 && std::string_view(argv[1]) == "__build-remote") {
         programName = "build-remote";
         argv++; argc--;
     }
@@ -289,7 +292,7 @@ void mainWrapped(int argc, char * * argv)
     NixArgs args;
 
     if (argc == 2 && std::string(argv[1]) == "__dump-args") {
-        std::cout << args.toJSON().dump() << "\n";
+        logger->cout("%s", args.toJSON());
         return;
     }
 
@@ -309,7 +312,7 @@ void mainWrapped(int argc, char * * argv)
             b["doc"] = trim(stripIndentation(primOp->doc));
             res[state.symbols[builtin.name]] = std::move(b);
         }
-        std::cout << res.dump() << "\n";
+        logger->cout("%s", res);
         return;
     }
 
@@ -318,14 +321,14 @@ void mainWrapped(int argc, char * * argv)
         if (completions) {
             switch (completionType) {
             case ctNormal:
-                std::cout << "normal\n"; break;
+                logger->cout("normal"); break;
             case ctFilenames:
-                std::cout << "filenames\n"; break;
+                logger->cout("filenames"); break;
             case ctAttrs:
-                std::cout << "attrs\n"; break;
+                logger->cout("attrs"); break;
             }
             for (auto & s : *completions)
-                std::cout << s.completion << "\t" << s.description << "\n";
+                logger->cout(s.completion + "\t" + trim(s.description));
         }
     });
 
@@ -391,7 +394,6 @@ void mainWrapped(int argc, char * * argv)
     if (args.command->second->forceImpureByDefault() && !evalSettings.pureEval.overridden) {
         evalSettings.pureEval = false;
     }
-    args.command->second->prepare();
     args.command->second->run();
 }
 

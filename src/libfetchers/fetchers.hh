@@ -63,6 +63,11 @@ public:
        one that contains a commit hash or content hash. */
     bool isLocked() const { return locked; }
 
+    /* Check whether the input carries all necessary info required
+       for cache insertion and substitution.
+       These fields are used to uniquely identify cached trees
+       within the "tarball TTL" window without necessarily
+       indicating that the input's origin is unchanged. */
     bool hasAllInfo() const;
 
     bool operator ==(const Input & other) const;
@@ -107,26 +112,25 @@ public:
  * recognized.  The Input object contains the information the fetcher
  * needs to actually perform the "fetch()" when called.
  */
-
 struct InputScheme
 {
     virtual ~InputScheme()
     { }
 
-    virtual std::optional<Input> inputFromURL(const ParsedURL & url) = 0;
+    virtual std::optional<Input> inputFromURL(const ParsedURL & url) const = 0;
 
-    virtual std::optional<Input> inputFromAttrs(const Attrs & attrs) = 0;
+    virtual std::optional<Input> inputFromAttrs(const Attrs & attrs) const = 0;
 
-    virtual ParsedURL toURL(const Input & input);
+    virtual ParsedURL toURL(const Input & input) const;
 
-    virtual bool hasAllInfo(const Input & input) = 0;
+    virtual bool hasAllInfo(const Input & input) const = 0;
 
     virtual Input applyOverrides(
         const Input & input,
         std::optional<std::string> ref,
-        std::optional<Hash> rev);
+        std::optional<Hash> rev) const;
 
-    virtual void clone(const Input & input, const Path & destDir);
+    virtual void clone(const Input & input, const Path & destDir) const;
 
     virtual std::optional<Path> getSourcePath(const Input & input);
 

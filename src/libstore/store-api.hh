@@ -1,5 +1,6 @@
 #pragma once
 
+#include "nar-info.hh"
 #include "realisation.hh"
 #include "path.hh"
 #include "derived-path.hh"
@@ -13,6 +14,7 @@
 #include "path-info.hh"
 #include "repair-flag.hh"
 
+#include <nlohmann/json_fwd.hpp>
 #include <atomic>
 #include <limits>
 #include <map>
@@ -67,7 +69,9 @@ struct Derivation;
 class FSAccessor;
 class NarInfoDiskCache;
 class Store;
-class JSONPlaceholder;
+
+
+typedef std::map<std::string, StorePath> OutputPathMap;
 
 
 enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
@@ -82,6 +86,8 @@ enum BuildMode { bmNormal, bmRepair, bmCheck };
 
 struct BuildResult;
 
+
+typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 
 struct StoreConfig : public Config
 {
@@ -118,6 +124,8 @@ class Store : public std::enable_shared_from_this<Store>, public virtual StoreCo
 public:
 
     typedef std::map<std::string, std::string> Params;
+
+
 
 protected:
 
@@ -178,7 +186,7 @@ public:
 
     /* Return true if ‘path’ is in the Nix store (but not the Nix
        store itself). */
-    bool isInStore(const Path & path) const;
+    bool isInStore(PathView path) const;
 
     /* Return true if ‘path’ is a store path, i.e. a direct child of
        the Nix store. */
@@ -186,7 +194,7 @@ public:
 
     /* Split a path like /nix/store/<hash>-<name>/<bla> into
        /nix/store/<hash>-<name> and /<bla>. */
-    std::pair<StorePath, Path> toStorePath(const Path & path) const;
+    std::pair<StorePath, Path> toStorePath(PathView path) const;
 
     /* Follow symlinks until we end up with a path in the Nix store. */
     Path followLinksToStore(std::string_view path) const;
@@ -359,9 +367,19 @@ public:
     virtual void addToStore(const ValidPathInfo & info, Source & narSource,
         RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs) = 0;
 
+    // A list of paths infos along with a source providing the content of the
+    // associated store path
+    using PathsSource = std::vector<std::pair<ValidPathInfo, std::unique_ptr<Source>>>;
+
     /* Import multiple paths into the store. */
     virtual void addMultipleToStore(
         Source & source,
+        RepairFlag repair = NoRepair,
+        CheckSigsFlag checkSigs = CheckSigs);
+
+    virtual void addMultipleToStore(
+        PathsSource & pathsToCopy,
+        Activity & act,
         RepairFlag repair = NoRepair,
         CheckSigsFlag checkSigs = CheckSigs);
 
@@ -501,7 +519,7 @@ public:
        variable elements such as the registration time are
        included. If ‘showClosureSize’ is true, the closure size of
        each path is included. */
-    void pathInfoToJSON(JSONPlaceholder & jsonOut, const StorePathSet & storePaths,
+    nlohmann::json pathInfoToJSON(const StorePathSet & storePaths,
         bool includeImpureInfo, bool showClosureSize,
         Base hashBase = Base32,
         AllowInvalidFlag allowInvalid = DisallowInvalid);
@@ -607,6 +625,13 @@ public:
      */
     StorePathSet exportReferences(const StorePathSet & storePaths, const StorePathSet & inputPaths);
 
+    /**
+     * Given a store path, return the realisation actually used in the realisation of this path:
+     * - If the path is a content-addressed derivation, try to resolve it
+     * - Otherwise, find one of its derivers
+     */
+    std::optional<StorePath> getBuildDerivationPath(const StorePath &);
+
     /* Hack to allow long-running processes like hydra-queue-runner to
        occasionally flush their path info cache. */
     void clearPathInfoCache()
@@ -633,9 +658,6 @@ public:
     {
         return toRealPath(printStorePath(storePath));
     }
-
-    virtual void createUser(const std::string & userName, uid_t userId)
-    { }
 
     /*
      * Synchronises the options of the client with those of the daemon
@@ -706,6 +728,11 @@ void copyClosure(
    root becomes garbage after this point unless it has been registered
    as a (permanent) root. */
 void removeTempRoots();
+
+
+/* Resolve the derived path completely, failing if any derivation output
+   is unknown. */
+OutputPathMap resolveDerivedPath(Store &, const DerivedPath::Built &, Store * evalStore = nullptr);
 
 
 /* Return a Store object to access the Nix store denoted by

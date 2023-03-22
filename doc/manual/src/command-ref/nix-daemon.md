@@ -8,6 +8,6 @@
 
 # Description
 
-The Nix daemon is necessary in multi-user Nix installations. It performs
-build actions and other operations on the Nix store on behalf of
+The Nix daemon is necessary in multi-user Nix installations. It runs
+build tasks and other operations on the Nix store on behalf of
 unprivileged users.

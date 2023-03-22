@@ -3,6 +3,7 @@
 , lib ? pkgs.lib
 , name ? "nix"
 , tag ? "latest"
+, bundleNixpkgs ? true
 , channelName ? "nixpkgs"
 , channelURL ? "https://nixos.org/channels/nixpkgs-unstable"
 , extraPkgs ? []
@@ -33,9 +34,20 @@ let
 
     root = {
       uid = 0;
-      shell = "/bin/bash";
+      shell = "${pkgs.bashInteractive}/bin/bash";
       home = "/root";
       gid = 0;
+      groups = [ "root" ];
+      description = "System administrator";
+    };
+
+    nobody = {
+      uid = 65534;
+      shell = "${pkgs.shadow}/bin/nologin";
+      home = "/var/empty";
+      gid = 65534;
+      groups = [ "nobody" ];
+      description = "Unprivileged account (don't use!)";
     };
 
   } // lib.listToAttrs (
@@ -57,6 +69,7 @@ let
   groups = {
     root.gid = 0;
     nixbld.gid = 30000;
+    nobody.gid = 65534;
   };
 
   userToPasswd = (
@@ -140,10 +153,12 @@ let
   baseSystem =
     let
       nixpkgs = pkgs.path;
-      channel = pkgs.runCommand "channel-nixos" { } ''
+      channel = pkgs.runCommand "channel-nixos" { inherit bundleNixpkgs; } ''
         mkdir $out
-        ln -s ${nixpkgs} $out/nixpkgs
-        echo "[]" > $out/manifest.nix
+        if [ "$bundleNixpkgs" ]; then
+          ln -s ${nixpkgs} $out/nixpkgs
+          echo "[]" > $out/manifest.nix
+        fi
       '';
       rootEnv = pkgs.buildPackages.buildEnv {
         name = "root-profile-env";

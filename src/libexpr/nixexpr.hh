@@ -8,7 +8,6 @@
 #include "error.hh"
 #include "chunked-vector.hh"
 
-
 namespace nix {
 
 
@@ -23,15 +22,22 @@ MakeError(MissingArgumentError, EvalError);
 MakeError(RestrictedPathError, Error);
 
 /* Position objects. */
-
 struct Pos
 {
-    std::string file;
-    FileOrigin origin;
     uint32_t line;
     uint32_t column;
 
+    struct none_tag { };
+    struct Stdin { ref<std::string> source; };
+    struct String { ref<std::string> source; };
+
+    typedef std::variant<none_tag, Stdin, String, Path> Origin;
+
+    Origin origin;
+
     explicit operator bool() const { return line > 0; }
+
+    operator std::shared_ptr<AbstractPos>() const;
 };
 
 class PosIdx {
@@ -47,7 +53,11 @@ public:
 
     explicit operator bool() const { return id > 0; }
 
-    bool operator<(const PosIdx other) const { return id < other.id; }
+    bool operator <(const PosIdx other) const { return id < other.id; }
+
+    bool operator ==(const PosIdx other) const { return id == other.id; }
+
+    bool operator !=(const PosIdx other) const { return id != other.id; }
 };
 
 class PosTable
@@ -61,13 +71,13 @@ public:
         // current origins.back() can be reused or not.
         mutable uint32_t idx = std::numeric_limits<uint32_t>::max();
 
-        explicit Origin(uint32_t idx): idx(idx), file{}, origin{} {}
+        // Used for searching in PosTable::[].
+        explicit Origin(uint32_t idx): idx(idx), origin{Pos::none_tag()} {}
 
     public:
-        const std::string file;
-        const FileOrigin origin;
+        const Pos::Origin origin;
 
-        Origin(std::string file, FileOrigin origin): file(std::move(file)), origin(origin) {}
+        Origin(Pos::Origin origin): origin(origin) {}
     };
 
     struct Offset {
@@ -107,7 +117,7 @@ public:
             [] (const auto & a, const auto & b) { return a.idx < b.idx; });
         const auto origin = *std::prev(pastOrigin);
         const auto offset = offsets[idx];
-        return {origin.file, origin.origin, offset.line, offset.column};
+        return {offset.line, offset.column, origin.origin};
     }
 };
 
@@ -176,7 +186,7 @@ struct ExprString : Expr
 {
     std::string s;
     Value v;
-    ExprString(std::string s) : s(std::move(s)) { v.mkString(this->s.data()); };
+    ExprString(std::string &&s) : s(std::move(s)) { v.mkString(this->s.data()); };
     Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };
@@ -223,7 +233,7 @@ struct ExprSelect : Expr
     PosIdx pos;
     Expr * e, * def;
     AttrPath attrPath;
-    ExprSelect(const PosIdx & pos, Expr * e, const AttrPath & attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(attrPath) { };
+    ExprSelect(const PosIdx & pos, Expr * e, const AttrPath && attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(std::move(attrPath)) { };
     ExprSelect(const PosIdx & pos, Expr * e, Symbol name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
@@ -233,7 +243,7 @@ struct ExprOpHasAttr : Expr
 {
     Expr * e;
     AttrPath attrPath;
-    ExprOpHasAttr(Expr * e, const AttrPath & attrPath) : e(e), attrPath(attrPath) { };
+    ExprOpHasAttr(Expr * e, const AttrPath && attrPath) : e(e), attrPath(std::move(attrPath)) { };
     PosIdx getPos() const override { return e->getPos(); }
     COMMON_METHODS
 };
