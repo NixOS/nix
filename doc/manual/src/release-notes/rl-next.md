@@ -29,3 +29,5 @@
   provides information about each of its outputs.
 
 * The experimental command `nix describe-stores` has been removed.
+
+* Nix stores and their settings are now documented in [`nix help-stores`](@docroot@/command-ref/new-cli/nix3-help-stores.md).
