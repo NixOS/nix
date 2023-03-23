@@ -1,5 +1,6 @@
 #include "ssh-store-config.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "remote-store.hh"
 #include "remote-store-connection.hh"
 #include "remote-fs-accessor.hh"
@@ -61,7 +62,7 @@ public:
     std::optional<std::string> getBuildLogExact(const StorePath & path) override
     { unsupported("getBuildLogExact"); }
 
-private:
+protected:
 
     struct Connection : RemoteStore::Connection
     {
@@ -93,9 +94,12 @@ private:
 ref<RemoteStore::Connection> SSHStore::openConnection()
 {
     auto conn = make_ref<Connection>();
-    conn->sshConn = master.startCommand(
-        fmt("%s --stdio", remoteProgram)
-        + (remoteStore.get() == "" ? "" : " --store " + shellEscape(remoteStore.get())));
+
+    std::string command = remoteProgram + " --stdio";
+    if (remoteStore.get() != "")
+        command += " --store " + shellEscape(remoteStore.get());
+
+    conn->sshConn = master.startCommand(command);
     conn->to = FdSink(conn->sshConn->in.get());
     conn->from = FdSource(conn->sshConn->out.get());
     return conn;

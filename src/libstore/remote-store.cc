@@ -822,15 +822,6 @@ void RemoteStore::addTempRoot(const StorePath & path)
 }
 
 
-void RemoteStore::addIndirectRoot(const Path & path)
-{
-    auto conn(getConnection());
-    conn->to << WorkerProto::Op::AddIndirectRoot << path;
-    conn.processStderr();
-    readInt(conn->from);
-}
-
-
 Roots RemoteStore::findRoots(bool censor)
 {
     auto conn(getConnection());
