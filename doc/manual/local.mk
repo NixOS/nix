@@ -13,6 +13,13 @@ man-pages := $(foreach n, \
 	nix.conf.5 nix-daemon.8 \
 , $(d)/$(n))
 
+# man pages for subcommands
+# convert from `$(d)/src/command-ref/nix-{1}/{2}.md` to `$(d)/nix-{1}-{2}.1`
+# FIXME: unify with how nix3-cli man pages are generated
+man-pages += $(foreach subcommand, \
+	$(filter-out %opt-common.md %env-common.md, $(wildcard $(d)/src/command-ref/nix-*/*.md)), \
+	$(d)/$(subst /,-,$(subst $(d)/src/command-ref/,,$(subst .md,.1,$(subcommand)))))
+
 clean-files += $(d)/*.1 $(d)/*.5 $(d)/*.8
 
 # Provide a dummy environment for nix, so that it will not access files outside the macOS sandbox.
@@ -37,6 +44,26 @@ define process-includes
 		sed -i "s/$$matchline//" $(2); \
 	done < <(grep '{{#include' $(1))
 endef
+
+$(d)/nix-env-%.1: $(d)/src/command-ref/nix-env/%.md
+	@printf "Title: %s\n\n" "$(subst nix-env-,nix-env --,$$(basename "$@" .1))" > $^.tmp
+	$(render-subcommand)
+
+$(d)/nix-store-%.1: $(d)/src/command-ref/nix-store/%.md
+	@printf -- 'Title: %s\n\n' "$(subst nix-store-,nix-store --,$$(basename "$@" .1))" > $^.tmp
+	$(render-subcommand)
+
+# FIXME: there surely is some more deduplication to be achieved here with even darker Make magic
+define render-subcommand
+  @cat $^ >> $^.tmp
+	@$(call process-includes,$^,$^.tmp)
+	$(trace-gen) lowdown -sT man --nroff-nolinks -M section=1 $^.tmp -o $@
+	@# fix up `lowdown`'s automatic escaping of `--`
+	@# https://github.com/kristapsdz/lowdown/blob/edca6ce6d5336efb147321a43c47a698de41bb7c/entity.c#L202
+	@sed -i 's/\e\[u2013\]/--/' $@
+	@rm $^.tmp
+endef
+
 
 $(d)/%.1: $(d)/src/command-ref/%.md
 	@printf "Title: %s\n\n" "$$(basename $@ .1)" > $^.tmp
