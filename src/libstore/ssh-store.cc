@@ -12,6 +12,7 @@ namespace nix {
 struct SSHStoreConfig : virtual RemoteStoreConfig, virtual CommonSSHStoreConfig
 {
     using RemoteStoreConfig::RemoteStoreConfig;
+    using CommonSSHStoreConfig::CommonSSHStoreConfig;
 
     const std::string name() override { return "Experimental SSH Store"; }
 
@@ -30,6 +31,7 @@ public:
     SSHStore(const std::string & scheme, const std::string & host, const Params & params)
         : StoreConfig(params)
         , RemoteStoreConfig(params)
+        , CommonSSHStoreConfig(params)
         , SSHStoreConfig(params)
         , Store(params)
         , RemoteStore(params)

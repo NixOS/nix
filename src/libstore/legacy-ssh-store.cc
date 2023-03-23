@@ -56,6 +56,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
     LegacySSHStore(const std::string & scheme, const std::string & host, const Params & params)
         : StoreConfig(params)
+        , CommonSSHStoreConfig(params)
         , LegacySSHStoreConfig(params)
         , Store(params)
         , host(host)
