@@ -15,9 +15,6 @@ struct CommonSSHStoreConfig : virtual StoreConfig
     const Setting<bool> compress{(StoreConfig*) this, false, "compress",
         "Whether to enable SSH compression."};
 
-    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-store", "remote-program",
-        "Path to the `nix-store` executable on the remote machine."};
-
     const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store",
         R"(
           [Store URL](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)

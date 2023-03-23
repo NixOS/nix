@@ -17,6 +17,9 @@ struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 {
     using CommonSSHStoreConfig::CommonSSHStoreConfig;
 
+    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-store", "remote-program",
+        "Path to the `nix-store` executable on the remote machine."};
+
     const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections",
         "Maximum number of concurrent SSH connections."};
 
