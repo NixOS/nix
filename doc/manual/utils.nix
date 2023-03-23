@@ -39,7 +39,7 @@ rec {
   filterAttrs = pred: set:
     listToAttrs (concatMap (name: let v = set.${name}; in if pred name v then [(nameValuePair name v)] else []) (attrNames set));
 
-  showSetting = { useAnchors }: name: { description, documentDefault, defaultValue, aliases, ... }:
+  showSetting = { useAnchors }: name: { description, documentDefault, defaultValue, aliases, value }:
     let
       result = squash ''
           - ${if useAnchors
