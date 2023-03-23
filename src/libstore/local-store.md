@@ -3,11 +3,10 @@ R"(
 **Store URL format**: `local`, *root*
 
 This store type accesses a Nix store in the local filesystem directly
-(i.e. not via the Nix daemon). *root* is an absolute path that denotes
-the "root" of the filesystem; other directories such as the Nix store
-directory (as denoted by the `store` setting) are interpreted relative
-to *root*. The store pseudo-URL `local` denotes a store that uses `/`
-as its root directory.
+(i.e. not via the Nix daemon). *root* is an absolute path that is
+prefixed to other directories such as the Nix store directory. The
+store pseudo-URL `local` denotes a store that uses `/` as its root
+directory.
 
 A store that uses a *root* other than `/` is called a *chroot
 store*. With such stores, the store directory is "logically" still

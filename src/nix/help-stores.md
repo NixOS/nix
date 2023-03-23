@@ -29,17 +29,17 @@ supported settings for each store type are documented below.
 The special store URL `auto` causes Nix to automatically select a
 store as follows:
 
-* Use the local store `/nix/store` if `/nix/var/nix` is writable by
-  the current user.
+* Use the [local store](#local-store) `/nix/store` if `/nix/var/nix`
+  is writable by the current user.
 
 * Otherwise, if `/nix/var/nix/daemon-socket/socket` exists, [connect
   to the Nix daemon listening on that socket](#local-daemon-store).
 
-* Otherwise, on Linux only, use the local chroot store
+* Otherwise, on Linux only, use the [local chroot store](#local-store)
   `~/.local/share/nix/root`, which will be created automatically if it
   does not exist.
 
-* Otherwise, use the local store `/nix/store`.
+* Otherwise, use the [local store](#local-store) `/nix/store`.
 
 @stores@
 
