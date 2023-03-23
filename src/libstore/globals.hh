@@ -98,7 +98,9 @@ public:
 
     Setting<std::string> storeUri{this, getEnv("NIX_REMOTE").value_or("auto"), "store",
         R"(
-          The URL of the Nix store to use. See [`nix help-stores`](@docroot@/command-ref/new-cli/nix3-help-stores.md)
+          The [URL of the Nix store](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
+          to use for most operations.
+          See [`nix help-stores`](@docroot@/command-ref/new-cli/nix3-help-stores.md)
           for supported store types and settings.
         )"};
 
@@ -681,8 +683,9 @@ public:
         Strings{"https://cache.nixos.org/"},
         "substituters",
         R"(
-          A list of URLs of substituters, separated by whitespace. Substituters
-          are tried based on their Priority value, which each substituter can set
+          A list of [URLs of Nix stores](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
+          to be used as substituters, separated by whitespace.
+          Substituters are tried based on their Priority value, which each substituter can set
           independently. Lower value means higher priority.
           The default is `https://cache.nixos.org`, with a Priority of 40.
 
@@ -700,7 +703,8 @@ public:
     Setting<StringSet> trustedSubstituters{
         this, {}, "trusted-substituters",
         R"(
-          A list of URLs of substituters, separated by whitespace. These are
+          A list of [URLs of Nix stores](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format),
+          separated by whitespace. These are
           not used by default, but can be enabled by users of the Nix daemon
           by specifying `--option substituters urls` on the command
           line. Unprivileged users are only allowed to pass a subset of the

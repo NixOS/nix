@@ -136,7 +136,11 @@ MixEvalArgs::MixEvalArgs()
 
     addFlag({
         .longName = "eval-store",
-        .description = "The Nix store to use for evaluations.",
+        .description =
+          R"(
+            The [URL of the Nix store](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
+            to use for evaluation, i.e. to store derivations (`.drv` files) and inputs referenced by them.
+          )",
         .category = category,
         .labels = {"store-url"},
         .handler = {&evalStoreUrl},
