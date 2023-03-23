@@ -103,12 +103,12 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
         toPath = fromPath;
     }
 
-    /* In pure mode, require a CA path. */
-    if (evalSettings.pureEval) {
+    /* In pure mode without enable-store-path-references, require a CA path. */
+    if (evalSettings.pureEval && !evalSettings.enableStorePathReferences) {
         auto info = state.store->queryPathInfo(*toPath);
         if (!info->isContentAddressed(*state.store))
             throw Error({
-                .msg = hintfmt("in pure mode, 'fetchClosure' requires a content-addressed path, which '%s' isn't",
+                .msg = hintfmt("in pure mode, with option 'enable-store-path-references' disabled, 'fetchClosure' requires a content-addressed path, which '%s' isn't",
                     state.store->printStorePath(*toPath)),
                 .errPos = state.positions[pos]
             });

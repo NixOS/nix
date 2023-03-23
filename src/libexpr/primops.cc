@@ -1449,8 +1449,9 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value * * args, 
     Path path = state.coerceToPath(pos, *args[0], context, "while evaluating the argument of builtins.storePath");
 
     /* The following branch permits a dependency on a store path to be declared,
-       but in restrict-eval, extending the allowed paths would not be desirable. */
-    if (evalSettings.pureEval && !evalSettings.restrictEval) {
+       but in restrict-eval, extending the allowed paths would not be desirable
+       regardless. */
+    if (evalSettings.pureEval && evalSettings.enableStorePathReferences && !evalSettings.restrictEval) {
 
         /* Reading from the store behaves like a pure function, but we want to
            be careful about symlink resolution, which would otherwise be done

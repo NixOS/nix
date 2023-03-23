@@ -605,6 +605,31 @@ struct EvalSettings : Config
           builds to take place.
         )"};
 
+    // TODO: (RFC 92) Add dynamic derivations as a use case here. Review the final assertion about non-buildable paths.
+    Setting<bool> enableStorePathReferences{
+        this, true, "allow-store-path-references",
+        R"(
+          Whether to allow references to store paths in the Nix language.
+
+          Usually, store paths are created by adding files to the store and
+          by using the `derivation` primitive. However, the `storePath`
+          primitive allows you to merely assert that a store path exists or
+          can be substituted, and allows you to use it in subsequent expressions.
+
+          This lets you use pre-built derivations, such as pre-built packages
+          that are passed into a NixOS VM test or closed source software that
+          is built and distributed with Nix.
+
+          However, unlike most expressions, it does not inherently provide a
+          means of obtaining, modifying and rebuilding the store path.
+          Unless these needs are covered by some process outside the current
+          evaluation context, use of this primitive suggests a lack of
+          reproducibility. You may disable this option to enforce that all
+          store paths are created by the current Nix evaluator. This ensures
+          that any non-reproducible content in your closure comes from
+          individual local files, built-in fetchers, or fixed-output derivations.
+        )"};
+
     Setting<Strings> allowedUris{this, {}, "allowed-uris",
         R"(
           A list of URI prefixes to which access is allowed in restricted
