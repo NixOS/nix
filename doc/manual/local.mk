@@ -29,9 +29,11 @@ nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -
 # re-implement mdBook's include directive to make it usable for terminal output and for proper @docroot@ substitution
 define process-includes
 	while read -r line; do \
-		filename=$$(sed 's/{{#include \(.*\)}}/\1/'<<< $$line); \
-		matchline=$$(sed 's|/|\\/|g' <<< $$line); \
-		sed -i "/$$matchline/r $$(dirname $(2))/$$filename" $(2); \
+		set -euo pipefail; \
+		filename="$$(dirname $(2))/$$(sed 's/{{#include \(.*\)}}/\1/'<<< $$line)"; \
+		matchline="$$(sed 's|/|\\/|g' <<< $$line)"; \
+		test -f "$$filename" || ( echo "#include-d file '$$filename' does not exist." >&2; exit 1; ); \
+		sed -i "/$$matchline/r $$filename" $(2); \
 		sed -i "s/$$matchline//" $(2); \
 	done < <(grep '{{#include' $(1))
 endef
