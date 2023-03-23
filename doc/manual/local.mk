@@ -66,7 +66,7 @@ $(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/generate-manpage.nix $(bindir)/
 
 $(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/utils.nix $(d)/src/command-ref/conf-file-prefix.md $(bindir)/nix
 	@cat doc/manual/src/command-ref/conf-file-prefix.md > $@.tmp
-	$(trace-gen) $(nix-eval) --expr '(import doc/manual/utils.nix).showSettings true (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp;
+	$(trace-gen) $(nix-eval) --expr '(import doc/manual/utils.nix).showSettings { useAnchors = true; } (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp;
 	@mv $@.tmp $@
 
 $(d)/nix.json: $(bindir)/nix

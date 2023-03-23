@@ -137,7 +137,7 @@ let
 
           **Settings**:
 
-          ${showSettings false settings}
+          ${showSettings { useAnchors = false; } settings}
         '';
     in concatStrings (attrValues (mapAttrs showStore cliDump.stores));
 
