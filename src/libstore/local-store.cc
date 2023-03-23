@@ -420,6 +420,13 @@ LocalStore::LocalStore(const Params & params)
 }
 
 
+LocalStore::LocalStore(std::string scheme, std::string path, const Params & params)
+    : LocalStore(params)
+{
+    throw UnimplementedError("LocalStore");
+}
+
+
 AutoCloseFD LocalStore::openGCLock()
 {
     Path fnGCLock = stateDir + "/gc.lock";
@@ -1957,5 +1964,6 @@ std::optional<std::string> LocalStore::getVersion()
     return nixVersion;
 }
 
+static RegisterStoreImplementation<LocalStore, LocalStoreConfig> regLocalStore;
 
 }  // namespace nix

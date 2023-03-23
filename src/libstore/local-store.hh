@@ -102,8 +102,12 @@ public:
     /* Initialise the local store, upgrading the schema if
        necessary. */
     LocalStore(const Params & params);
+    LocalStore(std::string scheme, std::string path, const Params & params);
 
     ~LocalStore();
+
+    static std::set<std::string> uriSchemes()
+    { return {}; }
 
     /* Implementations of abstract store API methods. */
 
