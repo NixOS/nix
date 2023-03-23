@@ -28,4 +28,4 @@
   ```
   provides information about each of its outputs.
 
-* The command `nix describe-stores` has been removed.
+* The experimental command `nix describe-stores` has been removed.
