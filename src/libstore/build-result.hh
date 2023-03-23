@@ -30,6 +30,7 @@ struct BuildResult
         NotDeterministic,
         ResolvesToAlreadyValid,
         NoSubstituters,
+        Abandoned,
     } status = MiscFailure;
 
     // FIXME: include entire ErrorInfo object.
@@ -52,6 +53,8 @@ struct BuildResult
                 case LogLimitExceeded: return "LogLimitExceeded";
                 case NotDeterministic: return "NotDeterministic";
                 case ResolvesToAlreadyValid: return "ResolvesToAlreadyValid";
+                case NoSubstituters: return "NoSubstituters";
+                case Abandoned: return "Abandoned";
                 default: return "Unknown";
             };
         }();

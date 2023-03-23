@@ -62,6 +62,8 @@ void Goal::amDone(ExitCode result, std::optional<Error> ex)
 
     if (ex) {
         if (!waiters.empty())
+            // FIXME: don't print errors for top-level goals here,
+            // since they'll presumably be shown by the caller.
             logError(ex->info());
         else
             this->ex = std::move(*ex);
