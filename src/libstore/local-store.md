@@ -13,7 +13,7 @@ A store that uses a *root* other than `/` is called a *chroot
 store*. With such stores, the store directory is "logically" still
 `/nix/store`, so programs stored in them can only be built and
 executed by `chroot`-ing into *root*. Chroot stores only support
-building and running on Linux when mount and user namespaces are
+building and running on Linux when [`mount namespaces`](https://man7.org/linux/man-pages/man7/mount_namespaces.7.html) and [`user namespaces`](https://man7.org/linux/man-pages/man7/user_namespaces.7.html) are
 enabled.
 
 For example, the following uses `/tmp/root` as the chroot environment
