@@ -672,7 +672,7 @@ protected:
     Stats stats;
 
     /* Unsupported methods. */
-    [[noreturn]] void unsupported(const std::string & op)
+    [[noreturn]] virtual void unsupported(const std::string & op)
     {
         throw Unsupported("operation '%s' is not supported by store '%s'", op, getUri());
     }

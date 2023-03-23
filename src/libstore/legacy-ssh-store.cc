@@ -384,6 +384,12 @@ public:
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override
     // TODO: Implement
     { unsupported("queryRealisation"); }
+
+    /* Unsupported methods. */
+    [[noreturn]] void unsupported(const std::string & op) override
+    {
+        throw Unsupported("operation '%s' is not supported by store '%s' (hint: try ssh-ng:// instead of ssh:// for a newer implementation)", op, getUri());
+    }
 };
 
 static RegisterStoreImplementation<LegacySSHStore, LegacySSHStoreConfig> regLegacySSHStore;
