@@ -296,6 +296,8 @@ private:
 
     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
+    void createUser(const std::string & userName, const std::string & profileDir) override;
+
     friend struct LocalDerivationGoal;
     friend struct PathSubstitutionGoal;
     friend struct SubstitutionGoal;

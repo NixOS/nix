@@ -165,8 +165,13 @@ std::optional<Path> getSelfExe();
 /* Return $XDG_STATE_HOME or $HOME/.local/state. */
 Path getStateDir();
 
-/* Create the Nix state directory and return the path to it. */
-Path createNixStateDir();
+enum struct CreateDirsFlag {
+    Create = true,
+    DontCreate = false
+};
+
+/* Return the path to the Nix state directory and optionnally create it if needed. */
+Path getNixStateDir(CreateDirsFlag create = CreateDirsFlag::Create);
 
 /* Create a directory and all its parents, if necessary.  Returns the
    list of created directories, in order of creation. */

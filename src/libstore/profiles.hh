@@ -70,11 +70,12 @@ std::string optimisticLockProfile(const Path & profile);
 
 /* Creates and returns the path to a directory suitable for storing the user’s
    profiles. */
-Path profilesDir();
+Path profilesDir(CreateDirsFlag create = CreateDirsFlag::Create);
 
 /* Resolve the default profile (~/.nix-profile by default, $XDG_STATE_HOME/
    nix/profile if XDG Base Directory Support is enabled), and create if doesn't
    exist */
 Path getDefaultProfile();
 
+void createLegacyProfileLink(Path oldProfile, Path newProfile);
 }

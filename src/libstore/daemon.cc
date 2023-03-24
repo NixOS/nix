@@ -1,5 +1,6 @@
 #include "daemon.hh"
 #include "monitor-fd.hh"
+#include "profiles.hh"
 #include "worker-protocol.hh"
 #include "build-result.hh"
 #include "store-api.hh"
@@ -271,9 +272,16 @@ static std::vector<DerivedPath> readDerivedPaths(Store & store, unsigned int cli
     return reqs;
 }
 
-static void performOp(TunnelLogger * logger, ref<Store> store,
-    TrustedFlag trusted, RecursiveFlag recursive, unsigned int clientVersion,
-    Source & from, BufferedSink & to, unsigned int op)
+static void performOp(
+    TunnelLogger * logger,
+    ref<Store> store,
+    TrustedFlag trusted,
+    RecursiveFlag recursive,
+    unsigned int clientVersion,
+    const std::optional<std::string> & userName,
+    Source & from,
+    BufferedSink & to,
+    unsigned int op)
 {
     switch (op) {
 
@@ -723,6 +731,16 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case wopCreateProfilesLink: {
+        auto newPath = readString(from);
+        logger->startWork();
+        if (userName) {
+            store->createUser(*userName, newPath);
+        }
+        logger->stopWork();
+        break;
+    }
+
     case wopSetOptions: {
 
         ClientSettings clientSettings;
@@ -994,7 +1012,8 @@ void processConnection(
     FdSource & from,
     FdSink & to,
     TrustedFlag trusted,
-    RecursiveFlag recursive)
+    RecursiveFlag recursive,
+    const std::optional<std::string> & userName)
 {
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
 
@@ -1056,7 +1075,7 @@ void processConnection(
             opCount++;
 
             try {
-                performOp(tunnelLogger, store, trusted, recursive, clientVersion, from, to, op);
+                performOp(tunnelLogger, store, trusted, recursive, clientVersion, userName, from, to, op);
             } catch (Error & e) {
                 /* If we're not in a state where we can send replies, then
                    something went wrong processing the input of the

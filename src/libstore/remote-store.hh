@@ -180,6 +180,8 @@ protected:
 
     virtual void narFromPath(const StorePath & path, Sink & sink) override;
 
+    void createLegacyProfileLink(Connection & conn);
+
 private:
 
     std::atomic_bool failed{false};

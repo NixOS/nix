@@ -278,7 +278,7 @@ static void daemonLoop()
                 //  Handle the connection.
                 FdSource from(remote.get());
                 FdSink to(remote.get());
-                processConnection(openUncachedStore(), from, to, trusted, NotRecursive);
+                processConnection(openUncachedStore(), from, to, trusted, NotRecursive, {user});
 
                 exit(0);
             }, options);
@@ -331,7 +331,7 @@ static void runDaemon(bool stdio)
             /* Auth hook is empty because in this mode we blindly trust the
                standard streams. Limiting access to those is explicitly
                not `nix-daemon`'s responsibility. */
-            processConnection(openUncachedStore(), from, to, Trusted, NotRecursive);
+            processConnection(openUncachedStore(), from, to, Trusted, NotRecursive, std::nullopt);
         }
     } else
         daemonLoop();
