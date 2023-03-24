@@ -1,5 +1,5 @@
-#include "command.hh"
 #include "installable-flake.hh"
+#include "command-installable-value.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
@@ -8,7 +8,7 @@
 
 using namespace nix;
 
-struct CmdBundle : InstallableCommand
+struct CmdBundle : InstallableValueCommand
 {
     std::string bundler = "github:NixOS/bundlers";
     std::optional<Path> outLink;
@@ -70,7 +70,7 @@ struct CmdBundle : InstallableCommand
         return res;
     }
 
-    void run(ref<Store> store, ref<Installable> installable) override
+    void run(ref<Store> store, ref<InstallableValue> installable) override
     {
         auto evalState = getEvalState();
 

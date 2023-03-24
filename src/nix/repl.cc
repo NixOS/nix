@@ -1,6 +1,7 @@
 #include "eval.hh"
 #include "globals.hh"
 #include "command.hh"
+#include "installable-value.hh"
 #include "repl.hh"
 
 namespace nix {
@@ -57,11 +58,12 @@ struct CmdRepl : RawInstallablesCommand
         auto getValues = [&]()->AbstractNixRepl::AnnotatedValues{
             auto installables = parseInstallables(store, rawInstallables);
             AbstractNixRepl::AnnotatedValues values;
-            for (auto & installable: installables){
-                auto what = installable->what();
+            for (auto & installable_: installables){
+                auto & installable = InstallableValue::require(*installable_);
+                auto what = installable.what();
                 if (file){
-                    auto [val, pos] = installable->toValue(*state);
-                    auto what = installable->what();
+                    auto [val, pos] = installable.toValue(*state);
+                    auto what = installable.what();
                     state->forceValue(*val, pos);
                     auto autoArgs = getAutoArgs(*state);
                     auto valPost = state->allocValue();
@@ -69,7 +71,7 @@ struct CmdRepl : RawInstallablesCommand
                     state->forceValue(*valPost, pos);
                     values.push_back( {valPost, what });
                 } else {
-                    auto [val, pos] = installable->toValue(*state);
+                    auto [val, pos] = installable.toValue(*state);
                     values.push_back( {val, what} );
                 }
             }
