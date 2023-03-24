@@ -7,6 +7,7 @@ let
 
   showCommand = { command, details, filename, toplevel }:
     let
+
       result = ''
         > **Warning** \
         > This program is **experimental** and its interface is subject to change.
@@ -25,6 +26,7 @@ let
 
         ${maybeOptions}
       '';
+
       showSynopsis = command: args:
         let
           showArgument = arg: "*${arg.label}*" + (if arg ? arity then "" else "...");
@@ -32,6 +34,7 @@ let
         in ''
          `${command}` [*option*...] ${arguments}
         '';
+
       maybeSubcommands = if details ? commands && details.commands != {}
         then ''
            where *subcommand* is one of the following:
@@ -39,26 +42,35 @@ let
            ${subcommands}
          ''
         else "";
+
       subcommands = if length categories > 1
         then listCategories
         else listSubcommands details.commands;
+
       categories = sort (x: y: x.id < y.id) (unique (map (cmd: cmd.category) (attrValues details.commands)));
+
       listCategories = concatStrings (map showCategory categories);
+
       showCategory = cat: ''
         **${toString cat.description}:**
 
         ${listSubcommands (filterAttrs (n: v: v.category == cat) details.commands)}
       '';
+
       listSubcommands = cmds: concatStrings (attrValues (mapAttrs showSubcommand cmds));
+
       showSubcommand = name: subcmd: ''
         * [`${command} ${name}`](./${appendName filename name}.md) - ${subcmd.description}
       '';
+
       maybeDocumentation = if details ? doc then details.doc else "";
+
       maybeOptions = if details.flags == {} then "" else ''
         # Options
 
         ${showOptions details.flags toplevel.flags}
       '';
+
       showOptions = options: commonOptions:
         let
           allOptions = options // commonOptions;
@@ -99,7 +111,7 @@ let
     in [ cmd ] ++ concatMap subcommand (attrNames details.commands or {});
 
   parsedToplevel = builtins.fromJSON toplevel;
-  
+
   manpages = processCommand {
     command = "nix";
     details = parsedToplevel;

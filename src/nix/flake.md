@@ -54,7 +54,7 @@ output attribute). They are also allowed in the `inputs` attribute
 of a flake, e.g.
 
 ```nix
-inputs.nixpkgs.url = github:NixOS/nixpkgs;
+inputs.nixpkgs.url = "github:NixOS/nixpkgs";
 ```
 
 is equivalent to
@@ -282,7 +282,7 @@ Nixpkgs flake and provides a single package (i.e. an
 {
   description = "A flake for building Hello World";
 
-  inputs.nixpkgs.url = github:NixOS/nixpkgs/nixos-20.03;
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-20.03";
 
   outputs = { self, nixpkgs }: {
 
@@ -374,7 +374,7 @@ inputs.nixpkgs = {
 Alternatively, you can use the URL-like syntax:
 
 ```nix
-inputs.import-cargo.url = github:edolstra/import-cargo;
+inputs.import-cargo.url = "github:edolstra/import-cargo";
 inputs.nixpkgs.url = "nixpkgs";
 ```
 

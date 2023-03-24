@@ -704,7 +704,7 @@ typedef std::function<bool(const Path & path)> PathFilter;
 extern PathFilter defaultPathFilter;
 
 /* Common initialisation performed in child processes. */
-void commonChildInit(int stderrFd);
+void commonChildInit();
 
 /* Create a Unix domain socket. */
 AutoCloseFD createUnixDomainSocket();

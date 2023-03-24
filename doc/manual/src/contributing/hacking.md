@@ -389,3 +389,35 @@ If a broken link occurs in a snippet that was inserted into multiple generated f
 If the `@docroot@` literal appears in an error message from the `mdbook-linkcheck` tool, the `@docroot@` replacement needs to be applied to the generated source file that mentions it.
 See existing `@docroot@` logic in the [Makefile].
 Regular markdown files used for the manual have a base path of their own and they can use relative paths instead of `@docroot@`.
+
+## API documentation
+
+Doxygen API documentation is [available
+online](https://hydra.nixos.org/job/nix/master/internal-api-docs/latest/download-by-type/doc/internal-api-docs). You
+can also build and view it yourself:
+
+```console
+# nix build .#hydraJobs.internal-api-docs
+# xdg-open ./result/share/doc/nix/internal-api/html/index.html
+```
+
+or inside a `nix develop` shell by running:
+
+```
+# make internal-api-html
+# xdg-open ./outputs/doc/share/doc/nix/internal-api/html/index.html
+```
+
+## Coverage analysis
+
+A coverage analysis report is [available
+online](https://hydra.nixos.org/job/nix/master/coverage/latest/download-by-type/report/coverage). You
+can build it yourself:
+
+```
+# nix build .#hydraJobs.coverage
+# xdg-open ./result/coverage/index.html
+```
+
+Metrics about the change in line/function coverage over time are also
+[available](https://hydra.nixos.org/job/nix/master/coverage#tabs-charts).

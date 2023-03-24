@@ -169,7 +169,7 @@ struct LocalDerivationGoal : public DerivationGoal
     int getChildStatus() override;
 
     /* Run the builder's process. */
-    void runChild(const std::string & slaveName);
+    void runChild();
 
     /* Check that the derivation outputs all exist and register them
        as valid. */
