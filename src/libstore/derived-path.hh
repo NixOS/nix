@@ -105,7 +105,7 @@ using _BuiltPathRaw = std::variant<
 >;
 
 /**
- * A built path. Similar to a `DerivedPath`, but enriched with the corresponding
+ * A built path. Similar to a DerivedPath, but enriched with the corresponding
  * output path(s).
  */
 struct BuiltPath : _BuiltPathRaw {
