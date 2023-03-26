@@ -1026,36 +1026,43 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
             auto visitor2 = visitor.getAttr(attrName);
 
-            if ((attrPathS[0] == "apps"
-                    || attrPathS[0] == "checks"
-                    || attrPathS[0] == "devShells"
-                    || attrPathS[0] == "legacyPackages"
-                    || attrPathS[0] == "packages")
-                && (attrPathS.size() == 1 || attrPathS.size() == 2)) {
-                for (const auto &subAttr : visitor2->getAttrs()) {
-                    if (hasContent(*visitor2, attrPath2, subAttr)) {
-                        return true;
+            try {
+                if ((attrPathS[0] == "apps"
+                        || attrPathS[0] == "checks"
+                        || attrPathS[0] == "devShells"
+                        || attrPathS[0] == "legacyPackages"
+                        || attrPathS[0] == "packages")
+                    && (attrPathS.size() == 1 || attrPathS.size() == 2)) {
+                    for (const auto &subAttr : visitor2->getAttrs()) {
+                        if (hasContent(*visitor2, attrPath2, subAttr)) {
+                            return true;
+                        }
                     }
+                    return false;
                 }
-                return false;
-            }
 
-            if ((attrPathS.size() == 1)
-                && (attrPathS[0] == "formatter"
-                    || attrPathS[0] == "nixosConfigurations"
-                    || attrPathS[0] == "nixosModules"
-                    || attrPathS[0] == "overlays"
-                    )) {
-                for (const auto &subAttr : visitor2->getAttrs()) {
-                    if (hasContent(*visitor2, attrPath2, subAttr)) {
-                        return true;
+                if ((attrPathS.size() == 1)
+                    && (attrPathS[0] == "formatter"
+                        || attrPathS[0] == "nixosConfigurations"
+                        || attrPathS[0] == "nixosModules"
+                        || attrPathS[0] == "overlays"
+                        )) {
+                    for (const auto &subAttr : visitor2->getAttrs()) {
+                        if (hasContent(*visitor2, attrPath2, subAttr)) {
+                            return true;
+                        }
                     }
+                    return false;
                 }
-                return false;
-            }
 
-            // If we don't recognize it, it's probably content
-            return true;
+                // If we don't recognize it, it's probably content
+                return true;
+            } catch (EvalError & e) {
+                // Some attrs may contain errors, eg. legacyPackages of
+                // nixpkgs. We still want to recurse into it, instead of
+                // skipping it at all.
+                return true;
+            }
         };
 
         std::function<nlohmann::json(

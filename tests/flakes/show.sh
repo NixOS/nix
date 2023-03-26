@@ -64,3 +64,23 @@ in
 assert show_output == { };
 true
 '
+
+# Test that legacyPackages with errors are handled correctly.
+cat >flake.nix <<EOF
+{
+  outputs = inputs: {
+    legacyPackages.$system = {
+      AAAAAASomeThingsFailToEvaluate = throw "nooo";
+      simple = import ./simple.nix;
+    };
+  };
+}
+EOF
+nix flake show --json --legacy --all-systems > show-output.json
+nix eval --impure --expr '
+let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
+in
+assert show_output.legacyPackages.${builtins.currentSystem}.AAAAAASomeThingsFailToEvaluate == { };
+assert show_output.legacyPackages.${builtins.currentSystem}.simple.name == "simple";
+true
+'
