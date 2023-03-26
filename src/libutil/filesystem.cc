@@ -1,6 +1,7 @@
 #include <sys/time.h>
 #include <filesystem>
 #include <atomic>
+#include <deque>
 
 #include "finally.hh"
 #include "util.hh"
@@ -167,6 +168,49 @@ void moveFile(const Path & oldName, const Path & newName)
             copy(fs::directory_entry(oldPath), tempCopyTarget, true);
             renameFile(tempCopyTarget, newPath);
         }
+    }
+}
+
+void recursiveSync(const Path & path)
+{
+    /* If it's a file, just fsync and return */
+    auto st = lstat(path);
+    if (S_ISREG(st.st_mode)) {
+        AutoCloseFD fd = open(path.c_str(), O_RDONLY, 0);
+        if (!fd)
+            throw SysError("opening file '%1%'", path);
+        fd.fsync();
+        return;
+    }
+
+    /* Otherwise, perform a depth-first traversal of the directory and fsync all the files */
+    std::deque<Path> dirsToEnumerate;
+    dirsToEnumerate.push_back(path);
+    std::vector<Path> dirsToFsync;
+    while (!dirsToEnumerate.empty()) {
+        auto currentDir = dirsToEnumerate.back();
+        dirsToEnumerate.pop_back();
+        const auto dirEntries = readDirectory(currentDir);
+        for (const auto& dirEntry : dirEntries) {
+            auto entryPath = currentDir + "/" + dirEntry.name;
+            if (dirEntry.type == DT_DIR) {
+                dirsToEnumerate.emplace_back(std::move(entryPath));
+            } else if (dirEntry.type == DT_REG) {
+                AutoCloseFD fd = open(entryPath.c_str(), O_RDONLY, 0);
+                if (!fd)
+                    throw SysError("opening file '%1%'", entryPath);
+                fd.fsync();
+            }
+        }
+        dirsToFsync.emplace_back(std::move(currentDir));
+    }
+
+    /* fsync all the directories */
+    for (auto dir = dirsToFsync.rbegin(); dir != dirsToFsync.rend(); ++dir) {
+        AutoCloseFD fd = open(dir->c_str(), O_RDONLY, 0);
+        if (!fd)
+            throw SysError("opening directory '%1%'", *dir);
+        fd.fsync();
     }
 }
 
