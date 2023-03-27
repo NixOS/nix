@@ -11,7 +11,7 @@ R""(
 * Upgrade Nix in a specific profile:
 
   ```console
-  # nix upgrade-nix -p /nix/var/nix/profiles/per-user/alice/profile
+  # nix upgrade-nix -p ~alice/.local/state/nix/profiles/profile
   ```
 
 # Description
