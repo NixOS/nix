@@ -65,7 +65,8 @@ assert show_output == { };
 true
 '
 
-# Test that legacyPackages with errors are handled correctly.
+# Test that attributes with errors are handled correctly.
+# nixpkgs.legacyPackages is a particularly prominent instance of this.
 cat >flake.nix <<EOF
 {
   outputs = inputs: {
