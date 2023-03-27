@@ -14,7 +14,7 @@ struct TarArchive {
 
     TarArchive(const Path & path);
 
-    // disable copy constructor
+    /// disable copy constructor
     TarArchive(const TarArchive &) = delete;
 
     void close();

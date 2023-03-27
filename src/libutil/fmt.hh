@@ -8,20 +8,25 @@
 namespace nix {
 
 
-/* Inherit some names from other namespaces for convenience. */
+/**
+ * Inherit some names from other namespaces for convenience.
+ */
 using boost::format;
 
 
-/* A variadic template that does nothing. Useful to call a function
-   for all variadic arguments but ignoring the result. */
+/**
+ * A variadic template that does nothing. Useful to call a function
+ * for all variadic arguments but ignoring the result.
+ */
 struct nop { template<typename... T> nop(T...) {} };
 
 
-/* A helper for formatting strings. ‘fmt(format, a_0, ..., a_n)’ is
-   equivalent to ‘boost::format(format) % a_0 % ... %
-   ... a_n’. However, ‘fmt(s)’ is equivalent to ‘s’ (so no %-expansion
-   takes place). */
-
+/**
+ * A helper for formatting strings. ‘fmt(format, a_0, ..., a_n)’ is
+ * equivalent to ‘boost::format(format) % a_0 % ... %
+ * ... a_n’. However, ‘fmt(s)’ is equivalent to ‘s’ (so no %-expansion
+ * takes place).
+ */
 template<class F>
 inline void formatHelper(F & f)
 {

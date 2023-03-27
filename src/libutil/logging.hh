@@ -217,7 +217,9 @@ extern Verbosity verbosity; /* suppress msgs > this */
 #define debug(args...) printMsg(lvlDebug, args)
 #define vomit(args...) printMsg(lvlVomit, args)
 
-/* if verbosity >= lvlWarn, print a message with a yellow 'warning:' prefix. */
+/**
+ * if verbosity >= lvlWarn, print a message with a yellow 'warning:' prefix.
+ */
 template<typename... Args>
 inline void warn(const std::string & fs, const Args & ... args)
 {

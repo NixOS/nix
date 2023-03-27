@@ -11,33 +11,37 @@
 
 namespace nix {
 
-/* This template class implements a simple pool manager of resources
-   of some type R, such as database connections. It is used as
-   follows:
-
-     class Connection { ... };
-
-     Pool<Connection> pool;
-
-     {
-       auto conn(pool.get());
-       conn->exec("select ...");
-     }
-
-   Here, the Connection object referenced by ‘conn’ is automatically
-   returned to the pool when ‘conn’ goes out of scope.
-*/
-
+/**
+ * This template class implements a simple pool manager of resources
+ * of some type R, such as database connections. It is used as
+ * follows:
+ *
+ *   class Connection { ... };
+ *
+ *   Pool<Connection> pool;
+ *
+ *   {
+ *     auto conn(pool.get());
+ *     conn->exec("select ...");
+ *   }
+ *
+ * Here, the Connection object referenced by ‘conn’ is automatically
+ * returned to the pool when ‘conn’ goes out of scope.
+ */
 template <class R>
 class Pool
 {
 public:
 
-    /* A function that produces new instances of R on demand. */
+    /**
+     * A function that produces new instances of R on demand.
+     */
     typedef std::function<ref<R>()> Factory;
 
-    /* A function that checks whether an instance of R is still
-       usable. Unusable instances are removed from the pool. */
+    /**
+     * A function that checks whether an instance of R is still
+     * usable. Unusable instances are removed from the pool.
+     */
     typedef std::function<bool(const ref<R> &)> Validator;
 
 private:

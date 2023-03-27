@@ -13,7 +13,8 @@ int levenshteinDistance(std::string_view first, std::string_view second);
  */
 class Suggestion {
 public:
-    int distance; // The smaller the better
+    /// The smaller the better
+    int distance;
     std::string suggestion;
 
     std::string to_string() const;
@@ -43,7 +44,9 @@ public:
 std::ostream & operator<<(std::ostream & str, const Suggestion &);
 std::ostream & operator<<(std::ostream & str, const Suggestions &);
 
-// Either a value of type `T`, or some suggestions
+/**
+ * Either a value of type `T`, or some suggestions
+ */
 template<typename T>
 class OrSuggestions {
 public:

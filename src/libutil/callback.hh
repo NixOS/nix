@@ -5,9 +5,11 @@
 
 namespace nix {
 
-/* A callback is a wrapper around a lambda that accepts a valid of
-   type T or an exception. (We abuse std::future<T> to pass the value or
-   exception.) */
+/**
+ * A callback is a wrapper around a lambda that accepts a valid of
+ * type T or an exception. (We abuse std::future<T> to pass the value or
+ * exception.)
+ */
 template<typename T>
 class Callback
 {

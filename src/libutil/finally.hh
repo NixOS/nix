@@ -1,6 +1,8 @@
 #pragma once
 
-/* A trivial class to run a function at the end of a scope. */
+/**
+ * A trivial class to run a function at the end of a scope.
+ */
 template<typename Fn>
 class Finally
 {

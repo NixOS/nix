@@ -7,7 +7,9 @@
 
 namespace nix {
 
-/* A simple least-recently used cache. Not thread-safe. */
+/**
+ * A simple least-recently used cache. Not thread-safe.
+ */
 template<typename Key, typename Value>
 class LRUCache
 {
@@ -31,7 +33,9 @@ public:
 
     LRUCache(size_t capacity) : capacity(capacity) { }
 
-    /* Insert or upsert an item in the cache. */
+    /**
+     * Insert or upsert an item in the cache.
+     */
     void upsert(const Key & key, const Value & value)
     {
         if (capacity == 0) return;
@@ -39,7 +43,9 @@ public:
         erase(key);
 
         if (data.size() >= capacity) {
-            /* Retire the oldest item. */
+            /**
+             * Retire the oldest item.
+             */
             auto oldest = lru.begin();
             data.erase(*oldest);
             lru.erase(oldest);
@@ -63,14 +69,18 @@ public:
         return true;
     }
 
-    /* Look up an item in the cache. If it exists, it becomes the most
-       recently used item. */
+    /**
+     * Look up an item in the cache. If it exists, it becomes the most
+     * recently used item.
+     * */
     std::optional<Value> get(const Key & key)
     {
         auto i = data.find(key);
         if (i == data.end()) return {};
 
-        /* Move this item to the back of the LRU list. */
+        /**
+         * Move this item to the back of the LRU list.
+         */
         lru.erase(i->second.first.it);
         auto j = lru.insert(lru.end(), i);
         i->second.first.it = j;

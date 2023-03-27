@@ -7,7 +7,8 @@ namespace nix {
 struct ParsedURL
 {
     std::string url;
-    std::string base; // URL without query/fragment
+    /// URL without query/fragment
+    std::string base;
     std::string scheme;
     std::optional<std::string> authority;
     std::string path;
@@ -28,7 +29,7 @@ std::map<std::string, std::string> decodeQuery(const std::string & query);
 
 ParsedURL parseURL(const std::string & url);
 
-/*
+/**
  * Although that’s not really standardized anywhere, an number of tools
  * use a scheme of the form 'x+y' in urls, where y is the “transport layer”
  * scheme, and x is the “application layer” scheme.

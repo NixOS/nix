@@ -14,6 +14,10 @@ namespace nix {
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
 
+/**
+ * Enumeration of all the request types for the "worker protocol", used
+ * by unix:// and ssh-ng:// stores.
+ */
 typedef enum {
     wopIsValidPath = 1,
     wopHasSubstitutes = 3,
@@ -74,7 +78,12 @@ typedef enum {
 class Store;
 struct Source;
 
-/* To guide overloading */
+/**
+ * Used to guide overloading
+ *
+ * See https://en.cppreference.com/w/cpp/language/adl for the broader
+ * concept of what is going on here.
+ */
 template<typename T>
 struct Phantom {};
 
@@ -103,18 +112,19 @@ MAKE_WORKER_PROTO(X_, Y_);
 #undef X_
 #undef Y_
 
-/* These use the empty string for the null case, relying on the fact
-   that the underlying types never serialize to the empty string.
-
-   We do this instead of a generic std::optional<T> instance because
-   ordinal tags (0 or 1, here) are a bit of a compatability hazard. For
-   the same reason, we don't have a std::variant<T..> instances (ordinal
-   tags 0...n).
-
-   We could the generic instances and then these as specializations for
-   compatability, but that's proven a bit finnicky, and also makes the
-   worker protocol harder to implement in other languages where such
-   specializations may not be allowed.
+/**
+ * These use the empty string for the null case, relying on the fact
+ * that the underlying types never serialize to the empty string.
+ *
+ * We do this instead of a generic std::optional<T> instance because
+ * ordinal tags (0 or 1, here) are a bit of a compatability hazard. For
+ * the same reason, we don't have a std::variant<T..> instances (ordinal
+ * tags 0...n).
+ *
+ * We could the generic instances and then these as specializations for
+ * compatability, but that's proven a bit finnicky, and also makes the
+ * worker protocol harder to implement in other languages where such
+ * specializations may not be allowed.
  */
 MAKE_WORKER_PROTO(, std::optional<StorePath>);
 MAKE_WORKER_PROTO(, std::optional<ContentAddress>);

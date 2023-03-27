@@ -7,22 +7,22 @@
 
 namespace nix {
 
-/* This template class ensures synchronized access to a value of type
-   T. It is used as follows:
-
-     struct Data { int x; ... };
-
-     Sync<Data> data;
-
-     {
-       auto data_(data.lock());
-       data_->x = 123;
-     }
-
-   Here, "data" is automatically unlocked when "data_" goes out of
-   scope.
-*/
-
+/**
+ * This template class ensures synchronized access to a value of type
+ * T. It is used as follows:
+ *
+ *   struct Data { int x; ... };
+ *
+ *   Sync<Data> data;
+ *
+ *   {
+ *     auto data_(data.lock());
+ *     data_->x = 123;
+ *   }
+ *
+ * Here, "data" is automatically unlocked when "data_" goes out of
+ * scope.
+ */
 template<class T, class M = std::mutex>
 class Sync
 {
