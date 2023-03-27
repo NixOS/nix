@@ -44,6 +44,13 @@
 
 namespace nix {
 
+std::string LocalStoreConfig::doc()
+{
+    return
+        #include "local-store.md"
+        ;
+}
+
 struct LocalStore::State::Stmts {
     /* Some precompiled SQLite statements. */
     SQLiteStmt RegisterValidPath;
@@ -410,6 +417,13 @@ LocalStore::LocalStore(const Params & params)
                     (select id from Realisations where drvPath = ? and outputName = ?));
             )");
     }
+}
+
+
+LocalStore::LocalStore(std::string scheme, std::string path, const Params & params)
+    : LocalStore(params)
+{
+    throw UnimplementedError("LocalStore");
 }
 
 
@@ -1950,5 +1964,6 @@ std::optional<std::string> LocalStore::getVersion()
     return nixVersion;
 }
 
+static RegisterStoreImplementation<LocalStore, LocalStoreConfig> regLocalStore;
 
 }  // namespace nix

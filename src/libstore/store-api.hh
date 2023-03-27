@@ -101,17 +101,41 @@ struct StoreConfig : public Config
 
     virtual const std::string name() = 0;
 
+    virtual std::string doc()
+    {
+        return "";
+    }
+
     const PathSetting storeDir_{this, false, settings.nixStore,
-        "store", "path to the Nix store"};
+        "store",
+        R"(
+          Logical location of the Nix store, usually
+          `/nix/store`. Note that you can only copy store paths
+          between stores if they have the same `store` setting.
+        )"};
     const Path storeDir = storeDir_;
 
-    const Setting<int> pathInfoCacheSize{this, 65536, "path-info-cache-size", "size of the in-memory store path information cache"};
+    const Setting<int> pathInfoCacheSize{this, 65536, "path-info-cache-size",
+        "Size of the in-memory store path metadata cache."};
 
-    const Setting<bool> isTrusted{this, false, "trusted", "whether paths from this store can be used as substitutes even when they lack trusted signatures"};
+    const Setting<bool> isTrusted{this, false, "trusted",
+        R"(
+          Whether paths from this store can be used as substitutes
+          even if they are not signed by a key listed in the
+          [`trusted-public-keys`](@docroot@/command-ref/conf-file.md#conf-trusted-public-keys)
+          setting.
+        )"};
 
-    Setting<int> priority{this, 0, "priority", "priority of this substituter (lower value means higher priority)"};
+    Setting<int> priority{this, 0, "priority",
+        R"(
+          Priority of this store when used as a substituter. A lower value means a higher priority.
+        )"};
 
-    Setting<bool> wantMassQuery{this, false, "want-mass-query", "whether this substituter can be queried efficiently for path validity"};
+    Setting<bool> wantMassQuery{this, false, "want-mass-query",
+        R"(
+          Whether this store (when used as a substituter) can be
+          queried efficiently for path validity.
+        )"};
 
     Setting<StringSet> systemFeatures{this, getDefaultSystemFeatures(),
         "system-features",
@@ -124,8 +148,6 @@ class Store : public std::enable_shared_from_this<Store>, public virtual StoreCo
 public:
 
     typedef std::map<std::string, std::string> Params;
-
-
 
 protected:
 

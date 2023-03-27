@@ -18,6 +18,7 @@ class EvalState;
 struct Pos;
 class Store;
 
+static constexpr Command::Category catHelp = -1;
 static constexpr Command::Category catSecondary = 100;
 static constexpr Command::Category catUtility = 101;
 static constexpr Command::Category catNixInstallation = 102;

@@ -27,3 +27,7 @@
   $ nix path-info /nix/store/gzaflydcr6sb3567hap9q6srzx8ggdgg-glibc-2.33-78.drv^*
   ```
   provides information about each of its outputs.
+
+* The experimental command `nix describe-stores` has been removed.
+
+* Nix stores and their settings are now documented in [`nix help-stores`](@docroot@/command-ref/new-cli/nix3-help-stores.md).
