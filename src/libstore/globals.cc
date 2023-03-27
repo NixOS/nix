@@ -44,14 +44,9 @@ Settings::Settings()
     lockCPU = getEnv("NIX_AFFINITY_HACK") == "1";
     allowSymlinkedStore = getEnv("NIX_IGNORE_SYMLINK_STORE") == "1";
 
-    caFile = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
-    if (caFile == "") {
-        for (auto & fn : {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
-            if (pathExists(fn)) {
-                caFile = fn;
-                break;
-            }
-    }
+    auto sslOverride = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
+    if (sslOverride != "")
+        caFile = sslOverride;
 
     /* Backwards compatibility. */
     auto s = getEnv("NIX_REMOTE_SYSTEMS");
@@ -173,6 +168,13 @@ bool Settings::isWSL1()
     // WSL1 uses -Microsoft suffix
     // WSL2 uses -microsoft-standard suffix
     return hasSuffix(utsbuf.release, "-Microsoft");
+}
+
+Path Settings::getDefaultSSLCertFile()
+{
+    for (auto & fn : {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
+        if (pathExists(fn)) return fn;
+    return "";
 }
 
 const std::string nixVersion = PACKAGE_VERSION;

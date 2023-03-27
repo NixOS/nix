@@ -63,6 +63,8 @@ class Settings : public Config {
 
     bool isWSL1();
 
+    Path getDefaultSSLCertFile();
+
 public:
 
     Settings();
@@ -825,8 +827,22 @@ public:
           > `.netrc`.
         )"};
 
-    /* Path to the SSL CA file used */
-    Path caFile;
+    Setting<Path> caFile{
+        this, getDefaultSSLCertFile(), "ssl-cert-file",
+        R"(
+          The path of a file containing CA certificates used to
+          authenticate `https://` downloads. Nix by default will use
+          the first of the following files that exists:
+
+          1. `/etc/ssl/certs/ca-certificates.crt`
+          2. `/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt`
+
+          The path can be overridden by the following environment
+          variables, in order of precedence:
+
+          1. `NIX_SSL_CERT_FILE`
+          2. `SSL_CERT_FILE`
+        )"};
 
 #if __linux__
     Setting<bool> filterSyscalls{
