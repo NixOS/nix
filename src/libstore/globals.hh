@@ -832,12 +832,17 @@ public:
         this, getDefaultSSLCertFile(), "ssl-cert-file",
         R"(
           The path of a file containing CA certificates used to
-          authenticate `https://` downloads. It defaults to the first
-          of `/etc/ssl/certs/ca-certificates.crt` and
-          `/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt`
-          that exists. It can be overriden using the
-          `NIX_SSL_CERT_FILE` and `SSL_CERT_FILE` environment variable
-          (in that order of precedence).
+          authenticate `https://` downloads. Nix by default will use
+          the first of the following files that exists:
+
+          1. `/etc/ssl/certs/ca-certificates.crt`
+          2. `/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt`
+
+          The path can be overridden by the following environment
+          variables, in order of precedence:
+
+          1. `NIX_SSL_CERT_FILE`
+          2. `SSL_CERT_FILE`
         )"};
 
 #if __linux__
