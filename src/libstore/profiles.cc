@@ -73,6 +73,9 @@ static Path makeName(const Path & profile, GenerationNumber num)
 
 Path createGeneration(LocalFSStore & store, Path profile, StorePath outPath)
 {
+    /* Make sure the directory for this profile exists. */
+    createDirs(dirOf(profile));
+
     /* The new generation number should be higher than old the
        previous ones. */
     auto [gens, dummy] = findGenerations(profile);
@@ -305,35 +308,94 @@ std::string optimisticLockProfile(const Path & profile)
 }
 
 
-Path profilesDir()
+Path userProfilesDir()
 {
-    auto profileRoot =
-        isRootUser()
-        ? rootProfilesDir()
-        : createNixStateDir() + "/profiles";
+    auto profileRoot = createNixStateDir() + "/profiles";
     createDirs(profileRoot);
     return profileRoot;
 }
 
-Path rootProfilesDir()
+/**
+ * Return the path to the global profile directory (but don't try creating it)
+ *
+ * Just used for the global profile and the global channels, but those
+ * go in different subdirs, so we do not expose this.
+ */
+static Path globalProfilesDir()
 {
-    return settings.nixStateDir + "/profiles/per-user/root";
+    return settings.nixStateDir + "/profiles";
 }
 
-
-Path getDefaultProfile()
+/**
+ * The other directory used for global profiles
+ */
+static Path perUsersRootDir()
 {
-    Path profileLink = settings.useXDGBaseDirectories ? createNixStateDir() + "/profile" : getHome() + "/.nix-profile";
+    return globalProfilesDir() + "/per-user/root/";
+}
+
+std::vector<Path> globalProfilesDirs()
+{
+    return {
+        globalProfilesDir(),
+        perUsersRootDir(),
+    };
+}
+
+/**
+ * The default per-user profile.
+ */
+static Path getDefaultUserProfile()
+{
+    return userProfilesDir() + "/profile";
+}
+
+/**
+ * The default global profile.
+ */
+static Path getDefaultGlobalProfile()
+{
+    return globalProfilesDir() + "/default";
+}
+
+DefaultProfileKind defaultDefaultProfileKind()
+{
+    return isRootUser()
+        ? DefaultProfileKind::Global
+        : DefaultProfileKind::User;
+}
+
+Path defaultProfileLink()
+{
+    return settings.useXDGBaseDirectories ? createNixStateDir() + "/profile" : getHome() + "/.nix-profile";
+}
+
+std::optional<Path> tryGetDefaultProfile()
+{
+    Path profileLink = defaultProfileLink();
+    if (pathExists(profileLink))
+        return absPath(readLink(profileLink), dirOf(profileLink));
+    else
+        return std::nullopt;
+}
+
+Path getDefaultProfile(DefaultProfileKind profileKind)
+{
+    Path profileLink = defaultProfileLink();
     try {
-        auto profile = profilesDir() + "/profile";
         if (!pathExists(profileLink)) {
+            Path profile;
+            switch (profileKind) {
+                case DefaultProfileKind::Global:
+                    profile = getDefaultGlobalProfile();
+                    break;
+                case DefaultProfileKind::User:
+                    profile = getDefaultUserProfile();
+                    break;
+                default:
+                    assert(false);
+            }
             replaceSymlink(profile, profileLink);
-        }
-        // Backwards compatibiliy measure: Make root's profile available as
-        // `.../default` as it's what NixOS and most of the init scripts expect
-        Path globalProfileLink = settings.nixStateDir + "/profiles/default";
-        if (isRootUser() && !pathExists(globalProfileLink)) {
-            replaceSymlink(profile, globalProfileLink);
         }
         return absPath(readLink(profileLink), dirOf(profileLink));
     } catch (Error &) {
@@ -343,14 +405,17 @@ Path getDefaultProfile()
     }
 }
 
-Path defaultChannelsDir()
+Path userChannelsDir()
 {
-    return profilesDir() + "/channels";
+    return userProfilesDir() + "/channels";
 }
 
-Path rootChannelsDir()
+Path globalChannelsDir()
 {
-    return rootProfilesDir() + "/channels";
+    /* "per-user" might seem like a weird thing to include in the path
+       to the "global" channels dir; it is done this way for
+       back-compat. */
+    return perUsersRootDir() + "/channels";
 }
 
 }

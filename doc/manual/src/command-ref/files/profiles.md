@@ -1,11 +1,32 @@
 ## Profiles
 
-A directory that contains links to profiles managed by [`nix-env`] and [`nix profile`]:
+A directory that contains links to profiles managed by [`nix-env`] and [`nix profile`].
 
-- `$XDG_STATE_HOME/nix/profiles` for regular users
-- `$NIX_STATE_DIR/profiles/per-user/root` if the user is `root`
+### [User-specific and global profiles]{#user-specific-and-global-profiles}
 
-A profile is a directory of symlinks to files in the Nix store.
+Profiles can be placed in any directory, but by default, different locations are used depending on whether the profile is intended to be used by a single user, or shared globally by all users.
+
+- The default directory for user-specific profiles is:
+  ```
+  $XDG_STATE_HOME/nix/profiles
+  ```
+
+  Within it, the [default user profile]{#default-user-profile} is:
+  ```
+  $XDG_STATE_HOME/nix/profiles/profile
+  ```
+
+- The default directory for global profiles is
+  ```
+  $NIX_STATE_DIR/profiles
+  ```
+
+  Within it, the [default global profile]{#default-global-profile} is
+  ```
+  $NIX_STATE_DIR/profiles/default
+  ```
+
+Nix command will default to the default user profile for regular users, and the default global profiles for root, but often provide flags to override this behavior.
 
 ### Filesystem layout
 
@@ -63,8 +84,8 @@ A symbolic link to the user's current profile:
 
 By default, this symlink points to:
 
-- `$XDG_STATE_HOME/nix/profiles/profile` for regular users
-- `$NIX_STATE_DIR/profiles/per-user/root/profile` for `root`
+- The [default user profile](#default-user-profile) (`$XDG_STATE_HOME/nix/profiles/profile`) for regular users
+- The [default global profile](#default-global-profile) (`$NIX_STATE_DIR/profiles/per-user/root/profile`) for `root`
 
 The `PATH` environment variable should include `/bin` subdirectory of the profile link (e.g. `~/.nix-profile/bin`) for the user environment to be visible to the user.
 The [installer](@docroot@/installation/installing-binary.md) sets this up by default, unless you enable [`use-xdg-base-directories`].

@@ -283,7 +283,24 @@ void MixProfile::updateProfile(const BuiltPaths & buildables)
 
 MixDefaultProfile::MixDefaultProfile()
 {
-    profile = getDefaultProfile();
+
+    addFlag({
+        .longName = "user-profile",
+        .description = "Act on the profile for this current user",
+        .handler = {[this]() {
+            profile = getDefaultProfile(DefaultProfileKind::User);
+        }}
+    });
+
+    addFlag({
+        .longName = "global-profile",
+        .description = "Act on the global profile shared between all default users",
+        .handler = {[this]() {
+            profile = getDefaultProfile(DefaultProfileKind::Global);
+        }}
+    });
+
+    profile = getDefaultProfile(defaultDefaultProfileKind());
 }
 
 MixEnvironment::MixEnvironment() : ignoreEnvironment(false)

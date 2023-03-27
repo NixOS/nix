@@ -1,6 +1,7 @@
 #include "users.hh"
 #include "globals.hh"
 #include "profiles.hh"
+#include "profiles/channels.hh"
 #include "eval.hh"
 #include "eval-settings.hh"
 
@@ -65,8 +66,8 @@ Strings EvalSettings::getDefaultNixPath()
 
     if (!evalSettings.restrictEval && !evalSettings.pureEval) {
         add(getNixDefExpr() + "/channels");
-        add(rootChannelsDir() + "/nixpkgs", "nixpkgs");
-        add(rootChannelsDir());
+        add(globalChannelsDir() + "/nixpkgs", "nixpkgs");
+        add(globalChannelsDir());
     }
 
     return res;

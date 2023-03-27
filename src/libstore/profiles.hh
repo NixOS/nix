@@ -211,28 +211,60 @@ std::string optimisticLockProfile(const Path & profile);
  * Create and return the path to a directory suitable for storing the user’s
  * profiles.
  */
-Path profilesDir();
+Path userProfilesDir();
 
 /**
- * Return the path to the profile directory for root (but don't try creating it)
+ * Create and return the paths to the directories use for storing the
+ * global profiles. There are multiple for backwards compatibility
+ * reasons.
  */
-Path rootProfilesDir();
+std::vector<Path> globalProfilesDirs();
 
 /**
- * Create and return the path to the file used for storing the users's channels
+ * We have two types of default profiles:
+ *
+ * - User, just for the current user (read/write).
+ *
+ * - Global, shared (read-only) by all users.
  */
-Path defaultChannelsDir();
+enum class DefaultProfileKind
+{
+   User,
+   Global,
+};
 
 /**
- * Return the path to the channel directory for root (but don't try creating it)
+ * Returns the default kind of default profile.
+ *
+ * For regular users, this is `DefaultProfileKind::User`, but for root it is `DefaultProfileKind::Global`.
  */
-Path rootChannelsDir();
+DefaultProfileKind defaultDefaultProfileKind();
 
 /**
- * Resolve the default profile (~/.nix-profile by default,
- * $XDG_STATE_HOME/nix/profile if XDG Base Directory Support is enabled),
- * and create if doesn't exist
+ * The path to the link (itself, not its target) defining the default profile.
+ *
+ * It is `~/.nix-profile` by default, `$XDG_STATE_HOME/nix/profile` if
+ * XDG Base Directory Support is enabled).
  */
-Path getDefaultProfile();
+Path defaultProfileLink();
+
+/**
+ * Resolve the default profile (as indicated by `defaultProfileLink()`).
+ *
+ * If it doesn't exist, return `std::nullopt`.
+ */
+std::optional<Path> tryGetDefaultProfile();
+
+/**
+ * Resolve the default profile (just `tryGetDefaultProfile()`),
+ * but also create if doesn't exist.
+ *
+ * If something goes wrong, just return the path to the link itself.
+ *
+ * @todo Why do squelch failures this way?
+ *
+ * @param kind Just used if the profile doesn't exist.
+ */
+Path getDefaultProfile(DefaultProfileKind kind);
 
 }
