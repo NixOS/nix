@@ -54,12 +54,11 @@ static bool haveInternet()
 
 std::string programPath;
 
-struct HelpRequested { };
-
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
     bool useNet = true;
     bool refresh = false;
+    bool helpRequested = false;
     bool showVersion = false;
 
     NixArgs() : MultiCommand(RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
@@ -74,7 +73,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .longName = "help",
             .description = "Show usage information.",
             .category = miscCategory,
-            .handler = {[&]() { throw HelpRequested(); }},
+            .handler = {[this]() { this->helpRequested = true; }},
         });
 
         addFlag({
@@ -297,7 +296,10 @@ void mainWrapped(int argc, char * * argv)
     }
 
     if (argc == 2 && std::string(argv[1]) == "__dump-builtins") {
-        settings.experimentalFeatures = {Xp::Flakes, Xp::FetchClosure};
+        experimentalFeatureSettings.experimentalFeatures = {
+            Xp::Flakes,
+            Xp::FetchClosure,
+        };
         evalSettings.pureEval = false;
         EvalState state({}, openStore("dummy://"));
         auto res = nlohmann::json::object();
@@ -334,7 +336,11 @@ void mainWrapped(int argc, char * * argv)
 
     try {
         args.parseCmdline(argvToStrings(argc, argv));
-    } catch (HelpRequested &) {
+    } catch (UsageError &) {
+        if (!args.helpRequested && !completions) throw;
+    }
+
+    if (args.helpRequested) {
         std::vector<std::string> subcommand;
         MultiCommand * command = &args;
         while (command) {
@@ -346,8 +352,6 @@ void mainWrapped(int argc, char * * argv)
         }
         showHelp(subcommand, args);
         return;
-    } catch (UsageError &) {
-        if (!completions) throw;
     }
 
     if (completions) {
@@ -366,7 +370,7 @@ void mainWrapped(int argc, char * * argv)
     if (args.command->first != "repl"
         && args.command->first != "doctor"
         && args.command->first != "upgrade-nix")
-        settings.requireExperimentalFeature(Xp::NixCommand);
+        experimentalFeatureSettings.require(Xp::NixCommand);
 
     if (args.useNet && !haveInternet()) {
         warn("you don't have Internet access; disabling some network-dependent features");

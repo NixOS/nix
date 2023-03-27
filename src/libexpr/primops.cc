@@ -1141,13 +1141,13 @@ drvName, Bindings * attrs, Value & v)
             if (i->name == state.sContentAddressed) {
                 contentAddressed = state.forceBool(*i->value, noPos, context_below);
                 if (contentAddressed)
-                    settings.requireExperimentalFeature(Xp::CaDerivations);
+                    experimentalFeatureSettings.require(Xp::CaDerivations);
             }
 
             else if (i->name == state.sImpure) {
                 isImpure = state.forceBool(*i->value, noPos, context_below);
                 if (isImpure)
-                    settings.requireExperimentalFeature(Xp::ImpureDerivations);
+                    experimentalFeatureSettings.require(Xp::ImpureDerivations);
             }
 
             /* The `args' attribute is special: it supplies the
@@ -4114,7 +4114,7 @@ void EvalState::createBaseEnv()
     if (RegisterPrimOp::primOps)
         for (auto & primOp : *RegisterPrimOp::primOps)
             if (!primOp.experimentalFeature
-                || settings.isExperimentalFeatureEnabled(*primOp.experimentalFeature))
+                || experimentalFeatureSettings.isEnabled(*primOp.experimentalFeature))
             {
                 addPrimOp({
                     .fun = primOp.fun,
