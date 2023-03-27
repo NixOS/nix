@@ -1403,11 +1403,11 @@ static int main_nix_env(int argc, char * * argv)
             try {
                 createDirs(globals.instSource.nixExprPath);
                 replaceSymlink(
-                    fmt("%s/profiles/per-user/%s/channels", settings.nixStateDir, getUserName()),
+                    defaultChannelsDir(),
                     globals.instSource.nixExprPath + "/channels");
                 if (getuid() != 0)
                     replaceSymlink(
-                        fmt("%s/profiles/per-user/root/channels", settings.nixStateDir),
+                        rootChannelsDir(),
                         globals.instSource.nixExprPath + "/channels_root");
             } catch (Error &) { }
         }
