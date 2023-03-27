@@ -1,6 +1,6 @@
 #pragma once
 
-#include "installables.hh"
+#include "installable-value.hh"
 #include "args.hh"
 #include "common-eval-args.hh"
 #include "path.hh"
