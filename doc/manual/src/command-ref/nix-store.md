@@ -493,7 +493,7 @@ depends on `svn`:
 $ nix-store -q --roots $(which svn)
 /nix/var/nix/profiles/default-81-link
 /nix/var/nix/profiles/default-82-link
-/nix/var/nix/profiles/per-user/eelco/profile-97-link
+/home/eelco/.local/state/nix/profiles/profile-97-link
 ```
 
 # Operation `--add`

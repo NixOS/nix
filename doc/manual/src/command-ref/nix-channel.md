@@ -70,7 +70,7 @@ $ nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
 
 # Files
 
-  - `/nix/var/nix/profiles/per-user/username/channels`\
+  - `${XDG_STATE_HOME-$HOME/.local/state}/nix/profiles/channels`\
     `nix-channel` uses a `nix-env` profile to keep track of previous
     versions of the subscribed channels. Every time you run `nix-channel
     --update`, a new channel generation (that is, a symlink to the
@@ -79,7 +79,7 @@ $ nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
 
   - `~/.nix-defexpr/channels`\
     This is a symlink to
-    `/nix/var/nix/profiles/per-user/username/channels`. It ensures that
+    `${XDG_STATE_HOME-$HOME/.local/state}/nix/profiles/channels`. It ensures that
     `nix-env` can find your channels. In a multi-user installation, you
     may also have `~/.nix-defexpr/channels_root`, which links to the
     channels of the root user.
