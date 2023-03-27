@@ -68,22 +68,32 @@ void lockProfile(PathLocks & lock, const Path & profile);
    rebuilt. */
 std::string optimisticLockProfile(const Path & profile);
 
-/* Creates and returns the path to a directory suitable for storing the user’s
-   profiles. */
+/**
+ * Create and return the path to a directory suitable for storing the user’s
+ * profiles.
+ */
 Path profilesDir();
 
-/* Returns the path to the profile directory for root (but doesn't try creating it) */
+/**
+ * Return the path to the profile directory for root (but don't try creating it)
+ */
 Path rootProfilesDir();
 
-/* Creates and returns the path to the file used for storing the users's channels */
+/**
+ * Create and return the path to the file used for storing the users's channels
+ */
 Path defaultChannelsDir();
 
-/* Returns the path to the channel directory for root (but doesn't try creating it) */
+/**
+ * Return the path to the channel directory for root (but don't try creating it)
+ */
 Path rootChannelsDir();
 
-/* Resolve the default profile (~/.nix-profile by default, $XDG_STATE_HOME/
-   nix/profile if XDG Base Directory Support is enabled), and create if doesn't
-   exist */
+/**
+ * Resolve the default profile (~/.nix-profile by default,
+ * $XDG_STATE_HOME/nix/profile if XDG Base Directory Support is enabled),
+ * and create if doesn't exist
+ */
 Path getDefaultProfile();
 
 }
