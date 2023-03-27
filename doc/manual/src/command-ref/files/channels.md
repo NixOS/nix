@@ -1,12 +1,24 @@
 ## Channels
 
-A directory containing symlinks to Nix channels, managed by [`nix-channel`]:
+A directory containing symlinks to Nix channels, managed by [`nix-channel`].
 
-- `$XDG_STATE_HOME/nix/profiles/channels` for regular users
-- `$NIX_STATE_DIR/profiles/per-user/root/channels` for `root`
-
-[`nix-channel`] uses a [profile](@docroot@/command-ref/files/profiles.md) to store channels.
+The channels directory is a [profile](@docroot@/command-ref/files/profiles.md), so as to allow easy management of multiple versions and switching between them.
 This profile contains symlinks to the contents of those channels.
+
+### User-specific and global channels
+
+Channels are managed either for a specific user, or for all users globally on the system to share.
+This matches the [user-specific vs global conventions](@docroot@/command-ref/files/profiles.md#user-specific-and-global-profiles) of profiles themselves.
+
+- [User-specific channels]{#user-channels} are stored in:
+  ```
+  $XDG_STATE_HOME/nix/profiles/channels
+  ```
+
+- [Global channels]{#global-channels} are stored in
+  ```
+  $NIX_STATE_DIR/profiles/per-user/root/channels
+  ```
 
 ## Subscribed channels
 

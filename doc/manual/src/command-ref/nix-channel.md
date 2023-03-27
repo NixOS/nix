@@ -62,6 +62,16 @@ This command has the following operations:
     Revert channels to the state before the last call to `nix-channel --update`.
     Optionally, you can specify a specific channel *generation* number to restore.
 
+It also has the following flags, which affect all operations:
+
+  - `--global-profile`\
+    Operate on the [global channels](@docroot@/command-ref/files/channels.md#global-channels), i.e. the channels shared by all users.
+
+  - `--user-profile`\
+    Operate on the [user channels](@docroot@/command-ref/files/channels.md#user-channels), i.e. the channels just for the current user.
+
+The list of subscribed channels is stored in `~/.nix-channels`.
+
 {{#include ./opt-common.md}}
 
 {{#include ./env-common.md}}
