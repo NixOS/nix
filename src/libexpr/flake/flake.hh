@@ -44,6 +44,7 @@ struct FlakeInput
     bool isFlake = true;  // true = process flake to get outputs, false = (fetched) static source path
     std::optional<InputPath> follows;
     FlakeInputs overrides;
+    std::vector<std::string> patchFiles;
 };
 
 struct ConfigFile
@@ -61,7 +62,7 @@ struct Flake
     FlakeRef originalRef; // the original flake specification (by the user)
     FlakeRef resolvedRef; // registry references and caching resolved to the specific underlying flake
     FlakeRef lockedRef; // the specific local store result of invoking the fetcher
-    SourcePath path;
+    SourcePath path; // the path of 'flake.nix'
     bool forceDirty = false; // pretend that 'lockedRef' is dirty
     std::optional<std::string> description;
     FlakeInputs inputs;

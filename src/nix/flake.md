@@ -463,6 +463,17 @@ way. Most flakes provide their functionality through Nixpkgs overlays
 or NixOS modules, which are composed into the top-level flake's
 `nixpkgs` input; so their own `nixpkgs` input is usually irrelevant.
 
+Flake inputs can be patched using the `patchFiles` attribute, e.g.
+```nix
+inputs.nixpkgs = {
+  url = "github:NixOS/nixpkgs";
+  patchFiles = [ ./fix-nixpkgs.patch ];
+};
+```
+applies the file `./fix-nixpkgs.patch` (which is relative to the
+directory containing `flake.nix`) to the `nixpkgs` source tree.
+
+
 # Lock files
 
 Inputs specified in `flake.nix` are typically "unlocked" in the sense

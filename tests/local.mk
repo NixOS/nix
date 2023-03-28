@@ -15,6 +15,7 @@ nix_tests = \
   flakes/build-paths.sh \
   flakes/flake-in-submodule.sh \
   flakes/tree-operators.sh \
+  flakes/patch.sh \
   ca/gc.sh \
   gc.sh \
   remote-store.sh \

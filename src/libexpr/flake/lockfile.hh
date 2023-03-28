@@ -37,12 +37,15 @@ struct LockedNode : Node
        (e.g. 'path:../foo') are interpreted. */
     std::optional<InputPath> parentPath;
 
+    std::vector<std::string> patchFiles;
+
     LockedNode(
         const FlakeRef & lockedRef,
         const FlakeRef & originalRef,
         bool isFlake = true,
-        std::optional<InputPath> parentPath = {})
-        : lockedRef(lockedRef), originalRef(originalRef), isFlake(isFlake), parentPath(parentPath)
+        std::optional<InputPath> parentPath = {},
+        std::vector<std::string> patchFiles = {})
+        : lockedRef(lockedRef), originalRef(originalRef), isFlake(isFlake), parentPath(parentPath), patchFiles(std::move(patchFiles))
     { }
 
     LockedNode(const nlohmann::json & json);

@@ -35,6 +35,7 @@ LockedNode::LockedNode(const nlohmann::json & json)
     , originalRef(getFlakeRef(json, "original", nullptr))
     , isFlake(json.find("flake") != json.end() ? (bool) json["flake"] : true)
     , parentPath(json.find("parent") != json.end() ? (std::optional<InputPath>) json["parent"] : std::nullopt)
+    , patchFiles(json.find("patchFiles") != json.end() ? (std::vector<std::string>) json["patchFiles"] : std::vector<std::string>{})
 {
     if (!lockedRef.input.isLocked() && !lockedRef.input.isRelative())
         throw Error("lock file contains unlocked input '%s'",
@@ -164,6 +165,8 @@ std::pair<nlohmann::json, LockFile::KeyMap> LockFile::toJSON() const
                 n["flake"] = false;
             if (lockedNode->parentPath)
                 n["parent"] = *lockedNode->parentPath;
+            if (!lockedNode->patchFiles.empty())
+                n["patchFiles"] = lockedNode->patchFiles;
         }
 
         nodes[key] = std::move(n);

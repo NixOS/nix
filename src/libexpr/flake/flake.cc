@@ -33,14 +33,16 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     EvalState & state,
     Value * value,
     const PosIdx pos,
-    const InputPath & lockRootPath);
+    const InputPath & lockRootPath,
+    const SourcePath & flakePath);
 
 static FlakeInput parseFlakeInput(
     EvalState & state,
     const std::string & inputName,
     Value * value,
     const PosIdx pos,
-    const InputPath & lockRootPath)
+    const InputPath & lockRootPath,
+    const SourcePath & flakePath)
 {
     expectType(state, nAttrs, *value, pos);
 
@@ -50,6 +52,7 @@ static FlakeInput parseFlakeInput(
     auto sUrl = state.symbols.create("url");
     auto sFlake = state.symbols.create("flake");
     auto sFollows = state.symbols.create("follows");
+    auto sPatchFiles = state.symbols.create("patchFiles");
 
     fetchers::Attrs attrs;
     std::optional<std::string> url;
@@ -64,12 +67,26 @@ static FlakeInput parseFlakeInput(
                 expectType(state, nBool, *attr.value, attr.pos);
                 input.isFlake = attr.value->boolean;
             } else if (attr.name == sInputs) {
-                input.overrides = parseFlakeInputs(state, attr.value, attr.pos, lockRootPath);
+                input.overrides = parseFlakeInputs(state, attr.value, attr.pos, lockRootPath, flakePath);
             } else if (attr.name == sFollows) {
                 expectType(state, nString, *attr.value, attr.pos);
                 auto follows(parseInputPath(attr.value->string.s));
                 follows.insert(follows.begin(), lockRootPath.begin(), lockRootPath.end());
                 input.follows = follows;
+            } else if (attr.name == sPatchFiles) {
+                expectType(state, nList, *attr.value, attr.pos);
+                for (auto elem : attr.value->listItems()) {
+                    if (elem->type() == nString)
+                        input.patchFiles.emplace_back(state.forceStringNoCtx(*elem, attr.pos, ""));
+                    else if (elem->type() == nPath) {
+                        if (elem->path().accessor != flakePath.accessor)
+                            throw Error("patch '%s' is not in the same source tree as flake '%s'", elem->path(), flakePath);
+                        input.patchFiles.emplace_back(flakePath.parent().path.makeRelative(elem->path().path));
+                    }
+                    else
+                        throw TypeError("flake input attribute '%s' is %s while a string or path is expected",
+                            state.symbols[attr.name], showType(*elem));
+                }
             } else {
                 switch (attr.value->type()) {
                     case nString:
@@ -79,7 +96,7 @@ static FlakeInput parseFlakeInput(
                         attrs.emplace(state.symbols[attr.name], Explicit<bool> { attr.value->boolean });
                         break;
                     case nInt:
-                        attrs.emplace(state.symbols[attr.name], (long unsigned int)attr.value->integer);
+                        attrs.emplace(state.symbols[attr.name], (long unsigned int) attr.value->integer);
                         break;
                     default:
                         throw TypeError("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
@@ -119,7 +136,8 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     EvalState & state,
     Value * value,
     const PosIdx pos,
-    const InputPath & lockRootPath)
+    const InputPath & lockRootPath,
+    const SourcePath & flakePath)
 {
     std::map<FlakeId, FlakeInput> inputs;
 
@@ -131,7 +149,8 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
                 state.symbols[inputAttr.name],
                 inputAttr.value,
                 inputAttr.pos,
-                lockRootPath));
+                lockRootPath,
+                flakePath));
     }
 
     return inputs;
@@ -168,7 +187,7 @@ static Flake readFlake(
     auto sInputs = state.symbols.create("inputs");
 
     if (auto inputs = vInfo.attrs->get(sInputs))
-        flake.inputs = parseFlakeInputs(state, inputs->value, inputs->pos, lockRootPath);
+        flake.inputs = parseFlakeInputs(state, inputs->value, inputs->pos, lockRootPath, flakePath);
 
     auto sOutputs = state.symbols.create("outputs");
 
@@ -257,11 +276,15 @@ static Flake getFlake(
     EvalState & state,
     const FlakeRef & originalRef,
     bool useRegistries,
-    const InputPath & lockRootPath)
+    const InputPath & lockRootPath,
+    const std::vector<std::string> & patches)
 {
     auto resolvedRef = maybeResolve(state, originalRef, useRegistries);
 
     auto [accessor, lockedRef] = resolvedRef.lazyFetch(state.store);
+
+    if (!patches.empty())
+        accessor = makePatchingInputAccessor(accessor, patches);
 
     state.registerAccessor(accessor);
 
@@ -270,7 +293,7 @@ static Flake getFlake(
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistries)
 {
-    return getFlake(state, originalRef, useRegistries, {});
+    return getFlake(state, originalRef, useRegistries, {}, {});
 }
 
 static LockFile readLockFile(const Flake & flake)
@@ -292,7 +315,7 @@ LockedFlake lockFlake(
 
     auto useRegistries = lockFlags.useRegistries.value_or(fetchSettings.useRegistries);
 
-    auto flake = std::make_unique<Flake>(getFlake(state, topRef, useRegistries, {}));
+    auto flake = std::make_unique<Flake>(getFlake(state, topRef, useRegistries, {}, {}));
 
     if (lockFlags.applyNixConfig) {
         flake->config.apply();
@@ -419,8 +442,11 @@ LockedFlake lockFlake(
 
                     assert(input.ref);
 
+                    // FIXME: can there be cases where the "parent"
+                    // for resolving relative paths is different than
+                    // the "parent" for resolving patches?
                     auto overridenParentPath =
-                        input.ref->input.isRelative()
+                        input.ref->input.isRelative() || !input.patchFiles.empty()
                         ? std::optional<InputPath>(hasOverride ? std::get<2>(i->second) : inputPathPrefix)
                         : std::nullopt;
 
@@ -439,10 +465,16 @@ LockedFlake lockFlake(
                        flakerefs relative to the parent flake. */
                     auto getInputFlake = [&]()
                     {
-                        if (auto resolvedPath = resolveRelativePath())
+                        if (auto resolvedPath = resolveRelativePath()) {
+                            if (!input.patchFiles.empty())
+                                throw UnimplementedError("patching relative flakes is not implemented");
                             return readFlake(state, *input.ref, *input.ref, *input.ref, *resolvedPath, inputPath);
-                        else
-                            return getFlake(state, *input.ref, useRegistries, inputPath);
+                        } else {
+                            std::vector<std::string> patches;
+                            for (auto & patchFile : input.patchFiles)
+                                patches.push_back(sourcePath.accessor->readFile(CanonPath(patchFile, sourcePath.parent().path)));
+                            return getFlake(state, *input.ref, useRegistries, inputPath, patches);
+                        }
                     };
 
                     /* Do we have an entry in the existing lock file? And we
@@ -468,7 +500,7 @@ LockedFlake lockFlake(
                            higher level flake. */
                         auto childNode = make_ref<LockedNode>(
                             oldLock->lockedRef, oldLock->originalRef, oldLock->isFlake,
-                            oldLock->parentPath);
+                            oldLock->parentPath, oldLock->patchFiles);
 
                         node->inputs.insert_or_assign(id, childNode);
 
@@ -494,6 +526,7 @@ LockedFlake lockFlake(
                                     fakeInputs.emplace(i.first, FlakeInput {
                                         .ref = (*lockedNode)->originalRef,
                                         .isFlake = (*lockedNode)->isFlake,
+                                        .patchFiles = (*lockedNode)->patchFiles,
                                     });
                                 } else if (auto follows = std::get_if<1>(&i.second)) {
                                     if (!trustLock) {
@@ -555,7 +588,7 @@ LockedFlake lockFlake(
 
                             auto childNode = make_ref<LockedNode>(
                                 inputFlake.lockedRef, ref, true,
-                                overridenParentPath);
+                                overridenParentPath, input.patchFiles);
 
                             node->inputs.insert_or_assign(id, childNode);
 
@@ -584,6 +617,9 @@ LockedFlake lockFlake(
                         else {
                             auto [path, lockedRef] = [&]() -> std::tuple<SourcePath, FlakeRef>
                             {
+                                if (!input.patchFiles.empty())
+                                    throw UnimplementedError("patching non-flake inputs is not implemented");
+
                                 // Handle non-flake 'path:./...' inputs.
                                 if (auto resolvedPath = resolveRelativePath()) {
                                     return {*resolvedPath, *input.ref};
@@ -594,7 +630,7 @@ LockedFlake lockFlake(
                                 }
                             }();
 
-                            auto childNode = make_ref<LockedNode>(lockedRef, ref, false, overridenParentPath);
+                            auto childNode = make_ref<LockedNode>(lockedRef, ref, false, overridenParentPath, input.patchFiles);
 
                             nodePaths.emplace(childNode, path);
 

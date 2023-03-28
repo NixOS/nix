@@ -63,6 +63,7 @@ struct PathInputScheme : InputScheme
 
     bool getLockAttr(const Input & input) const
     {
+        // FIXME: make the default "true"?
         return maybeGetBoolAttr(input.attrs, "lock").value_or(false);
     }
 
