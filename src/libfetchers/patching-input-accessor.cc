@@ -28,6 +28,9 @@ struct PatchingInputAccessor : InputAccessor
                 auto slash = fileName.find('/');
                 if (slash == fileName.npos) return;
                 fileName = fileName.substr(slash);
+                auto end = fileName.find('\t');
+                if (end != fileName.npos)
+                    fileName = fileName.substr(0, end);
                 debug("found patch for '%s'", fileName);
                 patchesPerFile.emplace(fileName, std::vector<std::string>())
                     .first->second.push_back(std::string(contents));
@@ -110,7 +113,7 @@ ref<InputAccessor> makePatchingInputAccessor(
     ref<InputAccessor> next,
     const std::vector<std::string> & patches)
 {
-    return make_ref<PatchingInputAccessor>(next, std::move(patches));
+    return make_ref<PatchingInputAccessor>(next, patches);
 }
 
 }
