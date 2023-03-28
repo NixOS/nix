@@ -256,7 +256,7 @@ static RegisterPrimOp primop_import({
     .doc = R"(
       Load, parse and return the Nix expression in the file *path*.
 
-      The value *path* is conveted to a string as described in `builtins.toString`.
+      The value *path* is converted to a string as described in `builtins.toString`.
 
       If *path* is a directory, the file ` default.nix ` in that directory
       is loaded.
