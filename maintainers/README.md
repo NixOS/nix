@@ -79,7 +79,8 @@ Items on the board progress through the following states:
 
   If there is disagreement on the general idea behind an issue or pull request, it is moved to _To discuss_, otherwise to _In review_.
 
-  To ensure process quality and reliability, all pull requests must be triaged before merging.
+  To ensure process quality and reliability, all non-trivial pull requests must be triaged before merging.
+  What constitutes a trivial pull request is up to maintainers' judgement.
 
 - To discuss
 
