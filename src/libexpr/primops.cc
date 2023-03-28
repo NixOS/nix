@@ -254,9 +254,14 @@ static RegisterPrimOp primop_import({
     .args = {"path"},
     // TODO turn "normal path values" into link below
     .doc = R"(
-      Load, parse and return the Nix expression in the file *path*. If
-      *path* is a directory, the file ` default.nix ` in that directory
-      is loaded. Evaluation aborts if the file doesn’t exist or contains
+      Load, parse and return the Nix expression in the file *path*.
+
+      The value *path* is conveted to a string as described in `builtins.toString`.
+
+      If *path* is a directory, the file ` default.nix ` in that directory
+      is loaded.
+
+      Evaluation aborts if the file doesn’t exist or contains
       an incorrect Nix expression. `import` implements Nix’s module
       system: you can put any Nix expression (such as a set or a
       function) in a separate file, and use it from Nix expressions in
