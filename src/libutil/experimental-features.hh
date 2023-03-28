@@ -10,8 +10,8 @@ namespace nix {
 /**
  * The list of available experimental features.
  *
- * If you update this, don’t forget to also change the map defining their
- * string representation in the corresponding `.cc` file.
+ * If you update this, don’t forget to also change the map defining their string
+ * representation and documentation in the corresponding `.cc` file as well.
  **/
 enum struct ExperimentalFeature
 {
@@ -36,6 +36,7 @@ using Xp = ExperimentalFeature;
 const std::optional<ExperimentalFeature> parseExperimentalFeature(
         const std::string_view & name);
 std::string_view showExperimentalFeature(const ExperimentalFeature);
+std::string getExperimentalFeaturesList();
 
 std::ostream & operator<<(
         std::ostream & str,
