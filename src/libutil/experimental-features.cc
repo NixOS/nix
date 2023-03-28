@@ -12,7 +12,7 @@ struct ExperimentalFeatureDetails
     std::string_view description;
 };
 
-constexpr std::array<ExperimentalFeatureDetails, 13> xpFeatureDetails = {{
+constexpr std::array<ExperimentalFeatureDetails, 14> xpFeatureDetails = {{
     {
         .tag = Xp::CaDerivations,
         .name = "ca-derivations",
@@ -212,6 +212,13 @@ constexpr std::array<ExperimentalFeatureDetails, 13> xpFeatureDetails = {{
                 derivations that are themselves derivations outputs.
         )",
     },
+    {
+        .tag = Xp::ParseTomlTimestamps,
+        .name = "parse-toml-timestamps",
+        .description = R"(
+            Allow parsing of timestamps in builtins.fromTOML.
+        )",
+    },
 }};
 
 static_assert(
@@ -246,7 +253,7 @@ std::string_view showExperimentalFeature(const ExperimentalFeature tag)
     return xpFeatureDetails[(size_t)tag].name;
 }
 
-nlohmann::json documentExperimentalFeatures() 
+nlohmann::json documentExperimentalFeatures()
 {
     StringMap res;
     for (auto & xpFeature : xpFeatureDetails)
