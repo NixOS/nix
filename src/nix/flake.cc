@@ -36,8 +36,8 @@ public:
             .label = "flake-url",
             .optional = true,
             .handler = {&flakeUrl},
-            .completer = {[&](size_t, std::string_view prefix) {
-                completeFlakeRef(getStore(), prefix);
+            .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+                completeFlakeRef(completions, getStore(), prefix);
             }}
         });
     }
@@ -52,9 +52,12 @@ public:
         return flake::lockFlake(*getEvalState(), getFlakeRef(), lockFlags);
     }
 
-    std::vector<std::string> getFlakesForCompletion() override
+    std::vector<FlakeRef> getFlakeRefsForCompletion() override
     {
-        return {flakeUrl};
+        return {
+            // Like getFlakeRef but with expandTilde calld first
+            parseFlakeRef(expandTilde(flakeUrl), absPath("."))
+        };
     }
 };
 
@@ -762,8 +765,9 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
             .description = "The template to use.",
             .labels = {"template"},
             .handler = {&templateUrl},
-            .completer = {[&](size_t, std::string_view prefix) {
+            .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
                 completeFlakeRefWithFragment(
+                    completions,
                     getEvalState(),
                     lockFlags,
                     defaultTemplateAttrPathsPrefixes,

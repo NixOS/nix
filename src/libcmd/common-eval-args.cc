@@ -132,8 +132,8 @@ MixEvalArgs::MixEvalArgs()
             if (to.subdir != "") extraAttrs["dir"] = to.subdir;
             fetchers::overrideRegistry(from.input, to.input, extraAttrs);
         }},
-        .completer = {[&](size_t, std::string_view prefix) {
-            completeFlakeRef(openStore(), prefix);
+        .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+            completeFlakeRef(completions, openStore(), prefix);
         }}
     });
 
