@@ -258,7 +258,7 @@ static RegisterPrimOp primop_import({
 
       The value *path* is converted to a string as described in `builtins.toString`.
 
-      If *path* is a directory, the file ` default.nix ` in that directory
+      If *path* is a directory, the file `default.nix` in that directory
       is loaded.
 
       Evaluation aborts if the file doesn’t exist or contains
