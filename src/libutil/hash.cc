@@ -403,7 +403,7 @@ HashType parseHashType(std::string_view s)
         throw UsageError("unknown hash algorithm '%1%'", s);
 }
 
-std::string printHashType(HashType ht)
+std::string_view printHashType(HashType ht)
 {
     switch (ht) {
     case htMD5: return "md5";
