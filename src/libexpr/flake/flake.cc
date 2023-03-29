@@ -734,6 +734,10 @@ void callFlake(EvalState & state,
         auto key = keyMap.find(node);
         assert(key != keyMap.end());
 
+        override
+            .alloc(state.symbols.create("dir"))
+            .mkString(lockedNode ? lockedNode->lockedRef.subdir : lockedFlake.flake.lockedRef.subdir);
+
         overrides.alloc(state.symbols.create(key->second)).mkAttrs(override);
     }
 

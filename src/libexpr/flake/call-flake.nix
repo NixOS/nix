@@ -53,7 +53,7 @@ let
               # FIXME: remove obsolete node.info.
               fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
 
-          subdir = node.locked.dir or "";
+          subdir = overrides.${key}.dir or node.locked.dir or "";
 
           outPath = sourceInfo + ((if subdir == "" then "" else "/") + subdir);
 
