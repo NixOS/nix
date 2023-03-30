@@ -37,9 +37,9 @@ nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -
 define process-includes
 	while read -r line; do \
 		set -euo pipefail; \
-		filename="$$(dirname $(2))/$$(sed 's/{{#include \(.*\)}}/\1/'<<< $$line)"; \
-		matchline="$$(sed 's|/|\\/|g' <<< $$line)"; \
+		filename="$$(dirname $(1))/$$(sed 's/{{#include \(.*\)}}/\1/'<<< $$line)"; \
 		test -f "$$filename" || ( echo "#include-d file '$$filename' does not exist." >&2; exit 1; ); \
+		matchline="$$(sed 's|/|\\/|g' <<< $$line)"; \
 		sed -i "/$$matchline/r $$filename" $(2); \
 		sed -i "s/$$matchline//" $(2); \
 	done < <(grep '{{#include' $(1))
@@ -151,6 +151,8 @@ $(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/
 		cp -r doc/manual "$$tmp"; \
 		find "$$tmp" -name '*.md' | while read -r file; do \
 			$(call process-includes,$$file,$$file); \
+		done; \
+		find "$$tmp" -name '*.md' | while read -r file; do \
 			docroot="$$(realpath --relative-to="$$(dirname "$$file")" $$tmp/manual/src)"; \
 			sed -i "s,@docroot@,$$docroot,g" "$$file"; \
 		done; \
