@@ -76,7 +76,9 @@ standard input.
     this option is not enabled, there may be uninstantiated store paths
     in the final output.
 
-<!-- end list -->
+{{#include ./opt-common.md}}
+
+{{#include ./env-common.md}}
 
 # Examples
 

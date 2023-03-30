@@ -45,6 +45,10 @@ Note that `--add` does not automatically perform an update.
 
 The list of subscribed channels is stored in `~/.nix-channels`.
 
+{{#include ./opt-common.md}}
+
+{{#include ./env-common.md}}
+
 # Examples
 
 To subscribe to the Nixpkgs channel and install the GNU Hello package:

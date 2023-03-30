@@ -63,11 +63,15 @@ authentication, you can avoid typing the passphrase with `ssh-agent`.
   - `-v`\
     Show verbose output.
 
+{{#include ./opt-common.md}}
+
 # Environment variables
 
   - `NIX_SSHOPTS`\
     Additional options to be passed to `ssh` on the command
     line.
+
+{{#include ./env-common.md}}
 
 # Examples
 
