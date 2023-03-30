@@ -265,7 +265,7 @@ void RemoteStore::setOptions(Connection & conn)
         overrides.erase(settings.buildCores.name);
         overrides.erase(settings.useSubstitutes.name);
         overrides.erase(loggerSettings.showTrace.name);
-        overrides.erase(settings.experimentalFeatures.name);
+        overrides.erase(experimentalFeatureSettings.experimentalFeatures.name);
         overrides.erase(settings.pluginFiles.name);
         conn.to << overrides.size();
         for (auto & i : overrides)
@@ -876,7 +876,7 @@ std::vector<BuildResult> RemoteStore::buildPathsWithResults(
                                     "the derivation '%s' doesn't have an output named '%s'",
                                     printStorePath(bfd.drvPath), output);
                             auto outputId = DrvOutput{ *outputHash, output };
-                            if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
+                            if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
                                 auto realisation =
                                     queryRealisation(outputId);
                                 if (!realisation)

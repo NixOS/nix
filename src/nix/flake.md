@@ -317,6 +317,8 @@ The following attributes are supported in `flake.nix`:
   also contains some metadata about the inputs. These are:
 
   * `outPath`: The path in the Nix store of the flake's source tree.
+     This way, the attribute set can be passed to `import` as if it was a path,
+     as in the example above (`import nixpkgs`).
 
   * `rev`: The commit hash of the flake's repository, if applicable.
 

@@ -1,4 +1,5 @@
 #include "command.hh"
+#include "installable-value.hh"
 #include "run.hh"
 
 using namespace nix;
@@ -31,8 +32,9 @@ struct CmdFmt : SourceExprCommand {
         auto evalState = getEvalState();
         auto evalStore = getEvalStore();
 
-        auto installable = parseInstallable(store, ".");
-        auto app = installable->toApp(*evalState).resolve(evalStore, store);
+        auto installable_ = parseInstallable(store, ".");
+        auto & installable = InstallableValue::require(*installable_);
+        auto app = installable.toApp(*evalState).resolve(evalStore, store);
 
         Strings programArgs{app.program};
 

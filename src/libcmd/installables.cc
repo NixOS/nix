@@ -333,7 +333,7 @@ void completeFlakeRefWithFragment(
 
 void completeFlakeRef(ref<Store> store, std::string_view prefix)
 {
-    if (!settings.isExperimentalFeatureEnabled(Xp::Flakes))
+    if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))
         return;
 
     if (prefix == "")
@@ -363,23 +363,6 @@ DerivedPathWithInfo Installable::toDerivedPath()
     if (buildables.size() != 1)
         throw Error("installable '%s' evaluates to %d derivations, where only one is expected", what(), buildables.size());
     return std::move(buildables[0]);
-}
-
-std::vector<ref<eval_cache::AttrCursor>>
-Installable::getCursors(EvalState & state)
-{
-    auto evalCache =
-        std::make_shared<nix::eval_cache::EvalCache>(std::nullopt, state,
-            [&]() { return toValue(state).first; });
-    return {evalCache->getRoot()};
-}
-
-ref<eval_cache::AttrCursor>
-Installable::getCursor(EvalState & state)
-{
-    /* Although getCursors should return at least one element, in case it doesn't,
-       bound check to avoid an undefined behavior for vector[0] */
-    return getCursors(state).at(0);
 }
 
 static StorePath getDeriver(
@@ -535,7 +518,7 @@ std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build
 
     struct Aux
     {
-        ExtraPathInfo info;
+        ref<ExtraPathInfo> info;
         ref<Installable> installable;
     };
 

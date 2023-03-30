@@ -1,6 +1,6 @@
 #pragma once
 
-#include "installables.hh"
+#include "installable-value.hh"
 #include "args.hh"
 #include "common-eval-args.hh"
 #include "path.hh"
@@ -18,6 +18,7 @@ class EvalState;
 struct Pos;
 class Store;
 
+static constexpr Command::Category catHelp = -1;
 static constexpr Command::Category catSecondary = 100;
 static constexpr Command::Category catUtility = 101;
 static constexpr Command::Category catNixInstallation = 102;

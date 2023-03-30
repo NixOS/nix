@@ -15,6 +15,13 @@ struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreCon
     }
 
     const std::string name() override { return "Local Daemon Store"; }
+
+    std::string doc() override
+    {
+        return
+          #include "uds-remote-store.md"
+          ;
+    }
 };
 
 class UDSRemoteStore : public virtual UDSRemoteStoreConfig, public virtual LocalFSStore, public virtual RemoteStore

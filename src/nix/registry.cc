@@ -226,7 +226,7 @@ struct CmdRegistry : virtual NixMultiCommand
 
     void run() override
     {
-        settings.requireExperimentalFeature(Xp::Flakes);
+        experimentalFeatureSettings.require(Xp::Flakes);
         if (!command)
             throw UsageError("'nix registry' requires a sub-command.");
         command->second->run();

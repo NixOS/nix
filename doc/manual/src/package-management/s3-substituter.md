@@ -1,40 +1,10 @@
 # Serving a Nix store via S3
 
-Nix has built-in support for storing and fetching store paths from
+Nix has [built-in support](@docroot@/command-ref/new-cli/nix3-help-stores.md#s3-binary-cache-store)
+for storing and fetching store paths from
 Amazon S3 and S3-compatible services. This uses the same *binary*
 cache mechanism that Nix usually uses to fetch prebuilt binaries from
 [cache.nixos.org](https://cache.nixos.org/).
-
-The following options can be specified as URL parameters to the S3 URL:
-
-  - `profile`\
-    The name of the AWS configuration profile to use. By default Nix
-    will use the `default` profile.
-
-  - `region`\
-    The region of the S3 bucket. `us–east-1` by default.
-    
-    If your bucket is not in `us–east-1`, you should always explicitly
-    specify the region parameter.
-
-  - `endpoint`\
-    The URL to your S3-compatible service, for when not using Amazon S3.
-    Do not specify this value if you're using Amazon S3.
-    
-    > **Note**
-    > 
-    > This endpoint must support HTTPS and will use path-based
-    > addressing instead of virtual host based addressing.
-
-  - `scheme`\
-    The scheme used for S3 requests, `https` (default) or `http`. This
-    option allows you to disable HTTPS for binary caches which don't
-    support it.
-    
-    > **Note**
-    > 
-    > HTTPS should be used if the cache might contain sensitive
-    > information.
 
 In this example we will use the bucket named `example-nix-cache`.
 

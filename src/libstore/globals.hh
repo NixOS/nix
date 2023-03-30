@@ -3,7 +3,6 @@
 #include "types.hh"
 #include "config.hh"
 #include "util.hh"
-#include "experimental-features.hh"
 
 #include <map>
 #include <limits>
@@ -64,6 +63,8 @@ class Settings : public Config {
 
     bool isWSL1();
 
+    Path getDefaultSSLCertFile();
+
 public:
 
     Settings();
@@ -97,7 +98,12 @@ public:
     Path nixDaemonSocketFile;
 
     Setting<std::string> storeUri{this, getEnv("NIX_REMOTE").value_or("auto"), "store",
-        "The default Nix store to use."};
+        R"(
+          The [URL of the Nix store](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
+          to use for most operations.
+          See [`nix help-stores`](@docroot@/command-ref/new-cli/nix3-help-stores.md)
+          for supported store types and settings.
+        )"};
 
     Setting<bool> keepFailed{this, false, "keep-failed",
         "Whether to keep temporary directories of failed builds."};
@@ -678,8 +684,9 @@ public:
         Strings{"https://cache.nixos.org/"},
         "substituters",
         R"(
-          A list of URLs of substituters, separated by whitespace. Substituters
-          are tried based on their Priority value, which each substituter can set
+          A list of [URLs of Nix stores](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
+          to be used as substituters, separated by whitespace.
+          Substituters are tried based on their Priority value, which each substituter can set
           independently. Lower value means higher priority.
           The default is `https://cache.nixos.org`, with a Priority of 40.
 
@@ -697,7 +704,8 @@ public:
     Setting<StringSet> trustedSubstituters{
         this, {}, "trusted-substituters",
         R"(
-          A list of URLs of substituters, separated by whitespace. These are
+          A list of [URLs of Nix stores](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format),
+          separated by whitespace. These are
           not used by default, but can be enabled by users of the Nix daemon
           by specifying `--option substituters urls` on the command
           line. Unprivileged users are only allowed to pass a subset of the
@@ -826,8 +834,22 @@ public:
           > `.netrc`.
         )"};
 
-    /* Path to the SSL CA file used */
-    Path caFile;
+    Setting<Path> caFile{
+        this, getDefaultSSLCertFile(), "ssl-cert-file",
+        R"(
+          The path of a file containing CA certificates used to
+          authenticate `https://` downloads. Nix by default will use
+          the first of the following files that exists:
+
+          1. `/etc/ssl/certs/ca-certificates.crt`
+          2. `/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt`
+
+          The path can be overridden by the following environment
+          variables, in order of precedence:
+
+          1. `NIX_SSL_CERT_FILE`
+          2. `SSL_CERT_FILE`
+        )"};
 
 #if __linux__
     Setting<bool> filterSyscalls{
@@ -931,13 +953,6 @@ public:
           If an entry in the list is a directory, all files in the directory
           are loaded as plugins (non-recursively).
         )"};
-
-    Setting<std::set<ExperimentalFeature>> experimentalFeatures{this, {}, "experimental-features",
-        "Experimental Nix features to enable."};
-
-    bool isExperimentalFeatureEnabled(const ExperimentalFeature &);
-
-    void requireExperimentalFeature(const ExperimentalFeature &);
 
     Setting<size_t> narBufferSize{this, 32 * 1024 * 1024, "nar-buffer-size",
         "Maximum size of NARs before spilling them to disk."};

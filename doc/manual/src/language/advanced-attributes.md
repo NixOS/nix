@@ -198,8 +198,7 @@ Derivations can declare some infrequently used optional attributes.
 
       - `"recursive"`\
         The hash is computed over the NAR archive dump of the output
-        (i.e., the result of [`nix-store
-        --dump`](../command-ref/nix-store.md#operation---dump)). In
+        (i.e., the result of [`nix-store --dump`](@docroot@/command-ref/nix-store/dump.md)). In
         this case, the output can be anything, including a directory
         tree.
 

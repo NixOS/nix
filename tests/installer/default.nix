@@ -30,6 +30,14 @@ let
     };
   };
 
+  mockChannel = pkgs:
+    pkgs.runCommandNoCC "mock-channel" {} ''
+      mkdir nixexprs
+      mkdir $out
+      echo -n 'someContent' > nixexprs/someFile
+      tar cvf - nixexprs | bzip2 > $out/nixexprs.tar.bz2
+    '';
+
   disableSELinux = "sudo setenforce 0";
 
   images = {
@@ -189,6 +197,9 @@ let
         echo "Running installer..."
         $ssh "set -eux; $installScript"
 
+        echo "Copying the mock channel"
+        scp -r -P 20022 $ssh_opts ${mockChannel pkgs} vagrant@localhost:channel
+
         echo "Testing Nix installation..."
         $ssh <<EOF
           set -ex
@@ -204,6 +215,17 @@ let
 
           out=\$(nix-build --no-substitute -E 'derivation { name = "foo"; system = "x86_64-linux"; builder = "/bin/sh"; args = ["-c" "echo foobar > \$out"]; }')
           [[ \$(cat \$out) = foobar ]]
+
+          if pgrep nix-daemon; then
+            MAYBESUDO="sudo"
+          else
+            MAYBESUDO=""
+          fi
+
+
+          $MAYBESUDO \$(which nix-channel) --add file://\$HOME/channel myChannel
+          $MAYBESUDO \$(which nix-channel) --update
+          [[ \$(nix-instantiate --eval --expr 'builtins.readFile <myChannel/someFile>') = '"someContent"' ]]
         EOF
 
         echo "Done!"

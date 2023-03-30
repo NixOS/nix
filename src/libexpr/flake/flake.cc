@@ -311,7 +311,7 @@ LockedFlake lockFlake(
     const FlakeRef & topRef,
     const LockFlags & lockFlags)
 {
-    settings.requireExperimentalFeature(Xp::Flakes);
+    experimentalFeatureSettings.require(Xp::Flakes);
 
     auto useRegistries = lockFlags.useRegistries.value_or(fetchSettings.useRegistries);
 
@@ -746,7 +746,7 @@ void callFlake(EvalState & state,
     const LockedFlake & lockedFlake,
     Value & vRes)
 {
-    settings.requireExperimentalFeature(Xp::Flakes);
+    experimentalFeatureSettings.require(Xp::Flakes);
 
     auto [lockFileStr, keyMap] = lockedFlake.lockFile.to_string();
 

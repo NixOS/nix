@@ -8,6 +8,7 @@
 #include "eval-inline.hh"
 #include "filetransfer.hh"
 #include "function-trace.hh"
+#include "profiles.hh"
 #include "fs-input-accessor.hh"
 
 #include <algorithm>
@@ -2485,8 +2486,8 @@ Strings EvalSettings::getDefaultNixPath()
 
     if (!evalSettings.restrictEval && !evalSettings.pureEval) {
         add(settings.useXDGBaseDirectories ? getStateDir() + "/nix/defexpr/channels" : getHome() + "/.nix-defexpr/channels");
-        add(settings.nixStateDir + "/profiles/per-user/root/channels/nixpkgs", "nixpkgs");
-        add(settings.nixStateDir + "/profiles/per-user/root/channels");
+        add(rootChannelsDir() + "/nixpkgs", "nixpkgs");
+        add(rootChannelsDir());
     }
 
     return res;

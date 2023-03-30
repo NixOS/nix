@@ -31,7 +31,7 @@
 
     This means either running the `builder` executable as specified in the corresponding [derivation] or fetching a pre-built [store object] from a [substituter].
 
-    See [`nix-build`](./command-ref/nix-build.md) and [`nix-store --realise`](./command-ref/nix-store.md#operation---realise).
+    See [`nix-build`](./command-ref/nix-build.md) and [`nix-store --realise`](@docroot@/command-ref/nix-store/realise.md).
 
     See [`nix build`](./command-ref/new-cli/nix3-build.md) (experimental).
 
