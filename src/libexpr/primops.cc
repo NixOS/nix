@@ -257,7 +257,7 @@ static RegisterPrimOp primop_import({
       Load, parse and return the Nix expression in the file *path*.
 
       The value *path* can be a path, a string, or an attribute set with an
-      `__toString` attribute or a `outPath` attribute (as derivations or falke
+      `__toString` attribute or a `outPath` attribute (as derivations or flake
       inputs typically have).
 
       If *path* is a directory, the file `default.nix` in that directory
