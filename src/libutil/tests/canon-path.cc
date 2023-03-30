@@ -107,15 +107,13 @@ namespace nix {
     }
 
     TEST(CanonPath, within) {
-        {
-            ASSERT_TRUE(CanonPath("foo").isWithin(CanonPath("foo")));
-            ASSERT_FALSE(CanonPath("foo").isWithin(CanonPath("bar")));
-            ASSERT_FALSE(CanonPath("foo").isWithin(CanonPath("fo")));
-            ASSERT_TRUE(CanonPath("foo/bar").isWithin(CanonPath("foo")));
-            ASSERT_FALSE(CanonPath("foo").isWithin(CanonPath("foo/bar")));
-            ASSERT_TRUE(CanonPath("/foo/bar/default.nix").isWithin(CanonPath("/")));
-            ASSERT_TRUE(CanonPath("/").isWithin(CanonPath("/")));
-        }
+        ASSERT_TRUE(CanonPath("foo").isWithin(CanonPath("foo")));
+        ASSERT_FALSE(CanonPath("foo").isWithin(CanonPath("bar")));
+        ASSERT_FALSE(CanonPath("foo").isWithin(CanonPath("fo")));
+        ASSERT_TRUE(CanonPath("foo/bar").isWithin(CanonPath("foo")));
+        ASSERT_FALSE(CanonPath("foo").isWithin(CanonPath("foo/bar")));
+        ASSERT_TRUE(CanonPath("/foo/bar/default.nix").isWithin(CanonPath("/")));
+        ASSERT_TRUE(CanonPath("/").isWithin(CanonPath("/")));
     }
 
     TEST(CanonPath, sort) {
@@ -127,29 +125,27 @@ namespace nix {
     }
 
     TEST(CanonPath, allowed) {
-        {
-            std::set<CanonPath> allowed {
-                CanonPath("foo/bar"),
-                CanonPath("foo!"),
-                CanonPath("xyzzy"),
-                CanonPath("a/b/c"),
-            };
+        std::set<CanonPath> allowed {
+            CanonPath("foo/bar"),
+            CanonPath("foo!"),
+            CanonPath("xyzzy"),
+            CanonPath("a/b/c"),
+        };
 
-            ASSERT_TRUE (CanonPath("foo/bar").isAllowed(allowed));
-            ASSERT_TRUE (CanonPath("foo/bar/bla").isAllowed(allowed));
-            ASSERT_TRUE (CanonPath("foo").isAllowed(allowed));
-            ASSERT_FALSE(CanonPath("bar").isAllowed(allowed));
-            ASSERT_FALSE(CanonPath("bar/a").isAllowed(allowed));
-            ASSERT_TRUE (CanonPath("a").isAllowed(allowed));
-            ASSERT_TRUE (CanonPath("a/b").isAllowed(allowed));
-            ASSERT_TRUE (CanonPath("a/b/c").isAllowed(allowed));
-            ASSERT_TRUE (CanonPath("a/b/c/d").isAllowed(allowed));
-            ASSERT_TRUE (CanonPath("a/b/c/d/e").isAllowed(allowed));
-            ASSERT_FALSE(CanonPath("a/b/a").isAllowed(allowed));
-            ASSERT_FALSE(CanonPath("a/b/d").isAllowed(allowed));
-            ASSERT_FALSE(CanonPath("aaa").isAllowed(allowed));
-            ASSERT_FALSE(CanonPath("zzz").isAllowed(allowed));
-            ASSERT_TRUE (CanonPath("/").isAllowed(allowed));
-        }
+        ASSERT_TRUE (CanonPath("foo/bar").isAllowed(allowed));
+        ASSERT_TRUE (CanonPath("foo/bar/bla").isAllowed(allowed));
+        ASSERT_TRUE (CanonPath("foo").isAllowed(allowed));
+        ASSERT_FALSE(CanonPath("bar").isAllowed(allowed));
+        ASSERT_FALSE(CanonPath("bar/a").isAllowed(allowed));
+        ASSERT_TRUE (CanonPath("a").isAllowed(allowed));
+        ASSERT_TRUE (CanonPath("a/b").isAllowed(allowed));
+        ASSERT_TRUE (CanonPath("a/b/c").isAllowed(allowed));
+        ASSERT_TRUE (CanonPath("a/b/c/d").isAllowed(allowed));
+        ASSERT_TRUE (CanonPath("a/b/c/d/e").isAllowed(allowed));
+        ASSERT_FALSE(CanonPath("a/b/a").isAllowed(allowed));
+        ASSERT_FALSE(CanonPath("a/b/d").isAllowed(allowed));
+        ASSERT_FALSE(CanonPath("aaa").isAllowed(allowed));
+        ASSERT_FALSE(CanonPath("zzz").isAllowed(allowed));
+        ASSERT_TRUE (CanonPath("/").isAllowed(allowed));
     }
 }
