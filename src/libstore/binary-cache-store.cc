@@ -450,7 +450,7 @@ StorePath BinaryCacheStore::addTextToStore(
     RepairFlag repair)
 {
     auto textHash = hashString(htSHA256, s);
-    auto path = makeTextPath(name, TextInfo { textHash, references });
+    auto path = makeTextPath(name, TextInfo { { textHash }, references });
 
     if (!repair && isValidPath(path))
         return path;
