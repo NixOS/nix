@@ -152,4 +152,15 @@ namespace nix {
             ASSERT_TRUE (CanonPath("/").isAllowed(allowed));
         }
     }
+
+    TEST(CanonPath, makeRelative) {
+        CanonPath d("/foo/bar");
+        ASSERT_EQ(d.makeRelative(CanonPath("/foo/bar")), ".");
+        ASSERT_EQ(d.makeRelative(CanonPath("/foo")), "..");
+        ASSERT_EQ(d.makeRelative(CanonPath("/")), "../..");
+        ASSERT_EQ(d.makeRelative(CanonPath("/foo/bar/xyzzy")), "xyzzy");
+        ASSERT_EQ(d.makeRelative(CanonPath("/foo/bar/xyzzy/bla")), "xyzzy/bla");
+        ASSERT_EQ(d.makeRelative(CanonPath("/foo/xyzzy/bla")), "../xyzzy/bla");
+        ASSERT_EQ(d.makeRelative(CanonPath("/xyzzy/bla")), "../../xyzzy/bla");
+    }
 }
