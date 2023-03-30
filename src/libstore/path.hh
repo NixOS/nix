@@ -8,13 +8,22 @@ namespace nix {
 
 struct Hash;
 
+/**
+ * \ref StorePath "Store path" is the fundamental reference type of Nix.
+ * A store paths refers to a Store object.
+ *
+ * See glossary.html#gloss-store-path for more information on a
+ * conceptual level.
+ */
 class StorePath
 {
     std::string baseName;
 
 public:
 
-    /* Size of the hash part of store paths, in base-32 characters. */
+    /**
+     * Size of the hash part of store paths, in base-32 characters.
+     */
     constexpr static size_t HashLen = 32; // i.e. 160 bits
 
     constexpr static size_t MaxPathLen = 211;
@@ -45,8 +54,9 @@ public:
         return baseName != other.baseName;
     }
 
-    /* Check whether a file name ends with the extension for
-       derivations. */
+    /**
+     * Check whether a file name ends with the extension for derivations.
+     */
     bool isDerivation() const;
 
     std::string_view name() const
@@ -67,7 +77,10 @@ public:
 typedef std::set<StorePath> StorePathSet;
 typedef std::vector<StorePath> StorePaths;
 
-/* Extension of derivations in the Nix store. */
+/**
+ * The file extension of \ref Derivation derivations when serialized
+ * into store objects.
+ */
 const std::string drvExtension = ".drv";
 
 }
