@@ -51,6 +51,9 @@ The JSON output is a JSON object whose keys are the store paths of the
 derivations, and whose values are a JSON object with the following
 fields:
 
+* `name`: The name of the derivation. This is used when calculating the
+  store paths of the derivation's outputs.
+
 * `outputs`: Information about the output paths of the
   derivation. This is a JSON object with one member per output, where
   the key is the output name and the value is a JSON object with these

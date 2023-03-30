@@ -988,6 +988,8 @@ nlohmann::json Derivation::toJSON(const Store & store) const
 {
     nlohmann::json res = nlohmann::json::object();
 
+    res["name"] = name;
+
     {
         nlohmann::json & outputsObj = res["outputs"];
         outputsObj = nlohmann::json::object();
@@ -1020,17 +1022,19 @@ nlohmann::json Derivation::toJSON(const Store & store) const
 
 
 Derivation Derivation::fromJSON(
-    const Store & store, std::string_view drvName,
+    const Store & store,
     const nlohmann::json & json)
 {
     Derivation res;
+
+    res.name = json["name"];
 
     {
         auto & outputsObj = json["outputs"];
         for (auto & [outputName, output] : outputsObj.items()) {
             res.outputs.insert_or_assign(
                 outputName,
-                DerivationOutput::fromJSON(store, drvName, outputName, output));
+                DerivationOutput::fromJSON(store, res.name, outputName, output));
         }
     }
 

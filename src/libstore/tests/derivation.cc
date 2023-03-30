@@ -98,12 +98,12 @@ TEST_JSON(impure,
             Derivation { VAL },                                 \
             Derivation::fromJSON(                               \
                 *store,                                         \
-                DRV_NAME,                                       \
                 STR ## _json));                                 \
     }
 
 TEST_JSON(simple,
     R"({
+      "name": "my-derivation",
       "inputSrcs": [
         "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"
       ],
@@ -126,6 +126,7 @@ TEST_JSON(simple,
     })",
     ({
         Derivation drv;
+        drv.name = "my-derivation";
         drv.inputSrcs = {
             store->parseStorePath("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"),
         };

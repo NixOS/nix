@@ -340,7 +340,6 @@ struct Derivation : BasicDerivation
     nlohmann::json toJSON(const Store & store) const;
     static Derivation fromJSON(
         const Store & store,
-        std::string_view drvName,
         const nlohmann::json & json);
 
     GENERATE_CMP(Derivation,
