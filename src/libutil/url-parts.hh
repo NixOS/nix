@@ -23,7 +23,7 @@ const static std::string absPathRegex = "(?:(?:/" + segmentRegex + ")*/?)";
 const static std::string pathRegex = "(?:" + segmentRegex + "(?:/" + segmentRegex + ")*/?)";
 
 // A Git ref (i.e. branch or tag name).
-const static std::string refRegexS = "[a-zA-Z0-9][a-zA-Z0-9_.\\/-]*"; // FIXME: check
+const static std::string refRegexS = "[a-zA-Z0-9@][a-zA-Z0-9_.\\/@-]*"; // FIXME: check
 extern std::regex refRegex;
 
 // Instead of defining what a good Git Ref is, we define what a bad Git Ref is
