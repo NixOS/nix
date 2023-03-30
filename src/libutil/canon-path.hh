@@ -85,6 +85,9 @@ public:
         bool operator != (const Iterator & x) const
         { return remaining.data() != x.remaining.data(); }
 
+        bool operator == (const Iterator & x) const
+        { return !(*this != x); }
+
         const std::string_view operator * () const
         { return remaining.substr(0, slash); }
 
@@ -166,6 +169,10 @@ public:
        the `allowed` paths are within `this`. (The latter condition
        ensures access to the parents of allowed paths.) */
     bool isAllowed(const std::set<CanonPath> & allowed) const;
+
+    /* Return a representation `x` of `path` relative to `this`, i.e.
+       `CanonPath(this.makeRelative(x), this) == path`. */
+    std::string makeRelative(const CanonPath & path) const;
 };
 
 std::ostream & operator << (std::ostream & stream, const CanonPath & path);
