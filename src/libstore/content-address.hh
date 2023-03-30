@@ -39,17 +39,16 @@ enum struct FileIngestionMethod : uint8_t {
     Recursive = true
 };
 
-struct FixedOutputHashMethod {
-  FileIngestionMethod fileIngestionMethod;
-  HashType hashType;
-};
-
 /**
  * Compute the prefix to the hash algorithm which indicates how the
  * files were ingested.
  */
 std::string makeFileIngestionPrefix(FileIngestionMethod m);
 
+struct FixedOutputHashMethod {
+  FileIngestionMethod fileIngestionMethod;
+  HashType hashType;
+};
 
 /**
  * An enumeration of all the ways we can serialize file system objects.
@@ -59,14 +58,25 @@ std::string makeFileIngestionPrefix(FileIngestionMethod m);
  * with info on references, and we have `ContentAddressWithReferences`,
  * as defined further below.
  */
-typedef std::variant<
-    TextHashMethod,
-    FixedOutputHashMethod
-> ContentAddressMethod;
+struct ContentAddressMethod
+{
+    typedef std::variant<
+        TextHashMethod,
+        FixedOutputHashMethod
+    > Raw;
 
-ContentAddressMethod parseContentAddressMethod(std::string_view rawCaMethod);
+    Raw raw;
 
-std::string renderContentAddressMethod(ContentAddressMethod caMethod);
+    /* The moral equivalent of `using Raw::Raw;` */
+    ContentAddressMethod(auto &&... arg)
+        : raw(std::forward<decltype(arg)>(arg)...)
+    { }
+
+    static ContentAddressMethod parse(std::string_view rawCaMethod);
+
+    std::string render() const;
+};
+
 
 /*
  * Mini content address
@@ -115,25 +125,41 @@ struct FixedOutputHash {
  * - ‘fixed:<r?>:<ht>:<h>’: For paths computed by
  *   Store::makeFixedOutputPath() / Store::addToStore().
  */
-typedef std::variant<
-    TextHash,
-    FixedOutputHash
-> ContentAddress;
+struct ContentAddress
+{
+    typedef std::variant<
+        TextHash,
+        FixedOutputHash
+    > Raw;
 
-/**
- * Compute the content-addressability assertion (ValidPathInfo::ca) for
- * paths created by Store::makeFixedOutputPath() / Store::addToStore().
- */
-std::string renderContentAddress(ContentAddress ca);
+    Raw raw;
+
+    /* The moral equivalent of `using Raw::Raw;` */
+    ContentAddress(auto &&... arg)
+        : raw(std::forward<decltype(arg)>(arg)...)
+    { }
+
+    /**
+     * Compute the content-addressability assertion (ValidPathInfo::ca) for
+     * paths created by Store::makeFixedOutputPath() / Store::addToStore().
+     */
+    std::string render() const;
+
+    static ContentAddress parse(std::string_view rawCa);
+
+    static std::optional<ContentAddress> parseOpt(std::string_view rawCaOpt);
+
+    const Hash & getHash() const;
+};
 
 std::string renderContentAddress(std::optional<ContentAddress> ca);
 
-ContentAddress parseContentAddress(std::string_view rawCa);
 
-std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt);
-
-Hash getContentAddressHash(const ContentAddress & ca);
-
+/*
+ * Full content address
+ *
+ * See the schema for store paths in store-api.cc
+ */
 
 /**
  * A set of references to other store objects.
@@ -167,12 +193,6 @@ struct StoreReferences {
     GENERATE_CMP(StoreReferences, me->self, me->others);
 };
 
-/*
- * Full content address
- *
- * See the schema for store paths in store-api.cc
- */
-
 // This matches the additional info that we need for makeTextPath
 struct TextInfo {
     TextHash hash;
@@ -200,15 +220,25 @@ struct FixedOutputInfo {
  *
  * A ContentAddress without a Hash.
  */
-typedef std::variant<
-    TextInfo,
-    FixedOutputInfo
-> ContentAddressWithReferences;
+struct ContentAddressWithReferences
+{
+    typedef std::variant<
+        TextInfo,
+        FixedOutputInfo
+    > Raw;
 
-/**
- * Create a ContentAddressWithReferences from a mere ContentAddress, by
- * assuming no references in all cases.
- */
-ContentAddressWithReferences caWithoutRefs(const ContentAddress &);
+    Raw raw;
+
+    /* The moral equivalent of `using Raw::Raw;` */
+    ContentAddressWithReferences(auto &&... arg)
+        : raw(std::forward<decltype(arg)>(arg)...)
+    { }
+
+    /**
+     * Create a ContentAddressWithReferences from a mere ContentAddress, by
+     * assuming no references in all cases.
+     */
+    static ContentAddressWithReferences withoutRefs(const ContentAddress &);
+};
 
 }

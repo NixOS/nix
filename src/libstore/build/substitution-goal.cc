@@ -97,7 +97,7 @@ void PathSubstitutionGoal::tryNext()
     if (ca) {
         subPath = sub->makeFixedOutputPathFromCA(
             std::string { storePath.name() },
-            caWithoutRefs(*ca));
+            ContentAddressWithReferences::withoutRefs(*ca));
         if (sub->storeDir == worker.store.storeDir)
             assert(subPath == storePath);
     } else if (sub->storeDir != worker.store.storeDir) {

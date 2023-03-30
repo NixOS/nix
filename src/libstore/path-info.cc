@@ -49,7 +49,7 @@ std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithRef
                 },
             };
         },
-    }, *ca);
+    }, ca->raw);
 }
 
 bool ValidPathInfo::isContentAddressed(const Store & store) const
@@ -116,7 +116,7 @@ ValidPathInfo::ValidPathInfo(
                 this->references.insert(path);
             this->ca = std::move((FixedOutputHash &&) foi);
         },
-    }, std::move(ca));
+    }, std::move(ca).raw);
 }
 
 
@@ -136,7 +136,7 @@ ValidPathInfo ValidPathInfo::read(Source & source, const Store & store, unsigned
     if (format >= 16) {
         source >> info.ultimate;
         info.sigs = readStrings<StringSet>(source);
-        info.ca = parseContentAddressOpt(readString(source));
+        info.ca = ContentAddress::parseOpt(readString(source));
     }
     return info;
 }

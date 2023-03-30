@@ -970,7 +970,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 info.references = worker_proto::read(*store, in, Phantom<StorePathSet> {});
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
-                info.ca = parseContentAddressOpt(readString(in));
+                info.ca = ContentAddress::parseOpt(readString(in));
 
                 if (info.narSize == 0)
                     throw Error("narInfo is too old and missing the narSize field");

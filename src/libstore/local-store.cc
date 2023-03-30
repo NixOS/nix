@@ -944,7 +944,7 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
     if (s) info->sigs = tokenizeString<StringSet>(s, " ");
 
     s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 7);
-    if (s) info->ca = parseContentAddressOpt(s);
+    if (s) info->ca = ContentAddress::parseOpt(s);
 
     /* Get the references. */
     auto useQueryReferences(state.stmts->QueryReferences.use()(info->id));
@@ -1150,7 +1150,7 @@ void LocalStore::querySubstitutablePathInfos(const StorePathCAMap & paths, Subst
             if (path.second) {
                 subPath = makeFixedOutputPathFromCA(
                     path.first.name(),
-                    caWithoutRefs(*path.second));
+                    ContentAddressWithReferences::withoutRefs(*path.second));
                 if (sub->storeDir == storeDir)
                     assert(subPath == path.first);
                 if (subPath != path.first)
@@ -1329,7 +1329,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                     printStorePath(info.path), info.narSize, hashResult.second);
 
             if (info.ca) {
-                if (auto foHash = std::get_if<FixedOutputHash>(&*info.ca)) {
+                if (auto foHash = std::get_if<FixedOutputHash>(&info.ca->raw)) {
                     auto actualFoHash = hashCAPath(
                         foHash->method,
                         foHash->hash.type,
@@ -1342,7 +1342,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                             actualFoHash.hash.to_string(Base32, true));
                     }
                 }
-                if (auto textHash = std::get_if<TextHash>(&*info.ca)) {
+                if (auto textHash = std::get_if<TextHash>(&info.ca->raw)) {
                     auto actualTextHash = hashString(htSHA256, readFile(realPath));
                     if (textHash->hash != actualTextHash) {
                         throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",

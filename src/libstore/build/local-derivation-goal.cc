@@ -2508,7 +2508,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 /* Check wanted hash */
                 const Hash & wanted = dof.hash.hash;
                 assert(newInfo0.ca);
-                auto got = getContentAddressHash(*newInfo0.ca);
+                auto got = newInfo0.ca->getHash();
                 if (wanted != got) {
                     /* Throw an error after registering the path as
                        valid. */
