@@ -1,5 +1,6 @@
 #include "installables.hh"
 #include "installable-derived-path.hh"
+#include "installable-value.hh"
 #include "store-api.hh"
 #include "eval-inline.hh"
 #include "eval-cache.hh"
@@ -40,7 +41,7 @@ std::string resolveString(
     return rewriteStrings(toResolve, rewrites);
 }
 
-UnresolvedApp Installable::toApp(EvalState & state)
+UnresolvedApp InstallableValue::toApp(EvalState & state)
 {
     auto cursor = getCursor(state);
     auto attrPath = cursor->getAttrPath();
@@ -119,11 +120,11 @@ App UnresolvedApp::resolve(ref<Store> evalStore, ref<Store> store)
 {
     auto res = unresolved;
 
-    std::vector<std::shared_ptr<Installable>> installableContext;
+    Installables installableContext;
 
     for (auto & ctxElt : unresolved.context)
         installableContext.push_back(
-            std::make_shared<InstallableDerivedPath>(store, DerivedPath { ctxElt }));
+            make_ref<InstallableDerivedPath>(store, DerivedPath { ctxElt }));
 
     auto builtContext = Installable::build(evalStore, store, Realise::Outputs, installableContext);
     res.program = resolveString(*store, unresolved.program, builtContext);

@@ -1,0 +1,6 @@
+"documentation":
+  - doc/manual/*
+  - src/nix/**/*.md
+
+"tests":
+  - tests/**/*

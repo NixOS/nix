@@ -36,10 +36,10 @@ deps=$(nix-store -quR "$drvPath")
 echo "output closure contains $deps"
 
 # The output path should be in the closure.
-echo "$deps" | grep -q "$outPath"
+echo "$deps" | grepQuiet "$outPath"
 
 # Input-1 is not retained.
-if echo "$deps" | grep -q "dependencies-input-1"; then exit 1; fi
+if echo "$deps" | grepQuiet "dependencies-input-1"; then exit 1; fi
 
 # Input-2 is retained.
 input2OutPath=$(echo "$deps" | grep "dependencies-input-2")
@@ -49,4 +49,4 @@ nix-store -q --referrers-closure "$input2OutPath" | grep "$outPath"
 
 # Check that the derivers are set properly.
 test $(nix-store -q --deriver "$outPath") = "$drvPath"
-nix-store -q --deriver "$input2OutPath" | grep -q -- "-input-2.drv"
+nix-store -q --deriver "$input2OutPath" | grepQuiet -- "-input-2.drv"

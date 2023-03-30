@@ -39,7 +39,7 @@ struct CmdShowDerivation : InstallablesCommand
 
     Category category() override { return catUtility; }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, Installables && installables) override
     {
         auto drvPaths = Installable::toDerivations(store, installables, true);
 
@@ -57,7 +57,7 @@ struct CmdShowDerivation : InstallablesCommand
             jsonRoot[store->printStorePath(drvPath)] =
                 store->readDerivation(drvPath).toJSON(*store);
         }
-        std::cout << jsonRoot.dump(2) << std::endl;
+        logger->cout(jsonRoot.dump(2));
     }
 };
 

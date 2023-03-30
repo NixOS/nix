@@ -1,4 +1,4 @@
-#include "command.hh"
+#include "command-installable-value.hh"
 #include "globals.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
@@ -22,7 +22,7 @@ std::string wrap(std::string prefix, std::string s)
     return concatStrings(prefix, s, ANSI_NORMAL);
 }
 
-struct CmdSearch : InstallableCommand, MixJSON
+struct CmdSearch : InstallableValueCommand, MixJSON
 {
     std::vector<std::string> res;
     std::vector<std::string> excludeRes;
@@ -61,7 +61,7 @@ struct CmdSearch : InstallableCommand, MixJSON
         };
     }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<InstallableValue> installable) override
     {
         settings.readOnlyMode = true;
         evalSettings.enableImportFromDerivation.setDefault(false);
@@ -196,9 +196,8 @@ struct CmdSearch : InstallableCommand, MixJSON
         for (auto & cursor : installable->getCursors(*state))
             visit(*cursor, cursor->getAttrPath(), true);
 
-        if (json) {
-            std::cout << jsonOut->dump() << std::endl;
-        }
+        if (json)
+            logger->cout("%s", *jsonOut);
 
         if (!json && !results)
             throw Error("no results for the given search term(s)!");

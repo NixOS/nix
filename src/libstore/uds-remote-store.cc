@@ -26,9 +26,9 @@ UDSRemoteStore::UDSRemoteStore(const Params & params)
 
 
 UDSRemoteStore::UDSRemoteStore(
-        const std::string scheme,
-        std::string socket_path,
-        const Params & params)
+    const std::string scheme,
+    std::string socket_path,
+    const Params & params)
     : UDSRemoteStore(params)
 {
     path.emplace(socket_path);

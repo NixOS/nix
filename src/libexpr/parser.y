@@ -469,7 +469,7 @@ expr_simple
            new ExprString(std::move(path))});
   }
   | URI {
-      static bool noURLLiterals = settings.isExperimentalFeatureEnabled(Xp::NoUrlLiterals);
+      static bool noURLLiterals = experimentalFeatureSettings.isEnabled(Xp::NoUrlLiterals);
       if (noURLLiterals)
           throw ParseError({
               .msg = hintfmt("URL literals are disabled"),
@@ -732,7 +732,7 @@ Expr * EvalState::parseExprFromString(std::string s, const Path & basePath)
 
 Expr * EvalState::parseStdin()
 {
-    //Activity act(*logger, lvlTalkative, format("parsing standard input"));
+    //Activity act(*logger, lvlTalkative, "parsing standard input");
     auto buffer = drainFD(0);
     // drainFD should have left some extra space for terminators
     buffer.append("\0\0", 2);
@@ -816,7 +816,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
     }
 
     else if (hasPrefix(elem.second, "flake:")) {
-        settings.requireExperimentalFeature(Xp::Flakes);
+        experimentalFeatureSettings.require(Xp::Flakes);
         auto flakeRef = parseFlakeRef(elem.second.substr(6), {}, true, false);
         debug("fetching flake search path element '%s''", elem.second);
         auto storePath = flakeRef.resolve(store).fetchTree(store).first.storePath;
@@ -835,7 +835,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
         }
     }
 
-    debug(format("resolved search path element '%s' to '%s'") % elem.second % res.second);
+    debug("resolved search path element '%s' to '%s'", elem.second, res.second);
 
     searchPathResolved[elem.second] = res;
     return res;

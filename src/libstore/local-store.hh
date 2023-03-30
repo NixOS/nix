@@ -38,11 +38,13 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
 
     Setting<bool> requireSigs{(StoreConfig*) this,
         settings.requireSigs,
-        "require-sigs", "whether store paths should have a trusted signature on import"};
+        "require-sigs",
+        "Whether store paths copied into this store should have a trusted signature."};
 
     const std::string name() override { return "Local Store"; }
-};
 
+    std::string doc() override;
+};
 
 class LocalStore : public virtual LocalStoreConfig, public virtual LocalFSStore, public virtual GcStore
 {
@@ -100,8 +102,12 @@ public:
     /* Initialise the local store, upgrading the schema if
        necessary. */
     LocalStore(const Params & params);
+    LocalStore(std::string scheme, std::string path, const Params & params);
 
     ~LocalStore();
+
+    static std::set<std::string> uriSchemes()
+    { return {}; }
 
     /* Implementations of abstract store API methods. */
 

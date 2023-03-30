@@ -4,7 +4,7 @@
 source common.sh
 
 if isDaemonNewer "2.4pre20211005"; then
-    exit 99
+    skipTest "Daemon is too new"
 fi
 
 

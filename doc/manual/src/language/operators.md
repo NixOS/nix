@@ -43,8 +43,8 @@ If the attribute doesn’t exist, return *value* if provided, otherwise abort ev
 An attribute path is a dot-separated list of attribute names.
 An attribute name can be an identifier or a string.
 
-> *attrpath* = *name* [ `.` *name* ]...
-> *name* = *identifier* | *string*
+> *attrpath* = *name* [ `.` *name* ]... \
+> *name* = *identifier* | *string* \
 > *identifier* ~ `[a-zA-Z_][a-zA-Z0-9_'-]*`
 
 [Attribute selection]: #attribute-selection

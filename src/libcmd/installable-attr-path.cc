@@ -87,6 +87,10 @@ DerivedPathsWithInfo InstallableAttrPath::toDerivedPaths()
                 .drvPath = drvPath,
                 .outputs = outputs,
             },
+            .info = make_ref<ExtraPathInfoValue>(ExtraPathInfoValue::Value {
+                /* FIXME: reconsider backwards compatibility above
+                   so we can fill in this info. */
+            }),
         });
 
     return res;

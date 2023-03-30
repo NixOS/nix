@@ -44,6 +44,13 @@
 
 namespace nix {
 
+std::string LocalStoreConfig::doc()
+{
+    return
+        #include "local-store.md"
+        ;
+}
+
 struct LocalStore::State::Stmts {
     /* Some precompiled SQLite statements. */
     SQLiteStmt RegisterValidPath;
@@ -280,7 +287,7 @@ LocalStore::LocalStore(const Params & params)
     else if (curSchema == 0) { /* new store */
         curSchema = nixSchemaVersion;
         openDB(*state, true);
-        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str(), 0666, true);
+        writeFile(schemaPath, fmt("%1%", nixSchemaVersion), 0666, true);
     }
 
     else if (curSchema < nixSchemaVersion) {
@@ -329,14 +336,14 @@ LocalStore::LocalStore(const Params & params)
             txn.commit();
         }
 
-        writeFile(schemaPath, (format("%1%") % nixSchemaVersion).str(), 0666, true);
+        writeFile(schemaPath, fmt("%1%", nixSchemaVersion), 0666, true);
 
         lockFile(globalLock.get(), ltRead, true);
     }
 
     else openDB(*state, false);
 
-    if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
+    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
         migrateCASchema(state->db, dbDir + "/ca-schema", globalLock);
     }
 
@@ -366,7 +373,7 @@ LocalStore::LocalStore(const Params & params)
     state->stmts->QueryPathFromHashPart.create(state->db,
         "select path from ValidPaths where path >= ? limit 1;");
     state->stmts->QueryValidPaths.create(state->db, "select path from ValidPaths");
-    if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
+    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
         state->stmts->RegisterRealisedOutput.create(state->db,
             R"(
                 insert into Realisations (drvPath, outputName, outputPath, signatures)
@@ -410,6 +417,13 @@ LocalStore::LocalStore(const Params & params)
                     (select id from Realisations where drvPath = ? and outputName = ?));
             )");
     }
+}
+
+
+LocalStore::LocalStore(std::string scheme, std::string path, const Params & params)
+    : LocalStore(params)
+{
+    throw UnimplementedError("LocalStore");
 }
 
 
@@ -754,7 +768,7 @@ void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivat
 
 void LocalStore::registerDrvOutput(const Realisation & info, CheckSigsFlag checkSigs)
 {
-    settings.requireExperimentalFeature(Xp::CaDerivations);
+    experimentalFeatureSettings.require(Xp::CaDerivations);
     if (checkSigs == NoCheckSigs || !realisationIsUntrusted(info))
         registerDrvOutput(info);
     else
@@ -763,7 +777,7 @@ void LocalStore::registerDrvOutput(const Realisation & info, CheckSigsFlag check
 
 void LocalStore::registerDrvOutput(const Realisation & info)
 {
-    settings.requireExperimentalFeature(Xp::CaDerivations);
+    experimentalFeatureSettings.require(Xp::CaDerivations);
     retrySQLite<void>([&]() {
         auto state(_state.lock());
         if (auto oldR = queryRealisation_(*state, info.id)) {
@@ -1052,7 +1066,7 @@ LocalStore::queryPartialDerivationOutputMap(const StorePath & path_)
         return outputs;
     });
 
-    if (!settings.isExperimentalFeatureEnabled(Xp::CaDerivations))
+    if (!experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
         return outputs;
 
     auto drv = readInvalidDerivation(path);
@@ -1580,7 +1594,7 @@ void LocalStore::invalidatePathChecked(const StorePath & path)
 
 bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 {
-    printInfo(format("reading the Nix store..."));
+    printInfo("reading the Nix store...");
 
     bool errors = false;
 
@@ -1970,5 +1984,6 @@ std::optional<std::string> LocalStore::getVersion()
     return nixVersion;
 }
 
+static RegisterStoreImplementation<LocalStore, LocalStoreConfig> regLocalStore;
 
 }  // namespace nix

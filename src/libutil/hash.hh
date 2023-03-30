@@ -133,7 +133,7 @@ HashType parseHashType(std::string_view s);
 std::optional<HashType> parseHashTypeOpt(std::string_view s);
 
 /* And the reverse. */
-std::string printHashType(HashType ht);
+std::string_view printHashType(HashType ht);
 
 
 union Ctx;

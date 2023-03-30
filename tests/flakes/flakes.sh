@@ -76,17 +76,17 @@ nix registry add --registry $registry nixpkgs flake1
 
 # Test 'nix registry list'.
 [[ $(nix registry list | wc -l) == 5 ]]
-nix registry list | grep -q    '^global'
-nix registry list | grep -q -v '^user' # nothing in user registry
+nix registry list | grep        '^global'
+nix registry list | grepInverse '^user' # nothing in user registry
 
 # Test 'nix flake metadata'.
 nix flake metadata flake1
-nix flake metadata flake1 | grep -q 'Locked URL:.*flake1.*'
+nix flake metadata flake1 | grepQuiet 'Locked URL:.*flake1.*'
 
 # Test 'nix flake metadata' on a local flake.
-(cd $flake1Dir && nix flake metadata) | grep -q 'URL:.*flake1.*'
-(cd $flake1Dir && nix flake metadata .) | grep -q 'URL:.*flake1.*'
-nix flake metadata $flake1Dir | grep -q 'URL:.*flake1.*'
+(cd $flake1Dir && nix flake metadata) | grepQuiet 'URL:.*flake1.*'
+(cd $flake1Dir && nix flake metadata .) | grepQuiet 'URL:.*flake1.*'
+nix flake metadata $flake1Dir | grepQuiet 'URL:.*flake1.*'
 
 # Test 'nix flake metadata --json'.
 json=$(nix flake metadata flake1 --json | jq .)
@@ -134,11 +134,11 @@ nix build -o $TEST_ROOT/result flake2#bar --impure --no-write-lock-file
 nix eval --expr "builtins.getFlake \"$flake2Dir\"" --impure
 
 # Building a local flake with an unlocked dependency should fail with --no-update-lock-file.
-nix build -o $TEST_ROOT/result $flake2Dir#bar --no-update-lock-file 2>&1 | grep 'requires lock file changes'
+expect 1 nix build -o $TEST_ROOT/result $flake2Dir#bar --no-update-lock-file 2>&1 | grep 'requires lock file changes'
 
 # But it should succeed without that flag.
 nix build -o $TEST_ROOT/result $flake2Dir#bar --no-write-lock-file
-nix build -o $TEST_ROOT/result $flake2Dir#bar --no-update-lock-file 2>&1 | grep 'requires lock file changes'
+expect 1 nix build -o $TEST_ROOT/result $flake2Dir#bar --no-update-lock-file 2>&1 | grep 'requires lock file changes'
 nix build -o $TEST_ROOT/result $flake2Dir#bar --commit-lock-file
 [[ -e $flake2Dir/flake.lock ]]
 [[ -z $(git -C $flake2Dir diff main || echo failed) ]]
@@ -196,10 +196,10 @@ git -C $flake3Dir add flake.lock
 git -C $flake3Dir commit -m 'Add lockfile'
 
 # Test whether registry caching works.
-nix registry list --flake-registry file://$registry | grep -q flake3
+nix registry list --flake-registry file://$registry | grepQuiet flake3
 mv $registry $registry.tmp
 nix store gc
-nix registry list --flake-registry file://$registry --refresh | grep -q flake3
+nix registry list --flake-registry file://$registry --refresh | grepQuiet flake3
 mv $registry.tmp $registry
 
 # Test whether flakes are registered as GC roots for offline use.
@@ -346,8 +346,8 @@ nix registry remove flake1
 nix registry add user-flake1 git+file://$flake1Dir
 nix registry add user-flake2 git+file://$flake2Dir
 [[ $(nix --flake-registry "" registry list | wc -l) == 2 ]]
-nix --flake-registry "" registry list | grep -q -v '^global' # nothing in global registry
-nix --flake-registry "" registry list | grep -q    '^user'
+nix --flake-registry "" registry list | grepQuietInverse '^global' # nothing in global registry
+nix --flake-registry "" registry list | grepQuiet '^user'
 nix registry remove user-flake1
 nix registry remove user-flake2
 [[ $(nix registry list | wc -l) == 5 ]]
@@ -454,7 +454,7 @@ url=$(nix flake metadata --json file://$TEST_ROOT/flake.tar.gz | jq -r .url)
 nix build -o $TEST_ROOT/result $url
 
 # Building with an incorrect SRI hash should fail.
-nix build -o $TEST_ROOT/result "file://$TEST_ROOT/flake.tar.gz?narHash=sha256-qQ2Zz4DNHViCUrp6gTS7EE4+RMqFQtUfWF2UNUtJKS0=" 2>&1 | grep 'NAR hash mismatch'
+expectStderr 102 nix build -o $TEST_ROOT/result "file://$TEST_ROOT/flake.tar.gz?narHash=sha256-qQ2Zz4DNHViCUrp6gTS7EE4+RMqFQtUfWF2UNUtJKS0=" | grep 'NAR hash mismatch'
 
 # Test --override-input.
 git -C $flake3Dir reset --hard

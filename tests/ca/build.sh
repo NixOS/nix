@@ -2,14 +2,14 @@
 
 source common.sh
 
-drv=$(nix-instantiate --experimental-features ca-derivations ./content-addressed.nix -A rootCA --arg seed 1)
-nix --experimental-features 'nix-command ca-derivations' show-derivation "$drv" --arg seed 1
+drv=$(nix-instantiate ./content-addressed.nix -A rootCA --arg seed 1)
+nix show-derivation "$drv" --arg seed 1
 
 buildAttr () {
     local derivationPath=$1
     local seedValue=$2
     shift; shift
-    local args=("--experimental-features" "ca-derivations" "./content-addressed.nix" "-A" "$derivationPath" --arg seed "$seedValue" "--no-out-link")
+    local args=("./content-addressed.nix" "-A" "$derivationPath" --arg seed "$seedValue" "--no-out-link")
     args+=("$@")
     nix-build "${args[@]}"
 }
@@ -19,7 +19,7 @@ testRemoteCache () {
     local outPath=$(buildAttr dependentNonCA 1)
     nix copy --to file://$cacheDir $outPath
     clearStore
-    buildAttr dependentNonCA 1 --option substituters file://$cacheDir --no-require-sigs |& (! grep "building dependent-non-ca")
+    buildAttr dependentNonCA 1 --option substituters file://$cacheDir --no-require-sigs |& grepQuietInverse "building dependent-non-ca"
 }
 
 testDeterministicCA () {
@@ -46,17 +46,17 @@ testCutoff () {
 }
 
 testGC () {
-    nix-instantiate --experimental-features ca-derivations ./content-addressed.nix -A rootCA --arg seed 5
-    nix-collect-garbage --experimental-features ca-derivations --option keep-derivations true
+    nix-instantiate ./content-addressed.nix -A rootCA --arg seed 5
+    nix-collect-garbage --option keep-derivations true
     clearStore
     buildAttr rootCA 1 --out-link $TEST_ROOT/rootCA
-    nix-collect-garbage --experimental-features ca-derivations
+    nix-collect-garbage
     buildAttr rootCA 1 -j0
 }
 
 testNixCommand () {
     clearStore
-    nix build --experimental-features 'nix-command ca-derivations' --file ./content-addressed.nix --no-link
+    nix build --file ./content-addressed.nix --no-link
 }
 
 # Regression test for https://github.com/NixOS/nix/issues/4775

@@ -136,7 +136,11 @@ MixEvalArgs::MixEvalArgs()
 
     addFlag({
         .longName = "eval-store",
-        .description = "The Nix store to use for evaluations.",
+        .description =
+          R"(
+            The [URL of the Nix store](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
+            to use for evaluation, i.e. to store derivations (`.drv` files) and inputs referenced by them.
+          )",
         .category = category,
         .labels = {"store-url"},
         .handler = {&evalStoreUrl},
@@ -166,7 +170,7 @@ Path lookupFileArg(EvalState & state, std::string_view s)
     }
 
     else if (hasPrefix(s, "flake:")) {
-        settings.requireExperimentalFeature(Xp::Flakes);
+        experimentalFeatureSettings.require(Xp::Flakes);
         auto flakeRef = parseFlakeRef(std::string(s.substr(6)), {}, true, false);
         auto storePath = flakeRef.resolve(state.store).fetchTree(state.store).first.storePath;
         return state.store->toRealPath(storePath);

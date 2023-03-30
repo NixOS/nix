@@ -4,7 +4,7 @@ set -eux
 
 cleanup() {
     PLIST="/Library/LaunchDaemons/org.nixos.nix-daemon.plist"
-    if sudo launchctl list | grep -q nix-daemon; then
+    if sudo launchctl list | grepQuiet nix-daemon; then
         sudo launchctl unload "$PLIST"
     fi
 

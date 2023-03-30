@@ -8,6 +8,7 @@
 #include "eval-inline.hh"
 #include "filetransfer.hh"
 #include "function-trace.hh"
+#include "profiles.hh"
 
 #include <algorithm>
 #include <chrono>
@@ -368,7 +369,7 @@ void initGC()
             size = (pageSize * pages) / 4; // 25% of RAM
         if (size > maxSize) size = maxSize;
 #endif
-        debug(format("setting initial heap size to %1% bytes") % size);
+        debug("setting initial heap size to %1% bytes", size);
         GC_expand_hp(size);
     }
 
@@ -609,7 +610,7 @@ Path EvalState::checkSourcePath(const Path & path_)
     }
 
     /* Resolve symlinks. */
-    debug(format("checking access to '%s'") % abspath);
+    debug("checking access to '%s'", abspath);
     Path path = canonPath(abspath, true);
 
     for (auto & i : *allowedPaths) {
@@ -2491,8 +2492,8 @@ Strings EvalSettings::getDefaultNixPath()
 
     if (!evalSettings.restrictEval && !evalSettings.pureEval) {
         add(settings.useXDGBaseDirectories ? getStateDir() + "/nix/defexpr/channels" : getHome() + "/.nix-defexpr/channels");
-        add(settings.nixStateDir + "/profiles/per-user/root/channels/nixpkgs", "nixpkgs");
-        add(settings.nixStateDir + "/profiles/per-user/root/channels");
+        add(rootChannelsDir() + "/nixpkgs", "nixpkgs");
+        add(rootChannelsDir());
     }
 
     return res;

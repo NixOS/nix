@@ -101,7 +101,8 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
             return {{
                 .path = DerivedPath::Opaque {
                     .path = std::move(storePath),
-                }
+                },
+                .info = make_ref<ExtraPathInfo>(),
             }};
         }
 
@@ -113,7 +114,8 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
                 return {{
                     .path = DerivedPath::Opaque {
                         .path = std::move(*storePath),
-                    }
+                    },
+                    .info = make_ref<ExtraPathInfo>(),
                 }};
             } else
                 throw Error("flake output attribute '%s' evaluates to the string '%s' which is not a store path", attrPath, s);
@@ -160,13 +162,16 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
                 },
             }, extendedOutputsSpec.raw()),
         },
-        .info = {
-            .priority = priority,
-            .originalRef = flakeRef,
-            .resolvedRef = getLockedFlake()->flake.lockedRef,
-            .attrPath = attrPath,
-            .extendedOutputsSpec = extendedOutputsSpec,
-        }
+        .info = make_ref<ExtraPathInfoFlake>(
+            ExtraPathInfoValue::Value {
+                .priority = priority,
+                .attrPath = attrPath,
+                .extendedOutputsSpec = extendedOutputsSpec,
+            },
+            ExtraPathInfoFlake::Flake {
+                .originalRef = flakeRef,
+                .resolvedRef = getLockedFlake()->flake.lockedRef,
+            }),
     }};
 }
 
@@ -178,8 +183,7 @@ std::pair<Value *, PosIdx> InstallableFlake::toValue(EvalState & state)
 std::vector<ref<eval_cache::AttrCursor>>
 InstallableFlake::getCursors(EvalState & state)
 {
-    auto evalCache = openEvalCache(state,
-        std::make_shared<flake::LockedFlake>(lockFlake(state, flakeRef, lockFlags)));
+    auto evalCache = openEvalCache(state, getLockedFlake());
 
     auto root = evalCache->getRoot();
 
@@ -213,6 +217,7 @@ std::shared_ptr<flake::LockedFlake> InstallableFlake::getLockedFlake() const
 {
     if (!_lockedFlake) {
         flake::LockFlags lockFlagsApplyConfig = lockFlags;
+        // FIXME why this side effect?
         lockFlagsApplyConfig.applyNixConfig = true;
         _lockedFlake = std::make_shared<flake::LockedFlake>(lockFlake(*state, flakeRef, lockFlagsApplyConfig));
     }
@@ -230,7 +235,7 @@ FlakeRef InstallableFlake::nixpkgsFlakeRef() const
         }
     }
 
-    return Installable::nixpkgsFlakeRef();
+    return InstallableValue::nixpkgsFlakeRef();
 }
 
 }

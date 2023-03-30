@@ -30,28 +30,23 @@ static GlobalConfig::Register rSettings(&settings);
 
 Settings::Settings()
     : nixPrefix(NIX_PREFIX)
-    , nixStore(canonPath(getEnv("NIX_STORE_DIR").value_or(getEnv("NIX_STORE").value_or(NIX_STORE_DIR))))
-    , nixDataDir(canonPath(getEnv("NIX_DATA_DIR").value_or(NIX_DATA_DIR)))
-    , nixLogDir(canonPath(getEnv("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
-    , nixStateDir(canonPath(getEnv("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
-    , nixConfDir(canonPath(getEnv("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
+    , nixStore(canonPath(getEnvNonEmpty("NIX_STORE_DIR").value_or(getEnvNonEmpty("NIX_STORE").value_or(NIX_STORE_DIR))))
+    , nixDataDir(canonPath(getEnvNonEmpty("NIX_DATA_DIR").value_or(NIX_DATA_DIR)))
+    , nixLogDir(canonPath(getEnvNonEmpty("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
+    , nixStateDir(canonPath(getEnvNonEmpty("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
+    , nixConfDir(canonPath(getEnvNonEmpty("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
     , nixUserConfFiles(getUserConfigFiles())
-    , nixBinDir(canonPath(getEnv("NIX_BIN_DIR").value_or(NIX_BIN_DIR)))
+    , nixBinDir(canonPath(getEnvNonEmpty("NIX_BIN_DIR").value_or(NIX_BIN_DIR)))
     , nixManDir(canonPath(NIX_MAN_DIR))
-    , nixDaemonSocketFile(canonPath(getEnv("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
+    , nixDaemonSocketFile(canonPath(getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
 {
     buildUsersGroup = getuid() == 0 ? "nixbld" : "";
     lockCPU = getEnv("NIX_AFFINITY_HACK") == "1";
     allowSymlinkedStore = getEnv("NIX_IGNORE_SYMLINK_STORE") == "1";
 
-    caFile = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
-    if (caFile == "") {
-        for (auto & fn : {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
-            if (pathExists(fn)) {
-                caFile = fn;
-                break;
-            }
-    }
+    auto sslOverride = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
+    if (sslOverride != "")
+        caFile = sslOverride;
 
     /* Backwards compatibility. */
     auto s = getEnv("NIX_REMOTE_SYSTEMS");
@@ -166,18 +161,6 @@ StringSet Settings::getDefaultExtraPlatforms()
     return extraPlatforms;
 }
 
-bool Settings::isExperimentalFeatureEnabled(const ExperimentalFeature & feature)
-{
-    auto & f = experimentalFeatures.get();
-    return std::find(f.begin(), f.end(), feature) != f.end();
-}
-
-void Settings::requireExperimentalFeature(const ExperimentalFeature & feature)
-{
-    if (!isExperimentalFeatureEnabled(feature))
-        throw MissingExperimentalFeature(feature);
-}
-
 bool Settings::isWSL1()
 {
     struct utsname utsbuf;
@@ -185,6 +168,13 @@ bool Settings::isWSL1()
     // WSL1 uses -Microsoft suffix
     // WSL2 uses -microsoft-standard suffix
     return hasSuffix(utsbuf.release, "-Microsoft");
+}
+
+Path Settings::getDefaultSSLCertFile()
+{
+    for (auto & fn : {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
+        if (pathExists(fn)) return fn;
+    return "";
 }
 
 const std::string nixVersion = PACKAGE_VERSION;

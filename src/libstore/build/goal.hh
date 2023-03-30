@@ -88,7 +88,7 @@ struct Goal : public std::enable_shared_from_this<Goal>
         abort();
     }
 
-    void trace(const FormatOrString & fs);
+    void trace(std::string_view s);
 
     std::string getName()
     {

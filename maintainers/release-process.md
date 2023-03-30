@@ -123,6 +123,7 @@ release:
   `/home/eelco/Dev/nixpkgs-pristine`.
 
   TODO: trigger nixos.org netlify: https://docs.netlify.com/configure-builds/build-hooks/
+
 * Prepare for the next point release by editing `.version` to
   e.g.
 
@@ -152,7 +153,7 @@ release:
   from the previous milestone, and close the previous milestone. Set
   the date for the next milestone 6 weeks from now.
 
-* Create a backport label
+* Create a backport label.
 
 * Post an [announcement on Discourse](https://discourse.nixos.org/c/announcements/8), including the contents of
   `rl-$VERSION.md`.
