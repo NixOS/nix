@@ -10,6 +10,7 @@
 #include "archive.hh"
 #include "callback.hh"
 #include "remote-store.hh"
+#include "sync.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>
@@ -1101,7 +1102,8 @@ std::map<StorePath, StorePath> copyPaths(
         return storePathForDst;
     };
 
-    uint64_t total = 0;
+    // total is accessed by each copy, which are each handled in separate threads
+    Sync<uint64_t> _total = 0;
 
     for (auto & missingPath : sortedMissing) {
         auto info = srcStore.queryPathInfo(missingPath);
@@ -1124,8 +1126,9 @@ std::map<StorePath, StorePath> copyPaths(
             PushActivity pact(act.id);
 
             LambdaSink progressSink([&](std::string_view data) {
-                total += data.size();
-                act.progress(total, info->narSize);
+                auto total(_total.lock());
+                *total += data.size();
+                act.progress(*total, info->narSize);
             });
             TeeSink tee { sink, progressSink };
 
