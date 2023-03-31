@@ -17,7 +17,7 @@ let
       script = ''
         tar -xf ./nix.tar.xz
         mv ./nix-* nix
-        ./nix/install --no-daemon
+        ./nix/install --no-daemon --no-channel-add
       '';
     };
 
