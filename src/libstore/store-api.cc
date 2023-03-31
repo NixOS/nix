@@ -1103,7 +1103,7 @@ std::map<StorePath, StorePath> copyPaths(
     };
 
     // total is accessed by each copy, which are each handled in separate threads
-    Sync<uint64_t> total = 0;
+    Sync<uint64_t> _total = 0;
 
     for (auto & missingPath : sortedMissing) {
         auto info = srcStore.queryPathInfo(missingPath);
@@ -1126,8 +1126,9 @@ std::map<StorePath, StorePath> copyPaths(
             PushActivity pact(act.id);
 
             LambdaSink progressSink([&](std::string_view data) {
-                *total.lock() += data.size();
-                act.progress(*total.lock(), info->narSize);
+                auto total(_total.lock());
+                *total += data.size();
+                act.progress(*total, info->narSize);
             });
             TeeSink tee { sink, progressSink };
 
