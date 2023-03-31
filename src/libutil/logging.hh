@@ -72,6 +72,9 @@ public:
 
     virtual void stop() { };
 
+    virtual void pause() { };
+    virtual void resume() { };
+
     // Whether the logger prints the whole build log
     virtual bool isVerbose() { return false; }
 
