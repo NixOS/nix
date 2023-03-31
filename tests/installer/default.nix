@@ -33,9 +33,9 @@ let
   mockChannel = pkgs:
     pkgs.runCommandNoCC "mock-channel" {} ''
       mkdir nixexprs
-      mkdir $out
+      mkdir -p $out/channel
       echo -n 'someContent' > nixexprs/someFile
-      tar cvf - nixexprs | bzip2 > $out/nixexprs.tar.bz2
+      tar cvf - nixexprs | bzip2 > $out/channel/nixexprs.tar.bz2
     '';
 
   disableSELinux = "sudo setenforce 0";
@@ -198,7 +198,9 @@ let
         $ssh "set -eux; $installScript"
 
         echo "Copying the mock channel"
-        scp -r -P 20022 $ssh_opts ${mockChannel pkgs} vagrant@localhost:channel
+        # `scp -r` doesn't seem to work properly on some rhel instances, so let's
+        # use a plain tarpipe instead
+        tar -C ${mockChannel pkgs} -c channel | ssh -p 20022 $ssh_opts vagrant@localhost tar x -f-
 
         echo "Testing Nix installation..."
         $ssh <<EOF
