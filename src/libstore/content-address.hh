@@ -46,8 +46,10 @@ enum struct FileIngestionMethod : uint8_t {
 std::string makeFileIngestionPrefix(FileIngestionMethod m);
 
 struct FixedOutputHashMethod {
-  FileIngestionMethod fileIngestionMethod;
-  HashType hashType;
+    FileIngestionMethod fileIngestionMethod;
+    HashType hashType;
+
+    GENERATE_CMP(FixedOutputHashMethod, me->fileIngestionMethod, me->hashType);
 };
 
 /**
@@ -66,6 +68,8 @@ struct ContentAddressMethod
     > Raw;
 
     Raw raw;
+
+    GENERATE_CMP(ContentAddressMethod, me->raw);
 
     /* The moral equivalent of `using Raw::Raw;` */
     ContentAddressMethod(auto &&... arg)
@@ -133,6 +137,8 @@ struct ContentAddress
     > Raw;
 
     Raw raw;
+
+    GENERATE_CMP(ContentAddress, me->raw);
 
     /* The moral equivalent of `using Raw::Raw;` */
     ContentAddress(auto &&... arg)
@@ -228,6 +234,8 @@ struct ContentAddressWithReferences
     > Raw;
 
     Raw raw;
+
+    GENERATE_CMP(ContentAddressWithReferences, me->raw);
 
     /* The moral equivalent of `using Raw::Raw;` */
     ContentAddressWithReferences(auto &&... arg)
