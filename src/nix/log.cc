@@ -23,7 +23,7 @@ struct CmdLog : InstallableCommand
 
     Category category() override { return catSecondary; }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<Installable> installable) override
     {
         settings.readOnlyMode = true;
 
@@ -53,7 +53,7 @@ struct CmdLog : InstallableCommand
             if (!log) continue;
             stopProgressBar();
             printInfo("got build log for '%s' from '%s'", installable->what(), logSub.getUri());
-            std::cout << *log;
+            writeFull(STDOUT_FILENO, *log);
             return;
         }
 

@@ -8,7 +8,7 @@ nix eval --expr 'assert 1 + 2 == 3; true'
 
 missingImpureErrorMsg=$(! nix eval --expr 'builtins.readFile ./pure-eval.sh' 2>&1)
 
-echo "$missingImpureErrorMsg" | grep -q -- --impure || \
+echo "$missingImpureErrorMsg" | grepQuiet -- --impure || \
     fail "The error message should mention the “--impure” flag to unblock users"
 
 [[ $(nix eval --expr 'builtins.pathExists ./pure-eval.sh') == false ]] || \

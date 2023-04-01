@@ -140,6 +140,36 @@ printf World2 > $flake2Dir/who
 
 nix profile install $flake1Dir
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World" ]]
+expect 1 nix profile install $flake2Dir
+diff -u <(
+    nix --offline profile install $flake2Dir 2>&1 1> /dev/null \
+        | grep -vE "^warning: " \
+        || true
+) <(cat << EOF
+error: An existing package already provides the following file:
+
+         $(nix build --no-link --print-out-paths ${flake1Dir}"#default.out")/bin/hello
+
+       This is the conflicting file from the new package:
+
+         $(nix build --no-link --print-out-paths ${flake2Dir}"#default.out")/bin/hello
+
+       To remove the existing package:
+
+         nix profile remove path:${flake1Dir}
+
+       The new package can also be installed next to the existing one by assigning a different priority.
+       The conflicting packages have a priority of 5.
+       To prioritise the new package:
+
+         nix profile install path:${flake2Dir} --priority 4
+
+       To prioritise the existing package:
+
+         nix profile install path:${flake2Dir} --priority 6
+EOF
+)
+[[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World" ]]
 nix profile install $flake2Dir --priority 100
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World" ]]
 nix profile install $flake2Dir --priority 0

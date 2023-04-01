@@ -82,7 +82,7 @@ R""(
 
 # Description
 
-`nix build` builds the specified *installables*. Installables that
+`nix build` builds the specified *installables*. [Installables](./nix.md#installables) that
 resolve to derivations are built (or substituted if possible). Store
 path installables are substituted.
 

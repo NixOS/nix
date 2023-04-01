@@ -3,12 +3,12 @@ if [ -n "$HOME" ] && [ -n "$USER" ]; then
     # Set up the per-user profile.
 
     NIX_LINK="$HOME/.nix-profile"
-    if [ -n "$XDG_STATE_HOME" ]; then
+    if [ -n "${XDG_STATE_HOME-}" ]; then
         NIX_LINK_NEW="$XDG_STATE_HOME/nix/profile"
     else
         NIX_LINK_NEW="$HOME/.local/state/nix/profile"
     fi
-    if ! [ -e "$NIX_LINK" ]; then
+    if [ -e "$NIX_LINK_NEW" ]; then
         NIX_LINK="$NIX_LINK_NEW"
     else
         if [ -t 2 ] && [ -e "$NIX_LINK_NEW" ]; then

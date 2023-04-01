@@ -54,7 +54,7 @@ output attribute). They are also allowed in the `inputs` attribute
 of a flake, e.g.
 
 ```nix
-inputs.nixpkgs.url = github:NixOS/nixpkgs;
+inputs.nixpkgs.url = "github:NixOS/nixpkgs";
 ```
 
 is equivalent to
@@ -275,14 +275,14 @@ Currently the `type` attribute can be one of the following:
 # Flake format
 
 As an example, here is a simple `flake.nix` that depends on the
-Nixpkgs flake and provides a single package (i.e. an installable
-derivation):
+Nixpkgs flake and provides a single package (i.e. an
+[installable](./nix.md#installables) derivation):
 
 ```nix
 {
   description = "A flake for building Hello World";
 
-  inputs.nixpkgs.url = github:NixOS/nixpkgs/nixos-20.03;
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-20.03";
 
   outputs = { self, nixpkgs }: {
 
@@ -317,6 +317,8 @@ The following attributes are supported in `flake.nix`:
   also contains some metadata about the inputs. These are:
 
   * `outPath`: The path in the Nix store of the flake's source tree.
+     This way, the attribute set can be passed to `import` as if it was a path,
+     as in the example above (`import nixpkgs`).
 
   * `rev`: The commit hash of the flake's repository, if applicable.
 
@@ -374,7 +376,7 @@ inputs.nixpkgs = {
 Alternatively, you can use the URL-like syntax:
 
 ```nix
-inputs.import-cargo.url = github:edolstra/import-cargo;
+inputs.import-cargo.url = "github:edolstra/import-cargo";
 inputs.nixpkgs.url = "nixpkgs";
 ```
 

@@ -26,8 +26,8 @@ static void posToXML(EvalState & state, XMLAttrs & xmlAttrs, const Pos & pos)
 {
     if (auto path = std::get_if<Path>(&pos.origin))
         xmlAttrs["path"] = *path;
-    xmlAttrs["line"] = (format("%1%") % pos.line).str();
-    xmlAttrs["column"] = (format("%1%") % pos.column).str();
+    xmlAttrs["line"] = fmt("%1%", pos.line);
+    xmlAttrs["column"] = fmt("%1%", pos.column);
 }
 
 
@@ -64,7 +64,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
     switch (v.type()) {
 
         case nInt:
-            doc.writeEmptyElement("int", singletonAttrs("value", (format("%1%") % v.integer).str()));
+            doc.writeEmptyElement("int", singletonAttrs("value", fmt("%1%", v.integer)));
             break;
 
         case nBool:
@@ -156,7 +156,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
             break;
 
         case nFloat:
-            doc.writeEmptyElement("float", singletonAttrs("value", (format("%1%") % v.fpoint).str()));
+            doc.writeEmptyElement("float", singletonAttrs("value", fmt("%1%", v.fpoint)));
             break;
 
         case nThunk:

@@ -218,7 +218,7 @@ static DerivationOutput parseDerivationOutput(const Store & store,
         ContentAddressMethod method = parseContentAddressingPrefix(hashAlgo);
         const auto hashType = parseHashType(hashAlgo);
         if (hashS == "impure") {
-            settings.requireExperimentalFeature(Xp::ImpureDerivations);
+            experimentalFeatureSettings.require(Xp::ImpureDerivations);
             assert(pathS == "");
             return DerivationOutput::Impure {
                 .method = std::move(method),
@@ -233,7 +233,7 @@ static DerivationOutput parseDerivationOutput(const Store & store,
                     method, std::move(hash), {}),
             };
         } else {
-            settings.requireExperimentalFeature(Xp::CaDerivations);
+            experimentalFeatureSettings.require(Xp::CaDerivations);
             assert(pathS == "");
             return DerivationOutput::CAFloating {
                 .method = std::move(method),

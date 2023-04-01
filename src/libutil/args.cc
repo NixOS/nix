@@ -52,7 +52,7 @@ std::shared_ptr<Completions> completions;
 
 std::string completionMarker = "___COMPLETE___";
 
-std::optional<std::string> needsCompletion(std::string_view s)
+static std::optional<std::string> needsCompletion(std::string_view s)
 {
     if (!completions) return {};
     auto i = s.find(completionMarker);
@@ -120,6 +120,12 @@ void Args::parseCmdline(const Strings & _cmdline)
 
     if (!argsSeen)
         initialFlagsProcessed();
+
+    /* Now that we are done parsing, make sure that any experimental
+     * feature required by the flags is enabled */
+    for (auto & f : flagExperimentalFeatures)
+        experimentalFeatureSettings.require(f);
+
 }
 
 bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
@@ -128,12 +134,18 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
 
     auto process = [&](const std::string & name, const Flag & flag) -> bool {
         ++pos;
+
+        if (auto & f = flag.experimentalFeature)
+            flagExperimentalFeatures.insert(*f);
+
         std::vector<std::string> args;
         bool anyCompleted = false;
         for (size_t n = 0 ; n < flag.handler.arity; ++n) {
             if (pos == end) {
                 if (flag.handler.arity == ArityAny || anyCompleted) break;
-                throw UsageError("flag '%s' requires %d argument(s)", name, flag.handler.arity);
+                throw UsageError(
+                    "flag '%s' requires %d argument(s), but only %d were given",
+                    name, flag.handler.arity, n);
             }
             if (auto prefix = needsCompletion(*pos)) {
                 anyCompleted = true;
@@ -152,7 +164,11 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
             for (auto & [name, flag] : longFlags) {
                 if (!hiddenCategories.count(flag->category)
                     && hasPrefix(name, std::string(*prefix, 2)))
+                {
+                    if (auto & f = flag->experimentalFeature)
+                        flagExperimentalFeatures.insert(*f);
                     completions->add("--" + name, flag->description);
+                }
             }
             return false;
         }
@@ -172,7 +188,8 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
         if (prefix == "-") {
             completions->add("--");
             for (auto & [flagName, flag] : shortFlags)
-                completions->add(std::string("-") + flagName, flag->description);
+                if (experimentalFeatureSettings.isEnabled(flag->experimentalFeature))
+                    completions->add(std::string("-") + flagName, flag->description);
         }
     }
 
@@ -219,6 +236,8 @@ nlohmann::json Args::toJSON()
     auto flags = nlohmann::json::object();
 
     for (auto & [name, flag] : longFlags) {
+        /* Skip experimental flags when listing flags. */
+        if (!experimentalFeatureSettings.isEnabled(flag->experimentalFeature)) continue;
         auto j = nlohmann::json::object();
         if (flag->aliases.count(name)) continue;
         if (flag->shortName)

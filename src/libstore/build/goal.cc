@@ -78,9 +78,9 @@ void Goal::amDone(ExitCode result, std::optional<Error> ex)
 }
 
 
-void Goal::trace(const FormatOrString & fs)
+void Goal::trace(std::string_view s)
 {
-    debug("%1%: %2%", name, fs.s);
+    debug("%1%: %2%", name, s);
 }
 
 }

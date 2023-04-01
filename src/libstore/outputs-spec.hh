@@ -9,6 +9,9 @@
 
 namespace nix {
 
+/**
+ * A non-empty set of outputs, specified by name
+ */
 struct OutputNames : std::set<std::string> {
     using std::set<std::string>::set;
 
@@ -18,6 +21,9 @@ struct OutputNames : std::set<std::string> {
         : std::set<std::string>(s)
     { assert(!empty()); }
 
+    /**
+     * Needs to be "inherited manually"
+     */
     OutputNames(std::set<std::string> && s)
         : std::set<std::string>(s)
     { assert(!empty()); }
@@ -28,6 +34,9 @@ struct OutputNames : std::set<std::string> {
     OutputNames() = delete;
 };
 
+/**
+ * The set of all outputs, without needing to name them explicitly
+ */
 struct AllOutputs : std::monostate { };
 
 typedef std::variant<AllOutputs, OutputNames> _OutputsSpecRaw;
@@ -36,7 +45,9 @@ struct OutputsSpec : _OutputsSpecRaw {
     using Raw = _OutputsSpecRaw;
     using Raw::Raw;
 
-    /* Force choosing a variant */
+    /**
+     * Force choosing a variant
+     */
     OutputsSpec() = delete;
 
     using Names = OutputNames;
@@ -52,14 +63,20 @@ struct OutputsSpec : _OutputsSpecRaw {
 
     bool contains(const std::string & output) const;
 
-    /* Create a new OutputsSpec which is the union of this and that. */
+    /**
+     * Create a new OutputsSpec which is the union of this and that.
+     */
     OutputsSpec union_(const OutputsSpec & that) const;
 
-    /* Whether this OutputsSpec is a subset of that. */
+    /**
+     * Whether this OutputsSpec is a subset of that.
+     */
     bool isSubsetOf(const OutputsSpec & outputs) const;
 
-    /* Parse a string of the form 'output1,...outputN' or
-       '*', returning the outputs spec. */
+    /**
+     * Parse a string of the form 'output1,...outputN' or '*', returning
+     * the outputs spec.
+     */
     static OutputsSpec parse(std::string_view s);
     static std::optional<OutputsSpec> parseOpt(std::string_view s);
 
@@ -81,8 +98,10 @@ struct ExtendedOutputsSpec : _ExtendedOutputsSpecRaw {
         return static_cast<const Raw &>(*this);
     }
 
-    /* Parse a string of the form 'prefix^output1,...outputN' or
-       'prefix^*', returning the prefix and the extended outputs spec. */
+    /**
+     * Parse a string of the form 'prefix^output1,...outputN' or
+     * 'prefix^*', returning the prefix and the extended outputs spec.
+     */
     static std::pair<std::string_view, ExtendedOutputsSpec> parse(std::string_view s);
     static std::optional<std::pair<std::string_view, ExtendedOutputsSpec>> parseOpt(std::string_view s);
 

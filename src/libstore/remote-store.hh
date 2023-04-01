@@ -22,11 +22,13 @@ struct RemoteStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
 
-    const Setting<int> maxConnections{(StoreConfig*) this, 1,
-            "max-connections", "maximum number of concurrent connections to the Nix daemon"};
+    const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections",
+        "Maximum number of concurrent connections to the Nix daemon."};
 
-    const Setting<unsigned int> maxConnectionAge{(StoreConfig*) this, std::numeric_limits<unsigned int>::max(),
-            "max-connection-age", "number of seconds to reuse a connection"};
+    const Setting<unsigned int> maxConnectionAge{(StoreConfig*) this,
+        std::numeric_limits<unsigned int>::max(),
+        "max-connection-age",
+        "Maximum age of a connection before it is closed."};
 };
 
 /* FIXME: RemoteStore is a misnomer - should be something like
@@ -37,8 +39,6 @@ class RemoteStore : public virtual RemoteStoreConfig,
     public virtual LogStore
 {
 public:
-
-    virtual bool sameMachine() = 0;
 
     RemoteStore(const Params & params);
 

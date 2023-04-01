@@ -1,4 +1,4 @@
-#include "command.hh"
+#include "command-installable-value.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
@@ -11,13 +11,13 @@
 
 using namespace nix;
 
-struct CmdEval : MixJSON, InstallableCommand, MixReadOnlyOption
+struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 {
     bool raw = false;
     std::optional<std::string> apply;
     std::optional<Path> writeTo;
 
-    CmdEval() : InstallableCommand()
+    CmdEval() : InstallableValueCommand()
     {
         addFlag({
             .longName = "raw",
@@ -54,7 +54,7 @@ struct CmdEval : MixJSON, InstallableCommand, MixReadOnlyOption
 
     Category category() override { return catSecondary; }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<InstallableValue> installable) override
     {
         if (raw && json)
             throw UsageError("--raw and --json are mutually exclusive");
@@ -112,11 +112,11 @@ struct CmdEval : MixJSON, InstallableCommand, MixReadOnlyOption
 
         else if (raw) {
             stopProgressBar();
-            std::cout << *state->coerceToString(noPos, *v, context, "while generating the eval command output");
+            writeFull(STDOUT_FILENO, *state->coerceToString(noPos, *v, context, "while generating the eval command output"));
         }
 
         else if (json) {
-            std::cout << printValueAsJSON(*state, true, *v, pos, context, false).dump() << std::endl;
+            logger->cout("%s", printValueAsJSON(*state, true, *v, pos, context, false));
         }
 
         else {

@@ -42,14 +42,6 @@ ContentAddressMethod parseContentAddressingPrefix(std::string_view & m)
     return method;
 }
 
-
-std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
-{
-    return "fixed:"
-        + makeFileIngestionPrefix(method)
-        + hash.to_string(Base32, true);
-}
-
 std::string renderContentAddress(ContentAddress ca)
 {
     return std::visit(overloaded {

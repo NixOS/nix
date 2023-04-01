@@ -153,7 +153,7 @@ SourceExprCommand::SourceExprCommand()
         .longName = "file",
         .shortName = 'f',
         .description =
-            "Interpret installables as attribute paths relative to the Nix expression stored in *file*. "
+            "Interpret [*installables*](@docroot@/command-ref/new-cli/nix.md#installables) as attribute paths relative to the Nix expression stored in *file*. "
             "If *file* is the character -, then a Nix expression will be read from standard input. "
             "Implies `--impure`.",
         .category = installablesCategory,
@@ -164,7 +164,7 @@ SourceExprCommand::SourceExprCommand()
 
     addFlag({
         .longName = "expr",
-        .description = "Interpret installables as attribute paths relative to the Nix expression *expr*.",
+        .description = "Interpret [*installables*](@docroot@/command-ref/new-cli/nix.md#installables) as attribute paths relative to the Nix expression *expr*.",
         .category = installablesCategory,
         .labels = {"expr"},
         .handler = {&expr}
@@ -332,7 +332,7 @@ void completeFlakeRefWithFragment(
 
 void completeFlakeRef(ref<Store> store, std::string_view prefix)
 {
-    if (!settings.isExperimentalFeatureEnabled(Xp::Flakes))
+    if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))
         return;
 
     if (prefix == "")
@@ -362,23 +362,6 @@ DerivedPathWithInfo Installable::toDerivedPath()
     if (buildables.size() != 1)
         throw Error("installable '%s' evaluates to %d derivations, where only one is expected", what(), buildables.size());
     return std::move(buildables[0]);
-}
-
-std::vector<ref<eval_cache::AttrCursor>>
-Installable::getCursors(EvalState & state)
-{
-    auto evalCache =
-        std::make_shared<nix::eval_cache::EvalCache>(std::nullopt, state,
-            [&]() { return toValue(state).first; });
-    return {evalCache->getRoot()};
-}
-
-ref<eval_cache::AttrCursor>
-Installable::getCursor(EvalState & state)
-{
-    /* Although getCursors should return at least one element, in case it doesn't,
-       bound check to avoid an undefined behavior for vector[0] */
-    return getCursors(state).at(0);
 }
 
 static StorePath getDeriver(
@@ -422,10 +405,10 @@ ref<eval_cache::EvalCache> openEvalCache(
         });
 }
 
-std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
+Installables SourceExprCommand::parseInstallables(
     ref<Store> store, std::vector<std::string> ss)
 {
-    std::vector<std::shared_ptr<Installable>> result;
+    Installables result;
 
     if (file || expr) {
         if (file && expr)
@@ -451,7 +434,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
         for (auto & s : ss) {
             auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse(s);
             result.push_back(
-                std::make_shared<InstallableAttrPath>(
+                make_ref<InstallableAttrPath>(
                     InstallableAttrPath::parse(
                         state, *this, vFile, prefix, extendedOutputsSpec)));
         }
@@ -468,7 +451,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
 
             if (prefix.find('/') != std::string::npos) {
                 try {
-                    result.push_back(std::make_shared<InstallableDerivedPath>(
+                    result.push_back(make_ref<InstallableDerivedPath>(
                         InstallableDerivedPath::parse(store, prefix, extendedOutputsSpec)));
                     continue;
                 } catch (BadStorePath &) {
@@ -480,7 +463,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
 
             try {
                 auto [flakeRef, fragment] = parseFlakeRefWithFragment(std::string { prefix }, absPath("."));
-                result.push_back(std::make_shared<InstallableFlake>(
+                result.push_back(make_ref<InstallableFlake>(
                         this,
                         getEvalState(),
                         std::move(flakeRef),
@@ -501,7 +484,7 @@ std::vector<std::shared_ptr<Installable>> SourceExprCommand::parseInstallables(
     return result;
 }
 
-std::shared_ptr<Installable> SourceExprCommand::parseInstallable(
+ref<Installable> SourceExprCommand::parseInstallable(
     ref<Store> store, const std::string & installable)
 {
     auto installables = parseInstallables(store, {installable});
@@ -513,7 +496,7 @@ std::vector<BuiltPathWithResult> Installable::build(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode,
-    const std::vector<std::shared_ptr<Installable>> & installables,
+    const Installables & installables,
     BuildMode bMode)
 {
     std::vector<BuiltPathWithResult> res;
@@ -522,11 +505,11 @@ std::vector<BuiltPathWithResult> Installable::build(
     return res;
 }
 
-std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> Installable::build2(
+std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build2(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode,
-    const std::vector<std::shared_ptr<Installable>> & installables,
+    const Installables & installables,
     BuildMode bMode)
 {
     if (mode == Realise::Nothing)
@@ -534,8 +517,8 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> Instal
 
     struct Aux
     {
-        ExtraPathInfo info;
-        std::shared_ptr<Installable> installable;
+        ref<ExtraPathInfo> info;
+        ref<Installable> installable;
     };
 
     std::vector<DerivedPath> pathsToBuild;
@@ -548,7 +531,7 @@ std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> Instal
         }
     }
 
-    std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> res;
+    std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> res;
 
     switch (mode) {
 
@@ -620,7 +603,7 @@ BuiltPaths Installable::toBuiltPaths(
     ref<Store> store,
     Realise mode,
     OperateOn operateOn,
-    const std::vector<std::shared_ptr<Installable>> & installables)
+    const Installables & installables)
 {
     if (operateOn == OperateOn::Output) {
         BuiltPaths res;
@@ -642,7 +625,7 @@ StorePathSet Installable::toStorePaths(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode, OperateOn operateOn,
-    const std::vector<std::shared_ptr<Installable>> & installables)
+    const Installables & installables)
 {
     StorePathSet outPaths;
     for (auto & path : toBuiltPaths(evalStore, store, mode, operateOn, installables)) {
@@ -656,7 +639,7 @@ StorePath Installable::toStorePath(
     ref<Store> evalStore,
     ref<Store> store,
     Realise mode, OperateOn operateOn,
-    std::shared_ptr<Installable> installable)
+    ref<Installable> installable)
 {
     auto paths = toStorePaths(evalStore, store, mode, operateOn, {installable});
 
@@ -668,7 +651,7 @@ StorePath Installable::toStorePath(
 
 StorePathSet Installable::toDerivations(
     ref<Store> store,
-    const std::vector<std::shared_ptr<Installable>> & installables,
+    const Installables & installables,
     bool useDeriver)
 {
     StorePathSet drvPaths;
@@ -677,9 +660,12 @@ StorePathSet Installable::toDerivations(
         for (const auto & b : i->toDerivedPaths())
             std::visit(overloaded {
                 [&](const DerivedPath::Opaque & bo) {
-                    if (!useDeriver)
-                        throw Error("argument '%s' did not evaluate to a derivation", i->what());
-                    drvPaths.insert(getDeriver(store, *i, bo.path));
+                    drvPaths.insert(
+                        bo.path.isDerivation()
+                            ? bo.path
+                        : useDeriver
+                            ? getDeriver(store, *i, bo.path)
+                        : throw Error("argument '%s' did not evaluate to a derivation", i->what()));
                 },
                 [&](const DerivedPath::Built & bfd) {
                     drvPaths.insert(bfd.drvPath);
@@ -689,36 +675,55 @@ StorePathSet Installable::toDerivations(
     return drvPaths;
 }
 
-InstallablesCommand::InstallablesCommand()
+RawInstallablesCommand::RawInstallablesCommand()
 {
+    addFlag({
+        .longName = "stdin",
+        .description = "Read installables from the standard input.",
+        .handler = {&readFromStdIn, true}
+    });
+
     expectArgs({
         .label = "installables",
-        .handler = {&_installables},
+        .handler = {&rawInstallables},
         .completer = {[&](size_t, std::string_view prefix) {
             completeInstallable(prefix);
         }}
     });
 }
 
-void InstallablesCommand::prepare()
+void RawInstallablesCommand::applyDefaultInstallables(std::vector<std::string> & rawInstallables)
 {
-    installables = load();
-}
-
-Installables InstallablesCommand::load()
-{
-    if (_installables.empty() && useDefaultInstallables())
+    if (rawInstallables.empty()) {
         // FIXME: commands like "nix profile install" should not have a
         // default, probably.
-        _installables.push_back(".");
-    return parseInstallables(getStore(), _installables);
+        rawInstallables.push_back(".");
+    }
 }
 
-std::vector<std::string> InstallablesCommand::getFlakesForCompletion()
+void RawInstallablesCommand::run(ref<Store> store)
 {
-    if (_installables.empty() && useDefaultInstallables())
-        return {"."};
-    return _installables;
+    if (readFromStdIn && !isatty(STDIN_FILENO)) {
+        std::string word;
+        while (std::cin >> word) {
+            rawInstallables.emplace_back(std::move(word));
+        }
+    }
+
+    applyDefaultInstallables(rawInstallables);
+    run(store, std::move(rawInstallables));
+}
+
+std::vector<std::string> RawInstallablesCommand::getFlakesForCompletion()
+{
+    applyDefaultInstallables(rawInstallables);
+    return rawInstallables;
+}
+
+void InstallablesCommand::run(ref<Store> store, std::vector<std::string> && rawInstallables)
+{
+    auto installables = parseInstallables(store, rawInstallables);
+    run(store, std::move(installables));
 }
 
 InstallableCommand::InstallableCommand()
@@ -734,9 +739,16 @@ InstallableCommand::InstallableCommand()
     });
 }
 
-void InstallableCommand::prepare()
+void InstallableCommand::run(ref<Store> store)
 {
-    installable = parseInstallable(getStore(), _installable);
+    auto installable = parseInstallable(store, _installable);
+    run(store, std::move(installable));
+}
+
+void BuiltPathsCommand::applyDefaultInstallables(std::vector<std::string> & rawInstallables)
+{
+    if (rawInstallables.empty() && !all)
+        rawInstallables.push_back(".");
 }
 
 }

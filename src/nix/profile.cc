@@ -237,12 +237,12 @@ struct ProfileManifest
 
         while (i != prevElems.end() || j != curElems.end()) {
             if (j != curElems.end() && (i == prevElems.end() || i->describe() > j->describe())) {
-                std::cout << fmt("%s%s: ∅ -> %s\n", indent, j->describe(), j->versions());
+                logger->cout("%s%s: ∅ -> %s", indent, j->describe(), j->versions());
                 changes = true;
                 ++j;
             }
             else if (i != prevElems.end() && (j == curElems.end() || i->describe() < j->describe())) {
-                std::cout << fmt("%s%s: %s -> ∅\n", indent, i->describe(), i->versions());
+                logger->cout("%s%s: %s -> ∅", indent, i->describe(), i->versions());
                 changes = true;
                 ++i;
             }
@@ -250,7 +250,7 @@ struct ProfileManifest
                 auto v1 = i->versions();
                 auto v2 = j->versions();
                 if (v1 != v2) {
-                    std::cout << fmt("%s%s: %s -> %s\n", indent, i->describe(), v1, v2);
+                    logger->cout("%s%s: %s -> %s", indent, i->describe(), v1, v2);
                     changes = true;
                 }
                 ++i;
@@ -259,17 +259,23 @@ struct ProfileManifest
         }
 
         if (!changes)
-            std::cout << fmt("%sNo changes.\n", indent);
+            logger->cout("%sNo changes.", indent);
     }
 };
 
-static std::map<Installable *, std::pair<BuiltPaths, ExtraPathInfo>>
+static std::map<Installable *, std::pair<BuiltPaths, ref<ExtraPathInfo>>>
 builtPathsPerInstallable(
-    const std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> & builtPaths)
+    const std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> & builtPaths)
 {
-    std::map<Installable *, std::pair<BuiltPaths, ExtraPathInfo>> res;
+    std::map<Installable *, std::pair<BuiltPaths, ref<ExtraPathInfo>>> res;
     for (auto & [installable, builtPath] : builtPaths) {
-        auto & r = res[installable.get()];
+        auto & r = res.insert({
+            &*installable,
+            {
+                {},
+                make_ref<ExtraPathInfo>(),
+            }
+        }).first->second;
         /* Note that there could be conflicting info
            (e.g. meta.priority fields) if the installable returned
            multiple derivations. So pick one arbitrarily. FIXME:
@@ -305,7 +311,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
           ;
     }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, Installables && installables) override
     {
         ProfileManifest manifest(*getEvalState(), *profile);
 
@@ -316,14 +322,16 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
         for (auto & installable : installables) {
             ProfileElement element;
 
-            auto & [res, info] = builtPaths[installable.get()];
+            auto iter = builtPaths.find(&*installable);
+            if (iter == builtPaths.end()) continue;
+            auto & [res, info] = iter->second;
 
-            if (info.originalRef && info.resolvedRef && info.attrPath && info.extendedOutputsSpec) {
+            if (auto * info2 = dynamic_cast<ExtraPathInfoFlake *>(&*info)) {
                 element.source = ProfileElementSource {
-                    .originalRef = *info.originalRef,
-                    .resolvedRef = *info.resolvedRef,
-                    .attrPath = *info.attrPath,
-                    .outputs = *info.extendedOutputsSpec,
+                    .originalRef = info2->flake.originalRef,
+                    .resolvedRef = info2->flake.resolvedRef,
+                    .attrPath = info2->value.attrPath,
+                    .outputs = info2->value.extendedOutputsSpec,
                 };
             }
 
@@ -332,14 +340,75 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
             element.priority =
                 priority
                 ? *priority
-                : info.priority.value_or(defaultPriority);
+                : ({
+                    auto * info2 = dynamic_cast<ExtraPathInfoValue *>(&*info);
+                    info2
+                        ? info2->value.priority.value_or(defaultPriority)
+                        : defaultPriority;
+                });
 
             element.updateStorePaths(getEvalStore(), store, res);
 
             manifest.elements.push_back(std::move(element));
         }
 
-        updateProfile(manifest.build(store));
+        try {
+            updateProfile(manifest.build(store));
+        } catch (BuildEnvFileConflictError & conflictError) {
+            // FIXME use C++20 std::ranges once macOS has it
+            //       See https://github.com/NixOS/nix/compare/3efa476c5439f8f6c1968a6ba20a31d1239c2f04..1fe5d172ece51a619e879c4b86f603d9495cc102
+            auto findRefByFilePath = [&]<typename Iterator>(Iterator begin, Iterator end) {
+                for (auto it = begin; it != end; it++) {
+                    auto profileElement = *it;
+                    for (auto & storePath : profileElement.storePaths) {
+                        if (conflictError.fileA.starts_with(store->printStorePath(storePath))) {
+                            return std::pair(conflictError.fileA, profileElement.source->originalRef);
+                        }
+                        if (conflictError.fileB.starts_with(store->printStorePath(storePath))) {
+                            return std::pair(conflictError.fileB, profileElement.source->originalRef);
+                        }
+                    }
+                }
+                throw conflictError;
+            };
+            // There are 2 conflicting files. We need to find out which one is from the already installed package and
+            // which one is the package that is the new package that is being installed.
+            // The first matching package is the one that was already installed (original).
+            auto [originalConflictingFilePath, originalConflictingRef] = findRefByFilePath(manifest.elements.begin(), manifest.elements.end());
+            // The last matching package is the one that was going to be installed (new).
+            auto [newConflictingFilePath, newConflictingRef] = findRefByFilePath(manifest.elements.rbegin(), manifest.elements.rend());
+
+            throw Error(
+                "An existing package already provides the following file:\n"
+                "\n"
+                "  %1%\n"
+                "\n"
+                "This is the conflicting file from the new package:\n"
+                "\n"
+                "  %2%\n"
+                "\n"
+                "To remove the existing package:\n"
+                "\n"
+                "  nix profile remove %3%\n"
+                "\n"
+                "The new package can also be installed next to the existing one by assigning a different priority.\n"
+                "The conflicting packages have a priority of %5%.\n"
+                "To prioritise the new package:\n"
+                "\n"
+                "  nix profile install %4% --priority %6%\n"
+                "\n"
+                "To prioritise the existing package:\n"
+                "\n"
+                "  nix profile install %4% --priority %7%\n",
+                originalConflictingFilePath,
+                newConflictingFilePath,
+                originalConflictingRef.to_string(),
+                newConflictingRef.to_string(),
+                conflictError.priority,
+                conflictError.priority - 1,
+                conflictError.priority + 1
+            );
+        }
     }
 };
 
@@ -466,7 +535,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
 
         auto matchers = getMatchers(store);
 
-        std::vector<std::shared_ptr<Installable>> installables;
+        Installables installables;
         std::vector<size_t> indices;
 
         auto upgradedCount = 0;
@@ -482,7 +551,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                 Activity act(*logger, lvlChatty, actUnknown,
                     fmt("checking '%s' for updates", element.source->attrPath));
 
-                auto installable = std::make_shared<InstallableFlake>(
+                auto installable = make_ref<InstallableFlake>(
                     this,
                     getEvalState(),
                     FlakeRef(element.source->originalRef),
@@ -494,19 +563,20 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
 
                 auto derivedPaths = installable->toDerivedPaths();
                 if (derivedPaths.empty()) continue;
-                auto & info = derivedPaths[0].info;
+                auto * infop = dynamic_cast<ExtraPathInfoFlake *>(&*derivedPaths[0].info);
+                // `InstallableFlake` should use `ExtraPathInfoFlake`.
+                assert(infop);
+                auto & info = *infop;
 
-                assert(info.resolvedRef && info.attrPath);
-
-                if (element.source->resolvedRef == info.resolvedRef) continue;
+                if (element.source->resolvedRef == info.flake.resolvedRef) continue;
 
                 printInfo("upgrading '%s' from flake '%s' to '%s'",
-                    element.source->attrPath, element.source->resolvedRef, *info.resolvedRef);
+                    element.source->attrPath, element.source->resolvedRef, info.flake.resolvedRef);
 
                 element.source = ProfileElementSource {
                     .originalRef = installable->flakeRef,
-                    .resolvedRef = *info.resolvedRef,
-                    .attrPath = *info.attrPath,
+                    .resolvedRef = info.flake.resolvedRef,
+                    .attrPath = info.value.attrPath,
                     .outputs = installable->extendedOutputsSpec,
                 };
 
@@ -535,7 +605,10 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
         for (size_t i = 0; i < installables.size(); ++i) {
             auto & installable = installables.at(i);
             auto & element = manifest.elements[indices.at(i)];
-            element.updateStorePaths(getEvalStore(), store, builtPaths[installable.get()].first);
+            element.updateStorePaths(
+                getEvalStore(),
+                store,
+                builtPaths.find(&*installable)->second.first);
         }
 
         updateProfile(manifest.build(store));
@@ -593,9 +666,9 @@ struct CmdProfileDiffClosures : virtual StoreCommand, MixDefaultProfile
 
         for (auto & gen : gens) {
             if (prevGen) {
-                if (!first) std::cout << "\n";
+                if (!first) logger->cout("");
                 first = false;
-                std::cout << fmt("Version %d -> %d:\n", prevGen->number, gen.number);
+                logger->cout("Version %d -> %d:", prevGen->number, gen.number);
                 printClosureDiff(store,
                     store->followLinksToStorePath(prevGen->path),
                     store->followLinksToStorePath(gen.path),
@@ -631,10 +704,10 @@ struct CmdProfileHistory : virtual StoreCommand, EvalCommand, MixDefaultProfile
         for (auto & gen : gens) {
             ProfileManifest manifest(*getEvalState(), gen.path);
 
-            if (!first) std::cout << "\n";
+            if (!first) logger->cout("");
             first = false;
 
-            std::cout << fmt("Version %s%d" ANSI_NORMAL " (%s)%s:\n",
+            logger->cout("Version %s%d" ANSI_NORMAL " (%s)%s:",
                 gen.number == curGen ? ANSI_GREEN : ANSI_BOLD,
                 gen.number,
                 std::put_time(std::gmtime(&gen.creationTime), "%Y-%m-%d"),
@@ -751,7 +824,6 @@ struct CmdProfile : NixMultiCommand
     {
         if (!command)
             throw UsageError("'nix profile' requires a sub-command.");
-        command->second->prepare();
         command->second->run();
     }
 };

@@ -25,7 +25,6 @@ struct CmdNar : NixMultiCommand
     {
         if (!command)
             throw UsageError("'nix nar' requires a sub-command.");
-        command->second->prepare();
         command->second->run();
     }
 };

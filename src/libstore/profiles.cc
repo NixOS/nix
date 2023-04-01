@@ -64,7 +64,7 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path pro
 static void makeName(const Path & profile, GenerationNumber num,
     Path & outLink)
 {
-    Path prefix = (format("%1%-%2%") % profile % num).str();
+    Path prefix = fmt("%1%-%2%", profile, num);
     outLink = prefix + "-link";
 }
 
@@ -269,7 +269,7 @@ void switchGeneration(
 
 void lockProfile(PathLocks & lock, const Path & profile)
 {
-    lock.lockPaths({profile}, (format("waiting for lock on profile '%1%'") % profile).str());
+    lock.lockPaths({profile}, fmt("waiting for lock on profile '%1%'", profile));
     lock.setDeletion(true);
 }
 
@@ -282,9 +282,17 @@ std::string optimisticLockProfile(const Path & profile)
 
 Path profilesDir()
 {
-    auto profileRoot = createNixStateDir() + "/profiles";
+    auto profileRoot =
+        (getuid() == 0)
+        ? rootProfilesDir()
+        : createNixStateDir() + "/profiles";
     createDirs(profileRoot);
     return profileRoot;
+}
+
+Path rootProfilesDir()
+{
+    return settings.nixStateDir + "/profiles/per-user/root";
 }
 
 
@@ -292,12 +300,15 @@ Path getDefaultProfile()
 {
     Path profileLink = settings.useXDGBaseDirectories ? createNixStateDir() + "/profile" : getHome() + "/.nix-profile";
     try {
-        auto profile =
-            getuid() == 0
-            ? settings.nixStateDir + "/profiles/default"
-            : profilesDir() + "/profile";
+        auto profile = profilesDir() + "/profile";
         if (!pathExists(profileLink)) {
             replaceSymlink(profile, profileLink);
+        }
+        // Backwards compatibiliy measure: Make root's profile available as
+        // `.../default` as it's what NixOS and most of the init scripts expect
+        Path globalProfileLink = settings.nixStateDir + "/profiles/default";
+        if (getuid() == 0 && !pathExists(globalProfileLink)) {
+            replaceSymlink(profile, globalProfileLink);
         }
         return absPath(readLink(profileLink), dirOf(profileLink));
     } catch (Error &) {
@@ -305,5 +316,14 @@ Path getDefaultProfile()
     }
 }
 
+Path defaultChannelsDir()
+{
+    return profilesDir() + "/channels";
+}
+
+Path rootChannelsDir()
+{
+    return rootProfilesDir() + "/channels";
+}
 
 }

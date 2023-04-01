@@ -240,9 +240,9 @@ static int main_nix_prefetch_url(int argc, char * * argv)
         if (!printPath)
             printInfo("path is '%s'", store->printStorePath(storePath));
 
-        std::cout << printHash16or32(hash) << std::endl;
+        logger->cout(printHash16or32(hash));
         if (printPath)
-            std::cout << store->printStorePath(storePath) << std::endl;
+            logger->cout(store->printStorePath(storePath));
 
         return 0;
     }

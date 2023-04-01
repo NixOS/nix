@@ -168,7 +168,8 @@ static int main_nix_channel(int argc, char ** argv)
         nixDefExpr = settings.useXDGBaseDirectories ? createNixStateDir() + "/defexpr" : home + "/.nix-defexpr";
 
         // Figure out the name of the channels profile.
-        profile = profilesDir() + "/channels";
+        profile = profilesDir() +  "/channels";
+        createDirs(dirOf(profile));
 
         enum {
             cNone,

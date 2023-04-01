@@ -1,3 +1,4 @@
+#include "ssh-store-config.hh"
 #include "store-api.hh"
 #include "remote-store.hh"
 #include "remote-fs-accessor.hh"
@@ -8,17 +9,22 @@
 
 namespace nix {
 
-struct SSHStoreConfig : virtual RemoteStoreConfig
+struct SSHStoreConfig : virtual RemoteStoreConfig, virtual CommonSSHStoreConfig
 {
     using RemoteStoreConfig::RemoteStoreConfig;
+    using CommonSSHStoreConfig::CommonSSHStoreConfig;
 
-    const Setting<Path> sshKey{(StoreConfig*) this, "", "ssh-key", "path to an SSH private key"};
-    const Setting<std::string> sshPublicHostKey{(StoreConfig*) this, "", "base64-ssh-public-host-key", "The public half of the host's SSH key"};
-    const Setting<bool> compress{(StoreConfig*) this, false, "compress", "whether to compress the connection"};
-    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-daemon", "remote-program", "path to the nix-daemon executable on the remote system"};
-    const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
+    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-daemon", "remote-program",
+        "Path to the `nix-daemon` executable on the remote machine."};
 
-    const std::string name() override { return "SSH Store"; }
+    const std::string name() override { return "Experimental SSH Store"; }
+
+    std::string doc() override
+    {
+        return
+          #include "ssh-store.md"
+          ;
+    }
 };
 
 class SSHStore : public virtual SSHStoreConfig, public virtual RemoteStore
@@ -28,6 +34,7 @@ public:
     SSHStore(const std::string & scheme, const std::string & host, const Params & params)
         : StoreConfig(params)
         , RemoteStoreConfig(params)
+        , CommonSSHStoreConfig(params)
         , SSHStoreConfig(params)
         , Store(params)
         , RemoteStore(params)
@@ -48,9 +55,6 @@ public:
     {
         return *uriSchemes().begin() + "://" + host;
     }
-
-    bool sameMachine() override
-    { return false; }
 
     // FIXME extend daemon protocol, move implementation to RemoteStore
     std::optional<std::string> getBuildLogExact(const StorePath & path) override

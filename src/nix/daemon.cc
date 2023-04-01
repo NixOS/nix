@@ -249,9 +249,9 @@ static void daemonLoop()
             if ((!trusted && !matchUser(user, group, allowedUsers)) || group == settings.buildUsersGroup)
                 throw Error("user '%1%' is not allowed to connect to the Nix daemon", user);
 
-            printInfo(format((std::string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""))
-                % (peer.pidKnown ? std::to_string(peer.pid) : "<unknown>")
-                % (peer.uidKnown ? user : "<unknown>"));
+            printInfo((std::string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""),
+                peer.pidKnown ? std::to_string(peer.pid) : "<unknown>",
+                peer.uidKnown ? user : "<unknown>");
 
             //  Fork a child to handle the connection.
             ProcessOptions options;

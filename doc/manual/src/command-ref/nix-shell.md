@@ -101,7 +101,7 @@ All options not listed here are passed to `nix-store
     When a `--pure` shell is started, keep the listed environment
     variables.
 
-The following common options are supported:
+{{#include ./opt-common.md}}
 
 # Environment variables
 
@@ -109,6 +109,8 @@ The following common options are supported:
     Shell used to start the interactive environment. Defaults to the
     `bash` found in `<nixpkgs>`, falling back to the `bash` found in
     `PATH` if not found.
+
+{{#include ./env-common.md}}
 
 # Examples
 

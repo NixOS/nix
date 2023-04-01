@@ -48,102 +48,112 @@ manual](https://nixos.org/manual/nix/stable/).
 
 # Installables
 
-Many `nix` subcommands operate on one or more *installables*. These are
-command line arguments that represent something that can be built in
-the Nix store. Here are the recognised types of installables:
+Many `nix` subcommands operate on one or more *installables*.
+These are command line arguments that represent something that can be realised in the Nix store.
 
-* **Flake output attributes**: `nixpkgs#hello`
+The following types of installable are supported by most commands:
 
-  These have the form *flakeref*[`#`*attrpath*], where *flakeref* is a
-  flake reference and *attrpath* is an optional attribute path. For
-  more information on flakes, see [the `nix flake` manual
-  page](./nix3-flake.md).  Flake references are most commonly a flake
-  identifier in the flake registry (e.g. `nixpkgs`), or a raw path
-  (e.g. `/path/to/my-flake` or `.` or `../foo`), or a full URL
-  (e.g. `github:nixos/nixpkgs` or `path:.`)
+- [Flake output attribute](#flake-output-attribute)
+- [Store path](#store-path)
+- [Nix file](#nix-file), optionally qualified by an attribute path
+- [Nix expression](#nix-expression), optionally qualified by an attribute path
 
-  When the flake reference is a raw path (a path without any URL
-  scheme), it is interpreted as a `path:` or `git+file:` url in the following
-  way:
-  
-  - If the path is within a Git repository, then the url will be of the form
-    `git+file://[GIT_REPO_ROOT]?dir=[RELATIVE_FLAKE_DIR_PATH]`
-    where `GIT_REPO_ROOT` is the path to the root of the git repository,
-    and `RELATIVE_FLAKE_DIR_PATH` is the path (relative to the directory
-    root) of the closest parent of the given path that contains a `flake.nix` within
-    the git repository.
-    If no such directory exists, then Nix will error-out.
-    
-    Note that the search will only include files indexed by git. In particular, files
-    which are matched by `.gitignore` or have never been `git add`-ed will not be
-    available in the flake. If this is undesirable, specify `path:<directory>` explicitly;
-    
-    For example, if `/foo/bar` is a git repository with the following structure:
-    ```
-    .
-    └── baz
-        ├── blah
-        │   └── file.txt
-        └── flake.nix
-    ```
+For most commands, if no installable is specified, `.` as assumed.
+That is, Nix will operate on the default flake output attribute of the flake in the current directory.
+
+### Flake output attribute
+
+Example: `nixpkgs#hello`
+
+These have the form *flakeref*[`#`*attrpath*], where *flakeref* is a
+[flake reference](./nix3-flake.md#flake-references) and *attrpath* is an optional attribute path. For
+more information on flakes, see [the `nix flake` manual
+page](./nix3-flake.md).  Flake references are most commonly a flake
+identifier in the flake registry (e.g. `nixpkgs`), or a raw path
+(e.g. `/path/to/my-flake` or `.` or `../foo`), or a full URL
+(e.g. `github:nixos/nixpkgs` or `path:.`)
+
+When the flake reference is a raw path (a path without any URL
+scheme), it is interpreted as a `path:` or `git+file:` url in the following
+way:
+
+- If the path is within a Git repository, then the url will be of the form
+  `git+file://[GIT_REPO_ROOT]?dir=[RELATIVE_FLAKE_DIR_PATH]`
+  where `GIT_REPO_ROOT` is the path to the root of the git repository,
+  and `RELATIVE_FLAKE_DIR_PATH` is the path (relative to the directory
+  root) of the closest parent of the given path that contains a `flake.nix` within
+  the git repository.
+  If no such directory exists, then Nix will error-out.
+
+  Note that the search will only include files indexed by git. In particular, files
+  which are matched by `.gitignore` or have never been `git add`-ed will not be
+  available in the flake. If this is undesirable, specify `path:<directory>` explicitly;
+
+  For example, if `/foo/bar` is a git repository with the following structure:
+  ```
+  .
+  └── baz
+      ├── blah
+      │   └── file.txt
+      └── flake.nix
+  ```
 
   Then `/foo/bar/baz/blah` will resolve to `git+file:///foo/bar?dir=baz`
 
-  - If the supplied path is not a git repository, then the url will have the form
-    `path:FLAKE_DIR_PATH` where `FLAKE_DIR_PATH` is the closest parent
-    of the supplied path that contains a `flake.nix` file (within the same file-system).
-    If no such directory exists, then Nix will error-out.
-    
-    For example, if `/foo/bar/flake.nix` exists, then `/foo/bar/baz/` will resolve to
-   `path:/foo/bar`
+- If the supplied path is not a git repository, then the url will have the form
+  `path:FLAKE_DIR_PATH` where `FLAKE_DIR_PATH` is the closest parent
+  of the supplied path that contains a `flake.nix` file (within the same file-system).
+  If no such directory exists, then Nix will error-out.
 
-  If *attrpath* is omitted, Nix tries some default values; for most
-  subcommands, the default is `packages.`*system*`.default`
-  (e.g. `packages.x86_64-linux.default`), but some subcommands have
-  other defaults. If *attrpath* *is* specified, *attrpath* is
-  interpreted as relative to one or more prefixes; for most
-  subcommands, these are `packages.`*system*,
-  `legacyPackages.*system*` and the empty prefix. Thus, on
-  `x86_64-linux` `nix build nixpkgs#hello` will try to build the
-  attributes `packages.x86_64-linux.hello`,
-  `legacyPackages.x86_64-linux.hello` and `hello`.
+  For example, if `/foo/bar/flake.nix` exists, then `/foo/bar/baz/` will resolve to
+ `path:/foo/bar`
 
-* **Store paths**: `/nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10`
+If *attrpath* is omitted, Nix tries some default values; for most
+subcommands, the default is `packages.`*system*`.default`
+(e.g. `packages.x86_64-linux.default`), but some subcommands have
+other defaults. If *attrpath* *is* specified, *attrpath* is
+interpreted as relative to one or more prefixes; for most
+subcommands, these are `packages.`*system*,
+`legacyPackages.*system*` and the empty prefix. Thus, on
+`x86_64-linux` `nix build nixpkgs#hello` will try to build the
+attributes `packages.x86_64-linux.hello`,
+`legacyPackages.x86_64-linux.hello` and `hello`.
 
-  These are paths inside the Nix store, or symlinks that resolve to a
-  path in the Nix store.
+### Store path
 
-* **Store derivations**: `/nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv`
+Example: `/nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10`
 
-  By default, if you pass a [store derivation] path to a `nix` subcommand, the command will operate on the [output path]s of the derivation.
+These are paths inside the Nix store, or symlinks that resolve to a path in the Nix store.
 
-  [output path]: ../../glossary.md#gloss-output-path
+A [store derivation] is also addressed by store path.
 
-  For example, `nix path-info` prints information about the output paths:
+Example: `/nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv`
 
-  ```console
-  # nix path-info --json /nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv
-  [{"path":"/nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10",…}]
-  ```
+If you want to refer to an output path of that store derivation, add the output name preceded by a caret (`^`).
 
-  If you want to operate on the store derivation itself, pass the
-  `--derivation` flag.
+Example: `/nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv^out`
 
-* **Nix attributes**: `--file /path/to/nixpkgs hello`
+All outputs can be referred to at once with the special syntax `^*`.
 
-  When the `-f` / `--file` *path* option is given, installables are
-  interpreted as attribute paths referencing a value returned by
-  evaluating the Nix file *path*.
+Example: `/nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv^*`
 
-* **Nix expressions**: `--expr '(import <nixpkgs> {}).hello.overrideDerivation (prev: { name = "my-hello"; })'`.
+### Nix file
 
-  When the `--expr` option is given, all installables are interpreted
-  as Nix expressions. You may need to specify `--impure` if the
-  expression references impure inputs (such as `<nixpkgs>`).
+Example: `--file /path/to/nixpkgs hello`
 
-For most commands, if no installable is specified, the default is `.`,
-i.e. Nix will operate on the default flake output attribute of the
-flake in the current directory.
+When the option `-f` / `--file` *path* \[*attrpath*...\] is given, installables are interpreted as the value of the expression in the Nix file at *path*.
+If attribute paths are provided, commands will operate on the corresponding values accessible at these paths.
+The Nix expression in that file, or any selected attribute, must evaluate to a derivation.
+
+### Nix expression
+
+Example: `--expr 'import <nixpkgs> {}' hello`
+
+When the option `--expr` *expression* \[*attrpath*...\] is given, installables are interpreted as the value of the of the Nix expression.
+If attribute paths are provided, commands will operate on the corresponding values accessible at these paths.
+The Nix expression, or any selected attribute, must evaluate to a derivation.
+
+You may need to specify `--impure` if the expression references impure inputs (such as `<nixpkgs>`).
 
 ## Derivation output selection
 
@@ -210,8 +220,7 @@ operate are determined as follows:
 
 # Nix stores
 
-Most `nix` subcommands operate on a *Nix store*.
-
-TODO: list store types, options
+Most `nix` subcommands operate on a *Nix store*. These are documented
+in [`nix help-stores`](./nix3-help-stores.md).
 
 )""

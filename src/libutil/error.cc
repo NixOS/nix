@@ -302,13 +302,13 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     if (!einfo.traces.empty()) {
         size_t count = 0;
         for (const auto & trace : einfo.traces) {
+            if (trace.hint.str().empty()) continue;
+            if (frameOnly && !trace.frame) continue;
+
             if (!showTrace && count > 3) {
                 oss << "\n" << ANSI_WARNING "(stack trace truncated; use '--show-trace' to show the full trace)" ANSI_NORMAL << "\n";
                 break;
             }
-
-            if (trace.hint.str().empty()) continue;
-            if (frameOnly && !trace.frame) continue;
 
             count++;
             frameOnly = trace.frame;

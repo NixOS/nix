@@ -1,4 +1,4 @@
-set -e
+set -eu -o pipefail
 
 if [[ -z "${COMMON_VARS_AND_FUNCTIONS_SH_SOURCED-}" ]]; then
 
@@ -152,31 +152,64 @@ isDaemonNewer () {
   [[ $(nix eval --expr "builtins.compareVersions ''$daemonVersion'' ''$requiredVersion''") -ge 0 ]]
 }
 
+skipTest () {
+    echo "$1, skipping this test..." >&2
+    exit 99
+}
+
 requireDaemonNewerThan () {
-  isDaemonNewer "$1" || exit 99
+    isDaemonNewer "$1" || skipTest "Daemon is too old"
 }
 
 canUseSandbox() {
-    if [[ ! $_canUseSandbox ]]; then
-        echo "Sandboxing not supported, skipping this test..."
-        return 1
-    fi
+    [[ ${_canUseSandbox-} ]]
+}
 
-    return 0
+requireSandboxSupport () {
+    canUseSandbox || skipTest "Sandboxing not supported"
+}
+
+requireGit() {
+    [[ $(type -p git) ]] || skipTest "Git not installed"
 }
 
 fail() {
-    echo "$1"
+    echo "$1" >&2
     exit 1
 }
 
+# Run a command failing if it didn't exit with the expected exit code.
+#
+# Has two advantages over the built-in `!`:
+#
+# 1. `!` conflates all non-0 codes. `expect` allows testing for an exact
+# code.
+#
+# 2. `!` unexpectedly negates `set -e`, and cannot be used on individual
+# pipeline stages with `set -o pipefail`. It only works on the entire
+# pipeline, which is useless if we want, say, `nix ...` invocation to
+# *fail*, but a grep on the error message it outputs to *succeed*.
 expect() {
     local expected res
     expected="$1"
     shift
-    "$@" || res="$?"
+    "$@" && res=0 || res="$?"
     if [[ $res -ne $expected ]]; then
-        echo "Expected '$expected' but got '$res' while running '$*'"
+        echo "Expected '$expected' but got '$res' while running '${*@Q}'" >&2
+        return 1
+    fi
+    return 0
+}
+
+# Better than just doing `expect ... >&2` because the "Expected..."
+# message below will *not* be redirected.
+expectStderr() {
+    local expected res
+    expected="$1"
+    shift
+    "$@" 2>&1 && res=0 || res="$?"
+    if [[ $res -ne $expected ]]; then
+        echo "Expected '$expected' but got '$res' while running '${*@Q}'" >&2
         return 1
     fi
     return 0
@@ -184,14 +217,13 @@ expect() {
 
 needLocalStore() {
   if [[ "$NIX_REMOTE" == "daemon" ]]; then
-    echo "Can’t run through the daemon ($1), skipping this test..."
-    return 99
+    skipTest "Can’t run through the daemon ($1)"
   fi
 }
 
 # Just to make it easy to find which tests should be fixed
 buggyNeedLocalStore() {
-  needLocalStore
+  needLocalStore "$1"
 }
 
 enableFeatures() {
@@ -208,6 +240,35 @@ onError() {
         if [[ -z ${BASH_SOURCE[i]} ]]; then break; fi
         echo "  ${FUNCNAME[i]} in ${BASH_SOURCE[i]}:${BASH_LINENO[i-1]}" >&2
     done
+}
+
+# `grep -v` doesn't work well for exit codes. We want `!(exist line l. l
+# matches)`. It gives us `exist line l. !(l matches)`.
+#
+# `!` normally doesn't work well with `set -e`, but when we wrap in a
+# function it *does*.
+grepInverse() {
+    ! grep "$@"
+}
+
+# A shorthand, `> /dev/null` is a bit noisy.
+#
+# `grep -q` would seem to do this, no function necessary, but it is a
+# bad fit with pipes and `set -o pipefail`: `-q` will exit after the
+# first match, and then subsequent writes will result in broken pipes.
+#
+# Note that reproducing the above is a bit tricky as it depends on
+# non-deterministic properties such as the timing between the match and
+# the closing of the pipe, the buffering of the pipe, and the speed of
+# the producer into the pipe. But rest assured we've seen it happen in
+# CI reliably.
+grepQuiet() {
+    grep "$@" > /dev/null
+}
+
+# The previous two, combined
+grepQuietInverse() {
+    ! grep "$@" > /dev/null
 }
 
 trap onError ERR

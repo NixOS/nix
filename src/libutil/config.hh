@@ -1,12 +1,13 @@
+#pragma once
+
 #include <cassert>
 #include <map>
 #include <set>
 
-#include "types.hh"
-
 #include <nlohmann/json_fwd.hpp>
 
-#pragma once
+#include "types.hh"
+#include "experimental-features.hh"
 
 namespace nix {
 
@@ -194,12 +195,15 @@ public:
 
     bool overridden = false;
 
+    std::optional<ExperimentalFeature> experimentalFeature;
+
 protected:
 
     AbstractSetting(
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases);
+        const std::set<std::string> & aliases,
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt);
 
     virtual ~AbstractSetting()
     {
@@ -240,8 +244,9 @@ public:
         const bool documentDefault,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : AbstractSetting(name, description, aliases)
+        const std::set<std::string> & aliases = {},
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
+        : AbstractSetting(name, description, aliases, experimentalFeature)
         , value(def)
         , defaultValue(def)
         , documentDefault(documentDefault)
@@ -296,8 +301,9 @@ public:
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {},
-        const bool documentDefault = true)
-        : BaseSetting<T>(def, documentDefault, name, description, aliases)
+        const bool documentDefault = true,
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
+        : BaseSetting<T>(def, documentDefault, name, description, aliases, experimentalFeature)
     {
         options->addSetting(this);
     }
@@ -356,5 +362,38 @@ struct GlobalConfig : public AbstractConfig
 };
 
 extern GlobalConfig globalConfig;
+
+
+struct ExperimentalFeatureSettings : Config {
+
+    Setting<std::set<ExperimentalFeature>> experimentalFeatures{this, {}, "experimental-features",
+        "Experimental Nix features to enable."};
+
+    /**
+     * Check whether the given experimental feature is enabled.
+     */
+    bool isEnabled(const ExperimentalFeature &) const;
+
+    /**
+     * Require an experimental feature be enabled, throwing an error if it is
+     * not.
+     */
+    void require(const ExperimentalFeature &) const;
+
+    /**
+     * `std::nullopt` pointer means no feature, which means there is nothing that could be
+     * disabled, and so the function returns true in that case.
+     */
+    bool isEnabled(const std::optional<ExperimentalFeature> &) const;
+
+    /**
+     * `std::nullopt` pointer means no feature, which means there is nothing that could be
+     * disabled, and so the function does nothing in that case.
+     */
+    void require(const std::optional<ExperimentalFeature> &) const;
+};
+
+// FIXME: don't use a global variable.
+extern ExperimentalFeatureSettings experimentalFeatureSettings;
 
 }

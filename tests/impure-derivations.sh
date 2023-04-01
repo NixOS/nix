@@ -5,8 +5,6 @@ requireDaemonNewerThan "2.8pre20220311"
 enableFeatures "ca-derivations impure-derivations"
 restartDaemon
 
-set -o pipefail
-
 clearStore
 
 # Basic test of impure derivations: building one a second time should not use the previous result.

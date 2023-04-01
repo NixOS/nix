@@ -16,7 +16,7 @@ class Worker;
 // 2. Substitute the corresponding output path
 // 3. Register the output info
 class DrvOutputSubstitutionGoal : public Goal {
-private:
+
     // The drv output we're trying to substitue
     DrvOutput id;
 
@@ -30,9 +30,13 @@ private:
     /* The current substituter. */
     std::shared_ptr<Store> sub;
 
-    Pipe outPipe;
-    std::thread thr;
-    std::promise<std::shared_ptr<const Realisation>> promise;
+    struct DownloadState
+    {
+        Pipe outPipe;
+        std::promise<std::shared_ptr<const Realisation>> promise;
+    };
+
+    std::shared_ptr<DownloadState> downloadState;
 
     /* Whether a substituter failed. */
     bool substituterFailed = false;

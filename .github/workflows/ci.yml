@@ -19,7 +19,7 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v19
+    - uses: cachix/install-nix-action@v20
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
     - uses: cachix/cachix-action@v12
       if: needs.check_secrets.outputs.cachix == 'true'
@@ -58,7 +58,9 @@ jobs:
       with:
         fetch-depth: 0
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
-    - uses: cachix/install-nix-action@v19
+    - uses: cachix/install-nix-action@v20
+      with:
+        install_url: https://releases.nixos.org/nix/nix-2.13.3/install
     - uses: cachix/cachix-action@v12
       with:
         name: '${{ env.CACHIX_NAME }}'
@@ -77,7 +79,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
-    - uses: cachix/install-nix-action@v19
+    - uses: cachix/install-nix-action@v20
       with:
         install_url: '${{needs.installer.outputs.installerURL}}'
         install_options: "--tarball-url-prefix https://${{ env.CACHIX_NAME }}.cachix.org/serve"
@@ -89,6 +91,8 @@ jobs:
     - run: exec sh -c "nix-instantiate -E 'builtins.currentTime' --eval"
     - run: exec zsh -c "nix-instantiate -E 'builtins.currentTime' --eval"
     - run: exec fish -c "nix-instantiate -E 'builtins.currentTime' --eval"
+    - run: exec bash -c "nix-channel --add https://releases.nixos.org/nixos/unstable/nixos-23.05pre466020.60c1d71f2ba nixpkgs"
+    - run: exec bash -c "nix-channel --update && nix-env -iA nixpkgs.hello && hello"
 
   docker_push_image:
     needs: [check_secrets, tests]
@@ -102,7 +106,9 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v19
+    - uses: cachix/install-nix-action@v20
+      with:
+        install_url: https://releases.nixos.org/nix/nix-2.13.3/install
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
     - run: echo NIX_VERSION="$(nix --experimental-features 'nix-command flakes' eval .\#default.version | tr -d \")" >> $GITHUB_ENV
     - uses: cachix/cachix-action@v12

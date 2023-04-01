@@ -129,7 +129,7 @@ struct AutoUserLock : UserLock
         useUserNamespace = false;
         #endif
 
-        settings.requireExperimentalFeature(Xp::AutoAllocateUids);
+        experimentalFeatureSettings.require(Xp::AutoAllocateUids);
         assert(settings.startId > 0);
         assert(settings.uidCount % maxIdsPerBuild == 0);
         assert((uint64_t) settings.startId + (uint64_t) settings.uidCount <= std::numeric_limits<uid_t>::max());

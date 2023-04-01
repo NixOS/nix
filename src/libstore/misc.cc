@@ -338,7 +338,7 @@ OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd, 
             throw Error(
                 "the derivation '%s' doesn't have an output named '%s'",
                 store.printStorePath(bfd.drvPath), output);
-        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
+        if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
             DrvOutput outputId { *outputHash, output };
             auto realisation = store.queryRealisation(outputId);
             if (!realisation)
