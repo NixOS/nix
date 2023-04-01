@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "suggestions.hh"
 #include "ref.hh"

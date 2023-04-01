@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "path.hh"
 #include "derived-path.hh"

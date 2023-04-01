@@ -1,3 +1,6 @@
+#pragma once
+///@file
+
 #include "installable-value.hh"
 #include "command.hh"
 

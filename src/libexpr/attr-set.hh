@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "nixexpr.hh"
 #include "symbol-table.hh"

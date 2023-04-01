@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 /**
  * A trivial class to run a function at the end of a scope.

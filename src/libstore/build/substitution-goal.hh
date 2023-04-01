@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "lock.hh"
 #include "store-api.hh"

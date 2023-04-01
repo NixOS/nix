@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "comparator.hh"
 #include "error.hh"

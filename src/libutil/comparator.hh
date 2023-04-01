@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 /**
  * Awful hacky generation of the comparison operators by doing a lexicographic

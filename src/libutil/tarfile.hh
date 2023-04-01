@@ -1,3 +1,6 @@
+#pragma once
+///@file
+
 #include "serialise.hh"
 #include <archive.h>
 

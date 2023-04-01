@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "remote-store.hh"
 #include "local-fs-store.hh"

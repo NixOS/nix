@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <boost/format.hpp>
 #include <string>

@@ -1,3 +1,6 @@
+#pragma once
+///@file
+
 #include "store-api.hh"
 
 namespace nix {
