@@ -401,12 +401,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             logger->startWork();
             auto pathInfo = [&]() {
                 // NB: FramedSource must be out of scope before logger->stopWork();
-                auto [contentAddressMethod, hashType_] = parseContentAddressMethod(camStr);
+                auto [contentAddressMethod, hashType_] = ContentAddressMethod::parse(camStr);
                 auto hashType = hashType_; // work around clang bug
                 FramedSource source(from);
                 // TODO this is essentially RemoteStore::addCAToStore. Move it up to Store.
                 return std::visit(overloaded {
-                    [&](TextHashMethod &) {
+                    [&](const TextHashMethod &) {
                         if (hashType != htSHA256)
                             throw UnimplementedError("Only SHA-256 is supported for adding text-hashed data, but '%1' was given",
                                 printHashType(hashType));
@@ -415,11 +415,11 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                         auto path = store->addTextToStore(name, contents, refs, repair);
                         return store->queryPathInfo(path);
                     },
-                    [&](FileIngestionMethod & fim) {
+                    [&](const FileIngestionMethod & fim) {
                         auto path = store->addToStoreFromDump(source, name, fim, hashType, repair, refs);
                         return store->queryPathInfo(path);
                     },
-                }, contentAddressMethod);
+                }, contentAddressMethod.raw);
             }();
             logger->stopWork();
 
@@ -884,7 +884,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         info.references = worker_proto::read(*store, from, Phantom<StorePathSet> {});
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
-        info.ca = parseContentAddressOpt(readString(from));
+        info.ca = ContentAddress::parseOpt(readString(from));
         from >> repair >> dontCheckSigs;
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;

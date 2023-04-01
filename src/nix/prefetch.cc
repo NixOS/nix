@@ -124,7 +124,7 @@ std::tuple<StorePath, Hash> prefetchFile(
         auto info = store->addToStoreSlow(*name, tmpFile, ingestionMethod, hashType, expectedHash);
         storePath = info.path;
         assert(info.ca);
-        hash = getContentAddressHash(*info.ca);
+        hash = info.ca->getHash();
     }
 
     return {storePath.value(), hash.value()};

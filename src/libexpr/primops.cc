@@ -1292,8 +1292,11 @@ drvName, Bindings * attrs, Value & v)
         auto method = ingestionMethod.value_or(FileIngestionMethod::Flat);
 
         DerivationOutput::CAFixed dof {
-            // FIXME non-trivial fixed refs set
-            .ca = contentAddressFromMethodHashAndRefs(method, std::move(h), {}),
+            .ca = ContentAddressWithReferences::fromParts(
+                std::move(method),
+                std::move(h),
+                // FIXME non-trivial fixed refs set
+                {}),
         };
 
         drv.env["out"] = state.store->printStorePath(dof.path(*state.store, drvName, "out"));
@@ -1315,13 +1318,13 @@ drvName, Bindings * attrs, Value & v)
             if (isImpure)
                 drv.outputs.insert_or_assign(i,
                     DerivationOutput::Impure {
-                        .method = method,
+                        .method = method.raw,
                         .hashType = ht,
                     });
             else
                 drv.outputs.insert_or_assign(i,
                     DerivationOutput::CAFloating {
-                        .method = method,
+                        .method = method.raw,
                         .hashType = ht,
                     });
         }

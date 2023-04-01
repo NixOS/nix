@@ -100,7 +100,7 @@ std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv)
                     return std::nullopt;
                 return fi.hash;
             },
-        }, dof->ca);
+        }, dof->ca.raw);
     }
     return std::nullopt;
 }

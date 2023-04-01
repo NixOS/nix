@@ -215,7 +215,7 @@ static DerivationOutput parseDerivationOutput(const Store & store,
     std::string_view pathS, std::string_view hashAlgo, std::string_view hashS)
 {
     if (hashAlgo != "") {
-        ContentAddressMethod method = parseContentAddressingPrefix(hashAlgo);
+        ContentAddressMethod method = ContentAddressMethod::parsePrefix(hashAlgo);
         const auto hashType = parseHashType(hashAlgo);
         if (hashS == "impure") {
             experimentalFeatureSettings.require(Xp::ImpureDerivations);
@@ -228,9 +228,11 @@ static DerivationOutput parseDerivationOutput(const Store & store,
             validatePath(pathS);
             auto hash = Hash::parseNonSRIUnprefixed(hashS, hashType);
             return DerivationOutput::CAFixed {
-                // FIXME non-trivial fixed refs set
-                .ca = contentAddressFromMethodHashAndRefs(
-                    method, std::move(hash), {}),
+                .ca = ContentAddressWithReferences::fromParts(
+                    std::move(method),
+                    std::move(hash),
+                    // FIXME non-trivial fixed refs set
+                    {}),
             };
         } else {
             experimentalFeatureSettings.require(Xp::CaDerivations);
@@ -381,12 +383,12 @@ std::string Derivation::unparse(const Store & store, bool maskOutputs,
             },
             [&](const DerivationOutput::CAFixed & dof) {
                 s += ','; printUnquotedString(s, maskOutputs ? "" : store.printStorePath(dof.path(store, name, i.first)));
-                s += ','; printUnquotedString(s, printMethodAlgo(dof.ca));
-                s += ','; printUnquotedString(s, getContentAddressHash(dof.ca).to_string(Base16, false));
+                s += ','; printUnquotedString(s, dof.ca.printMethodAlgo());
+                s += ','; printUnquotedString(s, dof.ca.getHash().to_string(Base16, false));
             },
             [&](const DerivationOutput::CAFloating & dof) {
                 s += ','; printUnquotedString(s, "");
-                s += ','; printUnquotedString(s, makeContentAddressingPrefix(dof.method) + printHashType(dof.hashType));
+                s += ','; printUnquotedString(s, dof.method.renderPrefix() + printHashType(dof.hashType));
                 s += ','; printUnquotedString(s, "");
             },
             [&](const DerivationOutput::Deferred &) {
@@ -397,7 +399,7 @@ std::string Derivation::unparse(const Store & store, bool maskOutputs,
             [&](const DerivationOutputImpure & doi) {
                 // FIXME
                 s += ','; printUnquotedString(s, "");
-                s += ','; printUnquotedString(s, makeContentAddressingPrefix(doi.method) + printHashType(doi.hashType));
+                s += ','; printUnquotedString(s, doi.method.renderPrefix() + printHashType(doi.hashType));
                 s += ','; printUnquotedString(s, "impure");
             }
         }, i.second.raw());
@@ -614,8 +616,8 @@ DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOut
         for (const auto & i : drv.outputs) {
             auto & dof = std::get<DerivationOutput::CAFixed>(i.second.raw());
             auto hash = hashString(htSHA256, "fixed:out:"
-                + printMethodAlgo(dof.ca) + ":"
-                + getContentAddressHash(dof.ca).to_string(Base16, false) + ":"
+                + dof.ca.printMethodAlgo() + ":"
+                + dof.ca.getHash().to_string(Base16, false) + ":"
                 + store.printStorePath(dof.path(store, drv.name, i.first)));
             outputHashes.insert_or_assign(i.first, std::move(hash));
         }
@@ -765,12 +767,12 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
             },
             [&](const DerivationOutput::CAFixed & dof) {
                 out << store.printStorePath(dof.path(store, drv.name, i.first))
-                    << printMethodAlgo(dof.ca)
-                    << getContentAddressHash(dof.ca).to_string(Base16, false);
+                    << dof.ca.printMethodAlgo()
+                    << dof.ca.getHash().to_string(Base16, false);
             },
             [&](const DerivationOutput::CAFloating & dof) {
                 out << ""
-                    << (makeContentAddressingPrefix(dof.method) + printHashType(dof.hashType))
+                    << (dof.method.renderPrefix() + printHashType(dof.hashType))
                     << "";
             },
             [&](const DerivationOutput::Deferred &) {
@@ -780,7 +782,7 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
             },
             [&](const DerivationOutput::Impure & doi) {
                 out << ""
-                    << (makeContentAddressingPrefix(doi.method) + printHashType(doi.hashType))
+                    << (doi.method.renderPrefix() + printHashType(doi.hashType))
                     << "impure";
             },
         }, i.second.raw());
@@ -898,16 +900,16 @@ nlohmann::json DerivationOutput::toJSON(
         },
         [&](const DerivationOutput::CAFixed & dof) {
             res["path"] = store.printStorePath(dof.path(store, drvName, outputName));
-            res["hashAlgo"] = printMethodAlgo(dof.ca);
-            res["hash"] = getContentAddressHash(dof.ca).to_string(Base16, false);
+            res["hashAlgo"] = dof.ca.printMethodAlgo();
+            res["hash"] = dof.ca.getHash().to_string(Base16, false);
             // FIXME print refs?
         },
         [&](const DerivationOutput::CAFloating & dof) {
-            res["hashAlgo"] = makeContentAddressingPrefix(dof.method) + printHashType(dof.hashType);
+            res["hashAlgo"] = dof.method.renderPrefix() + printHashType(dof.hashType);
         },
         [&](const DerivationOutput::Deferred &) {},
         [&](const DerivationOutput::Impure & doi) {
-            res["hashAlgo"] = makeContentAddressingPrefix(doi.method) + printHashType(doi.hashType);
+            res["hashAlgo"] = doi.method.renderPrefix() + printHashType(doi.hashType);
             res["impure"] = true;
         },
     }, raw());

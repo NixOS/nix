@@ -221,7 +221,7 @@ StorePath Store::makeFixedOutputPathFromCA(std::string_view name, const ContentA
         [&](const FixedOutputInfo & foi) {
             return makeFixedOutputPath(name, foi);
         }
-    }, ca);
+    }, ca.raw);
 }
 
 

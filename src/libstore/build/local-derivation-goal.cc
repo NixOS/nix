@@ -2451,12 +2451,12 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                         break;
                     }
                 },
-            }, outputHash.method);
+            }, outputHash.method.raw);
             auto got = caSink.finish().first;
             ValidPathInfo newInfo0 {
                 worker.store,
                 outputPathName(drv->name, outputName),
-                contentAddressFromMethodHashAndRefs(
+                ContentAddressWithReferences::fromParts(
                     outputHash.method,
                     std::move(got),
                     rewriteRefs()),
@@ -2506,16 +2506,16 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             },
 
             [&](const DerivationOutput::CAFixed & dof) {
-                auto wanted = getContentAddressHash(dof.ca);
+                auto wanted = dof.ca.getHash();
 
                 auto newInfo0 = newInfoFromCA(DerivationOutputCAFloating {
-                    .method = getContentAddressMethod(dof.ca),
+                    .method = dof.ca.getMethod(),
                     .hashType = wanted.type,
                 });
 
                 /* Check wanted hash */
                 assert(newInfo0.ca);
-                auto got = getContentAddressHash(*newInfo0.ca);
+                auto got = newInfo0.ca->getHash();
                 if (wanted != got) {
                     /* Throw an error after registering the path as
                        valid. */
