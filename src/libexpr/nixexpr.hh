@@ -22,7 +22,9 @@ MakeError(UndefinedVarError, Error);
 MakeError(MissingArgumentError, EvalError);
 MakeError(RestrictedPathError, Error);
 
-/* Position objects. */
+/**
+ * Position objects.
+ */
 struct Pos
 {
     uint32_t line;
@@ -133,7 +135,9 @@ class EvalState;
 struct StaticEnv;
 
 
-/* An attribute path is a sequence of attribute names. */
+/**
+ * An attribute path is a sequence of attribute names.
+ */
 struct AttrName
 {
     Symbol symbol;

@@ -242,8 +242,14 @@ struct DerivationType : _DerivationTypeRaw {
 
 struct BasicDerivation
 {
-    DerivationOutputs outputs; /* keyed on symbolic IDs */
-    StorePathSet inputSrcs; /* inputs that are sources */
+    /**
+     * keyed on symbolic IDs
+     */
+    DerivationOutputs outputs;
+    /**
+     * inputs that are sources
+     */
+    StorePathSet inputSrcs;
     std::string platform;
     Path builder;
     Strings args;
