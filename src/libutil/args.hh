@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <iostream>
 #include <map>
@@ -18,16 +19,22 @@ class Args
 {
 public:
 
-    /* Parse the command line, throwing a UsageError if something goes
-       wrong. */
+    /**
+     * Parse the command line, throwing a UsageError if something goes
+     * wrong.
+     */
     void parseCmdline(const Strings & cmdline);
 
-    /* Return a short one-line description of the command. */
+    /**
+     * Return a short one-line description of the command.
+     */
     virtual std::string description() { return ""; }
 
     virtual bool forceImpureByDefault() { return false; }
 
-    /* Return documentation about this command, in Markdown format. */
+    /**
+     * Return documentation about this command, in Markdown format.
+     */
     virtual std::string doc() { return ""; }
 
 protected:
@@ -146,13 +153,17 @@ protected:
 
     std::set<std::string> hiddenCategories;
 
-    /* Called after all command line flags before the first non-flag
-       argument (if any) have been processed. */
+    /**
+     * Called after all command line flags before the first non-flag
+     * argument (if any) have been processed.
+     */
     virtual void initialFlagsProcessed() {}
 
-    /* Called after the command line has been processed if we need to generate
-       completions. Useful for commands that need to know the whole command line
-       in order to know what completions to generate. */
+    /**
+     * Called after the command line has been processed if we need to generate
+     * completions. Useful for commands that need to know the whole command line
+     * in order to know what completions to generate.
+     */
     virtual void completionHook() { }
 
 public:
@@ -166,7 +177,9 @@ public:
         expectedArgs.emplace_back(std::move(arg));
     }
 
-    /* Expect a string argument. */
+    /**
+     * Expect a string argument.
+     */
     void expectArg(const std::string & label, std::string * dest, bool optional = false)
     {
         expectArgs({
@@ -176,7 +189,9 @@ public:
         });
     }
 
-    /* Expect 0 or more arguments. */
+    /**
+     * Expect 0 or more arguments.
+     */
     void expectArgs(const std::string & label, std::vector<std::string> * dest)
     {
         expectArgs({
@@ -202,14 +217,19 @@ private:
     std::set<ExperimentalFeature> flagExperimentalFeatures;
 };
 
-/* A command is an argument parser that can be executed by calling its
-   run() method. */
+/**
+ * A command is an argument parser that can be executed by calling its
+ * run() method.
+ */
 struct Command : virtual public Args
 {
     friend class MultiCommand;
 
     virtual ~Command() { }
 
+    /**
+     * Entry point to the command
+     */
     virtual void run() = 0;
 
     typedef int Category;
@@ -221,8 +241,10 @@ struct Command : virtual public Args
 
 typedef std::map<std::string, std::function<ref<Command>()>> Commands;
 
-/* An argument parser that supports multiple subcommands,
-   i.e. ‘<command> <subcommand>’. */
+/**
+ * An argument parser that supports multiple subcommands,
+ * i.e. ‘<command> <subcommand>’.
+ */
 class MultiCommand : virtual public Args
 {
 public:
@@ -230,7 +252,9 @@ public:
 
     std::map<Command::Category, std::string> categories;
 
-    // Selected command, if any.
+    /**
+     * Selected command, if any.
+     */
     std::optional<std::pair<std::string, ref<Command>>> command;
 
     MultiCommand(const Commands & commands);

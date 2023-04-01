@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "sync.hh"
 #include "hash.hh"

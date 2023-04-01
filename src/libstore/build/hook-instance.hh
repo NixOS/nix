@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "logging.hh"
 #include "serialise.hh"
