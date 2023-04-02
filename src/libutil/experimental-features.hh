@@ -11,8 +11,9 @@ namespace nix {
 /**
  * The list of available experimental features.
  *
- * If you update this, don’t forget to also change the map defining their string
- * representation and documentation in the corresponding `.cc` file as well.
+ * If you update this, don’t forget to also change the map defining
+ * their string representation and documentation in the corresponding
+ * `.cc` file as well.
  */
 enum struct ExperimentalFeature
 {

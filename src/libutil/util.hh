@@ -730,16 +730,16 @@ constexpr auto enumerate(T && iterable)
     {
         size_t i;
         TIter iter;
-        bool operator != (const iterator & other) const { return iter != other.iter; }
-        void operator ++ () { ++i; ++iter; }
-        auto operator * () const { return std::tie(i, *iter); }
+        constexpr bool operator != (const iterator & other) const { return iter != other.iter; }
+        constexpr void operator ++ () { ++i; ++iter; }
+        constexpr auto operator * () const { return std::tie(i, *iter); }
     };
 
     struct iterable_wrapper
     {
         T iterable;
-        auto begin() { return iterator{ 0, std::begin(iterable) }; }
-        auto end() { return iterator{ 0, std::end(iterable) }; }
+        constexpr auto begin() { return iterator{ 0, std::begin(iterable) }; }
+        constexpr auto end() { return iterator{ 0, std::end(iterable) }; }
     };
 
     return iterable_wrapper{ std::forward<T>(iterable) };
