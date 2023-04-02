@@ -8,7 +8,7 @@ R""(
   [store derivation]: ../../glossary.md#gloss-store-derivation
 
   ```console
-  # nix show-derivation nixpkgs#hello
+  # nix derivation show nixpkgs#hello
   {
     "/nix/store/s6rn4jz1sin56rf4qj5b5v8jxjm32hlk-hello-2.10.drv": {
       …
@@ -20,14 +20,14 @@ R""(
   NixOS system:
 
   ```console
-  # nix show-derivation -r /run/current-system
+  # nix derivation show -r /run/current-system
   ```
 
 * Print all files fetched using `fetchurl` by Firefox's dependency
   graph:
 
   ```console
-  # nix show-derivation -r nixpkgs#firefox \
+  # nix derivation show -r nixpkgs#firefox \
     | jq -r '.[] | select(.outputs.out.hash and .env.urls) | .env.urls' \
     | uniq | sort
   ```
