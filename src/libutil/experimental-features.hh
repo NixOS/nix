@@ -35,27 +35,54 @@ enum struct ExperimentalFeature
  */
 using Xp = ExperimentalFeature;
 
+/**
+ * Parse an experimental feature (enum value) from its name. Experimental
+ * feature flag names are hyphenated and do not contain spaces.
+ */
 const std::optional<ExperimentalFeature> parseExperimentalFeature(
         const std::string_view & name);
+
+/**
+ * Show the name of an experimental feature. This is the opposite of
+ * parseExperimentalFeature().
+ */
 std::string_view showExperimentalFeature(const ExperimentalFeature);
+
+/**
+ * Compute the documentation of all experimental features.
+ *
+ * This a markdown bulleted list where each item is first (a) the
+ * experimental feature flag name in backticks, and then (b) the
+ * description of the experimental feature.
+ */
 std::string getExperimentalFeaturesList();
 
+/**
+ * Shorthand for `str << showExperimentalFeature(feature)`.
+ */
 std::ostream & operator<<(
         std::ostream & str,
         const ExperimentalFeature & feature);
 
 /**
- * Parse a set of strings to the corresponding set of experimental features,
- * ignoring (but warning for) any unkwown feature.
+ * Parse a set of strings to the corresponding set of experimental
+ * features, ignoring (but warning for) any unknown feature.
  */
 std::set<ExperimentalFeature> parseFeatures(const std::set<std::string> &);
 
+/**
+ * An experimental feature was required for some (experimental)
+ * operation, but was not enabled.
+ */
 class MissingExperimentalFeature : public Error
 {
 public:
+    /**
+     * The experimental feature that was required but not enabled.
+     */
     ExperimentalFeature missingFeature;
 
-    MissingExperimentalFeature(ExperimentalFeature);
+    MissingExperimentalFeature(ExperimentalFeature missingFeature);
 };
 
 /**
