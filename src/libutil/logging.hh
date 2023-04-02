@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "types.hh"
 #include "error.hh"
@@ -71,6 +72,9 @@ public:
     virtual ~Logger() { }
 
     virtual void stop() { };
+
+    virtual void pause() { };
+    virtual void resume() { };
 
     // Whether the logger prints the whole build log
     virtual bool isVerbose() { return false; }
@@ -214,7 +218,9 @@ extern Verbosity verbosity; /* suppress msgs > this */
 #define debug(args...) printMsg(lvlDebug, args)
 #define vomit(args...) printMsg(lvlVomit, args)
 
-/* if verbosity >= lvlWarn, print a message with a yellow 'warning:' prefix. */
+/**
+ * if verbosity >= lvlWarn, print a message with a yellow 'warning:' prefix.
+ */
 template<typename... Args>
 inline void warn(const std::string & fs, const Args & ... args)
 {

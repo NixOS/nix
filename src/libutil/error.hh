@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "suggestions.hh"
 #include "ref.hh"
@@ -54,20 +55,26 @@ typedef enum {
     lvlVomit
 } Verbosity;
 
-// the lines of code surrounding an error.
+/**
+ * The lines of code surrounding an error.
+ */
 struct LinesOfCode {
     std::optional<std::string> prevLineOfCode;
     std::optional<std::string> errLineOfCode;
     std::optional<std::string> nextLineOfCode;
 };
 
-/* An abstract type that represents a location in a source file. */
+/**
+ * An abstract type that represents a location in a source file.
+ */
 struct AbstractPos
 {
     uint32_t line = 0;
     uint32_t column = 0;
 
-    /* Return the contents of the source file. */
+    /**
+     * Return the contents of the source file.
+     */
     virtual std::optional<std::string> getSource() const
     { return std::nullopt; };
 
@@ -104,8 +111,10 @@ struct ErrorInfo {
 
 std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace);
 
-/* BaseError should generally not be caught, as it has Interrupted as
-   a subclass. Catch Error instead. */
+/**
+ * BaseError should generally not be caught, as it has Interrupted as
+ * a subclass. Catch Error instead.
+ */
 class BaseError : public std::exception
 {
 protected:

@@ -38,7 +38,7 @@ directory containing at least a file named `default.nix`.
 `nix-build` is essentially a wrapper around
 [`nix-instantiate`](nix-instantiate.md) (to translate a high-level Nix
 expression to a low-level [store derivation]) and [`nix-store
---realise`](nix-store.md#operation---realise) (to build the store
+--realise`](@docroot@/command-ref/nix-store/realise.md) (to build the store
 derivation).
 
 [store derivation]: ../glossary.md#gloss-store-derivation
@@ -51,9 +51,8 @@ derivation).
 
 # Options
 
-All options not listed here are passed to `nix-store
---realise`, except for `--arg` and `--attr` / `-A` which are passed to
-`nix-instantiate`.
+All options not listed here are passed to `nix-store --realise`,
+except for `--arg` and `--attr` / `-A` which are passed to `nix-instantiate`.
 
   - <span id="opt-no-out-link">[`--no-out-link`](#opt-no-out-link)<span>
 
@@ -70,7 +69,9 @@ All options not listed here are passed to `nix-store
     Change the name of the symlink to the output path created from
     `result` to *outlink*.
 
-The following common options are supported:
+{{#include ./opt-common.md}}
+
+{{#include ./env-common.md}}
 
 # Examples
 

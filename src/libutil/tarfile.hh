@@ -1,3 +1,6 @@
+#pragma once
+///@file
+
 #include "serialise.hh"
 #include <archive.h>
 
@@ -14,7 +17,7 @@ struct TarArchive {
 
     TarArchive(const Path & path);
 
-    // disable copy constructor
+    /// disable copy constructor
     TarArchive(const TarArchive &) = delete;
 
     void close();

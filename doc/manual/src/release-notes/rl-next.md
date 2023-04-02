@@ -31,3 +31,11 @@
 * The experimental command `nix describe-stores` has been removed.
 
 * Nix stores and their settings are now documented in [`nix help-stores`](@docroot@/command-ref/new-cli/nix3-help-stores.md).
+
+* Documentation for operations of `nix-store` and `nix-env` are now available on separate pages of the manual.
+  They include all common options that can be specified and common environment variables that affect these commands.
+
+  These pages can be viewed offline with `man` using
+
+  * `man nix-store-<operation>` and `man nix-env-<operation>`
+  * `nix-store --help --<operation>` and `nix-env --help --<operation>`.

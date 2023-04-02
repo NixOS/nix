@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "parsed-derivations.hh"
 #include "lock.hh"

@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "crypto.hh"
 #include "path.hh"

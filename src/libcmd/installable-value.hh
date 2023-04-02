@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "installables.hh"
 #include "flake/flake.hh"

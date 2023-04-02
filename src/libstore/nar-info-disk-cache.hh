@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "ref.hh"
 #include "nar-info.hh"
