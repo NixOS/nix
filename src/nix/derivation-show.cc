@@ -33,7 +33,7 @@ struct CmdShowDerivation : InstallablesCommand
     std::string doc() override
     {
         return
-          #include "show-derivation.md"
+          #include "derivation-show.md"
           ;
     }
 
