@@ -1024,6 +1024,8 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         str << v.fpoint;
         break;
 
+    case nThunk:
+    case nExternal:
     default:
         str << ANSI_RED "«unknown»" ANSI_NORMAL;
         break;

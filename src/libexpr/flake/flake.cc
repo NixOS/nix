@@ -125,6 +125,9 @@ static FlakeInput parseFlakeInput(EvalState & state,
                 follows.insert(follows.begin(), lockRootPath.begin(), lockRootPath.end());
                 input.follows = follows;
             } else {
+                // Allow selecting a subset of enum values
+                #pragma GCC diagnostic push
+                #pragma GCC diagnostic ignored "-Wswitch-enum"
                 switch (attr.value->type()) {
                     case nString:
                         attrs.emplace(state.symbols[attr.name], attr.value->string.s);
@@ -139,6 +142,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
                         throw TypeError("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
                             state.symbols[attr.name], showType(*attr.value));
                 }
+                #pragma GCC diagnostic pop
             }
         } catch (Error & e) {
             e.addTrace(
