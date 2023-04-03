@@ -65,7 +65,7 @@ public:
             switch (lvl) {
             case lvlError: c = '3'; break;
             case lvlWarn: c = '4'; break;
-            case lvlInfo: c = '5'; break;
+            case lvlNotice: case lvlInfo: c = '5'; break;
             case lvlTalkative: case lvlChatty: c = '6'; break;
             default: c = '7';
             }
