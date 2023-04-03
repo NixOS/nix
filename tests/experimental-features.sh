@@ -15,15 +15,20 @@ function both_ways {
 # Simple case, the configuration effects the running command
 both_ways show-config
 
-# Complicated case, earlier args effect later args
+# Skipping for now, because we actually *do* want these to show up in
+# the manual, just be marked experimental. Will reenable once the manual
+# generation takes advantage of the JSON metadata on this.
 
-both_ways store gc --help
+# both_ways store gc --help
 
 expect 1 nix --experimental-features 'nix-command' show-config --flake-registry 'https://no'
 nix --experimental-features 'nix-command flakes' show-config --flake-registry 'https://no'
 
-# Double check this is stable
+# Double check these are stable
 nix --experimental-features '' --help
+nix --experimental-features '' doctor --help
+nix --experimental-features '' repl --help
+nix --experimental-features '' upgrade-nix --help
 
 # These 3 arguments are currently given to all commands, which is wrong (as not
 # all care). To deal with fixing later, we simply make them require the
