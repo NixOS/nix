@@ -456,7 +456,7 @@ public:
      * resulting ‘infos’ map.
      */
     virtual void querySubstitutablePathInfos(const StorePathCAMap & paths,
-        SubstitutablePathInfos & infos) { return; };
+        SubstitutablePathInfos & infos);
 
     /**
      * Import a path into the store.
