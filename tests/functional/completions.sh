@@ -48,6 +48,8 @@ EOF
 [[ "$(NIX_GET_COMPLETIONS=5 nix build ./foo ./bar --override-input '')" == $'normal\na\t\nb\t' ]]
 ## With tilde expansion
 [[ "$(HOME=$PWD NIX_GET_COMPLETIONS=4 nix build '~/foo' --override-input '')" == $'normal\na\t' ]]
+[[ "$(HOME=$PWD NIX_GET_COMPLETIONS=5 nix flake show '~/foo' --update-input '')" == $'normal\na\t' ]]
+[[ "$(HOME=$PWD NIX_GET_COMPLETIONS=4 nix run '~/foo' --update-input '')" == $'normal\na\t' ]]
 ## Out of order
 [[ "$(NIX_GET_COMPLETIONS=3 nix build --update-input '' ./foo)" == $'normal\na\t' ]]
 [[ "$(NIX_GET_COMPLETIONS=4 nix build ./foo --update-input '' ./bar)" == $'normal\na\t\nb\t' ]]
