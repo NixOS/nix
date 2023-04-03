@@ -1134,54 +1134,6 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
 }
 
 
-// FIXME: move this, it's not specific to LocalStore.
-void LocalStore::querySubstitutablePathInfos(const StorePathCAMap & paths, SubstitutablePathInfos & infos)
-{
-    if (!settings.useSubstitutes) return;
-    for (auto & sub : getDefaultSubstituters()) {
-        for (auto & path : paths) {
-            if (infos.count(path.first))
-                // Choose first succeeding substituter.
-                continue;
-
-            auto subPath(path.first);
-
-            // Recompute store path so that we can use a different store root.
-            if (path.second) {
-                subPath = makeFixedOutputPathFromCA(path.first.name(), *path.second);
-                if (sub->storeDir == storeDir)
-                    assert(subPath == path.first);
-                if (subPath != path.first)
-                    debug("replaced path '%s' with '%s' for substituter '%s'", printStorePath(path.first), sub->printStorePath(subPath), sub->getUri());
-            } else if (sub->storeDir != storeDir) continue;
-
-            debug("checking substituter '%s' for path '%s'", sub->getUri(), sub->printStorePath(subPath));
-            try {
-                auto info = sub->queryPathInfo(subPath);
-
-                if (sub->storeDir != storeDir && !(info->isContentAddressed(*sub) && info->references.empty()))
-                    continue;
-
-                auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
-                    std::shared_ptr<const ValidPathInfo>(info));
-                infos.insert_or_assign(path.first, SubstitutablePathInfo{
-                    info->deriver,
-                    info->references,
-                    narInfo ? narInfo->fileSize : 0,
-                    info->narSize});
-            } catch (InvalidPath &) {
-            } catch (SubstituterDisabled &) {
-            } catch (Error & e) {
-                if (settings.tryFallback)
-                    logError(e.info());
-                else
-                    throw;
-            }
-        }
-    }
-}
-
-
 void LocalStore::registerValidPath(const ValidPathInfo & info)
 {
     registerValidPaths({{info.path, info}});
