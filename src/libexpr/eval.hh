@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "attr-set.hh"
 #include "types.hh"

@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "nar-info.hh"
 #include "realisation.hh"

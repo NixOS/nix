@@ -1105,7 +1105,8 @@ std::map<StorePath, StorePath> copyPaths(
         return storePathForDst;
     };
 
-    uint64_t total = 0;
+    // total is accessed by each copy, which are each handled in separate threads
+    std::atomic<uint64_t> total = 0;
 
     for (auto & missingPath : sortedMissing) {
         auto info = srcStore.queryPathInfo(missingPath);

@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <nlohmann/json.hpp>
 #include "config.hh"

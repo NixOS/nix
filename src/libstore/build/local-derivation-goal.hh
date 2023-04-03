@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "derivation-goal.hh"
 #include "local-store.hh"
