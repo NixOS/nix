@@ -67,7 +67,8 @@ public:
             case lvlWarn: c = '4'; break;
             case lvlNotice: case lvlInfo: c = '5'; break;
             case lvlTalkative: case lvlChatty: c = '6'; break;
-            default: c = '7';
+            case lvlDebug: case lvlVomit: c = '7';
+            default: c = '7'; break;
             }
             prefix = std::string("<") + c + ">";
         }

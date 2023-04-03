@@ -443,7 +443,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             break;
         }
 
-        default:
+        default: case qDefault:
             abort();
     }
 }
