@@ -4,7 +4,7 @@ This section describes the notion of *experimental features*, and how it fits in
 
 Experimental features are new functionality that is not yet stable, but shipped as part of regular Nix releases to solicit community feedback.
 Because the are not yet stable, experimental features can be changed or removed at any time.
-Experimental features are guarded by named flags; users must [explicitly enable those flags](../nix-conf.md#conf-experimental-features) those flags in order to use experimental features.
+Experimental features are guarded by named flags; users must [explicitly enable those flags](@docroot@/command-ref/conf-file.md#conf-experimental-features) those flags in order to use experimental features.
 This allows users to try them out without unwittingly relying on them.
 
 Experimental features were first introduced in [Nix 2.4](../release-notes/rl-2.4.md).
