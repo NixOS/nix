@@ -1,6 +1,6 @@
 clean-files += Makefile.config
 
-GLOBAL_CXXFLAGS += -Wno-deprecated-declarations
+GLOBAL_CXXFLAGS += -Wno-deprecated-declarations -Werror=switch
 
 $(foreach i, config.h $(wildcard src/lib*/*.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix, 0644)))

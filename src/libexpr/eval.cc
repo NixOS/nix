@@ -102,10 +102,10 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
     switch (internalType) {
     case tInt:
         str << integer;
-        break;
+        return;
     case tBool:
         str << (boolean ? "true" : "false");
-        break;
+        return;
     case tString:
         str << "\"";
         for (const char * i = string.s; *i; i++)
@@ -116,13 +116,13 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
             else if (*i == '$' && *(i+1) == '{') str << "\\" << *i;
             else str << *i;
         str << "\"";
-        break;
+        return;
     case tPath:
         str << path; // !!! escaping?
-        break;
+        return;
     case tNull:
         str << "null";
-        break;
+        return;
     case tAttrs: {
         if (seen && !attrs->empty() && !seen->insert(attrs).second)
             str << "«repeated»";
@@ -135,7 +135,7 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
             }
             str << "}";
         }
-        break;
+        return;
     }
     case tList1:
     case tList2:
@@ -153,26 +153,26 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
             }
             str << "]";
         }
-        break;
+        return;
     case tThunk:
     case tApp:
         str << "<CODE>";
-        break;
+        return;
     case tLambda:
         str << "<LAMBDA>";
-        break;
+        return;
     case tPrimOp:
         str << "<PRIMOP>";
-        break;
+        return;
     case tPrimOpApp:
         str << "<PRIMOP-APP>";
-        break;
+        return;
     case tExternal:
         str << *external;
-        break;
+        return;
     case tFloat:
         str << fpoint;
-        break;
+        return;
     case tBlackhole:
         // Although we know for sure that it's going to be an infinite recursion
         // when this value is accessed _in the current context_, it's likely
@@ -181,11 +181,10 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
         // a valid value after `builtins.trace` and perhaps some other steps
         // have completed.
         str << "«potential infinite recursion»";
-        break;
-    default:
-        printError("Nix evaluator internal error: Value::print(): invalid value type %1%", internalType);
-        abort();
+        return;
     }
+    printError("Nix evaluator internal error: Value::print(): invalid value type %1%", internalType);
+    abort();
 }
 
 
