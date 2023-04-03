@@ -428,7 +428,7 @@ Installables SourceExprCommand::parseInstallables(
         else if (file)
             state->evalFile(lookupFileArg(*state, *file), *vFile);
         else {
-            auto e = state->parseExprFromString(*expr, state->rootPath(absPath(".")));
+            auto e = state->parseExprFromString(*expr, state->rootPath(CanonPath::fromCwd()));
             state->eval(e, *vFile);
         }
 

@@ -29,7 +29,7 @@ std::string resolveMirrorUrl(EvalState & state, const std::string & url)
     // FIXME: use nixpkgs flake
     state.eval(state.parseExprFromString(
             "import <nixpkgs/pkgs/build-support/fetchurl/mirrors.nix>",
-            state.rootPath(absPath("/"))),
+            state.rootPath(CanonPath::root)),
         vMirrors);
     state.forceAttrs(vMirrors, noPos, "while evaluating the set of all mirrors");
 

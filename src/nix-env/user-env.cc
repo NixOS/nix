@@ -19,10 +19,10 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
     DrvInfos elems;
     if (pathExists(userEnv + "/manifest.json"))
         throw Error("profile '%s' is incompatible with 'nix-env'; please use 'nix profile' instead", userEnv);
-    Path manifestFile = userEnv + "/manifest.nix";
+    auto manifestFile = userEnv + "/manifest.nix";
     if (pathExists(manifestFile)) {
         Value v;
-        state.evalFile(state.rootPath(manifestFile), v);
+        state.evalFile(state.rootPath(CanonPath(manifestFile)), v);
         Bindings & bindings(*state.allocBindings(0));
         getDerivations(state, v, "", bindings, elems, false);
     }
@@ -114,7 +114,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     Value envBuilder;
     state.eval(state.parseExprFromString(
         #include "buildenv.nix.gen.hh"
-            , state.rootPath("/")), envBuilder);
+            , state.rootPath(CanonPath::root)), envBuilder);
 
     /* Construct a Nix expression that calls the user environment
        builder with the manifest as argument. */

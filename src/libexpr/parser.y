@@ -535,7 +535,7 @@ path_start
             std::string_view($1.p, $1.l)
         );
     }
-    Path path(getHome() + std::string($1.p + 1, $1.l - 1));
+    CanonPath path(getHome() + std::string($1.p + 1, $1.l - 1));
     $$ = {.e = new ExprPath(data->state.rootPath(path)), .appendSlash = true};
   }
   ;
@@ -740,7 +740,7 @@ Expr * EvalState::parseStdin()
     // drainFD should have left some extra space for terminators
     buffer.append("\0\0", 2);
     auto s = make_ref<std::string>(std::move(buffer));
-    return parse(s->data(), s->size(), Pos::Stdin{.source = s}, rootPath(absPath(".")), staticBaseEnv);
+    return parse(s->data(), s->size(), Pos::Stdin{.source = s}, rootPath(CanonPath::fromCwd()), staticBaseEnv);
 }
 
 
@@ -828,7 +828,7 @@ std::optional<SourcePath> EvalState::resolveSearchPathElem(const SearchPathElem 
     }
 
     else {
-        auto path = rootPath(absPath(elem.second));
+        auto path = rootPath(CanonPath::fromCwd(elem.second));
 
         /* Allow access to paths in the search path. */
         if (initAccessControl) {

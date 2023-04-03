@@ -155,7 +155,7 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
     for (auto & i : autoArgs) {
         auto v = state.allocValue();
         if (i.second[0] == 'E')
-            state.mkThunk_(*v, state.parseExprFromString(i.second.substr(1), state.rootPath(absPath("."))));
+            state.mkThunk_(*v, state.parseExprFromString(i.second.substr(1), state.rootPath(CanonPath::fromCwd())));
         else
             v->mkString(((std::string_view) i.second).substr(1));
         res.insert(state.symbols.create(i.first), v);
@@ -186,7 +186,7 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s)
     }
 
     else
-        return state.rootPath(absPath(std::string(s)));
+        return state.rootPath(CanonPath::fromCwd(s));
 }
 
 }

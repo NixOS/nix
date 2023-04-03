@@ -337,7 +337,7 @@ LockedFlake lockFlake(
                 i.first,
                 std::make_tuple(
                     FlakeInput { .ref = i.second },
-                    state.rootPath("/"),
+                    state.rootPath(CanonPath::root),
                     std::nullopt));
 
         LockFile newLockFile;

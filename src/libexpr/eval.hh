@@ -267,7 +267,7 @@ public:
 
     SearchPath getSearchPath() { return searchPath; }
 
-    SourcePath rootPath(const Path & path);
+    SourcePath rootPath(CanonPath path);
 
     void registerAccessor(ref<InputAccessor> accessor);
 

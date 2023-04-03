@@ -54,8 +54,6 @@ struct NixRepl
     , gc
     #endif
 {
-    std::string curDir;
-
     size_t debugTraceIndex;
 
     Strings loadedFiles;
@@ -113,7 +111,6 @@ NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store, ref<EvalStat
     , staticEnv(new StaticEnv(false, state->staticBaseEnv.get()))
     , historyFile(getDataDir() + "/nix/repl-history")
 {
-    curDir = absPath(".");
 }
 
 
@@ -872,8 +869,7 @@ void NixRepl::addVarToScope(const Symbol name, Value & v)
 
 Expr * NixRepl::parseString(std::string s)
 {
-    Expr * e = state->parseExprFromString(std::move(s), state->rootPath(curDir), staticEnv);
-    return e;
+    return state->parseExprFromString(std::move(s), state->rootPath(CanonPath::fromCwd()), staticEnv);
 }
 
 
