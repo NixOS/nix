@@ -17,11 +17,11 @@ constexpr std::array<ExperimentalFeatureDetails, 11> xpFeatureDetails = {{
         .tag = Xp::CaDerivations,
         .name = "ca-derivations",
         .description = R"(
-            Allows derivations to be content-addressed in order to prevent rebuilds
+            Allow derivations to be content-addressed in order to prevent rebuilds
             when changes to the derivation do not result in changes to the
             derivation's output. See
-            [__contentAddressed](../language/advanced-attributes.md#adv-attr-__contentAddressed)
-            for more info.
+            [__contentAddressed](@docroot@/language/advanced-attributes.md#adv-attr-__contentAddressed)
+            for details.
         )",
     },
     {
@@ -37,18 +37,16 @@ constexpr std::array<ExperimentalFeatureDetails, 11> xpFeatureDetails = {{
         .tag = Xp::Flakes,
         .name = "flakes",
         .description = R"(
-            Allows for derivations to be packaged in flakes. See the manual entry for
-            [`nix flake`](../command-ref/new-cli/nix3-flake.md) or this [detailed
-            introduction](https://www.tweag.io/blog/2020-05-25-flakes/) for more info.
+            Enable flakes. See the manual entry for
+            [`nix flake`](../command-ref/new-cli/nix3-flake.md) for details.
         )",
     },
     {
         .tag = Xp::NixCommand,
         .name = "nix-command",
         .description = R"(
-            Allows the usage of the new `nix` CLI subcommands, such as `nix build`, `nix
-            develop`, `nix run`, etc. See the manual for
-            [`nix`](../command-ref/new-cli/nix.md) for more info.
+            Enable the new `nix` subcommands. See the manual on
+            [`nix`](@docroot@/command-ref/new-cli/nix.md) for details.
         )",
     },
     {
@@ -73,17 +71,14 @@ constexpr std::array<ExperimentalFeatureDetails, 11> xpFeatureDetails = {{
         .tag = Xp::FetchClosure,
         .name = "fetch-closure",
         .description = R"(
-            Enables the use of the `fetchClosure` function in the standard library. See
-            the docs for [`fetchClosure`](../language/builtins.md#builtins-fetchClosure)
-            for more info.
+            Enable the use of the [`fetchClosure`](@docroot@/language/builtins.md#builtins-fetchClosure) built-in function in the Nix language.
         )",
     },
     {
         .tag = Xp::ReplFlake,
         .name = "repl-flake",
         .description = R"(
-            Allows the user to enter a Nix REPL within a flake, e.g. `nix repl nixpkgs`
-            or `nix repl .#foo`.
+            Allow passing [installables](@docroot@/command-ref/new-cli/nix.md#installables) to `nix repl`, making its interface consistent with the other experimental commands.
         )",
     },
     {
@@ -91,7 +86,7 @@ constexpr std::array<ExperimentalFeatureDetails, 11> xpFeatureDetails = {{
         .name = "auto-allocate-uids",
         .description = R"(
             Allows Nix to automatically pick UIDs for builds, rather than creating
-            `nixbld*` user accounts. See [here](#conf-auto-allocate-uids) for more info.
+            `nixbld*` user accounts. See the [`auto-allocate-uids`](#conf-auto-allocate-uids) setting for details.
         )",
     },
     {
@@ -99,15 +94,15 @@ constexpr std::array<ExperimentalFeatureDetails, 11> xpFeatureDetails = {{
         .name = "cgroups",
         .description = R"(
             Allows Nix to execute builds inside cgroups. See
-            [`use-cgroups`](#conf-use-cgroups) for more info.
+            the [`use-cgroups`](#conf-use-cgroups) setting for details.
         )",
     },
     {
         .tag = Xp::DiscardReferences,
         .name = "discard-references",
         .description = R"(
-            Enables the use of the `unsafeDiscardReferences` attribute in derivations
-            that use structured attributes. This disables scanning of outputs for
+            Allow the use of the [`unsafeDiscardReferences`](@docroot@/language/advanced-attributes.html#adv-attr-unsafeDiscardReferences) attribute in derivations
+            that use [structured attributes](@docroot@/language/advanced-attributes.html#adv-attr-structuredAttrs). This disables scanning of outputs for
             runtime dependencies.
         )",
     },
@@ -147,8 +142,14 @@ std::string_view showExperimentalFeature(const ExperimentalFeature tag)
 
 std::string getExperimentalFeaturesList() {
     std::string experimentalFeaturesList = R"(
-        Experimental Nix features to enable.
-        Current experimental features are the following:
+        Experimental features that can be enabled.
+        
+        Example:
+        
+        ```
+        experimental-features = nix-command flakes
+        
+        Experimental features available:
 
 )";
 
