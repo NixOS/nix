@@ -217,9 +217,3 @@
     [string]: ./language/values.md#type-string
     [path]: ./language/values.md#type-path
     [attribute name]: ./language/values.md#attribute-set
-
-  - [Experimental Features]{#gloss-experimental-features}\
-    Not yet stabilized functionality gated on named experimental features flags.
-    These flags are enabled or disabled with the [`experimental-features`](./command-ref/conf-file.html#conf-experimental-features) setting.
-
-    The purpose and lifecycle of experimental feaures is [thoroughly documented](@docroot@/contributing/experimental-features.md) in a section of the contribution guide.

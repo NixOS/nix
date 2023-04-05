@@ -48,14 +48,12 @@ manual](https://nixos.org/manual/nix/stable/).
 
 # Installables
 
-*Installables are part of the unstable `nix-command` [experimental-feature](#gloss-experimental-features), and subject to change without notice.*
-
 Many `nix` subcommands operate on one or more *installables*.
 These are command line arguments that represent something that can be realised in the Nix store.
 
 The following types of installable are supported by most commands:
 
-- [Flake output attribute](#flake-output-attribute) (experimental)
+- [Flake output attribute](#flake-output-attribute)
 - [Store path](#store-path)
 - [Nix file](#nix-file), optionally qualified by an attribute path
 - [Nix expression](#nix-expression), optionally qualified by an attribute path
@@ -64,8 +62,6 @@ For most commands, if no installable is specified, `.` as assumed.
 That is, Nix will operate on the default flake output attribute of the flake in the current directory.
 
 ### Flake output attribute
-
-*Flake output attribute installables are part of the unstable `flakes` [experimental-feature](#gloss-experimental-features) (in addition to the `nix-command` one), and subject to change without notice.*
 
 Example: `nixpkgs#hello`
 
