@@ -54,7 +54,7 @@
     invoked, the  Nix store can be  referred to
     as a "_local_" or a "_remote_" one:
 
-    + A *local  store* exists  on the filesystem of
+    + A [local store]{#gloss-local-store} exists on the filesystem of
       the machine where Nix is  invoked. You can use other
       local stores  by passing  the `--store` flag  to the
       `nix` command.  Local stores can be used for building derivations.
@@ -65,9 +65,10 @@
       served by the `nix-serve` Perl script.
 
     [store]: #gloss-store
+    [local store]: #gloss-local-store
 
   - [chroot store]{#gloss-chroot-store}\
-    A local store whose canonical path is anything other than `/nix/store`.
+    A [local store] whose canonical path is anything other than `/nix/store`.
 
   - [binary cache]{#gloss-binary-cache}\
     A *binary cache* is a Nix store which uses a different format: its
@@ -175,7 +176,7 @@
   - [validity]{#gloss-validity}\
     A store path is valid if all [store object]s in its [closure] can be read from the [store].
 
-    For a local store, this means:
+    For a [local store], this means:
     - The store path leads to an existing [store object] in that [store].
     - The store path is listed in the Nix database as being valid.
     - All paths in the store path's [closure] are valid.
