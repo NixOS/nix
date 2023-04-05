@@ -3,9 +3,6 @@ source common.sh
 sed -i 's/experimental-features .*/& recursive-nix/' "$NIX_CONF_DIR"/nix.conf
 restartDaemon
 
-# FIXME
-if [[ $(uname) != Linux ]]; then skipTest "Not running Linux"; fi
-
 clearStore
 
 rm -f $TEST_ROOT/result
