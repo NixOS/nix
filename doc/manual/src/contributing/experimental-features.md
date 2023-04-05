@@ -41,17 +41,40 @@ However, the standard workflow for an experimental feature is as follows:
 
 The following diagram illustrates the process:
 
-<!-- TODO: replace with ASCII art to render correctly once contents are agreed upon -->
-
-```mermaid
-flowchart
-  idea([idea]) --> |discussion, design, implementation| pr([pull request])
-  experimental --> |"user feedback, (breaking) changes"| pr
-
-  pr --> |review| pr
-  pr --> |merge| experimental
-  experimental --> |decision to stabilise| stable
-  experimental --> |decision against keeping the feature| removed
+```
+                  .------.
+                  | idea |
+                  '------'
+                      |
+       discussion, design, implementation
+                      |
+                      |     .-------.
+                      |     |       |
+                      v     v       |
+               .--------------.  review
+               | pull request |     |
+               '--------------'     |
+                   |     ^  |       |
+                   |     |  '-------'
+               .---'     '----.
+               |              |
+             merge       user feedback,
+               |       (breaking) changes
+               |              |
+               '---.     .----'
+                   |     |
+                   v     |
+               +--------------+
+           .---| experimental |----.
+           |   +--------------+    |
+           |                       |
+decision to stabilise      decision against
+           |              keeping the feature
+           |                       |
+           v                       v
+       +--------+             +---------+
+       | stable |             | removed |
+       +--------+             +---------+
 ```
 
 # Relation to the RFC process
