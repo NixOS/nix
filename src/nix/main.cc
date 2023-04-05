@@ -83,6 +83,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .description = "Print full build logs on standard error.",
             .category = loggingCategory,
             .handler = {[&]() { logger->setPrintBuildLogs(true); }},
+            .experimentalFeature = Xp::NixCommand,
         });
 
         addFlag({
@@ -98,6 +99,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .description = "Disable substituters and consider all previously downloaded files up-to-date.",
             .category = miscCategory,
             .handler = {[&]() { useNet = false; }},
+            .experimentalFeature = Xp::NixCommand,
         });
 
         addFlag({
@@ -105,6 +107,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .description = "Consider all previously downloaded files out-of-date.",
             .category = miscCategory,
             .handler = {[&]() { refresh = true; }},
+            .experimentalFeature = Xp::NixCommand,
         });
     }
 
@@ -420,10 +423,8 @@ void mainWrapped(int argc, char * * argv)
     if (!args.command)
         throw UsageError("no subcommand specified");
 
-    if (args.command->first != "repl"
-        && args.command->first != "doctor"
-        && args.command->first != "upgrade-nix")
-        experimentalFeatureSettings.require(Xp::NixCommand);
+    experimentalFeatureSettings.require(
+        args.command->second->experimentalFeature());
 
     if (args.useNet && !haveInternet()) {
         warn("you don't have Internet access; disabling some network-dependent features");

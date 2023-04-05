@@ -125,6 +125,9 @@ static FlakeInput parseFlakeInput(EvalState & state,
                 follows.insert(follows.begin(), lockRootPath.begin(), lockRootPath.end());
                 input.follows = follows;
             } else {
+                // Allow selecting a subset of enum values
+                #pragma GCC diagnostic push
+                #pragma GCC diagnostic ignored "-Wswitch-enum"
                 switch (attr.value->type()) {
                     case nString:
                         attrs.emplace(state.symbols[attr.name], attr.value->string.s);
@@ -139,6 +142,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
                         throw TypeError("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
                             state.symbols[attr.name], showType(*attr.value));
                 }
+                #pragma GCC diagnostic pop
             }
         } catch (Error & e) {
             e.addTrace(
@@ -334,10 +338,14 @@ LockedFlake lockFlake(
     }
 
     try {
+        if (!fetchSettings.allowDirty && lockFlags.referenceLockFilePath) {
+            throw Error("reference lock file was provided, but the `allow-dirty` setting is set to false");
+        }
 
         // FIXME: symlink attack
         auto oldLockFile = LockFile::read(
-            flake.sourceInfo->actualPath + "/" + flake.lockedRef.subdir + "/flake.lock");
+            lockFlags.referenceLockFilePath.value_or(
+                flake.sourceInfo->actualPath + "/" + flake.lockedRef.subdir + "/flake.lock"));
 
         debug("old lock file: %s", oldLockFile);
 
@@ -619,13 +627,20 @@ LockedFlake lockFlake(
 
         debug("new lock file: %s", newLockFile);
 
+        auto relPath = (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock";
+        auto sourcePath = topRef.input.getSourcePath();
+        auto outputLockFilePath = sourcePath ? std::optional{*sourcePath + "/" + relPath} : std::nullopt;
+        if (lockFlags.outputLockFilePath) {
+            outputLockFilePath = lockFlags.outputLockFilePath;
+        }
+
         /* Check whether we need to / can write the new lock file. */
-        if (!(newLockFile == oldLockFile)) {
+        if (newLockFile != oldLockFile || lockFlags.outputLockFilePath) {
 
             auto diff = LockFile::diff(oldLockFile, newLockFile);
 
             if (lockFlags.writeLockFile) {
-                if (auto sourcePath = topRef.input.getSourcePath()) {
+                if (outputLockFilePath) {
                     if (auto unlockedInput = newLockFile.isUnlocked()) {
                         if (fetchSettings.warnDirty)
                             warn("will not write lock file of flake '%s' because it has an unlocked input ('%s')", topRef, *unlockedInput);
@@ -633,25 +648,24 @@ LockedFlake lockFlake(
                         if (!lockFlags.updateLockFile)
                             throw Error("flake '%s' requires lock file changes but they're not allowed due to '--no-update-lock-file'", topRef);
 
-                        auto relPath = (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock";
-
-                        auto path = *sourcePath + "/" + relPath;
-
-                        bool lockFileExists = pathExists(path);
+                        bool lockFileExists = pathExists(*outputLockFilePath);
 
                         if (lockFileExists) {
                             auto s = chomp(diff);
                             if (s.empty())
-                                warn("updating lock file '%s'", path);
+                                warn("updating lock file '%s'", *outputLockFilePath);
                             else
-                                warn("updating lock file '%s':\n%s", path, s);
+                                warn("updating lock file '%s':\n%s", *outputLockFilePath, s);
                         } else
-                            warn("creating lock file '%s'", path);
+                            warn("creating lock file '%s'", *outputLockFilePath);
 
-                        newLockFile.write(path);
+                        newLockFile.write(*outputLockFilePath);
 
                         std::optional<std::string> commitMessage = std::nullopt;
                         if (lockFlags.commitLockFile) {
+                            if (lockFlags.outputLockFilePath) {
+                                throw Error("--commit-lock-file and --output-lock-file are currently incompatible");
+                            }
                             std::string cm;
 
                             cm = fetchSettings.commitLockFileSummary.get();

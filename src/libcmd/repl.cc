@@ -252,7 +252,9 @@ void NixRepl::mainLoop()
     el_hist_size = 1000;
 #endif
     read_history(historyFile.c_str());
+    auto oldRepl = curRepl;
     curRepl = this;
+    Finally restoreRepl([&] { curRepl = oldRepl; });
 #ifndef READLINE
     rl_set_complete_func(completionCallback);
     rl_set_list_possib_func(listPossibleCallback);
@@ -1024,6 +1026,8 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         str << v.fpoint;
         break;
 
+    case nThunk:
+    case nExternal:
     default:
         str << ANSI_RED "«unknown»" ANSI_NORMAL;
         break;

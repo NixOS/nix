@@ -236,8 +236,6 @@ nlohmann::json Args::toJSON()
     auto flags = nlohmann::json::object();
 
     for (auto & [name, flag] : longFlags) {
-        /* Skip experimental flags when listing flags. */
-        if (!experimentalFeatureSettings.isEnabled(flag->experimentalFeature)) continue;
         auto j = nlohmann::json::object();
         if (flag->aliases.count(name)) continue;
         if (flag->shortName)
@@ -249,6 +247,11 @@ nlohmann::json Args::toJSON()
             j["arity"] = flag->handler.arity;
         if (!flag->labels.empty())
             j["labels"] = flag->labels;
+        // TODO With C++23 use `std::optional::tranform`
+        if (auto & xp = flag->experimentalFeature)
+            j["experimental-feature"] = showExperimentalFeature(*xp);
+        else
+            j["experimental-feature"] = nullptr;
         flags[name] = std::move(j);
     }
 
@@ -345,6 +348,11 @@ Strings argvToStrings(int argc, char * * argv)
     return args;
 }
 
+std::optional<ExperimentalFeature> Command::experimentalFeature ()
+{
+    return { Xp::NixCommand };
+}
+
 MultiCommand::MultiCommand(const Commands & commands_)
     : commands(commands_)
 {
@@ -408,6 +416,11 @@ nlohmann::json MultiCommand::toJSON()
         cat["id"] = command->category();
         cat["description"] = trim(categories[command->category()]);
         j["category"] = std::move(cat);
+        // TODO With C++23 use `std::optional::tranform`
+        if (auto xp = command->experimentalFeature())
+            cat["experimental-feature"] = showExperimentalFeature(*xp);
+        else
+            cat["experimental-feature"] = nullptr;
         cmds[name] = std::move(j);
     }
 

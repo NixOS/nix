@@ -53,6 +53,7 @@ struct BuildResult
                 case LogLimitExceeded: return "LogLimitExceeded";
                 case NotDeterministic: return "NotDeterministic";
                 case ResolvesToAlreadyValid: return "ResolvesToAlreadyValid";
+                case NoSubstituters: return "NoSubstituters";
                 default: return "Unknown";
             };
         }();

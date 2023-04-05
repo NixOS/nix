@@ -23,6 +23,7 @@ Maintainers: tick if completed or explain if not relevant
    - unit tests - `src/*/tests`
    - integration tests - `tests/nixos/*`
  - [ ] documentation in the manual
+ - [ ] documentation in the internal API docs
  - [ ] code and comments are self-explanatory
  - [ ] commit message explains why the change was made
  - [ ] new feature or incompatible change: updated release notes
