@@ -73,10 +73,9 @@
   - [binary cache]{#gloss-binary-cache}\
     A *binary cache* is a Nix store which uses a different format: its
     metadata and signatures are kept in `.narinfo` files rather than in a
-    Nix database.  This different format simplifies serving store objects
-    over the network, but cannot host builds.  Examples of binary caches
-    include S3 buckets and the [NixOS binary
-    cache](https://cache.nixos.org).
+    [Nix database]. This different format simplifies serving store objects
+    over the network, but cannot host builds. Examples of binary caches
+    include S3 buckets and the [NixOS binary cache](https://cache.nixos.org).
 
   - [store path]{#gloss-store-path}\
     The location of a [store object] in the file system, i.e., an
@@ -109,7 +108,7 @@
     [fixed-output derivations](#gloss-fixed-output-derivation).
 
   - [substitute]{#gloss-substitute}\
-    A substitute is a command invocation stored in the Nix database that
+    A substitute is a command invocation stored in the [Nix database] that
     describes how to build a store object, bypassing the normal build
     mechanism (i.e., derivations). Typically, the substitute builds the
     store object by downloading a pre-built version of the store object
@@ -127,6 +126,14 @@
     the same output. This cannot be guaranteed in general (e.g., a
     builder can rely on external inputs such as the network or the
     system time) but the Nix model assumes it.
+
+  - Nix database{#gloss-nix-database}\
+    An SQlite database to track [reference]s between [store object]s.
+    This is an implementation detail of the [local store].
+
+    Default location: `/nix/var/nix/db`.
+
+    [Nix database]: #gloss-nix-database
 
   - [Nix expression]{#gloss-nix-expression}\
     A high-level description of software packages and compositions
@@ -178,7 +185,7 @@
 
     For a [local store], this means:
     - The store path leads to an existing [store object] in that [store].
-    - The store path is listed in the Nix database as being valid.
+    - The store path is listed in the [Nix database] as being valid.
     - All paths in the store path's [closure] are valid.
 
     [validity]: #gloss-validity
