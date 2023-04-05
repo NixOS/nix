@@ -41,6 +41,7 @@
 
 namespace nix {
 
+struct Value;
 
 typedef enum {
     lvlError = 0,
@@ -130,6 +131,18 @@ protected:
 
 public:
     unsigned int status = 1; // exit status
+
+    /* `validThunk` signals that the Value at this optional address contains a
+       valid thunk. We generally can not assume a the return value to be valid
+       in case of an exception, but by making this explicit, we can preserve
+       partially evaluated expressions, which is crucial for performance if we
+       want to retry later.
+
+       For example, `forceValue()` has a `catch` clause that prevents garbage
+       from ending up in the value. If `validThunk` does not match the address
+       of the value in `forceValue()`, the value will be reset to the original
+       thunk. Similar logic exists elsewhere, including `callFunction`. */
+    mutable Value * validThunk = nullptr;
 
     BaseError(const BaseError &) = default;
 
