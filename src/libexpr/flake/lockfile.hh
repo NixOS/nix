@@ -67,6 +67,9 @@ struct LockFile
     std::optional<FlakeRef> isUnlocked() const;
 
     bool operator ==(const LockFile & other) const;
+    // Needed for old gcc versions that don't syntethise it (like gcc 8.2.2
+    // that is still the default on aarch64-linux)
+    bool operator !=(const LockFile & other) const;
 
     std::shared_ptr<Node> findInput(const InputPath & path);
 
