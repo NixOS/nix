@@ -88,7 +88,7 @@
     system time) but the Nix model assumes it.
     
   - Nix database{#gloss-nix-database}\
-    An SQlite database to track references between store objects.
+    An SQlite database to track references between store objects in a [local store][store].
     Default location: `/nix/var/nix/db`.
     about the Nix store such as hashes and references.
 
