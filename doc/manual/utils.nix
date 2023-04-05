@@ -74,10 +74,10 @@ rec {
           if aliases == [] then "" else
             "**Deprecated alias:** ${(concatStringsSep ", " (map (s: "`${s}`") aliases))}";
 
-      indent = prefix: s:
-        concatStringsSep "\n" (map (x: if x == "" then x else "${prefix}${x}") (splitLines s));
-
     in result;
+
+  indent = prefix: s:
+    concatStringsSep "\n" (map (x: if x == "" then x else "${prefix}${x}") (splitLines s));
 
   showSettings = args: settingsInfo: concatStrings (attrValues (mapAttrs (showSetting args) settingsInfo));
 }

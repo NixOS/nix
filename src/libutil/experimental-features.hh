@@ -51,11 +51,9 @@ std::string_view showExperimentalFeature(const ExperimentalFeature);
 /**
  * Compute the documentation of all experimental features.
  *
- * This a markdown bulleted list where each item is first (a) the
- * experimental feature flag name in backticks, and then (b) the
- * description of the experimental feature.
+ * See `doc/manual` for how this information is used.
  */
-std::string getExperimentalFeaturesList();
+nlohmann::json documentExperimentalFeatures();
 
 /**
  * Shorthand for `str << showExperimentalFeature(feature)`.

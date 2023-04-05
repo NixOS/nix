@@ -140,32 +140,12 @@ std::string_view showExperimentalFeature(const ExperimentalFeature tag)
     return xpFeatureDetails[(size_t)tag].name;
 }
 
-std::string getExperimentalFeaturesList() {
-    std::string experimentalFeaturesList = R"(
-        Experimental features that can be enabled.
-        
-        Example:
-        
-        ```
-        experimental-features = nix-command flakes
-        
-        Experimental features available:
-
-)";
-
-    for (auto & xpFeature : xpFeatureDetails) {
-        experimentalFeaturesList += std::string {}
-            /* length of this first string must be 12, matching the indent of
-               the descriptions in the xpFeatureDetails literal. FIXME compute
-               markdown in a less hacky way. */
-            + "          - "
-            + "`" + xpFeature.name + "`"
-            + "\n"
-            + xpFeature.description
-            + "\n\n";
-    }
-
-    return experimentalFeaturesList;
+nlohmann::json documentExperimentalFeatures() {
+    StringMap res;
+    for (auto & xpFeature : xpFeatureDetails)
+        res[std::string { xpFeature.name }] =
+            trim(stripIndentation(xpFeature.description));
+    return (nlohmann::json) res;
 }
 
 std::set<ExperimentalFeature> parseFeatures(const std::set<std::string> & rawFeatures)

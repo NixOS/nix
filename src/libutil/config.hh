@@ -371,8 +371,21 @@ extern GlobalConfig globalConfig;
 
 struct ExperimentalFeatureSettings : Config {
 
-    Setting<std::set<ExperimentalFeature>> experimentalFeatures{this, {}, "experimental-features",
-        getExperimentalFeaturesList()};
+    Setting<std::set<ExperimentalFeature>> experimentalFeatures{
+        this, {}, "experimental-features",
+        R"(
+          Experimental features that are enabled.
+
+          Example:
+
+          ```
+          experimental-features = nix-command flakes
+          ```
+
+          Experimental features available:
+
+          {{#include experimental-features.md}}
+        )"};
 
     /**
      * Check whether the given experimental feature is enabled.
