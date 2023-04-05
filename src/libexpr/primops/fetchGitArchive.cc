@@ -1,14 +1,17 @@
 #include "primops.hh"
 #include "store-api.hh"
 #include "cache.hh"
+#include "tarfile.hh"
+#include "archive.hh"
+
 
 namespace nix {
 
 static void prim_fetchGitArchive(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     std::optional<Hash> expectedHash;
-    std::string name = "source.tar.gz";
-    std::string remote = "";
+    std::optional<std::string> remote;
+    std::string name = "source";
     std::string format = "tar.gz";
     std::string version = "HEAD";
 
@@ -20,7 +23,7 @@ static void prim_fetchGitArchive(EvalState & state, const PosIdx pos, Value * * 
         else if (n == "sha256")
             expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the sha256 of the git archive we should fetch"), htSHA256);
         else if (n == "remote")
-            remote = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the remote of the git archive we should fetch");
+            remote.emplace(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the remote of the git archive we should fetch"));
         else if (n == "format")
             format = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the format of the git archive we should fetch");
         else if (n == "version")
@@ -32,6 +35,12 @@ static void prim_fetchGitArchive(EvalState & state, const PosIdx pos, Value * * 
             }));
     }
 
+    if (!remote) {
+        state.debugThrowLastTrace(EvalError({
+            .msg = hintfmt("missing required argument 'remote' to 'fetchGitArchive'"),
+            .errPos = state.positions[pos]
+        }));
+    }
     if (evalSettings.pureEval && !expectedHash) {
         state.debugThrowLastTrace(EvalError({
             .msg = hintfmt("in pure evaluation mode, 'fetchGitArchive' requires a 'sha256' argument"),
@@ -49,7 +58,7 @@ static void prim_fetchGitArchive(EvalState & state, const PosIdx pos, Value * * 
     auto inAttrs = fetchers::Attrs({
         {"type", "git-archive"},
         {"name", name},
-        {"remote", remote},
+        {"remote", *remote},
         {"version", version},
         {"format", format}
     });
@@ -61,38 +70,43 @@ static void prim_fetchGitArchive(EvalState & state, const PosIdx pos, Value * * 
         return;
     }
 
-    // Run `git archive`
     auto [errorCode, programOutput] = runProgram(RunOptions {
         .program = "git",
-        .args = {"archive", "--format=" + format, "--remote=" + remote, version},
+        .args = {"archive", "--format=" + format, "--remote=" + *remote, version},
         .mergeStderrToStdout = true
     });
     if (errorCode) {
         state.debugThrowLastTrace(EvalError({
-            .msg = hintfmt(programOutput),
+            .msg = hintfmt("git archive failed with exit code %i:\n" + programOutput, errorCode),
             .errPos = state.positions[pos]
         }));
     }
 
-    // Add archive to nix store
-    auto hash = expectedHash ? expectedHash.value() : hashString(htSHA256, programOutput);
-    auto storePath = state.store->makeFixedOutputPath(FileIngestionMethod::Flat, hash, name);
+    auto tarSource = StringSource(programOutput);
+    auto tmpDir = createTempDir();
+    AutoDelete(tmpDir, true);
+    unpackTarfile(tarSource, tmpDir);
 
-    StringSink narSink;
-    narSink << "nix-archive-1" << "(" << "type" << "regular" << "contents" << programOutput << ")";
-    auto narSource = StringSource(narSink.s);
-    auto narHash = hashString(htSHA256, narSink.s);
-    auto narSize = narSink.s.size();
-
-    auto info = ValidPathInfo { storePath, narHash };
-    info.narSize = narSize;
-    info.ca = FixedOutputHash { FileIngestionMethod::Flat, hash };
-
-    state.store->addToStore(info, narSource, NoRepair, NoCheckSigs);
+    PathFilter filter = [](const Path &) { return true; };
+    auto storePath = state.store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
+    if (expectedHash) {
+        auto narHash = state.store->queryPathInfo(storePath)->narHash;
+        if (narHash != *expectedHash) {
+            state.debugThrowLastTrace(EvalError({
+                .msg = hintfmt(
+                    "hash mismatch in git archive downloaded from (remote) :\n  specified: %s\n  got:       %s",
+                    expectedHash->to_string(Base32, true),
+                    narHash.to_string(Base32, true)
+                ),
+                .errPos = state.positions[pos]
+            }));
+        }
+    }
     state.allowAndSetStorePathString(storePath, v);
 
+    auto infoAttrs = fetchers::Attrs({});
     bool locked = (bool) expectedHash;
-    fetchers::getCache()->add(state.store, inAttrs, {}, storePath, locked);
+    fetchers::getCache()->add(state.store, inAttrs, infoAttrs, storePath, locked);
 }
 
 static RegisterPrimOp primop_fetchGitArchive({
