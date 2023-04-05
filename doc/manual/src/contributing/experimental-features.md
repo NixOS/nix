@@ -3,7 +3,7 @@ This section describes the notion of *experimental features*, and how it fits in
 # What are experimental features?
 
 Experimental features are considered unstable, which means that they can be changed or removed at any time.
-Users must explicitly enable them by toggling the associated [experimental feature flags](@docroot@/command-ref/nix-conf.md#conf-experimental-features).
+Users must explicitly enable them by toggling the associated [experimental feature flags](@docroot@/command-ref/conf-file.md#conf-experimental-features).
 This allows accessing unstable functionality without unwittingly relying on it.
 
 Experimental feature flags were first introduced in [Nix 2.4](@docroot@/release-notes/rl-2.4.md).
