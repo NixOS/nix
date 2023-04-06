@@ -54,8 +54,6 @@ struct NixRepl
     , gc
     #endif
 {
-    std::string curDir;
-
     size_t debugTraceIndex;
 
     Strings loadedFiles;
@@ -113,7 +111,6 @@ NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store, ref<EvalStat
     , staticEnv(new StaticEnv(false, state->staticBaseEnv.get()))
     , historyFile(getDataDir() + "/nix/repl-history")
 {
-    curDir = absPath(".");
 }
 
 
@@ -590,7 +587,7 @@ bool NixRepl::processLine(std::string line)
         Value v;
         evalString(arg, v);
 
-        const auto [path, line] = [&] () -> std::pair<Path, uint32_t> {
+        const auto [path, line] = [&] () -> std::pair<SourcePath, uint32_t> {
             if (v.type() == nPath || v.type() == nString) {
                 PathSet context;
                 auto path = state->coerceToPath(noPos, v, context, "while evaluating the filename to edit");
@@ -598,7 +595,7 @@ bool NixRepl::processLine(std::string line)
             } else if (v.isLambda()) {
                 auto pos = state->positions[v.lambda.fun->pos];
                 if (auto path = std::get_if<Path>(&pos.origin))
-                    return {*path, pos.line};
+                    return {SourcePath(CanonPath(*path)), pos.line};
                 else
                     throw Error("'%s' cannot be shown in an editor", pos);
             } else {
@@ -872,8 +869,7 @@ void NixRepl::addVarToScope(const Symbol name, Value & v)
 
 Expr * NixRepl::parseString(std::string s)
 {
-    Expr * e = state->parseExprFromString(std::move(s), curDir, staticEnv);
-    return e;
+    return state->parseExprFromString(std::move(s), state->rootPath(CanonPath::fromCwd()), staticEnv);
 }
 
 
@@ -930,7 +926,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     case nPath:
-        str << ANSI_GREEN << v.path << ANSI_NORMAL; // !!! escaping?
+        str << ANSI_GREEN << v.path().to_string() << ANSI_NORMAL; // !!! escaping?
         break;
 
     case nNull:

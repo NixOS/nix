@@ -106,7 +106,7 @@ std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::strin
 }
 
 
-std::pair<std::string, uint32_t> findPackageFilename(EvalState & state, Value & v, std::string what)
+std::pair<SourcePath, uint32_t> findPackageFilename(EvalState & state, Value & v, std::string what)
 {
     Value * v2;
     try {
@@ -118,21 +118,25 @@ std::pair<std::string, uint32_t> findPackageFilename(EvalState & state, Value & 
 
     // FIXME: is it possible to extract the Pos object instead of doing this
     //        toString + parsing?
-    auto pos = state.forceString(*v2, noPos, "while evaluating the 'meta.position' attribute of a derivation");
+    PathSet context;
+    auto path = state.coerceToPath(noPos, *v2, context, "while evaluating the 'meta.position' attribute of a derivation");
 
-    auto colon = pos.rfind(':');
-    if (colon == std::string::npos)
-        throw ParseError("cannot parse meta.position attribute '%s'", pos);
+    auto fn = path.path.abs();
 
-    std::string filename(pos, 0, colon);
-    unsigned int lineno;
+    auto fail = [fn]() {
+        throw ParseError("cannot parse 'meta.position' attribute '%s'", fn);
+    };
+
     try {
-        lineno = std::stoi(std::string(pos, colon + 1, std::string::npos));
+        auto colon = fn.rfind(':');
+        if (colon == std::string::npos) fail();
+        std::string filename(fn, 0, colon);
+        auto lineno = std::stoi(std::string(fn, colon + 1, std::string::npos));
+        return {CanonPath(fn.substr(0, colon)), lineno};
     } catch (std::invalid_argument & e) {
-        throw ParseError("cannot parse line number '%s'", pos);
+        fail();
+        abort();
     }
-
-    return { std::move(filename), lineno };
 }
 
 

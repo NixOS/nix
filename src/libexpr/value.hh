@@ -5,6 +5,7 @@
 
 #include "symbol-table.hh"
 #include "value/context.hh"
+#include "input-accessor.hh"
 
 #if HAVE_BOEHMGC
 #include <gc/gc_allocator.h>
@@ -171,7 +172,7 @@ public:
             const char * * context; // must be in sorted order
         } string;
 
-        const char * path;
+        const char * _path;
         Bindings * attrs;
         struct {
             size_t size;
@@ -251,14 +252,19 @@ public:
 
     void mkStringMove(const char * s, const PathSet & context);
 
-    inline void mkPath(const char * s)
+    inline void mkString(const Symbol & s)
+    {
+        mkString(((const std::string &) s).c_str());
+    }
+
+    void mkPath(const SourcePath & path);
+
+    inline void mkPath(const char * path)
     {
         clearValue();
         internalType = tPath;
-        path = s;
+        _path = path;
     }
-
-    void mkPath(std::string_view s);
 
     inline void mkNull()
     {
@@ -399,6 +405,18 @@ public:
         assert(isList());
         auto begin = listElems();
         return ConstListIterable { begin, begin + listSize() };
+    }
+
+    SourcePath path() const
+    {
+        assert(internalType == tPath);
+        return SourcePath{CanonPath(_path)};
+    }
+
+    std::string_view str() const
+    {
+        assert(internalType == tString);
+        return std::string_view(string.s);
     }
 };
 
