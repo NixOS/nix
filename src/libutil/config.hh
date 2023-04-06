@@ -385,6 +385,8 @@ struct ExperimentalFeatureSettings : Config {
           Experimental features available:
 
           {{#include experimental-features.md}}
+
+          Experimental features are [further documented](@docroot@/contributing/experimental-features.md) in the contribution guide.
         )"};
 
     /**
