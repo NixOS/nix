@@ -700,7 +700,7 @@ Expr * EvalState::parseExprFromFile(const SourcePath & path, std::shared_ptr<Sta
     auto buffer = path.readFile();
     // readFile hopefully have left some extra space for terminators
     buffer.append("\0\0", 2);
-    return parse(buffer.data(), buffer.size(), path.path.abs(), path.parent(), staticEnv);
+    return parse(buffer.data(), buffer.size(), Pos::Origin(path), path.parent(), staticEnv);
 }
 
 

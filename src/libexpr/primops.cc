@@ -4136,7 +4136,6 @@ void EvalState::createBaseEnv()
 
     /* Add a wrapper around the derivation primop that computes the
        `drvPath' and `outPath' attributes lazily. */
-    sDerivationNix = symbols.create(derivationNixPath);
     auto vDerivation = allocValue();
     addConstant("derivation", vDerivation);
 
@@ -4153,7 +4152,7 @@ void EvalState::createBaseEnv()
         // the parser needs two NUL bytes as terminators; one of them
         // is implied by being a C string.
         "\0";
-    eval(parse(code, sizeof(code), derivationNixPath, {CanonPath::root}, staticBaseEnv), *vDerivation);
+    eval(parse(code, sizeof(code), derivationInternal, {CanonPath::root}, staticBaseEnv), *vDerivation);
 }
 
 

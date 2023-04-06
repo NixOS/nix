@@ -32,7 +32,7 @@ struct Pos
     struct Stdin { ref<std::string> source; };
     struct String { ref<std::string> source; };
 
-    typedef std::variant<none_tag, Stdin, String, Path> Origin;
+    typedef std::variant<none_tag, Stdin, String, SourcePath> Origin;
 
     Origin origin;
 

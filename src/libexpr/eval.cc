@@ -499,6 +499,7 @@ EvalState::EvalState(
     , sOutputSpecified(symbols.create("outputSpecified"))
     , repair(NoRepair)
     , emptyBindings(0)
+    , derivationInternal(rootPath(CanonPath("/builtin/derivation.nix")))
     , store(store)
     , buildStore(buildStore ? buildStore : store)
     , debugRepl(nullptr)
@@ -991,9 +992,9 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 void EvalState::mkPos(Value & v, PosIdx p)
 {
     auto pos = positions[p];
-    if (auto path = std::get_if<Path>(&pos.origin)) {
+    if (auto path = std::get_if<SourcePath>(&pos.origin)) {
         auto attrs = buildBindings(3);
-        attrs.alloc(sFile).mkString(*path);
+        attrs.alloc(sFile).mkString(path->path.abs());
         attrs.alloc(sLine).mkInt(pos.line);
         attrs.alloc(sColumn).mkInt(pos.column);
         v.mkAttrs(attrs);
@@ -1373,8 +1374,8 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     } catch (Error & e) {
         if (pos2) {
             auto pos2r = state.positions[pos2];
-            auto origin = std::get_if<Path>(&pos2r.origin);
-            if (!(origin && *origin == state.derivationNixPath))
+            auto origin = std::get_if<SourcePath>(&pos2r.origin);
+            if (!(origin && *origin == state.derivationInternal))
                 state.addErrorTrace(e, pos2, "while evaluating the attribute '%1%'",
                     showAttrPath(state, env, attrPath));
         }
@@ -2417,8 +2418,8 @@ void EvalState::printStats()
                     else
                         obj["name"] = nullptr;
                     if (auto pos = positions[fun->pos]) {
-                        if (auto path = std::get_if<Path>(&pos.origin))
-                            obj["file"] = *path;
+                        if (auto path = std::get_if<SourcePath>(&pos.origin))
+                            obj["file"] = path->to_string();
                         obj["line"] = pos.line;
                         obj["column"] = pos.column;
                     }
@@ -2432,8 +2433,8 @@ void EvalState::printStats()
                 for (auto & i : attrSelects) {
                     json obj = json::object();
                     if (auto pos = positions[i.first]) {
-                        if (auto path = std::get_if<Path>(&pos.origin))
-                            obj["file"] = *path;
+                        if (auto path = std::get_if<SourcePath>(&pos.origin))
+                            obj["file"] = path->to_string();
                         obj["line"] = pos.line;
                         obj["column"] = pos.column;
                     }

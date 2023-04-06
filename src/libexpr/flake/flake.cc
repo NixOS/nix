@@ -220,7 +220,7 @@ static Flake getFlake(
     Value vInfo;
     state.evalFile(CanonPath(flakeFile), vInfo, true); // FIXME: symlink attack
 
-    expectType(state, nAttrs, vInfo, state.positions.add({flakeFile}, 1, 1));
+    expectType(state, nAttrs, vInfo, state.positions.add({CanonPath(flakeFile)}, 1, 1));
 
     if (auto description = vInfo.attrs->get(state.sDescription)) {
         expectType(state, nString, *description->value, description->pos);
