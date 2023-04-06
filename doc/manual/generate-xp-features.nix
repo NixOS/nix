@@ -1,11 +1,21 @@
+xps:
+
 with builtins;
 with import ./utils.nix;
 
 let
-  showExperimentalFeature = name: doc:
-    squash ''
-      - <span id="xp-feature-${name}">[`${name}`](#xp-feature-${name})</span>
+  makePage = { name, value }:
+    {
+      name = "${name}.md";
+      inherit value;
+      feature = name;
+    };
 
-      ${indent "  " doc}
-    '';
-in xps: indent "  " (concatStringsSep "\n" (attrValues (mapAttrs showExperimentalFeature xps)))
+  featurePages = map makePage (attrsToList xps);
+
+  tableOfContents = let
+    showEntry = page:
+      "    - [${page.feature}](contributing/experimental-features/${page.name})";
+    in concatStringsSep "\n" (map showEntry featurePages) + "\n";
+
+in (listToAttrs featurePages) // { "SUMMARY.md" = tableOfContents; }

@@ -5,6 +5,9 @@ rec {
 
   concatStrings = concatStringsSep "";
 
+  attrsToList = a:
+    map (name: { inherit name; value = a.${name}; }) (builtins.attrNames a);
+
   replaceStringsRec = from: to: string:
     # recursively replace occurrences of `from` with `to` within `string`
     # example:

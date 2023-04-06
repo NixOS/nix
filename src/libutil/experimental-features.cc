@@ -57,7 +57,7 @@ constexpr std::array<ExperimentalFeatureDetails, 11> xpFeatureDetails = {{
         .name = "flakes",
         .description = R"(
             Enable flakes. See the manual entry for [`nix
-            flake`](../command-ref/new-cli/nix3-flake.md) for details.
+            flake`](@docroot@/command-ref/new-cli/nix3-flake.md) for details.
         )",
     },
     {
