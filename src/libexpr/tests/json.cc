@@ -62,7 +62,7 @@ namespace nix {
     // not supported by store 'dummy'" thrown in the test body.
     TEST_F(JSONValueTest, DISABLED_Path) {
         Value v;
-        v.mkPath(state.rootPath("/test"));
+        v.mkPath(state.rootPath(CanonPath("/test")));
         ASSERT_EQ(getJSONValue(v), "\"/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x\"");
     }
 } /* namespace nix */
