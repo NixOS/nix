@@ -136,7 +136,7 @@ constexpr std::array<ExperimentalFeatureDetails, 11> xpFeatureDetails = {{
 
             at «string»:1:1:
 
-            1| http://bar
+            1| http://foo
              | ^
 
             ```
