@@ -2521,11 +2521,15 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                     /* Throw an error after registering the path as
                        valid. */
                     worker.hashMismatch = true;
-                    delayedException = std::make_exception_ptr(
+                    auto buildError =
                         BuildError("hash mismatch in fixed-output derivation '%s':\n  specified: %s\n     got:    %s",
                             worker.store.printStorePath(drvPath),
                             wanted.to_string(SRI, true),
-                            got.to_string(SRI, true)));
+                            got.to_string(SRI, true));
+                    std::stringstream oss;
+                    showErrorInfo(oss, buildError.info(), false);
+                    (*logSink)(oss.view());
+                    delayedException = std::make_exception_ptr(std::move(buildError));
                 }
                 return newInfo0;
             },
