@@ -95,6 +95,7 @@
 - [Glossary](glossary.md)
 - [Contributing](contributing/contributing.md)
   - [Hacking](contributing/hacking.md)
+  - [Experimental Features](contributing/experimental-features.md)
   - [CLI guideline](contributing/cli-guideline.md)
 - [Release Notes](release-notes/release-notes.md)
   - [Release X.Y (202?-??-??)](release-notes/rl-next.md)
