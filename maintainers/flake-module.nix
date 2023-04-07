@@ -372,6 +372,15 @@
         "tests/nixos/setuid.nix"
         "tests/nixos/sourcehut-flakes.nix"
         "tests/plugins/plugintest.cc"
+
+        # We still haven't applied formatting to pre-existing files yet
+        "src/libcmd/installable-value.cc"
+        "src/libstore/ssh-store-config.hh"
+        "src/nix/derivation-add.cc"
+        "src/nix/derivation-add.cc"
+        "src/nix/derivation-show.cc"
+        "src/nix/derivation.cc"
+        "tests/nixos/nix-copy.nix"
       ];
     };
 
