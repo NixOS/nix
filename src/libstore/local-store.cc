@@ -710,62 +710,6 @@ void canonicalisePathMetaData(const Path & path,
     canonicalisePathMetaData(path, uidRange, inodesSeen);
 }
 
-
-void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivation & drv)
-{
-    assert(drvPath.isDerivation());
-    std::string drvName(drvPath.name());
-    drvName = drvName.substr(0, drvName.size() - drvExtension.size());
-
-    auto envHasRightPath = [&](const StorePath & actual, const std::string & varName)
-    {
-        auto j = drv.env.find(varName);
-        if (j == drv.env.end() || parseStorePath(j->second) != actual)
-            throw Error("derivation '%s' has incorrect environment variable '%s', should be '%s'",
-                printStorePath(drvPath), varName, printStorePath(actual));
-    };
-
-
-    // Don't need the answer, but do this anyways to assert is proper
-    // combination. The code below is more general and naturally allows
-    // combinations that are currently prohibited.
-    drv.type();
-
-    std::optional<DrvHash> hashesModulo;
-    for (auto & i : drv.outputs) {
-        std::visit(overloaded {
-            [&](const DerivationOutput::InputAddressed & doia) {
-                if (!hashesModulo) {
-                    // somewhat expensive so we do lazily
-                    hashesModulo = hashDerivationModulo(*this, drv, true);
-                }
-                auto currentOutputHash = get(hashesModulo->hashes, i.first);
-                if (!currentOutputHash)
-                    throw Error("derivation '%s' has unexpected output '%s' (local-store / hashesModulo) named '%s'",
-                        printStorePath(drvPath), printStorePath(doia.path), i.first);
-                StorePath recomputed = makeOutputPath(i.first, *currentOutputHash, drvName);
-                if (doia.path != recomputed)
-                    throw Error("derivation '%s' has incorrect output '%s', should be '%s'",
-                        printStorePath(drvPath), printStorePath(doia.path), printStorePath(recomputed));
-                envHasRightPath(doia.path, i.first);
-            },
-            [&](const DerivationOutput::CAFixed & dof) {
-                StorePath path = makeFixedOutputPath(dof.hash.method, dof.hash.hash, drvName);
-                envHasRightPath(path, i.first);
-            },
-            [&](const DerivationOutput::CAFloating &) {
-                /* Nothing to check */
-            },
-            [&](const DerivationOutput::Deferred &) {
-                /* Nothing to check */
-            },
-            [&](const DerivationOutput::Impure &) {
-                /* Nothing to check */
-            },
-        }, i.second.raw());
-    }
-}
-
 void LocalStore::registerDrvOutput(const Realisation & info, CheckSigsFlag checkSigs)
 {
     experimentalFeatureSettings.require(Xp::CaDerivations);
@@ -876,7 +820,7 @@ uint64_t LocalStore::addValidPath(State & state,
            derivations).  Note that if this throws an error, then the
            DB transaction is rolled back, so the path validity
            registration above is undone. */
-        if (checkOutputs) checkDerivationOutputs(info.path, drv);
+        if (checkOutputs) drv.checkInvariants(*this, info.path);
 
         for (auto & i : drv.outputsAndOptPaths(*this)) {
             /* Floating CA derivations have indeterminate output paths until
@@ -1175,8 +1119,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         for (auto & [_, i] : infos)
             if (i.path.isDerivation()) {
                 // FIXME: inefficient; we already loaded the derivation in addValidPath().
-                checkDerivationOutputs(i.path,
-                    readInvalidDerivation(i.path));
+                readInvalidDerivation(i.path).checkInvariants(*this, i.path);
             }
 
         /* Do a topological sort of the paths.  This will throw an

@@ -270,8 +270,6 @@ private:
 
     std::pair<Path, AutoCloseFD> createTempDirInStore();
 
-    void checkDerivationOutputs(const StorePath & drvPath, const Derivation & drv);
-
     typedef std::unordered_set<ino_t> InodeHash;
 
     InodeHash loadInodeHash();

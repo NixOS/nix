@@ -15,7 +15,7 @@
 
     Example: `/nix/store/g946hcz4c8mdvq2g8vxx42z51qb71rvp-git-2.38.1.drv`
 
-    See [`nix show-derivation`](./command-ref/new-cli/nix3-show-derivation.md) (experimental) for displaying the contents of store derivations.
+    See [`nix derivation show`](./command-ref/new-cli/nix3-derivation-show.md) (experimental) for displaying the contents of store derivations.
 
     [store derivation]: #gloss-store-derivation
 

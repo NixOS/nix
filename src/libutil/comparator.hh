@@ -17,12 +17,12 @@
  * }
  * ```
  */
-#define GENERATE_ONE_CMP(COMPARATOR, MY_TYPE, FIELDS...) \
+#define GENERATE_ONE_CMP(COMPARATOR, MY_TYPE, ...) \
     bool operator COMPARATOR(const MY_TYPE& other) const { \
-      const MY_TYPE* me = this; \
-      auto fields1 = std::make_tuple( FIELDS ); \
-      me = &other; \
-      auto fields2 = std::make_tuple( FIELDS ); \
+      __VA_OPT__(const MY_TYPE* me = this;) \
+      auto fields1 = std::make_tuple( __VA_ARGS__ ); \
+      __VA_OPT__(me = &other;) \
+      auto fields2 = std::make_tuple( __VA_ARGS__ ); \
       return fields1 COMPARATOR fields2; \
     }
 #define GENERATE_EQUAL(args...) GENERATE_ONE_CMP(==, args)
