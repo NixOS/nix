@@ -20,7 +20,7 @@ void BufferedSink::operator () (std::string_view data)
            buffer size. */
         if (bufPos + data.size() >= bufSize) {
             flush();
-            write(data);
+            writeUnbuffered(data);
             break;
         }
         /* Otherwise, copy the bytes to the buffer.  Flush the buffer
@@ -38,7 +38,7 @@ void BufferedSink::flush()
     if (bufPos == 0) return;
     size_t n = bufPos;
     bufPos = 0; // don't trigger the assert() in ~BufferedSink()
-    write({buffer.get(), n});
+    writeUnbuffered({buffer.get(), n});
 }
 
 
@@ -48,7 +48,7 @@ FdSink::~FdSink()
 }
 
 
-void FdSink::write(std::string_view data)
+void FdSink::writeUnbuffered(std::string_view data)
 {
     written += data.size();
     try {
