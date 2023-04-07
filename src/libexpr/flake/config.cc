@@ -1,5 +1,6 @@
 #include "flake.hh"
 #include "globals.hh"
+#include "fetch-settings.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -30,7 +31,7 @@ static void writeTrustedList(const TrustedList & trustedList)
 
 void ConfigFile::apply()
 {
-    std::set<std::string> whitelist{"bash-prompt", "bash-prompt-suffix", "flake-registry"};
+    std::set<std::string> whitelist{"bash-prompt", "bash-prompt-prefix", "bash-prompt-suffix", "flake-registry"};
 
     for (auto & [name, value] : settings) {
 
@@ -49,15 +50,13 @@ void ConfigFile::apply()
         else
             assert(false);
 
-        if (!whitelist.count(baseName)) {
-            auto trustedList = readTrustedList();
-
+        if (!whitelist.count(baseName) && !nix::fetchSettings.acceptFlakeConfig) {
             bool trusted = false;
-            if (nix::settings.acceptFlakeConfig){
-                trusted = true;
-            } else if (auto saved = get(get(trustedList, name).value_or(std::map<std::string, bool>()), valueS)) {
+            auto trustedList = readTrustedList();
+            auto tlname = get(trustedList, name);
+            if (auto saved = tlname ? get(*tlname, valueS) : nullptr) {
                 trusted = *saved;
-                warn("Using saved setting for '%s = %s' from ~/.local/share/nix/trusted-settings.json.", name,valueS);
+                printInfo("Using saved setting for '%s = %s' from ~/.local/share/nix/trusted-settings.json.", name, valueS);
             } else {
                 // FIXME: filter ANSI escapes, newlines, \r, etc.
                 if (std::tolower(logger->ask(fmt("do you want to allow configuration setting '%s' to be set to '" ANSI_RED "%s" ANSI_NORMAL "' (y/N)?", name, valueS)).value_or('n')) == 'y') {
@@ -68,9 +67,8 @@ void ConfigFile::apply()
                     writeTrustedList(trustedList);
                 }
             }
-
             if (!trusted) {
-                warn("ignoring untrusted flake configuration setting '%s'", name);
+                warn("ignoring untrusted flake configuration setting '%s'.\nPass '%s' to trust it", name, "--accept-flake-config");
                 continue;
             }
         }

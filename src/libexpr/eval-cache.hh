@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "sync.hh"
 #include "hash.hh"
@@ -33,7 +34,7 @@ public:
         EvalState & state,
         RootLoader rootLoader);
 
-    std::shared_ptr<AttrCursor> getRoot();
+    ref<AttrCursor> getRoot();
 };
 
 enum AttrType {
@@ -44,15 +45,18 @@ enum AttrType {
     Misc = 4,
     Failed = 5,
     Bool = 6,
+    ListOfStrings = 7,
+    Int = 8,
 };
 
 struct placeholder_t {};
 struct missing_t {};
 struct misc_t {};
 struct failed_t {};
+struct int_t { NixInt x; };
 typedef uint64_t AttrId;
 typedef std::pair<AttrId, Symbol> AttrKey;
-typedef std::pair<std::string, std::vector<std::pair<Path, std::string>>> string_t;
+typedef std::pair<std::string, NixStringContext> string_t;
 
 typedef std::variant<
     std::vector<Symbol>,
@@ -61,7 +65,9 @@ typedef std::variant<
     missing_t,
     misc_t,
     failed_t,
-    bool
+    bool,
+    int_t,
+    std::vector<std::string>
     > AttrValue;
 
 class AttrCursor : public std::enable_shared_from_this<AttrCursor>
@@ -94,21 +100,29 @@ public:
 
     std::string getAttrPathStr(Symbol name) const;
 
+    Suggestions getSuggestionsForAttr(Symbol name);
+
     std::shared_ptr<AttrCursor> maybeGetAttr(Symbol name, bool forceErrors = false);
 
     std::shared_ptr<AttrCursor> maybeGetAttr(std::string_view name);
 
-    std::shared_ptr<AttrCursor> getAttr(Symbol name, bool forceErrors = false);
+    ref<AttrCursor> getAttr(Symbol name, bool forceErrors = false);
 
-    std::shared_ptr<AttrCursor> getAttr(std::string_view name);
+    ref<AttrCursor> getAttr(std::string_view name);
 
-    std::shared_ptr<AttrCursor> findAlongAttrPath(const std::vector<Symbol> & attrPath, bool force = false);
+    /* Get an attribute along a chain of attrsets. Note that this does
+       not auto-call functors or functions. */
+    OrSuggestions<ref<AttrCursor>> findAlongAttrPath(const std::vector<Symbol> & attrPath, bool force = false);
 
     std::string getString();
 
     string_t getStringWithContext();
 
     bool getBool();
+
+    NixInt getInt();
+
+    std::vector<std::string> getListOfStrings();
 
     std::vector<Symbol> getAttrs();
 

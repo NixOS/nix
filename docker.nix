@@ -2,8 +2,13 @@
 , lib ? pkgs.lib
 , name ? "nix"
 , tag ? "latest"
+, bundleNixpkgs ? true
 , channelName ? "nixpkgs"
 , channelURL ? "https://nixos.org/channels/nixpkgs-unstable"
+, extraPkgs ? []
+, maxLayers ? 100
+, nixConf ? {}
+, flake-registry ? null
 }:
 let
   defaultPkgs = with pkgs; [
@@ -22,15 +27,27 @@ let
     findutils
     iana-etc
     git
-  ];
+    openssh
+  ] ++ extraPkgs;
 
   users = {
 
     root = {
       uid = 0;
-      shell = "/bin/bash";
+      shell = "${pkgs.bashInteractive}/bin/bash";
       home = "/root";
       gid = 0;
+      groups = [ "root" ];
+      description = "System administrator";
+    };
+
+    nobody = {
+      uid = 65534;
+      shell = "${pkgs.shadow}/bin/nologin";
+      home = "/var/empty";
+      gid = 65534;
+      groups = [ "nobody" ];
+      description = "Unprivileged account (don't use!)";
     };
 
   } // lib.listToAttrs (
@@ -52,6 +69,7 @@ let
   groups = {
     root.gid = 0;
     nixbld.gid = 30000;
+    nobody.gid = 65534;
   };
 
   userToPasswd = (
@@ -120,20 +138,27 @@ let
       (lib.attrValues (lib.mapAttrs groupToGroup groups))
   );
 
-  nixConf = {
+  defaultNixConf = {
     sandbox = "false";
     build-users-group = "nixbld";
-    trusted-public-keys = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
+    trusted-public-keys = [ "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" ];
   };
-  nixConfContents = (lib.concatStringsSep "\n" (lib.mapAttrsFlatten (n: v: "${n} = ${v}") nixConf)) + "\n";
+
+  nixConfContents = (lib.concatStringsSep "\n" (lib.mapAttrsFlatten (n: v:
+    let
+      vStr = if builtins.isList v then lib.concatStringsSep " " v else v;
+    in
+      "${n} = ${vStr}") (defaultNixConf // nixConf))) + "\n";
 
   baseSystem =
     let
       nixpkgs = pkgs.path;
-      channel = pkgs.runCommand "channel-nixos" { } ''
+      channel = pkgs.runCommand "channel-nixos" { inherit bundleNixpkgs; } ''
         mkdir $out
-        ln -s ${nixpkgs} $out/nixpkgs
-        echo "[]" > $out/manifest.nix
+        if [ "$bundleNixpkgs" ]; then
+          ln -s ${nixpkgs} $out/nixpkgs
+          echo "[]" > $out/manifest.nix
+        fi
       '';
       rootEnv = pkgs.buildPackages.buildEnv {
         name = "root-profile-env";
@@ -223,12 +248,21 @@ let
       mkdir -p $out/bin $out/usr/bin
       ln -s ${pkgs.coreutils}/bin/env $out/usr/bin/env
       ln -s ${pkgs.bashInteractive}/bin/bash $out/bin/sh
-    '';
+
+    '' + (lib.optionalString (flake-registry != null) ''
+      nixCacheDir="/root/.cache/nix"
+      mkdir -p $out$nixCacheDir
+      globalFlakeRegistryPath="$nixCacheDir/flake-registry.json"
+      ln -s ${flake-registry}/flake-registry.json $out$globalFlakeRegistryPath
+      mkdir -p $out/nix/var/nix/gcroots/auto
+      rootName=$(${pkgs.nix}/bin/nix --extra-experimental-features nix-command hash file --type sha1 --base32 <(echo -n $globalFlakeRegistryPath))
+      ln -s $globalFlakeRegistryPath $out/nix/var/nix/gcroots/auto/$rootName
+    '');
 
 in
 pkgs.dockerTools.buildLayeredImageWithNixDb {
 
-  inherit name tag;
+  inherit name tag maxLayers;
 
   contents = [ baseSystem ];
 

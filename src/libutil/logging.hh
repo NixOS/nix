@@ -1,8 +1,11 @@
 #pragma once
+///@file
 
 #include "types.hh"
 #include "error.hh"
 #include "config.hh"
+
+#include <nlohmann/json_fwd.hpp>
 
 namespace nix {
 
@@ -70,17 +73,20 @@ public:
 
     virtual void stop() { };
 
+    virtual void pause() { };
+    virtual void resume() { };
+
     // Whether the logger prints the whole build log
     virtual bool isVerbose() { return false; }
 
-    virtual void log(Verbosity lvl, const FormatOrString & fs) = 0;
+    virtual void log(Verbosity lvl, std::string_view s) = 0;
 
-    void log(const FormatOrString & fs)
+    void log(std::string_view s)
     {
-        log(lvlInfo, fs);
+        log(lvlInfo, s);
     }
 
-    virtual void logEI(const ErrorInfo &ei) = 0;
+    virtual void logEI(const ErrorInfo & ei) = 0;
 
     void logEI(Verbosity lvl, ErrorInfo ei)
     {
@@ -100,15 +106,16 @@ public:
     virtual void writeToStdout(std::string_view s);
 
     template<typename... Args>
-    inline void cout(const std::string & fs, const Args & ... args)
+    inline void cout(const Args & ... args)
     {
-        boost::format f(fs);
-        formatHelper(f, args...);
-        writeToStdout(f.str());
+        writeToStdout(fmt(args...));
     }
 
     virtual std::optional<char> ask(std::string_view s)
     { return {}; }
+
+    virtual void setPrintBuildLogs(bool printBuildLogs)
+    { }
 };
 
 ActivityId getCurActivity();
@@ -166,6 +173,12 @@ Logger * makeSimpleLogger(bool printBuildLogs = true);
 
 Logger * makeJSONLogger(Logger & prevLogger);
 
+std::optional<nlohmann::json> parseJSONMessage(const std::string & msg);
+
+bool handleJSONLogMessage(nlohmann::json & json,
+    const Activity & act, std::map<ActivityId, Activity> & activities,
+    bool trusted);
+
 bool handleJSONLogMessage(const std::string & msg,
     const Activity & act, std::map<ActivityId, Activity> & activities,
     bool trusted);
@@ -205,7 +218,9 @@ extern Verbosity verbosity; /* suppress msgs > this */
 #define debug(args...) printMsg(lvlDebug, args)
 #define vomit(args...) printMsg(lvlVomit, args)
 
-/* if verbosity >= lvlWarn, print a message with a yellow 'warning:' prefix. */
+/**
+ * if verbosity >= lvlWarn, print a message with a yellow 'warning:' prefix.
+ */
 template<typename... Args>
 inline void warn(const std::string & fs, const Args & ... args)
 {
@@ -214,7 +229,11 @@ inline void warn(const std::string & fs, const Args & ... args)
     logger->warn(f.str());
 }
 
-void warnOnce(bool & haveWarned, const FormatOrString & fs);
+#define warnOnce(haveWarned, args...) \
+    if (!haveWarned) {                \
+        haveWarned = true;            \
+        warn(args);                   \
+    }
 
 void writeToStderr(std::string_view s);
 

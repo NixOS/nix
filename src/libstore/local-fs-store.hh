@@ -1,29 +1,43 @@
 #pragma once
+///@file
 
 #include "store-api.hh"
+#include "gc-store.hh"
+#include "log-store.hh"
 
 namespace nix {
 
 struct LocalFSStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
+
     // FIXME: the (StoreConfig*) cast works around a bug in gcc that causes
     // it to omit the call to the Setting constructor. Clang works fine
     // either way.
+
     const PathSetting rootDir{(StoreConfig*) this, true, "",
-        "root", "directory prefixed to all other paths"};
+        "root",
+        "Directory prefixed to all other paths."};
+
     const PathSetting stateDir{(StoreConfig*) this, false,
         rootDir != "" ? rootDir + "/nix/var/nix" : settings.nixStateDir,
-        "state", "directory where Nix will store state"};
+        "state",
+        "Directory where Nix will store state."};
+
     const PathSetting logDir{(StoreConfig*) this, false,
         rootDir != "" ? rootDir + "/nix/var/log/nix" : settings.nixLogDir,
-        "log", "directory where Nix will store state"};
+        "log",
+        "directory where Nix will store log files."};
+
     const PathSetting realStoreDir{(StoreConfig*) this, false,
         rootDir != "" ? rootDir + "/nix/store" : storeDir, "real",
-        "physical path to the Nix store"};
+        "Physical path of the Nix store."};
 };
 
-class LocalFSStore : public virtual LocalFSStoreConfig, public virtual Store
+class LocalFSStore : public virtual LocalFSStoreConfig,
+    public virtual Store,
+    public virtual GcStore,
+    public virtual LogStore
 {
 public:
 
@@ -45,7 +59,7 @@ public:
         return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);
     }
 
-    std::optional<std::string> getBuildLog(const StorePath & path) override;
+    std::optional<std::string> getBuildLogExact(const StorePath & path) override;
 
 };
 

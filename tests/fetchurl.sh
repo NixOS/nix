@@ -9,6 +9,10 @@ outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file:
 
 cmp $outPath fetchurl.sh
 
+# Do not re-fetch paths already present.
+outPath2=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file:///does-not-exist/must-remain-unused/fetchurl.sh --argstr sha256 $hash --no-out-link)
+test "$outPath" == "$outPath2"
+
 # Now using a base-64 hash.
 clearStore
 
@@ -58,7 +62,7 @@ hash=$(nix-hash --flat --type sha256 $nar)
 outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url file://$nar --argstr sha256 $hash \
           --arg unpack true --argstr name xyzzy --no-out-link)
 
-echo $outPath | grep -q 'xyzzy'
+echo $outPath | grepQuiet 'xyzzy'
 
 test -x $outPath/fetchurl.sh
 test -L $outPath/symlink

@@ -1,15 +1,17 @@
-#include "command.hh"
+#include "installable-flake.hh"
+#include "command-installable-value.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "fs-accessor.hh"
+#include "eval-inline.hh"
 
 using namespace nix;
 
-struct CmdBundle : InstallableCommand
+struct CmdBundle : InstallableValueCommand
 {
-    std::string bundler = "github:matthewbauer/nix-bundle";
+    std::string bundler = "github:NixOS/bundlers";
     std::optional<Path> outLink;
 
     CmdBundle()
@@ -69,16 +71,16 @@ struct CmdBundle : InstallableCommand
         return res;
     }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<InstallableValue> installable) override
     {
         auto evalState = getEvalState();
 
         auto val = installable->toValue(*evalState).first;
 
-        auto [bundlerFlakeRef, bundlerName] = parseFlakeRefWithFragment(bundler, absPath("."));
+        auto [bundlerFlakeRef, bundlerName, extendedOutputsSpec] = parseFlakeRefWithFragmentAndExtendedOutputsSpec(bundler, absPath("."));
         const flake::LockFlags lockFlags{ .writeLockFile = false };
         InstallableFlake bundler{this,
-            evalState, std::move(bundlerFlakeRef), bundlerName,
+            evalState, std::move(bundlerFlakeRef), bundlerName, extendedOutputsSpec,
             {"bundlers." + settings.thisSystem.get() + ".default",
              "defaultBundler." + settings.thisSystem.get()
             },
@@ -97,21 +99,28 @@ struct CmdBundle : InstallableCommand
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
         PathSet context2;
-        StorePath drvPath = store->parseStorePath(evalState->coerceToPath(*attr1->pos, *attr1->value, context2));
+        auto drvPath = evalState->coerceToStorePath(attr1->pos, *attr1->value, context2, "");
 
         auto attr2 = vRes->attrs->get(evalState->sOutPath);
         if (!attr2)
             throw Error("the bundler '%s' does not produce a derivation", bundler.what());
 
-        StorePath outPath = store->parseStorePath(evalState->coerceToPath(*attr2->pos, *attr2->value, context2));
+        auto outPath = evalState->coerceToStorePath(attr2->pos, *attr2->value, context2, "");
 
-        store->buildPaths({ DerivedPath::Built { drvPath } });
+        store->buildPaths({
+            DerivedPath::Built {
+                .drvPath = drvPath,
+                .outputs = OutputsSpec::All { },
+            },
+        });
 
         auto outPathS = store->printStorePath(outPath);
 
         if (!outLink) {
-            auto &attr = vRes->attrs->need(evalState->sName);
-            outLink = evalState->forceStringNoCtx(*attr.value,*attr.pos);
+            auto * attr = vRes->attrs->get(evalState->sName);
+            if (!attr)
+                throw Error("attribute 'name' missing");
+            outLink = evalState->forceStringNoCtx(*attr->value, attr->pos, "");
         }
 
         // TODO: will crash if not a localFSStore?

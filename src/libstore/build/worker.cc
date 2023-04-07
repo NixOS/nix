@@ -42,7 +42,7 @@ Worker::~Worker()
 
 std::shared_ptr<DerivationGoal> Worker::makeDerivationGoalCommon(
     const StorePath & drvPath,
-    const StringSet & wantedOutputs,
+    const OutputsSpec & wantedOutputs,
     std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal)
 {
     std::weak_ptr<DerivationGoal> & goal_weak = derivationGoals[drvPath];
@@ -59,7 +59,7 @@ std::shared_ptr<DerivationGoal> Worker::makeDerivationGoalCommon(
 
 
 std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(const StorePath & drvPath,
-    const StringSet & wantedOutputs, BuildMode buildMode)
+    const OutputsSpec & wantedOutputs, BuildMode buildMode)
 {
     return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
         return !dynamic_cast<LocalStore *>(&store)
@@ -70,7 +70,7 @@ std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(const StorePath & drv
 
 
 std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath & drvPath,
-    const BasicDerivation & drv, const StringSet & wantedOutputs, BuildMode buildMode)
+    const BasicDerivation & drv, const OutputsSpec & wantedOutputs, BuildMode buildMode)
 {
     return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
         return !dynamic_cast<LocalStore *>(&store)
@@ -276,7 +276,7 @@ void Worker::run(const Goals & _topGoals)
         if (!children.empty() || !waitingForAWhile.empty())
             waitForInput();
         else {
-            if (awake.empty() && 0 == settings.maxBuildJobs)
+            if (awake.empty() && 0U == settings.maxBuildJobs)
             {
                 if (getMachines().empty())
                    throw Error("unable to start any build; either increase '--max-jobs' "
@@ -350,7 +350,7 @@ void Worker::waitForInput()
        become `available'.  Note that `available' (i.e., non-blocking)
        includes EOF. */
     std::vector<struct pollfd> pollStatus;
-    std::map <int, int> fdToPollStatus;
+    std::map<int, size_t> fdToPollStatus;
     for (auto & i : children) {
         for (auto & j : i.fds) {
             pollStatus.push_back((struct pollfd) { .fd = j, .events = POLLIN });
@@ -380,7 +380,10 @@ void Worker::waitForInput()
         std::set<int> fds2(j->fds);
         std::vector<unsigned char> buffer(4096);
         for (auto & k : fds2) {
-            if (pollStatus.at(fdToPollStatus.at(k)).revents) {
+            const auto fdPollStatusId = get(fdToPollStatus, k);
+            assert(fdPollStatusId);
+            assert(*fdPollStatusId < pollStatus.size());
+            if (pollStatus.at(*fdPollStatusId).revents) {
                 ssize_t rd = ::read(k, buffer.data(), buffer.size());
                 // FIXME: is there a cleaner way to handle pt close
                 // than EIO? Is this even standard?

@@ -16,7 +16,7 @@ void Store::exportPaths(const StorePathSet & paths, Sink & sink)
     //logger->incExpected(doneLabel, sorted.size());
 
     for (auto & path : sorted) {
-        //Activity act(*logger, lvlInfo, format("exporting path '%s'") % path);
+        //Activity act(*logger, lvlInfo, "exporting path '%s'", path);
         sink << 1;
         exportPath(path, sink);
         //logger->incProgress(doneLabel);
@@ -71,7 +71,7 @@ StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
 
         auto path = parseStorePath(readString(source));
 
-        //Activity act(*logger, lvlInfo, format("importing path '%s'") % info.path);
+        //Activity act(*logger, lvlInfo, "importing path '%s'", info.path);
 
         auto references = worker_proto::read(*this, source, Phantom<StorePathSet> {});
         auto deriver = readString(source);

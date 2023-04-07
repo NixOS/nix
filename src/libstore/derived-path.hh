@@ -1,10 +1,13 @@
 #pragma once
+///@file
 
 #include "util.hh"
 #include "path.hh"
 #include "realisation.hh"
+#include "outputs-spec.hh"
+#include "comparator.hh"
 
-#include <optional>
+#include <variant>
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -25,6 +28,8 @@ struct DerivedPathOpaque {
     nlohmann::json toJSON(ref<Store> store) const;
     std::string to_string(const Store & store) const;
     static DerivedPathOpaque parse(const Store & store, std::string_view);
+
+    GENERATE_CMP(DerivedPathOpaque, me->path);
 };
 
 /**
@@ -41,10 +46,13 @@ struct DerivedPathOpaque {
  */
 struct DerivedPathBuilt {
     StorePath drvPath;
-    std::set<std::string> outputs;
+    OutputsSpec outputs;
 
     std::string to_string(const Store & store) const;
-    static DerivedPathBuilt parse(const Store & store, std::string_view);
+    static DerivedPathBuilt parse(const Store & store, std::string_view, std::string_view);
+    nlohmann::json toJSON(ref<Store> store) const;
+
+    GENERATE_CMP(DerivedPathBuilt, me->drvPath, me->outputs);
 };
 
 using _DerivedPathRaw = std::variant<
@@ -88,6 +96,8 @@ struct BuiltPathBuilt {
 
     nlohmann::json toJSON(ref<Store> store) const;
     static BuiltPathBuilt parse(const Store & store, std::string_view);
+
+    GENERATE_CMP(BuiltPathBuilt, me->drvPath, me->outputs);
 };
 
 using _BuiltPathRaw = std::variant<
@@ -96,7 +106,7 @@ using _BuiltPathRaw = std::variant<
 >;
 
 /**
- * A built path. Similar to a `DerivedPath`, but enriched with the corresponding
+ * A built path. Similar to a DerivedPath, but enriched with the corresponding
  * output path(s).
  */
 struct BuiltPath : _BuiltPathRaw {
@@ -117,7 +127,5 @@ struct BuiltPath : _BuiltPathRaw {
 
 typedef std::vector<DerivedPath> DerivedPaths;
 typedef std::vector<BuiltPath> BuiltPaths;
-
-nlohmann::json derivedPathsWithHintsToJSON(const BuiltPaths & buildables, ref<Store> store);
 
 }

@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <memory>
 
@@ -10,7 +11,9 @@ namespace boost::context { struct stack_context; }
 namespace nix {
 
 
-/* Abstract destination of binary data. */
+/**
+ * Abstract destination of binary data.
+ */
 struct Sink
 {
     virtual ~Sink() { }
@@ -18,7 +21,9 @@ struct Sink
     virtual bool good() { return true; }
 };
 
-/* Just throws away data. */
+/**
+ * Just throws away data.
+ */
 struct NullSink : Sink
 {
     void operator () (std::string_view data) override
@@ -32,8 +37,10 @@ struct FinishSink : virtual Sink
 };
 
 
-/* A buffered abstract sink. Warning: a BufferedSink should not be
-   used from multiple threads concurrently. */
+/**
+ * A buffered abstract sink. Warning: a BufferedSink should not be
+ * used from multiple threads concurrently.
+ */
 struct BufferedSink : virtual Sink
 {
     size_t bufSize, bufPos;
@@ -50,19 +57,25 @@ struct BufferedSink : virtual Sink
 };
 
 
-/* Abstract source of binary data. */
+/**
+ * Abstract source of binary data.
+ */
 struct Source
 {
     virtual ~Source() { }
 
-    /* Store exactly ‘len’ bytes in the buffer pointed to by ‘data’.
-       It blocks until all the requested data is available, or throws
-       an error if it is not going to be available.   */
+    /**
+     * Store exactly ‘len’ bytes in the buffer pointed to by ‘data’.
+     * It blocks until all the requested data is available, or throws
+     * an error if it is not going to be available.
+     */
     void operator () (char * data, size_t len);
 
-    /* Store up to ‘len’ in the buffer pointed to by ‘data’, and
-       return the number of bytes stored.  It blocks until at least
-       one byte is available. */
+    /**
+     * Store up to ‘len’ in the buffer pointed to by ‘data’, and
+     * return the number of bytes stored.  It blocks until at least
+     * one byte is available.
+     */
     virtual size_t read(char * data, size_t len) = 0;
 
     virtual bool good() { return true; }
@@ -73,8 +86,10 @@ struct Source
 };
 
 
-/* A buffered abstract source. Warning: a BufferedSource should not be
-   used from multiple threads concurrently. */
+/**
+ * A buffered abstract source. Warning: a BufferedSource should not be
+ * used from multiple threads concurrently.
+ */
 struct BufferedSource : Source
 {
     size_t bufSize, bufPosIn, bufPosOut;
@@ -88,28 +103,30 @@ struct BufferedSource : Source
     bool hasData();
 
 protected:
-    /* Underlying read call, to be overridden. */
+    /**
+     * Underlying read call, to be overridden.
+     */
     virtual size_t readUnbuffered(char * data, size_t len) = 0;
 };
 
 
-/* A sink that writes data to a file descriptor. */
+/**
+ * A sink that writes data to a file descriptor.
+ */
 struct FdSink : BufferedSink
 {
     int fd;
-    bool warn = false;
     size_t written = 0;
 
     FdSink() : fd(-1) { }
     FdSink(int fd) : fd(fd) { }
     FdSink(FdSink&&) = default;
 
-    FdSink& operator=(FdSink && s)
+    FdSink & operator=(FdSink && s)
     {
         flush();
         fd = s.fd;
         s.fd = -1;
-        warn = s.warn;
         written = s.written;
         return *this;
     }
@@ -125,7 +142,9 @@ private:
 };
 
 
-/* A source that reads data from a file descriptor. */
+/**
+ * A source that reads data from a file descriptor.
+ */
 struct FdSource : BufferedSource
 {
     int fd;
@@ -151,7 +170,9 @@ private:
 };
 
 
-/* A sink that writes data to a string. */
+/**
+ * A sink that writes data to a string.
+ */
 struct StringSink : Sink
 {
     std::string s;
@@ -165,7 +186,9 @@ struct StringSink : Sink
 };
 
 
-/* A source that reads data from a string. */
+/**
+ * A source that reads data from a string.
+ */
 struct StringSource : Source
 {
     std::string_view s;
@@ -175,7 +198,9 @@ struct StringSource : Source
 };
 
 
-/* A sink that writes all incoming data to two other sinks. */
+/**
+ * A sink that writes all incoming data to two other sinks.
+ */
 struct TeeSink : Sink
 {
     Sink & sink1, & sink2;
@@ -188,7 +213,9 @@ struct TeeSink : Sink
 };
 
 
-/* Adapter class of a Source that saves all data read to a sink. */
+/**
+ * Adapter class of a Source that saves all data read to a sink.
+ */
 struct TeeSource : Source
 {
     Source & orig;
@@ -203,7 +230,9 @@ struct TeeSource : Source
     }
 };
 
-/* A reader that consumes the original Source until 'size'. */
+/**
+ * A reader that consumes the original Source until 'size'.
+ */
 struct SizedSource : Source
 {
     Source & orig;
@@ -221,7 +250,9 @@ struct SizedSource : Source
         return n;
     }
 
-    /* Consume the original source until no remain data is left to consume. */
+    /**
+     * Consume the original source until no remain data is left to consume.
+     */
     size_t drainAll()
     {
         std::vector<char> buf(8192);
@@ -234,7 +265,9 @@ struct SizedSource : Source
     }
 };
 
-/* A sink that that just counts the number of bytes given to it */
+/**
+ * A sink that that just counts the number of bytes given to it
+ */
 struct LengthSink : Sink
 {
     uint64_t length = 0;
@@ -245,7 +278,9 @@ struct LengthSink : Sink
     }
 };
 
-/* Convert a function into a sink. */
+/**
+ * Convert a function into a sink.
+ */
 struct LambdaSink : Sink
 {
     typedef std::function<void(std::string_view data)> lambda_t;
@@ -261,7 +296,9 @@ struct LambdaSink : Sink
 };
 
 
-/* Convert a function into a source. */
+/**
+ * Convert a function into a source.
+ */
 struct LambdaSource : Source
 {
     typedef std::function<size_t(char *, size_t)> lambda_t;
@@ -276,8 +313,10 @@ struct LambdaSource : Source
     }
 };
 
-/* Chain two sources together so after the first is exhausted, the second is
-   used */
+/**
+ * Chain two sources together so after the first is exhausted, the second is
+ * used
+ */
 struct ChainSource : Source
 {
     Source & source1, & source2;
@@ -291,8 +330,10 @@ struct ChainSource : Source
 
 std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun);
 
-/* Convert a function that feeds data into a Sink into a Source. The
-   Source executes the function as a coroutine. */
+/**
+ * Convert a function that feeds data into a Sink into a Source. The
+ * Source executes the function as a coroutine.
+ */
 std::unique_ptr<Source> sinkToSource(
     std::function<void(Sink &)> fun,
     std::function<void()> eof = []() {
@@ -333,17 +374,9 @@ T readNum(Source & source)
     unsigned char buf[8];
     source((char *) buf, sizeof(buf));
 
-    uint64_t n =
-        ((uint64_t) buf[0]) |
-        ((uint64_t) buf[1] << 8) |
-        ((uint64_t) buf[2] << 16) |
-        ((uint64_t) buf[3] << 24) |
-        ((uint64_t) buf[4] << 32) |
-        ((uint64_t) buf[5] << 40) |
-        ((uint64_t) buf[6] << 48) |
-        ((uint64_t) buf[7] << 56);
+    auto n = readLittleEndian<uint64_t>(buf);
 
-    if (n > (uint64_t)std::numeric_limits<T>::max())
+    if (n > (uint64_t) std::numeric_limits<T>::max())
         throw SerialisationError("serialised integer %d is too large for type '%s'", n, typeid(T).name());
 
     return (T) n;
@@ -386,7 +419,9 @@ Source & operator >> (Source & in, bool & b)
 Error readError(Source & source);
 
 
-/* An adapter that converts a std::basic_istream into a source. */
+/**
+ * An adapter that converts a std::basic_istream into a source.
+ */
 struct StreamToSourceAdapter : Source
 {
     std::shared_ptr<std::basic_istream<char>> istream;
@@ -409,13 +444,14 @@ struct StreamToSourceAdapter : Source
 };
 
 
-/* A source that reads a distinct format of concatenated chunks back into its
-   logical form, in order to guarantee a known state to the original stream,
-   even in the event of errors.
-
-   Use with FramedSink, which also allows the logical stream to be terminated
-   in the event of an exception.
-*/
+/**
+ * A source that reads a distinct format of concatenated chunks back into its
+ * logical form, in order to guarantee a known state to the original stream,
+ * even in the event of errors.
+ *
+ * Use with FramedSink, which also allows the logical stream to be terminated
+ * in the event of an exception.
+ */
 struct FramedSource : Source
 {
     Source & from;
@@ -460,11 +496,12 @@ struct FramedSource : Source
     }
 };
 
-/* Write as chunks in the format expected by FramedSource.
-
-   The exception_ptr reference can be used to terminate the stream when you
-   detect that an error has occurred on the remote end.
-*/
+/**
+ * Write as chunks in the format expected by FramedSource.
+ *
+ * The exception_ptr reference can be used to terminate the stream when you
+ * detect that an error has occurred on the remote end.
+ */
 struct FramedSink : nix::BufferedSink
 {
     BufferedSink & to;
@@ -497,17 +534,20 @@ struct FramedSink : nix::BufferedSink
     };
 };
 
-/* Stack allocation strategy for sinkToSource.
-   Mutable to avoid a boehm gc dependency in libutil.
-
-   boost::context doesn't provide a virtual class, so we define our own.
+/**
+ * Stack allocation strategy for sinkToSource.
+ * Mutable to avoid a boehm gc dependency in libutil.
+ *
+ * boost::context doesn't provide a virtual class, so we define our own.
  */
 struct StackAllocator {
     virtual boost::context::stack_context allocate() = 0;
     virtual void deallocate(boost::context::stack_context sctx) = 0;
 
-    /* The stack allocator to use in sinkToSource and potentially elsewhere.
-       It is reassigned by the initGC() method in libexpr. */
+    /**
+     * The stack allocator to use in sinkToSource and potentially elsewhere.
+     * It is reassigned by the initGC() method in libexpr.
+     */
     static StackAllocator *defaultAllocator;
 };
 

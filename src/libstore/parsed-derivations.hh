@@ -1,5 +1,7 @@
 #pragma once
+///@file
 
+#include "derivations.hh"
 #include "store-api.hh"
 
 #include <nlohmann/json_fwd.hpp>
@@ -36,6 +38,8 @@ public:
     bool willBuildLocally(Store & localStore) const;
 
     bool substitutesAllowed() const;
+
+    bool useUidRange() const;
 
     std::optional<nlohmann::json> prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths);
 };

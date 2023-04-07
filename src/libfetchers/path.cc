@@ -1,11 +1,12 @@
 #include "fetchers.hh"
 #include "store-api.hh"
+#include "archive.hh"
 
 namespace nix::fetchers {
 
 struct PathInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url) override
+    std::optional<Input> inputFromURL(const ParsedURL & url) const override
     {
         if (url.scheme != "path") return {};
 
@@ -31,7 +32,7 @@ struct PathInputScheme : InputScheme
         return input;
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) override
+    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
         if (maybeGetStrAttr(attrs, "type") != "path") return {};
 
@@ -53,7 +54,7 @@ struct PathInputScheme : InputScheme
         return input;
     }
 
-    ParsedURL toURL(const Input & input) override
+    ParsedURL toURL(const Input & input) const override
     {
         auto query = attrsToQuery(input.attrs);
         query.erase("path");
@@ -65,7 +66,7 @@ struct PathInputScheme : InputScheme
         };
     }
 
-    bool hasAllInfo(const Input & input) override
+    bool hasAllInfo(const Input & input) const override
     {
         return true;
     }
@@ -80,8 +81,9 @@ struct PathInputScheme : InputScheme
         // nothing to do
     }
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
+    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
     {
+        Input input(_input);
         std::string absPath;
         auto path = getStrAttr(input.attrs, "path");
 
@@ -111,9 +113,15 @@ struct PathInputScheme : InputScheme
         if (storePath)
             store->addTempRoot(*storePath);
 
-        if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath))
+        time_t mtime = 0;
+        if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath)) {
             // FIXME: try to substitute storePath.
-            storePath = store->addToStore("source", absPath);
+            auto src = sinkToSource([&](Sink & sink) {
+                mtime = dumpPathAndGetMtime(absPath, sink, defaultPathFilter);
+            });
+            storePath = store->addToStoreFromDump(*src, "source");
+        }
+        input.attrs.insert_or_assign("lastModified", uint64_t(mtime));
 
         return {std::move(*storePath), input};
     }

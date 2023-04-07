@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "types.hh"
 #include "hash.hh"
@@ -31,7 +32,7 @@ struct FileTransferSettings : Config
         R"(
           The timeout (in seconds) for establishing connections in the
           binary cache substituter. It corresponds to `curl`’s
-          `--connect-timeout` option.
+          `--connect-timeout` option. A value of 0 means no limit.
         )"};
 
     Setting<unsigned long> stalledDownloadTimeout{
@@ -87,49 +88,59 @@ struct FileTransfer
 {
     virtual ~FileTransfer() { }
 
-    /* Enqueue a data transfer request, returning a future to the result of
-       the download. The future may throw a FileTransferError
-       exception. */
+    /**
+     * Enqueue a data transfer request, returning a future to the result of
+     * the download. The future may throw a FileTransferError
+     * exception.
+     */
     virtual void enqueueFileTransfer(const FileTransferRequest & request,
         Callback<FileTransferResult> callback) = 0;
 
     std::future<FileTransferResult> enqueueFileTransfer(const FileTransferRequest & request);
 
-    /* Synchronously download a file. */
+    /**
+     * Synchronously download a file.
+     */
     FileTransferResult download(const FileTransferRequest & request);
 
-    /* Synchronously upload a file. */
+    /**
+     * Synchronously upload a file.
+     */
     FileTransferResult upload(const FileTransferRequest & request);
 
-    /* Download a file, writing its data to a sink. The sink will be
-       invoked on the thread of the caller. */
+    /**
+     * Download a file, writing its data to a sink. The sink will be
+     * invoked on the thread of the caller.
+     */
     void download(FileTransferRequest && request, Sink & sink);
 
     enum Error { NotFound, Forbidden, Misc, Transient, Interrupted };
 };
 
-/* Return a shared FileTransfer object. Using this object is preferred
-   because it enables connection reuse and HTTP/2 multiplexing. */
+/**
+ * @return a shared FileTransfer object.
+ *
+ * Using this object is preferred because it enables connection reuse
+ * and HTTP/2 multiplexing.
+ */
 ref<FileTransfer> getFileTransfer();
 
-/* Return a new FileTransfer object. */
+/**
+ * @return a new FileTransfer object
+ *
+ * Prefer getFileTransfer() to this; see its docs for why.
+ */
 ref<FileTransfer> makeFileTransfer();
 
 class FileTransferError : public Error
 {
 public:
     FileTransfer::Error error;
-    std::optional<std::string> response; // intentionally optional
+    /// intentionally optional
+    std::optional<std::string> response;
 
     template<typename... Args>
     FileTransferError(FileTransfer::Error error, std::optional<std::string> response, const Args & ... args);
-
-    virtual const char* sname() const override { return "FileTransferError"; }
 };
-
-bool isUri(std::string_view s);
-
-/* Resolve deprecated 'channel:<foo>' URLs. */
-std::string resolveUri(std::string_view uri);
 
 }

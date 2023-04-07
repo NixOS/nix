@@ -2,13 +2,13 @@
 
 Most Nix commands accept the following command-line options:
 
-  - `--help`\
+  - <span id="opt-help">[`--help`](#opt-help)</span>\
     Prints out a summary of the command syntax and exits.
 
-  - `--version`\
+  - <span id="opt-version">[`--version`](#opt-version)</span>\
     Prints out the Nix version number on standard output and exits.
 
-  - `--verbose` / `-v`\
+  - <span id="opt-verbose">[`--verbose`](#opt-verbose)</span> / `-v`\
     Increases the level of verbosity of diagnostic messages printed on
     standard error. For each Nix operation, the information printed on
     standard output is well-defined; any diagnostic information is
@@ -37,14 +37,14 @@ Most Nix commands accept the following command-line options:
       - 5\
         “Vomit”: print vast amounts of debug information.
 
-  - `--quiet`\
+  - <span id="opt-quiet">[`--quiet`](#opt-quiet)</span>\
     Decreases the level of verbosity of diagnostic messages printed on
     standard error. This is the inverse option to `-v` / `--verbose`.
 
     This option may be specified repeatedly. See the previous verbosity
     levels list.
 
-  - `--log-format` *format*\
+  - <span id="opt-log-format">[`--log-format`](#opt-log-format)</span> *format*\
     This option can be used to change the output of the log format, with
     *format* being one of:
 
@@ -66,14 +66,14 @@ Most Nix commands accept the following command-line options:
       - bar-with-logs\
         Display the raw logs, with the progress bar at the bottom.
 
-  - `--no-build-output` / `-Q`\
+  - <span id="opt-no-build-output">[`--no-build-output`](#opt-no-build-output)</span> / `-Q`\
     By default, output written by builders to standard output and
     standard error is echoed to the Nix command's standard error. This
     option suppresses this behaviour. Note that the builder's standard
     output and error are always written to a log file in
     `prefix/nix/var/log/nix`.
 
-  - `--max-jobs` / `-j` *number*\
+  - <span id="opt-max-jobs">[`--max-jobs`](#opt-max-jobs)</span> / `-j` *number*\
     Sets the maximum number of build jobs that Nix will perform in
     parallel to the specified number. Specify `auto` to use the number
     of CPUs in the system. The default is specified by the `max-jobs`
@@ -83,7 +83,7 @@ Most Nix commands accept the following command-line options:
     Setting it to `0` disallows building on the local machine, which is
     useful when you want builds to happen only on remote builders.
 
-  - `--cores`\
+  - <span id="opt-cores">[`--cores`](#opt-cores)</span>\
     Sets the value of the `NIX_BUILD_CORES` environment variable in
     the invocation of builders. Builders can use this variable at
     their discretion to control the maximum amount of parallelism. For
@@ -94,18 +94,18 @@ Most Nix commands accept the following command-line options:
     means that the builder should use all available CPU cores in the
     system.
 
-  - `--max-silent-time`\
+  - <span id="opt-max-silent-time">[`--max-silent-time`](#opt-max-silent-time)</span>\
     Sets the maximum number of seconds that a builder can go without
     producing any data on standard output or standard error. The
     default is specified by the `max-silent-time` configuration
     setting. `0` means no time-out.
 
-  - `--timeout`\
+  - <span id="opt-timeout">[`--timeout`](#opt-timeout)</span>\
     Sets the maximum number of seconds that a builder can run. The
     default is specified by the `timeout` configuration setting. `0`
     means no timeout.
 
-  - `--keep-going` / `-k`\
+  - <span id="opt-keep-going">[`--keep-going`](#opt-keep-going)</span> / `-k`\
     Keep going in case of failed builds, to the greatest extent
     possible. That is, if building an input of some derivation fails,
     Nix will still build the other inputs, but not the derivation
@@ -113,13 +113,13 @@ Most Nix commands accept the following command-line options:
     for builds of substitutes), possibly killing builds in progress (in
     case of parallel or distributed builds).
 
-  - `--keep-failed` / `-K`\
+  - <span id="opt-keep-failed">[`--keep-failed`](#opt-keep-failed)</span> / `-K`\
     Specifies that in case of a build failure, the temporary directory
     (usually in `/tmp`) in which the build takes place should not be
     deleted. The path of the build directory is printed as an
     informational message.
 
-  - `--fallback`\
+  - <span id="opt-fallback">[`--fallback`](#opt-fallback)</span>\
     Whenever Nix attempts to build a derivation for which substitutes
     are known for each output path, but realising the output paths
     through the substitutes fails, fall back on building the derivation.
@@ -134,18 +134,18 @@ Most Nix commands accept the following command-line options:
     failure in obtaining the substitutes to lead to a full build from
     source (with the related consumption of resources).
 
-  - `--readonly-mode`\
+  - <span id="opt-readonly-mode">[`--readonly-mode`](#opt-readonly-mode)</span>\
     When this option is used, no attempt is made to open the Nix
     database. Most Nix operations do need database access, so those
     operations will fail.
 
-  - `--arg` *name* *value*\
+  - <span id="opt-arg">[`--arg`](#opt-arg)</span> *name* *value*\
     This option is accepted by `nix-env`, `nix-instantiate`,
     `nix-shell` and `nix-build`. When evaluating Nix expressions, the
     expression evaluator will automatically try to call functions that
     it encounters. It can automatically call functions for which every
     argument has a [default
-    value](../expressions/language-constructs.md#functions) (e.g.,
+    value](@docroot@/language/constructs.md#functions) (e.g.,
     `{ argName ?  defaultValue }: ...`). With `--arg`, you can also
     call functions that have arguments without a default value (or
     override a default value). That is, if the evaluator encounters a
@@ -164,26 +164,26 @@ Most Nix commands accept the following command-line options:
 
     So if you call this Nix expression (e.g., when you do `nix-env -iA
     pkgname`), the function will be called automatically using the
-    value [`builtins.currentSystem`](../expressions/builtins.md) for
+    value [`builtins.currentSystem`](@docroot@/language/builtins.md) for
     the `system` argument. You can override this using `--arg`, e.g.,
     `nix-env -iA pkgname --arg system \"i686-freebsd\"`. (Note that
     since the argument is a Nix string literal, you have to escape the
     quotes.)
 
-  - `--argstr` *name* *value*\
+  - <span id="opt-argstr">[`--argstr`](#opt-argstr)</span> *name* *value*\
     This option is like `--arg`, only the value is not a Nix
     expression but a string. So instead of `--arg system
     \"i686-linux\"` (the outer quotes are to keep the shell happy) you
     can say `--argstr system i686-linux`.
 
-  - `--attr` / `-A` *attrPath*\
+  - <span id="opt-attr">[`--attr`](#opt-attr)</span> / `-A` *attrPath*\
     Select an attribute from the top-level Nix expression being
     evaluated. (`nix-env`, `nix-instantiate`, `nix-build` and
     `nix-shell` only.) The *attribute path* *attrPath* is a sequence
     of attribute names separated by dots. For instance, given a
     top-level Nix expression *e*, the attribute path `xorg.xorgserver`
     would cause the expression `e.xorg.xorgserver` to be used. See
-    [`nix-env --install`](nix-env.md#operation---install) for some
+    [`nix-env --install`](@docroot@/command-ref/nix-env/install.md) for some
     concrete examples.
 
     In addition to attribute names, you can also specify array indices.
@@ -191,7 +191,7 @@ Most Nix commands accept the following command-line options:
     attribute of the fourth element of the array in the `foo` attribute
     of the top-level expression.
 
-  - `--expr` / `-E`\
+  - <span id="opt-expr">[`--expr`](#opt-expr)</span> / `-E`\
     Interpret the command line arguments as a list of Nix expressions to
     be parsed and evaluated, rather than as a list of file names of Nix
     expressions. (`nix-instantiate`, `nix-build` and `nix-shell` only.)
@@ -202,17 +202,17 @@ Most Nix commands accept the following command-line options:
     use, give your expression to the `nix-shell -p` convenience flag
     instead.
 
-  - `-I` *path*\
+  - <span id="opt-I">[`-I`](#opt-I)</span> *path*\
     Add a path to the Nix expression search path. This option may be
     given multiple times. See the `NIX_PATH` environment variable for
     information on the semantics of the Nix search path. Paths added
     through `-I` take precedence over `NIX_PATH`.
 
-  - `--option` *name* *value*\
+  - <span id="opt-option">[`--option`](#opt-option)</span> *name* *value*\
     Set the Nix configuration option *name* to *value*. This overrides
     settings in the Nix configuration file (see nix.conf5).
 
-  - `--repair`\
+  - <span id="opt-repair">[`--repair`](#opt-repair)</span>\
     Fix corrupted or missing store paths by redownloading or rebuilding
     them. Note that this is slow because it requires computing a
     cryptographic hash of the contents of every path in the closure of

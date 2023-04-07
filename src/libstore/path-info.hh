@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "crypto.hh"
 #include "path.hh"
@@ -80,12 +81,6 @@ struct ValidPathInfo
 
     /* Return true iff the path is verifiably content-addressed. */
     bool isContentAddressed(const Store & store) const;
-
-    /* Functions to view references + hasSelfReference as one set, mainly for
-       compatibility's sake. */
-    StorePathSet referencesPossiblyToSelf() const;
-    void insertReferencePossiblyToSelf(StorePath && ref);
-    void setReferencesPossiblyToSelf(StorePathSet && refs);
 
     static const size_t maxSigs = std::numeric_limits<size_t>::max();
 

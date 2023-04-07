@@ -1,4 +1,6 @@
 #include "store-api.hh"
+#include "store-cast.hh"
+#include "gc-store.hh"
 #include "profiles.hh"
 #include "shared.hh"
 #include "globals.hh"
@@ -35,9 +37,10 @@ void removeOldGenerations(std::string dir)
                 link = readLink(path);
             } catch (SysError & e) {
                 if (e.errNo == ENOENT) continue;
+                throw;
             }
             if (link.find("link") != std::string::npos) {
-                printInfo(format("removing old generations of profile %1%") % path);
+                printInfo("removing old generations of profile %s", path);
                 if (deleteOlderThan != "")
                     deleteGenerationsOlderThan(path, deleteOlderThan, dryRun);
                 else
@@ -74,16 +77,16 @@ static int main_nix_collect_garbage(int argc, char * * argv)
             return true;
         });
 
-        auto profilesDir = settings.nixStateDir + "/profiles";
-        if (removeOld) removeOldGenerations(profilesDir);
+        if (removeOld) removeOldGenerations(profilesDir());
 
         // Run the actual garbage collector.
         if (!dryRun) {
             auto store = openStore();
+            auto & gcStore = require<GcStore>(*store);
             options.action = GCOptions::gcDeleteDead;
             GCResults results;
             PrintFreed freed(true, results);
-            store->collectGarbage(options, results);
+            gcStore.collectGarbage(options, results);
         }
 
         return 0;

@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "sync.hh"
 #include "util.hh"
@@ -13,8 +14,10 @@ namespace nix {
 
 MakeError(ThreadPoolShutDown, Error);
 
-/* A simple thread pool that executes a queue of work items
-   (lambdas). */
+/**
+ * A simple thread pool that executes a queue of work items
+ * (lambdas).
+ */
 class ThreadPool
 {
 public:
@@ -23,19 +26,30 @@ public:
 
     ~ThreadPool();
 
-    // FIXME: use std::packaged_task?
+    /**
+     * An individual work item.
+     *
+     * \todo use std::packaged_task?
+     */
     typedef std::function<void()> work_t;
 
-    /* Enqueue a function to be executed by the thread pool. */
+    /**
+     * Enqueue a function to be executed by the thread pool.
+     */
     void enqueue(const work_t & t);
 
-    /* Execute work items until the queue is empty. Note that work
-       items are allowed to add new items to the queue; this is
-       handled correctly. Queue processing stops prematurely if any
-       work item throws an exception. This exception is propagated to
-       the calling thread. If multiple work items throw an exception
-       concurrently, only one item is propagated; the others are
-       printed on stderr and otherwise ignored. */
+    /**
+     * Execute work items until the queue is empty.
+     * 
+	 * \note Note that work items are allowed to add new items to the
+	 * queue; this is handled correctly.
+     *
+	 * Queue processing stops prematurely if any work item throws an
+	 * exception. This exception is propagated to the calling thread. If
+	 * multiple work items throw an exception concurrently, only one
+	 * item is propagated; the others are printed on stderr and
+	 * otherwise ignored.
+     */
     void process();
 
 private:
@@ -62,9 +76,11 @@ private:
     void shutdown();
 };
 
-/* Process in parallel a set of items of type T that have a partial
-   ordering between them. Thus, any item is only processed after all
-   its dependencies have been processed. */
+/**
+ * Process in parallel a set of items of type T that have a partial
+ * ordering between them. Thus, any item is only processed after all
+ * its dependencies have been processed.
+ */
 template<typename T>
 void processGraph(
     ThreadPool & pool,

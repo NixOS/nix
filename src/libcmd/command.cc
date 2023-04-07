@@ -4,6 +4,7 @@
 #include "derivations.hh"
 #include "nixexpr.hh"
 #include "profiles.hh"
+#include "repl.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -86,6 +87,12 @@ ref<Store> CopyCommand::getDstStore()
 
 EvalCommand::EvalCommand()
 {
+    addFlag({
+        .longName = "debugger",
+        .description = "Start an interactive environment if evaluation fails.",
+        .category = MixEvalArgs::category,
+        .handler = {&startReplOnEvalErrors, true},
+    });
 }
 
 EvalCommand::~EvalCommand()
@@ -103,7 +110,7 @@ ref<Store> EvalCommand::getEvalStore()
 
 ref<EvalState> EvalCommand::getEvalState()
 {
-    if (!evalState)
+    if (!evalState) {
         evalState =
             #if HAVE_BOEHMGC
             std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
@@ -113,7 +120,22 @@ ref<EvalState> EvalCommand::getEvalState()
                 searchPath, getEvalStore(), getStore())
             #endif
             ;
+
+        if (startReplOnEvalErrors) {
+            evalState->debugRepl = &AbstractNixRepl::runSimple;
+        };
+    }
     return ref<EvalState>(evalState);
+}
+
+MixOperateOnOptions::MixOperateOnOptions()
+{
+    addFlag({
+        .longName = "derivation",
+        .description = "Operate on the [store derivation](../../glossary.md#gloss-store-derivation) rather than its outputs.",
+        .category = installablesCategory,
+        .handler = {&operateOn, OperateOn::Derivation},
+    });
 }
 
 BuiltPathsCommand::BuiltPathsCommand(bool recursive)
@@ -143,7 +165,7 @@ BuiltPathsCommand::BuiltPathsCommand(bool recursive)
     });
 }
 
-void BuiltPathsCommand::run(ref<Store> store)
+void BuiltPathsCommand::run(ref<Store> store, Installables && installables)
 {
     BuiltPaths paths;
     if (all) {
@@ -153,7 +175,7 @@ void BuiltPathsCommand::run(ref<Store> store)
         for (auto & p : store->queryAllValidPaths())
             paths.push_back(BuiltPath::Opaque{p});
     } else {
-        paths = toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);
+        paths = Installable::toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);
         if (recursive) {
             // XXX: This only computes the store path closure, ignoring
             // intermediate realisations
@@ -189,7 +211,7 @@ void StorePathsCommand::run(ref<Store> store, BuiltPaths && paths)
     run(store, std::move(sorted));
 }
 
-void StorePathCommand::run(ref<Store> store, std::vector<StorePath> && storePaths)
+void StorePathCommand::run(ref<Store> store, StorePaths && storePaths)
 {
     if (storePaths.size() != 1)
         throw UsageError("this command requires exactly one store path");
@@ -197,24 +219,11 @@ void StorePathCommand::run(ref<Store> store, std::vector<StorePath> && storePath
     run(store, *storePaths.begin());
 }
 
-Strings editorFor(const Pos & pos)
-{
-    auto editor = getEnv("EDITOR").value_or("cat");
-    auto args = tokenizeString<Strings>(editor);
-    if (pos.line > 0 && (
-        editor.find("emacs") != std::string::npos ||
-        editor.find("nano") != std::string::npos ||
-        editor.find("vim") != std::string::npos))
-        args.push_back(fmt("+%d", pos.line));
-    args.push_back(pos.file);
-    return args;
-}
-
 MixProfile::MixProfile()
 {
     addFlag({
         .longName = "profile",
-        .description = "The profile to update.",
+        .description = "The profile to operate on.",
         .labels = {"path"},
         .handler = {&profile},
         .completer = completePath
@@ -237,7 +246,7 @@ void MixProfile::updateProfile(const BuiltPaths & buildables)
 {
     if (!profile) return;
 
-    std::vector<StorePath> result;
+    StorePaths result;
 
     for (auto & buildable : buildables) {
         std::visit(overloaded {

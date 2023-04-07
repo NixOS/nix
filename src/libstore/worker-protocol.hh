@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "store-api.hh"
 #include "serialise.hh"
@@ -9,11 +10,15 @@ namespace nix {
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-#define PROTOCOL_VERSION (1 << 8 | 33)
+#define PROTOCOL_VERSION (1 << 8 | 35)
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
 
+/**
+ * Enumeration of all the request types for the "worker protocol", used
+ * by unix:// and ssh-ng:// stores.
+ */
 typedef enum {
     wopIsValidPath = 1,
     wopHasSubstitutes = 3,
@@ -57,6 +62,7 @@ typedef enum {
     wopQueryRealisation = 43,
     wopAddMultipleToStore = 44,
     wopAddBuildLog = 45,
+    wopBuildPathsWithResults = 46,
 } WorkerOp;
 
 
@@ -73,7 +79,12 @@ typedef enum {
 class Store;
 struct Source;
 
-/* To guide overloading */
+/**
+ * Used to guide overloading
+ *
+ * See https://en.cppreference.com/w/cpp/language/adl for the broader
+ * concept of what is going on here.
+ */
 template<typename T>
 struct Phantom {};
 
@@ -91,6 +102,8 @@ MAKE_WORKER_PROTO(, ContentAddress);
 MAKE_WORKER_PROTO(, DerivedPath);
 MAKE_WORKER_PROTO(, Realisation);
 MAKE_WORKER_PROTO(, DrvOutput);
+MAKE_WORKER_PROTO(, BuildResult);
+MAKE_WORKER_PROTO(, std::optional<TrustedFlag>);
 
 MAKE_WORKER_PROTO(template<typename T>, std::vector<T>);
 MAKE_WORKER_PROTO(template<typename T>, std::set<T>);
@@ -101,18 +114,19 @@ MAKE_WORKER_PROTO(X_, Y_);
 #undef X_
 #undef Y_
 
-/* These use the empty string for the null case, relying on the fact
-   that the underlying types never serialize to the empty string.
-
-   We do this instead of a generic std::optional<T> instance because
-   ordinal tags (0 or 1, here) are a bit of a compatability hazard. For
-   the same reason, we don't have a std::variant<T..> instances (ordinal
-   tags 0...n).
-
-   We could the generic instances and then these as specializations for
-   compatability, but that's proven a bit finnicky, and also makes the
-   worker protocol harder to implement in other languages where such
-   specializations may not be allowed.
+/**
+ * These use the empty string for the null case, relying on the fact
+ * that the underlying types never serialize to the empty string.
+ *
+ * We do this instead of a generic std::optional<T> instance because
+ * ordinal tags (0 or 1, here) are a bit of a compatability hazard. For
+ * the same reason, we don't have a std::variant<T..> instances (ordinal
+ * tags 0...n).
+ *
+ * We could the generic instances and then these as specializations for
+ * compatability, but that's proven a bit finnicky, and also makes the
+ * worker protocol harder to implement in other languages where such
+ * specializations may not be allowed.
  */
 MAKE_WORKER_PROTO(, std::optional<StorePath>);
 MAKE_WORKER_PROTO(, std::optional<ContentAddress>);

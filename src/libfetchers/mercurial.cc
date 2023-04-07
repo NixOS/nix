@@ -5,6 +5,8 @@
 #include "store-api.hh"
 #include "url-parts.hh"
 
+#include "fetch-settings.hh"
+
 #include <sys/time.h>
 
 using namespace std::string_literals;
@@ -34,14 +36,14 @@ static std::string runHg(const Strings & args, const std::optional<std::string> 
     auto res = runProgram(std::move(opts));
 
     if (!statusOk(res.first))
-        throw ExecError(res.first, fmt("hg %1%", statusToString(res.first)));
+        throw ExecError(res.first, "hg %1%", statusToString(res.first));
 
     return res.second;
 }
 
 struct MercurialInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url) override
+    std::optional<Input> inputFromURL(const ParsedURL & url) const override
     {
         if (url.scheme != "hg+http" &&
             url.scheme != "hg+https" &&
@@ -67,7 +69,7 @@ struct MercurialInputScheme : InputScheme
         return inputFromAttrs(attrs);
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) override
+    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
         if (maybeGetStrAttr(attrs, "type") != "hg") return {};
 
@@ -87,7 +89,7 @@ struct MercurialInputScheme : InputScheme
         return input;
     }
 
-    ParsedURL toURL(const Input & input) override
+    ParsedURL toURL(const Input & input) const override
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         url.scheme = "hg+" + url.scheme;
@@ -96,7 +98,7 @@ struct MercurialInputScheme : InputScheme
         return url;
     }
 
-    bool hasAllInfo(const Input & input) override
+    bool hasAllInfo(const Input & input) const override
     {
         // FIXME: ugly, need to distinguish between dirty and clean
         // default trees.
@@ -106,7 +108,7 @@ struct MercurialInputScheme : InputScheme
     Input applyOverrides(
         const Input & input,
         std::optional<std::string> ref,
-        std::optional<Hash> rev) override
+        std::optional<Hash> rev) const override
     {
         auto res(input);
         if (rev) res.attrs.insert_or_assign("rev", rev->gitRev());
@@ -165,10 +167,10 @@ struct MercurialInputScheme : InputScheme
                 /* This is an unclean working tree. So copy all tracked
                    files. */
 
-                if (!settings.allowDirty)
+                if (!fetchSettings.allowDirty)
                     throw Error("Mercurial tree '%s' is unclean", actualUrl);
 
-                if (settings.warnDirty)
+                if (fetchSettings.warnDirty)
                     warn("Mercurial tree '%s' is unclean", actualUrl);
 
                 input.attrs.insert_or_assign("ref", chomp(runHg({ "branch", "-R", actualUrl })));
@@ -176,9 +178,11 @@ struct MercurialInputScheme : InputScheme
                 auto files = tokenizeString<std::set<std::string>>(
                     runHg({ "status", "-R", actualUrl, "--clean", "--modified", "--added", "--no-status", "--print0" }), "\0"s);
 
+                Path actualPath(absPath(actualUrl));
+
                 PathFilter filter = [&](const Path & p) -> bool {
-                    assert(hasPrefix(p, actualUrl));
-                    std::string file(p, actualUrl.size() + 1);
+                    assert(hasPrefix(p, actualPath));
+                    std::string file(p, actualPath.size() + 1);
 
                     auto st = lstat(p);
 
@@ -191,7 +195,7 @@ struct MercurialInputScheme : InputScheme
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore(input.getName(), actualUrl, FileIngestionMethod::Recursive, htSHA256, filter);
+                auto storePath = store->addToStore(input.getName(), actualPath, FileIngestionMethod::Recursive, htSHA256, filter);
 
                 return {std::move(storePath), input};
             }
@@ -199,8 +203,17 @@ struct MercurialInputScheme : InputScheme
 
         if (!input.getRef()) input.attrs.insert_or_assign("ref", "default");
 
+        auto checkHashType = [&](const std::optional<Hash> & hash)
+        {
+            if (hash.has_value() && hash->type != htSHA1)
+                throw Error("Hash '%s' is not supported by Mercurial. Only sha1 is supported.", hash->to_string(Base16, true));
+        };
+
+
         auto getLockedAttrs = [&]()
         {
+            checkHashType(input.getRev());
+
             return Attrs({
                 {"type", "hg"},
                 {"name", name},
@@ -260,7 +273,7 @@ struct MercurialInputScheme : InputScheme
                         runHg({ "recover", "-R", cacheDir });
                         runHg({ "pull", "-R", cacheDir, "--", actualUrl });
                     } else {
-                        throw ExecError(e.status, fmt("'hg pull' %s", statusToString(e.status)));
+                        throw ExecError(e.status, "'hg pull' %s", statusToString(e.status));
                     }
                 }
             } else {

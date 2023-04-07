@@ -70,10 +70,17 @@ void AbstractConfig::reapplyUnknownSettings()
         set(s.first, s.second);
 }
 
+// Whether we should process the option. Excludes aliases, which are handled elsewhere, and disabled features.
+static bool applicable(const Config::SettingData & sd)
+{
+    return !sd.isAlias
+        && experimentalFeatureSettings.isEnabled(sd.setting->experimentalFeature);
+}
+
 void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly)
 {
     for (auto & opt : _settings)
-        if (!opt.second.isAlias && (!overriddenOnly || opt.second.setting->overridden))
+        if (applicable(opt.second) && (!overriddenOnly || opt.second.setting->overridden))
             res.emplace(opt.first, SettingInfo{opt.second.setting->to_string(), opt.second.setting->description});
 }
 
@@ -147,9 +154,8 @@ nlohmann::json Config::toJSON()
 {
     auto res = nlohmann::json::object();
     for (auto & s : _settings)
-        if (!s.second.isAlias) {
+        if (applicable(s.second))
             res.emplace(s.first, s.second.setting->toJSON());
-        }
     return res;
 }
 
@@ -157,24 +163,31 @@ std::string Config::toKeyValue()
 {
     auto res = std::string();
     for (auto & s : _settings)
-        if (!s.second.isAlias) {
+        if (applicable(s.second))
             res += fmt("%s = %s\n", s.first, s.second.setting->to_string());
-        }
     return res;
 }
 
 void Config::convertToArgs(Args & args, const std::string & category)
 {
-    for (auto & s : _settings)
+    for (auto & s : _settings) {
+        /* We do include args for settings gated on disabled
+           experimental-features. The args themselves however will also be
+           gated on any experimental feature the underlying setting is. */
         if (!s.second.isAlias)
             s.second.setting->convertToArg(args, category);
+    }
 }
 
 AbstractSetting::AbstractSetting(
     const std::string & name,
     const std::string & description,
-    const std::set<std::string> & aliases)
-    : name(name), description(stripIndentation(description)), aliases(aliases)
+    const std::set<std::string> & aliases,
+    std::optional<ExperimentalFeature> experimentalFeature)
+    : name(name)
+    , description(stripIndentation(description))
+    , aliases(aliases)
+    , experimentalFeature(experimentalFeature)
 {
 }
 
@@ -209,7 +222,8 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
         .description = fmt("Set the `%s` setting.", name),
         .category = category,
         .labels = {"value"},
-        .handler = {[=](std::string s) { overridden = true; set(s); }},
+        .handler = {[this](std::string s) { overridden = true; set(s); }},
+        .experimentalFeature = experimentalFeature,
     });
 
     if (isAppendable())
@@ -218,7 +232,8 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
             .description = fmt("Append to the `%s` setting.", name),
             .category = category,
             .labels = {"value"},
-            .handler = {[=](std::string s) { overridden = true; set(s, true); }},
+            .handler = {[this](std::string s) { overridden = true; set(s, true); }},
+            .experimentalFeature = experimentalFeature,
         });
 }
 
@@ -270,13 +285,15 @@ template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string &
         .longName = name,
         .description = fmt("Enable the `%s` setting.", name),
         .category = category,
-        .handler = {[=]() { override(true); }}
+        .handler = {[this]() { override(true); }},
+        .experimentalFeature = experimentalFeature,
     });
     args.addFlag({
         .longName = "no-" + name,
         .description = fmt("Disable the `%s` setting.", name),
         .category = category,
-        .handler = {[=]() { override(false); }}
+        .handler = {[this]() { override(false); }},
+        .experimentalFeature = experimentalFeature,
     });
 }
 
@@ -442,6 +459,32 @@ GlobalConfig::Register::Register(Config * config)
     if (!configRegistrations)
         configRegistrations = new ConfigRegistrations;
     configRegistrations->emplace_back(config);
+}
+
+ExperimentalFeatureSettings experimentalFeatureSettings;
+
+static GlobalConfig::Register rSettings(&experimentalFeatureSettings);
+
+bool ExperimentalFeatureSettings::isEnabled(const ExperimentalFeature & feature) const
+{
+    auto & f = experimentalFeatures.get();
+    return std::find(f.begin(), f.end(), feature) != f.end();
+}
+
+void ExperimentalFeatureSettings::require(const ExperimentalFeature & feature) const
+{
+    if (!isEnabled(feature))
+        throw MissingExperimentalFeature(feature);
+}
+
+bool ExperimentalFeatureSettings::isEnabled(const std::optional<ExperimentalFeature> & feature) const
+{
+    return !feature || isEnabled(*feature);
+}
+
+void ExperimentalFeatureSettings::require(const std::optional<ExperimentalFeature> & feature) const
+{
+    if (feature) require(*feature);
 }
 
 }

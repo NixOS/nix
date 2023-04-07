@@ -1,13 +1,17 @@
 #include "store-api.hh"
 
+#include <sodium.h>
+
 namespace nix {
 
 static void checkName(std::string_view path, std::string_view name)
 {
     if (name.empty())
         throw BadStorePath("store path '%s' has an empty name", path);
-    if (name.size() > 211)
-        throw BadStorePath("store path '%s' has a name longer than 211 characters", path);
+    if (name.size() > StorePath::MaxPathLen)
+        throw BadStorePath("store path '%s' has a name longer than '%d characters",
+            StorePath::MaxPathLen, path);
+    // See nameRegexStr for the definition
     for (auto c : name)
         if (!((c >= '0' && c <= '9')
                 || (c >= 'a' && c <= 'z')
@@ -40,6 +44,13 @@ bool StorePath::isDerivation() const
 }
 
 StorePath StorePath::dummy("ffffffffffffffffffffffffffffffff-x");
+
+StorePath StorePath::random(std::string_view name)
+{
+    Hash hash(htSHA1);
+    randombytes_buf(hash.hash, hash.hashSize);
+    return StorePath(hash, name);
+}
 
 StorePath Store::parseStorePath(std::string_view path) const
 {

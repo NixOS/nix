@@ -19,8 +19,8 @@ echo "evaluating c..."
 # outputs.
 drvPath=$(nix-instantiate multiple-outputs.nix -A c)
 #[ "$drvPath" = "$drvPath2" ]
-grep -q 'multiple-outputs-a.drv",\["first","second"\]' $drvPath
-grep -q 'multiple-outputs-b.drv",\["out"\]' $drvPath
+grepQuiet 'multiple-outputs-a.drv",\["first","second"\]' $drvPath
+grepQuiet 'multiple-outputs-b.drv",\["out"\]' $drvPath
 
 # While we're at it, test the ‘unsafeDiscardOutputDependency’ primop.
 outPath=$(nix-build multiple-outputs.nix -A d --no-out-link)
@@ -83,3 +83,6 @@ nix-store --gc --keep-derivations --keep-outputs
 nix-store --gc --print-roots
 rm -rf $NIX_STORE_DIR/.links
 rmdir $NIX_STORE_DIR
+
+expect 1 nix build -f multiple-outputs.nix invalid-output-name-1 2>&1 | grep 'contains illegal character'
+expect 1 nix build -f multiple-outputs.nix invalid-output-name-2 2>&1 | grep 'contains illegal character'

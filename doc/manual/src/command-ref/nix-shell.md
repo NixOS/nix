@@ -15,6 +15,12 @@
   [`--keep` *name*]
   {{`--packages` | `-p`} {*packages* | *expressions*} … | [*path*]}
 
+# Disambiguation
+
+This man page describes the command `nix-shell`, which is distinct from `nix
+shell`. For documentation on the latter, run `nix shell --help` or see `man
+nix3-shell`.
+
 # Description
 
 The command `nix-shell` will build the dependencies of the specified
@@ -95,7 +101,7 @@ All options not listed here are passed to `nix-store
     When a `--pure` shell is started, keep the listed environment
     variables.
 
-The following common options are supported:
+{{#include ./opt-common.md}}
 
 # Environment variables
 
@@ -103,6 +109,8 @@ The following common options are supported:
     Shell used to start the interactive environment. Defaults to the
     `bash` found in `<nixpkgs>`, falling back to the `bash` found in
     `PATH` if not found.
+
+{{#include ./env-common.md}}
 
 # Examples
 
@@ -112,7 +120,8 @@ shell in which to build it:
 ```console
 $ nix-shell '<nixpkgs>' -A pan
 [nix-shell]$ eval ${unpackPhase:-unpackPhase}
-[nix-shell]$ cd pan-*
+[nix-shell]$ cd $sourceRoot
+[nix-shell]$ eval ${patchPhase:-patchPhase}
 [nix-shell]$ eval ${configurePhase:-configurePhase}
 [nix-shell]$ eval ${buildPhase:-buildPhase}
 [nix-shell]$ ./pan/gui/pan

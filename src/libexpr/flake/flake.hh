@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "types.hh"
 #include "flakeref.hh"
@@ -108,14 +109,20 @@ struct LockFlags
 
     bool applyNixConfig = false;
 
-    /* Whether mutable flake references (i.e. those without a Git
+    /* Whether unlocked flake references (i.e. those without a Git
        revision or similar) without a corresponding lock are
-       allowed. Mutable flake references with a lock are always
+       allowed. Unlocked flake references with a lock are always
        allowed. */
-    bool allowMutable = true;
+    bool allowUnlocked = true;
 
     /* Whether to commit changes to flake.lock. */
     bool commitLockFile = false;
+
+    /* The path to a lock file to read instead of the `flake.lock` file in the top-level flake */
+    std::optional<std::string> referenceLockFilePath;
+
+    /* The path to a lock file to write to instead of the `flake.lock` file in the top-level flake */
+    std::optional<Path> outputLockFilePath;
 
     /* Flake inputs to be overridden. */
     std::map<InputPath, FlakeRef> inputOverrides;

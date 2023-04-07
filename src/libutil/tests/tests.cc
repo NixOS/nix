@@ -312,6 +312,42 @@ namespace nix {
     }
 
     /* ----------------------------------------------------------------------------
+     * getLine
+     * --------------------------------------------------------------------------*/
+
+    TEST(getLine, all) {
+        {
+            auto [line, rest] = getLine("foo\nbar\nxyzzy");
+            ASSERT_EQ(line, "foo");
+            ASSERT_EQ(rest, "bar\nxyzzy");
+        }
+
+        {
+            auto [line, rest] = getLine("foo\r\nbar\r\nxyzzy");
+            ASSERT_EQ(line, "foo");
+            ASSERT_EQ(rest, "bar\r\nxyzzy");
+        }
+
+        {
+            auto [line, rest] = getLine("foo\n");
+            ASSERT_EQ(line, "foo");
+            ASSERT_EQ(rest, "");
+        }
+
+        {
+            auto [line, rest] = getLine("foo");
+            ASSERT_EQ(line, "foo");
+            ASSERT_EQ(rest, "");
+        }
+
+        {
+            auto [line, rest] = getLine("");
+            ASSERT_EQ(line, "");
+            ASSERT_EQ(rest, "");
+        }
+    }
+
+    /* ----------------------------------------------------------------------------
      * toLower
      * --------------------------------------------------------------------------*/
 
@@ -548,7 +584,7 @@ namespace nix {
 
     TEST(get, emptyContainer) {
         StringMap s = { };
-        auto expected = std::nullopt;
+        auto expected = nullptr;
 
         ASSERT_EQ(get(s, "one"), expected);
     }
@@ -559,7 +595,23 @@ namespace nix {
         s["two"] = "er";
         auto expected = "yi";
 
-        ASSERT_EQ(get(s, "one"), expected);
+        ASSERT_EQ(*get(s, "one"), expected);
+    }
+
+    TEST(getOr, emptyContainer) {
+        StringMap s = { };
+        auto expected = "yi";
+
+        ASSERT_EQ(getOr(s, "one", "yi"), expected);
+    }
+
+    TEST(getOr, getFromContainer) {
+        StringMap s;
+        s["one"] = "yi";
+        s["two"] = "er";
+        auto expected = "yi";
+
+        ASSERT_EQ(getOr(s, "one", "nope"), expected);
     }
 
     /* ----------------------------------------------------------------------------

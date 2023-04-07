@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "comparator.hh"
 #include "error.hh"
@@ -12,14 +13,20 @@ namespace nix {
  *
  * If you update this, don’t forget to also change the map defining their
  * string representation in the corresponding `.cc` file.
- **/
+ */
 enum struct ExperimentalFeature
 {
     CaDerivations,
+    ImpureDerivations,
     Flakes,
     NixCommand,
     RecursiveNix,
     NoUrlLiterals,
+    FetchClosure,
+    ReplFlake,
+    AutoAllocateUids,
+    Cgroups,
+    DiscardReferences,
 
     /**
      * A "permanent" experimental feature for extra features we just
@@ -53,10 +60,13 @@ public:
     ExperimentalFeature missingFeature;
 
     MissingExperimentalFeature(ExperimentalFeature);
-    virtual const char * sname() const override
-    {
-        return "MissingExperimentalFeature";
-    }
 };
+
+/**
+ * Semi-magic conversion to and from json.
+ * See the nlohmann/json readme for more details.
+ */
+void to_json(nlohmann::json &, const ExperimentalFeature &);
+void from_json(const nlohmann::json &, ExperimentalFeature &);
 
 }

@@ -41,13 +41,13 @@ std::vector<Symbol> parseAttrPath(EvalState & state, std::string_view s)
 }
 
 
-std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const std::string & attrPath,
+std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::string & attrPath,
     Bindings & autoArgs, Value & vIn)
 {
     Strings tokens = parseAttrPath(attrPath);
 
     Value * v = &vIn;
-    Pos pos = noPos;
+    PosIdx pos = noPos;
 
     for (auto & attr : tokens) {
 
@@ -74,10 +74,16 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const std::string &
                 throw Error("empty attribute name in selection path '%1%'", attrPath);
 
             Bindings::iterator a = v->attrs->find(state.symbols.create(attr));
-            if (a == v->attrs->end())
-                throw AttrPathNotFound("attribute '%1%' in selection path '%2%' not found", attr, attrPath);
+            if (a == v->attrs->end()) {
+                std::set<std::string> attrNames;
+                for (auto & attr : *v->attrs)
+                    attrNames.insert(state.symbols[attr.name]);
+
+                auto suggestions = Suggestions::bestMatches(attrNames, attr);
+                throw AttrPathNotFound(suggestions, "attribute '%1%' in selection path '%2%' not found", attr, attrPath);
+            }
             v = &*a->value;
-            pos = *a->pos;
+            pos = a->pos;
         }
 
         else {
@@ -100,7 +106,7 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const std::string &
 }
 
 
-Pos findPackageFilename(EvalState & state, Value & v, std::string what)
+std::pair<std::string, uint32_t> findPackageFilename(EvalState & state, Value & v, std::string what)
 {
     Value * v2;
     try {
@@ -112,7 +118,7 @@ Pos findPackageFilename(EvalState & state, Value & v, std::string what)
 
     // FIXME: is it possible to extract the Pos object instead of doing this
     //        toString + parsing?
-    auto pos = state.forceString(*v2);
+    auto pos = state.forceString(*v2, noPos, "while evaluating the 'meta.position' attribute of a derivation");
 
     auto colon = pos.rfind(':');
     if (colon == std::string::npos)
@@ -126,9 +132,7 @@ Pos findPackageFilename(EvalState & state, Value & v, std::string what)
         throw ParseError("cannot parse line number '%s'", pos);
     }
 
-    Symbol file = state.symbols.create(filename);
-
-    return { foFile, file, lineno, 0 };
+    return { std::move(filename), lineno };
 }
 
 

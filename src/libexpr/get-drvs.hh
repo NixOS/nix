@@ -1,6 +1,8 @@
 #pragma once
+///@file
 
 #include "eval.hh"
+#include "path.hh"
 
 #include <string>
 #include <map>
@@ -12,15 +14,15 @@ namespace nix {
 struct DrvInfo
 {
 public:
-    typedef std::map<std::string, Path> Outputs;
+    typedef std::map<std::string, std::optional<StorePath>> Outputs;
 
 private:
     EvalState * state;
 
     mutable std::string name;
     mutable std::string system;
-    mutable std::string drvPath;
-    mutable std::optional<std::string> outPath;
+    mutable std::optional<std::optional<StorePath>> drvPath;
+    mutable std::optional<StorePath> outPath;
     mutable std::string outputName;
     Outputs outputs;
 
@@ -41,11 +43,13 @@ public:
 
     std::string queryName() const;
     std::string querySystem() const;
-    std::string queryDrvPath() const;
-    std::string queryOutPath() const;
+    std::optional<StorePath> queryDrvPath() const;
+    StorePath requireDrvPath() const;
+    StorePath queryOutPath() const;
     std::string queryOutputName() const;
-    /** Return the list of outputs. The "outputs to install" are determined by `meta.outputsToInstall`. */
-    Outputs queryOutputs(bool onlyOutputsToInstall = false);
+    /** Return the unordered map of output names to (optional) output paths.
+     * The "outputs to install" are determined by `meta.outputsToInstall`. */
+    Outputs queryOutputs(bool withPaths = true, bool onlyOutputsToInstall = false);
 
     StringSet queryMetaNames();
     Value * queryMeta(const std::string & name);
@@ -61,8 +65,8 @@ public:
     */
 
     void setName(const std::string & s) { name = s; }
-    void setDrvPath(const std::string & s) { drvPath = s; }
-    void setOutPath(const std::string & s) { outPath = s; }
+    void setDrvPath(StorePath path) { drvPath = {{std::move(path)}}; }
+    void setOutPath(StorePath path) { outPath = {{std::move(path)}}; }
 
     void setFailed() { failed = true; };
     bool hasFailed() { return failed; };
@@ -70,7 +74,7 @@ public:
 
 
 #if HAVE_BOEHMGC
-typedef std::list<DrvInfo, traceable_allocator<DrvInfo> > DrvInfos;
+typedef std::list<DrvInfo, traceable_allocator<DrvInfo>> DrvInfos;
 #else
 typedef std::list<DrvInfo> DrvInfos;
 #endif

@@ -41,8 +41,6 @@ AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier ('cpu-os')])
 test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
 
 
-CFLAGS=
-CXXFLAGS=
 AC_PROG_CC
 AC_PROG_CXX
 AC_PROG_CPP
@@ -147,6 +145,32 @@ if test "x$GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC" = xyes; then
     LDFLAGS="-latomic $LDFLAGS"
 fi
 
+# Building without tests is useful for bootstrapping with a smaller footprint
+# or running the tests in a separate derivation. Otherwise, we do compile and
+# run them.
+AC_ARG_ENABLE(tests, AS_HELP_STRING([--disable-tests],[Do not build the tests]),
+  tests=$enableval, tests=yes)
+AC_SUBST(tests)
+
+# Building without API docs is the default as Nix' C++ interfaces are internal and unstable.
+AC_ARG_ENABLE(internal_api_docs, AS_HELP_STRING([--enable-internal-api-docs],[Build API docs for Nix's internal unstable C++ interfaces]),
+  internal_api_docs=$enableval, internal_api_docs=no)
+AC_SUBST(internal_api_docs)
+
+# LTO is currently broken with clang for unknown reasons; ld segfaults in the llvm plugin
+AC_ARG_ENABLE(lto, AS_HELP_STRING([--enable-lto],[Enable LTO (only supported with GCC) [default=no]]),
+  lto=$enableval, lto=no)
+if test "$lto" = yes; then
+    if $CXX --version | grep -q GCC; then
+        AC_SUBST(CXXLTO, [-flto=jobserver])
+    else
+        echo "error: LTO is only supported with GCC at the moment" >&2
+        exit 1
+    fi
+else
+    AC_SUBST(CXXLTO, [""])
+fi
+
 PKG_PROG_PKG_CONFIG
 
 AC_ARG_ENABLE(shared, AS_HELP_STRING([--enable-shared],[Build shared libraries for Nix [default=yes]]),
@@ -163,7 +187,7 @@ fi
 PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
 
 
-# Checks for libarchive
+# Look for libarchive.
 PKG_CHECK_MODULES([LIBARCHIVE], [libarchive >= 3.1.2], [CXXFLAGS="$LIBARCHIVE_CFLAGS $CXXFLAGS"])
 # Workaround until https://github.com/libarchive/libarchive/issues/1446 is fixed
 if test "$shared" != yes; then
@@ -258,9 +282,23 @@ if test "$gc" = yes; then
 fi
 
 
+if test "$tests" = yes; then
+
 # Look for gtest.
 PKG_CHECK_MODULES([GTEST], [gtest_main])
 
+
+# Look for rapidcheck.
+# No pkg-config yet, https://github.com/emil-e/rapidcheck/issues/302
+AC_LANG_PUSH(C++)
+AC_SUBST(RAPIDCHECK_HEADERS)
+[CXXFLAGS="-I $RAPIDCHECK_HEADERS $CXXFLAGS"]
+AC_CHECK_HEADERS([rapidcheck/gtest.h], [], [], [#include <gtest/gtest.h>])
+dnl No good for C++ libs with mangled symbols
+dnl AC_CHECK_LIB([rapidcheck], [])
+AC_LANG_POP(C++)
+
+fi
 
 # Look for nlohmann/json.
 PKG_CHECK_MODULES([NLOHMANN_JSON], [nlohmann_json >= 3.9])
@@ -282,18 +320,28 @@ AC_CHECK_FUNCS([setresuid setreuid lchown])
 AC_CHECK_FUNCS([strsignal posix_fallocate sysconf])
 
 
-# This is needed if bzip2 is a static library, and the Nix libraries
-# are dynamic.
-case "${host_os}" in
-  darwin*)
-    LDFLAGS="-all_load $LDFLAGS"
-    ;;
-esac
-
-
 AC_ARG_WITH(sandbox-shell, AS_HELP_STRING([--with-sandbox-shell=PATH],[path of a statically-linked shell to use as /bin/sh in sandboxes]),
   sandbox_shell=$withval)
 AC_SUBST(sandbox_shell)
+if test ${cross_compiling:-no} = no && ! test -z ${sandbox_shell+x}; then
+  AC_MSG_CHECKING([whether sandbox-shell has the standalone feature])
+  # busybox shell sometimes allows executing other busybox applets,
+  # even if they are not in the path, breaking our sandbox
+  if PATH= $sandbox_shell -c "busybox" 2>&1 | grep -qv "not found"; then
+    AC_MSG_RESULT(enabled)
+    AC_MSG_ERROR([Please disable busybox FEATURE_SH_STANDALONE])
+  else
+    AC_MSG_RESULT(disabled)
+  fi
+fi
+
+AC_ARG_ENABLE(embedded-sandbox-shell, AS_HELP_STRING([--enable-embedded-sandbox-shell],[include the sandbox shell in the Nix binary [default=no]]),
+  embedded_sandbox_shell=$enableval, embedded_sandbox_shell=no)
+AC_SUBST(embedded_sandbox_shell)
+if test "$embedded_sandbox_shell" = yes; then
+  AC_DEFINE(HAVE_EMBEDDED_SANDBOX_SHELL, 1, [Include the sandbox shell in the Nix binary.])
+fi
+
 
 # Expand all variables in config.status.
 test "$prefix" = NONE && prefix=$ac_default_prefix

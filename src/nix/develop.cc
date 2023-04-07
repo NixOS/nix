@@ -1,9 +1,10 @@
 #include "eval.hh"
-#include "command.hh"
+#include "installable-flake.hh"
+#include "command-installable-value.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "path-with-outputs.hh"
+#include "outputs-spec.hh"
 #include "derivations.hh"
 #include "progress-bar.hh"
 #include "run.hh"
@@ -17,6 +18,9 @@ struct DevelopSettings : Config
 {
     Setting<std::string> bashPrompt{this, "", "bash-prompt",
         "The bash prompt (`PS1`) in `nix develop` shells."};
+
+    Setting<std::string> bashPromptPrefix{this, "", "bash-prompt-prefix",
+        "Prefix prepended to the `PS1` environment variable in `nix develop` shells."};
 
     Setting<std::string> bashPromptSuffix{this, "", "bash-prompt-suffix",
         "Suffix appended to the `PS1` environment variable in `nix develop` shells."};
@@ -161,6 +165,14 @@ struct BuildEnvironment
     {
         return vars == other.vars && bashFunctions == other.bashFunctions;
     }
+
+    std::string getSystem() const
+    {
+        if (auto v = get(vars, "system"))
+            return getString(*v);
+        else
+            return settings.thisSystem;
+    }
 };
 
 const static std::string getEnvSh =
@@ -189,28 +201,31 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     drv.env.erase("allowedRequisites");
     drv.env.erase("disallowedReferences");
     drv.env.erase("disallowedRequisites");
+    drv.env.erase("name");
 
     /* Rehash and write the derivation. FIXME: would be nice to use
        'buildDerivation', but that's privileged. */
     drv.name += "-env";
+    drv.env.emplace("name", drv.name);
     drv.inputSrcs.insert(std::move(getEnvShPath));
-    if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
+    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
         for (auto & output : drv.outputs) {
-            output.second = {
-                .output = DerivationOutputDeferred{},
-            };
+            output.second = DerivationOutput::Deferred {},
             drv.env[output.first] = hashPlaceholder(output.first);
         }
     } else {
         for (auto & output : drv.outputs) {
-            output.second = { .output = DerivationOutputInputAddressed { .path = StorePath::dummy } };
+            output.second = DerivationOutput::Deferred { };
             drv.env[output.first] = "";
         }
-        Hash h = std::get<0>(hashDerivationModulo(*evalStore, drv, true));
+        auto hashesModulo = hashDerivationModulo(*evalStore, drv, true);
 
         for (auto & output : drv.outputs) {
+            Hash h = hashesModulo.hashes.at(output.first);
             auto outPath = store->makeOutputPath(output.first, h, drv.name);
-            output.second = { .output = DerivationOutputInputAddressed { .path = outPath } };
+            output.second = DerivationOutput::InputAddressed {
+                .path = outPath,
+            };
             drv.env[output.first] = store->printStorePath(outPath);
         }
     }
@@ -218,7 +233,12 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     auto shellDrvPath = writeDerivation(*evalStore, drv);
 
     /* Build the derivation. */
-    store->buildPaths({DerivedPath::Built{shellDrvPath}}, bmNormal, evalStore);
+    store->buildPaths(
+        { DerivedPath::Built {
+            .drvPath = shellDrvPath,
+            .outputs = OutputsSpec::All { },
+        }},
+        bmNormal, evalStore);
 
     for (auto & [_0, optPath] : evalStore->queryPartialDerivationOutputMap(shellDrvPath)) {
         assert(optPath);
@@ -232,7 +252,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     throw Error("get-env.sh failed to produce an environment");
 }
 
-struct Common : InstallableCommand, MixProfile
+struct Common : InstallableValueCommand, MixProfile
 {
     std::set<std::string> ignoreVars{
         "BASHOPTS",
@@ -242,6 +262,7 @@ struct Common : InstallableCommand, MixProfile
         "NIX_LOG_FD",
         "NIX_REMOTE",
         "PPID",
+        "SHELL",
         "SHELLOPTS",
         "SSL_CERT_FILE", // FIXME: only want to ignore /no-cert-file.crt
         "TEMP",
@@ -272,15 +293,27 @@ struct Common : InstallableCommand, MixProfile
         const BuildEnvironment & buildEnvironment,
         const Path & outputsDir = absPath(".") + "/outputs")
     {
+        // A list of colon-separated environment variables that should be
+        // prepended to, rather than overwritten, in order to keep the shell usable.
+        // Please keep this list minimal in order to avoid impurities.
+        static const char * const savedVars[] = {
+            "PATH",          // for commands
+            "XDG_DATA_DIRS", // for loadable completion
+        };
+
         std::ostringstream out;
 
         out << "unset shellHook\n";
 
-        out << "nix_saved_PATH=\"$PATH\"\n";
+        for (auto & var : savedVars) {
+            out << fmt("%s=${%s:-}\n", var, var);
+            out << fmt("nix_saved_%s=\"$%s\"\n", var, var);
+        }
 
         buildEnvironment.toBash(out, ignoreVars);
 
-        out << "PATH=\"$PATH:$nix_saved_PATH\"\n";
+        for (auto & var : savedVars)
+            out << fmt("%s=\"$%s${nix_saved_%s:+:$nix_saved_%s}\"\n", var, var, var, var);
 
         out << "export NIX_BUILD_TOP=\"$(mktemp -d -t nix-shell.XXXXXX)\"\n";
         for (auto & i : {"TMP", "TMPDIR", "TEMP", "TEMPDIR"})
@@ -307,7 +340,7 @@ struct Common : InstallableCommand, MixProfile
         for (auto & [installable_, dir_] : redirects) {
             auto dir = absPath(dir_);
             auto installable = parseInstallable(store, installable_);
-            auto builtPaths = toStorePaths(
+            auto builtPaths = Installable::toStorePaths(
                 getEvalStore(), store, Realise::Nothing, OperateOn::Output, {installable});
             for (auto & path: builtPaths) {
                 auto from = store->printStorePath(path);
@@ -341,13 +374,13 @@ struct Common : InstallableCommand, MixProfile
         return res;
     }
 
-    StorePath getShellOutPath(ref<Store> store)
+    StorePath getShellOutPath(ref<Store> store, ref<InstallableValue> installable)
     {
         auto path = installable->getStorePath();
         if (path && hasSuffix(path->to_string(), "-env"))
             return *path;
         else {
-            auto drvs = toDerivations(store, {installable});
+            auto drvs = Installable::toDerivations(store, {installable});
 
             if (drvs.size() != 1)
                 throw Error("'%s' needs to evaluate to a single derivation, but it evaluated to %d derivations",
@@ -359,9 +392,10 @@ struct Common : InstallableCommand, MixProfile
         }
     }
 
-    std::pair<BuildEnvironment, std::string> getBuildEnvironment(ref<Store> store)
+    std::pair<BuildEnvironment, std::string>
+    getBuildEnvironment(ref<Store> store, ref<InstallableValue> installable)
     {
-        auto shellOutPath = getShellOutPath(store);
+        auto shellOutPath = getShellOutPath(store, installable);
 
         auto strPath = store->printStorePath(shellOutPath);
 
@@ -447,9 +481,9 @@ struct CmdDevelop : Common, MixEnvironment
           ;
     }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<InstallableValue> installable) override
     {
-        auto [buildEnvironment, gcroot] = getBuildEnvironment(store);
+        auto [buildEnvironment, gcroot] = getBuildEnvironment(store, installable);
 
         auto [rcFileFd, rcFilePath] = createTempFile("nix-shell");
 
@@ -481,6 +515,9 @@ struct CmdDevelop : Common, MixEnvironment
             if (developSettings.bashPrompt != "")
                 script += fmt("[ -n \"$PS1\" ] && PS1=%s;\n",
                     shellEscape(developSettings.bashPrompt.get()));
+            if (developSettings.bashPromptPrefix != "")
+                script += fmt("[ -n \"$PS1\" ] && PS1=%s\"$PS1\";\n",
+                    shellEscape(developSettings.bashPromptPrefix.get()));
             if (developSettings.bashPromptSuffix != "")
                 script += fmt("[ -n \"$PS1\" ] && PS1+=%s;\n",
                     shellEscape(developSettings.bashPromptSuffix.get()));
@@ -501,17 +538,30 @@ struct CmdDevelop : Common, MixEnvironment
             nixpkgsLockFlags.inputOverrides = {};
             nixpkgsLockFlags.inputUpdates = {};
 
-            auto bashInstallable = std::make_shared<InstallableFlake>(
+            auto bashInstallable = make_ref<InstallableFlake>(
                 this,
                 state,
                 installable->nixpkgsFlakeRef(),
                 "bashInteractive",
+                DefaultOutputs(),
                 Strings{},
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
                 nixpkgsLockFlags);
 
-            shell = store->printStorePath(
-                toStorePath(getEvalStore(), store, Realise::Outputs, OperateOn::Output, bashInstallable)) + "/bin/bash";
+            bool found = false;
+
+            for (auto & path : Installable::toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, {bashInstallable})) {
+                auto s = store->printStorePath(path) + "/bin/bash";
+                if (pathExists(s)) {
+                    shell = s;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+                throw Error("package 'nixpkgs#bashInteractive' does not provide a 'bin/bash'");
+
         } catch (Error &) {
             ignoreException();
         }
@@ -524,7 +574,7 @@ struct CmdDevelop : Common, MixEnvironment
         // Need to chdir since phases assume in flake directory
         if (phase) {
             // chdir if installable is a flake of type git+file or path
-            auto installableFlake = std::dynamic_pointer_cast<InstallableFlake>(installable);
+            auto installableFlake = installable.dynamic_pointer_cast<InstallableFlake>();
             if (installableFlake) {
                 auto sourcePath = installableFlake->getLockedFlake()->flake.resolvedRef.input.getSourcePath();
                 if (sourcePath) {
@@ -535,7 +585,7 @@ struct CmdDevelop : Common, MixEnvironment
             }
         }
 
-        runProgramInStore(store, shell, args);
+        runProgramInStore(store, shell, args, buildEnvironment.getSystem());
     }
 };
 
@@ -555,9 +605,9 @@ struct CmdPrintDevEnv : Common, MixJSON
 
     Category category() override { return catUtility; }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<InstallableValue> installable) override
     {
-        auto buildEnvironment = getBuildEnvironment(store).first;
+        auto buildEnvironment = getBuildEnvironment(store, installable).first;
 
         stopProgressBar();
 

@@ -1,11 +1,17 @@
 #pragma once
+///@file
 
+#include <variant>
+
+#include "hash.hh"
 #include "path.hh"
 #include <nlohmann/json_fwd.hpp>
 #include "comparator.hh"
 #include "crypto.hh"
 
 namespace nix {
+
+class Store;
 
 struct DrvOutput {
     // The hash modulo of the derivation
@@ -91,6 +97,16 @@ struct RealisedPath {
     Set closure(Store& store) const;
 
     GENERATE_CMP(RealisedPath, me->raw);
+};
+
+class MissingRealisation : public Error
+{
+public:
+    MissingRealisation(DrvOutput & outputId)
+        : Error( "cannot operate on an output of the "
+                "unbuilt derivation '%s'",
+                outputId.to_string())
+    {}
 };
 
 }

@@ -8,7 +8,11 @@ define run-install-test
 
   .PHONY: $1.test
   $1.test: $1 $(test-deps)
-	@env TEST_NAME=$(basename $1) TESTS_ENVIRONMENT="$(tests-environment)" mk/run_test.sh $1 < /dev/null
+	@env BASH=$(bash) $(bash) mk/run-test.sh $1 < /dev/null
+
+  .PHONY: $1.test-debug
+  $1.test-debug: $1 $(test-deps)
+	@env BASH=$(bash) $(bash) mk/debug-test.sh $1 < /dev/null
 
 endef
 

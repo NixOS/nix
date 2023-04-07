@@ -4,6 +4,7 @@
 #include "fetchers.hh"
 #include "filetransfer.hh"
 #include "registry.hh"
+#include "url.hh"
 
 #include <ctime>
 #include <iomanip>
@@ -68,7 +69,16 @@ void emitTreeAttrs(
 std::string fixURI(std::string uri, EvalState & state, const std::string & defaultScheme = "file")
 {
     state.checkURI(uri);
-    return uri.find("://") != std::string::npos ? uri : defaultScheme + "://" + uri;
+    if (uri.find("://") == std::string::npos) {
+        const auto p = ParsedURL {
+            .scheme = defaultScheme,
+            .authority = "",
+            .path = uri
+        };
+        return p.to_string();
+    } else {
+        return uri;
+    }
 }
 
 std::string fixURIForGit(std::string uri, EvalState & state)
@@ -90,7 +100,7 @@ struct FetchTreeParams {
 
 static void fetchTree(
     EvalState & state,
-    const Pos & pos,
+    const PosIdx pos,
     Value * * args,
     Value & v,
     std::optional<std::string> type,
@@ -102,56 +112,58 @@ static void fetchTree(
     state.forceValue(*args[0], pos);
 
     if (args[0]->type() == nAttrs) {
-        state.forceAttrs(*args[0], pos);
+        state.forceAttrs(*args[0], pos, "while evaluating the argument passed to builtins.fetchTree");
 
         fetchers::Attrs attrs;
 
         if (auto aType = args[0]->attrs->get(state.sType)) {
             if (type)
-                throw Error({
+                state.debugThrowLastTrace(EvalError({
                     .msg = hintfmt("unexpected attribute 'type'"),
-                    .errPos = pos
-                });
-            type = state.forceStringNoCtx(*aType->value, *aType->pos);
+                    .errPos = state.positions[pos]
+                }));
+            type = state.forceStringNoCtx(*aType->value, aType->pos, "while evaluating the `type` attribute passed to builtins.fetchTree");
         } else if (!type)
-            throw Error({
+            state.debugThrowLastTrace(EvalError({
                 .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
-                .errPos = pos
-            });
+                .errPos = state.positions[pos]
+            }));
 
         attrs.emplace("type", type.value());
 
         for (auto & attr : *args[0]->attrs) {
             if (attr.name == state.sType) continue;
-            state.forceValue(*attr.value, *attr.pos);
+            state.forceValue(*attr.value, attr.pos);
             if (attr.value->type() == nPath || attr.value->type() == nString) {
-                auto s = state.coerceToString(*attr.pos, *attr.value, context, false, false).toOwned();
-                attrs.emplace(attr.name,
-                    attr.name == "url"
+                auto s = state.coerceToString(attr.pos, *attr.value, context, "", false, false).toOwned();
+                attrs.emplace(state.symbols[attr.name],
+                    state.symbols[attr.name] == "url"
                     ? type == "git"
                       ? fixURIForGit(s, state)
                       : fixURI(s, state)
                     : s);
             }
             else if (attr.value->type() == nBool)
-                attrs.emplace(attr.name, Explicit<bool>{attr.value->boolean});
+                attrs.emplace(state.symbols[attr.name], Explicit<bool>{attr.value->boolean});
             else if (attr.value->type() == nInt)
-                attrs.emplace(attr.name, uint64_t(attr.value->integer));
+                attrs.emplace(state.symbols[attr.name], uint64_t(attr.value->integer));
             else
-                throw TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
-                    attr.name, showType(*attr.value));
+                state.debugThrowLastTrace(TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
+                    state.symbols[attr.name], showType(*attr.value)));
         }
 
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
-                throw Error({
+                state.debugThrowLastTrace(EvalError({
                     .msg = hintfmt("attribute 'name' isn’t supported in call to 'fetchTree'"),
-                    .errPos = pos
-                });
+                    .errPos = state.positions[pos]
+                }));
 
         input = fetchers::Input::fromAttrs(std::move(attrs));
     } else {
-        auto url = state.coerceToString(pos, *args[0], context, false, false).toOwned();
+        auto url = state.coerceToString(pos, *args[0], context,
+                "while evaluating the first argument passed to the fetcher",
+                false, false).toOwned();
 
         if (type == "git") {
             fetchers::Attrs attrs;
@@ -167,7 +179,7 @@ static void fetchTree(
         input = lookupInRegistries(state.store, input).first;
 
     if (evalSettings.pureEval && !input.isLocked())
-        throw Error("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", pos);
+        state.debugThrowLastTrace(EvalError("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", state.positions[pos]));
 
     auto [tree, input2] = input.fetch(state.store);
 
@@ -176,16 +188,16 @@ static void fetchTree(
     emitTreeAttrs(state, tree, input2, v, params.emptyRevFallback, false);
 }
 
-static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, Value & v)
+static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    settings.requireExperimentalFeature(Xp::Flakes);
+    experimentalFeatureSettings.require(Xp::Flakes);
     fetchTree(state, pos, args, v, std::nullopt, FetchTreeParams { .allowNameArgument = false });
 }
 
 // FIXME: document
 static RegisterPrimOp primop_fetchTree("fetchTree", 1, prim_fetchTree);
 
-static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
+static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v,
     const std::string & who, bool unpack, std::string name)
 {
     std::optional<std::string> url;
@@ -195,32 +207,31 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
 
     if (args[0]->type() == nAttrs) {
 
-        state.forceAttrs(*args[0], pos);
-
         for (auto & attr : *args[0]->attrs) {
-            std::string n(attr.name);
+            std::string_view n(state.symbols[attr.name]);
             if (n == "url")
-                url = state.forceStringNoCtx(*attr.value, *attr.pos);
+                url = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the url we should fetch");
             else if (n == "sha256")
-                expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, *attr.pos), htSHA256);
+                expectedHash = newHashAllowEmpty(state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the sha256 of the content we should fetch"), htSHA256);
             else if (n == "name")
-                name = state.forceStringNoCtx(*attr.value, *attr.pos);
+                name = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the name of the content we should fetch");
             else
-                throw EvalError({
-                    .msg = hintfmt("unsupported argument '%s' to '%s'", attr.name, who),
-                    .errPos = *attr.pos
-                });
-            }
+                state.debugThrowLastTrace(EvalError({
+                    .msg = hintfmt("unsupported argument '%s' to '%s'", n, who),
+                    .errPos = state.positions[attr.pos]
+                }));
+        }
 
         if (!url)
-            throw EvalError({
+            state.debugThrowLastTrace(EvalError({
                 .msg = hintfmt("'url' argument required"),
-                .errPos = pos
-            });
+                .errPos = state.positions[pos]
+            }));
     } else
-        url = state.forceStringNoCtx(*args[0], pos);
+        url = state.forceStringNoCtx(*args[0], pos, "while evaluating the url we should fetch");
 
-    url = resolveUri(*url);
+    if (who == "fetchTarball")
+        url = evalSettings.resolvePseudoUrl(*url);
 
     state.checkURI(*url);
 
@@ -228,8 +239,23 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
         name = baseNameOf(*url);
 
     if (evalSettings.pureEval && !expectedHash)
-        throw Error("in pure evaluation mode, '%s' requires a 'sha256' argument", who);
+        state.debugThrowLastTrace(EvalError("in pure evaluation mode, '%s' requires a 'sha256' argument", who));
 
+    // early exit if pinned and already in the store
+    if (expectedHash && expectedHash->type == htSHA256) {
+        auto expectedPath =
+            unpack
+            ? state.store->makeFixedOutputPath(FileIngestionMethod::Recursive, *expectedHash, name, {})
+            : state.store->makeFixedOutputPath(FileIngestionMethod::Flat, *expectedHash, name, {});
+
+        if (state.store->isValidPath(expectedPath)) {
+            state.allowAndSetStorePathString(expectedPath, v);
+            return;
+        }
+    }
+
+    // TODO: fetching may fail, yet the path may be substitutable.
+    //       https://github.com/NixOS/nix/issues/4313
     auto storePath =
         unpack
         ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
@@ -240,17 +266,14 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             ? state.store->queryPathInfo(storePath)->narHash
             : hashFile(htSHA256, state.store->toRealPath(storePath));
         if (hash != *expectedHash)
-            throw Error((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
-                *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true));
+            state.debugThrowLastTrace(EvalError((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
+                *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true)));
     }
 
-    state.allowPath(storePath);
-
-    auto path = state.store->printStorePath(storePath);
-    v.mkString(path, PathSet({path}));
+    state.allowAndSetStorePathString(storePath, v);
 }
 
-static void prim_fetchurl(EvalState & state, const Pos & pos, Value * * args, Value & v)
+static void prim_fetchurl(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     fetch(state, pos, args, v, "fetchurl", false, "");
 }
@@ -266,7 +289,7 @@ static RegisterPrimOp primop_fetchurl({
     .fun = prim_fetchurl,
 });
 
-static void prim_fetchTarball(EvalState & state, const Pos & pos, Value * * args, Value & v)
+static void prim_fetchTarball(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     fetch(state, pos, args, v, "fetchTarball", true, "source");
 }
@@ -317,7 +340,7 @@ static RegisterPrimOp primop_fetchTarball({
     .fun = prim_fetchTarball,
 });
 
-static void prim_fetchGit(EvalState &state, const Pos &pos, Value **args, Value &v)
+static void prim_fetchGit(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     fetchTree(state, pos, args, v, "git", FetchTreeParams { .emptyRevFallback = true, .allowNameArgument = true });
 }
@@ -330,32 +353,44 @@ static RegisterPrimOp primop_fetchGit({
       of the repo at that URL is fetched. Otherwise, it can be an
       attribute with the following attributes (all except `url` optional):
 
-        - url\
-          The URL of the repo.
+      - `url`
 
-        - name\
-          The name of the directory the repo should be exported to in the
-          store. Defaults to the basename of the URL.
+        The URL of the repo.
 
-        - rev\
-          The git revision to fetch. Defaults to the tip of `ref`.
+      - `name` (default: *basename of the URL*)
 
-        - ref\
-          The git ref to look for the requested revision under. This is
-          often a branch or tag name. Defaults to `HEAD`.
+        The name of the directory the repo should be exported to in the store.
 
-          By default, the `ref` value is prefixed with `refs/heads/`. As
-          of Nix 2.3.0 Nix will not prefix `refs/heads/` if `ref` starts
-          with `refs/`.
+      - `rev` (default: *the tip of `ref`*)
 
-        - submodules\
-          A Boolean parameter that specifies whether submodules should be
-          checked out. Defaults to `false`.
+        The [Git revision] to fetch.
+        This is typically a commit hash.
 
-        - allRefs\
-          Whether to fetch all refs of the repository. With this argument being
-          true, it's possible to load a `rev` from *any* `ref` (by default only
-          `rev`s from the specified `ref` are supported).
+        [Git revision]: https://git-scm.com/docs/git-rev-parse#_specifying_revisions
+
+      - `ref` (default: `HEAD`)
+
+        The [Git reference] under which to look for the requested revision.
+        This is often a branch or tag name.
+
+        [Git reference]: https://git-scm.com/book/en/v2/Git-Internals-Git-References
+
+        By default, the `ref` value is prefixed with `refs/heads/`.
+        As of 2.3.0, Nix will not prefix `refs/heads/` if `ref` starts with `refs/`.
+
+      - `submodules` (default: `false`)
+
+        A Boolean parameter that specifies whether submodules should be checked out.
+
+      - `shallow` (default: `false`)
+
+        A Boolean parameter that specifies whether fetching a shallow clone is allowed.
+
+      - `allRefs`
+
+        Whether to fetch all references of the repository.
+        With this argument being true, it's possible to load a `rev` from *any* `ref`
+        (by default only `rev`s from the specified `ref` are supported).
 
       Here are some examples of how to use `fetchGit`.
 
@@ -439,6 +474,17 @@ static RegisterPrimOp primop_fetchGit({
           > **Note**
           >
           > This behavior is disabled in *Pure evaluation mode*.
+
+        - To fetch the content of a checked-out work directory:
+
+          ```nix
+          builtins.fetchGit ./work-dir
+          ```
+
+      If the URL points to a local directory, and no `ref` or `rev` is
+      given, `fetchGit` will use the current content of the checked-out
+      files, even if they are not committed or added to Git's index. It will
+      only consider files added to the Git repository, as listed by `git ls-files`.
     )",
     .fun = prim_fetchGit,
 });

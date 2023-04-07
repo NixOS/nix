@@ -33,14 +33,6 @@ FileTransferSettings fileTransferSettings;
 
 static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
 
-std::string resolveUri(std::string_view uri)
-{
-    if (uri.compare(0, 8, "channel:") == 0)
-        return "https://nixos.org/channels/" + std::string(uri.substr(8)) + "/nixexprs.tar.xz";
-    else
-        return std::string(uri);
-}
-
 struct curlFileTransfer : public FileTransfer
 {
     CURLM * curlm = 0;
@@ -96,6 +88,10 @@ struct curlFileTransfer : public FileTransfer
                 {request.uri}, request.parentAct)
             , callback(std::move(callback))
             , finalSink([this](std::string_view data) {
+                if (errorSink) {
+                    (*errorSink)(data);
+                }
+
                 if (this->request.dataCallback) {
                     auto httpStatus = getHTTPStatus();
 
@@ -109,6 +105,7 @@ struct curlFileTransfer : public FileTransfer
                     this->result.data.append(data);
               })
         {
+            requestHeaders = curl_slist_append(requestHeaders, "Accept-Encoding: zstd, br, gzip, deflate, bzip2, xz");
             if (!request.expectedETag.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
             if (!request.mimeType.empty())
@@ -142,9 +139,9 @@ struct curlFileTransfer : public FileTransfer
         }
 
         template<class T>
-        void fail(const T & e)
+        void fail(T && e)
         {
-            failEx(std::make_exception_ptr(e));
+            failEx(std::make_exception_ptr(std::move(e)));
         }
 
         LambdaSink finalSink;
@@ -170,8 +167,6 @@ struct curlFileTransfer : public FileTransfer
                     }
                 }
 
-                if (errorSink)
-                    (*errorSink)({(char *) contents, realSize});
                 (*decompressionSink)({(char *) contents, realSize});
 
                 return realSize;
@@ -190,14 +185,14 @@ struct curlFileTransfer : public FileTransfer
         {
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
-            printMsg(lvlVomit, format("got header for '%s': %s") % request.uri % trim(line));
+            printMsg(lvlVomit, "got header for '%s': %s", request.uri, trim(line));
             static std::regex statusLine("HTTP/[^ ]+ +[0-9]+(.*)", std::regex::extended | std::regex::icase);
             std::smatch match;
             if (std::regex_match(line, match, statusLine)) {
                 result.etag = "";
                 result.data.clear();
                 result.bodySize = 0;
-                statusMsg = trim((std::string &) match[1]);
+                statusMsg = trim(match.str(1));
                 acceptRanges = false;
                 encoding = "";
             } else {
@@ -214,7 +209,7 @@ struct curlFileTransfer : public FileTransfer
                         long httpStatus = 0;
                         curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
                         if (result.etag == request.expectedETag && httpStatus == 200) {
-                            debug(format("shutting down on 200 HTTP response with expected ETag"));
+                            debug("shutting down on 200 HTTP response with expected ETag");
                             return 0;
                         }
                     } else if (name == "content-encoding")
@@ -308,6 +303,9 @@ struct curlFileTransfer : public FileTransfer
 
             curl_easy_setopt(req, CURLOPT_HTTPHEADER, requestHeaders);
 
+            if (settings.downloadSpeed.get() > 0)
+                curl_easy_setopt(req, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t) (settings.downloadSpeed.get() * 1024));
+
             if (request.head)
                 curl_easy_setopt(req, CURLOPT_NOBODY, 1);
 
@@ -319,9 +317,8 @@ struct curlFileTransfer : public FileTransfer
             }
 
             if (request.verifyTLS) {
-                debug("verify TLS: Nix CA file = '%s'", settings.caFile);
                 if (settings.caFile != "")
-                    curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.c_str());
+                    curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.get().c_str());
             } else {
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYPEER, 0);
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);
@@ -410,6 +407,10 @@ struct curlFileTransfer : public FileTransfer
                     err = Misc;
                 } else {
                     // Don't bother retrying on certain cURL errors either
+
+                    // Allow selecting a subset of enum values
+                    #pragma GCC diagnostic push
+                    #pragma GCC diagnostic ignored "-Wswitch-enum"
                     switch (code) {
                         case CURLE_FAILED_INIT:
                         case CURLE_URL_MALFORMAT:
@@ -430,6 +431,7 @@ struct curlFileTransfer : public FileTransfer
                         default: // Shut up warnings
                             break;
                     }
+                    #pragma GCC diagnostic pop
                 }
 
                 attempt++;
@@ -443,14 +445,13 @@ struct curlFileTransfer : public FileTransfer
                     : httpStatus != 0
                     ? FileTransferError(err,
                         std::move(response),
-                        fmt("unable to %s '%s': HTTP error %d ('%s')",
-                            request.verb(), request.uri, httpStatus, statusMsg)
-                        + (code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
-                        )
+                        "unable to %s '%s': HTTP error %d%s",
+                        request.verb(), request.uri, httpStatus,
+                        code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
                     : FileTransferError(err,
                         std::move(response),
-                        fmt("unable to %s '%s': %s (%d)",
-                            request.verb(), request.uri, curl_easy_strerror(code), code));
+                        "unable to %s '%s': %s (%d)",
+                        request.verb(), request.uri, curl_easy_strerror(code), code);
 
                 /* If this is a transient error, then maybe retry the
                    download after a while. If we're writing to a
@@ -471,7 +472,7 @@ struct curlFileTransfer : public FileTransfer
                     fileTransfer.enqueueItem(shared_from_this());
                 }
                 else
-                    fail(exc);
+                    fail(std::move(exc));
             }
         }
     };
@@ -693,10 +694,10 @@ struct curlFileTransfer : public FileTransfer
 #if ENABLE_S3
                 auto [bucketName, key, params] = parseS3Uri(request.uri);
 
-                std::string profile = get(params, "profile").value_or("");
-                std::string region = get(params, "region").value_or(Aws::Region::US_EAST_1);
-                std::string scheme = get(params, "scheme").value_or("");
-                std::string endpoint = get(params, "endpoint").value_or("");
+                std::string profile = getOr(params, "profile", "");
+                std::string region = getOr(params, "region", Aws::Region::US_EAST_1);
+                std::string scheme = getOr(params, "scheme", "");
+                std::string endpoint = getOr(params, "endpoint", "");
 
                 S3Helper s3Helper(profile, region, scheme, endpoint);
 
@@ -704,7 +705,7 @@ struct curlFileTransfer : public FileTransfer
                 auto s3Res = s3Helper.getObject(bucketName, key);
                 FileTransferResult res;
                 if (!s3Res.data)
-                    throw FileTransferError(NotFound, {}, "S3 object '%s' does not exist", request.uri);
+                    throw FileTransferError(NotFound, "S3 object '%s' does not exist", request.uri);
                 res.data = std::move(*s3Res.data);
                 callback(std::move(res));
 #else
@@ -835,7 +836,7 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
         {
             auto state(_state->lock());
 
-            while (state->data.empty()) {
+            if (state->data.empty()) {
 
                 if (state->quit) {
                     if (state->exc) std::rethrow_exception(state->exc);
@@ -843,6 +844,8 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
                 }
 
                 state.wait(state->avail);
+
+                if (state->data.empty()) continue;
             }
 
             chunk = std::move(state->data);
@@ -871,15 +874,5 @@ FileTransferError::FileTransferError(FileTransfer::Error error, std::optional<st
     else
         err.msg = hf;
 }
-
-bool isUri(std::string_view s)
-{
-    if (s.compare(0, 8, "channel:") == 0) return true;
-    size_t pos = s.find("://");
-    if (pos == std::string::npos) return false;
-    std::string scheme(s, 0, pos);
-    return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "channel" || scheme == "git" || scheme == "s3" || scheme == "ssh";
-}
-
 
 }

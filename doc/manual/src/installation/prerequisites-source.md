@@ -71,3 +71,8 @@
     <http://libcpuid.sourceforge.net>.
     This is an optional dependency and can be disabled
     by providing a `--disable-cpuid` to the `configure` script.
+
+  - Unless `./configure --disable-tests` is specified, GoogleTest (GTest) and
+    RapidCheck are required, which are available at
+    <https://google.github.io/googletest/> and
+    <https://github.com/emil-e/rapidcheck> respectively.

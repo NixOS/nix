@@ -30,29 +30,23 @@ static GlobalConfig::Register rSettings(&settings);
 
 Settings::Settings()
     : nixPrefix(NIX_PREFIX)
-    , nixStore(canonPath(getEnv("NIX_STORE_DIR").value_or(getEnv("NIX_STORE").value_or(NIX_STORE_DIR))))
-    , nixDataDir(canonPath(getEnv("NIX_DATA_DIR").value_or(NIX_DATA_DIR)))
-    , nixLogDir(canonPath(getEnv("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
-    , nixStateDir(canonPath(getEnv("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
-    , nixConfDir(canonPath(getEnv("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
+    , nixStore(canonPath(getEnvNonEmpty("NIX_STORE_DIR").value_or(getEnvNonEmpty("NIX_STORE").value_or(NIX_STORE_DIR))))
+    , nixDataDir(canonPath(getEnvNonEmpty("NIX_DATA_DIR").value_or(NIX_DATA_DIR)))
+    , nixLogDir(canonPath(getEnvNonEmpty("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
+    , nixStateDir(canonPath(getEnvNonEmpty("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
+    , nixConfDir(canonPath(getEnvNonEmpty("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
     , nixUserConfFiles(getUserConfigFiles())
-    , nixLibexecDir(canonPath(getEnv("NIX_LIBEXEC_DIR").value_or(NIX_LIBEXEC_DIR)))
-    , nixBinDir(canonPath(getEnv("NIX_BIN_DIR").value_or(NIX_BIN_DIR)))
+    , nixBinDir(canonPath(getEnvNonEmpty("NIX_BIN_DIR").value_or(NIX_BIN_DIR)))
     , nixManDir(canonPath(NIX_MAN_DIR))
-    , nixDaemonSocketFile(canonPath(getEnv("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
+    , nixDaemonSocketFile(canonPath(getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
 {
     buildUsersGroup = getuid() == 0 ? "nixbld" : "";
     lockCPU = getEnv("NIX_AFFINITY_HACK") == "1";
     allowSymlinkedStore = getEnv("NIX_IGNORE_SYMLINK_STORE") == "1";
 
-    caFile = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
-    if (caFile == "") {
-        for (auto & fn : {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
-            if (pathExists(fn)) {
-                caFile = fn;
-                break;
-            }
-    }
+    auto sslOverride = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
+    if (sslOverride != "")
+        caFile = sslOverride;
 
     /* Backwards compatibility. */
     auto s = getEnv("NIX_REMOTE_SYSTEMS");
@@ -67,12 +61,13 @@ Settings::Settings()
     sandboxPaths = tokenizeString<StringSet>("/bin/sh=" SANDBOX_SHELL);
 #endif
 
-
-/* chroot-like behavior from Apple's sandbox */
+    /* chroot-like behavior from Apple's sandbox */
 #if __APPLE__
     sandboxPaths = tokenizeString<StringSet>("/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
     allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
 #endif
+
+    buildHook = getSelfExe().value_or("nix") + " __build-remote";
 }
 
 void loadConfFile()
@@ -114,7 +109,13 @@ std::vector<Path> getUserConfigFiles()
 
 unsigned int Settings::getDefaultCores()
 {
-    return std::max(1U, std::thread::hardware_concurrency());
+    const unsigned int concurrency = std::max(1U, std::thread::hardware_concurrency());
+    const unsigned int maxCPU = getMaxCPU();
+
+    if (maxCPU > 0)
+      return maxCPU;
+    else
+      return concurrency;
 }
 
 StringSet Settings::getDefaultSystemFeatures()
@@ -123,6 +124,10 @@ StringSet Settings::getDefaultSystemFeatures()
        used in Nixpkgs to route builds to certain machines but don't
        actually require anything special on the machines. */
     StringSet features{"nixos-test", "benchmark", "big-parallel"};
+
+    #if __linux__
+    features.insert("uid-range");
+    #endif
 
     #if __linux__
     if (access("/dev/kvm", R_OK | W_OK) == 0)
@@ -148,28 +153,12 @@ StringSet Settings::getDefaultExtraPlatforms()
     // machines. Note that we can’t force processes from executing
     // x86_64 in aarch64 environments or vice versa since they can
     // always exec with their own binary preferences.
-    if (pathExists("/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist") ||
-        pathExists("/System/Library/LaunchDaemons/com.apple.oahd.plist")) {
-        if (std::string{SYSTEM} == "x86_64-darwin")
-            extraPlatforms.insert("aarch64-darwin");
-        else if (std::string{SYSTEM} == "aarch64-darwin")
-            extraPlatforms.insert("x86_64-darwin");
-    }
+    if (std::string{SYSTEM} == "aarch64-darwin" &&
+        runProgram(RunOptions {.program = "arch", .args = {"-arch", "x86_64", "/usr/bin/true"}, .mergeStderrToStdout = true}).first == 0)
+        extraPlatforms.insert("x86_64-darwin");
 #endif
 
     return extraPlatforms;
-}
-
-bool Settings::isExperimentalFeatureEnabled(const ExperimentalFeature & feature)
-{
-    auto & f = experimentalFeatures.get();
-    return std::find(f.begin(), f.end(), feature) != f.end();
-}
-
-void Settings::requireExperimentalFeature(const ExperimentalFeature & feature)
-{
-    if (!isExperimentalFeatureEnabled(feature))
-        throw MissingExperimentalFeature(feature);
 }
 
 bool Settings::isWSL1()
@@ -179,6 +168,13 @@ bool Settings::isWSL1()
     // WSL1 uses -Microsoft suffix
     // WSL2 uses -microsoft-standard suffix
     return hasSuffix(utsbuf.release, "-Microsoft");
+}
+
+Path Settings::getDefaultSSLCertFile()
+{
+    for (auto & fn : {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
+        if (pathExists(fn)) return fn;
+    return "";
 }
 
 const std::string nixVersion = PACKAGE_VERSION;
@@ -216,19 +212,19 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
         .longName = name,
         .description = "Enable sandboxing.",
         .category = category,
-        .handler = {[=]() { override(smEnabled); }}
+        .handler = {[this]() { override(smEnabled); }}
     });
     args.addFlag({
         .longName = "no-" + name,
         .description = "Disable sandboxing.",
         .category = category,
-        .handler = {[=]() { override(smDisabled); }}
+        .handler = {[this]() { override(smDisabled); }}
     });
     args.addFlag({
         .longName = "relaxed-" + name,
         .description = "Enable sandboxing, but allow builds to disable it.",
         .category = category,
-        .handler = {[=]() { override(smRelaxed); }}
+        .handler = {[this]() { override(smRelaxed); }}
     });
 }
 
@@ -284,5 +280,19 @@ void initPlugins()
     /* Tell the user if they try to set plugin-files after we've already loaded */
     settings.pluginFiles.pluginsLoaded = true;
 }
+
+static bool initLibStoreDone = false;
+
+void assertLibStoreInitialized() {
+    if (!initLibStoreDone) {
+        printError("The program must call nix::initNix() before calling any libstore library functions.");
+        abort();
+    };
+}
+
+void initLibStore() {
+    initLibStoreDone = true;
+}
+
 
 }

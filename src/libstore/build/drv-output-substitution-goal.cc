@@ -6,8 +6,12 @@
 
 namespace nix {
 
-DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(const DrvOutput& id, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
-    : Goal(worker)
+DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(
+    const DrvOutput & id,
+    Worker & worker,
+    RepairFlag repair,
+    std::optional<ContentAddress> ca)
+    : Goal(worker, DerivedPath::Opaque { StorePath::dummy })
     , id(id)
 {
     state = &DrvOutputSubstitutionGoal::init;
@@ -32,12 +36,12 @@ void DrvOutputSubstitutionGoal::init()
 
 void DrvOutputSubstitutionGoal::tryNext()
 {
-    trace("Trying next substituter");
+    trace("trying next substituter");
 
     if (subs.size() == 0) {
         /* None left.  Terminate this goal and let someone else deal
            with it. */
-        debug("drv output '%s' is required, but there is no substituter that can provide it", id.to_string());
+        debug("derivation output '%s' is required, but there is no substituter that can provide it", id.to_string());
 
         /* Hack: don't indicate failure if there were no substituters.
            In that case the calling derivation should just do a
@@ -57,20 +61,25 @@ void DrvOutputSubstitutionGoal::tryNext()
 
     // FIXME: Make async
     // outputInfo = sub->queryRealisation(id);
-    outPipe.create();
-    promise = decltype(promise)();
+
+    /* The callback of the curl download below can outlive `this` (if
+       some other error occurs), so it must not touch `this`. So put
+       the shared state in a separate refcounted object. */
+    downloadState = std::make_shared<DownloadState>();
+    downloadState->outPipe.create();
 
     sub->queryRealisation(
-        id, { [&](std::future<std::shared_ptr<const Realisation>> res) {
+        id,
+        { [downloadState(downloadState)](std::future<std::shared_ptr<const Realisation>> res) {
             try {
-                Finally updateStats([this]() { outPipe.writeSide.close(); });
-                promise.set_value(res.get());
+                Finally updateStats([&]() { downloadState->outPipe.writeSide.close(); });
+                downloadState->promise.set_value(res.get());
             } catch (...) {
-                promise.set_exception(std::current_exception());
+                downloadState->promise.set_exception(std::current_exception());
             }
         } });
 
-    worker.childStarted(shared_from_this(), {outPipe.readSide.get()}, true, false);
+    worker.childStarted(shared_from_this(), {downloadState->outPipe.readSide.get()}, true, false);
 
     state = &DrvOutputSubstitutionGoal::realisationFetched;
 }
@@ -80,7 +89,7 @@ void DrvOutputSubstitutionGoal::realisationFetched()
     worker.childTerminated(this);
 
     try {
-        outputInfo = promise.get_future().get();
+        outputInfo = downloadState->promise.get_future().get();
     } catch (std::exception & e) {
         printError(e.what());
         substituterFailed = true;
@@ -119,7 +128,7 @@ void DrvOutputSubstitutionGoal::realisationFetched()
 void DrvOutputSubstitutionGoal::outPathValid()
 {
     assert(outputInfo);
-    trace("Output path substituted");
+    trace("output path substituted");
 
     if (nrFailed > 0) {
         debug("The output path of the derivation output '%s' could not be substituted", id.to_string());
@@ -151,7 +160,7 @@ void DrvOutputSubstitutionGoal::work()
 
 void DrvOutputSubstitutionGoal::handleEOF(int fd)
 {
-    if (fd == outPipe.readSide.get()) worker.wakeUp(shared_from_this());
+    if (fd == downloadState->outPipe.readSide.get()) worker.wakeUp(shared_from_this());
 }
 
 

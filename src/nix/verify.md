@@ -24,7 +24,7 @@ R""(
 
 # Description
 
-This command verifies the integrity of the store paths *installables*,
+This command verifies the integrity of the store paths [*installables*](./nix.md#installables),
 or, if `--all` is given, the entire Nix store. For each path, it
 checks that
 

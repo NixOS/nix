@@ -1,6 +1,7 @@
 #include "url.hh"
 #include "url-parts.hh"
 #include "util.hh"
+#include "split.hh"
 
 namespace nix {
 
@@ -29,13 +30,13 @@ ParsedURL parseURL(const std::string & url)
         auto & query = match[6];
         auto & fragment = match[7];
 
-        auto isFile = scheme.find("file") != std::string::npos;
+        auto transportIsFile = parseUrlScheme(scheme).transport == "file";
 
-        if (authority && *authority != "" && isFile)
+        if (authority && *authority != "" && transportIsFile)
             throw BadURL("file:// URL '%s' has unexpected authority '%s'",
                 url, *authority);
 
-        if (isFile && path.empty())
+        if (transportIsFile && path.empty())
             path = "/";
 
         return ParsedURL{
@@ -87,17 +88,22 @@ std::map<std::string, std::string> decodeQuery(const std::string & query)
     return result;
 }
 
-std::string percentEncode(std::string_view s)
+const static std::string allowedInQuery = ":@/?";
+const static std::string allowedInPath = ":@/";
+
+std::string percentEncode(std::string_view s, std::string_view keep)
 {
     std::string res;
     for (auto & c : s)
+        // unreserved + keep
         if ((c >= 'a' && c <= 'z')
             || (c >= 'A' && c <= 'Z')
             || (c >= '0' && c <= '9')
-            || strchr("-._~!$&'()*+,;=:@", c))
+            || strchr("-._~", c)
+            || keep.find(c) != std::string::npos)
             res += c;
         else
-            res += fmt("%%%02x", (unsigned int) c);
+            res += fmt("%%%02X", (unsigned int) c);
     return res;
 }
 
@@ -108,9 +114,9 @@ std::string encodeQuery(const std::map<std::string, std::string> & ss)
     for (auto & [name, value] : ss) {
         if (!first) res += '&';
         first = false;
-        res += percentEncode(name);
+        res += percentEncode(name, allowedInQuery);
         res += '=';
-        res += percentEncode(value);
+        res += percentEncode(value, allowedInQuery);
     }
     return res;
 }
@@ -121,7 +127,7 @@ std::string ParsedURL::to_string() const
         scheme
         + ":"
         + (authority ? "//" + *authority : "")
-        + path
+        + percentEncode(path, allowedInPath)
         + (query.empty() ? "" : "?" + encodeQuery(query))
         + (fragment.empty() ? "" : "#" + percentEncode(fragment));
 }
@@ -134,6 +140,23 @@ bool ParsedURL::operator ==(const ParsedURL & other) const
         && path == other.path
         && query == other.query
         && fragment == other.fragment;
+}
+
+/**
+ * Parse a URL scheme of the form '(applicationScheme\+)?transportScheme'
+ * into a tuple '(applicationScheme, transportScheme)'
+ *
+ * > parseUrlScheme("http") == ParsedUrlScheme{ {}, "http"}
+ * > parseUrlScheme("tarball+http") == ParsedUrlScheme{ {"tarball"}, "http"}
+ */
+ParsedUrlScheme parseUrlScheme(std::string_view scheme)
+{
+    auto application = splitPrefixTo(scheme, '+');
+    auto transport = scheme;
+    return ParsedUrlScheme {
+        .application = application,
+        .transport = transport,
+    };
 }
 
 }

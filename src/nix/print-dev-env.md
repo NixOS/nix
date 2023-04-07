@@ -40,7 +40,7 @@ R""(
 
 This command prints a shell script that can be sourced by `bash` and
 that sets the variables and shell functions defined by the build
-process of *installable*. This allows you to get a similar build
+process of [*installable*](./nix.md#installables). This allows you to get a similar build
 environment in your current shell rather than in a subshell (as with
 `nix develop`).
 

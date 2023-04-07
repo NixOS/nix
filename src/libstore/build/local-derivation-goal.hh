@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "derivation-goal.hh"
 #include "local-store.hh"
@@ -15,14 +16,18 @@ struct LocalDerivationGoal : public DerivationGoal
     /* The process ID of the builder. */
     Pid pid;
 
+    /* The cgroup of the builder, if any. */
+    std::optional<Path> cgroup;
+
     /* The temporary directory. */
     Path tmpDir;
 
     /* The path of the temporary directory in the sandbox. */
     Path tmpDirInSandbox;
 
-    /* Pipe for the builder's standard output/error. */
-    Pipe builderOut;
+    /* Master side of the pseudoterminal used for the builder's
+       standard output/error. */
+    AutoCloseFD builderOut;
 
     /* Pipe for synchronising updates to the builder namespaces. */
     Pipe userNamespaceSync;
@@ -92,8 +97,8 @@ struct LocalDerivationGoal : public DerivationGoal
        result. */
     std::map<Path, ValidPathInfo> prevInfos;
 
-    uid_t sandboxUid() { return usingUserNamespace ? 1000 : buildUser->getUID(); }
-    gid_t sandboxGid() { return usingUserNamespace ?  100 : buildUser->getGID(); }
+    uid_t sandboxUid() { return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 1000 : 0) : buildUser->getUID(); }
+    gid_t sandboxGid() { return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 100  : 0) : buildUser->getGID(); }
 
     const static Path homeDir;
 
@@ -169,7 +174,7 @@ struct LocalDerivationGoal : public DerivationGoal
 
     /* Check that the derivation outputs all exist and register them
        as valid. */
-    void registerOutputs() override;
+    DrvOutputs registerOutputs() override;
 
     void signRealisation(Realisation &) override;
 
@@ -196,6 +201,10 @@ struct LocalDerivationGoal : public DerivationGoal
 
     /* Forcibly kill the child process, if any. */
     void killChild() override;
+
+    /* Kill any processes running under the build user UID or in the
+       cgroup of the build. */
+    void killSandbox(bool getStats);
 
     /* Create alternative path calculated from but distinct from the
        input, so we can avoid overwriting outputs (or other store paths)

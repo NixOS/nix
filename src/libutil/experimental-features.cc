@@ -7,10 +7,16 @@ namespace nix {
 
 std::map<ExperimentalFeature, std::string> stringifiedXpFeatures = {
     { Xp::CaDerivations, "ca-derivations" },
+    { Xp::ImpureDerivations, "impure-derivations" },
     { Xp::Flakes, "flakes" },
     { Xp::NixCommand, "nix-command" },
     { Xp::RecursiveNix, "recursive-nix" },
     { Xp::NoUrlLiterals, "no-url-literals" },
+    { Xp::FetchClosure, "fetch-closure" },
+    { Xp::ReplFlake, "repl-flake" },
+    { Xp::AutoAllocateUids, "auto-allocate-uids" },
+    { Xp::Cgroups, "cgroups" },
+    { Xp::DiscardReferences, "discard-references" },
     { Xp::NixTesting, "nix-testing" },
 };
 
@@ -34,7 +40,9 @@ const std::optional<ExperimentalFeature> parseExperimentalFeature(const std::str
 
 std::string_view showExperimentalFeature(const ExperimentalFeature feature)
 {
-    return stringifiedXpFeatures.at(feature);
+    const auto ret = get(stringifiedXpFeatures, feature);
+    assert(ret);
+    return *ret;
 }
 
 std::set<ExperimentalFeature> parseFeatures(const std::set<std::string> & rawFeatures)
@@ -55,6 +63,22 @@ MissingExperimentalFeature::MissingExperimentalFeature(ExperimentalFeature featu
 std::ostream & operator <<(std::ostream & str, const ExperimentalFeature & feature)
 {
     return str << showExperimentalFeature(feature);
+}
+
+void to_json(nlohmann::json & j, const ExperimentalFeature & feature)
+{
+    j = showExperimentalFeature(feature);
+}
+
+void from_json(const nlohmann::json & j, ExperimentalFeature & feature)
+{
+    const std::string input = j;
+    const auto parsed = parseExperimentalFeature(input);
+
+    if (parsed.has_value())
+        feature = *parsed;
+    else
+        throw Error("Unknown experimental feature '%s' in JSON input", input);
 }
 
 }

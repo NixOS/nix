@@ -1,7 +1,11 @@
 #include "daemon.hh"
 #include "monitor-fd.hh"
 #include "worker-protocol.hh"
+#include "build-result.hh"
 #include "store-api.hh"
+#include "store-cast.hh"
+#include "gc-store.hh"
+#include "log-store.hh"
 #include "path-with-outputs.hh"
 #include "finally.hh"
 #include "archive.hh"
@@ -63,12 +67,12 @@ struct TunnelLogger : public Logger
             state->pendingMsgs.push_back(s);
     }
 
-    void log(Verbosity lvl, const FormatOrString & fs) override
+    void log(Verbosity lvl, std::string_view s) override
     {
         if (lvl > verbosity) return;
 
         StringSink buf;
-        buf << STDERR_NEXT << (fs.s + "\n");
+        buf << STDERR_NEXT << (s + "\n");
         enqueueMsg(buf.s);
     }
 
@@ -218,7 +222,8 @@ struct ClientSettings
                     else if (!hasSuffix(s, "/") && trusted.count(s + "/"))
                         subs.push_back(s + "/");
                     else
-                        warn("ignoring untrusted substituter '%s'", s);
+                        warn("ignoring untrusted substituter '%s', you are not a trusted user.\n"
+                             "Run `man nix.conf` for more information on the `substituters` configuration option.", s);
                 res = subs;
                 return true;
             };
@@ -226,15 +231,20 @@ struct ClientSettings
             try {
                 if (name == "ssh-auth-sock") // obsolete
                     ;
-                else if (name == settings.experimentalFeatures.name) {
+                else if (name == experimentalFeatureSettings.experimentalFeatures.name) {
                     // We don’t want to forward the experimental features to
                     // the daemon, as that could cause some pretty weird stuff
-                    if (parseFeatures(tokenizeString<StringSet>(value)) != settings.experimentalFeatures.get())
+                    if (parseFeatures(tokenizeString<StringSet>(value)) != experimentalFeatureSettings.experimentalFeatures.get())
                         debug("Ignoring the client-specified experimental features");
+                } else if (name == settings.pluginFiles.name) {
+                    if (tokenizeString<Paths>(value) != settings.pluginFiles.get())
+                        warn("Ignoring the client-specified plugin-files.\n"
+                             "The client specifying plugins to the daemon never made sense, and was removed in Nix >=2.14.");
                 }
                 else if (trusted
                     || name == settings.buildTimeout.name
-                    || name == settings.buildRepeat.name
+                    || name == settings.maxSilentTime.name
+                    || name == settings.pollInterval.name
                     || name == "connect-timeout"
                     || (name == "builders" && value == ""))
                     settings.set(name, value);
@@ -519,7 +529,14 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             mode = (BuildMode) readInt(from);
 
             /* Repairing is not atomic, so disallowed for "untrusted"
-               clients.  */
+               clients.
+
+               FIXME: layer violation in this message: the daemon code (i.e.
+               this file) knows whether a client/connection is trusted, but it
+               does not how how the client was authenticated. The mechanism
+               need not be getting the UID of the other end of a Unix Domain
+               Socket.
+              */
             if (mode == bmRepair && !trusted)
                 throw Error("repairing is not allowed because you are not in 'trusted-users'");
         }
@@ -530,12 +547,35 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case wopBuildPathsWithResults: {
+        auto drvs = readDerivedPaths(*store, clientVersion, from);
+        BuildMode mode = bmNormal;
+        mode = (BuildMode) readInt(from);
+
+        /* Repairing is not atomic, so disallowed for "untrusted"
+           clients.
+
+           FIXME: layer violation; see above. */
+        if (mode == bmRepair && !trusted)
+            throw Error("repairing is not allowed because you are not in 'trusted-users'");
+
+        logger->startWork();
+        auto results = store->buildPathsWithResults(drvs, mode);
+        logger->stopWork();
+
+        worker_proto::write(*store, to, results);
+
+        break;
+    }
+
     case wopBuildDerivation: {
         auto drvPath = store->parseStorePath(readString(from));
         BasicDerivation drv;
         readDerivation(from, *store, drv, Derivation::nameFromPath(drvPath));
         BuildMode buildMode = (BuildMode) readInt(from);
         logger->startWork();
+
+        auto drvType = drv.type();
 
         /* Content-addressed derivations are trustless because their output paths
            are verified by their content alone, so any derivation is free to
@@ -569,12 +609,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
            derivations, we throw out the precomputed output paths and just
            store the hashes, so there aren't two competing sources of truth an
            attacker could exploit. */
-        if (drv.type() == DerivationType::InputAddressed && !trusted)
+        if (!(drvType.isCA() || trusted))
             throw Error("you are not privileged to build input-addressed derivations");
 
         /* Make sure that the non-input-addressed derivations that got this far
            are in fact content-addressed if we don't trust them. */
-        assert(derivationIsCA(drv.type()) || trusted);
+        assert(drvType.isCA() || trusted);
 
         /* Recompute the derivation path when we cannot trust the original. */
         if (!trusted) {
@@ -583,7 +623,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                original not-necessarily-resolved derivation to verify the drv
                derivation as adequate claim to the input-addressed output
                paths. */
-            assert(derivationIsCA(drv.type()));
+            assert(drvType.isCA());
 
             Derivation drv2;
             static_cast<BasicDerivation &>(drv2) = drv;
@@ -622,9 +662,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopAddIndirectRoot: {
         Path path = absPath(readString(from));
+
         logger->startWork();
-        store->addIndirectRoot(path);
+        auto & gcStore = require<GcStore>(*store);
+        gcStore.addIndirectRoot(path);
         logger->stopWork();
+
         to << 1;
         break;
     }
@@ -639,7 +682,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopFindRoots: {
         logger->startWork();
-        Roots roots = store->findRoots(!trusted);
+        auto & gcStore = require<GcStore>(*store);
+        Roots roots = gcStore.findRoots(!trusted);
         logger->stopWork();
 
         size_t size = 0;
@@ -670,7 +714,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         if (options.ignoreLiveness)
             throw Error("you are not allowed to ignore liveness");
-        store->collectGarbage(options, results);
+        auto & gcStore = require<GcStore>(*store);
+        gcStore.collectGarbage(options, results);
         logger->stopWork();
 
         to << results.paths << results.bytesFreed << 0 /* obsolete */;
@@ -927,11 +972,12 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         if (!trusted)
             throw Error("you are not privileged to add logs");
+        auto & logStore = require<LogStore>(*store);
         {
             FramedSource source(from);
             StringSink sink;
             source.drainInto(sink);
-            store->addBuildLog(path, sink.s);
+            logStore.addBuildLog(path, sink.s);
         }
         logger->stopWork();
         to << 1;
@@ -948,8 +994,7 @@ void processConnection(
     FdSource & from,
     FdSink & to,
     TrustedFlag trusted,
-    RecursiveFlag recursive,
-    std::function<void(Store &)> authHook)
+    RecursiveFlag recursive)
 {
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
 
@@ -987,14 +1032,19 @@ void processConnection(
     if (GET_PROTOCOL_MINOR(clientVersion) >= 33)
         to << nixVersion;
 
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 35) {
+        // We and the underlying store both need to trust the client for
+        // it to be trusted.
+        auto temp = trusted
+            ? store->isTrustedClient()
+            : std::optional { NotTrusted };
+        worker_proto::write(*store, to, temp);
+    }
+
     /* Send startup error messages to the client. */
     tunnelLogger->startWork();
 
     try {
-
-        /* If we can't accept clientVersion, then throw an error
-           *here* (not above). */
-        authHook(*store);
 
         tunnelLogger->stopWork();
         to.flush();

@@ -1,6 +1,8 @@
 #pragma once
+///@file
 
-/* Awfull hacky generation of the comparison operators by doing a lexicographic
+/**
+ * Awful hacky generation of the comparison operators by doing a lexicographic
  * comparison between the choosen fields.
  *
  * ```

@@ -12,14 +12,14 @@ machine is accessible via SSH and that it has Nix installed. You can
 test whether connecting to the remote Nix instance works, e.g.
 
 ```console
-$ nix ping-store --store ssh://mac
+$ nix store ping --store ssh://mac
 ```
 
 will try to connect to the machine named `mac`. It is possible to
 specify an SSH identity file as part of the remote store URI, e.g.
 
 ```console
-$ nix ping-store --store ssh://mac?ssh-key=/home/alice/my-key
+$ nix store ping --store ssh://mac?ssh-key=/home/alice/my-key
 ```
 
 Since builds should be non-interactive, the key should not have a
@@ -110,7 +110,7 @@ default, set it to `-`.
 7.  A comma-separated list of *mandatory features*. A machine will only
     be used to build a derivation if all of the machine’s mandatory
     features appear in the derivation’s `requiredSystemFeatures`
-    attribute..
+    attribute.
 
 8.  The (base64-encoded) public host key of the remote machine. If omitted, SSH
     will use its regular known-hosts file. Specifically, the field is calculated

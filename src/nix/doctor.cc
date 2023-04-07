@@ -18,19 +18,23 @@ std::string formatProtocol(unsigned int proto)
     if (proto) {
         auto major = GET_PROTOCOL_MAJOR(proto) >> 8;
         auto minor = GET_PROTOCOL_MINOR(proto);
-        return (format("%1%.%2%") % major % minor).str();
+        return fmt("%1%.%2%", major, minor);
     }
     return "unknown";
 }
 
 bool checkPass(const std::string & msg) {
-    logger->log(ANSI_GREEN "[PASS] " ANSI_NORMAL + msg);
+    notice(ANSI_GREEN "[PASS] " ANSI_NORMAL + msg);
     return true;
 }
 
 bool checkFail(const std::string & msg) {
-    logger->log(ANSI_RED "[FAIL] " ANSI_NORMAL + msg);
+    notice(ANSI_RED "[FAIL] " ANSI_NORMAL + msg);
     return false;
+}
+
+void checkInfo(const std::string & msg) {
+    notice(ANSI_BLUE "[INFO] " ANSI_NORMAL + msg);
 }
 
 }
@@ -38,6 +42,14 @@ bool checkFail(const std::string & msg) {
 struct CmdDoctor : StoreCommand
 {
     bool success = true;
+
+    /**
+     * This command is stable before the others
+     */
+    std::optional<ExperimentalFeature> experimentalFeature() override
+    {
+        return std::nullopt;
+    }
 
     std::string description() override
     {
@@ -55,6 +67,7 @@ struct CmdDoctor : StoreCommand
             success &= checkProfileRoots(store);
         }
         success &= checkStoreProtocol(store->getProtocol());
+        checkTrustedUser(store);
 
         if (!success)
             throw Exit(2);
@@ -129,6 +142,14 @@ struct CmdDoctor : StoreCommand
         }
 
         return checkPass("Client protocol matches store protocol.");
+    }
+
+    void checkTrustedUser(ref<Store> store)
+    {
+        std::string_view trusted = store->isTrustedClient()
+            ? "trusted"
+            : "not trusted";
+        checkInfo(fmt("You are %s by store uri: %s", trusted, store->getUri()));
     }
 };
 

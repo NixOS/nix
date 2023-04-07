@@ -1,134 +1,195 @@
 #pragma once
+///@file
 
 #include "util.hh"
 #include "path.hh"
-#include "path-with-outputs.hh"
+#include "outputs-spec.hh"
 #include "derived-path.hh"
-#include "eval.hh"
-#include "flake/flake.hh"
+#include "store-api.hh"
+#include "build-result.hh"
 
 #include <optional>
 
 namespace nix {
 
 struct DrvInfo;
-struct SourceExprCommand;
 
-namespace eval_cache { class EvalCache; class AttrCursor; }
-
-struct App
-{
-    std::vector<StorePathWithOutputs> context;
-    Path program;
-    // FIXME: add args, sandbox settings, metadata, ...
+enum class Realise {
+    /**
+     * Build the derivation.
+     *
+     * Postcondition: the derivation outputs exist.
+     */
+    Outputs,
+    /**
+     * Don't build the derivation.
+     *
+     * Postcondition: the store derivation exists.
+     */
+    Derivation,
+    /**
+     * Evaluate in dry-run mode.
+     *
+     * Postcondition: nothing.
+     *
+     * \todo currently unused, but could be revived if we can evaluate
+     * derivations in-memory.
+     */
+    Nothing
 };
 
-struct UnresolvedApp
-{
-    App unresolved;
-    App resolve(ref<Store> evalStore, ref<Store> store);
+/**
+ * How to handle derivations in commands that operate on store paths.
+ */
+enum class OperateOn {
+    /**
+     * Operate on the output path.
+     */
+    Output,
+    /**
+     * Operate on the .drv path.
+     */
+    Derivation
 };
 
+/**
+ * Extra info about a DerivedPath
+ *
+ * Yes, this is empty, but that is intended. It will be sub-classed by
+ * the subclasses of Installable to allow those to provide more info.
+ * Certain commands will make use of this info.
+ */
+struct ExtraPathInfo
+{
+    virtual ~ExtraPathInfo() = default;
+};
+
+/**
+ * A DerivedPath with \ref ExtraPathInfo "any additional info" that
+ * commands might need from the derivation.
+ */
+struct DerivedPathWithInfo
+{
+    DerivedPath path;
+    ref<ExtraPathInfo> info;
+};
+
+/**
+ * Like DerivedPathWithInfo but extending BuiltPath with \ref
+ * ExtraPathInfo "extra info" and also possibly the \ref BuildResult
+ * "result of building".
+ */
+struct BuiltPathWithResult
+{
+    BuiltPath path;
+    ref<ExtraPathInfo> info;
+    std::optional<BuildResult> result;
+};
+
+/**
+ * Shorthand, for less typing and helping us keep the choice of
+ * collection in sync.
+ */
+typedef std::vector<DerivedPathWithInfo> DerivedPathsWithInfo;
+
+struct Installable;
+
+/**
+ * Shorthand, for less typing and helping us keep the choice of
+ * collection in sync.
+ */
+typedef std::vector<ref<Installable>> Installables;
+
+/**
+ * Installables are the main positional arguments for the Nix
+ * Command-line.
+ *
+ * This base class is very flexible, and just assumes and the
+ * Installable refers to a collection of \ref DerivedPath "derived paths" with
+ * \ref ExtraPathInfo "extra info".
+ */
 struct Installable
 {
     virtual ~Installable() { }
 
+    /**
+     * What Installable is this?
+     *
+     * Prints back valid CLI syntax that would result in this same
+     * installable. It doesn't need to be exactly what the user wrote,
+     * just something that means the same thing.
+     */
     virtual std::string what() const = 0;
 
-    virtual DerivedPaths toDerivedPaths() = 0;
+    /**
+     * Get the collection of \ref DerivedPathWithInfo "derived paths
+     * with info" that this \ref Installable instalallable denotes.
+     *
+     * This is the main method of this class
+     */
+    virtual DerivedPathsWithInfo toDerivedPaths() = 0;
 
-    virtual StorePathSet toDrvPaths(ref<Store> store)
-    {
-        throw Error("'%s' cannot be converted to a derivation path", what());
-    }
+    /**
+     * A convenience wrapper of the above for when we expect an
+     * installable to produce a single \ref DerivedPath "derived path"
+     * only.
+     *
+     * If no or multiple \ref DerivedPath "derived paths" are produced,
+     * and error is raised.
+     */
+    DerivedPathWithInfo toDerivedPath();
 
-    DerivedPath toDerivedPath();
-
-    UnresolvedApp toApp(EvalState & state);
-
-    virtual std::pair<Value *, Pos> toValue(EvalState & state)
-    {
-        throw Error("argument '%s' cannot be evaluated", what());
-    }
-
-    /* Return a value only if this installable is a store path or a
-       symlink to it. */
+    /**
+     * Return a value only if this installable is a store path or a
+     * symlink to it.
+     *
+     * \todo should we move this to InstallableDerivedPath? It is only
+     * supposed to work there anyways. Can always downcast.
+     */
     virtual std::optional<StorePath> getStorePath()
     {
         return {};
     }
 
-    virtual std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
-    getCursors(EvalState & state);
+    static std::vector<BuiltPathWithResult> build(
+        ref<Store> evalStore,
+        ref<Store> store,
+        Realise mode,
+        const Installables & installables,
+        BuildMode bMode = bmNormal);
 
-    std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>
-    getCursor(EvalState & state);
+    static std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> build2(
+        ref<Store> evalStore,
+        ref<Store> store,
+        Realise mode,
+        const Installables & installables,
+        BuildMode bMode = bmNormal);
 
-    virtual FlakeRef nixpkgsFlakeRef() const
-    {
-        return FlakeRef::fromAttrs({{"type","indirect"}, {"id", "nixpkgs"}});
-    }
+    static std::set<StorePath> toStorePaths(
+        ref<Store> evalStore,
+        ref<Store> store,
+        Realise mode,
+        OperateOn operateOn,
+        const Installables & installables);
+
+    static StorePath toStorePath(
+        ref<Store> evalStore,
+        ref<Store> store,
+        Realise mode,
+        OperateOn operateOn,
+        ref<Installable> installable);
+
+    static std::set<StorePath> toDerivations(
+        ref<Store> store,
+        const Installables & installables,
+        bool useDeriver = false);
+
+    static BuiltPaths toBuiltPaths(
+        ref<Store> evalStore,
+        ref<Store> store,
+        Realise mode,
+        OperateOn operateOn,
+        const Installables & installables);
 };
-
-struct InstallableValue : Installable
-{
-    ref<EvalState> state;
-
-    InstallableValue(ref<EvalState> state) : state(state) {}
-
-    struct DerivationInfo
-    {
-        StorePath drvPath;
-        std::optional<StorePath> outPath;
-        std::string outputName;
-    };
-
-    virtual std::vector<DerivationInfo> toDerivations() = 0;
-
-    DerivedPaths toDerivedPaths() override;
-
-    StorePathSet toDrvPaths(ref<Store> store) override;
-};
-
-struct InstallableFlake : InstallableValue
-{
-    FlakeRef flakeRef;
-    Strings attrPaths;
-    Strings prefixes;
-    const flake::LockFlags & lockFlags;
-    mutable std::shared_ptr<flake::LockedFlake> _lockedFlake;
-
-    InstallableFlake(
-        SourceExprCommand * cmd,
-        ref<EvalState> state,
-        FlakeRef && flakeRef,
-        std::string_view fragment,
-        Strings attrPaths,
-        Strings prefixes,
-        const flake::LockFlags & lockFlags);
-
-    std::string what() const override { return flakeRef.to_string() + "#" + *attrPaths.begin(); }
-
-    std::vector<std::string> getActualAttrPaths();
-
-    Value * getFlakeOutputs(EvalState & state, const flake::LockedFlake & lockedFlake);
-
-    std::tuple<std::string, FlakeRef, DerivationInfo> toDerivation();
-
-    std::vector<DerivationInfo> toDerivations() override;
-
-    std::pair<Value *, Pos> toValue(EvalState & state) override;
-
-    std::vector<std::pair<std::shared_ptr<eval_cache::AttrCursor>, std::string>>
-    getCursors(EvalState & state) override;
-
-    std::shared_ptr<flake::LockedFlake> getLockedFlake() const;
-
-    FlakeRef nixpkgsFlakeRef() const override;
-};
-
-ref<eval_cache::EvalCache> openEvalCache(
-    EvalState & state,
-    std::shared_ptr<flake::LockedFlake> lockedFlake);
 
 }

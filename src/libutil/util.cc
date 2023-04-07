@@ -2,6 +2,7 @@
 #include "sync.hh"
 #include "finally.hh"
 #include "serialise.hh"
+#include "cgroup.hh"
 
 #include <array>
 #include <cctype>
@@ -29,11 +30,15 @@
 
 #ifdef __APPLE__
 #include <sys/syscall.h>
+#include <mach-o/dyld.h>
 #endif
 
 #ifdef __linux__
 #include <sys/prctl.h>
 #include <sys/resource.h>
+#include <sys/mman.h>
+
+#include <cmath>
 #endif
 
 
@@ -49,6 +54,11 @@ std::optional<std::string> getEnv(const std::string & key)
     return std::string(value);
 }
 
+std::optional<std::string> getEnvNonEmpty(const std::string & key) {
+    auto value = getEnv(key);
+    if (value == "") return {};
+    return value;
+}
 
 std::map<std::string, std::string> getEnv()
 {
@@ -71,13 +81,11 @@ void clearEnv()
         unsetenv(name.first.c_str());
 }
 
-void replaceEnv(std::map<std::string, std::string> newEnv)
+void replaceEnv(const std::map<std::string, std::string> & newEnv)
 {
     clearEnv();
-    for (auto newEnvVar : newEnv)
-    {
+    for (auto & newEnvVar : newEnv)
         setenv(newEnvVar.first.c_str(), newEnvVar.second.c_str(), 1);
-    }
 }
 
 
@@ -200,6 +208,17 @@ std::string_view baseNameOf(std::string_view path)
 }
 
 
+std::string expandTilde(std::string_view path)
+{
+    // TODO: expand ~user ?
+    auto tilde = path.substr(0, 2);
+    if (tilde == "~/" || tilde == "~")
+        return getHome() + std::string(path.substr(1));
+    else
+        return std::string(path);
+}
+
+
 bool isInDir(std::string_view path, std::string_view dir)
 {
     return path.substr(0, 1) == "/"
@@ -212,6 +231,15 @@ bool isInDir(std::string_view path, std::string_view dir)
 bool isDirOrInDir(std::string_view path, std::string_view dir)
 {
     return path == dir || isInDir(path, dir);
+}
+
+
+struct stat stat(const Path & path)
+{
+    struct stat st;
+    if (stat(path.c_str(), &st))
+        throw SysError("getting status of '%1%'", path);
+    return st;
 }
 
 
@@ -331,7 +359,7 @@ void readFile(const Path & path, Sink & sink)
 }
 
 
-void writeFile(const Path & path, std::string_view s, mode_t mode)
+void writeFile(const Path & path, std::string_view s, mode_t mode, bool sync)
 {
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
@@ -342,10 +370,16 @@ void writeFile(const Path & path, std::string_view s, mode_t mode)
         e.addTrace({}, "writing file '%1%'", path);
         throw;
     }
+    if (sync)
+        fd.fsync();
+    // Explicitly close to make sure exceptions are propagated.
+    fd.close();
+    if (sync)
+        syncParent(path);
 }
 
 
-void writeFile(const Path & path, Source & source, mode_t mode)
+void writeFile(const Path & path, Source & source, mode_t mode, bool sync)
 {
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
@@ -364,6 +398,20 @@ void writeFile(const Path & path, Source & source, mode_t mode)
         e.addTrace({}, "writing file '%1%'", path);
         throw;
     }
+    if (sync)
+        fd.fsync();
+    // Explicitly close to make sure exceptions are propagated.
+    fd.close();
+    if (sync)
+        syncParent(path);
+}
+
+void syncParent(const Path & path)
+{
+    AutoCloseFD fd = open(dirOf(path).c_str(), O_RDONLY, 0);
+    if (!fd)
+        throw SysError("opening file '%1%'", path);
+    fd.fsync();
 }
 
 std::string readLine(int fd)
@@ -406,8 +454,29 @@ static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
         throw SysError("getting status of '%1%'", path);
     }
 
-    if (!S_ISDIR(st.st_mode) && st.st_nlink == 1)
-        bytesFreed += st.st_size;
+    if (!S_ISDIR(st.st_mode)) {
+        /* We are about to delete a file. Will it likely free space? */
+
+        switch (st.st_nlink) {
+            /* Yes: last link. */
+            case 1:
+                bytesFreed += st.st_size;
+                break;
+            /* Maybe: yes, if 'auto-optimise-store' or manual optimisation
+               was performed. Instead of checking for real let's assume
+               it's an optimised file and space will be freed.
+
+               In worst case we will double count on freed space for files
+               with exactly two hardlinks for unoptimised packages.
+             */
+            case 2:
+                bytesFreed += st.st_size;
+                break;
+            /* No: 3+ links. */
+            default:
+                break;
+        }
+    }
 
     if (S_ISDIR(st.st_mode)) {
         /* Make the directory accessible. */
@@ -459,64 +528,9 @@ void deletePath(const Path & path)
 
 void deletePath(const Path & path, uint64_t & bytesFreed)
 {
-    //Activity act(*logger, lvlDebug, format("recursively deleting path '%1%'") % path);
+    //Activity act(*logger, lvlDebug, "recursively deleting path '%1%'", path);
     bytesFreed = 0;
     _deletePath(path, bytesFreed);
-}
-
-
-static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
-    int & counter)
-{
-    tmpRoot = canonPath(tmpRoot.empty() ? getEnv("TMPDIR").value_or("/tmp") : tmpRoot, true);
-    if (includePid)
-        return (format("%1%/%2%-%3%-%4%") % tmpRoot % prefix % getpid() % counter++).str();
-    else
-        return (format("%1%/%2%-%3%") % tmpRoot % prefix % counter++).str();
-}
-
-
-Path createTempDir(const Path & tmpRoot, const Path & prefix,
-    bool includePid, bool useGlobalCounter, mode_t mode)
-{
-    static int globalCounter = 0;
-    int localCounter = 0;
-    int & counter(useGlobalCounter ? globalCounter : localCounter);
-
-    while (1) {
-        checkInterrupt();
-        Path tmpDir = tempName(tmpRoot, prefix, includePid, counter);
-        if (mkdir(tmpDir.c_str(), mode) == 0) {
-#if __FreeBSD__
-            /* Explicitly set the group of the directory.  This is to
-               work around around problems caused by BSD's group
-               ownership semantics (directories inherit the group of
-               the parent).  For instance, the group of /tmp on
-               FreeBSD is "wheel", so all directories created in /tmp
-               will be owned by "wheel"; but if the user is not in
-               "wheel", then "tar" will fail to unpack archives that
-               have the setgid bit set on directories. */
-            if (chown(tmpDir.c_str(), (uid_t) -1, getegid()) != 0)
-                throw SysError("setting group of directory '%1%'", tmpDir);
-#endif
-            return tmpDir;
-        }
-        if (errno != EEXIST)
-            throw SysError("creating directory '%1%'", tmpDir);
-    }
-}
-
-
-std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
-{
-    Path tmpl(getEnv("TMPDIR").value_or("/tmp") + "/" + prefix + ".XXXXXX");
-    // Strictly speaking, this is UB, but who cares...
-    // FIXME: use O_TMPFILE.
-    AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
-    if (!fd)
-        throw SysError("creating temporary file '%s'", tmpl);
-    closeOnExec(fd.get());
-    return {std::move(fd), tmpl};
 }
 
 
@@ -529,20 +543,41 @@ std::string getUserName()
     return name;
 }
 
+Path getHomeOf(uid_t userId)
+{
+    std::vector<char> buf(16384);
+    struct passwd pwbuf;
+    struct passwd * pw;
+    if (getpwuid_r(userId, &pwbuf, buf.data(), buf.size(), &pw) != 0
+        || !pw || !pw->pw_dir || !pw->pw_dir[0])
+        throw Error("cannot determine user's home directory");
+    return pw->pw_dir;
+}
 
 Path getHome()
 {
     static Path homeDir = []()
     {
+        std::optional<std::string> unownedUserHomeDir = {};
         auto homeDir = getEnv("HOME");
+        if (homeDir) {
+            // Only use $HOME if doesn't exist or is owned by the current user.
+            struct stat st;
+            int result = stat(homeDir->c_str(), &st);
+            if (result != 0) {
+                if (errno != ENOENT) {
+                    warn("couldn't stat $HOME ('%s') for reason other than not existing ('%d'), falling back to the one defined in the 'passwd' file", *homeDir, errno);
+                    homeDir.reset();
+                }
+            } else if (st.st_uid != geteuid()) {
+                unownedUserHomeDir.swap(homeDir);
+            }
+        }
         if (!homeDir) {
-            std::vector<char> buf(16384);
-            struct passwd pwbuf;
-            struct passwd * pw;
-            if (getpwuid_r(geteuid(), &pwbuf, buf.data(), buf.size(), &pw) != 0
-                || !pw || !pw->pw_dir || !pw->pw_dir[0])
-                throw Error("cannot determine user's home directory");
-            homeDir = pw->pw_dir;
+            homeDir = getHomeOf(geteuid());
+            if (unownedUserHomeDir.has_value() && unownedUserHomeDir != homeDir) {
+                warn("$HOME ('%s') is not owned by you, falling back to the one defined in the 'passwd' file ('%s')", *unownedUserHomeDir, *homeDir);
+            }
         }
         return *homeDir;
     }();
@@ -579,6 +614,40 @@ Path getDataDir()
     return dataDir ? *dataDir : getHome() + "/.local/share";
 }
 
+Path getStateDir()
+{
+    auto stateDir = getEnv("XDG_STATE_HOME");
+    return stateDir ? *stateDir : getHome() + "/.local/state";
+}
+
+Path createNixStateDir()
+{
+    Path dir = getStateDir() + "/nix";
+    createDirs(dir);
+    return dir;
+}
+
+
+std::optional<Path> getSelfExe()
+{
+    static auto cached = []() -> std::optional<Path>
+    {
+        #if __linux__
+        return readLink("/proc/self/exe");
+        #elif __APPLE__
+        char buf[1024];
+        uint32_t size = sizeof(buf);
+        if (_NSGetExecutablePath(buf, &size) == 0)
+            return buf;
+        else
+            return std::nullopt;
+        #else
+        return std::nullopt;
+        #endif
+    }();
+    return cached;
+}
+
 
 Paths createDirs(const Path & path)
 {
@@ -600,44 +669,6 @@ Paths createDirs(const Path & path)
     if (!S_ISDIR(st.st_mode)) throw Error("'%1%' is not a directory", path);
 
     return created;
-}
-
-
-void createSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime)
-{
-    if (symlink(target.c_str(), link.c_str()))
-        throw SysError("creating symlink from '%1%' to '%2%'", link, target);
-    if (mtime) {
-        struct timeval times[2];
-        times[0].tv_sec = *mtime;
-        times[0].tv_usec = 0;
-        times[1].tv_sec = *mtime;
-        times[1].tv_usec = 0;
-        if (lutimes(link.c_str(), times))
-            throw SysError("setting time of symlink '%s'", link);
-    }
-}
-
-
-void replaceSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime)
-{
-    for (unsigned int n = 0; true; n++) {
-        Path tmp = canonPath(fmt("%s/.%d_%s", dirOf(link), n, baseNameOf(link)));
-
-        try {
-            createSymlink(target, tmp, mtime);
-        } catch (SysError & e) {
-            if (e.errNo == EEXIST) continue;
-            throw;
-        }
-
-        if (rename(tmp.c_str(), link.c_str()) != 0)
-            throw SysError("renaming '%1%' to '%2%'", tmp, link);
-
-        break;
-    }
 }
 
 
@@ -682,7 +713,14 @@ std::string drainFD(int fd, bool block, const size_t reserveSize)
 
 void drainFD(int fd, Sink & sink, bool block)
 {
-    int saved;
+    // silence GCC maybe-uninitialized warning in finally
+    int saved = 0;
+
+    if (!block) {
+        saved = fcntl(fd, F_GETFL);
+        if (fcntl(fd, F_SETFL, saved | O_NONBLOCK) == -1)
+            throw SysError("making file descriptor non-blocking");
+    }
 
     Finally finally([&]() {
         if (!block) {
@@ -690,12 +728,6 @@ void drainFD(int fd, Sink & sink, bool block)
                 throw SysError("making file descriptor blocking");
         }
     });
-
-    if (!block) {
-        saved = fcntl(fd, F_GETFL);
-        if (fcntl(fd, F_SETFL, saved | O_NONBLOCK) == -1)
-            throw SysError("making file descriptor non-blocking");
-    }
 
     std::vector<unsigned char> buf(64 * 1024);
     while (1) {
@@ -712,7 +744,32 @@ void drainFD(int fd, Sink & sink, bool block)
     }
 }
 
+//////////////////////////////////////////////////////////////////////
 
+unsigned int getMaxCPU()
+{
+    #if __linux__
+    try {
+        auto cgroupFS = getCgroupFS();
+        if (!cgroupFS) return 0;
+
+        auto cgroups = getCgroups("/proc/self/cgroup");
+        auto cgroup = cgroups[""];
+        if (cgroup == "") return 0;
+
+        auto cpuFile = *cgroupFS + "/" + cgroup + "/cpu.max";
+
+        auto cpuMax = readFile(cpuFile);
+        auto cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " \n");
+        auto quota = cpuMaxParts[0];
+        auto period = cpuMaxParts[1];
+        if (quota != "max")
+                return std::ceil(std::stoi(quota) / std::stof(period));
+    } catch (Error &) { ignoreException(lvlDebug); }
+    #endif
+
+    return 0;
+}
 
 //////////////////////////////////////////////////////////////////////
 
@@ -802,6 +859,20 @@ void AutoCloseFD::close()
             throw SysError("closing file descriptor %1%", fd);
         fd = -1;
     }
+}
+
+void AutoCloseFD::fsync()
+{
+  if (fd != -1) {
+      int result;
+#if __APPLE__
+      result = ::fcntl(fd, F_FULLFSYNC);
+#else
+      result = ::fsync(fd);
+#endif
+      if (result == -1)
+          throw SysError("fsync file descriptor %1%", fd);
+  }
 }
 
 
@@ -999,9 +1070,19 @@ static pid_t doFork(bool allowVfork, std::function<void()> fun)
 }
 
 
+#if __linux__
+static int childEntry(void * arg)
+{
+    auto main = (std::function<void()> *) arg;
+    (*main)();
+    return 1;
+}
+#endif
+
+
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 {
-    auto wrapper = [&]() {
+    std::function<void()> wrapper = [&]() {
         if (!options.allowVfork)
             logger = makeSimpleLogger();
         try {
@@ -1021,7 +1102,27 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
             _exit(1);
     };
 
-    pid_t pid = doFork(options.allowVfork, wrapper);
+    pid_t pid = -1;
+
+    if (options.cloneFlags) {
+        #ifdef __linux__
+        // Not supported, since then we don't know when to free the stack.
+        assert(!(options.cloneFlags & CLONE_VM));
+
+        size_t stackSize = 1 * 1024 * 1024;
+        auto stack = (char *) mmap(0, stackSize,
+            PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
+        if (stack == MAP_FAILED) throw SysError("allocating stack");
+
+        Finally freeStack([&]() { munmap(stack, stackSize); });
+
+        pid = clone(childEntry, stack + stackSize, options.cloneFlags | SIGCHLD, &wrapper);
+        #else
+        throw Error("clone flags are only supported on Linux");
+        #endif
+    } else
+        pid = doFork(options.allowVfork, wrapper);
+
     if (pid == -1) throw SysError("unable to fork");
 
     return pid;
@@ -1042,7 +1143,7 @@ std::string runProgram(Path program, bool searchPath, const Strings & args,
     auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input});
 
     if (!statusOk(res.first))
-        throw ExecError(res.first, fmt("program '%1%' %2%", program, statusToString(res.first)));
+        throw ExecError(res.first, "program '%1%' %2%", program, statusToString(res.first));
 
     return res.second;
 }
@@ -1170,7 +1271,7 @@ void runProgram2(const RunOptions & options)
     if (source) promise.get_future().get();
 
     if (status)
-        throw ExecError(status, fmt("program '%1%' %2%", options.program, statusToString(status)));
+        throw ExecError(status, "program '%1%' %2%", options.program, statusToString(status));
 }
 
 
@@ -1239,9 +1340,9 @@ template<class C> C tokenizeString(std::string_view s, std::string_view separato
 {
     C result;
     auto pos = s.find_first_not_of(separators, 0);
-    while (pos != std::string::npos) {
+    while (pos != std::string_view::npos) {
         auto end = s.find_first_of(separators, pos + 1);
-        if (end == std::string::npos) end = s.size();
+        if (end == std::string_view::npos) end = s.size();
         result.insert(result.end(), std::string(s, pos, end - pos));
         pos = s.find_first_not_of(separators, end);
     }
@@ -1263,9 +1364,9 @@ std::string chomp(std::string_view s)
 std::string trim(std::string_view s, std::string_view whitespace)
 {
     auto i = s.find_first_not_of(whitespace);
-    if (i == std::string_view::npos) return "";
+    if (i == s.npos) return "";
     auto j = s.find_last_not_of(whitespace);
-    return std::string(s, i, j == std::string::npos ? j : j - i + 1);
+    return std::string(s, i, j == s.npos ? j : j - i + 1);
 }
 
 
@@ -1300,14 +1401,14 @@ std::string statusToString(int status)
 {
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
         if (WIFEXITED(status))
-            return (format("failed with exit code %1%") % WEXITSTATUS(status)).str();
+            return fmt("failed with exit code %1%", WEXITSTATUS(status));
         else if (WIFSIGNALED(status)) {
             int sig = WTERMSIG(status);
 #if HAVE_STRSIGNAL
             const char * description = strsignal(sig);
-            return (format("failed due to signal %1% (%2%)") % sig % description).str();
+            return fmt("failed due to signal %1% (%2%)", sig, description);
 #else
-            return (format("failed due to signal %1%") % sig).str();
+            return fmt("failed due to signal %1%", sig);
 #endif
         }
         else
@@ -1356,7 +1457,7 @@ std::string shellEscape(const std::string_view s)
 }
 
 
-void ignoreException()
+void ignoreException(Verbosity lvl)
 {
     /* Make sure no exceptions leave this function.
        printError() also throws when remote is closed. */
@@ -1364,7 +1465,7 @@ void ignoreException()
         try {
             throw;
         } catch (std::exception & e) {
-            printError("error (ignored): %1%", e.what());
+            printMsg(lvl, "error (ignored): %1%", e.what());
         }
     } catch (...) { }
 }
@@ -1376,7 +1477,7 @@ bool shouldANSI()
         && !getEnv("NO_COLOR").has_value();
 }
 
-std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned int width)
+std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int width)
 {
     std::string t, e;
     size_t w = 0;
@@ -1412,7 +1513,7 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
             }
         }
 
-        else if (*i == '\r')
+        else if (*i == '\r' || *i == '\a')
             // do nothing for now
             i++;
 
@@ -1451,6 +1552,7 @@ constexpr char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuv
 std::string base64Encode(std::string_view s)
 {
     std::string res;
+    res.reserve((s.size() + 2) / 3 * 4);
     int data = 0, nbits = 0;
 
     for (char c : s) {
@@ -1482,6 +1584,9 @@ std::string base64Decode(std::string_view s)
     }();
 
     std::string res;
+    // Some sequences are missing the padding consisting of up to two '='.
+    //                    vvv
+    res.reserve((s.size() + 2) / 4 * 3);
     unsigned int d = 0, bits = 0;
 
     for (char c : s) {
@@ -1542,8 +1647,22 @@ std::string stripIndentation(std::string_view s)
 }
 
 
-//////////////////////////////////////////////////////////////////////
+std::pair<std::string_view, std::string_view> getLine(std::string_view s)
+{
+    auto newline = s.find('\n');
 
+    if (newline == s.npos) {
+        return {s, ""};
+    } else {
+        auto line = s.substr(0, newline);
+        if (!line.empty() && line[line.size() - 1] == '\r')
+            line = line.substr(0, line.size() - 1);
+        return {line, s.substr(newline + 1)};
+    }
+}
+
+
+//////////////////////////////////////////////////////////////////////
 
 static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
 
@@ -1668,7 +1787,9 @@ void setStackSize(size_t stackSize)
     #endif
 }
 
+#if __linux__
 static AutoCloseFD fdSavedMountNamespace;
+#endif
 
 void saveMountNamespace()
 {
@@ -1687,8 +1808,13 @@ void restoreMountNamespace()
 {
 #if __linux__
     try {
+        auto savedCwd = absPath(".");
+
         if (fdSavedMountNamespace && setns(fdSavedMountNamespace.get(), CLONE_NEWNS) == -1)
             throw SysError("restoring parent mount namespace");
+        if (chdir(savedCwd.c_str()) == -1) {
+            throw SysError("restoring cwd");
+        }
     } catch (Error & e) {
         debug(e.msg());
     }
@@ -1768,7 +1894,7 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
     if (chmod(path.c_str(), mode) == -1)
         throw SysError("changing permissions on '%1%'", path);
 
-    if (listen(fdSocket.get(), 5) == -1)
+    if (listen(fdSocket.get(), 100) == -1)
         throw SysError("cannot listen on socket '%1%'", path);
 
     return fdSocket;
@@ -1842,7 +1968,7 @@ std::string showBytes(uint64_t bytes)
 
 
 // FIXME: move to libstore/build
-void commonChildInit(Pipe & logPipe)
+void commonChildInit()
 {
     logger = makeSimpleLogger();
 
@@ -1855,10 +1981,6 @@ void commonChildInit(Pipe & logPipe)
        terminal signals. */
     if (setsid() == -1)
         throw SysError("creating a new session");
-
-    /* Dup the write side of the logger pipe into stderr. */
-    if (dup2(logPipe.writeSide.get(), STDERR_FILENO) == -1)
-        throw SysError("cannot pipe standard error into log file");
 
     /* Dup stderr to stdout. */
     if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)

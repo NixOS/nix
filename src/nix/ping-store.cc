@@ -1,10 +1,13 @@
 #include "command.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "finally.hh"
+
+#include <nlohmann/json.hpp>
 
 using namespace nix;
 
-struct CmdPingStore : StoreCommand
+struct CmdPingStore : StoreCommand, MixJSON
 {
     std::string description() override
     {
@@ -20,10 +23,26 @@ struct CmdPingStore : StoreCommand
 
     void run(ref<Store> store) override
     {
-        notice("Store URL: %s", store->getUri());
-        store->connect();
-        if (auto version = store->getVersion())
-            notice("Version: %s", *version);
+        if (!json) {
+            notice("Store URL: %s", store->getUri());
+            store->connect();
+            if (auto version = store->getVersion())
+                notice("Version: %s", *version);
+            if (auto trusted = store->isTrustedClient())
+                notice("Trusted: %s", *trusted);
+        } else {
+            nlohmann::json res;
+            Finally printRes([&]() {
+                logger->cout("%s", res);
+            });
+
+            res["url"] = store->getUri();
+            store->connect();
+            if (auto version = store->getVersion())
+                res["version"] = *version;
+            if (auto trusted = store->isTrustedClient())
+                res["trusted"] = *trusted;
+        }
     }
 };
 

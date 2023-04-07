@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "util.hh"
 #include "args.hh"
@@ -39,7 +40,6 @@ void printVersion(const std::string & programName);
 void printGCWarning();
 
 class Store;
-struct StorePathWithOutputs;
 
 void printMissing(
     ref<Store> store,
@@ -113,5 +113,25 @@ struct PrintFreed
 /* Install a SIGSEGV handler to detect stack overflows. */
 void detectStackOverflow();
 
+/* Pluggable behavior to run in case of a stack overflow.
+
+   Default value: defaultStackOverflowHandler.
+
+   This is called by the handler installed by detectStackOverflow().
+
+   This gives Nix library consumers a limit opportunity to report the error
+   condition. The handler should exit the process.
+   See defaultStackOverflowHandler() for a reference implementation.
+
+   NOTE: Use with diligence, because this runs in the signal handler, with very
+   limited stack space and a potentially a corrupted heap, all while the failed
+   thread is blocked indefinitely. All functions called must be reentrant. */
+extern std::function<void(siginfo_t * info, void * ctx)> stackOverflowHandler;
+
+/* The default, robust implementation of stackOverflowHandler.
+
+   Prints an error message directly to stderr using a syscall instead of the
+   logger. Exits the process immediately after. */
+void defaultStackOverflowHandler(siginfo_t * info, void * ctx);
 
 }

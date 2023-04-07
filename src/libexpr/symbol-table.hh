@@ -1,48 +1,37 @@
 #pragma once
+///@file
 
 #include <list>
 #include <map>
 #include <unordered_map>
 
 #include "types.hh"
+#include "chunked-vector.hh"
 
 namespace nix {
 
 /* Symbol table used by the parser and evaluator to represent and look
    up identifiers and attributes efficiently.  SymbolTable::create()
    converts a string into a symbol.  Symbols have the property that
-   they can be compared efficiently (using a pointer equality test),
+   they can be compared efficiently (using an equality test),
    because the symbol table stores only one copy of each string. */
 
-class Symbol
+/* This class mainly exists to give us an operator<< for ostreams. We could also
+   return plain strings from SymbolTable, but then we'd have to wrap every
+   instance of a symbol that is fmt()ed, which is inconvenient and error-prone. */
+class SymbolStr
 {
-private:
-    const std::string * s; // pointer into SymbolTable
-    Symbol(const std::string * s) : s(s) { };
     friend class SymbolTable;
 
+private:
+    const std::string * s;
+
+    explicit SymbolStr(const std::string & symbol): s(&symbol) {}
+
 public:
-    Symbol() : s(0) { };
-
-    bool operator == (const Symbol & s2) const
-    {
-        return s == s2.s;
-    }
-
-    // FIXME: remove
     bool operator == (std::string_view s2) const
     {
-        return s->compare(s2) == 0;
-    }
-
-    bool operator != (const Symbol & s2) const
-    {
-        return s != s2.s;
-    }
-
-    bool operator < (const Symbol & s2) const
-    {
-        return s < s2.s;
+        return *s == s2;
     }
 
     operator const std::string & () const
@@ -55,51 +44,78 @@ public:
         return *s;
     }
 
-    bool set() const
-    {
-        return s;
-    }
+    friend std::ostream & operator <<(std::ostream & os, const SymbolStr & symbol);
+};
 
-    bool empty() const
-    {
-        return s->empty();
-    }
+class Symbol
+{
+    friend class SymbolTable;
 
-    friend std::ostream & operator << (std::ostream & str, const Symbol & sym);
+private:
+    uint32_t id;
+
+    explicit Symbol(uint32_t id): id(id) {}
+
+public:
+    Symbol() : id(0) {}
+
+    explicit operator bool() const { return id > 0; }
+
+    bool operator<(const Symbol other) const { return id < other.id; }
+    bool operator==(const Symbol other) const { return id == other.id; }
+    bool operator!=(const Symbol other) const { return id != other.id; }
 };
 
 class SymbolTable
 {
 private:
-    std::unordered_map<std::string_view, Symbol> symbols;
-    std::list<std::string> store;
+    std::unordered_map<std::string_view, std::pair<const std::string *, uint32_t>> symbols;
+    ChunkedVector<std::string, 8192> store{16};
 
 public:
+
     Symbol create(std::string_view s)
     {
         // Most symbols are looked up more than once, so we trade off insertion performance
         // for lookup performance.
         // TODO: could probably be done more efficiently with transparent Hash and Equals
         // on the original implementation using unordered_set
+        // FIXME: make this thread-safe.
         auto it = symbols.find(s);
-        if (it != symbols.end()) return it->second;
+        if (it != symbols.end()) return Symbol(it->second.second + 1);
 
-        auto & rawSym = store.emplace_back(s);
-        return symbols.emplace(rawSym, Symbol(&rawSym)).first->second;
+        const auto & [rawSym, idx] = store.add(std::string(s));
+        symbols.emplace(rawSym, std::make_pair(&rawSym, idx));
+        return Symbol(idx + 1);
+    }
+
+    std::vector<SymbolStr> resolve(const std::vector<Symbol> & symbols) const
+    {
+        std::vector<SymbolStr> result;
+        result.reserve(symbols.size());
+        for (auto sym : symbols)
+            result.push_back((*this)[sym]);
+        return result;
+    }
+
+    SymbolStr operator[](Symbol s) const
+    {
+        if (s.id == 0 || s.id > store.size())
+            abort();
+        return SymbolStr(store[s.id - 1]);
     }
 
     size_t size() const
     {
-        return symbols.size();
+        return store.size();
     }
 
     size_t totalSize() const;
 
     template<typename T>
-    void dump(T callback)
+    void dump(T callback) const
     {
-        for (auto & s : store)
-            callback(s);
+        store.forEach(callback);
     }
 };
 

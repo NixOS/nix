@@ -87,7 +87,7 @@ std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv)
 {
     auto out = drv.outputs.find("out");
     if (out != drv.outputs.end()) {
-        if (auto v = std::get_if<DerivationOutputCAFixed>(&out->second.output))
+        if (const auto * v = std::get_if<DerivationOutput::CAFixed>(&out->second.raw()))
             return v->hash;
     }
     return std::nullopt;
@@ -185,7 +185,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
                     knownOutputPaths = false;
                     break;
                 }
-                if (wantOutput(outputName, bfd.outputs) && !isValidPath(*pathOpt))
+                if (bfd.outputs.contains(outputName) && !isValidPath(*pathOpt))
                     invalid.insert(*pathOpt);
             }
             if (knownOutputPaths && invalid.empty()) return;
@@ -277,15 +277,20 @@ std::map<DrvOutput, StorePath> drvOutputReferences(
 {
     std::set<Realisation> inputRealisations;
 
-    for (const auto& [inputDrv, outputNames] : drv.inputDrvs) {
-        auto outputHashes =
+    for (const auto & [inputDrv, outputNames] : drv.inputDrvs) {
+        const auto outputHashes =
             staticOutputHashes(store, store.readDerivation(inputDrv));
-        for (const auto& outputName : outputNames) {
+        for (const auto & outputName : outputNames) {
+            auto outputHash = get(outputHashes, outputName);
+            if (!outputHash)
+                throw Error(
+                    "output '%s' of derivation '%s' isn't realised", outputName,
+                    store.printStorePath(inputDrv));
             auto thisRealisation = store.queryRealisation(
-                DrvOutput{outputHashes.at(outputName), outputName});
+                DrvOutput{*outputHash, outputName});
             if (!thisRealisation)
                 throw Error(
-                    "output '%s' of derivation '%s' isn’t built", outputName,
+                    "output '%s' of derivation '%s' isn't built", outputName,
                     store.printStorePath(inputDrv));
             inputRealisations.insert(*thisRealisation);
         }
@@ -295,4 +300,48 @@ std::map<DrvOutput, StorePath> drvOutputReferences(
 
     return drvOutputReferences(Realisation::closure(store, inputRealisations), info->references);
 }
+
+OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd, Store * evalStore_)
+{
+    auto & evalStore = evalStore_ ? *evalStore_ : store;
+
+    OutputPathMap outputs;
+    auto drv = evalStore.readDerivation(bfd.drvPath);
+    auto outputHashes = staticOutputHashes(store, drv);
+    auto drvOutputs = drv.outputsAndOptPaths(store);
+    auto outputNames = std::visit(overloaded {
+        [&](const OutputsSpec::All &) {
+            StringSet names;
+            for (auto & [outputName, _] : drv.outputs)
+                names.insert(outputName);
+            return names;
+        },
+        [&](const OutputsSpec::Names & names) {
+            return static_cast<std::set<std::string>>(names);
+        },
+    }, bfd.outputs.raw());
+    for (auto & output : outputNames) {
+        auto outputHash = get(outputHashes, output);
+        if (!outputHash)
+            throw Error(
+                "the derivation '%s' doesn't have an output named '%s'",
+                store.printStorePath(bfd.drvPath), output);
+        if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
+            DrvOutput outputId { *outputHash, output };
+            auto realisation = store.queryRealisation(outputId);
+            if (!realisation)
+                throw MissingRealisation(outputId);
+            outputs.insert_or_assign(output, realisation->outPath);
+        } else {
+            // If ca-derivations isn't enabled, assume that
+            // the output path is statically known.
+            auto drvOutput = get(drvOutputs, output);
+            assert(drvOutput);
+            assert(drvOutput->second);
+            outputs.insert_or_assign(output, *drvOutput->second);
+        }
+    }
+    return outputs;
+}
+
 }

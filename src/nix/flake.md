@@ -18,51 +18,56 @@ values such as packages or NixOS modules provided by the flake).
 Flake references (*flakerefs*) are a way to specify the location of a
 flake. These have two different forms:
 
-* An attribute set representation, e.g.
 
-  ```nix
-  {
-    type = "github";
-    owner = "NixOS";
-    repo = "nixpkgs";
-  }
-  ```
+## Attribute set representation
 
-  The only required attribute is `type`. The supported types are
-  listed below.
+Example:
 
-* A URL-like syntax, e.g.
+```nix
+{
+  type = "github";
+  owner = "NixOS";
+  repo = "nixpkgs";
+}
+```
 
-  ```
-  github:NixOS/nixpkgs
-  ```
+The only required attribute is `type`. The supported types are
+listed below.
 
-  These are used on the command line as a more convenient alternative
-  to the attribute set representation. For instance, in the command
+## URL-like syntax
 
-  ```console
-  # nix build github:NixOS/nixpkgs#hello
-  ```
+Example:
 
-  `github:NixOS/nixpkgs` is a flake reference (while `hello` is an
-  output attribute). They are also allowed in the `inputs` attribute
-  of a flake, e.g.
+```
+github:NixOS/nixpkgs
+```
 
-  ```nix
-  inputs.nixpkgs.url = github:NixOS/nixpkgs;
-  ```
+These are used on the command line as a more convenient alternative
+to the attribute set representation. For instance, in the command
 
-  is equivalent to
+```console
+# nix build github:NixOS/nixpkgs#hello
+```
 
-  ```nix
-  inputs.nixpkgs = {
-    type = "github";
-    owner = "NixOS";
-    repo = "nixpkgs";
-  };
-  ```
+`github:NixOS/nixpkgs` is a flake reference (while `hello` is an
+output attribute). They are also allowed in the `inputs` attribute
+of a flake, e.g.
 
-## Examples
+```nix
+inputs.nixpkgs.url = "github:NixOS/nixpkgs";
+```
+
+is equivalent to
+
+```nix
+inputs.nixpkgs = {
+  type = "github";
+  owner = "NixOS";
+  repo = "nixpkgs";
+};
+```
+
+### Examples
 
 Here are some examples of flake references in their URL-like representation:
 
@@ -153,13 +158,18 @@ Currently the `type` attribute can be one of the following:
   git(+http|+https|+ssh|+git|+file|):(//<server>)?<path>(\?<params>)?
   ```
 
-  The `ref` attribute defaults to `master`.
+  The `ref` attribute defaults to resolving the `HEAD` reference.
 
   The `rev` attribute must denote a commit that exists in the branch
   or tag specified by the `ref` attribute, since Nix doesn't do a full
   clone of the remote repository by default (and the Git protocol
   doesn't allow fetching a `rev` without a known `ref`). The default
   is the commit currently pointed to by `ref`.
+
+  When `git+file` is used without specifying `ref` or `rev`, files are
+  fetched directly from the local `path` as long as they have been added
+  to the Git repository. If there are uncommitted changes, the reference
+  is treated as dirty and a warning is printed.
 
   For example, the following are valid Git flake references:
 
@@ -176,9 +186,17 @@ Currently the `type` attribute can be one of the following:
 * `tarball`: Tarballs. The location of the tarball is specified by the
   attribute `url`.
 
-  In URL form, the schema must be `http://`, `https://` or `file://`
-  URLs and the extension must be `.zip`, `.tar`, `.tar.gz`, `.tar.xz`,
-  `.tar.bz2` or `.tar.zst`.
+  In URL form, the schema must be `tarball+http://`, `tarball+https://` or `tarball+file://`.
+  If the extension corresponds to a known archive format (`.zip`, `.tar`,
+  `.tgz`, `.tar.gz`, `.tar.xz`, `.tar.bz2` or `.tar.zst`), then the `tarball+`
+  can be dropped.
+
+* `file`: Plain files or directory tarballs, either over http(s) or from the local
+  disk.
+
+  In URL form, the schema must be `file+http://`, `file+https://` or `file+file://`.
+  If the extension doesn’t correspond to a known archive format (as defined by the
+  `tarball` fetcher), then the `file+` prefix can be dropped.
 
 * `github`: A more efficient way to fetch repositories from
   GitHub. The following attributes are required:
@@ -203,11 +221,46 @@ Currently the `type` attribute can be one of the following:
   commit hash (`rev`). Note that unlike Git, GitHub allows fetching by
   commit hash without specifying a branch or tag.
 
+  You can also specify `host` as a parameter, to point to a custom GitHub
+  Enterprise server.
+
   Some examples:
 
   * `github:edolstra/dwarffs`
   * `github:edolstra/dwarffs/unstable`
   * `github:edolstra/dwarffs/d3f2baba8f425779026c6ec04021b2e927f61e31`
+  * `github:internal/project?host=company-github.example.org`
+
+* `gitlab`: Similar to `github`, is a more efficient way to fetch
+  GitLab repositories. The following attributes are required:
+
+  * `owner`: The owner of the repository.
+
+  * `repo`: The name of the repository.
+
+  Like `github`, these are downloaded as tarball archives.
+
+  The URL syntax for `gitlab` flakes is:
+
+  `gitlab:<owner>/<repo>(/<rev-or-ref>)?(\?<params>)?`
+
+  `<rev-or-ref>` works the same as `github`. Either a branch or tag name
+  (`ref`), or a commit hash (`rev`) can be specified.
+
+  Since GitLab allows for self-hosting, you can specify `host` as
+  a parameter, to point to any instances other than `gitlab.com`.
+
+  Some examples:
+
+  * `gitlab:veloren/veloren`
+  * `gitlab:veloren/veloren/master`
+  * `gitlab:veloren/veloren/80a4d7f13492d916e47d6195be23acae8001985a`
+  * `gitlab:openldap/openldap?host=git.openldap.org`
+
+  When accessing a project in a (nested) subgroup, make sure to URL-encode any
+  slashes, i.e. replace `/` with `%2F`:
+
+  * `gitlab:veloren%2Fdev/rfcs`
 
 * `sourcehut`: Similar to `github`, is a more efficient way to fetch
   SourceHut repositories. The following attributes are required:
@@ -257,14 +310,14 @@ Currently the `type` attribute can be one of the following:
 # Flake format
 
 As an example, here is a simple `flake.nix` that depends on the
-Nixpkgs flake and provides a single package (i.e. an installable
-derivation):
+Nixpkgs flake and provides a single package (i.e. an
+[installable](./nix.md#installables) derivation):
 
 ```nix
 {
   description = "A flake for building Hello World";
 
-  inputs.nixpkgs.url = github:NixOS/nixpkgs/nixos-20.03;
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-20.03";
 
   outputs = { self, nixpkgs }: {
 
@@ -299,6 +352,8 @@ The following attributes are supported in `flake.nix`:
   also contains some metadata about the inputs. These are:
 
   * `outPath`: The path in the Nix store of the flake's source tree.
+     This way, the attribute set can be passed to `import` as if it was a path,
+     as in the example above (`import nixpkgs`).
 
   * `rev`: The commit hash of the flake's repository, if applicable.
 
@@ -326,9 +381,10 @@ The following attributes are supported in `flake.nix`:
 
 * `nixConfig`: a set of `nix.conf` options to be set when evaluating any
   part of a flake. In the interests of security, only a small set of
-  whitelisted options (currently `bash-prompt`, `bash-prompt-suffix`,
-  and `flake-registry`) are allowed to be set without confirmation so long as
-  `accept-flake-config` is not set in the global configuration.
+  whitelisted options (currently `bash-prompt`, `bash-prompt-prefix`,
+  `bash-prompt-suffix`, and `flake-registry`) are allowed to be set without
+  confirmation so long as `accept-flake-config` is not set in the global
+  configuration.
 
 ## Flake inputs
 
@@ -355,7 +411,7 @@ inputs.nixpkgs = {
 Alternatively, you can use the URL-like syntax:
 
 ```nix
-inputs.import-cargo.url = github:edolstra/import-cargo;
+inputs.import-cargo.url = "github:edolstra/import-cargo";
 inputs.nixpkgs.url = "nixpkgs";
 ```
 

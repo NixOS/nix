@@ -47,9 +47,9 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
             throw;
         }
 
-        /* The files below are special-cased to that they don't show up
-         * in user profiles, either because they are useless, or
-         * because they would cauase pointless collisions (e.g., each
+        /* The files below are special-cased to that they don't show
+         * up in user profiles, either because they are useless, or
+         * because they would cause pointless collisions (e.g., each
          * Python package brings its own
          * `$out/lib/pythonX.Y/site-packages/easy-install.pth'.)
          */
@@ -57,7 +57,9 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
             hasSuffix(srcFile, "/nix-support") ||
             hasSuffix(srcFile, "/perllocal.pod") ||
             hasSuffix(srcFile, "/info/dir") ||
-            hasSuffix(srcFile, "/log"))
+            hasSuffix(srcFile, "/log") ||
+            hasSuffix(srcFile, "/manifest.nix") ||
+            hasSuffix(srcFile, "/manifest.json"))
             continue;
 
         else if (S_ISDIR(srcSt.st_mode)) {
@@ -90,12 +92,11 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                 if (S_ISLNK(dstSt.st_mode)) {
                     auto prevPriority = state.priorities[dstFile];
                     if (prevPriority == priority)
-                        throw Error(
-                                "packages '%1%' and '%2%' have the same priority %3%; "
-                                "use 'nix-env --set-flag priority NUMBER INSTALLED_PKGNAME' "
-                                "to change the priority of one of the conflicting packages"
-                                " (0 being the highest priority)",
-                                srcFile, readLink(dstFile), priority);
+                        throw BuildEnvFileConflictError(
+                            readLink(dstFile),
+                            srcFile,
+                            priority
+                        );
                     if (prevPriority < priority)
                         continue;
                     if (unlink(dstFile.c_str()) == -1)

@@ -17,12 +17,13 @@
 
 # Description
 
-The command `nix-instantiate` generates [store
-derivations](../glossary.md) from (high-level) Nix expressions. It
-evaluates the Nix expressions in each of *files* (which defaults to
+The command `nix-instantiate` produces [store derivation]s from (high-level) Nix expressions.
+It evaluates the Nix expressions in each of *files* (which defaults to
 *./default.nix*). Each top-level expression should evaluate to a
 derivation, a list of derivations, or a set of derivations. The paths
 of the resulting store derivations are printed on standard output.
+
+[store derivation]: ../glossary.md#gloss-store-derivation
 
 If *files* is the character `-`, then a Nix expression will be read from
 standard input.
@@ -51,7 +52,7 @@ standard input.
   - `--strict`\
     When used with `--eval`, recursively evaluate list elements and
     attributes. Normally, such sub-expressions are left unevaluated
-    (since the Nix expression language is lazy).
+    (since the Nix language is lazy).
 
     > **Warning**
     >
@@ -66,7 +67,7 @@ standard input.
     When used with `--eval`, print the resulting value as an XML
     representation of the abstract syntax tree rather than as an ATerm.
     The schema is the same as that used by the [`toXML`
-    built-in](../expressions/builtins.md).
+    built-in](../language/builtins.md).
 
   - `--read-write-mode`\
     When used with `--eval`, perform evaluation in read/write mode so
@@ -75,12 +76,13 @@ standard input.
     this option is not enabled, there may be uninstantiated store paths
     in the final output.
 
-<!-- end list -->
+{{#include ./opt-common.md}}
+
+{{#include ./env-common.md}}
 
 # Examples
 
-Instantiating store derivations from a Nix expression, and building them
-using `nix-store`:
+Instantiate [store derivation]s from a Nix expression, and build them using `nix-store`:
 
 ```console
 $ nix-instantiate test.nix (instantiate)

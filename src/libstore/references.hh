@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "hash.hh"
 #include "path.hh"
@@ -25,6 +26,19 @@ public:
     { return seen; }
 
     void operator () (std::string_view data) override;
+};
+
+class PathRefScanSink : public RefScanSink
+{
+    std::map<std::string, StorePath> backMap;
+
+    PathRefScanSink(StringSet && hashes, std::map<std::string, StorePath> && backMap);
+
+public:
+
+    static PathRefScanSink fromPaths(const StorePathSet & refs);
+
+    StorePathSet getResultPaths();
 };
 
 struct RewritingSink : Sink

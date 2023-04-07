@@ -1,12 +1,14 @@
+#pragma once
+///@file
+
 #include <cassert>
 #include <map>
 #include <set>
 
-#include "types.hh"
-
 #include <nlohmann/json_fwd.hpp>
 
-#pragma once
+#include "types.hh"
+#include "experimental-features.hh"
 
 namespace nix {
 
@@ -123,21 +125,21 @@ public:
     void reapplyUnknownSettings();
 };
 
-/* A class to simplify providing configuration settings. The typical
-   use is to inherit Config and add Setting<T> members:
-
-   class MyClass : private Config
-   {
-     Setting<int> foo{this, 123, "foo", "the number of foos to use"};
-     Setting<std::string> bar{this, "blabla", "bar", "the name of the bar"};
-
-     MyClass() : Config(readConfigFile("/etc/my-app.conf"))
-     {
-       std::cout << foo << "\n"; // will print 123 unless overridden
-     }
-   };
-*/
-
+/**
+ * A class to simplify providing configuration settings. The typical
+ * use is to inherit Config and add Setting<T> members:
+ *
+ * class MyClass : private Config
+ * {
+ *   Setting<int> foo{this, 123, "foo", "the number of foos to use"};
+ *   Setting<std::string> bar{this, "blabla", "bar", "the name of the bar"};
+ *
+ *   MyClass() : Config(readConfigFile("/etc/my-app.conf"))
+ *   {
+ *     std::cout << foo << "\n"; // will print 123 unless overridden
+ *   }
+ * };
+ */
 class Config : public AbstractConfig
 {
     friend class AbstractSetting;
@@ -194,12 +196,15 @@ public:
 
     bool overridden = false;
 
+    std::optional<ExperimentalFeature> experimentalFeature;
+
 protected:
 
     AbstractSetting(
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases);
+        const std::set<std::string> & aliases,
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt);
 
     virtual ~AbstractSetting()
     {
@@ -224,7 +229,9 @@ protected:
     bool isOverridden() const { return overridden; }
 };
 
-/* A setting of type T. */
+/**
+ * A setting of type T.
+ */
 template<typename T>
 class BaseSetting : public AbstractSetting
 {
@@ -240,8 +247,9 @@ public:
         const bool documentDefault,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : AbstractSetting(name, description, aliases)
+        const std::set<std::string> & aliases = {},
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
+        : AbstractSetting(name, description, aliases, experimentalFeature)
         , value(def)
         , defaultValue(def)
         , documentDefault(documentDefault)
@@ -250,11 +258,15 @@ public:
     operator const T &() const { return value; }
     operator T &() { return value; }
     const T & get() const { return value; }
-    bool operator ==(const T & v2) const { return value == v2; }
-    bool operator !=(const T & v2) const { return value != v2; }
-    void operator =(const T & v) { assign(v); }
+    template<typename U>
+    bool operator ==(const U & v2) const { return value == v2; }
+    template<typename U>
+    bool operator !=(const U & v2) const { return value != v2; }
+    template<typename U>
+    void operator =(const U & v) { assign(v); }
     virtual void assign(const T & v) { value = v; }
-    void setDefault(const T & v) { if (!overridden) value = v; }
+    template<typename U>
+    void setDefault(const U & v) { if (!overridden) value = v; }
 
     void set(const std::string & str, bool append = false) override;
 
@@ -292,8 +304,9 @@ public:
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {},
-        const bool documentDefault = true)
-        : BaseSetting<T>(def, documentDefault, name, description, aliases)
+        const bool documentDefault = true,
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
+        : BaseSetting<T>(def, documentDefault, name, description, aliases, experimentalFeature)
     {
         options->addSetting(this);
     }
@@ -301,8 +314,10 @@ public:
     void operator =(const T & v) { this->assign(v); }
 };
 
-/* A special setting for Paths. These are automatically canonicalised
-   (e.g. "/foo//bar/" becomes "/foo/bar"). */
+/**
+ * A special setting for Paths. These are automatically canonicalised
+ * (e.g. "/foo//bar/" becomes "/foo/bar").
+ */
 class PathSetting : public BaseSetting<Path>
 {
     bool allowEmpty;
@@ -352,5 +367,38 @@ struct GlobalConfig : public AbstractConfig
 };
 
 extern GlobalConfig globalConfig;
+
+
+struct ExperimentalFeatureSettings : Config {
+
+    Setting<std::set<ExperimentalFeature>> experimentalFeatures{this, {}, "experimental-features",
+        "Experimental Nix features to enable."};
+
+    /**
+     * Check whether the given experimental feature is enabled.
+     */
+    bool isEnabled(const ExperimentalFeature &) const;
+
+    /**
+     * Require an experimental feature be enabled, throwing an error if it is
+     * not.
+     */
+    void require(const ExperimentalFeature &) const;
+
+    /**
+     * `std::nullopt` pointer means no feature, which means there is nothing that could be
+     * disabled, and so the function returns true in that case.
+     */
+    bool isEnabled(const std::optional<ExperimentalFeature> &) const;
+
+    /**
+     * `std::nullopt` pointer means no feature, which means there is nothing that could be
+     * disabled, and so the function does nothing in that case.
+     */
+    void require(const std::optional<ExperimentalFeature> &) const;
+};
+
+// FIXME: don't use a global variable.
+extern ExperimentalFeatureSettings experimentalFeatureSettings;
 
 }
