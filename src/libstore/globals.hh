@@ -157,6 +157,22 @@ public:
         )",
         {"build-cores"}, false};
 
+    Setting<unsigned int> loadLimit{
+        this,
+        getDefaultCores(),
+        "load-limit",
+        R"(
+          Sets the value of the `NIX_LOAD_LIMIT` environment variable in the
+          invocation of builders. Builders can use this variable at their
+          discretion to schedule jobs based on the average load of the system.
+          For instance, in Nixpkgs, if the derivation attribute
+          `enableParallelBuilding` is set to `true`, the builder passes the
+          `-lN` flag to GNU Make. It can be overriden using the `--max-build-load`
+          command line switch and defaults to `1`. The value `0`means that
+          the builder should ignore the average system load.
+        )",
+        {}, false};
+
     /* Read-only mode.  Don't copy stuff to the store, don't change
        the database. */
     bool readOnlyMode = false;
