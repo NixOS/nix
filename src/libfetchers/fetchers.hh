@@ -165,7 +165,7 @@ DownloadFileResult downloadFile(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
-    bool locked,
+    const std::optional<Hash> & expectedHash,
     const Headers & headers = {});
 
 struct DownloadTarballResult
@@ -179,7 +179,7 @@ DownloadTarballResult downloadTarball(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
-    bool locked,
+    const std::optional<Hash> & expectedHash,
     const Headers & headers = {});
 
 }

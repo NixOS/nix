@@ -14,7 +14,7 @@ DownloadFileResult downloadFile(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
-    bool locked,
+    const std::optional<Hash> & expectedHash,
     const Headers & headers)
 {
     // FIXME: check store
@@ -51,6 +51,33 @@ DownloadFileResult downloadFile(
         if (cached) {
             warn("%s; using cached version", e.msg());
             return useCached();
+
+        } else if (expectedHash) {
+            debug("%s; trying substitutes", e.msg());
+
+            auto expectedPath = store->makeFixedOutputPath(
+                name, FixedOutputInfo{
+                    .method = FileIngestionMethod::Flat,
+                    .hash = *expectedHash,
+                    .references = {}
+                });
+
+            store->substitutePaths({expectedPath});
+
+            auto validPaths = store->queryValidPaths({expectedPath}, SubstituteFlag::Substitute);
+
+            if (validPaths.empty()) {
+                debug("%s: no substitutes found", url);
+                throw;
+            }
+
+            return {
+              .storePath = expectedPath,
+              .etag = expectedHash->to_string(Base::SRI, true),
+              .effectiveUrl = "file://" + store->printStorePath(expectedPath),
+              .immutableUrl = {}
+            };
+
         } else
             throw;
     }
@@ -94,7 +121,7 @@ DownloadFileResult downloadFile(
         inAttrs,
         infoAttrs,
         *storePath,
-        locked);
+        (bool) expectedHash);
 
     if (url != res.effectiveUri)
         getCache()->add(
@@ -106,7 +133,7 @@ DownloadFileResult downloadFile(
             },
             infoAttrs,
             *storePath,
-            locked);
+            (bool) expectedHash);
 
     return {
         .storePath = std::move(*storePath),
@@ -120,7 +147,7 @@ DownloadTarballResult downloadTarball(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
-    bool locked,
+    const std::optional<Hash> & expectedHash,
     const Headers & headers)
 {
     Attrs inAttrs({
@@ -138,7 +165,7 @@ DownloadTarballResult downloadTarball(
             .immutableUrl = maybeGetStrAttr(cached->infoAttrs, "immutableUrl"),
         };
 
-    auto res = downloadFile(store, url, name, locked, headers);
+    auto res = downloadFile(store, url, name, expectedHash, headers);
 
     std::optional<StorePath> unpackedStorePath;
     time_t lastModified;
@@ -171,7 +198,7 @@ DownloadTarballResult downloadTarball(
         inAttrs,
         infoAttrs,
         *unpackedStorePath,
-        locked);
+        (bool) expectedHash);
 
     return {
         .tree = Tree { .actualPath = store->toRealPath(*unpackedStorePath), .storePath = std::move(*unpackedStorePath) },
@@ -276,7 +303,7 @@ struct FileInputScheme : CurlInputScheme
 
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
     {
-        auto file = downloadFile(store, getStrAttr(input.attrs, "url"), input.getName(), false);
+        auto file = downloadFile(store, getStrAttr(input.attrs, "url"), input.getName(), std::nullopt);
         return {std::move(file.storePath), input};
     }
 };
@@ -299,7 +326,7 @@ struct TarballInputScheme : CurlInputScheme
     {
         Input input(_input);
         auto url = getStrAttr(input.attrs, "url");
-        auto result = downloadTarball(store, url, input.getName(), false);
+        auto result = downloadTarball(store, url, input.getName(), std::nullopt);
 
         if (result.immutableUrl) {
             auto immutableInput = Input::fromURL(*result.immutableUrl);
