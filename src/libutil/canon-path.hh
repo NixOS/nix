@@ -192,8 +192,10 @@ public:
      */
     bool isAllowed(const std::set<CanonPath> & allowed) const;
 
-    /* Return a representation `x` of `path` relative to `this`, i.e.
-       `CanonPath(this.makeRelative(x), this) == path`. */
+    /**
+     * Return a representation `x` of `path` relative to `this`, i.e.
+     * `CanonPath(this.makeRelative(x), this) == path`.
+     */
     std::string makeRelative(const CanonPath & path) const;
 };
 
