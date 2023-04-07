@@ -290,14 +290,19 @@ connected:
         auto drv = store->readDerivation(*drvPath);
 
         std::optional<BuildResult> optResult;
-        if (sshStore->isTrustedClient() || drv.type().isCA()) {
-            // Hijack the inputs paths of the derivation to include all the paths
-            // that come from the `inputDrvs` set.
-            // We don’t do that for the derivations whose `inputDrvs` is empty
-            // because
+        // If we don't know whether we are trusted (e.g. `ssh://`
+        // stores), we assume we are. This is neccessary for backwards
+        // compat.
+        if (std::optional trust = sshStore->isTrustedClient(); (!trust || *trust) || drv.type().isCA()) {
+            // Hijack the inputs paths of the derivation to include all
+            // the paths that come from the `inputDrvs` set. We don’t do
+            // that for the derivations whose `inputDrvs` is empty
+            // because:
+            //
             // 1. It’s not needed
-            // 2. Changing the `inputSrcs` set changes the associated output ids,
-            //  which break CA derivations
+            //
+            // 2. Changing the `inputSrcs` set changes the associated
+            //    output ids, which break CA derivations
             if (!drv.inputDrvs.empty())
                 drv.inputSrcs = store->parseStorePathSet(inputs);
             optResult = sshStore->buildDerivation(*drvPath, (const BasicDerivation &) drv);

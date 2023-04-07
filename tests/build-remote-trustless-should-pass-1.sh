@@ -1,9 +1,9 @@
 source common.sh
 
-# Remote trusts us but we pretend it doesn't.
+# Remote trusts us
 file=build-hook.nix
 prog=nix-daemon
 proto=ssh-ng
-trusting=false
 
 source build-remote-trustless.sh
+source build-remote-trustless-after.sh
