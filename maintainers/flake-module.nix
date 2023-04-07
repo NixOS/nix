@@ -9,6 +9,12 @@
 
     # https://flake.parts/options/pre-commit-hooks-nix.html#options
     pre-commit.settings = {
+
+      # Update the pre-commit config file when the shell opens, but do not
+      # install the pre-commit hook by default. See https://github.com/cachix/pre-commit-hooks.nix/blob/6c08a5c6ad043dfb6e4b6bb4dd3a1e559172ca92/README.md#opting-out-opting-in
+      # TODO update link to point to main repo once PR is merged
+      installByDefault = false;
+
       hooks = {
         clang-format.enable = true;
         nixpkgs-fmt.enable = true;
