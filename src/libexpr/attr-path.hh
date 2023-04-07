@@ -17,7 +17,9 @@ std::pair<Value *, PosIdx> findAlongAttrPath(
     Bindings & autoArgs,
     Value & vIn);
 
-/* Heuristic to find the filename and lineno or a nix value. */
+/**
+ * Heuristic to find the filename and lineno or a nix value.
+ */
 std::pair<std::string, uint32_t> findPackageFilename(EvalState & state, Value & v, std::string what);
 
 std::vector<Symbol> parseAttrPath(EvalState & state, std::string_view s);

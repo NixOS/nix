@@ -16,9 +16,11 @@ typedef std::vector<FlakeId> InputPath;
 
 struct LockedNode;
 
-/* A node in the lock file. It has outgoing edges to other nodes (its
-   inputs). Only the root node has this type; all other nodes have
-   type LockedNode. */
+/**
+ * A node in the lock file. It has outgoing edges to other nodes (its
+ * inputs). Only the root node has this type; all other nodes have
+ * type LockedNode.
+ */
 struct Node : std::enable_shared_from_this<Node>
 {
     typedef std::variant<ref<LockedNode>, InputPath> Edge;
@@ -28,7 +30,9 @@ struct Node : std::enable_shared_from_this<Node>
     virtual ~Node() { }
 };
 
-/* A non-root node in the lock file. */
+/**
+ * A non-root node in the lock file.
+ */
 struct LockedNode : Node
 {
     FlakeRef lockedRef, originalRef;
@@ -63,7 +67,9 @@ struct LockFile
 
     void write(const Path & path) const;
 
-    /* Check whether this lock file has any unlocked inputs. */
+    /**
+     * Check whether this lock file has any unlocked inputs.
+     */
     std::optional<FlakeRef> isUnlocked() const;
 
     bool operator ==(const LockFile & other) const;
@@ -74,7 +80,9 @@ struct LockFile
 
     static std::string diff(const LockFile & oldLocks, const LockFile & newLocks);
 
-    /* Check that every 'follows' input target exists. */
+    /**
+     * Check that every 'follows' input target exists.
+     */
     void check();
 };
 

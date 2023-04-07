@@ -5,7 +5,9 @@
 
 namespace nix {
 
-/* Note: Various places expect the allocated memory to be zeroed. */
+/**
+ * Note: Various places expect the allocated memory to be zeroed.
+ */
 [[gnu::always_inline]]
 inline void * allocBytes(size_t n)
 {

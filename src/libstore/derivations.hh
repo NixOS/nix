@@ -258,8 +258,14 @@ struct DerivationType : _DerivationTypeRaw {
 
 struct BasicDerivation
 {
-    DerivationOutputs outputs; /* keyed on symbolic IDs */
-    StorePathSet inputSrcs; /* inputs that are sources */
+    /**
+     * keyed on symbolic IDs
+     */
+    DerivationOutputs outputs;
+    /**
+     * inputs that are sources
+     */
+    StorePathSet inputSrcs;
     std::string platform;
     Path builder;
     Strings args;
@@ -429,12 +435,12 @@ void operator |= (DrvHash::Kind & self, const DrvHash::Kind & other) noexcept;
  *
  * A fixed-output derivation is a derivation whose outputs have a
  * specified content hash and hash algorithm. (Currently they must have
- * exactly one output (`out'), which is specified using the `outputHash'
- * and `outputHashAlgo' attributes, but the algorithm doesn't assume
+ * exactly one output (`out`), which is specified using the `outputHash`
+ * and `outputHashAlgo` attributes, but the algorithm doesn't assume
  * this.) We don't want changes to such derivations to propagate upwards
  * through the dependency graph, changing output paths everywhere.
  *
- * For instance, if we change the url in a call to the `fetchurl'
+ * For instance, if we change the url in a call to the `fetchurl`
  * function, we do not want to rebuild everything depending on it---after
  * all, (the hash of) the file being downloaded is unchanged.  So the
  * *output paths* should not change. On the other hand, the *derivation

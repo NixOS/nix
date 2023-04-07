@@ -40,15 +40,15 @@ public:
 
     /**
      * Execute work items until the queue is empty.
-     * 
-	 * \note Note that work items are allowed to add new items to the
-	 * queue; this is handled correctly.
      *
-	 * Queue processing stops prematurely if any work item throws an
-	 * exception. This exception is propagated to the calling thread. If
-	 * multiple work items throw an exception concurrently, only one
-	 * item is propagated; the others are printed on stderr and
-	 * otherwise ignored.
+     * \note Note that work items are allowed to add new items to the
+     * queue; this is handled correctly.
+     *
+     * Queue processing stops prematurely if any work item throws an
+     * exception. This exception is propagated to the calling thread. If
+     * multiple work items throw an exception concurrently, only one
+     * item is propagated; the others are printed on stderr and
+     * otherwise ignored.
      */
     void process();
 

@@ -10,8 +10,10 @@ struct LogStore : public virtual Store
 {
     inline static std::string operationName = "Build log storage and retrieval";
 
-    /* Return the build log of the specified store path, if available,
-       or null otherwise. */
+    /**
+     * Return the build log of the specified store path, if available,
+     * or null otherwise.
+     */
     std::optional<std::string> getBuildLog(const StorePath & path);
 
     virtual std::optional<std::string> getBuildLogExact(const StorePath & path) = 0;

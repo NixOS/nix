@@ -32,8 +32,10 @@ struct RemoteStoreConfig : virtual StoreConfig
         "Maximum age of a connection before it is closed."};
 };
 
-/* FIXME: RemoteStore is a misnomer - should be something like
-   DaemonStore. */
+/**
+ * \todo RemoteStore is a misnomer - should be something like
+ * DaemonStore.
+ */
 class RemoteStore : public virtual RemoteStoreConfig,
     public virtual Store,
     public virtual GcStore,
@@ -69,7 +71,9 @@ public:
     void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
 
-    /* Add a content-addressable store path. `dump` will be drained. */
+    /**
+     * Add a content-addressable store path. `dump` will be drained.
+     */
     ref<const ValidPathInfo> addCAToStore(
         Source & dump,
         std::string_view name,
@@ -77,7 +81,9 @@ public:
         const StorePathSet & references,
         RepairFlag repair);
 
-    /* Add a content-addressable store path. Does not support references. `dump` will be drained. */
+    /**
+     * Add a content-addressable store path. Does not support references. `dump` will be drained.
+     */
     StorePath addToStoreFromDump(Source & dump, std::string_view name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair, const StorePathSet & references = StorePathSet()) override;
 

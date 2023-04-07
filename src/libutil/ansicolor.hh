@@ -1,9 +1,12 @@
 #pragma once
-///@file
+/**
+ * @file
+ *
+ * @brief Some ANSI escape sequences.
+ */
 
 namespace nix {
 
-/* Some ANSI escape sequences. */
 #define ANSI_NORMAL "\e[0m"
 #define ANSI_BOLD "\e[1m"
 #define ANSI_FAINT "\e[2m"
