@@ -45,3 +45,14 @@
   This is useful for scripting interactions with (non-legacy-ssh) remote Nix stores.
 
   `nix store ping` and `nix doctor` now display this information.
+
+* A new command `nix derivation add` is created, to allow adding derivations to the store without involving the Nix language.
+  It exists to round out our collection of basic utility/plumbing commands, and allow for a low barrier-to-entry way of experimenting with alternative front-ends to the Nix Store.
+  It uses the same JSON layout as `nix show-derivation`, and is its inverse.
+
+* `nix show-derivation` has been renamed to `nix derivation show`.
+  This matches `nix derivation add`, and avoids bloating the top-level namespace.
+  The old name is still kept as an alias for compatibility, however.
+
+* The `nix derivation {add,show}` JSON format now includes the derivation name as a top-level field.
+  This is useful in general, but especially necessary for the `add` direction, as otherwise we would need to pass in the name out of band for certain cases.
