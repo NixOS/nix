@@ -39,3 +39,9 @@
 
   * `man nix-store-<operation>` and `man nix-env-<operation>`
   * `nix-store --help --<operation>` and `nix-env --help --<operation>`.
+
+* Nix when used as a client now checks whether the store (the server) trusts the client.
+  (The store always had to check whether it trusts the client, but now the client is informed of the store's decision.)
+  This is useful for scripting interactions with (non-legacy-ssh) remote Nix stores.
+
+  `nix store ping` and `nix doctor` now display this information.

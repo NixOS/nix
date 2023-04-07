@@ -89,6 +89,7 @@ const uint32_t exportMagic = 0x4558494e;
 
 
 enum BuildMode { bmNormal, bmRepair, bmCheck };
+enum TrustedFlag : bool { NotTrusted = false, Trusted = true };
 
 struct BuildResult;
 
@@ -814,6 +815,17 @@ public:
     {
         return 0;
     };
+
+    /**
+     * @return/ whether store trusts *us*.
+     *
+     * `std::nullopt` means we do not know.
+     *
+     * @note This is the opposite of the StoreConfig::isTrusted
+     * store setting. That is about whether *we* trust the store.
+     */
+    virtual std::optional<TrustedFlag> isTrustedClient() = 0;
+
 
     virtual Path toRealPath(const Path & storePath)
     {

@@ -17,6 +17,7 @@ nix_tests = \
   ca/gc.sh \
   gc.sh \
   remote-store.sh \
+  legacy-ssh-store.sh \
   lang.sh \
   experimental-features.sh \
   fetchMercurial.sh \
