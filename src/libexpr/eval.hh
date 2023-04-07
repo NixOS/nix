@@ -43,7 +43,10 @@ struct PrimOp
 struct Env
 {
     Env * up;
-    unsigned short prevWith:14; // nr of levels up to next `with' environment
+    /**
+     * Number of of levels up to next `with` environment
+     */
+    unsigned short prevWith:14;
     enum { Plain = 0, HasWithExpr, HasWithAttrs } type:2;
     Value * values[0];
 };
@@ -371,9 +374,10 @@ public:
     std::pair<bool, std::string> resolveSearchPathElem(const SearchPathElem & elem);
 
     /**
-     * Evaluate an expression to normal form, storing the result in
-     * value `v'.
-      */
+     * Evaluate an expression to normal form
+     *
+     * @param [out] v The resulting is stored here.
+     */
     void eval(Expr * e, Value & v);
 
     /**
@@ -385,9 +389,9 @@ public:
     inline void evalAttrs(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx);
 
     /**
-     * If `v' is a thunk, enter it and overwrite `v' with the result
-     * of the evaluation of the thunk.  If `v' is a delayed function
-     * application, call the function and overwrite `v' with the
+     * If `v` is a thunk, enter it and overwrite `v` with the result
+     * of the evaluation of the thunk.  If `v` is a delayed function
+     * application, call the function and overwrite `v` with the
      * result.  Otherwise, this is a no-op.
      */
     inline void forceValue(Value & v, const PosIdx pos);
@@ -402,7 +406,7 @@ public:
     void forceValueDeep(Value & v);
 
     /**
-     * Force `v', and then verify that it has the expected type.
+     * Force `v`, and then verify that it has the expected type.
      */
     NixInt forceInt(Value & v, const PosIdx pos, std::string_view errorCtx);
     NixFloat forceFloat(Value & v, const PosIdx pos, std::string_view errorCtx);
@@ -429,8 +433,8 @@ public:
 
 public:
     /**
-     * @return true iff the value `v' denotes a derivation (i.e. a
-     * set with attribute `type = "derivation"').
+     * @return true iff the value `v` denotes a derivation (i.e. a
+     * set with attribute `type = "derivation"`).
      */
     bool isDerivation(Value & v);
 
@@ -441,8 +445,8 @@ public:
      * String coercion.
      *
      * Converts strings, paths and derivations to a
-     * string.  If `coerceMore' is set, also converts nulls, integers,
-     * booleans and lists to a string.  If `copyToStore' is set,
+     * string.  If `coerceMore` is set, also converts nulls, integers,
+     * booleans and lists to a string.  If `copyToStore` is set,
      * referenced paths are copied to the Nix store as a side effect.
      */
     BackedStringView coerceToString(const PosIdx pos, Value & v, PathSet & context,
@@ -545,7 +549,7 @@ public:
 
     /**
      * Automatically call a function for which each argument has a
-     * default value or has a binding in the `args' map.
+     * default value or has a binding in the `args` map.
      */
     void autoCallFunction(Bindings & args, Value & fun, Value & res);
 
@@ -638,13 +642,13 @@ struct DebugTraceStacker {
 };
 
 /**
- * @return A string representing the type of the value `v'.
+ * @return A string representing the type of the value `v`.
  */
 std::string_view showType(ValueType type);
 std::string showType(const Value & v);
 
 /**
- * If `path' refers to a directory, then append "/default.nix".
+ * If `path` refers to a directory, then append "/default.nix".
  */
 Path resolveExprPath(Path path);
 

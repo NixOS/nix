@@ -89,7 +89,7 @@ typedef std::list<DrvInfo> DrvInfos;
 
 
 /**
- * If value `v' denotes a derivation, return a DrvInfo object
+ * If value `v` denotes a derivation, return a DrvInfo object
  * describing it. Otherwise return nothing.
  */
 std::optional<DrvInfo> getDerivation(EvalState & state,

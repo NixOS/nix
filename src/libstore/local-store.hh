@@ -223,7 +223,7 @@ public:
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
     /**
-     * Register the validity of a path, i.e., that `path' exists, that
+     * Register the validity of a path, i.e., that `path` exists, that
      * the paths referenced by it exists, and in the case of an output
      * path of a derivation, that it has been produced by a successful
      * execution of the derivation (or something equivalent).  Also

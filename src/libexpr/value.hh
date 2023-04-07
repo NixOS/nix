@@ -162,13 +162,13 @@ public:
         bool boolean;
 
         /**
-         * Strings in the evaluator carry a so-called `context' which
+         * Strings in the evaluator carry a so-called `context` which
          * is a list of strings representing store paths.  This is to
          * allow users to write things like
 
          *   "--with-freetype2-library=" + freetype + "/lib"
 
-         * where `freetype' is a derivation (or a source to be copied
+         * where `freetype` is a derivation (or a source to be copied
          * to the store).  If we just concatenated the strings without
          * keeping track of the referenced store paths, then if the
          * string is used as a derivation attribute, the derivation

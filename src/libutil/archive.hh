@@ -50,10 +50,10 @@ namespace nix {
  *
  *   sort(strings) = lexicographic sort by 8-bit value (strcmp).
  *
- *   entries(path) = the entries of a directory, without `.' and
- *   `..'.
+ *   entries(path) = the entries of a directory, without `.` and
+ *   `..`.
  *
- *   `+' denotes string concatenation.
+ *   `+` denotes string concatenation.
  * ```
  */
 void dumpPath(const Path & path, Sink & sink,
@@ -90,7 +90,7 @@ struct ParseSink
 
 /**
  * If the NAR archive contains a single file at top-level, then save
- * the contents of the file to `s'.  Otherwise barf.
+ * the contents of the file to `s`.  Otherwise barf.
  */
 struct RetrieveRegularNARSink : ParseSink
 {

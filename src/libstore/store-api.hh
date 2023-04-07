@@ -411,17 +411,17 @@ public:
     { unsupported("queryReferrers"); }
 
     /**
-     * @return all currently valid derivations that have `path' as an
+     * @return all currently valid derivations that have `path` as an
      * output.
      *
-     * (Note that the result of `queryDeriver()' is the derivation that
-     * was actually used to produce `path', which may not exist
+     * (Note that the result of `queryDeriver()` is the derivation that
+     * was actually used to produce `path`, which may not exist
      * anymore.)
      */
     virtual StorePathSet queryValidDerivers(const StorePath & path) { return {}; };
 
     /**
-     * Query the outputs of the derivation denoted by `path'.
+     * Query the outputs of the derivation denoted by `path`.
      */
     virtual StorePathSet queryDerivationOutputs(const StorePath & path);
 
@@ -513,7 +513,7 @@ public:
 
     /**
      * Like addToStore(), but the contents of the path are contained
-     * in `dump', which is either a NAR serialisation (if recursive ==
+     * in `dump`, which is either a NAR serialisation (if recursive ==
      * true) or simply the contents of a regular file (if recursive ==
      * false).
      * `dump` may be drained
@@ -634,8 +634,8 @@ public:
 
     /**
      * @return a string representing information about the path that
-     * can be loaded into the database using `nix-store --load-db' or
-     * `nix-store --register-validity'.
+     * can be loaded into the database using `nix-store --load-db` or
+     * `nix-store --register-validity`.
      */
     std::string makeValidityRegistration(const StorePathSet & paths,
         bool showDerivers, bool showHash);
@@ -715,12 +715,12 @@ public:
 
     /**
      * @param [out] out Place in here the set of all store paths in the
-     * file system closure of `storePath'; that is, all paths than can
-     * be directly or indirectly reached from it. `out' is not cleared.
+     * file system closure of `storePath`; that is, all paths than can
+     * be directly or indirectly reached from it. `out` is not cleared.
      *
      * @param flipDirection If true, the set of paths that can reach
-     * `storePath' is returned; that is, the closures under the
-     * `referrers' relation instead of the `references' relation is
+     * `storePath` is returned; that is, the closures under the
+     * `referrers` relation instead of the `references` relation is
      * returned.
      */
     virtual void computeFSClosure(const StorePathSet & paths,

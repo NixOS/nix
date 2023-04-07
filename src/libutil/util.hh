@@ -70,7 +70,7 @@ Path absPath(Path path,
     bool resolveSymlinks = false);
 
 /**
- * Canonicalise a path by removing all `.' or `..' components and
+ * Canonicalise a path by removing all `.` or `..` components and
  * double or trailing slashes.  Optionally resolves all symlink
  * components such that each component of the resulting path is *not*
  * a symbolic link.
@@ -79,15 +79,15 @@ Path canonPath(PathView path, bool resolveSymlinks = false);
 
 /**
  * @return The directory part of the given canonical path, i.e.,
- * everything before the final `/'.  If the path is the root or an
- * immediate child thereof (e.g., `/foo'), this means `/'
+ * everything before the final `/`.  If the path is the root or an
+ * immediate child thereof (e.g., `/foo`), this means `/`
  * is returned.
  */
 Path dirOf(const PathView path);
 
 /**
  * @return the base name of the given canonical path, i.e., everything
- * following the final `/' (trailing slashes are removed).
+ * following the final `/` (trailing slashes are removed).
  */
 std::string_view baseNameOf(std::string_view path);
 
@@ -109,7 +109,7 @@ bool isInDir(std::string_view path, std::string_view dir);
 bool isDirOrInDir(std::string_view path, std::string_view dir);
 
 /**
- * Get status of `path'.
+ * Get status of `path`.
  */
 struct stat stat(const Path & path);
 struct stat lstat(const Path & path);
@@ -128,7 +128,7 @@ Path readLink(const Path & path);
 bool isLink(const Path & path);
 
 /**
- * Read the contents of a directory.  The entries `.' and `..' are
+ * Read the contents of a directory.  The entries `.` and `..` are
  * removed.
  */
 struct DirEntry
@@ -668,13 +668,13 @@ T readLittleEndian(unsigned char * p)
 
 
 /**
- * @return true iff `s' starts with `prefix'.
+ * @return true iff `s` starts with `prefix`.
  */
 bool hasPrefix(std::string_view s, std::string_view prefix);
 
 
 /**
- * @return true iff `s' ends in `suffix'.
+ * @return true iff `s` ends in `suffix`.
  */
 bool hasSuffix(std::string_view s, std::string_view suffix);
 
