@@ -20,8 +20,9 @@ class DrvOutputSubstitutionGoal;
 /**
  * Workaround for not being able to declare a something like
  *
- *   class PathSubstitutionGoal : public Goal;
- *
+ * ```c++
+ * class PathSubstitutionGoal : public Goal;
+ * ```
  * even when Goal is a complete type.
  *
  * This is still a static cast. The purpose of exporting it is to define it in

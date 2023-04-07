@@ -87,12 +87,12 @@ public:
 
     void timedOut(Error && ex) override { abort(); };
 
+    /**
+     * We prepend "a$" to the key name to ensure substitution goals
+     * happen before derivation goals.
+     */
     std::string key() override
     {
-        /**
-         * "a$" ensures substitution goals happen before derivation
-         * goals.
-         */
         return "a$" + std::string(storePath.name()) + "$" + worker.store.printStorePath(storePath);
     }
 
