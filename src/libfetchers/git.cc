@@ -610,11 +610,6 @@ struct GitInputScheme : InputScheme
             );
         }
 
-        /* Ensure git-lfs can still communicate with the actual remote
-           when gitDir is missing the origin URL.
-         */
-        // runProgram("git", true, { "-C", tmpDir, "config", "remote.origin.lfsurl", actualUrl });
-
         if (submodules) {
             Path tmpGitDir = createTempDir();
             AutoDelete delTmpGitDir(tmpGitDir, true);
