@@ -7,7 +7,7 @@
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
 
   # dev tooling
-  inputs.pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
+  inputs.pre-commit-hooks.url = "github:hercules-ci/pre-commit-hooks.nix/optional-install";
   inputs.flake-parts.url = "github:hercules-ci/flake-parts";
 
   # work around https://github.com/NixOS/nix/issues/7730

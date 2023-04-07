@@ -9,9 +9,6 @@
 
     # https://flake.parts/options/pre-commit-hooks-nix.html#options
     pre-commit.settings = {
-
-      default_stages = [ "manual" ];
-
       hooks = {
         clang-format.enable = true;
         nixpkgs-fmt.enable = true;

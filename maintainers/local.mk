@@ -8,7 +8,7 @@ format-quick:
 	  echo "make format: pre-commit not found. Please use \`nix develop\`."; \
 	  exit 1; \
 	fi; \
-	pre-commit run --all-files --hook-stage manual
+	pre-commit run --all-files
 
 format:
-	nix develop --command -- pre-commit run --all-files --hook-stage manual
+	nix develop --command -- pre-commit run --all-files

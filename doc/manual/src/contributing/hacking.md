@@ -192,30 +192,15 @@ Configure your editor to use the `clangd` from the shell, either by running it i
 > Some other editors (e.g. Emacs, Vim) need a plugin to support LSP servers in general (e.g. [lsp-mode](https://github.com/emacs-lsp/lsp-mode) for Emacs and [vim-lsp](https://github.com/prabirshrestha/vim-lsp) for vim).
 > Editor-specific setup is typically opinionated, so we will not cover it here in more detail.
 
-## Formatting and pre-commit
-
-You may run the formatters as a one-off using:
-
-```console
-make format
-```
-
-<!-- TBD, opt-in, blocked on https://github.com/cachix/pre-commit-hooks.nix/pull/261
-
-If you'd like to run the formatters before every commit, install the hooks:
-
-```
-nix-pre-commit-hooks-install
-```
+## Pre-commit and formatting
 
 `nix develop` installs Nix-[integrated](https://github.com/cachix/pre-commit-hooks.nix) [pre-commit](https://pre-commit.com) hooks.
 
-When the hook fails, because files were updated, run `git add --patch` to
+The formatters will run when you commit.
+Pay attention to the console output. If it fails, run `git add --patch` to
 approve the suggestions _and commit again_.
 
--->
-
-The hook configuration is only regenerated when you start a new development shell.
+The hook configuration is only regenerated when you start a new dev shell.
 
 ## Running tests
 
