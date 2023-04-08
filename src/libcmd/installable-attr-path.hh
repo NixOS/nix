@@ -1,3 +1,6 @@
+#pragma once
+///@file
+
 #include "globals.hh"
 #include "installable-value.hh"
 #include "outputs-spec.hh"

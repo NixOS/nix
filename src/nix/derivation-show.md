@@ -8,7 +8,7 @@ R""(
   [store derivation]: ../../glossary.md#gloss-store-derivation
 
   ```console
-  # nix show-derivation nixpkgs#hello
+  # nix derivation show nixpkgs#hello
   {
     "/nix/store/s6rn4jz1sin56rf4qj5b5v8jxjm32hlk-hello-2.10.drv": {
       …
@@ -20,14 +20,14 @@ R""(
   NixOS system:
 
   ```console
-  # nix show-derivation -r /run/current-system
+  # nix derivation show -r /run/current-system
   ```
 
 * Print all files fetched using `fetchurl` by Firefox's dependency
   graph:
 
   ```console
-  # nix show-derivation -r nixpkgs#firefox \
+  # nix derivation show -r nixpkgs#firefox \
     | jq -r '.[] | select(.outputs.out.hash and .env.urls) | .env.urls' \
     | uniq | sort
   ```
@@ -39,10 +39,11 @@ R""(
 # Description
 
 This command prints on standard output a JSON representation of the
-[store derivation]s to which [*installables*](./nix.md#installables) evaluate. Store derivations
-are used internally by Nix. They are store paths with extension `.drv`
-that represent the build-time dependency graph to which a Nix
-expression evaluates.
+[store derivation]s to which [*installables*](./nix.md#installables) evaluate.
+
+Store derivations are used internally by Nix. They are store paths with
+extension `.drv` that represent the build-time dependency graph to which
+a Nix expression evaluates.
 
 By default, this command only shows top-level derivations, but with
 `--recursive`, it also shows their dependencies.
@@ -50,6 +51,9 @@ By default, this command only shows top-level derivations, but with
 The JSON output is a JSON object whose keys are the store paths of the
 derivations, and whose values are a JSON object with the following
 fields:
+
+* `name`: The name of the derivation. This is used when calculating the
+  store paths of the derivation's outputs.
 
 * `outputs`: Information about the output paths of the
   derivation. This is a JSON object with one member per output, where

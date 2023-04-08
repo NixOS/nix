@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "comparator.hh"
 #include "error.hh"
@@ -12,7 +13,7 @@ namespace nix {
  *
  * If you update this, don’t forget to also change the map defining their
  * string representation in the corresponding `.cc` file.
- **/
+ */
 enum struct ExperimentalFeature
 {
     CaDerivations,

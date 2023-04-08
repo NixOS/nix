@@ -509,6 +509,16 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         return paths;
     }
 
+    /**
+     * For now, we conservatively say we don't know.
+     *
+     * \todo try to expose our S3 authentication status.
+     */
+    std::optional<TrustedFlag> isTrustedClient() override
+    {
+        return std::nullopt;
+    }
+
     static std::set<std::string> uriSchemes() { return {"s3"}; }
 
 };

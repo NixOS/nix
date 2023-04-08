@@ -120,7 +120,8 @@ shell in which to build it:
 ```console
 $ nix-shell '<nixpkgs>' -A pan
 [nix-shell]$ eval ${unpackPhase:-unpackPhase}
-[nix-shell]$ cd pan-*
+[nix-shell]$ cd $sourceRoot
+[nix-shell]$ eval ${patchPhase:-patchPhase}
 [nix-shell]$ eval ${configurePhase:-configurePhase}
 [nix-shell]$ eval ${buildPhase:-buildPhase}
 [nix-shell]$ ./pan/gui/pan

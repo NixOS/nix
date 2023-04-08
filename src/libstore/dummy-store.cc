@@ -39,6 +39,14 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
         callback(nullptr);
     }
 
+    /**
+     * The dummy store is incapable of *not* trusting! :)
+     */
+    virtual std::optional<TrustedFlag> isTrustedClient() override
+    {
+        return Trusted;
+    }
+
     static std::set<std::string> uriSchemes() {
         return {"dummy"};
     }

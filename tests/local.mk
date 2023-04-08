@@ -17,6 +17,7 @@ nix_tests = \
   ca/gc.sh \
   gc.sh \
   remote-store.sh \
+  legacy-ssh-store.sh \
   lang.sh \
   experimental-features.sh \
   fetchMercurial.sh \
@@ -101,6 +102,8 @@ nix_tests = \
   eval-store.sh \
   why-depends.sh \
   ca/why-depends.sh \
+  derivation-json.sh \
+  ca/derivation-json.sh \
   import-derivation.sh \
   ca/import-derivation.sh \
   nix_path.sh \
