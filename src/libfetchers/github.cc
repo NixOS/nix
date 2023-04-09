@@ -460,13 +460,13 @@ struct SourceHutInputScheme : GitArchiveInputScheme
     }
 };
 
-struct CodebergInputScheme : GitArchiveInputScheme
+struct ForgejoInputScheme : GitArchiveInputScheme
 {
-    std::string type() const override { return "codeberg"; }
+    std::string type() const override { return "forgejo"; }
 
     std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
     {
-        // Codeberg supports http and OAuth2 authentication
+        // Forgejo supports http and OAuth2 authentication
         // https://docs.gitea.io/en-us/api-usage/#authentication
         return std::pair<std::string, std::string>("Authorization", fmt("token %s", token));
     }
@@ -547,6 +547,6 @@ struct CodebergInputScheme : GitArchiveInputScheme
 static auto rGitHubInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GitHubInputScheme>()); });
 static auto rGitLabInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GitLabInputScheme>()); });
 static auto rSourceHutInputScheme = OnStartup([] { registerInputScheme(std::make_unique<SourceHutInputScheme>()); });
-static auto rCodebergInputScheme = OnStartup([] { registerInputScheme(std::make_unique<CodebergInputScheme>()); });
+static auto rForgejoInputScheme = OnStartup([] { registerInputScheme(std::make_unique<ForgejoInputScheme>()); });
 
 }

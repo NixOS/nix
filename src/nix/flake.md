@@ -260,8 +260,8 @@ Currently the `type` attribute can be one of the following:
   * `sourcehut:~misterio/nix-colors/21c1a380a6915d890d408e9f22203436a35bb2de?host=hg.sr.ht`
 
 
-* `codeberg`: Similar to `github`, is a more efficient way to fetch
-  Codeberg repositories. The following attributes are required:
+* `forgejo`: Similar to `github`, is a more efficient way to fetch
+  Forgejo repositories. The following attributes are required:
 
   * `owner`: The owner of the repository.
 
@@ -269,23 +269,25 @@ Currently the `type` attribute can be one of the following:
 
   Like `github`, these are downloaded as tarball archives.
 
-  The URL syntax for `codeberg` flakes is:
+  The URL syntax for `forgejo` flakes is:
 
-  `codeberg:<owner>/<repo>(/<rev-or-ref>)?(\?<params>)?`
+  `forgejo:<owner>/<repo>(/<rev-or-ref>)?(\?<params>)?`
 
   `<rev-or-ref>` works the same as `github`. Either a branch or tag name
   (`ref`), or a commit hash (`rev`) can be specified.
 
-  Since Codeberg/forgejo allows for self-hosting, you can specify `host` as
-  a parameter, to point to any instances other than `codeberg.org`.
+  Since Forgejo allows for self-hosting, you can specify `host` as
+  a parameter, to point to any instances other than the default `codeberg.org`.
+  You may also be able to specify Gitea instances are they are currently compatible,
+  but this has the possibility of changing in the future.
 
   Some examples:
 
-  * `codeberg:adamcstephens/lxd-nixos`
-  * `codeberg:adamcstephens/lxd-nixos/main`
-  * `codeberg:adamcstephens/lxd-nixos/126b6673cbe8f8b221a27ebc64ae934ded946330`
-  * `codeberg:adamcstephens/lxd-nixos?host=othercodeberg.org`
-  * `codeberg:adamcstephens/lxd-nixos/126b6673cbe8f8b221a27ebc64ae934ded946330?host=othercodeberg.org`
+  * `forgejo:adamcstephens/lxd-nixos`
+  * `forgejo:adamcstephens/lxd-nixos/main`
+  * `forgejo:adamcstephens/lxd-nixos/126b6673cbe8f8b221a27ebc64ae934ded946330`
+  * `forgejo:adamcstephens/lxd-nixos?host=othercodeberg.org`
+  * `forgejo:adamcstephens/lxd-nixos/126b6673cbe8f8b221a27ebc64ae934ded946330?host=othercodeberg.org`
 
 
 * `indirect`: Indirections through the flake registry. These have the

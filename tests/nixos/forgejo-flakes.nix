@@ -33,7 +33,7 @@
               "id": "nixpkgs"
             },
             "to": {
-              "type": "codeberg",
+              "type": "forgejo",
               "owner": "NixOS",
               "repo": "nixpkgs",
               "ref": "main"
@@ -45,7 +45,7 @@
               "id": "private-flake"
             },
             "to": {
-              "type": "codeberg",
+              "type": "forgejo",
               "owner": "fancy-enterprise",
               "repo": "private-flake"
             }
@@ -99,10 +99,11 @@
       tar cfz $out/archive/${nixpkgs.rev}.tar.gz $dir --hard-dereference
     '';
 in {
-  name = "codeberg-flakes";
+  name = "forgejo-flakes";
 
   nodes = {
-    codeberg = {
+    # impersonate codeberg.org as that's the default forgejo host
+    forgejo = {
       config,
       pkgs,
       ...
@@ -162,7 +163,7 @@ in {
       virtualisation.memorySize = 4096;
       nix.settings.substituters = lib.mkForce [];
       nix.extraOptions = "experimental-features = nix-command flakes";
-      networking.hosts.${(builtins.head nodes.codeberg.config.networking.interfaces.eth1.ipv4.addresses).address} = ["channels.nixos.org" "codeberg.org"];
+      networking.hosts.${(builtins.head nodes.forgejo.config.networking.interfaces.eth1.ipv4.addresses).address} = ["channels.nixos.org" "codeberg.org"];
       security.pki.certificateFiles = ["${cert}/ca.crt"];
     };
   };
@@ -175,18 +176,18 @@ in {
     start_all()
 
     def cat_log():
-         codeberg.succeed("cat /var/log/httpd/*.log >&2")
+         forgejo.succeed("cat /var/log/httpd/*.log >&2")
 
-    codeberg.wait_for_unit("httpd.service")
+    forgejo.wait_for_unit("httpd.service")
 
     client.succeed("curl -v https://codeberg.org/ >&2")
     out = client.succeed("nix registry list")
     print(out)
-    assert "codeberg:NixOS/nixpkgs" in out, "nixpkgs flake not found"
-    assert "codeberg:fancy-enterprise/private-flake" in out, "private flake not found"
+    assert "forgejo:NixOS/nixpkgs" in out, "nixpkgs flake not found"
+    assert "forgejo:fancy-enterprise/private-flake" in out, "private flake not found"
     cat_log()
 
-    # If no codeberg access token is provided, nix should use the public archive url...
+    # If no forgejo access token is provided, nix should use the public archive url...
     out = client.succeed("nix flake metadata nixpkgs --json")
     print(out)
     info = json.loads(out)
@@ -204,7 +205,7 @@ in {
     client.succeed("nix flake metadata nixpkgs --tarball-ttl 0 >&2")
 
     # Shut down the web server. The flake should be cached on the client.
-    codeberg.succeed("systemctl stop httpd.service")
+    forgejo.succeed("systemctl stop httpd.service")
 
     info = json.loads(client.succeed("nix flake metadata nixpkgs --json"))
     date = time.strftime("%Y%m%d%H%M%S", time.gmtime(info['lastModified']))
