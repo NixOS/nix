@@ -79,6 +79,14 @@ testReplResponse '
 "result: ${a}"
 ' "result: 2"
 
+# check dollar escaping https://github.com/NixOS/nix/issues/4909
+# note the escaped \,
+#    \\
+# because the second argument is a regex
+testReplResponse '
+"$" + "{hi}"
+' '"\\${hi}"'
+
 testReplResponse '
 drvPath
 ' '".*-simple.drv"' \

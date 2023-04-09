@@ -40,6 +40,7 @@ extern "C" {
 #include "markdown.hh"
 #include "local-fs-store.hh"
 #include "progress-bar.hh"
+#include "value/print.hh"
 
 #if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
@@ -894,17 +895,6 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 }
 
 
-std::ostream & printStringValue(std::ostream & str, const char * string) {
-    str << "\"";
-    for (const char * i = string; *i; i++)
-        if (*i == '\"' || *i == '\\') str << "\\" << *i;
-        else if (*i == '\n') str << "\\n";
-        else if (*i == '\r') str << "\\r";
-        else if (*i == '\t') str << "\\t";
-        else str << *i;
-    str << "\"";
-    return str;
-}
 
 
 // FIXME: lot of cut&paste from Nix's eval.cc.
@@ -922,12 +912,14 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     case nBool:
-        str << ANSI_CYAN << (v.boolean ? "true" : "false") << ANSI_NORMAL;
+        str << ANSI_CYAN;
+        printLiteral(str, v.boolean);
+        str << ANSI_NORMAL;
         break;
 
     case nString:
         str << ANSI_WARNING;
-        printStringValue(str, v.string.s);
+        printLiteral(str, v.string.s);
         str << ANSI_NORMAL;
         break;
 
@@ -967,7 +959,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                 if (isVarName(i.first))
                     str << i.first;
                 else
-                    printStringValue(str, i.first.c_str());
+                    printLiteral(str, i.first);
                 str << " = ";
                 if (seen.count(i.second))
                     str << "«repeated»";

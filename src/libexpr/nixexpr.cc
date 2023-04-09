@@ -3,6 +3,7 @@
 #include "eval.hh"
 #include "symbol-table.hh"
 #include "util.hh"
+#include "value/print.hh"
 
 #include <cstdlib>
 
@@ -62,18 +63,6 @@ Pos::operator std::shared_ptr<AbstractPos>() const
 
 /* Displaying abstract syntax trees. */
 
-static void showString(std::ostream & str, std::string_view s)
-{
-    str << '"';
-    for (auto c : s)
-        if (c == '"' || c == '\\' || c == '$') str << "\\" << c;
-        else if (c == '\n') str << "\\n";
-        else if (c == '\r') str << "\\r";
-        else if (c == '\t') str << "\\t";
-        else str << c;
-    str << '"';
-}
-
 std::ostream & operator <<(std::ostream & str, const SymbolStr & symbol)
 {
     std::string_view s = symbol;
@@ -85,7 +74,7 @@ std::ostream & operator <<(std::ostream & str, const SymbolStr & symbol)
     else {
         char c = s[0];
         if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_')) {
-            showString(str, s);
+            printLiteral(str, s);
             return str;
         }
         for (auto c : s)
@@ -93,7 +82,7 @@ std::ostream & operator <<(std::ostream & str, const SymbolStr & symbol)
                   (c >= 'A' && c <= 'Z') ||
                   (c >= '0' && c <= '9') ||
                   c == '_' || c == '\'' || c == '-')) {
-                showString(str, s);
+                printLiteral(str, s);
                 return str;
             }
         str << s;
@@ -118,7 +107,7 @@ void ExprFloat::show(const SymbolTable & symbols, std::ostream & str) const
 
 void ExprString::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    showString(str, s);
+    printLiteral(str, s);
 }
 
 void ExprPath::show(const SymbolTable & symbols, std::ostream & str) const
