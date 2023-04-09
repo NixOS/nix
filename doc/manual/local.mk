@@ -85,7 +85,7 @@ $(d)/nix.conf.5: $(d)/src/command-ref/conf-file.md
 	$(trace-gen) lowdown -sT man --nroff-nolinks -M section=5 $^.tmp -o $@
 	@rm $^.tmp
 
-$(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-features
+$(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md
 	@cp $< $@
 	@$(call process-includes,$@,$@)
 
@@ -107,7 +107,7 @@ $(d)/conf-file.json: $(bindir)/nix
 	$(trace-gen) $(dummy-env) $(bindir)/nix show-config --json --experimental-features nix-command > $@.tmp
 	@mv $@.tmp $@
 
-$(d)/src/contributing/experimental-features: $(d)/xp-features.json $(d)/utils.nix $(d)/generate-xp-features.nix $(bindir)/nix
+$(d)/src/contributing/experimental-feature-descriptions.md: $(d)/xp-features.json $(d)/utils.nix $(d)/generate-xp-features.nix $(bindir)/nix
 	@rm -rf $@ $@.tmp
 	$(trace-gen) $(nix-eval) --write-to $@.tmp --expr 'import doc/manual/generate-xp-features.nix (builtins.fromJSON (builtins.readFile $<))'
 	@mv $@.tmp $@
@@ -160,7 +160,7 @@ doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
 	done
 	@touch $@
 
-$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-features $(d)/src/command-ref/conf-file.md $(d)/src/language/builtins.md
+$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md $(d)/src/command-ref/conf-file.md $(d)/src/language/builtins.md
 	$(trace-gen) \
 		tmp="$$(mktemp -d)"; \
 		cp -r doc/manual "$$tmp"; \
