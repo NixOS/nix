@@ -254,13 +254,19 @@ struct ProfileManifest
     }
 };
 
-static std::map<Installable *, std::pair<BuiltPaths, ExtraPathInfo>>
+static std::map<Installable *, std::pair<BuiltPaths, ref<ExtraPathInfo>>>
 builtPathsPerInstallable(
     const std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> & builtPaths)
 {
-    std::map<Installable *, std::pair<BuiltPaths, ExtraPathInfo>> res;
+    std::map<Installable *, std::pair<BuiltPaths, ref<ExtraPathInfo>>> res;
     for (auto & [installable, builtPath] : builtPaths) {
-        auto & r = res[&*installable];
+        auto & r = res.insert({
+            &*installable,
+            {
+                {},
+                make_ref<ExtraPathInfo>(),
+            }
+        }).first->second;
         /* Note that there could be conflicting info
            (e.g. meta.priority fields) if the installable returned
            multiple derivations. So pick one arbitrarily. FIXME:
@@ -307,14 +313,16 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
         for (auto & installable : installables) {
             ProfileElement element;
 
-            auto & [res, info] = builtPaths[&*installable];
+            auto iter = builtPaths.find(&*installable);
+            if (iter == builtPaths.end()) continue;
+            auto & [res, info] = iter->second;
 
-            if (info.originalRef && info.resolvedRef && info.attrPath && info.extendedOutputsSpec) {
+            if (auto * info2 = dynamic_cast<ExtraPathInfoFlake *>(&*info)) {
                 element.source = ProfileElementSource {
-                    .originalRef = *info.originalRef,
-                    .resolvedRef = *info.resolvedRef,
-                    .attrPath = *info.attrPath,
-                    .outputs = *info.extendedOutputsSpec,
+                    .originalRef = info2->flake.originalRef,
+                    .resolvedRef = info2->flake.resolvedRef,
+                    .attrPath = info2->value.attrPath,
+                    .outputs = info2->value.extendedOutputsSpec,
                 };
             }
 
@@ -323,7 +331,12 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
             element.priority =
                 priority
                 ? *priority
-                : info.priority.value_or(defaultPriority);
+                : ({
+                    auto * info2 = dynamic_cast<ExtraPathInfoValue *>(&*info);
+                    info2
+                        ? info2->value.priority.value_or(defaultPriority)
+                        : defaultPriority;
+                });
 
             element.updateStorePaths(getEvalStore(), store, res);
 
@@ -541,19 +554,20 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
 
                 auto derivedPaths = installable->toDerivedPaths();
                 if (derivedPaths.empty()) continue;
-                auto & info = derivedPaths[0].info;
+                auto * infop = dynamic_cast<ExtraPathInfoFlake *>(&*derivedPaths[0].info);
+                // `InstallableFlake` should use `ExtraPathInfoFlake`.
+                assert(infop);
+                auto & info = *infop;
 
-                assert(info.resolvedRef && info.attrPath);
-
-                if (element.source->resolvedRef == info.resolvedRef) continue;
+                if (element.source->resolvedRef == info.flake.resolvedRef) continue;
 
                 printInfo("upgrading '%s' from flake '%s' to '%s'",
-                    element.source->attrPath, element.source->resolvedRef, *info.resolvedRef);
+                    element.source->attrPath, element.source->resolvedRef, info.flake.resolvedRef);
 
                 element.source = ProfileElementSource {
                     .originalRef = installable->flakeRef,
-                    .resolvedRef = *info.resolvedRef,
-                    .attrPath = *info.attrPath,
+                    .resolvedRef = info.flake.resolvedRef,
+                    .attrPath = info.value.attrPath,
                     .outputs = installable->extendedOutputsSpec,
                 };
 
@@ -582,7 +596,10 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
         for (size_t i = 0; i < installables.size(); ++i) {
             auto & installable = installables.at(i);
             auto & element = manifest.elements[indices.at(i)];
-            element.updateStorePaths(getEvalStore(), store, builtPaths[&*installable].first);
+            element.updateStorePaths(
+                getEvalStore(),
+                store,
+                builtPaths.find(&*installable)->second.first);
         }
 
         updateProfile(manifest.build(store));

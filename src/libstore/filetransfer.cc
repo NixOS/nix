@@ -318,7 +318,7 @@ struct curlFileTransfer : public FileTransfer
 
             if (request.verifyTLS) {
                 if (settings.caFile != "")
-                    curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.c_str());
+                    curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.get().c_str());
             } else {
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYPEER, 0);
                 curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);
@@ -407,6 +407,10 @@ struct curlFileTransfer : public FileTransfer
                     err = Misc;
                 } else {
                     // Don't bother retrying on certain cURL errors either
+
+                    // Allow selecting a subset of enum values
+                    #pragma GCC diagnostic push
+                    #pragma GCC diagnostic ignored "-Wswitch-enum"
                     switch (code) {
                         case CURLE_FAILED_INIT:
                         case CURLE_URL_MALFORMAT:
@@ -427,6 +431,7 @@ struct curlFileTransfer : public FileTransfer
                         default: // Shut up warnings
                             break;
                     }
+                    #pragma GCC diagnostic pop
                 }
 
                 attempt++;

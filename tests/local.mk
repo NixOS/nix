@@ -17,7 +17,9 @@ nix_tests = \
   ca/gc.sh \
   gc.sh \
   remote-store.sh \
+  legacy-ssh-store.sh \
   lang.sh \
+  experimental-features.sh \
   fetchMercurial.sh \
   gc-auto.sh \
   user-envs.sh \
@@ -100,6 +102,8 @@ nix_tests = \
   eval-store.sh \
   why-depends.sh \
   ca/why-depends.sh \
+  derivation-json.sh \
+  ca/derivation-json.sh \
   import-derivation.sh \
   ca/import-derivation.sh \
   nix_path.sh \
@@ -115,7 +119,6 @@ nix_tests = \
   db-migration.sh \
   bash-profile.sh \
   pass-as-file.sh \
-  describe-stores.sh \
   nix-profile.sh \
   suggestions.sh \
   store-ping.sh \

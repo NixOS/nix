@@ -277,17 +277,17 @@ static void printTree(const StorePath & path,
 static void opQuery(Strings opFlags, Strings opArgs)
 {
     enum QueryType
-        { qDefault, qOutputs, qRequisites, qReferences, qReferrers
+        { qOutputs, qRequisites, qReferences, qReferrers
         , qReferrersClosure, qDeriver, qBinding, qHash, qSize
         , qTree, qGraph, qGraphML, qResolve, qRoots };
-    QueryType query = qDefault;
+    std::optional<QueryType> query;
     bool useOutput = false;
     bool includeOutputs = false;
     bool forceRealise = false;
     std::string bindingName;
 
     for (auto & i : opFlags) {
-        QueryType prev = query;
+        std::optional<QueryType> prev = query;
         if (i == "--outputs") query = qOutputs;
         else if (i == "--requisites" || i == "-R") query = qRequisites;
         else if (i == "--references") query = qReferences;
@@ -312,15 +312,15 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (i == "--force-realise" || i == "--force-realize" || i == "-f") forceRealise = true;
         else if (i == "--include-outputs") includeOutputs = true;
         else throw UsageError("unknown flag '%1%'", i);
-        if (prev != qDefault && prev != query)
+        if (prev && prev != query)
             throw UsageError("query type '%1%' conflicts with earlier flag", i);
     }
 
-    if (query == qDefault) query = qOutputs;
+    if (!query) query = qOutputs;
 
     RunPager pager;
 
-    switch (query) {
+    switch (*query) {
 
         case qOutputs: {
             for (auto & i : opArgs) {
@@ -1024,62 +1024,104 @@ static int main_nix_store(int argc, char * * argv)
         Strings opFlags, opArgs;
         Operation op = 0;
         bool readFromStdIn = false;
+        std::string opName;
+        bool showHelp = false;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             Operation oldOp = op;
 
             if (*arg == "--help")
-                showManPage("nix-store");
+                showHelp = true;
             else if (*arg == "--version")
                 op = opVersion;
-            else if (*arg == "--realise" || *arg == "--realize" || *arg == "-r")
+            else if (*arg == "--realise" || *arg == "--realize" || *arg == "-r") {
                 op = opRealise;
-            else if (*arg == "--add" || *arg == "-A")
+                opName = "-realise";
+            }
+            else if (*arg == "--add" || *arg == "-A"){
                 op = opAdd;
-            else if (*arg == "--add-fixed")
+                opName = "-add";
+            }
+            else if (*arg == "--add-fixed") {
                 op = opAddFixed;
+                opName = arg->substr(1);
+            }
             else if (*arg == "--print-fixed-path")
                 op = opPrintFixedPath;
-            else if (*arg == "--delete")
+            else if (*arg == "--delete") {
                 op = opDelete;
-            else if (*arg == "--query" || *arg == "-q")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--query" || *arg == "-q") {
                 op = opQuery;
-            else if (*arg == "--print-env")
+                opName = "-query";
+            }
+            else if (*arg == "--print-env") {
                 op = opPrintEnv;
-            else if (*arg == "--read-log" || *arg == "-l")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--read-log" || *arg == "-l") {
                 op = opReadLog;
-            else if (*arg == "--dump-db")
+                opName = "-read-log";
+            }
+            else if (*arg == "--dump-db") {
                 op = opDumpDB;
-            else if (*arg == "--load-db")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--load-db") {
                 op = opLoadDB;
+                opName = arg->substr(1);
+            }
             else if (*arg == "--register-validity")
                 op = opRegisterValidity;
             else if (*arg == "--check-validity")
                 op = opCheckValidity;
-            else if (*arg == "--gc")
+            else if (*arg == "--gc") {
                 op = opGC;
-            else if (*arg == "--dump")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--dump") {
                 op = opDump;
-            else if (*arg == "--restore")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--restore") {
                 op = opRestore;
-            else if (*arg == "--export")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--export") {
                 op = opExport;
-            else if (*arg == "--import")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--import") {
                 op = opImport;
+                opName = arg->substr(1);
+            }
             else if (*arg == "--init")
                 op = opInit;
-            else if (*arg == "--verify")
+            else if (*arg == "--verify") {
                 op = opVerify;
-            else if (*arg == "--verify-path")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--verify-path") {
                 op = opVerifyPath;
-            else if (*arg == "--repair-path")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--repair-path") {
                 op = opRepairPath;
-            else if (*arg == "--optimise" || *arg == "--optimize")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--optimise" || *arg == "--optimize") {
                 op = opOptimise;
-            else if (*arg == "--serve")
+                opName = "-optimise";
+            }
+            else if (*arg == "--serve") {
                 op = opServe;
-            else if (*arg == "--generate-binary-cache-key")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--generate-binary-cache-key") {
                 op = opGenerateBinaryCacheKey;
+                opName = arg->substr(1);
+            }
             else if (*arg == "--add-root")
                 gcRoot = absPath(getArg(*arg, arg, end));
             else if (*arg == "--stdin" && !isatty(STDIN_FILENO))
@@ -1109,6 +1151,7 @@ static int main_nix_store(int argc, char * * argv)
             return true;
         });
 
+        if (showHelp) showManPage("nix-store" + opName);
         if (!op) throw UsageError("no operation specified");
 
         if (op != opDump && op != opRestore) /* !!! hack */

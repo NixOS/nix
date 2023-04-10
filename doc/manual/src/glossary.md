@@ -15,7 +15,7 @@
 
     Example: `/nix/store/g946hcz4c8mdvq2g8vxx42z51qb71rvp-git-2.38.1.drv`
 
-    See [`nix show-derivation`](./command-ref/new-cli/nix3-show-derivation.md) (experimental) for displaying the contents of store derivations.
+    See [`nix derivation show`](./command-ref/new-cli/nix3-derivation-show.md) (experimental) for displaying the contents of store derivations.
 
     [store derivation]: #gloss-store-derivation
 
@@ -31,7 +31,7 @@
 
     This means either running the `builder` executable as specified in the corresponding [derivation] or fetching a pre-built [store object] from a [substituter].
 
-    See [`nix-build`](./command-ref/nix-build.md) and [`nix-store --realise`](./command-ref/nix-store.md#operation---realise).
+    See [`nix-build`](./command-ref/nix-build.md) and [`nix-store --realise`](@docroot@/command-ref/nix-store/realise.md).
 
     See [`nix build`](./command-ref/new-cli/nix3-build.md) (experimental).
 
@@ -54,7 +54,7 @@
     invoked, the  Nix store can be  referred to
     as a "_local_" or a "_remote_" one:
 
-    + A *local  store* exists  on the filesystem of
+    + A [local store]{#gloss-local-store} exists on the filesystem of
       the machine where Nix is  invoked. You can use other
       local stores  by passing  the `--store` flag  to the
       `nix` command.  Local stores can be used for building derivations.
@@ -65,17 +65,17 @@
       served by the `nix-serve` Perl script.
 
     [store]: #gloss-store
+    [local store]: #gloss-local-store
 
   - [chroot store]{#gloss-chroot-store}\
-    A local store whose canonical path is anything other than `/nix/store`.
+    A [local store] whose canonical path is anything other than `/nix/store`.
 
   - [binary cache]{#gloss-binary-cache}\
     A *binary cache* is a Nix store which uses a different format: its
     metadata and signatures are kept in `.narinfo` files rather than in a
-    Nix database.  This different format simplifies serving store objects
-    over the network, but cannot host builds.  Examples of binary caches
-    include S3 buckets and the [NixOS binary
-    cache](https://cache.nixos.org).
+    [Nix database]. This different format simplifies serving store objects
+    over the network, but cannot host builds. Examples of binary caches
+    include S3 buckets and the [NixOS binary cache](https://cache.nixos.org).
 
   - [store path]{#gloss-store-path}\
     The location of a [store object] in the file system, i.e., an
@@ -108,7 +108,7 @@
     [fixed-output derivations](#gloss-fixed-output-derivation).
 
   - [substitute]{#gloss-substitute}\
-    A substitute is a command invocation stored in the Nix database that
+    A substitute is a command invocation stored in the [Nix database] that
     describes how to build a store object, bypassing the normal build
     mechanism (i.e., derivations). Typically, the substitute builds the
     store object by downloading a pre-built version of the store object
@@ -126,6 +126,14 @@
     the same output. This cannot be guaranteed in general (e.g., a
     builder can rely on external inputs such as the network or the
     system time) but the Nix model assumes it.
+
+  - Nix database{#gloss-nix-database}\
+    An SQlite database to track [reference]s between [store object]s.
+    This is an implementation detail of the [local store].
+
+    Default location: `/nix/var/nix/db`.
+
+    [Nix database]: #gloss-nix-database
 
   - [Nix expression]{#gloss-nix-expression}\
     A high-level description of software packages and compositions
@@ -175,9 +183,9 @@
   - [validity]{#gloss-validity}\
     A store path is valid if all [store object]s in its [closure] can be read from the [store].
 
-    For a local store, this means:
+    For a [local store], this means:
     - The store path leads to an existing [store object] in that [store].
-    - The store path is listed in the Nix database as being valid.
+    - The store path is listed in the [Nix database] as being valid.
     - All paths in the store path's [closure] are valid.
 
     [validity]: #gloss-validity

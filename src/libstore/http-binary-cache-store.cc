@@ -12,7 +12,14 @@ struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 {
     using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
 
-    const std::string name() override { return "Http Binary Cache Store"; }
+    const std::string name() override { return "HTTP Binary Cache Store"; }
+
+    std::string doc() override
+    {
+        return
+          #include "http-binary-cache-store.md"
+          ;
+    }
 };
 
 class HttpBinaryCacheStore : public virtual HttpBinaryCacheStoreConfig, public virtual BinaryCacheStore
@@ -187,6 +194,18 @@ protected:
             }});
     }
 
+    /**
+     * This isn't actually necessary read only. We support "upsert" now, so we
+     * have a notion of authentication via HTTP POST/PUT.
+     *
+     * For now, we conservatively say we don't know.
+     *
+     * \todo try to expose our HTTP authentication status.
+     */
+    std::optional<TrustedFlag> isTrustedClient() override
+    {
+        return std::nullopt;
+    }
 };
 
 static RegisterStoreImplementation<HttpBinaryCacheStore, HttpBinaryCacheStoreConfig> regHttpBinaryCacheStore;

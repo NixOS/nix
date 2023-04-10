@@ -254,9 +254,16 @@ static RegisterPrimOp primop_import({
     .args = {"path"},
     // TODO turn "normal path values" into link below
     .doc = R"(
-      Load, parse and return the Nix expression in the file *path*. If
-      *path* is a directory, the file ` default.nix ` in that directory
-      is loaded. Evaluation aborts if the file doesn’t exist or contains
+      Load, parse and return the Nix expression in the file *path*.
+
+      The value *path* can be a path, a string, or an attribute set with an
+      `__toString` attribute or a `outPath` attribute (as derivations or flake
+      inputs typically have).
+
+      If *path* is a directory, the file `default.nix` in that directory
+      is loaded.
+
+      Evaluation aborts if the file doesn’t exist or contains
       an incorrect Nix expression. `import` implements Nix’s module
       system: you can put any Nix expression (such as a set or a
       function) in a separate file, and use it from Nix expressions in
@@ -570,6 +577,9 @@ struct CompareValues
                 return v1->integer < v2->fpoint;
             if (v1->type() != v2->type())
                 state.error("cannot compare %s with %s", showType(*v1), showType(*v2)).debugThrow<EvalError>();
+            // Allow selecting a subset of enum values
+            #pragma GCC diagnostic push
+            #pragma GCC diagnostic ignored "-Wswitch-enum"
             switch (v1->type()) {
                 case nInt:
                     return v1->integer < v2->integer;
@@ -592,6 +602,7 @@ struct CompareValues
                     }
                 default:
                     state.error("cannot compare %s with %s; values of that type are incomparable", showType(*v1), showType(*v2)).debugThrow<EvalError>();
+            #pragma GCC diagnostic pop
             }
         } catch (Error & e) {
             if (!errorCtx.empty())
@@ -1141,13 +1152,13 @@ drvName, Bindings * attrs, Value & v)
             if (i->name == state.sContentAddressed) {
                 contentAddressed = state.forceBool(*i->value, noPos, context_below);
                 if (contentAddressed)
-                    settings.requireExperimentalFeature(Xp::CaDerivations);
+                    experimentalFeatureSettings.require(Xp::CaDerivations);
             }
 
             else if (i->name == state.sImpure) {
                 isImpure = state.forceBool(*i->value, noPos, context_below);
                 if (isImpure)
-                    settings.requireExperimentalFeature(Xp::ImpureDerivations);
+                    experimentalFeatureSettings.require(Xp::ImpureDerivations);
             }
 
             /* The `args' attribute is special: it supplies the
@@ -4114,7 +4125,7 @@ void EvalState::createBaseEnv()
     if (RegisterPrimOp::primOps)
         for (auto & primOp : *RegisterPrimOp::primOps)
             if (!primOp.experimentalFeature
-                || settings.isExperimentalFeatureEnabled(*primOp.experimentalFeature))
+                || experimentalFeatureSettings.isEnabled(*primOp.experimentalFeature))
             {
                 addPrimOp({
                     .fun = primOp.fun,

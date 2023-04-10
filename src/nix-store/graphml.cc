@@ -57,7 +57,7 @@ void printGraphML(ref<Store> store, StorePathSet && roots)
          << "<graphml xmlns='http://graphml.graphdrawing.org/xmlns'\n"
          << "    xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'\n"
          << "    xsi:schemaLocation='http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd'>\n"
-         << "<key id='narSize' for='node' attr.name='narSize' attr.type='int'/>"
+         << "<key id='narSize' for='node' attr.name='narSize' attr.type='long'/>"
          << "<key id='name' for='node' attr.name='name' attr.type='string'/>"
          << "<key id='type' for='node' attr.name='type' attr.type='string'/>"
          << "<graph id='G' edgedefault='directed'>\n";

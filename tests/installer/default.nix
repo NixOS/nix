@@ -17,7 +17,7 @@ let
       script = ''
         tar -xf ./nix.tar.xz
         mv ./nix-* nix
-        ./nix/install --no-daemon
+        ./nix/install --no-daemon --no-channel-add
       '';
     };
 
@@ -29,6 +29,14 @@ let
       '';
     };
   };
+
+  mockChannel = pkgs:
+    pkgs.runCommandNoCC "mock-channel" {} ''
+      mkdir nixexprs
+      mkdir -p $out/channel
+      echo -n 'someContent' > nixexprs/someFile
+      tar cvf - nixexprs | bzip2 > $out/channel/nixexprs.tar.bz2
+    '';
 
   disableSELinux = "sudo setenforce 0";
 
@@ -189,6 +197,11 @@ let
         echo "Running installer..."
         $ssh "set -eux; $installScript"
 
+        echo "Copying the mock channel"
+        # `scp -r` doesn't seem to work properly on some rhel instances, so let's
+        # use a plain tarpipe instead
+        tar -C ${mockChannel pkgs} -c channel | ssh -p 20022 $ssh_opts vagrant@localhost tar x -f-
+
         echo "Testing Nix installation..."
         $ssh <<EOF
           set -ex
@@ -204,6 +217,17 @@ let
 
           out=\$(nix-build --no-substitute -E 'derivation { name = "foo"; system = "x86_64-linux"; builder = "/bin/sh"; args = ["-c" "echo foobar > \$out"]; }')
           [[ \$(cat \$out) = foobar ]]
+
+          if pgrep nix-daemon; then
+            MAYBESUDO="sudo"
+          else
+            MAYBESUDO=""
+          fi
+
+
+          $MAYBESUDO \$(which nix-channel) --add file://\$HOME/channel myChannel
+          $MAYBESUDO \$(which nix-channel) --update
+          [[ \$(nix-instantiate --eval --expr 'builtins.readFile <myChannel/someFile>') = '"someContent"' ]]
         EOF
 
         echo "Done!"

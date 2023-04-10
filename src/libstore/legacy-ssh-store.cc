@@ -1,3 +1,4 @@
+#include "ssh-store-config.hh"
 #include "archive.hh"
 #include "pool.hh"
 #include "remote-store.hh"
@@ -12,17 +13,24 @@
 
 namespace nix {
 
-struct LegacySSHStoreConfig : virtual StoreConfig
+struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 {
-    using StoreConfig::StoreConfig;
-    const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections", "maximum number of concurrent SSH connections"};
-    const Setting<Path> sshKey{(StoreConfig*) this, "", "ssh-key", "path to an SSH private key"};
-    const Setting<std::string> sshPublicHostKey{(StoreConfig*) this, "", "base64-ssh-public-host-key", "The public half of the host's SSH key"};
-    const Setting<bool> compress{(StoreConfig*) this, false, "compress", "whether to compress the connection"};
-    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-store", "remote-program", "path to the nix-store executable on the remote system"};
-    const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
+    using CommonSSHStoreConfig::CommonSSHStoreConfig;
 
-    const std::string name() override { return "Legacy SSH Store"; }
+    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-store", "remote-program",
+        "Path to the `nix-store` executable on the remote machine."};
+
+    const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections",
+        "Maximum number of concurrent SSH connections."};
+
+    const std::string name() override { return "SSH Store"; }
+
+    std::string doc() override
+    {
+        return
+          #include "legacy-ssh-store.md"
+          ;
+    }
 };
 
 struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Store
@@ -51,6 +59,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
     LegacySSHStore(const std::string & scheme, const std::string & host, const Params & params)
         : StoreConfig(params)
+        , CommonSSHStoreConfig(params)
         , LegacySSHStoreConfig(params)
         , Store(params)
         , host(host)
@@ -378,6 +387,15 @@ public:
     {
         auto conn(connections->get());
         return conn->remoteVersion;
+    }
+
+    /**
+     * The legacy ssh protocol doesn't support checking for trusted-user.
+     * Try using ssh-ng:// instead if you want to know.
+     */
+    std::optional<TrustedFlag> isTrustedClient() override
+    {
+        return std::nullopt;
     }
 
     void queryRealisationUncached(const DrvOutput &,

@@ -469,7 +469,7 @@ expr_simple
            new ExprString(std::move(path))});
   }
   | URI {
-      static bool noURLLiterals = settings.isExperimentalFeatureEnabled(Xp::NoUrlLiterals);
+      static bool noURLLiterals = experimentalFeatureSettings.isEnabled(Xp::NoUrlLiterals);
       if (noURLLiterals)
           throw ParseError({
               .msg = hintfmt("URL literals are disabled"),
@@ -816,7 +816,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
     }
 
     else if (hasPrefix(elem.second, "flake:")) {
-        settings.requireExperimentalFeature(Xp::Flakes);
+        experimentalFeatureSettings.require(Xp::Flakes);
         auto flakeRef = parseFlakeRef(elem.second.substr(6), {}, true, false);
         debug("fetching flake search path element '%s''", elem.second);
         auto storePath = flakeRef.resolve(store).fetchTree(store).first.storePath;

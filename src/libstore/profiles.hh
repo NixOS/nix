@@ -1,6 +1,7 @@
 #pragma once
+///@file
 
-#include "types.hh"
+ #include "types.hh"
 #include "pathlocks.hh"
 
 #include <time.h>
@@ -23,9 +24,11 @@ struct Generation
 typedef std::list<Generation> Generations;
 
 
-/* Returns the list of currently present generations for the specified
-   profile, sorted by generation number. Also returns the number of
-   the current generation. */
+/**
+ * Returns the list of currently present generations for the specified
+ * profile, sorted by generation number. Also returns the number of
+ * the current generation.
+ */
 std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path profile);
 
 class LocalFSStore;
@@ -46,35 +49,60 @@ void deleteGenerationsOlderThan(const Path & profile, std::string_view timeSpec,
 
 void switchLink(Path link, Path target);
 
-/* Roll back a profile to the specified generation, or to the most
-   recent one older than the current. */
+/**
+ * Roll back a profile to the specified generation, or to the most
+ * recent one older than the current.
+ */
 void switchGeneration(
     const Path & profile,
     std::optional<GenerationNumber> dstGen,
     bool dryRun);
 
-/* Ensure exclusive access to a profile.  Any command that modifies
-   the profile first acquires this lock. */
+/**
+ * Ensure exclusive access to a profile.  Any command that modifies
+ * the profile first acquires this lock.
+ */
 void lockProfile(PathLocks & lock, const Path & profile);
 
-/* Optimistic locking is used by long-running operations like `nix-env
-   -i'.  Instead of acquiring the exclusive lock for the entire
-   duration of the operation, we just perform the operation
-   optimistically (without an exclusive lock), and check at the end
-   whether the profile changed while we were busy (i.e., the symlink
-   target changed).  If so, the operation is restarted.  Restarting is
-   generally cheap, since the build results are still in the Nix
-   store.  Most of the time, only the user environment has to be
-   rebuilt. */
+/**
+ * Optimistic locking is used by long-running operations like `nix-env
+ * -i'.  Instead of acquiring the exclusive lock for the entire
+ * duration of the operation, we just perform the operation
+ * optimistically (without an exclusive lock), and check at the end
+ * whether the profile changed while we were busy (i.e., the symlink
+ * target changed).  If so, the operation is restarted.  Restarting is
+ * generally cheap, since the build results are still in the Nix
+ * store.  Most of the time, only the user environment has to be
+ * rebuilt.
+ */
 std::string optimisticLockProfile(const Path & profile);
 
-/* Creates and returns the path to a directory suitable for storing the user’s
-   profiles. */
+/**
+ * Create and return the path to a directory suitable for storing the user’s
+ * profiles.
+ */
 Path profilesDir();
 
-/* Resolve the default profile (~/.nix-profile by default, $XDG_STATE_HOME/
-   nix/profile if XDG Base Directory Support is enabled), and create if doesn't
-   exist */
+/**
+ * Return the path to the profile directory for root (but don't try creating it)
+ */
+Path rootProfilesDir();
+
+/**
+ * Create and return the path to the file used for storing the users's channels
+ */
+Path defaultChannelsDir();
+
+/**
+ * Return the path to the channel directory for root (but don't try creating it)
+ */
+Path rootChannelsDir();
+
+/**
+ * Resolve the default profile (~/.nix-profile by default,
+ * $XDG_STATE_HOME/nix/profile if XDG Base Directory Support is enabled),
+ * and create if doesn't exist
+ */
 Path getDefaultProfile();
 
 }

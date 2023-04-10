@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "store-api.hh"
 #include "goal.hh"
@@ -10,24 +11,34 @@ namespace nix {
 
 class Worker;
 
-// Substitution of a derivation output.
-// This is done in three steps:
-// 1. Fetch the output info from a substituter
-// 2. Substitute the corresponding output path
-// 3. Register the output info
+/**
+ * Substitution of a derivation output.
+ * This is done in three steps:
+ * 1. Fetch the output info from a substituter
+ * 2. Substitute the corresponding output path
+ * 3. Register the output info
+ */
 class DrvOutputSubstitutionGoal : public Goal {
 
-    // The drv output we're trying to substitue
+    /**
+     * The drv output we're trying to substitue
+     */
     DrvOutput id;
 
-    // The realisation corresponding to the given output id.
-    // Will be filled once we can get it.
+    /**
+     * The realisation corresponding to the given output id.
+     * Will be filled once we can get it.
+     */
     std::shared_ptr<const Realisation> outputInfo;
 
-    /* The remaining substituters. */
+    /**
+     * The remaining substituters.
+     */
     std::list<ref<Store>> subs;
 
-    /* The current substituter. */
+    /**
+     * The current substituter.
+     */
     std::shared_ptr<Store> sub;
 
     struct DownloadState
@@ -38,7 +49,9 @@ class DrvOutputSubstitutionGoal : public Goal {
 
     std::shared_ptr<DownloadState> downloadState;
 
-    /* Whether a substituter failed. */
+    /**
+     * Whether a substituter failed.
+     */
     bool substituterFailed = false;
 
 public:

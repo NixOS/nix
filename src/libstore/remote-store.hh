@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <limits>
 #include <string>
@@ -22,15 +23,19 @@ struct RemoteStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
 
-    const Setting<int> maxConnections{(StoreConfig*) this, 1,
-            "max-connections", "maximum number of concurrent connections to the Nix daemon"};
+    const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections",
+        "Maximum number of concurrent connections to the Nix daemon."};
 
-    const Setting<unsigned int> maxConnectionAge{(StoreConfig*) this, std::numeric_limits<unsigned int>::max(),
-            "max-connection-age", "number of seconds to reuse a connection"};
+    const Setting<unsigned int> maxConnectionAge{(StoreConfig*) this,
+        std::numeric_limits<unsigned int>::max(),
+        "max-connection-age",
+        "Maximum age of a connection before it is closed."};
 };
 
-/* FIXME: RemoteStore is a misnomer - should be something like
-   DaemonStore. */
+/**
+ * \todo RemoteStore is a misnomer - should be something like
+ * DaemonStore.
+ */
 class RemoteStore : public virtual RemoteStoreConfig,
     public virtual Store,
     public virtual GcStore,
@@ -66,7 +71,9 @@ public:
     void querySubstitutablePathInfos(const StorePathCAMap & paths,
         SubstitutablePathInfos & infos) override;
 
-    /* Add a content-addressable store path. `dump` will be drained. */
+    /**
+     * Add a content-addressable store path. `dump` will be drained.
+     */
     ref<const ValidPathInfo> addCAToStore(
         Source & dump,
         std::string_view name,
@@ -74,7 +81,9 @@ public:
         const StorePathSet & references,
         RepairFlag repair);
 
-    /* Add a content-addressable store path. Does not support references. `dump` will be drained. */
+    /**
+     * Add a content-addressable store path. Does not support references. `dump` will be drained.
+     */
     StorePath addToStoreFromDump(Source & dump, std::string_view name,
         FileIngestionMethod method = FileIngestionMethod::Recursive, HashType hashAlgo = htSHA256, RepairFlag repair = NoRepair, const StorePathSet & references = StorePathSet()) override;
 
@@ -141,6 +150,8 @@ public:
 
     unsigned int getProtocol() override;
 
+    std::optional<TrustedFlag> isTrustedClient() override;
+
     void flushBadConnections();
 
     struct Connection
@@ -148,6 +159,7 @@ public:
         FdSink to;
         FdSource from;
         unsigned int daemonVersion;
+        std::optional<TrustedFlag> remoteTrustsUs;
         std::optional<std::string> daemonNixVersion;
         std::chrono::time_point<std::chrono::steady_clock> startTime;
 

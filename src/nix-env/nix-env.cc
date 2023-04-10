@@ -1387,6 +1387,8 @@ static int main_nix_env(int argc, char * * argv)
     {
         Strings opFlags, opArgs;
         Operation op = 0;
+        std::string opName;
+        bool showHelp = false;
         RepairFlag repair = NoRepair;
         std::string file;
 
@@ -1403,11 +1405,11 @@ static int main_nix_env(int argc, char * * argv)
             try {
                 createDirs(globals.instSource.nixExprPath);
                 replaceSymlink(
-                    fmt("%s/profiles/per-user/%s/channels", settings.nixStateDir, getUserName()),
+                    defaultChannelsDir(),
                     globals.instSource.nixExprPath + "/channels");
                 if (getuid() != 0)
                     replaceSymlink(
-                        fmt("%s/profiles/per-user/root/channels", settings.nixStateDir),
+                        rootChannelsDir(),
                         globals.instSource.nixExprPath + "/channels_root");
             } catch (Error &) { }
         }
@@ -1426,37 +1428,59 @@ static int main_nix_env(int argc, char * * argv)
             Operation oldOp = op;
 
             if (*arg == "--help")
-                showManPage("nix-env");
+                showHelp = true;
             else if (*arg == "--version")
                 op = opVersion;
-            else if (*arg == "--install" || *arg == "-i")
+            else if (*arg == "--install" || *arg == "-i") {
                 op = opInstall;
+                opName = "-install";
+            }
             else if (*arg == "--force-name") // undocumented flag for nix-install-package
                 globals.forceName = getArg(*arg, arg, end);
-            else if (*arg == "--uninstall" || *arg == "-e")
+            else if (*arg == "--uninstall" || *arg == "-e") {
                 op = opUninstall;
-            else if (*arg == "--upgrade" || *arg == "-u")
+                opName = "-uninstall";
+            }
+            else if (*arg == "--upgrade" || *arg == "-u") {
                 op = opUpgrade;
-            else if (*arg == "--set-flag")
+                opName = "-upgrade";
+            }
+            else if (*arg == "--set-flag") {
                 op = opSetFlag;
-            else if (*arg == "--set")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--set") {
                 op = opSet;
-            else if (*arg == "--query" || *arg == "-q")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--query" || *arg == "-q") {
                 op = opQuery;
+                opName = "-query";
+            }
             else if (*arg == "--profile" || *arg == "-p")
                 globals.profile = absPath(getArg(*arg, arg, end));
             else if (*arg == "--file" || *arg == "-f")
                 file = getArg(*arg, arg, end);
-            else if (*arg == "--switch-profile" || *arg == "-S")
+            else if (*arg == "--switch-profile" || *arg == "-S") {
                 op = opSwitchProfile;
-            else if (*arg == "--switch-generation" || *arg == "-G")
+                opName = "-switch-profile";
+            }
+            else if (*arg == "--switch-generation" || *arg == "-G") {
                 op = opSwitchGeneration;
-            else if (*arg == "--rollback")
+                opName = "-switch-generation";
+            }
+            else if (*arg == "--rollback") {
                 op = opRollback;
-            else if (*arg == "--list-generations")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--list-generations") {
                 op = opListGenerations;
-            else if (*arg == "--delete-generations")
+                opName = arg->substr(1);
+            }
+            else if (*arg == "--delete-generations") {
                 op = opDeleteGenerations;
+                opName = arg->substr(1);
+            }
             else if (*arg == "--dry-run") {
                 printInfo("(dry run; not doing anything)");
                 globals.dryRun = true;
@@ -1485,6 +1509,7 @@ static int main_nix_env(int argc, char * * argv)
 
         myArgs.parseCmdline(argvToStrings(argc, argv));
 
+        if (showHelp) showManPage("nix-env" + opName);
         if (!op) throw UsageError("no operation specified");
 
         auto store = openStore();

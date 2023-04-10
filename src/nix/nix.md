@@ -220,8 +220,7 @@ operate are determined as follows:
 
 # Nix stores
 
-Most `nix` subcommands operate on a *Nix store*.
-
-TODO: list store types, options
+Most `nix` subcommands operate on a *Nix store*. These are documented
+in [`nix help-stores`](./nix3-help-stores.md).
 
 )""

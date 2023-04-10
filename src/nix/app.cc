@@ -1,5 +1,6 @@
 #include "installables.hh"
 #include "installable-derived-path.hh"
+#include "installable-value.hh"
 #include "store-api.hh"
 #include "eval-inline.hh"
 #include "eval-cache.hh"
@@ -40,7 +41,7 @@ std::string resolveString(
     return rewriteStrings(toResolve, rewrites);
 }
 
-UnresolvedApp Installable::toApp(EvalState & state)
+UnresolvedApp InstallableValue::toApp(EvalState & state)
 {
     auto cursor = getCursor(state);
     auto attrPath = cursor->getAttrPath();

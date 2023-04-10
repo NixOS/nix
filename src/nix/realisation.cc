@@ -45,7 +45,7 @@ struct CmdRealisationInfo : BuiltPathsCommand, MixJSON
 
     void run(ref<Store> store, BuiltPaths && paths) override
     {
-        settings.requireExperimentalFeature(Xp::CaDerivations);
+        experimentalFeatureSettings.require(Xp::CaDerivations);
         RealisedPath::Set realisations;
 
         for (auto & builtPath : paths) {

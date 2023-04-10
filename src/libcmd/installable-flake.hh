@@ -1,8 +1,33 @@
 #pragma once
+///@file
 
 #include "installable-value.hh"
 
 namespace nix {
+
+/**
+ * Extra info about a \ref DerivedPath "derived path" that ultimately
+ * come from a Flake.
+ *
+ * Invariant: every ExtraPathInfo gotten from an InstallableFlake should
+ * be possible to downcast to an ExtraPathInfoFlake.
+ */
+struct ExtraPathInfoFlake : ExtraPathInfoValue
+{
+    /**
+     * Extra struct to get around C++ designated initializer limitations
+     */
+    struct Flake {
+        FlakeRef originalRef;
+        FlakeRef resolvedRef;
+    };
+
+    Flake flake;
+
+    ExtraPathInfoFlake(Value && v, Flake && f)
+        : ExtraPathInfoValue(std::move(v)), flake(f)
+    { }
+};
 
 struct InstallableFlake : InstallableValue
 {
@@ -33,8 +58,10 @@ struct InstallableFlake : InstallableValue
 
     std::pair<Value *, PosIdx> toValue(EvalState & state) override;
 
-    /* Get a cursor to every attrpath in getActualAttrPaths()
-       that exists. However if none exists, throw an exception. */
+    /**
+     * Get a cursor to every attrpath in getActualAttrPaths() that
+     * exists. However if none exists, throw an exception.
+     */
     std::vector<ref<eval_cache::AttrCursor>>
     getCursors(EvalState & state) override;
 

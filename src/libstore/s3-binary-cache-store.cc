@@ -192,19 +192,72 @@ S3BinaryCacheStore::S3BinaryCacheStore(const Params & params)
 struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 {
     using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
-    const Setting<std::string> profile{(StoreConfig*) this, "", "profile", "The name of the AWS configuration profile to use."};
-    const Setting<std::string> region{(StoreConfig*) this, Aws::Region::US_EAST_1, "region", {"aws-region"}};
-    const Setting<std::string> scheme{(StoreConfig*) this, "", "scheme", "The scheme to use for S3 requests, https by default."};
-    const Setting<std::string> endpoint{(StoreConfig*) this, "", "endpoint", "An optional override of the endpoint to use when talking to S3."};
-    const Setting<std::string> narinfoCompression{(StoreConfig*) this, "", "narinfo-compression", "compression method for .narinfo files"};
-    const Setting<std::string> lsCompression{(StoreConfig*) this, "", "ls-compression", "compression method for .ls files"};
-    const Setting<std::string> logCompression{(StoreConfig*) this, "", "log-compression", "compression method for log/* files"};
+
+    const Setting<std::string> profile{(StoreConfig*) this, "", "profile",
+        R"(
+          The name of the AWS configuration profile to use. By default
+          Nix will use the `default` profile.
+        )"};
+
+    const Setting<std::string> region{(StoreConfig*) this, Aws::Region::US_EAST_1, "region",
+        R"(
+          The region of the S3 bucket. If your bucket is not in
+          `us–east-1`, you should always explicitly specify the region
+          parameter.
+        )"};
+
+    const Setting<std::string> scheme{(StoreConfig*) this, "", "scheme",
+        R"(
+          The scheme used for S3 requests, `https` (default) or `http`. This
+          option allows you to disable HTTPS for binary caches which don't
+          support it.
+
+          > **Note**
+          > 
+          > HTTPS should be used if the cache might contain sensitive
+          > information.
+        )"};
+
+    const Setting<std::string> endpoint{(StoreConfig*) this, "", "endpoint",
+        R"(
+          The URL of the endpoint of an S3-compatible service such as MinIO.
+          Do not specify this setting if you're using Amazon S3.
+
+          > **Note**
+          > 
+          > This endpoint must support HTTPS and will use path-based
+          > addressing instead of virtual host based addressing.
+        )"};
+
+    const Setting<std::string> narinfoCompression{(StoreConfig*) this, "", "narinfo-compression",
+        "Compression method for `.narinfo` files."};
+
+    const Setting<std::string> lsCompression{(StoreConfig*) this, "", "ls-compression",
+        "Compression method for `.ls` files."};
+
+    const Setting<std::string> logCompression{(StoreConfig*) this, "", "log-compression",
+        R"(
+          Compression method for `log/*` files. It is recommended to
+          use a compression method supported by most web browsers
+          (e.g. `brotli`).
+        )"};
+
     const Setting<bool> multipartUpload{
-        (StoreConfig*) this, false, "multipart-upload", "whether to use multi-part uploads"};
+        (StoreConfig*) this, false, "multipart-upload",
+        "Whether to use multi-part uploads."};
+
     const Setting<uint64_t> bufferSize{
-        (StoreConfig*) this, 5 * 1024 * 1024, "buffer-size", "size (in bytes) of each part in multi-part uploads"};
+        (StoreConfig*) this, 5 * 1024 * 1024, "buffer-size",
+        "Size (in bytes) of each part in multi-part uploads."};
 
     const std::string name() override { return "S3 Binary Cache Store"; }
+
+    std::string doc() override
+    {
+        return
+          #include "s3-binary-cache-store.md"
+          ;
+    }
 };
 
 struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual S3BinaryCacheStore
@@ -454,6 +507,16 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         } while (!marker.empty());
 
         return paths;
+    }
+
+    /**
+     * For now, we conservatively say we don't know.
+     *
+     * \todo try to expose our S3 authentication status.
+     */
+    std::optional<TrustedFlag> isTrustedClient() override
+    {
+        return std::nullopt;
     }
 
     static std::set<std::string> uriSchemes() { return {"s3"}; }

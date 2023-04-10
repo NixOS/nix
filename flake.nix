@@ -219,6 +219,7 @@
 
         enableParallelBuilding = true;
 
+        configureFlags = testConfigureFlags; # otherwise configure fails
         dontBuild = true;
         doInstallCheck = true;
 
@@ -319,12 +320,18 @@
           };
           let
             canRunInstalled = currentStdenv.buildPlatform.canExecute currentStdenv.hostPlatform;
+
+            sourceByRegexInverted = rxs: origSrc: final.lib.cleanSourceWith {
+              filter = (path: type:
+                let relPath = final.lib.removePrefix (toString origSrc + "/") (toString path);
+                in ! lib.any (re: builtins.match re relPath != null) rxs);
+              src = origSrc;
+            };
           in currentStdenv.mkDerivation (finalAttrs: {
             name = "nix-${version}";
             inherit version;
 
-            src = self;
-
+            src = sourceByRegexInverted [ "tests/nixos/.*" "tests/installer/.*" ] self;
             VERSION_SUFFIX = versionSuffix;
 
             outputs = [ "out" "dev" "doc" ];
@@ -466,8 +473,6 @@
       };
 
     in {
-      inherit nixpkgsFor;
-
       # A Nixpkgs overlay that overrides the 'nix' and
       # 'nix.perl-bindings' packages.
       overlays.default = overlayFor (p: p.stdenv);
@@ -576,6 +581,8 @@
         tests.remoteBuilds = runNixOSTestFor "x86_64-linux" ./tests/nixos/remote-builds.nix;
 
         tests.nix-copy-closure = runNixOSTestFor "x86_64-linux" ./tests/nixos/nix-copy-closure.nix;
+
+        tests.nix-copy = runNixOSTestFor "x86_64-linux" ./tests/nixos/nix-copy.nix;
 
         tests.nssPreload = runNixOSTestFor "x86_64-linux" ./tests/nixos/nss-preload.nix;
 

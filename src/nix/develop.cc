@@ -1,6 +1,6 @@
 #include "eval.hh"
-#include "command.hh"
 #include "installable-flake.hh"
+#include "command-installable-value.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
@@ -208,7 +208,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     drv.name += "-env";
     drv.env.emplace("name", drv.name);
     drv.inputSrcs.insert(std::move(getEnvShPath));
-    if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
+    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
         for (auto & output : drv.outputs) {
             output.second = DerivationOutput::Deferred {},
             drv.env[output.first] = hashPlaceholder(output.first);
@@ -252,7 +252,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     throw Error("get-env.sh failed to produce an environment");
 }
 
-struct Common : InstallableCommand, MixProfile
+struct Common : InstallableValueCommand, MixProfile
 {
     std::set<std::string> ignoreVars{
         "BASHOPTS",
@@ -374,7 +374,7 @@ struct Common : InstallableCommand, MixProfile
         return res;
     }
 
-    StorePath getShellOutPath(ref<Store> store, ref<Installable> installable)
+    StorePath getShellOutPath(ref<Store> store, ref<InstallableValue> installable)
     {
         auto path = installable->getStorePath();
         if (path && hasSuffix(path->to_string(), "-env"))
@@ -393,7 +393,7 @@ struct Common : InstallableCommand, MixProfile
     }
 
     std::pair<BuildEnvironment, std::string>
-    getBuildEnvironment(ref<Store> store, ref<Installable> installable)
+    getBuildEnvironment(ref<Store> store, ref<InstallableValue> installable)
     {
         auto shellOutPath = getShellOutPath(store, installable);
 
@@ -481,7 +481,7 @@ struct CmdDevelop : Common, MixEnvironment
           ;
     }
 
-    void run(ref<Store> store, ref<Installable> installable) override
+    void run(ref<Store> store, ref<InstallableValue> installable) override
     {
         auto [buildEnvironment, gcroot] = getBuildEnvironment(store, installable);
 
@@ -605,7 +605,7 @@ struct CmdPrintDevEnv : Common, MixJSON
 
     Category category() override { return catUtility; }
 
-    void run(ref<Store> store, ref<Installable> installable) override
+    void run(ref<Store> store, ref<InstallableValue> installable) override
     {
         auto buildEnvironment = getBuildEnvironment(store, installable).first;
 

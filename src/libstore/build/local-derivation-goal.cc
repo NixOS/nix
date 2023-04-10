@@ -413,7 +413,7 @@ void LocalDerivationGoal::startBuilder()
         )
     {
         #if __linux__
-        settings.requireExperimentalFeature(Xp::Cgroups);
+        experimentalFeatureSettings.require(Xp::Cgroups);
 
         auto cgroupFS = getCgroupFS();
         if (!cgroupFS)
@@ -1415,12 +1415,15 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
 
     virtual void addBuildLog(const StorePath & path, std::string_view log) override
     { unsupported("addBuildLog"); }
+
+    std::optional<TrustedFlag> isTrustedClient() override
+    { return NotTrusted; }
 };
 
 
 void LocalDerivationGoal::startDaemon()
 {
-    settings.requireExperimentalFeature(Xp::RecursiveNix);
+    experimentalFeatureSettings.require(Xp::RecursiveNix);
 
     Store::Params params;
     params["path-info-cache-size"] = "0";
@@ -1467,7 +1470,7 @@ void LocalDerivationGoal::startDaemon()
                 FdSink to(remote.get());
                 try {
                     daemon::processConnection(store, from, to,
-                        daemon::NotTrusted, daemon::Recursive);
+                        NotTrusted, daemon::Recursive);
                     debug("terminated daemon connection");
                 } catch (SysError &) {
                     ignoreException();
@@ -2280,7 +2283,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
         bool discardReferences = false;
         if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
             if (auto udr = get(*structuredAttrs, "unsafeDiscardReferences")) {
-                settings.requireExperimentalFeature(Xp::DiscardReferences);
+                experimentalFeatureSettings.require(Xp::DiscardReferences);
                 if (auto output = get(*udr, outputName)) {
                     if (!output->is_boolean())
                         throw Error("attribute 'unsafeDiscardReferences.\"%s\"' of derivation '%s' must be a Boolean", outputName, drvPath.to_string());
@@ -2700,7 +2703,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             },
             .outPath = newInfo.path
         };
-        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)
+        if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)
             && drv->type().isPure())
         {
             signRealisation(thisRealisation);
