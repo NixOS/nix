@@ -219,6 +219,7 @@
 
         enableParallelBuilding = true;
 
+        configureFlags = testConfigureFlags; # otherwise configure fails
         dontBuild = true;
         doInstallCheck = true;
 
