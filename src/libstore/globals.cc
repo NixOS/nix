@@ -22,6 +22,9 @@
 #include <dlfcn.h>
 #endif
 
+#include "config-impl.hh"
+
+
 namespace nix {
 
 
@@ -192,18 +195,18 @@ NLOHMANN_JSON_SERIALIZE_ENUM(SandboxMode, {
     {SandboxMode::smDisabled, false},
 });
 
-template<> void BaseSetting<SandboxMode>::set(const std::string & str, bool append)
+template<> SandboxMode BaseSetting<SandboxMode>::parse(const std::string & str) const
 {
-    if (str == "true") value = smEnabled;
-    else if (str == "relaxed") value = smRelaxed;
-    else if (str == "false") value = smDisabled;
+    if (str == "true") return smEnabled;
+    else if (str == "relaxed") return smRelaxed;
+    else if (str == "false") return smDisabled;
     else throw UsageError("option '%s' has invalid value '%s'", name, str);
 }
 
-template<> bool BaseSetting<SandboxMode>::isAppendable()
+template<> struct BaseSetting<SandboxMode>::trait
 {
-    return false;
-}
+    static constexpr bool appendable = false;
+};
 
 template<> std::string BaseSetting<SandboxMode>::to_string() const
 {
@@ -235,23 +238,23 @@ template<> void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::s
     });
 }
 
-void MaxBuildJobsSetting::set(const std::string & str, bool append)
+unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
 {
-    if (str == "auto") value = std::max(1U, std::thread::hardware_concurrency());
+    if (str == "auto") return std::max(1U, std::thread::hardware_concurrency());
     else {
         if (auto n = string2Int<decltype(value)>(str))
-            value = *n;
+            return *n;
         else
             throw UsageError("configuration setting '%s' should be 'auto' or an integer", name);
     }
 }
 
 
-void PluginFilesSetting::set(const std::string & str, bool append)
+Paths PluginFilesSetting::parse(const std::string & str) const
 {
     if (pluginsLoaded)
         throw UsageError("plugin-files set after plugins were loaded, you may need to move the flag before the subcommand");
-    BaseSetting<Paths>::set(str, append);
+    return BaseSetting<Paths>::parse(str);
 }
 
 
