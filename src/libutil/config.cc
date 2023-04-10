@@ -191,6 +191,10 @@ std::map<std::string, nlohmann::json> AbstractSetting::toJSONObject()
     std::map<std::string, nlohmann::json> obj;
     obj.emplace("description", description);
     obj.emplace("aliases", aliases);
+    if (experimentalFeature)
+        obj.emplace("experimentalFeature", *experimentalFeature);
+    else
+        obj.emplace("experimentalFeature", nullptr);
     return obj;
 }
 
