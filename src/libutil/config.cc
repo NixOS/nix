@@ -70,17 +70,10 @@ void AbstractConfig::reapplyUnknownSettings()
         set(s.first, s.second);
 }
 
-// Whether we should process the option. Excludes aliases, which are handled elsewhere, and disabled features.
-static bool applicable(const Config::SettingData & sd)
-{
-    return !sd.isAlias
-        && experimentalFeatureSettings.isEnabled(sd.setting->experimentalFeature);
-}
-
 void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly)
 {
     for (auto & opt : _settings)
-        if (applicable(opt.second) && (!overriddenOnly || opt.second.setting->overridden))
+        if (!opt.second.isAlias && (!overriddenOnly || opt.second.setting->overridden))
             res.emplace(opt.first, SettingInfo{opt.second.setting->to_string(), opt.second.setting->description});
 }
 
@@ -154,7 +147,7 @@ nlohmann::json Config::toJSON()
 {
     auto res = nlohmann::json::object();
     for (auto & s : _settings)
-        if (applicable(s.second))
+        if (!s.second.isAlias)
             res.emplace(s.first, s.second.setting->toJSON());
     return res;
 }
@@ -163,7 +156,7 @@ std::string Config::toKeyValue()
 {
     auto res = std::string();
     for (auto & s : _settings)
-        if (applicable(s.second))
+        if (s.second.isAlias)
             res += fmt("%s = %s\n", s.first, s.second.setting->to_string());
     return res;
 }
@@ -171,9 +164,6 @@ std::string Config::toKeyValue()
 void Config::convertToArgs(Args & args, const std::string & category)
 {
     for (auto & s : _settings) {
-        /* We do include args for settings gated on disabled
-           experimental-features. The args themselves however will also be
-           gated on any experimental feature the underlying setting is. */
         if (!s.second.isAlias)
             s.second.setting->convertToArg(args, category);
     }
