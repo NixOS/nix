@@ -204,7 +204,7 @@ const std::optional<ExperimentalFeature> parseExperimentalFeature(const std::str
 {
     using ReverseXpMap = std::map<std::string_view, ExperimentalFeature>;
 
-    static std::unique_ptr<ReverseXpMap> reverseXpMap = [](){
+    static std::unique_ptr<ReverseXpMap> reverseXpMap = []() {
         auto reverseXpMap = std::make_unique<ReverseXpMap>();
         for (auto & xpFeature : xpFeatureDetails)
             (*reverseXpMap)[xpFeature.name] = xpFeature.tag;
@@ -223,7 +223,8 @@ std::string_view showExperimentalFeature(const ExperimentalFeature tag)
     return xpFeatureDetails[(size_t)tag].name;
 }
 
-nlohmann::json documentExperimentalFeatures() {
+nlohmann::json documentExperimentalFeatures() 
+{
     StringMap res;
     for (auto & xpFeature : xpFeatureDetails)
         res[std::string { xpFeature.name }] =

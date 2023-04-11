@@ -382,11 +382,11 @@ struct ExperimentalFeatureSettings : Config {
           experimental-features = nix-command flakes
           ```
 
-          Experimental features available:
+          The following experimental features are available:
 
           {{#include experimental-features-shortlist.md}}
 
-          Experimental features are [further documented](@docroot@/contributing/experimental-features.md) in the contribution guide.
+          Experimental features are [further documented in the manual](@docroot@/contributing/experimental-features.md).
         )"};
 
     /**
