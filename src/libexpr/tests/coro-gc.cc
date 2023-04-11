@@ -36,7 +36,7 @@ namespace nix {
         GC_gcollect();
         GC_invoke_finalizers();
 
-        ASSERT_TRUE(GC_is_disabled() || *do_collect_witness);
+        EXPECT_TRUE(GC_is_disabled() || *do_collect_witness);
         ASSERT_FALSE(*dont_collect_witness);
         ASSERT_NE(nullptr, dont_collect);
     }
@@ -120,7 +120,7 @@ namespace nix {
             writeString("foo", sink);
 
             ASSERT_FALSE(*dont_collect_inner_witness);
-            ASSERT_TRUE(*do_collect_inner_witness);
+            EXPECT_TRUE(*do_collect_inner_witness);
             ASSERT_NE(nullptr, dont_collect_inner);
 
             // pass control to main
@@ -140,7 +140,7 @@ namespace nix {
         ASSERT_EQ(bar, "bar");
 
         ASSERT_FALSE(*dont_collect_witness);
-        ASSERT_TRUE(*do_collect_witness);
+        EXPECT_TRUE(*do_collect_witness);
         ASSERT_NE(nullptr, dont_collect);
     }
 #endif
