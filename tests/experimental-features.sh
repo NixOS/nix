@@ -1,25 +1,27 @@
 source common.sh
 
-# Without flakes, flake options should not show up
-# With flakes, flake options should show up
-
-function both_ways {
-    nix --experimental-features 'nix-command' "$@" | grepQuietInverse flake
-    nix --experimental-features 'nix-command flakes' "$@" | grepQuiet flake
-
-    # Also, the order should not matter
-    nix "$@" --experimental-features 'nix-command' | grepQuietInverse flake
-    nix "$@" --experimental-features 'nix-command flakes' | grepQuiet flake
-}
-
-# Simple case, the configuration effects the running command
-both_ways show-config
-
-# Skipping for now, because we actually *do* want these to show up in
-# the manual, just be marked experimental. Will reenable once the manual
-# generation takes advantage of the JSON metadata on this.
-
-# both_ways store gc --help
+# Skipping these two for now, because we actually *do* want flags and
+# config settings to always show up in the manual, just be marked
+# experimental. Will reenable once the manual generation takes advantage
+# of the JSON metadata on this.
+#
+# # Without flakes, flake options should not show up
+# # With flakes, flake options should show up
+#
+# function grep_both_ways {
+#     nix --experimental-features 'nix-command' "$@" | grepQuietInverse flake
+#     nix --experimental-features 'nix-command flakes' "$@" | grepQuiet flake
+#
+#     # Also, the order should not matter
+#     nix "$@" --experimental-features 'nix-command' | grepQuietInverse flake
+#     nix "$@" --experimental-features 'nix-command flakes' | grepQuiet flake
+# }
+#
+# # Simple case, the configuration effects the running command
+# grep_both_ways show-config
+#
+# # Medium case, the configuration effects --help
+# grep_both_ways store gc --help
 
 expect 1 nix --experimental-features 'nix-command' show-config --flake-registry 'https://no'
 nix --experimental-features 'nix-command flakes' show-config --flake-registry 'https://no'
