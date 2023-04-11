@@ -375,6 +375,11 @@ void mainWrapped(int argc, char * * argv)
         return;
     }
 
+    if (argc == 2 && std::string(argv[1]) == "__dump-xp-features") {
+        logger->cout(documentExperimentalFeatures().dump());
+        return;
+    }
+
     Finally printCompletions([&]()
     {
         if (completions) {

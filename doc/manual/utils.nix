@@ -5,6 +5,9 @@ rec {
 
   concatStrings = concatStringsSep "";
 
+  attrsToList = a:
+    map (name: { inherit name; value = a.${name}; }) (builtins.attrNames a);
+
   replaceStringsRec = from: to: string:
     # recursively replace occurrences of `from` with `to` within `string`
     # example:
@@ -74,10 +77,10 @@ rec {
           if aliases == [] then "" else
             "**Deprecated alias:** ${(concatStringsSep ", " (map (s: "`${s}`") aliases))}";
 
-      indent = prefix: s:
-        concatStringsSep "\n" (map (x: if x == "" then x else "${prefix}${x}") (splitLines s));
-
     in result;
+
+  indent = prefix: s:
+    concatStringsSep "\n" (map (x: if x == "" then x else "${prefix}${x}") (splitLines s));
 
   showSettings = args: settingsInfo: concatStrings (attrValues (mapAttrs (showSetting args) settingsInfo));
 }
