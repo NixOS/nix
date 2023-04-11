@@ -139,7 +139,7 @@ protected:
 
 MakeError(SQLiteBusy, SQLiteError);
 
-void handleSQLiteBusy(const SQLiteBusy & e, bool shouldWarn);
+void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning);
 
 /**
  * Convenience function for retrying a SQLite transaction when the
@@ -153,17 +153,8 @@ T retrySQLite(F && fun)
     while (true) {
         try {
             return fun();
-
         } catch (SQLiteBusy & e) {
-            time_t now = time(0);
-            bool shouldWarn = false;
-
-            if (now > nextWarning) {
-                nextWarning = now + 10;
-                shouldWarn = true;
-            }
-
-            handleSQLiteBusy(e, shouldWarn);
+            handleSQLiteBusy(e, nextWarning);
         }
     }
 }

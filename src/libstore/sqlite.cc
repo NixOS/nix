@@ -239,9 +239,11 @@ SQLiteTxn::~SQLiteTxn()
     }
 }
 
-void handleSQLiteBusy(const SQLiteBusy & e, bool shouldWarn)
+void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning)
 {
-    if (shouldWarn) {
+    time_t now = time(0);
+    if (now > nextWarning) {
+        nextWarning = now + 10;
         logWarning({
             .msg = hintfmt(e.what())
         });
