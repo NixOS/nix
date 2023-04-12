@@ -9,8 +9,5 @@ them to be rolled back easily.
 
 # Files
 
-See [the "User Profiles" documentation page](@docroot@/command-ref/files/user-profiles.md).
-
-This page can be viewed offline with **`man 5 nix3-user-profiles`**.
-
 )""
+#include "doc/files/user-profiles.md"
