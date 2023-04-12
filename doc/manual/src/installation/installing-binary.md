@@ -136,7 +136,7 @@ which you may remove.
 
 ### macOS
 
-1. Edit `/etc/zshrc`, `/etc/bashrc`, and `/etc/bashrc` to remove the lines sourcing
+1. Edit `/etc/zshrc`, `/etc/bashrc`, and `/etc/bash.bashrc` to remove the lines sourcing
    `nix-daemon.sh`, which should look like this:
 
    ```bash
