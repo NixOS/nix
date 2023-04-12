@@ -11,8 +11,9 @@ namespace nix {
 /**
  * The list of available experimental features.
  *
- * If you update this, don’t forget to also change the map defining their
- * string representation in the corresponding `.cc` file.
+ * If you update this, don’t forget to also change the map defining
+ * their string representation and documentation in the corresponding
+ * `.cc` file as well.
  */
 enum struct ExperimentalFeature
 {
@@ -27,11 +28,6 @@ enum struct ExperimentalFeature
     AutoAllocateUids,
     Cgroups,
     DiscardReferences,
-
-    /**
-     * A "permanent" experimental feature for extra features we just
-     * need for testing.
-     **/
     NixTesting,
 };
 
@@ -40,26 +36,52 @@ enum struct ExperimentalFeature
  */
 using Xp = ExperimentalFeature;
 
+/**
+ * Parse an experimental feature (enum value) from its name. Experimental
+ * feature flag names are hyphenated and do not contain spaces.
+ */
 const std::optional<ExperimentalFeature> parseExperimentalFeature(
         const std::string_view & name);
+
+/**
+ * Show the name of an experimental feature. This is the opposite of
+ * parseExperimentalFeature().
+ */
 std::string_view showExperimentalFeature(const ExperimentalFeature);
 
+/**
+ * Compute the documentation of all experimental features.
+ *
+ * See `doc/manual` for how this information is used.
+ */
+nlohmann::json documentExperimentalFeatures();
+
+/**
+ * Shorthand for `str << showExperimentalFeature(feature)`.
+ */
 std::ostream & operator<<(
         std::ostream & str,
         const ExperimentalFeature & feature);
 
 /**
- * Parse a set of strings to the corresponding set of experimental features,
- * ignoring (but warning for) any unkwown feature.
+ * Parse a set of strings to the corresponding set of experimental
+ * features, ignoring (but warning for) any unknown feature.
  */
 std::set<ExperimentalFeature> parseFeatures(const std::set<std::string> &);
 
+/**
+ * An experimental feature was required for some (experimental)
+ * operation, but was not enabled.
+ */
 class MissingExperimentalFeature : public Error
 {
 public:
+    /**
+     * The experimental feature that was required but not enabled.
+     */
     ExperimentalFeature missingFeature;
 
-    MissingExperimentalFeature(ExperimentalFeature);
+    MissingExperimentalFeature(ExperimentalFeature missingFeature);
 };
 
 /**
