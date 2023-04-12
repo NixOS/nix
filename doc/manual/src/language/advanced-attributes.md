@@ -329,3 +329,40 @@ Derivations can declare some infrequently used optional attributes.
     This is useful, for example, when generating self-contained filesystem images with
     their own embedded Nix store: hashes found inside such an image refer
     to the embedded store and not to the host's Nix store.
+
+  - [`__impure`]{#adv-attr-__impure}\
+    > **Warning**
+	  > This is an experimental feature.
+    >
+    > To enable it, add the following to [nix.conf](../command-ref/conf-file.md):
+    >
+    > ```
+  	> extra-experimental-features = impure-derivations
+	  > ```
+
+    If the **experimental** attribute `__impure` is set to `true`, then the
+    derivation won't produce a fixed output. This means that an impure
+    derivation can have different outputs each time it is built.
+
+    Example:
+    
+    ```
+    derivation {
+      name = "impure";
+      builder = /bin/sh;
+      __impure = true; # mark this derivation as impure
+      args = [ "-c" "read -n 10 random < /dev/random; echo $random > $out" ];
+      system = builtins.currentSystem;
+    }
+    ```
+    
+    Each time this derivation is built it produces a different output,
+    since the builder outputs random bytes to $out.
+   
+    > **Note**
+    > 
+    > Impure derivations have the following traits:
+    >   - They have access to the network
+    >   - Only fixed-output and other impure derivations can depend on
+    >     impure derivations
+    >   - They cannot be [content-addressed](@docroot@/contributing/experimental-features.md#xp-feature-ca-derivations)
