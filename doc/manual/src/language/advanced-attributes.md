@@ -340,7 +340,7 @@ Derivations can declare some infrequently used optional attributes.
   	> extra-experimental-features = impure-derivations
 	  > ```
 
-    If the **experimental** attribute `__impure` is set to `true`, then the
+    If the attribute `__impure` is set to `true`, then the
     derivation won't produce a fixed output. This means that an impure
     derivation can have different outputs each time it is built.
 
