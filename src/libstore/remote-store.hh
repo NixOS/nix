@@ -136,6 +136,17 @@ public:
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
+    /**
+     * The default instance would schedule the work on the client side, but
+     * for consistency with `buildPaths` and `buildDerivation` it should happen
+     * on the remote side.
+     *
+     * We make this fail for now so we can add implement this properly later
+     * without it being a breaking change.
+     */
+    void repairPath(const StorePath & path) override
+    { unsupported("repairPath"); }
+
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
     void queryMissing(const std::vector<DerivedPath> & targets,
