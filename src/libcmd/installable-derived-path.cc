@@ -47,7 +47,7 @@ InstallableDerivedPath InstallableDerivedPath::parse(
                 };
                 warn(
                     "The interpretation of store paths arguments ending in `.drv` recently changed. If this command is now failing try again with '%s'",
-                    oldDerivedPath.to_string(*store));
+                    oldDerivedPath.to_string(*store, '^'));
             };
             return DerivedPath::Opaque {
                 .path = std::move(storePath),
