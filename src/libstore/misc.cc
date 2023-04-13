@@ -3,6 +3,8 @@
 #include "globals.hh"
 #include "local-store.hh"
 #include "store-api.hh"
+#include "referrers-store.hh"
+#include "store-cast.hh"
 #include "thread-pool.hh"
 #include "realisation.hh"
 #include "topo-sort.hh"
@@ -16,18 +18,22 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
     StorePathSet & paths_, bool flipDirection, bool includeOutputs, bool includeDerivers)
 {
     std::function<std::set<StorePath>(const StorePath & path, std::future<ref<const ValidPathInfo>> &)> queryDeps;
-    if (flipDirection)
+    if (flipDirection) {
+        // FIXME It is not good to do partial downcasts "deep" in the
+        // code, we should only do this in "boundary" code like the CLI
+        // or protocol handlers.
+        auto & referrersStore = require<ReferrersStore>(*this);
         queryDeps = [&](const StorePath& path,
                         std::future<ref<const ValidPathInfo>> & fut) {
             StorePathSet res;
             StorePathSet referrers;
-            queryReferrers(path, referrers);
+            referrersStore.queryReferrers(path, referrers);
             for (auto& ref : referrers)
                 if (ref != path)
                     res.insert(ref);
 
             if (includeOutputs)
-                for (auto& i : queryValidDerivers(path))
+                for (auto& i : referrersStore.queryValidDerivers(path))
                     res.insert(i);
 
             if (includeDerivers && path.isDerivation())
@@ -36,7 +42,7 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
                         res.insert(*maybeOutPath);
             return res;
         };
-    else
+    } else
         queryDeps = [&](const StorePath& path,
                         std::future<ref<const ValidPathInfo>> & fut) {
             StorePathSet res;

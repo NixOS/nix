@@ -6,6 +6,7 @@
 #include "store-cast.hh"
 #include "gc-store.hh"
 #include "log-store.hh"
+#include "referrers-store.hh"
 #include "local-store.hh"
 #include "monitor-fd.hh"
 #include "serve-protocol.hh"
@@ -361,8 +362,9 @@ static void opQuery(Strings opFlags, Strings opArgs)
                             paths.insert(p);
                     }
                     else if (query == qReferrers) {
+                        auto & referrersStore = require<ReferrersStore>(*store);
                         StorePathSet tmp;
-                        store->queryReferrers(j, tmp);
+                        referrersStore.queryReferrers(j, tmp);
                         for (auto & i : tmp)
                             paths.insert(i);
                     }
@@ -526,12 +528,13 @@ static void opReadLog(Strings opFlags, Strings opArgs)
 
 static void opDumpDB(Strings opFlags, Strings opArgs)
 {
+    auto & visibleStore = require<VisibleStore>(*store);
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (!opArgs.empty()) {
         for (auto & i : opArgs)
             cout << store->makeValidityRegistration({store->followLinksToStorePath(i)}, true, true);
     } else {
-        for (auto & i : store->queryAllValidPaths())
+        for (auto & i : visibleStore.queryAllValidPaths())
             cout << store->makeValidityRegistration({i}, true, true);
     }
 }

@@ -1,7 +1,9 @@
 #include "command.hh"
 #include "markdown.hh"
 #include "store-api.hh"
+#include "store-cast.hh"
 #include "local-fs-store.hh"
+#include "visible-store.hh"
 #include "derivations.hh"
 #include "nixexpr.hh"
 #include "profiles.hh"
@@ -185,10 +187,11 @@ void BuiltPathsCommand::run(ref<Store> store, Installables && installables)
 {
     BuiltPaths paths;
     if (all) {
+        auto & visibleStore = require<VisibleStore>(*store);
         if (installables.size())
             throw UsageError("'--all' does not expect arguments");
         // XXX: Only uses opaque paths, ignores all the realisations
-        for (auto & p : store->queryAllValidPaths())
+        for (auto & p : visibleStore.queryAllValidPaths())
             paths.emplace_back(BuiltPath::Opaque{p});
     } else {
         paths = Installable::toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);

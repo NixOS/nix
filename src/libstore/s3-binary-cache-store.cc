@@ -2,6 +2,7 @@
 
 #include "s3.hh"
 #include "s3-binary-cache-store.hh"
+#include "visible-store.hh"
 #include "nar-info.hh"
 #include "nar-info-disk-cache.hh"
 #include "globals.hh"
@@ -260,7 +261,7 @@ struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
     }
 };
 
-struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual S3BinaryCacheStore
+struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual S3BinaryCacheStore, public VisibleStore
 {
     std::string bucketName;
 

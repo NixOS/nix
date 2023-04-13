@@ -8,6 +8,7 @@
 #include "gc-store.hh"
 #include "log-store.hh"
 #include "indirect-root-store.hh"
+#include "referrers-store.hh"
 #include "path-with-outputs.hh"
 #include "finally.hh"
 #include "archive.hh"
@@ -342,9 +343,10 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (op == WorkerProto::Op::QueryReferences)
             for (auto & i : store->queryPathInfo(path)->references)
                 paths.insert(i);
-        else if (op == WorkerProto::Op::QueryReferrers)
-            store->queryReferrers(path, paths);
-        else if (op == WorkerProto::Op::QueryValidDerivers)
+        else if (op == WorkerProto::Op::QueryReferrers) {
+            auto & referrersStore = require<ReferrersStore>(*store);
+            referrersStore.queryReferrers(path, paths);
+        } else if (op == WorkerProto::Op::QueryValidDerivers)
             paths = store->queryValidDerivers(path);
         else paths = store->queryDerivationOutputs(path);
         logger->stopWork();
@@ -814,7 +816,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case WorkerProto::Op::QueryAllValidPaths: {
         logger->startWork();
-        auto paths = store->queryAllValidPaths();
+        auto & visibleStore = require<VisibleStore>(*store);
+        auto paths = visibleStore.queryAllValidPaths();
         logger->stopWork();
         WorkerProto::write(*store, wconn, paths);
         break;
