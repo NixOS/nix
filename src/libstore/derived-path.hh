@@ -48,7 +48,7 @@ struct DerivedPathBuilt {
     StorePath drvPath;
     OutputsSpec outputs;
 
-    std::string to_string(const Store & store) const;
+    std::string to_string(const Store & store, char separator = '!') const;
     static DerivedPathBuilt parse(const Store & store, std::string_view, std::string_view);
     nlohmann::json toJSON(ref<Store> store) const;
 
@@ -81,7 +81,7 @@ struct DerivedPath : _DerivedPathRaw {
         return static_cast<const Raw &>(*this);
     }
 
-    std::string to_string(const Store & store) const;
+    std::string to_string(const Store & store, char separator = '!') const;
     static DerivedPath parse(const Store & store, std::string_view);
 };
 

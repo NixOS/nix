@@ -59,18 +59,19 @@ std::string DerivedPath::Opaque::to_string(const Store & store) const
     return store.printStorePath(path);
 }
 
-std::string DerivedPath::Built::to_string(const Store & store) const
+std::string DerivedPath::Built::to_string(const Store & store, char separator) const
 {
     return store.printStorePath(drvPath)
-        + "!"
+        + separator
         + outputs.to_string();
 }
 
-std::string DerivedPath::to_string(const Store & store) const
+std::string DerivedPath::to_string(const Store & store, char separator) const
 {
-    return std::visit(
-        [&](const auto & req) { return req.to_string(store); },
-        this->raw());
+    return std::visit(overloaded {
+        [&](const DerivedPath::Built & req) { return req.to_string(store, separator); },
+        [&](const DerivedPath::Opaque & req) { return req.to_string(store); },
+    }, this->raw());
 }
 
 
