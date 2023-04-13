@@ -332,20 +332,20 @@ Derivations can declare some infrequently used optional attributes.
 
   - [`__impure`]{#adv-attr-__impure}\
     > **Warning**
-	  > This is an experimental feature.
+    > This is an experimental feature.
     >
     > To enable it, add the following to [nix.conf](../command-ref/conf-file.md):
     >
     > ```
-  	> extra-experimental-features = impure-derivations
-	  > ```
+    > extra-experimental-features = impure-derivations
+    > ```
 
     If the attribute `__impure` is set to `true`, then the
     derivation won't produce a fixed output. This means that an impure
     derivation can have different outputs each time it is built.
 
     Example:
-    
+
     ```
     derivation {
       name = "impure";
@@ -355,12 +355,10 @@ Derivations can declare some infrequently used optional attributes.
       system = builtins.currentSystem;
     }
     ```
-    
+
     Each time this derivation is built it produces a different output,
     since the builder outputs random bytes to $out.
-   
-    > **Note**
-    > 
+
     > Impure derivations have the following traits:
     >   - They have access to the network
     >   - Only fixed-output and other impure derivations can depend on
