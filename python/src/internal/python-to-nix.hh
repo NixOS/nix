@@ -1,7 +1,6 @@
 #pragma once
 
-struct PyObject;
-
+#include <Python.h>
 #include <eval.hh>
 #include <optional>
 
