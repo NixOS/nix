@@ -25,6 +25,7 @@ static struct PyModuleDef nixmodule = {
 
 extern "C" _public_ PyObject * PyInit_nix(void)
 {
+    // These bindings can trigger builds via IFD. This means we need the build-hook to work.
     // By default, Nix sets the build-hook to be "$(readlink /proc/self/exe) __build-remote", expecting the current
     // binary to be Nix itself. But when we call the Nix library from Python this isn't the case, the current binary is
     // Python then So we need to change this default, pointing it to the Nix binary instead
