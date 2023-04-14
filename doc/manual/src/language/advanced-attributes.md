@@ -331,7 +331,8 @@ Derivations can declare some infrequently used optional attributes.
     to the embedded store and not to the host's Nix store.
 
   - [`__impure`]{#adv-attr-__impure}\
-	> **Warning** > This is an experimental feature.
+	> **Warning**
+	> This is an experimental feature.
     >
     > To enable it, add the following to
     > [nix.conf](../command-ref/conf-file.md):
