@@ -343,7 +343,7 @@ HashSink::~HashSink()
     delete ctx;
 }
 
-void HashSink::write(std::string_view data)
+void HashSink::writeUnbuffered(std::string_view data)
 {
     bytes += data.size();
     update(ht, *ctx, data);
