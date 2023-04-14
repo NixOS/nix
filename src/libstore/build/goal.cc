@@ -23,7 +23,7 @@ BuildResult Goal::getBuildResult(const DerivedPath & req) {
          */
 
         for (auto it = res.builtOutputs.begin(); it != res.builtOutputs.end();) {
-            if (bp.outputs.contains(it->first.outputName))
+            if (bp.outputs.contains(it->first))
                 ++it;
             else
                 it = res.builtOutputs.erase(it);

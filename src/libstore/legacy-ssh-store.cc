@@ -294,7 +294,11 @@ public:
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
             conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 6) {
-            status.builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
+            auto builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
+            for (auto && [output, realisation] : builtOutputs)
+                status.builtOutputs.insert_or_assign(
+                    std::move(output.outputName),
+                    std::move(realisation));
         }
         return status;
     }

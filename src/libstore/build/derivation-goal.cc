@@ -1013,7 +1013,7 @@ void DerivationGoal::resolvedFinished()
     auto resolvedDrv = *resolvedDrvGoal->drv;
     auto & resolvedResult = resolvedDrvGoal->buildResult;
 
-    DrvOutputs builtOutputs;
+    SingleDrvOutputs builtOutputs;
 
     if (resolvedResult.success()) {
         auto resolvedHashes = staticOutputHashes(worker.store, resolvedDrv);
@@ -1039,7 +1039,7 @@ void DerivationGoal::resolvedFinished()
                     worker.store.printStorePath(drvPath), wantedOutput);
 
             auto realisation = [&]{
-              auto take1 = get(resolvedResult.builtOutputs, DrvOutput { *resolvedHash, wantedOutput });
+              auto take1 = get(resolvedResult.builtOutputs, wantedOutput);
               if (take1) return *take1;
 
               /* The above `get` should work. But sateful tracking of
@@ -1064,7 +1064,7 @@ void DerivationGoal::resolvedFinished()
                 worker.store.registerDrvOutput(newRealisation);
             }
             outputPaths.insert(realisation.outPath);
-            builtOutputs.emplace(realisation.id, realisation);
+            builtOutputs.emplace(wantedOutput, realisation);
         }
 
         runPostBuildHook(
@@ -1189,7 +1189,7 @@ HookReply DerivationGoal::tryBuildHook()
 }
 
 
-DrvOutputs DerivationGoal::registerOutputs()
+SingleDrvOutputs DerivationGoal::registerOutputs()
 {
     /* When using a build hook, the build hook can register the output
        as valid (by doing `nix-store --import').  If so we don't have
@@ -1351,7 +1351,7 @@ OutputPathMap DerivationGoal::queryDerivationOutputMap()
 }
 
 
-std::pair<bool, DrvOutputs> DerivationGoal::checkPathValidity()
+std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
 {
     if (!drv->type().isPure()) return { false, {} };
 
@@ -1364,7 +1364,7 @@ std::pair<bool, DrvOutputs> DerivationGoal::checkPathValidity()
             return static_cast<StringSet>(names);
         },
     }, wantedOutputs.raw());
-    DrvOutputs validOutputs;
+    SingleDrvOutputs validOutputs;
 
     for (auto & i : queryPartialDerivationOutputMap()) {
         auto initialOutput = get(initialOutputs, i.first);
@@ -1407,7 +1407,7 @@ std::pair<bool, DrvOutputs> DerivationGoal::checkPathValidity()
             }
         }
         if (info.wanted && info.known && info.known->isValid())
-            validOutputs.emplace(drvOutput, Realisation { drvOutput, info.known->path });
+            validOutputs.emplace(i.first, Realisation { drvOutput, info.known->path });
     }
 
     // If we requested all the outputs, we are always fine.
@@ -1431,7 +1431,7 @@ std::pair<bool, DrvOutputs> DerivationGoal::checkPathValidity()
 }
 
 
-DrvOutputs DerivationGoal::assertPathValidity()
+SingleDrvOutputs DerivationGoal::assertPathValidity()
 {
     auto [allValid, validOutputs] = checkPathValidity();
     if (!allValid)
@@ -1442,7 +1442,7 @@ DrvOutputs DerivationGoal::assertPathValidity()
 
 void DerivationGoal::done(
     BuildResult::Status status,
-    DrvOutputs builtOutputs,
+    SingleDrvOutputs builtOutputs,
     std::optional<Error> ex)
 {
     buildResult.status = status;
@@ -1498,11 +1498,11 @@ void DerivationGoal::waiteeDone(GoalPtr waitee, ExitCode result)
             .outputs = OutputsSpec::Names { outputName },
         });
         if (buildResult.success()) {
-            for (auto & [output, realisation] : buildResult.builtOutputs) {
+            auto i = buildResult.builtOutputs.find(outputName);
+            if (i != buildResult.builtOutputs.end())
                 inputDrvOutputs.insert_or_assign(
-                    { dg->drvPath, output.outputName },
-                    realisation.outPath);
-            }
+                    { dg->drvPath, outputName },
+                    i->second.outPath);
         }
     }
 }

@@ -152,7 +152,11 @@ BuildResult read(const Store & store, Source & from, Phantom<BuildResult> _)
         >> res.isNonDeterministic
         >> res.startTime
         >> res.stopTime;
-    res.builtOutputs = worker_proto::read(store, from, Phantom<DrvOutputs> {});
+    auto builtOutputs = worker_proto::read(store, from, Phantom<DrvOutputs> {});
+    for (auto && [output, realisation] : builtOutputs)
+        res.builtOutputs.insert_or_assign(
+            std::move(output.outputName),
+            std::move(realisation));
     return res;
 }
 
@@ -165,7 +169,10 @@ void write(const Store & store, Sink & to, const BuildResult & res)
         << res.isNonDeterministic
         << res.startTime
         << res.stopTime;
-    worker_proto::write(store, to, res.builtOutputs);
+    DrvOutputs builtOutputs;
+    for (auto & [output, realisation] : res.builtOutputs)
+        builtOutputs.insert_or_assign(realisation.id, realisation);
+    worker_proto::write(store, to, builtOutputs);
 }
 
 
@@ -941,10 +948,10 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
                                     queryRealisation(outputId);
                                 if (!realisation)
                                     throw MissingRealisation(outputId);
-                                res.builtOutputs.emplace(realisation->id, *realisation);
+                                res.builtOutputs.emplace(output, *realisation);
                             } else {
                                 res.builtOutputs.emplace(
-                                    outputId,
+                                    output,
                                     Realisation {
                                         .id = outputId,
                                         .outPath = outputPath,
@@ -979,7 +986,10 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
     }
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 28) {
         auto builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
-        res.builtOutputs = builtOutputs;
+        for (auto && [output, realisation] : builtOutputs)
+            res.builtOutputs.insert_or_assign(
+                std::move(output.outputName),
+                std::move(realisation));
     }
     return res;
 }

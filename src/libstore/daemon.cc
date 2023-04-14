@@ -637,7 +637,10 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             to << res.timesBuilt << res.isNonDeterministic << res.startTime << res.stopTime;
         }
         if (GET_PROTOCOL_MINOR(clientVersion) >= 28) {
-            worker_proto::write(*store, to, res.builtOutputs);
+            DrvOutputs builtOutputs;
+            for (auto & [output, realisation] : res.builtOutputs)
+                builtOutputs.insert_or_assign(realisation.id, realisation);
+            worker_proto::write(*store, to, builtOutputs);
         }
         break;
     }

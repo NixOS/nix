@@ -253,7 +253,7 @@ struct DerivationGoal : public Goal
      * Check that the derivation outputs all exist and register them
      * as valid.
      */
-    virtual DrvOutputs registerOutputs();
+    virtual SingleDrvOutputs registerOutputs();
 
     /**
      * Open a log file and a pipe to it.
@@ -306,17 +306,17 @@ struct DerivationGoal : public Goal
      * Update 'initialOutputs' to determine the current status of the
      * outputs of the derivation. Also returns a Boolean denoting
      * whether all outputs are valid and non-corrupt, and a
-     * 'DrvOutputs' structure containing the valid and wanted
+     * 'SingleDrvOutputs' structure containing the valid and wanted
      * outputs.
      */
-    std::pair<bool, DrvOutputs> checkPathValidity();
+    std::pair<bool, SingleDrvOutputs> checkPathValidity();
 
     /**
      * Aborts if any output is not valid or corrupt, and otherwise
-     * returns a 'DrvOutputs' structure containing the wanted
+     * returns a 'SingleDrvOutputs' structure containing the wanted
      * outputs.
      */
-    DrvOutputs assertPathValidity();
+    SingleDrvOutputs assertPathValidity();
 
     /**
      * Forcibly kill the child process, if any.
@@ -329,7 +329,7 @@ struct DerivationGoal : public Goal
 
     void done(
         BuildResult::Status status,
-        DrvOutputs builtOutputs = {},
+        SingleDrvOutputs builtOutputs = {},
         std::optional<Error> ex = {});
 
     void waiteeDone(GoalPtr waitee, ExitCode result) override;
