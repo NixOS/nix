@@ -1,8 +1,7 @@
 {
-  self,
   system,
   lib,
-  python,
+  python3,
   boost,
   gdb,
   clang-tools,
@@ -16,10 +15,10 @@
   isShell ? false,
 }:
 let
-  _python = python;
+  _python = python3;
 in
 let
-  python = _python.override { self = enableDebugging _python; };
+  python3 = _python.override { self = enableDebugging _python; };
   # Extracts tests/init.sh
   testScripts = nix.overrideAttrs (old: {
     name = "nix-test-scripts-${old.version}";
@@ -45,7 +44,7 @@ let
     dontFixup = true;
   });
 in
-python.pkgs.buildPythonPackage {
+python3.pkgs.buildPythonPackage {
   name = "nix";
   format = "other";
 
@@ -64,7 +63,7 @@ python.pkgs.buildPythonPackage {
   nativeBuildInputs = [
     ninja
     pkg-config
-    (meson.override { python3 = python; })
+    (meson.override { inherit python3; })
   ] ++ lib.optional (!isShell) nix;
 
   buildInputs = nix.propagatedBuildInputs ++ [
@@ -78,10 +77,10 @@ python.pkgs.buildPythonPackage {
   installCheckPhase = "meson test -v";
 
   passthru = {
-    exampleEnv = python.withPackages (p: [ nix.python-bindings ]);
+    exampleEnv = python3.withPackages (p: [ nix.python-bindings ]);
     tests = {
       example-buildPythonApplication = import ./examples/buildPythonApplication {
-        inherit nix system testScripts python;
+        inherit nix system testScripts python3;
       };
     };
     shell = mkShell {

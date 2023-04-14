@@ -439,10 +439,7 @@
               postUnpack = "sourceRoot=$sourceRoot/perl";
             });
 
-            passthru.python-bindings = final.callPackage ./python {
-              inherit self system;
-              python = final.python3;
-            };
+            passthru.python-bindings = prev.callPackage ./python { };
 
             meta.platforms = lib.platforms.unix;
           });
