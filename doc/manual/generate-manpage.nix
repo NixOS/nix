@@ -10,7 +10,9 @@ let
 
       result = ''
         > **Warning** \
-        > This program is **experimental** and its interface is subject to change.
+        > This program is
+        > [**experimental**](@docroot@/contributing/experimental-features.md#xp-feature-nix-command)
+        > and its interface is subject to change.
 
         # Name
 
