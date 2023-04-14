@@ -71,6 +71,9 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
     void queryRealisationUncached(const DrvOutput &,
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override
     { callback(nullptr); }
+
+    virtual ref<FSAccessor> getFSAccessor() override
+    { unsupported("getFSAccessor"); }
 };
 
 static RegisterStoreImplementation<DummyStore, DummyStoreConfig> regDummyStore;

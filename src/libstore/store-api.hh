@@ -678,8 +678,7 @@ public:
     /**
      * @return An object to access files in the Nix store.
      */
-    virtual ref<FSAccessor> getFSAccessor()
-    { unsupported("getFSAccessor"); }
+    virtual ref<FSAccessor> getFSAccessor() = 0;
 
     /**
      * Repair the contents of the given path by redownloading it using
