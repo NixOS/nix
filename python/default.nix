@@ -81,7 +81,7 @@ python.pkgs.buildPythonPackage {
     exampleEnv = python.withPackages (p: [ nix.python-bindings ]);
     tests = {
       example-buildPythonApplication = import ./examples/buildPythonApplication {
-        inherit nix system testScripts;
+        inherit nix system testScripts python;
       };
     };
     shell = mkShell {

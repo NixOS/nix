@@ -8,11 +8,11 @@
     overlays = [];
     inherit system;
   },
+  python ? pkgs.python3,
   nix ? (import ../../..).default,
   testScripts,
 }:
 let
-  python = pkgs.python3;
   nixBindings = nix.python-bindings.override { inherit python; };
 in python.pkgs.buildPythonApplication {
   pname = "hello-nix";
