@@ -3,7 +3,8 @@
 namespace nix {
 
 std::ostream &
-printLiteral(std::ostream & str, const std::string_view string) {
+printLiteral(std::ostream & str, const std::string_view string) 
+{
     str << "\"";
     for (auto i = string.begin(); i != string.end(); ++i) {
         if (*i == '\"' || *i == '\\') str << "\\" << *i;
@@ -18,7 +19,8 @@ printLiteral(std::ostream & str, const std::string_view string) {
 }
 
 std::ostream &
-printLiteral(std::ostream & str, bool boolean) {
+printLiteral(std::ostream & str, bool boolean) 
+{
     str << (boolean ? "true" : "false");
     return str;
 }

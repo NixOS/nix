@@ -314,7 +314,7 @@ Derivation parseDerivation(const Store & store, std::string && s, std::string_vi
 
 
 /**
- * Print a derivation string literal to an std::string.
+ * Print a derivation string literal to an `std::string`.
  *
  * This syntax does not generalize to the expression language, which needs to
  * escape `$`.
