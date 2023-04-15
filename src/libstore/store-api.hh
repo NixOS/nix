@@ -615,11 +615,11 @@ public:
      * returned.
      */
     virtual void computeFSClosure(const StorePathSet & paths,
-        StorePathSet & out, bool flipDirection = false,
+        StorePathSet & out,
         bool includeOutputs = false, bool includeDerivers = false);
 
     void computeFSClosure(const StorePath & path,
-        StorePathSet & out, bool flipDirection = false,
+        StorePathSet & out,
         bool includeOutputs = false, bool includeDerivers = false);
 
     /**

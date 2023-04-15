@@ -98,7 +98,7 @@ public:
     { unsupported("repairPath"); }
 
     void computeFSClosure(const StorePathSet & paths,
-        StorePathSet & out, bool flipDirection = false,
+        StorePathSet & out,
         bool includeOutputs = false, bool includeDerivers = false) override;
 
     StorePathSet queryValidPaths(const StorePathSet & paths,

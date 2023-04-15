@@ -356,7 +356,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             for (auto & i : opArgs) {
                 auto ps = maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise);
                 for (auto & j : ps) {
-                    if (query == qRequisites) store->computeFSClosure(j, paths, false, includeOutputs);
+                    if (query == qRequisites) store->computeFSClosure(j, paths, includeOutputs);
                     else if (query == qReferences) {
                         for (auto & p : store->queryPathInfo(j)->references)
                             paths.insert(p);
@@ -368,7 +368,10 @@ static void opQuery(Strings opFlags, Strings opArgs)
                         for (auto & i : tmp)
                             paths.insert(i);
                     }
-                    else if (query == qReferrersClosure) store->computeFSClosure(j, paths, true);
+                    else if (query == qReferrersClosure) {
+                        auto & referrersStore = require<ReferrersStore>(*store);
+                        referrersStore.computeFSCoClosure(j, paths);
+                    }
                 }
             }
             auto sorted = store->topoSortPaths(paths);
@@ -458,16 +461,17 @@ static void opQuery(Strings opFlags, Strings opArgs)
         }
 
         case qRoots: {
+            auto & referrersStore = require<ReferrersStore>(*store);
+            auto & gcStore = require<GcStore>(*store);
             StorePathSet args;
             for (auto & i : opArgs)
                 for (auto & p : maybeUseOutputs(store->followLinksToStorePath(i), useOutput, forceRealise))
                     args.insert(p);
 
             StorePathSet referrers;
-            store->computeFSClosure(
-                args, referrers, true, settings.gcKeepOutputs, settings.gcKeepDerivations);
+            referrersStore.computeFSCoClosure(
+                args, referrers, settings.gcKeepOutputs, settings.gcKeepDerivations);
 
-            auto & gcStore = require<GcStore>(*store);
             Roots roots = gcStore.findRoots(false);
             for (auto & [target, links] : roots)
                 if (referrers.find(target) != referrers.end())

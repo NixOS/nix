@@ -33,6 +33,24 @@ struct ReferrersStore : virtual VisibleStore
      * of `path`.
      */
     virtual void queryReferrers(const StorePath & path, StorePathSet & referrers) = 0;
+
+    /**
+     * @param [out] out Place in here the set of all store paths in the
+     * file system co-closure of `storePath`; that is, all paths than
+     * directly or indirectly refer from it. `out` is not cleared.
+     *
+     * Whereas `Store::computeFSClosure` uses the `references` relation,
+     * this function uses the dual of it which is the `referrers`
+     * relation.
+     */
+    virtual void computeFSCoClosure(const StorePathSet & paths,
+        StorePathSet & out,
+        bool includeOutputs = false, bool includeDerivers = false);
+
+    void computeFSCoClosure(const StorePath & path,
+        StorePathSet & out,
+        bool includeOutputs = false, bool includeDerivers = false);
+
 };
 
 }

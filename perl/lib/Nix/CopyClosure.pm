@@ -15,7 +15,7 @@ sub copyToOpen {
     $useSubstitutes = 0 if $dryRun || !defined $useSubstitutes;
 
     # Get the closure of this path.
-    my @closure = reverse(topoSortPaths(computeFSClosure(0, $includeOutputs,
+    my @closure = reverse(topoSortPaths(computeFSClosure($includeOutputs,
         map { followLinksToStorePath $_ } @{$storePaths})));
 
     # Send the "query valid paths" command with the "lock" option
