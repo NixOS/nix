@@ -48,8 +48,18 @@ struct DerivedPathBuilt {
     StorePath drvPath;
     OutputsSpec outputs;
 
-    std::string to_string(const Store & store, char separator = '!') const;
-    static DerivedPathBuilt parse(const Store & store, std::string_view, std::string_view);
+    /**
+     * Uses `^` as the separator
+     */
+    std::string to_string(const Store & store) const;
+    /**
+     * Uses `!` as the separator
+     */
+    std::string to_string_legacy(const Store & store) const;
+    /**
+     * The caller splits on the separator, so it works for both variants.
+     */
+    static DerivedPathBuilt parse(const Store & store, std::string_view drvPath, std::string_view outputs);
     nlohmann::json toJSON(ref<Store> store) const;
 
     GENERATE_CMP(DerivedPathBuilt, me->drvPath, me->outputs);
@@ -81,8 +91,22 @@ struct DerivedPath : _DerivedPathRaw {
         return static_cast<const Raw &>(*this);
     }
 
-    std::string to_string(const Store & store, char separator = '!') const;
+    /**
+     * Uses `^` as the separator
+     */
+    std::string to_string(const Store & store) const;
+    /**
+     * Uses `!` as the separator
+     */
+    std::string to_string_legacy(const Store & store) const;
+    /**
+     * Uses `^` as the separator
+     */
     static DerivedPath parse(const Store & store, std::string_view);
+    /**
+     * Uses `!` as the separator
+     */
+    static DerivedPath parseLegacy(const Store & store, std::string_view);
 };
 
 /**
