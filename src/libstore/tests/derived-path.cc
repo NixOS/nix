@@ -53,6 +53,14 @@ TEST_F(DerivedPathTest, force_init)
 
 RC_GTEST_FIXTURE_PROP(
     DerivedPathTest,
+    prop_legacy_round_rip,
+    (const DerivedPath & o))
+{
+    RC_ASSERT(o == DerivedPath::parseLegacy(*store, o.to_string_legacy(*store)));
+}
+
+RC_GTEST_FIXTURE_PROP(
+    DerivedPathTest,
     prop_round_rip,
     (const DerivedPath & o))
 {
