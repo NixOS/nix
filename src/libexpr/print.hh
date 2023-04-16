@@ -27,4 +27,22 @@ namespace nix {
 
     /** Print `true` or `false`. */
     std::ostream & printLiteralBool(std::ostream & o, bool b);
+
+    /**
+     * Print a string as an attribute name in the Nix expression language syntax.
+     *
+     * Prints a quoted string if necessary.
+     */
+    std::ostream & printAttributeName(std::ostream & o, std::string_view s);
+
+    /**
+     * Print a string as an identifier in the Nix expression language syntax.
+     *
+     * FIXME: "identifier" is ambiguous. Identifiers do not have a single
+     *        textual representation. They can be used in variable references,
+     *        let bindings, left-hand sides or attribute names in a select
+     *        expression, or something else entirely, like JSON. Use one of the
+     *        `print*` functions instead.
+     */
+    std::ostream & printIdentifier(std::ostream & o, std::string_view s);
 }

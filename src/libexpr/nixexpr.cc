@@ -61,33 +61,12 @@ Pos::operator std::shared_ptr<AbstractPos>() const
     return pos;
 }
 
-/* Displaying abstract syntax trees. */
-
+// FIXME: remove, because *symbols* are abstract and do not have a single
+//        textual representation; see printIdentifier()
 std::ostream & operator <<(std::ostream & str, const SymbolStr & symbol)
 {
     std::string_view s = symbol;
-
-    if (s.empty())
-        str << "\"\"";
-    else if (s == "if") // FIXME: handle other keywords
-        str << '"' << s << '"';
-    else {
-        char c = s[0];
-        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_')) {
-            printLiteralString(str, s);
-            return str;
-        }
-        for (auto c : s)
-            if (!((c >= 'a' && c <= 'z') ||
-                  (c >= 'A' && c <= 'Z') ||
-                  (c >= '0' && c <= '9') ||
-                  c == '_' || c == '\'' || c == '-')) {
-                printLiteralString(str, s);
-                return str;
-            }
-        str << s;
-    }
-    return str;
+    return printIdentifier(str, s);
 }
 
 void Expr::show(const SymbolTable & symbols, std::ostream & str) const

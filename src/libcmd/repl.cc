@@ -426,6 +426,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
 }
 
 
+// FIXME: DRY and match or use the parser
 static bool isVarName(std::string_view s)
 {
     if (s.size() == 0) return false;
@@ -956,10 +957,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                 sorted.emplace(state->symbols[i.name], i.value);
 
             for (auto & i : sorted) {
-                if (isVarName(i.first))
-                    str << i.first;
-                else
-                    printLiteralString(str, i.first);
+                printAttributeName(str, i.first);
                 str << " = ";
                 if (seen.count(i.second))
                     str << "«repeated»";
