@@ -42,6 +42,8 @@ rec {
   filterAttrs = pred: set:
     listToAttrs (concatMap (name: let v = set.${name}; in if pred name v then [(nameValuePair name v)] else []) (attrNames set));
 
+  optionalString = cond: string: if cond then string else "";
+
   showSetting = { useAnchors }: name: { description, documentDefault, defaultValue, aliases, value }:
     let
       result = squash ''
@@ -74,7 +76,7 @@ rec {
         else "*machine-specific*";
 
       showAliases = aliases:
-          if aliases == [] then "" else
+          optionalString (aliases != [])
             "**Deprecated alias:** ${(concatStringsSep ", " (map (s: "`${s}`") aliases))}";
 
     in result;

@@ -31,19 +31,18 @@ let
 
       showSynopsis = command: args:
         let
-          showArgument = arg: "*${arg.label}*" + (if arg ? arity then "" else "...");
+          showArgument = arg: "*${arg.label}*" + optionalString (! arg ? arity) "...";
           arguments = concatStringsSep " " (map showArgument args);
         in ''
          `${command}` [*option*...] ${arguments}
         '';
 
-      maybeSubcommands = if details ? commands && details.commands != {}
-        then ''
+      maybeSubcommands = optionalString (details ? commands && details.commands != {})
+         ''
            where *subcommand* is one of the following:
 
            ${subcommands}
-         ''
-        else "";
+         '';
 
       subcommands = if length categories > 1
         then listCategories
@@ -65,12 +64,11 @@ let
         * [`${command} ${name}`](./${appendName filename name}.md) - ${subcmd.description}
       '';
 
-      maybeDocumentation =
-        if details ? doc
-        then replaceStrings ["@stores@"] [storeDocs] details.doc
-        else "";
+      maybeDocumentation = optionalString
+        (details ? doc)
+        (replaceStrings ["@stores@"] [storeDocs] details.doc);
 
-      maybeOptions = if details.flags == {} then "" else ''
+      maybeOptions = optionalString (details.flags != {}) ''
         # Options
 
         ${showOptions details.flags toplevel.flags}
@@ -80,15 +78,19 @@ let
         let
           allOptions = options // commonOptions;
           showCategory = cat: ''
-            ${if cat != "" then "**${cat}:**" else ""}
+            ${optionalString (cat != "") "**${cat}:**"}
 
             ${listOptions (filterAttrs (n: v: v.category == cat) allOptions)}
             '';
           listOptions = opts: concatStringsSep "\n" (attrValues (mapAttrs showOption opts));
           showOption = name: option:
             let
-              shortName = if option ? shortName then "/ `-${option.shortName}`" else "";
-              labels = if option ? labels then (concatStringsSep " " (map (s: "*${s}*") option.labels)) else "";
+              shortName = optionalString
+                (option ? shortName)
+                ("/ `-${option.shortName}`");
+              labels = optionalString
+                (option ? labels)
+                (concatStringsSep " " (map (s: "*${s}*") option.labels));
             in trim ''
               - `--${name}` ${shortName} ${labels}
 
