@@ -3,7 +3,7 @@
 #include "eval.hh"
 #include "symbol-table.hh"
 #include "util.hh"
-#include "value/print.hh"
+#include "print.hh"
 
 #include <cstdlib>
 

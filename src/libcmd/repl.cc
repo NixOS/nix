@@ -40,7 +40,7 @@ extern "C" {
 #include "markdown.hh"
 #include "local-fs-store.hh"
 #include "progress-bar.hh"
-#include "value/print.hh"
+#include "print.hh"
 
 #if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
