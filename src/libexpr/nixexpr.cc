@@ -74,7 +74,7 @@ std::ostream & operator <<(std::ostream & str, const SymbolStr & symbol)
     else {
         char c = s[0];
         if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_')) {
-            printLiteral(str, s);
+            printLiteralString(str, s);
             return str;
         }
         for (auto c : s)
@@ -82,7 +82,7 @@ std::ostream & operator <<(std::ostream & str, const SymbolStr & symbol)
                   (c >= 'A' && c <= 'Z') ||
                   (c >= '0' && c <= '9') ||
                   c == '_' || c == '\'' || c == '-')) {
-                printLiteral(str, s);
+                printLiteralString(str, s);
                 return str;
             }
         str << s;
@@ -107,7 +107,7 @@ void ExprFloat::show(const SymbolTable & symbols, std::ostream & str) const
 
 void ExprString::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    printLiteral(str, s);
+    printLiteralString(str, s);
 }
 
 void ExprPath::show(const SymbolTable & symbols, std::ostream & str) const

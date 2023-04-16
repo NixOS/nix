@@ -913,13 +913,13 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
     case nBool:
         str << ANSI_CYAN;
-        printLiteral(str, v.boolean);
+        printLiteralBool(str, v.boolean);
         str << ANSI_NORMAL;
         break;
 
     case nString:
         str << ANSI_WARNING;
-        printLiteral(str, v.string.s);
+        printLiteralString(str, v.string.s);
         str << ANSI_NORMAL;
         break;
 
@@ -959,7 +959,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                 if (isVarName(i.first))
                     str << i.first;
                 else
-                    printLiteral(str, i.first);
+                    printLiteralString(str, i.first);
                 str << " = ";
                 if (seen.count(i.second))
                     str << "«repeated»";

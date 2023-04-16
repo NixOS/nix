@@ -105,10 +105,10 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
         str << integer;
         break;
     case tBool:
-        printLiteral(str, boolean);
+        printLiteralBool(str, boolean);
         break;
     case tString:
-        printLiteral(str, string.s);
+        printLiteralString(str, string.s);
         break;
     case tPath:
         str << path; // !!! escaping?

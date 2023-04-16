@@ -17,14 +17,14 @@ namespace nix {
      *
      * @param s The logical string
      */
-    std::ostream & printLiteral(std::ostream & o, std::string_view s);
-    inline std::ostream & printLiteral(std::ostream & o, const char * s) {
-        return printLiteral(o, std::string_view(s));
+    std::ostream & printLiteralString(std::ostream & o, std::string_view s);
+    inline std::ostream & printLiteralString(std::ostream & o, const char * s) {
+        return printLiteralString(o, std::string_view(s));
     }
-    inline std::ostream & printLiteral(std::ostream & o, const std::string & s) {
-        return printLiteral(o, std::string_view(s));
+    inline std::ostream & printLiteralString(std::ostream & o, const std::string & s) {
+        return printLiteralString(o, std::string_view(s));
     }
 
     /** Print `true` or `false`. */
-    std::ostream & printLiteral(std::ostream & o, bool b);
+    std::ostream & printLiteralBool(std::ostream & o, bool b);
 }
