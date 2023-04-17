@@ -205,7 +205,7 @@ Most Nix commands accept the following command-line options:
   - <span id="opt-I">[`-I`](#opt-I)</span> *path*\
     Add an entry to the [Nix expression search path](@docroot@/command-ref/conf-file.md#conf-nix-path).
     This option may be given multiple times.
-    Paths added through `-I` take precedence over [`NIX_PATH`](./env-common.md#env-NIX_PATH).
+    Paths added through `-I` take precedence over [`NIX_PATH`](@docroot@/command-ref/env-common.md#env-NIX_PATH).
 
   - <span id="opt-option">[`--option`](#opt-option)</span> *name* *value*\
     Set the Nix configuration option *name* to *value*. This overrides
