@@ -313,6 +313,15 @@ Derivation parseDerivation(const Store & store, std::string && s, std::string_vi
 }
 
 
+/**
+ * Print a derivation string literal to an `std::string`.
+ *
+ * This syntax does not generalize to the expression language, which needs to
+ * escape `$`.
+ *
+ * @param res Where to print to
+ * @param s Which logical string to print
+ */
 static void printString(std::string & res, std::string_view s)
 {
     boost::container::small_vector<char, 64 * 1024> buffer;
