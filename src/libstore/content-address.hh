@@ -22,7 +22,7 @@ namespace nix {
  * Somewhat obscure, used by \ref Derivation derivations and
  * `builtins.toFile` currently.
  */
-struct TextHashMethod : std::monostate { };
+struct TextIngestionMethod : std::monostate { };
 
 /**
  * An enumeration of the main ways we can serialize file system
@@ -57,7 +57,7 @@ std::string makeFileIngestionPrefix(FileIngestionMethod m);
 struct ContentAddressMethod
 {
     typedef std::variant<
-        TextHashMethod,
+        TextIngestionMethod,
         FileIngestionMethod
     > Raw;
 

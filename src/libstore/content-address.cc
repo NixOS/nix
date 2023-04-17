@@ -23,7 +23,7 @@ std::string makeFileIngestionPrefix(FileIngestionMethod m)
 
 std::string ContentAddressMethod::renderPrefix() const {
     return std::visit(overloaded {
-        [](TextHashMethod) -> std::string { return "text:"; },
+        [](TextIngestionMethod) -> std::string { return "text:"; },
         [](FileIngestionMethod m2) {
              /* Not prefixed for back compat with things that couldn't produce text before. */
             return makeFileIngestionPrefix(m2);
@@ -37,7 +37,7 @@ ContentAddressMethod ContentAddressMethod::parsePrefix(std::string_view & m)
     if (splitPrefix(m, "r:"))
         method = FileIngestionMethod::Recursive;
     else if (splitPrefix(m, "text:"))
-        method = TextHashMethod {};
+        method = TextIngestionMethod {};
     return method;
 }
 
@@ -59,7 +59,7 @@ std::string ContentAddress::render() const
 std::string ContentAddressMethod::render(HashType ht) const
 {
     return std::visit(overloaded {
-        [&](const TextHashMethod & th) {
+        [&](const TextIngestionMethod & th) {
             return std::string{"text:"} + printHashType(ht);
         },
         [&](const FileIngestionMethod & fim) {
@@ -96,7 +96,7 @@ static std::pair<ContentAddressMethod, HashType> parseContentAddressMethodPrefix
         // No parsing of the ingestion method, "text" only support flat.
         HashType hashType = parseHashType_();
         return {
-            TextHashMethod {},
+            TextIngestionMethod {},
             std::move(hashType),
         };
     } else if (prefix == "fixed") {
@@ -120,7 +120,7 @@ ContentAddress ContentAddress::parse(std::string_view rawCa) {
     auto hashType = hashType_; // work around clang bug
 
     return std::visit(overloaded {
-        [&](TextHashMethod &) {
+        [&](TextIngestionMethod &) {
             return ContentAddress(TextHash {
                 .hash = Hash::parseNonSRIUnprefixed(rest, hashType)
             });
@@ -158,7 +158,7 @@ ContentAddressWithReferences ContentAddressWithReferences::fromParts(
     ContentAddressMethod  method, Hash hash, StoreReferences refs)
 {
     return std::visit(overloaded {
-        [&](TextHashMethod _) -> ContentAddressWithReferences {
+        [&](TextIngestionMethod _) -> ContentAddressWithReferences {
             if (refs.self)
                 throw UsageError("Cannot have a self reference with text hashing scheme");
             return TextInfo {
@@ -182,7 +182,7 @@ ContentAddressMethod ContentAddressWithReferences::getMethod() const
 {
     return std::visit(overloaded {
         [](const TextInfo & th) -> ContentAddressMethod {
-            return TextHashMethod {};
+            return TextIngestionMethod {};
         },
         [](const FixedOutputInfo & fsh) -> ContentAddressMethod {
             return fsh.hash.method;

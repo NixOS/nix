@@ -339,12 +339,14 @@ struct Derivation : BasicDerivation
         Store & store,
         const std::map<std::pair<StorePath, std::string>, StorePath> & inputDrvOutputs) const;
 
-    /* Check that the derivation is valid and does not present any
-       illegal states.
-
-       This is mainly a matter of checking the outputs, where our C++
-       representation supports all sorts of combinations we do not yet
-       allow. */
+    /**
+     * Check that the derivation is valid and does not present any
+     * illegal states.
+     *
+     * This is mainly a matter of checking the outputs, where our C++
+     * representation supports all sorts of combinations we do not yet
+     * allow.
+     */
     void checkInvariants(Store & store, const StorePath & drvPath) const;
 
     Derivation() = default;

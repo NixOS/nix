@@ -1105,8 +1105,10 @@ drvName, Bindings * attrs, Value & v)
         auto handleHashMode = [&](const std::string_view s) {
             if (s == "recursive") ingestionMethod = FileIngestionMethod::Recursive;
             else if (s == "flat") ingestionMethod = FileIngestionMethod::Flat;
-            else if (s == "text") ingestionMethod = TextHashMethod {};
-            else
+            else if (s == "text") {
+                experimentalFeatureSettings.require(Xp::DynamicDerivations);
+                ingestionMethod = TextIngestionMethod {};
+            } else
                 state.debugThrowLastTrace(EvalError({
                     .msg = hintfmt("invalid value '%s' for 'outputHashMode' attribute", s),
                     .errPos = state.positions[noPos]
@@ -1274,11 +1276,16 @@ drvName, Bindings * attrs, Value & v)
         }));
 
     /* Check whether the derivation name is valid. */
-    if (isDerivation(drvName) && ingestionMethod != ContentAddressMethod { TextHashMethod { } })
+    if (isDerivation(drvName) &&
+        !(ingestionMethod == ContentAddressMethod { TextIngestionMethod { } } &&
+          outputs.size() == 1 &&
+          *(outputs.begin()) == "out"))
+    {
         state.debugThrowLastTrace(EvalError({
             .msg = hintfmt("derivation names are allowed to end in '%s' only if they produce a single derivation file", drvExtension),
             .errPos = state.positions[noPos]
         }));
+    }
 
     if (outputHash) {
         /* Handle fixed-output derivations.

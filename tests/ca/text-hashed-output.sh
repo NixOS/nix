@@ -2,8 +2,10 @@
 
 source common.sh
 
-# Globally enable the ca derivations experimental flag
-sed -i 's/experimental-features = .*/& ca-derivations ca-references/' "$NIX_CONF_DIR/nix.conf"
+# Globally enable dynamic-derivations in addition to CA derivations
+enableFeatures "dynamic-derivations"
+
+restartDaemon
 
 # In the corresponding nix file, we have two derivations: the first, named root,
 # is a normal recursive derivation, while the second, named dependent, has the
@@ -15,13 +17,13 @@ sed -i 's/experimental-features = .*/& ca-derivations ca-references/' "$NIX_CONF
 # - build the dependent derivation
 # - check that the path of the output coincides with that of the original derivation
 
-drv=$(nix-instantiate --experimental-features ca-derivations ./text-hashed-output.nix -A root)
+drv=$(nix-instantiate ./text-hashed-output.nix -A root)
 nix show-derivation "$drv"
 
-drvDep=$(nix-instantiate --experimental-features ca-derivations ./text-hashed-output.nix -A dependent)
+drvDep=$(nix-instantiate ./text-hashed-output.nix -A dependent)
 nix show-derivation "$drvDep"
 
-out1=$(nix-build --experimental-features ca-derivations ./text-hashed-output.nix -A dependent --no-out-link)
+out1=$(nix-build ./text-hashed-output.nix -A dependent --no-out-link)
 
 nix path-info $drv --derivation --json | jq
 nix path-info $out1 --derivation --json | jq

@@ -216,6 +216,8 @@ static DerivationOutput parseDerivationOutput(const Store & store,
 {
     if (hashAlgo != "") {
         ContentAddressMethod method = ContentAddressMethod::parsePrefix(hashAlgo);
+        if (method == TextIngestionMethod {})
+            experimentalFeatureSettings.require(Xp::DynamicDerivations);
         const auto hashType = parseHashType(hashAlgo);
         if (hashS == "impure") {
             experimentalFeatureSettings.require(Xp::ImpureDerivations);

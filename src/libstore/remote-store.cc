@@ -629,7 +629,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         if (repair) throw Error("repairing is not supported when building through the Nix daemon protocol < 1.25");
 
         std::visit(overloaded {
-            [&](const TextHashMethod & thm) -> void {
+            [&](const TextIngestionMethod & thm) -> void {
                 if (hashType != htSHA256)
                     throw UnimplementedError("Only SHA-256 is supported for adding text-hashed data, but '%1' was given",
                         printHashType(hashType));
@@ -782,7 +782,7 @@ StorePath RemoteStore::addTextToStore(
     RepairFlag repair)
 {
     StringSource source(s);
-    return addCAToStore(source, name, TextHashMethod {}, htSHA256, references, repair)->path;
+    return addCAToStore(source, name, TextIngestionMethod {}, htSHA256, references, repair)->path;
 }
 
 void RemoteStore::registerDrvOutput(const Realisation & info)

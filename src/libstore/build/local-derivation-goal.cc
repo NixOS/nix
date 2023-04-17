@@ -2427,7 +2427,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                     "output path %1% without valid stats info",
                     actualPath);
             if (outputHash.method == ContentAddressMethod { FileIngestionMethod::Flat } ||
-                outputHash.method == ContentAddressMethod { TextHashMethod {} })
+                outputHash.method == ContentAddressMethod { TextIngestionMethod {} })
             {
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st->st_mode) || (st->st_mode & S_IXUSR) != 0)
@@ -2441,7 +2441,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             std::string oldHashPart { scratchPath->hashPart() };
             HashModuloSink caSink { outputHash.hashType, oldHashPart };
             std::visit(overloaded {
-                [&](const TextHashMethod &) {
+                [&](const TextIngestionMethod &) {
                     readFile(actualPath, caSink);
                 },
                 [&](const FileIngestionMethod & m2) {
