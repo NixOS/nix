@@ -401,21 +401,21 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             logger->startWork();
             auto pathInfo = [&]() {
                 // NB: FramedSource must be out of scope before logger->stopWork();
-                ContentAddressMethod contentAddressMethod = parseContentAddressMethod(camStr);
+                ContentAddressMethod contentAddressMethod = ContentAddressMethod::parse(camStr);
                 FramedSource source(from);
                 // TODO this is essentially RemoteStore::addCAToStore. Move it up to Store.
                 return std::visit(overloaded {
-                    [&](TextHashMethod &) {
+                    [&](const TextHashMethod &) {
                         // We could stream this by changing Store
                         std::string contents = source.drain();
                         auto path = store->addTextToStore(name, contents, refs, repair);
                         return store->queryPathInfo(path);
                     },
-                    [&](FixedOutputHashMethod & fohm) {
+                    [&](const FixedOutputHashMethod & fohm) {
                         auto path = store->addToStoreFromDump(source, name, fohm.fileIngestionMethod, fohm.hashType, repair, refs);
                         return store->queryPathInfo(path);
                     },
-                }, contentAddressMethod);
+                }, contentAddressMethod.raw);
             }();
             logger->stopWork();
 
@@ -637,7 +637,10 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             to << res.timesBuilt << res.isNonDeterministic << res.startTime << res.stopTime;
         }
         if (GET_PROTOCOL_MINOR(clientVersion) >= 28) {
-            worker_proto::write(*store, to, res.builtOutputs);
+            DrvOutputs builtOutputs;
+            for (auto & [output, realisation] : res.builtOutputs)
+                builtOutputs.insert_or_assign(realisation.id, realisation);
+            worker_proto::write(*store, to, builtOutputs);
         }
         break;
     }
@@ -880,7 +883,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         info.references = worker_proto::read(*store, from, Phantom<StorePathSet> {});
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
-        info.ca = parseContentAddressOpt(readString(from));
+        info.ca = ContentAddress::parseOpt(readString(from));
         from >> repair >> dontCheckSigs;
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;

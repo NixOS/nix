@@ -1293,7 +1293,13 @@ drvName, Bindings * attrs, Value & v)
         auto h = newHashAllowEmpty(*outputHash, parseHashTypeOpt(outputHashAlgo));
 
         auto method = ingestionMethod.value_or(FileIngestionMethod::Flat);
-        auto outPath = state.store->makeFixedOutputPath(method, h, drvName);
+        auto outPath = state.store->makeFixedOutputPath(drvName, FixedOutputInfo {
+            .hash = {
+                .method = method,
+                .hash = h,
+            },
+            .references = {},
+        });
         drv.env["out"] = state.store->printStorePath(outPath);
         drv.outputs.insert_or_assign("out",
             DerivationOutput::CAFixed {
@@ -2103,7 +2109,13 @@ static void addPath(
 
         std::optional<StorePath> expectedStorePath;
         if (expectedHash)
-            expectedStorePath = state.store->makeFixedOutputPath(method, *expectedHash, name);
+            expectedStorePath = state.store->makeFixedOutputPath(name, FixedOutputInfo {
+                .hash = {
+                    .method = method,
+                    .hash = *expectedHash,
+                },
+                .references = {},
+            });
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
             StorePath dstPath = settings.readOnlyMode

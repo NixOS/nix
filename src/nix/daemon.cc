@@ -274,11 +274,11 @@ static std::pair<TrustedFlag, std::string> authPeer(const PeerInfo & peer)
  * Run a server. The loop opens a socket and accepts new connections from that
  * socket.
  *
- * @param trustClientOpt If present, force trusting or not trusted the client.
- * Otherwise, decide based on the authentication settings and user credentials
- * (from the unix domain socket).
+ * @param forceTrustClientOpt If present, force trusting or not trusted
+ * the client. Otherwise, decide based on the authentication settings
+ * and user credentials (from the unix domain socket).
  */
-static void daemonLoop(std::optional<TrustedFlag> trustClientOpt)
+static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
 {
     if (chdir("/") == -1)
         throw SysError("cannot change current directory");
@@ -325,8 +325,8 @@ static void daemonLoop(std::optional<TrustedFlag> trustClientOpt)
             TrustedFlag trusted;
             std::string user;
 
-            if (trustClientOpt)
-                trusted = *trustClientOpt;
+            if (forceTrustClientOpt)
+                trusted = *forceTrustClientOpt;
             else {
                 peer = getPeerInfo(remote.get());
                 auto [_trusted, _user] = authPeer(peer);
@@ -436,8 +436,11 @@ static void processStdioConnection(ref<Store> store, TrustedFlag trustClient)
 /**
  * Entry point shared between the new CLI `nix daemon` and old CLI
  * `nix-daemon`.
+ *
+ * @param forceTrustClientOpt See `daemonLoop()` and the parameter with
+ * the same name over there for details.
  */
-static void runDaemon(bool stdio, std::optional<TrustedFlag> trustClientOpt)
+static void runDaemon(bool stdio, std::optional<TrustedFlag> forceTrustClientOpt)
 {
     if (stdio) {
         auto store = openUncachedStore();
@@ -445,15 +448,15 @@ static void runDaemon(bool stdio, std::optional<TrustedFlag> trustClientOpt)
         // If --force-untrusted is passed, we cannot forward the connection and
         // must process it ourselves (before delegating to the next store) to
         // force untrusting the client.
-        if (auto remoteStore = store.dynamic_pointer_cast<RemoteStore>(); remoteStore && (!trustClientOpt || *trustClientOpt != NotTrusted))
+        if (auto remoteStore = store.dynamic_pointer_cast<RemoteStore>(); remoteStore && (!forceTrustClientOpt || *forceTrustClientOpt != NotTrusted))
             forwardStdioConnection(*remoteStore);
         else
             // `Trusted` is passed in the auto (no override case) because we
             // cannot see who is on the other side of a plain pipe. Limiting
             // access to those is explicitly not `nix-daemon`'s responsibility.
-            processStdioConnection(store, trustClientOpt.value_or(Trusted));
+            processStdioConnection(store, forceTrustClientOpt.value_or(Trusted));
     } else
-        daemonLoop(trustClientOpt);
+        daemonLoop(forceTrustClientOpt);
 }
 
 static int main_nix_daemon(int argc, char * * argv)

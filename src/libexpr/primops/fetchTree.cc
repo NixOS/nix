@@ -243,10 +243,15 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
 
     // early exit if pinned and already in the store
     if (expectedHash && expectedHash->type == htSHA256) {
-        auto expectedPath =
-            unpack
-            ? state.store->makeFixedOutputPath(FileIngestionMethod::Recursive, *expectedHash, name, {})
-            : state.store->makeFixedOutputPath(FileIngestionMethod::Flat, *expectedHash, name, {});
+        auto expectedPath = state.store->makeFixedOutputPath(
+            name,
+            FixedOutputInfo {
+                .hash = {
+                    .method = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat,
+                    .hash = *expectedHash,
+                },
+                .references = {}
+            });
 
         if (state.store->isValidPath(expectedPath)) {
             state.allowAndSetStorePathString(expectedPath, v);

@@ -350,8 +350,9 @@ connected:
                     debug("missing output %s", outputName);
                     assert(optResult);
                     auto & result = *optResult;
-                    assert(result.builtOutputs.count(thisOutputId));
-                    auto newRealisation = result.builtOutputs.at(thisOutputId);
+                    auto i = result.builtOutputs.find(outputName);
+                    assert(i != result.builtOutputs.end());
+                    auto & newRealisation = i->second;
                     missingRealisations.insert(newRealisation);
                     missingPaths.insert(newRealisation.outPath);
                 }

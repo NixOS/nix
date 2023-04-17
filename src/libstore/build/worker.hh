@@ -181,7 +181,7 @@ public:
      */
 
     /**
-     * derivation goal
+     * @ref DerivationGoal "derivation goal"
      */
 private:
     std::shared_ptr<DerivationGoal> makeDerivationGoalCommon(
@@ -196,10 +196,18 @@ public:
         const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
 
     /**
-     * substitution goal
+     * @ref SubstitutionGoal "substitution goal"
      */
     std::shared_ptr<PathSubstitutionGoal> makePathSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
     std::shared_ptr<DrvOutputSubstitutionGoal> makeDrvOutputSubstitutionGoal(const DrvOutput & id, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+
+    /**
+     * Make a goal corresponding to the `DerivedPath`.
+     *
+     * It will be a `DerivationGoal` for a `DerivedPath::Built` or
+     * a `SubstitutionGoal` for a `DerivedPath::Opaque`.
+     */
+    GoalPtr makeGoal(const DerivedPath & req, BuildMode buildMode = bmNormal);
 
     /**
      * Remove a dead goal.

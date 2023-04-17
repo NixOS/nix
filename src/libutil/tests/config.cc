@@ -82,6 +82,7 @@ namespace nix {
             TestSetting() : AbstractSetting("test", "test", {}) {}
             void set(const std::string & value, bool append) override {}
             std::string to_string() const override { return {}; }
+            bool isAppendable() override { return false; }
         };
 
         Config config;
@@ -90,6 +91,7 @@ namespace nix {
         ASSERT_FALSE(config.set("test", "value"));
         config.addSetting(&setting);
         ASSERT_TRUE(config.set("test", "value"));
+        ASSERT_FALSE(config.set("extra-test", "value"));
     }
 
     TEST(Config, withInitialValue) {

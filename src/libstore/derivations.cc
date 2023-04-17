@@ -36,8 +36,8 @@ std::optional<StorePath> DerivationOutput::path(const Store & store, std::string
 StorePath DerivationOutput::CAFixed::path(const Store & store, std::string_view drvName, std::string_view outputName) const
 {
     return store.makeFixedOutputPath(
-        hash.method, hash.hash,
-        outputPathName(drvName, outputName));
+        outputPathName(drvName, outputName),
+        { hash, {} });
 }
 
 
@@ -942,7 +942,7 @@ void Derivation::checkInvariants(Store & store, const StorePath & drvPath) const
                 envHasRightPath(doia.path, i.first);
             },
             [&](const DerivationOutput::CAFixed & dof) {
-                StorePath path = store.makeFixedOutputPath(dof.hash.method, dof.hash.hash, drvName);
+                StorePath path = store.makeFixedOutputPath(drvName, { dof.hash, {} });
                 envHasRightPath(path, i.first);
             },
             [&](const DerivationOutput::CAFloating &) {
