@@ -342,6 +342,9 @@ public:
     void ensurePath(const StorePath & path) override
     { unsupported("ensurePath"); }
 
+    virtual ref<FSAccessor> getFSAccessor() override
+    { unsupported("getFSAccessor"); }
+
     void computeFSClosure(const StorePathSet & paths,
         StorePathSet & out, bool flipDirection = false,
         bool includeOutputs = false, bool includeDerivers = false) override

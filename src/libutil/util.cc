@@ -47,6 +47,9 @@ extern char * * environ __attribute__((weak));
 
 namespace nix {
 
+void initLibUtil() {
+}
+
 std::optional<std::string> getEnv(const std::string & key)
 {
     char * value = getenv(key.c_str());
@@ -1744,13 +1747,39 @@ void triggerInterrupt()
 }
 
 static sigset_t savedSignalMask;
+static bool savedSignalMaskIsSet = false;
+
+void setChildSignalMask(sigset_t * sigs)
+{
+    assert(sigs); // C style function, but think of sigs as a reference
+
+#if _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE
+    sigemptyset(&savedSignalMask);
+    // There's no "assign" or "copy" function, so we rely on (math) idempotence
+    // of the or operator: a or a = a.
+    sigorset(&savedSignalMask, sigs, sigs);
+#else
+    // Without sigorset, our best bet is to assume that sigset_t is a type that
+    // can be assigned directly, such as is the case for a sigset_t defined as
+    // an integer type.
+    savedSignalMask = *sigs;
+#endif
+
+    savedSignalMaskIsSet = true;
+}
+
+void saveSignalMask() {
+    if (sigprocmask(SIG_BLOCK, nullptr, &savedSignalMask))
+        throw SysError("querying signal mask");
+
+    savedSignalMaskIsSet = true;
+}
 
 void startSignalHandlerThread()
 {
     updateWindowSize();
 
-    if (sigprocmask(SIG_BLOCK, nullptr, &savedSignalMask))
-        throw SysError("querying signal mask");
+    saveSignalMask();
 
     sigset_t set;
     sigemptyset(&set);
@@ -1767,6 +1796,20 @@ void startSignalHandlerThread()
 
 static void restoreSignals()
 {
+    // If startSignalHandlerThread wasn't called, that means we're not running
+    // in a proper libmain process, but a process that presumably manages its
+    // own signal handlers. Such a process should call either
+    //  - initNix(), to be a proper libmain process
+    //  - startSignalHandlerThread(), to resemble libmain regarding signal
+    //    handling only
+    //  - saveSignalMask(), for processes that define their own signal handling
+    //    thread
+    // TODO: Warn about this? Have a default signal mask? The latter depends on
+    //       whether we should generally inherit signal masks from the caller.
+    //       I don't know what the larger unix ecosystem expects from us here.
+    if (!savedSignalMaskIsSet)
+        return;
+
     if (sigprocmask(SIG_SETMASK, &savedSignalMask, nullptr))
         throw SysError("restoring signals");
 }

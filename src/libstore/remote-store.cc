@@ -90,12 +90,12 @@ void write(const Store & store, Sink & out, const ContentAddress & ca)
 DerivedPath read(const Store & store, Source & from, Phantom<DerivedPath> _)
 {
     auto s = readString(from);
-    return DerivedPath::parse(store, s);
+    return DerivedPath::parseLegacy(store, s);
 }
 
 void write(const Store & store, Sink & out, const DerivedPath & req)
 {
-    out << req.to_string(store);
+    out << req.to_string_legacy(store);
 }
 
 
