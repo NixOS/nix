@@ -1,5 +1,9 @@
 source common.sh
 
+enableFeatures "daemon-trust-override"
+
+restartDaemon
+
 [[ $busybox =~ busybox ]] || skipTest "no busybox"
 
 unset NIX_STORE_DIR

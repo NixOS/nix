@@ -472,13 +472,13 @@ static int main_nix_daemon(int argc, char * * argv)
             else if (*arg == "--stdio")
                 stdio = true;
             else if (*arg == "--force-trusted") {
-                experimentalFeatureSettings.require(Xp::NixTesting);
+                experimentalFeatureSettings.require(Xp::DaemonTrustOverride);
                 isTrustedOpt = Trusted;
             } else if (*arg == "--force-untrusted") {
-                experimentalFeatureSettings.require(Xp::NixTesting);
+                experimentalFeatureSettings.require(Xp::DaemonTrustOverride);
                 isTrustedOpt = NotTrusted;
             } else if (*arg == "--default-trust") {
-                experimentalFeatureSettings.require(Xp::NixTesting);
+                experimentalFeatureSettings.require(Xp::DaemonTrustOverride);
                 isTrustedOpt = std::nullopt;
             } else return false;
             return true;

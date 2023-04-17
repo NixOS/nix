@@ -190,12 +190,13 @@ constexpr std::array<ExperimentalFeatureDetails, 12> xpFeatureDetails = {{
         )",
     },
     {
-        .tag = Xp::NixTesting,
-        .name = "nix-testing",
+        .tag = Xp::DaemonTrustOverride,
+        .name = "daemon-trust-override",
         .description = R"(
-            A "permanent" experimental feature for extra features we just need
-            for testing. Not actually an "experiment" in the sense of being
-            prospective functionality for regular users.
+            Allow forcing trusting or not trusting clients with
+            `nix-daemon`. This is useful for testing, but possibly also
+            useful for various experiments with `nix-daemon --stdio`
+            networking.
         )",
     },
 }};
