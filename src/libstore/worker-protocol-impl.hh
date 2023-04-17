@@ -13,65 +13,65 @@
 namespace nix {
 
 template<typename T>
-std::vector<T> WorkerProto::Serialise<std::vector<T>>::read(const Store & store, Source & from)
+std::vector<T> WorkerProto::Serialise<std::vector<T>>::read(const Store & store, WorkerProto::ReadConn conn)
 {
     std::vector<T> resSet;
-    auto size = readNum<size_t>(from);
+    auto size = readNum<size_t>(conn.from);
     while (size--) {
-        resSet.push_back(WorkerProto::Serialise<T>::read(store, from));
+        resSet.push_back(WorkerProto::Serialise<T>::read(store, conn));
     }
     return resSet;
 }
 
 template<typename T>
-void WorkerProto::Serialise<std::vector<T>>::write(const Store & store, Sink & out, const std::vector<T> & resSet)
+void WorkerProto::Serialise<std::vector<T>>::write(const Store & store, WorkerProto::WriteConn conn, const std::vector<T> & resSet)
 {
-    out << resSet.size();
+    conn.to << resSet.size();
     for (auto & key : resSet) {
-        WorkerProto::Serialise<T>::write(store, out, key);
+        WorkerProto::Serialise<T>::write(store, conn, key);
     }
 }
 
 template<typename T>
-std::set<T> WorkerProto::Serialise<std::set<T>>::read(const Store & store, Source & from)
+std::set<T> WorkerProto::Serialise<std::set<T>>::read(const Store & store, WorkerProto::ReadConn conn)
 {
     std::set<T> resSet;
-    auto size = readNum<size_t>(from);
+    auto size = readNum<size_t>(conn.from);
     while (size--) {
-        resSet.insert(WorkerProto::Serialise<T>::read(store, from));
+        resSet.insert(WorkerProto::Serialise<T>::read(store, conn));
     }
     return resSet;
 }
 
 template<typename T>
-void WorkerProto::Serialise<std::set<T>>::write(const Store & store, Sink & out, const std::set<T> & resSet)
+void WorkerProto::Serialise<std::set<T>>::write(const Store & store, WorkerProto::WriteConn conn, const std::set<T> & resSet)
 {
-    out << resSet.size();
+    conn.to << resSet.size();
     for (auto & key : resSet) {
-        WorkerProto::Serialise<T>::write(store, out, key);
+        WorkerProto::Serialise<T>::write(store, conn, key);
     }
 }
 
 template<typename K, typename V>
-std::map<K, V> WorkerProto::Serialise<std::map<K, V>>::read(const Store & store, Source & from)
+std::map<K, V> WorkerProto::Serialise<std::map<K, V>>::read(const Store & store, WorkerProto::ReadConn conn)
 {
     std::map<K, V> resMap;
-    auto size = readNum<size_t>(from);
+    auto size = readNum<size_t>(conn.from);
     while (size--) {
-        auto k = WorkerProto::Serialise<K>::read(store, from);
-        auto v = WorkerProto::Serialise<V>::read(store, from);
+        auto k = WorkerProto::Serialise<K>::read(store, conn);
+        auto v = WorkerProto::Serialise<V>::read(store, conn);
         resMap.insert_or_assign(std::move(k), std::move(v));
     }
     return resMap;
 }
 
 template<typename K, typename V>
-void WorkerProto::Serialise<std::map<K, V>>::write(const Store & store, Sink & out, const std::map<K, V> & resMap)
+void WorkerProto::Serialise<std::map<K, V>>::write(const Store & store, WorkerProto::WriteConn conn, const std::map<K, V> & resMap)
 {
-    out << resMap.size();
+    conn.to << resMap.size();
     for (auto & i : resMap) {
-        WorkerProto::Serialise<K>::write(store, out, i.first);
-        WorkerProto::Serialise<V>::write(store, out, i.second);
+        WorkerProto::Serialise<K>::write(store, conn, i.first);
+        WorkerProto::Serialise<V>::write(store, conn, i.second);
     }
 }
 

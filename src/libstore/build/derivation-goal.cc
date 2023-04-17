@@ -1151,9 +1151,11 @@ HookReply DerivationGoal::tryBuildHook()
         throw;
     }
 
+    WorkerProto::WriteConn conn { hook->sink };
+
     /* Tell the hook all the inputs that have to be copied to the
        remote system. */
-    WorkerProto::write(worker.store, hook->sink, inputPaths);
+    WorkerProto::write(worker.store, conn, inputPaths);
 
     /* Tell the hooks the missing outputs that have to be copied back
        from the remote system. */
@@ -1164,7 +1166,7 @@ HookReply DerivationGoal::tryBuildHook()
             if (buildMode != bmCheck && status.known && status.known->isValid()) continue;
             missingOutputs.insert(outputName);
         }
-        WorkerProto::write(worker.store, hook->sink, missingOutputs);
+        WorkerProto::write(worker.store, conn, missingOutputs);
     }
 
     hook->sink = FdSink();

@@ -48,6 +48,42 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         FdSource from;
         int remoteVersion;
         bool good = true;
+
+        /**
+         * Coercion to `WorkerProto::ReadConn`. This makes it easy to use the
+         * factored out worker protocol searlizers with a
+         * `LegacySSHStore::Connection`.
+         *
+         * The worker protocol connection types are unidirectional, unlike
+         * this type.
+         *
+         * @todo Use server protocol serializers, not worker protocol
+         * serializers, once we have made that distiction.
+         */
+        operator WorkerProto::ReadConn ()
+        {
+            return WorkerProto::ReadConn {
+                .from = from,
+            };
+        }
+
+        /*
+         * Coercion to `WorkerProto::WriteConn`. This makes it easy to use the
+         * factored out worker protocol searlizers with a
+         * `LegacySSHStore::Connection`.
+         *
+         * The worker protocol connection types are unidirectional, unlike
+         * this type.
+         *
+         * @todo Use server protocol serializers, not worker protocol
+         * serializers, once we have made that distiction.
+         */
+        operator WorkerProto::WriteConn ()
+        {
+            return WorkerProto::WriteConn {
+                .to = to,
+            };
+        }
     };
 
     std::string host;
@@ -147,7 +183,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info->deriver = parseStorePath(deriver);
-            info->references = WorkerProto::Serialise<StorePathSet>::read(*this, conn->from);
+            info->references = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
             readLongLong(conn->from); // download size
             info->narSize = readLongLong(conn->from);
 
@@ -181,7 +217,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
                 << printStorePath(info.path)
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << info.narHash.to_string(Base16, false);
-            WorkerProto::write(*this, conn->to, info.references);
+            WorkerProto::write(*this, *conn, info.references);
             conn->to
                 << info.registrationTime
                 << info.narSize
@@ -210,7 +246,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             conn->to
                 << exportMagic
                 << printStorePath(info.path);
-            WorkerProto::write(*this, conn->to, info.references);
+            WorkerProto::write(*this, *conn, info.references);
             conn->to
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << 0
@@ -295,7 +331,7 @@ public:
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
             conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 6) {
-            auto builtOutputs = WorkerProto::Serialise<DrvOutputs>::read(*this, conn->from);
+            auto builtOutputs = WorkerProto::Serialise<DrvOutputs>::read(*this, *conn);
             for (auto && [output, realisation] : builtOutputs)
                 status.builtOutputs.insert_or_assign(
                     std::move(output.outputName),
@@ -370,10 +406,10 @@ public:
         conn->to
             << ServeProto::Command::QueryClosure
             << includeOutputs;
-        WorkerProto::write(*this, conn->to, paths);
+        WorkerProto::write(*this, *conn, paths);
         conn->to.flush();
 
-        for (auto & i : WorkerProto::Serialise<StorePathSet>::read(*this, conn->from))
+        for (auto & i : WorkerProto::Serialise<StorePathSet>::read(*this, *conn))
             out.insert(i);
     }
 
@@ -386,10 +422,10 @@ public:
             << ServeProto::Command::QueryValidPaths
             << false // lock
             << maybeSubstitute;
-        WorkerProto::write(*this, conn->to, paths);
+        WorkerProto::write(*this, *conn, paths);
         conn->to.flush();
 
-        return WorkerProto::Serialise<StorePathSet>::read(*this, conn->from);
+        return WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
     }
 
     void connect() override

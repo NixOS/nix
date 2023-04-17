@@ -807,6 +807,9 @@ static void opServe(Strings opFlags, Strings opArgs)
     out.flush();
     unsigned int clientVersion = readInt(in);
 
+    WorkerProto::ReadConn rconn { .from = in };
+    WorkerProto::WriteConn wconn { .to = out };
+
     auto getBuildSettings = [&]() {
         // FIXME: changing options here doesn't work if we're
         // building through the daemon.
@@ -850,7 +853,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             case ServeProto::Command::QueryValidPaths: {
                 bool lock = readInt(in);
                 bool substitute = readInt(in);
-                auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, in);
+                auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
                 if (lock && writeAllowed)
                     for (auto & path : paths)
                         store->addTempRoot(path);
@@ -859,19 +862,19 @@ static void opServe(Strings opFlags, Strings opArgs)
                     store->substitutePaths(paths);
                 }
 
-                WorkerProto::write(*store, out, store->queryValidPaths(paths));
+                WorkerProto::write(*store, wconn, store->queryValidPaths(paths));
                 break;
             }
 
             case ServeProto::Command::QueryPathInfos: {
-                auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, in);
+                auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
                 // !!! Maybe we want a queryPathInfos?
                 for (auto & i : paths) {
                     try {
                         auto info = store->queryPathInfo(i);
                         out << store->printStorePath(info->path)
                             << (info->deriver ? store->printStorePath(*info->deriver) : "");
-                        WorkerProto::write(*store, out, info->references);
+                        WorkerProto::write(*store, wconn, info->references);
                         // !!! Maybe we want compression?
                         out << info->narSize // downloadSize
                             << info->narSize;
@@ -899,7 +902,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case ServeProto::Command::ExportPaths: {
                 readInt(in); // obsolete
-                store->exportPaths(WorkerProto::Serialise<StorePathSet>::read(*store, in), out);
+                store->exportPaths(WorkerProto::Serialise<StorePathSet>::read(*store, rconn), out);
                 break;
             }
 
@@ -945,7 +948,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                     DrvOutputs builtOutputs;
                     for (auto & [output, realisation] : status.builtOutputs)
                         builtOutputs.insert_or_assign(realisation.id, realisation);
-                    WorkerProto::write(*store, out, builtOutputs);
+                    WorkerProto::write(*store, wconn, builtOutputs);
                 }
 
                 break;
@@ -954,9 +957,9 @@ static void opServe(Strings opFlags, Strings opArgs)
             case ServeProto::Command::QueryClosure: {
                 bool includeOutputs = readInt(in);
                 StorePathSet closure;
-                store->computeFSClosure(WorkerProto::Serialise<StorePathSet>::read(*store, in),
+                store->computeFSClosure(WorkerProto::Serialise<StorePathSet>::read(*store, rconn),
                     closure, false, includeOutputs);
-                WorkerProto::write(*store, out, closure);
+                WorkerProto::write(*store, wconn, closure);
                 break;
             }
 
@@ -971,7 +974,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 };
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.references = WorkerProto::Serialise<StorePathSet>::read(*store, in);
+                info.references = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
                 info.ca = ContentAddress::parseOpt(readString(in));

@@ -50,6 +50,28 @@ struct WorkerProto
     enum struct Op : uint64_t;
 
     /**
+     * A unidirectional read connection, to be used by the read half of the
+     * canonical serializers below.
+     *
+     * This currently is just a `Source &`, but more fields will be added
+     * later.
+     */
+    struct ReadConn {
+        Source & from;
+    };
+
+    /**
+     * A unidirectional write connection, to be used by the write half of the
+     * canonical serializers below.
+     *
+     * This currently is just a `Sink &`, but more fields will be added
+     * later.
+     */
+    struct WriteConn {
+        Sink & to;
+    };
+
+    /**
      * Data type for canonical pairs of serialisers for the worker protocol.
      *
      * See https://en.cppreference.com/w/cpp/language/adl for the broader
@@ -75,8 +97,8 @@ struct WorkerProto
     // This makes for a quicker debug cycle, as desired.
 #if 0
     {
-        static T read(const Store & store, Source & from);
-        static void write(const Store & store, Sink & out, const T & t);
+        static T read(const Store & store, ReadConn conn);
+        static void write(const Store & store, WriteConn conn, const T & t);
     };
 #endif
 
@@ -85,9 +107,9 @@ struct WorkerProto
      * infer the type instead of having to write it down explicitly.
      */
     template<typename T>
-    static void write(const Store & store, Sink & out, const T & t)
+    static void write(const Store & store, WriteConn conn, const T & t)
     {
-        WorkerProto::Serialise<T>::write(store, out, t);
+        WorkerProto::Serialise<T>::write(store, conn, t);
     }
 };
 
@@ -171,8 +193,8 @@ inline std::ostream & operator << (std::ostream & s, WorkerProto::Op op)
  */
 #define MAKE_WORKER_PROTO(T) \
     struct WorkerProto::Serialise< T > { \
-        static T read(const Store & store, Source & from); \
-        static void write(const Store & store, Sink & out, const T & t); \
+        static T read(const Store & store, WorkerProto::ReadConn conn); \
+        static void write(const Store & store, WorkerProto::WriteConn conn, const T & t); \
     };
 
 template<>
