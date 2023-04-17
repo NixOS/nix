@@ -1335,7 +1335,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
                 result.rethrow();
     }
 
-    std::vector<BuildResult> buildPathsWithResults(
+    std::vector<KeyedBuildResult> buildPathsWithResults(
         const std::vector<DerivedPath> & paths,
         BuildMode buildMode = bmNormal,
         std::shared_ptr<Store> evalStore = nullptr) override
@@ -2174,7 +2174,7 @@ void LocalDerivationGoal::runChild()
 }
 
 
-DrvOutputs LocalDerivationGoal::registerOutputs()
+SingleDrvOutputs LocalDerivationGoal::registerOutputs()
 {
     /* When using a build hook, the build hook can register the output
        as valid (by doing `nix-store --import').  If so we don't have
@@ -2683,7 +2683,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
        means it's safe to link the derivation to the output hash. We must do
        that for floating CA derivations, which otherwise couldn't be cached,
        but it's fine to do in all cases. */
-    DrvOutputs builtOutputs;
+    SingleDrvOutputs builtOutputs;
 
     for (auto & [outputName, newInfo] : infos) {
         auto oldinfo = get(initialOutputs, outputName);
@@ -2702,7 +2702,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             worker.store.registerDrvOutput(thisRealisation);
         }
         if (wantedOutputs.contains(outputName))
-            builtOutputs.emplace(thisRealisation.id, thisRealisation);
+            builtOutputs.emplace(outputName, thisRealisation);
     }
 
     return builtOutputs;

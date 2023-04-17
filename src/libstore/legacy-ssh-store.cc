@@ -287,19 +287,18 @@ public:
 
         conn->to.flush();
 
-        BuildResult status {
-            .path = DerivedPath::Built {
-                .drvPath = drvPath,
-                .outputs = OutputsSpec::All { },
-            },
-        };
+        BuildResult status;
         status.status = (BuildResult::Status) readInt(conn->from);
         conn->from >> status.errorMsg;
 
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
             conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 6) {
-            status.builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
+            auto builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
+            for (auto && [output, realisation] : builtOutputs)
+                status.builtOutputs.insert_or_assign(
+                    std::move(output.outputName),
+                    std::move(realisation));
         }
         return status;
     }
@@ -330,7 +329,7 @@ public:
 
         conn->to.flush();
 
-        BuildResult result { .path = DerivedPath::Opaque { StorePath::dummy } };
+        BuildResult result;
         result.status = (BuildResult::Status) readInt(conn->from);
 
         if (!result.success()) {
