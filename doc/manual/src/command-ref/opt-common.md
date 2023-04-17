@@ -203,7 +203,7 @@ Most Nix commands accept the following command-line options:
     instead.
 
   - <span id="opt-I">[`-I`](#opt-I)</span> *path*\
-    Add a path to the Nix expression search path.
+    Add an entry to the [Nix expression search path](@docroot@/command-ref/conf-file.md#conf-nix-path).
     This option may be given multiple times.
     Paths added through `-I` take precedence over [`NIX_PATH`](./env-common.md#env-NIX_PATH).
 
