@@ -156,7 +156,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
                     throw Error("NAR hash is now mandatory");
                 info->narHash = Hash::parseAnyPrefixed(s);
             }
-            info->ca = parseContentAddressOpt(readString(conn->from));
+            info->ca = ContentAddress::parseOpt(readString(conn->from));
             info->sigs = readStrings<StringSet>(conn->from);
 
             auto s = readString(conn->from);

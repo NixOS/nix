@@ -710,6 +710,7 @@ void canonicalisePathMetaData(const Path & path,
     canonicalisePathMetaData(path, uidRange, inodesSeen);
 }
 
+
 void LocalStore::registerDrvOutput(const Realisation & info, CheckSigsFlag checkSigs)
 {
     experimentalFeatureSettings.require(Xp::CaDerivations);
@@ -888,7 +889,7 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
     if (s) info->sigs = tokenizeString<StringSet>(s, " ");
 
     s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 7);
-    if (s) info->ca = parseContentAddressOpt(s);
+    if (s) info->ca = ContentAddress::parseOpt(s);
 
     /* Get the references. */
     auto useQueryReferences(state.stmts->QueryReferences.use()(info->id));
@@ -1221,7 +1222,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                     printStorePath(info.path), info.narSize, hashResult.second);
 
             if (info.ca) {
-                if (auto foHash = std::get_if<FixedOutputHash>(&*info.ca)) {
+                if (auto foHash = std::get_if<FixedOutputHash>(&info.ca->raw)) {
                     auto actualFoHash = hashCAPath(
                         foHash->method,
                         foHash->hash.type,
@@ -1234,7 +1235,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                             actualFoHash.hash.to_string(Base32, true));
                     }
                 }
-                if (auto textHash = std::get_if<TextHash>(&*info.ca)) {
+                if (auto textHash = std::get_if<TextHash>(&info.ca->raw)) {
                     auto actualTextHash = hashString(htSHA256, readFile(realPath));
                     if (textHash->hash != actualTextHash) {
                         throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
@@ -1320,7 +1321,19 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
 
     auto [hash, size] = hashSink->finish();
 
-    auto dstPath = makeFixedOutputPath(method, hash, name, references);
+    ContentAddressWithReferences desc = FixedOutputInfo {
+        .hash = {
+            .method = method,
+            .hash = hash,
+        },
+        .references = {
+            .others = references,
+            // caller is not capable of creating a self-reference, because this is content-addressed without modulus
+            .self = false,
+        },
+    };
+
+    auto dstPath = makeFixedOutputPathFromCA(name, desc);
 
     addTempRoot(dstPath);
 
@@ -1340,7 +1353,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
             autoGC();
 
             if (inMemory) {
-                 StringSource dumpSource { dump };
+                StringSource dumpSource { dump };
                 /* Restore from the NAR in memory. */
                 if (method == FileIngestionMethod::Recursive)
                     restorePath(realPath, dumpSource);
@@ -1364,10 +1377,13 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
 
             optimisePath(realPath, repair);
 
-            ValidPathInfo info { dstPath, narHash.first };
+            ValidPathInfo info {
+                *this,
+                name,
+                std::move(desc),
+                narHash.first
+            };
             info.narSize = narHash.second;
-            info.references = references;
-            info.ca = FixedOutputHash { .method = method, .hash = hash };
             registerValidPath(info);
         }
 
@@ -1384,7 +1400,10 @@ StorePath LocalStore::addTextToStore(
     const StorePathSet & references, RepairFlag repair)
 {
     auto hash = hashString(htSHA256, s);
-    auto dstPath = makeTextPath(name, hash, references);
+    auto dstPath = makeTextPath(name, TextInfo {
+        { .hash = hash },
+        references,
+    });
 
     addTempRoot(dstPath);
 

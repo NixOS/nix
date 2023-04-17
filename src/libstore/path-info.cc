@@ -21,25 +21,45 @@ void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
     sigs.insert(secretKey.signDetached(fingerprint(store)));
 }
 
-
-bool ValidPathInfo::isContentAddressed(const Store & store) const
+std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithReferences() const
 {
-    if (! ca) return false;
+    if (! ca)
+        return std::nullopt;
 
-    auto caPath = std::visit(overloaded {
-        [&](const TextHash & th) {
-            return store.makeTextPath(path.name(), th.hash, references);
+    return std::visit(overloaded {
+        [&](const TextHash & th) -> ContentAddressWithReferences {
+            assert(references.count(path) == 0);
+            return TextInfo {
+                .hash = th,
+                .references = references,
+            };
         },
-        [&](const FixedOutputHash & fsh) {
+        [&](const FixedOutputHash & foh) -> ContentAddressWithReferences {
             auto refs = references;
             bool hasSelfReference = false;
             if (refs.count(path)) {
                 hasSelfReference = true;
                 refs.erase(path);
             }
-            return store.makeFixedOutputPath(fsh.method, fsh.hash, path.name(), refs, hasSelfReference);
-        }
-    }, *ca);
+            return FixedOutputInfo {
+                .hash = foh,
+                .references = {
+                    .others = std::move(refs),
+                    .self = hasSelfReference,
+                },
+            };
+        },
+    }, ca->raw);
+}
+
+bool ValidPathInfo::isContentAddressed(const Store & store) const
+{
+    auto fullCaOpt = contentAddressWithReferences();
+
+    if (! fullCaOpt)
+        return false;
+
+    auto caPath = store.makeFixedOutputPathFromCA(path.name(), *fullCaOpt);
 
     bool res = caPath == path;
 
@@ -77,6 +97,29 @@ Strings ValidPathInfo::shortRefs() const
 }
 
 
+ValidPathInfo::ValidPathInfo(
+    const Store & store,
+    std::string_view name,
+    ContentAddressWithReferences && ca,
+    Hash narHash)
+      : path(store.makeFixedOutputPathFromCA(name, ca))
+      , narHash(narHash)
+{
+    std::visit(overloaded {
+        [this](TextInfo && ti) {
+            this->references = std::move(ti.references);
+            this->ca = std::move((TextHash &&) ti);
+        },
+        [this](FixedOutputInfo && foi) {
+            this->references = std::move(foi.references.others);
+            if (foi.references.self)
+                this->references.insert(path);
+            this->ca = std::move((FixedOutputHash &&) foi);
+        },
+    }, std::move(ca).raw);
+}
+
+
 ValidPathInfo ValidPathInfo::read(Source & source, const Store & store, unsigned int format)
 {
     return read(source, store, format, store.parseStorePath(readString(source)));
@@ -93,7 +136,7 @@ ValidPathInfo ValidPathInfo::read(Source & source, const Store & store, unsigned
     if (format >= 16) {
         source >> info.ultimate;
         info.sigs = readStrings<StringSet>(source);
-        info.ca = parseContentAddressOpt(readString(source));
+        info.ca = ContentAddress::parseOpt(readString(source));
     }
     return info;
 }

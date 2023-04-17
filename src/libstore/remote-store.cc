@@ -78,7 +78,7 @@ void write(const Store & store, Sink & out, const std::optional<TrustedFlag> & o
 
 ContentAddress read(const Store & store, Source & from, Phantom<ContentAddress> _)
 {
-    return parseContentAddress(readString(from));
+    return ContentAddress::parse(readString(from));
 }
 
 void write(const Store & store, Sink & out, const ContentAddress & ca)
@@ -168,7 +168,7 @@ void write(const Store & store, Sink & out, const std::optional<StorePath> & sto
 
 std::optional<ContentAddress> read(const Store & store, Source & from, Phantom<std::optional<ContentAddress>> _)
 {
-    return parseContentAddressOpt(readString(from));
+    return ContentAddress::parseOpt(readString(from));
 }
 
 void write(const Store & store, Sink & out, const std::optional<ContentAddress> & caOpt)
@@ -586,7 +586,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         conn->to
             << wopAddToStore
             << name
-            << renderContentAddressMethod(caMethod);
+            << caMethod.render();
         worker_proto::write(*this, conn->to, references);
         conn->to << repair;
 
@@ -644,7 +644,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
                 }
 
             }
-        }, caMethod);
+        }, caMethod.raw);
         auto path = parseStorePath(readString(conn->from));
         // Release our connection to prevent a deadlock in queryPathInfo().
         conn_.reset();

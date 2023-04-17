@@ -2395,27 +2395,26 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             }
         };
 
-        auto rewriteRefs = [&]() -> std::pair<bool, StorePathSet> {
+        auto rewriteRefs = [&]() -> StoreReferences {
             /* In the CA case, we need the rewritten refs to calculate the
                final path, therefore we look for a *non-rewritten
                self-reference, and use a bool rather try to solve the
                computationally intractable fixed point. */
-            std::pair<bool, StorePathSet> res {
-                false,
-                {},
+            StoreReferences res {
+                .self = false,
             };
             for (auto & r : references) {
                 auto name = r.name();
                 auto origHash = std::string { r.hashPart() };
                 if (r == *scratchPath) {
-                    res.first = true;
+                    res.self = true;
                 } else if (auto outputRewrite = get(outputRewrites, origHash)) {
                     std::string newRef = *outputRewrite;
                     newRef += '-';
                     newRef += name;
-                    res.second.insert(StorePath { newRef });
+                    res.others.insert(StorePath { newRef });
                 } else {
-                    res.second.insert(r);
+                    res.others.insert(r);
                 }
             }
             return res;
@@ -2448,18 +2447,22 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 break;
             }
             auto got = caSink.finish().first;
-            auto refs = rewriteRefs();
-
-            auto finalPath = worker.store.makeFixedOutputPath(
-                    outputHash.method,
-                    got,
-                    outputPathName(drv->name, outputName),
-                    refs.second,
-                    refs.first);
-            if (*scratchPath != finalPath) {
+            ValidPathInfo newInfo0 {
+                worker.store,
+                outputPathName(drv->name, outputName),
+                FixedOutputInfo {
+                    .hash = {
+                        .method = outputHash.method,
+                        .hash = got,
+                    },
+                    .references = rewriteRefs(),
+                },
+                Hash::dummy,
+            };
+            if (*scratchPath != newInfo0.path) {
                 // Also rewrite the output path
                 auto source = sinkToSource([&](Sink & nextSink) {
-                    RewritingSink rsink2(oldHashPart, std::string(finalPath.hashPart()), nextSink);
+                    RewritingSink rsink2(oldHashPart, std::string(newInfo0.path.hashPart()), nextSink);
                     dumpPath(actualPath, rsink2);
                     rsink2.flush();
                 });
@@ -2470,19 +2473,8 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             }
 
             HashResult narHashAndSize = hashPath(htSHA256, actualPath);
-            ValidPathInfo newInfo0 {
-                finalPath,
-                narHashAndSize.first,
-            };
-
+            newInfo0.narHash = narHashAndSize.first;
             newInfo0.narSize = narHashAndSize.second;
-            newInfo0.ca = FixedOutputHash {
-                .method = outputHash.method,
-                .hash = got,
-            };
-            newInfo0.references = refs.second;
-            if (refs.first)
-                newInfo0.references.insert(newInfo0.path);
 
             assert(newInfo0.ca);
             return newInfo0;
@@ -2504,8 +2496,8 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
                 auto refs = rewriteRefs();
-                newInfo0.references = refs.second;
-                if (refs.first)
+                newInfo0.references = std::move(refs.others);
+                if (refs.self)
                     newInfo0.references.insert(newInfo0.path);
                 return newInfo0;
             },
@@ -2519,7 +2511,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 /* Check wanted hash */
                 const Hash & wanted = dof.hash.hash;
                 assert(newInfo0.ca);
-                auto got = getContentAddressHash(*newInfo0.ca);
+                auto got = newInfo0.ca->getHash();
                 if (wanted != got) {
                     /* Throw an error after registering the path as
                        valid. */
