@@ -1415,6 +1415,9 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
 
     virtual void addBuildLog(const StorePath & path, std::string_view log) override
     { unsupported("addBuildLog"); }
+
+    std::optional<TrustedFlag> isTrustedClient() override
+    { return NotTrusted; }
 };
 
 
@@ -1467,7 +1470,7 @@ void LocalDerivationGoal::startDaemon()
                 FdSink to(remote.get());
                 try {
                     daemon::processConnection(store, from, to,
-                        daemon::NotTrusted, daemon::Recursive);
+                        NotTrusted, daemon::Recursive);
                     debug("terminated daemon connection");
                 } catch (SysError &) {
                     ignoreException();

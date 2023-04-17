@@ -1,5 +1,19 @@
 #pragma once
-///@file
+/**
+ * @file
+ *
+ * @brief This file defines two main structs/classes used in nix error handling.
+ *
+ * ErrorInfo provides a standard payload of error information, with conversion to string
+ * happening in the logger rather than at the call site.
+ *
+ * BaseError is the ancestor of nix specific exceptions (and Interrupted), and contains
+ * an ErrorInfo.
+ *
+ * ErrorInfo structs are sent to the logger as part of an exception, or directly with the
+ * logError or logWarning macros.
+ * See libutil/tests/logging.cc for usage examples.
+ */
 
 #include "suggestions.hh"
 #include "ref.hh"
@@ -27,22 +41,6 @@
 
 namespace nix {
 
-/*
-
-   This file defines two main structs/classes used in nix error handling.
-
-   ErrorInfo provides a standard payload of error information, with conversion to string
-   happening in the logger rather than at the call site.
-
-   BaseError is the ancestor of nix specific exceptions (and Interrupted), and contains
-   an ErrorInfo.
-
-   ErrorInfo structs are sent to the logger as part of an exception, or directly with the
-   logError or logWarning macros.
-
-   See libutil/tests/logging.cc for usage examples.
-
- */
 
 typedef enum {
     lvlError = 0,

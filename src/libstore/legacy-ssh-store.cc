@@ -342,6 +342,9 @@ public:
     void ensurePath(const StorePath & path) override
     { unsupported("ensurePath"); }
 
+    virtual ref<FSAccessor> getFSAccessor() override
+    { unsupported("getFSAccessor"); }
+
     void computeFSClosure(const StorePathSet & paths,
         StorePathSet & out, bool flipDirection = false,
         bool includeOutputs = false, bool includeDerivers = false) override
@@ -387,6 +390,15 @@ public:
     {
         auto conn(connections->get());
         return conn->remoteVersion;
+    }
+
+    /**
+     * The legacy ssh protocol doesn't support checking for trusted-user.
+     * Try using ssh-ng:// instead if you want to know.
+     */
+    std::optional<TrustedFlag> isTrustedClient() override
+    {
+        return std::nullopt;
     }
 
     void queryRealisationUncached(const DrvOutput &,

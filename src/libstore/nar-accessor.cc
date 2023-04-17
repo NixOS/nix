@@ -275,6 +275,7 @@ json listNar(ref<FSAccessor> accessor, const Path & path, bool recurse)
         obj["type"] = "symlink";
         obj["target"] = accessor->readLink(path);
         break;
+    case FSAccessor::Type::tMissing:
     default:
         throw Error("path '%s' does not exist in NAR", path);
     }

@@ -13,7 +13,9 @@ namespace nix {
 class EvalState;
 struct Value;
 
-/* Map one attribute name to its value. */
+/**
+ * Map one attribute name to its value.
+ */
 struct Attr
 {
     /* the placement of `name` and `pos` in this struct is important.
@@ -37,10 +39,12 @@ static_assert(sizeof(Attr) == 2 * sizeof(uint32_t) + sizeof(Value *),
     "avoid introducing any padding into Attr if at all possible, and do not "
     "introduce new fields that need not be present for almost every instance.");
 
-/* Bindings contains all the attributes of an attribute set. It is defined
-   by its size and its capacity, the capacity being the number of Attr
-   elements allocated after this structure, while the size corresponds to
-   the number of elements already inserted in this structure. */
+/**
+ * Bindings contains all the attributes of an attribute set. It is defined
+ * by its size and its capacity, the capacity being the number of Attr
+ * elements allocated after this structure, while the size corresponds to
+ * the number of elements already inserted in this structure.
+ */
 class Bindings
 {
 public:
@@ -95,7 +99,9 @@ public:
 
     size_t capacity() { return capacity_; }
 
-    /* Returns the attributes in lexicographically sorted order. */
+    /**
+     * Returns the attributes in lexicographically sorted order.
+     */
     std::vector<const Attr *> lexicographicOrder(const SymbolTable & symbols) const
     {
         std::vector<const Attr *> res;
@@ -112,9 +118,11 @@ public:
     friend class EvalState;
 };
 
-/* A wrapper around Bindings that ensures that its always in sorted
-   order at the end. The only way to consume a BindingsBuilder is to
-   call finish(), which sorts the bindings. */
+/**
+ * A wrapper around Bindings that ensures that its always in sorted
+ * order at the end. The only way to consume a BindingsBuilder is to
+ * call finish(), which sorts the bindings.
+ */
 class BindingsBuilder
 {
     Bindings * bindings;

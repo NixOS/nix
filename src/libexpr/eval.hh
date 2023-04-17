@@ -44,7 +44,10 @@ struct PrimOp
 struct Env
 {
     Env * up;
-    unsigned short prevWith:14; // nr of levels up to next `with' environment
+    /**
+     * Number of of levels up to next `with` environment
+     */
+    unsigned short prevWith:14;
     enum { Plain = 0, HasWithExpr, HasWithAttrs } type:2;
     Value * values[0];
 };
@@ -66,7 +69,9 @@ typedef std::pair<std::string, std::string> SearchPathElem;
 typedef std::list<SearchPathElem> SearchPath;
 
 
-/* Initialise the Boehm GC, if applicable. */
+/**
+ * Initialise the Boehm GC, if applicable.
+ */
 void initGC();
 
 
@@ -138,28 +143,38 @@ public:
         sPrefix,
         sOutputSpecified;
 
-    /* If set, force copying files to the Nix store even if they
-       already exist there. */
+    /**
+     * If set, force copying files to the Nix store even if they
+     * already exist there.
+     */
     RepairFlag repair;
 
-    /* The allowed filesystem paths in restricted or pure evaluation
-       mode. */
+    /**
+     * The allowed filesystem paths in restricted or pure evaluation
+     * mode.
+     */
     std::optional<PathSet> allowedPaths;
 
     Bindings emptyBindings;
 
     const SourcePath derivationInternal;
 
-    /* Store used to materialise .drv files. */
+    /**
+     * Store used to materialise .drv files.
+     */
     const ref<Store> store;
 
-    /* Store used to build stuff. */
+    /**
+     * Store used to build stuff.
+     */
     const ref<Store> buildStore;
 
     RootValue vCallFlake = nullptr;
     RootValue vImportedDrvToDerivation = nullptr;
 
-    /* Debugger */
+    /**
+     * Debugger
+     */
     void (* debugRepl)(ref<EvalState> es, const ValMap & extraEnv);
     bool debugStop;
     bool debugQuit;
@@ -218,7 +233,9 @@ private:
        paths. */
     std::map<SourcePath, StorePath> srcToStore;
 
-    /* A cache from path names to parse trees. */
+    /**
+     * A cache from path names to parse trees.
+     */
 #if HAVE_BOEHMGC
     typedef std::map<SourcePath, Expr *, std::less<SourcePath>, traceable_allocator<std::pair<const SourcePath, Expr *>>> FileParseCache;
 #else
@@ -226,7 +243,9 @@ private:
 #endif
     FileParseCache fileParseCache;
 
-    /* A cache from path names to values. */
+    /**
+     * A cache from path names to values.
+     */
 #if HAVE_BOEHMGC
     typedef std::map<SourcePath, Value, std::less<SourcePath>, traceable_allocator<std::pair<const SourcePath, Value>>> FileEvalCache;
 #else
@@ -238,17 +257,25 @@ private:
 
     std::map<std::string, std::pair<bool, std::string>> searchPathResolved;
 
-    /* Cache used by checkSourcePath(). */
+    /**
+     * Cache used by checkSourcePath().
+     */
     std::unordered_map<Path, SourcePath> resolvedPaths;
 
-    /* Cache used by prim_match(). */
+    /**
+     * Cache used by prim_match().
+     */
     std::shared_ptr<RegexCache> regexCache;
 
 #if HAVE_BOEHMGC
-    /* Allocation cache for GC'd Value objects. */
+    /**
+     * Allocation cache for GC'd Value objects.
+     */
     std::shared_ptr<void *> valueAllocCache;
 
-    /* Allocation cache for size-1 Env objects. */
+    /**
+     * Allocation cache for size-1 Env objects.
+     */
     std::shared_ptr<void *> env1AllocCache;
 #endif
 
@@ -270,47 +297,65 @@ public:
      */
     SourcePath rootPath(CanonPath path);
 
-    /* Allow access to a path. */
+    /**
+     * Allow access to a path.
+     */
     void allowPath(const Path & path);
 
-    /* Allow access to a store path. Note that this gets remapped to
-       the real store path if `store` is a chroot store. */
+    /**
+     * Allow access to a store path. Note that this gets remapped to
+     * the real store path if `store` is a chroot store.
+     */
     void allowPath(const StorePath & storePath);
 
-    /* Allow access to a store path and return it as a string. */
+    /**
+     * Allow access to a store path and return it as a string.
+     */
     void allowAndSetStorePathString(const StorePath & storePath, Value & v);
 
-    /* Check whether access to a path is allowed and throw an error if
-       not. Otherwise return the canonicalised path. */
+    /**
+     * Check whether access to a path is allowed and throw an error if
+     * not. Otherwise return the canonicalised path.
+     */
     SourcePath checkSourcePath(const SourcePath & path);
 
     void checkURI(const std::string & uri);
 
-    /* When using a diverted store and 'path' is in the Nix store, map
-       'path' to the diverted location (e.g. /nix/store/foo is mapped
-       to /home/alice/my-nix/nix/store/foo). However, this is only
-       done if the context is not empty, since otherwise we're
-       probably trying to read from the actual /nix/store. This is
-       intended to distinguish between import-from-derivation and
-       sources stored in the actual /nix/store. */
+    /**
+     * When using a diverted store and 'path' is in the Nix store, map
+     * 'path' to the diverted location (e.g. /nix/store/foo is mapped
+     * to /home/alice/my-nix/nix/store/foo). However, this is only
+     * done if the context is not empty, since otherwise we're
+     * probably trying to read from the actual /nix/store. This is
+     * intended to distinguish between import-from-derivation and
+     * sources stored in the actual /nix/store.
+     */
     Path toRealPath(const Path & path, const PathSet & context);
 
-    /* Parse a Nix expression from the specified file. */
+    /**
+     * Parse a Nix expression from the specified file.
+     */
     Expr * parseExprFromFile(const SourcePath & path);
     Expr * parseExprFromFile(const SourcePath & path, std::shared_ptr<StaticEnv> & staticEnv);
 
-    /* Parse a Nix expression from the specified string. */
+    /**
+     * Parse a Nix expression from the specified string.
+     */
     Expr * parseExprFromString(std::string s, const SourcePath & basePath, std::shared_ptr<StaticEnv> & staticEnv);
     Expr * parseExprFromString(std::string s, const SourcePath & basePath);
 
     Expr * parseStdin();
 
-    /* Evaluate an expression read from the given file to normal
-       form. Optionally enforce that the top-level expression is
-       trivial (i.e. doesn't require arbitrary computation). */
+    /**
+     * Evaluate an expression read from the given file to normal
+     * form. Optionally enforce that the top-level expression is
+     * trivial (i.e. doesn't require arbitrary computation).
+     */
     void evalFile(const SourcePath & path, Value & v, bool mustBeTrivial = false);
 
-    /* Like `evalFile`, but with an already parsed expression. */
+    /**
+     * Like `evalFile`, but with an already parsed expression.
+     */
     void cacheFile(
         const SourcePath & path,
         const SourcePath & resolvedPath,
@@ -320,37 +365,52 @@ public:
 
     void resetFileCache();
 
-    /* Look up a file in the search path. */
+    /**
+     * Look up a file in the search path.
+     */
     SourcePath findFile(const std::string_view path);
     SourcePath findFile(SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
 
-    /* If the specified search path element is a URI, download it. */
+    /**
+     * If the specified search path element is a URI, download it.
+     */
     std::pair<bool, std::string> resolveSearchPathElem(const SearchPathElem & elem);
 
-    /* Evaluate an expression to normal form, storing the result in
-       value `v'. */
+    /**
+     * Evaluate an expression to normal form
+     *
+     * @param [out] v The resulting is stored here.
+     */
     void eval(Expr * e, Value & v);
 
-    /* Evaluation the expression, then verify that it has the expected
-       type. */
+    /**
+     * Evaluation the expression, then verify that it has the expected
+     * type.
+     */
     inline bool evalBool(Env & env, Expr * e);
     inline bool evalBool(Env & env, Expr * e, const PosIdx pos, std::string_view errorCtx);
     inline void evalAttrs(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx);
 
-    /* If `v' is a thunk, enter it and overwrite `v' with the result
-       of the evaluation of the thunk.  If `v' is a delayed function
-       application, call the function and overwrite `v' with the
-       result.  Otherwise, this is a no-op. */
+    /**
+     * If `v` is a thunk, enter it and overwrite `v` with the result
+     * of the evaluation of the thunk.  If `v` is a delayed function
+     * application, call the function and overwrite `v` with the
+     * result.  Otherwise, this is a no-op.
+     */
     inline void forceValue(Value & v, const PosIdx pos);
 
     template <typename Callable>
     inline void forceValue(Value & v, Callable getPos);
 
-    /* Force a value, then recursively force list elements and
-       attributes. */
+    /**
+     * Force a value, then recursively force list elements and
+     * attributes.
+     */
     void forceValueDeep(Value & v);
 
-    /* Force `v', and then verify that it has the expected type. */
+    /**
+     * Force `v`, and then verify that it has the expected type.
+     */
     NixInt forceInt(Value & v, const PosIdx pos, std::string_view errorCtx);
     NixFloat forceFloat(Value & v, const PosIdx pos, std::string_view errorCtx);
     bool forceBool(Value & v, const PosIdx pos, std::string_view errorCtx);
@@ -361,7 +421,10 @@ public:
     inline void forceAttrs(Value & v, Callable getPos, std::string_view errorCtx);
 
     inline void forceList(Value & v, const PosIdx pos, std::string_view errorCtx);
-    void forceFunction(Value & v, const PosIdx pos, std::string_view errorCtx); // either lambda or primop
+    /**
+     * @param v either lambda or primop
+     */
+    void forceFunction(Value & v, const PosIdx pos, std::string_view errorCtx);
     std::string_view forceString(Value & v, const PosIdx pos, std::string_view errorCtx);
     std::string_view forceString(Value & v, PathSet & context, const PosIdx pos, std::string_view errorCtx);
     std::string_view forceStringNoCtx(Value & v, const PosIdx pos, std::string_view errorCtx);
@@ -372,17 +435,23 @@ public:
     void addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2, bool frame = false) const;
 
 public:
-    /* Return true iff the value `v' denotes a derivation (i.e. a
-       set with attribute `type = "derivation"'). */
+    /**
+     * @return true iff the value `v` denotes a derivation (i.e. a
+     * set with attribute `type = "derivation"`).
+     */
     bool isDerivation(Value & v);
 
     std::optional<std::string> tryAttrsToString(const PosIdx pos, Value & v,
         PathSet & context, bool coerceMore = false, bool copyToStore = true);
 
-    /* String coercion.  Converts strings, paths and derivations to a
-       string.  If `coerceMore' is set, also converts nulls, integers,
-       booleans and lists to a string.  If `copyToStore' is set,
-       referenced paths are copied to the Nix store as a side effect. */
+    /**
+     * String coercion.
+     *
+     * Converts strings, paths and derivations to a
+     * string.  If `coerceMore` is set, also converts nulls, integers,
+     * booleans and lists to a string.  If `copyToStore` is set,
+     * referenced paths are copied to the Nix store as a side effect.
+     */
     BackedStringView coerceToString(const PosIdx pos, Value & v, PathSet & context,
         std::string_view errorCtx,
         bool coerceMore = false, bool copyToStore = true,
@@ -390,21 +459,31 @@ public:
 
     StorePath copyPathToStore(PathSet & context, const SourcePath & path);
 
-    /* Path coercion.  Converts strings, paths and derivations to a
-       path.  The result is guaranteed to be a canonicalised, absolute
-       path.  Nothing is copied to the store. */
+    /**
+     * Path coercion.
+     *
+     * Converts strings, paths and derivations to a
+     * path.  The result is guaranteed to be a canonicalised, absolute
+     * path.  Nothing is copied to the store.
+     */
     SourcePath coerceToPath(const PosIdx pos, Value & v, PathSet & context, std::string_view errorCtx);
 
-    /* Like coerceToPath, but the result must be a store path. */
+    /**
+     * Like coerceToPath, but the result must be a store path.
+     */
     StorePath coerceToStorePath(const PosIdx pos, Value & v, PathSet & context, std::string_view errorCtx);
 
 public:
 
-    /* The base environment, containing the builtin functions and
-       values. */
+    /**
+     * The base environment, containing the builtin functions and
+     * values.
+     */
     Env & baseEnv;
 
-    /* The same, but used during parsing to resolve variables. */
+    /**
+     * The same, but used during parsing to resolve variables.
+     */
     std::shared_ptr<StaticEnv> staticBaseEnv; // !!! should be private
 
 private:
@@ -454,8 +533,10 @@ private:
 
 public:
 
-    /* Do a deep equality test between two values.  That is, list
-       elements and attributes are compared recursively. */
+    /**
+     * Do a deep equality test between two values.  That is, list
+     * elements and attributes are compared recursively.
+     */
     bool eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx);
 
     bool isFunctor(Value & fun);
@@ -469,11 +550,15 @@ public:
         callFunction(fun, 1, args, vRes, pos);
     }
 
-    /* Automatically call a function for which each argument has a
-       default value or has a binding in the `args' map. */
+    /**
+     * Automatically call a function for which each argument has a
+     * default value or has a binding in the `args` map.
+     */
     void autoCallFunction(Bindings & args, Value & fun, Value & res);
 
-    /* Allocation primitives. */
+    /**
+     * Allocation primitives.
+     */
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
 
@@ -493,10 +578,13 @@ public:
 
     void concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos, std::string_view errorCtx);
 
-    /* Print statistics. */
+    /**
+     * Print statistics.
+     */
     void printStats();
 
-    /* Realise the given context, and return a mapping from the placeholders
+    /**
+     * Realise the given context, and return a mapping from the placeholders
      * used to construct the associated value to their final store path
      */
     [[nodiscard]] StringMap realiseContext(const PathSet & context);
@@ -556,11 +644,15 @@ struct DebugTraceStacker {
     DebugTrace trace;
 };
 
-/* Return a string representing the type of the value `v'. */
+/**
+ * @return A string representing the type of the value `v`.
+ */
 std::string_view showType(ValueType type);
 std::string showType(const Value & v);
 
-/* If `path' refers to a directory, then append "/default.nix". */
+/**
+ * If `path` refers to a directory, then append "/default.nix".
+ */
 SourcePath resolveExprPath(const SourcePath & path);
 
 struct InvalidPathError : EvalError

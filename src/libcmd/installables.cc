@@ -103,6 +103,28 @@ MixFlakeOptions::MixFlakeOptions()
     });
 
     addFlag({
+        .longName = "reference-lock-file",
+        .description = "Read the given lock file instead of `flake.lock` within the top-level flake.",
+        .category = category,
+        .labels = {"flake-lock-path"},
+        .handler = {[&](std::string lockFilePath) {
+            lockFlags.referenceLockFilePath = lockFilePath;
+        }},
+        .completer = completePath
+    });
+
+    addFlag({
+        .longName = "output-lock-file",
+        .description = "Write the given lock file instead of `flake.lock` within the top-level flake.",
+        .category = category,
+        .labels = {"flake-lock-path"},
+        .handler = {[&](std::string lockFilePath) {
+            lockFlags.outputLockFilePath = lockFilePath;
+        }},
+        .completer = completePath
+    });
+
+    addFlag({
         .longName = "inputs-from",
         .description = "Use the inputs of the specified flake as registry entries.",
         .category = category,

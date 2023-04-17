@@ -72,30 +72,46 @@ public:
 
     Path nixPrefix;
 
-    /* The directory where we store sources and derived files. */
+    /**
+     * The directory where we store sources and derived files.
+     */
     Path nixStore;
 
     Path nixDataDir; /* !!! fix */
 
-    /* The directory where we log various operations. */
+    /**
+     * The directory where we log various operations.
+     */
     Path nixLogDir;
 
-    /* The directory where state is stored. */
+    /**
+     * The directory where state is stored.
+     */
     Path nixStateDir;
 
-    /* The directory where system configuration files are stored. */
+    /**
+     * The directory where system configuration files are stored.
+     */
     Path nixConfDir;
 
-    /* A list of user configuration files to load. */
+    /**
+     * A list of user configuration files to load.
+     */
     std::vector<Path> nixUserConfFiles;
 
-    /* The directory where the main programs are stored. */
+    /**
+     * The directory where the main programs are stored.
+     */
     Path nixBinDir;
 
-    /* The directory where the man pages are stored. */
+    /**
+     * The directory where the man pages are stored.
+     */
     Path nixManDir;
 
-    /* File name of the socket the daemon listens to.  */
+    /**
+     * File name of the socket the daemon listens to.
+     */
     Path nixDaemonSocketFile;
 
     Setting<std::string> storeUri{this, getEnv("NIX_REMOTE").value_or("auto"), "store",
@@ -121,7 +137,9 @@ public:
         )",
         {"build-fallback"}};
 
-    /* Whether to show build log output in real time. */
+    /**
+     * Whether to show build log output in real time.
+     */
     bool verboseBuild = true;
 
     Setting<size_t> logLines{this, 10, "log-lines",
@@ -157,8 +175,10 @@ public:
         )",
         {"build-cores"}, false};
 
-    /* Read-only mode.  Don't copy stuff to the store, don't change
-       the database. */
+    /**
+     * Read-only mode.  Don't copy stuff to the store, don't change
+     * the database.
+     */
     bool readOnlyMode = false;
 
     Setting<std::string> thisSystem{
@@ -308,16 +328,6 @@ public:
           users in `build-users-group`.
 
           UIDs are allocated starting at 872415232 (0x34000000) on Linux and 56930 on macOS.
-
-          > **Warning**
-          > This is an experimental feature.
-
-          To enable it, add the following to [`nix.conf`](#):
-
-          ```
-          extra-experimental-features = auto-allocate-uids
-          auto-allocate-uids = true
-          ```
         )"};
 
     Setting<uint32_t> startId{this,
@@ -347,16 +357,6 @@ public:
 
           Cgroups are required and enabled automatically for derivations
           that require the `uid-range` system feature.
-
-          > **Warning**
-          > This is an experimental feature.
-
-          To enable it, add the following to [`nix.conf`](#):
-
-          ```
-          extra-experimental-features = cgroups
-          use-cgroups = true
-          ```
         )"};
     #endif
 
@@ -458,7 +458,9 @@ public:
         )",
         {"env-keep-derivations"}};
 
-    /* Whether to lock the Nix client and worker to the same CPU. */
+    /**
+     * Whether to lock the Nix client and worker to the same CPU.
+     */
     bool lockCPU;
 
     Setting<SandboxMode> sandboxMode{
@@ -997,8 +999,10 @@ public:
 // FIXME: don't use a global variable.
 extern Settings settings;
 
-/* This should be called after settings are initialized, but before
-   anything else */
+/**
+ * This should be called after settings are initialized, but before
+ * anything else
+ */
 void initPlugins();
 
 void loadConfFile();
@@ -1008,12 +1012,16 @@ std::vector<Path> getUserConfigFiles();
 
 extern const std::string nixVersion;
 
-/* NB: This is not sufficient. You need to call initNix() */
+/**
+ * NB: This is not sufficient. You need to call initNix()
+ */
 void initLibStore();
 
-/* It's important to initialize before doing _anything_, which is why we
-   call upon the programmer to handle this correctly. However, we only add
-   this in a key locations, so as not to litter the code. */
+/**
+ * It's important to initialize before doing _anything_, which is why we
+ * call upon the programmer to handle this correctly. However, we only add
+ * this in a key locations, so as not to litter the code.
+ */
 void assertLibStoreInitialized();
 
 }

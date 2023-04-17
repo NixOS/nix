@@ -578,6 +578,9 @@ struct CompareValues
                 return v1->integer < v2->fpoint;
             if (v1->type() != v2->type())
                 state.error("cannot compare %s with %s", showType(*v1), showType(*v2)).debugThrow<EvalError>();
+            // Allow selecting a subset of enum values
+            #pragma GCC diagnostic push
+            #pragma GCC diagnostic ignored "-Wswitch-enum"
             switch (v1->type()) {
                 case nInt:
                     return v1->integer < v2->integer;
@@ -600,6 +603,7 @@ struct CompareValues
                     }
                 default:
                     state.error("cannot compare %s with %s; values of that type are incomparable", showType(*v1), showType(*v2)).debugThrow<EvalError>();
+            #pragma GCC diagnostic pop
             }
         } catch (Error & e) {
             if (!errorCtx.empty())
