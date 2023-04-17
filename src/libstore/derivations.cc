@@ -997,15 +997,13 @@ DerivationOutput DerivationOutput::fromJSON(
     for (const auto & [key, _] : json)
         keys.insert(key);
 
-    auto methodAlgo = [&]() -> std::pair<FileIngestionMethod, HashType> {
+    auto methodAlgo = [&]() -> std::pair<ContentAddressMethod, HashType> {
         std::string hashAlgo = json["hashAlgo"];
-        auto method = FileIngestionMethod::Flat;
-        if (hashAlgo.substr(0, 2) == "r:") {
-            method = FileIngestionMethod::Recursive;
-            hashAlgo = hashAlgo.substr(2);
-        }
-        auto hashType = parseHashType(hashAlgo);
-        return { method, hashType };
+        // remaining to parse, will be mutated by parsers
+        std::string_view s = hashAlgo;
+        ContentAddressMethod method = ContentAddressMethod::parsePrefix(s);
+        auto hashType = parseHashType(s);
+        return { std::move(method), std::move(hashType) };
     };
 
     if (keys == (std::set<std::string_view> { "path" })) {
@@ -1018,7 +1016,7 @@ DerivationOutput DerivationOutput::fromJSON(
         auto [method, hashType] = methodAlgo();
         auto dof = DerivationOutput::CAFixed {
             .ca = ContentAddressWithReferences::fromParts(
-                method,
+                std::move(method),
                 Hash::parseNonSRIUnprefixed((std::string) json["hash"], hashType),
                 {}),
         };
@@ -1030,8 +1028,8 @@ DerivationOutput DerivationOutput::fromJSON(
     else if (keys == (std::set<std::string_view> { "hashAlgo" })) {
         auto [method, hashType] = methodAlgo();
         return DerivationOutput::CAFloating {
-            .method = method,
-            .hashType = hashType,
+            .method = std::move(method),
+            .hashType = std::move(hashType),
         };
     }
 
@@ -1042,7 +1040,7 @@ DerivationOutput DerivationOutput::fromJSON(
     else if (keys == (std::set<std::string_view> { "hashAlgo", "impure" })) {
         auto [method, hashType] = methodAlgo();
         return DerivationOutput::Impure {
-            .method = method,
+            .method = std::move(method),
             .hashType = hashType,
         };
     }
