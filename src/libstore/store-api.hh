@@ -109,11 +109,26 @@ struct StoreConfig : public Config
 
     virtual ~StoreConfig() { }
 
+    /**
+     * The name of this type of store.
+     */
     virtual const std::string name() = 0;
 
+    /**
+     * Documentation for this type of store.
+     */
     virtual std::string doc()
     {
         return "";
+    }
+
+    /**
+     * An experimental feature this type store is gated, if it is to be
+     * experimental.
+     */
+    virtual std::optional<ExperimentalFeature> experimentalFeature() const
+    {
+        return std::nullopt;
     }
 
     const PathSetting storeDir_{this, settings.nixStore,
