@@ -290,9 +290,30 @@ connected:
         auto drv = store->readDerivation(*drvPath);
 
         std::optional<BuildResult> optResult;
+
+        // Let's break this down
+        //
+        // ### Trust part
+        //
+        // ```
+        // std::optional trust = sshStore->isTrustedClient(); (!trust || *trust)
+        // ```
+        //
         // If we don't know whether we are trusted (e.g. `ssh://`
-        // stores), we assume we are. This is neccessary for backwards
+        // stores), we assume we are. This is necessary for backwards
         // compat.
+        //
+        // ### Content-addressing part
+        //
+        // ```
+        // ...trustCond... || drv.type().isCA()
+        // ```
+        //
+        // See the very large comment in `case wopBuildDerivation:` in
+        // `src/libstore/daemon.cc` that explains the trust model here.
+        //
+        // This condition mirrors that: that code enforces the "rules";
+        // we do the best we can given those "rules".
         if (std::optional trust = sshStore->isTrustedClient(); (!trust || *trust) || drv.type().isCA()) {
             // Hijack the inputs paths of the derivation to include all
             // the paths that come from the `inputDrvs` set. We don’t do
