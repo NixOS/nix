@@ -215,8 +215,11 @@ protected:
 
     virtual void set(const std::string & value, bool append = false) = 0;
 
-    virtual bool isAppendable()
-    { return false; }
+    /**
+     * Whether the type is appendable; i.e. whether the `append`
+     * parameter to `set()` is allowed to be `true`.
+     */
+    virtual bool isAppendable() = 0;
 
     virtual std::string to_string() const = 0;
 
@@ -240,6 +243,23 @@ protected:
     T value;
     const T defaultValue;
     const bool documentDefault;
+
+    /**
+     * Parse the string into a `T`.
+     *
+     * Used by `set()`.
+     */
+    virtual T parse(const std::string & str) const;
+
+    /**
+     * Append or overwrite `value` with `newValue`.
+     *
+     * Some types to do not support appending in which case `append`
+     * should never be passed. The default handles this case.
+     *
+     * @param append Whether to append or overwrite.
+     */
+    virtual void appendOrSet(T && newValue, bool append);
 
 public:
 
@@ -268,9 +288,25 @@ public:
     template<typename U>
     void setDefault(const U & v) { if (!overridden) value = v; }
 
-    void set(const std::string & str, bool append = false) override;
+    /**
+     * Require any experimental feature the setting depends on
+     *
+     * Uses `parse()` to get the value from `str`, and `appendOrSet()`
+     * to set it.
+     */
+    void set(const std::string & str, bool append = false) override final;
 
-    bool isAppendable() override;
+    /**
+     * C++ trick; This is template-specialized to compile-time indicate whether
+     * the type is appendable.
+     */
+    struct trait;
+
+    /**
+     * Always defined based on the C++ magic
+     * with `trait` above.
+     */
+    bool isAppendable() override final;
 
     virtual void override(const T & v)
     {
@@ -336,7 +372,7 @@ public:
         options->addSetting(this);
     }
 
-    void set(const std::string & str, bool append = false) override;
+    Path parse(const std::string & str) const override;
 
     Path operator +(const char * p) const { return value + p; }
 
