@@ -1067,6 +1067,8 @@ void processConnection(
 
             opCount++;
 
+            debug("performing daemon worker op: %d", op);
+
             try {
                 performOp(tunnelLogger, store, trusted, recursive, clientVersion, from, to, op);
             } catch (Error & e) {
