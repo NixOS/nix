@@ -17,7 +17,6 @@ class Pid;
 struct FdSink;
 struct FdSource;
 template<typename T> class Pool;
-struct ConnectionHandle;
 
 struct RemoteStoreConfig : virtual StoreConfig
 {
@@ -182,6 +181,8 @@ protected:
 
     void setOptions() override;
 
+    struct ConnectionHandle;
+
     ConnectionHandle getConnection();
 
     friend struct ConnectionHandle;
@@ -198,6 +199,5 @@ private:
         const std::vector<DerivedPath> & paths,
         std::shared_ptr<Store> evalStore);
 };
-
 
 }
