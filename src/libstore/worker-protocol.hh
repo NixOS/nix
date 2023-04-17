@@ -9,7 +9,7 @@ namespace nix {
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-#define PROTOCOL_VERSION (1 << 8 | 35)
+#define PROTOCOL_VERSION (1 << 8 | 36)
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
@@ -161,6 +161,7 @@ enum struct WorkerProto::Op : uint64_t
     AddMultipleToStore = 44,
     AddBuildLog = 45,
     BuildPathsWithResults = 46,
+    AddPermRoot = 47,
 };
 
 /**
