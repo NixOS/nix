@@ -12,7 +12,7 @@ struct ExperimentalFeatureDetails
     std::string_view description;
 };
 
-constexpr std::array<ExperimentalFeatureDetails, 11> xpFeatureDetails = {{
+constexpr std::array<ExperimentalFeatureDetails, 12> xpFeatureDetails = {{
     {
         .tag = Xp::CaDerivations,
         .name = "ca-derivations",
@@ -187,6 +187,16 @@ constexpr std::array<ExperimentalFeatureDetails, 11> xpFeatureDetails = {{
             Allow the use of the [`unsafeDiscardReferences`](@docroot@/language/advanced-attributes.html#adv-attr-unsafeDiscardReferences) attribute in derivations
             that use [structured attributes](@docroot@/language/advanced-attributes.html#adv-attr-structuredAttrs). This disables scanning of outputs for
             runtime dependencies.
+        )",
+    },
+    {
+        .tag = Xp::DaemonTrustOverride,
+        .name = "daemon-trust-override",
+        .description = R"(
+            Allow forcing trusting or not trusting clients with
+            `nix-daemon`. This is useful for testing, but possibly also
+            useful for various experiments with `nix-daemon --stdio`
+            networking.
         )",
     },
 }};
