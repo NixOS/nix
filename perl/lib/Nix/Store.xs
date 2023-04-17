@@ -27,8 +27,6 @@ static ref<Store> store()
     if (!_store) {
         try {
             initLibStore();
-            loadConfFile();
-            settings.lockCPU = false;
             _store = openStore();
         } catch (Error & e) {
             croak("%s", e.what());

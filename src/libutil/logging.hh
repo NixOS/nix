@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "types.hh"
 #include "error.hh"
@@ -71,6 +72,9 @@ public:
     virtual ~Logger() { }
 
     virtual void stop() { };
+
+    virtual void pause() { };
+    virtual void resume() { };
 
     // Whether the logger prints the whole build log
     virtual bool isVerbose() { return false; }
@@ -179,12 +183,17 @@ bool handleJSONLogMessage(const std::string & msg,
     const Activity & act, std::map<ActivityId, Activity> & activities,
     bool trusted);
 
-extern Verbosity verbosity; /* suppress msgs > this */
+/**
+ * suppress msgs > this
+ */
+extern Verbosity verbosity;
 
-/* Print a message with the standard ErrorInfo format.
-   In general, use these 'log' macros for reporting problems that may require user
-   intervention or that need more explanation.  Use the 'print' macros for more
-   lightweight status messages. */
+/**
+ * Print a message with the standard ErrorInfo format.
+ * In general, use these 'log' macros for reporting problems that may require user
+ * intervention or that need more explanation.  Use the 'print' macros for more
+ * lightweight status messages.
+ */
 #define logErrorInfo(level, errorInfo...) \
     do { \
         if ((level) <= nix::verbosity) {     \
@@ -195,9 +204,11 @@ extern Verbosity verbosity; /* suppress msgs > this */
 #define logError(errorInfo...) logErrorInfo(lvlError, errorInfo)
 #define logWarning(errorInfo...) logErrorInfo(lvlWarn, errorInfo)
 
-/* Print a string message if the current log level is at least the specified
-   level. Note that this has to be implemented as a macro to ensure that the
-   arguments are evaluated lazily. */
+/**
+ * Print a string message if the current log level is at least the specified
+ * level. Note that this has to be implemented as a macro to ensure that the
+ * arguments are evaluated lazily.
+ */
 #define printMsgUsing(loggerParam, level, args...) \
     do { \
         auto __lvl = level; \
@@ -214,7 +225,9 @@ extern Verbosity verbosity; /* suppress msgs > this */
 #define debug(args...) printMsg(lvlDebug, args)
 #define vomit(args...) printMsg(lvlVomit, args)
 
-/* if verbosity >= lvlWarn, print a message with a yellow 'warning:' prefix. */
+/**
+ * if verbosity >= lvlWarn, print a message with a yellow 'warning:' prefix.
+ */
 template<typename... Args>
 inline void warn(const std::string & fs, const Args & ... args)
 {

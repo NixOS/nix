@@ -40,6 +40,7 @@ extern "C" {
 #include "markdown.hh"
 #include "local-fs-store.hh"
 #include "progress-bar.hh"
+#include "print.hh"
 
 #if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
@@ -252,7 +253,9 @@ void NixRepl::mainLoop()
     el_hist_size = 1000;
 #endif
     read_history(historyFile.c_str());
+    auto oldRepl = curRepl;
     curRepl = this;
+    Finally restoreRepl([&] { curRepl = oldRepl; });
 #ifndef READLINE
     rl_set_complete_func(completionCallback);
     rl_set_list_possib_func(listPossibleCallback);
@@ -423,6 +426,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
 }
 
 
+// FIXME: DRY and match or use the parser
 static bool isVarName(std::string_view s)
 {
     if (s.size() == 0) return false;
@@ -892,17 +896,6 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 }
 
 
-std::ostream & printStringValue(std::ostream & str, const char * string) {
-    str << "\"";
-    for (const char * i = string; *i; i++)
-        if (*i == '\"' || *i == '\\') str << "\\" << *i;
-        else if (*i == '\n') str << "\\n";
-        else if (*i == '\r') str << "\\r";
-        else if (*i == '\t') str << "\\t";
-        else str << *i;
-    str << "\"";
-    return str;
-}
 
 
 // FIXME: lot of cut&paste from Nix's eval.cc.
@@ -920,12 +913,14 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     case nBool:
-        str << ANSI_CYAN << (v.boolean ? "true" : "false") << ANSI_NORMAL;
+        str << ANSI_CYAN;
+        printLiteralBool(str, v.boolean);
+        str << ANSI_NORMAL;
         break;
 
     case nString:
         str << ANSI_WARNING;
-        printStringValue(str, v.string.s);
+        printLiteralString(str, v.string.s);
         str << ANSI_NORMAL;
         break;
 
@@ -962,10 +957,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                 sorted.emplace(state->symbols[i.name], i.value);
 
             for (auto & i : sorted) {
-                if (isVarName(i.first))
-                    str << i.first;
-                else
-                    printStringValue(str, i.first.c_str());
+                printAttributeName(str, i.first);
                 str << " = ";
                 if (seen.count(i.second))
                     str << "«repeated»";
@@ -1024,6 +1016,8 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         str << v.fpoint;
         break;
 
+    case nThunk:
+    case nExternal:
     default:
         str << ANSI_RED "«unknown»" ANSI_NORMAL;
         break;

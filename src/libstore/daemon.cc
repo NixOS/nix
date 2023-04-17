@@ -1036,6 +1036,15 @@ void processConnection(
     if (GET_PROTOCOL_MINOR(clientVersion) >= 33)
         to << nixVersion;
 
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 35) {
+        // We and the underlying store both need to trust the client for
+        // it to be trusted.
+        auto temp = trusted
+            ? store->isTrustedClient()
+            : std::optional { NotTrusted };
+        worker_proto::write(*store, to, temp);
+    }
+
     /* Send startup error messages to the client. */
     tunnelLogger->startWork();
 

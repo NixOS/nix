@@ -239,14 +239,11 @@ SQLiteTxn::~SQLiteTxn()
     }
 }
 
-void handleSQLiteBusy(const SQLiteBusy & e)
+void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning)
 {
-    static std::atomic<time_t> lastWarned{0};
-
     time_t now = time(0);
-
-    if (now > lastWarned + 10) {
-        lastWarned = now;
+    if (now > nextWarning) {
+        nextWarning = now + 10;
         logWarning({
             .msg = hintfmt(e.what())
         });

@@ -315,6 +315,7 @@ StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, std::string_view n
                 },
                 .references = {
                     .others = references,
+                    // caller is not capable of creating a self-reference, because this is content-addressed without modulus
                     .self = false,
                 },
             },
@@ -433,6 +434,7 @@ StorePath BinaryCacheStore::addToStore(
                 },
                 .references = {
                     .others = references,
+                    // caller is not capable of creating a self-reference, because this is content-addressed without modulus
                     .self = false,
                 },
             },

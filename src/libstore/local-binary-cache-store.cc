@@ -95,6 +95,10 @@ protected:
         return paths;
     }
 
+    std::optional<TrustedFlag> isTrustedClient() override
+    {
+        return Trusted;
+    }
 };
 
 void LocalBinaryCacheStore::init()

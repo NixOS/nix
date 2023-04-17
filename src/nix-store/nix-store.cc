@@ -283,17 +283,17 @@ static void printTree(const StorePath & path,
 static void opQuery(Strings opFlags, Strings opArgs)
 {
     enum QueryType
-        { qDefault, qOutputs, qRequisites, qReferences, qReferrers
+        { qOutputs, qRequisites, qReferences, qReferrers
         , qReferrersClosure, qDeriver, qBinding, qHash, qSize
         , qTree, qGraph, qGraphML, qResolve, qRoots };
-    QueryType query = qDefault;
+    std::optional<QueryType> query;
     bool useOutput = false;
     bool includeOutputs = false;
     bool forceRealise = false;
     std::string bindingName;
 
     for (auto & i : opFlags) {
-        QueryType prev = query;
+        std::optional<QueryType> prev = query;
         if (i == "--outputs") query = qOutputs;
         else if (i == "--requisites" || i == "-R") query = qRequisites;
         else if (i == "--references") query = qReferences;
@@ -318,15 +318,15 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (i == "--force-realise" || i == "--force-realize" || i == "-f") forceRealise = true;
         else if (i == "--include-outputs") includeOutputs = true;
         else throw UsageError("unknown flag '%1%'", i);
-        if (prev != qDefault && prev != query)
+        if (prev && prev != query)
             throw UsageError("query type '%1%' conflicts with earlier flag", i);
     }
 
-    if (query == qDefault) query = qOutputs;
+    if (!query) query = qOutputs;
 
     RunPager pager;
 
-    switch (query) {
+    switch (*query) {
 
         case qOutputs: {
             for (auto & i : opArgs) {

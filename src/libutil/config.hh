@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <cassert>
 #include <map>
@@ -124,21 +125,21 @@ public:
     void reapplyUnknownSettings();
 };
 
-/* A class to simplify providing configuration settings. The typical
-   use is to inherit Config and add Setting<T> members:
-
-   class MyClass : private Config
-   {
-     Setting<int> foo{this, 123, "foo", "the number of foos to use"};
-     Setting<std::string> bar{this, "blabla", "bar", "the name of the bar"};
-
-     MyClass() : Config(readConfigFile("/etc/my-app.conf"))
-     {
-       std::cout << foo << "\n"; // will print 123 unless overridden
-     }
-   };
-*/
-
+/**
+ * A class to simplify providing configuration settings. The typical
+ * use is to inherit Config and add Setting<T> members:
+ *
+ * class MyClass : private Config
+ * {
+ *   Setting<int> foo{this, 123, "foo", "the number of foos to use"};
+ *   Setting<std::string> bar{this, "blabla", "bar", "the name of the bar"};
+ *
+ *   MyClass() : Config(readConfigFile("/etc/my-app.conf"))
+ *   {
+ *     std::cout << foo << "\n"; // will print 123 unless overridden
+ *   }
+ * };
+ */
 class Config : public AbstractConfig
 {
     friend class AbstractSetting;
@@ -228,7 +229,9 @@ protected:
     bool isOverridden() const { return overridden; }
 };
 
-/* A setting of type T. */
+/**
+ * A setting of type T.
+ */
 template<typename T>
 class BaseSetting : public AbstractSetting
 {
@@ -311,8 +314,10 @@ public:
     void operator =(const T & v) { this->assign(v); }
 };
 
-/* A special setting for Paths. These are automatically canonicalised
-   (e.g. "/foo//bar/" becomes "/foo/bar"). */
+/**
+ * A special setting for Paths. These are automatically canonicalised
+ * (e.g. "/foo//bar/" becomes "/foo/bar").
+ */
 class PathSetting : public BaseSetting<Path>
 {
     bool allowEmpty;
@@ -366,8 +371,23 @@ extern GlobalConfig globalConfig;
 
 struct ExperimentalFeatureSettings : Config {
 
-    Setting<std::set<ExperimentalFeature>> experimentalFeatures{this, {}, "experimental-features",
-        "Experimental Nix features to enable."};
+    Setting<std::set<ExperimentalFeature>> experimentalFeatures{
+        this, {}, "experimental-features",
+        R"(
+          Experimental features that are enabled.
+
+          Example:
+
+          ```
+          experimental-features = nix-command flakes
+          ```
+
+          The following experimental features are available:
+
+          {{#include experimental-features-shortlist.md}}
+
+          Experimental features are [further documented in the manual](@docroot@/contributing/experimental-features.md).
+        )"};
 
     /**
      * Check whether the given experimental feature is enabled.

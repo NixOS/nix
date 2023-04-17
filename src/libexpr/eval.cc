@@ -9,6 +9,7 @@
 #include "filetransfer.hh"
 #include "function-trace.hh"
 #include "profiles.hh"
+#include "print.hh"
 
 #include <algorithm>
 #include <chrono>
@@ -104,18 +105,10 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
         str << integer;
         break;
     case tBool:
-        str << (boolean ? "true" : "false");
+        printLiteralBool(str, boolean);
         break;
     case tString:
-        str << "\"";
-        for (const char * i = string.s; *i; i++)
-            if (*i == '\"' || *i == '\\') str << "\\" << *i;
-            else if (*i == '\n') str << "\\n";
-            else if (*i == '\r') str << "\\r";
-            else if (*i == '\t') str << "\\t";
-            else if (*i == '$' && *(i+1) == '{') str << "\\" << *i;
-            else str << *i;
-        str << "\"";
+        printLiteralString(str, string.s);
         break;
     case tPath:
         str << path; // !!! escaping?
@@ -173,7 +166,17 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
     case tFloat:
         str << fpoint;
         break;
+    case tBlackhole:
+        // Although we know for sure that it's going to be an infinite recursion
+        // when this value is accessed _in the current context_, it's likely
+        // that the user will misinterpret a simpler «infinite recursion» output
+        // as a definitive statement about the value, while in fact it may be
+        // a valid value after `builtins.trace` and perhaps some other steps
+        // have completed.
+        str << "«potential infinite recursion»";
+        break;
     default:
+        printError("Nix evaluator internal error: Value::print(): invalid value type %1%", internalType);
         abort();
     }
 }
@@ -229,6 +232,9 @@ std::string_view showType(ValueType type)
 
 std::string showType(const Value & v)
 {
+    // Allow selecting a subset of enum values
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wswitch-enum"
     switch (v.internalType) {
         case tString: return v.string.context ? "a string with context" : "a string";
         case tPrimOp:
@@ -242,16 +248,21 @@ std::string showType(const Value & v)
     default:
         return std::string(showType(v.type()));
     }
+    #pragma GCC diagnostic pop
 }
 
 PosIdx Value::determinePos(const PosIdx pos) const
 {
+    // Allow selecting a subset of enum values
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wswitch-enum"
     switch (internalType) {
         case tAttrs: return attrs->pos;
         case tLambda: return lambda.fun->pos;
         case tApp: return app.left->determinePos(pos);
         default: return pos;
     }
+    #pragma GCC diagnostic pop
 }
 
 bool Value::isTrivial() const
@@ -326,6 +337,22 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
     }
 }
 
+#if HAVE_BOEHMGC
+/* Disable GC while this object lives. Used by CoroutineContext.
+ *
+ * Boehm keeps a count of GC_disable() and GC_enable() calls,
+ * and only enables GC when the count matches.
+ */
+class BoehmDisableGC {
+public:
+    BoehmDisableGC() {
+        GC_disable();
+    };
+    ~BoehmDisableGC() {
+        GC_enable();
+    };
+};
+#endif
 
 static bool gcInitialised = false;
 
@@ -349,6 +376,15 @@ void initGC()
     GC_set_oom_fn(oomHandler);
 
     StackAllocator::defaultAllocator = &boehmGCStackAllocator;
+
+
+#if NIX_BOEHM_PATCH_VERSION != 1
+    printTalkative("Unpatched BoehmGC, disabling GC inside coroutines");
+    /* Used to disable GC when entering coroutines on macOS */
+    create_coro_gc_hook = []() -> std::shared_ptr<void> {
+        return std::make_shared<BoehmDisableGC>();
+    };
+#endif
 
     /* Set the initial heap size to something fairly big (25% of
        physical RAM, up to a maximum of 384 MiB) so that in most cases
@@ -2327,6 +2363,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
         case nFloat:
             return v1.fpoint == v2.fpoint;
 
+        case nThunk: // Must not be left by forceValue
         default:
             error("cannot compare %1% with %2%", showType(v1), showType(v2)).withTrace(pos, errorCtx).debugThrow<EvalError>();
     }

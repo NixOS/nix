@@ -5,7 +5,18 @@ clearStore
 # Ensure "fake ssh" remote store works just as legacy fake ssh would.
 nix --store ssh-ng://localhost?remote-store=$TEST_ROOT/other-store doctor
 
+# Ensure that store ping trusted works with ssh-ng://
+nix --store ssh-ng://localhost?remote-store=$TEST_ROOT/other-store store ping --json | jq -e '.trusted'
+
 startDaemon
+
+if isDaemonNewer "2.15pre0"; then
+    # Ensure that ping works trusted with new daemon
+    nix store ping --json | jq -e '.trusted'
+else
+    # And the the field is absent with the old daemon
+    nix store ping --json | jq -e 'has("trusted") | not'
+fi
 
 # Test import-from-derivation through the daemon.
 [[ $(nix eval --impure --raw --expr '

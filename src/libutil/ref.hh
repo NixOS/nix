@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <memory>
 #include <exception>
@@ -6,8 +7,10 @@
 
 namespace nix {
 
-/* A simple non-nullable reference-counted pointer. Actually a wrapper
-   around std::shared_ptr that prevents null constructions. */
+/**
+ * A simple non-nullable reference-counted pointer. Actually a wrapper
+ * around std::shared_ptr that prevents null constructions.
+ */
 template<typename T>
 class ref
 {

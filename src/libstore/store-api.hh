@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "nar-info.hh"
 #include "realisation.hh"
@@ -88,6 +89,7 @@ const uint32_t exportMagic = 0x4558494e;
 
 
 enum BuildMode { bmNormal, bmRepair, bmCheck };
+enum TrustedFlag : bool { NotTrusted = false, Trusted = true };
 
 struct BuildResult;
 
@@ -403,17 +405,17 @@ public:
     { unsupported("queryReferrers"); }
 
     /**
-     * @return all currently valid derivations that have `path' as an
+     * @return all currently valid derivations that have `path` as an
      * output.
      *
-     * (Note that the result of `queryDeriver()' is the derivation that
-     * was actually used to produce `path', which may not exist
+     * (Note that the result of `queryDeriver()` is the derivation that
+     * was actually used to produce `path`, which may not exist
      * anymore.)
      */
     virtual StorePathSet queryValidDerivers(const StorePath & path) { return {}; };
 
     /**
-     * Query the outputs of the derivation denoted by `path'.
+     * Query the outputs of the derivation denoted by `path`.
      */
     virtual StorePathSet queryDerivationOutputs(const StorePath & path);
 
@@ -449,7 +451,7 @@ public:
      * resulting ‘infos’ map.
      */
     virtual void querySubstitutablePathInfos(const StorePathCAMap & paths,
-        SubstitutablePathInfos & infos) { return; };
+        SubstitutablePathInfos & infos);
 
     /**
      * Import a path into the store.
@@ -505,7 +507,7 @@ public:
 
     /**
      * Like addToStore(), but the contents of the path are contained
-     * in `dump', which is either a NAR serialisation (if recursive ==
+     * in `dump`, which is either a NAR serialisation (if recursive ==
      * true) or simply the contents of a regular file (if recursive ==
      * false).
      * `dump` may be drained
@@ -626,8 +628,8 @@ public:
 
     /**
      * @return a string representing information about the path that
-     * can be loaded into the database using `nix-store --load-db' or
-     * `nix-store --register-validity'.
+     * can be loaded into the database using `nix-store --load-db` or
+     * `nix-store --register-validity`.
      */
     std::string makeValidityRegistration(const StorePathSet & paths,
         bool showDerivers, bool showHash);
@@ -670,8 +672,7 @@ public:
     /**
      * @return An object to access files in the Nix store.
      */
-    virtual ref<FSAccessor> getFSAccessor()
-    { unsupported("getFSAccessor"); }
+    virtual ref<FSAccessor> getFSAccessor() = 0;
 
     /**
      * Repair the contents of the given path by redownloading it using
@@ -707,12 +708,12 @@ public:
 
     /**
      * @param [out] out Place in here the set of all store paths in the
-     * file system closure of `storePath'; that is, all paths than can
-     * be directly or indirectly reached from it. `out' is not cleared.
+     * file system closure of `storePath`; that is, all paths than can
+     * be directly or indirectly reached from it. `out` is not cleared.
      *
      * @param flipDirection If true, the set of paths that can reach
-     * `storePath' is returned; that is, the closures under the
-     * `referrers' relation instead of the `references' relation is
+     * `storePath` is returned; that is, the closures under the
+     * `referrers` relation instead of the `references` relation is
      * returned.
      */
     virtual void computeFSClosure(const StorePathSet & paths,
@@ -807,6 +808,17 @@ public:
     {
         return 0;
     };
+
+    /**
+     * @return/ whether store trusts *us*.
+     *
+     * `std::nullopt` means we do not know.
+     *
+     * @note This is the opposite of the StoreConfig::isTrusted
+     * store setting. That is about whether *we* trust the store.
+     */
+    virtual std::optional<TrustedFlag> isTrustedClient() = 0;
+
 
     virtual Path toRealPath(const Path & storePath)
     {

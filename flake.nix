@@ -219,6 +219,7 @@
 
         enableParallelBuilding = true;
 
+        configureFlags = testConfigureFlags; # otherwise configure fails
         dontBuild = true;
         doInstallCheck = true;
 
@@ -472,8 +473,6 @@
       };
 
     in {
-      inherit nixpkgsFor;
-
       # A Nixpkgs overlay that overrides the 'nix' and
       # 'nix.perl-bindings' packages.
       overlays.default = overlayFor (p: p.stdenv);
@@ -582,6 +581,8 @@
         tests.remoteBuilds = runNixOSTestFor "x86_64-linux" ./tests/nixos/remote-builds.nix;
 
         tests.nix-copy-closure = runNixOSTestFor "x86_64-linux" ./tests/nixos/nix-copy-closure.nix;
+
+        tests.nix-copy = runNixOSTestFor "x86_64-linux" ./tests/nixos/nix-copy.nix;
 
         tests.nssPreload = runNixOSTestFor "x86_64-linux" ./tests/nixos/nss-preload.nix;
 

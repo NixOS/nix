@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "store-api.hh"
 #include "gc-store.hh"
@@ -47,7 +48,9 @@ public:
     void narFromPath(const StorePath & path, Sink & sink) override;
     ref<FSAccessor> getFSAccessor() override;
 
-    /* Register a permanent GC root. */
+    /**
+     * Register a permanent GC root.
+     */
     Path addPermRoot(const StorePath & storePath, const Path & gcRoot);
 
     virtual Path getRealStoreDir() { return realStoreDir; }

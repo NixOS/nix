@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "path.hh"
 #include "types.hh"
@@ -6,6 +7,7 @@
 #include "content-address.hh"
 #include "repair-flag.hh"
 #include "sync.hh"
+#include "comparator.hh"
 
 #include <map>
 #include <variant>
@@ -23,6 +25,8 @@ class Store;
 struct DerivationOutputInputAddressed
 {
     StorePath path;
+
+    GENERATE_CMP(DerivationOutputInputAddressed, me->path);
 };
 
 /**
@@ -43,6 +47,8 @@ struct DerivationOutputCAFixed
      * @param outputName The name of this output.
      */
     StorePath path(const Store & store, std::string_view drvName, std::string_view outputName) const;
+
+    GENERATE_CMP(DerivationOutputCAFixed, me->ca);
 };
 
 /**
@@ -61,13 +67,17 @@ struct DerivationOutputCAFloating
      * How the serialization will be hashed
      */
     HashType hashType;
+
+    GENERATE_CMP(DerivationOutputCAFloating, me->method, me->hashType);
 };
 
 /**
  * Input-addressed output which depends on a (CA) derivation whose hash
  * isn't known yet.
  */
-struct DerivationOutputDeferred {};
+struct DerivationOutputDeferred {
+    GENERATE_CMP(DerivationOutputDeferred);
+};
 
 /**
  * Impure output which is moved to a content-addressed location (like
@@ -84,6 +94,8 @@ struct DerivationOutputImpure
      * How the serialization will be hashed
      */
     HashType hashType;
+
+    GENERATE_CMP(DerivationOutputImpure, me->method, me->hashType);
 };
 
 typedef std::variant<
@@ -124,6 +136,11 @@ struct DerivationOutput : _DerivationOutputRaw
         const Store & store,
         std::string_view drvName,
         std::string_view outputName) const;
+    static DerivationOutput fromJSON(
+        const Store & store,
+        std::string_view drvName,
+        std::string_view outputName,
+        const nlohmann::json & json);
 };
 
 typedef std::map<std::string, DerivationOutput> DerivationOutputs;
@@ -241,8 +258,14 @@ struct DerivationType : _DerivationTypeRaw {
 
 struct BasicDerivation
 {
-    DerivationOutputs outputs; /* keyed on symbolic IDs */
-    StorePathSet inputSrcs; /* inputs that are sources */
+    /**
+     * keyed on symbolic IDs
+     */
+    DerivationOutputs outputs;
+    /**
+     * inputs that are sources
+     */
+    StorePathSet inputSrcs;
     std::string platform;
     Path builder;
     Strings args;
@@ -272,6 +295,15 @@ struct BasicDerivation
     DerivationOutputsAndOptPaths outputsAndOptPaths(const Store & store) const;
 
     static std::string_view nameFromPath(const StorePath & storePath);
+
+    GENERATE_CMP(BasicDerivation,
+        me->outputs,
+        me->inputSrcs,
+        me->platform,
+        me->builder,
+        me->args,
+        me->env,
+        me->name);
 };
 
 struct Derivation : BasicDerivation
@@ -307,11 +339,26 @@ struct Derivation : BasicDerivation
         Store & store,
         const std::map<std::pair<StorePath, std::string>, StorePath> & inputDrvOutputs) const;
 
+    /* Check that the derivation is valid and does not present any
+       illegal states.
+
+       This is mainly a matter of checking the outputs, where our C++
+       representation supports all sorts of combinations we do not yet
+       allow. */
+    void checkInvariants(Store & store, const StorePath & drvPath) const;
+
     Derivation() = default;
     Derivation(const BasicDerivation & bd) : BasicDerivation(bd) { }
     Derivation(BasicDerivation && bd) : BasicDerivation(std::move(bd)) { }
 
     nlohmann::json toJSON(const Store & store) const;
+    static Derivation fromJSON(
+        const Store & store,
+        const nlohmann::json & json);
+
+    GENERATE_CMP(Derivation,
+        static_cast<const BasicDerivation &>(*me),
+        me->inputDrvs);
 };
 
 
@@ -388,12 +435,12 @@ void operator |= (DrvHash::Kind & self, const DrvHash::Kind & other) noexcept;
  *
  * A fixed-output derivation is a derivation whose outputs have a
  * specified content hash and hash algorithm. (Currently they must have
- * exactly one output (`out'), which is specified using the `outputHash'
- * and `outputHashAlgo' attributes, but the algorithm doesn't assume
+ * exactly one output (`out`), which is specified using the `outputHash`
+ * and `outputHashAlgo` attributes, but the algorithm doesn't assume
  * this.) We don't want changes to such derivations to propagate upwards
  * through the dependency graph, changing output paths everywhere.
  *
- * For instance, if we change the url in a call to the `fetchurl'
+ * For instance, if we change the url in a call to the `fetchurl`
  * function, we do not want to rebuild everything depending on it---after
  * all, (the hash of) the file being downloaded is unchanged.  So the
  * *output paths* should not change. On the other hand, the *derivation

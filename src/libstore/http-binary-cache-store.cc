@@ -194,6 +194,18 @@ protected:
             }});
     }
 
+    /**
+     * This isn't actually necessary read only. We support "upsert" now, so we
+     * have a notion of authentication via HTTP POST/PUT.
+     *
+     * For now, we conservatively say we don't know.
+     *
+     * \todo try to expose our HTTP authentication status.
+     */
+    std::optional<TrustedFlag> isTrustedClient() override
+    {
+        return std::nullopt;
+    }
 };
 
 static RegisterStoreImplementation<HttpBinaryCacheStore, HttpBinaryCacheStoreConfig> regHttpBinaryCacheStore;
