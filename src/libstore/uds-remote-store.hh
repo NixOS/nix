@@ -9,7 +9,7 @@ namespace nix {
 
 struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreConfig
 {
-    UDSRemoteStoreConfig(const Store::Params & params)
+    UDSRemoteStoreConfig(const Params & params)
         : StoreConfig(params)
         , LocalFSStoreConfig(params)
         , RemoteStoreConfig(params)

@@ -99,6 +99,8 @@ typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 
 struct StoreConfig : public Config
 {
+    typedef std::map<std::string, std::string> Params;
+
     using Config::Config;
 
     StoreConfig() = delete;
@@ -153,10 +155,6 @@ struct StoreConfig : public Config
 
 class Store : public std::enable_shared_from_this<Store>, public virtual StoreConfig
 {
-public:
-
-    typedef std::map<std::string, std::string> Params;
-
 protected:
 
     struct PathInfoCacheValue {
