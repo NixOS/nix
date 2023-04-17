@@ -209,6 +209,7 @@ struct ProfileManifest
                 },
                 .references = {
                     .others = std::move(references),
+                    // profiles never refer to themselves
                     .self = false,
                 },
             },

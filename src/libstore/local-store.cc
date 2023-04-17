@@ -1328,6 +1328,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
         },
         .references = {
             .others = references,
+            // caller is not capable of creating a self-reference, because this is content-addressed without modulus
             .self = false,
         },
     };
