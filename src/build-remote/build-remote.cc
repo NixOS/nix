@@ -332,7 +332,10 @@ connected:
                 throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
         } else {
             copyPaths(*store, *sshStore, StorePathSet {*drvPath}, NoRepair, NoCheckSigs, substitute);
-            sshStore->buildPaths({ DerivedPath::Built { *drvPath, OutputsSpec::All {} } });
+            auto res = sshStore->buildPathsWithResults({ DerivedPath::Built { *drvPath, OutputsSpec::All {} } });
+            // One path to build should mean one result back
+            assert(res.size() == 1);
+            optResult = std::move(res[0]);
         }
 
 
