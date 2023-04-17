@@ -331,6 +331,159 @@ VERSIONED_CHARACTERIZATION_TEST(
 
 VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
+    unkeyedValidPathInfo_1_15,
+    "unkeyed-valid-path-info-1.15",
+    1 << 8 | 15,
+    (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo> {
+        ({
+            UnkeyedValidPathInfo info {
+                Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+            };
+            info.registrationTime = 23423;
+            info.narSize = 34878;
+            info;
+        }),
+        ({
+            UnkeyedValidPathInfo info {
+                Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+            };
+            info.deriver = StorePath {
+                "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+            };
+            info.references = {
+                StorePath {
+                    "g1w7hyyyy1w7hy3qg1w7hy3qgqqqqy3q-foo.drv",
+                },
+            };
+            info.registrationTime = 23423;
+            info.narSize = 34878;
+            info;
+        }),
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    validPathInfo_1_15,
+    "valid-path-info-1.15",
+    1 << 8 | 15,
+    (std::tuple<ValidPathInfo, ValidPathInfo> {
+        ({
+            ValidPathInfo info {
+                StorePath {
+                    "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+                },
+                UnkeyedValidPathInfo {
+                    Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+                },
+            };
+            info.registrationTime = 23423;
+            info.narSize = 34878;
+            info;
+        }),
+        ({
+            ValidPathInfo info {
+                StorePath {
+                    "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+                },
+                UnkeyedValidPathInfo {
+                    Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+                },
+            };
+            info.deriver = StorePath {
+                "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+            };
+            info.references = {
+                // other reference
+                StorePath {
+                    "g1w7hyyyy1w7hy3qg1w7hy3qgqqqqy3q-foo",
+                },
+                // self reference
+                StorePath {
+                    "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+                },
+            };
+            info.registrationTime = 23423;
+            info.narSize = 34878;
+            info;
+        }),
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    validPathInfo_1_16,
+    "valid-path-info-1.16",
+    1 << 8 | 16,
+    (std::tuple<ValidPathInfo, ValidPathInfo, ValidPathInfo> {
+        ({
+            ValidPathInfo info {
+                StorePath {
+                    "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+                },
+                UnkeyedValidPathInfo {
+                    Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+                },
+            };
+            info.registrationTime = 23423;
+            info.narSize = 34878;
+            info.ultimate = true;
+            info;
+        }),
+        ({
+            ValidPathInfo info {
+                StorePath {
+                    "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+                },
+                UnkeyedValidPathInfo {
+                    Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+                },
+            };
+            info.deriver = StorePath {
+                "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+            };
+            info.references = {
+                // other reference
+                StorePath {
+                    "g1w7hyyyy1w7hy3qg1w7hy3qgqqqqy3q-foo",
+                },
+                // self reference
+                StorePath {
+                    "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+                },
+            };
+            info.registrationTime = 23423;
+            info.narSize = 34878;
+            info.sigs = {
+                "fake-sig-1",
+                "fake-sig-2",
+            },
+            info;
+        }),
+        ({
+            ValidPathInfo info {
+                *LibStoreTest::store,
+                "foo",
+                FixedOutputInfo {
+                    .method = FileIngestionMethod::Recursive,
+                    .hash = hashString(HashType::htSHA256, "(...)"),
+                    .references = {
+                        .others = {
+                            StorePath {
+                                "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+                            },
+                        },
+                        .self = true,
+                    },
+                },
+                Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+            };
+            info.registrationTime = 23423;
+            info.narSize = 34878;
+            info;
+        }),
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
     optionalTrustedFlag,
     "optional-trusted-flag",
     defaultVersion,

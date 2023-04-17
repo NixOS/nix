@@ -3,6 +3,25 @@
 
 namespace nix {
 
+GENERATE_CMP_EXT(
+    ,
+    UnkeyedValidPathInfo,
+    me->deriver,
+    me->narHash,
+    me->references,
+    me->registrationTime,
+    me->narSize,
+    //me->id,
+    me->ultimate,
+    me->sigs,
+    me->ca);
+
+GENERATE_CMP_EXT(
+    ,
+    ValidPathInfo,
+    me->path,
+    static_cast<const UnkeyedValidPathInfo &>(*me));
+
 std::string ValidPathInfo::fingerprint(const Store & store) const
 {
     if (narSize == 0)
@@ -102,8 +121,8 @@ ValidPathInfo::ValidPathInfo(
     std::string_view name,
     ContentAddressWithReferences && ca,
     Hash narHash)
-      : path(store.makeFixedOutputPathFromCA(name, ca))
-      , narHash(narHash)
+      : UnkeyedValidPathInfo(narHash)
+      , path(store.makeFixedOutputPathFromCA(name, ca))
 {
     std::visit(overloaded {
         [this](TextInfo && ti) {

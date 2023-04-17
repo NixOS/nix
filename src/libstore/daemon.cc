@@ -819,7 +819,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (info) {
             if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
-            WorkerProto::Serialise<ValidPathInfo>::write(*store, wconn, *info, false);
+            WorkerProto::write(*store, wconn, static_cast<const UnkeyedValidPathInfo &>(*info));
         } else {
             assert(GET_PROTOCOL_MINOR(clientVersion) >= 17);
             to << 0;

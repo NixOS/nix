@@ -32,6 +32,7 @@ struct DerivedPath;
 struct BuildResult;
 struct KeyedBuildResult;
 struct ValidPathInfo;
+struct UnkeyedValidPathInfo;
 enum TrustedFlag : bool;
 
 
@@ -207,6 +208,10 @@ DECLARE_WORKER_SERIALISER(BuildResult);
 template<>
 DECLARE_WORKER_SERIALISER(KeyedBuildResult);
 template<>
+DECLARE_WORKER_SERIALISER(ValidPathInfo);
+template<>
+DECLARE_WORKER_SERIALISER(UnkeyedValidPathInfo);
+template<>
 DECLARE_WORKER_SERIALISER(std::optional<TrustedFlag>);
 
 template<typename T>
@@ -220,16 +225,5 @@ DECLARE_WORKER_SERIALISER(std::tuple<Ts...>);
 template<typename K, typename V>
 DECLARE_WORKER_SERIALISER(std::map<K COMMA_ V>);
 #undef COMMA_
-
-/* These are a non-standard form for historical reasons. */
-
-template<>
-struct WorkerProto::Serialise<ValidPathInfo>
-{
-    static ValidPathInfo read(const Store & store, WorkerProto::ReadConn conn);
-    static ValidPathInfo read(const Store & store, WorkerProto::ReadConn conn, StorePath && path);
-
-    static void write(const Store & store, WriteConn conn, const ValidPathInfo & pathInfo, bool includePath = true);
-};
 
 }

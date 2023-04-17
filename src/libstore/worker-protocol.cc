@@ -145,14 +145,24 @@ void WorkerProto::Serialise<BuildResult>::write(const Store & store, WorkerProto
 ValidPathInfo WorkerProto::Serialise<ValidPathInfo>::read(const Store & store, ReadConn conn)
 {
     auto path = WorkerProto::Serialise<StorePath>::read(store, conn);
-    return WorkerProto::Serialise<ValidPathInfo>::read(store, conn, std::move(path));
+    return ValidPathInfo {
+        std::move(path),
+        WorkerProto::Serialise<UnkeyedValidPathInfo>::read(store, conn),
+    };
 }
 
-ValidPathInfo WorkerProto::Serialise<ValidPathInfo>::read(const Store & store, ReadConn conn, StorePath && path)
+void WorkerProto::Serialise<ValidPathInfo>::write(const Store & store, WriteConn conn, const ValidPathInfo & pathInfo)
+{
+    WorkerProto::write(store, conn, pathInfo.path);
+    WorkerProto::write(store, conn, static_cast<const UnkeyedValidPathInfo &>(pathInfo));
+}
+
+
+UnkeyedValidPathInfo WorkerProto::Serialise<UnkeyedValidPathInfo>::read(const Store & store, ReadConn conn)
 {
     auto deriver = readString(conn.from);
     auto narHash = Hash::parseAny(readString(conn.from), htSHA256);
-    ValidPathInfo info(path, narHash);
+    UnkeyedValidPathInfo info(narHash);
     if (deriver != "") info.deriver = store.parseStorePath(deriver);
     info.references = WorkerProto::Serialise<StorePathSet>::read(store, conn);
     conn.from >> info.registrationTime >> info.narSize;
@@ -164,14 +174,8 @@ ValidPathInfo WorkerProto::Serialise<ValidPathInfo>::read(const Store & store, R
     return info;
 }
 
-void WorkerProto::Serialise<ValidPathInfo>::write(
-    const Store & store,
-    WriteConn conn,
-    const ValidPathInfo & pathInfo,
-    bool includePath)
+void WorkerProto::Serialise<UnkeyedValidPathInfo>::write(const Store & store, WriteConn conn, const UnkeyedValidPathInfo & pathInfo)
 {
-    if (includePath)
-        conn.to << store.printStorePath(pathInfo.path);
     conn.to
         << (pathInfo.deriver ? store.printStorePath(*pathInfo.deriver) : "")
         << pathInfo.narHash.to_string(HashFormat::Base16, false);

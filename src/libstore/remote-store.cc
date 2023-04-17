@@ -332,7 +332,8 @@ void RemoteStore::queryPathInfoUncached(const StorePath & path,
                 if (!valid) throw InvalidPath("path '%s' is not valid", printStorePath(path));
             }
             info = std::make_shared<ValidPathInfo>(
-                WorkerProto::Serialise<ValidPathInfo>::read(*this, *conn, StorePath{path}));
+                StorePath{path},
+                WorkerProto::Serialise<UnkeyedValidPathInfo>::read(*this, *conn));
         }
         callback(std::move(info));
     } catch (...) { callback.rethrow(); }
