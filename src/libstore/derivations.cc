@@ -980,7 +980,8 @@ nlohmann::json DerivationOutput::toJSON(
 
 DerivationOutput DerivationOutput::fromJSON(
     const Store & store, std::string_view drvName, std::string_view outputName,
-    const nlohmann::json & _json)
+    const nlohmann::json & _json,
+    const ExperimentalFeatureSettings & xpSettings)
 {
     std::set<std::string_view> keys;
     auto json = (std::map<std::string, nlohmann::json>) _json;
@@ -1019,6 +1020,7 @@ DerivationOutput DerivationOutput::fromJSON(
     }
 
     else if (keys == (std::set<std::string_view> { "hashAlgo" })) {
+        xpSettings.require(Xp::CaDerivations);
         auto [method, hashType] = methodAlgo();
         return DerivationOutput::CAFloating {
             .method = method,
@@ -1031,6 +1033,7 @@ DerivationOutput DerivationOutput::fromJSON(
     }
 
     else if (keys == (std::set<std::string_view> { "hashAlgo", "impure" })) {
+        xpSettings.require(Xp::ImpureDerivations);
         auto [method, hashType] = methodAlgo();
         return DerivationOutput::Impure {
             .method = method,
