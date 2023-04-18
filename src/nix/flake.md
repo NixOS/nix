@@ -381,10 +381,12 @@ The following attributes are supported in `flake.nix`:
 
 * `nixConfig`: a set of `nix.conf` options to be set when evaluating any
   part of a flake. In the interests of security, only a small set of
-  whitelisted options (currently `bash-prompt`, `bash-prompt-prefix`,
-  `bash-prompt-suffix`, `flake-registry`, and `commit-lockfile-summary`)
-  are allowed to be set without confirmation so long as `accept-flake-config`
-  is not set in the global configuration.
+  set of options is allowed to be set without confirmation so long as [`accept-flake-config`](@docroot@/command-ref/conf-file.md#conf-accept-flake-config) is not enabled in the global configuration:
+   - [`bash-prompt`](@docroot@/command-ref/conf-file.md#conf-bash-prompt)
+   - [`bash-prompt-prefix`](@docroot@/command-ref/conf-file.md#conf-bash-prompt-prefix)
+   - [`bash-prompt-suffix`](@docroot@/command-ref/conf-file.md#conf-bash-prompt-suffix)
+   - [`flake-registry`](@docroot@/command-ref/conf-file.md#conf-flake-registry)
+   - [`commit-lockfile-summary`](@docroot@/command-ref/conf-file.md#conf-commit-lockfile-summary)
 
 ## Flake inputs
 
