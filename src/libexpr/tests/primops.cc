@@ -562,6 +562,16 @@ namespace nix {
         ASSERT_THAT(v, IsStringEq(""));
     }
 
+    TEST_F(PrimOpTest, substringStartOverflow){
+        auto v = eval("builtins.substring 4294967296 1 \"nixos\"");
+        ASSERT_THAT(v, IsStringEq(""));
+    }
+
+    TEST_F(PrimOpTest, substringUntilEnd){
+        auto v = eval("builtins.substring 1 (-1) \"nixos\"");
+        ASSERT_THAT(v, IsStringEq("ixos"));
+    }
+
     TEST_F(PrimOpTest, stringLength) {
         auto v = eval("builtins.stringLength \"123\"");
         ASSERT_THAT(v, IsIntEq(3));

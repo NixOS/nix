@@ -25,6 +25,7 @@
 #include <dlfcn.h>
 
 #include <cmath>
+#include <boost/numeric/conversion/cast.hpp>
 
 
 namespace nix {
@@ -159,6 +160,27 @@ static void mkOutputString(
                derivation */
             : downstreamPlaceholder(*state.store, drvPath, o.first),
         {"!" + o.first + "!" + state.store->printStorePath(drvPath)});
+}
+
+/* Try to interpret an argument as an int of the specified type,
+   throwing an error if this fails */
+template <typename I>
+static I forceIntChecked(EvalState & state, Value & v, const PosIdx pos, std::string_view errorCtx) {
+    NixInt result = state.forceInt(v, pos, errorCtx);
+
+    try {
+        return boost::numeric_cast<I>(result);
+    } catch(boost::bad_numeric_cast& e) {
+        if (dynamic_cast<boost::numeric::negative_overflow*>(&e)) {
+            state.error("integer %1% is too low", result)
+                .withTrace(pos, errorCtx)
+                .debugThrow<TypeError>();
+        } else {
+            state.error("integer %1% is too high", result)
+                .withTrace(pos, errorCtx)
+                .debugThrow<TypeError>();
+        }
+    }
 }
 
 /* Load and evaluate an expression from path specified by the
@@ -2816,7 +2838,7 @@ static RegisterPrimOp primop_isList({
 
 static void elemAt(EvalState & state, const PosIdx pos, Value & list, int n, Value & v)
 {
-    state.forceList(list, pos, "while evaluating the first argument passed to builtins.elemAt");
+    state.forceList(list, pos, "while evaluating the first argument (the list) passed to builtins.elemAt");
     if (n < 0 || (unsigned int) n >= list.listSize())
         state.debugThrowLastTrace(Error({
             .msg = hintfmt("list index %1% is out of bounds", n),
@@ -2829,7 +2851,7 @@ static void elemAt(EvalState & state, const PosIdx pos, Value & list, int n, Val
 /* Return the n-1'th element of a list. */
 static void prim_elemAt(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    elemAt(state, pos, *args[0], state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.elemAt"), v);
+    elemAt(state, pos, *args[0], forceIntChecked<size_t>(state, *args[1], pos, "while evaluating the second argument (the list index) passed to builtins.elemAt"), v);
 }
 
 static RegisterPrimOp primop_elemAt({
@@ -3113,7 +3135,7 @@ static RegisterPrimOp primop_all({
 
 static void prim_genList(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto len = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.genList");
+    auto len = forceIntChecked<unsigned int>(state, *args[1], pos, "while evaluating the second argument passed to builtins.genList");
 
     if (len < 0)
         state.error("cannot create list of size %1%", len).debugThrow<EvalError>();
@@ -3575,18 +3597,19 @@ static RegisterPrimOp primop_toString({
    non-negative. */
 static void prim_substring(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    int start = state.forceInt(*args[0], pos, "while evaluating the first argument (the start offset) passed to builtins.substring");
-    int len = state.forceInt(*args[1], pos, "while evaluating the second argument (the substring length) passed to builtins.substring");
+    size_t start = forceIntChecked<size_t>(state, *args[0], pos, "while evaluating the first argument (the start offset) passed to builtins.substring");
+    /* length can be negative, we want to map that to `npos` */
+    NixInt len_ = state.forceInt(*args[1], pos, "while evaluating the second argument (the substring length) passed to builtins.substring");
+    size_t len;
+    if (len_ < 0) {
+        len = std::string::npos;
+    } else {
+        len = forceIntChecked<size_t>(state, *args[1], pos, "while evaluating the second argument (the substring length) passed to builtins.substring");
+    }
     PathSet context;
     auto s = state.coerceToString(pos, *args[2], context, "while evaluating the third argument (the string) passed to builtins.substring");
 
-    if (start < 0)
-        state.debugThrowLastTrace(EvalError({
-            .msg = hintfmt("negative start position in 'substring'"),
-            .errPos = state.positions[pos]
-        }));
-
-    v.mkString((unsigned int) start >= s->size() ? "" : s->substr(start, len), context);
+    v.mkString(start >= s->size() ? "" : s->substr(start, len), context);
 }
 
 static RegisterPrimOp primop_substring({
