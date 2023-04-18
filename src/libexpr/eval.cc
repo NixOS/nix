@@ -188,6 +188,34 @@ void Value::print(const SymbolTable & symbols, std::ostream & str, bool showRepe
     print(symbols, str, showRepeated ? nullptr : &seen);
 }
 
+void Value::printCompact(const SymbolTable &symbols, std::ostream & str) const
+{
+    // avoid printing potentially large values, like sets or lists.
+    switch (type()) {
+        case nThunk:
+        case nInt:
+        case nFloat:
+        case nBool:
+        case nString:
+        case nPath:
+        case nNull:
+        case nFunction:
+            print(symbols, str);
+            break;
+        case nAttrs:
+            str << "<set>";
+            break;
+        case nList:
+            str << "<list>";
+            break;
+        case nExternal:
+            str << "<external>";
+            break;
+        default:
+            abort();
+    }
+}
+
 // Pretty print types for assertion errors
 std::ostream & operator << (std::ostream & os, const ValueType t) {
     os << showType(t);
@@ -1673,11 +1701,39 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             args++;
         }
 
-        else
-            error("attempt to call something which is not a function but %1%", showType(vCur)).atPos(pos).debugThrow<TypeError>();
+        else {
+            auto hf = buildFnTypeHint(vCur, nrArgs, args);
+            error_hf(hf).atPos(pos).debugThrow<TypeError>();
+        }
     }
 
     vRes = vCur;
+}
+
+// return a unique ptr to avoid putting a hintformat on the stack.
+std::unique_ptr<hintformat> EvalState::buildFnTypeHint(const Value & v, size_t nrArgs, Value * * args)
+{
+    std::ostringstream hintstr;
+
+    hintstr << "attempt to call something which is not a function but %1%: %2%" << std::endl;
+    hintstr << "function arguments:";
+    for (size_t i = 0; i < nrArgs; ++i) {
+        hintstr << std::endl << "%" << i*2 + 3 << "%: %" << i*2 + 1 + 3 << "%";
+    }
+
+    auto hf = std::unique_ptr<hintformat>(new hintformat(hintstr.str().c_str()));
+
+    std::ostringstream ps;
+    v.printCompact(symbols, ps);
+    *hf % showType(v) % ps.str();
+
+    for (size_t i = 0; i < nrArgs; ++i) {
+        std::ostringstream ps;
+        args[i]->printCompact(symbols, ps);
+        *hf % showType(*(args[i])) % ps.str().c_str();
+    }
+
+    return hf;
 }
 
 

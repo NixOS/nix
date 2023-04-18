@@ -141,6 +141,7 @@ private:
 public:
 
     void print(const SymbolTable & symbols, std::ostream & str, bool showRepeated = false) const;
+    void printCompact(const SymbolTable &symbols, std::ostream & str) const;
 
     // Functions needed to distinguish the type
     // These should be removed eventually, by putting the functionality that's
