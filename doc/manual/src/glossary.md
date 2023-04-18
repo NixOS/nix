@@ -127,7 +127,7 @@
     builder can rely on external inputs such as the network or the
     system time) but the Nix model assumes it.
 
-  - Nix database{#gloss-nix-database}\
+  - [Nix database]{#gloss-nix-database}\
     An SQlite database to track [reference]s between [store object]s.
     This is an implementation detail of the [local store].
 
