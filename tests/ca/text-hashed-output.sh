@@ -2,6 +2,9 @@
 
 source common.sh
 
+# Need backend to support text-hashing too
+requireDaemonNewerThan "2.16.0pre20230419"
+
 # Globally enable dynamic-derivations in addition to CA derivations
 enableFeatures "dynamic-derivations"
 
