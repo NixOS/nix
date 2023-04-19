@@ -6,7 +6,7 @@ src = [
 ]
 
 nix_bindings = py_installation.extension_module('nix', src,
-    dependencies : [nix_expr_dep, nix_main_dep],
+    dependencies : [nix_expr_dep],
     install: true,
     cpp_args: [
       '-std=c++17',

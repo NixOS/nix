@@ -7,7 +7,6 @@ python_mod = import('python')
 py_installation = python_mod.find_installation()
 
 nix_expr_dep = dependency('nix-expr', required: true)
-nix_main_dep = dependency('nix-main', required: true)
 
 subdir('src')
 

@@ -32,7 +32,7 @@ extern "C" _public_ PyObject * PyInit_nix(void)
     nix::settings.buildHook = nix::settings.nixBinDir + "/nix __build-remote";
     // And by setting buildHook before calling initNix, we can override the defaults without overriding the
     // user-provided options from the config files
-    nix::initNix();
+    nix::initLibStore();
     nix::initGC();
 
     PyObjPtr m(PyModule_Create(&nixmodule));
