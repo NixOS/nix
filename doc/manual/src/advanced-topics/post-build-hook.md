@@ -69,6 +69,8 @@ exec nix copy --to "s3://example-nix-cache" $OUT_PATHS
 > store sign`. Nix guarantees the paths will not contain any spaces,
 > however a store path might contain glob characters. The `set -f`
 > disables globbing in the shell.
+> If you want to upload the .drv file too, the `$DRV_PATH` variable
+> is also defined for the script and works just like `$OUT_PATHS`.
 
 Then make sure the hook program is executable by the `root` user:
 
