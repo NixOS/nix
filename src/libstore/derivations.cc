@@ -1005,6 +1005,8 @@ DerivationOutput DerivationOutput::fromJSON(
         // remaining to parse, will be mutated by parsers
         std::string_view s = hashAlgo;
         ContentAddressMethod method = ContentAddressMethod::parsePrefix(s);
+        if (method == TextIngestionMethod {})
+            xpSettings.require(Xp::DynamicDerivations);
         auto hashType = parseHashType(s);
         return { std::move(method), std::move(hashType) };
     };

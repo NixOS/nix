@@ -26,6 +26,14 @@ class CaDerivationTest : public DerivationTest
     }
 };
 
+class DynDerivationTest : public DerivationTest
+{
+    void SetUp() override
+    {
+        mockXpSettings.set("experimental-features", "dynamic-derivations ca-derivations");
+    }
+};
+
 class ImpureDerivationTest : public DerivationTest
 {
     void SetUp() override
@@ -83,7 +91,7 @@ TEST_JSON(DerivationTest, caFixed,
     }),
     "drv-name", "output-name")
 
-TEST_JSON(CaDerivationTest, caFixedText,
+TEST_JSON(DynDerivationTest, caFixedText,
     R"({
         "hashAlgo": "text:sha256",
         "hash": "894517c9163c896ec31a2adbd33c0681fd5f45b2c0ef08a64c92a03fb97f390f",
