@@ -110,7 +110,7 @@ nix_tests = \
   ca/derivation-json.sh \
   import-derivation.sh \
   ca/import-derivation.sh \
-  ca/text-hashed-output.sh \
+  dyn-drv/text-hashed-output.sh \
   nix_path.sh \
   case-hack.sh \
   placeholders.sh \
@@ -138,11 +138,18 @@ ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh
 endif
 
-install-tests += $(foreach x, $(nix_tests), tests/$(x))
+install-tests += $(foreach x, $(nix_tests), $(d)/$(x))
 
-clean-files += $(d)/common/vars-and-functions.sh $(d)/config.nix $(d)/ca/config.nix
+clean-files += \
+  $(d)/common/vars-and-functions.sh \
+  $(d)/config.nix \
+  $(d)/ca/config.nix \
+  $(d)/dyn-drv/config.nix
 
-test-deps += tests/common/vars-and-functions.sh tests/config.nix tests/ca/config.nix
+test-deps += \
+  tests/common/vars-and-functions.sh \
+  tests/config.nix \
+  tests/dyn-drv/config.nix \
 
 ifeq ($(BUILD_SHARED_LIBS), 1)
   test-deps += tests/plugins/libplugintest.$(SO_EXT)

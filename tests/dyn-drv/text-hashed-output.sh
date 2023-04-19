@@ -2,14 +2,6 @@
 
 source common.sh
 
-# Need backend to support text-hashing too
-requireDaemonNewerThan "2.16.0pre20230419"
-
-# Globally enable dynamic-derivations in addition to CA derivations
-enableFeatures "dynamic-derivations"
-
-restartDaemon
-
 # In the corresponding nix file, we have two derivations: the first, named root,
 # is a normal recursive derivation, while the second, named dependent, has the
 # new outputHashMode "text". Note that in "dependent", we don't refer to the
