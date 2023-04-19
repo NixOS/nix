@@ -154,38 +154,32 @@ std::string renderContentAddress(std::optional<ContentAddress> ca)
     return ca ? ca->render() : "";
 }
 
-ContentAddressWithReferences ContentAddressWithReferences::fromParts(
-    ContentAddressMethod  method, Hash hash, StoreReferences refs)
+ContentAddress ContentAddress::fromParts(
+    ContentAddressMethod method, Hash hash)
 {
     return std::visit(overloaded {
-        [&](TextIngestionMethod _) -> ContentAddressWithReferences {
-            if (refs.self)
-                throw UsageError("Cannot have a self reference with text hashing scheme");
-            return TextInfo {
-                .hash = { .hash = std::move(hash) },
-                .references = std::move(refs.others),
+        [&](TextIngestionMethod _) -> ContentAddress {
+            return TextHash {
+                .hash = std::move(hash),
             };
         },
-        [&](FileIngestionMethod m2) -> ContentAddressWithReferences {
-            return FixedOutputInfo {
-                .hash = {
-                    .method = m2,
-                    .hash = std::move(hash),
-                },
-                .references = std::move(refs),
+        [&](FileIngestionMethod m2) -> ContentAddress {
+            return FixedOutputHash {
+                .method = std::move(m2),
+                .hash = std::move(hash),
             };
         },
     }, method.raw);
 }
 
-ContentAddressMethod ContentAddressWithReferences::getMethod() const
+ContentAddressMethod ContentAddress::getMethod() const
 {
     return std::visit(overloaded {
-        [](const TextInfo & th) -> ContentAddressMethod {
+        [](const TextHash & th) -> ContentAddressMethod {
             return TextIngestionMethod {};
         },
-        [](const FixedOutputInfo & fsh) -> ContentAddressMethod {
-            return fsh.hash.method;
+        [](const FixedOutputHash & fsh) -> ContentAddressMethod {
+            return fsh.method;
         },
     }, raw);
 }
@@ -227,6 +221,42 @@ ContentAddressWithReferences ContentAddressWithReferences::withoutRefs(const Con
             };
         },
     }, ca.raw);
+}
+
+ContentAddressWithReferences ContentAddressWithReferences::fromParts(
+    ContentAddressMethod method, Hash hash, StoreReferences refs)
+{
+    return std::visit(overloaded {
+        [&](TextIngestionMethod _) -> ContentAddressWithReferences {
+            if (refs.self)
+                throw UsageError("Cannot have a self reference with text hashing scheme");
+            return TextInfo {
+                .hash = { .hash = std::move(hash) },
+                .references = std::move(refs.others),
+            };
+        },
+        [&](FileIngestionMethod m2) -> ContentAddressWithReferences {
+            return FixedOutputInfo {
+                .hash = {
+                    .method = m2,
+                    .hash = std::move(hash),
+                },
+                .references = std::move(refs),
+            };
+        },
+    }, method.raw);
+}
+
+ContentAddressMethod ContentAddressWithReferences::getMethod() const
+{
+    return std::visit(overloaded {
+        [](const TextInfo & th) -> ContentAddressMethod {
+            return TextIngestionMethod {};
+        },
+        [](const FixedOutputInfo & fsh) -> ContentAddressMethod {
+            return fsh.hash.method;
+        },
+    }, raw);
 }
 
 Hash ContentAddressWithReferences::getHash() const

@@ -154,14 +154,27 @@ struct ContentAddress
     { }
 
     /**
-     * Compute the content-addressability assertion (ValidPathInfo::ca) for
-     * paths created by Store::makeFixedOutputPath() / Store::addToStore().
+     * Compute the content-addressability assertion
+     * (`ValidPathInfo::ca`) for paths created by
+     * `Store::makeFixedOutputPath()` / `Store::addToStore()`.
      */
     std::string render() const;
 
     static ContentAddress parse(std::string_view rawCa);
 
     static std::optional<ContentAddress> parseOpt(std::string_view rawCaOpt);
+
+    /**
+     * Create a `ContentAddress` from 2 parts:
+     *
+     * @param method Way ingesting the file system data.
+     *
+     * @param hash Hash of ingested file system data.
+     */
+    static ContentAddress fromParts(
+        ContentAddressMethod method, Hash hash);
+
+    ContentAddressMethod getMethod() const;
 
     const Hash & getHash() const;
 };
@@ -251,13 +264,13 @@ struct ContentAddressWithReferences
     { }
 
     /**
-     * Create a ContentAddressWithReferences from a mere ContentAddress, by
-     * assuming no references in all cases.
+     * Create a `ContentAddressWithReferences` from a mere
+     * `ContentAddress`, by assuming no references in all cases.
      */
     static ContentAddressWithReferences withoutRefs(const ContentAddress &);
 
     /**
-     * Create a ContentAddressWithReferences from 3 parts:
+     * Create a `ContentAddressWithReferences` from 3 parts:
      *
      * @param method Way ingesting the file system data.
      *
