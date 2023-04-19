@@ -177,6 +177,8 @@ struct ContentAddress
     ContentAddressMethod getMethod() const;
 
     const Hash & getHash() const;
+
+    std::string printMethodAlgo() const;
 };
 
 std::string renderContentAddress(std::optional<ContentAddress> ca);
@@ -286,8 +288,6 @@ struct ContentAddressWithReferences
     ContentAddressMethod getMethod() const;
 
     Hash getHash() const;
-
-    std::string printMethodAlgo() const;
 };
 
 }

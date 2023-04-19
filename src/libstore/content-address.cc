@@ -196,6 +196,11 @@ const Hash & ContentAddress::getHash() const
     }, raw);
 }
 
+std::string ContentAddress::printMethodAlgo() const {
+    return getMethod().renderPrefix()
+        + printHashType(getHash().type);
+}
+
 bool StoreReferences::empty() const
 {
     return !self && others.empty();
@@ -269,11 +274,6 @@ Hash ContentAddressWithReferences::getHash() const
             return fsh.hash.hash;
         },
     }, raw);
-}
-
-std::string ContentAddressWithReferences::printMethodAlgo() const {
-    return getMethod().renderPrefix()
-        + printHashType(getHash().type);
 }
 
 }

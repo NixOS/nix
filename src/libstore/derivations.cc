@@ -38,7 +38,7 @@ StorePath DerivationOutput::CAFixed::path(const Store & store, std::string_view 
 {
     return store.makeFixedOutputPathFromCA(
         outputPathName(drvName, outputName),
-        ca);
+        ContentAddressWithReferences::withoutRefs(ca));
 }
 
 
@@ -230,11 +230,9 @@ static DerivationOutput parseDerivationOutput(const Store & store,
             validatePath(pathS);
             auto hash = Hash::parseNonSRIUnprefixed(hashS, hashType);
             return DerivationOutput::CAFixed {
-                .ca = ContentAddressWithReferences::fromParts(
+                .ca = ContentAddress::fromParts(
                     std::move(method),
-                    std::move(hash),
-                    // FIXME non-trivial fixed refs set
-                    {}),
+                    std::move(hash)),
             };
         } else {
             experimentalFeatureSettings.require(Xp::CaDerivations);
@@ -1020,10 +1018,9 @@ DerivationOutput DerivationOutput::fromJSON(
     else if (keys == (std::set<std::string_view> { "path", "hashAlgo", "hash" })) {
         auto [method, hashType] = methodAlgo();
         auto dof = DerivationOutput::CAFixed {
-            .ca = ContentAddressWithReferences::fromParts(
+            .ca = ContentAddress::fromParts(
                 std::move(method),
-                Hash::parseNonSRIUnprefixed((std::string) json["hash"], hashType),
-                {}),
+                Hash::parseNonSRIUnprefixed((std::string) json["hash"], hashType)),
         };
         if (dof.path(store, drvName, outputName) != store.parseStorePath((std::string) json["path"]))
             throw Error("Path doesn't match derivation output");

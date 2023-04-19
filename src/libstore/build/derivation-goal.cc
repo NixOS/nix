@@ -274,11 +274,13 @@ void DerivationGoal::haveDerivation()
                         )
                     )
                 );
-            else
+            else {
+                auto * cap = getDerivationCA(*drv);
                 addWaitee(upcast_goal(worker.makePathSubstitutionGoal(
                     status.known->path,
                     buildMode == bmRepair ? Repair : NoRepair,
-                    getDerivationCA(*drv))));
+                    cap ? std::optional { *cap } : std::nullopt)));
+            }
         }
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */

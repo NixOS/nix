@@ -36,9 +36,11 @@ struct DerivationOutputInputAddressed
 struct DerivationOutputCAFixed
 {
     /**
-     * hash and refs used for expected hash computation
+     * Method and hash used for expected hash computation.
+     *
+     * References are not allowed by fiat.
      */
-    ContentAddressWithReferences ca; /* hash and refs used for validating output */
+    ContentAddress ca;
 
     /**
      * Return the \ref StorePath "store path" corresponding to this output

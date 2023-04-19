@@ -1022,7 +1022,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
  */
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
 
-std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv);
+const ContentAddress * getDerivationCA(const BasicDerivation & drv);
 
 std::map<DrvOutput, StorePath> drvOutputReferences(
     Store & store,

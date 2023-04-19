@@ -1303,11 +1303,9 @@ drvName, Bindings * attrs, Value & v)
         auto method = ingestionMethod.value_or(FileIngestionMethod::Flat);
 
         DerivationOutput::CAFixed dof {
-            .ca = ContentAddressWithReferences::fromParts(
+            .ca = ContentAddress::fromParts(
                 std::move(method),
-                std::move(h),
-                // FIXME non-trivial fixed refs set
-                {}),
+                std::move(h)),
         };
 
         drv.env["out"] = state.store->printStorePath(dof.path(*state.store, drvName, "out"));
