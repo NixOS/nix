@@ -136,7 +136,7 @@ which you may remove.
 
 ### macOS
 
-1. Edit `/etc/zshrc` and `/etc/bashrc` to remove the lines sourcing
+1. Edit `/etc/zshrc`, `/etc/bashrc`, and `/etc/bash.bashrc` to remove the lines sourcing
    `nix-daemon.sh`, which should look like this:
 
    ```bash
@@ -153,6 +153,7 @@ which you may remove.
    ```console
    sudo mv /etc/zshrc.backup-before-nix /etc/zshrc
    sudo mv /etc/bashrc.backup-before-nix /etc/bashrc
+   sudo mv /etc/bash.bashrc.backup-before-nix /etc/bash.bashrc
    ```
 
    This will stop shells from sourcing the file and bringing everything you

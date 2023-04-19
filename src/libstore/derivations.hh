@@ -136,11 +136,15 @@ struct DerivationOutput : _DerivationOutputRaw
         const Store & store,
         std::string_view drvName,
         std::string_view outputName) const;
+    /**
+     * @param xpSettings Stop-gap to avoid globals during unit tests.
+     */
     static DerivationOutput fromJSON(
         const Store & store,
         std::string_view drvName,
         std::string_view outputName,
-        const nlohmann::json & json);
+        const nlohmann::json & json,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 };
 
 typedef std::map<std::string, DerivationOutput> DerivationOutputs;
