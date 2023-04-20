@@ -111,6 +111,7 @@ nix_tests = \
   import-derivation.sh \
   ca/import-derivation.sh \
   dyn-drv/text-hashed-output.sh \
+  dyn-drv/recursive-mod-json.sh \
   nix_path.sh \
   case-hack.sh \
   placeholders.sh \
