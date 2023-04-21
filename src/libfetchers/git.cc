@@ -432,6 +432,29 @@ struct GitInputScheme : InputScheme
             return {std::move(storePath), input};
         };
 
+        if (auto narHash = input.getNarHash()) {
+            auto expectedPath = store->makeFixedOutputPath(name, FixedOutputInfo {
+                .hash = {
+                    .method = FileIngestionMethod::Recursive,
+                    .hash = *narHash,
+                },
+                .references = {},
+            });
+
+            try {
+                store->ensurePath(expectedPath);
+
+                Attrs attrs({
+                    // TODO: do these need real values?
+                    {"lastModified", 0ull},
+                    {"revCount", 0ull},
+                });
+                return makeResult(attrs, StorePath(expectedPath));
+            } catch (Error & e) {
+                debug("substitution of input '%s' failed: %s", name, e.what());
+            }
+        }
+
         if (input.getRev()) {
             if (auto res = getCache()->lookup(store, getLockedAttrs()))
                 return makeResult(res->first, std::move(res->second));
