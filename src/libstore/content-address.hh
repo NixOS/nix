@@ -21,6 +21,12 @@ namespace nix {
  *
  * Somewhat obscure, used by \ref Derivation derivations and
  * `builtins.toFile` currently.
+ *
+ * TextIngestionMethod is identical to FileIngestionMethod::Fixed except that
+ * the former may not have self-references and is tagged `text:${algo}:${hash}`
+ * rather than `fixed:${algo}:${hash}`.  The contents of the store path are
+ * ingested and hashed identically, aside from the slightly different tag and
+ * restriction on self-references.
  */
 struct TextIngestionMethod : std::monostate { };
 
