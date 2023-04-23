@@ -819,6 +819,11 @@ bool DerivationGoal::cleanupDecideWhetherDiskFull()
 }
 
 
+void DerivationGoal::cleanupError()
+{
+}
+
+
 void DerivationGoal::cleanupPostOutputsRegisteredModeCheck()
 {
 }
@@ -984,6 +989,7 @@ void DerivationGoal::buildDone()
         done(BuildResult::Built, std::move(builtOutputs));
 
     } catch (BuildError & e) {
+        cleanupError();
         outputLocks.unlock();
 
         BuildResult::Status st = BuildResult::MiscFailure;

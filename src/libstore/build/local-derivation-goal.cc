@@ -349,6 +349,12 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
     }
 #endif
 
+    return diskFull;
+}
+
+
+void LocalDerivationGoal::cleanupError()
+{
     deleteTmpDir(false);
 
     /* Move paths out of the chroot for easier debugging of
@@ -361,8 +367,6 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
             if (pathExists(chrootRootDir + p))
                 renameFile((chrootRootDir + p), p);
         }
-
-    return diskFull;
 }
 
 
@@ -2336,6 +2340,9 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             }, *orifu);
         }},
         {[&](const std::string & path, const std::string & parent) {
+            // as the result is cast to an Error, the handler for BuildErrors is not run
+            // this will move paths out of a chroot directory
+            cleanupError();
             // TODO with more -vvvv also show the temporary paths for manual inspection.
             return BuildError(
                 "cycle detected in build of '%s' in the references of output '%s' from output '%s'",
