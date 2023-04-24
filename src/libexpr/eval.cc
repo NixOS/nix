@@ -111,7 +111,7 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
         printLiteralString(str, string.s);
         break;
     case tPath:
-        str << path; // !!! escaping?
+        str << path().to_string(); // !!! escaping?
         break;
     case tNull:
         str << "null";
@@ -535,6 +535,7 @@ EvalState::EvalState(
     , sOutputSpecified(symbols.create("outputSpecified"))
     , repair(NoRepair)
     , emptyBindings(0)
+    , derivationInternal(rootPath(CanonPath("/builtin/derivation.nix")))
     , store(store)
     , buildStore(buildStore ? buildStore : store)
     , debugRepl(nullptr)
@@ -612,11 +613,11 @@ void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & 
     mkStorePathString(storePath, v);
 }
 
-Path EvalState::checkSourcePath(const Path & path_)
+SourcePath EvalState::checkSourcePath(const SourcePath & path_)
 {
     if (!allowedPaths) return path_;
 
-    auto i = resolvedPaths.find(path_);
+    auto i = resolvedPaths.find(path_.path.abs());
     if (i != resolvedPaths.end())
         return i->second;
 
@@ -626,9 +627,9 @@ Path EvalState::checkSourcePath(const Path & path_)
      * attacker can't append ../../... to a path that would be in allowedPaths
      * and thus leak symlink targets.
      */
-    Path abspath = canonPath(path_);
+    Path abspath = canonPath(path_.path.abs());
 
-    if (hasPrefix(abspath, corepkgsPrefix)) return abspath;
+    if (hasPrefix(abspath, corepkgsPrefix)) return CanonPath(abspath);
 
     for (auto & i : *allowedPaths) {
         if (isDirOrInDir(abspath, i)) {
@@ -646,11 +647,11 @@ Path EvalState::checkSourcePath(const Path & path_)
 
     /* Resolve symlinks. */
     debug("checking access to '%s'", abspath);
-    Path path = canonPath(abspath, true);
+    SourcePath path = CanonPath(canonPath(abspath, true));
 
     for (auto & i : *allowedPaths) {
-        if (isDirOrInDir(path, i)) {
-            resolvedPaths[path_] = path;
+        if (isDirOrInDir(path.path.abs(), i)) {
+            resolvedPaths.insert_or_assign(path_.path.abs(), path);
             return path;
         }
     }
@@ -678,12 +679,12 @@ void EvalState::checkURI(const std::string & uri)
     /* If the URI is a path, then check it against allowedPaths as
        well. */
     if (hasPrefix(uri, "/")) {
-        checkSourcePath(uri);
+        checkSourcePath(CanonPath(uri));
         return;
     }
 
     if (hasPrefix(uri, "file://")) {
-        checkSourcePath(std::string(uri, 7));
+        checkSourcePath(CanonPath(std::string(uri, 7)));
         return;
     }
 
@@ -968,9 +969,9 @@ void Value::mkStringMove(const char * s, const NixStringContext & context)
 }
 
 
-void Value::mkPath(std::string_view s)
+void Value::mkPath(const SourcePath & path)
 {
-    mkPath(makeImmutableString(s));
+    mkPath(makeImmutableString(path.path.abs()));
 }
 
 
@@ -1026,9 +1027,9 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 void EvalState::mkPos(Value & v, PosIdx p)
 {
     auto pos = positions[p];
-    if (auto path = std::get_if<Path>(&pos.origin)) {
+    if (auto path = std::get_if<SourcePath>(&pos.origin)) {
         auto attrs = buildBindings(3);
-        attrs.alloc(sFile).mkString(*path);
+        attrs.alloc(sFile).mkString(path->path.abs());
         attrs.alloc(sLine).mkInt(pos.line);
         attrs.alloc(sColumn).mkInt(pos.column);
         v.mkAttrs(attrs);
@@ -1094,7 +1095,7 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
 }
 
 
-void EvalState::evalFile(const Path & path_, Value & v, bool mustBeTrivial)
+void EvalState::evalFile(const SourcePath & path_, Value & v, bool mustBeTrivial)
 {
     auto path = checkSourcePath(path_);
 
@@ -1104,7 +1105,7 @@ void EvalState::evalFile(const Path & path_, Value & v, bool mustBeTrivial)
         return;
     }
 
-    Path resolvedPath = resolveExprPath(path);
+    auto resolvedPath = resolveExprPath(path);
     if ((i = fileEvalCache.find(resolvedPath)) != fileEvalCache.end()) {
         v = i->second;
         return;
@@ -1132,8 +1133,8 @@ void EvalState::resetFileCache()
 
 
 void EvalState::cacheFile(
-    const Path & path,
-    const Path & resolvedPath,
+    const SourcePath & path,
+    const SourcePath & resolvedPath,
     Expr * e,
     Value & v,
     bool mustBeTrivial)
@@ -1147,7 +1148,7 @@ void EvalState::cacheFile(
                 *e,
                 this->baseEnv,
                 e->getPos() ? static_cast<std::shared_ptr<AbstractPos>>(positions[e->getPos()]) : nullptr,
-                "while evaluating the file '%1%':", resolvedPath)
+                "while evaluating the file '%1%':", resolvedPath.to_string())
             : nullptr;
 
         // Enforce that 'flake.nix' is a direct attrset, not a
@@ -1157,7 +1158,7 @@ void EvalState::cacheFile(
             error("file '%s' must be an attribute set", path).debugThrow<EvalError>();
         eval(e, v);
     } catch (Error & e) {
-        addErrorTrace(e, "while evaluating the file '%1%':", resolvedPath);
+        addErrorTrace(e, "while evaluating the file '%1%':", resolvedPath.to_string());
         throw;
     }
 
@@ -1418,8 +1419,8 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     } catch (Error & e) {
         if (pos2) {
             auto pos2r = state.positions[pos2];
-            auto origin = std::get_if<Path>(&pos2r.origin);
-            if (!(origin && *origin == state.derivationNixPath))
+            auto origin = std::get_if<SourcePath>(&pos2r.origin);
+            if (!(origin && *origin == state.derivationInternal))
                 state.addErrorTrace(e, pos2, "while evaluating the attribute '%1%'",
                     showAttrPath(state, env, attrPath));
         }
@@ -1992,7 +1993,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     else if (firstType == nPath) {
         if (!context.empty())
             state.error("a string that refers to a store path cannot be appended to a path").atPos(pos).withFrame(env, *this).debugThrow<EvalError>();
-        v.mkPath(canonPath(str()));
+        v.mkPath(CanonPath(canonPath(str())));
     } else
         v.mkStringMove(c_str(), context);
 }
@@ -2170,8 +2171,14 @@ std::optional<std::string> EvalState::tryAttrsToString(const PosIdx pos, Value &
     return {};
 }
 
-BackedStringView EvalState::coerceToString(const PosIdx pos, Value &v, NixStringContext &context,
-    std::string_view errorCtx, bool coerceMore, bool copyToStore, bool canonicalizePath)
+BackedStringView EvalState::coerceToString(
+    const PosIdx pos,
+    Value & v,
+    NixStringContext & context,
+    std::string_view errorCtx,
+    bool coerceMore,
+    bool copyToStore,
+    bool canonicalizePath)
 {
     forceValue(v, pos);
 
@@ -2181,12 +2188,14 @@ BackedStringView EvalState::coerceToString(const PosIdx pos, Value &v, NixString
     }
 
     if (v.type() == nPath) {
-        BackedStringView path(PathView(v.path));
-        if (canonicalizePath)
-            path = canonPath(*path);
-        if (copyToStore)
-            path = store->printStorePath(copyPathToStore(context, std::move(path).toOwned()));
-        return path;
+        return
+            !canonicalizePath && !copyToStore
+            ? // FIXME: hack to preserve path literals that end in a
+              // slash, as in /foo/${x}.
+              v._path
+            : copyToStore
+            ? store->printStorePath(copyPathToStore(context, v.path()))
+            : std::string(v.path().path.abs());
     }
 
     if (v.type() == nAttrs) {
@@ -2247,24 +2256,22 @@ BackedStringView EvalState::coerceToString(const PosIdx pos, Value &v, NixString
 }
 
 
-StorePath EvalState::copyPathToStore(NixStringContext & context, const Path & path)
+StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePath & path)
 {
-    if (nix::isDerivation(path))
+    if (nix::isDerivation(path.path.abs()))
         error("file names are not allowed to end in '%1%'", drvExtension).debugThrow<EvalError>();
 
-    auto dstPath = [&]() -> StorePath
-    {
-        auto i = srcToStore.find(path);
-        if (i != srcToStore.end()) return i->second;
+    auto i = srcToStore.find(path);
 
-        auto dstPath = settings.readOnlyMode
-            ? store->computeStorePathForPath(std::string(baseNameOf(path)), checkSourcePath(path)).first
-            : store->addToStore(std::string(baseNameOf(path)), checkSourcePath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
-        allowPath(dstPath);
-        srcToStore.insert_or_assign(path, dstPath);
-        printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
-        return dstPath;
-    }();
+    auto dstPath = i != srcToStore.end()
+        ? i->second
+        : [&]() {
+            auto dstPath = path.fetchToStore(store, path.baseName(), nullptr, repair);
+            allowPath(dstPath);
+            srcToStore.insert_or_assign(path, dstPath);
+            printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
+            return dstPath;
+        }();
 
     context.insert(NixStringContextElem::Opaque {
         .path = dstPath
@@ -2273,12 +2280,12 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const Path & pa
 }
 
 
-Path EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)
+SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)
 {
     auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
     if (path == "" || path[0] != '/')
         error("string '%1%' doesn't represent an absolute path", path).withTrace(pos, errorCtx).debugThrow<EvalError>();
-    return path;
+    return CanonPath(path);
 }
 
 
@@ -2321,7 +2328,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
             return strcmp(v1.string.s, v2.string.s) == 0;
 
         case nPath:
-            return strcmp(v1.path, v2.path) == 0;
+            return strcmp(v1._path, v2._path) == 0;
 
         case nNull:
             return true;
@@ -2448,8 +2455,8 @@ void EvalState::printStats()
                     else
                         obj["name"] = nullptr;
                     if (auto pos = positions[fun->pos]) {
-                        if (auto path = std::get_if<Path>(&pos.origin))
-                            obj["file"] = *path;
+                        if (auto path = std::get_if<SourcePath>(&pos.origin))
+                            obj["file"] = path->to_string();
                         obj["line"] = pos.line;
                         obj["column"] = pos.column;
                     }
@@ -2463,8 +2470,8 @@ void EvalState::printStats()
                 for (auto & i : attrSelects) {
                     json obj = json::object();
                     if (auto pos = positions[i.first]) {
-                        if (auto path = std::get_if<Path>(&pos.origin))
-                            obj["file"] = *path;
+                        if (auto path = std::get_if<SourcePath>(&pos.origin))
+                            obj["file"] = path->to_string();
                         obj["line"] = pos.line;
                         obj["column"] = pos.column;
                     }

@@ -8,6 +8,7 @@ namespace nix {
 class Store;
 class EvalState;
 class Bindings;
+struct SourcePath;
 
 struct MixEvalArgs : virtual Args
 {
@@ -25,6 +26,6 @@ private:
     std::map<std::string, std::string> autoArgs;
 };
 
-Path lookupFileArg(EvalState & state, std::string_view s);
+SourcePath lookupFileArg(EvalState & state, std::string_view s);
 
 }

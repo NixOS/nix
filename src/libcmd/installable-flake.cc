@@ -96,8 +96,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
         auto v = attr->forceValue();
 
         if (v.type() == nPath) {
-            NixStringContext context;
-            auto storePath = state->copyPathToStore(context, Path(v.path));
+            auto storePath = v.path().fetchToStore(state->store);
             return {{
                 .path = DerivedPath::Opaque {
                     .path = std::move(storePath),
