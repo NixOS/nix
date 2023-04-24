@@ -610,8 +610,7 @@ void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & 
 {
     allowPath(storePath);
 
-    auto path = store->printStorePath(storePath);
-    v.mkString(path, PathSet({path}));
+    mkStorePathString(storePath, v);
 }
 
 SourcePath EvalState::checkSourcePath(const SourcePath & path_)
@@ -693,7 +692,7 @@ void EvalState::checkURI(const std::string & uri)
 }
 
 
-Path EvalState::toRealPath(const Path & path, const PathSet & context)
+Path EvalState::toRealPath(const Path & path, const NixStringContext & context)
 {
     // FIXME: check whether 'path' is in 'context'.
     return
@@ -945,25 +944,25 @@ void Value::mkString(std::string_view s)
 }
 
 
-static void copyContextToValue(Value & v, const PathSet & context)
+static void copyContextToValue(Value & v, const NixStringContext & context)
 {
     if (!context.empty()) {
         size_t n = 0;
         v.string.context = (const char * *)
             allocBytes((context.size() + 1) * sizeof(char *));
         for (auto & i : context)
-            v.string.context[n++] = dupString(i.c_str());
+            v.string.context[n++] = dupString(i.to_string().c_str());
         v.string.context[n] = 0;
     }
 }
 
-void Value::mkString(std::string_view s, const PathSet & context)
+void Value::mkString(std::string_view s, const NixStringContext & context)
 {
     mkString(s);
     copyContextToValue(*this, context);
 }
 
-void Value::mkStringMove(const char * s, const PathSet & context)
+void Value::mkStringMove(const char * s, const NixStringContext & context)
 {
     mkString(s);
     copyContextToValue(*this, context);
@@ -1036,6 +1035,16 @@ void EvalState::mkPos(Value & v, PosIdx p)
         v.mkAttrs(attrs);
     } else
         v.mkNull();
+}
+
+
+void EvalState::mkStorePathString(const StorePath & p, Value & v)
+{
+    v.mkString(
+        store->printStorePath(p),
+        NixStringContext {
+            NixStringContextElem::Opaque { .path = p },
+        });
 }
 
 
@@ -1901,7 +1910,7 @@ void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const Po
 
 void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 {
-    PathSet context;
+    NixStringContext context;
     std::vector<BackedStringView> s;
     size_t sSize = 0;
     NixInt n = 0;
@@ -2110,26 +2119,15 @@ std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string
 }
 
 
-void copyContext(const Value & v, PathSet & context)
+void copyContext(const Value & v, NixStringContext & context)
 {
     if (v.string.context)
         for (const char * * p = v.string.context; *p; ++p)
-            context.insert(*p);
+            context.insert(NixStringContextElem::parse(*p));
 }
 
 
-NixStringContext Value::getContext(const Store & store)
-{
-    NixStringContext res;
-    assert(internalType == tString);
-    if (string.context)
-        for (const char * * p = string.context; *p; ++p)
-            res.push_back(NixStringContextElem::parse(store, *p));
-    return res;
-}
-
-
-std::string_view EvalState::forceString(Value & v, PathSet & context, const PosIdx pos, std::string_view errorCtx)
+std::string_view EvalState::forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx)
 {
     auto s = forceString(v, pos, errorCtx);
     copyContext(v, context);
@@ -2159,7 +2157,7 @@ bool EvalState::isDerivation(Value & v)
 
 
 std::optional<std::string> EvalState::tryAttrsToString(const PosIdx pos, Value & v,
-    PathSet & context, bool coerceMore, bool copyToStore)
+    NixStringContext & context, bool coerceMore, bool copyToStore)
 {
     auto i = v.attrs->find(sToString);
     if (i != v.attrs->end()) {
@@ -2176,7 +2174,7 @@ std::optional<std::string> EvalState::tryAttrsToString(const PosIdx pos, Value &
 BackedStringView EvalState::coerceToString(
     const PosIdx pos,
     Value & v,
-    PathSet & context,
+    NixStringContext & context,
     std::string_view errorCtx,
     bool coerceMore,
     bool copyToStore,
@@ -2258,7 +2256,7 @@ BackedStringView EvalState::coerceToString(
 }
 
 
-StorePath EvalState::copyPathToStore(PathSet & context, const SourcePath & path)
+StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePath & path)
 {
     if (nix::isDerivation(path.path.abs()))
         error("file names are not allowed to end in '%1%'", drvExtension).debugThrow<EvalError>();
@@ -2275,12 +2273,14 @@ StorePath EvalState::copyPathToStore(PathSet & context, const SourcePath & path)
             return dstPath;
         }();
 
-    context.insert(store->printStorePath(dstPath));
+    context.insert(NixStringContextElem::Opaque {
+        .path = dstPath
+    });
     return dstPath;
 }
 
 
-SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, PathSet & context, std::string_view errorCtx)
+SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)
 {
     auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
     if (path == "" || path[0] != '/')
@@ -2289,7 +2289,7 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, PathSet & contex
 }
 
 
-StorePath EvalState::coerceToStorePath(const PosIdx pos, Value & v, PathSet & context, std::string_view errorCtx)
+StorePath EvalState::coerceToStorePath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)
 {
     auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
     if (auto storePath = store->maybeParseStorePath(path))
@@ -2496,7 +2496,7 @@ void EvalState::printStats()
 }
 
 
-std::string ExternalValueBase::coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore) const
+std::string ExternalValueBase::coerceToString(const Pos & pos, NixStringContext & context, bool copyMore, bool copyToStore) const
 {
     throw TypeError({
         .msg = hintfmt("cannot coerce %1% to a string", showType())

@@ -593,7 +593,7 @@ bool NixRepl::processLine(std::string line)
 
         const auto [path, line] = [&] () -> std::pair<SourcePath, uint32_t> {
             if (v.type() == nPath || v.type() == nString) {
-                PathSet context;
+                NixStringContext context;
                 auto path = state->coerceToPath(noPos, v, context, "while evaluating the filename to edit");
                 return {path, 0};
             } else if (v.isLambda()) {
@@ -936,7 +936,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         if (isDrv) {
             str << "«derivation ";
             Bindings::iterator i = v.attrs->find(state->sDrvPath);
-            PathSet context;
+            NixStringContext context;
             if (i != v.attrs->end())
                 str << state->store->printStorePath(state->coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation"));
             else

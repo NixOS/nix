@@ -81,10 +81,25 @@ struct Goal : public std::enable_shared_from_this<Goal>
      */
     ExitCode exitCode = ecBusy;
 
+protected:
     /**
      * Build result.
      */
     BuildResult buildResult;
+
+public:
+
+    /**
+     * Project a `BuildResult` with just the information that pertains
+     * to the given request.
+     *
+     * In general, goals may be aliased between multiple requests, and
+     * the stored `BuildResult` has information for the union of all
+     * requests. We don't want to leak what the other request are for
+     * sake of both privacy and determinism, and this "safe accessor"
+     * ensures we don't.
+     */
+    BuildResult getBuildResult(const DerivedPath &);
 
     /**
      * Exception containing an error message, if any.
@@ -93,7 +108,6 @@ struct Goal : public std::enable_shared_from_this<Goal>
 
     Goal(Worker & worker, DerivedPath path)
         : worker(worker)
-        , buildResult { .path = std::move(path) }
     { }
 
     virtual ~Goal()

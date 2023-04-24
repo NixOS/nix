@@ -57,7 +57,7 @@ void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & 
 
 std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env);
 
-void copyContext(const Value & v, PathSet & context);
+void copyContext(const Value & v, NixStringContext & context);
 
 
 std::string printValue(const EvalState & state, const Value & v);
@@ -330,7 +330,7 @@ public:
      * intended to distinguish between import-from-derivation and
      * sources stored in the actual /nix/store.
      */
-    Path toRealPath(const Path & path, const PathSet & context);
+    Path toRealPath(const Path & path, const NixStringContext & context);
 
     /**
      * Parse a Nix expression from the specified file.
@@ -426,7 +426,7 @@ public:
      */
     void forceFunction(Value & v, const PosIdx pos, std::string_view errorCtx);
     std::string_view forceString(Value & v, const PosIdx pos, std::string_view errorCtx);
-    std::string_view forceString(Value & v, PathSet & context, const PosIdx pos, std::string_view errorCtx);
+    std::string_view forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx);
     std::string_view forceStringNoCtx(Value & v, const PosIdx pos, std::string_view errorCtx);
 
     [[gnu::noinline]]
@@ -442,7 +442,7 @@ public:
     bool isDerivation(Value & v);
 
     std::optional<std::string> tryAttrsToString(const PosIdx pos, Value & v,
-        PathSet & context, bool coerceMore = false, bool copyToStore = true);
+        NixStringContext & context, bool coerceMore = false, bool copyToStore = true);
 
     /**
      * String coercion.
@@ -452,12 +452,12 @@ public:
      * booleans and lists to a string.  If `copyToStore` is set,
      * referenced paths are copied to the Nix store as a side effect.
      */
-    BackedStringView coerceToString(const PosIdx pos, Value & v, PathSet & context,
+    BackedStringView coerceToString(const PosIdx pos, Value & v, NixStringContext & context,
         std::string_view errorCtx,
         bool coerceMore = false, bool copyToStore = true,
         bool canonicalizePath = true);
 
-    StorePath copyPathToStore(PathSet & context, const SourcePath & path);
+    StorePath copyPathToStore(NixStringContext & context, const SourcePath & path);
 
     /**
      * Path coercion.
@@ -466,12 +466,12 @@ public:
      * path.  The result is guaranteed to be a canonicalised, absolute
      * path.  Nothing is copied to the store.
      */
-    SourcePath coerceToPath(const PosIdx pos, Value & v, PathSet & context, std::string_view errorCtx);
+    SourcePath coerceToPath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx);
 
     /**
      * Like coerceToPath, but the result must be a store path.
      */
-    StorePath coerceToStorePath(const PosIdx pos, Value & v, PathSet & context, std::string_view errorCtx);
+    StorePath coerceToStorePath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx);
 
 public:
 
@@ -576,6 +576,12 @@ public:
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, PosIdx pos);
 
+    /* Create a string representing a store path.
+
+       The string is the printed store path with a context containing a single
+       `Opaque` element of that store path. */
+    void mkStorePathString(const StorePath & storePath, Value & v);
+
     void concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos, std::string_view errorCtx);
 
     /**
@@ -587,7 +593,7 @@ public:
      * Realise the given context, and return a mapping from the placeholders
      * used to construct the associated value to their final store path
      */
-    [[nodiscard]] StringMap realiseContext(const PathSet & context);
+    [[nodiscard]] StringMap realiseContext(const NixStringContext & context);
 
 private:
 

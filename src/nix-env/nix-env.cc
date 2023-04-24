@@ -962,7 +962,7 @@ static void queryJSON(Globals & globals, std::vector<DrvInfo> & elems, bool prin
                         printError("derivation '%s' has invalid meta attribute '%s'", i.queryName(), j);
                         metaObj[j] = nullptr;
                     } else {
-                        PathSet context;
+                        NixStringContext context;
                         metaObj[j] = printValueAsJSON(*globals.state, true, *v, noPos, context);
                     }
                 }

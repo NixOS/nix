@@ -10,7 +10,6 @@
 #include <cctype>
 #include <exception>
 #include <iostream>
-#include <mutex>
 
 #include <cstdlib>
 #include <sys/time.h>
@@ -20,15 +19,8 @@
 #ifdef __linux__
 #include <features.h>
 #endif
-#ifdef __GLIBC__
-#include <gnu/lib-names.h>
-#include <nss.h>
-#include <dlfcn.h>
-#endif
 
 #include <openssl/crypto.h>
-
-#include <sodium.h>
 
 
 namespace nix {
@@ -115,57 +107,6 @@ std::string getArg(const std::string & opt,
     return *i;
 }
 
-
-#if OPENSSL_VERSION_NUMBER < 0x10101000L
-/* OpenSSL is not thread-safe by default - it will randomly crash
-   unless the user supplies a mutex locking function. So let's do
-   that. */
-static std::vector<std::mutex> opensslLocks;
-
-static void opensslLockCallback(int mode, int type, const char * file, int line)
-{
-    if (mode & CRYPTO_LOCK)
-        opensslLocks[type].lock();
-    else
-        opensslLocks[type].unlock();
-}
-#endif
-
-static std::once_flag dns_resolve_flag;
-
-static void preloadNSS() {
-    /* builtin:fetchurl can trigger a DNS lookup, which with glibc can trigger a dynamic library load of
-       one of the glibc NSS libraries in a sandboxed child, which will fail unless the library's already
-       been loaded in the parent. So we force a lookup of an invalid domain to force the NSS machinery to
-       load its lookup libraries in the parent before any child gets a chance to. */
-    std::call_once(dns_resolve_flag, []() {
-#ifdef __GLIBC__
-        /* On linux, glibc will run every lookup through the nss layer.
-         * That means every lookup goes, by default, through nscd, which acts as a local
-         * cache.
-         * Because we run builds in a sandbox, we also remove access to nscd otherwise
-         * lookups would leak into the sandbox.
-         *
-         * But now we have a new problem, we need to make sure the nss_dns backend that
-         * does the dns lookups when nscd is not available is loaded or available.
-         *
-         * We can't make it available without leaking nix's environment, so instead we'll
-         * load the backend, and configure nss so it does not try to run dns lookups
-         * through nscd.
-         *
-         * This is technically only used for builtins:fetch* functions so we only care
-         * about dns.
-         *
-         * All other platforms are unaffected.
-         */
-        if (!dlopen(LIBNSS_DNS_SO, RTLD_NOW))
-            warn("unable to load nss_dns backend");
-        // FIXME: get hosts entry from nsswitch.conf.
-        __nss_configure_lookup("hosts", "files dns");
-#endif
-    });
-}
-
 static void sigHandler(int signo) { }
 
 
@@ -177,16 +118,7 @@ void initNix()
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
 
-#if OPENSSL_VERSION_NUMBER < 0x10101000L
-    /* Initialise OpenSSL locking. */
-    opensslLocks = std::vector<std::mutex>(CRYPTO_num_locks());
-    CRYPTO_set_locking_callback(opensslLockCallback);
-#endif
-
-    if (sodium_init() == -1)
-        throw Error("could not initialise libsodium");
-
-    loadConfFile();
+    initLibStore();
 
     startSignalHandlerThread();
 
@@ -223,7 +155,10 @@ void initNix()
     if (sigaction(SIGTRAP, &act, 0)) throw SysError("handling SIGTRAP");
 #endif
 
-    /* Register a SIGSEGV handler to detect stack overflows. */
+    /* Register a SIGSEGV handler to detect stack overflows.
+       Why not initLibExpr()? initGC() is essentially that, but
+       detectStackOverflow is not an instance of the init function concept, as
+       it may have to be invoked more than once per process. */
     detectStackOverflow();
 
     /* There is no privacy in the Nix system ;-)  At least not for
@@ -236,16 +171,6 @@ void initNix()
     gettimeofday(&tv, 0);
     srandom(tv.tv_usec);
 
-    /* On macOS, don't use the per-session TMPDIR (as set e.g. by
-       sshd). This breaks build users because they don't have access
-       to the TMPDIR, in particular in ‘nix-store --serve’. */
-#if __APPLE__
-    if (hasPrefix(getEnv("TMPDIR").value_or("/tmp"), "/var/folders/"))
-        unsetenv("TMPDIR");
-#endif
-
-    preloadNSS();
-    initLibStore();
 }
 
 

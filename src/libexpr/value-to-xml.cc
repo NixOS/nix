@@ -18,7 +18,7 @@ static XMLAttrs singletonAttrs(const std::string & name, const std::string & val
 
 
 static void printValueAsXML(EvalState & state, bool strict, bool location,
-    Value & v, XMLWriter & doc, PathSet & context, PathSet & drvsSeen,
+    Value & v, XMLWriter & doc, NixStringContext & context, PathSet & drvsSeen,
     const PosIdx pos);
 
 
@@ -32,7 +32,7 @@ static void posToXML(EvalState & state, XMLAttrs & xmlAttrs, const Pos & pos)
 
 
 static void showAttrs(EvalState & state, bool strict, bool location,
-    Bindings & attrs, XMLWriter & doc, PathSet & context, PathSet & drvsSeen)
+    Bindings & attrs, XMLWriter & doc, NixStringContext & context, PathSet & drvsSeen)
 {
     StringSet names;
 
@@ -54,7 +54,7 @@ static void showAttrs(EvalState & state, bool strict, bool location,
 
 
 static void printValueAsXML(EvalState & state, bool strict, bool location,
-    Value & v, XMLWriter & doc, PathSet & context, PathSet & drvsSeen,
+    Value & v, XMLWriter & doc, NixStringContext & context, PathSet & drvsSeen,
     const PosIdx pos)
 {
     checkInterrupt();
@@ -166,7 +166,7 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 
 
 void ExternalValueBase::printValueAsXML(EvalState & state, bool strict,
-    bool location, XMLWriter & doc, PathSet & context, PathSet & drvsSeen,
+    bool location, XMLWriter & doc, NixStringContext & context, PathSet & drvsSeen,
     const PosIdx pos) const
 {
     doc.writeEmptyElement("unevaluated");
@@ -174,7 +174,7 @@ void ExternalValueBase::printValueAsXML(EvalState & state, bool strict,
 
 
 void printValueAsXML(EvalState & state, bool strict, bool location,
-    Value & v, std::ostream & out, PathSet & context, const PosIdx pos)
+    Value & v, std::ostream & out, NixStringContext & context, const PosIdx pos)
 {
     XMLWriter doc(true, out);
     XMLOpenElement root(doc, "expr");

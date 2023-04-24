@@ -593,8 +593,8 @@ std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build
                 std::visit(overloaded {
                     [&](const DerivedPath::Built & bfd) {
                         std::map<std::string, StorePath> outputs;
-                        for (auto & path : buildResult.builtOutputs)
-                            outputs.emplace(path.first.outputName, path.second.outPath);
+                        for (auto & [outputName, realisation] : buildResult.builtOutputs)
+                            outputs.emplace(outputName, realisation.outPath);
                         res.push_back({aux.installable, {
                             .path = BuiltPath::Built { bfd.drvPath, outputs },
                             .info = aux.info,

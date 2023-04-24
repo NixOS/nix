@@ -26,7 +26,7 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
         options->addSetting(this);
     }
 
-    void set(const std::string & str, bool append = false) override;
+    unsigned int parse(const std::string & str) const override;
 };
 
 struct PluginFilesSetting : public BaseSetting<Paths>
@@ -43,7 +43,7 @@ struct PluginFilesSetting : public BaseSetting<Paths>
         options->addSetting(this);
     }
 
-    void set(const std::string & str, bool append = false) override;
+    Paths parse(const std::string & str) const override;
 };
 
 const uint32_t maxIdsPerBuild =
@@ -457,11 +457,6 @@ public:
           at the moment the garbage collector is run.
         )",
         {"env-keep-derivations"}};
-
-    /**
-     * Whether to lock the Nix client and worker to the same CPU.
-     */
-    bool lockCPU;
 
     Setting<SandboxMode> sandboxMode{
         this,

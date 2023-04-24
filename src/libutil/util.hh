@@ -32,6 +32,7 @@ namespace nix {
 struct Sink;
 struct Source;
 
+void initLibUtil();
 
 /**
  * The system for which Nix is compiled.
@@ -445,6 +446,8 @@ void setStackSize(size_t stackSize);
 /**
  * Restore the original inherited Unix process context (such as signal
  * masks, stack size).
+
+ * See startSignalHandlerThread(), saveSignalMask().
  */
 void restoreProcessContext(bool restoreMounts = true);
 
@@ -814,8 +817,25 @@ class Callback;
 /**
  * Start a thread that handles various signals. Also block those signals
  * on the current thread (and thus any threads created by it).
+ * Saves the signal mask before changing the mask to block those signals.
+ * See saveSignalMask().
  */
 void startSignalHandlerThread();
+
+/**
+ * Saves the signal mask, which is the signal mask that nix will restore
+ * before creating child processes.
+ * See setChildSignalMask() to set an arbitrary signal mask instead of the
+ * current mask.
+ */
+void saveSignalMask();
+
+/**
+ * Sets the signal mask. Like saveSignalMask() but for a signal set that doesn't
+ * necessarily match the current thread's mask.
+ * See saveSignalMask() to set the saved mask to the current mask.
+ */
+void setChildSignalMask(sigset_t *sigs);
 
 struct InterruptCallback
 {

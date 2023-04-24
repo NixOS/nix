@@ -92,6 +92,13 @@ struct ValidPathInfo
 
     void sign(const Store & store, const SecretKey & secretKey);
 
+	/**
+	 * @return The `ContentAddressWithReferences` that determines the
+	 * store path for a content-addressed store object, `std::nullopt`
+	 * for an input-addressed store object.
+	 */
+    std::optional<ContentAddressWithReferences> contentAddressWithReferences() const;
+
     /**
      * @return true iff the path is verifiably content-addressed.
      */
@@ -117,6 +124,9 @@ struct ValidPathInfo
 
     ValidPathInfo(StorePath && path, Hash narHash) : path(std::move(path)), narHash(narHash) { };
     ValidPathInfo(const StorePath & path, Hash narHash) : path(path), narHash(narHash) { };
+
+    ValidPathInfo(const Store & store,
+        std::string_view name, ContentAddressWithReferences && ca, Hash narHash);
 
     virtual ~ValidPathInfo() { }
 

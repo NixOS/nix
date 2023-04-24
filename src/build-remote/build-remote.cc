@@ -311,8 +311,9 @@ connected:
                 auto thisOutputId = DrvOutput{ thisOutputHash, outputName };
                 if (!store->queryRealisation(thisOutputId)) {
                     debug("missing output %s", outputName);
-                    assert(result.builtOutputs.count(thisOutputId));
-                    auto newRealisation = result.builtOutputs.at(thisOutputId);
+                    auto i = result.builtOutputs.find(outputName);
+                    assert(i != result.builtOutputs.end());
+                    auto & newRealisation = i->second;
                     missingRealisations.insert(newRealisation);
                     missingPaths.insert(newRealisation.outPath);
                 }

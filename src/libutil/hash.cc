@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstring>
 
+#include <openssl/crypto.h>
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 
@@ -15,7 +16,6 @@
 #include <fcntl.h>
 
 namespace nix {
-
 
 static size_t regularHashSize(HashType type) {
     switch (type) {

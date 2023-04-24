@@ -438,7 +438,7 @@ struct CmdFlakeCheck : FlakeCommand
 
                 if (auto attr = v.attrs->get(state->symbols.create("path"))) {
                     if (attr->name == state->symbols.create("path")) {
-                        PathSet context;
+                        NixStringContext context;
                         auto path = state->coerceToPath(attr->pos, *attr->value, context, "");
                         if (!path.pathExists())
                             throw Error("template '%s' refers to a non-existent path '%s'", attrPath, path);
