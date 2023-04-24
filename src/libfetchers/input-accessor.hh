@@ -13,7 +13,17 @@ class Store;
 
 struct InputAccessor
 {
-    enum Type { tRegular, tSymlink, tDirectory, tMisc };
+    enum Type {
+      tRegular, tSymlink, tDirectory,
+      /**
+        Any other node types that may be encountered on the file system, such as device nodes, sockets, named pipe, and possibly even more exotic things.
+
+        Responsible for `"unknown"` from `builtins.readFileType "/dev/null"`.
+
+        Unlike `DT_UNKNOWN`, this must not be used for deferring the lookup of types.
+      */
+      tMisc
+    };
 
     struct Stat
     {
