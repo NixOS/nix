@@ -236,6 +236,8 @@ struct Command : virtual public Args
 
     static constexpr Category catDefault = 0;
 
+    virtual std::optional<ExperimentalFeature> experimentalFeature ();
+
     virtual Category category() { return catDefault; }
 };
 

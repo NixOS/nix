@@ -83,6 +83,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .description = "Print full build logs on standard error.",
             .category = loggingCategory,
             .handler = {[&]() { logger->setPrintBuildLogs(true); }},
+            .experimentalFeature = Xp::NixCommand,
         });
 
         addFlag({
@@ -98,6 +99,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .description = "Disable substituters and consider all previously downloaded files up-to-date.",
             .category = miscCategory,
             .handler = {[&]() { useNet = false; }},
+            .experimentalFeature = Xp::NixCommand,
         });
 
         addFlag({
@@ -105,6 +107,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .description = "Consider all previously downloaded files out-of-date.",
             .category = miscCategory,
             .handler = {[&]() { refresh = true; }},
+            .experimentalFeature = Xp::NixCommand,
         });
     }
 
@@ -124,6 +127,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         {"optimise-store", {"store", "optimise"}},
         {"ping-store", {"store", "ping"}},
         {"sign-paths", {"store", "sign"}},
+        {"show-derivation", {"derivation", "show"}},
         {"to-base16", {"hash", "to-base16"}},
         {"to-base32", {"hash", "to-base32"}},
         {"to-base64", {"hash", "to-base64"}},
@@ -368,6 +372,11 @@ void mainWrapped(int argc, char * * argv)
         return;
     }
 
+    if (argc == 2 && std::string(argv[1]) == "__dump-xp-features") {
+        logger->cout(documentExperimentalFeatures().dump());
+        return;
+    }
+
     Finally printCompletions([&]()
     {
         if (completions) {
@@ -417,10 +426,8 @@ void mainWrapped(int argc, char * * argv)
     if (!args.command)
         throw UsageError("no subcommand specified");
 
-    if (args.command->first != "repl"
-        && args.command->first != "doctor"
-        && args.command->first != "upgrade-nix")
-        experimentalFeatureSettings.require(Xp::NixCommand);
+    experimentalFeatureSettings.require(
+        args.command->second->experimentalFeature());
 
     if (args.useNet && !haveInternet()) {
         warn("you don't have Internet access; disabling some network-dependent features");

@@ -23,7 +23,7 @@ static void prim_patch(EvalState & state, const PosIdx pos, Value * * args, Valu
         };
 
         if (n == "src") {
-            PathSet context;
+            NixStringContext context;
             src.emplace(state.coerceToPath(pos, *attr.value, context,
                     "while evaluating the 'src' attribute passed to 'builtins.patch'"));
         }
@@ -34,7 +34,7 @@ static void prim_patch(EvalState & state, const PosIdx pos, Value * * args, Valu
                 "while evaluating the 'patchFiles' attribute passed to 'builtins.patch'");
             for (auto elem : attr.value->listItems()) {
                 // FIXME: use realisePath
-                PathSet context;
+                NixStringContext context;
                 auto patchFile = state.coerceToPath(attr.pos, *elem, context,
                     "while evaluating the 'patchFiles' attribute passed to 'builtins.patch'");
                 patches.push_back(patchFile.readFile());

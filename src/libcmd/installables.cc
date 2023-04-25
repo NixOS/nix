@@ -19,6 +19,7 @@
 #include "url.hh"
 #include "registry.hh"
 #include "build-result.hh"
+#include "fs-input-accessor.hh"
 
 #include <regex>
 #include <queue>
@@ -100,6 +101,28 @@ MixFlakeOptions::MixFlakeOptions()
             else if (n == 1)
                 completeFlakeRef(getEvalState()->store, prefix);
         }}
+    });
+
+    addFlag({
+        .longName = "reference-lock-file",
+        .description = "Read the given lock file instead of `flake.lock` within the top-level flake.",
+        .category = category,
+        .labels = {"flake-lock-path"},
+        .handler = {[&](std::string lockFilePath) {
+            lockFlags.referenceLockFilePath = getUnfilteredRootPath(CanonPath::fromCwd(lockFilePath));
+        }},
+        .completer = completePath
+    });
+
+    addFlag({
+        .longName = "output-lock-file",
+        .description = "Write the given lock file instead of `flake.lock` within the top-level flake.",
+        .category = category,
+        .labels = {"flake-lock-path"},
+        .handler = {[&](std::string lockFilePath) {
+            lockFlags.outputLockFilePath = getUnfilteredRootPath(CanonPath::fromCwd(lockFilePath));
+        }},
+        .completer = completePath
     });
 
     addFlag({
@@ -572,8 +595,8 @@ std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build
                 std::visit(overloaded {
                     [&](const DerivedPath::Built & bfd) {
                         std::map<std::string, StorePath> outputs;
-                        for (auto & path : buildResult.builtOutputs)
-                            outputs.emplace(path.first.outputName, path.second.outPath);
+                        for (auto & [outputName, realisation] : buildResult.builtOutputs)
+                            outputs.emplace(outputName, realisation.outPath);
                         res.push_back({aux.installable, {
                             .path = BuiltPath::Built { bfd.drvPath, outputs },
                             .info = aux.info,

@@ -26,4 +26,6 @@ ref<FSInputAccessor> makeStorePathAccessor(
     const StorePath & storePath,
     MakeNotAllowedError && makeNotAllowedError = {});
 
+SourcePath getUnfilteredRootPath(CanonPath path);
+
 }

@@ -200,12 +200,22 @@ struct ProfileManifest
         auto narHash = hashString(htSHA256, sink.s);
 
         ValidPathInfo info {
-            store->makeFixedOutputPath(FileIngestionMethod::Recursive, narHash, "profile", references),
+            *store,
+            "profile",
+            FixedOutputInfo {
+                .hash = {
+                    .method = FileIngestionMethod::Recursive,
+                    .hash = narHash,
+                },
+                .references = {
+                    .others = std::move(references),
+                    // profiles never refer to themselves
+                    .self = false,
+                },
+            },
             narHash,
         };
-        info.references = std::move(references);
         info.narSize = sink.s.size();
-        info.ca = FixedOutputHash { .method = FileIngestionMethod::Recursive, .hash = info.narHash };
 
         StringSource source(sink.s);
         store->addToStore(info, source);

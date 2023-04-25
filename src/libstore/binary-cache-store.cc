@@ -306,11 +306,22 @@ StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, std::string_view n
         unsupported("addToStoreFromDump");
     return addToStoreCommon(dump, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
-            makeFixedOutputPath(method, nar.first, name, references),
+            *this,
+            name,
+            FixedOutputInfo {
+                .hash = {
+                    .method = method,
+                    .hash = nar.first,
+                },
+                .references = {
+                    .others = references,
+                    // caller is not capable of creating a self-reference, because this is content-addressed without modulus
+                    .self = false,
+                },
+            },
             nar.first,
         };
         info.narSize = nar.second;
-        info.references = references;
         return info;
     })->path;
 }
@@ -414,15 +425,22 @@ StorePath BinaryCacheStore::addToStore(
     });
     return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
-            makeFixedOutputPath(method, h, name, references),
+            *this,
+            name,
+            FixedOutputInfo {
+                .hash = {
+                    .method = method,
+                    .hash = h,
+                },
+                .references = {
+                    .others = references,
+                    // caller is not capable of creating a self-reference, because this is content-addressed without modulus
+                    .self = false,
+                },
+            },
             nar.first,
         };
         info.narSize = nar.second;
-        info.references = references;
-        info.ca = FixedOutputHash {
-            .method = method,
-            .hash = h,
-        };
         return info;
     })->path;
 }
@@ -434,7 +452,7 @@ StorePath BinaryCacheStore::addTextToStore(
     RepairFlag repair)
 {
     auto textHash = hashString(htSHA256, s);
-    auto path = makeTextPath(name, textHash, references);
+    auto path = makeTextPath(name, TextInfo { { textHash }, references });
 
     if (!repair && isValidPath(path))
         return path;
@@ -443,10 +461,16 @@ StorePath BinaryCacheStore::addTextToStore(
     dumpString(s, sink);
     StringSource source(sink.s);
     return addToStoreCommon(source, repair, CheckSigs, [&](HashResult nar) {
-        ValidPathInfo info { path, nar.first };
+        ValidPathInfo info {
+            *this,
+            std::string { name },
+            TextInfo {
+                { .hash = textHash },
+                references,
+            },
+            nar.first,
+        };
         info.narSize = nar.second;
-        info.ca = TextHash { textHash };
-        info.references = references;
         return info;
     })->path;
 }

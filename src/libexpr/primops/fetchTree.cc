@@ -120,7 +120,7 @@ static void fetchTree(
     const FetchTreeParams & params = FetchTreeParams{}
 ) {
     fetchers::Input input;
-    PathSet context;
+    NixStringContext context;
 
     state.forceValue(*args[0], pos);
 
@@ -211,12 +211,10 @@ static void fetchTree(
     } else {
         auto [storePath, input2] = input.fetchToStore(state.store);
 
-        auto storePath2 = state.store->printStorePath(storePath);
-
         emitTreeAttrs(
             state, input2, v,
             [&](Value & vOutPath) {
-                vOutPath.mkString(storePath2, {storePath2});
+                state.mkStorePathString(storePath, vOutPath);
             },
             params.emptyRevFallback,
             false);
@@ -280,10 +278,15 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
 
     // early exit if pinned and already in the store
     if (expectedHash && expectedHash->type == htSHA256) {
-        auto expectedPath =
-            unpack
-            ? state.store->makeFixedOutputPath(FileIngestionMethod::Recursive, *expectedHash, name, {})
-            : state.store->makeFixedOutputPath(FileIngestionMethod::Flat, *expectedHash, name, {});
+        auto expectedPath = state.store->makeFixedOutputPath(
+            name,
+            FixedOutputInfo {
+                .hash = {
+                    .method = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat,
+                    .hash = *expectedHash,
+                },
+                .references = {}
+            });
 
         if (state.store->isValidPath(expectedPath)) {
             state.allowAndSetStorePathString(expectedPath, v);

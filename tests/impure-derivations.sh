@@ -10,6 +10,15 @@ clearStore
 # Basic test of impure derivations: building one a second time should not use the previous result.
 printf 0 > $TEST_ROOT/counter
 
+# `nix derivation add` with impure derivations work
+drvPath=$(nix-instantiate ./impure-derivations.nix -A impure)
+nix derivation show $drvPath | jq .[] > $TEST_HOME/impure-drv.json
+drvPath2=$(nix derivation add < $TEST_HOME/impure-drv.json)
+[[ "$drvPath" = "$drvPath2" ]]
+
+# But only with the experimental feature!
+expectStderr 1 nix derivation add < $TEST_HOME/impure-drv.json --experimental-features nix-command | grepQuiet "experimental Nix feature 'impure-derivations' is disabled"
+
 nix build --dry-run --json --file ./impure-derivations.nix impure.all
 json=$(nix build -L --no-link --json --file ./impure-derivations.nix impure.all)
 path1=$(echo $json | jq -r .[].outputs.out)
@@ -37,8 +46,8 @@ path4=$(nix build -L --no-link --json --file ./impure-derivations.nix impureOnIm
 (! nix build -L --no-link --json --file ./impure-derivations.nix inputAddressed 2>&1) | grep 'depends on impure derivation'
 
 drvPath=$(nix eval --json --file ./impure-derivations.nix impure.drvPath | jq -r .)
-[[ $(nix show-derivation $drvPath | jq ".[\"$drvPath\"].outputs.out.impure") = true ]]
-[[ $(nix show-derivation $drvPath | jq ".[\"$drvPath\"].outputs.stuff.impure") = true ]]
+[[ $(nix derivation show $drvPath | jq ".[\"$drvPath\"].outputs.out.impure") = true ]]
+[[ $(nix derivation show $drvPath | jq ".[\"$drvPath\"].outputs.stuff.impure") = true ]]
 
 # Fixed-output derivations *can* depend on impure derivations.
 path5=$(nix build -L --no-link --json --file ./impure-derivations.nix contentAddressed | jq -r .[].outputs.out)

@@ -53,7 +53,9 @@ struct BufferedSink : virtual Sink
 
     void flush();
 
-    virtual void write(std::string_view data) = 0;
+protected:
+
+    virtual void writeUnbuffered(std::string_view data) = 0;
 };
 
 
@@ -133,7 +135,7 @@ struct FdSink : BufferedSink
 
     ~FdSink();
 
-    void write(std::string_view data) override;
+    void writeUnbuffered(std::string_view data) override;
 
     bool good() override;
 
@@ -520,7 +522,7 @@ struct FramedSink : nix::BufferedSink
         }
     }
 
-    void write(std::string_view data) override
+    void writeUnbuffered(std::string_view data) override
     {
         /* Don't send more data if the remote has
             encountered an error. */
@@ -550,5 +552,11 @@ struct StackAllocator {
      */
     static StackAllocator *defaultAllocator;
 };
+
+/* Disabling GC when entering a coroutine (without the boehm patch).
+   mutable to avoid boehm gc dependency in libutil.
+ */
+extern std::shared_ptr<void> (*create_coro_gc_hook)();
+
 
 }

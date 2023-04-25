@@ -106,10 +106,10 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
         }
 
         else if (v.type() == nString) {
-            PathSet context;
+            NixStringContext context;
             auto s = state->forceString(v, context, noPos, fmt("while evaluating the flake output attribute '%s'", attrPath));
             auto storePath = state->store->maybeParseStorePath(s);
-            if (storePath && context.count(std::string(s))) {
+            if (storePath && context.count(NixStringContextElem::Opaque { .path = *storePath })) {
                 return {{
                     .path = DerivedPath::Opaque {
                         .path = std::move(*storePath),

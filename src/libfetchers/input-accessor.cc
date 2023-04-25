@@ -241,30 +241,30 @@ SourcePath SourcePath::parent() const
 
 SourcePath SourcePath::resolveSymlinks() const
 {
-    CanonPath res("/");
+    auto res = accessor->root();
 
     int linksAllowed = 1024;
 
     for (auto & component : path) {
-        res.push(component);
+        res.path.push(component);
         while (true) {
-            if (auto st = accessor->maybeLstat(res)) {
+            if (auto st = res.maybeLstat()) {
                 if (!linksAllowed--)
                     throw Error("infinite symlink recursion in path '%s'", path);
                 if (st->type != InputAccessor::tSymlink) break;
-                auto target = accessor->readLink(res);
+                auto target = res.readLink();
                 if (hasPrefix(target, "/"))
-                    res = CanonPath(target);
+                    res.path = CanonPath(target);
                 else {
-                    res.pop();
-                    res.extend(CanonPath(target));
+                    res.path.pop();
+                    res.path.extend(CanonPath(target));
                 }
             } else
                 break;
         }
     }
 
-    return {accessor, res};
+    return res;
 }
 
 }

@@ -71,7 +71,7 @@ std::optional<StorePath> DrvInfo::queryDrvPath() const
 {
     if (!drvPath && attrs) {
         Bindings::iterator i = attrs->find(state->sDrvPath);
-        PathSet context;
+        NixStringContext context;
         if (i == attrs->end())
             drvPath = {std::nullopt};
         else
@@ -93,7 +93,7 @@ StorePath DrvInfo::queryOutPath() const
 {
     if (!outPath && attrs) {
         Bindings::iterator i = attrs->find(state->sOutPath);
-        PathSet context;
+        NixStringContext context;
         if (i != attrs->end())
             outPath = state->coerceToStorePath(i->pos, *i->value, context, "while evaluating the output path of a derivation");
     }
@@ -124,7 +124,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool withPaths, bool onlyOutputsToInstall
                     /* And evaluate its ‘outPath’ attribute. */
                     Bindings::iterator outPath = out->value->attrs->find(state->sOutPath);
                     if (outPath == out->value->attrs->end()) continue; // FIXME: throw error?
-                    PathSet context;
+                    NixStringContext context;
                     outputs.emplace(output, state->coerceToStorePath(outPath->pos, *outPath->value, context, "while evaluating an output path of a derivation"));
                 } else
                     outputs.emplace(output, std::nullopt);

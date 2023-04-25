@@ -10,49 +10,75 @@ struct LocalDerivationGoal : public DerivationGoal
 {
     LocalStore & getLocalStore();
 
-    /* User selected for running the builder. */
+    /**
+     * User selected for running the builder.
+     */
     std::unique_ptr<UserLock> buildUser;
 
-    /* The process ID of the builder. */
+    /**
+     * The process ID of the builder.
+     */
     Pid pid;
 
-    /* The cgroup of the builder, if any. */
+    /**
+     * The cgroup of the builder, if any.
+     */
     std::optional<Path> cgroup;
 
-    /* The temporary directory. */
+    /**
+     * The temporary directory.
+     */
     Path tmpDir;
 
-    /* The path of the temporary directory in the sandbox. */
+    /**
+     * The path of the temporary directory in the sandbox.
+     */
     Path tmpDirInSandbox;
 
-    /* Master side of the pseudoterminal used for the builder's
-       standard output/error. */
+    /**
+     * Master side of the pseudoterminal used for the builder's
+     * standard output/error.
+     */
     AutoCloseFD builderOut;
 
-    /* Pipe for synchronising updates to the builder namespaces. */
+    /**
+     * Pipe for synchronising updates to the builder namespaces.
+     */
     Pipe userNamespaceSync;
 
-    /* The mount namespace and user namespace of the builder, used to add additional
-       paths to the sandbox as a result of recursive Nix calls. */
+    /**
+     * The mount namespace and user namespace of the builder, used to add additional
+     * paths to the sandbox as a result of recursive Nix calls.
+     */
     AutoCloseFD sandboxMountNamespace;
     AutoCloseFD sandboxUserNamespace;
 
-    /* On Linux, whether we're doing the build in its own user
-       namespace. */
+    /**
+     * On Linux, whether we're doing the build in its own user
+     * namespace.
+     */
     bool usingUserNamespace = true;
 
-    /* Whether we're currently doing a chroot build. */
+    /**
+     * Whether we're currently doing a chroot build.
+     */
     bool useChroot = false;
 
     Path chrootRootDir;
 
-    /* RAII object to delete the chroot directory. */
+    /**
+     * RAII object to delete the chroot directory.
+     */
     std::shared_ptr<AutoDelete> autoDelChroot;
 
-    /* Whether to run the build in a private network namespace. */
+    /**
+     * Whether to run the build in a private network namespace.
+     */
     bool privateNetwork = false;
 
-    /* Stuff we need to pass to initChild(). */
+    /**
+     * Stuff we need to pass to initChild().
+     */
     struct ChrootPath {
         Path source;
         bool optional;
@@ -71,30 +97,35 @@ struct LocalDerivationGoal : public DerivationGoal
     SandboxProfile additionalSandboxProfile;
 #endif
 
-    /* Hash rewriting. */
+    /**
+     * Hash rewriting.
+     */
     StringMap inputRewrites, outputRewrites;
     typedef map<StorePath, StorePath> RedirectedOutputs;
     RedirectedOutputs redirectedOutputs;
 
-    /* The outputs paths used during the build.
-
-       - Input-addressed derivations or fixed content-addressed outputs are
-         sometimes built when some of their outputs already exist, and can not
-         be hidden via sandboxing. We use temporary locations instead and
-         rewrite after the build. Otherwise the regular predetermined paths are
-         put here.
-
-       - Floating content-addressed derivations do not know their final build
-         output paths until the outputs are hashed, so random locations are
-         used, and then renamed. The randomness helps guard against hidden
-         self-references.
+    /**
+     * The outputs paths used during the build.
+     *
+     * - Input-addressed derivations or fixed content-addressed outputs are
+     *   sometimes built when some of their outputs already exist, and can not
+     *   be hidden via sandboxing. We use temporary locations instead and
+     *   rewrite after the build. Otherwise the regular predetermined paths are
+     *   put here.
+     *
+     * - Floating content-addressed derivations do not know their final build
+     *   output paths until the outputs are hashed, so random locations are
+     *   used, and then renamed. The randomness helps guard against hidden
+     *   self-references.
      */
     OutputPathMap scratchOutputs;
 
-    /* Path registration info from the previous round, if we're
-       building multiple times. Since this contains the hash, it
-       allows us to compare whether two rounds produced the same
-       result. */
+    /**
+     * Path registration info from the previous round, if we're
+     * building multiple times. Since this contains the hash, it
+     * allows us to compare whether two rounds produced the same
+     * result.
+     */
     std::map<Path, ValidPathInfo> prevInfos;
 
     uid_t sandboxUid() { return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 1000 : 0) : buildUser->getUID(); }
@@ -102,25 +133,37 @@ struct LocalDerivationGoal : public DerivationGoal
 
     const static Path homeDir;
 
-    /* The recursive Nix daemon socket. */
+    /**
+     * The recursive Nix daemon socket.
+     */
     AutoCloseFD daemonSocket;
 
-    /* The daemon main thread. */
+    /**
+     * The daemon main thread.
+     */
     std::thread daemonThread;
 
-    /* The daemon worker threads. */
+    /**
+     * The daemon worker threads.
+     */
     std::vector<std::thread> daemonWorkerThreads;
 
-    /* Paths that were added via recursive Nix calls. */
+    /**
+     * Paths that were added via recursive Nix calls.
+     */
     StorePathSet addedPaths;
 
-    /* Realisations that were added via recursive Nix calls. */
+    /**
+     * Realisations that were added via recursive Nix calls.
+     */
     std::set<DrvOutput> addedDrvOutputs;
 
-    /* Recursive Nix calls are only allowed to build or realize paths
-       in the original input closure or added via a recursive Nix call
-       (so e.g. you can't do 'nix-store -r /nix/store/<bla>' where
-       /nix/store/<bla> is some arbitrary path in a binary cache). */
+    /**
+     * Recursive Nix calls are only allowed to build or realize paths
+     * in the original input closure or added via a recursive Nix call
+     * (so e.g. you can't do 'nix-store -r /nix/store/<bla>' where
+     * /nix/store/<bla> is some arbitrary path in a binary cache).
+     */
     bool isAllowed(const StorePath & path)
     {
         return inputPaths.count(path) || addedPaths.count(path);
@@ -138,55 +181,81 @@ struct LocalDerivationGoal : public DerivationGoal
 
     virtual ~LocalDerivationGoal() override;
 
-    /* Whether we need to perform hash rewriting if there are valid output paths. */
+    /**
+     * Whether we need to perform hash rewriting if there are valid output paths.
+     */
     bool needsHashRewrite();
 
-    /* The additional states. */
+    /**
+     * The additional states.
+     */
     void tryLocalBuild() override;
 
-    /* Start building a derivation. */
+    /**
+     * Start building a derivation.
+     */
     void startBuilder();
 
-    /* Fill in the environment for the builder. */
+    /**
+     * Fill in the environment for the builder.
+     */
     void initEnv();
 
-    /* Setup tmp dir location. */
+    /**
+     * Setup tmp dir location.
+     */
     void initTmpDir();
 
-    /* Write a JSON file containing the derivation attributes. */
+    /**
+     * Write a JSON file containing the derivation attributes.
+     */
     void writeStructuredAttrs();
 
     void startDaemon();
 
     void stopDaemon();
 
-    /* Add 'path' to the set of paths that may be referenced by the
-       outputs, and make it appear in the sandbox. */
+    /**
+     * Add 'path' to the set of paths that may be referenced by the
+     * outputs, and make it appear in the sandbox.
+     */
     void addDependency(const StorePath & path);
 
-    /* Make a file owned by the builder. */
+    /**
+     * Make a file owned by the builder.
+     */
     void chownToBuilder(const Path & path);
 
     int getChildStatus() override;
 
-    /* Run the builder's process. */
+    /**
+     * Run the builder's process.
+     */
     void runChild();
 
-    /* Check that the derivation outputs all exist and register them
-       as valid. */
-    DrvOutputs registerOutputs() override;
+    /**
+     * Check that the derivation outputs all exist and register them
+     * as valid.
+     */
+    SingleDrvOutputs registerOutputs() override;
 
     void signRealisation(Realisation &) override;
 
-    /* Check that an output meets the requirements specified by the
-       'outputChecks' attribute (or the legacy
-       '{allowed,disallowed}{References,Requisites}' attributes). */
+    /**
+     * Check that an output meets the requirements specified by the
+     * 'outputChecks' attribute (or the legacy
+     * '{allowed,disallowed}{References,Requisites}' attributes).
+     */
     void checkOutputs(const std::map<std::string, ValidPathInfo> & outputs);
 
-    /* Close the read side of the logger pipe. */
+    /**
+     * Close the read side of the logger pipe.
+     */
     void closeReadPipes() override;
 
-    /* Cleanup hooks for buildDone() */
+    /**
+     * Cleanup hooks for buildDone()
+     */
     void cleanupHookFinally() override;
     void cleanupPreChildKill() override;
     void cleanupPostChildKill() override;
@@ -196,24 +265,36 @@ struct LocalDerivationGoal : public DerivationGoal
 
     bool isReadDesc(int fd) override;
 
-    /* Delete the temporary directory, if we have one. */
+    /**
+     * Delete the temporary directory, if we have one.
+     */
     void deleteTmpDir(bool force);
 
-    /* Forcibly kill the child process, if any. */
+    /**
+     * Forcibly kill the child process, if any.
+     */
     void killChild() override;
 
-    /* Kill any processes running under the build user UID or in the
-       cgroup of the build. */
+    /**
+     * Kill any processes running under the build user UID or in the
+     * cgroup of the build.
+     */
     void killSandbox(bool getStats);
 
-    /* Create alternative path calculated from but distinct from the
-       input, so we can avoid overwriting outputs (or other store paths)
-       that already exist. */
+    /**
+     * Create alternative path calculated from but distinct from the
+     * input, so we can avoid overwriting outputs (or other store paths)
+     * that already exist.
+     */
     StorePath makeFallbackPath(const StorePath & path);
-    /* Make a path to another based on the output name along with the
-       derivation hash. */
-    /* FIXME add option to randomize, so we can audit whether our
-       rewrites caught everything */
+
+    /**
+     * Make a path to another based on the output name along with the
+     * derivation hash.
+     *
+     * @todo Add option to randomize, so we can audit whether our
+     * rewrites caught everything
+     */
     StorePath makeFallbackPath(std::string_view outputName);
 };
 

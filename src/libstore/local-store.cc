@@ -711,61 +711,6 @@ void canonicalisePathMetaData(const Path & path,
 }
 
 
-void LocalStore::checkDerivationOutputs(const StorePath & drvPath, const Derivation & drv)
-{
-    assert(drvPath.isDerivation());
-    std::string drvName(drvPath.name());
-    drvName = drvName.substr(0, drvName.size() - drvExtension.size());
-
-    auto envHasRightPath = [&](const StorePath & actual, const std::string & varName)
-    {
-        auto j = drv.env.find(varName);
-        if (j == drv.env.end() || parseStorePath(j->second) != actual)
-            throw Error("derivation '%s' has incorrect environment variable '%s', should be '%s'",
-                printStorePath(drvPath), varName, printStorePath(actual));
-    };
-
-
-    // Don't need the answer, but do this anyways to assert is proper
-    // combination. The code below is more general and naturally allows
-    // combinations that are currently prohibited.
-    drv.type();
-
-    std::optional<DrvHash> hashesModulo;
-    for (auto & i : drv.outputs) {
-        std::visit(overloaded {
-            [&](const DerivationOutput::InputAddressed & doia) {
-                if (!hashesModulo) {
-                    // somewhat expensive so we do lazily
-                    hashesModulo = hashDerivationModulo(*this, drv, true);
-                }
-                auto currentOutputHash = get(hashesModulo->hashes, i.first);
-                if (!currentOutputHash)
-                    throw Error("derivation '%s' has unexpected output '%s' (local-store / hashesModulo) named '%s'",
-                        printStorePath(drvPath), printStorePath(doia.path), i.first);
-                StorePath recomputed = makeOutputPath(i.first, *currentOutputHash, drvName);
-                if (doia.path != recomputed)
-                    throw Error("derivation '%s' has incorrect output '%s', should be '%s'",
-                        printStorePath(drvPath), printStorePath(doia.path), printStorePath(recomputed));
-                envHasRightPath(doia.path, i.first);
-            },
-            [&](const DerivationOutput::CAFixed & dof) {
-                StorePath path = makeFixedOutputPath(dof.hash.method, dof.hash.hash, drvName);
-                envHasRightPath(path, i.first);
-            },
-            [&](const DerivationOutput::CAFloating &) {
-                /* Nothing to check */
-            },
-            [&](const DerivationOutput::Deferred &) {
-                /* Nothing to check */
-            },
-            [&](const DerivationOutput::Impure &) {
-                /* Nothing to check */
-            },
-        }, i.second.raw());
-    }
-}
-
 void LocalStore::registerDrvOutput(const Realisation & info, CheckSigsFlag checkSigs)
 {
     experimentalFeatureSettings.require(Xp::CaDerivations);
@@ -876,7 +821,7 @@ uint64_t LocalStore::addValidPath(State & state,
            derivations).  Note that if this throws an error, then the
            DB transaction is rolled back, so the path validity
            registration above is undone. */
-        if (checkOutputs) checkDerivationOutputs(info.path, drv);
+        if (checkOutputs) drv.checkInvariants(*this, info.path);
 
         for (auto & i : drv.outputsAndOptPaths(*this)) {
             /* Floating CA derivations have indeterminate output paths until
@@ -944,7 +889,7 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
     if (s) info->sigs = tokenizeString<StringSet>(s, " ");
 
     s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 7);
-    if (s) info->ca = parseContentAddressOpt(s);
+    if (s) info->ca = ContentAddress::parseOpt(s);
 
     /* Get the references. */
     auto useQueryReferences(state.stmts->QueryReferences.use()(info->id));
@@ -1134,54 +1079,6 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
 }
 
 
-// FIXME: move this, it's not specific to LocalStore.
-void LocalStore::querySubstitutablePathInfos(const StorePathCAMap & paths, SubstitutablePathInfos & infos)
-{
-    if (!settings.useSubstitutes) return;
-    for (auto & sub : getDefaultSubstituters()) {
-        for (auto & path : paths) {
-            if (infos.count(path.first))
-                // Choose first succeeding substituter.
-                continue;
-
-            auto subPath(path.first);
-
-            // Recompute store path so that we can use a different store root.
-            if (path.second) {
-                subPath = makeFixedOutputPathFromCA(path.first.name(), *path.second);
-                if (sub->storeDir == storeDir)
-                    assert(subPath == path.first);
-                if (subPath != path.first)
-                    debug("replaced path '%s' with '%s' for substituter '%s'", printStorePath(path.first), sub->printStorePath(subPath), sub->getUri());
-            } else if (sub->storeDir != storeDir) continue;
-
-            debug("checking substituter '%s' for path '%s'", sub->getUri(), sub->printStorePath(subPath));
-            try {
-                auto info = sub->queryPathInfo(subPath);
-
-                if (sub->storeDir != storeDir && !(info->isContentAddressed(*sub) && info->references.empty()))
-                    continue;
-
-                auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
-                    std::shared_ptr<const ValidPathInfo>(info));
-                infos.insert_or_assign(path.first, SubstitutablePathInfo{
-                    info->deriver,
-                    info->references,
-                    narInfo ? narInfo->fileSize : 0,
-                    info->narSize});
-            } catch (InvalidPath &) {
-            } catch (SubstituterDisabled &) {
-            } catch (Error & e) {
-                if (settings.tryFallback)
-                    logError(e.info());
-                else
-                    throw;
-            }
-        }
-    }
-}
-
-
 void LocalStore::registerValidPath(const ValidPathInfo & info)
 {
     registerValidPaths({{info.path, info}});
@@ -1223,8 +1120,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         for (auto & [_, i] : infos)
             if (i.path.isDerivation()) {
                 // FIXME: inefficient; we already loaded the derivation in addValidPath().
-                checkDerivationOutputs(i.path,
-                    readInvalidDerivation(i.path));
+                readInvalidDerivation(i.path).checkInvariants(*this, i.path);
             }
 
         /* Do a topological sort of the paths.  This will throw an
@@ -1326,7 +1222,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                     printStorePath(info.path), info.narSize, hashResult.second);
 
             if (info.ca) {
-                if (auto foHash = std::get_if<FixedOutputHash>(&*info.ca)) {
+                if (auto foHash = std::get_if<FixedOutputHash>(&info.ca->raw)) {
                     auto actualFoHash = hashCAPath(
                         foHash->method,
                         foHash->hash.type,
@@ -1339,7 +1235,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                             actualFoHash.hash.to_string(Base32, true));
                     }
                 }
-                if (auto textHash = std::get_if<TextHash>(&*info.ca)) {
+                if (auto textHash = std::get_if<TextHash>(&info.ca->raw)) {
                     auto actualTextHash = hashString(htSHA256, readFile(realPath));
                     if (textHash->hash != actualTextHash) {
                         throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
@@ -1425,7 +1321,19 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
 
     auto [hash, size] = hashSink->finish();
 
-    auto dstPath = makeFixedOutputPath(method, hash, name, references);
+    ContentAddressWithReferences desc = FixedOutputInfo {
+        .hash = {
+            .method = method,
+            .hash = hash,
+        },
+        .references = {
+            .others = references,
+            // caller is not capable of creating a self-reference, because this is content-addressed without modulus
+            .self = false,
+        },
+    };
+
+    auto dstPath = makeFixedOutputPathFromCA(name, desc);
 
     addTempRoot(dstPath);
 
@@ -1445,7 +1353,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
             autoGC();
 
             if (inMemory) {
-                 StringSource dumpSource { dump };
+                StringSource dumpSource { dump };
                 /* Restore from the NAR in memory. */
                 if (method == FileIngestionMethod::Recursive)
                     restorePath(realPath, dumpSource);
@@ -1469,10 +1377,13 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
 
             optimisePath(realPath, repair);
 
-            ValidPathInfo info { dstPath, narHash.first };
+            ValidPathInfo info {
+                *this,
+                name,
+                std::move(desc),
+                narHash.first
+            };
             info.narSize = narHash.second;
-            info.references = references;
-            info.ca = FixedOutputHash { .method = method, .hash = hash };
             registerValidPath(info);
         }
 
@@ -1489,7 +1400,10 @@ StorePath LocalStore::addTextToStore(
     const StorePathSet & references, RepairFlag repair)
 {
     auto hash = hashString(htSHA256, s);
-    auto dstPath = makeTextPath(name, hash, references);
+    auto dstPath = makeTextPath(name, TextInfo {
+        { .hash = hash },
+        references,
+    });
 
     addTempRoot(dstPath);
 
@@ -1731,6 +1645,11 @@ void LocalStore::verifyPath(const Path & pathS, const StringSet & store,
 unsigned int LocalStore::getProtocol()
 {
     return PROTOCOL_VERSION;
+}
+
+std::optional<TrustedFlag> LocalStore::isTrustedClient()
+{
+    return Trusted;
 }
 
 

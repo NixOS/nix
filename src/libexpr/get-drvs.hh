@@ -26,7 +26,10 @@ private:
     mutable std::string outputName;
     Outputs outputs;
 
-    bool failed = false; // set if we get an AssertionError
+    /**
+     * Set if we get an AssertionError
+     */
+    bool failed = false;
 
     Bindings * attrs = nullptr, * meta = nullptr;
 
@@ -35,7 +38,10 @@ private:
     bool checkMeta(Value & v);
 
 public:
-    std::string attrPath; /* path towards the derivation */
+    /**
+     * path towards the derivation
+     */
+    std::string attrPath;
 
     DrvInfo(EvalState & state) : state(&state) { };
     DrvInfo(EvalState & state, std::string attrPath, Bindings * attrs);
@@ -47,8 +53,10 @@ public:
     StorePath requireDrvPath() const;
     StorePath queryOutPath() const;
     std::string queryOutputName() const;
-    /** Return the unordered map of output names to (optional) output paths.
-     * The "outputs to install" are determined by `meta.outputsToInstall`. */
+    /**
+     * Return the unordered map of output names to (optional) output paths.
+     * The "outputs to install" are determined by `meta.outputsToInstall`.
+     */
     Outputs queryOutputs(bool withPaths = true, bool onlyOutputsToInstall = false);
 
     StringSet queryMetaNames();
@@ -80,8 +88,10 @@ typedef std::list<DrvInfo> DrvInfos;
 #endif
 
 
-/* If value `v' denotes a derivation, return a DrvInfo object
-   describing it. Otherwise return nothing. */
+/**
+ * If value `v` denotes a derivation, return a DrvInfo object
+ * describing it. Otherwise return nothing.
+ */
 std::optional<DrvInfo> getDerivation(EvalState & state,
     Value & v, bool ignoreAssertionFailures);
 

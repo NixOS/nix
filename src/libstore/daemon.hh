@@ -6,7 +6,6 @@
 
 namespace nix::daemon {
 
-enum TrustedFlag : bool { NotTrusted = false, Trusted = true };
 enum RecursiveFlag : bool { NotRecursive = false, Recursive = true };
 
 void processConnection(

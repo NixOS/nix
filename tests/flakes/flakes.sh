@@ -97,7 +97,9 @@ json=$(nix flake metadata flake1 --json | jq .)
 hash1=$(echo "$json" | jq -r .revision)
 
 echo -n '# foo' >> $flake1Dir/flake.nix
+flake1OriginalCommit=$(git -C $flake1Dir rev-parse HEAD)
 git -C $flake1Dir commit -a -m 'Foo'
+flake1NewCommit=$(git -C $flake1Dir rev-parse HEAD)
 hash2=$(nix flake metadata flake1 --json --refresh | jq -r .revision)
 [[ $hash1 != $hash2 ]]
 
@@ -495,3 +497,14 @@ nix store delete $(nix store add-path $badFlakeDir)
 [[ $(nix-instantiate --eval flake:git+file://$flake3Dir -A x) = 123 ]]
 [[ $(nix-instantiate -I flake3=flake:flake3 --eval '<flake3>' -A x) = 123 ]]
 [[ $(NIX_PATH=flake3=flake:flake3 nix-instantiate --eval '<flake3>' -A x) = 123 ]]
+
+# Test alternate lockfile paths.
+nix flake lock $flake2Dir --output-lock-file $TEST_ROOT/flake2.lock
+cmp $flake2Dir/flake.lock $TEST_ROOT/flake2.lock >/dev/null # lockfiles should be identical, since we're referencing flake2's original one
+
+nix flake lock $flake2Dir --output-lock-file $TEST_ROOT/flake2-overridden.lock --override-input flake1 git+file://$flake1Dir?rev=$flake1OriginalCommit
+expectStderr 1 cmp $flake2Dir/flake.lock $TEST_ROOT/flake2-overridden.lock
+nix flake metadata $flake2Dir --reference-lock-file $TEST_ROOT/flake2-overridden.lock | grepQuiet $flake1OriginalCommit
+
+# reference-lock-file can only be used if allow-dirty is set.
+expectStderr 1 nix flake metadata $flake2Dir --no-allow-dirty --reference-lock-file $TEST_ROOT/flake2-overridden.lock

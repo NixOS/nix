@@ -28,15 +28,20 @@ struct CmdPingStore : StoreCommand, MixJSON
             store->connect();
             if (auto version = store->getVersion())
                 notice("Version: %s", *version);
+            if (auto trusted = store->isTrustedClient())
+                notice("Trusted: %s", *trusted);
         } else {
             nlohmann::json res;
             Finally printRes([&]() {
                 logger->cout("%s", res);
             });
+
             res["url"] = store->getUri();
             store->connect();
             if (auto version = store->getVersion())
                 res["version"] = *version;
+            if (auto trusted = store->isTrustedClient())
+                res["trusted"] = *trusted;
         }
     }
 };

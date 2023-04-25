@@ -16,9 +16,11 @@ typedef std::vector<FlakeId> InputPath;
 
 struct LockedNode;
 
-/* A node in the lock file. It has outgoing edges to other nodes (its
-   inputs). Only the root node has this type; all other nodes have
-   type LockedNode. */
+/**
+ * A node in the lock file. It has outgoing edges to other nodes (its
+ * inputs). Only the root node has this type; all other nodes have
+ * type LockedNode.
+ */
 struct Node : std::enable_shared_from_this<Node>
 {
     typedef std::variant<ref<LockedNode>, InputPath> Edge;
@@ -28,7 +30,9 @@ struct Node : std::enable_shared_from_this<Node>
     virtual ~Node() { }
 };
 
-/* A non-root node in the lock file. */
+/**
+ * A non-root node in the lock file.
+ */
 struct LockedNode : Node
 {
     FlakeRef lockedRef, originalRef;
@@ -65,11 +69,16 @@ struct LockFile
 
     std::pair<std::string, KeyMap> to_string() const;
 
-    /* Check whether this lock file has any unlocked inputs. If so,
-       return one. */
+    /**
+     * Check whether this lock file has any unlocked inputs. If so,
+     * return one.
+     */
     std::optional<FlakeRef> isUnlocked() const;
 
     bool operator ==(const LockFile & other) const;
+    // Needed for old gcc versions that don't synthesize it (like gcc 8.2.2
+    // that is still the default on aarch64-linux)
+    bool operator !=(const LockFile & other) const;
 
     std::shared_ptr<Node> findInput(const InputPath & path);
 
@@ -77,7 +86,9 @@ struct LockFile
 
     static std::string diff(const LockFile & oldLocks, const LockFile & newLocks);
 
-    /* Check that every 'follows' input target exists. */
+    /**
+     * Check that every 'follows' input target exists.
+     */
     void check();
 };
 

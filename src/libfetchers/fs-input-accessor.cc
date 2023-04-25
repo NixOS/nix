@@ -113,11 +113,7 @@ struct FSInputAccessorImpl : FSInputAccessor
 
     std::optional<CanonPath> getPhysicalPath(const CanonPath & path) override
     {
-        auto absPath = makeAbsPath(path);
-        if (isAllowed(absPath))
-            return absPath;
-        else
-            return std::nullopt;
+        return makeAbsPath(path);
     }
 };
 
@@ -135,6 +131,12 @@ ref<FSInputAccessor> makeStorePathAccessor(
     MakeNotAllowedError && makeNotAllowedError)
 {
     return makeFSInputAccessor(CanonPath(store->toRealPath(storePath)), {}, std::move(makeNotAllowedError));
+}
+
+SourcePath getUnfilteredRootPath(CanonPath path)
+{
+    static auto rootFS = makeFSInputAccessor(CanonPath::root);
+    return {rootFS, path};
 }
 
 }

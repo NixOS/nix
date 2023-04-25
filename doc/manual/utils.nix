@@ -5,6 +5,9 @@ rec {
 
   concatStrings = concatStringsSep "";
 
+  attrsToList = a:
+    map (name: { inherit name; value = a.${name}; }) (builtins.attrNames a);
+
   replaceStringsRec = from: to: string:
     # recursively replace occurrences of `from` with `to` within `string`
     # example:
@@ -39,7 +42,9 @@ rec {
   filterAttrs = pred: set:
     listToAttrs (concatMap (name: let v = set.${name}; in if pred name v then [(nameValuePair name v)] else []) (attrNames set));
 
-  showSetting = { useAnchors }: name: { description, documentDefault, defaultValue, aliases, value }:
+  optionalString = cond: string: if cond then string else "";
+
+  showSetting = { useAnchors }: name: { description, documentDefault, defaultValue, aliases, value, experimentalFeature }:
     let
       result = squash ''
           - ${if useAnchors
@@ -49,9 +54,27 @@ rec {
           ${indent "  " body}
         '';
 
+      experimentalFeatureNote = optionalString (experimentalFeature != null) ''
+          > **Warning**
+          > This setting is part of an
+          > [experimental feature](@docroot@/contributing/experimental-features.md).
+
+          To change this setting, you need to make sure the corresponding experimental feature,
+          [`${experimentalFeature}`](@docroot@/contributing/experimental-features.md#xp-feature-${experimentalFeature}),
+          is enabled.
+          For example, include the following in [`nix.conf`](#):
+
+          ```
+          extra-experimental-features = ${experimentalFeature}
+          ${name} = ...
+          ```
+        '';
+
       # separate body to cleanly handle indentation
       body = ''
           ${description}
+
+          ${experimentalFeatureNote}
 
           **Default:** ${showDefault documentDefault defaultValue}
 
@@ -71,13 +94,13 @@ rec {
         else "*machine-specific*";
 
       showAliases = aliases:
-          if aliases == [] then "" else
+          optionalString (aliases != [])
             "**Deprecated alias:** ${(concatStringsSep ", " (map (s: "`${s}`") aliases))}";
 
-      indent = prefix: s:
-        concatStringsSep "\n" (map (x: if x == "" then x else "${prefix}${x}") (splitLines s));
-
     in result;
+
+  indent = prefix: s:
+    concatStringsSep "\n" (map (x: if x == "" then x else "${prefix}${x}") (splitLines s));
 
   showSettings = args: settingsInfo: concatStrings (attrValues (mapAttrs (showSetting args) settingsInfo));
 }

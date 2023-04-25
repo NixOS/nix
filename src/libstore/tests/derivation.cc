@@ -1,6 +1,7 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
+#include "experimental-features.hh"
 #include "derivations.hh"
 
 #include "tests/libstore.hh"
@@ -9,17 +10,54 @@ namespace nix {
 
 class DerivationTest : public LibStoreTest
 {
+public:
+    /**
+     * We set these in tests rather than the regular globals so we don't have
+     * to worry about race conditions if the tests run concurrently.
+     */
+    ExperimentalFeatureSettings mockXpSettings;
 };
 
-#define TEST_JSON(TYPE, NAME, STR, VAL, ...)                           \
-    TEST_F(DerivationTest, TYPE ## _ ## NAME ## _to_json) {            \
-        using nlohmann::literals::operator "" _json;                   \
-        ASSERT_EQ(                                                     \
-            STR ## _json,                                              \
-            (TYPE { VAL }).toJSON(*store __VA_OPT__(,) __VA_ARGS__));  \
+class CaDerivationTest : public DerivationTest
+{
+    void SetUp() override
+    {
+        mockXpSettings.set("experimental-features", "ca-derivations");
+    }
+};
+
+class ImpureDerivationTest : public DerivationTest
+{
+    void SetUp() override
+    {
+        mockXpSettings.set("experimental-features", "impure-derivations");
+    }
+};
+
+#define TEST_JSON(FIXTURE, NAME, STR, VAL, DRV_NAME, OUTPUT_NAME) \
+    TEST_F(FIXTURE, DerivationOutput_ ## NAME ## _to_json) {    \
+        using nlohmann::literals::operator "" _json;           \
+        ASSERT_EQ(                                             \
+            STR ## _json,                                      \
+            (DerivationOutput { VAL }).toJSON(                 \
+                *store,                                        \
+                DRV_NAME,                                      \
+                OUTPUT_NAME));                                 \
+    }                                                          \
+                                                               \
+    TEST_F(FIXTURE, DerivationOutput_ ## NAME ## _from_json) {  \
+        using nlohmann::literals::operator "" _json;           \
+        ASSERT_EQ(                                             \
+            DerivationOutput { VAL },                          \
+            DerivationOutput::fromJSON(                        \
+                *store,                                        \
+                DRV_NAME,                                      \
+                OUTPUT_NAME,                                   \
+                STR ## _json,                                  \
+                mockXpSettings));                              \
     }
 
-TEST_JSON(DerivationOutput, inputAddressed,
+TEST_JSON(DerivationTest, inputAddressed,
     R"({
         "path": "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-drv-name-output-name"
     })",
@@ -28,7 +66,7 @@ TEST_JSON(DerivationOutput, inputAddressed,
     }),
     "drv-name", "output-name")
 
-TEST_JSON(DerivationOutput, caFixed,
+TEST_JSON(DerivationTest, caFixed,
     R"({
         "hashAlgo": "r:sha256",
         "hash": "894517c9163c896ec31a2adbd33c0681fd5f45b2c0ef08a64c92a03fb97f390f",
@@ -42,7 +80,7 @@ TEST_JSON(DerivationOutput, caFixed,
     }),
     "drv-name", "output-name")
 
-TEST_JSON(DerivationOutput, caFloating,
+TEST_JSON(CaDerivationTest, caFloating,
     R"({
         "hashAlgo": "r:sha256"
     })",
@@ -52,12 +90,12 @@ TEST_JSON(DerivationOutput, caFloating,
     }),
     "drv-name", "output-name")
 
-TEST_JSON(DerivationOutput, deferred,
+TEST_JSON(DerivationTest, deferred,
     R"({ })",
     DerivationOutput::Deferred { },
     "drv-name", "output-name")
 
-TEST_JSON(DerivationOutput, impure,
+TEST_JSON(ImpureDerivationTest, impure,
     R"({
         "hashAlgo": "r:sha256",
         "impure": true
@@ -68,8 +106,28 @@ TEST_JSON(DerivationOutput, impure,
     }),
     "drv-name", "output-name")
 
-TEST_JSON(Derivation, impure,
+#undef TEST_JSON
+
+#define TEST_JSON(NAME, STR, VAL, DRV_NAME)                     \
+    TEST_F(DerivationTest, Derivation_ ## NAME ## _to_json) {   \
+        using nlohmann::literals::operator "" _json;            \
+        ASSERT_EQ(                                              \
+            STR ## _json,                                       \
+            (Derivation { VAL }).toJSON(*store));               \
+    }                                                           \
+                                                                \
+    TEST_F(DerivationTest, Derivation_ ## NAME ## _from_json) { \
+        using nlohmann::literals::operator "" _json;            \
+        ASSERT_EQ(                                              \
+            Derivation { VAL },                                 \
+            Derivation::fromJSON(                               \
+                *store,                                         \
+                STR ## _json));                                 \
+    }
+
+TEST_JSON(simple,
     R"({
+      "name": "my-derivation",
       "inputSrcs": [
         "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"
       ],
@@ -92,6 +150,7 @@ TEST_JSON(Derivation, impure,
     })",
     ({
         Derivation drv;
+        drv.name = "my-derivation";
         drv.inputSrcs = {
             store->parseStorePath("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"),
         };
@@ -117,7 +176,8 @@ TEST_JSON(Derivation, impure,
             },
         };
         drv;
-    }))
+    }),
+    "drv-name")
 
 #undef TEST_JSON
 

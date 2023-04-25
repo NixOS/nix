@@ -39,6 +39,14 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
         callback(nullptr);
     }
 
+    /**
+     * The dummy store is incapable of *not* trusting! :)
+     */
+    virtual std::optional<TrustedFlag> isTrustedClient() override
+    {
+        return Trusted;
+    }
+
     static std::set<std::string> uriSchemes() {
         return {"dummy"};
     }
@@ -63,6 +71,9 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
     void queryRealisationUncached(const DrvOutput &,
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override
     { callback(nullptr); }
+
+    virtual ref<FSAccessor> getFSAccessor() override
+    { unsupported("getFSAccessor"); }
 };
 
 static RegisterStoreImplementation<DummyStore, DummyStoreConfig> regDummyStore;

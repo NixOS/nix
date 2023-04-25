@@ -89,8 +89,10 @@ const uint32_t exportMagic = 0x4558494e;
 
 
 enum BuildMode { bmNormal, bmRepair, bmCheck };
+enum TrustedFlag : bool { NotTrusted = false, Trusted = true };
 
 struct BuildResult;
+struct KeyedBuildResult;
 
 
 typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
@@ -267,17 +269,11 @@ public:
     StorePath makeOutputPath(std::string_view id,
         const Hash & hash, std::string_view name) const;
 
-    StorePath makeFixedOutputPath(FileIngestionMethod method,
-        const Hash & hash, std::string_view name,
-        const StorePathSet & references = {},
-        bool hasSelfReference = false) const;
+    StorePath makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const;
 
-    StorePath makeTextPath(std::string_view name, const Hash & hash,
-        const StorePathSet & references = {}) const;
+    StorePath makeTextPath(std::string_view name, const TextInfo & info) const;
 
-    StorePath makeFixedOutputPathFromCA(std::string_view name, ContentAddress ca,
-        const StorePathSet & references = {},
-        bool hasSelfReference = false) const;
+    StorePath makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const;
 
     /**
      * Read-only variant of addToStoreFromDump(). It returns the store
@@ -411,17 +407,17 @@ public:
     { unsupported("queryReferrers"); }
 
     /**
-     * @return all currently valid derivations that have `path' as an
+     * @return all currently valid derivations that have `path` as an
      * output.
      *
-     * (Note that the result of `queryDeriver()' is the derivation that
-     * was actually used to produce `path', which may not exist
+     * (Note that the result of `queryDeriver()` is the derivation that
+     * was actually used to produce `path`, which may not exist
      * anymore.)
      */
     virtual StorePathSet queryValidDerivers(const StorePath & path) { return {}; };
 
     /**
-     * Query the outputs of the derivation denoted by `path'.
+     * Query the outputs of the derivation denoted by `path`.
      */
     virtual StorePathSet queryDerivationOutputs(const StorePath & path);
 
@@ -457,7 +453,7 @@ public:
      * resulting ‘infos’ map.
      */
     virtual void querySubstitutablePathInfos(const StorePathCAMap & paths,
-        SubstitutablePathInfos & infos) { return; };
+        SubstitutablePathInfos & infos);
 
     /**
      * Import a path into the store.
@@ -513,7 +509,7 @@ public:
 
     /**
      * Like addToStore(), but the contents of the path are contained
-     * in `dump', which is either a NAR serialisation (if recursive ==
+     * in `dump`, which is either a NAR serialisation (if recursive ==
      * true) or simply the contents of a regular file (if recursive ==
      * false).
      * `dump` may be drained
@@ -575,7 +571,7 @@ public:
      * case of a build/substitution error, this function won't throw an
      * exception, but return a BuildResult containing an error message.
      */
-    virtual std::vector<BuildResult> buildPathsWithResults(
+    virtual std::vector<KeyedBuildResult> buildPathsWithResults(
         const std::vector<DerivedPath> & paths,
         BuildMode buildMode = bmNormal,
         std::shared_ptr<Store> evalStore = nullptr);
@@ -634,8 +630,8 @@ public:
 
     /**
      * @return a string representing information about the path that
-     * can be loaded into the database using `nix-store --load-db' or
-     * `nix-store --register-validity'.
+     * can be loaded into the database using `nix-store --load-db` or
+     * `nix-store --register-validity`.
      */
     std::string makeValidityRegistration(const StorePathSet & paths,
         bool showDerivers, bool showHash);
@@ -678,8 +674,7 @@ public:
     /**
      * @return An object to access files in the Nix store.
      */
-    virtual ref<FSAccessor> getFSAccessor()
-    { unsupported("getFSAccessor"); }
+    virtual ref<FSAccessor> getFSAccessor() = 0;
 
     /**
      * Repair the contents of the given path by redownloading it using
@@ -715,12 +710,12 @@ public:
 
     /**
      * @param [out] out Place in here the set of all store paths in the
-     * file system closure of `storePath'; that is, all paths than can
-     * be directly or indirectly reached from it. `out' is not cleared.
+     * file system closure of `storePath`; that is, all paths than can
+     * be directly or indirectly reached from it. `out` is not cleared.
      *
      * @param flipDirection If true, the set of paths that can reach
-     * `storePath' is returned; that is, the closures under the
-     * `referrers' relation instead of the `references' relation is
+     * `storePath` is returned; that is, the closures under the
+     * `referrers` relation instead of the `references` relation is
      * returned.
      */
     virtual void computeFSClosure(const StorePathSet & paths,
@@ -815,6 +810,17 @@ public:
     {
         return 0;
     };
+
+    /**
+     * @return/ whether store trusts *us*.
+     *
+     * `std::nullopt` means we do not know.
+     *
+     * @note This is the opposite of the StoreConfig::isTrusted
+     * store setting. That is about whether *we* trust the store.
+     */
+    virtual std::optional<TrustedFlag> isTrustedClient() = 0;
+
 
     virtual Path toRealPath(const Path & storePath)
     {

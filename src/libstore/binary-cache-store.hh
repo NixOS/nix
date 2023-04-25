@@ -46,6 +46,11 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
         )"};
 };
 
+
+/**
+ * @note subclasses must implement at least one of the two
+ * virtual getFile() methods.
+ */
 class BinaryCacheStore : public virtual BinaryCacheStoreConfig,
     public virtual Store,
     public virtual LogStore
@@ -75,14 +80,15 @@ public:
         std::string && data,
         const std::string & mimeType);
 
-    /* Note: subclasses must implement at least one of the two
-       following getFile() methods. */
-
-    /* Dump the contents of the specified file to a sink. */
+    /**
+     * Dump the contents of the specified file to a sink.
+     */
     virtual void getFile(const std::string & path, Sink & sink);
 
-    /* Fetch the specified file and call the specified callback with
-       the result. A subclass may implement this asynchronously. */
+    /**
+     * Fetch the specified file and call the specified callback with
+     * the result. A subclass may implement this asynchronously.
+     */
     virtual void getFile(
         const std::string & path,
         Callback<std::optional<std::string>> callback) noexcept;

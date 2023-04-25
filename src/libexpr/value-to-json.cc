@@ -11,7 +11,7 @@
 namespace nix {
 using json = nlohmann::json;
 json printValueAsJSON(EvalState & state, bool strict,
-    Value & v, const PosIdx pos, PathSet & context, bool copyToStore)
+    Value & v, const PosIdx pos, NixStringContext & context, bool copyToStore)
 {
     checkInterrupt();
 
@@ -95,13 +95,13 @@ json printValueAsJSON(EvalState & state, bool strict,
 }
 
 void printValueAsJSON(EvalState & state, bool strict,
-    Value & v, const PosIdx pos, std::ostream & str, PathSet & context, bool copyToStore)
+    Value & v, const PosIdx pos, std::ostream & str, NixStringContext & context, bool copyToStore)
 {
     str << printValueAsJSON(state, strict, v, pos, context, copyToStore);
 }
 
 json ExternalValueBase::printValueAsJSON(EvalState & state, bool strict,
-    PathSet & context, bool copyToStore) const
+    NixStringContext & context, bool copyToStore) const
 {
     state.debugThrowLastTrace(TypeError("cannot convert %1% to JSON", showType()));
 }

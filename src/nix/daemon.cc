@@ -1,3 +1,5 @@
+///@file
+
 #include "command.hh"
 #include "shared.hh"
 #include "local-store.hh"
@@ -34,6 +36,19 @@
 using namespace nix;
 using namespace nix::daemon;
 
+/**
+ * Settings related to authenticating clients for the Nix daemon.
+ *
+ * For pipes we have little good information about the client side, but
+ * for Unix domain sockets we do. So currently these options implemented
+ * mandatory access control based on user names and group names (looked
+ * up and translated to UID/GIDs in the CLI process that runs the code
+ * in this file).
+ *
+ * No code outside of this file knows about these settings (this is not
+ * exposed in a header); all authentication and authorization happens in
+ * `daemon.cc`.
+ */
 struct AuthorizationSettings : Config {
 
     Setting<Strings> trustedUsers{
@@ -54,7 +69,9 @@ struct AuthorizationSettings : Config {
           > directories that are otherwise inacessible to them.
         )"};
 
-    /* ?Who we trust to use the daemon in safe ways */
+    /**
+     * Who we trust to use the daemon in safe ways
+     */
     Setting<Strings> allowedUsers{
         this, {"*"}, "allowed-users",
         R"(
@@ -112,8 +129,36 @@ static void setSigChldAction(bool autoReap)
         throw SysError("setting SIGCHLD handler");
 }
 
+/**
+ * @return Is the given user a member of this group?
+ *
+ * @param user User specified by username.
+ *
+ * @param group Group the user might be a member of.
+ */
+static bool matchUser(std::string_view user, const struct group & gr)
+{
+    for (char * * mem = gr.gr_mem; *mem; mem++)
+        if (user == std::string_view(*mem)) return true;
+    return false;
+}
 
-bool matchUser(const std::string & user, const std::string & group, const Strings & users)
+
+/**
+ * Does the given user (specified by user name and primary group name)
+ * match the given user/group whitelist?
+ *
+ * If the list allows all users: Yes.
+ *
+ * If the username is in the set: Yes.
+ *
+ * If the groupname is in the set: Yes.
+ *
+ * If the user is in another group which is in the set: yes.
+ *
+ * Otherwise: No.
+ */
+static bool matchUser(const std::string & user, const std::string & group, const Strings & users)
 {
     if (find(users.begin(), users.end(), "*") != users.end())
         return true;
@@ -126,8 +171,7 @@ bool matchUser(const std::string & user, const std::string & group, const String
             if (group == i.substr(1)) return true;
             struct group * gr = getgrnam(i.c_str() + 1);
             if (!gr) continue;
-            for (char * * mem = gr->gr_mem; *mem; mem++)
-                if (user == std::string(*mem)) return true;
+            if (matchUser(user, *gr)) return true;
         }
 
     return false;
@@ -145,7 +189,9 @@ struct PeerInfo
 };
 
 
-//  Get the identity of the caller, if possible.
+/**
+ * Get the identity of the caller, if possible.
+ */
 static PeerInfo getPeerInfo(int remote)
 {
     PeerInfo peer = { false, 0, false, 0, false, 0 };
@@ -179,6 +225,9 @@ static PeerInfo getPeerInfo(int remote)
 #define SD_LISTEN_FDS_START 3
 
 
+/**
+ * Open a store without a path info cache.
+ */
 static ref<Store> openUncachedStore()
 {
     Store::Params params; // FIXME: get params from somewhere
@@ -187,8 +236,49 @@ static ref<Store> openUncachedStore()
     return openStore(settings.storeUri, params);
 }
 
+/**
+ * Authenticate a potential client
+ *
+ * @param peer Information about other end of the connection, the client which
+ * wants to communicate with us.
+ *
+ * @return A pair of a `TrustedFlag`, whether the potential client is trusted,
+ * and the name of the user (useful for printing messages).
+ *
+ * If the potential client is not allowed to talk to us, we throw an `Error`.
+ */
+static std::pair<TrustedFlag, std::string> authPeer(const PeerInfo & peer)
+{
+    TrustedFlag trusted = NotTrusted;
 
-static void daemonLoop()
+    struct passwd * pw = peer.uidKnown ? getpwuid(peer.uid) : 0;
+    std::string user = pw ? pw->pw_name : std::to_string(peer.uid);
+
+    struct group * gr = peer.gidKnown ? getgrgid(peer.gid) : 0;
+    std::string group = gr ? gr->gr_name : std::to_string(peer.gid);
+
+    const Strings & trustedUsers = authorizationSettings.trustedUsers;
+    const Strings & allowedUsers = authorizationSettings.allowedUsers;
+
+    if (matchUser(user, group, trustedUsers))
+        trusted = Trusted;
+
+    if ((!trusted && !matchUser(user, group, allowedUsers)) || group == settings.buildUsersGroup)
+        throw Error("user '%1%' is not allowed to connect to the Nix daemon", user);
+
+    return { trusted, std::move(user) };
+}
+
+
+/**
+ * Run a server. The loop opens a socket and accepts new connections from that
+ * socket.
+ *
+ * @param forceTrustClientOpt If present, force trusting or not trusted
+ * the client. Otherwise, decide based on the authentication settings
+ * and user credentials (from the unix domain socket).
+ */
+static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
 {
     if (chdir("/") == -1)
         throw SysError("cannot change current directory");
@@ -231,23 +321,18 @@ static void daemonLoop()
 
             closeOnExec(remote.get());
 
-            TrustedFlag trusted = NotTrusted;
-            PeerInfo peer = getPeerInfo(remote.get());
+            PeerInfo peer { .pidKnown = false };
+            TrustedFlag trusted;
+            std::string user;
 
-            struct passwd * pw = peer.uidKnown ? getpwuid(peer.uid) : 0;
-            std::string user = pw ? pw->pw_name : std::to_string(peer.uid);
-
-            struct group * gr = peer.gidKnown ? getgrgid(peer.gid) : 0;
-            std::string group = gr ? gr->gr_name : std::to_string(peer.gid);
-
-            Strings trustedUsers = authorizationSettings.trustedUsers;
-            Strings allowedUsers = authorizationSettings.allowedUsers;
-
-            if (matchUser(user, group, trustedUsers))
-                trusted = Trusted;
-
-            if ((!trusted && !matchUser(user, group, allowedUsers)) || group == settings.buildUsersGroup)
-                throw Error("user '%1%' is not allowed to connect to the Nix daemon", user);
+            if (forceTrustClientOpt)
+                trusted = *forceTrustClientOpt;
+            else {
+                peer = getPeerInfo(remote.get());
+                auto [_trusted, _user] = authPeer(peer);
+                trusted = _trusted;
+                user = _user;
+            };
 
             printInfo((std::string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""),
                 peer.pidKnown ? std::to_string(peer.pid) : "<unknown>",
@@ -294,53 +379,91 @@ static void daemonLoop()
     }
 }
 
-static void runDaemon(bool stdio)
+/**
+ * Forward a standard IO connection to the given remote store.
+ *
+ * We just act as a middleman blindly ferry output between the standard
+ * input/output and the remote store connection, not processing anything.
+ *
+ * Loops until standard input disconnects, or an error is encountered.
+ */
+static void forwardStdioConnection(RemoteStore & store) {
+    auto conn = store.openConnectionWrapper();
+    int from = conn->from.fd;
+    int to = conn->to.fd;
+
+    auto nfds = std::max(from, STDIN_FILENO) + 1;
+    while (true) {
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(from, &fds);
+        FD_SET(STDIN_FILENO, &fds);
+        if (select(nfds, &fds, nullptr, nullptr, nullptr) == -1)
+            throw SysError("waiting for data from client or server");
+        if (FD_ISSET(from, &fds)) {
+            auto res = splice(from, nullptr, STDOUT_FILENO, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
+            if (res == -1)
+                throw SysError("splicing data from daemon socket to stdout");
+            else if (res == 0)
+                throw EndOfFile("unexpected EOF from daemon socket");
+        }
+        if (FD_ISSET(STDIN_FILENO, &fds)) {
+            auto res = splice(STDIN_FILENO, nullptr, to, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
+            if (res == -1)
+                throw SysError("splicing data from stdin to daemon socket");
+            else if (res == 0)
+                return;
+        }
+    }
+}
+
+/**
+ * Process a client connecting to us via standard input/output
+ *
+ * Unlike `forwardStdioConnection()` we do process commands ourselves in
+ * this case, not delegating to another daemon.
+ *
+ * @param trustClient Whether to trust the client. Forwarded directly to
+ * `processConnection()`.
+ */
+static void processStdioConnection(ref<Store> store, TrustedFlag trustClient)
+{
+    FdSource from(STDIN_FILENO);
+    FdSink to(STDOUT_FILENO);
+    processConnection(store, from, to, trustClient, NotRecursive);
+}
+
+/**
+ * Entry point shared between the new CLI `nix daemon` and old CLI
+ * `nix-daemon`.
+ *
+ * @param forceTrustClientOpt See `daemonLoop()` and the parameter with
+ * the same name over there for details.
+ */
+static void runDaemon(bool stdio, std::optional<TrustedFlag> forceTrustClientOpt)
 {
     if (stdio) {
-        if (auto store = openUncachedStore().dynamic_pointer_cast<RemoteStore>()) {
-            auto conn = store->openConnectionWrapper();
-            int from = conn->from.fd;
-            int to = conn->to.fd;
+        auto store = openUncachedStore();
 
-            auto nfds = std::max(from, STDIN_FILENO) + 1;
-            while (true) {
-                fd_set fds;
-                FD_ZERO(&fds);
-                FD_SET(from, &fds);
-                FD_SET(STDIN_FILENO, &fds);
-                if (select(nfds, &fds, nullptr, nullptr, nullptr) == -1)
-                    throw SysError("waiting for data from client or server");
-                if (FD_ISSET(from, &fds)) {
-                    auto res = splice(from, nullptr, STDOUT_FILENO, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
-                    if (res == -1)
-                        throw SysError("splicing data from daemon socket to stdout");
-                    else if (res == 0)
-                        throw EndOfFile("unexpected EOF from daemon socket");
-                }
-                if (FD_ISSET(STDIN_FILENO, &fds)) {
-                    auto res = splice(STDIN_FILENO, nullptr, to, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
-                    if (res == -1)
-                        throw SysError("splicing data from stdin to daemon socket");
-                    else if (res == 0)
-                        return;
-                }
-            }
-        } else {
-            FdSource from(STDIN_FILENO);
-            FdSink to(STDOUT_FILENO);
-            /* Auth hook is empty because in this mode we blindly trust the
-               standard streams. Limiting access to those is explicitly
-               not `nix-daemon`'s responsibility. */
-            processConnection(openUncachedStore(), from, to, Trusted, NotRecursive);
-        }
+        // If --force-untrusted is passed, we cannot forward the connection and
+        // must process it ourselves (before delegating to the next store) to
+        // force untrusting the client.
+        if (auto remoteStore = store.dynamic_pointer_cast<RemoteStore>(); remoteStore && (!forceTrustClientOpt || *forceTrustClientOpt != NotTrusted))
+            forwardStdioConnection(*remoteStore);
+        else
+            // `Trusted` is passed in the auto (no override case) because we
+            // cannot see who is on the other side of a plain pipe. Limiting
+            // access to those is explicitly not `nix-daemon`'s responsibility.
+            processStdioConnection(store, forceTrustClientOpt.value_or(Trusted));
     } else
-        daemonLoop();
+        daemonLoop(forceTrustClientOpt);
 }
 
 static int main_nix_daemon(int argc, char * * argv)
 {
     {
         auto stdio = false;
+        std::optional<TrustedFlag> isTrustedOpt = std::nullopt;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--daemon")
@@ -351,11 +474,20 @@ static int main_nix_daemon(int argc, char * * argv)
                 printVersion("nix-daemon");
             else if (*arg == "--stdio")
                 stdio = true;
-            else return false;
+            else if (*arg == "--force-trusted") {
+                experimentalFeatureSettings.require(Xp::DaemonTrustOverride);
+                isTrustedOpt = Trusted;
+            } else if (*arg == "--force-untrusted") {
+                experimentalFeatureSettings.require(Xp::DaemonTrustOverride);
+                isTrustedOpt = NotTrusted;
+            } else if (*arg == "--default-trust") {
+                experimentalFeatureSettings.require(Xp::DaemonTrustOverride);
+                isTrustedOpt = std::nullopt;
+            } else return false;
             return true;
         });
 
-        runDaemon(stdio);
+        runDaemon(stdio, isTrustedOpt);
 
         return 0;
     }
@@ -381,7 +513,7 @@ struct CmdDaemon : StoreCommand
 
     void run(ref<Store> store) override
     {
-        runDaemon(false);
+        runDaemon(false, std::nullopt);
     }
 };
 

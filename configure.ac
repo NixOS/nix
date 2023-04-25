@@ -184,7 +184,7 @@ fi
 
 # Look for OpenSSL, a required dependency. FIXME: this is only (maybe)
 # used by S3BinaryCacheStore.
-PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
+PKG_CHECK_MODULES([OPENSSL], [libcrypto >= 1.1.1], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
 
 
 # Look for libarchive.
@@ -289,13 +289,24 @@ PKG_CHECK_MODULES([GTEST], [gtest_main])
 
 
 # Look for rapidcheck.
+AC_ARG_VAR([RAPIDCHECK_HEADERS], [include path of gtest headers shipped by RAPIDCHECK])
 # No pkg-config yet, https://github.com/emil-e/rapidcheck/issues/302
 AC_LANG_PUSH(C++)
 AC_SUBST(RAPIDCHECK_HEADERS)
 [CXXFLAGS="-I $RAPIDCHECK_HEADERS $CXXFLAGS"]
+[LIBS="-lrapidcheck -lgtest $LIBS"]
 AC_CHECK_HEADERS([rapidcheck/gtest.h], [], [], [#include <gtest/gtest.h>])
-dnl No good for C++ libs with mangled symbols
-dnl AC_CHECK_LIB([rapidcheck], [])
+dnl AC_CHECK_LIB doesn't work for C++ libs with mangled symbols
+AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([[
+      #include <gtest/gtest.h>
+      #include <rapidcheck/gtest.h>
+    ]], [[
+      return RUN_ALL_TESTS();
+    ]])
+  ],
+  [],
+  [AC_MSG_ERROR([librapidcheck is not found.])])
 AC_LANG_POP(C++)
 
 fi

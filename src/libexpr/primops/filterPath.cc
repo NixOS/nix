@@ -88,7 +88,7 @@ static void prim_filterPath(EvalState & state, PosIdx pos, Value * * args, Value
 {
     std::optional<SourcePath> path;
     Value * filterFun = nullptr;
-    PathSet context;
+    NixStringContext context;
 
     state.forceAttrs(*args[0], pos,
         "while evaluating the first argument to 'builtins.filterPath'");

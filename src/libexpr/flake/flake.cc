@@ -88,6 +88,9 @@ static FlakeInput parseFlakeInput(
                             state.symbols[attr.name], showType(*elem));
                 }
             } else {
+                // Allow selecting a subset of enum values
+                #pragma GCC diagnostic push
+                #pragma GCC diagnostic ignored "-Wswitch-enum"
                 switch (attr.value->type()) {
                     case nString:
                         attrs.emplace(state.symbols[attr.name], attr.value->string.s);
@@ -102,6 +105,7 @@ static FlakeInput parseFlakeInput(
                         throw TypeError("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
                             state.symbols[attr.name], showType(*attr.value));
                 }
+                #pragma GCC diagnostic pop
             }
         } catch (Error & e) {
             e.addTrace(
@@ -218,7 +222,7 @@ static Flake readFlake(
                     state.symbols[setting.name],
                     std::string(state.forceStringNoCtx(*setting.value, setting.pos, "")));
             else if (setting.value->type() == nPath) {
-                PathSet emptyContext = {};
+                NixStringContext emptyContext = {};
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
                     state.coerceToString(setting.pos, *setting.value, emptyContext, "", false, true).toOwned());
@@ -296,9 +300,8 @@ Flake getFlake(EvalState & state, const FlakeRef & originalRef, bool useRegistri
     return getFlake(state, originalRef, useRegistries, {}, {});
 }
 
-static LockFile readLockFile(const Flake & flake)
+static LockFile readLockFile(const SourcePath & lockFilePath)
 {
-    auto lockFilePath = flake.path.parent() + "flake.lock";
     return lockFilePath.pathExists()
         ? LockFile(lockFilePath.readFile(), fmt("%s", lockFilePath))
         : LockFile();
@@ -323,8 +326,13 @@ LockedFlake lockFlake(
     }
 
     try {
+        if (!fetchSettings.allowDirty && lockFlags.referenceLockFilePath) {
+            throw Error("reference lock file was provided, but the `allow-dirty` setting is set to false");
+        }
 
-        auto oldLockFile = readLockFile(*flake);
+        auto oldLockFile = readLockFile(
+            lockFlags.referenceLockFilePath.value_or(
+                flake->lockFilePath()));
 
         debug("old lock file: %s", oldLockFile);
 
@@ -608,7 +616,7 @@ LockedFlake lockFlake(
                                 inputFlake.inputs, childNode, inputPath,
                                 oldLock
                                 ? std::dynamic_pointer_cast<const Node>(oldLock)
-                                : readLockFile(inputFlake).root.get_ptr(),
+                                : readLockFile(inputFlake.lockFilePath()).root.get_ptr(),
                                 oldLock ? followsPrefix : inputPath,
                                 inputFlake.path,
                                 false);
@@ -671,7 +679,7 @@ LockedFlake lockFlake(
         debug("new lock file: %s", newLockFile);
 
         /* Check whether we need to / can write the new lock file. */
-        if (!(newLockFile == oldLockFile)) {
+        if (newLockFile != oldLockFile || lockFlags.outputLockFilePath) {
 
             auto diff = LockFile::diff(oldLockFile, newLockFile);
 
@@ -683,45 +691,47 @@ LockedFlake lockFlake(
                     if (!lockFlags.updateLockFile)
                         throw Error("flake '%s' requires lock file changes but they're not allowed due to '--no-update-lock-file'", topRef);
 
-                    auto path = flake->path.parent() + "flake.lock";
+                    auto outputLockFilePath = lockFlags.outputLockFilePath.value_or(flake->lockFilePath());
 
-                    bool lockFileExists = path.pathExists();
-
-                    if (lockFileExists) {
+                    if (outputLockFilePath.pathExists()) {
                         auto s = chomp(diff);
                         if (s.empty())
-                            warn("updating lock file '%s'", path);
+                            warn("updating lock file '%s'", outputLockFilePath);
                         else
-                            warn("updating lock file '%s':\n%s", path, s);
+                            warn("updating lock file '%s':\n%s", outputLockFilePath, s);
                     } else
-                        warn("creating lock file '%s'", path);
+                        warn("creating lock file '%s'", outputLockFilePath);
 
-                    std::optional<std::string> commitMessage = std::nullopt;
-                    if (lockFlags.commitLockFile) {
-                        std::string cm;
+                    auto newLockFileS = fmt("%s\n", newLockFile);
 
-                        cm = fetchSettings.commitLockFileSummary.get();
+                    if (lockFlags.outputLockFilePath) {
+                        if (lockFlags.commitLockFile)
+                            throw Error("--commit-lock-file and --output-lock-file are currently incompatible");
+                        auto p = lockFlags.outputLockFilePath->getPhysicalPath();
+                        if (p)
+                            writeFile(p->abs(), newLockFileS);
+                    } else {
+                        std::optional<std::string> commitMessage = std::nullopt;
+                        if (lockFlags.commitLockFile) {
+                            std::string cm;
+                            cm += "\n\nFlake lock file updates:\n\n";
+                            cm += filterANSIEscapes(diff, true);
+                            commitMessage = cm;
+                        }
 
-                        if (cm == "")
-                            cm = fmt("%s: %s", path.path.rel(), lockFileExists ? "Update" : "Add");
+                        topRef.input.putFile(outputLockFilePath.path, newLockFileS, commitMessage);
 
-                        cm += "\n\nFlake lock file updates:\n\n";
-                        cm += filterANSIEscapes(diff, true);
-                        commitMessage = cm;
+                        /* Rewriting the lockfile changed the top-level
+                           repo, so we should re-read it. FIXME: we could
+                           also just clear the 'rev' field... */
+                        auto prevLockedRef = flake->lockedRef;
+                        flake = std::make_unique<Flake>(getFlake(state, topRef, useRegistries));
+
+                        if (lockFlags.commitLockFile &&
+                            flake->lockedRef.input.getRev() &&
+                            prevLockedRef.input.getRev() != flake->lockedRef.input.getRev())
+                            warn("committed new revision '%s'", flake->lockedRef.input.getRev()->gitRev());
                     }
-
-                    topRef.input.putFile(path.path, fmt("%s\n", newLockFile), commitMessage);
-
-                    /* Rewriting the lockfile changed the top-level
-                       repo, so we should re-read it. FIXME: we could
-                       also just clear the 'rev' field... */
-                    auto prevLockedRef = flake->lockedRef;
-                    flake = std::make_unique<Flake>(getFlake(state, topRef, useRegistries));
-
-                    if (lockFlags.commitLockFile &&
-                        flake->lockedRef.input.getRev() &&
-                        prevLockedRef.input.getRev() != flake->lockedRef.input.getRev())
-                        warn("committed new revision '%s'", flake->lockedRef.input.getRev()->gitRev());
                 }
             } else {
                 warn("not writing modified lock file of flake '%s':\n%s", topRef, chomp(diff));

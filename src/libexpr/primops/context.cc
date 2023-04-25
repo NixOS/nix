@@ -7,7 +7,7 @@ namespace nix {
 
 static void prim_unsafeDiscardStringContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    PathSet context;
+    NixStringContext context;
     auto s = state.coerceToString(pos, *args[0], context, "while evaluating the argument passed to builtins.unsafeDiscardStringContext");
     v.mkString(*s);
 }
@@ -17,7 +17,7 @@ static RegisterPrimOp primop_unsafeDiscardStringContext("__unsafeDiscardStringCo
 
 static void prim_hasContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    PathSet context;
+    NixStringContext context;
     state.forceString(*args[0], context, pos, "while evaluating the argument passed to builtins.hasContext");
     v.mkBool(!context.empty());
 }
@@ -33,17 +33,18 @@ static RegisterPrimOp primop_hasContext("__hasContext", 1, prim_hasContext);
    drv.inputDrvs. */
 static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    PathSet context;
+    NixStringContext context;
     auto s = state.coerceToString(pos, *args[0], context, "while evaluating the argument passed to builtins.unsafeDiscardOutputDependency");
 
-    PathSet context2;
-    for (auto && p : context) {
-        auto c = NixStringContextElem::parse(*state.store, p);
+    NixStringContext context2;
+    for (auto && c : context) {
         if (auto * ptr = std::get_if<NixStringContextElem::DrvDeep>(&c)) {
-            context2.emplace(state.store->printStorePath(ptr->drvPath));
+            context2.emplace(NixStringContextElem::Opaque {
+                .path = ptr->drvPath
+            });
         } else {
             /* Can reuse original item */
-            context2.emplace(std::move(p));
+            context2.emplace(std::move(c));
         }
     }
 
@@ -79,22 +80,21 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
         bool allOutputs = false;
         Strings outputs;
     };
-    PathSet context;
+    NixStringContext context;
     state.forceString(*args[0], context, pos, "while evaluating the argument passed to builtins.getContext");
     auto contextInfos = std::map<StorePath, ContextInfo>();
-    for (const auto & p : context) {
-        NixStringContextElem ctx = NixStringContextElem::parse(*state.store, p);
+    for (auto && i : context) {
         std::visit(overloaded {
-            [&](NixStringContextElem::DrvDeep & d) {
-                contextInfos[d.drvPath].allOutputs = true;
+            [&](NixStringContextElem::DrvDeep && d) {
+                contextInfos[std::move(d.drvPath)].allOutputs = true;
             },
-            [&](NixStringContextElem::Built & b) {
-                contextInfos[b.drvPath].outputs.emplace_back(std::move(b.output));
+            [&](NixStringContextElem::Built && b) {
+                contextInfos[std::move(b.drvPath)].outputs.emplace_back(std::move(b.output));
             },
-            [&](NixStringContextElem::Opaque & o) {
-                contextInfos[o.path].path = true;
+            [&](NixStringContextElem::Opaque && o) {
+                contextInfos[std::move(o.path)].path = true;
             },
-        }, ctx.raw());
+        }, ((NixStringContextElem &&) i).raw());
     }
 
     auto attrs = state.buildBindings(contextInfos.size());
@@ -129,7 +129,7 @@ static RegisterPrimOp primop_getContext("__getContext", 1, prim_getContext);
 */
 static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    PathSet context;
+    NixStringContext context;
     auto orig = state.forceString(*args[0], context, noPos, "while evaluating the first argument passed to builtins.appendContext");
 
     state.forceAttrs(*args[1], pos, "while evaluating the second argument passed to builtins.appendContext");
@@ -143,13 +143,16 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
                 .msg = hintfmt("context key '%s' is not a store path", name),
                 .errPos = state.positions[i.pos]
             });
+        auto namePath = state.store->parseStorePath(name);
         if (!settings.readOnlyMode)
-            state.store->ensurePath(state.store->parseStorePath(name));
+            state.store->ensurePath(namePath);
         state.forceAttrs(*i.value, i.pos, "while evaluating the value of a string context");
         auto iter = i.value->attrs->find(sPath);
         if (iter != i.value->attrs->end()) {
             if (state.forceBool(*iter->value, iter->pos, "while evaluating the `path` attribute of a string context"))
-                context.emplace(name);
+                context.emplace(NixStringContextElem::Opaque {
+                    .path = namePath,
+                });
         }
 
         iter = i.value->attrs->find(sAllOutputs);
@@ -161,7 +164,9 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
                         .errPos = state.positions[i.pos]
                     });
                 }
-                context.insert(concatStrings("=", name));
+                context.emplace(NixStringContextElem::DrvDeep {
+                    .drvPath = namePath,
+                });
             }
         }
 
@@ -176,7 +181,10 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
             }
             for (auto elem : iter->value->listItems()) {
                 auto outputName = state.forceStringNoCtx(*elem, iter->pos, "while evaluating an output name within a string context");
-                context.insert(concatStrings("!", outputName, "!", name));
+                context.emplace(NixStringContextElem::Built {
+                    .drvPath = namePath,
+                    .output = std::string { outputName },
+                });
             }
         }
     }

@@ -204,10 +204,10 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
 /* Hack to support caching in `nix-prefetch-url'. */
 static void opPrintFixedPath(Strings opFlags, Strings opArgs)
 {
-    auto recursive = FileIngestionMethod::Flat;
+    auto method = FileIngestionMethod::Flat;
 
     for (auto i : opFlags)
-        if (i == "--recursive") recursive = FileIngestionMethod::Recursive;
+        if (i == "--recursive") method = FileIngestionMethod::Recursive;
         else throw UsageError("unknown flag '%1%'", i);
 
     if (opArgs.size() != 3)
@@ -218,7 +218,13 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
     std::string hash = *i++;
     std::string name = *i++;
 
-    cout << fmt("%s\n", store->printStorePath(store->makeFixedOutputPath(recursive, Hash::parseAny(hash, hashAlgo), name)));
+    cout << fmt("%s\n", store->printStorePath(store->makeFixedOutputPath(name, FixedOutputInfo {
+        .hash = {
+            .method = method,
+            .hash = Hash::parseAny(hash, hashAlgo),
+        },
+        .references = {},
+    })));
 }
 
 
@@ -277,17 +283,17 @@ static void printTree(const StorePath & path,
 static void opQuery(Strings opFlags, Strings opArgs)
 {
     enum QueryType
-        { qDefault, qOutputs, qRequisites, qReferences, qReferrers
+        { qOutputs, qRequisites, qReferences, qReferrers
         , qReferrersClosure, qDeriver, qBinding, qHash, qSize
         , qTree, qGraph, qGraphML, qResolve, qRoots };
-    QueryType query = qDefault;
+    std::optional<QueryType> query;
     bool useOutput = false;
     bool includeOutputs = false;
     bool forceRealise = false;
     std::string bindingName;
 
     for (auto & i : opFlags) {
-        QueryType prev = query;
+        std::optional<QueryType> prev = query;
         if (i == "--outputs") query = qOutputs;
         else if (i == "--requisites" || i == "-R") query = qRequisites;
         else if (i == "--references") query = qReferences;
@@ -312,15 +318,15 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (i == "--force-realise" || i == "--force-realize" || i == "-f") forceRealise = true;
         else if (i == "--include-outputs") includeOutputs = true;
         else throw UsageError("unknown flag '%1%'", i);
-        if (prev != qDefault && prev != query)
+        if (prev && prev != query)
             throw UsageError("query type '%1%' conflicts with earlier flag", i);
     }
 
-    if (query == qDefault) query = qOutputs;
+    if (!query) query = qOutputs;
 
     RunPager pager;
 
-    switch (query) {
+    switch (*query) {
 
         case qOutputs: {
             for (auto & i : opArgs) {
@@ -935,7 +941,10 @@ static void opServe(Strings opFlags, Strings opArgs)
                 if (GET_PROTOCOL_MINOR(clientVersion) >= 3)
                     out << status.timesBuilt << status.isNonDeterministic << status.startTime << status.stopTime;
                 if (GET_PROTOCOL_MINOR(clientVersion) >= 6) {
-                    worker_proto::write(*store, out, status.builtOutputs);
+                    DrvOutputs builtOutputs;
+                    for (auto & [output, realisation] : status.builtOutputs)
+                        builtOutputs.insert_or_assign(realisation.id, realisation);
+                    worker_proto::write(*store, out, builtOutputs);
                 }
 
                 break;
@@ -964,7 +973,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 info.references = worker_proto::read(*store, in, Phantom<StorePathSet> {});
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
-                info.ca = parseContentAddressOpt(readString(in));
+                info.ca = ContentAddress::parseOpt(readString(in));
 
                 if (info.narSize == 0)
                     throw Error("narInfo is too old and missing the narSize field");

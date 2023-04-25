@@ -22,7 +22,7 @@ InstallableValue::getCursor(EvalState & state)
 
 static UsageError nonValueInstallable(Installable & installable)
 {
-	return UsageError("installable '%s' does not correspond to a Nix language value", installable.what());
+    return UsageError("installable '%s' does not correspond to a Nix language value", installable.what());
 }
 
 InstallableValue & InstallableValue::require(Installable & installable)

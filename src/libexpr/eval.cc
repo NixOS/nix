@@ -9,6 +9,7 @@
 #include "filetransfer.hh"
 #include "function-trace.hh"
 #include "profiles.hh"
+#include "print.hh"
 #include "fs-input-accessor.hh"
 
 #include <algorithm>
@@ -105,18 +106,10 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
         str << integer;
         break;
     case tBool:
-        str << (boolean ? "true" : "false");
+        printLiteralBool(str, boolean);
         break;
     case tString:
-        str << "\"";
-        for (const char * i = string.s; *i; i++)
-            if (*i == '\"' || *i == '\\') str << "\\" << *i;
-            else if (*i == '\n') str << "\\n";
-            else if (*i == '\r') str << "\\r";
-            else if (*i == '\t') str << "\\t";
-            else if (*i == '$' && *(i+1) == '{') str << "\\" << *i;
-            else str << *i;
-        str << "\"";
+        printLiteralString(str, string.s);
         break;
     case tPath:
         str << path().to_string(); // !!! escaping?
@@ -174,7 +167,17 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
     case tFloat:
         str << fpoint;
         break;
+    case tBlackhole:
+        // Although we know for sure that it's going to be an infinite recursion
+        // when this value is accessed _in the current context_, it's likely
+        // that the user will misinterpret a simpler «infinite recursion» output
+        // as a definitive statement about the value, while in fact it may be
+        // a valid value after `builtins.trace` and perhaps some other steps
+        // have completed.
+        str << "«potential infinite recursion»";
+        break;
     default:
+        printError("Nix evaluator internal error: Value::print(): invalid value type %1%", internalType);
         abort();
     }
 }
@@ -230,6 +233,9 @@ std::string_view showType(ValueType type)
 
 std::string showType(const Value & v)
 {
+    // Allow selecting a subset of enum values
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wswitch-enum"
     switch (v.internalType) {
         case tString: return v.string.context ? "a string with context" : "a string";
         case tPrimOp:
@@ -243,16 +249,21 @@ std::string showType(const Value & v)
     default:
         return std::string(showType(v.type()));
     }
+    #pragma GCC diagnostic pop
 }
 
 PosIdx Value::determinePos(const PosIdx pos) const
 {
+    // Allow selecting a subset of enum values
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wswitch-enum"
     switch (internalType) {
         case tAttrs: return attrs->pos;
         case tLambda: return lambda.fun->pos;
         case tApp: return app.left->determinePos(pos);
         default: return pos;
     }
+    #pragma GCC diagnostic pop
 }
 
 bool Value::isTrivial() const
@@ -327,6 +338,22 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
     }
 }
 
+#if HAVE_BOEHMGC
+/* Disable GC while this object lives. Used by CoroutineContext.
+ *
+ * Boehm keeps a count of GC_disable() and GC_enable() calls,
+ * and only enables GC when the count matches.
+ */
+class BoehmDisableGC {
+public:
+    BoehmDisableGC() {
+        GC_disable();
+    };
+    ~BoehmDisableGC() {
+        GC_enable();
+    };
+};
+#endif
 
 static bool gcInitialised = false;
 
@@ -350,6 +377,15 @@ void initGC()
     GC_set_oom_fn(oomHandler);
 
     StackAllocator::defaultAllocator = &boehmGCStackAllocator;
+
+
+#if NIX_BOEHM_PATCH_VERSION != 1
+    printTalkative("Unpatched BoehmGC, disabling GC inside coroutines");
+    /* Used to disable GC when entering coroutines on macOS */
+    create_coro_gc_hook = []() -> std::shared_ptr<void> {
+        return std::make_shared<BoehmDisableGC>();
+    };
+#endif
 
     /* Set the initial heap size to something fairly big (25% of
        physical RAM, up to a maximum of 384 MiB) so that in most cases
@@ -585,8 +621,7 @@ void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & 
 {
     allowPath(storePath);
 
-    auto path = store->printStorePath(storePath);
-    v.mkString(path, PathSet({path}));
+    mkStorePathString(storePath, v);
 }
 
 void EvalState::checkURI(const std::string & uri)
@@ -621,7 +656,7 @@ void EvalState::checkURI(const std::string & uri)
 }
 
 
-Path EvalState::toRealPath(const Path & path, const PathSet & context)
+Path EvalState::toRealPath(const Path & path, const NixStringContext & context)
 {
     // FIXME: check whether 'path' is in 'context'.
     return
@@ -873,25 +908,25 @@ void Value::mkString(std::string_view s)
 }
 
 
-static void copyContextToValue(Value & v, const PathSet & context)
+static void copyContextToValue(Value & v, const NixStringContext & context)
 {
     if (!context.empty()) {
         size_t n = 0;
         v.string.context = (const char * *)
             allocBytes((context.size() + 1) * sizeof(char *));
         for (auto & i : context)
-            v.string.context[n++] = dupString(i.c_str());
+            v.string.context[n++] = dupString(i.to_string().c_str());
         v.string.context[n] = 0;
     }
 }
 
-void Value::mkString(std::string_view s, const PathSet & context)
+void Value::mkString(std::string_view s, const NixStringContext & context)
 {
     mkString(s);
     copyContextToValue(*this, context);
 }
 
-void Value::mkStringMove(const char * s, const PathSet & context)
+void Value::mkStringMove(const char * s, const NixStringContext & context)
 {
     mkString(s);
     copyContextToValue(*this, context);
@@ -964,6 +999,16 @@ void EvalState::mkPos(Value & v, PosIdx p)
         v.mkAttrs(attrs);
     } else
         v.mkNull();
+}
+
+
+void EvalState::mkStorePathString(const StorePath & p, Value & v)
+{
+    v.mkString(
+        store->printStorePath(p),
+        NixStringContext {
+            NixStringContextElem::Opaque { .path = p },
+        });
 }
 
 
@@ -1817,7 +1862,7 @@ void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const Po
 
 void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 {
-    PathSet context;
+    NixStringContext context;
     std::vector<BackedStringView> s;
     size_t sSize = 0;
     NixInt n = 0;
@@ -2047,26 +2092,15 @@ std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string
 }
 
 
-void copyContext(const Value & v, PathSet & context)
+void copyContext(const Value & v, NixStringContext & context)
 {
     if (v.string.context)
         for (const char * * p = v.string.context; *p; ++p)
-            context.insert(*p);
+            context.insert(NixStringContextElem::parse(*p));
 }
 
 
-NixStringContext Value::getContext(const Store & store)
-{
-    NixStringContext res;
-    assert(internalType == tString);
-    if (string.context)
-        for (const char * * p = string.context; *p; ++p)
-            res.push_back(NixStringContextElem::parse(store, *p));
-    return res;
-}
-
-
-std::string_view EvalState::forceString(Value & v, PathSet & context, const PosIdx pos, std::string_view errorCtx)
+std::string_view EvalState::forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx)
 {
     auto s = forceString(v, pos, errorCtx);
     copyContext(v, context);
@@ -2096,7 +2130,7 @@ bool EvalState::isDerivation(Value & v)
 
 
 std::optional<std::string> EvalState::tryAttrsToString(const PosIdx pos, Value & v,
-    PathSet & context, bool coerceMore, bool copyToStore)
+    NixStringContext & context, bool coerceMore, bool copyToStore)
 {
     auto i = v.attrs->find(sToString);
     if (i != v.attrs->end()) {
@@ -2113,7 +2147,7 @@ std::optional<std::string> EvalState::tryAttrsToString(const PosIdx pos, Value &
 BackedStringView EvalState::coerceToString(
     const PosIdx pos,
     Value & v,
-    PathSet & context,
+    NixStringContext & context,
     std::string_view errorCtx,
     bool coerceMore,
     bool copyToStore)
@@ -2189,7 +2223,7 @@ BackedStringView EvalState::coerceToString(
 }
 
 
-StorePath EvalState::copyPathToStore(PathSet & context, const SourcePath & path)
+StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePath & path)
 {
     if (nix::isDerivation(path.path.abs()))
         error("file names are not allowed to end in '%1%'", drvExtension).debugThrow<EvalError>();
@@ -2206,12 +2240,14 @@ StorePath EvalState::copyPathToStore(PathSet & context, const SourcePath & path)
             return dstPath;
         }();
 
-    context.insert(store->printStorePath(dstPath));
+    context.insert(NixStringContextElem::Opaque {
+        .path = dstPath
+    });
     return dstPath;
 }
 
 
-SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, PathSet & context, std::string_view errorCtx)
+SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)
 {
     try {
         forceValue(v, pos);
@@ -2238,7 +2274,7 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, PathSet & contex
 }
 
 
-StorePath EvalState::coerceToStorePath(const PosIdx pos, Value & v, PathSet & context, std::string_view errorCtx)
+StorePath EvalState::coerceToStorePath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)
 {
     auto path = coerceToString(pos, v, context, errorCtx, false, false).toOwned();
     if (auto storePath = store->maybeParseStorePath(path))
@@ -2321,6 +2357,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
         case nFloat:
             return v1.fpoint == v2.fpoint;
 
+        case nThunk: // Must not be left by forceValue
         default:
             error("cannot compare %1% with %2%", showType(v1), showType(v2)).withTrace(pos, errorCtx).debugThrow<EvalError>();
     }
@@ -2446,7 +2483,7 @@ void EvalState::printStats()
 }
 
 
-std::string ExternalValueBase::coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore) const
+std::string ExternalValueBase::coerceToString(const Pos & pos, NixStringContext & context, bool copyMore, bool copyToStore) const
 {
     throw TypeError({
         .msg = hintfmt("cannot coerce %1% to a string", showType())

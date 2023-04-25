@@ -5,8 +5,10 @@
 
 namespace nix {
 
-/* An abstract class for accessing a filesystem-like structure, such
-   as a (possibly remote) Nix store or the contents of a NAR file. */
+/**
+ * An abstract class for accessing a filesystem-like structure, such
+ * as a (possibly remote) Nix store or the contents of a NAR file.
+ */
 class FSAccessor
 {
 public:
@@ -15,8 +17,17 @@ public:
     struct Stat
     {
         Type type = tMissing;
-        uint64_t fileSize = 0; // regular files only
+        /**
+         * regular files only
+         */
+        uint64_t fileSize = 0;
+        /**
+         * regular files only
+         */
         bool isExecutable = false; // regular files only
+        /**
+         * regular files only
+         */
         uint64_t narOffset = 0; // regular files only
     };
 
