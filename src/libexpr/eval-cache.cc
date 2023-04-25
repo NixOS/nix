@@ -625,7 +625,8 @@ string_t AttrCursor::getStringWithContext()
         NixStringContext context;
         copyContext(v, context);
         return {v.string.s, std::move(context)};
-    } else if (v.type() == nPath)
+    }
+    else if (v.type() == nPath)
         return {v.path().to_string(), {}};
     else
         root->state.error("'%s' is not a string but %s", getAttrPathStr()).debugThrow<TypeError>();
