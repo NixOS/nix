@@ -28,7 +28,7 @@ For example, if the default expression contains two files, `foo.nix` and `bar.ni
 }
 ```
 
-The file `manifest.nix` is always ignored.
+The file [`manifest.nix`](@docroot@/command-ref/files/user-profiles.md#manifest.nix) is always ignored.
 
 The command [`nix-channel`] places a symlink to the user's current [channels profile](@docroot@/command-ref/files/channels.md) in this directory.
 This makes all subscribed channels available as attributes in the default expression.

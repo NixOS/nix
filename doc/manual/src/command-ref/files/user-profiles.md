@@ -50,6 +50,25 @@ lrwxrwxrwx 3 root root 107 Jan  1  1970 us.zoom.Zoom.desktop -> /nix/store/wbhg2
 …
 ```
 
+## User profile link
+
+A symbolic link to the user's current profile:
+
+- `~/.nix-profile`
+- `$XDG_STATE_HOME/nix/profile` if [`use-xdg-base-directories`] is set to `true`.
+
+By default, this symlink points to:
+
+- `$XDG_STATE_HOME/nix/profiles/profile` for regular users
+- `$NIX_STATE_DIR/profiles/per-user/root/profile` for `root`
+
+The `PATH` environment variable should include `/bin` subdirectory of the profile link (e.g. `~/.nix-profile/bin`) for the user environment to be visible to the user.
+The [installer](@docroot@/installation/installing-binary.md) sets this up by default, unless you enable [`use-xdg-base-directories`].
+
+[`nix-env`]: @docroot@/command-ref/nix-env.md
+[`nix profile`]: @docroot@/command-ref/new-cli/nix3-profile.md
+[`use-xdg-base-directories`]: @docroot@/command-ref/conf-file.md#conf-use-xdg-base-directories
+
 ## Manifest
 
 The manifest file records the provenance of the packages that are installed in this version of the profile.
@@ -225,22 +244,3 @@ has the following fields:
 * `active`: Whether the profile contains symlinks to the files of this
   package. If set to false, the package is kept in the Nix store, but
   is not "visible" in the profile's symlink tree.
-
-## User profile link
-
-A symbolic link to the user's current profile:
-
-- `~/.nix-profile`
-- `$XDG_STATE_HOME/nix/profile` if [`use-xdg-base-directories`] is set to `true`.
-
-By default, this symlink points to:
-
-- `$XDG_STATE_HOME/nix/profiles/profile` for regular users
-- `$NIX_STATE_DIR/profiles/per-user/root/profile` for `root`
-
-The `PATH` environment variable should include `/bin` subdirectory of the profile link (e.g. `~/.nix-profile/bin`) for the user environment to be visible to the user.
-The [installer](@docroot@/installation/installing-binary.md) sets this up by default, unless you enable [`use-xdg-base-directories`].
-
-[`nix-env`]: @docroot@/command-ref/nix-env.md
-[`nix profile`]: @docroot@/command-ref/new-cli/nix3-profile.md
-[`use-xdg-base-directories`]: @docroot@/command-ref/conf-file.md#conf-use-xdg-base-directories
