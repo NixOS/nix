@@ -14,8 +14,7 @@ A profile is a directory of symlinks to files in the Nix store.
 > `nix profile` is experimental.
 > Once you have used `nix profile` you can no longer use `nix-env` without first deleting `$XDG_STATE_HOME/nix/profiles/profile`
 
-Once you installed a package with `nix profile`, you get the following
-error message when using `nix-env`:
+Once you installed a package with `nix profile`, you get the following error message when using `nix-env`:
 
 ```console
 $ nix-env -f '<nixpkgs>' -iA 'hello'
@@ -27,7 +26,7 @@ To migrate back to `nix-env` you can delete your current profile:
 
 > **Warning**
 >
-> This will delete packages that have been installed before, so you may want to back this information before running the command.
+> This will delete packages that have been installed before, so you may want to back up this information before running the command.
 
 ```console
  $ rm -rf "${XDG_STATE_HOME-$HOME/.local/state}/nix/profiles/profile"
@@ -207,7 +206,7 @@ Used by [`nix-env`]. Here is an example of how this file might look like after i
 
 Each element in this list corresponds to an installed package.
 It incorporates some attributes of the original package derivation, including `meta`, `name`, `out`, `outPath`, `outputs`, `system`.
-This is used by Nix for querying and updating the package.
+This information is used by Nix for querying and updating the package.
 
 ### `manifest.json`
 
