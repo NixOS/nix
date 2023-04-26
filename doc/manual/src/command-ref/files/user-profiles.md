@@ -7,31 +7,6 @@ A directory that contains links to user profiles managed by [`nix-env`] and [`ni
 
 A profile is a directory of symlinks to files in the Nix store.
 
-### Profile compatibility
-
-> **Warning**
->
-> `nix profile` is experimental.
-> Once you have used `nix profile` you can no longer use `nix-env` without first deleting `$XDG_STATE_HOME/nix/profiles/profile`
-
-Once you installed a package with `nix profile`, you get the following error message when using `nix-env`:
-
-```console
-$ nix-env -f '<nixpkgs>' -iA 'hello'
-error: --- Error ----------------------------------------------------------------------------------------------------------------- nix-env
-profile '/home/alice/.local/state/nix/profiles/profile' is incompatible with 'nix-env'; please use 'nix profile' instead
-```
-
-To migrate back to `nix-env` you can delete your current profile:
-
-> **Warning**
->
-> This will delete packages that have been installed before, so you may want to back up this information before running the command.
-
-```console
- $ rm -rf "${XDG_STATE_HOME-$HOME/.local/state}/nix/profiles/profile"
-```
-
 ### Filesystem layout
 
 Profiles are versioned as follows. When using a profile named *path*, *path* is a symlink to *path*`-`*N*`-link`, where *N* is the version of the profile.
