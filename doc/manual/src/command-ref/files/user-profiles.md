@@ -1,6 +1,6 @@
 # User profiles
 
-A directory that contains links to user profiles managed by [`nix-env`] and [`nix profile`].
+A directory that contains links to user profiles managed by [`nix-env`] and [`nix profile`]:
 
 - `$XDG_STATE_HOME/nix/profiles` for regular users
 - `$NIX_STATE_DIR/profiles/per-user/root` if the user is `root`
@@ -84,7 +84,7 @@ It is different between [`nix-env`] and [`nix profile`].
 
 ### `manifest.nix` 
 
-Used by [`nix-env`]. This is an example of how this file might look like after installing `hello` from nixpkgs.
+Used by [`nix-env`]. Here is an example of how this file might look like after installing `hello` from Nixpkgs:
 
 ```nix
 [{
@@ -211,7 +211,7 @@ This is used by Nix for querying and updating the package.
 
 ### `manifest.json`
 
-Used by [`nix profile`]. This is an example of what the file might look like after installing `zoom-us` from nixpkgs:
+Used by [`nix profile`]. Here is an example of what the file might look like after installing `zoom-us` from Nixpkgs:
 
 ```json
 {
@@ -255,7 +255,7 @@ has the following fields:
 
 ## User profile link
 
-A symbolic link to the user's current profile. 
+A symbolic link to the user's current profile:
 
 - `~/.nix-profile`
 - `$XDG_STATE_HOME/nix/profile` if [`use-xdg-base-directories`] is set to `true`.

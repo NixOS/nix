@@ -1,6 +1,6 @@
 # Default Nix expression
 
-The source for the default [Nix expressions](@docroot@/language/index.md) used by [`nix-env`].
+The source for the default [Nix expressions](@docroot@/language/index.md) used by [`nix-env`]:
 
 - `~/.nix-defexpr`
 - `$XDG_STATE_HOME/nix/defexpr` if [`use-xdg-base-directories`] is set to `true`.
@@ -35,7 +35,7 @@ This makes all subscribed channels available as attributes in the default expres
 
 ## User channel link
 
-A symlink that ensures that [`nix-env`] can find your channels.
+A symlink that ensures that [`nix-env`] can find your channels:
 
 - `~/.nix-defexpr/channels`
 - `$XDG_STATE_HOME/defexpr/channels` if [`use-xdg-base-directories`] is set to `true`.

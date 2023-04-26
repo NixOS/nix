@@ -1,6 +1,6 @@
 # Channels
 
-A directory containing symlinks to Nix channels, managed by [`nix-channel`].
+A directory containing symlinks to Nix channels, managed by [`nix-channel`]:
 
 - `$XDG_STATE_HOME/nix/profiles/channels` for regular users
 - `$NIX_STATE_DIR/profiles/per-user/root/channels` for `root`
