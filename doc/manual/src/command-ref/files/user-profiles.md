@@ -1,4 +1,4 @@
-# User profiles
+## User profiles
 
 A directory that contains links to user profiles managed by [`nix-env`] and [`nix profile`]:
 
@@ -7,7 +7,7 @@ A directory that contains links to user profiles managed by [`nix-env`] and [`ni
 
 A profile is a directory of symlinks to files in the Nix store.
 
-## Profile compatibility
+### Profile compatibility
 
 > **Warning**
 >
@@ -32,7 +32,7 @@ To migrate back to `nix-env` you can delete your current profile:
  $ rm -rf "${XDG_STATE_HOME-$HOME/.local/state}/nix/profiles/profile"
 ```
 
-## Filesystem layout
+### Filesystem layout
 
 Profiles are versioned as follows. When using a profile named *path*, *path* is a symlink to *path*`-`*N*`-link`, where *N* is the version of the profile.
 In turn, *path*`-`*N*`-link` is a symlink to a path in the Nix store.

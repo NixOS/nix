@@ -1,4 +1,4 @@
-# User profile link
+## User profile link
 
 A symbolic link to the user's current profile. 
 

@@ -1,4 +1,4 @@
-# Default Nix expression
+## Default Nix expression
 
 The source for the default [Nix expressions](@docroot@/language/index.md) used by [`nix-env`]:
 

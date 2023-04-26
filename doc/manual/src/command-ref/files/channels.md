@@ -1,4 +1,4 @@
-# Channels
+## Channels
 
 A directory containing symlinks to Nix channels, managed by [`nix-channel`]:
 
