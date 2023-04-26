@@ -1,76 +1,23 @@
 #include "primops.hh"
+#include "filtering-input-accessor.hh"
 
 namespace nix {
 
-struct FilteringInputAccessor : InputAccessor
+struct FilterPathInputAccessor : CachingFilteringInputAccessor
 {
     EvalState & state;
     PosIdx pos;
-    ref<InputAccessor> next;
-    CanonPath prefix;
     Value * filterFun;
 
-    std::map<CanonPath, bool> cache;
-
-    FilteringInputAccessor(EvalState & state, PosIdx pos, const SourcePath & src, Value * filterFun)
-        : state(state)
+    FilterPathInputAccessor(EvalState & state, PosIdx pos, const SourcePath & src, Value * filterFun)
+        : CachingFilteringInputAccessor(src)
+        , state(state)
         , pos(pos)
-        , next(src.accessor)
-        , prefix(src.path)
         , filterFun(filterFun)
     {
     }
 
-    std::string readFile(const CanonPath & path) override
-    {
-        checkAccess(path);
-        return next->readFile(prefix + path);
-    }
-
-    bool pathExists(const CanonPath & path) override
-    {
-        return isAllowed(path) && next->pathExists(prefix + path);
-    }
-
-    Stat lstat(const CanonPath & path) override
-    {
-        checkAccess(path);
-        return next->lstat(prefix + path);
-    }
-
-    DirEntries readDirectory(const CanonPath & path) override
-    {
-        checkAccess(path);
-        DirEntries entries;
-        for (auto & entry : next->readDirectory(prefix + path)) {
-            if (isAllowed(path + entry.first))
-                entries.insert(std::move(entry));
-        }
-        return entries;
-    }
-
-    std::string readLink(const CanonPath & path) override
-    {
-        checkAccess(path);
-        return next->readLink(prefix + path);
-    }
-
-    void checkAccess(const CanonPath & path)
-    {
-        if (!isAllowed(path))
-            throw Error("access to path '%s' has been filtered out", showPath(path));
-    }
-
-    bool isAllowed(const CanonPath & path)
-    {
-        auto i = cache.find(path);
-        if (i != cache.end()) return i->second;
-        auto res = isAllowedUncached(path);
-        cache.emplace(path, res);
-        return res;
-    }
-
-    bool isAllowedUncached(const CanonPath & path)
+    bool isAllowedUncached(const CanonPath & path) override
     {
         if (!path.isRoot() && !isAllowed(*path.parent())) return false;
         // Note that unlike 'builtins.{path,filterSource}', we don't
@@ -78,10 +25,6 @@ struct FilteringInputAccessor : InputAccessor
         return state.callPathFilter(filterFun, {next, prefix + path}, path.abs(), pos);
     }
 
-    std::string showPath(const CanonPath & path) override
-    {
-        return next->showPath(prefix + path);
-    }
 };
 
 static void prim_filterPath(EvalState & state, PosIdx pos, Value * * args, Value & v)
@@ -127,7 +70,7 @@ static void prim_filterPath(EvalState & state, PosIdx pos, Value * * args, Value
             .errPos = state.positions[pos]
         }));
 
-    auto accessor = make_ref<FilteringInputAccessor>(state, pos, *path, filterFun);
+    auto accessor = make_ref<FilterPathInputAccessor>(state, pos, *path, filterFun);
 
     state.registerAccessor(accessor);
 
