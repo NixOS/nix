@@ -34,10 +34,9 @@ To migrate back to `nix-env` you can delete your current profile:
 
 ## Filesystem layout
 
-Profiles are versioned as follows. When using profile *path*, *path*
-is a symlink to *path*`-`*N*, where *N* is the current *version* of
-the profile. In turn, *path*`-`*N* is a symlink to a path in the Nix
-store. For example:
+Profiles are versioned as follows. When using a profile named *path*, *path* is a symlink to *path*`-`*N*`-link`, where *N* is the version of the profile.
+In turn, *path*`-`*N*`-link` is a symlink to a path in the Nix store.
+For example:
 
 ```console
 $ ls -l ~alice/.local/state/nix/profiles/profile*
