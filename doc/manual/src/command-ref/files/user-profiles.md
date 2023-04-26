@@ -2,8 +2,8 @@
 
 A directory that contains links to user profiles managed by [`nix-env`] and [`nix profile`].
 
+- `$XDG_STATE_HOME/nix/profiles` for regular users
 - `$NIX_STATE_DIR/profiles/per-user/root` if the user is `root`
-- `$XDG_STATE_HOME/nix/profiles` otherwise
 
 A profile is a directory of symlinks to files in the Nix store.
 
