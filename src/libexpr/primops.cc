@@ -706,12 +706,14 @@ static RegisterPrimOp primop_genericClosure(RegisterPrimOp::Info {
     .arity = 1,
     .doc = R"(
       Take an *attrset* with values named `startSet` and `operator` in order to
-      return a *list of attrsets* by starting with the `startSet`, recursively
-      applying the `operator` function to each element. The *attrsets* in the
-      `startSet` and produced by the `operator` must each contain value named
-      `key` which are comparable to each other. The result is produced by
-      repeatedly calling the operator for each element encountered with a
-      unique key, terminating when no new elements are produced. For example,
+      return a *list of attrsets* by starting with the `startSet` and recursively
+      applying the `operator` function to each `item`. The *attrsets* in the
+      `startSet` and the *attrsets* produced by `operator` must contain a value
+      named `key` which is comparable. The result is produced by calling `operator`
+      for each `item` with a value for `key` that has not been called yet including
+      newly produced `item`s. The function terminates when no new `item`s are
+      produced. The resulting *list of attrsets* contains only *attrsets* with a
+      unique key. For example,
 
       ```
       builtins.genericClosure {
