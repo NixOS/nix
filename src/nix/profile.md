@@ -11,7 +11,7 @@ them to be rolled back easily.
 
 )""
 
-#include "doc/files/user-profiles.md"
+#include "doc/files/profiles.md"
 
 R""(
 

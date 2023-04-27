@@ -85,4 +85,4 @@ match. Here are some examples:
 
 {{#include ./files/default-nix-expression.md}}
 
-{{#include ./files/user-profiles.md}}
+{{#include ./files/profiles.md}}
