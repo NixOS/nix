@@ -102,7 +102,6 @@ static int main_nix_instantiate(int argc, char * * argv)
         bool strict = false;
         Strings attrPaths;
         bool wantsReadWrite = false;
-        RepairFlag repair = NoRepair;
 
         struct MyArgs : LegacyArgs, MixEvalArgs
         {
@@ -140,8 +139,6 @@ static int main_nix_instantiate(int argc, char * * argv)
                 xmlOutputSourceLocation = false;
             else if (*arg == "--strict")
                 strict = true;
-            else if (*arg == "--repair")
-                repair = Repair;
             else if (*arg == "--dry-run")
                 settings.readOnlyMode = true;
             else if (*arg != "" && arg->at(0) == '-')
@@ -160,7 +157,7 @@ static int main_nix_instantiate(int argc, char * * argv)
         auto evalStore = myArgs.evalStoreUrl ? openStore(*myArgs.evalStoreUrl) : store;
 
         auto state = std::make_unique<EvalState>(myArgs.searchPath, evalStore, store);
-        state->repair = repair;
+        state->repair = myArgs.repair;
 
         Bindings & autoArgs = *myArgs.getAutoArgs(*state);
 
