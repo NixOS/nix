@@ -259,7 +259,7 @@ struct CmdFlakeInfo : CmdFlakeMetadata
 struct CmdFlakeCheck : FlakeCommand
 {
     bool build = true;
-    bool checkCurrentSystemOnly = false;
+    bool checkAllSystems = false;
 
     CmdFlakeCheck()
     {
@@ -269,9 +269,9 @@ struct CmdFlakeCheck : FlakeCommand
             .handler = {&build, false}
         });
         addFlag({
-            .longName = "current-system-only",
-            .description = "Check the outputs for only the current system.",
-            .handler = {&checkCurrentSystemOnly, true}
+            .longName = "all-systems",
+            .description = "Check the outputs for all systems.",
+            .handler = {&checkAllSystems, true}
         });
     }
 
@@ -337,7 +337,7 @@ struct CmdFlakeCheck : FlakeCommand
         };
 
         auto checkSystemType = [&](const std::string & system, const PosIdx pos) {
-            if (checkCurrentSystemOnly && system != localSystem) {
+            if (!checkAllSystems && system != localSystem) {
                 omittedSystems.insert(system);
                 return false;
             } else {
@@ -722,7 +722,7 @@ struct CmdFlakeCheck : FlakeCommand
             throw Error("some errors were encountered during the evaluation");
 
         if (!omittedSystems.empty()) {
-            logger->warn("The check omitted these incompatible systems:");
+            logger->warn("The check omitted these incompatible systems (use '--all-systems' to check all):");
             for (auto omittedSystem: omittedSystems)
                 logger->warn(omittedSystem);
         }
