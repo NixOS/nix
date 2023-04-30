@@ -22,7 +22,7 @@ void emitTreeAttrs(
 {
     assert(input.isLocked());
 
-    auto attrs = state.buildBindings(8);
+    auto attrs = state.buildBindings(9);
 
 
     state.mkStorePathString(tree.storePath, attrs.alloc(state.sOutPath));
@@ -60,6 +60,8 @@ void emitTreeAttrs(
         attrs.alloc("lastModified").mkInt(*lastModified);
         attrs.alloc("lastModifiedDate").mkString(
             fmt("%s", std::put_time(std::gmtime(&*lastModified), "%Y%m%d%H%M%S")));
+        attrs.alloc("lastModifiedDateISO8601").mkString(
+            fmt("%s", std::put_time(std::gmtime(&*lastModified), "%Y-%m-%d")));
     }
 
     v.mkAttrs(attrs);

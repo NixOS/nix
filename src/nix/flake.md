@@ -367,6 +367,9 @@ The following attributes are supported in `flake.nix`:
     useful for generating (hopefully) monotonically increasing version
     strings.
 
+  * `lastModifiedDateISO8601`: This is similar to `lastModifiedDate`, but
+    it is in the ISO 8601 format, `%Y-%m-%d` (e.g. `2023-04-29`).
+
   * `lastModified`: The commit time of the revision `rev` as an integer
     denoting the number of seconds since 1970.
 
