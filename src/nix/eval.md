@@ -18,7 +18,7 @@ R""(
 * Evaluate a Nix expression from a file:
 
   ```console
-  # nix eval -f ./my-nixpkgs hello.name
+  # nix eval --file ./my-nixpkgs hello.name
   ```
 
 * Get the current version of the `nixpkgs` flake:
