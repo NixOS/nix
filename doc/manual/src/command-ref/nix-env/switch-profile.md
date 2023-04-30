@@ -22,5 +22,5 @@ the symlink `~/.nix-profile` is made to point to *path*.
 # Examples
 
 ```console
-$ nix-env -S ~/my-profile
+$ nix-env --switch-profile ~/my-profile
 ```

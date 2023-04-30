@@ -59,18 +59,18 @@ To subscribe to the Nixpkgs channel and install the GNU Hello package:
 ```console
 $ nix-channel --add https://nixos.org/channels/nixpkgs-unstable
 $ nix-channel --update
-$ nix-env -iA nixpkgs.hello
+$ nix-env --install --attr nixpkgs.hello
 ```
 
 You can revert channel updates using `--rollback`:
 
 ```console
-$ nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
+$ nix-instantiate --eval --expr '(import <nixpkgs> {}).lib.version'
 "14.04.527.0e935f1"
 
 $ nix-channel --rollback
 switching from generation 483 to 482
 
-$ nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
+$ nix-instantiate --eval --expr '(import <nixpkgs> {}).lib.version'
 "14.04.526.dbadfad"
 ```

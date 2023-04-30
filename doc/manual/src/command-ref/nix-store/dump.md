@@ -23,7 +23,7 @@ produce the same NAR archive. For instance, directory entries are
 always sorted so that the actual on-disk order doesn’t influence the
 result.  This means that the cryptographic hash of a NAR dump of a
 path is usable as a fingerprint of the contents of the path. Indeed,
-the hashes of store paths stored in Nix’s database (see `nix-store -q
+the hashes of store paths stored in Nix’s database (see `nix-store --query
 --hash`) are SHA-256 hashes of the NAR dump of each store path.
 
 NAR archives support filenames of unlimited length and 64-bit file
