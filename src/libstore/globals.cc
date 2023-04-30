@@ -249,6 +249,17 @@ unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
     }
 }
 
+unsigned int MaxSubstitutionJobsSetting::parse(const std::string & str) const
+{
+    if (str == "auto") return std::max(1U, std::thread::hardware_concurrency());
+    else {
+        if (auto n = string2Int<decltype(value)>(str))
+            return std::max(1U, *n);
+        else
+            throw UsageError("configuration setting '%s' should be 'auto' or an integer", name);
+    }
+}
+
 
 Paths PluginFilesSetting::parse(const std::string & str) const
 {

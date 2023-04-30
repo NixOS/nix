@@ -29,6 +29,21 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
     unsigned int parse(const std::string & str) const override;
 };
 
+struct MaxSubstitutionJobsSetting : public BaseSetting<unsigned int>
+{
+    MaxSubstitutionJobsSetting(Config * options,
+        unsigned int def,
+        const std::string & name,
+        const std::string & description,
+        const std::set<std::string> & aliases = {})
+        : BaseSetting<unsigned int>(def, true, name, description, aliases)
+    {
+        options->addSetting(this);
+    }
+
+    unsigned int parse(const std::string & str) const override;
+};
+
 struct PluginFilesSetting : public BaseSetting<Paths>
 {
     bool pluginsLoaded = false;
@@ -158,6 +173,18 @@ public:
           command line switch.
         )",
         {"build-max-jobs"}};
+
+    MaxSubstitutionJobsSetting maxSubstitutionJobs{
+        this, 16, "max-substitution-jobs",
+        R"(
+          This option defines the maximum number of substitution jobs that Nix
+          will try to run in parallel. The default is `16`. The minimum value
+          one can choose is `1` and lower values will be interpreted as `1`. The
+          special value `auto` causes Nix to use the number of CPUs in your
+          system. It can be overridden using the `--max-substitution-jobs`
+          command line switch.
+        )",
+        {"substitution-max-jobs"}};
 
     Setting<unsigned int> buildCores{
         this,

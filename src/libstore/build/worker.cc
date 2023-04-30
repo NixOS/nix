@@ -18,6 +18,7 @@ Worker::Worker(Store & store, Store & evalStore)
 {
     /* Debugging: prevent recursive workers. */
     nrLocalBuilds = 0;
+    nrSubstitutions = 0;
     lastWokenUp = steady_time_point::min();
     permanentFailure = false;
     timedOut = false;
@@ -176,6 +177,12 @@ unsigned Worker::getNrLocalBuilds()
 }
 
 
+unsigned Worker::getNrSubstitutions()
+{
+    return nrSubstitutions;
+}
+
+
 void Worker::childStarted(GoalPtr goal, const std::set<int> & fds,
     bool inBuildSlot, bool respectTimeouts)
 {
@@ -187,7 +194,10 @@ void Worker::childStarted(GoalPtr goal, const std::set<int> & fds,
     child.inBuildSlot = inBuildSlot;
     child.respectTimeouts = respectTimeouts;
     children.emplace_back(child);
-    if (inBuildSlot) nrLocalBuilds++;
+    if (inBuildSlot) {
+        if (dynamic_cast<PathSubstitutionGoal *>(child.goal2)) nrSubstitutions++;
+        else nrLocalBuilds++;
+    }
 }
 
 
@@ -198,8 +208,13 @@ void Worker::childTerminated(Goal * goal, bool wakeSleepers)
     if (i == children.end()) return;
 
     if (i->inBuildSlot) {
-        assert(nrLocalBuilds > 0);
-        nrLocalBuilds--;
+        if (dynamic_cast<PathSubstitutionGoal *>(goal)) {
+            assert(nrSubstitutions > 0);
+            nrSubstitutions--;
+        } else {
+            assert(nrLocalBuilds > 0);
+            nrLocalBuilds--;
+        }
     }
 
     children.erase(i);
@@ -220,7 +235,9 @@ void Worker::childTerminated(Goal * goal, bool wakeSleepers)
 void Worker::waitForBuildSlot(GoalPtr goal)
 {
     debug("wait for build slot");
-    if (getNrLocalBuilds() < settings.maxBuildJobs)
+    bool isSubstitutionGoal = dynamic_cast<PathSubstitutionGoal *>(goal.get());
+    if ((!isSubstitutionGoal && getNrLocalBuilds() < settings.maxBuildJobs) ||
+        (isSubstitutionGoal && getNrSubstitutions() < settings.maxSubstitutionJobs))
         wakeUp(goal); /* we can do it right away */
     else
         addToWeakGoals(wantingToBuild, goal);
