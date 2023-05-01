@@ -213,7 +213,7 @@ static void fetchTree(
 
         emitTreeAttrs(
             state, input2, v,
-            [&](Value & vOutPath) {
+            [&, storePath(storePath)](Value & vOutPath) {
                 state.mkStorePathString(storePath, vOutPath);
             },
             params.emptyRevFallback,
