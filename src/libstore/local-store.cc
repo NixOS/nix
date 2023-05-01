@@ -1133,7 +1133,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
                 return i == infos.end() ? StorePathSet() : i->second.references;
             }},
             {[&](const StorePath & path, const StorePath & parent) {
-                return BuildError(
+                throw BuildError(
                     "cycle detected in the references of '%s' from '%s'",
                     printStorePath(path),
                     printStorePath(parent));
