@@ -364,8 +364,11 @@ void LocalDerivationGoal::cleanupError()
             if (!status.known) continue;
             if (buildMode != bmCheck && status.known->isValid()) continue;
             auto p = worker.store.toRealPath(status.known->path);
-            if (pathExists(chrootRootDir + p))
+            if (pathExists(chrootRootDir + p)) {
+                // print the paths for inspection
+                printMsg(lvlChatty, "moving path %s out of the chroot", p);
                 renameFile((chrootRootDir + p), p);
+            }
         }
 }
 
@@ -2340,7 +2343,6 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             }, *orifu);
         }},
         {[&](const std::string & path, const std::string & parent) {
-            // TODO with more -vvvv also show the temporary paths for manual inspection.
             throw BuildError(
                 "cycle detected in build of '%s' in the references of output '%s' from output '%s'",
                 worker.store.printStorePath(drvPath), path, parent);
