@@ -77,10 +77,18 @@ Items on the board progress through the following states:
   - [most popular issues](https://github.com/NixOS/nix/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc)
 
   Team members can also add pull requests or issues they would like the whole team to consider.
-
-  If there is disagreement on the general idea behind an issue or pull request, it is moved to _To discuss_, otherwise to _In review_.
-
   To ensure process quality and reliability, all non-trivial pull requests must be triaged before merging.
+
+  If there is disagreement on the general idea behind an issue or pull request, it is moved to _To discuss_.
+  Otherwise, the issue or pull request in questions get the label [`idea approved`](https://github.com/NixOS/nix/labels/idea%20approved).
+  For issues this means that an implementation is welcome and will be prioritised for review.
+  For pull requests this means that:
+  - Unfinished work is encouraged to be continued.
+  - A reviewer is assigned to take responsibility for getting the pull request merged.
+    The item is moved to the _Assigned_ column.
+  - If needed, the team can decide to do a collarorative review.
+    Then the item is moved to the _In review_ column, and review session is scheduled.
+
   What constitutes a trivial pull request is up to maintainers' judgement.
 
 - To discuss
@@ -110,12 +118,12 @@ Items on the board progress through the following states:
 
   When the overall direction is agreed upon, even when further changes are required, the pull request is assigned to one team member.
 
-- Assigned for merging
+- Assigned
 
   One team member is assigned to each of these pull requests.
   They will communicate with the authors, and make the final approval once all remaining issues are addressed.
 
-  If more substantive issues arise, the assignee can move the pull request back to _To discuss_ to involve the team again.
+  If more substantive issues arise, the assignee can move the pull request back to _To discuss_ or _In review_ to involve the team again.
 
 The process is illustrated in the following diagram:
 
