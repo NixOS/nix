@@ -121,6 +121,8 @@ ref<EvalState> EvalCommand::getEvalState()
             #endif
             ;
 
+        evalState->repair = repair;
+
         if (startReplOnEvalErrors) {
             evalState->debugRepl = &AbstractNixRepl::runSimple;
         };
