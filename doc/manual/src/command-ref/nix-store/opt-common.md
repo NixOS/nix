@@ -1,6 +1,6 @@
-# Options
+# Command options
 
-The following options are allowed for all `nix-store` operations, but may not always have an effect.
+The following options are allowed for all operations in the `nix-store` command, but may not always have an effect.
 
 - <span id="opt-add-root">[`--add-root`](#opt-add-root)</span> *path*
 
