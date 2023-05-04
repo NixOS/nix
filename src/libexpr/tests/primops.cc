@@ -204,6 +204,25 @@ namespace nix {
         ASSERT_THAT(*key->value, IsIntEq(123));
     }
 
+    TEST_F(PrimOpTest, sublist) {
+        auto v = eval("builtins.sublist 3 5 [ 1 2 3 4 5 6 7 8 9 10 ]");
+        ASSERT_THAT(v, IsListOfSize(5));
+        ASSERT_THAT(*v.listElems()[0], IsIntEq(4));
+        ASSERT_THAT(*v.listElems()[4], IsIntEq(8));
+    }
+
+    TEST_F(PrimOpTest, sublistTooLong) {
+        auto v = eval("builtins.sublist 5 10 [ 1 2 3 4 5 6 7 8 9 10 ]");
+        ASSERT_THAT(v, IsListOfSize(5));
+        ASSERT_THAT(*v.listElems()[0], IsIntEq(6));
+        ASSERT_THAT(*v.listElems()[4], IsIntEq(10));
+    }
+
+    TEST_F(PrimOpTest, sublistTooShifted) {
+        auto v = eval("builtins.sublist 11 10 [ 1 2 3 4 5 6 7 8 9 10 ]");
+        ASSERT_THAT(v, IsListOfSize(0));
+    }
+
     TEST_F(PrimOpTest, intersectAttrs) {
         auto v = eval("builtins.intersectAttrs { a = 1; b = 2; } { b = 3; c = 4; }");
         ASSERT_THAT(v, IsAttrsOfSize(1));
