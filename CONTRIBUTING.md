@@ -30,6 +30,7 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
    You can use [labels](https://github.com/NixOS/nix/labels) to filter for relevant topics.
 
 2. Search for related issues that cover what you're going to work on. It could help to mention there that you will work on the issue.
+   Pull requests addressing issues labeled ["idea approved"](https://github.com/NixOS/nix/labels/idea%20approved) are especially welcomed by maintainers will receive prioritised review.
 
 3. Check the [Nix reference manual](https://nixos.org/manual/nix/unstable/contributing/hacking.html) for information on building Nix and running its tests.
 
