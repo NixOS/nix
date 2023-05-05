@@ -8,7 +8,7 @@ mkDerivation rec {
 
   requiredSystemFeatures = [ "recursive-nix" ];
 
-  drv = builtins.unsafeDiscardOutputDependency (import ./text-hashed-output.nix).root.drvPath;
+  drv = builtins.unsafeDiscardOutputDependency (import ./text-hashed-output.nix).hello.drvPath;
 
   buildCommand = ''
     export NIX_CONFIG='experimental-features = nix-command ca-derivations'

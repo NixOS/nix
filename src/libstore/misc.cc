@@ -89,7 +89,6 @@ const ContentAddress * getDerivationCA(const BasicDerivation & drv)
     if (out == drv.outputs.end())
         return nullptr;
     if (auto dof = std::get_if<DerivationOutput::CAFixed>(&out->second)) {
-
         return &dof->ca;
     }
     return nullptr;

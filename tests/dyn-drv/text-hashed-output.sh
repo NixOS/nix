@@ -12,13 +12,13 @@ source common.sh
 # - build the dependent derivation
 # - check that the path of the output coincides with that of the original derivation
 
-drv=$(nix-instantiate ./text-hashed-output.nix -A root)
+drv=$(nix-instantiate ./text-hashed-output.nix -A hello)
 nix show-derivation "$drv"
 
-drvDep=$(nix-instantiate ./text-hashed-output.nix -A dependent)
-nix show-derivation "$drvDep"
+drvProducingDrv=$(nix-instantiate ./text-hashed-output.nix -A producingDrv)
+nix show-derivation "$drvProducingDrv"
 
-out1=$(nix-build ./text-hashed-output.nix -A dependent --no-out-link)
+out1=$(nix-build ./text-hashed-output.nix -A producingDrv --no-out-link)
 
 nix path-info $drv --derivation --json | jq
 nix path-info $out1 --derivation --json | jq

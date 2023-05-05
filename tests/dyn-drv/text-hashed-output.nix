@@ -4,8 +4,8 @@ with import ./config.nix;
 # The derivation can be arbitrarily modified by passing a different `seed`,
 # but the output will always be the same
 rec {
-  root = mkDerivation {
-    name = "text-hashed-root";
+  hello = mkDerivation {
+    name = "hello";
     buildCommand = ''
       set -x
       echo "Building a CA derivation"
@@ -16,11 +16,11 @@ rec {
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
   };
-  dependent = mkDerivation {
-    name = "text-hashed-root.drv";
+  producingDrv = mkDerivation {
+    name = "hello.drv";
     buildCommand = ''
       echo "Copying the derivation"
-      cp ${builtins.unsafeDiscardOutputDependency root.drvPath} $out
+      cp ${builtins.unsafeDiscardOutputDependency hello.drvPath} $out
     '';
     __contentAddressed = true;
     outputHashMode = "text";
