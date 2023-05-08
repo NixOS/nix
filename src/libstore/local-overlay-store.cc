@@ -15,6 +15,17 @@ LocalOverlayStore::LocalOverlayStore(const Params & params)
 }
 
 
+void LocalOverlayStore::registerDrvOutput(const Realisation & info)
+{
+    // First do queryRealisation on lower layer to populate DB
+    auto res = lowerStore->queryRealisation(info.id);
+    if (res)
+        LocalStore::registerDrvOutput(*res);
+
+    LocalStore::registerDrvOutput(info);
+}
+
+
 static RegisterStoreImplementation<LocalOverlayStore, LocalOverlayStoreConfig> regLocalOverlayStore;
 
 }

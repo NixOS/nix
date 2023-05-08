@@ -69,6 +69,8 @@ public:
 
 private:
     // Overridden methods…
+
+    void registerDrvOutput(const Realisation & info) override;
 };
 
 }
