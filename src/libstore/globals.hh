@@ -687,7 +687,7 @@ public:
 
           Substituters are tried based on their priority value, which each substituter can set independently.
           Lower value means higher priority.
-          The default is `https://cache.nixos.org`, with a priority of 40.
+          The default is `https://cache.nixos.org`, which has a priority of 40.
 
           At least one of the following conditions must be met for Nix to use a substituter:
 
