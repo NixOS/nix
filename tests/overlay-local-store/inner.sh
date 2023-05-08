@@ -63,12 +63,15 @@ expect 1 nix-store --verify-path --store "$storeB" "$path"
 
 ### Do a redundant add
 
+# upper layer should not have it
+expect 1 stat $(toRealPath "$storeBTop/nix/store" "$path")
+
 path=$(nix-store --store "$storeB" --add dummy)
 
 # lower store should have it from before
 stat $(toRealPath "$storeA/nix/store" "$path")
 
-# upper store should not have redundant copy
+# upper layer should still not have it (no redundant copy)
 # FIXME should fail
 stat $(toRealPath "$storeA/nix/store" "$path")
 
