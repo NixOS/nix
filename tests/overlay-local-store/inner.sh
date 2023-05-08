@@ -11,12 +11,15 @@ export NIX_CONFIG='build-users-group = '
 # Creating testing directories
 
 storeA="$TEST_ROOT/store_a"
-storeB="$TEST_ROOT/store_b?real=$TEST_ROOT/merged-store"
+storeB="local-overlay?root=$TEST_ROOT/store_b&lower-store=$TEST_ROOT/merged-store"
 storeBTop="$TEST_ROOT/store_b"
 
 mkdir -p "$TEST_ROOT"/{store_a,store_b,merged-store,workdir}
 
 # Mounting Overlay Store
+
+## Restore normal, because we are using these chroot stores
+#NIX_STORE_DIR=/nix/store
 
 nix-store --store "$TEST_ROOT/store_a" --add dummy
 nix-store --store "$TEST_ROOT/store_b" --add dummy
@@ -27,7 +30,14 @@ mount -t overlay overlay \
   -o workdir="$TEST_ROOT/workdir" \
   "$TEST_ROOT/merged-store" || skipTest "overlayfs is not supported"
 
-path_a=$(nix-build '<nixpkgs>' -A signal-desktop --store "$storeA")
+# Add in lower
+NIX_REMOTE=$storeA source add.sh
+
+# Add in layered
+NIX_REMOTE=$storeB source add.sh
+
+#busyboxExpr="\"\${$(dirname "$busybox")}/$(basename "$busybox")\""
+path_a=$(nix-build ./hermetic.nix --arg busybox "$busybox" --store "$storeA")
 
 # Checking for Path in store_a
 stat "$TEST_ROOT/store_a/$path_a"
@@ -48,4 +58,4 @@ expect 1 nix-store --verify-path --store "$storeB" "$path_a"
 # Verifying path in store_b (Should fail)
 expect 1 nix-store --verify-path --store "$storeBTop" "$path_a"
 
-path_b=$(nix-build '<nixpkgs>' -A signal-desktop --store "$storeB")
+path_b=$(nix-build ./hermetic.nix --arg busybox $busybox --store "$storeB")
