@@ -195,7 +195,7 @@ void Worker::childStarted(GoalPtr goal, const std::set<int> & fds,
     child.respectTimeouts = respectTimeouts;
     children.emplace_back(child);
     if (inBuildSlot) {
-        if (dynamic_cast<PathSubstitutionGoal *>(child.goal2)) nrSubstitutions++;
+        if (goal->jobCategory() == JobCategory::Substitution) nrSubstitutions++;
         else nrLocalBuilds++;
     }
 }
@@ -208,7 +208,7 @@ void Worker::childTerminated(Goal * goal, bool wakeSleepers)
     if (i == children.end()) return;
 
     if (i->inBuildSlot) {
-        if (dynamic_cast<PathSubstitutionGoal *>(goal)) {
+        if (goal->jobCategory() == JobCategory::Substitution) {
             assert(nrSubstitutions > 0);
             nrSubstitutions--;
         } else {
@@ -235,7 +235,7 @@ void Worker::childTerminated(Goal * goal, bool wakeSleepers)
 void Worker::waitForBuildSlot(GoalPtr goal)
 {
     debug("wait for build slot");
-    bool isSubstitutionGoal = dynamic_cast<PathSubstitutionGoal *>(goal.get());
+    bool isSubstitutionGoal = goal->jobCategory() == JobCategory::Substitution;
     if ((!isSubstitutionGoal && getNrLocalBuilds() < settings.maxBuildJobs) ||
         (isSubstitutionGoal && getNrSubstitutions() < settings.maxSubstitutionJobs))
         wakeUp(goal); /* we can do it right away */

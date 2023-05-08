@@ -335,6 +335,8 @@ struct DerivationGoal : public Goal
     void waiteeDone(GoalPtr waitee, ExitCode result) override;
 
     StorePathSet exportReferences(const StorePathSet & storePaths);
+
+    JobCategory jobCategory() override { return JobCategory::Build; };
 };
 
 MakeError(NotDeterministic, BuildError);
