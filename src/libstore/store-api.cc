@@ -10,6 +10,7 @@
 #include "archive.hh"
 #include "callback.hh"
 #include "remote-store.hh"
+#include "local-overlay-store.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>
@@ -1391,6 +1392,8 @@ std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Para
         return std::make_shared<UDSRemoteStore>(params);
     } else if (uri == "local") {
         return std::make_shared<LocalStore>(params);
+    } else if (uri == "local-overlay") {
+        return std::make_shared<LocalOverlayStore>(params);
     } else if (isNonUriPath(uri)) {
         Store::Params params2 = params;
         params2["root"] = absPath(uri);
