@@ -58,8 +58,7 @@ diff $(toRealPath "$storeA/nix/store" "$path") $(toRealPath "$TEST_ROOT/merged-s
 nix-store --verify-path --store "$storeA" "$path"
 
 # Verifying path in merged-store
-# FIXME should succeed
-expect 1 nix-store --verify-path --store "$storeB" "$path"
+nix-store --verify-path --store "$storeB" "$path"
 
 ### Do a redundant add
 

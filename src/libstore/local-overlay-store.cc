@@ -33,21 +33,24 @@ void LocalOverlayStore::queryPathInfoUncached(const StorePath & path,
 
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
-    // If we don't have it, check lower store
     LocalStore::queryPathInfoUncached(path,
         {[this, path, callbackPtr](std::future<std::shared_ptr<const ValidPathInfo>> fut) {
             try {
-                (*callbackPtr)(fut.get());
+                auto info = fut.get();
+                if (info)
+                    return (*callbackPtr)(std::move(info));
             } catch (...) {
-                lowerStore->queryPathInfo(path,
-                    {[path, callbackPtr](std::future<ref<const ValidPathInfo>> fut) {
-                        try {
-                            (*callbackPtr)(fut.get().get_ptr());
-                        } catch (...) {
-                            callbackPtr->rethrow();
-                        }
-                    }});
+                return callbackPtr->rethrow();
             }
+            // If we don't have it, check lower store
+            lowerStore->queryPathInfo(path,
+                {[path, callbackPtr](std::future<ref<const ValidPathInfo>> fut) {
+                    try {
+                        (*callbackPtr)(fut.get().get_ptr());
+                    } catch (...) {
+                        return callbackPtr->rethrow();
+                    }
+                }});
         }});
 }
 
