@@ -8,7 +8,7 @@ namespace nix {
         protected:
             std::string getJSONValue(Value& value) {
                 std::stringstream ss;
-                PathSet ps;
+                NixStringContext ps;
                 printValueAsJSON(state, true, value, noPos, ss, ps);
                 return ss.str();
             }

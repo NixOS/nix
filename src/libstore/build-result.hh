@@ -84,15 +84,10 @@ struct BuildResult
     bool isNonDeterministic = false;
 
     /**
-     * The derivation we built or the store path we substituted.
-     */
-    DerivedPath path;
-
-    /**
      * For derivations, a mapping from the names of the wanted outputs
      * to actual paths.
      */
-    DrvOutputs builtOutputs;
+    SingleDrvOutputs builtOutputs;
 
     /**
      * The start/stop times of the build (or one of the rounds, if it
@@ -114,6 +109,17 @@ struct BuildResult
     {
         throw Error("%s", errorMsg);
     }
+};
+
+/**
+ * A `BuildResult` together with its "primary key".
+ */
+struct KeyedBuildResult : BuildResult
+{
+    /**
+     * The derivation we built or the store path we substituted.
+     */
+    DerivedPath path;
 };
 
 }

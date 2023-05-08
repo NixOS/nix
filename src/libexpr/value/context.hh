@@ -26,8 +26,6 @@ public:
     }
 };
 
-class Store;
-
 /**
  * Plain opaque path to some store object.
  *
@@ -80,11 +78,14 @@ struct NixStringContextElem : _NixStringContextElem_Raw {
     using DrvDeep = NixStringContextElem_DrvDeep;
     using Built = NixStringContextElem_Built;
 
-    inline const Raw & raw() const {
+    inline const Raw & raw() const & {
         return static_cast<const Raw &>(*this);
     }
-    inline Raw & raw() {
+    inline Raw & raw() & {
         return static_cast<Raw &>(*this);
+    }
+    inline Raw && raw() && {
+        return static_cast<Raw &&>(*this);
     }
 
     /**
@@ -93,10 +94,10 @@ struct NixStringContextElem : _NixStringContextElem_Raw {
      * - ‘=<path>’
      * - ‘!<name>!<path>’
      */
-    static NixStringContextElem parse(const Store & store, std::string_view s);
-    std::string to_string(const Store & store) const;
+    static NixStringContextElem parse(std::string_view s);
+    std::string to_string() const;
 };
 
-typedef std::vector<NixStringContextElem> NixStringContext;
+typedef std::set<NixStringContextElem> NixStringContext;
 
 }

@@ -27,7 +27,10 @@ std::string resolveMirrorUrl(EvalState & state, const std::string & url)
 
     Value vMirrors;
     // FIXME: use nixpkgs flake
-    state.eval(state.parseExprFromString("import <nixpkgs/pkgs/build-support/fetchurl/mirrors.nix>", "."), vMirrors);
+    state.eval(state.parseExprFromString(
+            "import <nixpkgs/pkgs/build-support/fetchurl/mirrors.nix>",
+            state.rootPath(CanonPath::root)),
+        vMirrors);
     state.forceAttrs(vMirrors, noPos, "while evaluating the set of all mirrors");
 
     auto mirrorList = vMirrors.attrs->find(state.symbols.create(mirrorName));
@@ -67,7 +70,13 @@ std::tuple<StorePath, Hash> prefetchFile(
        the store. */
     if (expectedHash) {
         hashType = expectedHash->type;
-        storePath = store->makeFixedOutputPath(ingestionMethod, *expectedHash, *name);
+        storePath = store->makeFixedOutputPath(*name, FixedOutputInfo {
+            .hash = {
+                .method = ingestionMethod,
+                .hash = *expectedHash,
+            },
+            .references = {},
+        });
         if (store->isValidPath(*storePath))
             hash = expectedHash;
         else
@@ -118,7 +127,7 @@ std::tuple<StorePath, Hash> prefetchFile(
         auto info = store->addToStoreSlow(*name, tmpFile, ingestionMethod, hashType, expectedHash);
         storePath = info.path;
         assert(info.ca);
-        hash = getContentAddressHash(*info.ca);
+        hash = info.ca->getHash();
     }
 
     return {storePath.value(), hash.value()};
@@ -192,9 +201,11 @@ static int main_nix_prefetch_url(int argc, char * * argv)
                 throw UsageError("you must specify a URL");
             url = args[0];
         } else {
-            Path path = resolveExprPath(lookupFileArg(*state, args.empty() ? "." : args[0]));
             Value vRoot;
-            state->evalFile(path, vRoot);
+            state->evalFile(
+                resolveExprPath(
+                    lookupFileArg(*state, args.empty() ? "." : args[0])),
+                vRoot);
             Value & v(*findAlongAttrPath(*state, attrPath, autoArgs, vRoot).first);
             state->forceAttrs(v, noPos, "while evaluating the source attribute to prefetch");
 

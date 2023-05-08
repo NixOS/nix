@@ -5,6 +5,7 @@
 
 #include "symbol-table.hh"
 #include "value/context.hh"
+#include "input-accessor.hh"
 
 #if HAVE_BOEHMGC
 #include <gc/gc_allocator.h>
@@ -100,7 +101,7 @@ class ExternalValueBase
      * Coerce the value to a string. Defaults to uncoercable, i.e. throws an
      * error.
      */
-    virtual std::string coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore) const;
+    virtual std::string coerceToString(const Pos & pos, NixStringContext & context, bool copyMore, bool copyToStore) const;
 
     /**
      * Compare to another value of the same type. Defaults to uncomparable,
@@ -112,13 +113,13 @@ class ExternalValueBase
      * Print the value as JSON. Defaults to unconvertable, i.e. throws an error
      */
     virtual nlohmann::json printValueAsJSON(EvalState & state, bool strict,
-        PathSet & context, bool copyToStore = true) const;
+        NixStringContext & context, bool copyToStore = true) const;
 
     /**
      * Print the value as XML. Defaults to unevaluated
      */
     virtual void printValueAsXML(EvalState & state, bool strict, bool location,
-        XMLWriter & doc, PathSet & context, PathSet & drvsSeen,
+        XMLWriter & doc, NixStringContext & context, PathSet & drvsSeen,
         const PosIdx pos) const;
 
     virtual ~ExternalValueBase()
@@ -188,7 +189,7 @@ public:
             const char * * context; // must be in sorted order
         } string;
 
-        const char * path;
+        const char * _path;
         Bindings * attrs;
         struct {
             size_t size;
@@ -268,18 +269,23 @@ public:
 
     void mkString(std::string_view s);
 
-    void mkString(std::string_view s, const PathSet & context);
+    void mkString(std::string_view s, const NixStringContext & context);
 
-    void mkStringMove(const char * s, const PathSet & context);
+    void mkStringMove(const char * s, const NixStringContext & context);
 
-    inline void mkPath(const char * s)
+    inline void mkString(const Symbol & s)
+    {
+        mkString(((const std::string &) s).c_str());
+    }
+
+    void mkPath(const SourcePath & path);
+
+    inline void mkPath(const char * path)
     {
         clearValue();
         internalType = tPath;
-        path = s;
+        _path = path;
     }
-
-    void mkPath(std::string_view s);
 
     inline void mkNull()
     {
@@ -394,8 +400,6 @@ public:
      */
     bool isTrivial() const;
 
-    NixStringContext getContext(const Store &);
-
     auto listItems()
     {
         struct ListIterable
@@ -422,6 +426,18 @@ public:
         assert(isList());
         auto begin = listElems();
         return ConstListIterable { begin, begin + listSize() };
+    }
+
+    SourcePath path() const
+    {
+        assert(internalType == tPath);
+        return SourcePath{CanonPath(_path)};
+    }
+
+    std::string_view str() const
+    {
+        assert(internalType == tString);
+        return std::string_view(string.s);
     }
 };
 

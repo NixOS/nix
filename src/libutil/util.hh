@@ -32,6 +32,7 @@ namespace nix {
 struct Sink;
 struct Source;
 
+void initLibUtil();
 
 /**
  * The system for which Nix is compiled.
@@ -445,6 +446,8 @@ void setStackSize(size_t stackSize);
 /**
  * Restore the original inherited Unix process context (such as signal
  * masks, stack size).
+
+ * See startSignalHandlerThread(), saveSignalMask().
  */
 void restoreProcessContext(bool restoreMounts = true);
 
@@ -814,8 +817,25 @@ class Callback;
 /**
  * Start a thread that handles various signals. Also block those signals
  * on the current thread (and thus any threads created by it).
+ * Saves the signal mask before changing the mask to block those signals.
+ * See saveSignalMask().
  */
 void startSignalHandlerThread();
+
+/**
+ * Saves the signal mask, which is the signal mask that nix will restore
+ * before creating child processes.
+ * See setChildSignalMask() to set an arbitrary signal mask instead of the
+ * current mask.
+ */
+void saveSignalMask();
+
+/**
+ * Sets the signal mask. Like saveSignalMask() but for a signal set that doesn't
+ * necessarily match the current thread's mask.
+ * See saveSignalMask() to set the saved mask to the current mask.
+ */
+void setChildSignalMask(sigset_t *sigs);
 
 struct InterruptCallback
 {
@@ -916,16 +936,16 @@ constexpr auto enumerate(T && iterable)
     {
         size_t i;
         TIter iter;
-        bool operator != (const iterator & other) const { return iter != other.iter; }
-        void operator ++ () { ++i; ++iter; }
-        auto operator * () const { return std::tie(i, *iter); }
+        constexpr bool operator != (const iterator & other) const { return iter != other.iter; }
+        constexpr void operator ++ () { ++i; ++iter; }
+        constexpr auto operator * () const { return std::tie(i, *iter); }
     };
 
     struct iterable_wrapper
     {
         T iterable;
-        auto begin() { return iterator{ 0, std::begin(iterable) }; }
-        auto end() { return iterator{ 0, std::end(iterable) }; }
+        constexpr auto begin() { return iterator{ 0, std::begin(iterable) }; }
+        constexpr auto end() { return iterator{ 0, std::end(iterable) }; }
     };
 
     return iterable_wrapper{ std::forward<T>(iterable) };

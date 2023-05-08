@@ -62,11 +62,11 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
         auto state = getEvalState();
 
         auto [v, pos] = installable->toValue(*state);
-        PathSet context;
+        NixStringContext context;
 
         if (apply) {
             auto vApply = state->allocValue();
-            state->eval(state->parseExprFromString(*apply, absPath(".")), *vApply);
+            state->eval(state->parseExprFromString(*apply, state->rootPath(CanonPath::fromCwd())), *vApply);
             auto vRes = state->allocValue();
             state->callFunction(*vApply, *v, *vRes, noPos);
             v = vRes;

@@ -26,7 +26,7 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
         options->addSetting(this);
     }
 
-    void set(const std::string & str, bool append = false) override;
+    unsigned int parse(const std::string & str) const override;
 };
 
 struct PluginFilesSetting : public BaseSetting<Paths>
@@ -43,7 +43,7 @@ struct PluginFilesSetting : public BaseSetting<Paths>
         options->addSetting(this);
     }
 
-    void set(const std::string & str, bool append = false) override;
+    Paths parse(const std::string & str) const override;
 };
 
 const uint32_t maxIdsPerBuild =
@@ -328,16 +328,6 @@ public:
           users in `build-users-group`.
 
           UIDs are allocated starting at 872415232 (0x34000000) on Linux and 56930 on macOS.
-
-          > **Warning**
-          > This is an experimental feature.
-
-          To enable it, add the following to [`nix.conf`](#):
-
-          ```
-          extra-experimental-features = auto-allocate-uids
-          auto-allocate-uids = true
-          ```
         )"};
 
     Setting<uint32_t> startId{this,
@@ -367,16 +357,6 @@ public:
 
           Cgroups are required and enabled automatically for derivations
           that require the `uid-range` system feature.
-
-          > **Warning**
-          > This is an experimental feature.
-
-          To enable it, add the following to [`nix.conf`](#):
-
-          ```
-          extra-experimental-features = cgroups
-          use-cgroups = true
-          ```
         )"};
     #endif
 
@@ -477,11 +457,6 @@ public:
           at the moment the garbage collector is run.
         )",
         {"env-keep-derivations"}};
-
-    /**
-     * Whether to lock the Nix client and worker to the same CPU.
-     */
-    bool lockCPU;
 
     Setting<SandboxMode> sandboxMode{
         this,

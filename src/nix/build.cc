@@ -27,8 +27,10 @@ nlohmann::json builtPathsWithResultToJSON(const std::vector<BuiltPathWithResult>
         std::visit([&](const auto & t) {
             auto j = t.toJSON(store);
             if (b.result) {
-                j["startTime"] = b.result->startTime;
-                j["stopTime"] = b.result->stopTime;
+                if (b.result->startTime)
+                    j["startTime"] = b.result->startTime;
+                if (b.result->stopTime)
+                    j["stopTime"] = b.result->stopTime;
                 if (b.result->cpuUser)
                     j["cpuUser"] = ((double) b.result->cpuUser->count()) / 1000000;
                 if (b.result->cpuSystem)
@@ -131,7 +133,8 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
         auto buildables = Installable::build(
             getEvalStore(), store,
             Realise::Outputs,
-            installables, buildMode);
+            installables,
+            repair ? bmRepair : buildMode);
 
         if (json) logger->cout("%s", builtPathsWithResultToJSON(buildables, store).dump());
 

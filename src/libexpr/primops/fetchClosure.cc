@@ -18,7 +18,7 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
         const auto & attrName = state.symbols[attr.name];
 
         if (attrName == "fromPath") {
-            PathSet context;
+            NixStringContext context;
             fromPath = state.coerceToStorePath(attr.pos, *attr.value, context,
                     "while evaluating the 'fromPath' attribute passed to builtins.fetchClosure");
         }
@@ -27,7 +27,7 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
             state.forceValue(*attr.value, attr.pos);
             toCA = true;
             if (attr.value->type() != nString || attr.value->string.s != std::string("")) {
-                PathSet context;
+                NixStringContext context;
                 toPath = state.coerceToStorePath(attr.pos, *attr.value, context,
                         "while evaluating the 'toPath' attribute passed to builtins.fetchClosure");
             }
@@ -114,8 +114,7 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
             });
     }
 
-    auto toPathS = state.store->printStorePath(*toPath);
-    v.mkString(toPathS, {toPathS});
+    state.mkStorePathString(*toPath, v);
 }
 
 static RegisterPrimOp primop_fetchClosure({

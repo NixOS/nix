@@ -201,14 +201,14 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
     auto vGenerateManpage = state.allocValue();
     state.eval(state.parseExprFromString(
         #include "generate-manpage.nix.gen.hh"
-        , "/"), *vGenerateManpage);
+        , CanonPath::root), *vGenerateManpage);
 
     auto vUtils = state.allocValue();
     state.cacheFile(
-        "/utils.nix", "/utils.nix",
+        CanonPath("/utils.nix"), CanonPath("/utils.nix"),
         state.parseExprFromString(
             #include "utils.nix.gen.hh"
-            , "/"),
+            , CanonPath::root),
         *vUtils);
 
     auto vDump = state.allocValue();
@@ -372,6 +372,11 @@ void mainWrapped(int argc, char * * argv)
             res[state.symbols[builtin.name]] = std::move(b);
         }
         logger->cout("%s", res);
+        return;
+    }
+
+    if (argc == 2 && std::string(argv[1]) == "__dump-xp-features") {
+        logger->cout(documentExperimentalFeatures().dump());
         return;
     }
 

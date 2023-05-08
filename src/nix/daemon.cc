@@ -273,8 +273,12 @@ static std::pair<TrustedFlag, std::string> authPeer(const PeerInfo & peer)
 /**
  * Run a server. The loop opens a socket and accepts new connections from that
  * socket.
+ *
+ * @param forceTrustClientOpt If present, force trusting or not trusted
+ * the client. Otherwise, decide based on the authentication settings
+ * and user credentials (from the unix domain socket).
  */
-static void daemonLoop()
+static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
 {
     if (chdir("/") == -1)
         throw SysError("cannot change current directory");
@@ -317,9 +321,18 @@ static void daemonLoop()
 
             closeOnExec(remote.get());
 
-            PeerInfo peer = getPeerInfo(remote.get());
-            auto [_trusted, user] = authPeer(peer);
-            auto trusted = _trusted;
+            PeerInfo peer { .pidKnown = false };
+            TrustedFlag trusted;
+            std::string user;
+
+            if (forceTrustClientOpt)
+                trusted = *forceTrustClientOpt;
+            else {
+                peer = getPeerInfo(remote.get());
+                auto [_trusted, _user] = authPeer(peer);
+                trusted = _trusted;
+                user = _user;
+            };
 
             printInfo((std::string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""),
                 peer.pidKnown ? std::to_string(peer.pid) : "<unknown>",
@@ -410,38 +423,47 @@ static void forwardStdioConnection(RemoteStore & store) {
  * Unlike `forwardStdioConnection()` we do process commands ourselves in
  * this case, not delegating to another daemon.
  *
- * @note `Trusted` is unconditionally passed because in this mode we
- * blindly trust the standard streams. Limiting access to those is
- * explicitly not `nix-daemon`'s responsibility.
+ * @param trustClient Whether to trust the client. Forwarded directly to
+ * `processConnection()`.
  */
-static void processStdioConnection(ref<Store> store)
+static void processStdioConnection(ref<Store> store, TrustedFlag trustClient)
 {
     FdSource from(STDIN_FILENO);
     FdSink to(STDOUT_FILENO);
-    processConnection(store, from, to, Trusted, NotRecursive);
+    processConnection(store, from, to, trustClient, NotRecursive);
 }
 
 /**
  * Entry point shared between the new CLI `nix daemon` and old CLI
  * `nix-daemon`.
+ *
+ * @param forceTrustClientOpt See `daemonLoop()` and the parameter with
+ * the same name over there for details.
  */
-static void runDaemon(bool stdio)
+static void runDaemon(bool stdio, std::optional<TrustedFlag> forceTrustClientOpt)
 {
     if (stdio) {
         auto store = openUncachedStore();
 
-        if (auto remoteStore = store.dynamic_pointer_cast<RemoteStore>())
+        // If --force-untrusted is passed, we cannot forward the connection and
+        // must process it ourselves (before delegating to the next store) to
+        // force untrusting the client.
+        if (auto remoteStore = store.dynamic_pointer_cast<RemoteStore>(); remoteStore && (!forceTrustClientOpt || *forceTrustClientOpt != NotTrusted))
             forwardStdioConnection(*remoteStore);
         else
-            processStdioConnection(store);
+            // `Trusted` is passed in the auto (no override case) because we
+            // cannot see who is on the other side of a plain pipe. Limiting
+            // access to those is explicitly not `nix-daemon`'s responsibility.
+            processStdioConnection(store, forceTrustClientOpt.value_or(Trusted));
     } else
-        daemonLoop();
+        daemonLoop(forceTrustClientOpt);
 }
 
 static int main_nix_daemon(int argc, char * * argv)
 {
     {
         auto stdio = false;
+        std::optional<TrustedFlag> isTrustedOpt = std::nullopt;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--daemon")
@@ -452,11 +474,20 @@ static int main_nix_daemon(int argc, char * * argv)
                 printVersion("nix-daemon");
             else if (*arg == "--stdio")
                 stdio = true;
-            else return false;
+            else if (*arg == "--force-trusted") {
+                experimentalFeatureSettings.require(Xp::DaemonTrustOverride);
+                isTrustedOpt = Trusted;
+            } else if (*arg == "--force-untrusted") {
+                experimentalFeatureSettings.require(Xp::DaemonTrustOverride);
+                isTrustedOpt = NotTrusted;
+            } else if (*arg == "--default-trust") {
+                experimentalFeatureSettings.require(Xp::DaemonTrustOverride);
+                isTrustedOpt = std::nullopt;
+            } else return false;
             return true;
         });
 
-        runDaemon(stdio);
+        runDaemon(stdio, isTrustedOpt);
 
         return 0;
     }
@@ -482,7 +513,7 @@ struct CmdDaemon : StoreCommand
 
     void run(ref<Store> store) override
     {
-        runDaemon(false);
+        runDaemon(false, std::nullopt);
     }
 };
 

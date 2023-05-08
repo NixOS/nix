@@ -92,7 +92,7 @@ poly_configure_nix_daemon_service() {
         task "Setting up the nix-daemon systemd service"
 
         _sudo "to create the nix-daemon tmpfiles config" \
-              ln -sfn /nix/var/nix/profiles/default/$TMPFILES_SRC $TMPFILES_DEST
+              ln -sfn "/nix/var/nix/profiles/default$TMPFILES_SRC" "$TMPFILES_DEST"
 
         _sudo "to run systemd-tmpfiles once to pick that path up" \
              systemd-tmpfiles --create --prefix=/nix/var/nix

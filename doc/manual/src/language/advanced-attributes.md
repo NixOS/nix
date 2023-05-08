@@ -208,12 +208,26 @@ Derivations can declare some infrequently used optional attributes.
     about converting to and from base-32 notation.)
 
   - [`__contentAddressed`]{#adv-attr-__contentAddressed}
-    If this **experimental** attribute is set to true, then the derivation
+    > **Warning**
+    > This attribute is part of an [experimental feature](@docroot@/contributing/experimental-features.md).
+    >
+    > To use this attribute, you must enable the
+    > [`ca-derivations`](@docroot@/contributing/experimental-features.md#xp-feature-ca-derivations) experimental feature.
+    > For example, in [nix.conf](../command-ref/conf-file.md) you could add:
+    >
+    > ```
+    > extra-experimental-features = ca-derivations
+    > ```
+
+    If this attribute is set to `true`, then the derivation
     outputs will be stored in a content-addressed location rather than the
     traditional input-addressed one.
-    This only has an effect if the `ca-derivations` experimental feature is enabled.
 
-    Setting this attribute also requires setting `outputHashMode` and `outputHashAlgo` like for *fixed-output derivations* (see above).
+    Setting this attribute also requires setting
+    [`outputHashMode`](#adv-attr-outputHashMode)
+    and
+    [`outputHashAlgo`](#adv-attr-outputHashAlgo)
+    like for *fixed-output derivations* (see above).
 
   - [`passAsFile`]{#adv-attr-passAsFile}\
     A list of names of attributes that should be passed via files rather
@@ -307,9 +321,11 @@ Derivations can declare some infrequently used optional attributes.
 
   - [`unsafeDiscardReferences`]{#adv-attr-unsafeDiscardReferences}\
     > **Warning**
-    > This is an experimental feature.
+    > This attribute is part of an [experimental feature](@docroot@/contributing/experimental-features.md).
     >
-    > To enable it, add the following to [nix.conf](../command-ref/conf-file.md):
+    > To use this attribute, you must enable the
+    > [`discard-references`](@docroot@/contributing/experimental-features.md#xp-feature-discard-references) experimental feature.
+    > For example, in [nix.conf](../command-ref/conf-file.md) you could add:
     >
     > ```
     > extra-experimental-features = discard-references

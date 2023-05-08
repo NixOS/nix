@@ -145,8 +145,20 @@ void DerivationGoal::work()
 void DerivationGoal::addWantedOutputs(const OutputsSpec & outputs)
 {
     auto newWanted = wantedOutputs.union_(outputs);
-    if (!newWanted.isSubsetOf(wantedOutputs))
-        needRestart = true;
+    switch (needRestart) {
+    case NeedRestartForMoreOutputs::OutputsUnmodifedDontNeed:
+        if (!newWanted.isSubsetOf(wantedOutputs))
+            needRestart = NeedRestartForMoreOutputs::OutputsAddedDoNeed;
+        break;
+    case NeedRestartForMoreOutputs::OutputsAddedDoNeed:
+        /* No need to check whether we added more outputs, because a
+           restart is already queued up. */
+        break;
+    case NeedRestartForMoreOutputs::BuildInProgressWillNotNeed:
+        /* We are already building all outputs, so it doesn't matter if
+           we now want more. */
+        break;
+    };
     wantedOutputs = newWanted;
 }
 
@@ -297,12 +309,29 @@ void DerivationGoal::outputsSubstitutionTried()
         In particular, it may be the case that the hole in the closure is
         an output of the current derivation, which causes a loop if retried.
      */
-    if (nrIncompleteClosure > 0 && nrIncompleteClosure == nrFailed) retrySubstitution = true;
+    {
+        bool substitutionFailed =
+            nrIncompleteClosure > 0 &&
+            nrIncompleteClosure == nrFailed;
+        switch (retrySubstitution) {
+        case RetrySubstitution::NoNeed:
+            if (substitutionFailed)
+                retrySubstitution = RetrySubstitution::YesNeed;
+            break;
+        case RetrySubstitution::YesNeed:
+            // Should not be able to reach this state from here.
+            assert(false);
+            break;
+        case RetrySubstitution::AlreadyRetried:
+            debug("substitution failed again, but we already retried once. Not retrying again.");
+            break;
+        }
+    }
 
     nrFailed = nrNoSubstituters = nrIncompleteClosure = 0;
 
-    if (needRestart) {
-        needRestart = false;
+    if (needRestart == NeedRestartForMoreOutputs::OutputsAddedDoNeed) {
+        needRestart = NeedRestartForMoreOutputs::OutputsUnmodifedDontNeed;
         haveDerivation();
         return;
     }
@@ -330,6 +359,10 @@ void DerivationGoal::outputsSubstitutionTried()
    produced using a substitute.  So we have to build instead. */
 void DerivationGoal::gaveUpOnSubstitution()
 {
+    /* At this point we are building all outputs, so if more are wanted there
+       is no need to restart. */
+    needRestart = NeedRestartForMoreOutputs::BuildInProgressWillNotNeed;
+
     /* The inputs must be built before we can build this goal. */
     inputDrvOutputs.clear();
     if (useDerivation)
@@ -451,8 +484,8 @@ void DerivationGoal::inputsRealised()
         return;
     }
 
-    if (retrySubstitution && !retriedSubstitution) {
-        retriedSubstitution = true;
+    if (retrySubstitution == RetrySubstitution::YesNeed) {
+        retrySubstitution = RetrySubstitution::AlreadyRetried;
         haveDerivation();
         return;
     }
@@ -570,8 +603,6 @@ void DerivationGoal::inputsRealised()
        build hook. */
     state = &DerivationGoal::tryToBuild;
     worker.wakeUp(shared_from_this());
-
-    buildResult = BuildResult { .path = buildResult.path };
 }
 
 void DerivationGoal::started()
@@ -982,7 +1013,7 @@ void DerivationGoal::resolvedFinished()
     auto resolvedDrv = *resolvedDrvGoal->drv;
     auto & resolvedResult = resolvedDrvGoal->buildResult;
 
-    DrvOutputs builtOutputs;
+    SingleDrvOutputs builtOutputs;
 
     if (resolvedResult.success()) {
         auto resolvedHashes = staticOutputHashes(worker.store, resolvedDrv);
@@ -1008,7 +1039,7 @@ void DerivationGoal::resolvedFinished()
                     worker.store.printStorePath(drvPath), wantedOutput);
 
             auto realisation = [&]{
-              auto take1 = get(resolvedResult.builtOutputs, DrvOutput { *resolvedHash, wantedOutput });
+              auto take1 = get(resolvedResult.builtOutputs, wantedOutput);
               if (take1) return *take1;
 
               /* The above `get` should work. But sateful tracking of
@@ -1033,7 +1064,7 @@ void DerivationGoal::resolvedFinished()
                 worker.store.registerDrvOutput(newRealisation);
             }
             outputPaths.insert(realisation.outPath);
-            builtOutputs.emplace(realisation.id, realisation);
+            builtOutputs.emplace(wantedOutput, realisation);
         }
 
         runPostBuildHook(
@@ -1158,7 +1189,7 @@ HookReply DerivationGoal::tryBuildHook()
 }
 
 
-DrvOutputs DerivationGoal::registerOutputs()
+SingleDrvOutputs DerivationGoal::registerOutputs()
 {
     /* When using a build hook, the build hook can register the output
        as valid (by doing `nix-store --import').  If so we don't have
@@ -1320,7 +1351,7 @@ OutputPathMap DerivationGoal::queryDerivationOutputMap()
 }
 
 
-std::pair<bool, DrvOutputs> DerivationGoal::checkPathValidity()
+std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
 {
     if (!drv->type().isPure()) return { false, {} };
 
@@ -1333,7 +1364,7 @@ std::pair<bool, DrvOutputs> DerivationGoal::checkPathValidity()
             return static_cast<StringSet>(names);
         },
     }, wantedOutputs.raw());
-    DrvOutputs validOutputs;
+    SingleDrvOutputs validOutputs;
 
     for (auto & i : queryPartialDerivationOutputMap()) {
         auto initialOutput = get(initialOutputs, i.first);
@@ -1376,7 +1407,7 @@ std::pair<bool, DrvOutputs> DerivationGoal::checkPathValidity()
             }
         }
         if (info.wanted && info.known && info.known->isValid())
-            validOutputs.emplace(drvOutput, Realisation { drvOutput, info.known->path });
+            validOutputs.emplace(i.first, Realisation { drvOutput, info.known->path });
     }
 
     // If we requested all the outputs, we are always fine.
@@ -1400,7 +1431,7 @@ std::pair<bool, DrvOutputs> DerivationGoal::checkPathValidity()
 }
 
 
-DrvOutputs DerivationGoal::assertPathValidity()
+SingleDrvOutputs DerivationGoal::assertPathValidity()
 {
     auto [allValid, validOutputs] = checkPathValidity();
     if (!allValid)
@@ -1411,7 +1442,7 @@ DrvOutputs DerivationGoal::assertPathValidity()
 
 void DerivationGoal::done(
     BuildResult::Status status,
-    DrvOutputs builtOutputs,
+    SingleDrvOutputs builtOutputs,
     std::optional<Error> ex)
 {
     buildResult.status = status;
@@ -1452,12 +1483,28 @@ void DerivationGoal::waiteeDone(GoalPtr waitee, ExitCode result)
 {
     Goal::waiteeDone(waitee, result);
 
-    if (waitee->buildResult.success())
-        if (auto bfd = std::get_if<DerivedPath::Built>(&waitee->buildResult.path))
-            for (auto & [output, realisation] : waitee->buildResult.builtOutputs)
+    if (!useDerivation) return;
+    auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
+
+    auto * dg = dynamic_cast<DerivationGoal *>(&*waitee);
+    if (!dg) return;
+
+    auto outputs = fullDrv.inputDrvs.find(dg->drvPath);
+    if (outputs == fullDrv.inputDrvs.end()) return;
+
+    for (auto & outputName : outputs->second) {
+        auto buildResult = dg->getBuildResult(DerivedPath::Built {
+            .drvPath = dg->drvPath,
+            .outputs = OutputsSpec::Names { outputName },
+        });
+        if (buildResult.success()) {
+            auto i = buildResult.builtOutputs.find(outputName);
+            if (i != buildResult.builtOutputs.end())
                 inputDrvOutputs.insert_or_assign(
-                    { bfd->drvPath, output.outputName },
-                    realisation.outPath);
+                    { dg->drvPath, outputName },
+                    i->second.outPath);
+        }
+    }
 }
 
 }

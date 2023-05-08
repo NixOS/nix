@@ -40,6 +40,7 @@ extern "C" {
 #include "markdown.hh"
 #include "local-fs-store.hh"
 #include "progress-bar.hh"
+#include "print.hh"
 
 #if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
@@ -54,8 +55,6 @@ struct NixRepl
     , gc
     #endif
 {
-    std::string curDir;
-
     size_t debugTraceIndex;
 
     Strings loadedFiles;
@@ -113,7 +112,6 @@ NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store, ref<EvalStat
     , staticEnv(new StaticEnv(false, state->staticBaseEnv.get()))
     , historyFile(getDataDir() + "/nix/repl-history")
 {
-    curDir = absPath(".");
 }
 
 
@@ -425,6 +423,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
 }
 
 
+// FIXME: DRY and match or use the parser
 static bool isVarName(std::string_view s)
 {
     if (s.size() == 0) return false;
@@ -592,14 +591,14 @@ bool NixRepl::processLine(std::string line)
         Value v;
         evalString(arg, v);
 
-        const auto [path, line] = [&] () -> std::pair<Path, uint32_t> {
+        const auto [path, line] = [&] () -> std::pair<SourcePath, uint32_t> {
             if (v.type() == nPath || v.type() == nString) {
-                PathSet context;
+                NixStringContext context;
                 auto path = state->coerceToPath(noPos, v, context, "while evaluating the filename to edit");
                 return {path, 0};
             } else if (v.isLambda()) {
                 auto pos = state->positions[v.lambda.fun->pos];
-                if (auto path = std::get_if<Path>(&pos.origin))
+                if (auto path = std::get_if<SourcePath>(&pos.origin))
                     return {*path, pos.line};
                 else
                     throw Error("'%s' cannot be shown in an editor", pos);
@@ -874,8 +873,7 @@ void NixRepl::addVarToScope(const Symbol name, Value & v)
 
 Expr * NixRepl::parseString(std::string s)
 {
-    Expr * e = state->parseExprFromString(std::move(s), curDir, staticEnv);
-    return e;
+    return state->parseExprFromString(std::move(s), state->rootPath(CanonPath::fromCwd()), staticEnv);
 }
 
 
@@ -894,17 +892,6 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 }
 
 
-std::ostream & printStringValue(std::ostream & str, const char * string) {
-    str << "\"";
-    for (const char * i = string; *i; i++)
-        if (*i == '\"' || *i == '\\') str << "\\" << *i;
-        else if (*i == '\n') str << "\\n";
-        else if (*i == '\r') str << "\\r";
-        else if (*i == '\t') str << "\\t";
-        else str << *i;
-    str << "\"";
-    return str;
-}
 
 
 // FIXME: lot of cut&paste from Nix's eval.cc.
@@ -922,17 +909,19 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     case nBool:
-        str << ANSI_CYAN << (v.boolean ? "true" : "false") << ANSI_NORMAL;
+        str << ANSI_CYAN;
+        printLiteralBool(str, v.boolean);
+        str << ANSI_NORMAL;
         break;
 
     case nString:
         str << ANSI_WARNING;
-        printStringValue(str, v.string.s);
+        printLiteralString(str, v.string.s);
         str << ANSI_NORMAL;
         break;
 
     case nPath:
-        str << ANSI_GREEN << v.path << ANSI_NORMAL; // !!! escaping?
+        str << ANSI_GREEN << v.path().to_string() << ANSI_NORMAL; // !!! escaping?
         break;
 
     case nNull:
@@ -947,7 +936,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         if (isDrv) {
             str << "«derivation ";
             Bindings::iterator i = v.attrs->find(state->sDrvPath);
-            PathSet context;
+            NixStringContext context;
             if (i != v.attrs->end())
                 str << state->store->printStorePath(state->coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation"));
             else
@@ -964,10 +953,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
                 sorted.emplace(state->symbols[i.name], i.value);
 
             for (auto & i : sorted) {
-                if (isVarName(i.first))
-                    str << i.first;
-                else
-                    printStringValue(str, i.first.c_str());
+                printAttributeName(str, i.first);
                 str << " = ";
                 if (seen.count(i.second))
                     str << "«repeated»";

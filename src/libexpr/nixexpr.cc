@@ -3,6 +3,7 @@
 #include "eval.hh"
 #include "symbol-table.hh"
 #include "util.hh"
+#include "print.hh"
 
 #include <cstdlib>
 
@@ -31,9 +32,9 @@ struct PosAdapter : AbstractPos
                 // Get rid of the null terminators added by the parser.
                 return std::string(s.source->c_str());
             },
-            [](const Path & path) -> std::optional<std::string> {
+            [](const SourcePath & path) -> std::optional<std::string> {
                 try {
-                    return readFile(path);
+                    return path.readFile();
                 } catch (Error &) {
                     return std::nullopt;
                 }
@@ -47,7 +48,7 @@ struct PosAdapter : AbstractPos
             [&](const Pos::none_tag &) { out << "«none»"; },
             [&](const Pos::Stdin &) { out << "«stdin»"; },
             [&](const Pos::String & s) { out << "«string»"; },
-            [&](const Path & path) { out << path; }
+            [&](const SourcePath & path) { out << path; }
         }, origin);
     }
 };
@@ -60,45 +61,12 @@ Pos::operator std::shared_ptr<AbstractPos>() const
     return pos;
 }
 
-/* Displaying abstract syntax trees. */
-
-static void showString(std::ostream & str, std::string_view s)
-{
-    str << '"';
-    for (auto c : s)
-        if (c == '"' || c == '\\' || c == '$') str << "\\" << c;
-        else if (c == '\n') str << "\\n";
-        else if (c == '\r') str << "\\r";
-        else if (c == '\t') str << "\\t";
-        else str << c;
-    str << '"';
-}
-
+// FIXME: remove, because *symbols* are abstract and do not have a single
+//        textual representation; see printIdentifier()
 std::ostream & operator <<(std::ostream & str, const SymbolStr & symbol)
 {
     std::string_view s = symbol;
-
-    if (s.empty())
-        str << "\"\"";
-    else if (s == "if") // FIXME: handle other keywords
-        str << '"' << s << '"';
-    else {
-        char c = s[0];
-        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_')) {
-            showString(str, s);
-            return str;
-        }
-        for (auto c : s)
-            if (!((c >= 'a' && c <= 'z') ||
-                  (c >= 'A' && c <= 'Z') ||
-                  (c >= '0' && c <= '9') ||
-                  c == '_' || c == '\'' || c == '-')) {
-                showString(str, s);
-                return str;
-            }
-        str << s;
-    }
-    return str;
+    return printIdentifier(str, s);
 }
 
 void Expr::show(const SymbolTable & symbols, std::ostream & str) const
@@ -118,7 +86,7 @@ void ExprFloat::show(const SymbolTable & symbols, std::ostream & str) const
 
 void ExprString::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    showString(str, s);
+    printLiteralString(str, s);
 }
 
 void ExprPath::show(const SymbolTable & symbols, std::ostream & str) const

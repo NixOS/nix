@@ -89,3 +89,7 @@ However they serve different purposes:
   It is primarily an issue of *design* and *communication*, targeting the broader community.
 
 This means that experimental features and RFCs are orthogonal mechanisms, and can be used independently or together as needed.
+
+# Currently available experimental features
+
+{{#include ./experimental-feature-descriptions.md}}

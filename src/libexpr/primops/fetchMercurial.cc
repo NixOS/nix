@@ -13,7 +13,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     std::optional<Hash> rev;
     std::optional<std::string> ref;
     std::string_view name = "source";
-    PathSet context;
+    NixStringContext context;
 
     state.forceValue(*args[0], pos);
 
@@ -73,8 +73,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     auto [tree, input2] = input.fetch(state.store);
 
     auto attrs2 = state.buildBindings(8);
-    auto storePath = state.store->printStorePath(tree.storePath);
-    attrs2.alloc(state.sOutPath).mkString(storePath, {storePath});
+    state.mkStorePathString(tree.storePath, attrs2.alloc(state.sOutPath));
     if (input2.getRef())
         attrs2.alloc("branch").mkString(*input2.getRef());
     // Backward compatibility: set 'rev' to

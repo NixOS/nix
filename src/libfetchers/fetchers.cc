@@ -210,7 +210,13 @@ StorePath Input::computeStorePath(Store & store) const
     auto narHash = getNarHash();
     if (!narHash)
         throw Error("cannot compute store path for unlocked input '%s'", to_string());
-    return store.makeFixedOutputPath(FileIngestionMethod::Recursive, *narHash, getName());
+    return store.makeFixedOutputPath(getName(), FixedOutputInfo {
+        .hash = {
+            .method = FileIngestionMethod::Recursive,
+            .hash = *narHash,
+        },
+        .references = {},
+    });
 }
 
 std::string Input::getType() const
