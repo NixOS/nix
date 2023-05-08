@@ -116,6 +116,8 @@
 
   - [substituter]{#gloss-substituter}\
     An additional store from which Nix can obtain store objects instead of building them.
+    Often the substituter is a [binary cache](#gloss-binary-cache), but any [store](#gloss-store) can serve as substituter.
+
     See the [`substituters` configuration option](./command-ref/conf-file.md#conf-substituters) for details.
 
     [substituter]: #gloss-substituter
