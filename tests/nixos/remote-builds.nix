@@ -90,8 +90,9 @@ in
 
     # Perform a build and check that it was performed on the builder.
     out = client.succeed(
-      "nix-build ${expr nodes.client.config 1} 2> build-output",
+      "NIX_SSHOPTS='echo bar &>2;' nix-build ${expr nodes.client.config 1} 2> build-output",
       "grep -q Hello build-output"
+      "grep -q bar build-output"
     )
     builder1.succeed(f"test -e {out}")
 
