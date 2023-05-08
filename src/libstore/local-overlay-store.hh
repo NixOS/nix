@@ -22,6 +22,12 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           for the lower store. The default is `auto` (i.e. use the Nix daemon or `/nix/store` directly).
 
           Must be a store with a store dir on the file system.
+          Must be used as OverlayFS lower layer for this store's store dir.
+        )"};
+
+    const Setting<std::string> upperLayer{(StoreConfig*) this, "", "upper-layer",
+        R"(
+          Must be used as OverlayFS upper layer for this store's store dir.
         )"};
 
     const std::string name() override { return "Experimental Local Overlay Store"; }
@@ -34,6 +40,12 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           //#include "local-overlay-store.md"
           ;
     }
+
+    /**
+     * Given a store path, get its location (if it is exists) in the
+     * upper layer of the overlayfs.
+     */
+    Path toUpperPath(const StorePath & path);
 };
 
 /**
@@ -74,6 +86,23 @@ private:
 
     void queryPathInfoUncached(const StorePath & path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
+
+    bool isValidPathUncached(const StorePath & path) override;
+
+    void addToStore(const ValidPathInfo & info, Source & source,
+        RepairFlag repair, CheckSigsFlag checkSigs) override;
+
+    StorePath addToStoreFromDump(Source & dump, std::string_view name,
+        FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references) override;
+
+    StorePath addTextToStore(
+        std::string_view name,
+        std::string_view s,
+        const StorePathSet & references,
+        RepairFlag repair) override;
+
+    void queryRealisationUncached(const DrvOutput&,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 };
 
 }

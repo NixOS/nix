@@ -3,6 +3,12 @@
 
 namespace nix {
 
+Path LocalOverlayStoreConfig::toUpperPath(const StorePath & path) {
+    auto res = upperLayer + "/" + path.to_string();
+    warn("upper path: %s", res);
+    return res;
+}
+
 LocalOverlayStore::LocalOverlayStore(const Params & params)
     : StoreConfig(params)
     , LocalFSStoreConfig(params)
@@ -30,7 +36,6 @@ void LocalOverlayStore::registerDrvOutput(const Realisation & info)
 void LocalOverlayStore::queryPathInfoUncached(const StorePath & path,
     Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
-
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
     LocalStore::queryPathInfoUncached(path,
@@ -52,6 +57,79 @@ void LocalOverlayStore::queryPathInfoUncached(const StorePath & path,
                     }
                 }});
         }});
+}
+
+
+void LocalOverlayStore::queryRealisationUncached(const DrvOutput & drvOutput,
+    Callback<std::shared_ptr<const Realisation>> callback) noexcept 
+{
+    auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
+
+    LocalStore::queryRealisationUncached(drvOutput,
+        {[this, drvOutput, callbackPtr](std::future<std::shared_ptr<const Realisation>> fut) {
+            try {
+                auto info = fut.get();
+                if (info)
+                    return (*callbackPtr)(std::move(info));
+            } catch (...) {
+                return callbackPtr->rethrow();
+            }
+            // If we don't have it, check lower store
+            lowerStore->queryRealisation(drvOutput,
+                {[callbackPtr](std::future<std::shared_ptr<const Realisation>> fut) {
+                    try {
+                        (*callbackPtr)(fut.get());
+                    } catch (...) {
+                        return callbackPtr->rethrow();
+                    }
+                }});
+        }});
+}
+
+
+bool LocalOverlayStore::isValidPathUncached(const StorePath & path)
+{
+    auto res = LocalStore::isValidPathUncached(path);
+    if (res) return res;
+    return lowerStore->isValidPath(path);
+}
+
+
+void LocalOverlayStore::addToStore(const ValidPathInfo & info, Source & source,
+    RepairFlag repair, CheckSigsFlag checkSigs)
+{
+    LocalStore::addToStore(info, source, repair, checkSigs);
+    if (lowerStore->isValidPath(info.path)) {
+        // dedup stores
+        deletePath(toUpperPath(info.path));
+    }
+}
+
+
+StorePath LocalOverlayStore::addToStoreFromDump(Source & dump, std::string_view name,
+    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references)
+{
+    auto path = LocalStore::addToStoreFromDump(dump, name, method, hashAlgo, repair, references);
+    if (lowerStore->isValidPath(path)) {
+        // dedup stores
+        deletePath(toUpperPath(path));
+    }
+    return path;
+}
+
+
+StorePath LocalOverlayStore::addTextToStore(
+    std::string_view name,
+    std::string_view s,
+    const StorePathSet & references,
+    RepairFlag repair)
+{
+    auto path = LocalStore::addTextToStore(name, s, references, repair);
+    if (lowerStore->isValidPath(path)) {
+        // dedup stores
+        deletePath(toUpperPath(path));
+    }
+    return path;
 }
 
 
