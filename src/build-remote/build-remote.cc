@@ -258,6 +258,8 @@ static int main_build_remote(int argc, char * * argv)
 connected:
         close(5);
 
+        assert(sshStore);
+
         std::cerr << "# accept\n" << storeUri << "\n";
 
         auto inputs = readStrings<PathSet>(source);
@@ -286,23 +288,48 @@ connected:
         uploadLock = -1;
 
         auto drv = store->readDerivation(*drvPath);
+
+        std::optional<BuildResult> optResult;
+
+        // If we don't know whether we are trusted (e.g. `ssh://`
+        // stores), we assume we are. This is necessary for backwards
+        // compat.
+        bool trustedOrLegacy = ({
+            std::optional trusted = sshStore->isTrustedClient();
+            !trusted || *trusted;
+        });
+
+        // See the very large comment in `case wopBuildDerivation:` in
+        // `src/libstore/daemon.cc` that explains the trust model here.
+        //
+        // This condition mirrors that: that code enforces the "rules" outlined there;
+        // we do the best we can given those "rules".
+        if (trustedOrLegacy || drv.type().isCA())  {
+            // Hijack the inputs paths of the derivation to include all
+            // the paths that come from the `inputDrvs` set. We don’t do
+            // that for the derivations whose `inputDrvs` is empty
+            // because:
+            //
+            // 1. It’s not needed
+            //
+            // 2. Changing the `inputSrcs` set changes the associated
+            //    output ids, which break CA derivations
+            if (!drv.inputDrvs.empty())
+                drv.inputSrcs = store->parseStorePathSet(inputs);
+            optResult = sshStore->buildDerivation(*drvPath, (const BasicDerivation &) drv);
+            auto & result = *optResult;
+            if (!result.success())
+                throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
+        } else {
+            copyClosure(*store, *sshStore, StorePathSet {*drvPath}, NoRepair, NoCheckSigs, substitute);
+            auto res = sshStore->buildPathsWithResults({ DerivedPath::Built { *drvPath, OutputsSpec::All {} } });
+            // One path to build should produce exactly one build result
+            assert(res.size() == 1);
+            optResult = std::move(res[0]);
+        }
+
+
         auto outputHashes = staticOutputHashes(*store, drv);
-
-        // Hijack the inputs paths of the derivation to include all the paths
-        // that come from the `inputDrvs` set.
-        // We don’t do that for the derivations whose `inputDrvs` is empty
-        // because
-        // 1. It’s not needed
-        // 2. Changing the `inputSrcs` set changes the associated output ids,
-        //  which break CA derivations
-        if (!drv.inputDrvs.empty())
-            drv.inputSrcs = store->parseStorePathSet(inputs);
-
-        auto result = sshStore->buildDerivation(*drvPath, drv);
-
-        if (!result.success())
-            throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
-
         std::set<Realisation> missingRealisations;
         StorePathSet missingPaths;
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations) && !drv.type().hasKnownOutputPaths()) {
@@ -311,6 +338,8 @@ connected:
                 auto thisOutputId = DrvOutput{ thisOutputHash, outputName };
                 if (!store->queryRealisation(thisOutputId)) {
                     debug("missing output %s", outputName);
+                    assert(optResult);
+                    auto & result = *optResult;
                     auto i = result.builtOutputs.find(outputName);
                     assert(i != result.builtOutputs.end());
                     auto & newRealisation = i->second;
