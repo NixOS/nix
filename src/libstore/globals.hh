@@ -515,6 +515,25 @@ public:
     Setting<bool> sandboxFallback{this, true, "sandbox-fallback",
         "Whether to disable sandboxing when the kernel doesn't allow it."};
 
+    Setting<bool> dropSupplementaryGroups{this, getuid() == 0, "drop-supplementary-groups",
+        R"(
+          Whether to drop supplementary groups when building with sandboxing.
+          This is normally a good idea if we are root and have the capability to
+          do so.
+
+          But if this "root" is mapped from a non-root user in a larger
+          namespace, we won't be able drop additional groups; they will be
+          mapped to nogroup in the child namespace. There does not seem to be a
+          workaround for this.
+
+          (But who can tell from reading user_namespaces(7)? See also https://lwn.net/Articles/621612/.)
+
+          TODO: It might be good to create a middle ground option that allows
+          `setgroups` to fail if all additional groups are "nogroup" / the value
+          of `/proc/sys/fs/overflowuid`. This would handle the common
+          nested-sandboxing case identified above.
+        )"};
+
 #if __linux__
     Setting<std::string> sandboxShmSize{
         this, "50%", "sandbox-dev-shm-size",
