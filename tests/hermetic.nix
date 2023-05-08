@@ -1,4 +1,4 @@
-{ busybox }:
+{ busybox, seed }:
 
 with import ./config.nix;
 
@@ -21,19 +21,19 @@ let
 
   input1 = mkDerivation {
     shell = busybox;
-    name = "build-remote-input-1";
-    buildCommand = "echo hi-input1; echo FOO > $out";
+    name = "hermetic-input-1";
+    buildCommand = "echo hi-input1 seed=${toString seed}; echo FOO > $out";
   };
 
   input2 = mkDerivation {
     shell = busybox;
-    name = "build-remote-input-2";
+    name = "hermetic-input-2";
     buildCommand = "echo hi; echo BAR > $out";
   };
 
   input3 = mkDerivation {
     shell = busybox;
-    name = "build-remote-input-3";
+    name = "hermetic-input-3";
     buildCommand = ''
       echo hi-input3
       read x < ${input2}
@@ -45,7 +45,7 @@ in
 
   mkDerivation {
     shell = busybox;
-    name = "build-remote";
+    name = "hermetic";
     passthru = { inherit input1 input2 input3; };
     buildCommand =
       ''

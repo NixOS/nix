@@ -10,52 +10,77 @@ export NIX_CONFIG='build-users-group = '
 
 # Creating testing directories
 
-storeA="$TEST_ROOT/store_a"
-storeB="local-overlay?root=$TEST_ROOT/store_b&lower-store=$TEST_ROOT/merged-store"
-storeBTop="$TEST_ROOT/store_b"
+storeA="$TEST_ROOT/store-a"
+storeBTop="$TEST_ROOT/store-b"
+storeB="local-overlay?root=$TEST_ROOT/merged-store&lower-store=$TEST_ROOT/store-a"
 
-mkdir -p "$TEST_ROOT"/{store_a,store_b,merged-store,workdir}
+mkdir -p "$TEST_ROOT"/{store-a,store-b,merged-store/nix/store,workdir}
 
 # Mounting Overlay Store
 
-## Restore normal, because we are using these chroot stores
-#NIX_STORE_DIR=/nix/store
+# Init lower store with some stuff
+nix-store --store "$storeA" --add dummy
 
-nix-store --store "$TEST_ROOT/store_a" --add dummy
-nix-store --store "$TEST_ROOT/store_b" --add dummy
+# Build something in lower store
+path=$(nix-build ./hermetic.nix --arg busybox "$busybox" --arg seed 1 --store "$storeA")
 
 mount -t overlay overlay \
-  -o lowerdir="$TEST_ROOT/store_a/nix/store" \
-  -o upperdir="$TEST_ROOT/store_b/nix/store" \
+  -o lowerdir="$storeA/nix/store" \
+  -o upperdir="$storeBTop" \
   -o workdir="$TEST_ROOT/workdir" \
-  "$TEST_ROOT/merged-store" || skipTest "overlayfs is not supported"
+  "$TEST_ROOT/merged-store/nix/store" \
+  || skipTest "overlayfs is not supported"
 
-# Add in lower
-NIX_REMOTE=$storeA source add.sh
+cleanupOverlay () {
+  umount "$TEST_ROOT/merged-store/nix/store"
+  rm -r $TEST_ROOT/workdir
+}
+trap cleanupOverlay EXIT
 
-# Add in layered
-NIX_REMOTE=$storeB source add.sh
+toRealPath () {
+   storeDir=$1; shift
+   storePath=$1; shift
+   echo $storeDir$(echo $storePath | sed "s^$NIX_STORE_DIR^^")
+}
 
-#busyboxExpr="\"\${$(dirname "$busybox")}/$(basename "$busybox")\""
-path_a=$(nix-build ./hermetic.nix --arg busybox "$busybox" --store "$storeA")
+### Check status
 
-# Checking for Path in store_a
-stat "$TEST_ROOT/store_a/$path_a"
+# Checking for path in lower layer
+stat $(toRealPath "$storeA/nix/store" "$path")
 
-# Checking for Path in store_b
-expect 1 stat "$TEST_ROOT/store_b/$path_a"
+# Checking for path in upper layer (should fail)
+expect 1 stat $(toRealPath "$storeBTop" "$path")
 
-# Checking for Path in merged-store
-ls "$TEST_ROOT/merged-store/$(echo "$path_a" | sed 's|/nix/store/||g')"
+# Checking for path in overlay store matching lower layer
+diff $(toRealPath "$storeA/nix/store" "$path") $(toRealPath "$TEST_ROOT/merged-store/nix/store" "$path")
 
+# Verifying path in lower layer
+nix-store --verify-path --store "$storeA" "$path"
 
-# Verifying path in store_a
-nix-store --verify-path --store "$storeA" "$path_a"
+# Verifying path in merged-store
+# FIXME should succeed
+expect 1 nix-store --verify-path --store "$storeB" "$path"
 
-# Verifiying path in merged-store (Should fail)
-expect 1 nix-store --verify-path --store "$storeB" "$path_a"
+### Do a redundant add
 
-# Verifying path in store_b (Should fail)
-expect 1 nix-store --verify-path --store "$storeBTop" "$path_a"
+path=$(nix-store --store "$storeB" --add dummy)
 
-path_b=$(nix-build ./hermetic.nix --arg busybox $busybox --store "$storeB")
+# lower store should have it from before
+stat $(toRealPath "$storeA/nix/store" "$path")
+
+# upper store should not have redundant copy
+# FIXME should fail
+stat $(toRealPath "$storeA/nix/store" "$path")
+
+### Do a build in overlay store
+
+path=$(nix-build ./hermetic.nix --arg busybox $busybox --arg seed 2 --store "$storeB")
+
+# Checking for path in lower layer (should fail)
+expect 1 stat $(toRealPath "$storeA/nix/store" "$path")
+
+# Checking for path in upper layer
+stat $(toRealPath "$storeBTop" "$path")
+
+# Verifying path in overlay store
+nix-store --verify-path --store "$storeB" "$path"
