@@ -312,9 +312,12 @@ connected:
         // See the very large comment in `case wopBuildDerivation:` in
         // `src/libstore/daemon.cc` that explains the trust model here.
         //
-        // This condition mirrors that: that code enforces the "rules";
+        // This condition mirrors that: that code enforces the "rules" outlined there;
         // we do the best we can given those "rules".
-        if (std::optional trust = sshStore->isTrustedClient(); (!trust || *trust) || drv.type().isCA()) {
+        std::optional trusted = sshStore->isTrustedClient();
+        // for backward compatibility (use existing comments here)
+        bool trustedOrLegacy = !trusted || *trusted;
+        if (trustedOrLegacy || drv.type().isCA())  {
             // Hijack the inputs paths of the derivation to include all
             // the paths that come from the `inputDrvs` set. We don’t do
             // that for the derivations whose `inputDrvs` is empty
@@ -331,9 +334,9 @@ connected:
             if (!result.success())
                 throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
         } else {
-            copyPaths(*store, *sshStore, StorePathSet {*drvPath}, NoRepair, NoCheckSigs, substitute);
+            copyClosure(*store, *sshStore, StorePathSet {*drvPath}, NoRepair, NoCheckSigs, substitute);
             auto res = sshStore->buildPathsWithResults({ DerivedPath::Built { *drvPath, OutputsSpec::All {} } });
-            // One path to build should mean one result back
+            // One path to build should produce exactly one build result
             assert(res.size() == 1);
             optResult = std::move(res[0]);
         }
