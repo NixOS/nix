@@ -71,6 +71,9 @@ private:
     // Overridden methods…
 
     void registerDrvOutput(const Realisation & info) override;
+
+    void queryPathInfoUncached(const StorePath & path,
+        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 };
 
 }

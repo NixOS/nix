@@ -1,4 +1,5 @@
 #include "local-overlay-store.hh"
+#include "callback.hh"
 
 namespace nix {
 
@@ -23,6 +24,31 @@ void LocalOverlayStore::registerDrvOutput(const Realisation & info)
         LocalStore::registerDrvOutput(*res);
 
     LocalStore::registerDrvOutput(info);
+}
+
+
+void LocalOverlayStore::queryPathInfoUncached(const StorePath & path,
+    Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
+{
+
+    auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
+
+    // If we don't have it, check lower store
+    LocalStore::queryPathInfoUncached(path,
+        {[this, path, callbackPtr](std::future<std::shared_ptr<const ValidPathInfo>> fut) {
+            try {
+                (*callbackPtr)(fut.get());
+            } catch (...) {
+                lowerStore->queryPathInfo(path,
+                    {[path, callbackPtr](std::future<ref<const ValidPathInfo>> fut) {
+                        try {
+                            (*callbackPtr)(fut.get().get_ptr());
+                        } catch (...) {
+                            callbackPtr->rethrow();
+                        }
+                    }});
+            }
+        }});
 }
 
 
