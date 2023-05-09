@@ -2511,7 +2511,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             [&](const DerivationOutput::CAFixed & dof) {
                 auto wanted = dof.ca.getHash();
 
-                auto newInfo0 = newInfoFromCA(DerivationOutputCAFloating {
+                auto newInfo0 = newInfoFromCA(DerivationOutput::CAFloating {
                     .method = dof.ca.getMethod(),
                     .hashType = wanted.type,
                 });
