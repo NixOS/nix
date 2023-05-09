@@ -55,6 +55,21 @@ expect 1 stat $(toRealPath "$storeBTop" "$path")
 # Checking for path in overlay store matching lower layer
 diff $(toRealPath "$storeA/nix/store" "$path") $(toRealPath "$TEST_ROOT/merged-store/nix/store" "$path")
 
+# Checking requisites query agreement
+[[ \
+  $(nix-store --store $storeA --query --requisites $drvPath) \
+  == \
+  $(nix-store --store $storeB --query --requisites $drvPath) \
+  ]]
+
+# Checking referrers query agreement
+busyboxStore=$(nix store --store $storeA add-path $busybox)
+[[ \
+  $(nix-store --store $storeA --query --referrers $busyboxStore) \
+  == \
+  $(nix-store --store $storeB --query --referrers $busyboxStore) \
+  ]]
+
 # Checking derivers query agreement
 [[ \
   $(nix-store --store $storeA --query --deriver $path) \

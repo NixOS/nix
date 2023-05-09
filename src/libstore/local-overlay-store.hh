@@ -89,6 +89,10 @@ private:
 
     bool isValidPathUncached(const StorePath & path) override;
 
+    void queryReferrers(const StorePath & path, StorePathSet & referrers) override;
+
+    StorePathSet queryValidDerivers(const StorePath & path) override;
+
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
     void registerValidPaths(const ValidPathInfos & infos) override;

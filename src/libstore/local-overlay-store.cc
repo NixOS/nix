@@ -103,6 +103,22 @@ bool LocalOverlayStore::isValidPathUncached(const StorePath & path)
 }
 
 
+void LocalOverlayStore::queryReferrers(const StorePath & path, StorePathSet & referrers)
+{
+    LocalStore::queryReferrers(path, referrers);
+    lowerStore->queryReferrers(path, referrers);
+}
+
+
+StorePathSet LocalOverlayStore::queryValidDerivers(const StorePath & path)
+{
+    auto res = LocalStore::queryValidDerivers(path);
+    for (auto p : lowerStore->queryValidDerivers(path))
+        res.insert(p);
+    return res;
+}
+
+
 std::optional<StorePath> LocalOverlayStore::queryPathFromHashPart(const std::string & hashPart)
 {
     auto res = LocalStore::queryPathFromHashPart(hashPart);
