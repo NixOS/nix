@@ -1,4 +1,5 @@
 #include "print.hh"
+#include <unordered_set>
 
 namespace nix {
 
@@ -25,11 +26,26 @@ printLiteralBool(std::ostream & str, bool boolean)
     return str;
 }
 
+// Returns `true' is a string is a reserved keyword which requires quotation
+// when printing attribute set field names.
+//
+// This list should generally be kept in sync with `./lexer.l'.
+// You can test if a keyword needs to be added by running:
+//   $ nix eval --expr '{ <KEYWORD> = 1; }'
+// For example `or' doesn't need to be quoted.
+bool isReservedKeyword(const std::string_view str)
+{
+    static const std::unordered_set<std::string_view> reservedKeywords = {
+        "if", "then", "else", "assert", "with", "let", "in", "rec", "inherit"
+    };
+    return reservedKeywords.contains(str);
+}
+
 std::ostream &
 printIdentifier(std::ostream & str, std::string_view s) {
     if (s.empty())
         str << "\"\"";
-    else if (s == "if") // FIXME: handle other keywords
+    else if (isReservedKeyword(s))
         str << '"' << s << '"';
     else {
         char c = s[0];
@@ -50,10 +66,10 @@ printIdentifier(std::ostream & str, std::string_view s) {
     return str;
 }
 
-// FIXME: keywords
 static bool isVarName(std::string_view s)
 {
     if (s.size() == 0) return false;
+    if (isReservedKeyword(s)) return false;
     char c = s[0];
     if ((c >= '0' && c <= '9') || c == '-' || c == '\'') return false;
     for (auto & i : s)
