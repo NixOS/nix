@@ -89,6 +89,8 @@ private:
 
     bool isValidPathUncached(const StorePath & path) override;
 
+    void registerValidPaths(const ValidPathInfos & infos) override;
+
     void addToStore(const ValidPathInfo & info, Source & source,
         RepairFlag repair, CheckSigsFlag checkSigs) override;
 

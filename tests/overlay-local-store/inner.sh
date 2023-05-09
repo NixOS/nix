@@ -22,7 +22,7 @@ mkdir -p "$TEST_ROOT"/{store-a,store-b,merged-store/nix/store,workdir}
 nix-store --store "$storeA" --add dummy
 
 # Build something in lower store
-path=$(nix-build ./hermetic.nix --arg busybox "$busybox" --arg seed 1 --store "$storeA")
+path=$(nix-build ./hermetic.nix --arg busybox "$busybox" --arg seed 1 --store "$storeA" --no-out-link)
 
 mount -t overlay overlay \
   -o lowerdir="$storeA/nix/store" \
@@ -73,17 +73,15 @@ stat $(toRealPath "$storeA/nix/store" "$path")
 # upper layer should still not have it (no redundant copy)
 expect 1 stat $(toRealPath "$storeB/nix/store" "$path")
 
-## Ooops something went wrong
+### Do a build in overlay store
 
-## ### Do a build in overlay store
-##
-## path=$(nix-build ./hermetic.nix --arg busybox $busybox --arg seed 2 --store "$storeB")
-##
-## # Checking for path in lower layer (should fail)
-## expect 1 stat $(toRealPath "$storeA/nix/store" "$path")
-##
-## # Checking for path in upper layer
-## stat $(toRealPath "$storeBTop" "$path")
-##
-## # Verifying path in overlay store
-## nix-store --verify-path --store "$storeB" "$path"
+path=$(nix-build ./hermetic.nix --arg busybox $busybox --arg seed 2 --store "$storeB" --no-out-link)
+
+# Checking for path in lower layer (should fail)
+expect 1 stat $(toRealPath "$storeA/nix/store" "$path")
+
+# Checking for path in upper layer
+stat $(toRealPath "$storeBTop" "$path")
+
+# Verifying path in overlay store
+nix-store --verify-path --store "$storeB" "$path"

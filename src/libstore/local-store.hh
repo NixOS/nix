@@ -232,7 +232,7 @@ public:
      */
     void registerValidPath(const ValidPathInfo & info);
 
-    void registerValidPaths(const ValidPathInfos & infos);
+    virtual void registerValidPaths(const ValidPathInfos & infos);
 
     unsigned int getProtocol() override;
 

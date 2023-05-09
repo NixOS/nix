@@ -4,9 +4,7 @@
 namespace nix {
 
 Path LocalOverlayStoreConfig::toUpperPath(const StorePath & path) {
-    auto res = upperLayer + "/" + path.to_string();
-    warn("upper path: %s", res);
-    return res;
+    return upperLayer + "/" + path.to_string();
 }
 
 LocalOverlayStore::LocalOverlayStore(const Params & params)
@@ -91,7 +89,31 @@ bool LocalOverlayStore::isValidPathUncached(const StorePath & path)
 {
     auto res = LocalStore::isValidPathUncached(path);
     if (res) return res;
-    return lowerStore->isValidPath(path);
+    res = lowerStore->isValidPath(path);
+    if (res) {
+        // Get path info from lower store so upper DB genuinely has it.
+        LocalStore::registerValidPath(*lowerStore->queryPathInfo(path));
+    }
+    return res;
+}
+
+
+void LocalOverlayStore::registerValidPaths(const ValidPathInfos & infos)
+{
+    // First, get any from lower store so we merge
+    {
+        StorePathSet notInUpper;
+        for (auto & [p, _] : infos)
+            if (!LocalStore::isValidPathUncached(p)) // avoid divergence
+                notInUpper.insert(p);
+        auto pathsInLower = lowerStore->queryValidPaths(notInUpper);
+        ValidPathInfos inLower;
+        for (auto & p : pathsInLower)
+            inLower.insert_or_assign(p, *lowerStore->queryPathInfo(p));
+        LocalStore::registerValidPaths(inLower);
+    }
+    // Then do original request
+    LocalStore::registerValidPaths(infos);
 }
 
 
