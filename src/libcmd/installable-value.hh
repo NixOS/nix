@@ -96,11 +96,6 @@ struct InstallableValue : Installable
 
     UnresolvedApp toApp(EvalState & state);
 
-    virtual FlakeRef nixpkgsFlakeRef() const
-    {
-        return FlakeRef::fromAttrs({{"type","indirect"}, {"id", "nixpkgs"}});
-    }
-
     static InstallableValue & require(Installable & installable);
     static ref<InstallableValue> require(ref<Installable> installable);
 };
