@@ -2,6 +2,7 @@
 ///@file
 
 #include "args.hh"
+#include "common-args.hh"
 
 namespace nix {
 
@@ -10,7 +11,7 @@ class EvalState;
 class Bindings;
 struct SourcePath;
 
-struct MixEvalArgs : virtual Args
+struct MixEvalArgs : virtual Args, virtual MixRepair
 {
     static constexpr auto category = "Common evaluation options";
 

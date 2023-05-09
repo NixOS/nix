@@ -1391,7 +1391,6 @@ static int main_nix_env(int argc, char * * argv)
         Operation op = 0;
         std::string opName;
         bool showHelp = false;
-        RepairFlag repair = NoRepair;
         std::string file;
 
         Globals globals;
@@ -1489,8 +1488,6 @@ static int main_nix_env(int argc, char * * argv)
                 globals.instSource.systemFilter = getArg(*arg, arg, end);
             else if (*arg == "--prebuilt-only" || *arg == "-b")
                 globals.prebuiltOnly = true;
-            else if (*arg == "--repair")
-                repair = Repair;
             else if (*arg != "" && arg->at(0) == '-') {
                 opFlags.push_back(*arg);
                 /* FIXME: hacky */
@@ -1515,7 +1512,7 @@ static int main_nix_env(int argc, char * * argv)
         auto store = openStore();
 
         globals.state = std::shared_ptr<EvalState>(new EvalState(myArgs.searchPath, store));
-        globals.state->repair = repair;
+        globals.state->repair = myArgs.repair;
 
         globals.instSource.nixExprPath = std::make_shared<SourcePath>(
             file != ""

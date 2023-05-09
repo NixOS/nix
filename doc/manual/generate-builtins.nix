@@ -1,8 +1,12 @@
-builtinsDump:
+let
+  inherit (builtins) concatStringsSep attrNames;
+in
+
+builtinsInfo:
 let
   showBuiltin = name:
     let
-      inherit (builtinsDump.${name}) doc args;
+      inherit (builtinsInfo.${name}) doc args;
     in
     ''
       <dt id="builtins-${name}">
@@ -14,7 +18,7 @@ let
 
       </dd>
     '';
-  listArgs = args: builtins.concatStringsSep " " (map (s: "<var>${s}</var>") args);
+  listArgs = args: concatStringsSep " " (map (s: "<var>${s}</var>") args);
 in
-with builtins; concatStringsSep "\n" (map showBuiltin (attrNames builtinsDump))
+concatStringsSep "\n" (map showBuiltin (attrNames builtinsInfo))
 

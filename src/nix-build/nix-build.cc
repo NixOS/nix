@@ -84,7 +84,6 @@ static void main_nix_build(int argc, char * * argv)
     auto interactive = isatty(STDIN_FILENO) && isatty(STDERR_FILENO);
     Strings attrPaths;
     Strings left;
-    RepairFlag repair = NoRepair;
     BuildMode buildMode = bmNormal;
     bool readStdin = false;
 
@@ -169,11 +168,6 @@ static void main_nix_build(int argc, char * * argv)
         else if (*arg == "--dry-run")
             dryRun = true;
 
-        else if (*arg == "--repair") {
-            repair = Repair;
-            buildMode = bmRepair;
-        }
-
         else if (*arg == "--run-env") // obsolete
             runEnv = true;
 
@@ -249,7 +243,8 @@ static void main_nix_build(int argc, char * * argv)
     auto evalStore = myArgs.evalStoreUrl ? openStore(*myArgs.evalStoreUrl) : store;
 
     auto state = std::make_unique<EvalState>(myArgs.searchPath, evalStore, store);
-    state->repair = repair;
+    state->repair = myArgs.repair;
+    if (myArgs.repair) buildMode = bmRepair;
 
     auto autoArgs = myArgs.getAutoArgs(*state);
 

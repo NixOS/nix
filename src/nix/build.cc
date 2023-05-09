@@ -133,7 +133,8 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
         auto buildables = Installable::build(
             getEvalStore(), store,
             Realise::Outputs,
-            installables, buildMode);
+            installables,
+            repair ? bmRepair : buildMode);
 
         if (json) logger->cout("%s", builtPathsWithResultToJSON(buildables, store).dump());
 

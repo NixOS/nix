@@ -1,9 +1,15 @@
-cliDumpStr:
+let
+  inherit (builtins)
+    attrNames attrValues fromJSON listToAttrs mapAttrs
+    concatStringsSep concatMap length lessThan replaceStrings sort;
+  inherit (import <nix/utils.nix>) concatStrings optionalString filterAttrs trim squash unique showSettings;
+in
 
-with builtins;
-with import <nix/utils.nix>;
+commandDump:
 
 let
+
+  commandInfo = fromJSON commandDump;
 
   showCommand = { command, details, filename, toplevel }:
     let
@@ -96,7 +102,7 @@ let
 
                 ${option.description}
             '';
-          categories = sort builtins.lessThan (unique (map (cmd: cmd.category) (attrValues allOptions)));
+          categories = sort lessThan (unique (map (cmd: cmd.category) (attrValues allOptions)));
         in concatStrings (map showCategory categories);
     in squash result;
 
@@ -117,13 +123,11 @@ let
       };
     in [ cmd ] ++ concatMap subcommand (attrNames details.commands or {});
 
-  cliDump = builtins.fromJSON cliDumpStr;
-
   manpages = processCommand {
     command = "nix";
-    details = cliDump.args;
+    details = commandInfo.args;
     filename = "nix";
-    toplevel = cliDump.args;
+    toplevel = commandInfo.args;
   };
 
   tableOfContents = let
@@ -143,6 +147,6 @@ let
 
           ${showSettings { useAnchors = false; } settings}
         '';
-    in concatStrings (attrValues (mapAttrs showStore cliDump.stores));
+    in concatStrings (attrValues (mapAttrs showStore commandInfo.stores));
 
 in (listToAttrs manpages) // { "SUMMARY.md" = tableOfContents; }
