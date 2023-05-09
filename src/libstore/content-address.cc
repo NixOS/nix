@@ -232,25 +232,29 @@ ContentAddressWithReferences ContentAddressWithReferences::withoutRefs(const Con
     }, ca.raw);
 }
 
-ContentAddressWithReferences ContentAddressWithReferences::fromParts(
-    ContentAddressMethod method, Hash hash, StoreReferences refs)
+std::optional<ContentAddressWithReferences> ContentAddressWithReferences::fromPartsOpt(
+    ContentAddressMethod method, Hash hash, StoreReferences refs) noexcept
 {
     return std::visit(overloaded {
-        [&](TextIngestionMethod _) -> ContentAddressWithReferences {
+        [&](TextIngestionMethod _) -> std::optional<ContentAddressWithReferences> {
             if (refs.self)
-                throw UsageError("Cannot have a self reference with text hashing scheme");
-            return TextInfo {
-                .hash = { .hash = std::move(hash) },
-                .references = std::move(refs.others),
+                return std::nullopt;
+            return ContentAddressWithReferences {
+                TextInfo {
+                    .hash = { .hash = std::move(hash) },
+                    .references = std::move(refs.others),
+                }
             };
         },
-        [&](FileIngestionMethod m2) -> ContentAddressWithReferences {
-            return FixedOutputInfo {
-                .hash = {
-                    .method = m2,
-                    .hash = std::move(hash),
-                },
-                .references = std::move(refs),
+        [&](FileIngestionMethod m2) -> std::optional<ContentAddressWithReferences> {
+            return ContentAddressWithReferences {
+                FixedOutputInfo {
+                    .hash = {
+                        .method = m2,
+                        .hash = std::move(hash),
+                    },
+                    .references = std::move(refs),
+                }
             };
         },
     }, method.raw);

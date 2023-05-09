@@ -2456,13 +2456,21 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 },
             }, outputHash.method.raw);
             auto got = caSink.finish().first;
+
+            auto optCA = ContentAddressWithReferences::fromPartsOpt(
+                outputHash.method,
+                std::move(got),
+                rewriteRefs());
+            if (!optCA) {
+                // TODO track distinct failure modes separately (at the time of
+                // writing there is just one but `nullopt` is unclear) so this
+                // message can't get out of sync.
+                throw BuildError("output path '%s' has illegal content address, probably a spurious self-reference with text hashing");
+            }
             ValidPathInfo newInfo0 {
                 worker.store,
                 outputPathName(drv->name, outputName),
-                ContentAddressWithReferences::fromParts(
-                    outputHash.method,
-                    std::move(got),
-                    rewriteRefs()),
+                *std::move(optCA),
                 Hash::dummy,
             };
             if (*scratchPath != newInfo0.path) {

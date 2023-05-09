@@ -303,10 +303,11 @@ struct ContentAddressWithReferences
      *
      * @param refs References to other store objects or oneself.
      *
-     * Do note that not all combinations are supported.
+     * Do note that not all combinations are supported; `nullopt` is
+     * returns for invalid combinations.
      */
-    static ContentAddressWithReferences fromParts(
-        ContentAddressMethod method, Hash hash, StoreReferences refs);
+    static std::optional<ContentAddressWithReferences> fromPartsOpt(
+        ContentAddressMethod method, Hash hash, StoreReferences refs) noexcept;
 
     ContentAddressMethod getMethod() const;
 
