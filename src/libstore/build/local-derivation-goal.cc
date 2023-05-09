@@ -2529,7 +2529,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                             wanted.to_string(SRI, true),
                             got.to_string(SRI, true)));
                 }
-                if (!newInfo.references.empty())
+                if (!newInfo0.references.empty())
                     delayedException = std::make_exception_ptr(
                         BuildError("illegal path references in fixed-output derivation '%s'",
                             worker.store.printStorePath(drvPath)));
