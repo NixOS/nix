@@ -22,7 +22,8 @@ mkdir -p "$TEST_ROOT"/{store-a,store-b,merged-store/nix/store,workdir}
 nix-store --store "$storeA" --add dummy
 
 # Build something in lower store
-path=$(nix-build ./hermetic.nix --arg busybox "$busybox" --arg seed 1 --store "$storeA" --no-out-link)
+drvPath=$(nix-instantiate --store $storeA ./hermetic.nix --arg busybox "$busybox" --arg seed 1)
+path=$(nix-store --store "$storeA" --realise $drvPath)
 
 mount -t overlay overlay \
   -o lowerdir="$storeA/nix/store" \
@@ -38,9 +39,9 @@ cleanupOverlay () {
 trap cleanupOverlay EXIT
 
 toRealPath () {
-   storeDir=$1; shift
-   storePath=$1; shift
-   echo $storeDir$(echo $storePath | sed "s^$NIX_STORE_DIR^^")
+  storeDir=$1; shift
+  storePath=$1; shift
+  echo $storeDir$(echo $storePath | sed "s^$NIX_STORE_DIR^^")
 }
 
 ### Check status
@@ -59,6 +60,12 @@ nix-store --verify-path --store "$storeA" "$path"
 
 # Verifying path in merged-store
 nix-store --verify-path --store "$storeB" "$path"
+
+[[ \
+  $(nix-store --store $storeA --query --outputs $drvPath) \
+  == \
+  $(nix-store --store $storeB --query --outputs $drvPath) \
+  ]]
 
 hashPart=$(echo $path | sed "s^$NIX_STORE_DIR/^^" | sed 's/-.*//')
 

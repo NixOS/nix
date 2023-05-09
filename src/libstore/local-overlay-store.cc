@@ -92,7 +92,12 @@ bool LocalOverlayStore::isValidPathUncached(const StorePath & path)
     res = lowerStore->isValidPath(path);
     if (res) {
         // Get path info from lower store so upper DB genuinely has it.
-        LocalStore::registerValidPath(*lowerStore->queryPathInfo(path));
+        auto p = lowerStore->queryPathInfo(path);
+        // recur on references, syncing entire closure.
+        for (auto & r : p->references)
+            if (r != path)
+                isValidPath(r);
+        LocalStore::registerValidPath(*p);
     }
     return res;
 }
