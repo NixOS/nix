@@ -94,7 +94,6 @@ RootValue allocRootValue(Value * v)
 #endif
 }
 
-
 void Value::print(const SymbolTable & symbols, std::ostream & str,
     std::set<const void *> * seen) const
 {
