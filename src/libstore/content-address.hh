@@ -78,8 +78,8 @@ struct ContentAddressMethod
 
 
     /**
-     * Parse and pretty print the algorithm which indicates how the files
-     * were ingested, with the the fixed output case not prefixed for back
+     * Parse the prefix tag which indicates how the files
+     * were ingested, with the fixed output case not prefixed for back
      * compat.
      */
     static ContentAddressMethod parsePrefix(std::string_view & m);
@@ -273,9 +273,9 @@ struct ContentAddressWithReferences
 
     /**
      * Create a `ContentAddressWithReferences` from a mere
-     * `ContentAddress`, by assuming no references in all cases.
+     * `ContentAddress`, by claiming no references.
      */
-    static ContentAddressWithReferences withoutRefs(const ContentAddress &);
+    static ContentAddressWithReferences withoutRefs(const ContentAddress &) noexcept;
 
     /**
      * Create a `ContentAddressWithReferences` from 3 parts:
