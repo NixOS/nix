@@ -21,7 +21,8 @@ std::string makeFileIngestionPrefix(FileIngestionMethod m)
     }
 }
 
-std::string ContentAddressMethod::renderPrefix() const {
+std::string ContentAddressMethod::renderPrefix() const
+{
     return std::visit(overloaded {
         [](TextIngestionMethod) -> std::string { return "text:"; },
         [](FileIngestionMethod m2) {
@@ -113,7 +114,8 @@ static std::pair<ContentAddressMethod, HashType> parseContentAddressMethodPrefix
         throw UsageError("content address prefix '%s' is unrecognized. Recogonized prefixes are 'text' or 'fixed'", prefix);
 }
 
-ContentAddress ContentAddress::parse(std::string_view rawCa) {
+ContentAddress ContentAddress::parse(std::string_view rawCa)
+{
     auto rest = rawCa;
 
     auto [caMethod, hashType_] = parseContentAddressMethodPrefix(rest);
@@ -155,7 +157,7 @@ std::string renderContentAddress(std::optional<ContentAddress> ca)
 }
 
 ContentAddress ContentAddress::fromParts(
-    ContentAddressMethod method, Hash hash)
+    ContentAddressMethod method, Hash hash) noexcept
 {
     return std::visit(overloaded {
         [&](TextIngestionMethod _) -> ContentAddress {
@@ -196,7 +198,8 @@ const Hash & ContentAddress::getHash() const
     }, raw);
 }
 
-std::string ContentAddress::printMethodAlgo() const {
+std::string ContentAddress::printMethodAlgo() const
+{
     return getMethod().renderPrefix()
         + printHashType(getHash().type);
 }
@@ -211,7 +214,8 @@ size_t StoreReferences::size() const
     return (self ? 1 : 0) + others.size();
 }
 
-ContentAddressWithReferences ContentAddressWithReferences::withoutRefs(const ContentAddress & ca) {
+ContentAddressWithReferences ContentAddressWithReferences::withoutRefs(const ContentAddress & ca) noexcept
+{
     return std::visit(overloaded {
         [&](const TextHash & h) -> ContentAddressWithReferences {
             return TextInfo {

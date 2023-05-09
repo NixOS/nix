@@ -81,17 +81,30 @@ struct ContentAddressMethod
      * Parse the prefix tag which indicates how the files
      * were ingested, with the fixed output case not prefixed for back
      * compat.
+     *
+     * @param [in] m A string that should begin with the prefix.
+     * @param [out] m The remainder of the string after the prefix.
      */
     static ContentAddressMethod parsePrefix(std::string_view & m);
 
+    /**
+     * Render the prefix tag which indicates how the files wre ingested.
+     *
+     * The rough inverse of `parsePrefix()`.
+     */
     std::string renderPrefix() const;
 
     /**
-     * Parse and pretty print a content addressing method and hash type in a
-     * nicer way, prefixing both cases.
+     * Parse a content addressing method and hash type.
      */
     static std::pair<ContentAddressMethod, HashType> parse(std::string_view rawCaMethod);
 
+    /**
+     * Render a content addressing method and hash type in a
+     * nicer way, prefixing both cases.
+     *
+     * The rough inverse of `parse()`.
+     */
     std::string render(HashType ht) const;
 };
 
@@ -178,7 +191,7 @@ struct ContentAddress
      * @param hash Hash of ingested file system data.
      */
     static ContentAddress fromParts(
-        ContentAddressMethod method, Hash hash);
+        ContentAddressMethod method, Hash hash) noexcept;
 
     ContentAddressMethod getMethod() const;
 
@@ -187,6 +200,10 @@ struct ContentAddress
     std::string printMethodAlgo() const;
 };
 
+/**
+ * Render the `ContentAddress` if it exists to a string, return empty
+ * string otherwise.
+ */
 std::string renderContentAddress(std::optional<ContentAddress> ca);
 
 
