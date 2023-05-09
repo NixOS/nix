@@ -98,6 +98,16 @@ bool LocalOverlayStore::isValidPathUncached(const StorePath & path)
 }
 
 
+std::optional<StorePath> LocalOverlayStore::queryPathFromHashPart(const std::string & hashPart)
+{
+    auto res = LocalStore::queryPathFromHashPart(hashPart);
+    if (res)
+        return res;
+    else
+        return lowerStore->queryPathFromHashPart(hashPart);
+}
+
+
 void LocalOverlayStore::registerValidPaths(const ValidPathInfos & infos)
 {
     // First, get any from lower store so we merge

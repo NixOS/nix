@@ -89,6 +89,8 @@ private:
 
     bool isValidPathUncached(const StorePath & path) override;
 
+    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
+
     void registerValidPaths(const ValidPathInfos & infos) override;
 
     void addToStore(const ValidPathInfo & info, Source & source,
