@@ -121,13 +121,7 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
         else {
             str << "{ ";
             for (auto & i : attrs->lexicographicOrder(symbols)) {
-                // Quote reserved keywords so that the output can be
-                // re-evaluated later without upsetting the lexer.
-                if (isReservedKeyword(symbols[i->name])) {
-                    str << "\"" << symbols[i->name] << "\" = ";
-                } else {
-                    str << symbols[i->name] << " = ";
-                }
+                str << symbols[i->name] << " = ";
                 i->value->print(symbols, str, seen);
                 str << "; ";
             }
