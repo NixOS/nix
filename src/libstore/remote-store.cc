@@ -631,8 +631,8 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         std::visit(overloaded {
             [&](const TextIngestionMethod & thm) -> void {
                 if (hashType != htSHA256)
-                    throw UnimplementedError("Only SHA-256 is supported for adding text-hashed data, but '%1' was given",
-                        printHashType(hashType));
+                    throw UnimplementedError("When adding text-hashed data called '%s', only SHA-256 is supported but '%s' was given",
+                        name, printHashType(hashType));
                 std::string s = dump.drain();
                 conn->to << wopAddTextToStore << name << s;
                 worker_proto::write(*this, conn->to, references);

@@ -408,8 +408,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 return std::visit(overloaded {
                     [&](const TextIngestionMethod &) {
                         if (hashType != htSHA256)
-                            throw UnimplementedError("Only SHA-256 is supported for adding text-hashed data, but '%1' was given",
-                                printHashType(hashType));
+                            throw UnimplementedError("When adding text-hashed data called '%s', only SHA-256 is supported but '%s' was given",
+                                name, printHashType(hashType));
                         // We could stream this by changing Store
                         std::string contents = source.drain();
                         auto path = store->addTextToStore(name, contents, refs, repair);
