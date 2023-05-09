@@ -55,17 +55,25 @@ expect 1 stat $(toRealPath "$storeBTop" "$path")
 # Checking for path in overlay store matching lower layer
 diff $(toRealPath "$storeA/nix/store" "$path") $(toRealPath "$TEST_ROOT/merged-store/nix/store" "$path")
 
-# Verifying path in lower layer
-nix-store --verify-path --store "$storeA" "$path"
+# Checking derivers query agreement
+[[ \
+  $(nix-store --store $storeA --query --deriver $path) \
+  == \
+  $(nix-store --store $storeB --query --deriver $path) \
+  ]]
 
-# Verifying path in merged-store
-nix-store --verify-path --store "$storeB" "$path"
-
+# Checking outputs query agreement
 [[ \
   $(nix-store --store $storeA --query --outputs $drvPath) \
   == \
   $(nix-store --store $storeB --query --outputs $drvPath) \
   ]]
+
+# Verifying path in lower layer
+nix-store --verify-path --store "$storeA" "$path"
+
+# Verifying path in merged-store
+nix-store --verify-path --store "$storeB" "$path"
 
 hashPart=$(echo $path | sed "s^$NIX_STORE_DIR/^^" | sed 's/-.*//')
 
