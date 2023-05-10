@@ -123,7 +123,7 @@ cat > $flakeFollowsA/flake.nix <<EOF
 {
     description = "Flake A";
     inputs = {
-        B.url = "path:../flakeB";
+        B.url = "../flakeB"; # test relative paths without 'path:'
         E.flake = false;
         E.url = "path:./foo.nix";
     };

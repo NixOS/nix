@@ -71,7 +71,8 @@ FlakeRef parseFlakeRef(
     const std::string & url,
     const std::optional<Path> & baseDir = {},
     bool allowMissing = false,
-    bool isFlake = true);
+    bool isFlake = true,
+    bool allowRelative = false);
 
 std::optional<FlakeRef> maybeParseFlake(
     const std::string & url, const std::optional<Path> & baseDir = {});
@@ -80,7 +81,8 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     const std::string & url,
     const std::optional<Path> & baseDir = {},
     bool allowMissing = false,
-    bool isFlake = true);
+    bool isFlake = true,
+    bool allowRelative = false);
 
 std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
     const std::string & url, const std::optional<Path> & baseDir = {});

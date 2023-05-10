@@ -127,7 +127,7 @@ static FlakeInput parseFlakeInput(
         if (!attrs.empty())
             throw Error("unexpected flake input attribute '%s', at %s", attrs.begin()->first, state.positions[pos]);
         if (url)
-            input.ref = parseFlakeRef(*url, {}, true, input.isFlake);
+            input.ref = parseFlakeRef(*url, {}, true, input.isFlake, true);
     }
 
     if (!input.follows && !input.ref)
