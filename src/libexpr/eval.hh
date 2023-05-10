@@ -21,6 +21,7 @@ namespace nix {
 class Store;
 class EvalState;
 class StorePath;
+struct DerivedPath;
 enum RepairFlag : bool;
 
 
@@ -472,6 +473,28 @@ public:
      * Like coerceToPath, but the result must be a store path.
      */
     StorePath coerceToStorePath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx);
+
+    /**
+     * Part of `coerceToDerivedPath()` without any store IO which is exposed for unit testing only.
+     */
+    std::pair<DerivedPath, std::string_view> coerceToDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx);
+
+    /**
+     * Coerce to `DerivedPath`.
+     *
+     * Must be a string which is either a literal store path or a
+     * "placeholder (see `downstreamPlaceholder()`).
+     *
+     * Even more importantly, the string context must be exactly one
+     * element, which is either a `NixStringContextElem::Opaque` or
+     * `NixStringContextElem::Built`. (`NixStringContextEleme::DrvDeep`
+     * is not permitted).
+     *
+     * The string is parsed based on the context --- the context is the
+     * source of truth, and ultimately tells us what we want, and then
+     * we ensure the string corresponds to it.
+     */
+    DerivedPath coerceToDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx);
 
 public:
 
