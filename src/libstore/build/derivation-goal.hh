@@ -306,15 +306,13 @@ struct DerivationGoal : public Goal
      * Update 'initialOutputs' to determine the current status of the
      * outputs of the derivation. Also returns a Boolean denoting
      * whether all outputs are valid and non-corrupt, and a
-     * 'SingleDrvOutputs' structure containing the valid and wanted
-     * outputs.
+     * 'SingleDrvOutputs' structure containing the valid outputs.
      */
     std::pair<bool, SingleDrvOutputs> checkPathValidity();
 
     /**
      * Aborts if any output is not valid or corrupt, and otherwise
-     * returns a 'SingleDrvOutputs' structure containing the wanted
-     * outputs.
+     * returns a 'SingleDrvOutputs' structure containing all outputs.
      */
     SingleDrvOutputs assertPathValidity();
 

@@ -12,6 +12,7 @@
 namespace nix {
 
 class Store;
+struct OutputsSpec;
 
 /**
  * A general `Realisation` key.
@@ -92,6 +93,14 @@ typedef std::map<std::string, Realisation> SingleDrvOutputs;
  * secondly which output of that derivation.
  */
 typedef std::map<DrvOutput, Realisation> DrvOutputs;
+
+/**
+ * Filter a SingleDrvOutputs to include only specific output names
+ *
+ * Moves the `outputs` input.
+ */
+SingleDrvOutputs filterDrvOutputs(const OutputsSpec&, SingleDrvOutputs&&);
+
 
 struct OpaquePath {
     StorePath path;
