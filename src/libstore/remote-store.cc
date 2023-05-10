@@ -597,6 +597,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
     Source & dump,
     std::string_view name,
     ContentAddressMethod caMethod,
+    HashType hashType,
     const StorePathSet & references,
     RepairFlag repair)
 {
@@ -608,7 +609,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         conn->to
             << wopAddToStore
             << name
-            << caMethod.render();
+            << caMethod.render(hashType);
         worker_proto::write(*this, conn->to, references);
         conn->to << repair;
 
@@ -628,26 +629,29 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         if (repair) throw Error("repairing is not supported when building through the Nix daemon protocol < 1.25");
 
         std::visit(overloaded {
-            [&](const TextHashMethod & thm) -> void {
+            [&](const TextIngestionMethod & thm) -> void {
+                if (hashType != htSHA256)
+                    throw UnimplementedError("When adding text-hashed data called '%s', only SHA-256 is supported but '%s' was given",
+                        name, printHashType(hashType));
                 std::string s = dump.drain();
                 conn->to << wopAddTextToStore << name << s;
                 worker_proto::write(*this, conn->to, references);
                 conn.processStderr();
             },
-            [&](const FixedOutputHashMethod & fohm) -> void {
+            [&](const FileIngestionMethod & fim) -> void {
                 conn->to
                     << wopAddToStore
                     << name
-                    << ((fohm.hashType == htSHA256 && fohm.fileIngestionMethod == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
-                    << (fohm.fileIngestionMethod == FileIngestionMethod::Recursive ? 1 : 0)
-                    << printHashType(fohm.hashType);
+                    << ((hashType == htSHA256 && fim == FileIngestionMethod::Recursive) ? 0 : 1) /* backwards compatibility hack */
+                    << (fim == FileIngestionMethod::Recursive ? 1 : 0)
+                    << printHashType(hashType);
 
                 try {
                     conn->to.written = 0;
                     connections->incCapacity();
                     {
                         Finally cleanup([&]() { connections->decCapacity(); });
-                        if (fohm.fileIngestionMethod == FileIngestionMethod::Recursive) {
+                        if (fim == FileIngestionMethod::Recursive) {
                             dump.drainInto(conn->to);
                         } else {
                             std::string contents = dump.drain();
@@ -678,7 +682,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
 StorePath RemoteStore::addToStoreFromDump(Source & dump, std::string_view name,
       FileIngestionMethod method, HashType hashType, RepairFlag repair, const StorePathSet & references)
 {
-    return addCAToStore(dump, name, FixedOutputHashMethod{ .fileIngestionMethod = method, .hashType = hashType }, references, repair)->path;
+    return addCAToStore(dump, name, method, hashType, references, repair)->path;
 }
 
 
@@ -778,7 +782,7 @@ StorePath RemoteStore::addTextToStore(
     RepairFlag repair)
 {
     StringSource source(s);
-    return addCAToStore(source, name, TextHashMethod{}, references, repair)->path;
+    return addCAToStore(source, name, TextIngestionMethod {}, htSHA256, references, repair)->path;
 }
 
 void RemoteStore::registerDrvOutput(const Realisation & info)
