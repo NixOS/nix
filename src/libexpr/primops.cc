@@ -129,39 +129,56 @@ static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, co
     }
 }
 
-/* Add and attribute to the given attribute map from the output name to
-   the output path, or a placeholder.
+/**
+ * Inverse of one of the `EvalState::coerceToDerivedPath()` cases.
+ */
+static void mkOutputString(
+    EvalState & state,
+    Value & value,
+    const StorePath & drvPath,
+    const std::string outputName,
+    std::optional<StorePath> optOutputPath)
+{
+    value.mkString(
+        optOutputPath
+            ? state.store->printStorePath(*std::move(optOutputPath))
+            /* Downstream we would substitute this for an actual path once
+               we build the floating CA derivation */
+            : downstreamPlaceholder(*state.store, drvPath, outputName),
+        NixStringContext {
+            NixStringContextElem::Built {
+                .drvPath = drvPath,
+                .output = outputName,
+            }
+        });
+}
 
-   Where possible the path is used, but for floating CA derivations we
-   may not know it. For sake of determinism we always assume we don't
-   and instead put in a place holder. In either case, however, the
-   string context will contain the drv path and output name, so
-   downstream derivations will have the proper dependency, and in
-   addition, before building, the placeholder will be rewritten to be
-   the actual path.
-
-   The 'drv' and 'drvPath' outputs must correspond. */
+/**
+ * Add and attribute to the given attribute map from the output name to
+ * the output path, or a placeholder.
+ *
+ * Where possible the path is used, but for floating CA derivations we
+ * may not know it. For sake of determinism we always assume we don't
+ * and instead put in a place holder. In either case, however, the
+ * string context will contain the drv path and output name, so
+ * downstream derivations will have the proper dependency, and in
+ * addition, before building, the placeholder will be rewritten to be
+ * the actual path.
+ *
+ * The 'drv' and 'drvPath' outputs must correspond.
+ */
 static void mkOutputString(
     EvalState & state,
     BindingsBuilder & attrs,
     const StorePath & drvPath,
     const std::pair<std::string, DerivationOutput> & o)
 {
-    auto optOutputPath = o.second.path(*state.store, Derivation::nameFromPath(drvPath), o.first);
-    attrs.alloc(o.first).mkString(
-        optOutputPath
-            ? state.store->printStorePath(*optOutputPath)
-            /* Downstream we would substitute this for an actual path once
-               we build the floating CA derivation */
-            /* FIXME: we need to depend on the basic derivation, not
-               derivation */
-            : downstreamPlaceholder(*state.store, drvPath, o.first),
-        NixStringContext {
-            NixStringContextElem::Built {
-                .drvPath = drvPath,
-                .output = o.first,
-            }
-        });
+    mkOutputString(
+        state,
+        attrs.alloc(o.first),
+        drvPath,
+        o.first,
+        o.second.path(*state.store, Derivation::nameFromPath(drvPath), o.first));
 }
 
 /* Load and evaluate an expression from path specified by the
