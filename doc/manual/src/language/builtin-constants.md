@@ -17,3 +17,26 @@ These constants are built into the Nix language evaluator:
   The built-in value `currentSystem` evaluates to the Nix platform
   identifier for the Nix installation on which the expression is being
   evaluated, such as `"i686-linux"` or `"x86_64-darwin"`.
+
+- [`builtins.currentTime`]{#builtins-currentTime} (integer)
+
+  Return the [Unix time](https://en.wikipedia.org/wiki/Unix_time) at first evaluation.
+  Repeated references to that name will re-use the initially obtained value.
+
+  Example:
+
+  ```console
+  $ nix repl
+  Welcome to Nix 2.15.1 Type :? for help.
+
+  nix-repl> builtins.currentTime
+  1683705525
+
+  nix-repl> builtins.currentTime
+  1683705525
+  ```
+
+  > **Warning**
+  >
+  > This is intended for testing and debugging only.
+  > Do not use it in production systems, since an impure, that is, non-constant value will break reproducibility.
