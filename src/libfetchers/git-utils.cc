@@ -132,9 +132,11 @@ int statusCallbackTrampoline(const char * path, unsigned int statusFlags, void *
 
 struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 {
+    CanonPath path;
     Repository repo;
 
-    GitRepoImpl(const CanonPath & path, bool create, bool bare)
+    GitRepoImpl(CanonPath _path, bool create, bool bare)
+        : path(std::move(_path))
     {
         initLibGit2();
 
@@ -429,6 +431,9 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         const std::string & url,
         const std::string & refspec) override
     {
+        /* FIXME: use libgit2. Unfortunately, it doesn't support
+           ssh_config at the moment. */
+        #if 0
         Remote remote;
 
         if (git_remote_create_anonymous(Setter(remote), *this, url.c_str()))
@@ -442,6 +447,20 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
         if (git_remote_fetch(remote.get(), &refspecs2, nullptr, nullptr))
             throw Error("fetching '%s' from '%s': %s", refspec, url, git_error_last()->message);
+        #endif
+
+        // FIXME: git stderr messes up our progress indicator, so
+        // we're using --quiet for now. Should process its stderr.
+        runProgram("git", true,
+            { "-C", path.abs(),
+              "--bare",
+              "fetch",
+              "--quiet",
+              "--force",
+              "--",
+              url,
+              refspec
+            });
     }
 };
 
