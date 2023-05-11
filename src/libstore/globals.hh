@@ -858,7 +858,7 @@ public:
         )"};
 
     Setting<Path> caFile{
-        this, getDefaultSSLCertFile(), "ssl-cert-file",
+        this, "", "ssl-cert-file",
         R"(
           The path of a file containing CA certificates used to
           authenticate `https://` downloads. Nix by default will use
