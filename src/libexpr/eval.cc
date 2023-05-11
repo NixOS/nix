@@ -1047,6 +1047,27 @@ void EvalState::mkStorePathString(const StorePath & p, Value & v)
 }
 
 
+void EvalState::mkOutputString(
+    Value & value,
+    const StorePath & drvPath,
+    const std::string outputName,
+    std::optional<StorePath> optOutputPath)
+{
+    value.mkString(
+        optOutputPath
+            ? store->printStorePath(*std::move(optOutputPath))
+            /* Downstream we would substitute this for an actual path once
+               we build the floating CA derivation */
+            : downstreamPlaceholder(*store, drvPath, outputName),
+        NixStringContext {
+            NixStringContextElem::Built {
+                .drvPath = drvPath,
+                .output = outputName,
+            }
+        });
+}
+
+
 /* Create a thunk for the delayed computation of the given expression
    in the given environment.  But if the expression is a variable,
    then look it up right away.  This significantly reduces the number

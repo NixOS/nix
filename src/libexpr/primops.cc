@@ -130,30 +130,6 @@ static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, co
 }
 
 /**
- * Inverse of one of the `EvalState::coerceToDerivedPath()` cases.
- */
-static void mkOutputString(
-    EvalState & state,
-    Value & value,
-    const StorePath & drvPath,
-    const std::string outputName,
-    std::optional<StorePath> optOutputPath)
-{
-    value.mkString(
-        optOutputPath
-            ? state.store->printStorePath(*std::move(optOutputPath))
-            /* Downstream we would substitute this for an actual path once
-               we build the floating CA derivation */
-            : downstreamPlaceholder(*state.store, drvPath, outputName),
-        NixStringContext {
-            NixStringContextElem::Built {
-                .drvPath = drvPath,
-                .output = outputName,
-            }
-        });
-}
-
-/**
  * Add and attribute to the given attribute map from the output name to
  * the output path, or a placeholder.
  *
@@ -173,8 +149,7 @@ static void mkOutputString(
     const StorePath & drvPath,
     const std::pair<std::string, DerivationOutput> & o)
 {
-    mkOutputString(
-        state,
+    state.mkOutputString(
         attrs.alloc(o.first),
         drvPath,
         o.first,

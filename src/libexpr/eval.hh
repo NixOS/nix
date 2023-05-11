@@ -576,11 +576,36 @@ public:
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, PosIdx pos);
 
-    /* Create a string representing a store path.
-
-       The string is the printed store path with a context containing a single
-       `Opaque` element of that store path. */
+    /**
+     * Create a string representing a store path.
+     *
+     * The string is the printed store path with a context containing a single
+     * `NixStringContextElem::Opaque` element of that store path.
+     */
     void mkStorePathString(const StorePath & storePath, Value & v);
+
+    /**
+     * Create a string representing a `DerivedPath::Built`.
+     *
+     * The string is the printed store path with a context containing a single
+     * `NixStringContextElem::Built` element of the drv path and output name.
+     *
+     * @param value Value we are settings
+     *
+     * @param drvPath Path the drv whose output we are making a string for
+     *
+     * @param outputName Name of the output
+     *
+     * @param optOutputPath Optional output path for that string. Must
+     * be passed if and only if output store object is input-addressed.
+     * Will be printed to form string if passed, otherwise a placeholder
+     * will be used (see `downstreamPlaceholder()`).
+     */
+    void mkOutputString(
+        Value & value,
+        const StorePath & drvPath,
+        const std::string outputName,
+        std::optional<StorePath> optOutputPath);
 
     void concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos, std::string_view errorCtx);
 
