@@ -494,6 +494,7 @@ struct GitInputScheme : InputScheme
                     repo->fetch(repoInfo.url, fmt("%s:%s", fetchRef, fetchRef));
                 } catch (Error & e) {
                     if (!pathExists(localRefFile)) throw;
+                    logError(e.info());
                     warn("could not update local clone of Git repository '%s'; continuing with the most recent version", repoInfo.url);
                 }
 
