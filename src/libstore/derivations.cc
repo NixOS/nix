@@ -1,4 +1,5 @@
 #include "derivations.hh"
+#include "downstream-placeholder.hh"
 #include "store-api.hh"
 #include "globals.hh"
 #include "util.hh"
@@ -810,13 +811,7 @@ std::string hashPlaceholder(const std::string_view outputName)
     return "/" + hashString(htSHA256, concatStrings("nix-output:", outputName)).to_string(Base32, false);
 }
 
-std::string downstreamPlaceholder(const Store & store, const StorePath & drvPath, std::string_view outputName)
-{
-    auto drvNameWithExtension = drvPath.name();
-    auto drvName = drvNameWithExtension.substr(0, drvNameWithExtension.size() - 4);
-    auto clearText = "nix-upstream-output:" + std::string { drvPath.hashPart() } + ":" + outputPathName(drvName, outputName);
-    return "/" + hashString(htSHA256, clearText).to_string(Base32, false);
-}
+
 
 
 static void rewriteDerivation(Store & store, BasicDerivation & drv, const StringMap & rewrites)
@@ -880,7 +875,7 @@ std::optional<BasicDerivation> Derivation::tryResolve(
         for (auto & outputName : inputOutputs) {
             if (auto actualPath = get(inputDrvOutputs, { inputDrv, outputName })) {
                 inputRewrites.emplace(
-                    downstreamPlaceholder(store, inputDrv, outputName),
+                    DownstreamPlaceholder::unknownCaOutput(inputDrv, outputName).render(),
                     store.printStorePath(*actualPath));
                 resolved.inputSrcs.insert(*actualPath);
             } else {

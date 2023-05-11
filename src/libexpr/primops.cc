@@ -1,5 +1,6 @@
 #include "archive.hh"
 #include "derivations.hh"
+#include "downstream-placeholder.hh"
 #include "eval-inline.hh"
 #include "eval.hh"
 #include "globals.hh"
@@ -87,7 +88,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
         auto outputs = resolveDerivedPath(*store, drv);
         for (auto & [outputName, outputPath] : outputs) {
             res.insert_or_assign(
-                downstreamPlaceholder(*store, drv.drvPath, outputName),
+                DownstreamPlaceholder::unknownCaOutput(drv.drvPath, outputName).render(),
                 store->printStorePath(outputPath)
             );
         }

@@ -6,6 +6,7 @@
 #include "hash.hh"
 #include "content-address.hh"
 #include "repair-flag.hh"
+#include "derived-path.hh"
 #include "sync.hh"
 #include "comparator.hh"
 
@@ -494,17 +495,6 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
  * itself, making the hash near-impossible to calculate.
  */
 std::string hashPlaceholder(const std::string_view outputName);
-
-/**
- * This creates an opaque and almost certainly unique string
- * deterministically from a derivation path and output name.
- *
- * It is used as a placeholder to allow derivations to refer to
- * content-addressed paths whose content --- and thus the path
- * themselves --- isn't yet known. This occurs when a derivation has a
- * dependency which is a CA derivation.
- */
-std::string downstreamPlaceholder(const Store & store, const StorePath & drvPath, std::string_view outputName);
 
 extern const Hash impureOutputHash;
 
