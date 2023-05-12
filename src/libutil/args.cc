@@ -86,6 +86,147 @@ void RootArgs::parseCmdline(const Strings & _cmdline)
     Args::parseCmdline(_cmdline, false);
 }
 
+/**
+ * Basically this is `typedef std::optional<Parser> Parser(std::string_view s, Strings & r);`
+ *
+ * Except we can't recursively reference the Parser typedef, so we have to write a class.
+ */
+struct Parser {
+    std::string_view remaining;
+
+    /**
+     * @brief Parse the next character(s)
+     *
+     * @param r
+     * @return std::shared_ptr<Parser>
+     */
+    virtual void operator()(std::shared_ptr<Parser> & state, Strings & r) = 0;
+
+    Parser(std::string_view s) : remaining(s) {};
+};
+
+struct ParseQuoted : public Parser {
+    /**
+     * @brief Accumulated string
+     *
+     * Parsed argument up to this point.
+     */
+    std::string acc;
+
+    ParseQuoted(std::string_view s) : Parser(s) {};
+
+    virtual void operator()(std::shared_ptr<Parser> & state, Strings & r) override;
+};
+
+
+struct ParseUnquoted : public Parser {
+    /**
+     * @brief Accumulated string
+     *
+     * Parsed argument up to this point. Empty string is not representable in
+     * unquoted syntax, so we use it for the initial state.
+     */
+    std::string acc;
+
+    ParseUnquoted(std::string_view s) : Parser(s) {};
+
+    virtual void operator()(std::shared_ptr<Parser> & state, Strings & r) override {
+        if (remaining.empty()) {
+            if (!acc.empty())
+                r.push_back(acc);
+            state = nullptr; // done
+            return;
+        }
+        switch (remaining[0]) {
+            case ' ': case '\t': case '\n': case '\r':
+                if (!acc.empty())
+                    r.push_back(acc);
+                state = std::make_shared<ParseUnquoted>(ParseUnquoted(remaining.substr(1)));
+                return;
+            case '`':
+                if (remaining.size() > 1 && remaining[1] == '`') {
+                    state = std::make_shared<ParseQuoted>(ParseQuoted(remaining.substr(2)));
+                    return;
+                }
+                else
+                    throw Error("single backtick is not a supported syntax in the nix shebang.");
+
+            // reserved characters
+            // meaning to be determined, or may be reserved indefinitely so that
+            // #!nix syntax looks unambiguous
+            case '$':
+            case '*':
+            case '~':
+            case '<':
+            case '>':
+            case '|':
+            case ';':
+            case '(':
+            case ')':
+            case '[':
+            case ']':
+            case '{':
+            case '}':
+            case '\'':
+            case '"':
+            case '\\':
+                throw Error("unsupported unquoted character in nix shebang: " + std::string(1, remaining[0]) + ". Use double backticks to escape?");
+
+            case '#':
+                if (acc.empty()) {
+                    throw Error ("unquoted nix shebang argument cannot start with #. Use double backticks to escape?");
+                } else {
+                    acc += remaining[0];
+                    remaining = remaining.substr(1);
+                    return;
+                }
+
+            default:
+                acc += remaining[0];
+                remaining = remaining.substr(1);
+                return;
+        }
+        assert(false);
+    }
+};
+
+void ParseQuoted::operator()(std::shared_ptr<Parser> &state, Strings & r) {
+    if (remaining.empty()) {
+        throw Error("unterminated quoted string in nix shebang");
+    }
+    switch (remaining[0]) {
+        case '`':
+            if (remaining.size() > 1 && remaining[1] == '`') {
+                state = std::make_shared<ParseUnquoted>(ParseUnquoted(remaining.substr(2)));
+                r.push_back(acc);
+                return;
+            }
+            else {
+                acc += remaining[0];
+                remaining = remaining.substr(1);
+                return;
+            }
+        default:
+            acc += remaining[0];
+            remaining = remaining.substr(1);
+            return;
+    }
+    assert(false);
+}
+
+static Strings parseShebangContent(std::string_view s) {
+    Strings result;
+    std::shared_ptr<Parser> parserState(std::make_shared<ParseUnquoted>(ParseUnquoted(s)));
+
+    // trampoline == iterated strategy pattern
+    while (parserState) {
+        auto currentState = parserState;
+        (*currentState)(parserState, result);
+    }
+
+    return result;
+}
+
 void Args::parseCmdline(const Strings & _cmdline, bool allowShebang)
 {
     Strings pendingArgs;
@@ -121,13 +262,18 @@ void Args::parseCmdline(const Strings & _cmdline, bool allowShebang)
                 std::string line;
                 std::getline(stream,line);
                 static const std::string commentChars("#/\\%@*-");
+                std::string shebangContent;
                 while (std::getline(stream,line) && !line.empty() && commentChars.find(line[0]) != std::string::npos){
                     line = chomp(line);
 
                     std::smatch match;
-                    if (std::regex_match(line, match, std::regex("^#!\\s*nix\\s(.*)$")))
-                        for (const auto & word : shellwords(match[1].str()))
-                            cmdline.push_back(word);
+                    // We match one space after `nix` so that we preserve indentation.
+                    // No space is necessary for an empty line. An empty line has basically no effect.
+                    if (std::regex_match(line, match, std::regex("^#!\\s*nix(:? |$)(.*)$")))
+                        shebangContent += match[2].str() + "\n";
+                }
+                for (const auto & word : parseShebangContent(shebangContent)) {
+                    cmdline.push_back(word);
                 }
                 cmdline.push_back(script);
                 for (auto pos = savedArgs.begin(); pos != savedArgs.end();pos++)
