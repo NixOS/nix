@@ -1102,7 +1102,7 @@ drvName, Bindings * attrs, Value & v)
     bool isImpure = false;
     std::optional<std::string> outputHash;
     std::string outputHashAlgo;
-    std::optional<FileIngestionMethod> ingestionMethod;
+    std::optional<ContentAddressMethod> ingestionMethod;
 
     StringSet outputs;
     outputs.insert("out");
@@ -1115,7 +1115,10 @@ drvName, Bindings * attrs, Value & v)
         auto handleHashMode = [&](const std::string_view s) {
             if (s == "recursive") ingestionMethod = FileIngestionMethod::Recursive;
             else if (s == "flat") ingestionMethod = FileIngestionMethod::Flat;
-            else
+            else if (s == "text") {
+                experimentalFeatureSettings.require(Xp::DynamicDerivations);
+                ingestionMethod = TextIngestionMethod {};
+            } else
                 state.debugThrowLastTrace(EvalError({
                     .msg = hintfmt("invalid value '%s' for 'outputHashMode' attribute", s),
                     .errPos = state.positions[noPos]
@@ -1282,11 +1285,16 @@ drvName, Bindings * attrs, Value & v)
         }));
 
     /* Check whether the derivation name is valid. */
-    if (isDerivation(drvName))
+    if (isDerivation(drvName) &&
+        !(ingestionMethod == ContentAddressMethod { TextIngestionMethod { } } &&
+          outputs.size() == 1 &&
+          *(outputs.begin()) == "out"))
+    {
         state.debugThrowLastTrace(EvalError({
-            .msg = hintfmt("derivation names are not allowed to end in '%s'", drvExtension),
+            .msg = hintfmt("derivation names are allowed to end in '%s' only if they produce a single derivation file", drvExtension),
             .errPos = state.positions[noPos]
         }));
+    }
 
     if (outputHash) {
         /* Handle fixed-output derivations.
@@ -1302,21 +1310,15 @@ drvName, Bindings * attrs, Value & v)
         auto h = newHashAllowEmpty(*outputHash, parseHashTypeOpt(outputHashAlgo));
 
         auto method = ingestionMethod.value_or(FileIngestionMethod::Flat);
-        auto outPath = state.store->makeFixedOutputPath(drvName, FixedOutputInfo {
-            .hash = {
-                .method = method,
-                .hash = h,
-            },
-            .references = {},
-        });
-        drv.env["out"] = state.store->printStorePath(outPath);
-        drv.outputs.insert_or_assign("out",
-            DerivationOutput::CAFixed {
-                .hash = FixedOutputHash {
-                    .method = method,
-                    .hash = std::move(h),
-                },
-            });
+
+        DerivationOutput::CAFixed dof {
+            .ca = ContentAddress::fromParts(
+                std::move(method),
+                std::move(h)),
+        };
+
+        drv.env["out"] = state.store->printStorePath(dof.path(*state.store, drvName, "out"));
+        drv.outputs.insert_or_assign("out", std::move(dof));
     }
 
     else if (contentAddressed || isImpure) {
@@ -1334,13 +1336,13 @@ drvName, Bindings * attrs, Value & v)
             if (isImpure)
                 drv.outputs.insert_or_assign(i,
                     DerivationOutput::Impure {
-                        .method = method,
+                        .method = method.raw,
                         .hashType = ht,
                     });
             else
                 drv.outputs.insert_or_assign(i,
                     DerivationOutput::CAFloating {
-                        .method = method,
+                        .method = method.raw,
                         .hashType = ht,
                     });
         }

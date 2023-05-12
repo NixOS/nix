@@ -12,7 +12,7 @@ struct ExperimentalFeatureDetails
     std::string_view description;
 };
 
-constexpr std::array<ExperimentalFeatureDetails, 12> xpFeatureDetails = {{
+constexpr std::array<ExperimentalFeatureDetails, 13> xpFeatureDetails = {{
     {
         .tag = Xp::CaDerivations,
         .name = "ca-derivations",
@@ -197,6 +197,16 @@ constexpr std::array<ExperimentalFeatureDetails, 12> xpFeatureDetails = {{
             `nix-daemon`. This is useful for testing, but possibly also
             useful for various experiments with `nix-daemon --stdio`
             networking.
+        )",
+    },
+    {
+        .tag = Xp::DynamicDerivations,
+        .name = "dynamic-derivations",
+        .description = R"(
+            Allow the use of a few things related to dynamic derivations:
+
+              - "text hashing" derivation outputs, so we can build .drv
+                files.
         )",
     },
 }};

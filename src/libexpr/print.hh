@@ -36,6 +36,12 @@ namespace nix {
     std::ostream & printAttributeName(std::ostream & o, std::string_view s);
 
     /**
+     * Returns `true' is a string is a reserved keyword which requires quotation
+     * when printing attribute set field names.
+     */
+    bool isReservedKeyword(const std::string_view str);
+
+    /**
      * Print a string as an identifier in the Nix expression language syntax.
      *
      * FIXME: "identifier" is ambiguous. Identifiers do not have a single

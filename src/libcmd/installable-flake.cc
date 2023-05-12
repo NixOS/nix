@@ -234,7 +234,7 @@ FlakeRef InstallableFlake::nixpkgsFlakeRef() const
         }
     }
 
-    return InstallableValue::nixpkgsFlakeRef();
+    return defaultNixpkgsFlakeRef();
 }
 
 }

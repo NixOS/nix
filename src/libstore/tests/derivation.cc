@@ -26,6 +26,14 @@ class CaDerivationTest : public DerivationTest
     }
 };
 
+class DynDerivationTest : public DerivationTest
+{
+    void SetUp() override
+    {
+        mockXpSettings.set("experimental-features", "dynamic-derivations ca-derivations");
+    }
+};
+
 class ImpureDerivationTest : public DerivationTest
 {
     void SetUp() override
@@ -66,15 +74,42 @@ TEST_JSON(DerivationTest, inputAddressed,
     }),
     "drv-name", "output-name")
 
-TEST_JSON(DerivationTest, caFixed,
+TEST_JSON(DerivationTest, caFixedFlat,
+    R"({
+        "hashAlgo": "sha256",
+        "hash": "894517c9163c896ec31a2adbd33c0681fd5f45b2c0ef08a64c92a03fb97f390f",
+        "path": "/nix/store/rhcg9h16sqvlbpsa6dqm57sbr2al6nzg-drv-name-output-name"
+    })",
+    (DerivationOutput::CAFixed {
+        .ca = FixedOutputHash {
+            .method = FileIngestionMethod::Flat,
+            .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
+        },
+    }),
+    "drv-name", "output-name")
+
+TEST_JSON(DerivationTest, caFixedNAR,
     R"({
         "hashAlgo": "r:sha256",
         "hash": "894517c9163c896ec31a2adbd33c0681fd5f45b2c0ef08a64c92a03fb97f390f",
         "path": "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-drv-name-output-name"
     })",
     (DerivationOutput::CAFixed {
-        .hash = {
+        .ca = FixedOutputHash {
             .method = FileIngestionMethod::Recursive,
+            .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
+        },
+    }),
+    "drv-name", "output-name")
+
+TEST_JSON(DynDerivationTest, caFixedText,
+    R"({
+        "hashAlgo": "text:sha256",
+        "hash": "894517c9163c896ec31a2adbd33c0681fd5f45b2c0ef08a64c92a03fb97f390f",
+        "path": "/nix/store/6s1zwabh956jvhv4w9xcdb5jiyanyxg1-drv-name-output-name"
+    })",
+    (DerivationOutput::CAFixed {
+        .ca = TextHash {
             .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
         },
     }),

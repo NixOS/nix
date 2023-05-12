@@ -34,6 +34,17 @@ typedef std::set<WeakGoalPtr, std::owner_less<WeakGoalPtr>> WeakGoals;
  */
 typedef std::map<StorePath, WeakGoalPtr> WeakGoalMap;
 
+/**
+ * Used as a hint to the worker on how to schedule a particular goal. For example,
+ * builds are typically CPU- and memory-bound, while substitutions are I/O bound.
+ * Using this information, the worker might decide to schedule more or fewer goals
+ * of each category in parallel.
+ */
+enum struct JobCategory {
+    Build,
+    Substitution,
+};
+
 struct Goal : public std::enable_shared_from_this<Goal>
 {
     typedef enum {ecBusy, ecSuccess, ecFailed, ecNoSubstituters, ecIncompleteClosure} ExitCode;
@@ -150,6 +161,8 @@ public:
     void amDone(ExitCode result, std::optional<Error> ex = {});
 
     virtual void cleanup() { }
+
+    virtual JobCategory jobCategory() = 0;
 };
 
 void addToWeakGoals(WeakGoals & goals, GoalPtr p);

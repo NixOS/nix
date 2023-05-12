@@ -115,6 +115,8 @@ public:
     void handleEOF(int fd) override;
 
     void cleanup() override;
+
+    JobCategory jobCategory() override { return JobCategory::Substitution; };
 };
 
 }

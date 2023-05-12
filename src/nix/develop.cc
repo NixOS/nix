@@ -252,7 +252,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     throw Error("get-env.sh failed to produce an environment");
 }
 
-struct Common : InstallableValueCommand, MixProfile
+struct Common : InstallableCommand, MixProfile
 {
     std::set<std::string> ignoreVars{
         "BASHOPTS",
@@ -374,7 +374,7 @@ struct Common : InstallableValueCommand, MixProfile
         return res;
     }
 
-    StorePath getShellOutPath(ref<Store> store, ref<InstallableValue> installable)
+    StorePath getShellOutPath(ref<Store> store, ref<Installable> installable)
     {
         auto path = installable->getStorePath();
         if (path && hasSuffix(path->to_string(), "-env"))
@@ -393,7 +393,7 @@ struct Common : InstallableValueCommand, MixProfile
     }
 
     std::pair<BuildEnvironment, std::string>
-    getBuildEnvironment(ref<Store> store, ref<InstallableValue> installable)
+    getBuildEnvironment(ref<Store> store, ref<Installable> installable)
     {
         auto shellOutPath = getShellOutPath(store, installable);
 
@@ -481,7 +481,7 @@ struct CmdDevelop : Common, MixEnvironment
           ;
     }
 
-    void run(ref<Store> store, ref<InstallableValue> installable) override
+    void run(ref<Store> store, ref<Installable> installable) override
     {
         auto [buildEnvironment, gcroot] = getBuildEnvironment(store, installable);
 
@@ -538,10 +538,14 @@ struct CmdDevelop : Common, MixEnvironment
             nixpkgsLockFlags.inputOverrides = {};
             nixpkgsLockFlags.inputUpdates = {};
 
+            auto nixpkgs = defaultNixpkgsFlakeRef();
+            if (auto * i = dynamic_cast<const InstallableFlake *>(&*installable))
+                nixpkgs = i->nixpkgsFlakeRef();
+
             auto bashInstallable = make_ref<InstallableFlake>(
                 this,
                 state,
-                installable->nixpkgsFlakeRef(),
+                std::move(nixpkgs),
                 "bashInteractive",
                 DefaultOutputs(),
                 Strings{},
@@ -607,7 +611,7 @@ struct CmdPrintDevEnv : Common, MixJSON
 
     Category category() override { return catUtility; }
 
-    void run(ref<Store> store, ref<InstallableValue> installable) override
+    void run(ref<Store> store, ref<Installable> installable) override
     {
         auto buildEnvironment = getBuildEnvironment(store, installable).first;
 

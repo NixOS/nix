@@ -2426,37 +2426,51 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 throw BuildError(
                     "output path %1% without valid stats info",
                     actualPath);
-            if (outputHash.method == FileIngestionMethod::Flat) {
+            if (outputHash.method == ContentAddressMethod { FileIngestionMethod::Flat } ||
+                outputHash.method == ContentAddressMethod { TextIngestionMethod {} })
+            {
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st->st_mode) || (st->st_mode & S_IXUSR) != 0)
                     throw BuildError(
                         "output path '%1%' should be a non-executable regular file "
-                        "since recursive hashing is not enabled (outputHashMode=flat)",
+                        "since recursive hashing is not enabled (one of outputHashMode={flat,text} is true)",
                         actualPath);
             }
             rewriteOutput();
             /* FIXME optimize and deduplicate with addToStore */
             std::string oldHashPart { scratchPath->hashPart() };
             HashModuloSink caSink { outputHash.hashType, oldHashPart };
-            switch (outputHash.method) {
-            case FileIngestionMethod::Recursive:
-                dumpPath(actualPath, caSink);
-                break;
-            case FileIngestionMethod::Flat:
-                readFile(actualPath, caSink);
-                break;
-            }
+            std::visit(overloaded {
+                [&](const TextIngestionMethod &) {
+                    readFile(actualPath, caSink);
+                },
+                [&](const FileIngestionMethod & m2) {
+                    switch (m2) {
+                    case FileIngestionMethod::Recursive:
+                        dumpPath(actualPath, caSink);
+                        break;
+                    case FileIngestionMethod::Flat:
+                        readFile(actualPath, caSink);
+                        break;
+                    }
+                },
+            }, outputHash.method.raw);
             auto got = caSink.finish().first;
+
+            auto optCA = ContentAddressWithReferences::fromPartsOpt(
+                outputHash.method,
+                std::move(got),
+                rewriteRefs());
+            if (!optCA) {
+                // TODO track distinct failure modes separately (at the time of
+                // writing there is just one but `nullopt` is unclear) so this
+                // message can't get out of sync.
+                throw BuildError("output path '%s' has illegal content address, probably a spurious self-reference with text hashing");
+            }
             ValidPathInfo newInfo0 {
                 worker.store,
                 outputPathName(drv->name, outputName),
-                FixedOutputInfo {
-                    .hash = {
-                        .method = outputHash.method,
-                        .hash = got,
-                    },
-                    .references = rewriteRefs(),
-                },
+                *std::move(optCA),
                 Hash::dummy,
             };
             if (*scratchPath != newInfo0.path) {
@@ -2503,13 +2517,14 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             },
 
             [&](const DerivationOutput::CAFixed & dof) {
+                auto wanted = dof.ca.getHash();
+
                 auto newInfo0 = newInfoFromCA(DerivationOutput::CAFloating {
-                    .method = dof.hash.method,
-                    .hashType = dof.hash.hash.type,
+                    .method = dof.ca.getMethod(),
+                    .hashType = wanted.type,
                 });
 
                 /* Check wanted hash */
-                const Hash & wanted = dof.hash.hash;
                 assert(newInfo0.ca);
                 auto got = newInfo0.ca->getHash();
                 if (wanted != got) {
@@ -2522,6 +2537,11 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                             wanted.to_string(SRI, true),
                             got.to_string(SRI, true)));
                 }
+                if (!newInfo0.references.empty())
+                    delayedException = std::make_exception_ptr(
+                        BuildError("illegal path references in fixed-output derivation '%s'",
+                            worker.store.printStorePath(drvPath)));
+
                 return newInfo0;
             },
 
@@ -2701,8 +2721,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             signRealisation(thisRealisation);
             worker.store.registerDrvOutput(thisRealisation);
         }
-        if (wantedOutputs.contains(outputName))
-            builtOutputs.emplace(outputName, thisRealisation);
+        builtOutputs.emplace(outputName, thisRealisation);
     }
 
     return builtOutputs;

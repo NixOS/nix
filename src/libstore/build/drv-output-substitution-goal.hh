@@ -21,7 +21,7 @@ class Worker;
 class DrvOutputSubstitutionGoal : public Goal {
 
     /**
-     * The drv output we're trying to substitue
+     * The drv output we're trying to substitute
      */
     DrvOutput id;
 
@@ -72,6 +72,8 @@ public:
 
     void work() override;
     void handleEOF(int fd) override;
+
+    JobCategory jobCategory() override { return JobCategory::Substitution; };
 };
 
 }
