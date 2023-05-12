@@ -24,6 +24,16 @@ class AddCompletions;
 
 class Args
 {
+    /**
+     * @brief The command's "working directory", but only set when top level.
+     *
+     * Use getCommandBaseDir() to get the directory regardless of whether this
+     * is a top-level command or subcommand.
+     *
+     * @see getCommandBaseDir()
+     */
+    Path commandBaseDir = ".";
+
 public:
 
     /**
@@ -43,6 +53,16 @@ public:
      * Return documentation about this command, in Markdown format.
      */
     virtual std::string doc() { return ""; }
+
+    /**
+     * @brief Get the base directory for the command.
+     *
+     * @return Generally the working directory, but in case of a shebang
+     *         interpreter, returns the directory of the script.
+     *
+     * This only returns the correct value after parseCmdline() has run.
+     */
+    Path getCommandBaseDir() const;
 
 protected:
 
