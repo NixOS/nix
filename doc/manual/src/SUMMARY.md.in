@@ -96,7 +96,7 @@
       - [manifest.json](command-ref/files/manifest.json.md)
     - [Channels](command-ref/files/channels.md)
     - [Default Nix expression](command-ref/files/default-nix-expression.md)
-- [Archititecture](architecture.md)
+- [Architecture](architecture/architecture.md)
 - [Glossary](glossary.md)
 - [Contributing](contributing/contributing.md)
   - [Hacking](contributing/hacking.md)
