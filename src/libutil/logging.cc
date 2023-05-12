@@ -10,6 +10,11 @@ namespace nix {
 
 LoggerSettings loggerSettings;
 
+LoggerSettings::LoggerSettings()
+{
+    printBuildLogs.shortName = 'L';
+}
+
 static GlobalConfig::Register rLoggerSettings(&loggerSettings);
 
 static thread_local ActivityId curActivity = 0;

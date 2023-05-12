@@ -78,15 +78,6 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         });
 
         addFlag({
-            .longName = "print-build-logs",
-            .shortName = 'L',
-            .description = "Print full build logs on standard error.",
-            .category = loggingCategory,
-            .handler = {[&]() { logger->setPrintBuildLogs(true); }},
-            .experimentalFeature = Xp::NixCommand,
-        });
-
-        addFlag({
             .longName = "version",
             .description = "Show version information.",
             .category = miscCategory,
@@ -401,6 +392,8 @@ void mainWrapped(int argc, char * * argv)
     } catch (UsageError &) {
         if (!args.helpRequested && !completions) throw;
     }
+
+    logger->setPrintBuildLogs(loggerSettings.printBuildLogs);
 
     if (args.helpRequested) {
         std::vector<std::string> subcommand;

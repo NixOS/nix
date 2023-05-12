@@ -46,6 +46,14 @@ struct LoggerSettings : Config
           Whether Nix should print out a stack trace in case of Nix
           expression evaluation errors.
         )"};
+
+    Setting<bool> printBuildLogs{
+        this, false, "print-build-logs",
+        R"(
+          Print full build logs on standard error.
+        )"};
+
+    LoggerSettings();
 };
 
 extern LoggerSettings loggerSettings;
