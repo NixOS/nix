@@ -98,6 +98,18 @@ nix develop -f "$shellDotNix" shellDrv -c echo foo |& grepQuiet foo
 nix print-dev-env -f "$shellDotNix" shellDrv > $TEST_ROOT/dev-env.sh
 nix print-dev-env -f "$shellDotNix" shellDrv --json > $TEST_ROOT/dev-env.json
 
+# Test with raw drv
+
+shellDrv=$(nix-instantiate "$shellDotNix" -A shellDrv.out)
+
+nix develop $shellDrv -c bash -c '[[ -n $stdenv ]]'
+
+nix print-dev-env $shellDrv > $TEST_ROOT/dev-env2.sh
+nix print-dev-env $shellDrv --json > $TEST_ROOT/dev-env2.json
+
+diff $TEST_ROOT/dev-env{,2}.sh
+diff $TEST_ROOT/dev-env{,2}.json
+
 # Ensure `nix print-dev-env --json` contains variable assignments.
 [[ $(jq -r .variables.arr1.value[2] $TEST_ROOT/dev-env.json) = '3 4' ]]
 
