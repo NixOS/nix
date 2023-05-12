@@ -88,7 +88,7 @@ MixFlakeOptions::MixFlakeOptions()
             lockFlags.writeLockFile = false;
             lockFlags.inputOverrides.insert_or_assign(
                 flake::parseInputPath(inputPath),
-                parseFlakeRef(flakeRef, absPath("."), true));
+                parseFlakeRef(flakeRef, absPath(getCommandBaseDir()), true));
         }},
         .completer = {[&](AddCompletions & completions, size_t n, std::string_view prefix) {
             if (n == 0) {
@@ -130,7 +130,7 @@ MixFlakeOptions::MixFlakeOptions()
             auto evalState = getEvalState();
             auto flake = flake::lockFlake(
                 *evalState,
-                parseFlakeRef(flakeRef, absPath(".")),
+                parseFlakeRef(flakeRef, absPath(getCommandBaseDir())),
                 { .writeLockFile = false });
             for (auto & [inputName, input] : flake.lockFile.root->inputs) {
                 auto input2 = flake.lockFile.findInput({inputName}); // resolve 'follows' nodes
@@ -294,7 +294,7 @@ void completeFlakeRefWithFragment(
                 prefixRoot = ".";
             }
             auto flakeRefS = std::string(prefix.substr(0, hash));
-            auto flakeRef = parseFlakeRef(expandTilde(flakeRefS), absPath("."));
+            auto flakeRef = parseFlakeRef(expandTilde(flakeRefS), absPath(getCommandBaseDir()));
 
             auto evalCache = openEvalCache(*evalState,
                 std::make_shared<flake::LockedFlake>(lockFlake(*evalState, flakeRef, lockFlags)));
@@ -482,7 +482,7 @@ Installables SourceExprCommand::parseInstallables(
             }
 
             try {
-                auto [flakeRef, fragment] = parseFlakeRefWithFragment(std::string { prefix }, absPath("."));
+                auto [flakeRef, fragment] = parseFlakeRefWithFragment(std::string { prefix }, absPath(getCommandBaseDir()));
                 result.push_back(make_ref<InstallableFlake>(
                         this,
                         getEvalState(),
@@ -756,7 +756,7 @@ std::vector<FlakeRef> RawInstallablesCommand::getFlakeRefsForCompletion()
     for (auto i : rawInstallables)
         res.push_back(parseFlakeRefWithFragment(
             expandTilde(i),
-            absPath(".")).first);
+            absPath(getCommandBaseDir())).first);
     return res;
 }
 
@@ -778,7 +778,7 @@ std::vector<FlakeRef> InstallableCommand::getFlakeRefsForCompletion()
     return {
         parseFlakeRefWithFragment(
             expandTilde(_installable),
-            absPath(".")).first
+            absPath(getCommandBaseDir())).first
     };
 }
 
