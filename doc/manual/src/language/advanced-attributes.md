@@ -320,16 +320,6 @@ Derivations can declare some infrequently used optional attributes.
     ```
 
   - [`unsafeDiscardReferences`]{#adv-attr-unsafeDiscardReferences}\
-    > **Warning**
-    > This attribute is part of an [experimental feature](@docroot@/contributing/experimental-features.md).
-    >
-    > To use this attribute, you must enable the
-    > [`discard-references`](@docroot@/contributing/experimental-features.md#xp-feature-discard-references) experimental feature.
-    > For example, in [nix.conf](../command-ref/conf-file.md) you could add:
-    >
-    > ```
-    > extra-experimental-features = discard-references
-    > ```
 
     When using [structured attributes](#adv-attr-structuredAttrs), the
     attribute `unsafeDiscardReferences` is an attribute set with a boolean value for each output name.
