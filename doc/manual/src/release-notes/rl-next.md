@@ -4,6 +4,7 @@
   contents of any `#! nix` lines and the script's location to a single call.
 
   Verbatim strings may be passed in double backtick (```` `` ````) quotes.
+  `--expr` resolves relative paths based on the shebang script location.
 
   Some examples:
   ```
