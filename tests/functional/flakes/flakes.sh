@@ -123,6 +123,25 @@ echo "$@"
 EOF
 chmod +x $nonFlakeDir/shebang-inline-expr.sh
 
+cat > $nonFlakeDir/fooScript.nix <<"EOF"
+let flake = (builtins.getFlake (toString ../flake1)).packages;
+    fooScript = flake.${builtins.currentSystem}.fooScript;
+ in fooScript
+EOF
+
+cat > $nonFlakeDir/shebang-file.sh <<EOF
+#! $(type -P env) nix
+EOF
+cat >> $nonFlakeDir/shebang-file.sh <<"EOF"
+#! nix --offline shell
+#! nix --impure --file ./fooScript.nix
+#! nix --no-write-lock-file --command bash
+set -ex
+foo
+echo "$@"
+EOF
+chmod +x $nonFlakeDir/shebang-file.sh
+
 # Construct a custom registry, additionally test the --registry flag
 nix registry add --registry "$registry" flake1 "git+file://$flake1Dir"
 nix registry add --registry "$registry" flake2 "git+file://$percentEncodedFlake2Dir"
@@ -571,4 +590,5 @@ expectStderr 1 nix flake metadata "$flake2Dir" --no-allow-dirty --reference-lock
 [[ $($nonFlakeDir/shebang.sh "bar") = "foo"$'\n'"bar" ]]
 [[ $($nonFlakeDir/shebang-comments.sh ) = "foo" ]]
 [[ $($nonFlakeDir/shebang-inline-expr.sh baz) = "foo"$'\n'"baz" ]]
+[[ $($nonFlakeDir/shebang-file.sh baz) = "foo"$'\n'"baz" ]]
 expect 1 $nonFlakeDir/shebang-reject.sh 2>&1 | grepQuiet -F 'error: unsupported unquoted character in nix shebang: *. Use double backticks to escape?'
