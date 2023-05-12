@@ -27,7 +27,7 @@ public:
 
     /* Parse the command line with argv0, throwing a UsageError if something
        goes wrong. */
-    void parseCmdline(const std::string & argv0, const Strings & cmdline);
+    void parseCmdline(const Strings & _cmdline, bool allowShebang);
 
     /* Return a short one-line description of the command. */
     virtual std::string description() { return ""; }

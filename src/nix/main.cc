@@ -17,6 +17,7 @@
 #include <ifaddrs.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <regex>
 
 #include <nlohmann/json.hpp>
 
@@ -397,7 +398,9 @@ void mainWrapped(int argc, char * * argv)
     });
 
     try {
-        args.parseCmdline(programName, argvToStrings(argc, argv));
+        auto isNixCommand = std::regex_search(programName, std::regex("nix$"));
+        auto allowShebang = isNixCommand && argc > 1;
+        args.parseCmdline(argvToStrings(argc, argv),allowShebang);
     } catch (UsageError &) {
         if (!args.helpRequested && !completions) throw;
     }

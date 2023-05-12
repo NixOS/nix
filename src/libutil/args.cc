@@ -67,10 +67,10 @@ static std::optional<std::string> needsCompletion(std::string_view s)
 void Args::parseCmdline(const Strings & _cmdline)
 {
     // Default via 5.1.2.2.1 in C standard
-    Args::parseCmdline("", _cmdline);
+    Args::parseCmdline(_cmdline, false);
 }
 
-void Args::parseCmdline(const std::string & programName, const Strings & _cmdline)
+void Args::parseCmdline(const Strings & _cmdline, bool allowShebang)
 {
     Strings pendingArgs;
     bool dashDash = false;
@@ -91,8 +91,7 @@ void Args::parseCmdline(const std::string & programName, const Strings & _cmdlin
     // if we have at least one argument, it's the name of an
     // executable file, and it starts with "#!".
     Strings savedArgs;
-    auto isNixCommand = std::regex_search(programName, std::regex("nix$"));
-    if (isNixCommand && cmdline.size() > 0) {
+    if (allowShebang){
         auto script = *cmdline.begin();
         try {
             std::ifstream stream(script);
@@ -105,7 +104,7 @@ void Args::parseCmdline(const std::string & programName, const Strings & _cmdlin
 
                 std::string line;
                 std::getline(stream,line);
-                std::string commentChars("#/\\%@*-");
+                static const std::string commentChars("#/\\%@*-");
                 while (std::getline(stream,line) && !line.empty() && commentChars.find(line[0]) != std::string::npos){
                     line = chomp(line);
 
