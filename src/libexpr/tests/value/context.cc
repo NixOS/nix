@@ -95,13 +95,15 @@ Gen<NixStringContextElem::Built> Arbitrary<NixStringContextElem::Built>::arbitra
 
 Gen<NixStringContextElem> Arbitrary<NixStringContextElem>::arbitrary()
 {
-    switch (*gen::inRange<uint8_t>(0, 2)) {
+    switch (*gen::inRange<uint8_t>(0, std::variant_size_v<NixStringContextElem::Raw>)) {
     case 0:
         return gen::just<NixStringContextElem>(*gen::arbitrary<NixStringContextElem::Opaque>());
     case 1:
         return gen::just<NixStringContextElem>(*gen::arbitrary<NixStringContextElem::DrvDeep>());
-    default:
+    case 2:
         return gen::just<NixStringContextElem>(*gen::arbitrary<NixStringContextElem::Built>());
+    default:
+        assert(false);
     }
 }
 
