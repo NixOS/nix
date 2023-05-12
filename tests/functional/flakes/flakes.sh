@@ -80,6 +80,7 @@ chmod +x "$nonFlakeDir/shebang.sh"
 git -C "$nonFlakeDir" add README.md shebang.sh
 git -C "$nonFlakeDir" commit -m 'Initial'
 
+# this also tests a fairly trivial double backtick quoted string, ``--command``
 cat > $nonFlakeDir/shebang-comments.sh <<EOF
 #! $(type -P env) nix
 # some comments
@@ -87,10 +88,22 @@ cat > $nonFlakeDir/shebang-comments.sh <<EOF
 # some comments
 #! nix --offline shell
 #! nix flake1#fooScript
-#! nix --no-write-lock-file --command bash
+#! nix --no-write-lock-file ``--command`` bash
 foo
 EOF
 chmod +x $nonFlakeDir/shebang-comments.sh
+
+cat > $nonFlakeDir/shebang-reject.sh <<EOF
+#! $(type -P env) nix
+# some comments
+# some comments
+# some comments
+#! nix --offline shell *
+#! nix flake1#fooScript
+#! nix --no-write-lock-file --command bash
+foo
+EOF
+chmod +x $nonFlakeDir/shebang-reject.sh
 
 # Construct a custom registry, additionally test the --registry flag
 nix registry add --registry "$registry" flake1 "git+file://$flake1Dir"
@@ -539,3 +552,4 @@ expectStderr 1 nix flake metadata "$flake2Dir" --no-allow-dirty --reference-lock
 [[ $($nonFlakeDir/shebang.sh) = "foo" ]]
 [[ $($nonFlakeDir/shebang.sh "bar") = "foo"$'\n'"bar" ]]
 [[ $($nonFlakeDir/shebang-comments.sh ) = "foo" ]]
+expect 1 $nonFlakeDir/shebang-reject.sh 2>&1 | grepQuiet -F 'error: unsupported unquoted character in nix shebang: *. Use double backticks to escape?'

@@ -2,10 +2,13 @@
 
 - The experimental nix command is now a `#!-interpreter` by appending the
   contents of any `#! nix` lines and the script's location to a single call.
+
+  Verbatim strings may be passed in double backtick (```` `` ````) quotes.
+
   Some examples:
   ```
   #!/usr/bin/env nix
-  #! nix shell --file "<nixpkgs>" hello --command bash
+  #! nix shell --file ``<nixpkgs>`` hello --command bash
 
   hello | cowsay
   ```
@@ -19,8 +22,10 @@
   or
   ```bash
   #! /usr/bin/env nix
-  #! nix shell --impure --expr
-  #! nix "with (import (builtins.getFlake ''nixpkgs'') {}); terraform.withPlugins (plugins: [ plugins.openstack ])"
+  #! nix shell --impure --expr ``
+  #! nix with (import (builtins.getFlake "nixpkgs") {});
+  #! nix terraform.withPlugins (plugins: [ plugins.openstack ])
+  #! nix ``
   #! nix --command bash
 
   terraform "$@"

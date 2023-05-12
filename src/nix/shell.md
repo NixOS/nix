@@ -109,8 +109,10 @@ package like Terraform:
 
 ```bash
 #! /usr/bin/env nix
-#! nix shell --impure --expr
-#! nix "with (import (builtins.getFlake ''nixpkgs'') {}); terraform.withPlugins (plugins: [ plugins.openstack ])"
+#! nix shell --impure --expr ``
+#! nix with (import (builtins.getFlake ''nixpkgs'') {});
+#! nix terraform.withPlugins (plugins: [ plugins.openstack ])
+#! nix ``
 #! nix --command bash
 
 terraform "$@"
@@ -118,7 +120,7 @@ terraform "$@"
 
 > **Note**
 >
-> You must use double quotes (`"`) when passing a simple Nix expression
+> You must use double backticks (```` `` ````) when passing a simple Nix expression
 > in a nix shell shebang.
 
 Finally, using the merging of multiple nix shell shebangs the following
