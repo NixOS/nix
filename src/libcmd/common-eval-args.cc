@@ -164,7 +164,7 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
     return res.finish();
 }
 
-SourcePath lookupFileArg(EvalState & state, std::string_view s)
+SourcePath lookupFileArg(EvalState & state, std::string_view s, CanonPath baseDir)
 {
     if (EvalSettings::isPseudoUrl(s)) {
         auto storePath = fetchers::downloadTarball(
@@ -185,7 +185,7 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s)
     }
 
     else
-        return state.rootPath(CanonPath::fromCwd(s));
+        return state.rootPath(CanonPath(s, baseDir));
 }
 
 }
