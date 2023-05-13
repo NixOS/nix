@@ -200,10 +200,9 @@ void PathSubstitutionGoal::tryToRun()
 {
     trace("trying to run");
 
-    /* Make sure that we are allowed to start a build.  Note that even
-       if maxBuildJobs == 0 (no local builds allowed), we still allow
-       a substituter to run.  This is because substitutions cannot be
-       distributed to another machine via the build hook. */
+    /* Make sure that we are allowed to start a substitution.  Note that even
+       if maxSubstitutionJobs == 0, we still allow a substituter to run. This
+       prevents infinite waiting. */
     if (worker.getNrSubstitutions() >= std::max(1U, (unsigned int) settings.maxSubstitutionJobs)) {
         worker.waitForBuildSlot(shared_from_this());
         return;
