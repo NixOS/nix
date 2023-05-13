@@ -703,28 +703,34 @@ Path EvalState::toRealPath(const Path & path, const NixStringContext & context)
 }
 
 
-Value * EvalState::addConstant(const std::string & name, Value & v)
+Value * EvalState::addConstant(const std::string & name, Value & v, Constant info)
 {
     Value * v2 = allocValue();
     *v2 = v;
-    addConstant(name, v2);
+    addConstant(name, v2, info);
     return v2;
 }
 
 
-void EvalState::addConstant(const std::string & name, Value * v)
+void EvalState::addConstant(const std::string & name, Value * v, Constant info)
 {
-    staticBaseEnv->vars.emplace_back(symbols.create(name), baseEnvDispl);
-    baseEnv.values[baseEnvDispl++] = v;
     auto name2 = name.substr(0, 2) == "__" ? name.substr(2) : name;
-    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v));
-}
 
+    constantInfos.push_back({name2, info});
 
-Value * EvalState::addPrimOp(const std::string & name,
-    size_t arity, PrimOpFun primOp)
-{
-    return addPrimOp(PrimOp { .fun = primOp, .arity = arity, .name = name });
+    if (!(evalSettings.pureEval && info.impureOnly)) {
+        /* Check the type, if possible.
+
+           We might know the type of a thunk in advance, so be allowed
+           to just write it down in that case. */
+        if (auto gotType = v->type(true); gotType != nThunk)
+            assert(info.type == gotType);
+
+        /* Install value the base environment. */
+        staticBaseEnv->vars.emplace_back(symbols.create(name), baseEnvDispl);
+        baseEnv.values[baseEnvDispl++] = v;
+        baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v));
+    }
 }
 
 
@@ -738,7 +744,10 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
         vPrimOp->mkPrimOp(new PrimOp(primOp));
         Value v;
         v.mkApp(vPrimOp, vPrimOp);
-        return addConstant(primOp.name, v);
+        return addConstant(primOp.name, v, {
+            .type = nThunk, // FIXME
+            .doc = primOp.doc,
+        });
     }
 
     auto envName = symbols.create(primOp.name);
@@ -764,13 +773,13 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 {
     if (v.isPrimOp()) {
         auto v2 = &v;
-        if (v2->primOp->doc)
+        if (auto * doc = v2->primOp->doc)
             return Doc {
                 .pos = {},
                 .name = v2->primOp->name,
                 .arity = v2->primOp->arity,
                 .args = v2->primOp->args,
-                .doc = v2->primOp->doc,
+                .doc = doc,
             };
     }
     return {};

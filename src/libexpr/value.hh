@@ -218,8 +218,11 @@ public:
     /**
      * Returns the normal type of a Value. This only returns nThunk if
      * the Value hasn't been forceValue'd
+     *
+     * @param invalidIsThunk Instead of aborting an an invalid (probably
+     * 0, so uninitialized) internal type, return `nThunk`.
      */
-    inline ValueType type() const
+    inline ValueType type(bool invalidIsThunk = false) const
     {
         switch (internalType) {
             case tInt: return nInt;
@@ -234,7 +237,10 @@ public:
             case tFloat: return nFloat;
             case tThunk: case tApp: case tBlackhole: return nThunk;
         }
-        abort();
+        if (invalidIsThunk)
+            return nThunk;
+        else
+            abort();
     }
 
     /**

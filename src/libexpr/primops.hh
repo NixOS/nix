@@ -10,17 +10,7 @@ namespace nix {
 
 struct RegisterPrimOp
 {
-    struct Info
-    {
-        std::string name;
-        std::vector<std::string> args;
-        size_t arity = 0;
-        const char * doc;
-        PrimOpFun fun;
-        std::optional<ExperimentalFeature> experimentalFeature;
-    };
-
-    typedef std::vector<Info> PrimOps;
+    typedef std::vector<PrimOp> PrimOps;
     static PrimOps * primOps;
 
     /**
@@ -28,7 +18,7 @@ struct RegisterPrimOp
      * will get called during EvalState initialization, so there
      * may be primops not yet added and builtins is not yet sorted.
      */
-    RegisterPrimOp(Info && info);
+    RegisterPrimOp(PrimOp && primOp);
 };
 
 /* These primops are disabled without enableNativeCode, but plugins

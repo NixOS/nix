@@ -352,7 +352,7 @@ void mainWrapped(int argc, char * * argv)
         return;
     }
 
-    if (argc == 2 && std::string(argv[1]) == "__dump-builtins") {
+    if (argc == 2 && std::string(argv[1]) == "__dump-language") {
         experimentalFeatureSettings.experimentalFeatures = {
             Xp::Flakes,
             Xp::FetchClosure,
@@ -360,17 +360,34 @@ void mainWrapped(int argc, char * * argv)
         evalSettings.pureEval = false;
         EvalState state({}, openStore("dummy://"));
         auto res = nlohmann::json::object();
-        auto builtins = state.baseEnv.values[0]->attrs;
-        for (auto & builtin : *builtins) {
-            auto b = nlohmann::json::object();
-            if (!builtin.value->isPrimOp()) continue;
-            auto primOp = builtin.value->primOp;
-            if (!primOp->doc) continue;
-            b["arity"] = primOp->arity;
-            b["args"] = primOp->args;
-            b["doc"] = trim(stripIndentation(primOp->doc));
-            res[state.symbols[builtin.name]] = std::move(b);
-        }
+        res["builtins"] = ({
+            auto builtinsJson = nlohmann::json::object();
+            auto builtins = state.baseEnv.values[0]->attrs;
+            for (auto & builtin : *builtins) {
+                auto b = nlohmann::json::object();
+                if (!builtin.value->isPrimOp()) continue;
+                auto primOp = builtin.value->primOp;
+                if (!primOp->doc) continue;
+                b["arity"] = primOp->arity;
+                b["args"] = primOp->args;
+                b["doc"] = trim(stripIndentation(primOp->doc));
+                b["experimental-feature"] = primOp->experimentalFeature;
+                builtinsJson[state.symbols[builtin.name]] = std::move(b);
+            }
+            std::move(builtinsJson);
+        });
+        res["constants"] = ({
+            auto constantsJson = nlohmann::json::object();
+            for (auto & [name, info] : state.constantInfos) {
+                auto c = nlohmann::json::object();
+                if (!info.doc) continue;
+                c["doc"] = trim(stripIndentation(info.doc));
+                c["type"] = showType(info.type, false);
+                c["impure-only"] = info.impureOnly;
+                constantsJson[name] = std::move(c);
+            }
+            std::move(constantsJson);
+        });
         logger->cout("%s", res);
         return;
     }

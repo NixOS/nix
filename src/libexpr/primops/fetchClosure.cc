@@ -154,9 +154,6 @@ static RegisterPrimOp primop_fetchClosure({
       specifying a binary cache from which the path can be fetched.
       Also, requiring a content-addressed final store path avoids the
       need for users to configure binary cache public keys.
-
-      This function is only available if you enable the experimental
-      feature `fetch-closure`.
     )",
     .fun = prim_fetchClosure,
     .experimentalFeature = Xp::FetchClosure,
