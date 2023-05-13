@@ -497,8 +497,8 @@ struct EvalSettings : Config
     Setting<bool> useEvalCache{this, true, "eval-cache",
         "Whether to use the flake evaluation cache."};
 
-    Setting<bool> logAllIFD{this, false, "log-all-ifd",
-        "Emit log messages for all imports from derivation at the 'info' log level"};
+    Setting<bool> logImportFromDerivation{this, false, "log-import-from-derivation",
+        "Emit log messages for all imports from derivations at the `info` log level"};
 };
 
 extern EvalSettings evalSettings;

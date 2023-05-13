@@ -37,7 +37,7 @@ namespace nix {
 InvalidPathError::InvalidPathError(const Path & path) :
     EvalError("path '%s' is not valid", path), path(path) {}
 
-StringMap EvalState::realiseContext(const PathSet & context, const Pos &pos, const string & reason)
+StringMap EvalState::realiseContext(const PathSet & context, const Pos & pos, std::string_view reason)
 {
     std::vector<DerivedPath::Built> drvs;
     StringMap res;
@@ -50,7 +50,7 @@ StringMap EvalState::realiseContext(const PathSet & context, const Pos &pos, con
         if (!outputName.empty() && ctx.isDerivation()) {
             drvs.push_back({ctx, {outputName}});
             if (evalSettings.logAllIFD) {
-              printInfo("%1% importing from derivation %2% via %3%", pos, ctxS, reason);
+                printInfo("'import from derivation of '%s' by '%s' at %s", ctxS, reason, pos);
             }
         } else {
             res.insert_or_assign(ctxS, ctxS);
@@ -99,7 +99,7 @@ struct RealisePathFlags {
     bool checkForPureEval = true;
 };
 
-static Path realisePath(EvalState & state, const Pos & pos, Value & v, const string & reason, const RealisePathFlags flags = {})
+static Path realisePath(EvalState & state, const Pos & pos, Value & v, std::string_view reason, const RealisePathFlags flags = {})
 {
     PathSet context;
 
