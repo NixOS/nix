@@ -658,12 +658,16 @@ struct CmdFlakeCheck : FlakeCommand
 
                         else if (
                             name == "lib"
+                            || name == "configurations"
                             || name == "darwinConfigurations"
                             || name == "darwinModules"
+                            || name == "debug"
                             || name == "flakeModule"
                             || name == "flakeModules"
                             || name == "herculesCI"
                             || name == "homeConfigurations"
+                            || name == "internals"
+                            || name == "modules"
                             || name == "nixopsConfigurations"
                             )
                             // Known but unchecked community attribute
