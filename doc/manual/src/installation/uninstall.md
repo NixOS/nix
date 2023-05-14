@@ -24,17 +24,10 @@ If you are on Linux with systemd:
    sudo systemctl daemon-reload
    ```
 
-1. The installer script uses systemd-tmpfiles to create the socket directory.
-    You may also want to remove the configuration for that:
-
-   ```console
-   sudo rm /etc/tmpfiles.d/nix-daemon.conf
-   ```
-
 Remove files created by Nix:
 
 ```console
-sudo rm -rf /etc/nix /etc/profile.d/nix.sh /nix ~root/.nix-channels ~root/.nix-defexpr ~root/.nix-profile
+sudo rm -rf /etc/nix /etc/profile.d/nix.sh /etc/tmpfiles.d/nix-daemon.conf /nix ~root/.nix-channels ~root/.nix-defexpr ~root/.nix-profile
 ```
 
 Remove build users and their group:
