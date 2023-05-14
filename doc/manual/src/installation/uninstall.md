@@ -24,12 +24,6 @@ If you are on Linux with systemd:
    sudo systemctl daemon-reload
    ```
 
-1. Remove systemd service files:
-
-   ```console
-   sudo rm /etc/systemd/system/nix-daemon.service /etc/systemd/system/nix-daemon.socket
-   ```
-
 1. The installer script uses systemd-tmpfiles to create the socket directory.
     You may also want to remove the configuration for that:
 
