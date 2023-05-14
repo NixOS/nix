@@ -48,8 +48,10 @@ sudo groupdel nixbld
 
 There may also be references to Nix in
 
+- `/etc/bash.bashrc`
 - `/etc/bashrc`
 - `/etc/profile`
+- `/etc/zsh/zshrc`
 - `/etc/zshrc`
 
 which you may remove.
