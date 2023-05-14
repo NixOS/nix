@@ -34,7 +34,7 @@ If you are on Linux with systemd:
 Remove files created by Nix:
 
 ```console
-sudo rm -rf /etc/nix /etc/profile.d/nix.sh /nix ~/.nix-channels ~/.nix-defexpr ~/.nix-profile ~root/.nix-channels ~root/.nix-defexpr ~root/.nix-profile
+sudo rm -rf /etc/nix /etc/profile.d/nix.sh /nix ~root/.nix-channels ~root/.nix-defexpr ~root/.nix-profile
 ```
 
 Remove build users and their group:
