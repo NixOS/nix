@@ -30,6 +30,9 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           Must be used as OverlayFS upper layer for this store's store dir.
         )"};
 
+    Setting<bool> checkMount{(StoreConfig*) this, true, "check-mount",
+        "Check that the overlay filesystem is correctly mounted."};
+
     const std::string name() override { return "Experimental Local Overlay Store"; }
 
     std::string doc() override

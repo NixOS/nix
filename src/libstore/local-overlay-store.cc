@@ -1,5 +1,6 @@
 #include "local-overlay-store.hh"
 #include "callback.hh"
+#include <regex>
 
 namespace nix {
 
@@ -17,6 +18,32 @@ LocalOverlayStore::LocalOverlayStore(const Params & params)
     , LocalStore(params)
     , lowerStore(openStore(lowerStoreUri).dynamic_pointer_cast<LocalFSStore>())
 {
+    if (checkMount.get()) {
+        std::smatch match;
+        std::string mountInfo;
+        auto mounts = readFile("/proc/self/mounts");
+        auto regex = std::regex(R"((^|\n)overlay )" + realStoreDir.get() + R"( .*(\n|$))");
+
+        // Mount points can be stacked, so there might be multiple matching entries.
+        // Loop until the last match, which will be the current state of the mount point.
+        while (std::regex_search(mounts, match, regex)) {
+            mountInfo = match.str();
+            mounts = match.suffix();
+        }
+
+        auto checkOption = [&](std::string option, std::string value) {
+            return std::regex_search(mountInfo, std::regex("\\b" + option + "=" + value + "( |,)"));
+        };
+
+        auto expectedLowerDir = lowerStore->realStoreDir.get();
+        if (!checkOption("lowerdir", expectedLowerDir) || !checkOption("upperdir", upperLayer)) {
+            debug("expected lowerdir: %s", expectedLowerDir);
+            debug("expected upperdir: %s", upperLayer);
+            debug("actual mount: %s", mountInfo);
+            throw Error("overlay filesystem '%s' mounted incorrectly",
+                realStoreDir.get());
+        }
+    }
 }
 
 
