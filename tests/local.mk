@@ -135,9 +135,13 @@ nix_tests = \
   flakes/show.sh \
   impure-derivations.sh \
   path-from-hash-part.sh \
-  toString-path.sh \
-  overlay-local-store/outer.sh \
-  overlay-local-store/bad-uris.sh
+  toString-path.sh
+
+overlay-local-store-tests := \
+  $(d)/overlay-local-store/outer.sh \
+  $(d)/overlay-local-store/bad-uris.sh
+
+install-tests-groups += overlay-local-store
 
 ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh

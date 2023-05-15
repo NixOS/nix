@@ -10,6 +10,7 @@ bin-scripts :=
 noinst-scripts :=
 man-pages :=
 install-tests :=
+install-tests-groups :=
 
 ifdef HOST_OS
   HOST_KERNEL = $(firstword $(subst -, ,$(HOST_OS)))
@@ -122,6 +123,14 @@ $(foreach script, $(bin-scripts), $(eval programs-list += $(script)))
 $(foreach script, $(noinst-scripts), $(eval programs-list += $(script)))
 $(foreach template, $(template-files), $(eval $(call instantiate-template,$(template))))
 $(foreach test, $(install-tests), $(eval $(call run-install-test,$(test))))
+$(foreach test, $(install-tests), $(eval installcheck: $(test).test))
+$(foreach test-group, $(install-tests-groups), \
+  $(eval installcheck: $(test-group).test-group) \
+  $(eval .PHONY: $(test-group).test-group) \
+  $(foreach test, $($(test-group)-tests), \
+    $(eval $(call run-install-test,$(test))) \
+    $(eval $(test-group).test-group: $(test).test)))
+
 $(foreach file, $(man-pages), $(eval $(call install-data-in, $(file), $(mandir)/man$(patsubst .%,%,$(suffix $(file))))))
 
 

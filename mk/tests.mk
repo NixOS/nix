@@ -2,10 +2,7 @@
 
 test-deps =
 
-define run-install-test
-
-  installcheck: $1.test
-
+define run-install-test $1
   .PHONY: $1.test
   $1.test: $1 $(test-deps)
 	@env BASH=$(bash) $(bash) mk/run-test.sh $1 < /dev/null
