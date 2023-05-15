@@ -6,53 +6,11 @@ set -x
 
 source common.sh
 
-export NIX_CONFIG='build-users-group = '
+storeDirs
 
-# Creating testing directories
+initLowerStore
 
-storeA="$TEST_ROOT/store-a"
-storeBTop="$TEST_ROOT/store-b"
-storeB="local-overlay?root=$TEST_ROOT/merged-store&lower-store=$storeA&upper-layer=$storeBTop"
-
-mkdir -p $TEST_ROOT/bad_test
-badTestRoot=$TEST_ROOT/bad_test
-storeBadRoot="local-overlay?root=$badTestRoot&lower-store=$storeA&upper-layer=$storeBTop"
-storeBadLower="local-overlay?root=$TEST_ROOT/merged-store&lower-store=$badTestRoot&upper-layer=$storeBTop"
-storeBadUpper="local-overlay?root=$TEST_ROOT/merged-store&lower-store=$storeA&upper-layer=$badTestRoot"
-
-declare -a storesBad=(
-    "$storeBadRoot" "$storeBadLower" "$storeBadUpper"
-)
-
-mkdir -p "$TEST_ROOT"/{store-a,store-b,merged-store/nix/store,workdir}
-
-# Mounting Overlay Store
-
-# Init lower store with some stuff
-nix-store --store "$storeA" --add dummy
-
-# Build something in lower store
-drvPath=$(nix-instantiate --store $storeA ./hermetic.nix --arg busybox "$busybox" --arg seed 1)
-path=$(nix-store --store "$storeA" --realise $drvPath)
-
-mount -t overlay overlay \
-  -o lowerdir="$storeA/nix/store" \
-  -o upperdir="$storeBTop" \
-  -o workdir="$TEST_ROOT/workdir" \
-  "$TEST_ROOT/merged-store/nix/store" \
-  || skipTest "overlayfs is not supported"
-
-cleanupOverlay () {
-  umount "$TEST_ROOT/merged-store/nix/store"
-  rm -r $TEST_ROOT/workdir
-}
-trap cleanupOverlay EXIT
-
-toRealPath () {
-  storeDir=$1; shift
-  storePath=$1; shift
-  echo $storeDir$(echo $storePath | sed "s^$NIX_STORE_DIR^^")
-}
+mountOverlayfs
 
 ### Check status
 
@@ -113,12 +71,7 @@ hashPart=$(echo $path | sed "s^$NIX_STORE_DIR/^^" | sed 's/-.*//')
 # upper layer should not have it
 expect 1 stat $(toRealPath "$storeBTop/nix/store" "$path")
 
-path=$(nix-store --store "$storeB" --add dummy)
-
-for i in "${storesBad[@]}"; do
-    echo $i
-    expectStderr 1 nix-store --store "$i" --add dummy | grepQuiet "overlay filesystem .* mounted incorrectly"
-done
+path=$(nix-store --store "$storeB" --add ../dummy)
 
 # lower store should have it from before
 stat $(toRealPath "$storeA/nix/store" "$path")
@@ -128,7 +81,7 @@ expect 1 stat $(toRealPath "$storeB/nix/store" "$path")
 
 ### Do a build in overlay store
 
-path=$(nix-build ./hermetic.nix --arg busybox $busybox --arg seed 2 --store "$storeB" --no-out-link)
+path=$(nix-build ../hermetic.nix --arg busybox $busybox --arg seed 2 --store "$storeB" --no-out-link)
 
 # Checking for path in lower layer (should fail)
 expect 1 stat $(toRealPath "$storeA/nix/store" "$path")

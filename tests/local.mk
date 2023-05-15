@@ -133,7 +133,8 @@ nix_tests = \
   impure-derivations.sh \
   path-from-hash-part.sh \
   toString-path.sh \
-  overlay-local-store.sh
+  overlay-local-store/outer.sh \
+  overlay-local-store/bad-uris.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh
