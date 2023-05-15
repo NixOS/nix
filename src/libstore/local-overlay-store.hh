@@ -25,7 +25,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           Must be used as OverlayFS lower layer for this store's store dir.
         )"};
 
-    const Setting<std::string> upperLayer{(StoreConfig*) this, "", "upper-layer",
+    const PathSetting upperLayer{(StoreConfig*) this, false, "", "upper-layer",
         R"(
           Must be used as OverlayFS upper layer for this store's store dir.
         )"};
