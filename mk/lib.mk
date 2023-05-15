@@ -101,6 +101,7 @@ include mk/libraries.mk
 include mk/programs.mk
 include mk/patterns.mk
 include mk/templates.mk
+include mk/cxx-big-literal.mk
 include mk/tests.mk
 
 
