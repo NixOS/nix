@@ -108,7 +108,7 @@ Most Nix commands interpret the following environment variables:
 
 ## XDG Base Directories
 
-Nix implements the [XDG Base Directory Specification].
+Nix follows the [XDG Base Directory Specification].
 
 For backwards compatibility, Nix commands will follow the standard only when [`use-xdg-base-directories`] is enabled.
 [New Nix commands](@docroot@/command-ref/new-cli/nix.md) (experimental) conform to the standard by default.
