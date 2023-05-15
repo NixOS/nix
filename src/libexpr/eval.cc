@@ -1047,6 +1047,27 @@ void EvalState::mkStorePathString(const StorePath & p, Value & v)
 }
 
 
+void EvalState::mkOutputString(
+    Value & value,
+    const StorePath & drvPath,
+    const std::string outputName,
+    std::optional<StorePath> optOutputPath)
+{
+    value.mkString(
+        optOutputPath
+            ? store->printStorePath(*std::move(optOutputPath))
+            /* Downstream we would substitute this for an actual path once
+               we build the floating CA derivation */
+            : downstreamPlaceholder(*store, drvPath, outputName),
+        NixStringContext {
+            NixStringContextElem::Built {
+                .drvPath = drvPath,
+                .output = outputName,
+            }
+        });
+}
+
+
 /* Create a thunk for the delayed computation of the given expression
    in the given environment.  But if the expression is a variable,
    then look it up right away.  This significantly reduces the number
@@ -2294,6 +2315,80 @@ StorePath EvalState::coerceToStorePath(const PosIdx pos, Value & v, NixStringCon
     if (auto storePath = store->maybeParseStorePath(path))
         return *storePath;
     error("path '%1%' is not in the Nix store", path).withTrace(pos, errorCtx).debugThrow<EvalError>();
+}
+
+
+std::pair<DerivedPath, std::string_view> EvalState::coerceToDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx)
+{
+    NixStringContext context;
+    auto s = forceString(v, context, pos, errorCtx);
+    auto csize = context.size();
+    if (csize != 1)
+        error(
+            "string '%s' has %d entries in its context. It should only have exactly one entry",
+            s, csize)
+            .withTrace(pos, errorCtx).debugThrow<EvalError>();
+    auto derivedPath = std::visit(overloaded {
+        [&](NixStringContextElem::Opaque && o) -> DerivedPath {
+            return DerivedPath::Opaque {
+                .path = std::move(o.path),
+            };
+        },
+        [&](NixStringContextElem::DrvDeep &&) -> DerivedPath {
+            error(
+                "string '%s' has a context which refers to a complete source and binary closure. This is not supported at this time",
+                s).withTrace(pos, errorCtx).debugThrow<EvalError>();
+        },
+        [&](NixStringContextElem::Built && b) -> DerivedPath {
+            return DerivedPath::Built {
+                .drvPath = std::move(b.drvPath),
+                .outputs = OutputsSpec::Names { std::move(b.output) },
+            };
+        },
+    }, ((NixStringContextElem &&) *context.begin()).raw());
+    return {
+        std::move(derivedPath),
+        std::move(s),
+    };
+}
+
+
+DerivedPath EvalState::coerceToDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx)
+{
+    auto [derivedPath, s_] = coerceToDerivedPathUnchecked(pos, v, errorCtx);
+    auto s = s_;
+    std::visit(overloaded {
+        [&](const DerivedPath::Opaque & o) {
+            auto sExpected = store->printStorePath(o.path);
+            if (s != sExpected)
+                error(
+                    "path string '%s' has context with the different path '%s'",
+                    s, sExpected)
+                    .withTrace(pos, errorCtx).debugThrow<EvalError>();
+        },
+        [&](const DerivedPath::Built & b) {
+            // TODO need derived path with single output to make this
+            // total. Will add as part of RFC 92 work and then this is
+            // cleaned up.
+            auto output = *std::get<OutputsSpec::Names>(b.outputs).begin();
+
+            auto drv = store->readDerivation(b.drvPath);
+            auto i = drv.outputs.find(output);
+            if (i == drv.outputs.end())
+                throw Error("derivation '%s' does not have output '%s'", store->printStorePath(b.drvPath), output);
+            auto optOutputPath = i->second.path(*store, drv.name, output);
+            // This is testing for the case of CA derivations
+            auto sExpected = optOutputPath
+                ? store->printStorePath(*optOutputPath)
+                : downstreamPlaceholder(*store, b.drvPath, output);
+            if (s != sExpected)
+                error(
+                    "string '%s' has context with the output '%s' from derivation '%s', but the string is not the right placeholder for this derivation output. It should be '%s'",
+                    s, output, store->printStorePath(b.drvPath), sExpected)
+                    .withTrace(pos, errorCtx).debugThrow<EvalError>();
+        }
+    }, derivedPath.raw());
+    return derivedPath;
 }
 
 
