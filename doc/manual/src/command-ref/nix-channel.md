@@ -52,6 +52,12 @@ The list of subscribed channels is stored in `~/.nix-channels`.
 
 {{#include ./env-common.md}}
 
+# Files
+
+`nix-channel` operates on the following files.
+
+{{#include ./files/channels.md}}
+
 # Examples
 
 To subscribe to the Nixpkgs channel and install the GNU Hello package:

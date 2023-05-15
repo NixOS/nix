@@ -83,6 +83,8 @@ match. Here are some examples:
 
 # Files
 
+`nix-env` operates on the following files.
+
 {{#include ./files/default-nix-expression.md}}
 
 {{#include ./files/profiles.md}}
