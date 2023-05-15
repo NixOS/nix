@@ -14,6 +14,16 @@ storeA="$TEST_ROOT/store-a"
 storeBTop="$TEST_ROOT/store-b"
 storeB="local-overlay?root=$TEST_ROOT/merged-store&lower-store=$storeA&upper-layer=$storeBTop"
 
+mkdir -p $TEST_ROOT/bad_test
+badTestRoot=$TEST_ROOT/bad_test
+storeBadRoot="local-overlay?root=$badTestRoot&lower-store=$storeA&upper-layer=$storeBTop"
+storeBadLower="local-overlay?root=$TEST_ROOT/merged-store&lower-store=$badTestRoot&upper-layer=$storeBTop"
+storeBadUpper="local-overlay?root=$TEST_ROOT/merged-store&lower-store=$storeA&upper-layer=$badTestRoot"
+
+declare -a storesBad=(
+    "$storeBadRoot" "$storeBadLower" "$storeBadUpper"
+)
+
 mkdir -p "$TEST_ROOT"/{store-a,store-b,merged-store/nix/store,workdir}
 
 # Mounting Overlay Store
@@ -104,6 +114,11 @@ hashPart=$(echo $path | sed "s^$NIX_STORE_DIR/^^" | sed 's/-.*//')
 expect 1 stat $(toRealPath "$storeBTop/nix/store" "$path")
 
 path=$(nix-store --store "$storeB" --add dummy)
+
+for i in "${storesBad[@]}"; do
+    echo $i
+    expectStderr 1 nix-store --store "$i" --add dummy | grepQuiet "overlay filesystem .* mounted incorrectly"
+done
 
 # lower store should have it from before
 stat $(toRealPath "$storeA/nix/store" "$path")
