@@ -67,8 +67,21 @@ struct InstallableFlake : InstallableValue
 
     std::shared_ptr<flake::LockedFlake> getLockedFlake() const;
 
-    FlakeRef nixpkgsFlakeRef() const override;
+    FlakeRef nixpkgsFlakeRef() const;
 };
+
+/**
+ * Default flake ref for referring to Nixpkgs. For flakes that don't
+ * have their own Nixpkgs input, or other installables.
+ *
+ * It is a layer violation for Nix to know about Nixpkgs; currently just
+ * `nix develop` does. Be wary of using this /
+ * `InstallableFlake::nixpkgsFlakeRef` more places.
+ */
+static inline FlakeRef defaultNixpkgsFlakeRef()
+{
+    return FlakeRef::fromAttrs({{"type","indirect"}, {"id", "nixpkgs"}});
+}
 
 ref<eval_cache::EvalCache> openEvalCache(
     EvalState & state,

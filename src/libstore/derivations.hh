@@ -36,9 +36,11 @@ struct DerivationOutputInputAddressed
 struct DerivationOutputCAFixed
 {
     /**
-     * hash used for expected hash computation
+     * Method and hash used for expected hash computation.
+     *
+     * References are not allowed by fiat.
      */
-    FixedOutputHash hash;
+    ContentAddress ca;
 
     /**
      * Return the \ref StorePath "store path" corresponding to this output
@@ -48,7 +50,7 @@ struct DerivationOutputCAFixed
      */
     StorePath path(const Store & store, std::string_view drvName, std::string_view outputName) const;
 
-    GENERATE_CMP(DerivationOutputCAFixed, me->hash);
+    GENERATE_CMP(DerivationOutputCAFixed, me->ca);
 };
 
 /**
@@ -61,7 +63,7 @@ struct DerivationOutputCAFloating
     /**
      * How the file system objects will be serialized for hashing
      */
-    FileIngestionMethod method;
+    ContentAddressMethod method;
 
     /**
      * How the serialization will be hashed
@@ -88,7 +90,7 @@ struct DerivationOutputImpure
     /**
      * How the file system objects will be serialized for hashing
      */
-    FileIngestionMethod method;
+    ContentAddressMethod method;
 
     /**
      * How the serialization will be hashed
@@ -343,12 +345,14 @@ struct Derivation : BasicDerivation
         Store & store,
         const std::map<std::pair<StorePath, std::string>, StorePath> & inputDrvOutputs) const;
 
-    /* Check that the derivation is valid and does not present any
-       illegal states.
-
-       This is mainly a matter of checking the outputs, where our C++
-       representation supports all sorts of combinations we do not yet
-       allow. */
+    /**
+     * Check that the derivation is valid and does not present any
+     * illegal states.
+     *
+     * This is mainly a matter of checking the outputs, where our C++
+     * representation supports all sorts of combinations we do not yet
+     * allow.
+     */
     void checkInvariants(Store & store, const StorePath & drvPath) const;
 
     Derivation() = default;

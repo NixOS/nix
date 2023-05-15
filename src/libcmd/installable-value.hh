@@ -96,13 +96,26 @@ struct InstallableValue : Installable
 
     UnresolvedApp toApp(EvalState & state);
 
-    virtual FlakeRef nixpkgsFlakeRef() const
-    {
-        return FlakeRef::fromAttrs({{"type","indirect"}, {"id", "nixpkgs"}});
-    }
-
     static InstallableValue & require(Installable & installable);
     static ref<InstallableValue> require(ref<Installable> installable);
+
+protected:
+
+    /**
+     * Handles either a plain path, or a string with a single string
+     * context elem in the right format. The latter case is handled by
+     * `EvalState::coerceToDerivedPath()`; see it for details.
+     *
+     * @param v Value that is hopefully a string or path per the above.
+     *
+     * @param pos Position of value to aid with diagnostics.
+     *
+     * @param errorCtx Arbitrary message for use in potential error message when something is wrong with `v`.
+     *
+     * @result A derived path (with empty info, for now) if the value
+     * matched the above criteria.
+     */
+    std::optional<DerivedPathWithInfo> trySinglePathToDerivedPaths(Value & v, const PosIdx pos, std::string_view errorCtx);
 };
 
 }

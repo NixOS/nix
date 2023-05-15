@@ -88,10 +88,15 @@ private:
     std::list<Child> children;
 
     /**
-     * Number of build slots occupied.  This includes local builds and
-     * substitutions but not remote builds via the build hook.
+     * Number of build slots occupied.  This includes local builds but does not
+     * include substitutions or remote builds via the build hook.
      */
     unsigned int nrLocalBuilds;
+
+    /**
+     * Number of substitution slots occupied.
+     */
+    unsigned int nrSubstitutions;
 
     /**
      * Maps used to prevent multiple instantiations of a goal for the
@@ -220,11 +225,15 @@ public:
     void wakeUp(GoalPtr goal);
 
     /**
-     * Return the number of local build and substitution processes
-     * currently running (but not remote builds via the build
-     * hook).
+     * Return the number of local build processes currently running (but not
+     * remote builds via the build hook).
      */
     unsigned int getNrLocalBuilds();
+
+    /**
+     * Return the number of substitution processes currently running.
+     */
+    unsigned int getNrSubstitutions();
 
     /**
      * Registers a running child process.  `inBuildSlot` means that

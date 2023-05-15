@@ -36,7 +36,7 @@
 ## Attribute selection
 
 Select the attribute denoted by attribute path *attrpath* from [attribute set] *attrset*.
-If the attribute doesn’t exist, return *value* if provided, otherwise abort evaluation.
+If the attribute doesn’t exist, return the *expr* after `or` if provided, otherwise abort evaluation.
 
 <!-- FIXME: the following should to into its own language syntax section, but that needs more work to fit in well -->
 

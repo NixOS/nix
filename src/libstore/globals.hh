@@ -159,6 +159,15 @@ public:
         )",
         {"build-max-jobs"}};
 
+    Setting<unsigned int> maxSubstitutionJobs{
+        this, 16, "max-substitution-jobs",
+        R"(
+          This option defines the maximum number of substitution jobs that Nix
+          will try to run in parallel. The default is `16`. The minimum value
+          one can choose is `1` and lower values will be interpreted as `1`.
+        )",
+        {"substitution-max-jobs"}};
+
     Setting<unsigned int> buildCores{
         this,
         getDefaultCores(),
@@ -991,7 +1000,7 @@ public:
         this, false, "use-xdg-base-directories",
         R"(
           If set to `true`, Nix will conform to the [XDG Base Directory Specification] for files in `$HOME`.
-          The environment variables used to implement this are documented in the [Environment Variables section](@docroot@/installation/env-variables.md).
+          The environment variables used to implement this are documented in the [Environment Variables section](@docroot@/command-ref/env-common.md).
 
           [XDG Base Directory Specification]: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
 
