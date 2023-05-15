@@ -78,6 +78,7 @@ public:
         Source & dump,
         std::string_view name,
         ContentAddressMethod caMethod,
+        HashType hashType,
         const StorePathSet & references,
         RepairFlag repair);
 

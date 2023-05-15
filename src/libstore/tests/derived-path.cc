@@ -27,11 +27,13 @@ Gen<DerivedPath::Built> Arbitrary<DerivedPath::Built>::arbitrary()
 
 Gen<DerivedPath> Arbitrary<DerivedPath>::arbitrary()
 {
-    switch (*gen::inRange<uint8_t>(0, 1)) {
+    switch (*gen::inRange<uint8_t>(0, std::variant_size_v<DerivedPath::Raw>)) {
     case 0:
         return gen::just<DerivedPath>(*gen::arbitrary<DerivedPath::Opaque>());
-    default:
+    case 1:
         return gen::just<DerivedPath>(*gen::arbitrary<DerivedPath::Built>());
+    default:
+        assert(false);
     }
 }
 

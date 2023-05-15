@@ -24,23 +24,10 @@ If you are on Linux with systemd:
    sudo systemctl daemon-reload
    ```
 
-1. Remove systemd service files:
-
-   ```console
-   sudo rm /etc/systemd/system/nix-daemon.service /etc/systemd/system/nix-daemon.socket
-   ```
-
-1. The installer script uses systemd-tmpfiles to create the socket directory.
-    You may also want to remove the configuration for that:
-
-   ```console
-   sudo rm /etc/tmpfiles.d/nix-daemon.conf
-   ```
-
 Remove files created by Nix:
 
 ```console
-sudo rm -rf /nix /etc/nix /etc/profile/nix.sh ~root/.nix-profile ~root/.nix-defexpr ~root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
+sudo rm -rf /etc/nix /etc/profile.d/nix.sh /etc/tmpfiles.d/nix-daemon.conf /nix ~root/.nix-channels ~root/.nix-defexpr ~root/.nix-profile
 ```
 
 Remove build users and their group:
@@ -54,8 +41,10 @@ sudo groupdel nixbld
 
 There may also be references to Nix in
 
-- `/etc/profile`
+- `/etc/bash.bashrc`
 - `/etc/bashrc`
+- `/etc/profile`
+- `/etc/zsh/zshrc`
 - `/etc/zshrc`
 
 which you may remove.

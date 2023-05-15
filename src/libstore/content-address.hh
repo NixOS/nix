@@ -21,8 +21,14 @@ namespace nix {
  *
  * Somewhat obscure, used by \ref Derivation derivations and
  * `builtins.toFile` currently.
+ *
+ * TextIngestionMethod is identical to FileIngestionMethod::Fixed except that
+ * the former may not have self-references and is tagged `text:${algo}:${hash}`
+ * rather than `fixed:${algo}:${hash}`.  The contents of the store path are
+ * ingested and hashed identically, aside from the slightly different tag and
+ * restriction on self-references.
  */
-struct TextHashMethod : std::monostate { };
+struct TextIngestionMethod : std::monostate { };
 
 /**
  * An enumeration of the main ways we can serialize file system
@@ -46,13 +52,6 @@ enum struct FileIngestionMethod : uint8_t {
  */
 std::string makeFileIngestionPrefix(FileIngestionMethod m);
 
-struct FixedOutputHashMethod {
-    FileIngestionMethod fileIngestionMethod;
-    HashType hashType;
-
-    GENERATE_CMP(FixedOutputHashMethod, me->fileIngestionMethod, me->hashType);
-};
-
 /**
  * An enumeration of all the ways we can serialize file system objects.
  *
@@ -64,8 +63,8 @@ struct FixedOutputHashMethod {
 struct ContentAddressMethod
 {
     typedef std::variant<
-        TextHashMethod,
-        FixedOutputHashMethod
+        TextIngestionMethod,
+        FileIngestionMethod
     > Raw;
 
     Raw raw;
@@ -77,9 +76,36 @@ struct ContentAddressMethod
         : raw(std::forward<decltype(arg)>(arg)...)
     { }
 
-    static ContentAddressMethod parse(std::string_view rawCaMethod);
 
-    std::string render() const;
+    /**
+     * Parse the prefix tag which indicates how the files
+     * were ingested, with the fixed output case not prefixed for back
+     * compat.
+     *
+     * @param [in] m A string that should begin with the prefix.
+     * @param [out] m The remainder of the string after the prefix.
+     */
+    static ContentAddressMethod parsePrefix(std::string_view & m);
+
+    /**
+     * Render the prefix tag which indicates how the files wre ingested.
+     *
+     * The rough inverse of `parsePrefix()`.
+     */
+    std::string renderPrefix() const;
+
+    /**
+     * Parse a content addressing method and hash type.
+     */
+    static std::pair<ContentAddressMethod, HashType> parse(std::string_view rawCaMethod);
+
+    /**
+     * Render a content addressing method and hash type in a
+     * nicer way, prefixing both cases.
+     *
+     * The rough inverse of `parse()`.
+     */
+    std::string render(HashType ht) const;
 };
 
 
@@ -147,8 +173,9 @@ struct ContentAddress
     { }
 
     /**
-     * Compute the content-addressability assertion (ValidPathInfo::ca) for
-     * paths created by Store::makeFixedOutputPath() / Store::addToStore().
+     * Compute the content-addressability assertion
+     * (`ValidPathInfo::ca`) for paths created by
+     * `Store::makeFixedOutputPath()` / `Store::addToStore()`.
      */
     std::string render() const;
 
@@ -156,9 +183,27 @@ struct ContentAddress
 
     static std::optional<ContentAddress> parseOpt(std::string_view rawCaOpt);
 
+    /**
+     * Create a `ContentAddress` from 2 parts:
+     *
+     * @param method Way ingesting the file system data.
+     *
+     * @param hash Hash of ingested file system data.
+     */
+    static ContentAddress fromParts(
+        ContentAddressMethod method, Hash hash) noexcept;
+
+    ContentAddressMethod getMethod() const;
+
     const Hash & getHash() const;
+
+    std::string printMethodAlgo() const;
 };
 
+/**
+ * Render the `ContentAddress` if it exists to a string, return empty
+ * string otherwise.
+ */
 std::string renderContentAddress(std::optional<ContentAddress> ca);
 
 
@@ -244,10 +289,29 @@ struct ContentAddressWithReferences
     { }
 
     /**
-     * Create a ContentAddressWithReferences from a mere ContentAddress, by
-     * assuming no references in all cases.
+     * Create a `ContentAddressWithReferences` from a mere
+     * `ContentAddress`, by claiming no references.
      */
-    static ContentAddressWithReferences withoutRefs(const ContentAddress &);
+    static ContentAddressWithReferences withoutRefs(const ContentAddress &) noexcept;
+
+    /**
+     * Create a `ContentAddressWithReferences` from 3 parts:
+     *
+     * @param method Way ingesting the file system data.
+     *
+     * @param hash Hash of ingested file system data.
+     *
+     * @param refs References to other store objects or oneself.
+     *
+     * Do note that not all combinations are supported; `nullopt` is
+     * returns for invalid combinations.
+     */
+    static std::optional<ContentAddressWithReferences> fromPartsOpt(
+        ContentAddressMethod method, Hash hash, StoreReferences refs) noexcept;
+
+    ContentAddressMethod getMethod() const;
+
+    Hash getHash() const;
 };
 
 }

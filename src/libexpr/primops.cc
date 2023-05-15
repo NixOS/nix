@@ -129,40 +129,31 @@ static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, co
     }
 }
 
-/* Add and attribute to the given attribute map from the output name to
-   the output path, or a placeholder.
-
-   Where possible the path is used, but for floating CA derivations we
-   may not know it. For sake of determinism we always assume we don't
-   and instead put in a place holder. In either case, however, the
-   string context will contain the drv path and output name, so
-   downstream derivations will have the proper dependency, and in
-   addition, before building, the placeholder will be rewritten to be
-   the actual path.
-
-   The 'drv' and 'drvPath' outputs must correspond. */
+/**
+ * Add and attribute to the given attribute map from the output name to
+ * the output path, or a placeholder.
+ *
+ * Where possible the path is used, but for floating CA derivations we
+ * may not know it. For sake of determinism we always assume we don't
+ * and instead put in a place holder. In either case, however, the
+ * string context will contain the drv path and output name, so
+ * downstream derivations will have the proper dependency, and in
+ * addition, before building, the placeholder will be rewritten to be
+ * the actual path.
+ *
+ * The 'drv' and 'drvPath' outputs must correspond.
+ */
 static void mkOutputString(
     EvalState & state,
     BindingsBuilder & attrs,
     const StorePath & drvPath,
-    const BasicDerivation & drv,
     const std::pair<std::string, DerivationOutput> & o)
 {
-    auto optOutputPath = o.second.path(*state.store, drv.name, o.first);
-    attrs.alloc(o.first).mkString(
-        optOutputPath
-            ? state.store->printStorePath(*optOutputPath)
-            /* Downstream we would substitute this for an actual path once
-               we build the floating CA derivation */
-            /* FIXME: we need to depend on the basic derivation, not
-               derivation */
-            : downstreamPlaceholder(*state.store, drvPath, o.first),
-        NixStringContext {
-            NixStringContextElem::Built {
-                .drvPath = drvPath,
-                .output = o.first,
-            }
-        });
+    state.mkOutputString(
+        attrs.alloc(o.first),
+        drvPath,
+        o.first,
+        o.second.path(*state.store, Derivation::nameFromPath(drvPath), o.first));
 }
 
 /* Load and evaluate an expression from path specified by the
@@ -193,7 +184,7 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
         state.mkList(outputsVal, drv.outputs.size());
 
         for (const auto & [i, o] : enumerate(drv.outputs)) {
-            mkOutputString(state, attrs, *storePath, drv, o);
+            mkOutputString(state, attrs, *storePath, o);
             (outputsVal.listElems()[i] = state.allocValue())->mkString(o.first);
         }
 
@@ -1100,7 +1091,7 @@ drvName, Bindings * attrs, Value & v)
     bool isImpure = false;
     std::optional<std::string> outputHash;
     std::string outputHashAlgo;
-    std::optional<FileIngestionMethod> ingestionMethod;
+    std::optional<ContentAddressMethod> ingestionMethod;
 
     StringSet outputs;
     outputs.insert("out");
@@ -1113,7 +1104,10 @@ drvName, Bindings * attrs, Value & v)
         auto handleHashMode = [&](const std::string_view s) {
             if (s == "recursive") ingestionMethod = FileIngestionMethod::Recursive;
             else if (s == "flat") ingestionMethod = FileIngestionMethod::Flat;
-            else
+            else if (s == "text") {
+                experimentalFeatureSettings.require(Xp::DynamicDerivations);
+                ingestionMethod = TextIngestionMethod {};
+            } else
                 state.debugThrowLastTrace(EvalError({
                     .msg = hintfmt("invalid value '%s' for 'outputHashMode' attribute", s),
                     .errPos = state.positions[noPos]
@@ -1280,11 +1274,16 @@ drvName, Bindings * attrs, Value & v)
         }));
 
     /* Check whether the derivation name is valid. */
-    if (isDerivation(drvName))
+    if (isDerivation(drvName) &&
+        !(ingestionMethod == ContentAddressMethod { TextIngestionMethod { } } &&
+          outputs.size() == 1 &&
+          *(outputs.begin()) == "out"))
+    {
         state.debugThrowLastTrace(EvalError({
-            .msg = hintfmt("derivation names are not allowed to end in '%s'", drvExtension),
+            .msg = hintfmt("derivation names are allowed to end in '%s' only if they produce a single derivation file", drvExtension),
             .errPos = state.positions[noPos]
         }));
+    }
 
     if (outputHash) {
         /* Handle fixed-output derivations.
@@ -1300,21 +1299,15 @@ drvName, Bindings * attrs, Value & v)
         auto h = newHashAllowEmpty(*outputHash, parseHashTypeOpt(outputHashAlgo));
 
         auto method = ingestionMethod.value_or(FileIngestionMethod::Flat);
-        auto outPath = state.store->makeFixedOutputPath(drvName, FixedOutputInfo {
-            .hash = {
-                .method = method,
-                .hash = h,
-            },
-            .references = {},
-        });
-        drv.env["out"] = state.store->printStorePath(outPath);
-        drv.outputs.insert_or_assign("out",
-            DerivationOutput::CAFixed {
-                .hash = FixedOutputHash {
-                    .method = method,
-                    .hash = std::move(h),
-                },
-            });
+
+        DerivationOutput::CAFixed dof {
+            .ca = ContentAddress::fromParts(
+                std::move(method),
+                std::move(h)),
+        };
+
+        drv.env["out"] = state.store->printStorePath(dof.path(*state.store, drvName, "out"));
+        drv.outputs.insert_or_assign("out", std::move(dof));
     }
 
     else if (contentAddressed || isImpure) {
@@ -1332,13 +1325,13 @@ drvName, Bindings * attrs, Value & v)
             if (isImpure)
                 drv.outputs.insert_or_assign(i,
                     DerivationOutput::Impure {
-                        .method = method,
+                        .method = method.raw,
                         .hashType = ht,
                     });
             else
                 drv.outputs.insert_or_assign(i,
                     DerivationOutput::CAFloating {
-                        .method = method,
+                        .method = method.raw,
                         .hashType = ht,
                     });
         }
@@ -1403,7 +1396,7 @@ drvName, Bindings * attrs, Value & v)
         NixStringContextElem::DrvDeep { .drvPath = drvPath },
     });
     for (auto & i : drv.outputs)
-        mkOutputString(state, result, drvPath, drv, i);
+        mkOutputString(state, result, drvPath, i);
 
     v.mkAttrs(result);
 }

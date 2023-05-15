@@ -21,6 +21,7 @@ namespace nix {
 class Store;
 class EvalState;
 class StorePath;
+struct DerivedPath;
 enum RepairFlag : bool;
 
 
@@ -473,6 +474,28 @@ public:
      */
     StorePath coerceToStorePath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx);
 
+    /**
+     * Part of `coerceToDerivedPath()` without any store IO which is exposed for unit testing only.
+     */
+    std::pair<DerivedPath, std::string_view> coerceToDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx);
+
+    /**
+     * Coerce to `DerivedPath`.
+     *
+     * Must be a string which is either a literal store path or a
+     * "placeholder (see `downstreamPlaceholder()`).
+     *
+     * Even more importantly, the string context must be exactly one
+     * element, which is either a `NixStringContextElem::Opaque` or
+     * `NixStringContextElem::Built`. (`NixStringContextEleme::DrvDeep`
+     * is not permitted).
+     *
+     * The string is parsed based on the context --- the context is the
+     * source of truth, and ultimately tells us what we want, and then
+     * we ensure the string corresponds to it.
+     */
+    DerivedPath coerceToDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx);
+
 public:
 
     /**
@@ -576,11 +599,36 @@ public:
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, PosIdx pos);
 
-    /* Create a string representing a store path.
-
-       The string is the printed store path with a context containing a single
-       `Opaque` element of that store path. */
+    /**
+     * Create a string representing a store path.
+     *
+     * The string is the printed store path with a context containing a single
+     * `NixStringContextElem::Opaque` element of that store path.
+     */
     void mkStorePathString(const StorePath & storePath, Value & v);
+
+    /**
+     * Create a string representing a `DerivedPath::Built`.
+     *
+     * The string is the printed store path with a context containing a single
+     * `NixStringContextElem::Built` element of the drv path and output name.
+     *
+     * @param value Value we are settings
+     *
+     * @param drvPath Path the drv whose output we are making a string for
+     *
+     * @param outputName Name of the output
+     *
+     * @param optOutputPath Optional output path for that string. Must
+     * be passed if and only if output store object is input-addressed.
+     * Will be printed to form string if passed, otherwise a placeholder
+     * will be used (see `downstreamPlaceholder()`).
+     */
+    void mkOutputString(
+        Value & value,
+        const StorePath & drvPath,
+        const std::string outputName,
+        std::optional<StorePath> optOutputPath);
 
     void concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos, std::string_view errorCtx);
 

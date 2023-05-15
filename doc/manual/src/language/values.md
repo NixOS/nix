@@ -190,13 +190,17 @@ instance,
 ```
 
 evaluates to `"Foo"`. It is possible to provide a default value in an
-attribute selection using the `or` keyword. For example,
+attribute selection using the `or` keyword:
 
 ```nix
 { a = "Foo"; b = "Bar"; }.c or "Xyzzy"
 ```
 
-will evaluate to `"Xyzzy"` because there is no `c` attribute in the set.
+```nix
+{ a = "Foo"; b = "Bar"; }.c.d.e.f.g or "Xyzzy"
+```
+
+will both evaluate to `"Xyzzy"` because there is no `c` attribute in the set.
 
 You can use arbitrary double-quoted strings as attribute names:
 
