@@ -981,7 +981,7 @@ public:
         this, false, "use-xdg-base-directories",
         R"(
           If set to `true`, Nix will conform to the [XDG Base Directory Specification] for files in `$HOME`.
-          The environment variables used to implement this are documented in the [Environment Variables section](@docroot@/installation/env-variables.md).
+          The environment variables used to implement this are documented in the [Environment Variables section](@docroot@/command-ref/env-common.md).
 
           [XDG Base Directory Specification]: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
 
