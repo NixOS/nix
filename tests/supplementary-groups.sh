@@ -13,7 +13,7 @@ unshare --mount --map-root-user bash <<EOF
     mkdir -p \$NIX_REMOTE
   }
 
-  cmd=(nix-build ./hermetic.nix --arg busybox "$busybox" --arg seed 1)
+  cmd=(nix-build ./hermetic.nix --arg busybox "$busybox" --arg seed 1 --no-out-link)
 
   # Fails with default setting
   # TODO better error
