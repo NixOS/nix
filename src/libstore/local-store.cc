@@ -271,10 +271,12 @@ LocalStore::LocalStore(const Params & params)
 
     /* Acquire the big fat lock in shared mode to make sure that no
        schema upgrade is in progress. */
-    Path globalLockPath = dbDir + "/big-lock";
-    globalLock = openLockFile(globalLockPath.c_str(), true);
+    if (!readOnly) {
+        Path globalLockPath = dbDir + "/big-lock";
+        globalLock = openLockFile(globalLockPath.c_str(), true);
+    }
 
-    if (!lockFile(globalLock.get(), ltRead, false)) {
+    if (!readOnly && !lockFile(globalLock.get(), ltRead, false)) {
         printInfo("waiting for the big Nix store lock...");
         lockFile(globalLock.get(), ltRead, true);
     }
@@ -305,7 +307,7 @@ LocalStore::LocalStore(const Params & params)
                 "which is no longer supported. To convert to the new format,\n"
                 "please upgrade Nix to version 1.11 first.");
 
-        if (!lockFile(globalLock.get(), ltWrite, false)) {
+        if (!readOnly && !lockFile(globalLock.get(), ltWrite, false)) {
             printInfo("waiting for exclusive access to the Nix store...");
             lockFile(globalLock.get(), ltNone, false); // We have acquired a shared lock; release it to prevent deadlocks
             lockFile(globalLock.get(), ltWrite, true);
@@ -340,7 +342,8 @@ LocalStore::LocalStore(const Params & params)
 
         writeFile(schemaPath, fmt("%1%", nixSchemaVersion), 0666, true);
 
-        lockFile(globalLock.get(), ltRead, true);
+        if (!readOnly)
+            lockFile(globalLock.get(), ltRead, true);
     }
 
     else openDB(*state, false);
