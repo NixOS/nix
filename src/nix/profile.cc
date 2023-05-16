@@ -42,7 +42,7 @@ struct ProfileElement
     bool active = true;
     int priority = defaultPriority;
 
-    std::string describe() const
+    std::string identifier() const
     {
         if (source)
             return fmt("%s#%s%s", source->originalRef, source->attrPath, source->outputs.to_string());
@@ -62,7 +62,7 @@ struct ProfileElement
 
     bool operator < (const ProfileElement & other) const
     {
-        return std::tuple(describe(), storePaths) < std::tuple(other.describe(), other.storePaths);
+        return std::tuple(identifier(), storePaths) < std::tuple(other.identifier(), other.storePaths);
     }
 
     void updateStorePaths(
@@ -237,13 +237,13 @@ struct ProfileManifest
         bool changes = false;
 
         while (i != prevElems.end() || j != curElems.end()) {
-            if (j != curElems.end() && (i == prevElems.end() || i->describe() > j->describe())) {
-                logger->cout("%s%s: ∅ -> %s", indent, j->describe(), j->versions());
+            if (j != curElems.end() && (i == prevElems.end() || i->identifier() > j->identifier())) {
+                logger->cout("%s%s: ∅ -> %s", indent, j->identifier(), j->versions());
                 changes = true;
                 ++j;
             }
-            else if (i != prevElems.end() && (j == curElems.end() || i->describe() < j->describe())) {
-                logger->cout("%s%s: %s -> ∅", indent, i->describe(), i->versions());
+            else if (i != prevElems.end() && (j == curElems.end() || i->identifier() < j->identifier())) {
+                logger->cout("%s%s: %s -> ∅", indent, i->identifier(), i->versions());
                 changes = true;
                 ++i;
             }
@@ -251,7 +251,7 @@ struct ProfileManifest
                 auto v1 = i->versions();
                 auto v2 = j->versions();
                 if (v1 != v2) {
-                    logger->cout("%s%s: %s -> %s", indent, i->describe(), v1, v2);
+                    logger->cout("%s%s: %s -> %s", indent, i->identifier(), v1, v2);
                     changes = true;
                 }
                 ++i;
@@ -491,7 +491,7 @@ struct CmdProfileRemove : virtual EvalCommand, MixDefaultProfile, MixProfileElem
             if (!matches(*store, element, i, matchers)) {
                 newManifest.elements.push_back(std::move(element));
             } else {
-                notice("removing '%s'", element.describe());
+                notice("removing '%s'", element.identifier());
             }
         }
 
