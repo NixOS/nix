@@ -157,17 +157,17 @@ error: An existing package already provides the following file:
 
        To remove the existing package:
 
-         nix profile remove path:${flake1Dir}
+         nix profile remove path:${flake1Dir}#packages.${system}.default
 
        The new package can also be installed next to the existing one by assigning a different priority.
        The conflicting packages have a priority of 5.
        To prioritise the new package:
 
-         nix profile install path:${flake2Dir} --priority 4
+         nix profile install path:${flake2Dir}#packages.${system}.default --priority 4
 
        To prioritise the existing package:
 
-         nix profile install path:${flake2Dir} --priority 6
+         nix profile install path:${flake2Dir}#packages.${system}.default --priority 6
 EOF
 )
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World" ]]
@@ -177,3 +177,10 @@ nix profile install $flake2Dir --priority 0
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World2" ]]
 # nix profile install $flake1Dir --priority 100
 # [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World" ]]
+
+# Ensure that conflicts are handled properly even when the installables aren't
+# flake references.
+# Regression test for https://github.com/NixOS/nix/issues/8284
+clearProfiles
+nix profile install $(nix build $flake1Dir --no-link --print-out-paths)
+expect 1 nix profile install --impure --expr "(builtins.getFlake ''$flake2Dir'').packages.$system.default"
