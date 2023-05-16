@@ -36,7 +36,7 @@ struct SQLite
 {
     sqlite3 * db = 0;
     SQLite() { }
-    SQLite(const Path & path, bool create = true);
+    SQLite(const Path & path, SQLiteOpenMode mode = SQLiteOpenMode::Normal);
     SQLite(const SQLite & from) = delete;
     SQLite& operator = (const SQLite & from) = delete;
     SQLite& operator = (SQLite && from) { db = from.db; from.db = 0; return *this; }

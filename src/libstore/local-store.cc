@@ -480,13 +480,20 @@ int LocalStore::getSchema()
 
 void LocalStore::openDB(State & state, bool create)
 {
+    if (create && readOnly) {
+        throw Error("unable to create database while in read-only mode");
+    }
+
     if (access(dbDir.c_str(), R_OK | (readOnly ? 0 : W_OK)))
         throw SysError("Nix database directory '%1%' is not writable", dbDir);
 
     /* Open the Nix database. */
     std::string dbPath = dbDir + "/db.sqlite";
     auto & db(state.db);
-    state.db = SQLite(dbPath, create);
+    auto openMode = readOnly ? SQLiteOpenMode::ReadOnly
+                  : create ? SQLiteOpenMode::Normal
+                  : SQLiteOpenMode::NoCreate;
+    state.db = SQLite(dbPath, openMode);
 
 #ifdef __CYGWIN__
     /* The cygwin version of sqlite3 has a patch which calls
