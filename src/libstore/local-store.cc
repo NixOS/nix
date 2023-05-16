@@ -348,7 +348,7 @@ LocalStore::LocalStore(const Params & params)
 
     else openDB(*state, false);
 
-    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
+    if (!readOnly && experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
         migrateCASchema(state->db, dbDir + "/ca-schema", globalLock);
     }
 
