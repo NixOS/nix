@@ -204,8 +204,10 @@ LocalStore::LocalStore(const Params & params)
 
     for (auto & perUserDir : {profilesDir + "/per-user", gcRootsDir + "/per-user"}) {
         createDirs(perUserDir);
-        if (chmod(perUserDir.c_str(), 0755) == -1)
-            throw SysError("could not set permissions on '%s' to 755", perUserDir);
+        if (!readOnly) {
+            if (chmod(perUserDir.c_str(), 0755) == -1)
+                throw SysError("could not set permissions on '%s' to 755", perUserDir);
+        }
     }
 
     /* Optionally, create directories and set permissions for a
