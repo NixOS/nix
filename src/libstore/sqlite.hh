@@ -11,6 +11,24 @@ struct sqlite3_stmt;
 
 namespace nix {
 
+enum class SQLiteOpenMode {
+    /**
+     * Open the database in read-write mode.
+     * If the database does not exist, it will be created.
+     */
+    Normal,
+    /**
+     * Open the database in read-write mode.
+     * Fails with an error if the database does not exist.
+     */
+    NoCreate,
+    /**
+     * Open the database in read-only mode.
+     * Fails with an error if the database does not exist.
+     */
+    ReadOnly
+};
+
 /**
  * RAII wrapper to close a SQLite database automatically.
  */
