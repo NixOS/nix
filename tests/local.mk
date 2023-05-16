@@ -137,14 +137,6 @@ nix_tests = \
   path-from-hash-part.sh \
   toString-path.sh
 
-overlay-local-store-tests := \
-  $(d)/overlay-local-store/check-post-init.sh \
-  $(d)/overlay-local-store/redundant-add.sh \
-  $(d)/overlay-local-store/build.sh \
-  $(d)/overlay-local-store/bad-uris.sh
-
-install-tests-groups += overlay-local-store
-
 ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh
 endif

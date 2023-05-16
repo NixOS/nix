@@ -27,6 +27,7 @@ makefiles += \
   src/libstore/tests/local.mk \
   src/libexpr/tests/local.mk \
   tests/local.mk \
+  tests/overlay-local-store/local.mk \
   tests/plugins/local.mk
 else
 makefiles += \
