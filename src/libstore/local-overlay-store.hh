@@ -31,7 +31,15 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
         )"};
 
     Setting<bool> checkMount{(StoreConfig*) this, true, "check-mount",
-        "Check that the overlay filesystem is correctly mounted."};
+        R"(
+          Check that the overlay filesystem is correctly mounted.
+
+          Nix does not manage the overlayfs mount point itself, but the correct
+          functioning of the overlay store does depend on this mount point being set up
+          correctly. Rather than just assume this is the case, check that the lowerdir
+          and upperdir options are what we expect them to be. This check is on by
+          default, but can be disabled if needed.
+        )"};
 
     const std::string name() override { return "Experimental Local Overlay Store"; }
 
