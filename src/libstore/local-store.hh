@@ -46,6 +46,11 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
         "require-sigs",
         "Whether store paths copied into this store should have a trusted signature."};
 
+    Setting<bool> readOnly{(StoreConfig*) this,
+        false,
+        "read-only",
+        "TODO"};
+
     const std::string name() override { return "Local Store"; }
 
     std::string doc() override;
