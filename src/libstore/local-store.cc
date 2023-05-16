@@ -490,7 +490,7 @@ void LocalStore::openDB(State & state, bool create)
     /* Open the Nix database. */
     std::string dbPath = dbDir + "/db.sqlite";
     auto & db(state.db);
-    auto openMode = readOnly ? SQLiteOpenMode::ReadOnly
+    auto openMode = readOnly ? SQLiteOpenMode::Immutable
                   : create ? SQLiteOpenMode::Normal
                   : SQLiteOpenMode::NoCreate;
     state.db = SQLite(dbPath, openMode);

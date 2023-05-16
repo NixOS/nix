@@ -23,10 +23,13 @@ enum class SQLiteOpenMode {
      */
     NoCreate,
     /**
-     * Open the database in read-only mode.
+     * Open the database in immutable mode.
+     * In addition to the database being read-only,
+     * no wal or journal files will be created by sqlite.
+     * Use this mode if the database is on a read-only filesystem.
      * Fails with an error if the database does not exist.
      */
-    ReadOnly
+    Immutable
 };
 
 /**
