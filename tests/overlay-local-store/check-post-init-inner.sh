@@ -65,29 +65,3 @@ hashPart=$(echo $path | sed "s^$NIX_STORE_DIR/^^" | sed 's/-.*//')
 
 # merged store can find from hash part
 [[ $(nix store --store $storeB path-from-hash-part $hashPart) == $path ]]
-
-### Do a redundant add
-
-# upper layer should not have it
-expect 1 stat $(toRealPath "$storeBTop/nix/store" "$path")
-
-path=$(nix-store --store "$storeB" --add ../dummy)
-
-# lower store should have it from before
-stat $(toRealPath "$storeA/nix/store" "$path")
-
-# upper layer should still not have it (no redundant copy)
-expect 1 stat $(toRealPath "$storeB/nix/store" "$path")
-
-### Do a build in overlay store
-
-path=$(nix-build ../hermetic.nix --arg busybox $busybox --arg seed 2 --store "$storeB" --no-out-link)
-
-# Checking for path in lower layer (should fail)
-expect 1 stat $(toRealPath "$storeA/nix/store" "$path")
-
-# Checking for path in upper layer
-stat $(toRealPath "$storeBTop" "$path")
-
-# Verifying path in overlay store
-nix-store --verify-path --store "$storeB" "$path"

@@ -138,7 +138,9 @@ nix_tests = \
   toString-path.sh
 
 overlay-local-store-tests := \
-  $(d)/overlay-local-store/outer.sh \
+  $(d)/overlay-local-store/check-post-init.sh \
+  $(d)/overlay-local-store/redundant-add.sh \
+  $(d)/overlay-local-store/build.sh \
   $(d)/overlay-local-store/bad-uris.sh
 
 install-tests-groups += overlay-local-store
