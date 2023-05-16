@@ -41,6 +41,11 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
     args.push_back("-oLocalCommand=echo started");
 }
 
+bool SSHMaster::isMasterRunning() {
+    auto res = runProgram(RunOptions {.program = "ssh", .args = {"-O", "check", host}, .mergeStderrToStdout = true});
+    return res.first == 0;
+}
+
 std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string & command)
 {
     Path socketPath = startMaster();
@@ -97,7 +102,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
 
     // Wait for the SSH connection to be established,
     // So that we don't overwrite the password prompt with our progress bar.
-    if (!fakeSSH && !useMaster) {
+    if (!fakeSSH && !useMaster && !isMasterRunning()) {
         std::string reply;
         try {
             reply = readLine(out.readSide.get());
@@ -133,6 +138,8 @@ Path SSHMaster::startMaster()
     logger->pause();
     Finally cleanup = [&]() { logger->resume(); };
 
+    bool wasMasterRunning = isMasterRunning();
+
     state->sshMaster = startProcess([&]() {
         restoreProcessContext();
 
@@ -152,13 +159,15 @@ Path SSHMaster::startMaster()
 
     out.writeSide = -1;
 
-    std::string reply;
-    try {
-        reply = readLine(out.readSide.get());
-    } catch (EndOfFile & e) { }
+    if (!wasMasterRunning) {
+        std::string reply;
+        try {
+            reply = readLine(out.readSide.get());
+        } catch (EndOfFile & e) { }
 
-    if (reply != "started")
-        throw Error("failed to start SSH master connection to '%s'", host);
+        if (reply != "started")
+            throw Error("failed to start SSH master connection to '%s'", host);
+    }
 
     return state->socketPath;
 }
