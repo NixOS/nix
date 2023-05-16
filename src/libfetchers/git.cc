@@ -1,4 +1,5 @@
 #include "fetchers.hh"
+#include "finally.hh"
 #include "cache.hh"
 #include "globals.hh"
 #include "tarfile.hh"
@@ -20,6 +21,14 @@ using namespace std::string_literals;
 namespace nix::fetchers {
 
 namespace {
+
+template<typename... Args>
+auto runProgramWithCredentialsInput(Args... args)
+{
+    logger->pause();
+    Finally defer([]{ logger->resume(); });
+    return runProgram(std::forward<Args>(args)...);
+}
 
 // Explicit initial branch of our bare repo to suppress warnings from new version of git.
 // The value itself does not matter, since we always fetch a specific revision or branch.
@@ -58,7 +67,7 @@ Path getCachePath(std::string_view key)
 //   ...
 std::optional<std::string> readHead(const Path & path)
 {
-    auto [status, output] = runProgram(RunOptions {
+    auto [status, output] = runProgramWithCredentialsInput(RunOptions {
         .program = "git",
         // FIXME: use 'HEAD' to avoid returning all refs
         .args = {"ls-remote", "--symref", path},
@@ -350,7 +359,7 @@ struct GitInputScheme : InputScheme
 
         args.push_back(destDir);
 
-        runProgram("git", true, args);
+        runProgramWithCredentialsInput("git", true, args);
     }
 
     std::optional<Path> getSourcePath(const Input & input) override
@@ -555,7 +564,7 @@ struct GitInputScheme : InputScheme
                             : ref == "HEAD"
                                 ? *ref
                                 : "refs/heads/" + *ref;
-                    runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", fetchRef, fetchRef) });
+                    runProgramWithCredentialsInput("git", true, Strings { "-C", repoDir, "--git-dir", gitDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", fetchRef, fetchRef) });
                 } catch (Error & e) {
                     if (!pathExists(localRefFile)) throw;
                     warn("could not update local clone of Git repository '%s'; continuing with the most recent version", actualUrl);
@@ -621,7 +630,7 @@ struct GitInputScheme : InputScheme
                 // exists, see FIXME above) so use a big hammer and fetch
                 // everything to ensure we get the rev.
                 Activity act(*logger, lvlTalkative, actUnknown, fmt("making temporary clone of '%s'", repoDir));
-                runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
+                runProgramWithCredentialsInput("git", true, Strings { "-C", tmpDir, "fetch", "--quiet", "--force",
                         "--update-head-ok", "--", repoDir, "refs/*:refs/*" });
             }
 
@@ -649,7 +658,7 @@ struct GitInputScheme : InputScheme
 
             {
                 Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching submodules of '%s'", actualUrl));
-                runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
+                runProgramWithCredentialsInput("git", true, Strings{ "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
             }
 
             filter = isNotDotGitDirectory;
