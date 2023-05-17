@@ -1607,7 +1607,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 if (countCalls) primOpCalls[name]++;
 
                 try {
-                    vCur.primOp->fun(*this, noPos, args, vCur);
+                    vCur.primOp->fun(*this, pos, args, vCur);
                 } catch (Error & e) {
                     addErrorTrace(e, pos, "while calling the '%1%' builtin", name);
                     throw;

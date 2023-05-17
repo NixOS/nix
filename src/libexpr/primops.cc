@@ -78,10 +78,27 @@ StringMap EvalState::realiseContext(const NixStringContext & context, const PosI
 
     if (evalSettings.logImportFromDerivation) {
          for (auto & drv : drvs) {
+              auto pos2 = positions[pos];
+              std::ostringstream str;
+              ((std::shared_ptr<AbstractPos>) pos2)->print(str);
               Activity act{
                    *logger, lvlInfo, actFromDerivation,
                    fmt("Derivation %s Output %s: importing from derivation %s via %s",
                        store->printStorePath(drv.drvPath), drv.output, positions[pos], reason),
+                   {
+                        Logger::Field{store->printStorePath(drv.drvPath)},
+                        Logger::Field{drv.output},
+                        Logger::Field{
+                          str.str()
+                        },
+                        Logger::Field{
+                          pos2.line
+                        },
+                        Logger::Field {
+                          pos2.column
+                        },
+                        Logger::Field{(std::string) reason},
+                   },
               };
          }
     }
@@ -2101,7 +2118,7 @@ static void addPath(
     try {
         // FIXME: handle CA derivation outputs (where path needs to
         // be rewritten to the actual output).
-        auto rewrites = state.realiseContext(context, noPos, "addPath");
+        auto rewrites = state.realiseContext(context, pos, "addPath");
         path = state.toRealPath(rewriteStrings(path, rewrites), context);
 
         StorePathSet refs;
