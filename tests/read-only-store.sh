@@ -16,7 +16,9 @@ expectStderr 1 nix-store --store local?read-only=true --add eval.nix | grepQuiet
 # Make sure we can get an already-present store-path in the database
 nix-store --store local?read-only=true --add dummy
 
-## Ensure store is actually read-only
+## Testing read-only mode with an underlying store that is actually read-only
+
+# Ensure store is actually read-only
 chmod -R -w $TEST_ROOT/store
 chmod -R -w $TEST_ROOT/var
 
