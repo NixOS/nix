@@ -2,19 +2,26 @@ source common.sh
 
 clearStore
 
+happy () {
+    # We can do a read-only query just fine with a read-only store
+    nix --store local?read-only=true path-info $dummyPath
+    
+    # We can "write" an already-present store-path a read-only store, because no IO is actually required
+    nix-store --store local?read-only=true --add dummy
+}
 ## Testing read-only mode without forcing the underlying store to actually be read-only
 
 # Make sure the command fails when the store doesn't already have a database
 expectStderr 1 nix-store --store local?read-only=true --add dummy | grepQuiet "unable to create database while in read-only mode"
 
-# Make sure the store actually has a current-database
-nix-store --add dummy
+# Make sure the store actually has a current-database, with at least one store object
+dummyPath=$(nix-store --add dummy)
 
 # Try again and make sure we fail when adding a item not already in the store
 expectStderr 1 nix-store --store local?read-only=true --add eval.nix | grepQuiet "attempt to write a readonly database"
 
-# Make sure we can get an already-present store-path in the database
-nix-store --store local?read-only=true --add dummy
+# Test a few operations that should work with the read-only store in its current state
+happy
 
 ## Testing read-only mode with an underlying store that is actually read-only
 
@@ -27,5 +34,5 @@ chmod -R -w $TEST_ROOT/var
 expectStderr 1 nix-store --add eval.nix | grepQuiet "error: opening lock file '$(readlink -e $TEST_ROOT)/var/nix/db/big-lock'"
 expectStderr 1 nix-store --store local?read-only=true --add eval.nix | grepQuiet "Permission denied"
 
-# Should succeed
-nix-store --store local?read-only=true --add dummy
+# Test the same operations from before should again succeed
+happy

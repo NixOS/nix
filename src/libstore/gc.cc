@@ -114,6 +114,7 @@ void LocalStore::addTempRoot(const StorePath & path)
       debug("Read-only store doesn't support creating lock files for temp roots, but nothing can be deleted anyways.");
       return;
     }
+
     createTempRootsFile();
 
     /* Open/create the global GC lock file. */
