@@ -23,6 +23,12 @@ in {
           nix.settings.substituters = lib.mkForce [ ];
           nix.settings.experimental-features = [ "nix-command" ];
           services.getty.autologinUser = "root";
+          programs.ssh.extraConfig = ''
+            Host *
+                ControlMaster auto
+                ControlPath ~/.ssh/master-%h:%r@%n:%p
+                ControlPersist 15m
+          '';
         };
 
       server =
@@ -61,6 +67,10 @@ in {
     client.send_chars("foobar\n")
     client.wait_for_text("done")
     server.succeed("nix-store --check-validity ${pkgA}")
+
+    # Check that ControlMaster is working
+    client.send_chars("nix copy --to ssh://server ${pkgA} >&2; echo done\n")
+    client.wait_for_text("done")
 
     client.copy_from_host("key", "/root/.ssh/id_ed25519")
     client.succeed("chmod 600 /root/.ssh/id_ed25519")
