@@ -13,6 +13,12 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
 
     Path cacheUri;
 
+    const Setting<std::string> sslCert{
+        this, "", "ssl-cert", "An optional SSL client certificate in PEM format; see CURLOPT_SSLCERT."};
+
+    const Setting<std::string> sslKey{
+        this, "", "ssl-key", "The SSL client certificate key in PEM format; see CURLOPT_SSLKEY."};
+
     static const std::string name()
     {
         return "HTTP Binary Cache Store";
