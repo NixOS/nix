@@ -52,12 +52,12 @@ R""(
 * Search for packages containing `neovim` but hide ones containing either `gui` or `python`:
 
   ```console
-  # nix search nixpkgs neovim -e 'python|gui'
+  # nix search nixpkgs neovim --exclude 'python|gui'
   ```
   or
 
   ```console
-  # nix search nixpkgs neovim -e 'python' -e 'gui'
+  # nix search nixpkgs neovim --exclude 'python' --exclude 'gui'
   ```
 
 # Description

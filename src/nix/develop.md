@@ -69,7 +69,7 @@ R""(
 * Run a series of script commands:
 
   ```console
-  # nix develop --command bash -c "mkdir build && cmake .. && make"
+  # nix develop --command bash --command "mkdir build && cmake .. && make"
   ```
 
 # Description

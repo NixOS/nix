@@ -36,7 +36,7 @@ a number of possible ways:
     then the derivation with the highest version will be installed.
 
     You can force the installation of multiple derivations with the same
-    name by being specific about the versions. For instance, `nix-env -i
+    name by being specific about the versions. For instance, `nix-env --install
     gcc-3.3.6 gcc-4.1.1` will install both version of GCC (and will
     probably cause a user environment conflict\!).
 
@@ -44,7 +44,7 @@ a number of possible ways:
     paths* that select attributes from the top-level Nix
     expression. This is faster than using derivation names and
     unambiguous. To find out the attribute paths of available
-    packages, use `nix-env -qaP`.
+    packages, use `nix-env --query --available --attr-path `.
 
   - If `--from-profile` *path* is given, *args* is a set of names
     denoting installed store paths in the profile *path*. This is an
@@ -87,7 +87,7 @@ a number of possible ways:
 
   - `--remove-all` / `-r`\
     Remove all previously installed packages first. This is equivalent
-    to running `nix-env -e '.*'` first, except that everything happens
+    to running `nix-env --uninstall '.*'` first, except that everything happens
     in a single transaction.
 
 {{#include ./opt-common.md}}
@@ -103,9 +103,9 @@ a number of possible ways:
 To install a package using a specific attribute path from the active Nix expression:
 
 ```console
-$ nix-env -iA gcc40mips
+$ nix-env --install --attr gcc40mips
 installing `gcc-4.0.2'
-$ nix-env -iA xorg.xorgserver
+$ nix-env --install --attr xorg.xorgserver
 installing `xorg-server-1.2.0'
 ```
 
@@ -133,32 +133,32 @@ installing `gcc-3.3.2'
 To install all derivations in the Nix expression `foo.nix`:
 
 ```console
-$ nix-env -f ~/foo.nix -i '.*'
+$ nix-env --file ~/foo.nix --install '.*'
 ```
 
 To copy the store path with symbolic name `gcc` from another profile:
 
 ```console
-$ nix-env -i --from-profile /nix/var/nix/profiles/foo gcc
+$ nix-env --install --from-profile /nix/var/nix/profiles/foo gcc
 ```
 
 To install a specific [store derivation] (typically created by
 `nix-instantiate`):
 
 ```console
-$ nix-env -i /nix/store/fibjb1bfbpm5mrsxc4mh2d8n37sxh91i-gcc-3.4.3.drv
+$ nix-env --install /nix/store/fibjb1bfbpm5mrsxc4mh2d8n37sxh91i-gcc-3.4.3.drv
 ```
 
 To install a specific output path:
 
 ```console
-$ nix-env -i /nix/store/y3cgx0xj1p4iv9x0pnnmdhr8iyg741vk-gcc-3.4.3
+$ nix-env --install /nix/store/y3cgx0xj1p4iv9x0pnnmdhr8iyg741vk-gcc-3.4.3
 ```
 
 To install from a Nix expression specified on the command-line:
 
 ```console
-$ nix-env -f ./foo.nix -i -E \
+$ nix-env --file ./foo.nix --install --expr \
     'f: (f {system = "i686-linux";}).subversionWithJava'
 ```
 
@@ -170,7 +170,7 @@ function defined in `./foo.nix`.
 A dry-run tells you which paths will be downloaded or built from source:
 
 ```console
-$ nix-env -f '<nixpkgs>' -iA hello --dry-run
+$ nix-env --file '<nixpkgs>' --install --attr hello --dry-run
 (dry run; not doing anything)
 installing ‘hello-2.10’
 this path will be fetched (0.04 MiB download, 0.19 MiB unpacked):
@@ -182,6 +182,6 @@ To install Firefox from the latest revision in the Nixpkgs/NixOS 14.12
 channel:
 
 ```console
-$ nix-env -f https://github.com/NixOS/nixpkgs/archive/nixos-14.12.tar.gz -iA firefox
+$ nix-env --file https://github.com/NixOS/nixpkgs/archive/nixos-14.12.tar.gz --install --attr firefox
 ```
 

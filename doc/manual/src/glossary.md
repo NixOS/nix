@@ -163,7 +163,7 @@
     build-time dependencies, while the closure of its output path is
     equivalent to its runtime dependencies. For correct deployment it
     is necessary to deploy whole closures, since otherwise at runtime
-    files could be missing. The command `nix-store -qR` prints out
+    files could be missing. The command `nix-store --query --requisites ` prints out
     closures of store paths.
 
     As an example, if the [store object] at path `P` contains a [reference]

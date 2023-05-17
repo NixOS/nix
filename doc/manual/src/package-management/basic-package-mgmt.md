@@ -47,7 +47,7 @@ $ nix-channel --update
 You can view the set of available packages in Nixpkgs:
 
 ```console
-$ nix-env -qaP
+$ nix-env --query --available --attr-path
 nixpkgs.aterm                       aterm-2.2
 nixpkgs.bash                        bash-3.0
 nixpkgs.binutils                    binutils-2.15
@@ -65,7 +65,7 @@ If you downloaded Nixpkgs yourself, or if you checked it out from GitHub,
 then you need to pass the path to your Nixpkgs tree using the `-f` flag:
 
 ```console
-$ nix-env -qaPf /path/to/nixpkgs
+$ nix-env --query --available --attr-path --file /path/to/nixpkgs
 aterm                               aterm-2.2
 bash                                bash-3.0
 …
@@ -77,7 +77,7 @@ Nixpkgs.
 You can filter the packages by name:
 
 ```console
-$ nix-env -qaP firefox
+$ nix-env --query --available --attr-path firefox
 nixpkgs.firefox-esr                 firefox-91.3.0esr
 nixpkgs.firefox                     firefox-94.0.1
 ```
@@ -85,7 +85,7 @@ nixpkgs.firefox                     firefox-94.0.1
 and using regular expressions:
 
 ```console
-$ nix-env -qaP 'firefox.*'
+$ nix-env --query --available --attr-path 'firefox.*'
 ```
 
 It is also possible to see the *status* of available packages, i.e.,
@@ -93,7 +93,7 @@ whether they are installed into the user environment and/or present in
 the system:
 
 ```console
-$ nix-env -qaPs
+$ nix-env --query --available --attr-path --status
 …
 -PS  nixpkgs.bash                bash-3.0
 --S  nixpkgs.binutils            binutils-2.15
@@ -110,10 +110,10 @@ which is Nix’s mechanism for doing binary deployment. It just means that
 Nix knows that it can fetch a pre-built package from somewhere
 (typically a network server) instead of building it locally.
 
-You can install a package using `nix-env -iA`. For instance,
+You can install a package using `nix-env --install --attr `. For instance,
 
 ```console
-$ nix-env -iA nixpkgs.subversion
+$ nix-env --install --attr nixpkgs.subversion
 ```
 
 will install the package called `subversion` from `nixpkgs` channel (which is, of course, the
@@ -143,14 +143,14 @@ instead of the attribute path, as `nix-env` does not record which attribute
 was used for installing:
 
 ```console
-$ nix-env -e subversion
+$ nix-env --uninstall subversion
 ```
 
 Upgrading to a new version is just as easy. If you have a new release of
 Nix Packages, you can do:
 
 ```console
-$ nix-env -uA nixpkgs.subversion
+$ nix-env --upgrade --attr nixpkgs.subversion
 ```
 
 This will *only* upgrade Subversion if there is a “newer” version in the
@@ -163,15 +163,15 @@ whatever version is in the Nix expressions, use `-i` instead of `-u`;
 You can also upgrade all packages for which there are newer versions:
 
 ```console
-$ nix-env -u
+$ nix-env --upgrade
 ```
 
 Sometimes it’s useful to be able to ask what `nix-env` would do, without
 actually doing it. For instance, to find out what packages would be
-upgraded by `nix-env -u`, you can do
+upgraded by `nix-env --upgrade `, you can do
 
 ```console
-$ nix-env -u --dry-run
+$ nix-env --upgrade --dry-run
 (dry run; not doing anything)
 upgrading `libxslt-1.1.0' to `libxslt-1.1.10'
 upgrading `graphviz-1.10' to `graphviz-1.12'

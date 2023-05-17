@@ -76,7 +76,7 @@ except for `--arg` and `--attr` / `-A` which are passed to `nix-instantiate`.
 # Examples
 
 ```console
-$ nix-build '<nixpkgs>' -A firefox
+$ nix-build '<nixpkgs>' --attr firefox
 store derivation is /nix/store/qybprl8sz2lc...-firefox-1.5.0.7.drv
 /nix/store/d18hyl92g30l...-firefox-1.5.0.7
 
@@ -91,7 +91,7 @@ If a derivation has multiple outputs, `nix-build` will build the default
 (first) output. You can also build all outputs:
 
 ```console
-$ nix-build '<nixpkgs>' -A openssl.all
+$ nix-build '<nixpkgs>' --attr openssl.all
 ```
 
 This will create a symlink for each output named `result-outputname`.
@@ -101,7 +101,7 @@ outputs `out`, `bin` and `man`, `nix-build` will create symlinks
 specific output:
 
 ```console
-$ nix-build '<nixpkgs>' -A openssl.man
+$ nix-build '<nixpkgs>' --attr openssl.man
 ```
 
 This will create a symlink `result-man`.
@@ -109,7 +109,7 @@ This will create a symlink `result-man`.
 Build a Nix expression given on the command line:
 
 ```console
-$ nix-build -E 'with import <nixpkgs> { }; runCommand "foo" { } "echo bar > $out"'
+$ nix-build --expr 'with import <nixpkgs> { }; runCommand "foo" { } "echo bar > $out"'
 $ cat ./result
 bar
 ```
@@ -118,5 +118,5 @@ Build the GNU Hello package from the latest revision of the master
 branch of Nixpkgs:
 
 ```console
-$ nix-build https://github.com/NixOS/nixpkgs/archive/master.tar.gz -A hello
+$ nix-build https://github.com/NixOS/nixpkgs/archive/master.tar.gz --attr hello
 ```
