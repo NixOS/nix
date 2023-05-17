@@ -18,6 +18,8 @@ These constants are built into the Nix language evaluator:
   identifier for the Nix installation on which the expression is being
   evaluated, such as `"i686-linux"` or `"x86_64-darwin"`.
 
+  Not available in [pure evaluation mode](@docroot@/command-ref/conf-file.md#conf-pure-eval).
+
 - [`builtins.currentTime`]{#builtins-currentTime} (integer)
 
   Return the [Unix time](https://en.wikipedia.org/wiki/Unix_time) at first evaluation.
@@ -36,7 +38,6 @@ These constants are built into the Nix language evaluator:
   1683705525
   ```
 
-  > **Warning**
-  >
-  > This is intended for testing and debugging only.
-  > Do not use it in production systems, since an impure, that is, non-constant value will break reproducibility.
+  The [store path](@docroot@/glossary.md#gloss-store-path) of a derivation depending on `currentTime` will differ for each evaluation.
+
+  Not available in [pure evaluation mode](@docroot@/command-ref/conf-file.md#conf-pure-eval).

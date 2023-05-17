@@ -745,7 +745,13 @@ struct EvalSettings : Config
         )"};
 
     Setting<bool> pureEval{this, false, "pure-eval",
-        "Whether to restrict file system and network access to files specified by cryptographic hash."};
+        R"(
+          Pure evaluation mode ensures that the result of Nix expressions is fully determined by explicitly declared inputs, and not influenced by external state:
+
+          - Restrict file system and network access to files specified by cryptographic hash
+          - Disable [`bultins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem) and [`builtins.currentTime`](@docroot@/language/builtin-constants.md#builtins-currentTime)
+        )"
+        };
 
     Setting<bool> enableImportFromDerivation{
         this, true, "allow-import-from-derivation",
