@@ -11,6 +11,7 @@
 #include "value-to-json.hh"
 #include "value-to-xml.hh"
 #include "primops.hh"
+#include "build-result.hh"
 
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>
@@ -38,9 +39,9 @@ namespace nix {
 InvalidPathError::InvalidPathError(const Path & path) :
     EvalError("path '%s' is not valid", path), path(path) {}
 
-StringMap EvalState::realiseContext(const NixStringContext & context)
+StringMap EvalState::realiseContext(const NixStringContext & context, const PosIdx pos, const std::string_view reason)
 {
-    std::vector<DerivedPath::Built> drvs;
+    std::vector<NixStringContextElem::Built> drvs;
     StringMap res;
 
     for (auto & c : context) {
@@ -50,10 +51,8 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
         };
         std::visit(overloaded {
             [&](const NixStringContextElem::Built & b) {
-                drvs.push_back(DerivedPath::Built {
-                    .drvPath = b.drvPath,
-                    .outputs = OutputsSpec::Names { b.output },
-                });
+                auto ctxS = store->printStorePath(b.drvPath);
+                drvs.push_back(b);
                 ensureValid(b.drvPath);
             },
             [&](const NixStringContextElem::Opaque & o) {
@@ -77,18 +76,55 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
             "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
             store->printStorePath(drvs.begin()->drvPath)));
 
+    if (evalSettings.logImportFromDerivation) {
+         for (auto & drv : drvs) {
+              auto pos2 = positions[pos];
+              std::ostringstream str;
+              ((std::shared_ptr<AbstractPos>) pos2)->print(str);
+              Activity act{
+                   *logger, lvlInfo, actFromDerivation,
+                   fmt("Derivation %s Output %s: importing from derivation %s via %s",
+                       store->printStorePath(drv.drvPath), drv.output, positions[pos], reason),
+                   {
+                        Logger::Field{store->printStorePath(drv.drvPath)},
+                        Logger::Field{drv.output},
+                        Logger::Field{
+                          str.str()
+                        },
+                        Logger::Field{
+                          pos2.line
+                        },
+                        Logger::Field {
+                          pos2.column
+                        },
+                        Logger::Field{(std::string) reason},
+                   },
+              };
+         }
+    }
+   
     /* Build/substitute the context. */
     std::vector<DerivedPath> buildReqs;
-    for (auto & d : drvs) buildReqs.emplace_back(DerivedPath { d });
-    store->buildPaths(buildReqs);
+    for (auto & d : drvs) buildReqs.emplace_back(DerivedPath {
+        DerivedPath::Built {
+            .drvPath = d.drvPath,
+            .outputs = OutputsSpec::Names { d.output },
+        }
+    });
+    auto results = store->buildPathsWithResults(buildReqs);
 
     /* Get all the output paths corresponding to the placeholders we had */
-    for (auto & drv : drvs) {
-        auto outputs = resolveDerivedPath(*store, drv);
-        for (auto & [outputName, outputPath] : outputs) {
+    for (auto & result : results) {
+        auto built = std::get<DerivedPath::Built>(result.path);
+        if (!result.success()) {
+            auto e = result.error();
+            e.addTrace(positions[pos], fmt("Derivation %s Output %s via %s", store->printStorePath(built.drvPath), built.outputs.to_string(), reason));
+            throw e;
+        }
+        for (auto & [outputName, realisation] : result.builtOutputs) {
             res.insert_or_assign(
-                downstreamPlaceholder(*store, drv.drvPath, outputName),
-                store->printStorePath(outputPath)
+                downstreamPlaceholder(*store, built.drvPath, outputName),
+                store->printStorePath(realisation.outPath)
             );
         }
     }
@@ -109,14 +145,14 @@ struct RealisePathFlags {
     bool checkForPureEval = true;
 };
 
-static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, const RealisePathFlags flags = {})
+static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, const std::string_view reason, const RealisePathFlags flags = {})
 {
     NixStringContext context;
 
-    auto path = state.coerceToPath(noPos, v, context, "while realising the context of a path");
+    auto path = state.coerceToPath(pos, v, context, "while realising the context of a path");
 
     try {
-        StringMap rewrites = state.realiseContext(context);
+        StringMap rewrites = state.realiseContext(context, pos, reason);
 
         auto realPath = state.rootPath(CanonPath(state.toRealPath(rewriteStrings(path.path.abs(), rewrites), context)));
 
@@ -160,7 +196,7 @@ static void mkOutputString(
    argument. */
 static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * vScope, Value & v)
 {
-    auto path = realisePath(state, pos, vPath);
+    auto path = realisePath(state, pos, vPath, "scopedImport");
     auto path2 = path.path.abs();
 
     // FIXME
@@ -323,7 +359,7 @@ extern "C" typedef void (*ValueInitializer)(EvalState & state, Value & v);
 /* Load a ValueInitializer from a DSO and return whatever it initializes */
 void prim_importNative(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto path = realisePath(state, pos, *args[0]);
+    auto path = realisePath(state, pos, *args[0], "importNative");
 
     std::string sym(state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument passed to builtins.importNative"));
 
@@ -367,7 +403,7 @@ void prim_exec(EvalState & state, const PosIdx pos, Value * * args, Value & v)
                         false, false).toOwned());
     }
     try {
-        auto _ = state.realiseContext(context); // FIXME: Handle CA derivations
+        auto _ = state.realiseContext(context, pos, "exec"); // FIXME: Handle CA derivations
     } catch (InvalidPathError & e) {
         state.error("cannot execute '%1%', since path '%2%' is not valid", program, e.path).atPos(pos).debugThrow<EvalError>();
     }
@@ -1514,7 +1550,7 @@ static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args,
        can’t just catch the exception here because we still want to
        throw if something in the evaluation of `*args[0]` tries to
        access an unauthorized path). */
-    auto path = realisePath(state, pos, *args[0], { .checkForPureEval = false });
+    auto path = realisePath(state, pos, *args[0], "pathExists", { .checkForPureEval = false });
 
     try {
         v.mkBool(state.checkSourcePath(path).pathExists());
@@ -1591,7 +1627,7 @@ static RegisterPrimOp primop_dirOf({
 /* Return the contents of a file as a string. */
 static void prim_readFile(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto path = realisePath(state, pos, *args[0]);
+    auto path = realisePath(state, pos, *args[0], "readFile");
     auto s = path.readFile();
     if (s.find((char) 0) != std::string::npos)
         state.debugThrowLastTrace(Error("the contents of the file '%1%' cannot be represented as a Nix string", path));
@@ -1648,7 +1684,7 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
                 false, false).toOwned();
 
         try {
-            auto rewrites = state.realiseContext(context);
+            auto rewrites = state.realiseContext(context, pos, "findFile");
             path = rewriteStrings(path, rewrites);
         } catch (InvalidPathError & e) {
             state.debugThrowLastTrace(EvalError({
@@ -1682,7 +1718,7 @@ static void prim_hashFile(EvalState & state, const PosIdx pos, Value * * args, V
             .errPos = state.positions[pos]
         }));
 
-    auto path = realisePath(state, pos, *args[1]);
+    auto path = realisePath(state, pos, *args[1], "hashFile");
 
     v.mkString(hashString(*ht, path.readFile()).to_string(Base16, false));
 }
@@ -1709,7 +1745,7 @@ static std::string_view fileTypeToString(InputAccessor::Type type)
 
 static void prim_readFileType(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto path = realisePath(state, pos, *args[0]);
+    auto path = realisePath(state, pos, *args[0], "readFileType");
     /* Retrieve the directory entry type and stringize it. */
     v.mkString(fileTypeToString(path.lstat().type));
 }
@@ -1727,7 +1763,7 @@ static RegisterPrimOp primop_readFileType({
 /* Read a directory (without . or ..) */
 static void prim_readDir(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    auto path = realisePath(state, pos, *args[0]);
+    auto path = realisePath(state, pos, *args[0], "readDir");
 
     // Retrieve directory entries for all nodes in a directory.
     // This is similar to `getFileType` but is optimized to reduce system calls
@@ -2073,7 +2109,7 @@ static void addPath(
     try {
         // FIXME: handle CA derivation outputs (where path needs to
         // be rewritten to the actual output).
-        auto rewrites = state.realiseContext(context);
+        auto rewrites = state.realiseContext(context, pos, "addPath");
         path = state.toRealPath(rewriteStrings(path, rewrites), context);
 
         StorePathSet refs;
