@@ -1141,9 +1141,9 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
 }
 
 std::string runProgram(Path program, bool searchPath, const Strings & args,
-    const std::optional<std::string> & input)
+    const std::optional<std::string> & input, bool isInteractive)
 {
-    auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input});
+    auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input, .isInteractive = isInteractive});
 
     if (!statusOk(res.first))
         throw ExecError(res.first, "program '%1%' %2%", program, statusToString(res.first));
@@ -1192,6 +1192,16 @@ void runProgram2(const RunOptions & options)
     // be shared (technically this is undefined, but in practice that's the
     // case), so we can't use it if we alter the environment
     processOptions.allowVfork = !options.environment;
+
+    std::optional<Finally<std::function<void()>>> resumeLoggerDefer;
+    if (options.isInteractive) {
+        logger->pause();
+        resumeLoggerDefer.emplace(
+            []() {
+                logger->resume();
+            }
+        );
+    }
 
     /* Fork. */
     Pid pid = startProcess([&]() {
