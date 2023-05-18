@@ -284,6 +284,14 @@ LocalStore::LocalStore(const Params & params)
     /* Check the current database schema and if necessary do an
        upgrade.  */
     int curSchema = getSchema();
+    if (readOnly && curSchema < nixSchemaVersion) {
+        debug("current schema version: %d", curSchema);
+        debug("supported schema version: %d", nixSchemaVersion);
+        throw Error(curSchema == 0 ?
+            "database does not exist, and cannot be created in read-only mode" :
+            "database schema needs migrating, but this cannot be done in read-only mode");
+    }
+
     if (curSchema > nixSchemaVersion)
         throw Error("current Nix store schema is version %1%, but I only support %2%",
              curSchema, nixSchemaVersion);
@@ -307,7 +315,7 @@ LocalStore::LocalStore(const Params & params)
                 "which is no longer supported. To convert to the new format,\n"
                 "please upgrade Nix to version 1.11 first.");
 
-        if (!readOnly && !lockFile(globalLock.get(), ltWrite, false)) {
+        if (!lockFile(globalLock.get(), ltWrite, false)) {
             printInfo("waiting for exclusive access to the Nix store...");
             lockFile(globalLock.get(), ltNone, false); // We have acquired a shared lock; release it to prevent deadlocks
             lockFile(globalLock.get(), ltWrite, true);
@@ -342,8 +350,7 @@ LocalStore::LocalStore(const Params & params)
 
         writeFile(schemaPath, fmt("%1%", nixSchemaVersion), 0666, true);
 
-        if (!readOnly)
-            lockFile(globalLock.get(), ltRead, true);
+        lockFile(globalLock.get(), ltRead, true);
     }
 
     else openDB(*state, false);
