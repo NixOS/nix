@@ -7,6 +7,7 @@
 #include "names.hh"
 #include "command.hh"
 #include "derivations.hh"
+#include "downstream-placeholder.hh"
 
 namespace nix {
 
@@ -23,7 +24,7 @@ StringPairs resolveRewrites(
         if (auto drvDep = std::get_if<BuiltPathBuilt>(&dep.path))
             for (auto & [ outputName, outputPath ] : drvDep->outputs)
                 res.emplace(
-                    downstreamPlaceholder(store, drvDep->drvPath, outputName),
+                    DownstreamPlaceholder::unknownCaOutput(drvDep->drvPath, outputName).render(),
                     store.printStorePath(outputPath)
                 );
     return res;

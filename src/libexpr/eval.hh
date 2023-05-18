@@ -483,7 +483,7 @@ public:
      * Coerce to `DerivedPath`.
      *
      * Must be a string which is either a literal store path or a
-     * "placeholder (see `downstreamPlaceholder()`).
+     * "placeholder (see `DownstreamPlaceholder`).
      *
      * Even more importantly, the string context must be exactly one
      * element, which is either a `NixStringContextElem::Opaque` or
@@ -622,7 +622,7 @@ public:
      * @param optOutputPath Optional output path for that string. Must
      * be passed if and only if output store object is input-addressed.
      * Will be printed to form string if passed, otherwise a placeholder
-     * will be used (see `downstreamPlaceholder()`).
+     * will be used (see `DownstreamPlaceholder`).
      */
     void mkOutputString(
         Value & value,
