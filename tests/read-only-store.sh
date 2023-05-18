@@ -12,7 +12,7 @@ happy () {
 ## Testing read-only mode without forcing the underlying store to actually be read-only
 
 # Make sure the command fails when the store doesn't already have a database
-expectStderr 1 nix-store --store local?read-only=true --add dummy | grepQuiet "unable to create database while in read-only mode"
+expectStderr 1 nix-store --store local?read-only=true --add dummy | grepQuiet "database does not exist, and cannot be created in read-only mode"
 
 # Make sure the store actually has a current-database, with at least one store object
 dummyPath=$(nix-store --add dummy)
