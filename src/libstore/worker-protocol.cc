@@ -9,31 +9,31 @@
 
 #include <nlohmann/json.hpp>
 
-namespace nix::worker_proto {
+namespace nix {
 
-std::string read(const Store & store, Source & from, Phantom<std::string> _)
+std::string WorkerProto<std::string>::read(const Store & store, Source & from)
 {
     return readString(from);
 }
 
-void write(const Store & store, Sink & out, const std::string & str)
+void WorkerProto<std::string>::write(const Store & store, Sink & out, const std::string & str)
 {
     out << str;
 }
 
 
-StorePath read(const Store & store, Source & from, Phantom<StorePath> _)
+StorePath WorkerProto<StorePath>::read(const Store & store, Source & from)
 {
     return store.parseStorePath(readString(from));
 }
 
-void write(const Store & store, Sink & out, const StorePath & storePath)
+void WorkerProto<StorePath>::write(const Store & store, Sink & out, const StorePath & storePath)
 {
     out << store.printStorePath(storePath);
 }
 
 
-std::optional<TrustedFlag> read(const Store & store, Source & from, Phantom<std::optional<TrustedFlag>> _)
+std::optional<TrustedFlag> WorkerProto<std::optional<TrustedFlag>>::read(const Store & store, Source & from)
 {
     auto temp = readNum<uint8_t>(from);
     switch (temp) {
@@ -48,7 +48,7 @@ std::optional<TrustedFlag> read(const Store & store, Source & from, Phantom<std:
     }
 }
 
-void write(const Store & store, Sink & out, const std::optional<TrustedFlag> & optTrusted)
+void WorkerProto<std::optional<TrustedFlag>>::write(const Store & store, Sink & out, const std::optional<TrustedFlag> & optTrusted)
 {
     if (!optTrusted)
         out << (uint8_t)0;
@@ -67,30 +67,30 @@ void write(const Store & store, Sink & out, const std::optional<TrustedFlag> & o
 }
 
 
-ContentAddress read(const Store & store, Source & from, Phantom<ContentAddress> _)
+ContentAddress WorkerProto<ContentAddress>::read(const Store & store, Source & from)
 {
     return ContentAddress::parse(readString(from));
 }
 
-void write(const Store & store, Sink & out, const ContentAddress & ca)
+void WorkerProto<ContentAddress>::write(const Store & store, Sink & out, const ContentAddress & ca)
 {
     out << renderContentAddress(ca);
 }
 
 
-DerivedPath read(const Store & store, Source & from, Phantom<DerivedPath> _)
+DerivedPath WorkerProto<DerivedPath>::read(const Store & store, Source & from)
 {
     auto s = readString(from);
     return DerivedPath::parseLegacy(store, s);
 }
 
-void write(const Store & store, Sink & out, const DerivedPath & req)
+void WorkerProto<DerivedPath>::write(const Store & store, Sink & out, const DerivedPath & req)
 {
     out << req.to_string_legacy(store);
 }
 
 
-Realisation read(const Store & store, Source & from, Phantom<Realisation> _)
+Realisation WorkerProto<Realisation>::read(const Store & store, Source & from)
 {
     std::string rawInput = readString(from);
     return Realisation::fromJSON(
@@ -99,41 +99,41 @@ Realisation read(const Store & store, Source & from, Phantom<Realisation> _)
     );
 }
 
-void write(const Store & store, Sink & out, const Realisation & realisation)
+void WorkerProto<Realisation>::write(const Store & store, Sink & out, const Realisation & realisation)
 {
     out << realisation.toJSON().dump();
 }
 
 
-DrvOutput read(const Store & store, Source & from, Phantom<DrvOutput> _)
+DrvOutput WorkerProto<DrvOutput>::read(const Store & store, Source & from)
 {
     return DrvOutput::parse(readString(from));
 }
 
-void write(const Store & store, Sink & out, const DrvOutput & drvOutput)
+void WorkerProto<DrvOutput>::write(const Store & store, Sink & out, const DrvOutput & drvOutput)
 {
     out << drvOutput.to_string();
 }
 
 
-KeyedBuildResult read(const Store & store, Source & from, Phantom<KeyedBuildResult> _)
+KeyedBuildResult WorkerProto<KeyedBuildResult>::read(const Store & store, Source & from)
 {
-    auto path = read(store, from, Phantom<DerivedPath> {});
-    auto br = read(store, from, Phantom<BuildResult> {});
+    auto path = WorkerProto<DerivedPath>::read(store, from);
+    auto br = WorkerProto<BuildResult>::read(store, from);
     return KeyedBuildResult {
         std::move(br),
         /* .path = */ std::move(path),
     };
 }
 
-void write(const Store & store, Sink & to, const KeyedBuildResult & res)
+void WorkerProto<KeyedBuildResult>::write(const Store & store, Sink & to, const KeyedBuildResult & res)
 {
-    write(store, to, res.path);
-    write(store, to, static_cast<const BuildResult &>(res));
+    workerProtoWrite(store, to, res.path);
+    workerProtoWrite(store, to, static_cast<const BuildResult &>(res));
 }
 
 
-BuildResult read(const Store & store, Source & from, Phantom<BuildResult> _)
+BuildResult WorkerProto<BuildResult>::read(const Store & store, Source & from)
 {
     BuildResult res;
     res.status = (BuildResult::Status) readInt(from);
@@ -143,7 +143,7 @@ BuildResult read(const Store & store, Source & from, Phantom<BuildResult> _)
         >> res.isNonDeterministic
         >> res.startTime
         >> res.stopTime;
-    auto builtOutputs = read(store, from, Phantom<DrvOutputs> {});
+    auto builtOutputs = WorkerProto<DrvOutputs>::read(store, from);
     for (auto && [output, realisation] : builtOutputs)
         res.builtOutputs.insert_or_assign(
             std::move(output.outputName),
@@ -151,7 +151,7 @@ BuildResult read(const Store & store, Source & from, Phantom<BuildResult> _)
     return res;
 }
 
-void write(const Store & store, Sink & to, const BuildResult & res)
+void WorkerProto<BuildResult>::write(const Store & store, Sink & to, const BuildResult & res)
 {
     to
         << res.status
@@ -163,28 +163,28 @@ void write(const Store & store, Sink & to, const BuildResult & res)
     DrvOutputs builtOutputs;
     for (auto & [output, realisation] : res.builtOutputs)
         builtOutputs.insert_or_assign(realisation.id, realisation);
-    write(store, to, builtOutputs);
+    workerProtoWrite(store, to, builtOutputs);
 }
 
 
-std::optional<StorePath> read(const Store & store, Source & from, Phantom<std::optional<StorePath>> _)
+std::optional<StorePath> WorkerProto<std::optional<StorePath>>::read(const Store & store, Source & from)
 {
     auto s = readString(from);
     return s == "" ? std::optional<StorePath> {} : store.parseStorePath(s);
 }
 
-void write(const Store & store, Sink & out, const std::optional<StorePath> & storePathOpt)
+void WorkerProto<std::optional<StorePath>>::write(const Store & store, Sink & out, const std::optional<StorePath> & storePathOpt)
 {
     out << (storePathOpt ? store.printStorePath(*storePathOpt) : "");
 }
 
 
-std::optional<ContentAddress> read(const Store & store, Source & from, Phantom<std::optional<ContentAddress>> _)
+std::optional<ContentAddress> WorkerProto<std::optional<ContentAddress>>::read(const Store & store, Source & from)
 {
     return ContentAddress::parseOpt(readString(from));
 }
 
-void write(const Store & store, Sink & out, const std::optional<ContentAddress> & caOpt)
+void WorkerProto<std::optional<ContentAddress>>::write(const Store & store, Sink & out, const std::optional<ContentAddress> & caOpt)
 {
     out << (caOpt ? renderContentAddress(*caOpt) : "");
 }
