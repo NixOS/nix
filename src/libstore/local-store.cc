@@ -355,8 +355,12 @@ LocalStore::LocalStore(const Params & params)
 
     else openDB(*state, false);
 
-    if (!readOnly && experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
-        migrateCASchema(state->db, dbDir + "/ca-schema", globalLock);
+    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
+        if (!readOnly) {
+            migrateCASchema(state->db, dbDir + "/ca-schema", globalLock);
+        } else {
+            throw Error("need to migrate to CA schema, but this cannot be done in read-only mode");
+        }
     }
 
     /* Prepare SQL statements. */
