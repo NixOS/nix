@@ -1,5 +1,4 @@
 #include "fetchers.hh"
-#include "finally.hh"
 #include "cache.hh"
 #include "globals.hh"
 #include "tarfile.hh"
@@ -557,7 +556,7 @@ struct GitInputScheme : InputScheme
                             : ref == "HEAD"
                                 ? *ref
                                 : "refs/heads/" + *ref;
-                    runProgram("git", true, Strings { "-C", repoDir, "--git-dir", gitDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", fetchRef, fetchRef) }, {}, true);
+                    runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", fetchRef, fetchRef) }, {}, true);
                 } catch (Error & e) {
                     if (!pathExists(localRefFile)) throw;
                     warn("could not update local clone of Git repository '%s'; continuing with the most recent version", actualUrl);
@@ -623,7 +622,7 @@ struct GitInputScheme : InputScheme
                 // exists, see FIXME above) so use a big hammer and fetch
                 // everything to ensure we get the rev.
                 Activity act(*logger, lvlTalkative, actUnknown, fmt("making temporary clone of '%s'", repoDir));
-                runProgram("git", true, Strings { "-C", tmpDir, "fetch", "--quiet", "--force",
+                runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
                         "--update-head-ok", "--", repoDir, "refs/*:refs/*" }, {}, true);
             }
 
@@ -651,7 +650,7 @@ struct GitInputScheme : InputScheme
 
             {
                 Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching submodules of '%s'", actualUrl));
-                runProgram("git", true, Strings{ "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" }, {}, true);
+                runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" }, {}, true);
             }
 
             filter = isNotDotGitDirectory;
