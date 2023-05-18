@@ -57,7 +57,7 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
           database is on a read-only filesystem.
 
           Enable read-only mode to disable locking and open the SQLite database with the
-          **imutable** parameter set. Do not use this unless the filesystem is read-only.
+          **immutable** parameter set. Do not use this unless the filesystem is read-only.
           Using it when the filesystem is writable can cause incorrect query results or
           corruption errors if the database is changed by another process.
         )"};
