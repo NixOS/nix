@@ -4154,7 +4154,14 @@ void EvalState::createBaseEnv()
                     .arity = std::max(primOp.args.size(), primOp.arity),
                     .name = primOp.name,
                     .args = primOp.args,
-                    .doc = primOp.doc,
+                    .doc =
+                        primOp.experimentalFeature
+                        ? strdup(
+                            (std::string(primOp.doc) +
+                            "\n\n      This function is only available if you enable the [experimental](@docroot@/contributing/experimental-features.md) feature [`" + showExperimentalFeature(*primOp.experimentalFeature) +
+                            "`](@docroot@/contributing/experimental-features.md#xp-feature-" + showExperimentalFeature(*primOp.experimentalFeature) +
+                            ").\n").c_str())
+                        : primOp.doc,
                 });
             }
 
