@@ -13,7 +13,7 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
     std::optional<StorePath> fromPath;
     bool enableRewriting = false;
     std::optional<StorePath> toPath;
-    bool inputAddressed = false;
+    std::optional<bool> inputAddressedMaybe;
 
     for (auto & attr : *args[0]->attrs) {
         const auto & attrName = state.symbols[attr.name];
@@ -40,7 +40,7 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
                     attrHint());
 
         else if (attrName == "inputAddressed")
-            inputAddressed = state.forceBool(*attr.value, attr.pos, attrHint());
+            inputAddressedMaybe = state.forceBool(*attr.value, attr.pos, attrHint());
 
         else
             throw Error({
@@ -54,6 +54,8 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
             .msg = hintfmt("attribute '%s' is missing in call to 'fetchClosure'", "fromPath"),
             .errPos = state.positions[pos]
         });
+
+    bool inputAddressed = inputAddressedMaybe.value_or(false);
 
     if (inputAddressed) {
         if (toPath && toPath != fromPath)
@@ -120,15 +122,39 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
         toPath = fromPath;
     }
 
-    /* We want input addressing to be explicit, to inform readers and to give
-       expression authors an opportunity to improve their user experience. */
-    if (!inputAddressed) {
-        auto info = state.store->queryPathInfo(*toPath);
+    auto info = state.store->queryPathInfo(*toPath);
+
+    /* If inputAddressed is set, make sure the result is as expected. */
+    if (inputAddressedMaybe) {
+        bool expectCA = !inputAddressed;
+        if (info->isContentAddressed(*state.store) != expectCA) {
+            if (inputAddressed)
+                throw Error({
+                    .msg = hintfmt("The 'fetchClosure' result, '%s' is not input addressed, despite 'inputAddressed' being set to true. It is ok or even preferable to return a content addressed path, so you probably want to remove the 'inputAddressed' attribute",
+                        state.store->printStorePath(*toPath)),
+                    .errPos = state.positions[pos]
+                });
+            else
+                throw Error({
+                    .msg = hintfmt("The 'fetchClosure' result, '%s' is input addressed, despite 'inputAddressed' being set to false. Please make sure you passed the correct path(s) or set 'inputAddressed' to true if you intended to return an input addressed path",
+                        state.store->printStorePath(*toPath)),
+                    .errPos = state.positions[pos]
+                });
+        }
+    } else {
+        /*
+          While it's fine to omit the inputAddressed attribute for CA paths,
+          we want input addressing to be explicit, to inform readers and to give
+          expression authors an opportunity to improve their user experience;
+          see message below.
+        */
         if (!info->isContentAddressed(*state.store)) {
             if (enableRewriting) {
+                // We don't perform the rewriting when outPath already exists, as an optimisation.
+                // However, we can quickly detect a mistake if the toPath is input addressed.
+                // Ideally we'd compute the path for them here, but this error message is unlikely to occur in practice, so we keep it simple.
                 throw Error({
-                    // Ideally we'd compute the path for them, but this error message is unlikely to occur in practice, so we keep it simple.
-                    .msg = hintfmt("Rewriting was requested, but 'toPath' is not content addressed. This is impossible. Please change 'toPath' to the correct path, or to a non-existing path, and try again",
+                    .msg = hintfmt("The 'toPath' value '%s' is input addressed, so it can't possibly be the result of rewriting. You may set 'toPath' to an empty string to figure out the correct path.",
                         state.store->printStorePath(*toPath)),
                     .errPos = state.positions[pos]
                 });
