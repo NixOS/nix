@@ -16,11 +16,13 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
 
     for (auto & attr : *args[0]->attrs) {
         const auto & attrName = state.symbols[attr.name];
+        auto attrHint = [&]() -> std::string {
+            return "while evaluating the '" + attrName + "' attribute passed to builtins.fetchClosure";
+        };
 
         if (attrName == "fromPath") {
             NixStringContext context;
-            fromPath = state.coerceToStorePath(attr.pos, *attr.value, context,
-                    "while evaluating the 'fromPath' attribute passed to builtins.fetchClosure");
+            fromPath = state.coerceToStorePath(attr.pos, *attr.value, context, attrHint());
         }
 
         else if (attrName == "toPath") {
@@ -28,14 +30,13 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
             toCA = true;
             if (attr.value->type() != nString || attr.value->string.s != std::string("")) {
                 NixStringContext context;
-                toPath = state.coerceToStorePath(attr.pos, *attr.value, context,
-                        "while evaluating the 'toPath' attribute passed to builtins.fetchClosure");
+                toPath = state.coerceToStorePath(attr.pos, *attr.value, context, attrHint());
             }
         }
 
         else if (attrName == "fromStore")
             fromStoreUrl = state.forceStringNoCtx(*attr.value, attr.pos,
-                    "while evaluating the 'fromStore' attribute passed to builtins.fetchClosure");
+                    attrHint());
 
         else
             throw Error({
