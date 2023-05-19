@@ -11,7 +11,7 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
 
     std::optional<std::string> fromStoreUrl;
     std::optional<StorePath> fromPath;
-    bool toCA = false;
+    bool enableRewriting = false;
     std::optional<StorePath> toPath;
 
     for (auto & attr : *args[0]->attrs) {
@@ -27,7 +27,7 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
 
         else if (attrName == "toPath") {
             state.forceValue(*attr.value, attr.pos);
-            toCA = true;
+            enableRewriting = true;
             if (attr.value->type() != nString || attr.value->string.s != std::string("")) {
                 NixStringContext context;
                 toPath = state.coerceToStorePath(attr.pos, *attr.value, context, attrHint());
@@ -75,7 +75,7 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
 
     auto fromStore = openStore(parsedURL.to_string());
 
-    if (toCA) {
+    if (enableRewriting) {
         if (!toPath || !state.store->isValidPath(*toPath)) {
             auto remappings = makeContentAddressed(*fromStore, *state.store, { *fromPath });
             auto i = remappings.find(*fromPath);
