@@ -124,10 +124,7 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
 
     /* Rehash and write the derivation. FIXME: would be nice to use
        'buildDerivation', but that's privileged. */
-    auto drvName = std::string(drvPath.name());
-    assert(hasSuffix(drvName, ".drv"));
-    drvName.resize(drvName.size() - 4);
-    drvName += "-env";
+    drv.name += "-env";
     for (auto & output : drv.outputs)
         drv.env.erase(output.first);
     drv.outputs = {{"out", DerivationOutput { .output = DerivationOutputInputAddressed { .path = StorePath::dummy }}}};
@@ -136,12 +133,12 @@ StorePath getDerivationEnvironment(ref<Store> store, const StorePath & drvPath)
     drv.env["outputs"] = "out";
     drv.inputSrcs.insert(std::move(getEnvShPath));
     Hash h = std::get<0>(hashDerivationModulo(*store, drv, true));
-    auto shellOutPath = store->makeOutputPath("out", h, drvName);
+    auto shellOutPath = store->makeOutputPath("out", h, drv.name);
     drv.outputs.insert_or_assign("out", DerivationOutput { .output = DerivationOutputInputAddressed {
                 .path = shellOutPath
             } });
     drv.env["out"] = store->printStorePath(shellOutPath);
-    auto shellDrvPath2 = writeDerivation(store, drv, drvName);
+    auto shellDrvPath2 = writeDerivation(store, drv);
 
     /* Build the derivation. */
     store->buildPaths({{shellDrvPath2}});
