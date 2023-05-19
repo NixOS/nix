@@ -344,6 +344,17 @@ public:
     virtual ref<FSAccessor> getFSAccessor() override
     { unsupported("getFSAccessor"); }
 
+    /**
+     * The default instance would schedule the work on the client side, but
+     * for consistency with `buildPaths` and `buildDerivation` it should happen
+     * on the remote side.
+     *
+     * We make this fail for now so we can add implement this properly later
+     * without it being a breaking change.
+     */
+    void repairPath(const StorePath & path) override
+    { unsupported("repairPath"); }
+
     void computeFSClosure(const StorePathSet & paths,
         StorePathSet & out, bool flipDirection = false,
         bool includeOutputs = false, bool includeDerivers = false) override

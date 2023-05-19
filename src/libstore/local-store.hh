@@ -240,8 +240,6 @@ public:
 
     void vacuumDB();
 
-    void repairPath(const StorePath & path) override;
-
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
     /**
