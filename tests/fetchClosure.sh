@@ -35,15 +35,27 @@ clearStore
 
 if [[ "$NIX_REMOTE" != "daemon" ]]; then
 
-    # In impure mode, we can use non-CA paths.
-    [[ $(nix eval --raw --no-require-sigs --impure --expr "
+    # We can use non-CA paths when we ask explicitly.
+    [[ $(nix eval --raw --no-require-sigs --expr "
       builtins.fetchClosure {
         fromStore = \"file://$cacheDir\";
         fromPath = $nonCaPath;
+        inputAddressed = true;
       }
     ") = $nonCaPath ]]
 
     [ -e $nonCaPath ]
+
+    # .. but only if we ask explicitly.
+    expectStderr 1 nix eval --raw --no-require-sigs --expr "
+      builtins.fetchClosure {
+        fromStore = \"file://$cacheDir\";
+        fromPath = $nonCaPath;
+      }
+    " | grepQuiet -E "The .fromPath. value .* is input addressed, but input addressing was not requested. If you do intend to return an input addressed store path, add .inputAddressed = true;. to the .fetchClosure. arguments."
+
+    [ -e $nonCaPath ]
+
 
 fi
 

@@ -13,6 +13,7 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
     std::optional<StorePath> fromPath;
     bool enableRewriting = false;
     std::optional<StorePath> toPath;
+    bool inputAddressed = false;
 
     for (auto & attr : *args[0]->attrs) {
         const auto & attrName = state.symbols[attr.name];
@@ -38,6 +39,9 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
             fromStoreUrl = state.forceStringNoCtx(*attr.value, attr.pos,
                     attrHint());
 
+        else if (attrName == "inputAddressed")
+            inputAddressed = state.forceBool(*attr.value, attr.pos, attrHint());
+
         else
             throw Error({
                 .msg = hintfmt("attribute '%s' isn't supported in call to 'fetchClosure'", attrName),
@@ -50,6 +54,18 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
             .msg = hintfmt("attribute '%s' is missing in call to 'fetchClosure'", "fromPath"),
             .errPos = state.positions[pos]
         });
+
+    if (inputAddressed) {
+        if (toPath && toPath != fromPath)
+            throw Error({
+                .msg = hintfmt("attribute '%s' is set to true, but 'toPath' does not match 'fromPath'. 'toPath' should be equal, or should be omitted. Instead 'toPath' was '%s' and 'fromPath' was '%s'",
+                    "inputAddressed",
+                    state.store->printStorePath(*toPath),
+                    state.store->printStorePath(*fromPath)),
+                .errPos = state.positions[pos]
+            });
+        assert(!enableRewriting);
+    }
 
     if (!fromStoreUrl)
         throw Error({
@@ -104,15 +120,28 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
         toPath = fromPath;
     }
 
-    /* In pure mode, require a CA path. */
-    if (evalSettings.pureEval) {
+    /* We want input addressing to be explicit, to inform readers and to give
+       expression authors an opportunity to improve their user experience. */
+    if (!inputAddressed) {
         auto info = state.store->queryPathInfo(*toPath);
-        if (!info->isContentAddressed(*state.store))
-            throw Error({
-                .msg = hintfmt("in pure mode, 'fetchClosure' requires a content-addressed path, which '%s' isn't",
-                    state.store->printStorePath(*toPath)),
-                .errPos = state.positions[pos]
-            });
+        if (!info->isContentAddressed(*state.store)) {
+            if (enableRewriting) {
+                throw Error({
+                    // Ideally we'd compute the path for them, but this error message is unlikely to occur in practice, so we keep it simple.
+                    .msg = hintfmt("Rewriting was requested, but 'toPath' is not content addressed. This is impossible. Please change 'toPath' to the correct path, or to a non-existing path, and try again",
+                        state.store->printStorePath(*toPath)),
+                    .errPos = state.positions[pos]
+                });
+            } else {
+                // We just checked toPath, but we report fromPath, because that's what the user certainly passed.
+                assert (toPath == fromPath);
+                throw Error({
+                    .msg = hintfmt("The 'fromPath' value '%s' is input addressed, but input addressing was not requested. If you do intend to return an input addressed store path, add 'inputAddressed = true;' to the 'fetchClosure' arguments. Note that content addressing does not require users to configure a trusted binary cache public key on their systems, and is therefore preferred.",
+                        state.store->printStorePath(*fromPath)),
+                    .errPos = state.positions[pos]
+                });
+            }
+        }
     }
 
     state.mkStorePathString(*toPath, v);
@@ -138,7 +167,7 @@ static RegisterPrimOp primop_fetchClosure({
       `/nix/store/ldbh...`.
 
       If `fromPath` is already content-addressed, or if you are
-      allowing impure evaluation (`--impure`), then `toPath` may be
+      allowing input addressing (`inputAddressed = true;`), then `toPath` may be
       omitted.
 
       To find out the correct value for `toPath` given a `fromPath`,
@@ -153,8 +182,11 @@ static RegisterPrimOp primop_fetchClosure({
       allows you to use a previously built store path in a Nix
       expression. However, it is more reproducible because it requires
       specifying a binary cache from which the path can be fetched.
-      Also, requiring a content-addressed final store path avoids the
-      need for users to configure binary cache public keys.
+      Also, the default requirement of a content-addressed final store path
+      avoids the need for users to configure [`trusted-public-keys`](@docroot@/command-ref/conf-file.md#conf-trusted-public-keys).
+
+      This function is only available if you enable the experimental
+      feature `fetch-closure`.
     )",
     .fun = prim_fetchClosure,
     .experimentalFeature = Xp::FetchClosure,
