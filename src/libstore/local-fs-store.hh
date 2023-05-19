@@ -15,22 +15,22 @@ struct LocalFSStoreConfig : virtual StoreConfig
     // it to omit the call to the Setting constructor. Clang works fine
     // either way.
 
-    const PathSetting rootDir{(StoreConfig*) this, true, "",
+    const OptionalPathSetting rootDir{(StoreConfig*) this, std::nullopt,
         "root",
         "Directory prefixed to all other paths."};
 
-    const PathSetting stateDir{(StoreConfig*) this, false,
-        rootDir != "" ? rootDir + "/nix/var/nix" : settings.nixStateDir,
+    const PathSetting stateDir{(StoreConfig*) this,
+        rootDir.get() ? *rootDir.get() + "/nix/var/nix" : settings.nixStateDir,
         "state",
         "Directory where Nix will store state."};
 
-    const PathSetting logDir{(StoreConfig*) this, false,
-        rootDir != "" ? rootDir + "/nix/var/log/nix" : settings.nixLogDir,
+    const PathSetting logDir{(StoreConfig*) this,
+        rootDir.get() ? *rootDir.get() + "/nix/var/log/nix" : settings.nixLogDir,
         "log",
         "directory where Nix will store log files."};
 
-    const PathSetting realStoreDir{(StoreConfig*) this, false,
-        rootDir != "" ? rootDir + "/nix/store" : storeDir, "real",
+    const PathSetting realStoreDir{(StoreConfig*) this,
+        rootDir.get() ? *rootDir.get() + "/nix/store" : storeDir, "real",
         "Physical path of the Nix store."};
 };
 
