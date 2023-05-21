@@ -1861,11 +1861,13 @@ void restoreMountNamespace()
 {
 #if __linux__
     try {
-        auto savedCwd = absPath(".");
-
+        AutoCloseFD fdSavedCwd = open("/proc/self/cwd", O_RDONLY);
+        if (!fdSavedCwd) {
+            throw SysError("saving cwd");
+        }
         if (fdSavedMountNamespace && setns(fdSavedMountNamespace.get(), CLONE_NEWNS) == -1)
             throw SysError("restoring parent mount namespace");
-        if (chdir(savedCwd.c_str()) == -1) {
+        if (fdSavedCwd && fchdir(fdSavedCwd.get()) == -1) {
             throw SysError("restoring cwd");
         }
     } catch (Error & e) {
