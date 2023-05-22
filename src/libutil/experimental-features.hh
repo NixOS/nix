@@ -30,6 +30,7 @@ enum struct ExperimentalFeature
     DiscardReferences,
     DaemonTrustOverride,
     DynamicDerivations,
+    ReadOnlyLocalStore,
 };
 
 /**

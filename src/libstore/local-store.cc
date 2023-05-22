@@ -202,6 +202,10 @@ LocalStore::LocalStore(const Params & params)
         createSymlink(profilesDir, gcRootsDir + "/profiles");
     }
 
+    if (readOnly) {
+        experimentalFeatureSettings.require(Xp::ReadOnlyLocalStore);
+    }
+
     for (auto & perUserDir : {profilesDir + "/per-user", gcRootsDir + "/per-user"}) {
         createDirs(perUserDir);
         if (!readOnly) {
