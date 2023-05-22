@@ -722,11 +722,13 @@ struct CmdFlakeCheck : FlakeCommand
             throw Error("some errors were encountered during the evaluation");
 
         if (!omittedSystems.empty()) {
-            logger->warn("The check omitted these incompatible systems (use '--all-systems' to check all):");
-            for (auto omittedSystem: omittedSystems)
-                logger->warn(omittedSystem);
-        }
-    }
+            warn(
+                "The check omitted these incompatible systems: %s\n"
+                "Use '--all-systems' to check all.",
+                concatStringsSep(", ", omittedSystems)
+            );
+        };
+    };
 };
 
 static Strings defaultTemplateAttrPathsPrefixes{"templates."};
