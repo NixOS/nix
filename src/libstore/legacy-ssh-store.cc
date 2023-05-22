@@ -146,7 +146,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info->deriver = parseStorePath(deriver);
-            info->references = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+            info->references = WorkerProto<StorePathSet>::read(*this, conn->from);
             readLongLong(conn->from); // download size
             info->narSize = readLongLong(conn->from);
 
@@ -180,7 +180,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
                 << printStorePath(info.path)
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << info.narHash.to_string(Base16, false);
-            worker_proto::write(*this, conn->to, info.references);
+            workerProtoWrite(*this, conn->to, info.references);
             conn->to
                 << info.registrationTime
                 << info.narSize
@@ -209,7 +209,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             conn->to
                 << exportMagic
                 << printStorePath(info.path);
-            worker_proto::write(*this, conn->to, info.references);
+            workerProtoWrite(*this, conn->to, info.references);
             conn->to
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << 0
@@ -294,7 +294,7 @@ public:
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
             conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 6) {
-            auto builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
+            auto builtOutputs = WorkerProto<DrvOutputs>::read(*this, conn->from);
             for (auto && [output, realisation] : builtOutputs)
                 status.builtOutputs.insert_or_assign(
                     std::move(output.outputName),
@@ -369,10 +369,10 @@ public:
         conn->to
             << cmdQueryClosure
             << includeOutputs;
-        worker_proto::write(*this, conn->to, paths);
+        workerProtoWrite(*this, conn->to, paths);
         conn->to.flush();
 
-        for (auto & i : worker_proto::read(*this, conn->from, Phantom<StorePathSet> {}))
+        for (auto & i : WorkerProto<StorePathSet>::read(*this, conn->from))
             out.insert(i);
     }
 
@@ -385,10 +385,10 @@ public:
             << cmdQueryValidPaths
             << false // lock
             << maybeSubstitute;
-        worker_proto::write(*this, conn->to, paths);
+        workerProtoWrite(*this, conn->to, paths);
         conn->to.flush();
 
-        return worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+        return WorkerProto<StorePathSet>::read(*this, conn->from);
     }
 
     void connect() override

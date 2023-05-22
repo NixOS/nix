@@ -132,7 +132,7 @@ ValidPathInfo ValidPathInfo::read(Source & source, const Store & store, unsigned
     auto narHash = Hash::parseAny(readString(source), htSHA256);
     ValidPathInfo info(path, narHash);
     if (deriver != "") info.deriver = store.parseStorePath(deriver);
-    info.references = worker_proto::read(store, source, Phantom<StorePathSet> {});
+    info.references = WorkerProto<StorePathSet>::read(store, source);
     source >> info.registrationTime >> info.narSize;
     if (format >= 16) {
         source >> info.ultimate;
@@ -153,7 +153,7 @@ void ValidPathInfo::write(
         sink << store.printStorePath(path);
     sink << (deriver ? store.printStorePath(*deriver) : "")
          << narHash.to_string(Base16, false);
-    worker_proto::write(store, sink, references);
+    workerProtoWrite(store, sink, references);
     sink << registrationTime << narSize;
     if (format >= 16) {
         sink << ultimate
