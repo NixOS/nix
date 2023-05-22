@@ -34,19 +34,23 @@ nix-build dependencies.nix --no-out-link --check --sandbox-paths /nix/store
 # Test that sandboxed builds with --check and -K can move .check directory to store
 nix-build check.nix -A nondeterministic --sandbox-paths /nix/store --no-out-link
 
-(! nix-build check.nix -A nondeterministic --sandbox-paths /nix/store --no-out-link --check -K 2> $TEST_ROOT/log)
-if grepQuiet 'error: renaming' $TEST_ROOT/log; then false; fi
-grepQuiet 'may not be deterministic' $TEST_ROOT/log
+expectStderr 104 nix-build check.nix -A nondeterministic --sandbox-paths /nix/store --no-out-link --check -K \
+  | tee >( grepQuietInverse 'error: renaming' ) \
+  | grepQuiet 'may not be deterministic'
 
 # Test that sandboxed builds cannot write to /etc easily
-(! nix-build -E 'with import ./config.nix; mkDerivation { name = "etc-write"; buildCommand = "echo > /etc/test"; }' --no-out-link --sandbox-paths /nix/store)
+expect 100 nix-build -E 'with import ./config.nix; mkDerivation { name = "etc-write"; buildCommand = "echo > /etc/test"; }' --no-out-link --sandbox-paths /nix/store
 
 
 ## Test mounting of SSL certificates into the sandbox
 testCert () {
-    (! nix-build linux-sandbox-cert-test.nix --argstr fixed-output "$2" --no-out-link --sandbox-paths /nix/store --option ssl-cert-file "$3" 2> $TEST_ROOT/log)
-    cat $TEST_ROOT/log
-    grepQuiet "CERT_${1}_IN_SANDBOX" $TEST_ROOT/log
+    expectation=$1 # "missing" | "present"
+    mode=$2        # "normal" | "fixed-output"
+    certFile=$3    # a string that can be the path to a cert file
+    [ "$mode" == fixed-output ] && ret=1 || ret=100
+    expectStderr $ret nix-build linux-sandbox-cert-test.nix --argstr mode "$mode" --no-out-link --sandbox-paths /nix/store --option ssl-cert-file "$certFile" | \
+      # tee /dev/stderr | \
+      grepQuiet "CERT_${expectation}_IN_SANDBOX"
 }
 
 nocert=$TEST_ROOT/no-cert-file.pem
