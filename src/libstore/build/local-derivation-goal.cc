@@ -1777,7 +1777,8 @@ void LocalDerivationGoal::runChild()
                     if (pathExists(path))
                         ss.push_back(path);
 
-                dirsInChroot.emplace(settings.caFile, "/etc/ssl/certs/ca-certificates.crt");
+                if (settings.caFile != "")
+                    dirsInChroot.try_emplace("/etc/ssl/certs/ca-certificates.crt", settings.caFile, true);
             }
 
             for (auto & i : ss) dirsInChroot.emplace(i, i);
