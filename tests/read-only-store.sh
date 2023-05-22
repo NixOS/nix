@@ -1,5 +1,7 @@
 source common.sh
 
+enableFeatures "read-only-local-store"
+
 clearStore
 
 happy () {
