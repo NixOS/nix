@@ -1,4 +1,5 @@
 #include "derivations.hh"
+#include "downstream-placeholder.hh"
 #include "store-api.hh"
 #include "globals.hh"
 #include "util.hh"
@@ -748,7 +749,7 @@ Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv,
         drv.outputs.emplace(std::move(name), std::move(output));
     }
 
-    drv.inputSrcs = worker_proto::read(store, in, Phantom<StorePathSet> {});
+    drv.inputSrcs = WorkerProto<StorePathSet>::read(store, in);
     in >> drv.platform >> drv.builder;
     drv.args = readStrings<Strings>(in);
 
@@ -796,7 +797,7 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
             },
         }, i.second.raw());
     }
-    worker_proto::write(store, out, drv.inputSrcs);
+    workerProtoWrite(store, out, drv.inputSrcs);
     out << drv.platform << drv.builder << drv.args;
     out << drv.env.size();
     for (auto & i : drv.env)
@@ -810,13 +811,7 @@ std::string hashPlaceholder(const std::string_view outputName)
     return "/" + hashString(htSHA256, concatStrings("nix-output:", outputName)).to_string(Base32, false);
 }
 
-std::string downstreamPlaceholder(const Store & store, const StorePath & drvPath, std::string_view outputName)
-{
-    auto drvNameWithExtension = drvPath.name();
-    auto drvName = drvNameWithExtension.substr(0, drvNameWithExtension.size() - 4);
-    auto clearText = "nix-upstream-output:" + std::string { drvPath.hashPart() } + ":" + outputPathName(drvName, outputName);
-    return "/" + hashString(htSHA256, clearText).to_string(Base32, false);
-}
+
 
 
 static void rewriteDerivation(Store & store, BasicDerivation & drv, const StringMap & rewrites)
@@ -880,7 +875,7 @@ std::optional<BasicDerivation> Derivation::tryResolve(
         for (auto & outputName : inputOutputs) {
             if (auto actualPath = get(inputDrvOutputs, { inputDrv, outputName })) {
                 inputRewrites.emplace(
-                    downstreamPlaceholder(store, inputDrv, outputName),
+                    DownstreamPlaceholder::unknownCaOutput(inputDrv, outputName).render(),
                     store.printStorePath(*actualPath));
                 resolved.inputSrcs.insert(*actualPath);
             } else {

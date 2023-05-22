@@ -4,6 +4,7 @@
 #include "util.hh"
 #include "store-api.hh"
 #include "derivations.hh"
+#include "downstream-placeholder.hh"
 #include "globals.hh"
 #include "eval-inline.hh"
 #include "filetransfer.hh"
@@ -1058,7 +1059,7 @@ void EvalState::mkOutputString(
             ? store->printStorePath(*std::move(optOutputPath))
             /* Downstream we would substitute this for an actual path once
                we build the floating CA derivation */
-            : downstreamPlaceholder(*store, drvPath, outputName),
+            : DownstreamPlaceholder::unknownCaOutput(drvPath, outputName).render(),
         NixStringContext {
             NixStringContextElem::Built {
                 .drvPath = drvPath,
@@ -2380,7 +2381,7 @@ DerivedPath EvalState::coerceToDerivedPath(const PosIdx pos, Value & v, std::str
             // This is testing for the case of CA derivations
             auto sExpected = optOutputPath
                 ? store->printStorePath(*optOutputPath)
-                : downstreamPlaceholder(*store, b.drvPath, output);
+                : DownstreamPlaceholder::unknownCaOutput(b.drvPath, output).render();
             if (s != sExpected)
                 error(
                     "string '%s' has context with the output '%s' from derivation '%s', but the string is not the right placeholder for this derivation output. It should be '%s'",

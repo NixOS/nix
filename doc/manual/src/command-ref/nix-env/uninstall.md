@@ -24,5 +24,5 @@ designated by the symbolic names *drvnames* are removed.
 
 ```console
 $ nix-env --uninstall gcc
-$ nix-env -e '.*' (remove everything)
+$ nix-env --uninstall '.*' (remove everything)
 ```

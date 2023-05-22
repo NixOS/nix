@@ -31,7 +31,7 @@ To copy a whole closure, do something
 like:
 
 ```console
-$ nix-store --export $(nix-store -qR paths) > out
+$ nix-store --export $(nix-store --query --requisites paths) > out
 ```
 
 To import the whole closure again, run:

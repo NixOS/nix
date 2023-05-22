@@ -415,7 +415,7 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
  */
 std::string runProgram(Path program, bool searchPath = false,
     const Strings & args = Strings(),
-    const std::optional<std::string> & input = {});
+    const std::optional<std::string> & input = {}, bool isInteractive = false);
 
 struct RunOptions
 {
@@ -430,6 +430,7 @@ struct RunOptions
     Source * standardIn = nullptr;
     Sink * standardOut = nullptr;
     bool mergeStderrToStdout = false;
+    bool isInteractive = false;
 };
 
 std::pair<int, std::string> runProgram(RunOptions && options);

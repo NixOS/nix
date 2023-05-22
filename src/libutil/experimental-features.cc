@@ -207,6 +207,9 @@ constexpr std::array<ExperimentalFeatureDetails, 14> xpFeatureDetails = {{
 
               - "text hashing" derivation outputs, so we can build .drv
                 files.
+
+              - dependencies in derivations on the outputs of
+                derivations that are themselves derivations outputs.
         )",
     },
     {

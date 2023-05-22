@@ -24,6 +24,6 @@ path has changed, and 1 otherwise.
 To verify the integrity of the `svn` command and all its dependencies:
 
 ```console
-$ nix-store --verify-path $(nix-store -qR $(which svn))
+$ nix-store --verify-path $(nix-store --query --requisites $(which svn))
 ```
 

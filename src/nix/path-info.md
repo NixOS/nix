@@ -13,7 +13,7 @@ R""(
   closure, sorted by size:
 
   ```console
-  # nix path-info -rS /run/current-system | sort -nk2
+  # nix path-info --recursive --closure-size /run/current-system | sort -nk2
   /nix/store/hl5xwp9kdrd1zkm0idm3kkby9q66z404-empty                                                96
   /nix/store/27324qvqhnxj3rncazmxc4mwy79kz8ha-nameservers                                         112
   …
@@ -25,7 +25,7 @@ R""(
   readable sizes:
 
   ```console
-  # nix path-info -rsSh nixpkgs#rustc
+  # nix path-info --recursive --size --closure-size --human-readable nixpkgs#rustc
   /nix/store/01rrgsg5zk3cds0xgdsq40zpk6g51dz9-ncurses-6.2-dev      386.7K   69.1M
   /nix/store/0q783wnvixpqz6dxjp16nw296avgczam-libpfm-4.11.0          5.9M   37.4M
   …
@@ -34,7 +34,7 @@ R""(
 * Check the existence of a path in a binary cache:
 
   ```console
-  # nix path-info -r /nix/store/blzxgyvrk32ki6xga10phr4sby2xf25q-geeqie-1.5.1 --store https://cache.nixos.org/
+  # nix path-info --recursive /nix/store/blzxgyvrk32ki6xga10phr4sby2xf25q-geeqie-1.5.1 --store https://cache.nixos.org/
   path '/nix/store/blzxgyvrk32ki6xga10phr4sby2xf25q-geeqie-1.5.1' is not valid
 
   ```
@@ -57,7 +57,7 @@ R""(
   size:
 
   ```console
-  # nix path-info --json --all -S \
+  # nix path-info --json --all --closure-size \
     | jq 'map(select(.closureSize > 1e9)) | sort_by(.closureSize) | map([.path, .closureSize])'
   [
     …,

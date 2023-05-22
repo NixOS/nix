@@ -190,6 +190,12 @@ let
         cp -a ${rootEnv}/* $out/
         ln -s ${manifest} $out/manifest.nix
       '';
+      flake-registry-path = if (flake-registry == null) then
+        null
+      else if (builtins.readFileType (toString flake-registry)) == "directory" then
+        "${flake-registry}/flake-registry.json"
+      else
+        flake-registry;
     in
     pkgs.runCommand "base-system"
       {
@@ -202,7 +208,7 @@ let
         ];
         allowSubstitutes = false;
         preferLocalBuild = true;
-      } ''
+      } (''
       env
       set -x
       mkdir -p $out/etc
@@ -249,15 +255,15 @@ let
       ln -s ${pkgs.coreutils}/bin/env $out/usr/bin/env
       ln -s ${pkgs.bashInteractive}/bin/bash $out/bin/sh
 
-    '' + (lib.optionalString (flake-registry != null) ''
+    '' + (lib.optionalString (flake-registry-path != null) ''
       nixCacheDir="/root/.cache/nix"
       mkdir -p $out$nixCacheDir
       globalFlakeRegistryPath="$nixCacheDir/flake-registry.json"
-      ln -s ${flake-registry}/flake-registry.json $out$globalFlakeRegistryPath
+      ln -s ${flake-registry-path} $out$globalFlakeRegistryPath
       mkdir -p $out/nix/var/nix/gcroots/auto
       rootName=$(${pkgs.nix}/bin/nix --extra-experimental-features nix-command hash file --type sha1 --base32 <(echo -n $globalFlakeRegistryPath))
       ln -s $globalFlakeRegistryPath $out/nix/var/nix/gcroots/auto/$rootName
-    '');
+    ''));
 
 in
 pkgs.dockerTools.buildLayeredImageWithNixDb {

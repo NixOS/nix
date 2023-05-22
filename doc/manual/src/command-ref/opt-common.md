@@ -162,11 +162,11 @@ Most Nix commands accept the following command-line options:
     }: ...
     ```
 
-    So if you call this Nix expression (e.g., when you do `nix-env -iA
+    So if you call this Nix expression (e.g., when you do `nix-env --install --attr
     pkgname`), the function will be called automatically using the
     value [`builtins.currentSystem`](@docroot@/language/builtins.md) for
     the `system` argument. You can override this using `--arg`, e.g.,
-    `nix-env -iA pkgname --arg system \"i686-freebsd\"`. (Note that
+    `nix-env --install --attr pkgname --arg system \"i686-freebsd\"`. (Note that
     since the argument is a Nix string literal, you have to escape the
     quotes.)
 
@@ -199,7 +199,7 @@ Most Nix commands accept the following command-line options:
     For `nix-shell`, this option is commonly used to give you a shell in
     which you can build the packages returned by the expression. If you
     want to get a shell which contain the *built* packages ready for
-    use, give your expression to the `nix-shell -p` convenience flag
+    use, give your expression to the `nix-shell --packages ` convenience flag
     instead.
 
   - <span id="opt-I">[`-I`](#opt-I)</span> *path*\

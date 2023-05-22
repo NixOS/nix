@@ -27,7 +27,7 @@ substitute, then the log is unavailable.
 # Example
 
 ```console
-$ nix-store -l $(which ktorrent)
+$ nix-store --read-log $(which ktorrent)
 building /nix/store/dhc73pvzpnzxhdgpimsd9sw39di66ph1-ktorrent-2.2.1
 unpacking sources
 unpacking source archive /nix/store/p8n1jpqs27mgkjw07pb5269717nzf5f8-ktorrent-2.2.1.tar.gz

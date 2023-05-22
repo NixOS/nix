@@ -90,7 +90,7 @@ Then, restart the `nix-daemon`.
 Build any derivation, for example:
 
 ```console
-$ nix-build -E '(import <nixpkgs> {}).writeText "example" (builtins.toString builtins.currentTime)'
+$ nix-build --expr '(import <nixpkgs> {}).writeText "example" (builtins.toString builtins.currentTime)'
 this derivation will be built:
   /nix/store/s4pnfbkalzy5qz57qs6yybna8wylkig6-example.drv
 building '/nix/store/s4pnfbkalzy5qz57qs6yybna8wylkig6-example.drv'...
