@@ -345,3 +345,55 @@ Derivations can declare some infrequently used optional attributes.
     This is useful, for example, when generating self-contained filesystem images with
     their own embedded Nix store: hashes found inside such an image refer
     to the embedded store and not to the host's Nix store.
+
+  - [`__impure`]{#adv-attr-__impure}\
+	> **Warning**
+	> This is an experimental feature.
+    >
+    > To enable it, add the following to
+    > [nix.conf](../command-ref/conf-file.md):
+    >
+    > ```
+	> extra-experimental-features = impure-derivations
+	> ```
+
+    If the attribute `__impure` is set to `true`, then the derivation
+    won't produce a fixed output. This means that an impure derivation
+    can have different outputs each time it is built.
+
+    Example:
+
+    ```
+    derivation {
+      name = "impure";
+      builder = /bin/sh;
+      __impure = true; # mark this derivation as impure
+      args = [ "-c" "read -n 10 random < /dev/random; echo $random > $out" ];
+      system = builtins.currentSystem;
+    }
+    ```
+
+    Each time this derivation is built it produces a different output,
+    since the builder outputs random bytes to $out. The [pull request
+    introducing impure
+    derivations](https://github.com/NixOS/nix/pull/6227) has more
+    examples.
+
+    Impure derivations have the following traits:
+	- Only impure or fixed-output derivations are allowed to depend on
+      impure derivations directly. "Pure" (i.e. input-addressed or
+      floating CA derivations) can depend on impure derivations
+      indirectly, if there is a fixed-output derivation in
+      between. Thus the fixed-output derivation forms an "impurity
+      barrier" in the dependency graph.
+	- They cannot be
+      [content-addressed](@docroot@/contributing/experimental-features.md#xp-feature-ca-derivations)
+	- Impure derivations are not "cached". Thus, running "nix-build"
+      on the example above multiple times will cause a rebuild every
+      time.
+	- They are implemented similar to CA derivations, i.e. the output
+      is moved to a content-addressed path in the store. The
+      difference is that we don't register a realisation in the Nix database.
+	- When sandboxing is enabled, impure derivations can access the
+      network in the same way as fixed-output derivations. In relaxed
+      sandboxing mode, they can access the local filesystem.
