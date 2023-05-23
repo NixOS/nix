@@ -9,8 +9,8 @@ static void checkName(std::string_view path, std::string_view name)
     if (name.empty())
         throw BadStorePath("store path '%s' has an empty name", path);
     if (name.size() > StorePath::MaxPathLen)
-        throw BadStorePath("store path '%s' has a name longer than '%d characters",
-            StorePath::MaxPathLen, path);
+        throw BadStorePath("store path '%s' has a name longer than %d characters",
+            path, StorePath::MaxPathLen);
     // See nameRegexStr for the definition
     for (auto c : name)
         if (!((c >= '0' && c <= '9')
