@@ -11,6 +11,27 @@ struct sqlite3_stmt;
 
 namespace nix {
 
+enum class SQLiteOpenMode {
+    /**
+     * Open the database in read-write mode.
+     * If the database does not exist, it will be created.
+     */
+    Normal,
+    /**
+     * Open the database in read-write mode.
+     * Fails with an error if the database does not exist.
+     */
+    NoCreate,
+    /**
+     * Open the database in immutable mode.
+     * In addition to the database being read-only,
+     * no wal or journal files will be created by sqlite.
+     * Use this mode if the database is on a read-only filesystem.
+     * Fails with an error if the database does not exist.
+     */
+    Immutable
+};
+
 /**
  * RAII wrapper to close a SQLite database automatically.
  */
@@ -18,7 +39,7 @@ struct SQLite
 {
     sqlite3 * db = 0;
     SQLite() { }
-    SQLite(const Path & path, bool create = true);
+    SQLite(const Path & path, SQLiteOpenMode mode = SQLiteOpenMode::Normal);
     SQLite(const SQLite & from) = delete;
     SQLite& operator = (const SQLite & from) = delete;
     SQLite& operator = (SQLite && from) { db = from.db; from.db = 0; return *this; }

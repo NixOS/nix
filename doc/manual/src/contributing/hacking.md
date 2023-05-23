@@ -77,7 +77,7 @@ $ nix-shell
 To get a shell with one of the other [supported compilation environments](#compilation-environments):
 
 ```console
-$ nix-shell -A devShells.x86_64-linux.native-clang11StdenvPackages
+$ nix-shell --attr devShells.x86_64-linux.native-clang11StdenvPackages
 ```
 
 > **Note**
@@ -139,7 +139,7 @@ $ nix build .#packages.aarch64-linux.default
 for flake-enabled Nix, or
 
 ```console
-$ nix-build -A packages.aarch64-linux.default
+$ nix-build --attr packages.aarch64-linux.default
 ```
 
 for classic Nix.
@@ -166,7 +166,7 @@ $ nix build .#nix-ccacheStdenv
 for flake-enabled Nix, or
 
 ```console
-$ nix-build -A nix-ccacheStdenv
+$ nix-build --attr nix-ccacheStdenv
 ```
 
 for classic Nix.

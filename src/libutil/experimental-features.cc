@@ -12,7 +12,7 @@ struct ExperimentalFeatureDetails
     std::string_view description;
 };
 
-constexpr std::array<ExperimentalFeatureDetails, 13> xpFeatureDetails = {{
+constexpr std::array<ExperimentalFeatureDetails, 14> xpFeatureDetails = {{
     {
         .tag = Xp::CaDerivations,
         .name = "ca-derivations",
@@ -207,6 +207,25 @@ constexpr std::array<ExperimentalFeatureDetails, 13> xpFeatureDetails = {{
 
               - "text hashing" derivation outputs, so we can build .drv
                 files.
+
+              - dependencies in derivations on the outputs of
+                derivations that are themselves derivations outputs.
+        )",
+    },
+    {
+        .tag = Xp::ReadOnlyLocalStore,
+        .name = "read-only-local-store",
+        .description = R"(
+            Allow the use of the `read-only` parameter in local store URIs.
+
+            Set this parameter to `true` to allow stores with databases on read-only
+            filesystems to be opened for querying; ordinarily Nix will refuse to do this.
+
+            Enabling this setting disables the locking required for safe concurrent
+            access, so you should be certain that the database will not be changed.
+            While the filesystem the database resides on might be read-only to this
+            process, consider whether another user, process, or system, might have
+            write access to it.
         )",
     },
 }};

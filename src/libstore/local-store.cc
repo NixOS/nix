@@ -202,10 +202,16 @@ LocalStore::LocalStore(const Params & params)
         createSymlink(profilesDir, gcRootsDir + "/profiles");
     }
 
+    if (readOnly) {
+        experimentalFeatureSettings.require(Xp::ReadOnlyLocalStore);
+    }
+
     for (auto & perUserDir : {profilesDir + "/per-user", gcRootsDir + "/per-user"}) {
         createDirs(perUserDir);
-        if (chmod(perUserDir.c_str(), 0755) == -1)
-            throw SysError("could not set permissions on '%s' to 755", perUserDir);
+        if (!readOnly) {
+            if (chmod(perUserDir.c_str(), 0755) == -1)
+                throw SysError("could not set permissions on '%s' to 755", perUserDir);
+        }
     }
 
     /* Optionally, create directories and set permissions for a
@@ -269,10 +275,12 @@ LocalStore::LocalStore(const Params & params)
 
     /* Acquire the big fat lock in shared mode to make sure that no
        schema upgrade is in progress. */
-    Path globalLockPath = dbDir + "/big-lock";
-    globalLock = openLockFile(globalLockPath.c_str(), true);
+    if (!readOnly) {
+        Path globalLockPath = dbDir + "/big-lock";
+        globalLock = openLockFile(globalLockPath.c_str(), true);
+    }
 
-    if (!lockFile(globalLock.get(), ltRead, false)) {
+    if (!readOnly && !lockFile(globalLock.get(), ltRead, false)) {
         printInfo("waiting for the big Nix store lock...");
         lockFile(globalLock.get(), ltRead, true);
     }
@@ -280,6 +288,14 @@ LocalStore::LocalStore(const Params & params)
     /* Check the current database schema and if necessary do an
        upgrade.  */
     int curSchema = getSchema();
+    if (readOnly && curSchema < nixSchemaVersion) {
+        debug("current schema version: %d", curSchema);
+        debug("supported schema version: %d", nixSchemaVersion);
+        throw Error(curSchema == 0 ?
+            "database does not exist, and cannot be created in read-only mode" :
+            "database schema needs migrating, but this cannot be done in read-only mode");
+    }
+
     if (curSchema > nixSchemaVersion)
         throw Error("current Nix store schema is version %1%, but I only support %2%",
              curSchema, nixSchemaVersion);
@@ -344,7 +360,11 @@ LocalStore::LocalStore(const Params & params)
     else openDB(*state, false);
 
     if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
-        migrateCASchema(state->db, dbDir + "/ca-schema", globalLock);
+        if (!readOnly) {
+            migrateCASchema(state->db, dbDir + "/ca-schema", globalLock);
+        } else {
+            throw Error("need to migrate to CA schema, but this cannot be done in read-only mode");
+        }
     }
 
     /* Prepare SQL statements. */
@@ -475,13 +495,20 @@ int LocalStore::getSchema()
 
 void LocalStore::openDB(State & state, bool create)
 {
-    if (access(dbDir.c_str(), R_OK | W_OK))
+    if (create && readOnly) {
+        throw Error("unable to create database while in read-only mode");
+    }
+
+    if (access(dbDir.c_str(), R_OK | (readOnly ? 0 : W_OK)))
         throw SysError("Nix database directory '%1%' is not writable", dbDir);
 
     /* Open the Nix database. */
     std::string dbPath = dbDir + "/db.sqlite";
     auto & db(state.db);
-    state.db = SQLite(dbPath, create);
+    auto openMode = readOnly ? SQLiteOpenMode::Immutable
+                  : create ? SQLiteOpenMode::Normal
+                  : SQLiteOpenMode::NoCreate;
+    state.db = SQLite(dbPath, openMode);
 
 #ifdef __CYGWIN__
     /* The cygwin version of sqlite3 has a patch which calls

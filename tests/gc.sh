@@ -52,9 +52,7 @@ rmdir $NIX_STORE_DIR/.links
 rmdir $NIX_STORE_DIR
 
 ## Test `nix-collect-garbage -d`
-# `nix-env` doesn't work with CA derivations, so let's ignore that bit if we're
-# using them
-if [[ -z "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
+testCollectGarbageD () {
     clearProfiles
     # Run two `nix-env` commands, should create two generations of
     # the profile
@@ -66,4 +64,17 @@ if [[ -z "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
     # left
     nix-collect-garbage -d
     [[ $(nix-env --list-generations | wc -l) -eq 1 ]]
+}
+# `nix-env` doesn't work with CA derivations, so let's ignore that bit if we're
+# using them
+if [[ -z "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
+    testCollectGarbageD
+
+    # Run the same test, but forcing the profiles at their legacy location under
+    # /nix/var/nix.
+    #
+    # Regression test for #8294
+    rm ~/.nix-profile
+    ln -s $NIX_STATE_DIR/profiles/per-user/me ~/.nix-profile
+    testCollectGarbageD
 fi

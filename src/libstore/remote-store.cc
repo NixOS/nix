@@ -18,189 +18,6 @@
 
 namespace nix {
 
-namespace worker_proto {
-
-std::string read(const Store & store, Source & from, Phantom<std::string> _)
-{
-    return readString(from);
-}
-
-void write(const Store & store, Sink & out, const std::string & str)
-{
-    out << str;
-}
-
-
-StorePath read(const Store & store, Source & from, Phantom<StorePath> _)
-{
-    return store.parseStorePath(readString(from));
-}
-
-void write(const Store & store, Sink & out, const StorePath & storePath)
-{
-    out << store.printStorePath(storePath);
-}
-
-
-std::optional<TrustedFlag> read(const Store & store, Source & from, Phantom<std::optional<TrustedFlag>> _)
-{
-    auto temp = readNum<uint8_t>(from);
-    switch (temp) {
-        case 0:
-            return std::nullopt;
-        case 1:
-            return { Trusted };
-        case 2:
-            return { NotTrusted };
-        default:
-            throw Error("Invalid trusted status from remote");
-    }
-}
-
-void write(const Store & store, Sink & out, const std::optional<TrustedFlag> & optTrusted)
-{
-    if (!optTrusted)
-        out << (uint8_t)0;
-    else {
-        switch (*optTrusted) {
-        case Trusted:
-            out << (uint8_t)1;
-            break;
-        case NotTrusted:
-            out << (uint8_t)2;
-            break;
-        default:
-            assert(false);
-        };
-    }
-}
-
-
-ContentAddress read(const Store & store, Source & from, Phantom<ContentAddress> _)
-{
-    return ContentAddress::parse(readString(from));
-}
-
-void write(const Store & store, Sink & out, const ContentAddress & ca)
-{
-    out << renderContentAddress(ca);
-}
-
-
-DerivedPath read(const Store & store, Source & from, Phantom<DerivedPath> _)
-{
-    auto s = readString(from);
-    return DerivedPath::parseLegacy(store, s);
-}
-
-void write(const Store & store, Sink & out, const DerivedPath & req)
-{
-    out << req.to_string_legacy(store);
-}
-
-
-Realisation read(const Store & store, Source & from, Phantom<Realisation> _)
-{
-    std::string rawInput = readString(from);
-    return Realisation::fromJSON(
-        nlohmann::json::parse(rawInput),
-        "remote-protocol"
-    );
-}
-
-void write(const Store & store, Sink & out, const Realisation & realisation)
-{
-    out << realisation.toJSON().dump();
-}
-
-
-DrvOutput read(const Store & store, Source & from, Phantom<DrvOutput> _)
-{
-    return DrvOutput::parse(readString(from));
-}
-
-void write(const Store & store, Sink & out, const DrvOutput & drvOutput)
-{
-    out << drvOutput.to_string();
-}
-
-
-KeyedBuildResult read(const Store & store, Source & from, Phantom<KeyedBuildResult> _)
-{
-    auto path = worker_proto::read(store, from, Phantom<DerivedPath> {});
-    auto br = worker_proto::read(store, from, Phantom<BuildResult> {});
-    return KeyedBuildResult {
-        std::move(br),
-        /* .path = */ std::move(path),
-    };
-}
-
-void write(const Store & store, Sink & to, const KeyedBuildResult & res)
-{
-    worker_proto::write(store, to, res.path);
-    worker_proto::write(store, to, static_cast<const BuildResult &>(res));
-}
-
-
-BuildResult read(const Store & store, Source & from, Phantom<BuildResult> _)
-{
-    BuildResult res;
-    res.status = (BuildResult::Status) readInt(from);
-    from
-        >> res.errorMsg
-        >> res.timesBuilt
-        >> res.isNonDeterministic
-        >> res.startTime
-        >> res.stopTime;
-    auto builtOutputs = worker_proto::read(store, from, Phantom<DrvOutputs> {});
-    for (auto && [output, realisation] : builtOutputs)
-        res.builtOutputs.insert_or_assign(
-            std::move(output.outputName),
-            std::move(realisation));
-    return res;
-}
-
-void write(const Store & store, Sink & to, const BuildResult & res)
-{
-    to
-        << res.status
-        << res.errorMsg
-        << res.timesBuilt
-        << res.isNonDeterministic
-        << res.startTime
-        << res.stopTime;
-    DrvOutputs builtOutputs;
-    for (auto & [output, realisation] : res.builtOutputs)
-        builtOutputs.insert_or_assign(realisation.id, realisation);
-    worker_proto::write(store, to, builtOutputs);
-}
-
-
-std::optional<StorePath> read(const Store & store, Source & from, Phantom<std::optional<StorePath>> _)
-{
-    auto s = readString(from);
-    return s == "" ? std::optional<StorePath> {} : store.parseStorePath(s);
-}
-
-void write(const Store & store, Sink & out, const std::optional<StorePath> & storePathOpt)
-{
-    out << (storePathOpt ? store.printStorePath(*storePathOpt) : "");
-}
-
-
-std::optional<ContentAddress> read(const Store & store, Source & from, Phantom<std::optional<ContentAddress>> _)
-{
-    return ContentAddress::parseOpt(readString(from));
-}
-
-void write(const Store & store, Sink & out, const std::optional<ContentAddress> & caOpt)
-{
-    out << (caOpt ? renderContentAddress(*caOpt) : "");
-}
-
-}
-
-
 /* TODO: Separate these store impls into different files, give them better names */
 RemoteStore::RemoteStore(const Params & params)
     : RemoteStoreConfig(params)
@@ -283,7 +100,7 @@ void RemoteStore::initConnection(Connection & conn)
         }
 
         if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 35) {
-            conn.remoteTrustsUs = worker_proto::read(*this, conn.from, Phantom<std::optional<TrustedFlag>> {});
+            conn.remoteTrustsUs = WorkerProto<std::optional<TrustedFlag>>::read(*this, conn.from);
         } else {
             // We don't know the answer; protocol to old.
             conn.remoteTrustsUs = std::nullopt;
@@ -410,12 +227,12 @@ StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, Substitute
         return res;
     } else {
         conn->to << wopQueryValidPaths;
-        worker_proto::write(*this, conn->to, paths);
+        workerProtoWrite(*this, conn->to, paths);
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 27) {
             conn->to << (settings.buildersUseSubstitutes ? 1 : 0);
         }
         conn.processStderr();
-        return worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+        return WorkerProto<StorePathSet>::read(*this, conn->from);
     }
 }
 
@@ -425,7 +242,7 @@ StorePathSet RemoteStore::queryAllValidPaths()
     auto conn(getConnection());
     conn->to << wopQueryAllValidPaths;
     conn.processStderr();
-    return worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+    return WorkerProto<StorePathSet>::read(*this, conn->from);
 }
 
 
@@ -442,9 +259,9 @@ StorePathSet RemoteStore::querySubstitutablePaths(const StorePathSet & paths)
         return res;
     } else {
         conn->to << wopQuerySubstitutablePaths;
-        worker_proto::write(*this, conn->to, paths);
+        workerProtoWrite(*this, conn->to, paths);
         conn.processStderr();
-        return worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+        return WorkerProto<StorePathSet>::read(*this, conn->from);
     }
 }
 
@@ -466,7 +283,7 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info.deriver = parseStorePath(deriver);
-            info.references = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+            info.references = WorkerProto<StorePathSet>::read(*this, conn->from);
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
             infos.insert_or_assign(i.first, std::move(info));
@@ -479,9 +296,9 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
             StorePathSet paths;
             for (auto & path : pathsMap)
                 paths.insert(path.first);
-            worker_proto::write(*this, conn->to, paths);
+            workerProtoWrite(*this, conn->to, paths);
         } else
-            worker_proto::write(*this, conn->to, pathsMap);
+            workerProtoWrite(*this, conn->to, pathsMap);
         conn.processStderr();
         size_t count = readNum<size_t>(conn->from);
         for (size_t n = 0; n < count; n++) {
@@ -489,7 +306,7 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info.deriver = parseStorePath(deriver);
-            info.references = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+            info.references = WorkerProto<StorePathSet>::read(*this, conn->from);
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
         }
@@ -532,7 +349,7 @@ void RemoteStore::queryReferrers(const StorePath & path,
     auto conn(getConnection());
     conn->to << wopQueryReferrers << printStorePath(path);
     conn.processStderr();
-    for (auto & i : worker_proto::read(*this, conn->from, Phantom<StorePathSet> {}))
+    for (auto & i : WorkerProto<StorePathSet>::read(*this, conn->from))
         referrers.insert(i);
 }
 
@@ -542,7 +359,7 @@ StorePathSet RemoteStore::queryValidDerivers(const StorePath & path)
     auto conn(getConnection());
     conn->to << wopQueryValidDerivers << printStorePath(path);
     conn.processStderr();
-    return worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+    return WorkerProto<StorePathSet>::read(*this, conn->from);
 }
 
 
@@ -554,7 +371,7 @@ StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
     auto conn(getConnection());
     conn->to << wopQueryDerivationOutputs << printStorePath(path);
     conn.processStderr();
-    return worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+    return WorkerProto<StorePathSet>::read(*this, conn->from);
 }
 
 
@@ -564,7 +381,7 @@ std::map<std::string, std::optional<StorePath>> RemoteStore::queryPartialDerivat
         auto conn(getConnection());
         conn->to << wopQueryDerivationOutputMap << printStorePath(path);
         conn.processStderr();
-        return worker_proto::read(*this, conn->from, Phantom<std::map<std::string, std::optional<StorePath>>> {});
+        return WorkerProto<std::map<std::string, std::optional<StorePath>>>::read(*this, conn->from);
     } else {
         // Fallback for old daemon versions.
         // For floating-CA derivations (and their co-dependencies) this is an
@@ -610,7 +427,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
             << wopAddToStore
             << name
             << caMethod.render(hashType);
-        worker_proto::write(*this, conn->to, references);
+        workerProtoWrite(*this, conn->to, references);
         conn->to << repair;
 
         // The dump source may invoke the store, so we need to make some room.
@@ -635,7 +452,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
                         name, printHashType(hashType));
                 std::string s = dump.drain();
                 conn->to << wopAddTextToStore << name << s;
-                worker_proto::write(*this, conn->to, references);
+                workerProtoWrite(*this, conn->to, references);
                 conn.processStderr();
             },
             [&](const FileIngestionMethod & fim) -> void {
@@ -701,7 +518,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
             sink
                 << exportMagic
                 << printStorePath(info.path);
-            worker_proto::write(*this, sink, info.references);
+            workerProtoWrite(*this, sink, info.references);
             sink
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << 0 // == no legacy signature
@@ -711,7 +528,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
 
         conn.processStderr(0, source2.get());
 
-        auto importedPaths = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+        auto importedPaths = WorkerProto<StorePathSet>::read(*this, conn->from);
         assert(importedPaths.size() <= 1);
     }
 
@@ -720,7 +537,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
                  << printStorePath(info.path)
                  << (info.deriver ? printStorePath(*info.deriver) : "")
                  << info.narHash.to_string(Base16, false);
-        worker_proto::write(*this, conn->to, info.references);
+        workerProtoWrite(*this, conn->to, info.references);
         conn->to << info.registrationTime << info.narSize
                  << info.ultimate << info.sigs << renderContentAddress(info.ca)
                  << repair << !checkSigs;
@@ -793,7 +610,7 @@ void RemoteStore::registerDrvOutput(const Realisation & info)
         conn->to << info.id.to_string();
         conn->to << std::string(info.outPath.to_string());
     } else {
-        worker_proto::write(*this, conn->to, info);
+        workerProtoWrite(*this, conn->to, info);
     }
     conn.processStderr();
 }
@@ -815,14 +632,14 @@ void RemoteStore::queryRealisationUncached(const DrvOutput & id,
 
         auto real = [&]() -> std::shared_ptr<const Realisation> {
             if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 31) {
-                auto outPaths = worker_proto::read(
-                    *this, conn->from, Phantom<std::set<StorePath>> {});
+                auto outPaths = WorkerProto<std::set<StorePath>>::read(
+                    *this, conn->from);
                 if (outPaths.empty())
                     return nullptr;
                 return std::make_shared<const Realisation>(Realisation { .id = id, .outPath = *outPaths.begin() });
             } else {
-                auto realisations = worker_proto::read(
-                    *this, conn->from, Phantom<std::set<Realisation>> {});
+                auto realisations = WorkerProto<std::set<Realisation>>::read(
+                    *this, conn->from);
                 if (realisations.empty())
                     return nullptr;
                 return std::make_shared<const Realisation>(*realisations.begin());
@@ -836,7 +653,7 @@ void RemoteStore::queryRealisationUncached(const DrvOutput & id,
 static void writeDerivedPaths(RemoteStore & store, ConnectionHandle & conn, const std::vector<DerivedPath> & reqs)
 {
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 30) {
-        worker_proto::write(store, conn->to, reqs);
+        workerProtoWrite(store, conn->to, reqs);
     } else {
         Strings ss;
         for (auto & p : reqs) {
@@ -906,7 +723,7 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
         writeDerivedPaths(*this, conn, paths);
         conn->to << buildMode;
         conn.processStderr();
-        return worker_proto::read(*this, conn->from, Phantom<std::vector<KeyedBuildResult>> {});
+        return WorkerProto<std::vector<KeyedBuildResult>>::read(*this, conn->from);
     } else {
         // Avoid deadlock.
         conn_.reset();
@@ -989,7 +806,7 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
         conn->from >> res.timesBuilt >> res.isNonDeterministic >> res.startTime >> res.stopTime;
     }
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 28) {
-        auto builtOutputs = worker_proto::read(*this, conn->from, Phantom<DrvOutputs> {});
+        auto builtOutputs = WorkerProto<DrvOutputs>::read(*this, conn->from);
         for (auto && [output, realisation] : builtOutputs)
             res.builtOutputs.insert_or_assign(
                 std::move(output.outputName),
@@ -1048,7 +865,7 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     conn->to
         << wopCollectGarbage << options.action;
-    worker_proto::write(*this, conn->to, options.pathsToDelete);
+    workerProtoWrite(*this, conn->to, options.pathsToDelete);
     conn->to << options.ignoreLiveness
         << options.maxFreed
         /* removed options */
@@ -1107,9 +924,9 @@ void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
         conn->to << wopQueryMissing;
         writeDerivedPaths(*this, conn, targets);
         conn.processStderr();
-        willBuild = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
-        willSubstitute = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
-        unknown = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+        willBuild = WorkerProto<StorePathSet>::read(*this, conn->from);
+        willSubstitute = WorkerProto<StorePathSet>::read(*this, conn->from);
+        unknown = WorkerProto<StorePathSet>::read(*this, conn->from);
         conn->from >> downloadSize >> narSize;
         return;
     }

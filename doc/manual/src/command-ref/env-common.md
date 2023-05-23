@@ -71,9 +71,12 @@ Most Nix commands interpret the following environment variables:
     Settings are separated by the newline character.
 
   - <span id="env-NIX_USER_CONF_FILES">[`NIX_USER_CONF_FILES`](#env-NIX_USER_CONF_FILES)</span>\
-    Overrides the location of the user Nix configuration files to load
-    from (defaults to the XDG spec locations). The variable is treated
-    as a list separated by the `:` token.
+    Overrides the location of the Nix user configuration files to load from.
+
+    The default are the locations according to the [XDG Base Directory Specification].
+    See the [XDG Base Directories](#xdg-base-directories) sub-section for details.
+
+    The variable is treated as a list separated by the `:` token.
 
   - <span id="env-TMPDIR">[`TMPDIR`](#env-TMPDIR)</span>\
     Use the specified directory to store temporary files. In particular,
@@ -103,15 +106,19 @@ Most Nix commands interpret the following environment variables:
     384 MiB. Setting it to a low value reduces memory consumption, but
     will increase runtime due to the overhead of garbage collection.
 
-## XDG Base Directory
+## XDG Base Directories
 
-New Nix commands conform to the [XDG Base Directory Specification], and use the following environment variables to determine locations of various state and configuration files:
+Nix follows the [XDG Base Directory Specification].
+
+For backwards compatibility, Nix commands will follow the standard only when [`use-xdg-base-directories`] is enabled.
+[New Nix commands](@docroot@/command-ref/new-cli/nix.md) (experimental) conform to the standard by default.
+
+The following environment variables are used to determine locations of various state and configuration files:
 
 - [`XDG_CONFIG_HOME`]{#env-XDG_CONFIG_HOME} (default `~/.config`)
 - [`XDG_STATE_HOME`]{#env-XDG_STATE_HOME} (default `~/.local/state`)
 - [`XDG_CACHE_HOME`]{#env-XDG_CACHE_HOME} (default `~/.cache`)
 
-Classic Nix commands can also be made to follow this standard using the [`use-xdg-base-directories`] configuration option.
 
 [XDG Base Directory Specification]: https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
 [`use-xdg-base-directories`]: @docroot@/command-ref/conf-file.md#conf-use-xdg-base-directories

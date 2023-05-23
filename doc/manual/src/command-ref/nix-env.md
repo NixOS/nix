@@ -49,7 +49,7 @@ These pages can be viewed offline:
 
 # Selectors
 
-Several commands, such as `nix-env -q` and `nix-env -i`, take a list of
+Several commands, such as `nix-env --query ` and `nix-env --install `, take a list of
 arguments that specify the packages on which to operate. These are
 extended regular expressions that must match the entire name of the
 package. (For details on regular expressions, see **regex**(7).) The match is
@@ -82,6 +82,8 @@ match. Here are some examples:
     `chromium`.
 
 # Files
+
+`nix-env` operates on the following files.
 
 {{#include ./files/default-nix-expression.md}}
 
