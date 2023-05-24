@@ -654,7 +654,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         results.paths.insert(path);
 
         uint64_t bytesFreed;
-        deletePath(realPath, bytesFreed);
+        deleteGCPath(realPath, bytesFreed);
+
         results.bytesFreed += bytesFreed;
 
         if (results.bytesFreed > options.maxFreed) {
@@ -872,7 +873,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             if (unlink(path.c_str()) == -1)
                 throw SysError("deleting '%1%'", path);
 
-            /* Do not accound for deleted file here. Rely on deletePath()
+            /* Do not account for deleted file here. Rely on deletePath()
                accounting.  */
         }
 
@@ -887,6 +888,12 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* While we're at it, vacuum the database. */
     //if (options.action == GCOptions::gcDeleteDead) vacuumDB();
+}
+
+
+void GcStore::deleteGCPath(const Path & path, uint64_t & bytesFreed)
+{
+    deletePath(path, bytesFreed);
 }
 
 
