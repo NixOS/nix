@@ -265,7 +265,7 @@ std::set<ExperimentalFeature> parseFeatures(const std::set<std::string> & rawFea
 }
 
 MissingExperimentalFeature::MissingExperimentalFeature(ExperimentalFeature feature)
-    : Error("experimental Nix feature '%1%' is disabled; use '--extra-experimental-features %1%' to override;"
+    : Error("experimental Nix feature '%1%' is disabled; use '--extra-experimental-features %1%' to override; "
             "alternatively, add 'experimental-features = %1%' to '$HOME/.config/nix/nix.conf'"
             , showExperimentalFeature(feature))
     , missingFeature(feature)
