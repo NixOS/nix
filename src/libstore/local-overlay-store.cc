@@ -182,7 +182,7 @@ void LocalOverlayStore::addToStore(const ValidPathInfo & info, Source & source,
     LocalStore::addToStore(info, source, repair, checkSigs);
     if (lowerStore->isValidPath(info.path)) {
         // dedup stores
-        deletePath(toUpperPath(info.path));
+        deletePath(toUpperPath(info.path));  // TODO: Investigate whether this can trigger 'stale file handle' errors.
     }
 }
 
@@ -213,6 +213,18 @@ StorePath LocalOverlayStore::addTextToStore(
     return path;
 }
 
+
+void LocalOverlayStore::deleteGCPath(const Path & path, uint64_t & bytesFreed)
+{
+    auto mergedDir = realStoreDir.get() + "/";
+    if (path.substr(0, mergedDir.length()) != mergedDir) {
+        warn("local-overlay: unexpected gc path '%s' ", path);
+        return;
+    }
+    if (pathExists(toUpperPath({path.substr(mergedDir.length())}))) {
+        GcStore::deleteGCPath(path, bytesFreed);
+    }
+}
 
 static RegisterStoreImplementation<LocalOverlayStore, LocalOverlayStoreConfig> regLocalOverlayStore;
 
