@@ -38,3 +38,12 @@
 * You can now disable the global flake registry by setting the `flake-registry`
   configuration option to an empty string. The same can be achieved at runtime with
   `--flake-registry ""`.
+
+* Since 2.13.4, a new function `builtins.readFileType` is available. It is similar to
+  `builtins.readDir` but acts on a single file or directory.
+
+* Since 2.13.4, the `builtins.readDir` function has been optimized when encountering not-yet-known
+  file types from POSIX's `readdir`. In such cases the type of each file was
+  discovered by making multiple syscalls. This change makes these operations
+  lazy such that these lookups will only be performed if the attribute is used.
+  This optimization affects a minority of filesystems and operating systems.
