@@ -43,7 +43,7 @@
   `builtins.readDir` but acts on a single file or directory.
 
 * Since 2.13.4, the `builtins.readDir` function has been optimized when encountering not-yet-known
-  file types from POSIX's `readdir`. In such cases the type of each file is/was
+  file types from POSIX's `readdir`. In such cases the type of each file was
   discovered by making multiple syscalls. This change makes these operations
   lazy such that these lookups will only be performed if the attribute is used.
   This optimization affects a minority of filesystems and operating systems.
