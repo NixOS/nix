@@ -8,4 +8,5 @@ with builtins;
   (replaceStrings [""] ["X"] "abc")
   (replaceStrings [""] ["X"] "")
   (replaceStrings ["-"] ["_"] "a-b")
+  (replaceStrings ["oo" "XX"] ["u" (throw "unreachable")] "foobar")
 ]
