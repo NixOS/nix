@@ -359,7 +359,7 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
             if (buildMode != bmCheck && status.known->isValid()) continue;
             auto p = worker.store.printStorePath(status.known->path);
             if (pathExists(chrootRootDir + p))
-                renameFile((chrootRootDir + p), p);
+                moveFile((chrootRootDir + p), p);
         }
 
     return diskFull;
