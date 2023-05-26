@@ -134,7 +134,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
             debug("querying remote host '%s' for info on '%s'", host, printStorePath(path));
 
-            conn->to << cmdQueryPathInfos << PathSet{printStorePath(path)};
+            conn->to << ServeProto::Command::QueryPathInfos << PathSet{printStorePath(path)};
             conn->to.flush();
 
             auto p = readString(conn->from);
@@ -177,7 +177,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 5) {
 
             conn->to
-                << cmdAddToStoreNar
+                << ServeProto::Command::AddToStoreNar
                 << printStorePath(info.path)
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << info.narHash.to_string(Base16, false);
@@ -199,7 +199,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         } else {
 
             conn->to
-                << cmdImportPaths
+                << ServeProto::Command::ImportPaths
                 << 1;
             try {
                 copyNAR(source, conn->to);
@@ -227,7 +227,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     {
         auto conn(connections->get());
 
-        conn->to << cmdDumpStorePath << printStorePath(path);
+        conn->to << ServeProto::Command::DumpStorePath << printStorePath(path);
         conn->to.flush();
         copyNAR(conn->from, sink);
     }
@@ -280,7 +280,7 @@ public:
         auto conn(connections->get());
 
         conn->to
-            << cmdBuildDerivation
+            << ServeProto::Command::BuildDerivation
             << printStorePath(drvPath);
         writeDerivation(conn->to, *this, drv);
 
@@ -311,7 +311,7 @@ public:
 
         auto conn(connections->get());
 
-        conn->to << cmdBuildPaths;
+        conn->to << ServeProto::Command::BuildPaths;
         Strings ss;
         for (auto & p : drvPaths) {
             auto sOrDrvPath = StorePathWithOutputs::tryFromDerivedPath(p);
@@ -368,7 +368,7 @@ public:
         auto conn(connections->get());
 
         conn->to
-            << cmdQueryClosure
+            << ServeProto::Command::QueryClosure
             << includeOutputs;
         WorkerProto::write(*this, conn->to, paths);
         conn->to.flush();
@@ -383,7 +383,7 @@ public:
         auto conn(connections->get());
 
         conn->to
-            << cmdQueryValidPaths
+            << ServeProto::Command::QueryValidPaths
             << false // lock
             << maybeSubstitute;
         WorkerProto::write(*this, conn->to, paths);

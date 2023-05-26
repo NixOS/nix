@@ -838,16 +838,16 @@ static void opServe(Strings opFlags, Strings opArgs)
     };
 
     while (true) {
-        ServeCommand cmd;
+        ServeProto::Command cmd;
         try {
-            cmd = (ServeCommand) readInt(in);
+            cmd = (ServeProto::Command) readInt(in);
         } catch (EndOfFile & e) {
             break;
         }
 
         switch (cmd) {
 
-            case cmdQueryValidPaths: {
+            case ServeProto::Command::QueryValidPaths: {
                 bool lock = readInt(in);
                 bool substitute = readInt(in);
                 auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, in);
@@ -863,7 +863,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 break;
             }
 
-            case cmdQueryPathInfos: {
+            case ServeProto::Command::QueryPathInfos: {
                 auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, in);
                 // !!! Maybe we want a queryPathInfos?
                 for (auto & i : paths) {
@@ -886,24 +886,24 @@ static void opServe(Strings opFlags, Strings opArgs)
                 break;
             }
 
-            case cmdDumpStorePath:
+            case ServeProto::Command::DumpStorePath:
                 store->narFromPath(store->parseStorePath(readString(in)), out);
                 break;
 
-            case cmdImportPaths: {
+            case ServeProto::Command::ImportPaths: {
                 if (!writeAllowed) throw Error("importing paths is not allowed");
                 store->importPaths(in, NoCheckSigs); // FIXME: should we skip sig checking?
                 out << 1; // indicate success
                 break;
             }
 
-            case cmdExportPaths: {
+            case ServeProto::Command::ExportPaths: {
                 readInt(in); // obsolete
                 store->exportPaths(WorkerProto::Serialise<StorePathSet>::read(*store, in), out);
                 break;
             }
 
-            case cmdBuildPaths: {
+            case ServeProto::Command::BuildPaths: {
 
                 if (!writeAllowed) throw Error("building paths is not allowed");
 
@@ -924,7 +924,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 break;
             }
 
-            case cmdBuildDerivation: { /* Used by hydra-queue-runner. */
+            case ServeProto::Command::BuildDerivation: { /* Used by hydra-queue-runner. */
 
                 if (!writeAllowed) throw Error("building paths is not allowed");
 
@@ -951,7 +951,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 break;
             }
 
-            case cmdQueryClosure: {
+            case ServeProto::Command::QueryClosure: {
                 bool includeOutputs = readInt(in);
                 StorePathSet closure;
                 store->computeFSClosure(WorkerProto::Serialise<StorePathSet>::read(*store, in),
@@ -960,7 +960,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 break;
             }
 
-            case cmdAddToStoreNar: {
+            case ServeProto::Command::AddToStoreNar: {
                 if (!writeAllowed) throw Error("importing paths is not allowed");
 
                 auto path = readString(in);
