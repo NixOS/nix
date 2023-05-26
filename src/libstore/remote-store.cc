@@ -655,33 +655,6 @@ void RemoteStore::queryRealisationUncached(const DrvOutput & id,
     } catch (...) { return callback.rethrow(); }
 }
 
-static void writeDerivedPaths(RemoteStore & store, RemoteStore::Connection & conn, const std::vector<DerivedPath> & reqs)
-{
-    if (GET_PROTOCOL_MINOR(conn.daemonVersion) >= 30) {
-        WorkerProto::write(store, conn, reqs);
-    } else {
-        Strings ss;
-        for (auto & p : reqs) {
-            auto sOrDrvPath = StorePathWithOutputs::tryFromDerivedPath(p);
-            std::visit(overloaded {
-                [&](const StorePathWithOutputs & s) {
-                    ss.push_back(s.to_string(store));
-                },
-                [&](const StorePath & drvPath) {
-                    throw Error("trying to request '%s', but daemon protocol %d.%d is too old (< 1.29) to request a derivation file",
-                        store.printStorePath(drvPath),
-                        GET_PROTOCOL_MAJOR(conn.daemonVersion),
-                        GET_PROTOCOL_MINOR(conn.daemonVersion));
-                },
-                [&](std::monostate) {
-                    throw Error("wanted to build a derivation that is itself a build product, but the legacy 'ssh://' protocol doesn't support that. Try using 'ssh-ng://'");
-                },
-            }, sOrDrvPath);
-        }
-        conn.to << ss;
-    }
-}
-
 void RemoteStore::copyDrvsFromEvalStore(
     const std::vector<DerivedPath> & paths,
     std::shared_ptr<Store> evalStore)
@@ -711,7 +684,7 @@ void RemoteStore::buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMod
     auto conn(getConnection());
     conn->to << WorkerProto::Op::BuildPaths;
     assert(GET_PROTOCOL_MINOR(conn->daemonVersion) >= 13);
-    writeDerivedPaths(*this, *conn, drvPaths);
+    WorkerProto::write(*this, *conn, drvPaths);
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 15)
         conn->to << buildMode;
     else
@@ -735,7 +708,7 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
 
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 34) {
         conn->to << WorkerProto::Op::BuildPathsWithResults;
-        writeDerivedPaths(*this, *conn, paths);
+        WorkerProto::write(*this, *conn, paths);
         conn->to << buildMode;
         conn.processStderr();
         return WorkerProto::Serialise<std::vector<KeyedBuildResult>>::read(*this, *conn);
@@ -929,7 +902,7 @@ void RemoteStore::queryMissing(const std::vector<DerivedPath> & targets,
             // to prevent a deadlock.
             goto fallback;
         conn->to << WorkerProto::Op::QueryMissing;
-        writeDerivedPaths(*this, *conn, targets);
+        WorkerProto::write(*this, *conn, targets);
         conn.processStderr();
         willBuild = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
         willSubstitute = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);

@@ -261,18 +261,6 @@ struct ClientSettings
     }
 };
 
-static std::vector<DerivedPath> readDerivedPaths(Store & store, WorkerProto::Version clientVersion, WorkerProto::ReadConn conn)
-{
-    std::vector<DerivedPath> reqs;
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 30) {
-        reqs = WorkerProto::Serialise<std::vector<DerivedPath>>::read(store, conn);
-    } else {
-        for (auto & s : readStrings<Strings>(conn.from))
-            reqs.push_back(parsePathWithOutputs(store, s).toDerivedPath());
-    }
-    return reqs;
-}
-
 static void performOp(TunnelLogger * logger, ref<Store> store,
     TrustedFlag trusted, RecursiveFlag recursive, WorkerProto::Version clientVersion,
     Source & from, BufferedSink & to, WorkerProto::Op op)
@@ -538,7 +526,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case WorkerProto::Op::BuildPaths: {
-        auto drvs = readDerivedPaths(*store, clientVersion, rconn);
+        auto drvs = WorkerProto::Serialise<DerivedPaths>::read(*store, rconn);
         BuildMode mode = bmNormal;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 15) {
             mode = (BuildMode) readInt(from);
@@ -563,7 +551,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case WorkerProto::Op::BuildPathsWithResults: {
-        auto drvs = readDerivedPaths(*store, clientVersion, rconn);
+        auto drvs = WorkerProto::Serialise<DerivedPaths>::read(*store, rconn);
         BuildMode mode = bmNormal;
         mode = (BuildMode) readInt(from);
 
@@ -938,7 +926,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case WorkerProto::Op::QueryMissing: {
-        auto targets = readDerivedPaths(*store, clientVersion, rconn);
+        auto targets = WorkerProto::Serialise<DerivedPaths>::read(*store, rconn);
         logger->startWork();
         StorePathSet willBuild, willSubstitute, unknown;
         uint64_t downloadSize, narSize;

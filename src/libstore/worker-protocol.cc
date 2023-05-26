@@ -51,12 +51,34 @@ void WorkerProto::Serialise<std::optional<TrustedFlag>>::write(const Store & sto
 DerivedPath WorkerProto::Serialise<DerivedPath>::read(const Store & store, WorkerProto::ReadConn conn)
 {
     auto s = readString(conn.from);
-    return DerivedPath::parseLegacy(store, s);
+    if (GET_PROTOCOL_MINOR(conn.version) >= 30) {
+        return DerivedPath::parseLegacy(store, s);
+    } else {
+        return parsePathWithOutputs(store, s).toDerivedPath();
+    }
 }
 
 void WorkerProto::Serialise<DerivedPath>::write(const Store & store, WorkerProto::WriteConn conn, const DerivedPath & req)
 {
-    conn.to << req.to_string_legacy(store);
+    if (GET_PROTOCOL_MINOR(conn.version) >= 30) {
+        conn.to << req.to_string_legacy(store);
+    } else {
+        auto sOrDrvPath = StorePathWithOutputs::tryFromDerivedPath(req);
+        std::visit(overloaded {
+            [&](const StorePathWithOutputs & s) {
+                conn.to << s.to_string(store);
+            },
+            [&](const StorePath & drvPath) {
+                throw Error("trying to request '%s', but daemon protocol %d.%d is too old (< 1.29) to request a derivation file",
+                    store.printStorePath(drvPath),
+                    GET_PROTOCOL_MAJOR(conn.version),
+                    GET_PROTOCOL_MINOR(conn.version));
+            },
+            [&](std::monostate) {
+                throw Error("wanted to build a derivation that is itself a build product, but protocols do not support that. Try upgrading the Nix on the other end of this connection");
+            },
+        }, sOrDrvPath);
+    }
 }
 
 
