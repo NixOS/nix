@@ -850,7 +850,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdQueryValidPaths: {
                 bool lock = readInt(in);
                 bool substitute = readInt(in);
-                auto paths = WorkerProto<StorePathSet>::read(*store, in);
+                auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, in);
                 if (lock && writeAllowed)
                     for (auto & path : paths)
                         store->addTempRoot(path);
@@ -859,19 +859,19 @@ static void opServe(Strings opFlags, Strings opArgs)
                     store->substitutePaths(paths);
                 }
 
-                workerProtoWrite(*store, out, store->queryValidPaths(paths));
+                WorkerProto::write(*store, out, store->queryValidPaths(paths));
                 break;
             }
 
             case cmdQueryPathInfos: {
-                auto paths = WorkerProto<StorePathSet>::read(*store, in);
+                auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, in);
                 // !!! Maybe we want a queryPathInfos?
                 for (auto & i : paths) {
                     try {
                         auto info = store->queryPathInfo(i);
                         out << store->printStorePath(info->path)
                             << (info->deriver ? store->printStorePath(*info->deriver) : "");
-                        workerProtoWrite(*store, out, info->references);
+                        WorkerProto::write(*store, out, info->references);
                         // !!! Maybe we want compression?
                         out << info->narSize // downloadSize
                             << info->narSize;
@@ -899,7 +899,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case cmdExportPaths: {
                 readInt(in); // obsolete
-                store->exportPaths(WorkerProto<StorePathSet>::read(*store, in), out);
+                store->exportPaths(WorkerProto::Serialise<StorePathSet>::read(*store, in), out);
                 break;
             }
 
@@ -945,7 +945,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                     DrvOutputs builtOutputs;
                     for (auto & [output, realisation] : status.builtOutputs)
                         builtOutputs.insert_or_assign(realisation.id, realisation);
-                    workerProtoWrite(*store, out, builtOutputs);
+                    WorkerProto::write(*store, out, builtOutputs);
                 }
 
                 break;
@@ -954,9 +954,9 @@ static void opServe(Strings opFlags, Strings opArgs)
             case cmdQueryClosure: {
                 bool includeOutputs = readInt(in);
                 StorePathSet closure;
-                store->computeFSClosure(WorkerProto<StorePathSet>::read(*store, in),
+                store->computeFSClosure(WorkerProto::Serialise<StorePathSet>::read(*store, in),
                     closure, false, includeOutputs);
-                workerProtoWrite(*store, out, closure);
+                WorkerProto::write(*store, out, closure);
                 break;
             }
 
@@ -971,7 +971,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 };
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.references = WorkerProto<StorePathSet>::read(*store, in);
+                info.references = WorkerProto::Serialise<StorePathSet>::read(*store, in);
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
                 info.ca = ContentAddress::parseOpt(readString(in));
