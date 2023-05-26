@@ -57,8 +57,6 @@ Settings::Settings()
     auto sslOverride = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
     if (sslOverride != "")
         caFile = sslOverride;
-    else if (caFile == "")
-        caFile = getDefaultSSLCertFile();
 
     /* Backwards compatibility. */
     auto s = getEnv("NIX_REMOTE_SYSTEMS");
@@ -185,7 +183,7 @@ bool Settings::isWSL1()
 Path Settings::getDefaultSSLCertFile()
 {
     for (auto & fn : {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
-        if (pathExists(fn)) return fn;
+        if (pathAccessible(fn)) return fn;
     return "";
 }
 
