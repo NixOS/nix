@@ -1152,16 +1152,14 @@ drvName, Bindings * attrs, Value & v)
                 if (i->value->type() == nNull) continue;
             }
 
-            if (i->name == state.sContentAddressed) {
-                contentAddressed = state.forceBool(*i->value, noPos, context_below);
-                if (contentAddressed)
-                    experimentalFeatureSettings.require(Xp::CaDerivations);
+            if (i->name == state.sContentAddressed && state.forceBool(*i->value, noPos, context_below)) {
+                contentAddressed = true;
+                experimentalFeatureSettings.require(Xp::CaDerivations);
             }
 
-            else if (i->name == state.sImpure) {
-                isImpure = state.forceBool(*i->value, noPos, context_below);
-                if (isImpure)
-                    experimentalFeatureSettings.require(Xp::ImpureDerivations);
+            else if (i->name == state.sImpure && state.forceBool(*i->value, noPos, context_below)) {
+                isImpure = true;
+                experimentalFeatureSettings.require(Xp::ImpureDerivations);
             }
 
             /* The `args' attribute is special: it supplies the
