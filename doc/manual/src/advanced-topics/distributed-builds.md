@@ -39,10 +39,11 @@ contains Nix.
 > **Warning**
 >
 > If you are building via the Nix daemon, it is the Nix daemon user
-> account (that is, `root`) that should have SSH access to the remote
+> account (that is, `root`) that should have SSH access to a user (not necessarily `root`) on the remote
 > machine. If you can’t or don’t want to configure `root` to be able to
-> access to remote machine, you can use a private Nix store instead by
-> passing e.g. `--store ~/my-nix`.
+> access the remote machine, you can use a private Nix store instead by
+> passing e.g. `--store ~/my-nix` when running a nix command from the
+> local machine.
 
 The list of remote machines can be specified on the command line or in
 the Nix configuration file. The former is convenient for testing. For
