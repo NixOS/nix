@@ -1,0 +1,1 @@
+"a = 123\nb = -456\nc = \"foo\"\nd = \"\"\"\nfoo\n\"bar\"\\\n\"\"\"\ne = true\nf = false\ng = [\n1,\n2,\n3,\n]\nh = [\n\"a\",\n[\n\"b\",\n{\"foo\\nbar\"={}},\n],\n]\ni = 3\nj = 1.44\nk = nan\nl = nan\nm = inf\nn = -inf\no = \"foo\"\np = [\n{},\n\"foobar\",\n{x=1,y=0.0,z=\"\"},\n]\n"
