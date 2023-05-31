@@ -1501,7 +1501,7 @@ static RegisterPrimOp primop_storePath({
       causes the path to be *copied* again to the Nix store, resulting
       in a new path (e.g. `/nix/store/ld01dnzc…-source-source`).
 
-      This function is not available in pure evaluation mode.
+      Not available in [pure evaluation mode](@docroot@/command-ref/conf-file.md#conf-pure-eval).
     )",
     .fun = prim_storePath,
 });
