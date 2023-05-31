@@ -459,18 +459,6 @@ ErrorBuilder & ErrorBuilder::atPos(PosIdx pos)
     return *this;
 }
 
-ErrorBuilder & ErrorBuilder::withTrace(PosIdx pos, const std::string_view text)
-{
-    info.traces.push_front(Trace{ .pos = state.positions[pos], .hint = hintformat(std::string(text)), .frame = false });
-    return *this;
-}
-
-ErrorBuilder & ErrorBuilder::withFrameTrace(PosIdx pos, const std::string_view text)
-{
-    info.traces.push_front(Trace{ .pos = state.positions[pos], .hint = hintformat(std::string(text)), .frame = true });
-    return *this;
-}
-
 ErrorBuilder & ErrorBuilder::withSuggestions(Suggestions & s)
 {
     info.suggestions = s;
@@ -1191,34 +1179,6 @@ void EvalState::cacheFile(
 void EvalState::eval(Expr * e, Value & v)
 {
     e->eval(*this, baseEnv, v);
-}
-
-
-inline bool EvalState::evalBool(Env & env, Expr * e, const PosIdx pos, std::string_view errorCtx)
-{
-    try {
-        Value v;
-        e->eval(*this, env, v);
-        if (v.type() != nBool)
-            error("value is %1% while a Boolean was expected", showType(v)).withFrame(env, *e).debugThrow<TypeError>();
-        return v.boolean;
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
-    }
-}
-
-
-inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx)
-{
-    try {
-        e->eval(*this, env, v);
-        if (v.type() != nAttrs)
-            error("value is %1% while a set was expected", showType(v)).withFrame(env, *e).debugThrow<TypeError>();
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
-    }
 }
 
 
@@ -2063,80 +2023,9 @@ void EvalState::forceValueDeep(Value & v)
 }
 
 
-NixInt EvalState::forceInt(Value & v, const PosIdx pos, std::string_view errorCtx)
-{
-    try {
-        forceValue(v, pos);
-        if (v.type() != nInt)
-            error("value is %1% while an integer was expected", showType(v)).debugThrow<TypeError>();
-        return v.integer;
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
-    }
-}
-
-
-NixFloat EvalState::forceFloat(Value & v, const PosIdx pos, std::string_view errorCtx)
-{
-    try {
-        forceValue(v, pos);
-        if (v.type() == nInt)
-            return v.integer;
-        else if (v.type() != nFloat)
-            error("value is %1% while a float was expected", showType(v)).debugThrow<TypeError>();
-        return v.fpoint;
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
-    }
-}
-
-
-bool EvalState::forceBool(Value & v, const PosIdx pos, std::string_view errorCtx)
-{
-    try {
-        forceValue(v, pos);
-        if (v.type() != nBool)
-            error("value is %1% while a Boolean was expected", showType(v)).debugThrow<TypeError>();
-        return v.boolean;
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
-    }
-}
-
-
 bool EvalState::isFunctor(Value & fun)
 {
     return fun.type() == nAttrs && fun.attrs->find(sFunctor) != fun.attrs->end();
-}
-
-
-void EvalState::forceFunction(Value & v, const PosIdx pos, std::string_view errorCtx)
-{
-    try {
-        forceValue(v, pos);
-        if (v.type() != nFunction && !isFunctor(v))
-            error("value is %1% while a function was expected", showType(v)).debugThrow<TypeError>();
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
-    }
-}
-
-
-std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string_view errorCtx)
-{
-    try {
-        forceValue(v, pos);
-        if (v.type() != nString)
-            error("value is %1% while a string was expected", showType(v)).debugThrow<TypeError>();
-        return v.string.s;
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
-    }
 }
 
 
@@ -2145,24 +2034,6 @@ void copyContext(const Value & v, NixStringContext & context)
     if (v.string.context)
         for (const char * * p = v.string.context; *p; ++p)
             context.insert(NixStringContextElem::parse(*p));
-}
-
-
-std::string_view EvalState::forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx)
-{
-    auto s = forceString(v, pos, errorCtx);
-    copyContext(v, context);
-    return s;
-}
-
-
-std::string_view EvalState::forceStringNoCtx(Value & v, const PosIdx pos, std::string_view errorCtx)
-{
-    auto s = forceString(v, pos, errorCtx);
-    if (v.string.context) {
-        error("the string '%1%' is not allowed to refer to a store path (such as '%2%')", v.string.s, v.string.context[0]).withTrace(pos, errorCtx).debugThrow<EvalError>();
-    }
-    return s;
 }
 
 

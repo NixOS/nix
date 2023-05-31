@@ -109,11 +109,13 @@ class ErrorBuilder
         [[nodiscard, gnu::noinline]]
         ErrorBuilder & atPos(PosIdx pos);
 
+        template<typename... Args>
         [[nodiscard, gnu::noinline]]
-        ErrorBuilder & withTrace(PosIdx pos, const std::string_view text);
+        ErrorBuilder & withTrace(PosIdx pos, const std::string_view text, const Args & ... args);
 
+        template<typename... Args>
         [[nodiscard, gnu::noinline]]
-        ErrorBuilder & withFrameTrace(PosIdx pos, const std::string_view text);
+        ErrorBuilder & withFrameTrace(PosIdx pos, const std::string_view text, const Args & ... args);
 
         [[nodiscard, gnu::noinline]]
         ErrorBuilder & withSuggestions(Suggestions & s);
@@ -388,9 +390,10 @@ public:
      * Evaluation the expression, then verify that it has the expected
      * type.
      */
-    inline bool evalBool(Env & env, Expr * e);
-    inline bool evalBool(Env & env, Expr * e, const PosIdx pos, std::string_view errorCtx);
-    inline void evalAttrs(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx);
+    template<typename... Args>
+    inline bool evalBool(Env & env, Expr * e, const PosIdx pos, std::string_view errorCtx, const Args & ... args);
+    template<typename... Args>
+    inline void evalAttrs(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args);
 
     /**
      * If `v` is a thunk, enter it and overwrite `v` with the result
@@ -412,23 +415,33 @@ public:
     /**
      * Force `v`, and then verify that it has the expected type.
      */
-    NixInt forceInt(Value & v, const PosIdx pos, std::string_view errorCtx);
-    NixFloat forceFloat(Value & v, const PosIdx pos, std::string_view errorCtx);
-    bool forceBool(Value & v, const PosIdx pos, std::string_view errorCtx);
+    template<typename... Args>
+    NixInt forceInt(Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args);
+    template<typename... Args>
+    NixFloat forceFloat(Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args);
+    template<typename... Args>
+    bool forceBool(Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args);
 
-    void forceAttrs(Value & v, const PosIdx pos, std::string_view errorCtx);
+    template<typename... Args>
+    inline void forceAttrs(Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args);
 
-    template <typename Callable>
-    inline void forceAttrs(Value & v, Callable getPos, std::string_view errorCtx);
+    template<typename Callable, typename... Args>
+    inline void forceAttrs(Value & v, Callable getPos, std::string_view errorCtx, const Args & ... args);
 
-    inline void forceList(Value & v, const PosIdx pos, std::string_view errorCtx);
+    template<typename... Args>
+    inline void forceList(Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args);
+
     /**
      * @param v either lambda or primop
      */
-    void forceFunction(Value & v, const PosIdx pos, std::string_view errorCtx);
-    std::string_view forceString(Value & v, const PosIdx pos, std::string_view errorCtx);
-    std::string_view forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx);
-    std::string_view forceStringNoCtx(Value & v, const PosIdx pos, std::string_view errorCtx);
+    template<typename... Args>
+    void forceFunction(Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args);
+    template<typename... Args>
+    std::string_view forceString(Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args);
+    template<typename... Args>
+    std::string_view forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx, const Args & ... args);
+    template<typename... Args>
+    std::string_view forceStringNoCtx(Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args);
 
     [[gnu::noinline]]
     void addErrorTrace(Error & e, const char * s, const std::string & s2) const;
@@ -805,6 +818,20 @@ struct EvalSettings : Config
 extern EvalSettings evalSettings;
 
 static const std::string corepkgsPrefix{"/__corepkgs__/"};
+
+template<typename... Args>
+ErrorBuilder & ErrorBuilder::withTrace(PosIdx pos, const std::string_view text, const Args & ... args)
+{
+    info.traces.push_front(Trace{ .pos = state.positions[pos], .hint = hintfmt(std::string(text), args...), .frame = false });
+    return *this;
+}
+
+template<typename... Args>
+ErrorBuilder & ErrorBuilder::withFrameTrace(PosIdx pos, const std::string_view text, const Args & ... args)
+{
+    info.traces.push_front(Trace{ .pos = state.positions[pos], .hint = hintfmt(std::string(text), args...), .frame = true });
+    return *this;
+}
 
 template<class ErrorType>
 void ErrorBuilder::debugThrow()

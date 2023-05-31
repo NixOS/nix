@@ -81,15 +81,48 @@ Env & EvalState::allocEnv(size_t size)
 }
 
 
+template<typename... Args>
 [[gnu::always_inline]]
-void EvalState::forceValue(Value & v, const PosIdx pos)
+inline bool EvalState::evalBool(Env & env, Expr * e, const PosIdx pos, std::string_view errorCtx, const Args & ... args)
+{
+    try {
+        Value v;
+        e->eval(*this, env, v);
+        if (v.type() != nBool)
+            error("value is %1% while a Boolean was expected", showType(v)).withFrame(env, *e).debugThrow<TypeError>();
+        return v.boolean;
+    } catch (Error & e) {
+        e.addTrace(positions[pos], errorCtx, args...);
+        throw;
+    }
+}
+
+
+template<typename... Args>
+[[gnu::always_inline]]
+inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args)
+{
+    try {
+        e->eval(*this, env, v);
+        if (v.type() != nAttrs)
+            error("value is %1% while a set was expected", showType(v)).withFrame(env, *e).debugThrow<TypeError>();
+    } catch (Error & e) {
+        e.addTrace(positions[pos], errorCtx, args...);
+        throw;
+    }
+}
+
+
+[[gnu::always_inline]]
+inline void EvalState::forceValue(Value & v, const PosIdx pos)
 {
     forceValue(v, [&]() { return pos; });
 }
 
 
 template<typename Callable>
-void EvalState::forceValue(Value & v, Callable getPos)
+[[gnu::always_inline]]
+inline void EvalState::forceValue(Value & v, Callable getPos)
 {
     if (v.isThunk()) {
         Env * env = v.thunk.env;
@@ -109,32 +142,128 @@ void EvalState::forceValue(Value & v, Callable getPos)
         error("infinite recursion encountered").atPos(getPos()).template debugThrow<EvalError>();
 }
 
-
+template<typename... Args>
 [[gnu::always_inline]]
-inline void EvalState::forceAttrs(Value & v, const PosIdx pos, std::string_view errorCtx)
+inline void EvalState::forceAttrs(Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args)
 {
-    forceAttrs(v, [&]() { return pos; }, errorCtx);
+    forceAttrs(v, [&]() { return pos; }, errorCtx, args...);
 }
 
 
-template <typename Callable>
+template<typename Callable, typename... Args>
 [[gnu::always_inline]]
-inline void EvalState::forceAttrs(Value & v, Callable getPos, std::string_view errorCtx)
+inline void EvalState::forceAttrs(Value & v, Callable getPos, std::string_view errorCtx, const Args & ... args)
 {
     forceValue(v, noPos);
     if (v.type() != nAttrs) {
         PosIdx pos = getPos();
-        error("value is %1% while a set was expected", showType(v)).withTrace(pos, errorCtx).debugThrow<TypeError>();
+        error("value is %1% while a set was expected", showType(v)).withTrace(pos, errorCtx, args...).template debugThrow<TypeError>();
+    }
+}
+
+template<typename... Args>
+[[gnu::always_inline]]
+inline void EvalState::forceList(Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args)
+{
+    forceValue(v, noPos);
+    if (!v.isList()) {
+        error("value is %1% while a list was expected", showType(v)).withTrace(pos, errorCtx, args...).template debugThrow<TypeError>();
     }
 }
 
 
-[[gnu::always_inline]]
-inline void EvalState::forceList(Value & v, const PosIdx pos, std::string_view errorCtx)
+template<typename... Args>
+void EvalState::forceFunction(Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args)
 {
-    forceValue(v, noPos);
-    if (!v.isList()) {
-        error("value is %1% while a list was expected", showType(v)).withTrace(pos, errorCtx).debugThrow<TypeError>();
+    try {
+        forceValue(v, pos);
+        if (v.type() != nFunction && !isFunctor(v))
+            error("value is %1% while a function was expected", showType(v)).debugThrow<TypeError>();
+    } catch (Error & e) {
+        e.addTrace(positions[pos], errorCtx, args...);
+        throw;
+    }
+}
+
+
+template<typename... Args>
+std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args)
+{
+    try {
+        forceValue(v, pos);
+        if (v.type() != nString)
+            error("value is %1% while a string was expected", showType(v)).debugThrow<TypeError>();
+        return v.string.s;
+    } catch (Error & e) {
+        e.addTrace(positions[pos], errorCtx, args...);
+        throw;
+    }
+}
+
+
+template<typename... Args>
+std::string_view EvalState::forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx, const Args & ... args)
+{
+    auto s = forceString(v, pos, errorCtx, args...);
+    copyContext(v, context);
+    return s;
+}
+
+
+template<typename... Args>
+std::string_view EvalState::forceStringNoCtx(Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args)
+{
+    auto s = forceString(v, pos, errorCtx, args...);
+    if (v.string.context) {
+        error("the string '%1%' is not allowed to refer to a store path (such as '%2%')", v.string.s, v.string.context[0]).withTrace(pos, errorCtx, args...).template debugThrow<EvalError>();
+    }
+    return s;
+}
+
+
+template<typename... Args>
+NixInt EvalState::forceInt(Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args)
+{
+    try {
+        forceValue(v, pos);
+        if (v.type() != nInt)
+            error("value is %1% while an integer was expected", showType(v)).debugThrow<TypeError>();
+        return v.integer;
+    } catch (Error & e) {
+        e.addTrace(positions[pos], errorCtx, args...);
+        throw;
+    }
+}
+
+
+template<typename... Args>
+NixFloat EvalState::forceFloat(Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args)
+{
+    try {
+        forceValue(v, pos);
+        if (v.type() == nInt)
+            return v.integer;
+        else if (v.type() != nFloat)
+            error("value is %1% while a float was expected", showType(v)).debugThrow<TypeError>();
+        return v.fpoint;
+    } catch (Error & e) {
+        e.addTrace(positions[pos], errorCtx, args...);
+        throw;
+    }
+}
+
+
+template<typename... Args>
+bool EvalState::forceBool(Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args)
+{
+    try {
+        forceValue(v, pos);
+        if (v.type() != nBool)
+            error("value is %1% while a Boolean was expected", showType(v)).debugThrow<TypeError>();
+        return v.boolean;
+    } catch (Error & e) {
+        e.addTrace(positions[pos], errorCtx, args...);
+        throw;
     }
 }
 
