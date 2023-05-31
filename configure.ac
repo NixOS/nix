@@ -11,6 +11,8 @@ AC_PROG_SED
 # https://git.savannah.gnu.org/cgit/config.git/tree/config.guess
 # It has the following form, which is not documented anywhere:
 # <cpu>-<vendor>-<os>[<version>][-<abi>]
+# If `./configure` is passed any of the `--host`, `--build`, `--target` options, the value comes from `config.sub` instead:
+# https://git.savannah.gnu.org/cgit/config.git/tree/config.sub
 AC_CANONICAL_HOST
 AC_MSG_CHECKING([for the canonical Nix system name])
 

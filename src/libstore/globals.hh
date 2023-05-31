@@ -193,12 +193,49 @@ public:
     Setting<std::string> thisSystem{
         this, SYSTEM, "system",
         R"(
-          This option specifies the canonical Nix system name of the current installation, such as `i686-linux` or `x86_64-darwin`.
-          Nix can only build derivations whose `system` attribute equals the value specified here.
-          In general, it never makes sense to modify this value from its default, since you can use it to ‘lie’ about the platform you are building on (e.g., perform a Mac OS build on a Linux machine; the result would obviously be wrong).
+          The system type of the current Nix installation.
+
+          Nix can only build [derivations](@docroot@/language/derivations.md) whose `system` attribute equals the value specified here.
+          In general, it never makes sense to modify this value, since you can use it to ‘lie’ about the system you are building on (e.g., perform a macOS build on a Linux machine; the result would obviously be wrong).
           It only makes sense if the Nix binaries can run on multiple platforms, e.g., ‘universal binaries’ that run on `x86_64-linux` and `i686-linux`.
 
-          It defaults to the canonical Nix system name detected by `configure` at build time.
+          The default value is set when Nix itself is compiled for the system it will run on.
+          The following system types are widely used, as Nix is actively supported on these platforms:
+
+          - `x86_64-linux`
+          - `x86_64-darwin`
+          - `i686-linux`
+          - `aarch64-linux`
+          - `aarch64-darwin`
+
+          The concrete value is based on the output of [`config.guess`](https://git.savannah.gnu.org/cgit/config.git/tree/config.guess):
+
+          ```
+          <cpu>-<vendor>-<os>[<version>][-<abi>]
+          ```
+
+          When Nix is built such that `./configure` is passed any of the `--host`, `--build`, `--target` options, the value is based on the output of [`config.sub`](https://git.savannah.gnu.org/cgit/config.git/tree/config.sub):
+
+          ```
+          <cpu>-<vendor>[-<kernel>]-<os>
+          ```
+
+          Nix only uses the CPU and OS identifiers:
+
+          ```
+          <cpu>-<os>[-<abi>]
+          ```
+
+          For historic reasons and backwards-compatibility, some CPU and OS identifiers are transformed as follows:
+
+          | `config.guess`             | Nix                 |
+          |----------------------------|---------------------|
+          | `amd64`                    | `x86_64`            |
+          | `i*86`                     | `i686`              |
+          | `arm6`                     | `arm6l`             |
+          | `arm7`                     | `arm7l`             |
+          | `linux-gnu*`               | `linux`             |
+          | `linux-musl*`              | `linux`             |
         )"};
 
     Setting<time_t> maxSilentTime{
