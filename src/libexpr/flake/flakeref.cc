@@ -77,14 +77,6 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
 {
     using namespace fetchers;
 
-    static std::string fnRegex = "[0-9a-zA-Z-._~!$&'\"()*+,;=]+";
-
-    static std::regex pathUrlRegex(
-        "(/?" + fnRegex + "(?:/" + fnRegex + ")*/?)"
-        + "(?:\\?(" + queryRegex + "))?"
-        + "(?:#(" + queryRegex + "))?",
-        std::regex::ECMAScript);
-
     static std::regex flakeRegex(
         "((" + flakeIdRegexS + ")(?:/(?:" + refAndOrRevRegex + "))?)"
         + "(?:#(" + queryRegex + "))?",
@@ -92,26 +84,23 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
 
     std::smatch match;
 
-    /* Check if 'url' is a flake ID. This is an abbreviated syntax for
-       'flake:<flake-id>?ref=<ref>&rev=<rev>'. */
-
-    if (std::regex_match(url, match, flakeRegex)) {
-        auto parsedURL = ParsedURL{
-            .url = url,
-            .base = "flake:" + match.str(1),
-            .scheme = "flake",
-            .authority = "",
-            .path = match[1],
-        };
-
-        return std::make_pair(
-            FlakeRef(Input::fromURL(parsedURL, isFlake), ""),
-            percentDecode(match.str(6)));
-    }
-
-    else if (std::regex_match(url, match, pathUrlRegex)) {
-        std::string path = match[1];
-        std::string fragment = percentDecode(match.str(3));
+    auto parsePathFlakeRef = [&]() {
+        std::string path = url;
+        std::string fragment = "";
+        std::map<std::string, std::string> query = {};
+        auto pathEnd = url.find_first_of("#?");
+        auto fragmentStart = pathEnd;
+        if (pathEnd != std::string::npos && url[pathEnd] == '?')
+            fragmentStart = url.find("#");
+        if (pathEnd != std::string::npos) {
+            path = url.substr(0, pathEnd);
+        }
+        if (fragmentStart != std::string::npos) {
+            fragment = percentDecode(url.substr(fragmentStart+1));
+        }
+        if (fragmentStart != std::string::npos && pathEnd != std::string::npos) {
+            query = decodeQuery(url.substr(pathEnd+1, fragmentStart));
+        }
 
         if (baseDir) {
             /* Check if 'url' is a path (either absolute or relative
@@ -163,7 +152,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                             .scheme = "git+file",
                             .authority = "",
                             .path = flakeRoot,
-                            .query = decodeQuery(match[2]),
+                            .query = query,
                         };
 
                         if (subdir != "") {
@@ -188,7 +177,6 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         } else {
             if (!hasPrefix(path, "/"))
                 throw BadURL("flake reference '%s' is not an absolute path", url);
-            auto query = decodeQuery(match[2]);
             path = canonPath(path + "/" + getOr(query, "dir", ""));
         }
 
@@ -197,19 +185,40 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         attrs.insert_or_assign("path", path);
 
         return std::make_pair(FlakeRef(Input::fromAttrs(std::move(attrs)), ""), fragment);
+    };
+
+    /* Check if 'url' is a flake ID. This is an abbreviated syntax for
+       'flake:<flake-id>?ref=<ref>&rev=<rev>'. */
+
+    if (std::regex_match(url, match, flakeRegex)) {
+        auto parsedURL = ParsedURL{
+            .url = url,
+            .base = "flake:" + match.str(1),
+            .scheme = "flake",
+            .authority = "",
+            .path = match[1],
+        };
+
+        return std::make_pair(
+            FlakeRef(Input::fromURL(parsedURL), ""),
+            percentDecode(match.str(6)));
     }
 
     else {
-        auto parsedURL = parseURL(url);
-        std::string fragment;
-        std::swap(fragment, parsedURL.fragment);
+        try {
+            auto parsedURL = parseURL(url);
+            std::string fragment;
+            std::swap(fragment, parsedURL.fragment);
 
-        auto input = Input::fromURL(parsedURL, isFlake);
-        input.parent = baseDir;
+            auto input = Input::fromURL(parsedURL, isFlake);
+            input.parent = baseDir;
 
-        return std::make_pair(
-            FlakeRef(std::move(input), getOr(parsedURL.query, "dir", "")),
-            fragment);
+            return std::make_pair(
+                FlakeRef(std::move(input), getOr(parsedURL.query, "dir", "")),
+                fragment);
+        } catch (BadURL &) {
+            return parsePathFlakeRef();
+        }
     }
 }
 
