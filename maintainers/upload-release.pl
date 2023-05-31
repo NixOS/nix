@@ -15,7 +15,6 @@ my $evalId = $ARGV[0] or die "Usage: $0 EVAL-ID\n";
 
 my $releasesBucketName = "nix-releases";
 my $channelsBucketName = "nix-channels";
-my $nixpkgsDir = "/home/eelco/Dev/nixpkgs-pristine";
 
 my $TMPDIR = $ENV{'TMPDIR'} // "/tmp";
 
@@ -200,26 +199,22 @@ for my $fn (glob "$tmpDir/*") {
     }
 }
 
-# Update nix-fallback-paths.nix.
+# Print new nix-fallback-paths.nix.
 if ($isLatest) {
-    system("cd $nixpkgsDir && git pull") == 0 or die;
-
     sub getStorePath {
         my ($jobName) = @_;
         my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
         return $buildInfo->{buildoutputs}->{out}->{path} or die "cannot get store path for '$jobName'";
     }
 
-    write_file("$nixpkgsDir/nixos/modules/installer/tools/nix-fallback-paths.nix",
+    print STDERR "nixos/modules/installer/tools/nix-fallback-paths.nix:\n" .
                "{\n" .
                "  x86_64-linux = \"" . getStorePath("build.x86_64-linux") . "\";\n" .
                "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
                "  aarch64-linux = \"" . getStorePath("build.aarch64-linux") . "\";\n" .
                "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
                "  aarch64-darwin = \"" . getStorePath("build.aarch64-darwin") . "\";\n" .
-               "}\n");
-
-    system("cd $nixpkgsDir && git commit -a -m 'nix-fallback-paths.nix: Update to $version'") == 0 or die;
+               "}\n";
 }
 
 # Update the "latest" symlink.
