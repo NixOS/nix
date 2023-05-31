@@ -733,19 +733,46 @@ struct EvalSettings : Config
 
     Setting<Strings> nixPath{
         this, getDefaultNixPath(), "nix-path",
-        "List of directories to be searched for `<...>` file references."};
+        R"(
+          List of directories to be searched for file references in `<...>` search path expressions.
+
+          - The configuration setting is overridden by the [`NIX_PATH`](@docroot@/command-ref/env-common.md#env-NIX_PATH)
+          environment variable.
+          - `NIX_PATH` be extended using the [`-I` option](@docroot@/command-ref/opt-common.md#opt-I).
+          - `NIX_PATH` is overridden by specifying the setting as the option `--nix-path`.
+          - Any current value is extended with `--extra-nix-path`.
+
+          If nothing is specified:
+
+          - If [restricted evaluation](#conf-restrict-eval) is enabled, use the values in `NIX_PATH`.
+
+          - Otherwise, and if `NIX_PATH` is not set, use a fallback:
+
+            ```
+            $HOME/.nix-defexpr/channels"
+            nixpkgs=$NIX_STATE_DIR/profiles/per-user/root/channels/nixpkgs
+            $NIX_STATE_DIR/profiles/per-user/root/channels
+            ```
+
+            See [`NIX_STATE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STATE_DIR) for details.
+
+          If [pure evaluation](#conf-pure-eval) is enabled, search path expressions are not resolved at all.
+        )"};
 
     Setting<bool> restrictEval{
         this, false, "restrict-eval",
         R"(
           If set to `true`, the Nix evaluator will not allow access to any
-          files outside of the Nix search path (as set via the `NIX_PATH`
-          environment variable or the `-I` option), or to URIs outside of
-          `allowed-uri`. The default is `false`.
+          files outside of the Nix search path (as set via the [`NIX_PATH`](@docroot@/command-ref/env-common.md#env-NIX_PATH)
+          environment variable or the [`-I` option](@docroot@/command-ref/opt-common.md#opt-I)), or to URIs outside of
+          [`allowed-uris`](#conf-allowed-uris). The default is `false`.
         )"};
 
     Setting<bool> pureEval{this, false, "pure-eval",
-        "Whether to restrict file system and network access to files specified by cryptographic hash."};
+        R"(
+          If set to `true`, restrict file system and network access to files specified by cryptographic hash,
+          and do not resolve `<...>` search path expressions.
+        )"};
 
     Setting<bool> enableImportFromDerivation{
         this, true, "allow-import-from-derivation",
@@ -759,10 +786,9 @@ struct EvalSettings : Config
 
     Setting<Strings> allowedUris{this, {}, "allowed-uris",
         R"(
-          A list of URI prefixes to which access is allowed in restricted
-          evaluation mode. For example, when set to
-          `https://github.com/NixOS`, builtin functions such as `fetchGit` are
-          allowed to access `https://github.com/NixOS/patchelf.git`.
+          A list of URI prefixes to which access is allowed in [restricted evaluation mode](#conf-restrict-eval).
+          For example, when set to `https://github.com/NixOS`, [built-in functions](@docroot@/language/builtins.md) such as
+          [`fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit) are allowed to access `https://github.com/NixOS/patchelf.git`.
         )"};
 
     Setting<bool> traceFunctionCalls{this, false, "trace-function-calls",
