@@ -2620,7 +2620,7 @@ Strings EvalSettings::getDefaultNixPath()
 {
     Strings res;
     auto add = [&](const Path & p, const std::string & s = std::string()) {
-        if (pathExists(p)) {
+        if (pathAccessible(p)) {
             if (s.empty()) {
                 res.push_back(p);
             } else {

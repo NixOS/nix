@@ -121,6 +121,14 @@ struct stat lstat(const Path & path);
 bool pathExists(const Path & path);
 
 /**
+ * A version of pathExists that returns false on a permission error.
+ * Useful for inferring default paths across directories that might not
+ * be readable.
+ * @return true iff the given path can be accessed and exists
+ */
+bool pathAccessible(const Path & path);
+
+/**
  * Read the contents (target) of a symbolic link.  The result is not
  * in any way canonicalised.
  */

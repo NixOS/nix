@@ -171,7 +171,7 @@ namespace nix {
                       hintfmt("value is %s while a string was expected", "an integer"),
                       hintfmt("while evaluating one of the strings to replace passed to builtins.replaceStrings"));
 
-        ASSERT_TRACE2("replaceStrings [ \"old\" ] [ true ] {}",
+        ASSERT_TRACE2("replaceStrings [ \"oo\" ] [ true ] \"foo\"",
                       TypeError,
                       hintfmt("value is %s while a string was expected", "a Boolean"),
                       hintfmt("while evaluating one of the replacement strings passed to builtins.replaceStrings"));
