@@ -193,18 +193,12 @@ public:
     Setting<std::string> thisSystem{
         this, SYSTEM, "system",
         R"(
-          This option specifies the canonical Nix system name of the current
-          installation, such as `i686-linux` or `x86_64-darwin`. Nix can only
-          build derivations whose `system` attribute equals the value
-          specified here. In general, it never makes sense to modify this
-          value from its default, since you can use it to ‘lie’ about the
-          platform you are building on (e.g., perform a Mac OS build on a
-          Linux machine; the result would obviously be wrong). It only makes
-          sense if the Nix binaries can run on multiple platforms, e.g.,
-          ‘universal binaries’ that run on `x86_64-linux` and `i686-linux`.
+          This option specifies the canonical Nix system name of the current installation, such as `i686-linux` or `x86_64-darwin`.
+          Nix can only build derivations whose `system` attribute equals the value specified here.
+          In general, it never makes sense to modify this value from its default, since you can use it to ‘lie’ about the platform you are building on (e.g., perform a Mac OS build on a Linux machine; the result would obviously be wrong).
+          It only makes sense if the Nix binaries can run on multiple platforms, e.g., ‘universal binaries’ that run on `x86_64-linux` and `i686-linux`.
 
-          It defaults to the canonical Nix system name detected by `configure`
-          at build time.
+          It defaults to the canonical Nix system name detected by `configure` at build time.
         )"};
 
     Setting<time_t> maxSilentTime{
