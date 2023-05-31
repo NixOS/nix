@@ -3957,7 +3957,11 @@ static RegisterPrimOp primop_replaceStrings({
     .args = {"from", "to", "s"},
     .doc = R"(
       Given string *s*, replace every occurrence of the strings in *from*
-      with the corresponding string in *to*. For example,
+      with the corresponding string in *to*.
+
+      The argument *to* is lazy, that is, it is only evaluated when its corresponding pattern in *from* is matched in the string *s*
+
+      Example:
 
       ```nix
       builtins.replaceStrings ["oo" "a"] ["a" "i"] "foobar"
