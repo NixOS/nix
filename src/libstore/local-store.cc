@@ -190,7 +190,11 @@ LocalStore::LocalStore(const Params & params)
 
     /* Create missing state directories if they don't already exist. */
     createDirs(realStoreDir);
-    makeStoreWritable();
+    if (readOnly) {
+        experimentalFeatureSettings.require(Xp::ReadOnlyLocalStore);
+    } else {
+        makeStoreWritable();
+    }
     createDirs(linksDir);
     Path profilesDir = stateDir + "/profiles";
     createDirs(profilesDir);
@@ -200,10 +204,6 @@ LocalStore::LocalStore(const Params & params)
     if (!pathExists(gcRootsDir)) {
         createDirs(gcRootsDir);
         createSymlink(profilesDir, gcRootsDir + "/profiles");
-    }
-
-    if (readOnly) {
-        experimentalFeatureSettings.require(Xp::ReadOnlyLocalStore);
     }
 
     for (auto & perUserDir : {profilesDir + "/per-user", gcRootsDir + "/per-user"}) {
