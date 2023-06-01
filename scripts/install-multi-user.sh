@@ -880,7 +880,7 @@ configure_shell_profile() {
         fi
     done
 
-    task "Setting up shell profiles for Fish with with ${PROFILE_FISH_SUFFIX} inside ${PROFILE_FISH_PREFIXES[*]}"
+    task "Setting up shell profiles for Fish with ${PROFILE_FISH_SUFFIX} inside ${PROFILE_FISH_PREFIXES[*]}"
     for fish_prefix in "${PROFILE_FISH_PREFIXES[@]}"; do
         if [ ! -d "$fish_prefix" ]; then
             # this specific prefix (ie: /etc/fish) is very likely to exist
