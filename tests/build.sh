@@ -57,6 +57,30 @@ nix build -f multiple-outputs.nix --json 'e^*' --no-link | jq --exit-status '
     (.outputs | keys == ["a_a", "b", "c"]))
 '
 
+# test buidling from non-drv attr path
+
+nix build -f multiple-outputs.nix --json 'e.a_a.outPath' --no-link | jq --exit-status '
+  (.[0] |
+    (.drvPath | match(".*multiple-outputs-e.drv")) and
+    (.outputs | keys == ["a_a"]))
+'
+
+# Illegal type of string context
+expectStderr 1 nix build -f multiple-outputs.nix 'e.a_a.drvPath' \
+  | grepQuiet "has a context which refers to a complete source and binary closure."
+
+# No string context
+expectStderr 1 nix build --expr '""' --no-link \
+  | grepQuiet "has 0 entries in its context. It should only have exactly one entry"
+
+# Too much string context
+expectStderr 1 nix build --impure --expr 'with (import ./multiple-outputs.nix).e.a_a; "${drvPath}${outPath}"' --no-link \
+  | grepQuiet "has 2 entries in its context. It should only have exactly one entry"
+
+nix build --impure --json --expr 'builtins.unsafeDiscardOutputDependency (import ./multiple-outputs.nix).e.a_a.drvPath' --no-link | jq --exit-status '
+  (.[0] | .path | match(".*multiple-outputs-e.drv"))
+'
+
 # Test building from raw store path to drv not expression.
 
 drv=$(nix eval -f multiple-outputs.nix --raw a.drvPath)

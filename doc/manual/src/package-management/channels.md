@@ -43,7 +43,7 @@ operations (via the symlink `~/.nix-defexpr/channels`). Consequently,
 you can then say
 
 ```console
-$ nix-env -u
+$ nix-env --upgrade
 ```
 
 to upgrade all packages in your profile to the latest versions available

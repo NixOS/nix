@@ -27,7 +27,7 @@ Switching will fail if the specified generation does not exist.
 # Examples
 
 ```console
-$ nix-env -G 42
+$ nix-env --switch-generation 42
 switching from generation 50 to 42
 ```
 

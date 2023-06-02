@@ -110,7 +110,7 @@ void Store::ensurePath(const StorePath & path)
 }
 
 
-void LocalStore::repairPath(const StorePath & path)
+void Store::repairPath(const StorePath & path)
 {
     Worker worker(*this, *this);
     GoalPtr goal = worker.makePathSubstitutionGoal(path, Repair);

@@ -680,8 +680,7 @@ public:
      * Repair the contents of the given path by redownloading it using
      * a substituter (if available).
      */
-    virtual void repairPath(const StorePath & path)
-    { unsupported("repairPath"); }
+    virtual void repairPath(const StorePath & path);
 
     /**
      * Add signatures to the specified store path. The signatures are

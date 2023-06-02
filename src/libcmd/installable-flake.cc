@@ -95,31 +95,13 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
         // FIXME: use eval cache?
         auto v = attr->forceValue();
 
-        if (v.type() == nPath) {
-            auto storePath = v.path().fetchToStore(state->store);
-            return {{
-                .path = DerivedPath::Opaque {
-                    .path = std::move(storePath),
-                },
-                .info = make_ref<ExtraPathInfo>(),
-            }};
+        if (std::optional derivedPathWithInfo = trySinglePathToDerivedPaths(
+            v,
+            noPos,
+            fmt("while evaluating the flake output attribute '%s'", attrPath)))
+        {
+            return { *derivedPathWithInfo };
         }
-
-        else if (v.type() == nString) {
-            NixStringContext context;
-            auto s = state->forceString(v, context, noPos, fmt("while evaluating the flake output attribute '%s'", attrPath));
-            auto storePath = state->store->maybeParseStorePath(s);
-            if (storePath && context.count(NixStringContextElem::Opaque { .path = *storePath })) {
-                return {{
-                    .path = DerivedPath::Opaque {
-                        .path = std::move(*storePath),
-                    },
-                    .info = make_ref<ExtraPathInfo>(),
-                }};
-            } else
-                throw Error("flake output attribute '%s' evaluates to the string '%s' which is not a store path", attrPath, s);
-        }
-
         else
             throw Error("flake output attribute '%s' is not a derivation or path", attrPath);
     }

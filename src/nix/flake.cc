@@ -255,6 +255,7 @@ struct CmdFlakeInfo : CmdFlakeMetadata
 struct CmdFlakeCheck : FlakeCommand
 {
     bool build = true;
+    bool checkAllSystems = false;
 
     CmdFlakeCheck()
     {
@@ -262,6 +263,11 @@ struct CmdFlakeCheck : FlakeCommand
             .longName = "no-build",
             .description = "Do not build checks.",
             .handler = {&build, false}
+        });
+        addFlag({
+            .longName = "all-systems",
+            .description = "Check the outputs for all systems.",
+            .handler = {&checkAllSystems, true}
         });
     }
 
@@ -288,6 +294,7 @@ struct CmdFlakeCheck : FlakeCommand
 
         lockFlags.applyNixConfig = true;
         auto flake = lockFlake();
+        auto localSystem = std::string(settings.thisSystem.get());
 
         bool hasErrors = false;
         auto reportError = [&](const Error & e) {
@@ -302,6 +309,8 @@ struct CmdFlakeCheck : FlakeCommand
                     throw;
             }
         };
+
+        std::set<std::string> omittedSystems;
 
         // FIXME: rewrite to use EvalCache.
 
@@ -321,6 +330,15 @@ struct CmdFlakeCheck : FlakeCommand
             // FIXME: what's the format of "system"?
             if (system.find('-') == std::string::npos)
                 reportError(Error("'%s' is not a valid system type, at %s", system, resolve(pos)));
+        };
+
+        auto checkSystemType = [&](const std::string & system, const PosIdx pos) {
+            if (!checkAllSystems && system != localSystem) {
+                omittedSystems.insert(system);
+                return false;
+            } else {
+                return true;
+            }
         };
 
         auto checkDerivation = [&](const std::string & attrPath, Value & v, const PosIdx pos) -> std::optional<StorePath> {
@@ -505,16 +523,18 @@ struct CmdFlakeCheck : FlakeCommand
                             for (auto & attr : *vOutput.attrs) {
                                 const auto & attr_name = state->symbols[attr.name];
                                 checkSystemName(attr_name, attr.pos);
-                                state->forceAttrs(*attr.value, attr.pos, "");
-                                for (auto & attr2 : *attr.value->attrs) {
-                                    auto drvPath = checkDerivation(
-                                        fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
-                                        *attr2.value, attr2.pos);
-                                    if (drvPath && attr_name == settings.thisSystem.get()) {
-                                        drvPaths.push_back(DerivedPath::Built {
-                                            .drvPath = *drvPath,
-                                            .outputs = OutputsSpec::All { },
-                                        });
+                                if (checkSystemType(attr_name, attr.pos)) {
+                                    state->forceAttrs(*attr.value, attr.pos, "");
+                                    for (auto & attr2 : *attr.value->attrs) {
+                                        auto drvPath = checkDerivation(
+                                            fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
+                                            *attr2.value, attr2.pos);
+                                        if (drvPath && attr_name == settings.thisSystem.get()) {
+                                            drvPaths.push_back(DerivedPath::Built {
+                                                    .drvPath = *drvPath,
+                                                        .outputs = OutputsSpec::All { },
+                                                        });
+                                        }
                                     }
                                 }
                             }
@@ -525,9 +545,11 @@ struct CmdFlakeCheck : FlakeCommand
                             for (auto & attr : *vOutput.attrs) {
                                 const auto & attr_name = state->symbols[attr.name];
                                 checkSystemName(attr_name, attr.pos);
-                                checkApp(
-                                    fmt("%s.%s", name, attr_name),
-                                    *attr.value, attr.pos);
+                                if (checkSystemType(attr_name, attr.pos)) {
+                                    checkApp(
+                                        fmt("%s.%s", name, attr_name),
+                                        *attr.value, attr.pos);
+                                };
                             }
                         }
 
@@ -536,11 +558,13 @@ struct CmdFlakeCheck : FlakeCommand
                             for (auto & attr : *vOutput.attrs) {
                                 const auto & attr_name = state->symbols[attr.name];
                                 checkSystemName(attr_name, attr.pos);
-                                state->forceAttrs(*attr.value, attr.pos, "");
-                                for (auto & attr2 : *attr.value->attrs)
-                                    checkDerivation(
-                                        fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
-                                        *attr2.value, attr2.pos);
+                                if (checkSystemType(attr_name, attr.pos)) {
+                                    state->forceAttrs(*attr.value, attr.pos, "");
+                                    for (auto & attr2 : *attr.value->attrs)
+                                        checkDerivation(
+                                            fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
+                                            *attr2.value, attr2.pos);
+                                };
                             }
                         }
 
@@ -549,11 +573,13 @@ struct CmdFlakeCheck : FlakeCommand
                             for (auto & attr : *vOutput.attrs) {
                                 const auto & attr_name = state->symbols[attr.name];
                                 checkSystemName(attr_name, attr.pos);
-                                state->forceAttrs(*attr.value, attr.pos, "");
-                                for (auto & attr2 : *attr.value->attrs)
-                                    checkApp(
-                                        fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
-                                        *attr2.value, attr2.pos);
+                                if (checkSystemType(attr_name, attr.pos)) {
+                                    state->forceAttrs(*attr.value, attr.pos, "");
+                                    for (auto & attr2 : *attr.value->attrs)
+                                        checkApp(
+                                            fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
+                                            *attr2.value, attr2.pos);
+                                };
                             }
                         }
 
@@ -562,9 +588,11 @@ struct CmdFlakeCheck : FlakeCommand
                             for (auto & attr : *vOutput.attrs) {
                                 const auto & attr_name = state->symbols[attr.name];
                                 checkSystemName(attr_name, attr.pos);
-                                checkDerivation(
-                                    fmt("%s.%s", name, attr_name),
-                                    *attr.value, attr.pos);
+                                if (checkSystemType(attr_name, attr.pos)) {
+                                    checkDerivation(
+                                        fmt("%s.%s", name, attr_name),
+                                        *attr.value, attr.pos);
+                                };
                             }
                         }
 
@@ -573,9 +601,11 @@ struct CmdFlakeCheck : FlakeCommand
                             for (auto & attr : *vOutput.attrs) {
                                 const auto & attr_name = state->symbols[attr.name];
                                 checkSystemName(attr_name, attr.pos);
-                                checkApp(
-                                    fmt("%s.%s", name, attr_name),
-                                    *attr.value, attr.pos);
+                                if (checkSystemType(attr_name, attr.pos) ) {
+                                    checkApp(
+                                        fmt("%s.%s", name, attr_name),
+                                        *attr.value, attr.pos);
+                                };
                             }
                         }
 
@@ -583,6 +613,7 @@ struct CmdFlakeCheck : FlakeCommand
                             state->forceAttrs(vOutput, pos, "");
                             for (auto & attr : *vOutput.attrs) {
                                 checkSystemName(state->symbols[attr.name], attr.pos);
+                                checkSystemType(state->symbols[attr.name], attr.pos);
                                 // FIXME: do getDerivations?
                             }
                         }
@@ -632,9 +663,11 @@ struct CmdFlakeCheck : FlakeCommand
                             for (auto & attr : *vOutput.attrs) {
                                 const auto & attr_name = state->symbols[attr.name];
                                 checkSystemName(attr_name, attr.pos);
-                                checkBundler(
-                                    fmt("%s.%s", name, attr_name),
-                                    *attr.value, attr.pos);
+                                if (checkSystemType(attr_name, attr.pos)) {
+                                    checkBundler(
+                                        fmt("%s.%s", name, attr_name),
+                                        *attr.value, attr.pos);
+                                };
                             }
                         }
 
@@ -643,12 +676,14 @@ struct CmdFlakeCheck : FlakeCommand
                             for (auto & attr : *vOutput.attrs) {
                                 const auto & attr_name = state->symbols[attr.name];
                                 checkSystemName(attr_name, attr.pos);
-                                state->forceAttrs(*attr.value, attr.pos, "");
-                                for (auto & attr2 : *attr.value->attrs) {
-                                    checkBundler(
-                                        fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
-                                        *attr2.value, attr2.pos);
-                                }
+                                if (checkSystemType(attr_name, attr.pos)) {
+                                    state->forceAttrs(*attr.value, attr.pos, "");
+                                    for (auto & attr2 : *attr.value->attrs) {
+                                        checkBundler(
+                                            fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
+                                            *attr2.value, attr2.pos);
+                                    }
+                                };
                             }
                         }
 
@@ -681,7 +716,15 @@ struct CmdFlakeCheck : FlakeCommand
         }
         if (hasErrors)
             throw Error("some errors were encountered during the evaluation");
-    }
+
+        if (!omittedSystems.empty()) {
+            warn(
+                "The check omitted these incompatible systems: %s\n"
+                "Use '--all-systems' to check all.",
+                concatStringsSep(", ", omittedSystems)
+            );
+        };
+    };
 };
 
 static Strings defaultTemplateAttrPathsPrefixes{"templates."};

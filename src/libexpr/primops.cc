@@ -1,5 +1,6 @@
 #include "archive.hh"
 #include "derivations.hh"
+#include "downstream-placeholder.hh"
 #include "eval-inline.hh"
 #include "eval.hh"
 #include "globals.hh"
@@ -88,7 +89,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
         auto outputs = resolveDerivedPath(*store, drv);
         for (auto & [outputName, outputPath] : outputs) {
             res.insert_or_assign(
-                downstreamPlaceholder(*store, drv.drvPath, outputName),
+                DownstreamPlaceholder::unknownCaOutput(drv.drvPath, outputName).render(),
                 store->printStorePath(outputPath)
             );
         }
@@ -130,40 +131,31 @@ static SourcePath realisePath(EvalState & state, const PosIdx pos, Value & v, co
     }
 }
 
-/* Add and attribute to the given attribute map from the output name to
-   the output path, or a placeholder.
-
-   Where possible the path is used, but for floating CA derivations we
-   may not know it. For sake of determinism we always assume we don't
-   and instead put in a place holder. In either case, however, the
-   string context will contain the drv path and output name, so
-   downstream derivations will have the proper dependency, and in
-   addition, before building, the placeholder will be rewritten to be
-   the actual path.
-
-   The 'drv' and 'drvPath' outputs must correspond. */
+/**
+ * Add and attribute to the given attribute map from the output name to
+ * the output path, or a placeholder.
+ *
+ * Where possible the path is used, but for floating CA derivations we
+ * may not know it. For sake of determinism we always assume we don't
+ * and instead put in a place holder. In either case, however, the
+ * string context will contain the drv path and output name, so
+ * downstream derivations will have the proper dependency, and in
+ * addition, before building, the placeholder will be rewritten to be
+ * the actual path.
+ *
+ * The 'drv' and 'drvPath' outputs must correspond.
+ */
 static void mkOutputString(
     EvalState & state,
     BindingsBuilder & attrs,
     const StorePath & drvPath,
-    const BasicDerivation & drv,
     const std::pair<std::string, DerivationOutput> & o)
 {
-    auto optOutputPath = o.second.path(*state.store, drv.name, o.first);
-    attrs.alloc(o.first).mkString(
-        optOutputPath
-            ? state.store->printStorePath(*optOutputPath)
-            /* Downstream we would substitute this for an actual path once
-               we build the floating CA derivation */
-            /* FIXME: we need to depend on the basic derivation, not
-               derivation */
-            : downstreamPlaceholder(*state.store, drvPath, o.first),
-        NixStringContext {
-            NixStringContextElem::Built {
-                .drvPath = drvPath,
-                .output = o.first,
-            }
-        });
+    state.mkOutputString(
+        attrs.alloc(o.first),
+        drvPath,
+        o.first,
+        o.second.path(*state.store, Derivation::nameFromPath(drvPath), o.first));
 }
 
 /* Load and evaluate an expression from path specified by the
@@ -195,7 +187,7 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
         state.mkList(outputsVal, drv.outputs.size());
 
         for (const auto & [i, o] : enumerate(drv.outputs)) {
-            mkOutputString(state, attrs, *storePath, drv, o);
+            mkOutputString(state, attrs, *storePath, o);
             (outputsVal.listElems()[i] = state.allocValue())->mkString(o.first);
         }
 
@@ -1162,16 +1154,14 @@ drvName, Bindings * attrs, Value & v)
                 if (i->value->type() == nNull) continue;
             }
 
-            if (i->name == state.sContentAddressed) {
-                contentAddressed = state.forceBool(*i->value, noPos, context_below);
-                if (contentAddressed)
-                    experimentalFeatureSettings.require(Xp::CaDerivations);
+            if (i->name == state.sContentAddressed && state.forceBool(*i->value, noPos, context_below)) {
+                contentAddressed = true;
+                experimentalFeatureSettings.require(Xp::CaDerivations);
             }
 
-            else if (i->name == state.sImpure) {
-                isImpure = state.forceBool(*i->value, noPos, context_below);
-                if (isImpure)
-                    experimentalFeatureSettings.require(Xp::ImpureDerivations);
+            else if (i->name == state.sImpure && state.forceBool(*i->value, noPos, context_below)) {
+                isImpure = true;
+                experimentalFeatureSettings.require(Xp::ImpureDerivations);
             }
 
             /* The `args' attribute is special: it supplies the
@@ -1407,7 +1397,7 @@ drvName, Bindings * attrs, Value & v)
         NixStringContextElem::DrvDeep { .drvPath = drvPath },
     });
     for (auto & i : drv.outputs)
-        mkOutputString(state, result, drvPath, drv, i);
+        mkOutputString(state, result, drvPath, i);
 
     v.mkAttrs(result);
 }
@@ -1515,7 +1505,7 @@ static RegisterPrimOp primop_storePath({
       causes the path to be *copied* again to the Nix store, resulting
       in a new path (e.g. `/nix/store/ld01dnzc…-source-source`).
 
-      This function is not available in pure evaluation mode.
+      Not available in [pure evaluation mode](@docroot@/command-ref/conf-file.md#conf-pure-eval).
     )",
     .fun = prim_storePath,
 });
@@ -3944,13 +3934,8 @@ static void prim_replaceStrings(EvalState & state, const PosIdx pos, Value * * a
     for (auto elem : args[0]->listItems())
         from.emplace_back(state.forceString(*elem, pos, "while evaluating one of the strings to replace passed to builtins.replaceStrings"));
 
-    std::vector<std::pair<std::string, NixStringContext>> to;
-    to.reserve(args[1]->listSize());
-    for (auto elem : args[1]->listItems()) {
-        NixStringContext ctx;
-        auto s = state.forceString(*elem, ctx, pos, "while evaluating one of the replacement strings passed to builtins.replaceStrings");
-        to.emplace_back(s, std::move(ctx));
-    }
+    std::unordered_map<size_t, std::string> cache;
+    auto to = args[1]->listItems();
 
     NixStringContext context;
     auto s = state.forceString(*args[2], context, pos, "while evaluating the third argument passed to builtins.replaceStrings");
@@ -3961,10 +3946,19 @@ static void prim_replaceStrings(EvalState & state, const PosIdx pos, Value * * a
         bool found = false;
         auto i = from.begin();
         auto j = to.begin();
-        for (; i != from.end(); ++i, ++j)
+        size_t j_index = 0;
+        for (; i != from.end(); ++i, ++j, ++j_index)
             if (s.compare(p, i->size(), *i) == 0) {
                 found = true;
-                res += j->first;
+                auto v = cache.find(j_index);
+                if (v == cache.end()) {
+                    NixStringContext ctx;
+                    auto ts = state.forceString(**j, ctx, pos, "while evaluating one of the replacement strings passed to builtins.replaceStrings");
+                    v = (cache.emplace(j_index, ts)).first;
+                    for (auto& path : ctx)
+                        context.insert(path);
+                }
+                res += v->second;
                 if (i->empty()) {
                     if (p < s.size())
                         res += s[p];
@@ -3972,9 +3966,6 @@ static void prim_replaceStrings(EvalState & state, const PosIdx pos, Value * * a
                 } else {
                     p += i->size();
                 }
-                for (auto& path : j->second)
-                    context.insert(path);
-                j->second.clear();
                 break;
             }
         if (!found) {
@@ -3992,7 +3983,11 @@ static RegisterPrimOp primop_replaceStrings({
     .args = {"from", "to", "s"},
     .doc = R"(
       Given string *s*, replace every occurrence of the strings in *from*
-      with the corresponding string in *to*. For example,
+      with the corresponding string in *to*.
+
+      The argument *to* is lazy, that is, it is only evaluated when its corresponding pattern in *from* is matched in the string *s*
+
+      Example:
 
       ```nix
       builtins.replaceStrings ["oo" "a"] ["a" "i"] "foobar"

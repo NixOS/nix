@@ -50,6 +50,8 @@ constexpr std::array<ExperimentalFeatureDetails, 13> xpFeatureDetails = {{
             or other impure derivations can rely on impure derivations. Finally,
             an impure derivation cannot also be
             [content-addressed](#xp-feature-ca-derivations).
+
+            This is a more explicit alternative to using [`builtins.currentTime`](@docroot@/language/builtin-constants.md#builtins-currentTime).
         )",
     },
     {
@@ -207,6 +209,9 @@ constexpr std::array<ExperimentalFeatureDetails, 13> xpFeatureDetails = {{
 
               - "text hashing" derivation outputs, so we can build .drv
                 files.
+
+              - dependencies in derivations on the outputs of
+                derivations that are themselves derivations outputs.
         )",
     },
 }};

@@ -77,7 +77,12 @@ static int main_nix_collect_garbage(int argc, char * * argv)
             return true;
         });
 
-        if (removeOld) removeOldGenerations(profilesDir());
+        if (removeOld) {
+            std::set<Path> dirsToClean = {
+                profilesDir(), settings.nixStateDir + "/profiles", dirOf(getDefaultProfile())};
+            for (auto & dir : dirsToClean)
+                removeOldGenerations(dir);
+        }
 
         // Run the actual garbage collector.
         if (!dryRun) {

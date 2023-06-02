@@ -41,4 +41,26 @@ ref<InstallableValue> InstallableValue::require(ref<Installable> installable)
     return ref { castedInstallable };
 }
 
+std::optional<DerivedPathWithInfo> InstallableValue::trySinglePathToDerivedPaths(Value & v, const PosIdx pos, std::string_view errorCtx)
+{
+    if (v.type() == nPath) {
+        auto storePath = v.path().fetchToStore(state->store);
+        return {{
+            .path = DerivedPath::Opaque {
+                .path = std::move(storePath),
+            },
+            .info = make_ref<ExtraPathInfo>(),
+        }};
+    }
+
+    else if (v.type() == nString) {
+        return {{
+            .path = state->coerceToDerivedPath(pos, v, errorCtx),
+            .info = make_ref<ExtraPathInfo>(),
+        }};
+    }
+
+    else return std::nullopt;
+}
+
 }

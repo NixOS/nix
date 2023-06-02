@@ -40,3 +40,27 @@ grepQuiet 'may not be deterministic' $TEST_ROOT/log
 
 # Test that sandboxed builds cannot write to /etc easily
 (! nix-build -E 'with import ./config.nix; mkDerivation { name = "etc-write"; buildCommand = "echo > /etc/test"; }' --no-out-link --sandbox-paths /nix/store)
+
+
+## Test mounting of SSL certificates into the sandbox
+testCert () {
+    (! nix-build linux-sandbox-cert-test.nix --argstr fixed-output "$2" --no-out-link --sandbox-paths /nix/store --option ssl-cert-file "$3" 2> $TEST_ROOT/log)
+    cat $TEST_ROOT/log
+    grepQuiet "CERT_${1}_IN_SANDBOX" $TEST_ROOT/log
+}
+
+nocert=$TEST_ROOT/no-cert-file.pem
+cert=$TEST_ROOT/some-cert-file.pem
+echo -n "CERT_CONTENT" > $cert
+
+# No cert in sandbox when not a fixed-output derivation
+testCert missing normal       "$cert"
+
+# No cert in sandbox when ssl-cert-file is empty
+testCert missing fixed-output ""
+
+# No cert in sandbox when ssl-cert-file is a nonexistent file
+testCert missing fixed-output "$nocert"
+
+# Cert in sandbox when ssl-cert-file is set to an existing file
+testCert present fixed-output "$cert"

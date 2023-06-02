@@ -64,6 +64,7 @@ std::optional<std::string> readHead(const Path & path)
         .program = "git",
         // FIXME: use 'HEAD' to avoid returning all refs
         .args = {"ls-remote", "--symref", path},
+        .isInteractive = true,
     });
     if (status != 0) return std::nullopt;
 
@@ -235,7 +236,7 @@ struct GitInputScheme : InputScheme
 
         args.push_back(destDir);
 
-        runProgram("git", true, args);
+        runProgram("git", true, args, {}, true);
     }
 
     void putFile(
@@ -564,7 +565,7 @@ struct GitInputScheme : InputScheme
                 // everything to ensure we get the rev.
                 Activity act(*logger, lvlTalkative, actUnknown, fmt("making temporary clone of '%s'", repoDir));
                 runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
-                        "--update-head-ok", "--", repoDir, "refs/*:refs/*" });
+                        "--update-head-ok", "--", repoDir, "refs/*:refs/*" }, {}, true);
             }
 
             runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", rev.gitRev() });
@@ -591,7 +592,7 @@ struct GitInputScheme : InputScheme
 
             {
                 Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching submodules of '%s'", repoInfo.url));
-                runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
+                runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" }, {}, true);
             }
 
             filter = isNotDotGitDirectory;
