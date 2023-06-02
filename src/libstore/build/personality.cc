@@ -21,7 +21,8 @@ void setPersonality(std::string_view system)
                 && (std::string_view(SYSTEM) == "x86_64-linux"
                     || (!strcmp(utsbuf.sysname, "Linux") && !strcmp(utsbuf.machine, "x86_64"))))
             || system == "armv7l-linux"
-            || system == "armv6l-linux")
+            || system == "armv6l-linux"
+            || system == "armv5tel-linux")
         {
             if (personality(PER_LINUX32) == -1)
                 throw SysError("cannot set 32-bit personality");
