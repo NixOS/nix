@@ -1631,13 +1631,13 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
 
     SearchPath searchPath;
 
-    for (auto v2 : args[0]->listItems()) {
-        state.forceAttrs(*v2, pos, "while evaluating an element of the list passed to builtins.findFile");
+    for (auto [n, v2] : enumerate(args[0]->listItems())) {
+        state.forceAttrs(*v2, pos, "while evaluating the element at index %d of the list passed to builtins.findFile", n);
 
         std::string prefix;
         Bindings::iterator i = v2->attrs->find(state.sPrefix);
         if (i != v2->attrs->end())
-            prefix = state.forceStringNoCtx(*i->value, pos, "while evaluating the `prefix` attribute of an element of the list passed to builtins.findFile");
+            prefix = state.forceStringNoCtx(*i->value, pos, "while evaluating the `prefix` attribute of the element at index %d of the list passed to builtins.findFile", n);
 
         i = getAttr(state, state.sPath, v2->attrs, "in an element of the __nixPath");
 
@@ -2436,8 +2436,8 @@ static void prim_removeAttrs(EvalState & state, const PosIdx pos, Value * * args
        can be used to remove them from attrs[0]. */
     boost::container::small_vector<Attr, 64> names;
     names.reserve(args[1]->listSize());
-    for (auto elem : args[1]->listItems()) {
-        state.forceStringNoCtx(*elem, pos, "while evaluating the values of the second argument passed to builtins.removeAttrs");
+    for (auto [n, elem] : enumerate(args[1]->listItems())) {
+        state.forceStringNoCtx(*elem, pos, "while evaluating the element at index %d of the list of attribute names to remove passed as the second argument to builtins.removeAttrs", n);
         names.emplace_back(state.symbols.create(elem->string.s), nullptr);
     }
     std::sort(names.begin(), names.end());
@@ -2482,8 +2482,8 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value * * args
 
     std::set<Symbol> seen;
 
-    for (auto v2 : args[0]->listItems()) {
-        state.forceAttrs(*v2, pos, "while evaluating an element of the list passed to builtins.listToAttrs");
+    for (auto [n, v2] : enumerate(args[0]->listItems())) {
+        state.forceAttrs(*v2, pos, "while evaluating the element at index %d of the list passed to builtins.listToAttrs", n);
 
         Bindings::iterator j = getAttr(state, state.sName, v2->attrs, "in a {name=...; value=...;} pair");
 
@@ -2616,8 +2616,8 @@ static void prim_catAttrs(EvalState & state, const PosIdx pos, Value * * args, V
     Value * res[args[1]->listSize()];
     unsigned int found = 0;
 
-    for (auto v2 : args[1]->listItems()) {
-        state.forceAttrs(*v2, pos, "while evaluating an element in the list passed as second argument to builtins.catAttrs");
+    for (auto [n, v2] : enumerate(args[1]->listItems())) {
+        state.forceAttrs(*v2, pos, "while evaluating the element at index %d of the list of attribute sets passed as the second argument to builtins.catAttrs", n);
         Bindings::iterator i = v2->attrs->find(attrName);
         if (i != v2->attrs->end())
             res[found++] = i->value;
@@ -2738,7 +2738,7 @@ static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value * * arg
 
     for (unsigned int n = 0; n < listSize; ++n) {
         Value * vElem = listElems[n];
-        state.forceAttrs(*vElem, noPos, "while evaluating a value of the list passed as second argument to builtins.zipAttrsWith");
+        state.forceAttrs(*vElem, noPos, "while evaluating the element at index %d of the list of attribute sets passed as the second argument to builtins.zipAttrsWith", n);
         for (auto & attr : *vElem->attrs)
             attrsSeen[attr.name].first++;
     }
@@ -3007,7 +3007,7 @@ static RegisterPrimOp primop_elem({
 static void prim_concatLists(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.concatLists");
-    state.concatLists(v, args[0]->listSize(), args[0]->listElems(), pos, "while evaluating a value of the list passed to builtins.concatLists");
+    state.concatLists(v, args[0]->listSize(), args[0]->listElems(), pos);
 }
 
 static RegisterPrimOp primop_concatLists({
@@ -3905,8 +3905,8 @@ static void prim_replaceStrings(EvalState & state, const PosIdx pos, Value * * a
 
     std::vector<std::string> from;
     from.reserve(args[0]->listSize());
-    for (auto elem : args[0]->listItems())
-        from.emplace_back(state.forceString(*elem, pos, "while evaluating one of the strings to replace passed to builtins.replaceStrings"));
+    for (auto [i, elem] : enumerate(args[0]->listItems()))
+        from.emplace_back(state.forceString(*elem, pos, "while evaluating the element at index %d of the strings to replace passed to builtins.replaceStrings", i));
 
     std::unordered_map<size_t, std::string> cache;
     auto to = args[1]->listItems();
@@ -3927,7 +3927,7 @@ static void prim_replaceStrings(EvalState & state, const PosIdx pos, Value * * a
                 auto v = cache.find(j_index);
                 if (v == cache.end()) {
                     NixStringContext ctx;
-                    auto ts = state.forceString(**j, ctx, pos, "while evaluating one of the replacement strings passed to builtins.replaceStrings");
+                    auto ts = state.forceString(**j, ctx, pos, "while evaluating the element at index %d of the replacement strings passed to builtins.replaceStrings", j_index);
                     v = (cache.emplace(j_index, ts)).first;
                     for (auto& path : ctx)
                         context.insert(path);

@@ -394,6 +394,8 @@ public:
     inline bool evalBool(Env & env, Expr * e, const PosIdx pos, std::string_view errorCtx, const Args & ... args);
     template<typename... Args>
     inline void evalAttrs(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args);
+    template<typename... Args>
+    inline void evalList(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args);
 
     /**
      * If `v` is a thunk, enter it and overwrite `v` with the result
@@ -643,7 +645,7 @@ public:
         const std::string outputName,
         std::optional<StorePath> optOutputPath);
 
-    void concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos, std::string_view errorCtx);
+    void concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos);
 
     /**
      * Print statistics.

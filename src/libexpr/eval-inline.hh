@@ -113,6 +113,21 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const PosIdx po
 }
 
 
+template<typename... Args>
+[[gnu::always_inline]]
+inline void EvalState::evalList(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx, const Args & ... args)
+{
+    try {
+        e->eval(*this, env, v);
+        if (v.type() != nList)
+            error("value is %1% while a list was expected", showType(v)).withFrame(env, *e).debugThrow<TypeError>();
+    } catch (Error & e) {
+        e.addTrace(positions[pos], errorCtx, args...);
+        throw;
+    }
+}
+
+
 [[gnu::always_inline]]
 inline void EvalState::forceValue(Value & v, const PosIdx pos)
 {
