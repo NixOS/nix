@@ -70,6 +70,14 @@ will invoke `sudo` as needed.
 
 > **Note**
 >
+> If you are using a graphical login manager (e.g, GDM or SDDM), it's
+> recommended to adjust the accepted UID range to avoid displaying
+> these system users on the login screen. For example, in SDDM, you can
+> lower the [MaximumUID](https://man.archlinux.org/man/sddm.conf.5.en#MaximumUid=)
+> to 30000.
+
+> **Note**
+>
 > If you need Nix to use a different group ID or user ID set, you will
 > have to download the tarball manually and [edit the install
 > script](#installing-from-a-binary-tarball).
