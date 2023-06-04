@@ -700,6 +700,8 @@ EOF
 }
 
 welcome_to_nix() {
+    local -r NIX_UID_RANGES="(${NIX_FIRST_BUILD_UID} ~ $((NIX_FIRST_BUILD_UID + NIX_USER_COUNT - 1)))"
+
     ok "Welcome to the Multi-User Nix Installation"
 
     cat <<EOF
@@ -714,7 +716,10 @@ manager. This will happen in a few stages:
    if you are ready to continue.
 
 3. Create the system users and groups that the Nix daemon uses to run
-   builds.
+   builds. Their UIDs will be $(_textout ${BLUE} ${NIX_UID_RANGES}.)
+   If you're using a graphical environment, it's recommended to
+   adjust the UID ranges in your login manager (e.g., GDM or SDDM)'s
+   configuration to avoid displaying these system users on the login screen.
 
 4. Perform the basic installation of the Nix files daemon.
 
