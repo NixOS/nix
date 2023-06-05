@@ -141,7 +141,7 @@ restartDaemon() {
     startDaemon
 }
 
-if [[ $(uname) == Linux ]] && [[ -L /proc/self/ns/user ]] && unshare --user true; then
+if [[ -z "${_NIX_TEST_NO_SANDBOX:-}" ]] && [[ $(uname) == Linux ]] && [[ -L /proc/self/ns/user ]] && unshare --user true; then
     _canUseSandbox=1
 fi
 
