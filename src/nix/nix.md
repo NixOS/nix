@@ -102,6 +102,7 @@ way:
   available in the flake. If this is undesirable, specify `path:<directory>` explicitly;
 
   For example, if `/foo/bar` is a git repository with the following structure:
+
   ```
   .
   └── baz
