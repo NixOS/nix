@@ -100,14 +100,15 @@ static void runFetchClosureWithInputAddressedPath(EvalState & state, const PosId
     state.mkStorePathString(fromPath, v);
 }
 
+typedef std::optional<StorePath> StorePathOrGap;
+
 static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     state.forceAttrs(*args[0], pos, "while evaluating the argument passed to builtins.fetchClosure");
 
     std::optional<std::string> fromStoreUrl;
     std::optional<StorePath> fromPath;
-    bool enableRewriting = false;
-    std::optional<StorePath> toPath;
+    std::optional<StorePathOrGap> toPath;
     std::optional<bool> inputAddressedMaybe;
 
     for (auto & attr : *args[0]->attrs) {
@@ -123,8 +124,11 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
 
         else if (attrName == "toPath") {
             state.forceValue(*attr.value, attr.pos);
-            enableRewriting = true;
-            if (attr.value->type() != nString || attr.value->string.s != std::string("")) {
+            bool isEmptyString = attr.value->type() == nString && attr.value->string.s == std::string("");
+            if (isEmptyString) {
+                toPath = StorePathOrGap {};
+            }
+            else {
                 NixStringContext context;
                 toPath = state.coerceToStorePath(attr.pos, *attr.value, context, attrHint());
             }
@@ -160,7 +164,6 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
                     "toPath"),
                 .errPos = state.positions[pos]
             });
-        assert(!enableRewriting);
     }
 
     if (!fromStoreUrl)
@@ -187,8 +190,8 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
 
     auto fromStore = openStore(parsedURL.to_string());
 
-    if (enableRewriting)
-        runFetchClosureWithRewrite(state, pos, *fromStore, *fromPath, toPath, v);
+    if (toPath)
+        runFetchClosureWithRewrite(state, pos, *fromStore, *fromPath, *toPath, v);
     else if (inputAddressed)
         runFetchClosureWithInputAddressedPath(state, pos, *fromStore, *fromPath, v);
     else
