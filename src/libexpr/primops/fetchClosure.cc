@@ -202,39 +202,75 @@ static RegisterPrimOp primop_fetchClosure({
     .name = "__fetchClosure",
     .args = {"args"},
     .doc = R"(
-      Fetch a Nix store closure from a binary cache, rewriting it into
-      content-addressed form. For example,
+      Fetch a Nix store closure from a binary cache.
 
-      ```nix
-      builtins.fetchClosure {
-        fromStore = "https://cache.nixos.org";
-        fromPath = /nix/store/r2jd6ygnmirm2g803mksqqjm4y39yi6i-git-2.33.1;
-        toPath = /nix/store/ldbhlwhh39wha58rm61bkiiwm6j7211j-git-2.33.1;
-      }
-      ```
+      This function can be used in three ways:
 
-      fetches `/nix/store/r2jd...` from the specified binary cache,
+      - Fetch any store path and rewrite it to a fully content-addressed store path. Example:
+
+        ```nix
+        builtins.fetchClosure {
+            fromStore = "https://cache.nixos.org";
+            fromPath = /nix/store/r2jd6ygnmirm2g803mksqqjm4y39yi6i-git-2.33.1;
+            toPath = /nix/store/ldbhlwhh39wha58rm61bkiiwm6j7211j-git-2.33.1;
+        }
+        ```
+
+      - Fetch a content-addressed store path.
+
+        ```nix
+        builtins.fetchClosure {
+            fromStore = "https://cache.nixos.org";
+            fromPath = /nix/store/ldbhlwhh39wha58rm61bkiiwm6j7211j-git-2.33.1;
+        }
+        ```
+
+      - Fetch an [input-addressed store path](@docroot@/glossary.md#gloss-input-addressed-store-object) as is. This depends on user configuration, which is less preferable.
+
+        ```nix
+        builtins.fetchClosure {
+            fromStore = "https://cache.nixos.org";
+            fromPath = /nix/store/r2jd6ygnmirm2g803mksqqjm4y39yi6i-git-2.33.1;
+            inputAddressed = true;
+        }
+        ```
+
+      **Rewriting a store path**
+
+      This first example fetches `/nix/store/r2jd...` from the specified binary cache,
       and rewrites it into the content-addressed store path
       `/nix/store/ldbh...`.
 
-      If `fromPath` is already content-addressed, or if you are
-      allowing input addressing (`inputAddressed = true;`), then `toPath` may be
-      omitted.
+      By rewriting the store paths, you can add the contents to any store without requiring that you or perhaps your users configure any extra trust.
 
       To find out the correct value for `toPath` given a `fromPath`,
-      you can use `nix store make-content-addressed`:
+      you can use [`nix store make-content-addressed`](@docroot@/command-ref/new-cli/nix3-store-make-content-addressed.md):
 
       ```console
       # nix store make-content-addressed --from https://cache.nixos.org /nix/store/r2jd6ygnmirm2g803mksqqjm4y39yi6i-git-2.33.1
       rewrote '/nix/store/r2jd6ygnmirm2g803mksqqjm4y39yi6i-git-2.33.1' to '/nix/store/ldbhlwhh39wha58rm61bkiiwm6j7211j-git-2.33.1'
       ```
 
-      This function is similar to `builtins.storePath` in that it
+      Alternatively, you may set `toPath = ""` and find the correct `toPath` in the error message.
+
+      **Not rewriting**
+
+      `toPath` may be omitted when either
+       - `fromPath` is already content-addressed, or
+       - `inputAddressed = true;` is set.
+
+      Fetching an [input addressed path](@docroot@/glossary.md#gloss-input-addressed-store-object) is not recommended because it requires that the source be trusted by the Nix configuration.
+
+      **`builtins.storePath`**
+
+      This function is similar to [`builtins.storePath`](#builtins-storePath) in that it
       allows you to use a previously built store path in a Nix
       expression. However, it is more reproducible because it requires
       specifying a binary cache from which the path can be fetched.
       Also, the default requirement of a content-addressed final store path
       avoids the need for users to configure [`trusted-public-keys`](@docroot@/command-ref/conf-file.md#conf-trusted-public-keys).
+
+      **Experimental feature**
 
       This function is only available if you enable the experimental
       feature `fetch-closure`.
