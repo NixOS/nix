@@ -94,14 +94,12 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
 
     if (enableRewriting) {
         if (!toPath || !state.store->isValidPath(*toPath)) {
-            auto remappings = makeContentAddressed(*fromStore, *state.store, { *fromPath });
-            auto i = remappings.find(*fromPath);
-            assert(i != remappings.end());
-            if (toPath && *toPath != i->second)
+            auto rewrittenPath = makeContentAddressed(*fromStore, *state.store, *fromPath);
+            if (toPath && *toPath != rewrittenPath)
                 throw Error({
                     .msg = hintfmt("rewriting '%s' to content-addressed form yielded '%s', while '%s' was expected",
                         state.store->printStorePath(*fromPath),
-                        state.store->printStorePath(i->second),
+                        state.store->printStorePath(rewrittenPath),
                         state.store->printStorePath(*toPath)),
                     .errPos = state.positions[pos]
                 });
@@ -111,7 +109,7 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
                         "rewriting '%s' to content-addressed form yielded '%s'; "
                         "please set this in the 'toPath' attribute passed to 'fetchClosure'",
                         state.store->printStorePath(*fromPath),
-                        state.store->printStorePath(i->second)),
+                        state.store->printStorePath(rewrittenPath)),
                     .errPos = state.positions[pos]
                 });
         }
