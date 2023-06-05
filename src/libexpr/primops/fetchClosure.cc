@@ -58,12 +58,11 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value * * arg
     bool inputAddressed = inputAddressedMaybe.value_or(false);
 
     if (inputAddressed) {
-        if (toPath && toPath != fromPath)
+        if (toPath)
             throw Error({
-                .msg = hintfmt("attribute '%s' is set to true, but 'toPath' does not match 'fromPath'. 'toPath' should be equal, or should be omitted. Instead 'toPath' was '%s' and 'fromPath' was '%s'",
+                .msg = hintfmt("attribute '%s' is set to true, but '%s' is also set. Please remove one of them",
                     "inputAddressed",
-                    state.store->printStorePath(*toPath),
-                    state.store->printStorePath(*fromPath)),
+                    "toPath"),
                 .errPos = state.positions[pos]
             });
         assert(!enableRewriting);
