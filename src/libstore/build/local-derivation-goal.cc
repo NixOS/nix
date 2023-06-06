@@ -357,7 +357,7 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
         for (auto & [_, status] : initialOutputs) {
             if (!status.known) continue;
             if (buildMode != bmCheck && status.known->isValid()) continue;
-            auto p = worker.store.printStorePath(status.known->path);
+            auto p = worker.store.toRealPath(status.known->path);
             if (pathExists(chrootRootDir + p))
                 renameFile((chrootRootDir + p), p);
         }
@@ -1772,7 +1772,8 @@ void LocalDerivationGoal::runChild()
                     if (pathExists(path))
                         ss.push_back(path);
 
-                dirsInChroot.emplace(settings.caFile, "/etc/ssl/certs/ca-certificates.crt");
+                if (settings.caFile != "")
+                    dirsInChroot.try_emplace("/etc/ssl/certs/ca-certificates.crt", settings.caFile, true);
             }
 
             for (auto & i : ss) dirsInChroot.emplace(i, i);

@@ -286,9 +286,9 @@ static RegisterPrimOp primop_fetchurl({
     .name = "__fetchurl",
     .args = {"url"},
     .doc = R"(
-      Download the specified URL and return the path of the downloaded
-      file. This function is not available if [restricted evaluation
-      mode](../command-ref/conf-file.md) is enabled.
+      Download the specified URL and return the path of the downloaded file.
+
+      Not available in [restricted evaluation mode](@docroot@/command-ref/conf-file.md#conf-restrict-eval).
     )",
     .fun = prim_fetchurl,
 });
@@ -338,8 +338,7 @@ static RegisterPrimOp primop_fetchTarball({
       stdenv.mkDerivation { … }
       ```
 
-      This function is not available if [restricted evaluation
-      mode](../command-ref/conf-file.md) is enabled.
+      Not available in [restricted evaluation mode](@docroot@/command-ref/conf-file.md#conf-restrict-eval).
     )",
     .fun = prim_fetchTarball,
 });
@@ -470,14 +469,9 @@ static RegisterPrimOp primop_fetchGit({
           }
           ```
 
-          > **Note**
-          >
-          > Nix will refetch the branch in accordance with
-          > the option `tarball-ttl`.
+          Nix will refetch the branch according to the [`tarball-ttl`](@docroot@/command-ref/conf-file.md#conf-tarball-ttl) setting.
 
-          > **Note**
-          >
-          > This behavior is disabled in *Pure evaluation mode*.
+          This behavior is disabled in [pure evaluation mode](@docroot@/command-ref/conf-file.md#conf-pure-eval).
 
         - To fetch the content of a checked-out work directory:
 

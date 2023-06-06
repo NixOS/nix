@@ -1152,16 +1152,14 @@ drvName, Bindings * attrs, Value & v)
                 if (i->value->type() == nNull) continue;
             }
 
-            if (i->name == state.sContentAddressed) {
-                contentAddressed = state.forceBool(*i->value, noPos, context_below);
-                if (contentAddressed)
-                    experimentalFeatureSettings.require(Xp::CaDerivations);
+            if (i->name == state.sContentAddressed && state.forceBool(*i->value, noPos, context_below)) {
+                contentAddressed = true;
+                experimentalFeatureSettings.require(Xp::CaDerivations);
             }
 
-            else if (i->name == state.sImpure) {
-                isImpure = state.forceBool(*i->value, noPos, context_below);
-                if (isImpure)
-                    experimentalFeatureSettings.require(Xp::ImpureDerivations);
+            else if (i->name == state.sImpure && state.forceBool(*i->value, noPos, context_below)) {
+                isImpure = true;
+                experimentalFeatureSettings.require(Xp::ImpureDerivations);
             }
 
             /* The `args' attribute is special: it supplies the
@@ -1503,7 +1501,7 @@ static RegisterPrimOp primop_storePath({
       causes the path to be *copied* again to the Nix store, resulting
       in a new path (e.g. `/nix/store/ld01dnzc…-source-source`).
 
-      This function is not available in pure evaluation mode.
+      Not available in [pure evaluation mode](@docroot@/command-ref/conf-file.md#conf-pure-eval).
     )",
     .fun = prim_storePath,
 });
@@ -3910,13 +3908,8 @@ static void prim_replaceStrings(EvalState & state, const PosIdx pos, Value * * a
     for (auto elem : args[0]->listItems())
         from.emplace_back(state.forceString(*elem, pos, "while evaluating one of the strings to replace passed to builtins.replaceStrings"));
 
-    std::vector<std::pair<std::string, NixStringContext>> to;
-    to.reserve(args[1]->listSize());
-    for (auto elem : args[1]->listItems()) {
-        NixStringContext ctx;
-        auto s = state.forceString(*elem, ctx, pos, "while evaluating one of the replacement strings passed to builtins.replaceStrings");
-        to.emplace_back(s, std::move(ctx));
-    }
+    std::unordered_map<size_t, std::string> cache;
+    auto to = args[1]->listItems();
 
     NixStringContext context;
     auto s = state.forceString(*args[2], context, pos, "while evaluating the third argument passed to builtins.replaceStrings");
@@ -3927,10 +3920,19 @@ static void prim_replaceStrings(EvalState & state, const PosIdx pos, Value * * a
         bool found = false;
         auto i = from.begin();
         auto j = to.begin();
-        for (; i != from.end(); ++i, ++j)
+        size_t j_index = 0;
+        for (; i != from.end(); ++i, ++j, ++j_index)
             if (s.compare(p, i->size(), *i) == 0) {
                 found = true;
-                res += j->first;
+                auto v = cache.find(j_index);
+                if (v == cache.end()) {
+                    NixStringContext ctx;
+                    auto ts = state.forceString(**j, ctx, pos, "while evaluating one of the replacement strings passed to builtins.replaceStrings");
+                    v = (cache.emplace(j_index, ts)).first;
+                    for (auto& path : ctx)
+                        context.insert(path);
+                }
+                res += v->second;
                 if (i->empty()) {
                     if (p < s.size())
                         res += s[p];
@@ -3938,9 +3940,6 @@ static void prim_replaceStrings(EvalState & state, const PosIdx pos, Value * * a
                 } else {
                     p += i->size();
                 }
-                for (auto& path : j->second)
-                    context.insert(path);
-                j->second.clear();
                 break;
             }
         if (!found) {
@@ -3958,7 +3957,11 @@ static RegisterPrimOp primop_replaceStrings({
     .args = {"from", "to", "s"},
     .doc = R"(
       Given string *s*, replace every occurrence of the strings in *from*
-      with the corresponding string in *to*. For example,
+      with the corresponding string in *to*.
+
+      The argument *to* is lazy, that is, it is only evaluated when its corresponding pattern in *from* is matched in the string *s*
+
+      Example:
 
       ```nix
       builtins.replaceStrings ["oo" "a"] ["a" "i"] "foobar"

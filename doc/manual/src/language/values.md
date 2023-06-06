@@ -164,8 +164,16 @@ Note that lists are only lazy in values, and they are strict in length.
 
 An attribute set is a collection of name-value-pairs (called *attributes*) enclosed in curly brackets (`{ }`).
 
+An attribute name can be an identifier or a [string](#string).
+An identifier must start with a letter (`a-z`, `A-Z`) or underscore (`_`), and can otherwise contain letters (`a-z`, `A-Z`), numbers (`0-9`), underscores (`_`), apostrophes (`'`), or dashes (`-`).
+
+> *name* = *identifier* | *string* \
+> *identifier* ~ `[a-zA-Z_][a-zA-Z0-9_'-]*`
+
 Names and values are separated by an equal sign (`=`).
 Each value is an arbitrary expression terminated by a semicolon (`;`).
+
+> *attrset* = `{` [ *name* `=` *expr* `;` `]`... `}`
 
 Attributes can appear in any order.
 An attribute name may only occur once.
@@ -182,15 +190,19 @@ Example:
 
 This defines a set with attributes named `x`, `text`, `y`.
 
-Attributes can be selected from a set using the `.` operator. For
-instance,
+Attributes can be accessed with the [`.` operator](./operators.md#attribute-selection).
+
+Example:
 
 ```nix
 { a = "Foo"; b = "Bar"; }.a
 ```
 
-evaluates to `"Foo"`. It is possible to provide a default value in an
-attribute selection using the `or` keyword:
+This evaluates to `"Foo"`.
+
+It is possible to provide a default value in an attribute selection using the `or` keyword.
+
+Example:
 
 ```nix
 { a = "Foo"; b = "Bar"; }.c or "Xyzzy"
