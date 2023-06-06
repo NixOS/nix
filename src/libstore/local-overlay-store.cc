@@ -176,44 +176,6 @@ void LocalOverlayStore::registerValidPaths(const ValidPathInfos & infos)
 }
 
 
-void LocalOverlayStore::addToStore(const ValidPathInfo & info, Source & source,
-    RepairFlag repair, CheckSigsFlag checkSigs)
-{
-    LocalStore::addToStore(info, source, repair, checkSigs);
-    if (lowerStore->isValidPath(info.path)) {
-        // dedup stores
-        deletePath(toUpperPath(info.path));  // TODO: Investigate whether this can trigger 'stale file handle' errors.
-    }
-}
-
-
-StorePath LocalOverlayStore::addToStoreFromDump(Source & dump, std::string_view name,
-    FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references)
-{
-    auto path = LocalStore::addToStoreFromDump(dump, name, method, hashAlgo, repair, references);
-    if (lowerStore->isValidPath(path)) {
-        // dedup stores
-        deletePath(toUpperPath(path));
-    }
-    return path;
-}
-
-
-StorePath LocalOverlayStore::addTextToStore(
-    std::string_view name,
-    std::string_view s,
-    const StorePathSet & references,
-    RepairFlag repair)
-{
-    auto path = LocalStore::addTextToStore(name, s, references, repair);
-    if (lowerStore->isValidPath(path)) {
-        // dedup stores
-        deletePath(toUpperPath(path));
-    }
-    return path;
-}
-
-
 void LocalOverlayStore::deleteGCPath(const Path & path, uint64_t & bytesFreed)
 {
     auto mergedDir = realStoreDir.get() + "/";
