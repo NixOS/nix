@@ -223,6 +223,13 @@ public:
     void collectGarbage(const GCOptions & options, GCResults & results) override;
 
     /**
+     * Called by `collectGarbage` to recursively delete a path.
+     * The default implementation simply calls `deletePath`, but it can be
+     * overridden by stores that wish to provide their own deletion behaviour.
+     */
+    virtual void deleteGCPath(const Path & path, uint64_t & bytesFreed);
+
+    /**
      * Optimise the disk space usage of the Nix store by hard-linking
      * files with the same contents.
      */

@@ -97,13 +97,6 @@ struct GcStore : public virtual Store
      * Perform a garbage collection.
      */
     virtual void collectGarbage(const GCOptions & options, GCResults & results) = 0;
-
-    /**
-     * Called by `collectGarbage` to recursively delete a path.
-     * The default implementation simply calls `deletePath`, but it can be
-     * overridden by stores that wish to provide their own deletion behaviour.
-     */
-    virtual void deleteGCPath(const Path & path, uint64_t & bytesFreed);
 };
 
 }

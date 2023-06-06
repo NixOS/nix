@@ -457,6 +457,12 @@ AutoCloseFD LocalStore::openGCLock()
 }
 
 
+void LocalStore::deleteGCPath(const Path & path, uint64_t & bytesFreed)
+{
+    deletePath(path, bytesFreed);
+}
+
+
 LocalStore::~LocalStore()
 {
     std::shared_future<void> future;

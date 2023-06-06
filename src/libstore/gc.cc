@@ -891,12 +891,6 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 }
 
 
-void GcStore::deleteGCPath(const Path & path, uint64_t & bytesFreed)
-{
-    deletePath(path, bytesFreed);
-}
-
-
 void LocalStore::autoGC(bool sync)
 {
     static auto fakeFreeSpaceFile = getEnv("_NIX_TEST_FREE_SPACE_FILE");

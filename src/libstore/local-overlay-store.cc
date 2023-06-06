@@ -222,7 +222,7 @@ void LocalOverlayStore::deleteGCPath(const Path & path, uint64_t & bytesFreed)
         return;
     }
     if (pathExists(toUpperPath({path.substr(mergedDir.length())}))) {
-        GcStore::deleteGCPath(path, bytesFreed);
+        LocalStore::deleteGCPath(path, bytesFreed);
     }
 }
 
