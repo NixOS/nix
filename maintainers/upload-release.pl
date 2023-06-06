@@ -80,6 +80,38 @@ my $s3_us = Net::Amazon::S3->new(
 
 my $channelsBucket = $s3_us->bucket($channelsBucketName) or die;
 
+sub getStorePath {
+    my ($jobName, $output) = @_;
+    my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
+    return $buildInfo->{buildoutputs}->{$output or "out"}->{path} or die "cannot get store path for '$jobName'";
+}
+
+sub copyManual {
+    my $manual = getStorePath("build.x86_64-linux", "doc");
+    print "$manual\n";
+
+    my $manualNar = "$tmpDir/$releaseName-manual.nar.xz";
+    print "$manualNar\n";
+
+    unless (-e $manualNar) {
+        system("NIX_REMOTE=$binaryCache nix store dump-path '$manual' | xz > '$manualNar'.tmp") == 0
+            or die "unable to fetch $manual\n";
+        rename("$manualNar.tmp", $manualNar) or die;
+    }
+
+    unless (-e "$tmpDir/manual") {
+        system("xz -d < '$manualNar' | nix-store --restore $tmpDir/manual.tmp") == 0
+            or die "unable to unpack $manualNar\n";
+        rename("$tmpDir/manual.tmp/share/doc/nix/manual", "$tmpDir/manual") or die;
+        system("rm -rf '$tmpDir/manual.tmp'") == 0 or die;
+    }
+
+    system("aws s3 sync '$tmpDir/manual' s3://$releasesBucketName/$releaseDir/manual") == 0
+        or die "syncing manual to S3\n";
+}
+
+copyManual;
+
 sub downloadFile {
     my ($jobName, $productNr, $dstName) = @_;
 
@@ -180,12 +212,6 @@ if ($isLatest) {
 }
 
 # Upload nix-fallback-paths.nix.
-sub getStorePath {
-    my ($jobName) = @_;
-    my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
-    return $buildInfo->{buildoutputs}->{out}->{path} or die "cannot get store path for '$jobName'";
-}
-
 write_file("$tmpDir/fallback-paths.nix",
     "{\n" .
     "  x86_64-linux = \"" . getStorePath("build.x86_64-linux") . "\";\n" .
@@ -198,6 +224,7 @@ write_file("$tmpDir/fallback-paths.nix",
 # Upload release files to S3.
 for my $fn (glob "$tmpDir/*") {
     my $name = basename($fn);
+    next if $name eq "manual";
     my $dstKey = "$releaseDir/" . $name;
     unless (defined $releasesBucket->head_key($dstKey)) {
         print STDERR "uploading $fn to s3://$releasesBucketName/$dstKey...\n";
