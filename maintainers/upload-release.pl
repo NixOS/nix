@@ -179,6 +179,22 @@ if ($isLatest) {
     system("docker manifest push nixos/nix:latest") == 0 or die;
 }
 
+# Upload nix-fallback-paths.nix.
+sub getStorePath {
+    my ($jobName) = @_;
+    my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
+    return $buildInfo->{buildoutputs}->{out}->{path} or die "cannot get store path for '$jobName'";
+}
+
+write_file("$tmpDir/fallback-paths.nix",
+    "{\n" .
+    "  x86_64-linux = \"" . getStorePath("build.x86_64-linux") . "\";\n" .
+    "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
+    "  aarch64-linux = \"" . getStorePath("build.aarch64-linux") . "\";\n" .
+    "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
+    "  aarch64-darwin = \"" . getStorePath("build.aarch64-darwin") . "\";\n" .
+    "}\n");
+
 # Upload release files to S3.
 for my $fn (glob "$tmpDir/*") {
     my $name = basename($fn);
@@ -197,24 +213,6 @@ for my $fn (glob "$tmpDir/*") {
         $releasesBucket->add_key_filename($dstKey, $fn, $configuration)
             or die $releasesBucket->err . ": " . $releasesBucket->errstr;
     }
-}
-
-# Print new nix-fallback-paths.nix.
-if ($isLatest) {
-    sub getStorePath {
-        my ($jobName) = @_;
-        my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
-        return $buildInfo->{buildoutputs}->{out}->{path} or die "cannot get store path for '$jobName'";
-    }
-
-    print STDERR "nixos/modules/installer/tools/nix-fallback-paths.nix:\n" .
-               "{\n" .
-               "  x86_64-linux = \"" . getStorePath("build.x86_64-linux") . "\";\n" .
-               "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
-               "  aarch64-linux = \"" . getStorePath("build.aarch64-linux") . "\";\n" .
-               "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
-               "  aarch64-darwin = \"" . getStorePath("build.aarch64-darwin") . "\";\n" .
-               "}\n";
 }
 
 # Update the "latest" symlink.
