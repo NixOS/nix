@@ -119,8 +119,7 @@ release:
   TODO: This script requires the right AWS credentials. Document.
 
   TODO: This script currently requires a
-  `/home/eelco/Dev/nix-pristine` and
-  `/home/eelco/Dev/nixpkgs-pristine`.
+  `/home/eelco/Dev/nix-pristine`.
 
   TODO: trigger nixos.org netlify: https://docs.netlify.com/configure-builds/build-hooks/
 
@@ -141,7 +140,7 @@ release:
   $ git checkout master
   $ git pull
   $ NEW_VERSION=2.13.0
-  $ echo -n $NEW_VERSION > .version
+  $ echo $NEW_VERSION > .version
   $ git checkout -b bump-$NEW_VERSION
   $ git commit -a -m 'Bump version'
   $ git push --set-upstream origin bump-$NEW_VERSION

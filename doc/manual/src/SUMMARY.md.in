@@ -105,6 +105,7 @@
   - [CLI guideline](contributing/cli-guideline.md)
 - [Release Notes](release-notes/release-notes.md)
   - [Release X.Y (202?-??-??)](release-notes/rl-next.md)
+  - [Release 2.16 (2023-05-31)](release-notes/rl-2.16.md)
   - [Release 2.15 (2023-04-11)](release-notes/rl-2.15.md)
   - [Release 2.14 (2023-02-28)](release-notes/rl-2.14.md)
   - [Release 2.13 (2023-01-17)](release-notes/rl-2.13.md)
