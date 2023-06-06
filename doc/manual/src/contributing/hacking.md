@@ -46,6 +46,12 @@ To build Nix itself in this shell:
 [nix-shell]$ make -j $NIX_BUILD_CORES
 ```
 
+> **Note**
+>
+> If using zsh and `./configure` is failing, use `${=configureFlags}` in place
+> of `$configureFlags` so the configure flags are expanded to multiple words as
+> they are in `sh` compatible shells.
+
 To install it in `$(pwd)/outputs` and test it:
 
 ```console
