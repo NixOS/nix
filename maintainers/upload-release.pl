@@ -205,8 +205,7 @@ for my $fn (glob "$tmpDir/*") {
         my $configuration = ();
         $configuration->{content_type} = "application/octet-stream";
 
-        if ($fn =~ /.sha256|install/) {
-            # Text files
+        if ($fn =~ /.sha256|install|\.nix$/) {
             $configuration->{content_type} = "text/plain";
         }
 
