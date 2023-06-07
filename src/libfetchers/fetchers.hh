@@ -158,6 +158,7 @@ struct DownloadFileResult
     StorePath storePath;
     std::string etag;
     std::string effectiveUrl;
+    std::optional<std::string> immutableUrl;
 };
 
 DownloadFileResult downloadFile(
@@ -167,7 +168,14 @@ DownloadFileResult downloadFile(
     bool locked,
     const Headers & headers = {});
 
-std::pair<Tree, time_t> downloadTarball(
+struct DownloadTarballResult
+{
+    Tree tree;
+    time_t lastModified;
+    std::optional<std::string> immutableUrl;
+};
+
+DownloadTarballResult downloadTarball(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
