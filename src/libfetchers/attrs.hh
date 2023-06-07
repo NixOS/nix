@@ -2,6 +2,7 @@
 ///@file
 
 #include "types.hh"
+#include "hash.hh"
 
 #include <variant>
 

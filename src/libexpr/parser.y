@@ -793,7 +793,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
     if (EvalSettings::isPseudoUrl(elem.second)) {
         try {
             auto storePath = fetchers::downloadTarball(
-                store, EvalSettings::resolvePseudoUrl(elem.second), "source", false).first.storePath;
+                store, EvalSettings::resolvePseudoUrl(elem.second), "source", false).tree.storePath;
             res = { true, store->toRealPath(storePath) };
         } catch (FileTransferError & e) {
             logWarning({

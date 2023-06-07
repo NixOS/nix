@@ -186,9 +186,9 @@ struct curlFileTransfer : public FileTransfer
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
             printMsg(lvlVomit, "got header for '%s': %s", request.uri, trim(line));
+
             static std::regex statusLine("HTTP/[^ ]+ +[0-9]+(.*)", std::regex::extended | std::regex::icase);
-            std::smatch match;
-            if (std::regex_match(line, match, statusLine)) {
+            if (std::smatch match; std::regex_match(line, match, statusLine)) {
                 result.etag = "";
                 result.data.clear();
                 result.bodySize = 0;
@@ -196,9 +196,11 @@ struct curlFileTransfer : public FileTransfer
                 acceptRanges = false;
                 encoding = "";
             } else {
+
                 auto i = line.find(':');
                 if (i != std::string::npos) {
                     std::string name = toLower(trim(line.substr(0, i)));
+
                     if (name == "etag") {
                         result.etag = trim(line.substr(i + 1));
                         /* Hack to work around a GitHub bug: it sends
@@ -212,10 +214,22 @@ struct curlFileTransfer : public FileTransfer
                             debug("shutting down on 200 HTTP response with expected ETag");
                             return 0;
                         }
-                    } else if (name == "content-encoding")
+                    }
+
+                    else if (name == "content-encoding")
                         encoding = trim(line.substr(i + 1));
+
                     else if (name == "accept-ranges" && toLower(trim(line.substr(i + 1))) == "bytes")
                         acceptRanges = true;
+
+                    else if (name == "link" || name == "x-amz-meta-link") {
+                        auto value = trim(line.substr(i + 1));
+                        static std::regex linkRegex("<([^>]*)>; rel=\"immutable\"", std::regex::extended | std::regex::icase);
+                        if (std::smatch match; std::regex_match(value, match, linkRegex))
+                            result.immutableUrl = match.str(1);
+                        else
+                            debug("got invalid link header '%s'", value);
+                    }
                 }
             }
             return realSize;
@@ -345,7 +359,7 @@ struct curlFileTransfer : public FileTransfer
         {
             auto httpStatus = getHTTPStatus();
 
-            char * effectiveUriCStr;
+            char * effectiveUriCStr = nullptr;
             curl_easy_getinfo(req, CURLINFO_EFFECTIVE_URL, &effectiveUriCStr);
             if (effectiveUriCStr)
                 result.effectiveUri = effectiveUriCStr;
