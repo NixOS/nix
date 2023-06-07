@@ -80,6 +80,10 @@ struct FileTransferResult
     std::string effectiveUri;
     std::string data;
     uint64_t bodySize = 0;
+    /* An "immutable" URL for this resource (i.e. one whose contents
+       will never change), as returned by the `Link: <url>;
+       rel="immutable"` header. */
+    std::optional<std::string> immutableUrl;
 };
 
 class Store;

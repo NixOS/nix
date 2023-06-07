@@ -165,7 +165,7 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s)
 {
     if (EvalSettings::isPseudoUrl(s)) {
         auto storePath = fetchers::downloadTarball(
-            state.store, EvalSettings::resolvePseudoUrl(s), "source", false).first.storePath;
+            state.store, EvalSettings::resolvePseudoUrl(s), "source", false).tree.storePath;
         return state.rootPath(CanonPath(state.store->toRealPath(storePath)));
     }
 
