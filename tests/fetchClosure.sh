@@ -52,7 +52,7 @@ if [[ "$NIX_REMOTE" != "daemon" ]]; then
         fromStore = \"file://$cacheDir\";
         fromPath = $nonCaPath;
       }
-    " | grepQuiet -E "The .fromPath. value .* is input addressed, but input addressing was not requested. If you do intend to return an input addressed store path, add .inputAddressed = true;. to the .fetchClosure. arguments."
+    " | grepQuiet -E "The .fromPath. value .* is input-addressed, but .inputAddressed. is set to .false."
 
     [ -e $nonCaPath ]
 

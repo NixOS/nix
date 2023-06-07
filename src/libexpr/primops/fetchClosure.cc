@@ -8,11 +8,11 @@ namespace nix {
 /**
  * Handler for the content addressed case.
  *
- * @param state The evaluator state and store to write to.
- * @param fromStore The store containing the path to rewrite.
- * @param fromPath The source path to be rewritten.
- * @param toPathMaybe The path to write the rewritten path to. If empty, the error shows the actual path.
- * @param v The return `Value`
+ * @param state Evaluator state and store to write to.
+ * @param fromStore Store containing the path to rewrite.
+ * @param fromPath Source path to be rewritten.
+ * @param toPathMaybe Path to write the rewritten path to. If empty, the error shows the actual path.
+ * @param v Return `Value`
  */
 static void runFetchClosureWithRewrite(EvalState & state, const PosIdx pos, Store & fromStore, const StorePath & fromPath, const std::optional<StorePath> & toPathMaybe, Value &v) {
 
@@ -31,8 +31,8 @@ static void runFetchClosureWithRewrite(EvalState & state, const PosIdx pos, Stor
         if (!toPathMaybe)
             throw Error({
                 .msg = hintfmt(
-                    "rewriting '%s' to content-addressed form yielded '%s'; "
-                    "please set this in the 'toPath' attribute passed to 'fetchClosure'",
+                    "rewriting '%s' to content-addressed form yielded '%s'\n"
+                    "Use this value for the 'toPath' attribute passed to 'fetchClosure'",
                     state.store->printStorePath(fromPath),
                     state.store->printStorePath(rewrittenPath)),
                 .errPos = state.positions[pos]
@@ -49,7 +49,9 @@ static void runFetchClosureWithRewrite(EvalState & state, const PosIdx pos, Stor
         // We don't perform the rewriting when outPath already exists, as an optimisation.
         // However, we can quickly detect a mistake if the toPath is input addressed.
         throw Error({
-            .msg = hintfmt("The 'toPath' value '%s' is input addressed, so it can't possibly be the result of rewriting. You may set 'toPath' to an empty string to figure out the correct path.",
+            .msg = hintfmt(
+                "The 'toPath' value '%s' is input-addressed, so it can't possibly be the result of rewriting to a content-addressed path.\n\n"
+                "Set 'toPath' to an empty string to make Nix report the correct content-addressed path.",
                 state.store->printStorePath(toPath)),
             .errPos = state.positions[pos]
         });
@@ -70,7 +72,9 @@ static void runFetchClosureWithContentAddressedPath(EvalState & state, const Pos
 
     if (!info->isContentAddressed(*state.store)) {
         throw Error({
-            .msg = hintfmt("The 'fromPath' value '%s' is input addressed, but input addressing was not requested. If you do intend to return an input addressed store path, add 'inputAddressed = true;' to the 'fetchClosure' arguments. Note that content addressing does not require users to configure a trusted binary cache public key on their systems, and is therefore preferred.",
+            .msg = hintfmt(
+                "The 'fromPath' value '%s' is input-addressed, but 'inputAddressed' is set to 'false' (default).\n\n"
+                "If you do intend to fetch an input-addressed store path, add 'inputAddressed = true;' to the 'fetchClosure' arguments. Note that content addressing does not require users to configure a trusted binary cache public key on their systems, and is therefore preferred.",
                 state.store->printStorePath(fromPath)),
             .errPos = state.positions[pos]
         });
@@ -91,7 +95,9 @@ static void runFetchClosureWithInputAddressedPath(EvalState & state, const PosId
 
     if (info->isContentAddressed(*state.store)) {
         throw Error({
-            .msg = hintfmt("The 'fetchClosure' result, '%s' is not input addressed, despite 'inputAddressed' being set to true. It is preferable to return a content addressed path, so remove the 'inputAddressed' attribute to ensure content addressing is used in the future",
+            .msg = hintfmt(
+                "The store object referred to by 'fromPath' at '%s' is not input-addressed, but 'inputAddressed' is set to 'true'.\n\n"
+                "Remove the 'inputAddressed' attribute (it defaults to 'false') to expect 'fromPath' to be content-addressed",
                 state.store->printStorePath(fromPath)),
             .errPos = state.positions[pos]
         });
@@ -202,11 +208,13 @@ static RegisterPrimOp primop_fetchClosure({
     .name = "__fetchClosure",
     .args = {"args"},
     .doc = R"(
-      Fetch a Nix store closure from a binary cache.
+      Fetch a store path [closure](@docroot@/glossary.md#gloss-closure) from a binary cache.
 
       This function can be used in three ways:
 
-      - Fetch any store path and rewrite it to a fully content-addressed store path. Example:
+      - Fetch any store path and rewrite it to a fully content-addressed store path.
+
+        Example:
 
         ```nix
         builtins.fetchClosure {
@@ -218,6 +226,8 @@ static RegisterPrimOp primop_fetchClosure({
 
       - Fetch a content-addressed store path.
 
+Example:
+
         ```nix
         builtins.fetchClosure {
             fromStore = "https://cache.nixos.org";
@@ -226,6 +236,8 @@ static RegisterPrimOp primop_fetchClosure({
         ```
 
       - Fetch an [input-addressed store path](@docroot@/glossary.md#gloss-input-addressed-store-object) as is. This depends on user configuration, which is less preferable.
+
+        Example:
 
         ```nix
         builtins.fetchClosure {
@@ -244,7 +256,7 @@ static RegisterPrimOp primop_fetchClosure({
       By rewriting the store paths, you can add the contents to any store without requiring that you or perhaps your users configure any extra trust.
 
       To find out the correct value for `toPath` given a `fromPath`,
-      you can use [`nix store make-content-addressed`](@docroot@/command-ref/new-cli/nix3-store-make-content-addressed.md):
+      use [`nix store make-content-addressed`](@docroot@/command-ref/new-cli/nix3-store-make-content-addressed.md):
 
       ```console
       # nix store make-content-addressed --from https://cache.nixos.org /nix/store/r2jd6ygnmirm2g803mksqqjm4y39yi6i-git-2.33.1
