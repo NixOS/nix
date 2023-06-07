@@ -159,6 +159,12 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
                 input.to_string(), *prevLastModified);
     }
 
+    if (auto prevRev = getRev()) {
+        if (input.getRev() != prevRev)
+            throw Error("'rev' attribute mismatch in input '%s', expected %s",
+                input.to_string(), prevRev->gitRev());
+    }
+
     if (auto prevRevCount = getRevCount()) {
         if (input.getRevCount() != prevRevCount)
             throw Error("'revCount' attribute mismatch in input '%s', expected %d",
