@@ -40,7 +40,8 @@ static std::vector<std::string> shellwords(const std::string & s)
     std::string cur;
     enum state {
         sBegin,
-        sQuote
+        sSingleQuote,
+        sDoubleQuote
     };
     state st = sBegin;
     auto it = begin;
@@ -56,15 +57,26 @@ static std::vector<std::string> shellwords(const std::string & s)
             }
         }
         switch (*it) {
+            case '\'':
+                if (st != sDoubleQuote) {
+                    cur.append(begin, it);
+                    begin = it + 1;
+                    st = st == sBegin ? sSingleQuote : sBegin;
+                }
+                break;
             case '"':
-                cur.append(begin, it);
-                begin = it + 1;
-                st = st == sBegin ? sQuote : sBegin;
+                if (st != sSingleQuote) {
+                    cur.append(begin, it);
+                    begin = it + 1;
+                    st = st == sBegin ? sDoubleQuote : sBegin;
+                }
                 break;
             case '\\':
-                /* perl shellwords mostly just treats the next char as part of the string with no special processing */
-                cur.append(begin, it);
-                begin = ++it;
+                if (st != sSingleQuote) {
+                    /* perl shellwords mostly just treats the next char as part of the string with no special processing */
+                    cur.append(begin, it);
+                    begin = ++it;
+                }
                 break;
         }
     }
