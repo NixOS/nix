@@ -4,9 +4,7 @@ The Nix language is
 
 - *domain-specific*
 
-  It only exists for the Nix package manager:
-  to describe packages and configurations as well as their variants and compositions.
-  It is not intended for general purpose use.
+  Its purpose is to conveniently create and compose precise descriptions of how contents of existing files are used to derive new files.
 
 - *declarative*
 
@@ -25,7 +23,7 @@ The Nix language is
 
 - *lazy*
 
-  Expressions are only evaluated when their value is needed.
+  Values are only computed when they are needed.
 
 - *dynamically typed*
 
