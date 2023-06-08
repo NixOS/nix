@@ -34,7 +34,7 @@ extern char * * environ __attribute__((weak));
  */
 static std::vector<std::string> shellwords(const std::string & s)
 {
-    std::regex whitespace("^(\\s+).*");
+    std::regex whitespace("^\\s+");
     auto begin = s.cbegin();
     std::vector<std::string> res;
     std::string cur;
@@ -51,9 +51,10 @@ static std::vector<std::string> shellwords(const std::string & s)
             if (regex_search(it, s.cend(), match, whitespace)) {
                 cur.append(begin, it);
                 res.push_back(cur);
-                cur.clear();
-                it = match[1].second;
+                it = match[0].second;
+                if (it == s.cend()) return res;
                 begin = it;
+                cur.clear();
             }
         }
         switch (*it) {
@@ -80,8 +81,9 @@ static std::vector<std::string> shellwords(const std::string & s)
                 break;
         }
     }
+    if (st != sBegin) throw Error("unterminated quote in shebang line");
     cur.append(begin, it);
-    if (!cur.empty()) res.push_back(cur);
+    res.push_back(cur);
     return res;
 }
 
@@ -140,7 +142,7 @@ static void main_nix_build(int argc, char * * argv)
                 for (auto line : lines) {
                     line = chomp(line);
                     std::smatch match;
-                    if (std::regex_match(line, match, std::regex("^#!\\s*nix-shell (.*)$")))
+                    if (std::regex_match(line, match, std::regex("^#!\\s*nix-shell\\s+(.*)$")))
                         for (const auto & word : shellwords(match[1].str()))
                             args.push_back(word);
                 }
