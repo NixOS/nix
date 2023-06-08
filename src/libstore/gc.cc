@@ -48,7 +48,7 @@ static void makeSymlink(const Path & link, const Path & target)
 }
 
 
-void LocalStore::addIndirectRoot(const Path & path)
+void MixLocalStore::addIndirectRoot(const Path & path)
 {
     std::string hash = hashString(HashAlgorithm::SHA1, path).to_string(HashFormat::Nix32, false);
     Path realRoot = canonPath(fmt("%1%/%2%/auto/%3%", stateDir, gcRootsDir, hash));
