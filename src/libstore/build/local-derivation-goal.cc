@@ -1457,7 +1457,7 @@ void LocalDerivationGoal::startDaemon()
                 (struct sockaddr *) &remoteAddr, &remoteAddrLen);
             if (!remote) {
                 if (errno == EINTR || errno == EAGAIN) continue;
-                if (errno == EINVAL) break;
+                if (errno == EINVAL || errno == ECONNABORTED) break;
                 throw SysError("accepting connection");
             }
 
@@ -1487,8 +1487,22 @@ void LocalDerivationGoal::startDaemon()
 
 void LocalDerivationGoal::stopDaemon()
 {
-    if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1)
-        throw SysError("shutting down daemon socket");
+    if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1) {
+        // According to the POSIX standard, the 'shutdown' function should
+        // return an ENOTCONN error when attempting to shut down a socket that
+        // hasn't been connected yet. This situation occurs when the 'accept'
+        // function is called on a socket without any accepted connections,
+        // leaving the socket unconnected. While Linux doesn't seem to produce
+        // an error for sockets that have only been accepted, more
+        // POSIX-compliant operating systems like OpenBSD, macOS, and others do
+        // return the ENOTCONN error. Therefore, we handle this error here to
+        // avoid raising an exception for compliant behaviour.
+        if (errno == ENOTCONN) {
+            daemonSocket.close();
+        } else {
+            throw SysError("shutting down daemon socket");
+        }
+    }
 
     if (daemonThread.joinable())
         daemonThread.join();
@@ -1499,7 +1513,8 @@ void LocalDerivationGoal::stopDaemon()
         thread.join();
     daemonWorkerThreads.clear();
 
-    daemonSocket = -1;
+    // release the socket.
+    daemonSocket.close();
 }
 
 
