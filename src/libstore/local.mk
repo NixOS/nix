@@ -66,3 +66,6 @@ $(foreach i, $(wildcard src/libstore/builtins/*.hh), \
 
 $(foreach i, $(wildcard src/libstore/build/*.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix/build, 0644)))
+
+$(foreach i, $(wildcard src/libstore/*.md), \
+  $(eval $(call install-file-in, $(i), $(includedir)/nix, 0644)))
