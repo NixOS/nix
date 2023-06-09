@@ -284,6 +284,7 @@ struct DerivationGoal : public Goal
     virtual bool cleanupDecideWhetherDiskFull();
     virtual void cleanupPostOutputsRegisteredModeCheck();
     virtual void cleanupPostOutputsRegisteredModeNonCheck();
+    virtual void cleanupError();
 
     virtual bool isReadDesc(int fd);
 

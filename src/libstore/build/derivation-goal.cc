@@ -9,7 +9,6 @@
 #include "archive.hh"
 #include "compression.hh"
 #include "worker-protocol.hh"
-#include "topo-sort.hh"
 #include "callback.hh"
 #include "local-store.hh" // TODO remove, along with remaining downcasts
 
@@ -819,6 +818,11 @@ bool DerivationGoal::cleanupDecideWhetherDiskFull()
 }
 
 
+void DerivationGoal::cleanupError()
+{
+}
+
+
 void DerivationGoal::cleanupPostOutputsRegisteredModeCheck()
 {
 }
@@ -984,6 +988,7 @@ void DerivationGoal::buildDone()
         done(BuildResult::Built, std::move(builtOutputs));
 
     } catch (BuildError & e) {
+        cleanupError();
         outputLocks.unlock();
 
         BuildResult::Status st = BuildResult::MiscFailure;

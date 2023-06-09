@@ -8,7 +8,7 @@ namespace nix {
 template<typename T>
 std::vector<T> topoSort(std::set<T> items,
         std::function<std::set<T>(const T &)> getChildren,
-        std::function<Error(const T &, const T &)> makeCycleError)
+        std::function<void (const T &, const T &)> makeCycleError)
 {
     std::vector<T> sorted;
     std::set<T> visited, parents;
@@ -16,7 +16,7 @@ std::vector<T> topoSort(std::set<T> items,
     std::function<void(const T & path, const T * parent)> dfsVisit;
 
     dfsVisit = [&](const T & path, const T * parent) {
-        if (parents.count(path)) throw makeCycleError(path, *parent);
+        if (parents.count(path)) makeCycleError(path, *parent);
 
         if (!visited.insert(path).second) return;
         parents.insert(path);

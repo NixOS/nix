@@ -262,6 +262,7 @@ struct LocalDerivationGoal : public DerivationGoal
     bool cleanupDecideWhetherDiskFull() override;
     void cleanupPostOutputsRegisteredModeCheck() override;
     void cleanupPostOutputsRegisteredModeNonCheck() override;
+    void cleanupError() override;
 
     bool isReadDesc(int fd) override;
 
