@@ -28,7 +28,7 @@ namespace nix {
             }
             Value eval(std::string input, bool forceValue = true) {
                 Value v;
-                Expr * e = state.parseExprFromString(input, "");
+                Expr * e = state.parseExprFromString(input, state.rootPath(CanonPath::root));
                 assert(e);
                 state.eval(e, v);
                 if (forceValue)

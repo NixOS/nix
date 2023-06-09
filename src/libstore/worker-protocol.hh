@@ -1,7 +1,6 @@
 #pragma once
 ///@file
 
-#include "store-api.hh"
 #include "serialise.hh"
 
 namespace nix {
@@ -79,41 +78,81 @@ typedef enum {
 class Store;
 struct Source;
 
+// items being serialized
+struct DerivedPath;
+struct DrvOutput;
+struct Realisation;
+struct BuildResult;
+struct KeyedBuildResult;
+enum TrustedFlag : bool;
+
+
 /**
- * Used to guide overloading
+ * Data type for canonical pairs of serializers for the worker protocol.
  *
  * See https://en.cppreference.com/w/cpp/language/adl for the broader
  * concept of what is going on here.
  */
 template<typename T>
-struct Phantom {};
+struct WorkerProto {
+    static T read(const Store & store, Source & from);
+    static void write(const Store & store, Sink & out, const T & t);
+};
 
+/**
+ * Wrapper function around `WorkerProto<T>::write` that allows us to
+ * infer the type instead of having to write it down explicitly.
+ */
+template<typename T>
+void workerProtoWrite(const Store & store, Sink & out, const T & t)
+{
+    WorkerProto<T>::write(store, out, t);
+}
 
-namespace worker_proto {
-/* FIXME maybe move more stuff inside here */
+/**
+ * Declare a canonical serializer pair for the worker protocol.
+ *
+ * We specialize the struct merely to indicate that we are implementing
+ * the function for the given type.
+ *
+ * Some sort of `template<...>` must be used with the caller for this to
+ * be legal specialization syntax. See below for what that looks like in
+ * practice.
+ */
+#define MAKE_WORKER_PROTO(T) \
+    struct WorkerProto< T > { \
+        static T read(const Store & store, Source & from); \
+        static void write(const Store & store, Sink & out, const T & t); \
+    };
 
-#define MAKE_WORKER_PROTO(TEMPLATE, T) \
-    TEMPLATE T read(const Store & store, Source & from, Phantom< T > _); \
-    TEMPLATE void write(const Store & store, Sink & out, const T & str)
+template<>
+MAKE_WORKER_PROTO(std::string);
+template<>
+MAKE_WORKER_PROTO(StorePath);
+template<>
+MAKE_WORKER_PROTO(ContentAddress);
+template<>
+MAKE_WORKER_PROTO(DerivedPath);
+template<>
+MAKE_WORKER_PROTO(Realisation);
+template<>
+MAKE_WORKER_PROTO(DrvOutput);
+template<>
+MAKE_WORKER_PROTO(BuildResult);
+template<>
+MAKE_WORKER_PROTO(KeyedBuildResult);
+template<>
+MAKE_WORKER_PROTO(std::optional<TrustedFlag>);
 
-MAKE_WORKER_PROTO(, std::string);
-MAKE_WORKER_PROTO(, StorePath);
-MAKE_WORKER_PROTO(, ContentAddress);
-MAKE_WORKER_PROTO(, DerivedPath);
-MAKE_WORKER_PROTO(, Realisation);
-MAKE_WORKER_PROTO(, DrvOutput);
-MAKE_WORKER_PROTO(, BuildResult);
-MAKE_WORKER_PROTO(, KeyedBuildResult);
-MAKE_WORKER_PROTO(, std::optional<TrustedFlag>);
+template<typename T>
+MAKE_WORKER_PROTO(std::vector<T>);
+template<typename T>
+MAKE_WORKER_PROTO(std::set<T>);
 
-MAKE_WORKER_PROTO(template<typename T>, std::vector<T>);
-MAKE_WORKER_PROTO(template<typename T>, std::set<T>);
-
-#define X_ template<typename K, typename V>
-#define Y_ std::map<K, V>
-MAKE_WORKER_PROTO(X_, Y_);
+template<typename K, typename V>
+#define X_ std::map<K, V>
+MAKE_WORKER_PROTO(X_);
 #undef X_
-#undef Y_
 
 /**
  * These use the empty string for the null case, relying on the fact
@@ -129,72 +168,72 @@ MAKE_WORKER_PROTO(X_, Y_);
  * worker protocol harder to implement in other languages where such
  * specializations may not be allowed.
  */
-MAKE_WORKER_PROTO(, std::optional<StorePath>);
-MAKE_WORKER_PROTO(, std::optional<ContentAddress>);
+template<>
+MAKE_WORKER_PROTO(std::optional<StorePath>);
+template<>
+MAKE_WORKER_PROTO(std::optional<ContentAddress>);
 
 template<typename T>
-std::vector<T> read(const Store & store, Source & from, Phantom<std::vector<T>> _)
+std::vector<T> WorkerProto<std::vector<T>>::read(const Store & store, Source & from)
 {
     std::vector<T> resSet;
     auto size = readNum<size_t>(from);
     while (size--) {
-        resSet.push_back(read(store, from, Phantom<T> {}));
+        resSet.push_back(WorkerProto<T>::read(store, from));
     }
     return resSet;
 }
 
 template<typename T>
-void write(const Store & store, Sink & out, const std::vector<T> & resSet)
+void WorkerProto<std::vector<T>>::write(const Store & store, Sink & out, const std::vector<T> & resSet)
 {
     out << resSet.size();
     for (auto & key : resSet) {
-        write(store, out, key);
+        WorkerProto<T>::write(store, out, key);
     }
 }
 
 template<typename T>
-std::set<T> read(const Store & store, Source & from, Phantom<std::set<T>> _)
+std::set<T> WorkerProto<std::set<T>>::read(const Store & store, Source & from)
 {
     std::set<T> resSet;
     auto size = readNum<size_t>(from);
     while (size--) {
-        resSet.insert(read(store, from, Phantom<T> {}));
+        resSet.insert(WorkerProto<T>::read(store, from));
     }
     return resSet;
 }
 
 template<typename T>
-void write(const Store & store, Sink & out, const std::set<T> & resSet)
+void WorkerProto<std::set<T>>::write(const Store & store, Sink & out, const std::set<T> & resSet)
 {
     out << resSet.size();
     for (auto & key : resSet) {
-        write(store, out, key);
+        WorkerProto<T>::write(store, out, key);
     }
 }
 
 template<typename K, typename V>
-std::map<K, V> read(const Store & store, Source & from, Phantom<std::map<K, V>> _)
+std::map<K, V> WorkerProto<std::map<K, V>>::read(const Store & store, Source & from)
 {
     std::map<K, V> resMap;
     auto size = readNum<size_t>(from);
     while (size--) {
-        auto k = read(store, from, Phantom<K> {});
-        auto v = read(store, from, Phantom<V> {});
+        auto k = WorkerProto<K>::read(store, from);
+        auto v = WorkerProto<V>::read(store, from);
         resMap.insert_or_assign(std::move(k), std::move(v));
     }
     return resMap;
 }
 
 template<typename K, typename V>
-void write(const Store & store, Sink & out, const std::map<K, V> & resMap)
+void WorkerProto<std::map<K, V>>::write(const Store & store, Sink & out, const std::map<K, V> & resMap)
 {
     out << resMap.size();
     for (auto & i : resMap) {
-        write(store, out, i.first);
-        write(store, out, i.second);
+        WorkerProto<K>::write(store, out, i.first);
+        WorkerProto<V>::write(store, out, i.second);
     }
-}
-
 }
 
 }

@@ -32,9 +32,9 @@ struct PosAdapter : AbstractPos
                 // Get rid of the null terminators added by the parser.
                 return std::string(s.source->c_str());
             },
-            [](const Path & path) -> std::optional<std::string> {
+            [](const SourcePath & path) -> std::optional<std::string> {
                 try {
-                    return readFile(path);
+                    return path.readFile();
                 } catch (Error &) {
                     return std::nullopt;
                 }
@@ -48,7 +48,7 @@ struct PosAdapter : AbstractPos
             [&](const Pos::none_tag &) { out << "«none»"; },
             [&](const Pos::Stdin &) { out << "«stdin»"; },
             [&](const Pos::String & s) { out << "«string»"; },
-            [&](const Path & path) { out << path; }
+            [&](const SourcePath & path) { out << path; }
         }, origin);
     }
 };

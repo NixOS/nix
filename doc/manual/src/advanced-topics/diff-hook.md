@@ -48,13 +48,13 @@ If the build passes and is deterministic, Nix will exit with a status
 code of 0:
 
 ```console
-$ nix-build ./deterministic.nix -A stable
+$ nix-build ./deterministic.nix --attr stable
 this derivation will be built:
   /nix/store/z98fasz2jqy9gs0xbvdj939p27jwda38-stable.drv
 building '/nix/store/z98fasz2jqy9gs0xbvdj939p27jwda38-stable.drv'...
 /nix/store/yyxlzw3vqaas7wfp04g0b1xg51f2czgq-stable
 
-$ nix-build ./deterministic.nix -A stable --check
+$ nix-build ./deterministic.nix --attr stable --check
 checking outputs of '/nix/store/z98fasz2jqy9gs0xbvdj939p27jwda38-stable.drv'...
 /nix/store/yyxlzw3vqaas7wfp04g0b1xg51f2czgq-stable
 ```
@@ -63,13 +63,13 @@ If the build is not deterministic, Nix will exit with a status code of
 1:
 
 ```console
-$ nix-build ./deterministic.nix -A unstable
+$ nix-build ./deterministic.nix --attr unstable
 this derivation will be built:
   /nix/store/cgl13lbj1w368r5z8gywipl1ifli7dhk-unstable.drv
 building '/nix/store/cgl13lbj1w368r5z8gywipl1ifli7dhk-unstable.drv'...
 /nix/store/krpqk0l9ib0ibi1d2w52z293zw455cap-unstable
 
-$ nix-build ./deterministic.nix -A unstable --check
+$ nix-build ./deterministic.nix --attr unstable --check
 checking outputs of '/nix/store/cgl13lbj1w368r5z8gywipl1ifli7dhk-unstable.drv'...
 error: derivation '/nix/store/cgl13lbj1w368r5z8gywipl1ifli7dhk-unstable.drv' may
 not be deterministic: output '/nix/store/krpqk0l9ib0ibi1d2w52z293zw455cap-unstable' differs
@@ -89,7 +89,7 @@ Using `--check` with `--keep-failed` will cause Nix to keep the second
 build's output in a special, `.check` path:
 
 ```console
-$ nix-build ./deterministic.nix -A unstable --check --keep-failed
+$ nix-build ./deterministic.nix --attr unstable --check --keep-failed
 checking outputs of '/nix/store/cgl13lbj1w368r5z8gywipl1ifli7dhk-unstable.drv'...
 note: keeping build directory '/tmp/nix-build-unstable.drv-0'
 error: derivation '/nix/store/cgl13lbj1w368r5z8gywipl1ifli7dhk-unstable.drv' may

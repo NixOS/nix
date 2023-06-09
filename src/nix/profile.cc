@@ -31,6 +31,11 @@ struct ProfileElementSource
             std::tuple(originalRef.to_string(), attrPath, outputs) <
             std::tuple(other.originalRef.to_string(), other.attrPath, other.outputs);
     }
+
+    std::string to_string() const
+    {
+        return fmt("%s#%s%s", originalRef, attrPath, outputs.to_string());
+    }
 };
 
 const int defaultPriority = 5;
@@ -42,14 +47,28 @@ struct ProfileElement
     bool active = true;
     int priority = defaultPriority;
 
-    std::string describe() const
+    std::string identifier() const
     {
         if (source)
-            return fmt("%s#%s%s", source->originalRef, source->attrPath, source->outputs.to_string());
+            return source->to_string();
         StringSet names;
         for (auto & path : storePaths)
             names.insert(DrvName(path.name()).name);
         return concatStringsSep(", ", names);
+    }
+
+    /**
+     * Return a string representing an installable corresponding to the current
+     * element, either a flakeref or a plain store path
+     */
+    std::set<std::string> toInstallables(Store & store)
+    {
+        if (source)
+            return {source->to_string()};
+        StringSet rawPaths;
+        for (auto & path : storePaths)
+            rawPaths.insert(store.printStorePath(path));
+        return rawPaths;
     }
 
     std::string versions() const
@@ -62,7 +81,7 @@ struct ProfileElement
 
     bool operator < (const ProfileElement & other) const
     {
-        return std::tuple(describe(), storePaths) < std::tuple(other.describe(), other.storePaths);
+        return std::tuple(identifier(), storePaths) < std::tuple(other.identifier(), other.storePaths);
     }
 
     void updateStorePaths(
@@ -237,13 +256,13 @@ struct ProfileManifest
         bool changes = false;
 
         while (i != prevElems.end() || j != curElems.end()) {
-            if (j != curElems.end() && (i == prevElems.end() || i->describe() > j->describe())) {
-                logger->cout("%s%s: ∅ -> %s", indent, j->describe(), j->versions());
+            if (j != curElems.end() && (i == prevElems.end() || i->identifier() > j->identifier())) {
+                logger->cout("%s%s: ∅ -> %s", indent, j->identifier(), j->versions());
                 changes = true;
                 ++j;
             }
-            else if (i != prevElems.end() && (j == curElems.end() || i->describe() < j->describe())) {
-                logger->cout("%s%s: %s -> ∅", indent, i->describe(), i->versions());
+            else if (i != prevElems.end() && (j == curElems.end() || i->identifier() < j->identifier())) {
+                logger->cout("%s%s: %s -> ∅", indent, i->identifier(), i->versions());
                 changes = true;
                 ++i;
             }
@@ -251,7 +270,7 @@ struct ProfileManifest
                 auto v1 = i->versions();
                 auto v2 = j->versions();
                 if (v1 != v2) {
-                    logger->cout("%s%s: %s -> %s", indent, i->describe(), v1, v2);
+                    logger->cout("%s%s: %s -> %s", indent, i->identifier(), v1, v2);
                     changes = true;
                 }
                 ++i;
@@ -363,10 +382,10 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                     auto profileElement = *it;
                     for (auto & storePath : profileElement.storePaths) {
                         if (conflictError.fileA.starts_with(store->printStorePath(storePath))) {
-                            return std::pair(conflictError.fileA, profileElement.source->originalRef);
+                            return std::pair(conflictError.fileA, profileElement.toInstallables(*store));
                         }
                         if (conflictError.fileB.starts_with(store->printStorePath(storePath))) {
-                            return std::pair(conflictError.fileB, profileElement.source->originalRef);
+                            return std::pair(conflictError.fileB, profileElement.toInstallables(*store));
                         }
                     }
                 }
@@ -375,9 +394,9 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
             // There are 2 conflicting files. We need to find out which one is from the already installed package and
             // which one is the package that is the new package that is being installed.
             // The first matching package is the one that was already installed (original).
-            auto [originalConflictingFilePath, originalConflictingRef] = findRefByFilePath(manifest.elements.begin(), manifest.elements.end());
+            auto [originalConflictingFilePath, originalConflictingRefs] = findRefByFilePath(manifest.elements.begin(), manifest.elements.end());
             // The last matching package is the one that was going to be installed (new).
-            auto [newConflictingFilePath, newConflictingRef] = findRefByFilePath(manifest.elements.rbegin(), manifest.elements.rend());
+            auto [newConflictingFilePath, newConflictingRefs] = findRefByFilePath(manifest.elements.rbegin(), manifest.elements.rend());
 
             throw Error(
                 "An existing package already provides the following file:\n"
@@ -403,8 +422,8 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                 "  nix profile install %4% --priority %7%\n",
                 originalConflictingFilePath,
                 newConflictingFilePath,
-                originalConflictingRef.to_string(),
-                newConflictingRef.to_string(),
+                concatStringsSep(" ", originalConflictingRefs),
+                concatStringsSep(" ", newConflictingRefs),
                 conflictError.priority,
                 conflictError.priority - 1,
                 conflictError.priority + 1
@@ -491,7 +510,7 @@ struct CmdProfileRemove : virtual EvalCommand, MixDefaultProfile, MixProfileElem
             if (!matches(*store, element, i, matchers)) {
                 newManifest.elements.push_back(std::move(element));
             } else {
-                notice("removing '%s'", element.describe());
+                notice("removing '%s'", element.identifier());
             }
         }
 

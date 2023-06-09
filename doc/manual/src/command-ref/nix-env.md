@@ -49,7 +49,7 @@ These pages can be viewed offline:
 
 # Selectors
 
-Several commands, such as `nix-env -q` and `nix-env -i`, take a list of
+Several commands, such as `nix-env --query ` and `nix-env --install `, take a list of
 arguments that specify the packages on which to operate. These are
 extended regular expressions that must match the entire name of the
 package. (For details on regular expressions, see **regex**(7).) The match is
@@ -83,46 +83,8 @@ match. Here are some examples:
 
 # Files
 
-  - `~/.nix-defexpr`\
-    The source for the default Nix expressions used by the
-    `--install`, `--upgrade`, and `--query --available` operations to
-    obtain derivations. The `--file` option may be used to override
-    this default.
+`nix-env` operates on the following files.
 
-    If `~/.nix-defexpr` is a file, it is loaded as a Nix expression. If
-    the expression is a set, it is used as the default Nix expression.
-    If the expression is a function, an empty set is passed as argument
-    and the return value is used as the default Nix expression.
+{{#include ./files/default-nix-expression.md}}
 
-    If `~/.nix-defexpr` is a directory containing a `default.nix` file,
-    that file is loaded as in the above paragraph.
-
-    If `~/.nix-defexpr` is a directory without a `default.nix` file,
-    then its contents (both files and subdirectories) are loaded as Nix
-    expressions. The expressions are combined into a single set, each
-    expression under an attribute with the same name as the original
-    file or subdirectory.
-
-    For example, if `~/.nix-defexpr` contains two files, `foo.nix` and
-    `bar.nix`, then the default Nix expression will essentially be
-
-    ```nix
-    {
-      foo = import ~/.nix-defexpr/foo.nix;
-      bar = import ~/.nix-defexpr/bar.nix;
-    }
-    ```
-
-    The file `manifest.nix` is always ignored. Subdirectories without a
-    `default.nix` file are traversed recursively in search of more Nix
-    expressions, but the names of these intermediate directories are not
-    added to the attribute paths of the default Nix expression.
-
-    The command `nix-channel` places symlinks to the downloaded Nix
-    expressions from each subscribed channel in this directory.
-
-  - `~/.nix-profile`\
-    A symbolic link to the user's current profile. By default, this
-    symlink points to `prefix/var/nix/profiles/default`. The `PATH`
-    environment variable should include `~/.nix-profile/bin` for the
-    user environment to be visible to the user.
+{{#include ./files/profiles.md}}

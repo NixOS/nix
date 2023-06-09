@@ -15,7 +15,6 @@ my $evalId = $ARGV[0] or die "Usage: $0 EVAL-ID\n";
 
 my $releasesBucketName = "nix-releases";
 my $channelsBucketName = "nix-channels";
-my $nixpkgsDir = "/home/eelco/Dev/nixpkgs-pristine";
 
 my $TMPDIR = $ENV{'TMPDIR'} // "/tmp";
 
@@ -80,6 +79,38 @@ my $s3_us = Net::Amazon::S3->new(
     });
 
 my $channelsBucket = $s3_us->bucket($channelsBucketName) or die;
+
+sub getStorePath {
+    my ($jobName, $output) = @_;
+    my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
+    return $buildInfo->{buildoutputs}->{$output or "out"}->{path} or die "cannot get store path for '$jobName'";
+}
+
+sub copyManual {
+    my $manual = getStorePath("build.x86_64-linux", "doc");
+    print "$manual\n";
+
+    my $manualNar = "$tmpDir/$releaseName-manual.nar.xz";
+    print "$manualNar\n";
+
+    unless (-e $manualNar) {
+        system("NIX_REMOTE=$binaryCache nix store dump-path '$manual' | xz > '$manualNar'.tmp") == 0
+            or die "unable to fetch $manual\n";
+        rename("$manualNar.tmp", $manualNar) or die;
+    }
+
+    unless (-e "$tmpDir/manual") {
+        system("xz -d < '$manualNar' | nix-store --restore $tmpDir/manual.tmp") == 0
+            or die "unable to unpack $manualNar\n";
+        rename("$tmpDir/manual.tmp/share/doc/nix/manual", "$tmpDir/manual") or die;
+        system("rm -rf '$tmpDir/manual.tmp'") == 0 or die;
+    }
+
+    system("aws s3 sync '$tmpDir/manual' s3://$releasesBucketName/$releaseDir/manual") == 0
+        or die "syncing manual to S3\n";
+}
+
+copyManual;
 
 sub downloadFile {
     my ($jobName, $productNr, $dstName) = @_;
@@ -180,9 +211,20 @@ if ($isLatest) {
     system("docker manifest push nixos/nix:latest") == 0 or die;
 }
 
+# Upload nix-fallback-paths.nix.
+write_file("$tmpDir/fallback-paths.nix",
+    "{\n" .
+    "  x86_64-linux = \"" . getStorePath("build.x86_64-linux") . "\";\n" .
+    "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
+    "  aarch64-linux = \"" . getStorePath("build.aarch64-linux") . "\";\n" .
+    "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
+    "  aarch64-darwin = \"" . getStorePath("build.aarch64-darwin") . "\";\n" .
+    "}\n");
+
 # Upload release files to S3.
 for my $fn (glob "$tmpDir/*") {
     my $name = basename($fn);
+    next if $name eq "manual";
     my $dstKey = "$releaseDir/" . $name;
     unless (defined $releasesBucket->head_key($dstKey)) {
         print STDERR "uploading $fn to s3://$releasesBucketName/$dstKey...\n";
@@ -190,36 +232,13 @@ for my $fn (glob "$tmpDir/*") {
         my $configuration = ();
         $configuration->{content_type} = "application/octet-stream";
 
-        if ($fn =~ /.sha256|install/) {
-            # Text files
+        if ($fn =~ /.sha256|install|\.nix$/) {
             $configuration->{content_type} = "text/plain";
         }
 
         $releasesBucket->add_key_filename($dstKey, $fn, $configuration)
             or die $releasesBucket->err . ": " . $releasesBucket->errstr;
     }
-}
-
-# Update nix-fallback-paths.nix.
-if ($isLatest) {
-    system("cd $nixpkgsDir && git pull") == 0 or die;
-
-    sub getStorePath {
-        my ($jobName) = @_;
-        my $buildInfo = decode_json(fetch("$evalUrl/job/$jobName", 'application/json'));
-        return $buildInfo->{buildoutputs}->{out}->{path} or die "cannot get store path for '$jobName'";
-    }
-
-    write_file("$nixpkgsDir/nixos/modules/installer/tools/nix-fallback-paths.nix",
-               "{\n" .
-               "  x86_64-linux = \"" . getStorePath("build.x86_64-linux") . "\";\n" .
-               "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
-               "  aarch64-linux = \"" . getStorePath("build.aarch64-linux") . "\";\n" .
-               "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
-               "  aarch64-darwin = \"" . getStorePath("build.aarch64-darwin") . "\";\n" .
-               "}\n");
-
-    system("cd $nixpkgsDir && git commit -a -m 'nix-fallback-paths.nix: Update to $version'") == 0 or die;
 }
 
 # Update the "latest" symlink.

@@ -46,6 +46,8 @@ public:
         : path(std::move(path))
     { }
 
+    static CanonPath fromCwd(std::string_view path = ".");
+
     static CanonPath root;
 
     /**

@@ -1,11 +1,10 @@
 #include "value/context.hh"
-#include "store-api.hh"
 
 #include <optional>
 
 namespace nix {
 
-NixStringContextElem NixStringContextElem::parse(const Store & store, std::string_view s0)
+NixStringContextElem NixStringContextElem::parse(std::string_view s0)
 {
     std::string_view s = s0;
 
@@ -25,41 +24,41 @@ NixStringContextElem NixStringContextElem::parse(const Store & store, std::strin
                 "String content element beginning with '!' should have a second '!'");
         }
         return NixStringContextElem::Built {
-            .drvPath = store.parseStorePath(s.substr(index + 1)),
+            .drvPath = StorePath { s.substr(index + 1) },
             .output = std::string(s.substr(0, index)),
         };
     }
     case '=': {
         return NixStringContextElem::DrvDeep {
-            .drvPath = store.parseStorePath(s.substr(1)),
+            .drvPath = StorePath { s.substr(1) },
         };
     }
     default: {
         return NixStringContextElem::Opaque {
-            .path = store.parseStorePath(s),
+            .path = StorePath { s },
         };
     }
     }
 }
 
-std::string NixStringContextElem::to_string(const Store & store) const {
+std::string NixStringContextElem::to_string() const {
     return std::visit(overloaded {
         [&](const NixStringContextElem::Built & b) {
             std::string res;
             res += '!';
             res += b.output;
             res += '!';
-            res += store.printStorePath(b.drvPath);
+            res += b.drvPath.to_string();
             return res;
         },
         [&](const NixStringContextElem::DrvDeep & d) {
             std::string res;
             res += '=';
-            res += store.printStorePath(d.drvPath);
+            res += d.drvPath.to_string();
             return res;
         },
         [&](const NixStringContextElem::Opaque & o) {
-            return store.printStorePath(o.path);
+            return std::string { o.path.to_string() };
         },
     }, raw());
 }

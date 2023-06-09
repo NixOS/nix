@@ -95,32 +95,13 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
         // FIXME: use eval cache?
         auto v = attr->forceValue();
 
-        if (v.type() == nPath) {
-            PathSet context;
-            auto storePath = state->copyPathToStore(context, Path(v.path));
-            return {{
-                .path = DerivedPath::Opaque {
-                    .path = std::move(storePath),
-                },
-                .info = make_ref<ExtraPathInfo>(),
-            }};
+        if (std::optional derivedPathWithInfo = trySinglePathToDerivedPaths(
+            v,
+            noPos,
+            fmt("while evaluating the flake output attribute '%s'", attrPath)))
+        {
+            return { *derivedPathWithInfo };
         }
-
-        else if (v.type() == nString) {
-            PathSet context;
-            auto s = state->forceString(v, context, noPos, fmt("while evaluating the flake output attribute '%s'", attrPath));
-            auto storePath = state->store->maybeParseStorePath(s);
-            if (storePath && context.count(std::string(s))) {
-                return {{
-                    .path = DerivedPath::Opaque {
-                        .path = std::move(*storePath),
-                    },
-                    .info = make_ref<ExtraPathInfo>(),
-                }};
-            } else
-                throw Error("flake output attribute '%s' evaluates to the string '%s' which is not a store path", attrPath, s);
-        }
-
         else
             throw Error("flake output attribute '%s' is not a derivation or path", attrPath);
     }
@@ -235,7 +216,7 @@ FlakeRef InstallableFlake::nixpkgsFlakeRef() const
         }
     }
 
-    return InstallableValue::nixpkgsFlakeRef();
+    return defaultNixpkgsFlakeRef();
 }
 
 }

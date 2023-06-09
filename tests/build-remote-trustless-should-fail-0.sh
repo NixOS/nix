@@ -17,13 +17,13 @@ nix-build build-hook.nix -A passthru.input2 \
   --store "$TEST_ROOT/local" \
   --option system-features bar
 
-# Now when we go to build that downstream derivation, Nix will fail
-# because we cannot trustlessly build input-addressed derivations with
-# `inputDrv` dependencies.
+# Now when we go to build that downstream derivation, Nix will try to
+# copy our already-build `input2` to the remote store. That store object
+# is input-addressed, so this will fail.
 
 file=build-hook.nix
 prog=$(readlink -e ./nix-daemon-untrusting.sh)
 proto=ssh-ng
 
 expectStderr 1 source build-remote-trustless.sh \
-    | grepQuiet "you are not privileged to build input-addressed derivations"
+    | grepQuiet "cannot add path '[^ ]*' because it lacks a signature by a trusted key"

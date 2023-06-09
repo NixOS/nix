@@ -11,9 +11,9 @@
 namespace nix {
 
 nlohmann::json printValueAsJSON(EvalState & state, bool strict,
-    Value & v, const PosIdx pos, PathSet & context, bool copyToStore = true);
+    Value & v, const PosIdx pos, NixStringContext & context, bool copyToStore = true);
 
 void printValueAsJSON(EvalState & state, bool strict,
-    Value & v, const PosIdx pos, std::ostream & str, PathSet & context, bool copyToStore = true);
+    Value & v, const PosIdx pos, std::ostream & str, NixStringContext & context, bool copyToStore = true);
 
 }

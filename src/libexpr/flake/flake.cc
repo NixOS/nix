@@ -222,9 +222,9 @@ static Flake getFlake(
         throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", lockedRef, lockedRef.subdir);
 
     Value vInfo;
-    state.evalFile(flakeFile, vInfo, true); // FIXME: symlink attack
+    state.evalFile(CanonPath(flakeFile), vInfo, true); // FIXME: symlink attack
 
-    expectType(state, nAttrs, vInfo, state.positions.add({flakeFile}, 1, 1));
+    expectType(state, nAttrs, vInfo, state.positions.add({CanonPath(flakeFile)}, 1, 1));
 
     if (auto description = vInfo.attrs->get(state.sDescription)) {
         expectType(state, nString, *description->value, description->pos);
@@ -265,7 +265,7 @@ static Flake getFlake(
                     state.symbols[setting.name],
                     std::string(state.forceStringNoCtx(*setting.value, setting.pos, "")));
             else if (setting.value->type() == nPath) {
-                PathSet emptyContext = {};
+                NixStringContext emptyContext = {};
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
                     state.coerceToString(setting.pos, *setting.value, emptyContext, "", false, true, true) .toOwned());
@@ -745,7 +745,7 @@ void callFlake(EvalState & state,
         state.vCallFlake = allocRootValue(state.allocValue());
         state.eval(state.parseExprFromString(
             #include "call-flake.nix.gen.hh"
-            , "/"), **state.vCallFlake);
+            , CanonPath::root), **state.vCallFlake);
     }
 
     state.callFunction(**state.vCallFlake, *vLocks, *vTmp1, noPos);

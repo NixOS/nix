@@ -29,6 +29,8 @@ enum struct ExperimentalFeature
     Cgroups,
     DiscardReferences,
     DaemonTrustOverride,
+    DynamicDerivations,
+    ParseTomlTimestamps,
 };
 
 /**

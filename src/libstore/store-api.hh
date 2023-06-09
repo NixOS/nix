@@ -679,8 +679,7 @@ public:
      * Repair the contents of the given path by redownloading it using
      * a substituter (if available).
      */
-    virtual void repairPath(const StorePath & path)
-    { unsupported("repairPath"); }
+    virtual void repairPath(const StorePath & path);
 
     /**
      * Add signatures to the specified store path. The signatures are
@@ -1022,7 +1021,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
  */
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
 
-std::optional<ContentAddress> getDerivationCA(const BasicDerivation & drv);
+const ContentAddress * getDerivationCA(const BasicDerivation & drv);
 
 std::map<DrvOutput, StorePath> drvOutputReferences(
     Store & store,

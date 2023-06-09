@@ -55,8 +55,6 @@ struct NixRepl
     , gc
     #endif
 {
-    std::string curDir;
-
     size_t debugTraceIndex;
 
     Strings loadedFiles;
@@ -114,7 +112,6 @@ NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store, ref<EvalStat
     , staticEnv(new StaticEnv(false, state->staticBaseEnv.get()))
     , historyFile(getDataDir() + "/nix/repl-history")
 {
-    curDir = absPath(".");
 }
 
 
@@ -594,14 +591,14 @@ bool NixRepl::processLine(std::string line)
         Value v;
         evalString(arg, v);
 
-        const auto [path, line] = [&] () -> std::pair<Path, uint32_t> {
+        const auto [path, line] = [&] () -> std::pair<SourcePath, uint32_t> {
             if (v.type() == nPath || v.type() == nString) {
-                PathSet context;
+                NixStringContext context;
                 auto path = state->coerceToPath(noPos, v, context, "while evaluating the filename to edit");
                 return {path, 0};
             } else if (v.isLambda()) {
                 auto pos = state->positions[v.lambda.fun->pos];
-                if (auto path = std::get_if<Path>(&pos.origin))
+                if (auto path = std::get_if<SourcePath>(&pos.origin))
                     return {*path, pos.line};
                 else
                     throw Error("'%s' cannot be shown in an editor", pos);
@@ -876,8 +873,7 @@ void NixRepl::addVarToScope(const Symbol name, Value & v)
 
 Expr * NixRepl::parseString(std::string s)
 {
-    Expr * e = state->parseExprFromString(std::move(s), curDir, staticEnv);
-    return e;
+    return state->parseExprFromString(std::move(s), state->rootPath(CanonPath::fromCwd()), staticEnv);
 }
 
 
@@ -925,7 +921,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         break;
 
     case nPath:
-        str << ANSI_GREEN << v.path << ANSI_NORMAL; // !!! escaping?
+        str << ANSI_GREEN << v.path().to_string() << ANSI_NORMAL; // !!! escaping?
         break;
 
     case nNull:
@@ -940,7 +936,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         if (isDrv) {
             str << "«derivation ";
             Bindings::iterator i = v.attrs->find(state->sDrvPath);
-            PathSet context;
+            NixStringContext context;
             if (i != v.attrs->end())
                 str << state->store->printStorePath(state->coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation"));
             else

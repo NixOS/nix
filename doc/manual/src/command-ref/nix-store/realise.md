@@ -99,7 +99,7 @@ This operation is typically used to build [store derivation]s produced by
 [store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
 ```console
-$ nix-store -r $(nix-instantiate ./test.nix)
+$ nix-store --realise $(nix-instantiate ./test.nix)
 /nix/store/31axcgrlbfsxzmfff1gyj1bf62hvkby2-aterm-2.3.1
 ```
 
@@ -108,7 +108,7 @@ This is essentially what [`nix-build`](@docroot@/command-ref/nix-build.md) does.
 To test whether a previously-built derivation is deterministic:
 
 ```console
-$ nix-build '<nixpkgs>' -A hello --check -K
+$ nix-build '<nixpkgs>' --attr hello --check -K
 ```
 
 Use [`nix-store --read-log`](./read-log.md) to show the stderr and stdout of a build:

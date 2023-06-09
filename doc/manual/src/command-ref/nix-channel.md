@@ -22,6 +22,9 @@ This command has the following operations:
     channels. If *name* is omitted, it defaults to the last component of
     *url*, with the suffixes `-stable` or `-unstable` removed.
 
+    A channel URL must point to a directory containing a file `nixexprs.tar.gz`.
+    At the top level, that tarball must contain a single directory with a `default.nix` file that serves as the channel’s entry point.
+
   - `--remove` *name*\
     Removes the channel named *name* from the list of subscribed
     channels.
@@ -49,6 +52,12 @@ The list of subscribed channels is stored in `~/.nix-channels`.
 
 {{#include ./env-common.md}}
 
+# Files
+
+`nix-channel` operates on the following files.
+
+{{#include ./files/channels.md}}
+
 # Examples
 
 To subscribe to the Nixpkgs channel and install the GNU Hello package:
@@ -56,45 +65,18 @@ To subscribe to the Nixpkgs channel and install the GNU Hello package:
 ```console
 $ nix-channel --add https://nixos.org/channels/nixpkgs-unstable
 $ nix-channel --update
-$ nix-env -iA nixpkgs.hello
+$ nix-env --install --attr nixpkgs.hello
 ```
 
 You can revert channel updates using `--rollback`:
 
 ```console
-$ nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
+$ nix-instantiate --eval --expr '(import <nixpkgs> {}).lib.version'
 "14.04.527.0e935f1"
 
 $ nix-channel --rollback
 switching from generation 483 to 482
 
-$ nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
+$ nix-instantiate --eval --expr '(import <nixpkgs> {}).lib.version'
 "14.04.526.dbadfad"
 ```
-
-# Files
-
-  - `${XDG_STATE_HOME-$HOME/.local/state}/nix/profiles/channels`\
-    `nix-channel` uses a `nix-env` profile to keep track of previous
-    versions of the subscribed channels. Every time you run `nix-channel
-    --update`, a new channel generation (that is, a symlink to the
-    channel Nix expressions in the Nix store) is created. This enables
-    `nix-channel --rollback` to revert to previous versions.
-
-  - `~/.nix-defexpr/channels`\
-    This is a symlink to
-    `${XDG_STATE_HOME-$HOME/.local/state}/nix/profiles/channels`. It ensures that
-    `nix-env` can find your channels. In a multi-user installation, you
-    may also have `~/.nix-defexpr/channels_root`, which links to the
-    channels of the root user.
-
-# Channel format
-
-A channel URL should point to a directory containing the following
-files:
-
-  - `nixexprs.tar.xz`\
-    A tarball containing Nix expressions and files referenced by them
-    (such as build scripts and patches). At the top level, the tarball
-    should contain a single directory. That directory must contain a
-    file `default.nix` that serves as the channel’s “entry point”.

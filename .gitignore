@@ -51,6 +51,8 @@ perl/Makefile.config
 
 /src/nix/nix
 
+/src/nix/doc
+
 # /src/nix-env/
 /src/nix-env/nix-env
 
@@ -85,6 +87,7 @@ perl/Makefile.config
 /tests/shell.drv
 /tests/config.nix
 /tests/ca/config.nix
+/tests/dyn-drv/config.nix
 /tests/repl-result-out
 
 # /tests/lang/

@@ -338,6 +338,9 @@ const redirects = {
     "strings": "#string",
     "lists": "#list",
     "attribute-sets": "#attribute-set"
+  },
+  "installation/installing-binary.html": {
+    "uninstalling": "uninstall.html"
   }
 };
 

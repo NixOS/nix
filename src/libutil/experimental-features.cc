@@ -12,7 +12,7 @@ struct ExperimentalFeatureDetails
     std::string_view description;
 };
 
-constexpr std::array<ExperimentalFeatureDetails, 12> xpFeatureDetails = {{
+constexpr std::array<ExperimentalFeatureDetails, 14> xpFeatureDetails = {{
     {
         .tag = Xp::CaDerivations,
         .name = "ca-derivations",
@@ -50,6 +50,8 @@ constexpr std::array<ExperimentalFeatureDetails, 12> xpFeatureDetails = {{
             or other impure derivations can rely on impure derivations. Finally,
             an impure derivation cannot also be
             [content-addressed](#xp-feature-ca-derivations).
+
+            This is a more explicit alternative to using [`builtins.currentTime`](@docroot@/language/builtin-constants.md#builtins-currentTime).
         )",
     },
     {
@@ -199,6 +201,26 @@ constexpr std::array<ExperimentalFeatureDetails, 12> xpFeatureDetails = {{
             networking.
         )",
     },
+    {
+        .tag = Xp::DynamicDerivations,
+        .name = "dynamic-derivations",
+        .description = R"(
+            Allow the use of a few things related to dynamic derivations:
+
+              - "text hashing" derivation outputs, so we can build .drv
+                files.
+
+              - dependencies in derivations on the outputs of
+                derivations that are themselves derivations outputs.
+        )",
+    },
+    {
+        .tag = Xp::ParseTomlTimestamps,
+        .name = "parse-toml-timestamps",
+        .description = R"(
+            Allow parsing of timestamps in builtins.fromTOML.
+        )",
+    },
 }};
 
 static_assert(
@@ -233,7 +255,7 @@ std::string_view showExperimentalFeature(const ExperimentalFeature tag)
     return xpFeatureDetails[(size_t)tag].name;
 }
 
-nlohmann::json documentExperimentalFeatures() 
+nlohmann::json documentExperimentalFeatures()
 {
     StringMap res;
     for (auto & xpFeature : xpFeatureDetails)

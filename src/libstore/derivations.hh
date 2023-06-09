@@ -6,6 +6,7 @@
 #include "hash.hh"
 #include "content-address.hh"
 #include "repair-flag.hh"
+#include "derived-path.hh"
 #include "sync.hh"
 #include "comparator.hh"
 
@@ -36,9 +37,11 @@ struct DerivationOutputInputAddressed
 struct DerivationOutputCAFixed
 {
     /**
-     * hash used for expected hash computation
+     * Method and hash used for expected hash computation.
+     *
+     * References are not allowed by fiat.
      */
-    FixedOutputHash hash;
+    ContentAddress ca;
 
     /**
      * Return the \ref StorePath "store path" corresponding to this output
@@ -48,7 +51,7 @@ struct DerivationOutputCAFixed
      */
     StorePath path(const Store & store, std::string_view drvName, std::string_view outputName) const;
 
-    GENERATE_CMP(DerivationOutputCAFixed, me->hash);
+    GENERATE_CMP(DerivationOutputCAFixed, me->ca);
 };
 
 /**
@@ -61,7 +64,7 @@ struct DerivationOutputCAFloating
     /**
      * How the file system objects will be serialized for hashing
      */
-    FileIngestionMethod method;
+    ContentAddressMethod method;
 
     /**
      * How the serialization will be hashed
@@ -88,7 +91,7 @@ struct DerivationOutputImpure
     /**
      * How the file system objects will be serialized for hashing
      */
-    FileIngestionMethod method;
+    ContentAddressMethod method;
 
     /**
      * How the serialization will be hashed
@@ -343,12 +346,14 @@ struct Derivation : BasicDerivation
         Store & store,
         const std::map<std::pair<StorePath, std::string>, StorePath> & inputDrvOutputs) const;
 
-    /* Check that the derivation is valid and does not present any
-       illegal states.
-
-       This is mainly a matter of checking the outputs, where our C++
-       representation supports all sorts of combinations we do not yet
-       allow. */
+    /**
+     * Check that the derivation is valid and does not present any
+     * illegal states.
+     *
+     * This is mainly a matter of checking the outputs, where our C++
+     * representation supports all sorts of combinations we do not yet
+     * allow.
+     */
     void checkInvariants(Store & store, const StorePath & drvPath) const;
 
     Derivation() = default;
@@ -490,17 +495,6 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
  * itself, making the hash near-impossible to calculate.
  */
 std::string hashPlaceholder(const std::string_view outputName);
-
-/**
- * This creates an opaque and almost certainly unique string
- * deterministically from a derivation path and output name.
- *
- * It is used as a placeholder to allow derivations to refer to
- * content-addressed paths whose content --- and thus the path
- * themselves --- isn't yet known. This occurs when a derivation has a
- * dependency which is a CA derivation.
- */
-std::string downstreamPlaceholder(const Store & store, const StorePath & drvPath, std::string_view outputName);
 
 extern const Hash impureOutputHash;
 

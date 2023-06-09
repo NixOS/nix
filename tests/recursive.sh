@@ -1,6 +1,6 @@
 source common.sh
 
-sed -i 's/experimental-features .*/& recursive-nix/' "$NIX_CONF_DIR"/nix.conf
+enableFeatures 'recursive-nix'
 restartDaemon
 
 clearStore

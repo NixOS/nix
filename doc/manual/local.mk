@@ -11,6 +11,7 @@ man-pages := $(foreach n, \
 	nix-prefetch-url.1 nix-channel.1 \
 	nix-hash.1 nix-copy-closure.1 \
 	nix.conf.5 nix-daemon.8 \
+	nix-profiles.5 \
 , $(d)/$(n))
 
 # man pages for subcommands
@@ -82,6 +83,12 @@ $(d)/nix.conf.5: $(d)/src/command-ref/conf-file.md
 	@printf "Title: %s\n\n" "$$(basename $@ .5)" > $^.tmp
 	@cat $^ >> $^.tmp
 	@$(call process-includes,$^,$^.tmp)
+	$(trace-gen) lowdown -sT man --nroff-nolinks -M section=5 $^.tmp -o $@
+	@rm $^.tmp
+
+$(d)/nix-profiles.5: $(d)/src/command-ref/files/profiles.md
+	@printf "Title: %s\n\n" "$$(basename $@ .5)" > $^.tmp
+	@cat $^ >> $^.tmp
 	$(trace-gen) lowdown -sT man --nroff-nolinks -M section=5 $^.tmp -o $@
 	@rm $^.tmp
 

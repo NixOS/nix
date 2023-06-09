@@ -41,6 +41,6 @@ $ nix-env --delete-generations 30d
 ```
 
 ```console
-$ nix-env -p other_profile --delete-generations old
+$ nix-env --profile other_profile --delete-generations old
 ```
 

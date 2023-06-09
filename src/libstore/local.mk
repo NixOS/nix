@@ -57,12 +57,6 @@ $(d)/local-store.cc: $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh
 
 $(d)/build.cc:
 
-%.gen.hh: %
-	@echo 'R"foo(' >> $@.tmp
-	$(trace-gen) cat $< >> $@.tmp
-	@echo ')foo"' >> $@.tmp
-	@mv $@.tmp $@
-
 clean-files += $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh
 
 $(eval $(call install-file-in, $(d)/nix-store.pc, $(libdir)/pkgconfig, 0644))
