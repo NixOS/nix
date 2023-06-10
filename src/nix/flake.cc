@@ -1343,6 +1343,46 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
     }
 };
 
+struct CmdFlakeRoot : FlakeCommand
+{
+    bool asRef = true;
+    CmdFlakeRoot()
+    {
+        addFlag({
+            .longName = "as-ref",
+            .shortName = 'r',
+            .description = "Show the root as a flakeref in URL-like representation.",
+            .handler = {&asRef, false}
+        });
+    }
+
+    std::string description() override
+    {
+        return "get the root directory of a flake";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "flake-root.md"
+          ;
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
+        std::string rootRef = getFlakeRef().to_string();
+        if (asRef) {
+            int slashIndex = rootRef.find('/');
+            while (rootRef[slashIndex + 1] == '/') {
+                slashIndex++;
+            }
+            rootRef = rootRef.substr(slashIndex);
+        }
+        std::cout << rootRef << std::endl;
+    }
+};
+
+
 struct CmdFlake : NixMultiCommand
 {
     CmdFlake()
@@ -1358,6 +1398,7 @@ struct CmdFlake : NixMultiCommand
                 {"archive", []() { return make_ref<CmdFlakeArchive>(); }},
                 {"show", []() { return make_ref<CmdFlakeShow>(); }},
                 {"prefetch", []() { return make_ref<CmdFlakePrefetch>(); }},
+                {"root", []() { return make_ref<CmdFlakeRoot>(); }},
             })
     {
     }
