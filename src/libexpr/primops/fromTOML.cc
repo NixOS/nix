@@ -90,6 +90,10 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value * * args, V
     }
 }
 
-static RegisterPrimOp primop_fromTOML("fromTOML", 1, prim_fromTOML);
+static RegisterPrimOp primop_fromTOML({
+    .name = "fromTOML",
+    .arity = 1,
+    .fun = prim_fromTOML
+});
 
 }
