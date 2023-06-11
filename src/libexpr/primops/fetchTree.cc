@@ -236,6 +236,10 @@ static RegisterPrimOp primop_fetchTree({
           ```nix
           builtins.fetchTree "https://example.com/"
           ```
+
+      > **Note**
+      >
+      > This function requires the [`flakes` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-flakes) to be enabled.
     )",
     .fun = prim_fetchTree,
     .experimentalFeature = Xp::Flakes,
