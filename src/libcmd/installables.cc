@@ -730,9 +730,9 @@ void RawInstallablesCommand::run(ref<Store> store)
         while (std::cin >> word) {
             rawInstallables.emplace_back(std::move(word));
         }
+    } else {
+        applyDefaultInstallables(rawInstallables);
     }
-
-    applyDefaultInstallables(rawInstallables);
     run(store, std::move(rawInstallables));
 }
 
