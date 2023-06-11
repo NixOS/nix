@@ -198,10 +198,49 @@ static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, 
     fetchTree(state, pos, args, v, std::nullopt, FetchTreeParams { .allowNameArgument = false });
 }
 
-// FIXME: document
 static RegisterPrimOp primop_fetchTree({
     .name = "fetchTree",
-    .arity = 1,
+    .args = {"input"},
+    .doc = R"(
+      Fetch a source tree or a plain file using one of the supported backends.
+      *input* can be an attribute set representation of [flake reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references) or a URL.
+      The input should be "locked", that is, it should contain a commit hash or content hash unless impure evaluation (`--impure`) is allowed.
+
+      Here are some examples of how to use `fetchTree`:
+
+      - Fetch a GitHub repository:
+
+          ```nix
+          builtins.fetchTree {
+            type = "github";
+            owner = "NixOS";
+            repo = "nixpkgs";
+            rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
+          }
+          ```
+
+        This evaluates to attribute set:
+
+          ```
+          {
+            lastModified = 1686503798;
+            lastModifiedDate = "20230611171638";
+            narHash = "sha256-rA9RqKP9OlBrgGCPvfd5HVAXDOy8k2SmPtB/ijShNXc=";
+            outPath = "/nix/store/l5m6qlvfs9sdw14ja3qbzpglcjlb6j1x-source";
+            rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
+            shortRev = "ae2e6b3";
+          }
+          ```
+      - Fetch a single file from a URL:
+
+          ```nix
+          builtins.fetchTree "https://example.com/"
+          ```
+
+      > **Note**
+      >
+      > This function requires the [`flakes` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-flakes) to be enabled.
+    )",
     .fun = prim_fetchTree
 });
 
