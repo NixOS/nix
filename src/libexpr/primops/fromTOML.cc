@@ -92,7 +92,21 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value * * args, V
 
 static RegisterPrimOp primop_fromTOML({
     .name = "fromTOML",
-    .arity = 1,
+    .args = {"e"},
+    .doc = R"(
+      Convert a TOML string to a Nix value. For example,
+
+      ```nix
+      builtins.fromTOML ''
+        x=1
+        s="a"
+        [table]
+        y=2
+      ''
+      ```
+
+      returns the value `{ s = "a"; table = { y = 2; }; x = 1; }`.
+    )",
     .fun = prim_fromTOML
 });
 
