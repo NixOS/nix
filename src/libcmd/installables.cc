@@ -701,7 +701,7 @@ RawInstallablesCommand::RawInstallablesCommand()
 {
     addFlag({
         .longName = "stdin",
-        .description = "Read installables from the standard input.",
+        .description = "Read installables from the standard input. No default installable applied.",
         .handler = {&readFromStdIn, true}
     });
 
