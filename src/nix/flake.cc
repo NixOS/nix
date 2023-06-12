@@ -167,6 +167,8 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
         auto lockedFlake = lockFlake();
         auto & flake = lockedFlake.flake;
 
+        RunPager pager;
+
         if (json) {
             nlohmann::json j;
             if (flake.description)
@@ -1128,6 +1130,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
             Activity act(*logger, lvlInfo, actUnknown,
                 fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
 
+            std::optional<RunPager> pager = json ? std::nullopt : std::optional<RunPager>(RunPager());
             try {
                 auto recurse = [&]()
                 {

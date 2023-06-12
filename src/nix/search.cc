@@ -63,6 +63,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
 
     void run(ref<Store> store, ref<InstallableValue> installable) override
     {
+        RunPager pager;
         settings.readOnlyMode = true;
         evalSettings.enableImportFromDerivation.setDefault(false);
 
