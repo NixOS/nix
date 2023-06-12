@@ -10,7 +10,6 @@
 #include <cctype>
 #include <exception>
 #include <iostream>
-
 #include <cstdlib>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -350,55 +349,6 @@ int handleExceptions(const std::string & programName, std::function<void()> fun)
 
     return 0;
 }
-
-
-RunPager::RunPager()
-{
-    if (!isatty(STDOUT_FILENO)) return;
-    char * pager = getenv("NIX_PAGER");
-    if (!pager) pager = getenv("PAGER");
-    if (pager && ((std::string) pager == "" || (std::string) pager == "cat")) return;
-
-    stopProgressBar();
-
-    Pipe toPager;
-    toPager.create();
-
-    pid = startProcess([&]() {
-        if (dup2(toPager.readSide.get(), STDIN_FILENO) == -1)
-            throw SysError("dupping stdin");
-        if (!getenv("LESS"))
-            setenv("LESS", "FRSXMK", 1);
-        restoreProcessContext();
-        if (pager)
-            execl("/bin/sh", "sh", "-c", pager, nullptr);
-        execlp("pager", "pager", nullptr);
-        execlp("less", "less", nullptr);
-        execlp("more", "more", nullptr);
-        throw SysError("executing '%1%'", pager);
-    });
-
-    pid.setKillSignal(SIGINT);
-    stdout = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
-    if (dup2(toPager.writeSide.get(), STDOUT_FILENO) == -1)
-        throw SysError("dupping stdout");
-    setLogFormat(LogFormat::raw);
-}
-
-
-RunPager::~RunPager()
-{
-    try {
-        if (pid != -1) {
-            std::cout.flush();
-            dup2(stdout, STDOUT_FILENO);
-            pid.wait();
-        }
-    } catch (...) {
-        ignoreException();
-    }
-}
-
 
 PrintFreed::~PrintFreed()
 {

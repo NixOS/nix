@@ -6,6 +6,7 @@
 #include "eval-inline.hh"
 #include "flake/flake.hh"
 #include "get-drvs.hh"
+#include "loggers.hh"
 #include "store-api.hh"
 #include "derivations.hh"
 #include "outputs-spec.hh"
@@ -1130,7 +1131,9 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
             Activity act(*logger, lvlInfo, actUnknown,
                 fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
 
-            std::optional<RunPager> pager = json ? std::nullopt : std::optional<RunPager>(RunPager());
+            std::optional<RunPager> pager = json
+                ? std::nullopt
+                : std::make_optional<RunPager>();
             try {
                 auto recurse = [&]()
                 {

@@ -84,21 +84,6 @@ struct LegacyArgs : public MixCommonArgs
  */
 void showManPage(const std::string & name);
 
-/**
- * The constructor of this class starts a pager if stdout is a
- * terminal and $PAGER is set. Stdout is redirected to the pager.
- */
-class RunPager
-{
-public:
-    RunPager();
-    ~RunPager();
-
-private:
-    Pid pid;
-    int stdout;
-};
-
 extern volatile ::sig_atomic_t blockInt;
 
 

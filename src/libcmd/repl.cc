@@ -29,6 +29,7 @@ extern "C" {
 #include "attr-path.hh"
 #include "store-api.hh"
 #include "log-store.hh"
+#include "loggers.hh"
 #include "common-eval-args.hh"
 #include "get-drvs.hh"
 #include "derivations.hh"
