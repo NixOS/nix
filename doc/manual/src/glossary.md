@@ -85,12 +85,18 @@
 
     [store path]: #gloss-store-path
 
+  - [file system object]{#gloss-store-object}\
+    The Nix data model for representing file system data.
+
+    See [File System Object](@docroot@/architecture/file-system-object.md) for details.
+
+    [file system object]: #gloss-file-system-object
+
   - [store object]{#gloss-store-object}\
-    A file that is an immediate child of the Nix store directory. These
-    can be regular files, but also entire directory trees. Store objects
-    can be sources (objects copied from outside of the store),
-    derivation outputs (objects produced by running a build task), or
-    derivations (files describing a build task).
+
+    A store object is a [file system object] with [reference]s to other store objects.
+
+    Store objects can be sources (copied from outside of the store), derivation outputs (produced by running a build task), or [derivation]s (files describing a build task).
 
     [store object]: #gloss-store-object
 
