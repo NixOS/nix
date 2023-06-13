@@ -69,8 +69,7 @@ void createSymlink(const Path & target, const Path & link)
         throw SysError("creating symlink from '%1%' to '%2%'", link, target);
 }
 
-void replaceSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime)
+void replaceSymlink(const Path & target, const Path & link)
 {
     for (unsigned int n = 0; true; n++) {
         Path tmp = canonPath(fmt("%s/.%d_%s", dirOf(link), n, baseNameOf(link)));
