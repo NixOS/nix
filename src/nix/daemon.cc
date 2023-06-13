@@ -184,12 +184,9 @@ static bool matchUser(const std::string & user, const std::string & group, const
 
 struct PeerInfo
 {
-    bool pidKnown;
-    pid_t pid;
-    bool uidKnown;
-    uid_t uid;
-    bool gidKnown;
-    gid_t gid;
+    std::optional<pid_t> pid;
+    std::optional<uid_t> uid;
+    std::optional<gid_t> gid;
 };
 
 
@@ -198,7 +195,7 @@ struct PeerInfo
  */
 static PeerInfo getPeerInfo(int remote)
 {
-    PeerInfo peer = { false, 0, false, 0, false, 0 };
+    PeerInfo peer;
 
 #if defined(SO_PEERCRED)
 
@@ -206,7 +203,7 @@ static PeerInfo getPeerInfo(int remote)
     socklen_t credLen = sizeof(cred);
     if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == -1)
         throw SysError("getting peer credentials");
-    peer = { true, cred.pid, true, cred.uid, true, cred.gid };
+    peer = { .pid = cred.pid, .uid = cred.uid, .gid = cred.gid };
 
 #elif defined(LOCAL_PEERCRED)
 
@@ -255,11 +252,11 @@ static std::pair<TrustedFlag, std::string> authPeer(const PeerInfo & peer)
 {
     TrustedFlag trusted = NotTrusted;
 
-    struct passwd * pw = peer.uidKnown ? getpwuid(peer.uid) : 0;
-    std::string user = pw ? pw->pw_name : std::to_string(peer.uid);
+    struct passwd * pw = peer.uid ? getpwuid(peer.uid.value()) : 0;
+    std::string user = pw ? pw->pw_name : std::to_string(peer.uid.value());
 
-    struct group * gr = peer.gidKnown ? getgrgid(peer.gid) : 0;
-    std::string group = gr ? gr->gr_name : std::to_string(peer.gid);
+    struct group * gr = peer.gid ? getgrgid(peer.gid.value()) : 0;
+    std::string group = gr ? gr->gr_name : std::to_string(peer.gid.value());
 
     const Strings & trustedUsers = authorizationSettings.trustedUsers;
     const Strings & allowedUsers = authorizationSettings.allowedUsers;
@@ -325,7 +322,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
 
             closeOnExec(remote.get());
 
-            PeerInfo peer { .pidKnown = false };
+            PeerInfo peer;
             TrustedFlag trusted;
             std::string user;
 
@@ -339,8 +336,8 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
             };
 
             printInfo((std::string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""),
-                peer.pidKnown ? std::to_string(peer.pid) : "<unknown>",
-                peer.uidKnown ? user : "<unknown>");
+                peer.pid ? std::to_string(peer.pid.value()) : "<unknown>",
+                peer.uid ? user : "<unknown>");
 
             //  Fork a child to handle the connection.
             ProcessOptions options;
@@ -359,8 +356,8 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
                 setSigChldAction(false);
 
                 //  For debugging, stuff the pid into argv[1].
-                if (peer.pidKnown && savedArgv[1]) {
-                    auto processName = std::to_string(peer.pid);
+                if (peer.pid && savedArgv[1]) {
+                    auto processName = std::to_string(peer.pid.value());
                     strncpy(savedArgv[1], processName.c_str(), strlen(savedArgv[1]));
                 }
 
