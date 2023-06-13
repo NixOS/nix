@@ -181,7 +181,6 @@ static bool matchUser(std::optional<uid_t> uid, std::optional<gid_t> gid, const 
 
         if (gid) {
             auto gr = getgrgid(gid.value());
-            //std::string group = gr ? gr->gr_name : std::to_string(peer.gid.value());
 
             /* Don't allow connecting as the build users group. */
             if (gr && gr->gr_name == settings.buildUsersGroup)
