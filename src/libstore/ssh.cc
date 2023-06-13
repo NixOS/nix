@@ -42,7 +42,10 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
 }
 
 bool SSHMaster::isMasterRunning() {
-    auto res = runProgram(RunOptions {.program = "ssh", .args = {"-O", "check", host}, .mergeStderrToStdout = true});
+    Strings args = {"-O", "check", host};
+    addCommonSSHOpts(args);
+
+    auto res = runProgram(RunOptions {.program = "ssh", .args = args, .mergeStderrToStdout = true});
     return res.first == 0;
 }
 
