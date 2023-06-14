@@ -700,8 +700,8 @@ EOF
 }
 
 welcome_to_nix() {
-    local -r NIX_UID_RANGES="${NIX_FIRST_BUILD_UID} ~ $((NIX_FIRST_BUILD_UID + NIX_USER_COUNT - 1))"
-    local -r RANGE_TEXT=$(echo -ne "${BLUE}(uid ${NIX_UID_RANGES})${ESC}")
+    local -r NIX_UID_RANGES="${NIX_FIRST_BUILD_UID}..$((NIX_FIRST_BUILD_UID + NIX_USER_COUNT - 1))"
+    local -r RANGE_TEXT=$(echo -ne "${BLUE}(uid [${NIX_UID_RANGES}])${ESC}")
     local -r GROUP_TEXT=$(echo -ne "${BLUE}(gid ${NIX_BUILD_GROUP_ID})${ESC}")
 
     ok "Welcome to the Multi-User Nix Installation"
