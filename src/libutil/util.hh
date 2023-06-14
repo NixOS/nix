@@ -256,14 +256,12 @@ inline Paths createDirs(PathView path)
 /**
  * Create a symlink.
  */
-void createSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime = {});
+void createSymlink(const Path & target, const Path & link);
 
 /**
  * Atomically create or replace a symlink.
  */
-void replaceSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime = {});
+void replaceSymlink(const Path & target, const Path & link);
 
 void renameFile(const Path & src, const Path & dst);
 
