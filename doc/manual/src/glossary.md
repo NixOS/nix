@@ -94,7 +94,7 @@
 
   - [store object]{#gloss-store-object}\
 
-    A store object is a [file system object] with [reference]s to other store objects.
+    A store object consists of a [file system object], [reference]s to other store objects, and other metadata.
 
     Store objects can be sources (copied from outside of the store), derivation outputs (produced by running a build task), or [derivation]s (files describing a build task).
 
