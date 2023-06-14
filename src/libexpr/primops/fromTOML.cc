@@ -3,6 +3,8 @@
 
 #include "../../toml11/toml.hpp"
 
+#include <sstream>
+
 namespace nix {
 
 static void prim_fromTOML(EvalState & state, const PosIdx pos, Value * * args, Value & val)
@@ -58,8 +60,18 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value * * args, V
             case toml::value_t::offset_datetime:
             case toml::value_t::local_date:
             case toml::value_t::local_time:
-                // We fail since Nix doesn't have date and time types
-                throw std::runtime_error("Dates and times are not supported");
+                {
+                    if (experimentalFeatureSettings.isEnabled(Xp::ParseTomlTimestamps)) {
+                        auto attrs = state.buildBindings(2);
+                        attrs.alloc("_type").mkString("timestamp");
+                        std::ostringstream s;
+                        s << t;
+                        attrs.alloc("value").mkString(s.str());
+                        v.mkAttrs(attrs);
+                    } else {
+                        throw std::runtime_error("Dates and times are not supported");
+                    }
+                }
                 break;;
             case toml::value_t::empty:
                 v.mkNull();
