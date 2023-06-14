@@ -17,7 +17,6 @@ Every file system object is one of the following:
    A file system path that may point anywhere
 
 File systems objects and their children form a tree.
-
 A bare file or symlink can be a root file system object.
 
 ## Examples of file system objects
