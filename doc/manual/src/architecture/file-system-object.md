@@ -5,8 +5,8 @@ Every file system object is one of the following:
 
  - File
 
-   - Arbitrary data for contents
-   - An [executable](https://en.m.wikipedia.org/wiki/File-system_permissions#Permissions) flag
+   - A possibly empty sequence of bytes for contents
+   - A single boolean representing the [executable](https://en.m.wikipedia.org/wiki/File-system_permissions#Permissions) permission
 
  - Directory
 
