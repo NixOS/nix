@@ -8,6 +8,7 @@ rm -f $TEST_HOME/.nix-channels $TEST_HOME/.nix-profile
 nix-channel --add http://foo/bar xyzzy
 nix-channel --list | grepQuiet http://foo/bar
 nix-channel --remove xyzzy
+[[ $(nix-channel --list-generations | wc -l) == 1 ]]
 
 [ -e $TEST_HOME/.nix-channels ]
 [ "$(cat $TEST_HOME/.nix-channels)" = '' ]
@@ -38,6 +39,7 @@ ln -s dependencies.nix $TEST_ROOT/nixexprs/default.nix
 # Test the update action.
 nix-channel --add file://$TEST_ROOT/foo
 nix-channel --update
+[[ $(nix-channel --list-generations | wc -l) == 2 ]]
 
 # Do a query.
 nix-env -qa \* --meta --xml --out-path > $TEST_ROOT/meta.xml
