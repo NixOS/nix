@@ -21,11 +21,15 @@ A bare file or symlink can be a root file system object.
 
 ## Examples of file system objects
 
-
 A plain file:
 
 ```
-. hello-2.10.tar.gz
+. "Hello World", executable: false
+```
+
+An executable file:
+```
+. "#!/bin/bash\necho Hello World", executable: true
 ```
 
 A directory with contents:
@@ -33,13 +37,13 @@ A directory with contents:
 ```
 .
 ├── bin
-│   └── hello
+│   └── hello, executable: true
 └── share
     ├── info
-    │   └── hello.info
+    │   └── hello.info, executable: false
     └── man
         └── man1
-            └── hello.1.gz
+            └── hello.1.gz, executable: false
 ```
 
 A directory with relative symlink and other contents:
