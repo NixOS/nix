@@ -2,6 +2,8 @@ source common.sh
 
 enableFeatures "read-only-local-store"
 
+needLocalStore "cannot open store read-only when daemon has already opened it writeable"
+
 clearStore
 
 happy () {
