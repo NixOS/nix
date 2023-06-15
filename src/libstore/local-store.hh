@@ -50,7 +50,7 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
         false,
         "read-only",
         R"(
-          Allow this store to be opened when its database is on a read-only filesystem.
+          Allow this store to be opened when its [database](@docroot@/glossary.md#gloss-nix-database) is on a read-only filesystem.
 
           Normally Nix will attempt to open the store database in read-write mode, even
           for querying (when write access is not needed). This causes it to fail if the
