@@ -75,7 +75,7 @@ RewritingSink::RewritingSink(const std::string & from, const std::string & to, S
 RewritingSink::RewritingSink(const StringMap & rewrites, Sink & nextSink)
     : rewrites(rewrites), nextSink(nextSink)
 {
-    long unsigned int maxRewriteSize = 0;
+    std::string::size_type maxRewriteSize = 0;
     for (auto & [from, to] : rewrites) {
         assert(from.size() == to.size());
         maxRewriteSize = std::max(maxRewriteSize, from.size());
