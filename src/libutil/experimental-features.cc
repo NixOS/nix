@@ -227,14 +227,13 @@ constexpr std::array<ExperimentalFeatureDetails, 15> xpFeatureDetails = {{
         .description = R"(
             Allow the use of the `read-only` parameter in local store URIs.
 
-            Set this parameter to `true` to allow stores with databases on read-only
-            filesystems to be opened for querying; ordinarily Nix will refuse to do this.
+            Set this parameter to `true` to allow stores with databases on read-only filesystems to be opened for querying; ordinarily Nix will refuse to do this.
 
-            Enabling this setting disables the locking required for safe concurrent
-            access, so you should be certain that the database will not be changed.
-            While the filesystem the database resides on might be read-only to this
-            process, consider whether another user, process, or system, might have
-            write access to it.
+            This is because SQLite requires write access to the database file to perform the file locking operations necessary for safe concurrent access.
+            When `read-only` is set to `true`, the database will be opened in immutable mode.
+
+            Under this mode, SQLite will not do any locking at all, so you should be certain that the database will not be changed.
+            While the filesystem the database resides on might be read-only to this process, consider whether another user, process, or system, might have write access to it.
         )",
     },
 }};

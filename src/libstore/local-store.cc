@@ -363,7 +363,7 @@ LocalStore::LocalStore(const Params & params)
         if (!readOnly) {
             migrateCASchema(state->db, dbDir + "/ca-schema", globalLock);
         } else {
-            throw Error("need to migrate to CA schema, but this cannot be done in read-only mode");
+            throw Error("need to migrate to content-addressed schema, but this cannot be done in read-only mode");
         }
     }
 
@@ -502,7 +502,7 @@ int LocalStore::getSchema()
 void LocalStore::openDB(State & state, bool create)
 {
     if (create && readOnly) {
-        throw Error("unable to create database while in read-only mode");
+        throw Error("cannot create database while in read-only mode");
     }
 
     if (access(dbDir.c_str(), R_OK | (readOnly ? 0 : W_OK)))
