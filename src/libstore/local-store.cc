@@ -363,7 +363,7 @@ LocalStore::LocalStore(const Params & params)
         if (!readOnly) {
             migrateCASchema(state->db, dbDir + "/ca-schema", globalLock);
         } else {
-            throw Error("need to migrate to CA schema, but this cannot be done in read-only mode");
+            throw Error("need to migrate to content-addressed schema, but this cannot be done in read-only mode");
         }
     }
 
