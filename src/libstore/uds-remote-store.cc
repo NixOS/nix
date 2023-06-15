@@ -13,6 +13,14 @@
 
 namespace nix {
 
+std::string UDSRemoteStoreConfig::doc()
+{
+    return
+        #include "uds-remote-store.md"
+        ;
+}
+
+
 UDSRemoteStore::UDSRemoteStore(const Params & params)
     : StoreConfig(params)
     , LocalFSStoreConfig(params)

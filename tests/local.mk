@@ -16,6 +16,7 @@ nix_tests = \
   flakes/flake-in-submodule.sh \
   ca/gc.sh \
   gc.sh \
+  nix-collect-garbage-d.sh \
   remote-store.sh \
   legacy-ssh-store.sh \
   lang.sh \

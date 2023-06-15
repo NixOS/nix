@@ -112,9 +112,10 @@
     from some server.
 
   - [substituter]{#gloss-substituter}\
-    A *substituter* is an additional store from which Nix will
-    copy store objects it doesn't have.  For details, see the
-    [`substituters` option](./command-ref/conf-file.md#conf-substituters).
+    An additional [store]{#gloss-store} from which Nix can obtain store objects instead of building them.
+    Often the substituter is a [binary cache](#gloss-binary-cache), but any store can serve as substituter.
+
+    See the [`substituters` configuration option](./command-ref/conf-file.md#conf-substituters) for details.
 
     [substituter]: #gloss-substituter
 

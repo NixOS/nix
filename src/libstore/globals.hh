@@ -691,20 +691,19 @@ public:
         Strings{"https://cache.nixos.org/"},
         "substituters",
         R"(
-          A list of [URLs of Nix stores](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
-          to be used as substituters, separated by whitespace.
-          Substituters are tried based on their Priority value, which each substituter can set
-          independently. Lower value means higher priority.
-          The default is `https://cache.nixos.org`, with a Priority of 40.
+          A list of [URLs of Nix stores](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format) to be used as substituters, separated by whitespace.
+          A substituter is an additional [store]{@docroot@/glossary.md##gloss-store} from which Nix can obtain [store objects](@docroot@/glossary.md#gloss-store-object) instead of building them.
 
-          At least one of the following conditions must be met for Nix to use
-          a substituter:
+          Substituters are tried based on their priority value, which each substituter can set independently.
+          Lower value means higher priority.
+          The default is `https://cache.nixos.org`, which has a priority of 40.
+
+          At least one of the following conditions must be met for Nix to use a substituter:
 
           - the substituter is in the [`trusted-substituters`](#conf-trusted-substituters) list
           - the user calling Nix is in the [`trusted-users`](#conf-trusted-users) list
 
-          In addition, each store path should be trusted as described
-          in [`trusted-public-keys`](#conf-trusted-public-keys)
+          In addition, each store path should be trusted as described in [`trusted-public-keys`](#conf-trusted-public-keys)
         )",
         {"binary-caches"}};
 
@@ -896,12 +895,11 @@ public:
         this, {}, "hashed-mirrors",
         R"(
           A list of web servers used by `builtins.fetchurl` to obtain files by
-          hash. The default is `http://tarballs.nixos.org/`. Given a hash type
-          *ht* and a base-16 hash *h*, Nix will try to download the file from
-          *hashed-mirror*/*ht*/*h*. This allows files to be downloaded even if
-          they have disappeared from their original URI. For example, given
-          the default mirror `http://tarballs.nixos.org/`, when building the
-          derivation
+          hash. Given a hash type *ht* and a base-16 hash *h*, Nix will try to
+          download the file from *hashed-mirror*/*ht*/*h*. This allows files to
+          be downloaded even if they have disappeared from their original URI.
+          For example, given an example mirror `http://tarballs.nixos.org/`,
+          when building the derivation
 
           ```nix
           builtins.fetchurl {

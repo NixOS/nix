@@ -6,7 +6,7 @@
 #include "globals.hh"
 #include "json-to-value.hh"
 #include "names.hh"
-#include "references.hh"
+#include "path-references.hh"
 #include "store-api.hh"
 #include "util.hh"
 #include "value-to-json.hh"
@@ -4056,18 +4056,6 @@ static RegisterPrimOp primop_splitVersion({
 
 
 RegisterPrimOp::PrimOps * RegisterPrimOp::primOps;
-
-
-RegisterPrimOp::RegisterPrimOp(std::string name, size_t arity, PrimOpFun fun)
-{
-    if (!primOps) primOps = new PrimOps;
-    primOps->push_back({
-        .name = name,
-        .args = {},
-        .arity = arity,
-        .fun = fun,
-    });
-}
 
 
 RegisterPrimOp::RegisterPrimOp(Info && info)
