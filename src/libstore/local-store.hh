@@ -285,6 +285,10 @@ public:
 
 private:
 
+    /**
+     * Retrieve the current version of the database schema.
+     * If the database does not exist yet, the version returned will be 0.
+     */
     int getSchema();
 
     void openDB(State & state, bool create);
