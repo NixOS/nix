@@ -81,7 +81,7 @@ struct AuthorizationSettings : Config {
 
           > **Note**
           >
-          > Trusted users are always allowed to connect to the Nix daemon.
+          > Trusted users (set in [`trusted-users`](#conf-trusted-users)) can always to connect to the Nix daemon.
         )"};
 };
 
