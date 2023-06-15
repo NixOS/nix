@@ -2,6 +2,7 @@ source common.sh
 
 enableFeatures "daemon-trust-override"
 
+requireSandboxSupport
 restartDaemon
 
 [[ $busybox =~ busybox ]] || skipTest "no busybox"
