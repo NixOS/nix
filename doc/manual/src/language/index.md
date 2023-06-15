@@ -1,10 +1,11 @@
 # Nix Language
 
-The Nix language is
+The Nix language is designed for conveniently creating and composing *derivations* – precise descriptions of how contents of existing files are used to derive new files.
+It is:
 
 - *domain-specific*
 
-  Its purpose is to conveniently create and compose precise descriptions of how contents of existing files are used to derive new files.
+  It comes with [built-in functions](@docroot@/language/builtins.md) to integrate with the Nix store, which manages files and performs the derivations declared in the Nix language.
 
 - *declarative*
 
