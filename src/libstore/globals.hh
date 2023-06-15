@@ -713,7 +713,7 @@ public:
           A list of [URLs of Nix stores](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format), separated by whitespace.
           These are not used by default, but can be enabled by users of the Nix daemon by specifying [`substituters`](#conf-substituters).
 
-          Unprivileged users are only allowed to pass as `substituters` only those URLs listed in `trusted-substituters`.
+          Unprivileged users are allowed to pass as `substituters` only those URLs listed in `trusted-substituters`.
         )",
         {"trusted-binary-caches"}};
 
