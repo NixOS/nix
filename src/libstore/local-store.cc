@@ -496,7 +496,7 @@ int LocalStore::getSchema()
 void LocalStore::openDB(State & state, bool create)
 {
     if (create && readOnly) {
-        throw Error("unable to create database while in read-only mode");
+        throw Error("cannot create database while in read-only mode");
     }
 
     if (access(dbDir.c_str(), R_OK | (readOnly ? 0 : W_OK)))
