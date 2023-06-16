@@ -17,8 +17,10 @@ Every file system object is one of the following:
    An arbitrary string.
    Nix does not assign any semantics to symbolic links.
 
-File systems objects and their children form a tree.
+File system objects and their children form a tree.
 A bare file or symlink can be a root file system object.
+
+Nix does not encode any other file system notions such as [hard links](https://en.m.wikipedia.org/wiki/Hard_link), [permissions](https://en.m.wikipedia.org/wiki/File-system_permissions), timestamps, or other metadata.
 
 ## Examples of file system objects
 
