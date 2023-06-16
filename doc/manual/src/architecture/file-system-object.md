@@ -25,40 +25,38 @@ A bare file or symlink can be a root file system object.
 A plain file:
 
 ```
-. "Hello World", executable: false
+50 B, executable: false
 ```
 
 An executable file:
+
 ```
-. "#!/bin/bash\necho Hello World", executable: true
+122 KB, executable: true
+```
+
+A symlink:
+
+```
+-> /usr/bin/sh
 ```
 
 A directory with contents:
 
 ```
-.
 ├── bin
-│   └── hello, executable: true
+│   └── hello: 35 KB, executable: true
 └── share
     ├── info
-    │   └── hello.info, executable: false
+    │   └── hello.info: 36 KB, executable: false
     └── man
         └── man1
-            └── hello.1.gz, executable: false
+            └── hello.1.gz: 790 B, executable: false
 ```
 
-A directory with relative symlink and other contents:
+A directory that contains a symlink and other directories:
 
 ```
-.
 ├── bin -> share/go/bin
 ├── nix-support/
 └── share/
-```
-
-A directory with absolute symlink:
-
-```
-.
-└── nix_node -> /nix/store/f20...-nodejs-10.24.
 ```
