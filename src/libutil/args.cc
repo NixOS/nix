@@ -1,9 +1,8 @@
 #include "args.hh"
 #include "hash.hh"
+#include "json-utils.hh"
 
 #include <glob.h>
-
-#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -247,11 +246,7 @@ nlohmann::json Args::toJSON()
             j["arity"] = flag->handler.arity;
         if (!flag->labels.empty())
             j["labels"] = flag->labels;
-        // TODO With C++23 use `std::optional::tranform`
-        if (auto & xp = flag->experimentalFeature)
-            j["experimental-feature"] = showExperimentalFeature(*xp);
-        else
-            j["experimental-feature"] = nullptr;
+        j["experimental-feature"] = flag->experimentalFeature;
         flags[name] = std::move(j);
     }
 
@@ -416,11 +411,7 @@ nlohmann::json MultiCommand::toJSON()
         cat["id"] = command->category();
         cat["description"] = trim(categories[command->category()]);
         j["category"] = std::move(cat);
-        // TODO With C++23 use `std::optional::tranform`
-        if (auto xp = command->experimentalFeature())
-            cat["experimental-feature"] = showExperimentalFeature(*xp);
-        else
-            cat["experimental-feature"] = nullptr;
+        cat["experimental-feature"] = command->experimentalFeature();
         cmds[name] = std::move(j);
     }
 
