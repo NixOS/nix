@@ -76,7 +76,8 @@ struct AuthorizationSettings : Config {
           A list user names, separated by whitespace.
           These users are allowed to connect to the Nix daemon.
 
-          As with the [`trusted-users`](#conf-trusted-users) option, you can specify groups by prefixing names with `@`.
+          You can specify groups by prefixing names with `@`.
+          For instance, `@wheel` means all users in the `wheel` group.
           Also, you can allow all users by specifying `*`.
 
           > **Note**
