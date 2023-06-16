@@ -12,7 +12,7 @@ jobs:
     needs: [check_secrets]
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-13]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -77,7 +77,7 @@ jobs:
     if: github.event_name == 'push' && needs.check_secrets.outputs.cachix == 'true'
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-13]
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v3
@@ -89,7 +89,7 @@ jobs:
     - run: sudo apt install fish zsh
       if: matrix.os == 'ubuntu-latest'
     - run: brew install fish
-      if: matrix.os == 'macos-latest'
+      if: matrix.os == 'macos-13'
     - run: exec bash -c "nix-instantiate -E 'builtins.currentTime' --eval"
     - run: exec sh -c "nix-instantiate -E 'builtins.currentTime' --eval"
     - run: exec zsh -c "nix-instantiate -E 'builtins.currentTime' --eval"
