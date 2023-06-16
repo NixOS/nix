@@ -1,15 +1,17 @@
-# Serving Tarball Flakes
+# Lockable HTTP Tarball Protocol
 
-Tarball flakes are served as regular tarballs via HTTP or the file
-system (for `file://` URLs).
+Tarball flakes can be served as regular tarballs via HTTP or the file
+system (for `file://` URLs). Unless the server implements the Lockable
+HTTP Tarball protocol, it is the responsibility of the user to make sure that
+the URL always produces the same tarball contents.
 
-An HTTP server can return an "immutable" flakeref appropriate for lock
+An HTTP server can return an "immutable" HTTP URL appropriate for lock
 files. This allows users to specify a tarball flake input in
 `flake.nix` that requests the latest version of a flake
 (e.g. `https://example.org/hello/latest.tar.gz`), while `flake.lock`
 will record a URL whose contents will not change
 (e.g. `https://example.org/hello/<revision>.tar.gz`). To do so, the
-server must return a `Link` header with the `rel` attribute set to
+server must return an [HTTP `Link` header](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Link) with the `rel` attribute set to
 `immutable`, as follows:
 
 ```
