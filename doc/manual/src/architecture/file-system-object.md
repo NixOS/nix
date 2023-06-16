@@ -14,7 +14,8 @@ Every file system object is one of the following:
 
  - [Symbolic link](https://en.m.wikipedia.org/wiki/Symbolic_link)
 
-   A file system path that may point anywhere
+   An arbitrary string.
+   Nix does not assign any semantics to symbolic links.
 
 File systems objects and their children form a tree.
 A bare file or symlink can be a root file system object.
