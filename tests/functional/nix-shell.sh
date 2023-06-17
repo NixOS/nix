@@ -84,6 +84,11 @@ chmod a+rx $TEST_ROOT/spaced\ \\\'\"shell.shebang.rb
 output=$($TEST_ROOT/spaced\ \\\'\"shell.shebang.rb abc ruby)
 [ "$output" = '-e load(ARGV.shift) -- '"$TEST_ROOT"'/spaced \'\''"shell.shebang.rb abc ruby' ]
 
+# Test nix-shell shebang quoting
+sed -e "s|@ENV_PROG@|$(type -P env)|" shell.shebang.nix > $TEST_ROOT/shell.shebang.nix
+chmod a+rx $TEST_ROOT/shell.shebang.nix
+$TEST_ROOT/shell.shebang.nix
+
 # Test 'nix develop'.
 nix develop -f "$shellDotNix" shellDrv -c bash -c '[[ -n $stdenv ]]'
 
