@@ -6,28 +6,25 @@
 
 By default Nix reads settings from the following places:
 
-  - The system-wide configuration file `sysconfdir/nix/nix.conf` (i.e.
-    `/etc/nix/nix.conf` on most systems), or `$NIX_CONF_DIR/nix.conf` if
-    `NIX_CONF_DIR` is set. Values loaded in this file are not forwarded
-    to the Nix daemon. The client assumes that the daemon has already
-    loaded them.
+  - The system-wide configuration file `sysconfdir/nix/nix.conf` (i.e. `/etc/nix/nix.conf` on most systems), or `$NIX_CONF_DIR/nix.conf` if [`NIX_CONF_DIR`](./env-common.md#env-NIX_CONF_DIR) is set.
 
-  - If `NIX_USER_CONF_FILES` is set, then each path separated by `:`
-    will be loaded in reverse order.
+    Values loaded in this file are not forwarded to the Nix daemon.
+    The client assumes that the daemon has already loaded them.
 
-    Otherwise it will look for `nix/nix.conf` files in `XDG_CONFIG_DIRS`
-    and `XDG_CONFIG_HOME`. If unset, `XDG_CONFIG_DIRS` defaults to
-    `/etc/xdg`, and `XDG_CONFIG_HOME` defaults to `$HOME/.config`
-    as per [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html).
+  - If [`NIX_USER_CONF_FILES`](./env-common.md#env-NIX_USER_CONF_FILES) is set, then each path separated by `:` will be loaded in reverse order.
 
-  - If `NIX_CONFIG` is set, its contents is treated as the contents of
-    a configuration file.
+    Otherwise it will look for `nix/nix.conf` files in `XDG_CONFIG_DIRS` and [`XDG_CONFIG_HOME`](./env-common.md#env-XDG_CONFIG_HOME).
+    If unset, `XDG_CONFIG_DIRS` defaults to `/etc/xdg`, and `XDG_CONFIG_HOME` defaults to `$HOME/.config` as per [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html).
+
+  - If [`NIX_CONFIG`](./env-common.md#env-NIX_CONFIG) is set, its contents are treated as the contents of a configuration file.
 
 The configuration files consist of `name = value` pairs, one per
 line. Other files can be included with a line like `include path`,
 where *path* is interpreted relative to the current conf file and a
 missing file is an error unless `!include` is used instead. Comments
-start with a `#` character. Here is an example configuration file:
+start with a `#` character.
+
+Here is an example configuration file:
 
     keep-outputs = true       # Nice for developers
     keep-derivations = true   # Idem
