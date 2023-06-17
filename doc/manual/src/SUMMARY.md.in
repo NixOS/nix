@@ -99,6 +99,8 @@
     - [Default Nix expression](command-ref/files/default-nix-expression.md)
 - [Architecture and Design](architecture/architecture.md)
   - [File System Object](architecture/file-system-object.md)
+- [Protocols](protocols/protocols.md)
+  - [Serving Tarball Flakes](protocols/tarball-fetcher.md)
 - [Glossary](glossary.md)
 - [Contributing](contributing/contributing.md)
   - [Hacking](contributing/hacking.md)
