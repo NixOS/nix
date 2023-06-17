@@ -4,6 +4,10 @@
 
 # Description
 
+Nix supports a variety of configuration settings, which are read from configuration files or taken as command line flags.
+
+## Configuration file
+
 By default Nix reads settings from the following places:
 
   - The system-wide configuration file `sysconfdir/nix/nix.conf` (i.e. `/etc/nix/nix.conf` on most systems), or `$NIX_CONF_DIR/nix.conf` if [`NIX_CONF_DIR`](./env-common.md#env-NIX_CONF_DIR) is set.
@@ -18,32 +22,39 @@ By default Nix reads settings from the following places:
 
   - If [`NIX_CONFIG`](./env-common.md#env-NIX_CONFIG) is set, its contents are treated as the contents of a configuration file.
 
-The configuration files consist of `name = value` pairs, one per
-line. Other files can be included with a line like `include path`,
-where *path* is interpreted relative to the current conf file and a
-missing file is an error unless `!include` is used instead. Comments
-start with a `#` character.
+### File format
 
-Here is an example configuration file:
+Configuration files consist of `name = value` pairs, one per line.
+Comments start with a `#` character.
 
-    keep-outputs = true       # Nice for developers
-    keep-derivations = true   # Idem
+Example:
 
-You can override settings on the command line using the `--option`
-flag, e.g. `--option keep-outputs false`. Every configuration setting
-also has a corresponding command line flag, e.g. `--max-jobs 16`; for
-Boolean settings, there are two flags to enable or disable the setting
-(e.g. `--keep-failed` and `--no-keep-failed`).
+```
+keep-outputs = true       # Nice for developers
+keep-derivations = true   # Idem
+```
 
-A configuration setting usually overrides any previous value. However,
-you can prefix the name of the setting by `extra-` to *append* to the
-previous value. For instance,
+Other files can be included with a line like `include <path>`, where `<path>` is interpreted relative to the current configuration file.
+A missing file is an error unless `!include` is used instead.
 
-    substituters = a b
-    extra-substituters = c d
+A configuration setting usually overrides any previous value.
+However, you can prefix the name of the setting by `extra-` to *append* to the previous value.
 
-defines the `substituters` setting to be `a b c d`. This is also
-available as a command line flag (e.g. `--extra-substituters`).
+For instance,
 
-The following settings are currently available:
+```
+substituters = a b
+extra-substituters = c d
+```
+
+defines the `substituters` setting to be `a b c d`.
+
+## Command line flags
+
+Every configuration setting has a corresponding command line flag (e.g. `--max-jobs 16`).
+Boolean settings do not need an argument, and can be explicitly disabled with the `no-` prefix (e.g. `--keep-failed` and `--no-keep-failed`).
+
+Existing settings can be appended to using the `extra-` prefix (e.g. `--extra-substituters`).
+
+# Available settings
 
