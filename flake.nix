@@ -711,6 +711,7 @@
                 PATH=$prefix/bin:$PATH
                 unset PYTHONPATH
                 export MANPATH=$out/share/man:$MANPATH
+                export RAPIDCHECK_HEADERS=${lib.getDev pkgs.rapidcheck}/extras/gtest/include
 
                 # Make bash completion work.
                 XDG_DATA_DIRS+=:$out/share
