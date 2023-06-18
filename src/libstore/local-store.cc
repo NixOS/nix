@@ -354,8 +354,29 @@ LocalStore::LocalStore(const Params & params)
         "update ValidPaths set narSize = ?, hash = ?, ultimate = ?, sigs = ?, ca = ? where path = ?;");
     state->stmts->AddReference.create(state->db,
         "insert or replace into Refs (referrer, reference) values (?, ?);");
+    /* about the deriver column: attempt to return
+     * - the deriver store in db if it is valid,
+     * - any valid deriver if available,
+     * - otherwise fallback on the stored deriver
+     */
     state->stmts->QueryPathInfo.create(state->db,
-        "select id, hash, registrationTime, deriver, narSize, ultimate, sigs, ca from ValidPaths where path = ?;");
+        R"(
+            select id, hash, registrationTime,
+                coalesce(
+                    (select ValidDrvs.path
+                        from ValidPaths as ValidDrvs
+                        where ValidDrvs.path = ValidPaths.deriver
+                    ),
+                    (select ValidDrvs.path
+                        from DerivationOutputs join ValidPaths as ValidDrvs on DerivationOutputs.drv = ValidDrvs.id
+                        where DerivationOutputs.path = ValidPaths.path
+                        order by ValidDrvs.id
+                    ),
+                    deriver
+                ),
+                narSize, ultimate, sigs, ca
+                from ValidPaths where path = ?
+        )");
     state->stmts->QueryReferences.create(state->db,
         "select path from Refs join ValidPaths on reference = id where referrer = ?;");
     state->stmts->QueryReferrers.create(state->db,

@@ -17,13 +17,13 @@ rec {
   foo."bar.runtimeGraph" = mkDerivation {
     name = "dependencies";
     builder = builtins.toFile "build-graph-builder" "${printRefs}";
-    exportReferencesGraph = ["refs" (import ./dependencies.nix)];
+    exportReferencesGraph = ["refs" (import ./dependencies.nix {})];
   };
 
   foo."bar.buildGraph" = mkDerivation {
     name = "dependencies";
     builder = builtins.toFile "build-graph-builder" "${printRefs}";
-    exportReferencesGraph = ["refs" (import ./dependencies.nix).drvPath];
+    exportReferencesGraph = ["refs" (import ./dependencies.nix {}).drvPath];
   };
 
 }

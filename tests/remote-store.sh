@@ -24,7 +24,7 @@ fi
   import (
     mkDerivation {
       name = "foo";
-      bla = import ./dependencies.nix;
+      bla = import ./dependencies.nix {};
       buildCommand = "
         echo \\\"hi\\\" > $out
       ";
