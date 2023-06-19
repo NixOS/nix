@@ -5,7 +5,6 @@ We appreciate your support.
 
 Reading and following these guidelines will help us make the contribution process easy and effective for everyone involved.
 
-
 ## Report a bug
 
 1. Check on the [GitHub issue tracker](https://github.com/NixOS/nix/issues) if your bug was already reported.
@@ -30,6 +29,8 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
    You can use [labels](https://github.com/NixOS/nix/labels) to filter for relevant topics.
 
 2. Search for related issues that cover what you're going to work on. It could help to mention there that you will work on the issue.
+
+   Issues labeled ["good first issue"](https://github.com/NixOS/nix/labels/good-first-issue) should be relatively easy to fix and are likely to get merged quickly.
    Pull requests addressing issues labeled ["idea approved"](https://github.com/NixOS/nix/labels/idea%20approved) are especially welcomed by maintainers and will receive prioritised review.
 
 3. Check the [Nix reference manual](https://nixos.org/manual/nix/unstable/contributing/hacking.html) for information on building Nix and running its tests.
