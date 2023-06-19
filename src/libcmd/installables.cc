@@ -701,7 +701,7 @@ RawInstallablesCommand::RawInstallablesCommand()
 {
     addFlag({
         .longName = "stdin",
-        .description = "Read installables from the standard input.",
+        .description = "Read installables from the standard input. No default installable applied.",
         .handler = {&readFromStdIn, true}
     });
 
@@ -730,9 +730,9 @@ void RawInstallablesCommand::run(ref<Store> store)
         while (std::cin >> word) {
             rawInstallables.emplace_back(std::move(word));
         }
+    } else {
+        applyDefaultInstallables(rawInstallables);
     }
-
-    applyDefaultInstallables(rawInstallables);
     run(store, std::move(rawInstallables));
 }
 

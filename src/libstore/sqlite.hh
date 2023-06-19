@@ -29,7 +29,7 @@ enum class SQLiteOpenMode {
      * Use this mode if the database is on a read-only filesystem.
      * Fails with an error if the database does not exist.
      */
-    Immutable
+    Immutable,
 };
 
 /**

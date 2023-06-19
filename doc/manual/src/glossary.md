@@ -85,12 +85,17 @@
 
     [store path]: #gloss-store-path
 
+  - [file system object]{#gloss-store-object}\
+    The Nix data model for representing simplified file system data.
+
+    See [File System Object](@docroot@/architecture/file-system-object.md) for details.
+
+    [file system object]: #gloss-file-system-object
+
   - [store object]{#gloss-store-object}\
-    A file that is an immediate child of the Nix store directory. These
-    can be regular files, but also entire directory trees. Store objects
-    can be sources (objects copied from outside of the store),
-    derivation outputs (objects produced by running a build task), or
-    derivations (files describing a build task).
+
+    A store object consists of a [file system object], [reference]s to other store objects, and other metadata.
+    It can be referred to by a [store path].
 
     [store object]: #gloss-store-object
 
@@ -112,9 +117,10 @@
     from some server.
 
   - [substituter]{#gloss-substituter}\
-    A *substituter* is an additional store from which Nix will
-    copy store objects it doesn't have.  For details, see the
-    [`substituters` option](./command-ref/conf-file.md#conf-substituters).
+    An additional [store]{#gloss-store} from which Nix can obtain store objects instead of building them.
+    Often the substituter is a [binary cache](#gloss-binary-cache), but any store can serve as substituter.
+
+    See the [`substituters` configuration option](./command-ref/conf-file.md#conf-substituters) for details.
 
     [substituter]: #gloss-substituter
 

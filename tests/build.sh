@@ -129,3 +129,7 @@ nix build --impure -f multiple-outputs.nix --json e --no-link | jq --exit-status
     (.drvPath | match(".*multiple-outputs-e.drv")) and
     (.outputs | keys == ["a_a", "b"]))
 '
+
+# Make sure that `--stdin` works and does not apply any defaults
+printf "" | nix build --no-link --stdin --json | jq --exit-status '. == []'
+printf "%s\n" "$drv^*" | nix build --no-link --stdin --json | jq --exit-status '.[0]|has("drvPath")'

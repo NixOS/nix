@@ -28,11 +28,6 @@ struct RegisterPrimOp
      * will get called during EvalState initialization, so there
      * may be primops not yet added and builtins is not yet sorted.
      */
-    RegisterPrimOp(
-        std::string name,
-        size_t arity,
-        PrimOpFun fun);
-
     RegisterPrimOp(Info && info);
 };
 

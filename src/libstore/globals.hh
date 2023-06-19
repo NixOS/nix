@@ -710,20 +710,19 @@ public:
         Strings{"https://cache.nixos.org/"},
         "substituters",
         R"(
-          A list of [URLs of Nix stores](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
-          to be used as substituters, separated by whitespace.
-          Substituters are tried based on their Priority value, which each substituter can set
-          independently. Lower value means higher priority.
-          The default is `https://cache.nixos.org`, with a Priority of 40.
+          A list of [URLs of Nix stores](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format) to be used as substituters, separated by whitespace.
+          A substituter is an additional [store]{@docroot@/glossary.md##gloss-store} from which Nix can obtain [store objects](@docroot@/glossary.md#gloss-store-object) instead of building them.
 
-          At least one of the following conditions must be met for Nix to use
-          a substituter:
+          Substituters are tried based on their priority value, which each substituter can set independently.
+          Lower value means higher priority.
+          The default is `https://cache.nixos.org`, which has a priority of 40.
+
+          At least one of the following conditions must be met for Nix to use a substituter:
 
           - the substituter is in the [`trusted-substituters`](#conf-trusted-substituters) list
           - the user calling Nix is in the [`trusted-users`](#conf-trusted-users) list
 
-          In addition, each store path should be trusted as described
-          in [`trusted-public-keys`](#conf-trusted-public-keys)
+          In addition, each store path should be trusted as described in [`trusted-public-keys`](#conf-trusted-public-keys)
         )",
         {"binary-caches"}};
 

@@ -21,4 +21,8 @@ static void prim_anotherNull (EvalState & state, const PosIdx pos, Value ** args
         v.mkBool(false);
 }
 
-static RegisterPrimOp rp("anotherNull", 0, prim_anotherNull);
+static RegisterPrimOp rp({
+    .name = "anotherNull",
+    .arity = 0,
+    .fun = prim_anotherNull,
+});

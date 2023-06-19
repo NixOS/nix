@@ -4,7 +4,7 @@
 
 # Synopsis
 
-`nix-channel` {`--add` url [*name*] | `--remove` *name* | `--list` | `--update` [*names…*] | `--rollback` [*generation*] }
+`nix-channel` {`--add` url [*name*] | `--remove` *name* | `--list` | `--update` [*names…*] | `--list-generations` | `--rollback` [*generation*] }
 
 # Description
 
@@ -38,6 +38,15 @@ This command has the following operations:
     those included in *names* if specified) and makes them the default
     for `nix-env` operations (by symlinking them from the directory
     `~/.nix-defexpr`).
+
+  - `--list-generations`\
+    Prints a list of all the current existing generations for the
+    channel profile.
+
+    Works the same way as
+    ```
+    nix-env --profile /nix/var/nix/profiles/per-user/$USER/channels --list-generations
+    ```
 
   - `--rollback` \[*generation*\]\
     Reverts the previous call to `nix-channel
