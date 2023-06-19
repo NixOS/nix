@@ -95,7 +95,7 @@ define build-library
 	+$$(trace-ld) $(CXX) -o $$(abspath $$@) -shared $$(LDFLAGS) $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$($(1)_LDFLAGS_PROPAGATED) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE)) $$($(1)_LDFLAGS_UNINSTALLED)
 
     ifndef HOST_DARWIN
-      $(1)_LDFLAGS_USE += -Wl,-rpath,$$(abspath $$(_d))
+      $(1)_LDFLAGS_USE += -Wl,-rpath,'$$$$ORIGIN'
     endif
     $(1)_LDFLAGS_USE += -L$$(_d) -l$$(patsubst lib%,%,$$(strip $$($(1)_NAME)))
 
