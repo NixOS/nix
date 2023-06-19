@@ -89,6 +89,7 @@ perl/Makefile.config
 /tests/ca/config.nix
 /tests/dyn-drv/config.nix
 /tests/repl-result-out
+/tests/test-libstoreconsumer/test-libstoreconsumer
 
 # /tests/lang/
 /tests/lang/*.out

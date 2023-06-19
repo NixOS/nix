@@ -26,7 +26,7 @@ public:
 struct RewritingSink : Sink
 {
     const StringMap rewrites;
-    long unsigned int maxRewriteSize;
+    std::string::size_type maxRewriteSize;
     std::string prev;
     Sink & nextSink;
     uint64_t pos = 0;

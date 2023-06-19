@@ -772,7 +772,7 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
 
     debug("switching to new user environment");
     Path generation = createGeneration(
-        ref<LocalFSStore>(store2),
+        *store2,
         globals.profile,
         drv.queryOutPath());
     switchLink(globals.profile, generation);
@@ -1356,13 +1356,14 @@ static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opAr
     if (opArgs.size() == 1 && opArgs.front() == "old") {
         deleteOldGenerations(globals.profile, globals.dryRun);
     } else if (opArgs.size() == 1 && opArgs.front().find('d') != std::string::npos) {
-        deleteGenerationsOlderThan(globals.profile, opArgs.front(), globals.dryRun);
+        auto t = parseOlderThanTimeSpec(opArgs.front());
+        deleteGenerationsOlderThan(globals.profile, t, globals.dryRun);
     } else if (opArgs.size() == 1 && opArgs.front().find('+') != std::string::npos) {
         if (opArgs.front().size() < 2)
             throw Error("invalid number of generations '%1%'", opArgs.front());
         auto str_max = opArgs.front().substr(1);
         auto max = string2Int<GenerationNumber>(str_max);
-        if (!max || *max == 0)
+        if (!max)
             throw Error("invalid number of generations to keep '%1%'", opArgs.front());
         deleteGenerationsGreaterThan(globals.profile, *max, globals.dryRun);
     } else {
