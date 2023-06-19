@@ -263,6 +263,17 @@ bool pathExists(const Path & path)
     return false;
 }
 
+bool pathAccessible(const Path & path)
+{
+    try {
+        return pathExists(path);
+    } catch (SysError & e) {
+        // swallow EPERM
+        if (e.errNo == EPERM) return false;
+        throw;
+    }
+}
+
 
 Path readLink(const Path & path)
 {

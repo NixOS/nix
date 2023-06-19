@@ -20,6 +20,9 @@ jobs:
       with:
         fetch-depth: 0
     - uses: cachix/install-nix-action@v20
+      with:
+        # The sandbox would otherwise be disabled by default on Darwin
+        extra_nix_config: "sandbox = true"
     - run: echo CACHIX_NAME="$(echo $GITHUB_REPOSITORY-install-tests | tr "[A-Z]/" "[a-z]-")" >> $GITHUB_ENV
     - uses: cachix/cachix-action@v12
       if: needs.check_secrets.outputs.cachix == 'true'
