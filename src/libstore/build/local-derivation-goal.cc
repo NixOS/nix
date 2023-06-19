@@ -10,8 +10,6 @@
 #include "archive.hh"
 #include "compression.hh"
 #include "daemon.hh"
-#include "worker-protocol.hh"
-#include "worker-protocol-impl.hh"
 #include "topo-sort.hh"
 #include "callback.hh"
 #include "json-utils.hh"
