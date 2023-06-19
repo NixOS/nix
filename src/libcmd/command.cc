@@ -239,9 +239,7 @@ void MixProfile::updateProfile(const StorePath & storePath)
     if (!store) throw Error("'--profile' is not supported for this Nix store");
     auto profile2 = absPath(*profile);
     switchLink(profile2,
-        createGeneration(
-            ref<LocalFSStore>(store),
-            profile2, storePath));
+        createGeneration(*store, profile2, storePath));
 }
 
 void MixProfile::updateProfile(const BuiltPaths & buildables)
