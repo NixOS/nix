@@ -52,8 +52,7 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
         R"(
           Allow this store to be opened when its [database](@docroot@/glossary.md#gloss-nix-database) is on a read-only filesystem.
 
-          Normally Nix will attempt to open the store database in read-write mode, even for querying (when write access is not needed).
-          This causes it to fail if the database is on a read-only filesystem.
+          Normally Nix will attempt to open the store database in read-write mode, even for querying (when write access is not needed), causing it to fail if the database is on a read-only filesystem.
 
           Enable read-only mode to disable locking and open the SQLite database with the [`immutable` parameter](https://www.sqlite.org/c3ref/open.html) set.
 
