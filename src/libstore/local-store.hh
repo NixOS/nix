@@ -59,6 +59,7 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
           **Warning**
           Do not use this unless the filesystem is read-only.
           Using it when the filesystem is writable can cause incorrect query results or corruption errors if the database is changed by another process.
+          While the filesystem the database resides on might appear to be read-only, consider whether another user or system might have write access to it.
         )"};
 
     const std::string name() override { return "Local Store"; }
