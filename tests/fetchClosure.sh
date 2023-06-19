@@ -33,7 +33,25 @@ clearStore
 [ ! -e $nonCaPath ]
 [ -e $caPath ]
 
+clearStore
+
+# The daemon will reject input addressed paths unless configured to trust the
+# cache key or the user. This behavior should be covered by another test, so we
+# skip this part when using the daemon.
 if [[ "$NIX_REMOTE" != "daemon" ]]; then
+
+    # If we want to return a non-CA path, we have to be explicit about it.
+    expectStderr 1 nix eval --raw --no-require-sigs --expr "
+      builtins.fetchClosure {
+        fromStore = \"file://$cacheDir\";
+        fromPath = $nonCaPath;
+      }
+    " | grepQuiet -E "The .fromPath. value .* is input-addressed, but .inputAddressed. is set to .false."
+
+    # TODO: Should the closure be rejected, despite single user mode?
+    # [ ! -e $nonCaPath ]
+
+    [ ! -e $caPath ]
 
     # We can use non-CA paths when we ask explicitly.
     [[ $(nix eval --raw --no-require-sigs --expr "
@@ -45,19 +63,12 @@ if [[ "$NIX_REMOTE" != "daemon" ]]; then
     ") = $nonCaPath ]]
 
     [ -e $nonCaPath ]
-
-    # .. but only if we ask explicitly.
-    expectStderr 1 nix eval --raw --no-require-sigs --expr "
-      builtins.fetchClosure {
-        fromStore = \"file://$cacheDir\";
-        fromPath = $nonCaPath;
-      }
-    " | grepQuiet -E "The .fromPath. value .* is input-addressed, but .inputAddressed. is set to .false."
-
-    [ -e $nonCaPath ]
+    [ ! -e $caPath ]
 
 
 fi
+
+[ ! -e $caPath ]
 
 # 'toPath' set to empty string should fail but print the expected path.
 expectStderr 1 nix eval -v --json --expr "
@@ -71,12 +82,18 @@ expectStderr 1 nix eval -v --json --expr "
 # If fromPath is CA, then toPath isn't needed.
 nix copy --to file://$cacheDir $caPath
 
+clearStore
+
+[ ! -e $caPath ]
+
 [[ $(nix eval -v --raw --expr "
   builtins.fetchClosure {
     fromStore = \"file://$cacheDir\";
     fromPath = $caPath;
   }
 ") = $caPath ]]
+
+[ -e $caPath ]
 
 # Check that URL query parameters aren't allowed.
 clearStore
@@ -89,3 +106,45 @@ rm -rf $narCache
   }
 ")
 (! [ -e $narCache ])
+
+# If toPath is specified but wrong, we check it (only) when the path is missing.
+clearStore
+
+badPath=$(echo $caPath | sed -e 's!/store/................................-!/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-!')
+
+[ ! -e $badPath ]
+
+expectStderr 1 nix eval -v --raw --expr "
+  builtins.fetchClosure {
+    fromStore = \"file://$cacheDir\";
+    fromPath = $nonCaPath;
+    toPath = $badPath;
+  }
+" | grep "error: rewriting.*$nonCaPath.*yielded.*$caPath.*while.*$badPath.*was expected"
+
+[ ! -e $badPath ]
+
+# We only check it when missing, as a performance optimization similar to what we do for fixed output derivations. So if it's already there, we don't check it.
+# It would be nice for this to fail, but checking it would be too(?) slow.
+[ -e $caPath ]
+
+[[ $(nix eval -v --raw --expr "
+  builtins.fetchClosure {
+    fromStore = \"file://$cacheDir\";
+    fromPath = $badPath;
+    toPath = $caPath;
+  }
+") = $caPath ]]
+
+
+# However, if the output address is unexpected, we can report it
+
+
+expectStderr 1 nix eval -v --raw --expr "
+  builtins.fetchClosure {
+    fromStore = \"file://$cacheDir\";
+    fromPath = $caPath;
+    inputAddressed = true;
+  }
+" | grepQuiet 'error.*The store object referred to by.*fromPath.* at .* is not input-addressed, but .*inputAddressed.* is set to .*true.*'
+
