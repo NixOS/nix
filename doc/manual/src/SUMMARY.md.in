@@ -106,6 +106,7 @@
   - [Hacking](contributing/hacking.md)
   - [Experimental Features](contributing/experimental-features.md)
   - [CLI guideline](contributing/cli-guideline.md)
+  - [C++ style guide](contributing/cxx.md)
 - [Release Notes](release-notes/release-notes.md)
   - [Release X.Y (202?-??-??)](release-notes/rl-next.md)
   - [Release 2.16 (2023-05-31)](release-notes/rl-2.16.md)

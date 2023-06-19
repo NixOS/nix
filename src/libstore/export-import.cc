@@ -2,6 +2,7 @@
 #include "store-api.hh"
 #include "archive.hh"
 #include "worker-protocol.hh"
+#include "worker-protocol-impl.hh"
 
 #include <algorithm>
 
@@ -45,7 +46,9 @@ void Store::exportPath(const StorePath & path, Sink & sink)
     teeSink
         << exportMagic
         << printStorePath(path);
-    workerProtoWrite(*this, teeSink, info->references);
+    WorkerProto::write(*this,
+        WorkerProto::WriteConn { .to = teeSink },
+        info->references);
     teeSink
         << (info->deriver ? printStorePath(*info->deriver) : "")
         << 0;
@@ -73,7 +76,8 @@ StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
 
         //Activity act(*logger, lvlInfo, "importing path '%s'", info.path);
 
-        auto references = WorkerProto<StorePathSet>::read(*this, source);
+        auto references = WorkerProto::Serialise<StorePathSet>::read(*this,
+            WorkerProto::ReadConn { .from = source });
         auto deriver = readString(source);
         auto narHash = hashString(htSHA256, saved.s);
 

@@ -4,6 +4,7 @@
 #include "store-api.hh"
 #include "build-result.hh"
 #include "worker-protocol.hh"
+#include "worker-protocol-impl.hh"
 #include "archive.hh"
 #include "derivations.hh"
 
@@ -11,31 +12,31 @@
 
 namespace nix {
 
-std::string WorkerProto<std::string>::read(const Store & store, Source & from)
+std::string WorkerProto::Serialise<std::string>::read(const Store & store, WorkerProto::ReadConn conn)
 {
-    return readString(from);
+    return readString(conn.from);
 }
 
-void WorkerProto<std::string>::write(const Store & store, Sink & out, const std::string & str)
+void WorkerProto::Serialise<std::string>::write(const Store & store, WorkerProto::WriteConn conn, const std::string & str)
 {
-    out << str;
-}
-
-
-StorePath WorkerProto<StorePath>::read(const Store & store, Source & from)
-{
-    return store.parseStorePath(readString(from));
-}
-
-void WorkerProto<StorePath>::write(const Store & store, Sink & out, const StorePath & storePath)
-{
-    out << store.printStorePath(storePath);
+    conn.to << str;
 }
 
 
-std::optional<TrustedFlag> WorkerProto<std::optional<TrustedFlag>>::read(const Store & store, Source & from)
+StorePath WorkerProto::Serialise<StorePath>::read(const Store & store, WorkerProto::ReadConn conn)
 {
-    auto temp = readNum<uint8_t>(from);
+    return store.parseStorePath(readString(conn.from));
+}
+
+void WorkerProto::Serialise<StorePath>::write(const Store & store, WorkerProto::WriteConn conn, const StorePath & storePath)
+{
+    conn.to << store.printStorePath(storePath);
+}
+
+
+std::optional<TrustedFlag> WorkerProto::Serialise<std::optional<TrustedFlag>>::read(const Store & store, WorkerProto::ReadConn conn)
+{
+    auto temp = readNum<uint8_t>(conn.from);
     switch (temp) {
         case 0:
             return std::nullopt;
@@ -48,17 +49,17 @@ std::optional<TrustedFlag> WorkerProto<std::optional<TrustedFlag>>::read(const S
     }
 }
 
-void WorkerProto<std::optional<TrustedFlag>>::write(const Store & store, Sink & out, const std::optional<TrustedFlag> & optTrusted)
+void WorkerProto::Serialise<std::optional<TrustedFlag>>::write(const Store & store, WorkerProto::WriteConn conn, const std::optional<TrustedFlag> & optTrusted)
 {
     if (!optTrusted)
-        out << (uint8_t)0;
+        conn.to << (uint8_t)0;
     else {
         switch (*optTrusted) {
         case Trusted:
-            out << (uint8_t)1;
+            conn.to << (uint8_t)1;
             break;
         case NotTrusted:
-            out << (uint8_t)2;
+            conn.to << (uint8_t)2;
             break;
         default:
             assert(false);
@@ -67,83 +68,83 @@ void WorkerProto<std::optional<TrustedFlag>>::write(const Store & store, Sink & 
 }
 
 
-ContentAddress WorkerProto<ContentAddress>::read(const Store & store, Source & from)
+ContentAddress WorkerProto::Serialise<ContentAddress>::read(const Store & store, WorkerProto::ReadConn conn)
 {
-    return ContentAddress::parse(readString(from));
+    return ContentAddress::parse(readString(conn.from));
 }
 
-void WorkerProto<ContentAddress>::write(const Store & store, Sink & out, const ContentAddress & ca)
+void WorkerProto::Serialise<ContentAddress>::write(const Store & store, WorkerProto::WriteConn conn, const ContentAddress & ca)
 {
-    out << renderContentAddress(ca);
+    conn.to << renderContentAddress(ca);
 }
 
 
-DerivedPath WorkerProto<DerivedPath>::read(const Store & store, Source & from)
+DerivedPath WorkerProto::Serialise<DerivedPath>::read(const Store & store, WorkerProto::ReadConn conn)
 {
-    auto s = readString(from);
+    auto s = readString(conn.from);
     return DerivedPath::parseLegacy(store, s);
 }
 
-void WorkerProto<DerivedPath>::write(const Store & store, Sink & out, const DerivedPath & req)
+void WorkerProto::Serialise<DerivedPath>::write(const Store & store, WorkerProto::WriteConn conn, const DerivedPath & req)
 {
-    out << req.to_string_legacy(store);
+    conn.to << req.to_string_legacy(store);
 }
 
 
-Realisation WorkerProto<Realisation>::read(const Store & store, Source & from)
+Realisation WorkerProto::Serialise<Realisation>::read(const Store & store, WorkerProto::ReadConn conn)
 {
-    std::string rawInput = readString(from);
+    std::string rawInput = readString(conn.from);
     return Realisation::fromJSON(
         nlohmann::json::parse(rawInput),
         "remote-protocol"
     );
 }
 
-void WorkerProto<Realisation>::write(const Store & store, Sink & out, const Realisation & realisation)
+void WorkerProto::Serialise<Realisation>::write(const Store & store, WorkerProto::WriteConn conn, const Realisation & realisation)
 {
-    out << realisation.toJSON().dump();
+    conn.to << realisation.toJSON().dump();
 }
 
 
-DrvOutput WorkerProto<DrvOutput>::read(const Store & store, Source & from)
+DrvOutput WorkerProto::Serialise<DrvOutput>::read(const Store & store, WorkerProto::ReadConn conn)
 {
-    return DrvOutput::parse(readString(from));
+    return DrvOutput::parse(readString(conn.from));
 }
 
-void WorkerProto<DrvOutput>::write(const Store & store, Sink & out, const DrvOutput & drvOutput)
+void WorkerProto::Serialise<DrvOutput>::write(const Store & store, WorkerProto::WriteConn conn, const DrvOutput & drvOutput)
 {
-    out << drvOutput.to_string();
+    conn.to << drvOutput.to_string();
 }
 
 
-KeyedBuildResult WorkerProto<KeyedBuildResult>::read(const Store & store, Source & from)
+KeyedBuildResult WorkerProto::Serialise<KeyedBuildResult>::read(const Store & store, WorkerProto::ReadConn conn)
 {
-    auto path = WorkerProto<DerivedPath>::read(store, from);
-    auto br = WorkerProto<BuildResult>::read(store, from);
+    auto path = WorkerProto::Serialise<DerivedPath>::read(store, conn);
+    auto br = WorkerProto::Serialise<BuildResult>::read(store, conn);
     return KeyedBuildResult {
         std::move(br),
         /* .path = */ std::move(path),
     };
 }
 
-void WorkerProto<KeyedBuildResult>::write(const Store & store, Sink & to, const KeyedBuildResult & res)
+void WorkerProto::Serialise<KeyedBuildResult>::write(const Store & store, WorkerProto::WriteConn conn, const KeyedBuildResult & res)
 {
-    workerProtoWrite(store, to, res.path);
-    workerProtoWrite(store, to, static_cast<const BuildResult &>(res));
+    WorkerProto::write(store, conn, res.path);
+    WorkerProto::write(store, conn, static_cast<const BuildResult &>(res));
 }
 
 
-BuildResult WorkerProto<BuildResult>::read(const Store & store, Source & from)
+BuildResult WorkerProto::Serialise<BuildResult>::read(const Store & store, WorkerProto::ReadConn conn)
 {
     BuildResult res;
-    res.status = (BuildResult::Status) readInt(from);
-    from
+    res.status = (BuildResult::Status) readInt(conn.from);
+    conn.from
         >> res.errorMsg
         >> res.timesBuilt
         >> res.isNonDeterministic
         >> res.startTime
         >> res.stopTime;
-    auto builtOutputs = WorkerProto<DrvOutputs>::read(store, from);
+    auto builtOutputs = WorkerProto::Serialise<DrvOutputs>::read(store, conn);
     for (auto && [output, realisation] : builtOutputs)
         res.builtOutputs.insert_or_assign(
             std::move(output.outputName),
@@ -151,9 +152,9 @@ BuildResult WorkerProto<BuildResult>::read(const Store & store, Source & from)
     return res;
 }
 
-void WorkerProto<BuildResult>::write(const Store & store, Sink & to, const BuildResult & res)
+void WorkerProto::Serialise<BuildResult>::write(const Store & store, WorkerProto::WriteConn conn, const BuildResult & res)
 {
-    to
+    conn.to
         << res.status
         << res.errorMsg
         << res.timesBuilt
@@ -163,30 +164,30 @@ void WorkerProto<BuildResult>::write(const Store & store, Sink & to, const Build
     DrvOutputs builtOutputs;
     for (auto & [output, realisation] : res.builtOutputs)
         builtOutputs.insert_or_assign(realisation.id, realisation);
-    workerProtoWrite(store, to, builtOutputs);
+    WorkerProto::write(store, conn, builtOutputs);
 }
 
 
-std::optional<StorePath> WorkerProto<std::optional<StorePath>>::read(const Store & store, Source & from)
+std::optional<StorePath> WorkerProto::Serialise<std::optional<StorePath>>::read(const Store & store, WorkerProto::ReadConn conn)
 {
-    auto s = readString(from);
+    auto s = readString(conn.from);
     return s == "" ? std::optional<StorePath> {} : store.parseStorePath(s);
 }
 
-void WorkerProto<std::optional<StorePath>>::write(const Store & store, Sink & out, const std::optional<StorePath> & storePathOpt)
+void WorkerProto::Serialise<std::optional<StorePath>>::write(const Store & store, WorkerProto::WriteConn conn, const std::optional<StorePath> & storePathOpt)
 {
-    out << (storePathOpt ? store.printStorePath(*storePathOpt) : "");
+    conn.to << (storePathOpt ? store.printStorePath(*storePathOpt) : "");
 }
 
 
-std::optional<ContentAddress> WorkerProto<std::optional<ContentAddress>>::read(const Store & store, Source & from)
+std::optional<ContentAddress> WorkerProto::Serialise<std::optional<ContentAddress>>::read(const Store & store, WorkerProto::ReadConn conn)
 {
-    return ContentAddress::parseOpt(readString(from));
+    return ContentAddress::parseOpt(readString(conn.from));
 }
 
-void WorkerProto<std::optional<ContentAddress>>::write(const Store & store, Sink & out, const std::optional<ContentAddress> & caOpt)
+void WorkerProto::Serialise<std::optional<ContentAddress>>::write(const Store & store, WorkerProto::WriteConn conn, const std::optional<ContentAddress> & caOpt)
 {
-    out << (caOpt ? renderContentAddress(*caOpt) : "");
+    conn.to << (caOpt ? renderContentAddress(*caOpt) : "");
 }
 
 }

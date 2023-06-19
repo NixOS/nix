@@ -5,6 +5,7 @@
 #include "util.hh"
 #include "split.hh"
 #include "worker-protocol.hh"
+#include "worker-protocol-impl.hh"
 #include "fs-accessor.hh"
 #include <boost/container/small_vector.hpp>
 #include <nlohmann/json.hpp>
@@ -749,7 +750,8 @@ Source & readDerivation(Source & in, const Store & store, BasicDerivation & drv,
         drv.outputs.emplace(std::move(name), std::move(output));
     }
 
-    drv.inputSrcs = WorkerProto<StorePathSet>::read(store, in);
+    drv.inputSrcs = WorkerProto::Serialise<StorePathSet>::read(store,
+        WorkerProto::ReadConn { .from = in });
     in >> drv.platform >> drv.builder;
     drv.args = readStrings<Strings>(in);
 
@@ -797,7 +799,9 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
             },
         }, i.second.raw());
     }
-    workerProtoWrite(store, out, drv.inputSrcs);
+    WorkerProto::write(store,
+        WorkerProto::WriteConn { .to = out },
+        drv.inputSrcs);
     out << drv.platform << drv.builder << drv.args;
     out << drv.env.size();
     for (auto & i : drv.env)
