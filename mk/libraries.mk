@@ -133,9 +133,9 @@ define build-library
 
     $(1)_INSTALL_PATH := $$(libdir)/$$($(1)_NAME).a
 
-    $(1)_LIB_CLOSURE += $$($(1)_LIBS)
-
   endif
+
+	$(1)_LIB_CLOSURE += $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LIB_CLOSURE))
 
   $(1)_LDFLAGS_USE += $$($(1)_LDFLAGS_PROPAGATED)
   $(1)_LDFLAGS_USE_INSTALLED += $$($(1)_LDFLAGS_PROPAGATED)
