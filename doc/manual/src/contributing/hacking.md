@@ -378,7 +378,7 @@ rm $(git ls-files doc/manual/ -o | grep -F '.md') && rmdir doc/manual/src/comman
 [`mdbook-linkcheck`] does not implement checking [URI fragments] yet.
 
 [`mdbook-linkcheck`]: https://github.com/Michael-F-Bryan/mdbook-linkcheck
-[URI fragments]: https://en.m.wikipedia.org/wiki/URI_fragment
+[URI fragments]: https://en.wikipedia.org/wiki/URI_fragment
 
 #### `@docroot@` variable
 

@@ -2,13 +2,8 @@
 ///@file
 
 #include "hash.hh"
-#include "path.hh"
 
 namespace nix {
-
-std::pair<StorePathSet, HashResult> scanForReferences(const Path & path, const StorePathSet & refs);
-
-StorePathSet scanForReferences(Sink & toTee, const Path & path, const StorePathSet & refs);
 
 class RefScanSink : public Sink
 {
@@ -28,28 +23,18 @@ public:
     void operator () (std::string_view data) override;
 };
 
-class PathRefScanSink : public RefScanSink
-{
-    std::map<std::string, StorePath> backMap;
-
-    PathRefScanSink(StringSet && hashes, std::map<std::string, StorePath> && backMap);
-
-public:
-
-    static PathRefScanSink fromPaths(const StorePathSet & refs);
-
-    StorePathSet getResultPaths();
-};
-
 struct RewritingSink : Sink
 {
-    std::string from, to, prev;
+    const StringMap rewrites;
+    std::string::size_type maxRewriteSize;
+    std::string prev;
     Sink & nextSink;
     uint64_t pos = 0;
 
     std::vector<uint64_t> matches;
 
     RewritingSink(const std::string & from, const std::string & to, Sink & nextSink);
+    RewritingSink(const StringMap & rewrites, Sink & nextSink);
 
     void operator () (std::string_view data) override;
 

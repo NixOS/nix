@@ -591,6 +591,8 @@
 
         tests.sourcehutFlakes = runNixOSTestFor "x86_64-linux" ./tests/nixos/sourcehut-flakes.nix;
 
+        tests.tarballFlakes = runNixOSTestFor "x86_64-linux" ./tests/nixos/tarball-flakes.nix;
+
         tests.containers = runNixOSTestFor "x86_64-linux" ./tests/nixos/containers/containers.nix;
 
         tests.setuid = lib.genAttrs

@@ -146,6 +146,12 @@ void InputScheme::checkLocks(const Input & specified, const Input & final) const
                 final.to_string(), *prevLastModified);
     }
 
+    if (auto prevRev = specified.getRev()) {
+        if (final.getRev() != prevRev)
+            throw Error("'rev' attribute mismatch in input '%s', expected %s",
+                final.to_string(), prevRev->gitRev());
+    }
+
     if (auto prevRevCount = specified.getRevCount()) {
         if (final.getRevCount() != prevRevCount)
             throw Error("'revCount' attribute mismatch in input '%s', expected %d",

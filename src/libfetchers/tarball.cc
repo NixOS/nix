@@ -35,7 +35,8 @@ DownloadFileResult downloadFile(
         return {
             .storePath = std::move(cached->storePath),
             .etag = getStrAttr(cached->infoAttrs, "etag"),
-            .effectiveUrl = getStrAttr(cached->infoAttrs, "url")
+            .effectiveUrl = getStrAttr(cached->infoAttrs, "url"),
+            .immutableUrl = maybeGetStrAttr(cached->infoAttrs, "immutableUrl"),
         };
     };
 
@@ -58,11 +59,13 @@ DownloadFileResult downloadFile(
     }
 
     // FIXME: write to temporary file.
-
     Attrs infoAttrs({
         {"etag", res.etag},
         {"url", res.effectiveUri},
     });
+
+    if (res.immutableUrl)
+        infoAttrs.emplace("immutableUrl", *res.immutableUrl);
 
     std::optional<StorePath> storePath;
 
@@ -114,10 +117,11 @@ DownloadFileResult downloadFile(
         .storePath = std::move(*storePath),
         .etag = res.etag,
         .effectiveUrl = res.effectiveUri,
+        .immutableUrl = res.immutableUrl,
     };
 }
 
-std::pair<StorePath, time_t> downloadTarball(
+DownloadTarballResult downloadTarball(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
@@ -134,8 +138,9 @@ std::pair<StorePath, time_t> downloadTarball(
 
     if (cached && !cached->expired)
         return {
-            std::move(cached->storePath),
-            getIntAttr(cached->infoAttrs, "lastModified")
+            .storePath = std::move(cached->storePath),
+            .lastModified = (time_t) getIntAttr(cached->infoAttrs, "lastModified"),
+            .immutableUrl = maybeGetStrAttr(cached->infoAttrs, "immutableUrl"),
         };
 
     auto res = downloadFile(store, url, name, locked, headers);
@@ -163,6 +168,9 @@ std::pair<StorePath, time_t> downloadTarball(
         {"etag", res.etag},
     });
 
+    if (res.immutableUrl)
+        infoAttrs.emplace("immutableUrl", *res.immutableUrl);
+
     getCache()->add(
         store,
         inAttrs,
@@ -171,8 +179,9 @@ std::pair<StorePath, time_t> downloadTarball(
         locked);
 
     return {
-        std::move(*unpackedStorePath),
-        lastModified,
+        .storePath = std::move(*unpackedStorePath),
+        .lastModified = lastModified,
+        .immutableUrl = res.immutableUrl,
     };
 }
 
@@ -192,21 +201,33 @@ struct CurlInputScheme : InputScheme
 
     virtual bool isValidURL(const ParsedURL & url) const = 0;
 
-    std::optional<Input> inputFromURL(const ParsedURL & url) const override
+    std::optional<Input> inputFromURL(const ParsedURL & _url) const override
     {
-        if (!isValidURL(url))
+        if (!isValidURL(_url))
             return std::nullopt;
 
         Input input;
 
-        auto urlWithoutApplicationScheme = url;
-        urlWithoutApplicationScheme.scheme = parseUrlScheme(url.scheme).transport;
+        auto url = _url;
 
-        input.attrs.insert_or_assign("type", inputType());
-        input.attrs.insert_or_assign("url", urlWithoutApplicationScheme.to_string());
+        url.scheme = parseUrlScheme(url.scheme).transport;
+
         auto narHash = url.query.find("narHash");
         if (narHash != url.query.end())
             input.attrs.insert_or_assign("narHash", narHash->second);
+
+        if (auto i = get(url.query, "rev"))
+            input.attrs.insert_or_assign("rev", *i);
+
+        if (auto i = get(url.query, "revCount"))
+            if (auto n = string2Int<uint64_t>(*i))
+                input.attrs.insert_or_assign("revCount", *n);
+
+        url.query.erase("rev");
+        url.query.erase("revCount");
+
+        input.attrs.insert_or_assign("type", inputType());
+        input.attrs.insert_or_assign("url", url.to_string());
         return input;
     }
 
@@ -215,7 +236,8 @@ struct CurlInputScheme : InputScheme
         auto type = maybeGetStrAttr(attrs, "type");
         if (type != inputType()) return {};
 
-        std::set<std::string> allowedNames = {"type", "url", "narHash", "name", "unpack"};
+        // FIXME: some of these only apply to TarballInputScheme.
+        std::set<std::string> allowedNames = {"type", "url", "narHash", "name", "unpack", "rev", "revCount"};
         for (auto & [name, value] : attrs)
             if (!allowedNames.count(name))
                 throw Error("unsupported %s input attribute '%s'", *type, name);
@@ -288,13 +310,22 @@ struct TarballInputScheme : CurlInputScheme
     {
         auto input(_input);
 
-        auto storePath = downloadTarball(store, getStrAttr(input.attrs, "url"), input.getName(), false).first;
+        auto result = downloadTarball(store, getStrAttr(input.attrs, "url"), input.getName(), false);
 
         // FIXME: remove?
-        auto narHash = store->queryPathInfo(storePath)->narHash;
+        auto narHash = store->queryPathInfo(result.storePath)->narHash;
         input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
 
-        return {makeStorePathAccessor(store, storePath), input};
+        if (result.immutableUrl) {
+            auto immutableInput = Input::fromURL(*result.immutableUrl);
+            // FIXME: would be nice to support arbitrary flakerefs
+            // here, e.g. git flakes.
+            if (immutableInput.getType() != "tarball")
+                throw Error("tarball 'Link' headers that redirect to non-tarball URLs are not supported");
+            input = immutableInput;
+        }
+
+        return {makeStorePathAccessor(store, result.storePath), input};
     }
 };
 

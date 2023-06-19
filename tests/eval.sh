@@ -35,3 +35,9 @@ nix-instantiate --eval -E 'assert 1 + 2 == 3; true'
 # Check that symlink cycles don't cause a hang.
 ln -sfn cycle.nix $TEST_ROOT/cycle.nix
 (! nix eval --file $TEST_ROOT/cycle.nix)
+
+# Check that relative symlinks are resolved correctly.
+mkdir -p $TEST_ROOT/xyzzy $TEST_ROOT/foo
+ln -sfn ../xyzzy $TEST_ROOT/foo/bar
+printf 123 > $TEST_ROOT/xyzzy/default.nix
+[[ $(nix eval --impure --expr "import $TEST_ROOT/foo/bar") = 123 ]]

@@ -177,6 +177,7 @@ static int main_nix_channel(int argc, char ** argv)
             cRemove,
             cList,
             cUpdate,
+            cListGenerations,
             cRollback
         } cmd = cNone;
         std::vector<std::string> args;
@@ -193,6 +194,8 @@ static int main_nix_channel(int argc, char ** argv)
                 cmd = cList;
             } else if (*arg == "--update") {
                 cmd = cUpdate;
+            } else if (*arg == "--list-generations") {
+                cmd = cListGenerations;
             } else if (*arg == "--rollback") {
                 cmd = cRollback;
             } else {
@@ -236,6 +239,11 @@ static int main_nix_channel(int argc, char ** argv)
                 break;
             case cUpdate:
                 update(StringSet(args.begin(), args.end()));
+                break;
+            case cListGenerations:
+                if (!args.empty())
+                    throw UsageError("'--list-generations' expects no arguments");
+                std::cout << runProgram(settings.nixBinDir + "/nix-env", false, {"--profile", profile, "--list-generations"}) << std::flush;
                 break;
             case cRollback:
                 if (args.size() > 1)

@@ -808,7 +808,7 @@ std::optional<SourcePath> EvalState::resolveSearchPathElem(const SearchPathElem 
     if (EvalSettings::isPseudoUrl(elem.second)) {
         try {
             auto storePath = fetchers::downloadTarball(
-                store, EvalSettings::resolvePseudoUrl(elem.second), "source", false).first;
+                store, EvalSettings::resolvePseudoUrl(elem.second), "source", false).storePath;
             auto accessor = makeStorePathAccessor(store, storePath);
             registerAccessor(accessor);
             res.emplace(accessor->root());

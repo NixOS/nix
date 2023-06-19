@@ -88,6 +88,10 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     state.allowPath(storePath);
 }
 
-static RegisterPrimOp r_fetchMercurial("fetchMercurial", 1, prim_fetchMercurial);
+static RegisterPrimOp r_fetchMercurial({
+    .name = "fetchMercurial",
+    .arity = 1,
+    .fun = prim_fetchMercurial
+});
 
 }

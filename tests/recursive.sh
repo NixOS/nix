@@ -1,8 +1,5 @@
 source common.sh
 
-# FIXME
-if [[ $(uname) != Linux ]]; then skipTest "Not running Linux"; fi
-
 enableFeatures 'recursive-nix'
 restartDaemon
 
