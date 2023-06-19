@@ -84,7 +84,7 @@ info=$(nix path-info --store file://$cacheDir --json $outPath2)
 # Copying to a diverted store should fail due to a lack of signatures by trusted keys.
 chmod -R u+w $TEST_ROOT/store0 || true
 rm -rf $TEST_ROOT/store0
-(! nix copy --to $TEST_ROOT/store0 $outPath)
+expectStderr 1 nix copy --to $TEST_ROOT/store0 $outPath | grepQuiet -E 'cannot add path .* because it lacks a signature by a trusted key'
 
 # But succeed if we supply the public keys.
 nix copy --to $TEST_ROOT/store0 $outPath --trusted-public-keys $pk1
