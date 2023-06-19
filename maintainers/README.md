@@ -117,6 +117,7 @@ Pull requests in this column are reviewed together during work meetings.
 This is both for spreading implementation knowledge and for establishing common values in code reviews.
 
 When the overall direction is agreed upon, even when further changes are required, the pull request is assigned to one team member.
+If significant changes are requested or reviewers cannot come to a conclusion in reasonable time, the pull request is [marked as draft](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/changing-the-stage-of-a-pull-request#converting-a-pull-request-to-a-draft).
 
 ### Assigned
 
