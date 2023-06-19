@@ -46,3 +46,10 @@ endif
 include mk/lib.mk
 
 GLOBAL_CXXFLAGS += -g -Wall -include config.h -std=c++2a -I src
+
+ifeq ($(missingMakefiles), ok)
+$(makefiles):
+	@echo "WARNING: Touching missing makefile $@"
+	@mkdir -p $(dir $@)
+	@touch $@
+endif

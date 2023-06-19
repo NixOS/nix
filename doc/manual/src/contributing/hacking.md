@@ -421,3 +421,12 @@ can build it yourself:
 
 Metrics about the change in line/function coverage over time are also
 [available](https://hydra.nixos.org/job/nix/master/coverage#tabs-charts).
+
+## Coarse incremental cached build
+
+The flake provides an extra package, `.#quickBuild`, which builds Nix using
+individual derivations for the libraries and such. This allows cached versions
+of those intermediate build steps to be used, so that it builds a lot quicker.
+
+This package is useful for reviewing changes to `/doc`, assuming that the
+base commit is in the binary cache.

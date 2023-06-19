@@ -312,6 +312,172 @@
           # Forward from the previous stage as we don’t want it to pick the lowdown override
           nixUnstable = prev.nixUnstable;
 
+          # A build where build products are taken from component-specific derivations
+          # meant for hacking on Nix, not for production use, and will be removed
+          # when dynamic derivations (RFC 92) is implemented and available, or sooner.
+          nixQuick =
+            let
+              prepper = import ./prepper.nix { pkgs = final; };
+
+              inherit (prepper.prep {
+                  drv = drvSimple;
+                  inherit componentSpecs;
+                })
+                components
+                copyPrebuilt
+                toplevel;
+
+              # Prepper doesn't support multiple outputs, so we remove that.
+              # Also disable tests and filter the source a bit more.
+              drvSimple = final.nix.overrideAttrs (o: {
+                outputs = ["out"];
+                separateDebugInfo = false;
+                doCheck = false;
+                doInstallCheck = false;
+                preConfigure = ''
+                  ${o.preConfigure or ""}
+                  doc=$out
+                '';
+
+                makeFlags = o.makeFlags
+                  # It was setting rpath to /build/... for some reason
+                  + " SET_RPATH_TO_LIBS=0";
+
+                src =
+                  lib.cleanSourceWith {
+                    src = o.src;
+                    filter = path: type:
+                      (toString (dirOf path) == toString ./.
+                        -> ! lib.strings.hasSuffix ".nix" (baseNameOf path)
+                      )
+                      && ! lib.strings.hasPrefix (toString ./doc) path
+                      ;
+                  };
+              });
+
+              preConfigure = o: {
+                configurePhase =
+                ''
+                  runHook preConfigure
+                  echo "Using prebuilt configure outputs..."
+                  touch timestamper
+                  ${copyPrebuilt components.configure}
+                  rm timestamper
+                  runHook postConfigure
+                '';
+                nativeBuildInputs = lib.filter (p:
+                  p.pname or p.name or null != "autoreconf-hook"
+                  # TODO: remove once the rename comes through in our nixpkgs input
+                  && p.pname or p.name or null != "hook"
+                  ) o.nativeBuildInputs;
+              };
+
+              componentSpecs = {
+                "configure" = {
+                  dirs = [ "Makefile.config" "configure" "config.status" "config" "config.h" ];
+                  attrsOverride = o: {
+                    buildPhase = ":";
+                  };
+                };
+                "libutil" = {
+                  deps = [ "configure" ];
+                  dirs = [ "src/libutil" ];
+                  targets = "src/libutil/libnixutil.so";
+                  checkTargets = "libutil-tests_RUN";
+                  attrsOverride =
+                    preConfigure
+                    # The local .so produces a build sandbox reference in rpath, which
+                    # is not ok for an output.
+                    # This can be avoided by changing -rpath to -rpath-link, but I do not
+                    # know enough to assess whether that's the right thing to do, and I'd
+                    # like to stay in sync with the regular build.
+                    # composeOverrides (removeFile "src/libutil/libnixutil.so");
+                    ;
+                };
+                "libmain" = {
+                  dirs = [ "src/libmain" ];
+                  deps = [ "libutil" "libstore" ];
+                  targets = "src/libmain/libnixmain.so";
+                  checkTargets = "libmain-tests_RUN";
+                  attrsOverride = preConfigure;
+                };
+                "libstore" = {
+                  dirs = [ "src/libstore" ];
+                  deps = [ "libutil" ];
+                  targets = "src/libstore/libnixstore.so";
+                  checkTargets = "libstore-tests_RUN";
+                  attrsOverride = preConfigure;
+                };
+                "libfetchers" = {
+                  dirs = [ "src/libfetchers" ];
+                  deps = [ "libutil" "libstore" ];
+                  targets = "src/libfetchers/libnixfetchers.so";
+                  checkTargets = "libfetchers-tests_RUN";
+                  attrsOverride = preConfigure;
+                };
+                "libexpr" = {
+                  dirs = [ "src/libexpr" ];
+                  deps = [ "libutil" "libstore" "libfetchers" ];
+                  targets = "src/libexpr/libnixexpr.so";
+                  checkTargets = "libexpr-tests_RUN";
+                  attrsOverride = preConfigure;
+                };
+                "libcmd" = {
+                  dirs = [ "src/libcmd" ];
+                  deps = [ "libutil" "libstore" "libfetchers" "libmain" "libexpr" ];
+                  targets = "src/libcmd/libnixcmd.so";
+                  checkTargets = "libcmd-tests_RUN";
+                  attrsOverride = preConfigure;
+                };
+                "programs" = {
+                  dirs = [
+                    "src/build-remote"
+                    "src/nix"
+                    "src/nix-build"
+                    "src/nix-channel"
+                    "src/nix-collect-garbage"
+                    "src/nix-copy-closure"
+                    "src/nix-env"
+                    "src/nix-instantiate"
+                    "src/nix-store"
+                    "src/resolve-system-dependencies"
+                  ];
+                  deps = [ "libutil" "libstore" "libfetchers" "libmain" "libexpr" "libcmd" ];
+                  targets = lib.concatStringsSep " " ([
+                    "src/nix/nix"
+                  ] ++ lib.optionals final.stdenv.hostPlatform.isDarwin [
+                    "src/resolve-system-dependencies/resolve-system-dependencies"
+                  ]);
+                  checkTargets = "";
+                  attrsOverride = prepper.composeOverrides preConfigure (o: {
+                    src = lib.cleanSourceWith {
+                      src = ./.;
+                      filter = path: type:
+                        if lib.hasPrefix (toString ./doc) path
+                        then
+                          path == toString ./doc
+                          || path == toString ./doc/manual
+                          || path == toString ./doc/manual/local.mk
+                          || path == toString ./doc/manual/generate-manpage.nix
+                          || path == toString ./doc/manual/utils.nix
+                          || path == toString ./doc/manual/src
+                          || lib.hasPrefix (toString ./doc/manual/src/command-ref) path
+                        else
+                          o.src.filter path type;
+                    };
+                  });
+                };
+              };
+
+            in
+              toplevel.overrideAttrs
+                (o: preConfigure o // { # FIXME use composition combinator
+                  # undo the source override; we depend on everything anyway
+                  src = final.nix.src;
+                  buildFlags = "${o.buildFlags or ""} all";
+
+                });
+
           nix =
           with final;
           with commonDeps {
@@ -656,6 +822,7 @@
       packages = forAllSystems (system: rec {
         inherit (nixpkgsFor.${system}.native) nix;
         default = nix;
+        quickBuild = nixpkgsFor.${system}.native.nixQuick;
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems) {
         nix-static = nixpkgsFor.${system}.static.nix;
         dockerImage =
