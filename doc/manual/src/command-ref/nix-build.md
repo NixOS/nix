@@ -51,8 +51,8 @@ derivation).
 
 # Options
 
-All options not listed here are passed to [`nix-store
---realise`](@docroot@/command-ref/nix-store/realise.md),
+All options not listed here are passed to
+[`nix-store --realise`](nix-store/realise.md),
 except for `--arg` and `--attr` / `-A` which are passed to [`nix-instantiate`](nix-instantiate.md).
 
   - <span id="opt-no-out-link">[`--no-out-link`](#opt-no-out-link)<span>
