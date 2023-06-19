@@ -169,7 +169,7 @@ static inline void iterDropUntil(Generations & gens, auto && i, auto && cond)
 void deleteGenerationsGreaterThan(const Path & profile, GenerationNumber max, bool dryRun)
 {
     if (max == 0)
-        throw Error("Must keep at least one generation so we don't delete the current one");
+        throw Error("Must keep at least one generation, otherwise the current one would be deleted");
 
     PathLocks lock;
     lockProfile(lock, profile);
@@ -218,10 +218,11 @@ void deleteGenerationsOlderThan(const Path & profile, time_t t, bool dryRun)
     // Find the first older generation, if one exists
     iterDropUntil(gens, i, older);
 
-    /* Go back one previous generation
+    /* Take the previous generation
 
-       We don't want delete this generation yet because this generation
-       was active at the requested point in time. */
+       We don't want delete this one yet because it
+       existed at the requested point in time, and
+       we want to be able to roll back to it. */
     if (i != gens.rend()) ++i;
 
     // Delete all previous generations (unless current).

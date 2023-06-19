@@ -53,7 +53,7 @@ struct Generation
     /**
      * When the generation was created. This is extra metadata about the
      * generation used to make garbage collecting old generations more
-     * human-friendly.
+     * convenient.
      */
     time_t creationTime;
 };
@@ -67,7 +67,10 @@ typedef std::list<Generation> Generations;
 /**
  * Find all generations for the given profile.
  *
- * @param profile A profile specified by its name and location combined into a path.
+ * @param profile A profile specified by its name and location combined
+ * into a path. E.g. if "foo" is the name of the profile, and "/bar/baz"
+ * is the directory it is in, then the path "/bar/baz/foo" would be the
+ * argument for this parameter.
  *
  * @return The pair of:
  *
