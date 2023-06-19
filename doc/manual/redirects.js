@@ -340,6 +340,8 @@ const redirects = {
     "attribute-sets": "#attribute-set"
   },
   "installation/installing-binary.html": {
+    "linux": "uninstall.html#linux",
+    "macos": "uninstall.html#macos",
     "uninstalling": "uninstall.html"
   }
 };
