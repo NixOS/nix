@@ -138,9 +138,9 @@ void LocalStore::addTempRoot(const StorePath & path)
             try {
                 nix::connect(fdRootsSocket->get(), socketPath);
             } catch (SysError & e) {
-                /* The garbage collector may have exited, so we need to
-                   restart. */
-                if (e.errNo == ECONNREFUSED) {
+                /* The garbage collector may have exited or not
+                   created the socket yet, so we need to restart. */
+                if (e.errNo == ECONNREFUSED || e.errNo == ENOENT) {
                     debug("GC socket connection refused");
                     fdRootsSocket->close();
                     goto restart;
@@ -503,6 +503,11 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     auto fdGCLock = openGCLock();
     FdLock gcLock(fdGCLock.get(), ltWrite, true, "waiting for the big garbage collector lock...");
 
+    /* Synchronisation point to test ENOENT handling in
+       addTempRoot(), see tests/gc-non-blocking.sh. */
+    if (auto p = getEnv("_NIX_TEST_GC_SYNC_2"))
+        readFile(*p);
+
     /* Start the server for receiving new roots. */
     auto socketPath = stateDir.get() + gcSocketPath;
     createDirs(dirOf(socketPath));
@@ -772,7 +777,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         }
     };
 
-    /* Synchronisation point for testing, see tests/gc-concurrent.sh. */
+    /* Synchronisation point for testing, see tests/gc-non-blocking.sh. */
     if (auto p = getEnv("_NIX_TEST_GC_SYNC"))
         readFile(*p);
 
