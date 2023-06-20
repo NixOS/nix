@@ -49,12 +49,22 @@ extra-substituters = c d
 
 defines the `substituters` setting to be `a b c d`.
 
+Unknown option names are not an error, and are simply ignored with a warning.
+
 ## Command line flags
 
-Every configuration setting has a corresponding command line flag (e.g. `--max-jobs 16`).
-Boolean settings do not need an argument, and can be explicitly disabled with the `no-` prefix (e.g. `--keep-failed` and `--no-keep-failed`).
+Configuration options can be set on the command line, overriding the values set in the [configuration file](#configuration-file):
 
-Existing settings can be appended to using the `extra-` prefix (e.g. `--extra-substituters`).
+- Every configuration setting has corresponding command line flag (e.g. `--max-jobs 16`).
+  Boolean settings do not need an argument, and can be explicitly disabled with the `no-` prefix (e.g. `--keep-failed` and `--no-keep-failed`).
+
+  Unknown option names are invalid flags (unless there is already a flag with that name), and are rejected with an error.
+
+- The flag `--option <name> <value>` is interpreted exactly like a `<name> = <value>` in a setting file.
+
+  Unknown option names are ignored with a warning.
+
+The `extra-` prefix is supported for settings that take a list of items (e.g. `--extra-trusted users alice` or `--option extra-trusted-users alice`).
 
 # Available settings
 
