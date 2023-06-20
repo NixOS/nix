@@ -52,7 +52,6 @@ testCert () {
     certFile=$3    # a string that can be the path to a cert file
     [ "$mode" == fixed-output ] && ret=1 || ret=100
     expectStderr $ret nix-sandbox-build linux-sandbox-cert-test.nix --argstr mode "$mode" --option ssl-cert-file "$certFile" |
-        # tee /dev/stderr |
         grepQuiet "CERT_${expectation}_IN_SANDBOX"
 }
 
