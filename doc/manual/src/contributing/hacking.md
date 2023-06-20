@@ -62,7 +62,7 @@ To build a release version of Nix for the current operating system and CPU archi
 $ nix build
 ```
 
-You can also build Nix for one of the [supported target platforms](#target-platforms).
+You can also build Nix for one of the [supported target platforms](#platforms).
 
 ## Building Nix
 
@@ -106,7 +106,7 @@ To build a release version of Nix for the current operating system and CPU archi
 $ nix-build
 ```
 
-You can also build Nix for one of the [supported target platforms](#target-platforms).
+You can also build Nix for one of the [supported target platforms](#platforms).
 
 ## Platforms
 
