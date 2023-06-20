@@ -8,19 +8,19 @@ Nix supports a variety of configuration settings, which are read from configurat
 
 ## Configuration file
 
-By default Nix reads settings from the following places:
+By default Nix reads settings from the following places, in that order:
 
-  - The system-wide configuration file `sysconfdir/nix/nix.conf` (i.e. `/etc/nix/nix.conf` on most systems), or `$NIX_CONF_DIR/nix.conf` if [`NIX_CONF_DIR`](./env-common.md#env-NIX_CONF_DIR) is set.
+1. The system-wide configuration file `sysconfdir/nix/nix.conf` (i.e. `/etc/nix/nix.conf` on most systems), or `$NIX_CONF_DIR/nix.conf` if [`NIX_CONF_DIR`](./env-common.md#env-NIX_CONF_DIR) is set.
 
-    Values loaded in this file are not forwarded to the Nix daemon.
-    The client assumes that the daemon has already loaded them.
+   Values loaded in this file are not forwarded to the Nix daemon.
+   The client assumes that the daemon has already loaded them.
 
-  - If [`NIX_USER_CONF_FILES`](./env-common.md#env-NIX_USER_CONF_FILES) is set, then each path separated by `:` will be loaded in reverse order.
+1. If [`NIX_USER_CONF_FILES`](./env-common.md#env-NIX_USER_CONF_FILES) is set, then each path separated by `:` will be loaded in reverse order.
 
-    Otherwise it will look for `nix/nix.conf` files in `XDG_CONFIG_DIRS` and [`XDG_CONFIG_HOME`](./env-common.md#env-XDG_CONFIG_HOME).
-    If unset, `XDG_CONFIG_DIRS` defaults to `/etc/xdg`, and `XDG_CONFIG_HOME` defaults to `$HOME/.config` as per [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html).
+   Otherwise it will look for `nix/nix.conf` files in `XDG_CONFIG_DIRS` and [`XDG_CONFIG_HOME`](./env-common.md#env-XDG_CONFIG_HOME).
+   If unset, `XDG_CONFIG_DIRS` defaults to `/etc/xdg`, and `XDG_CONFIG_HOME` defaults to `$HOME/.config` as per [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html).
 
-  - If [`NIX_CONFIG`](./env-common.md#env-NIX_CONFIG) is set, its contents are treated as the contents of a configuration file.
+1. If [`NIX_CONFIG`](./env-common.md#env-NIX_CONFIG) is set, its contents are treated as the contents of a configuration file.
 
 ### File format
 
@@ -38,7 +38,7 @@ Other files can be included with a line like `include <path>`, where `<path>` is
 A missing file is an error unless `!include` is used instead.
 
 A configuration setting usually overrides any previous value.
-However, you can prefix the name of the setting by `extra-` to *append* to the previous value.
+However, for settings that take a list of items, you can prefix the name of the setting by `extra-` to *append* to the previous value.
 
 For instance,
 
