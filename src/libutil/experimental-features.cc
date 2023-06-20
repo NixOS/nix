@@ -12,7 +12,7 @@ struct ExperimentalFeatureDetails
     std::string_view description;
 };
 
-constexpr std::array<ExperimentalFeatureDetails, 14> xpFeatureDetails = {{
+constexpr std::array<ExperimentalFeatureDetails, 15> xpFeatureDetails = {{
     {
         .tag = Xp::CaDerivations,
         .name = "ca-derivations",
@@ -219,6 +219,13 @@ constexpr std::array<ExperimentalFeatureDetails, 14> xpFeatureDetails = {{
         .name = "parse-toml-timestamps",
         .description = R"(
             Allow parsing of timestamps in builtins.fromTOML.
+        )",
+    },
+    {
+        .tag = Xp::ReadOnlyLocalStore,
+        .name = "read-only-local-store",
+        .description = R"(
+            Allow the use of the `read-only` parameter in [local store](@docroot@/command-ref/new-cli/nix3-help-stores.md#local-store) URIs.
         )",
     },
 }};

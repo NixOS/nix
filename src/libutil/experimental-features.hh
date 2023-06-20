@@ -31,6 +31,7 @@ enum struct ExperimentalFeature
     DaemonTrustOverride,
     DynamicDerivations,
     ParseTomlTimestamps,
+    ReadOnlyLocalStore,
 };
 
 /**

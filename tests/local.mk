@@ -136,7 +136,8 @@ nix_tests = \
   impure-derivations.sh \
   path-from-hash-part.sh \
   test-libstoreconsumer.sh \
-  toString-path.sh
+  toString-path.sh \
+  read-only-store.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh
