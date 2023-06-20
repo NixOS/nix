@@ -64,7 +64,7 @@ struct AuthorizationSettings : Config {
           > **Warning**
           >
           > Adding a user to `trusted-users` is essentially equivalent to giving that user root access to the system.
-          > For example, the user can set [`sandbox-paths`](#conf-sandbox-paths) and thereby obtain read access to directories that are otherwise inacessible to them.
+          > For example, the user can access or replace store path contents that are critical for system security.
         )"};
 
     /**
