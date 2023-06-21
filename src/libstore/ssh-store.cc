@@ -1,6 +1,7 @@
 #include "ssh-store-config.hh"
 #include "store-api.hh"
 #include "remote-store.hh"
+#include "remote-store-connection.hh"
 #include "remote-fs-accessor.hh"
 #include "archive.hh"
 #include "worker-protocol.hh"

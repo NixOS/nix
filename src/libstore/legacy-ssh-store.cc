@@ -7,6 +7,7 @@
 #include "store-api.hh"
 #include "path-with-outputs.hh"
 #include "worker-protocol.hh"
+#include "worker-protocol-impl.hh"
 #include "ssh.hh"
 #include "derivations.hh"
 #include "callback.hh"
@@ -47,6 +48,42 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         FdSource from;
         int remoteVersion;
         bool good = true;
+
+        /**
+         * Coercion to `WorkerProto::ReadConn`. This makes it easy to use the
+         * factored out worker protocol searlizers with a
+         * `LegacySSHStore::Connection`.
+         *
+         * The worker protocol connection types are unidirectional, unlike
+         * this type.
+         *
+         * @todo Use server protocol serializers, not worker protocol
+         * serializers, once we have made that distiction.
+         */
+        operator WorkerProto::ReadConn ()
+        {
+            return WorkerProto::ReadConn {
+                .from = from,
+            };
+        }
+
+        /*
+         * Coercion to `WorkerProto::WriteConn`. This makes it easy to use the
+         * factored out worker protocol searlizers with a
+         * `LegacySSHStore::Connection`.
+         *
+         * The worker protocol connection types are unidirectional, unlike
+         * this type.
+         *
+         * @todo Use server protocol serializers, not worker protocol
+         * serializers, once we have made that distiction.
+         */
+        operator WorkerProto::WriteConn ()
+        {
+            return WorkerProto::WriteConn {
+                .to = to,
+            };
+        }
     };
 
     std::string host;
@@ -133,7 +170,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
             debug("querying remote host '%s' for info on '%s'", host, printStorePath(path));
 
-            conn->to << cmdQueryPathInfos << PathSet{printStorePath(path)};
+            conn->to << ServeProto::Command::QueryPathInfos << PathSet{printStorePath(path)};
             conn->to.flush();
 
             auto p = readString(conn->from);
@@ -146,7 +183,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info->deriver = parseStorePath(deriver);
-            info->references = WorkerProto<StorePathSet>::read(*this, conn->from);
+            info->references = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
             readLongLong(conn->from); // download size
             info->narSize = readLongLong(conn->from);
 
@@ -176,11 +213,11 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 5) {
 
             conn->to
-                << cmdAddToStoreNar
+                << ServeProto::Command::AddToStoreNar
                 << printStorePath(info.path)
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << info.narHash.to_string(Base16, false);
-            workerProtoWrite(*this, conn->to, info.references);
+            WorkerProto::write(*this, *conn, info.references);
             conn->to
                 << info.registrationTime
                 << info.narSize
@@ -198,7 +235,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         } else {
 
             conn->to
-                << cmdImportPaths
+                << ServeProto::Command::ImportPaths
                 << 1;
             try {
                 copyNAR(source, conn->to);
@@ -209,7 +246,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             conn->to
                 << exportMagic
                 << printStorePath(info.path);
-            workerProtoWrite(*this, conn->to, info.references);
+            WorkerProto::write(*this, *conn, info.references);
             conn->to
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << 0
@@ -226,7 +263,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     {
         auto conn(connections->get());
 
-        conn->to << cmdDumpStorePath << printStorePath(path);
+        conn->to << ServeProto::Command::DumpStorePath << printStorePath(path);
         conn->to.flush();
         copyNAR(conn->from, sink);
     }
@@ -279,7 +316,7 @@ public:
         auto conn(connections->get());
 
         conn->to
-            << cmdBuildDerivation
+            << ServeProto::Command::BuildDerivation
             << printStorePath(drvPath);
         writeDerivation(conn->to, *this, drv);
 
@@ -294,7 +331,7 @@ public:
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
             conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 6) {
-            auto builtOutputs = WorkerProto<DrvOutputs>::read(*this, conn->from);
+            auto builtOutputs = WorkerProto::Serialise<DrvOutputs>::read(*this, *conn);
             for (auto && [output, realisation] : builtOutputs)
                 status.builtOutputs.insert_or_assign(
                     std::move(output.outputName),
@@ -310,7 +347,7 @@ public:
 
         auto conn(connections->get());
 
-        conn->to << cmdBuildPaths;
+        conn->to << ServeProto::Command::BuildPaths;
         Strings ss;
         for (auto & p : drvPaths) {
             auto sOrDrvPath = StorePathWithOutputs::tryFromDerivedPath(p);
@@ -367,12 +404,12 @@ public:
         auto conn(connections->get());
 
         conn->to
-            << cmdQueryClosure
+            << ServeProto::Command::QueryClosure
             << includeOutputs;
-        workerProtoWrite(*this, conn->to, paths);
+        WorkerProto::write(*this, *conn, paths);
         conn->to.flush();
 
-        for (auto & i : WorkerProto<StorePathSet>::read(*this, conn->from))
+        for (auto & i : WorkerProto::Serialise<StorePathSet>::read(*this, *conn))
             out.insert(i);
     }
 
@@ -382,13 +419,13 @@ public:
         auto conn(connections->get());
 
         conn->to
-            << cmdQueryValidPaths
+            << ServeProto::Command::QueryValidPaths
             << false // lock
             << maybeSubstitute;
-        workerProtoWrite(*this, conn->to, paths);
+        WorkerProto::write(*this, *conn, paths);
         conn->to.flush();
 
-        return WorkerProto<StorePathSet>::read(*this, conn->from);
+        return WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
     }
 
     void connect() override
