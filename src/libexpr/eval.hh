@@ -704,8 +704,11 @@ struct DebugTraceStacker {
 
 /**
  * @return A string representing the type of the value `v`.
+ *
+ * @param withArticle Whether to begin with an english article, e.g. "an
+ * integer" vs "integer".
  */
-std::string_view showType(ValueType type);
+std::string_view showType(ValueType type, bool withArticle = true);
 std::string showType(const Value & v);
 
 /**

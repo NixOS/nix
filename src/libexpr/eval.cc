@@ -211,20 +211,21 @@ const Value * getPrimOp(const Value &v) {
     return primOp;
 }
 
-std::string_view showType(ValueType type)
+std::string_view showType(ValueType type, bool withArticle)
 {
+    #define WA(a, w) withArticle ? a " " w : w
     switch (type) {
-        case nInt: return "an integer";
-        case nBool: return "a Boolean";
-        case nString: return "a string";
-        case nPath: return "a path";
+        case nInt: return WA("an", "integer");
+        case nBool: return WA("a", "Boolean");
+        case nString: return WA("a", "string");
+        case nPath: return WA("a", "path");
         case nNull: return "null";
-        case nAttrs: return "a set";
-        case nList: return "a list";
-        case nFunction: return "a function";
-        case nExternal: return "an external value";
-        case nFloat: return "a float";
-        case nThunk: return "a thunk";
+        case nAttrs: return WA("a", "set");
+        case nList: return WA("a", "list");
+        case nFunction: return WA("a", "function");
+        case nExternal: return WA("an", "external value");
+        case nFloat: return WA("a", "float");
+        case nThunk: return WA("a", "thunk");
     }
     abort();
 }
