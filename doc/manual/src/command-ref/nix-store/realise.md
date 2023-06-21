@@ -19,7 +19,7 @@ Realisation of a store path works as follows:
     - Try to fetch from [substituters] the [store objects] associated with the output paths in the store derivation's [closure].
       - With [content-addressed derivations] (experimental): Determine the output paths to realise by querying build certificates in the [Nix database].
     - For any store paths that cannot be substituted, produce the required store objects by first realising all outputs of the derivation's dependencies and then running the derivation's build instructions.
-- Otherwise: Try to fetch the associated [store objects] in the paths' [closure] from the [substituters].
+- Otherwise: Try to fetch the associated [store objects] in the paths' [closure] from [substituters].
 
 If no substitutes are available and no store derivation is given, realisation fails.
 
