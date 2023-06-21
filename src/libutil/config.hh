@@ -353,21 +353,20 @@ public:
 /**
  * A special setting for Paths. These are automatically canonicalised
  * (e.g. "/foo//bar/" becomes "/foo/bar").
+ *
+ * It is mandatory to specify a path; i.e. the empty string is not
+ * permitted.
  */
 class PathSetting : public BaseSetting<Path>
 {
-    bool allowEmpty;
-
 public:
 
     PathSetting(Config * options,
-        bool allowEmpty,
         const Path & def,
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {})
         : BaseSetting<Path>(def, true, name, description, aliases)
-        , allowEmpty(allowEmpty)
     {
         options->addSetting(this);
     }
@@ -377,6 +376,30 @@ public:
     Path operator +(const char * p) const { return value + p; }
 
     void operator =(const Path & v) { this->assign(v); }
+};
+
+/**
+ * Like `PathSetting`, but the absence of a path is also allowed.
+ *
+ * `std::optional` is used instead of the empty string for clarity.
+ */
+class OptionalPathSetting : public BaseSetting<std::optional<Path>>
+{
+public:
+
+    OptionalPathSetting(Config * options,
+        const std::optional<Path> & def,
+        const std::string & name,
+        const std::string & description,
+        const std::set<std::string> & aliases = {})
+        : BaseSetting<std::optional<Path>>(def, true, name, description, aliases)
+    {
+        options->addSetting(this);
+    }
+
+    std::optional<Path> parse(const std::string & str) const override;
+
+    void operator =(const std::optional<Path> & v) { this->assign(v); }
 };
 
 struct GlobalConfig : public AbstractConfig

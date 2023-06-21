@@ -236,7 +236,7 @@ public:
         )",
         {"build-timeout"}};
 
-    PathSetting buildHook{this, true, "", "build-hook",
+    Setting<Strings> buildHook{this, {}, "build-hook",
         R"(
           The path to the helper program that executes remote builds.
 
@@ -556,8 +556,8 @@ public:
           line.
         )"};
 
-    PathSetting diffHook{
-        this, true, "", "diff-hook",
+    OptionalPathSetting diffHook{
+        this, std::nullopt, "diff-hook",
         R"(
           Absolute path to an executable capable of diffing build
           results. The hook is executed if `run-diff-hook` is true, and the
