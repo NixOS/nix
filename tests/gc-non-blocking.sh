@@ -23,6 +23,7 @@ pid=$!
 sleep 2
 
 (sleep 1; echo > $fifo2) &
+pid2=$!
 
 outPath=$(nix-build --max-silent-time 60 -o "$TEST_ROOT/result" -E "
   with import ./config.nix;
@@ -32,6 +33,7 @@ outPath=$(nix-build --max-silent-time 60 -o "$TEST_ROOT/result" -E "
   }")
 
 wait $pid
+wait $pid2
 
 (! test -e $running)
 (! test -e $dummy)
