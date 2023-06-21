@@ -598,6 +598,8 @@
           ["i686-linux" "x86_64-linux"]
           (system: runNixOSTestFor system ./tests/nixos/setuid.nix);
 
+        tests.cve-2022-24765 = runNixOSTestFor "x86_64-linux" ./tests/nixos/cve-2022-24765.nix;
+
 
         # Make sure that nix-env still produces the exact same result
         # on a particular version of Nixpkgs.
