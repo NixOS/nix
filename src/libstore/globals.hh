@@ -629,6 +629,11 @@ public:
 
           Files fetched via `NIX_PATH`, `fetchGit`, `fetchMercurial`,
           `fetchTarball`, and `fetchurl` respect this TTL.
+
+          This option also affects how often the global flake registry is
+          updated.  For example, a flake URI like `nixpkgs#hello` will trigger
+          a new download of Nixpkgs if the last download is older than the
+          `tarball-ttl`.
         )"};
 
     Setting<bool> requireSigs{
