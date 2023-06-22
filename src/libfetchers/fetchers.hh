@@ -109,6 +109,7 @@ public:
     std::string getType() const;
     std::optional<Hash> getNarHash() const;
     std::optional<std::string> getRef() const;
+    std::optional<std::string> getDate() const;
     std::optional<Hash> getRev() const;
     std::optional<uint64_t> getRevCount() const;
     std::optional<time_t> getLastModified() const;

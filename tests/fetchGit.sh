@@ -227,6 +227,23 @@ rev_tag2=$(git -C $repo rev-parse refs/tags/tag2)
 [[ $rev_tag2_nix = $rev_tag2 ]]
 unset _NIX_FORCE_HTTP
 
+# The date argument works for both local repos and "remote" repos, returning the
+# first commit preceding the specified commit
+timestamp="$(date '+%s')"
+sleep 1
+git -C $repo commit -m 'Bla6' --allow-empty
+
+rev4_date=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; date = \"$timestamp\"; }).rev")
+[[ $rev4 = $rev4_date ]]
+export _NIX_FORCE_HTTP=1
+rev4_date=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; date = \"$timestamp\"; }).rev")
+[[ $rev4 = $rev4_date ]]
+unset _NIX_FORCE_HTTP
+
+# A date prior to the first commit returns the first commit instead of failing
+rev1_date=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; date = \"1 year ago\"; }).rev")
+[[ $rev1 = $rev1_date ]]
+
 # should fail if there is no repo
 rm -rf $repo/.git
 (! nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")

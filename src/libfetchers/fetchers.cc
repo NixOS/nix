@@ -248,6 +248,13 @@ std::optional<std::string> Input::getRef() const
     return {};
 }
 
+std::optional<std::string> Input::getDate() const
+{
+    if (auto s = maybeGetStrAttr(attrs, "date"))
+        return *s;
+    return {};
+}
+
 std::optional<Hash> Input::getRev() const
 {
     std::optional<Hash> hash = {};
