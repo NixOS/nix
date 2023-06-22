@@ -388,9 +388,37 @@ public:
      * Evaluation the expression, then verify that it has the expected
      * type.
      */
-    inline bool evalBool(Env & env, Expr * e);
-    inline bool evalBool(Env & env, Expr * e, const PosIdx pos, std::string_view errorCtx);
-    inline void evalAttrs(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx);
+    bool evalBool(Env & env, Expr * e, const PosIdx pos,
+                  std::string_view errorCtx)
+    {
+        try {
+            Value v;
+            e->eval(*this, env, v);
+            if (v.type() != nBool)
+                error("value is %1% while a Boolean was expected", showType(v))
+                    .withFrame(env, *e)
+                    .debugThrow<TypeError>();
+            return v.boolean;
+        } catch (Error & e) {
+            e.addTrace(positions[pos], errorCtx);
+            throw;
+        }
+    }
+
+    void evalAttrs(Env & env, Expr * e, Value & v, const PosIdx pos,
+                   std::string_view errorCtx)
+    {
+        try {
+            e->eval(*this, env, v);
+            if (v.type() != nAttrs)
+                error("value is %1% while a set was expected", showType(v))
+                    .withFrame(env, *e)
+                    .debugThrow<TypeError>();
+        } catch (Error & e) {
+            e.addTrace(positions[pos], errorCtx);
+            throw;
+        }
+    }
 
     /**
      * If `v` is a thunk, enter it and overwrite `v` with the result
