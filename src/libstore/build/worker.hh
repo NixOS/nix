@@ -280,7 +280,28 @@ public:
      */
     void waitForInput();
 
-    unsigned int exitStatus();
+    /***
+     * The exit status in case of failure.
+     *
+     * In the case of a build failure, returned value follows this
+     * bitmask:
+     *
+     * ```
+     * 0b1100100
+     *      ^^^^
+     *      |||`- timeout
+     *      ||`-- output hash mismatch
+     *      |`--- build failure
+     *      `---- not deterministic
+     * ```
+     *
+     * In other words, the failure code is at least 100 (0b1100100), but
+     * might also be greater.
+     *
+     * Otherwise (no build failure, but some other sort of failure by
+     * assumption), this returned value is 1.
+     */
+    unsigned int failingExitStatus();
 
     /**
      * Check whether the given valid path exists and has the right

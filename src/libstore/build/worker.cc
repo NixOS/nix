@@ -468,16 +468,9 @@ void Worker::waitForInput()
 }
 
 
-unsigned int Worker::exitStatus()
+unsigned int Worker::failingExitStatus()
 {
-    /*
-     * 1100100
-     *    ^^^^
-     *    |||`- timeout
-     *    ||`-- output hash mismatch
-     *    |`--- build failure
-     *    `---- not deterministic
-     */
+    // See API docs in header for explanation
     unsigned int mask = 0;
     bool buildFailure = permanentFailure || timedOut || hashMismatch;
     if (buildFailure)
