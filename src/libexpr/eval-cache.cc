@@ -47,7 +47,7 @@ struct AttrDb
     {
         auto state(_state->lock());
 
-        Path cacheDir = getCacheDir() + "/nix/eval-cache-v4";
+        Path cacheDir = getCacheDir() + "/nix/eval-cache-v5";
         createDirs(cacheDir);
 
         Path dbPath = cacheDir + "/" + fingerprint.to_string(Base16, false) + ".sqlite";
@@ -300,7 +300,7 @@ struct AttrDb
                 NixStringContext context;
                 if (!queryAttribute.isNull(3))
                     for (auto & s : tokenizeString<std::vector<std::string>>(queryAttribute.getStr(3), ";"))
-                        context.push_back(decodeContext(cfg, s));
+                        context.insert(NixStringContextElem::parse(s));
                 return {{rowId, string_t{queryAttribute.getStr(2), context}}};
             }
             case AttrType::Bool:
@@ -385,7 +385,7 @@ Value & AttrCursor::getValue()
     if (!_value) {
         if (parent) {
             auto & vParent = parent->first->getValue();
-            root->state.forceAttrs(vParent, noPos);
+            root->state.forceAttrs(vParent, noPos, "while searching for an attribute");
             auto attr = vParent.attrs->get(parent->second);
             if (!attr)
                 throw Error("attribute '%s' is unexpectedly missing", getAttrPathStr());
@@ -442,8 +442,10 @@ Value & AttrCursor::forceValue()
         if (v.type() == nString)
             cachedValue = {root->db->setString(getKey(), v.string.s, v.string.context),
                            string_t{v.string.s, {}}};
-        else if (v.type() == nPath)
-            cachedValue = {root->db->setString(getKey(), v.path), string_t{v.path, {}}};
+        else if (v.type() == nPath) {
+            auto path = v.path().path;
+            cachedValue = {root->db->setString(getKey(), path.abs()), string_t{path.abs(), {}}};
+        }
         else if (v.type() == nBool)
             cachedValue = {root->db->setBool(getKey(), v.boolean), v.boolean};
         else if (v.type() == nInt)
@@ -506,11 +508,6 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name, bool forceErro
     if (v.type() != nAttrs)
         return nullptr;
         //throw TypeError("'%s' is not an attribute set", getAttrPathStr());
-
-    for (auto & attr : *v.attrs) {
-        if (root->db)
-            root->db->setPlaceholder({cachedValue->first, attr.name});
-    }
 
     auto attr = v.attrs->get(name);
 
@@ -576,16 +573,16 @@ std::string AttrCursor::getString()
                 debug("using cached string attribute '%s'", getAttrPathStr());
                 return s->first;
             } else
-                root->state.debugThrowLastTrace(TypeError("'%s' is not a string", getAttrPathStr()));
+                root->state.error("'%s' is not a string", getAttrPathStr()).debugThrow<TypeError>();
         }
     }
 
     auto & v = forceValue();
 
     if (v.type() != nString && v.type() != nPath)
-        root->state.debugThrowLastTrace(TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type())));
+        root->state.error("'%s' is not a string but %s", getAttrPathStr()).debugThrow<TypeError>();
 
-    return v.type() == nString ? v.string.s : v.path;
+    return v.type() == nString ? v.string.s : v.path().to_string();
 }
 
 string_t AttrCursor::getStringWithContext()
@@ -597,7 +594,18 @@ string_t AttrCursor::getStringWithContext()
             if (auto s = std::get_if<string_t>(&cachedValue->second)) {
                 bool valid = true;
                 for (auto & c : s->second) {
-                    if (!root->state.store->isValidPath(c.first)) {
+                    const StorePath & path = std::visit(overloaded {
+                        [&](const NixStringContextElem::DrvDeep & d) -> const StorePath & {
+                            return d.drvPath;
+                        },
+                        [&](const NixStringContextElem::Built & b) -> const StorePath & {
+                            return b.drvPath;
+                        },
+                        [&](const NixStringContextElem::Opaque & o) -> const StorePath & {
+                            return o.path;
+                        },
+                    }, c.raw());
+                    if (!root->state.store->isValidPath(path)) {
                         valid = false;
                         break;
                     }
@@ -607,18 +615,21 @@ string_t AttrCursor::getStringWithContext()
                     return *s;
                 }
             } else
-                root->state.debugThrowLastTrace(TypeError("'%s' is not a string", getAttrPathStr()));
+                root->state.error("'%s' is not a string", getAttrPathStr()).debugThrow<TypeError>();
         }
     }
 
     auto & v = forceValue();
 
-    if (v.type() == nString)
-        return {v.string.s, v.getContext(*root->state.store)};
+    if (v.type() == nString) {
+        NixStringContext context;
+        copyContext(v, context);
+        return {v.string.s, std::move(context)};
+    }
     else if (v.type() == nPath)
-        return {v.path, {}};
+        return {v.path().to_string(), {}};
     else
-        root->state.debugThrowLastTrace(TypeError("'%s' is not a string but %s", getAttrPathStr(), showType(v.type())));
+        root->state.error("'%s' is not a string but %s", getAttrPathStr()).debugThrow<TypeError>();
 }
 
 bool AttrCursor::getBool()
@@ -631,14 +642,14 @@ bool AttrCursor::getBool()
                 debug("using cached Boolean attribute '%s'", getAttrPathStr());
                 return *b;
             } else
-                root->state.debugThrowLastTrace(TypeError("'%s' is not a Boolean", getAttrPathStr()));
+                root->state.error("'%s' is not a Boolean", getAttrPathStr()).debugThrow<TypeError>();
         }
     }
 
     auto & v = forceValue();
 
     if (v.type() != nBool)
-        root->state.debugThrowLastTrace(TypeError("'%s' is not a Boolean", getAttrPathStr()));
+        root->state.error("'%s' is not a Boolean", getAttrPathStr()).debugThrow<TypeError>();
 
     return v.boolean;
 }
@@ -650,17 +661,17 @@ NixInt AttrCursor::getInt()
             cachedValue = root->db->getAttr(getKey());
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
             if (auto i = std::get_if<int_t>(&cachedValue->second)) {
-                debug("using cached Integer attribute '%s'", getAttrPathStr());
+                debug("using cached integer attribute '%s'", getAttrPathStr());
                 return i->x;
             } else
-                throw TypeError("'%s' is not an Integer", getAttrPathStr());
+                throw TypeError("'%s' is not an integer", getAttrPathStr());
         }
     }
 
     auto & v = forceValue();
 
     if (v.type() != nInt)
-        throw TypeError("'%s' is not an Integer", getAttrPathStr());
+        throw TypeError("'%s' is not an integer", getAttrPathStr());
 
     return v.integer;
 }
@@ -690,7 +701,7 @@ std::vector<std::string> AttrCursor::getListOfStrings()
     std::vector<std::string> res;
 
     for (auto & elem : v.listItems())
-        res.push_back(std::string(root->state.forceStringNoCtx(*elem)));
+        res.push_back(std::string(root->state.forceStringNoCtx(*elem, noPos, "while evaluating an attribute for caching")));
 
     if (root->db)
         cachedValue = {root->db->setListOfStrings(getKey(), res), res};
@@ -708,14 +719,14 @@ std::vector<Symbol> AttrCursor::getAttrs()
                 debug("using cached attrset attribute '%s'", getAttrPathStr());
                 return *attrs;
             } else
-                root->state.debugThrowLastTrace(TypeError("'%s' is not an attribute set", getAttrPathStr()));
+                root->state.error("'%s' is not an attribute set", getAttrPathStr()).debugThrow<TypeError>();
         }
     }
 
     auto & v = forceValue();
 
     if (v.type() != nAttrs)
-        root->state.debugThrowLastTrace(TypeError("'%s' is not an attribute set", getAttrPathStr()));
+        root->state.error("'%s' is not an attribute set", getAttrPathStr()).debugThrow<TypeError>();
 
     std::vector<Symbol> attrs;
     for (auto & attr : *getValue().attrs)

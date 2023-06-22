@@ -30,8 +30,8 @@ Since `nix-copy-closure` calls `ssh`, you may be asked to type in the
 appropriate password or passphrase.  In fact, you may be asked _twice_
 because `nix-copy-closure` currently connects twice to the remote
 machine, first to get the set of paths missing on the target machine,
-and second to send the dump of those paths.  If this bothers you, use
-`ssh-agent`.
+and second to send the dump of those paths.  When using public key
+authentication, you can avoid typing the passphrase with `ssh-agent`.
 
 # Options
 
@@ -47,7 +47,9 @@ and second to send the dump of those paths.  If this bothers you, use
     Enable compression of the SSH connection.
 
   - `--include-outputs`\
-    Also copy the outputs of store derivations included in the closure.
+    Also copy the outputs of [store derivation]s included in the closure.
+
+    [store derivation]: ../glossary.md#gloss-store-derivation
 
   - `--use-substitutes` / `-s`\
     Attempt to download missing paths on the target machine using Nix’s
@@ -61,11 +63,15 @@ and second to send the dump of those paths.  If this bothers you, use
   - `-v`\
     Show verbose output.
 
+{{#include ./opt-common.md}}
+
 # Environment variables
 
   - `NIX_SSHOPTS`\
     Additional options to be passed to `ssh` on the command
     line.
+
+{{#include ./env-common.md}}
 
 # Examples
 
@@ -81,5 +87,5 @@ environment:
 ```console
 $ nix-copy-closure --from alice@itchy.labs \
     /nix/store/0dj0503hjxy5mbwlafv1rsbdiyx1gkdy-subversion-1.4.4
-$ nix-env -i /nix/store/0dj0503hjxy5mbwlafv1rsbdiyx1gkdy-subversion-1.4.4
+$ nix-env --install /nix/store/0dj0503hjxy5mbwlafv1rsbdiyx1gkdy-subversion-1.4.4
 ```

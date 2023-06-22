@@ -1,16 +1,16 @@
 # Built-in Functions
 
-This section lists the functions built into the Nix expression
-evaluator. (The built-in function `derivation` is discussed above.)
-Some built-ins, such as `derivation`, are always in scope of every Nix
-expression; you can just access them right away. But to prevent
-polluting the namespace too much, most built-ins are not in
-scope. Instead, you can access them through the `builtins` built-in
-value, which is a set that contains all built-in functions and values.
-For instance, `derivation` is also available as `builtins.derivation`.
+This section lists the functions built into the Nix language evaluator.
+All built-in functions are available through the global [`builtins`](./builtin-constants.md#builtins-builtins) constant.
+
+For convenience, some built-ins are can be accessed directly:
+
+- [`derivation`](#builtins-derivation)
+- [`import`](#builtins-import)
+- [`abort`](#builtins-abort)
+- [`throw`](#builtins-throw)
 
 <dl>
-  <dt><code>derivation <var>attrs</var></code>;
-      <code>builtins.derivation <var>attrs</var></code></dt>
+  <dt id="builtins-derivation"><a href="#builtins-derivation"><code>derivation <var>attrs</var></code></a></dt>
   <dd><p><var>derivation</var> is described in
          <a href="derivations.md">its own section</a>.</p></dd>

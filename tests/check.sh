@@ -37,7 +37,7 @@ checkBuildTempDirRemoved $TEST_ROOT/log
 
 nix-build check.nix -A deterministic --argstr checkBuildId $checkBuildId \
     --no-out-link --check --keep-failed 2> $TEST_ROOT/log
-if grep -q 'may not be deterministic' $TEST_ROOT/log; then false; fi
+if grepQuiet 'may not be deterministic' $TEST_ROOT/log; then false; fi
 checkBuildTempDirRemoved $TEST_ROOT/log
 
 nix-build check.nix -A nondeterministic --argstr checkBuildId $checkBuildId \
@@ -58,12 +58,6 @@ if checkBuildTempDirRemoved $TEST_ROOT/log; then false; fi
 
 clearStore
 
-nix-build dependencies.nix --no-out-link --repeat 3
-
-nix-build check.nix -A nondeterministic --no-out-link --repeat 1 2> $TEST_ROOT/log || status=$?
-[ "$status" = "1" ]
-grep 'differs from previous round' $TEST_ROOT/log
-
 path=$(nix-build check.nix -A fetchurl --no-out-link)
 
 chmod +w $path
@@ -77,13 +71,13 @@ nix-build check.nix -A fetchurl --no-out-link --check
 nix-build check.nix -A fetchurl --no-out-link --repair
 [[ $(cat $path) != foo ]]
 
-echo 'Hello World' > $TMPDIR/dummy
+echo 'Hello World' > $TEST_ROOT/dummy
 nix-build check.nix -A hashmismatch --no-out-link || status=$?
 [ "$status" = "102" ]
 
-echo -n > $TMPDIR/dummy
+echo -n > $TEST_ROOT/dummy
 nix-build check.nix -A hashmismatch --no-out-link
-echo 'Hello World' > $TMPDIR/dummy
+echo 'Hello World' > $TEST_ROOT/dummy
 
 nix-build check.nix -A hashmismatch --no-out-link --check || status=$?
 [ "$status" = "102" ]

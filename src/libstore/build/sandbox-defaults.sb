@@ -1,0 +1,110 @@
+R""(
+
+(define TMPDIR (param "_GLOBAL_TMP_DIR"))
+
+(deny default)
+
+; Disallow creating setuid/setgid binaries, since that
+; would allow breaking build user isolation.
+(deny file-write-setugid)
+
+; Allow forking.
+(allow process-fork)
+
+; Allow reading system information like #CPUs, etc.
+(allow sysctl-read)
+
+; Allow POSIX semaphores and shared memory.
+(allow ipc-posix*)
+
+; Allow socket creation.
+(allow system-socket)
+
+; Allow sending signals within the sandbox.
+(allow signal (target same-sandbox))
+
+; Allow getpwuid.
+(allow mach-lookup (global-name "com.apple.system.opendirectoryd.libinfo"))
+
+; Access to /tmp.
+; The network-outbound/network-inbound ones are for unix domain sockets, which
+; we allow access to in TMPDIR (but if we allow them more broadly, you could in
+; theory escape the sandbox)
+(allow file* process-exec network-outbound network-inbound
+       (literal "/tmp") (subpath TMPDIR))
+
+; Some packages like to read the system version.
+(allow file-read*
+       (literal "/System/Library/CoreServices/SystemVersion.plist")
+       (literal "/System/Library/CoreServices/SystemVersionCompat.plist"))
+
+; Without this line clang cannot write to /dev/null, breaking some configure tests.
+(allow file-read-metadata (literal "/dev"))
+
+; Many packages like to do local networking in their test suites, but let's only
+; allow it if the package explicitly asks for it.
+(if (param "_ALLOW_LOCAL_NETWORKING")
+    (begin
+      (allow network* (local ip) (local tcp) (local udp))
+
+      ; Allow access to /etc/resolv.conf (which is a symlink to
+      ; /private/var/run/resolv.conf).
+      ; TODO: deduplicate with sandbox-network.sb
+      (allow file-read-metadata
+             (literal "/var")
+             (literal "/etc")
+             (literal "/etc/resolv.conf")
+             (literal "/private/etc/resolv.conf"))
+
+      (allow file-read*
+             (literal "/private/var/run/resolv.conf"))
+
+      ; Allow DNS lookups. This is even needed for localhost, which lots of tests rely on
+      (allow file-read-metadata (literal "/etc/hosts"))
+      (allow file-read*         (literal "/private/etc/hosts"))
+      (allow network-outbound (remote unix-socket (path-literal "/private/var/run/mDNSResponder")))))
+
+; Standard devices.
+(allow file*
+       (literal "/dev/null")
+       (literal "/dev/random")
+       (literal "/dev/stdin")
+       (literal "/dev/stdout")
+       (literal "/dev/tty")
+       (literal "/dev/urandom")
+       (literal "/dev/zero")
+       (subpath "/dev/fd"))
+
+; Allow pseudo-terminals.
+(allow file*
+       (literal "/dev/ptmx")
+       (regex #"^/dev/pty[a-z]+")
+       (regex #"^/dev/ttys[0-9]+"))
+
+; Does nothing, but reduces build noise.
+(allow file* (literal "/dev/dtracehelper"))
+
+; Allow access to zoneinfo since libSystem needs it.
+(allow file-read* (subpath "/usr/share/zoneinfo"))
+
+(allow file-read* (subpath "/usr/share/locale"))
+
+; This is mostly to get more specific log messages when builds try to
+; access something in /etc or /var.
+(allow file-read-metadata
+       (literal "/etc")
+       (literal "/var")
+       (literal "/private/var/tmp"))
+
+; This is used by /bin/sh on macOS 10.15 and later.
+(allow file*
+       (literal "/private/var/select/sh"))
+
+; Allow Rosetta 2 to run x86_64 binaries on aarch64-darwin (and vice versa).
+(allow file-read*
+       (subpath "/Library/Apple/usr/libexec/oah")
+       (subpath "/System/Library/Apple/usr/libexec/oah")
+       (subpath "/System/Library/LaunchDaemons/com.apple.oahd.plist")
+       (subpath "/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist"))
+
+)""

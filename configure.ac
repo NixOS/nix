@@ -41,8 +41,6 @@ AC_DEFINE_UNQUOTED(SYSTEM, ["$system"], [platform identifier ('cpu-os')])
 test "$localstatedir" = '${prefix}/var' && localstatedir=/nix/var
 
 
-CFLAGS=
-CXXFLAGS=
 AC_PROG_CC
 AC_PROG_CXX
 AC_PROG_CPP
@@ -147,6 +145,18 @@ if test "x$GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC" = xyes; then
     LDFLAGS="-latomic $LDFLAGS"
 fi
 
+# Building without tests is useful for bootstrapping with a smaller footprint
+# or running the tests in a separate derivation. Otherwise, we do compile and
+# run them.
+AC_ARG_ENABLE(tests, AS_HELP_STRING([--disable-tests],[Do not build the tests]),
+  tests=$enableval, tests=yes)
+AC_SUBST(tests)
+
+# Building without API docs is the default as Nix' C++ interfaces are internal and unstable.
+AC_ARG_ENABLE(internal_api_docs, AS_HELP_STRING([--enable-internal-api-docs],[Build API docs for Nix's internal unstable C++ interfaces]),
+  internal_api_docs=$enableval, internal_api_docs=no)
+AC_SUBST(internal_api_docs)
+
 # LTO is currently broken with clang for unknown reasons; ld segfaults in the llvm plugin
 AC_ARG_ENABLE(lto, AS_HELP_STRING([--enable-lto],[Enable LTO (only supported with GCC) [default=no]]),
   lto=$enableval, lto=no)
@@ -174,10 +184,10 @@ fi
 
 # Look for OpenSSL, a required dependency. FIXME: this is only (maybe)
 # used by S3BinaryCacheStore.
-PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
+PKG_CHECK_MODULES([OPENSSL], [libcrypto >= 1.1.1], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"])
 
 
-# Checks for libarchive
+# Look for libarchive.
 PKG_CHECK_MODULES([LIBARCHIVE], [libarchive >= 3.1.2], [CXXFLAGS="$LIBARCHIVE_CFLAGS $CXXFLAGS"])
 # Workaround until https://github.com/libarchive/libarchive/issues/1446 is fixed
 if test "$shared" != yes; then
@@ -272,9 +282,34 @@ if test "$gc" = yes; then
 fi
 
 
+if test "$tests" = yes; then
+
 # Look for gtest.
 PKG_CHECK_MODULES([GTEST], [gtest_main])
 
+
+# Look for rapidcheck.
+AC_ARG_VAR([RAPIDCHECK_HEADERS], [include path of gtest headers shipped by RAPIDCHECK])
+# No pkg-config yet, https://github.com/emil-e/rapidcheck/issues/302
+AC_LANG_PUSH(C++)
+AC_SUBST(RAPIDCHECK_HEADERS)
+[CXXFLAGS="-I $RAPIDCHECK_HEADERS $CXXFLAGS"]
+[LIBS="-lrapidcheck -lgtest $LIBS"]
+AC_CHECK_HEADERS([rapidcheck/gtest.h], [], [], [#include <gtest/gtest.h>])
+dnl AC_CHECK_LIB doesn't work for C++ libs with mangled symbols
+AC_LINK_IFELSE([
+    AC_LANG_PROGRAM([[
+      #include <gtest/gtest.h>
+      #include <rapidcheck/gtest.h>
+    ]], [[
+      return RUN_ALL_TESTS();
+    ]])
+  ],
+  [],
+  [AC_MSG_ERROR([librapidcheck is not found.])])
+AC_LANG_POP(C++)
+
+fi
 
 # Look for nlohmann/json.
 PKG_CHECK_MODULES([NLOHMANN_JSON], [nlohmann_json >= 3.9])
@@ -294,15 +329,6 @@ AC_CHECK_FUNCS([setresuid setreuid lchown])
 
 # Nice to have, but not essential.
 AC_CHECK_FUNCS([strsignal posix_fallocate sysconf])
-
-
-# This is needed if bzip2 is a static library, and the Nix libraries
-# are dynamic.
-case "${host_os}" in
-  darwin*)
-    LDFLAGS="-all_load $LDFLAGS"
-    ;;
-esac
 
 
 AC_ARG_WITH(sandbox-shell, AS_HELP_STRING([--with-sandbox-shell=PATH],[path of a statically-linked shell to use as /bin/sh in sandboxes]),

@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "store-api.hh"
 #include "gc-store.hh"
@@ -9,20 +10,28 @@ namespace nix {
 struct LocalFSStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
+
     // FIXME: the (StoreConfig*) cast works around a bug in gcc that causes
     // it to omit the call to the Setting constructor. Clang works fine
     // either way.
-    const PathSetting rootDir{(StoreConfig*) this, true, "",
-        "root", "directory prefixed to all other paths"};
-    const PathSetting stateDir{(StoreConfig*) this, false,
-        rootDir != "" ? rootDir + "/nix/var/nix" : settings.nixStateDir,
-        "state", "directory where Nix will store state"};
-    const PathSetting logDir{(StoreConfig*) this, false,
-        rootDir != "" ? rootDir + "/nix/var/log/nix" : settings.nixLogDir,
-        "log", "directory where Nix will store state"};
-    const PathSetting realStoreDir{(StoreConfig*) this, false,
-        rootDir != "" ? rootDir + "/nix/store" : storeDir, "real",
-        "physical path to the Nix store"};
+
+    const OptionalPathSetting rootDir{(StoreConfig*) this, std::nullopt,
+        "root",
+        "Directory prefixed to all other paths."};
+
+    const PathSetting stateDir{(StoreConfig*) this,
+        rootDir.get() ? *rootDir.get() + "/nix/var/nix" : settings.nixStateDir,
+        "state",
+        "Directory where Nix will store state."};
+
+    const PathSetting logDir{(StoreConfig*) this,
+        rootDir.get() ? *rootDir.get() + "/nix/var/log/nix" : settings.nixLogDir,
+        "log",
+        "directory where Nix will store log files."};
+
+    const PathSetting realStoreDir{(StoreConfig*) this,
+        rootDir.get() ? *rootDir.get() + "/nix/store" : storeDir, "real",
+        "Physical path of the Nix store."};
 };
 
 class LocalFSStore : public virtual LocalFSStoreConfig,
@@ -39,7 +48,9 @@ public:
     void narFromPath(const StorePath & path, Sink & sink) override;
     ref<FSAccessor> getFSAccessor() override;
 
-    /* Register a permanent GC root. */
+    /**
+     * Register a permanent GC root.
+     */
     Path addPermRoot(const StorePath & storePath, const Path & gcRoot);
 
     virtual Path getRealStoreDir() { return realStoreDir; }
@@ -50,7 +61,7 @@ public:
         return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);
     }
 
-    std::optional<std::string> getBuildLog(const StorePath & path) override;
+    std::optional<std::string> getBuildLogExact(const StorePath & path) override;
 
 };
 

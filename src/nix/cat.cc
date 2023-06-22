@@ -17,7 +17,7 @@ struct MixCat : virtual Args
         if (st.type != FSAccessor::Type::tRegular)
             throw Error("path '%1%' is not a regular file", path);
 
-        std::cout << accessor->readFile(path);
+        writeFull(STDOUT_FILENO, accessor->readFile(path));
     }
 };
 

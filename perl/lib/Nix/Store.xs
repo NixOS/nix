@@ -26,8 +26,7 @@ static ref<Store> store()
     static std::shared_ptr<Store> _store;
     if (!_store) {
         try {
-            loadConfFile();
-            settings.lockCPU = false;
+            initLibStore();
             _store = openStore();
         } catch (Error & e) {
             croak("%s", e.what());
@@ -294,7 +293,13 @@ SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
         try {
             auto h = Hash::parseAny(hash, parseHashType(algo));
             auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
-            auto path = store()->makeFixedOutputPath(method, h, name);
+            auto path = store()->makeFixedOutputPath(name, FixedOutputInfo {
+                .hash = {
+                    .method = method,
+                    .hash = h,
+                },
+                .references = {},
+            });
             XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(path).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());

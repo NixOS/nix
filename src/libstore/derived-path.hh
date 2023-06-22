@@ -1,10 +1,13 @@
 #pragma once
+///@file
 
 #include "util.hh"
 #include "path.hh"
 #include "realisation.hh"
+#include "outputs-spec.hh"
+#include "comparator.hh"
 
-#include <optional>
+#include <variant>
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -26,8 +29,7 @@ struct DerivedPathOpaque {
     std::string to_string(const Store & store) const;
     static DerivedPathOpaque parse(const Store & store, std::string_view);
 
-    bool operator < (const DerivedPathOpaque & b) const
-    { return path < b.path; }
+    GENERATE_CMP(DerivedPathOpaque, me->path);
 };
 
 /**
@@ -44,14 +46,23 @@ struct DerivedPathOpaque {
  */
 struct DerivedPathBuilt {
     StorePath drvPath;
-    std::set<std::string> outputs;
+    OutputsSpec outputs;
 
+    /**
+     * Uses `^` as the separator
+     */
     std::string to_string(const Store & store) const;
-    static DerivedPathBuilt parse(const Store & store, std::string_view);
+    /**
+     * Uses `!` as the separator
+     */
+    std::string to_string_legacy(const Store & store) const;
+    /**
+     * The caller splits on the separator, so it works for both variants.
+     */
+    static DerivedPathBuilt parse(const Store & store, std::string_view drvPath, std::string_view outputs);
     nlohmann::json toJSON(ref<Store> store) const;
 
-    bool operator < (const DerivedPathBuilt & b) const
-    { return std::make_pair(drvPath, outputs) < std::make_pair(b.drvPath, b.outputs); }
+    GENERATE_CMP(DerivedPathBuilt, me->drvPath, me->outputs);
 };
 
 using _DerivedPathRaw = std::variant<
@@ -80,8 +91,22 @@ struct DerivedPath : _DerivedPathRaw {
         return static_cast<const Raw &>(*this);
     }
 
+    /**
+     * Uses `^` as the separator
+     */
     std::string to_string(const Store & store) const;
+    /**
+     * Uses `!` as the separator
+     */
+    std::string to_string_legacy(const Store & store) const;
+    /**
+     * Uses `^` as the separator
+     */
     static DerivedPath parse(const Store & store, std::string_view);
+    /**
+     * Uses `!` as the separator
+     */
+    static DerivedPath parseLegacy(const Store & store, std::string_view);
 };
 
 /**
@@ -95,6 +120,8 @@ struct BuiltPathBuilt {
 
     nlohmann::json toJSON(ref<Store> store) const;
     static BuiltPathBuilt parse(const Store & store, std::string_view);
+
+    GENERATE_CMP(BuiltPathBuilt, me->drvPath, me->outputs);
 };
 
 using _BuiltPathRaw = std::variant<
@@ -103,7 +130,7 @@ using _BuiltPathRaw = std::variant<
 >;
 
 /**
- * A built path. Similar to a `DerivedPath`, but enriched with the corresponding
+ * A built path. Similar to a DerivedPath, but enriched with the corresponding
  * output path(s).
  */
 struct BuiltPath : _BuiltPathRaw {
@@ -124,8 +151,5 @@ struct BuiltPath : _BuiltPathRaw {
 
 typedef std::vector<DerivedPath> DerivedPaths;
 typedef std::vector<BuiltPath> BuiltPaths;
-
-nlohmann::json derivedPathsWithHintsToJSON(const BuiltPaths & buildables, ref<Store> store);
-nlohmann::json derivedPathsToJSON(const DerivedPaths & , ref<Store> store);
 
 }

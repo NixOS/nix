@@ -2,6 +2,7 @@
 #include "sync.hh"
 #include "finally.hh"
 #include "serialise.hh"
+#include "cgroup.hh"
 
 #include <array>
 #include <cctype>
@@ -35,8 +36,8 @@
 #ifdef __linux__
 #include <sys/prctl.h>
 #include <sys/resource.h>
+#include <sys/mman.h>
 
-#include <mntent.h>
 #include <cmath>
 #endif
 
@@ -46,6 +47,9 @@ extern char * * environ __attribute__((weak));
 
 namespace nix {
 
+void initLibUtil() {
+}
+
 std::optional<std::string> getEnv(const std::string & key)
 {
     char * value = getenv(key.c_str());
@@ -53,6 +57,11 @@ std::optional<std::string> getEnv(const std::string & key)
     return std::string(value);
 }
 
+std::optional<std::string> getEnvNonEmpty(const std::string & key) {
+    auto value = getEnv(key);
+    if (value == "") return {};
+    return value;
+}
 
 std::map<std::string, std::string> getEnv()
 {
@@ -257,6 +266,17 @@ bool pathExists(const Path & path)
     return false;
 }
 
+bool pathAccessible(const Path & path)
+{
+    try {
+        return pathExists(path);
+    } catch (SysError & e) {
+        // swallow EPERM
+        if (e.errNo == EPERM) return false;
+        throw;
+    }
+}
+
 
 Path readLink(const Path & path)
 {
@@ -353,7 +373,7 @@ void readFile(const Path & path, Sink & sink)
 }
 
 
-void writeFile(const Path & path, std::string_view s, mode_t mode)
+void writeFile(const Path & path, std::string_view s, mode_t mode, bool sync)
 {
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
@@ -364,10 +384,16 @@ void writeFile(const Path & path, std::string_view s, mode_t mode)
         e.addTrace({}, "writing file '%1%'", path);
         throw;
     }
+    if (sync)
+        fd.fsync();
+    // Explicitly close to make sure exceptions are propagated.
+    fd.close();
+    if (sync)
+        syncParent(path);
 }
 
 
-void writeFile(const Path & path, Source & source, mode_t mode)
+void writeFile(const Path & path, Source & source, mode_t mode, bool sync)
 {
     AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
     if (!fd)
@@ -386,6 +412,20 @@ void writeFile(const Path & path, Source & source, mode_t mode)
         e.addTrace({}, "writing file '%1%'", path);
         throw;
     }
+    if (sync)
+        fd.fsync();
+    // Explicitly close to make sure exceptions are propagated.
+    fd.close();
+    if (sync)
+        syncParent(path);
+}
+
+void syncParent(const Path & path)
+{
+    AutoCloseFD fd = open(dirOf(path).c_str(), O_RDONLY, 0);
+    if (!fd)
+        throw SysError("opening file '%1%'", path);
+    fd.fsync();
 }
 
 std::string readLine(int fd)
@@ -502,64 +542,9 @@ void deletePath(const Path & path)
 
 void deletePath(const Path & path, uint64_t & bytesFreed)
 {
-    //Activity act(*logger, lvlDebug, format("recursively deleting path '%1%'") % path);
+    //Activity act(*logger, lvlDebug, "recursively deleting path '%1%'", path);
     bytesFreed = 0;
     _deletePath(path, bytesFreed);
-}
-
-
-static Path tempName(Path tmpRoot, const Path & prefix, bool includePid,
-    int & counter)
-{
-    tmpRoot = canonPath(tmpRoot.empty() ? getEnv("TMPDIR").value_or("/tmp") : tmpRoot, true);
-    if (includePid)
-        return (format("%1%/%2%-%3%-%4%") % tmpRoot % prefix % getpid() % counter++).str();
-    else
-        return (format("%1%/%2%-%3%") % tmpRoot % prefix % counter++).str();
-}
-
-
-Path createTempDir(const Path & tmpRoot, const Path & prefix,
-    bool includePid, bool useGlobalCounter, mode_t mode)
-{
-    static int globalCounter = 0;
-    int localCounter = 0;
-    int & counter(useGlobalCounter ? globalCounter : localCounter);
-
-    while (1) {
-        checkInterrupt();
-        Path tmpDir = tempName(tmpRoot, prefix, includePid, counter);
-        if (mkdir(tmpDir.c_str(), mode) == 0) {
-#if __FreeBSD__
-            /* Explicitly set the group of the directory.  This is to
-               work around around problems caused by BSD's group
-               ownership semantics (directories inherit the group of
-               the parent).  For instance, the group of /tmp on
-               FreeBSD is "wheel", so all directories created in /tmp
-               will be owned by "wheel"; but if the user is not in
-               "wheel", then "tar" will fail to unpack archives that
-               have the setgid bit set on directories. */
-            if (chown(tmpDir.c_str(), (uid_t) -1, getegid()) != 0)
-                throw SysError("setting group of directory '%1%'", tmpDir);
-#endif
-            return tmpDir;
-        }
-        if (errno != EEXIST)
-            throw SysError("creating directory '%1%'", tmpDir);
-    }
-}
-
-
-std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
-{
-    Path tmpl(getEnv("TMPDIR").value_or("/tmp") + "/" + prefix + ".XXXXXX");
-    // Strictly speaking, this is UB, but who cares...
-    // FIXME: use O_TMPFILE.
-    AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
-    if (!fd)
-        throw SysError("creating temporary file '%s'", tmpl);
-    closeOnExec(fd.get());
-    return {std::move(fd), tmpl};
 }
 
 
@@ -572,11 +557,22 @@ std::string getUserName()
     return name;
 }
 
+Path getHomeOf(uid_t userId)
+{
+    std::vector<char> buf(16384);
+    struct passwd pwbuf;
+    struct passwd * pw;
+    if (getpwuid_r(userId, &pwbuf, buf.data(), buf.size(), &pw) != 0
+        || !pw || !pw->pw_dir || !pw->pw_dir[0])
+        throw Error("cannot determine user's home directory");
+    return pw->pw_dir;
+}
 
 Path getHome()
 {
     static Path homeDir = []()
     {
+        std::optional<std::string> unownedUserHomeDir = {};
         auto homeDir = getEnv("HOME");
         if (homeDir) {
             // Only use $HOME if doesn't exist or is owned by the current user.
@@ -588,18 +584,14 @@ Path getHome()
                     homeDir.reset();
                 }
             } else if (st.st_uid != geteuid()) {
-                warn("$HOME ('%s') is not owned by you, falling back to the one defined in the 'passwd' file", *homeDir);
-                homeDir.reset();
+                unownedUserHomeDir.swap(homeDir);
             }
         }
         if (!homeDir) {
-            std::vector<char> buf(16384);
-            struct passwd pwbuf;
-            struct passwd * pw;
-            if (getpwuid_r(geteuid(), &pwbuf, buf.data(), buf.size(), &pw) != 0
-                || !pw || !pw->pw_dir || !pw->pw_dir[0])
-                throw Error("cannot determine user's home directory");
-            homeDir = pw->pw_dir;
+            homeDir = getHomeOf(geteuid());
+            if (unownedUserHomeDir.has_value() && unownedUserHomeDir != homeDir) {
+                warn("$HOME ('%s') is not owned by you, falling back to the one defined in the 'passwd' file ('%s')", *unownedUserHomeDir, *homeDir);
+            }
         }
         return *homeDir;
     }();
@@ -634,6 +626,19 @@ Path getDataDir()
 {
     auto dataDir = getEnv("XDG_DATA_HOME");
     return dataDir ? *dataDir : getHome() + "/.local/share";
+}
+
+Path getStateDir()
+{
+    auto stateDir = getEnv("XDG_STATE_HOME");
+    return stateDir ? *stateDir : getHome() + "/.local/state";
+}
+
+Path createNixStateDir()
+{
+    Path dir = getStateDir() + "/nix";
+    createDirs(dir);
+    return dir;
 }
 
 
@@ -678,44 +683,6 @@ Paths createDirs(const Path & path)
     if (!S_ISDIR(st.st_mode)) throw Error("'%1%' is not a directory", path);
 
     return created;
-}
-
-
-void createSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime)
-{
-    if (symlink(target.c_str(), link.c_str()))
-        throw SysError("creating symlink from '%1%' to '%2%'", link, target);
-    if (mtime) {
-        struct timeval times[2];
-        times[0].tv_sec = *mtime;
-        times[0].tv_usec = 0;
-        times[1].tv_sec = *mtime;
-        times[1].tv_usec = 0;
-        if (lutimes(link.c_str(), times))
-            throw SysError("setting time of symlink '%s'", link);
-    }
-}
-
-
-void replaceSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime)
-{
-    for (unsigned int n = 0; true; n++) {
-        Path tmp = canonPath(fmt("%s/.%d_%s", dirOf(link), n, baseNameOf(link)));
-
-        try {
-            createSymlink(target, tmp, mtime);
-        } catch (SysError & e) {
-            if (e.errNo == EEXIST) continue;
-            throw;
-        }
-
-        if (rename(tmp.c_str(), link.c_str()) != 0)
-            throw SysError("renaming '%1%' to '%2%'", tmp, link);
-
-        break;
-    }
 }
 
 
@@ -797,45 +764,22 @@ unsigned int getMaxCPU()
 {
     #if __linux__
     try {
-        FILE *fp = fopen("/proc/mounts", "r");
-        if (!fp)
-            return 0;
+        auto cgroupFS = getCgroupFS();
+        if (!cgroupFS) return 0;
 
-        Strings cgPathParts;
+        auto cgroups = getCgroups("/proc/self/cgroup");
+        auto cgroup = cgroups[""];
+        if (cgroup == "") return 0;
 
-        struct mntent *ent;
-        while ((ent = getmntent(fp))) {
-            std::string mountType, mountPath;
+        auto cpuFile = *cgroupFS + "/" + cgroup + "/cpu.max";
 
-            mountType = ent->mnt_type;
-            mountPath = ent->mnt_dir;
-
-            if (mountType == "cgroup2") {
-                cgPathParts.push_back(mountPath);
-                break;
-            }
-        }
-
-        fclose(fp);
-
-        if (cgPathParts.size() > 0 && pathExists("/proc/self/cgroup")) {
-            std::string currentCgroup = readFile("/proc/self/cgroup");
-            Strings cgValues = tokenizeString<Strings>(currentCgroup, ":");
-            cgPathParts.push_back(trim(cgValues.back(), "\n"));
-            cgPathParts.push_back("cpu.max");
-            std::string fullCgPath = canonPath(concatStringsSep("/", cgPathParts));
-
-            if (pathExists(fullCgPath)) {
-                std::string cpuMax = readFile(fullCgPath);
-                std::vector<std::string> cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " ");
-                std::string quota = cpuMaxParts[0];
-                std::string period = trim(cpuMaxParts[1], "\n");
-
-                if (quota != "max")
-                    return std::ceil(std::stoi(quota) / std::stof(period));
-            }
-        }
-    } catch (Error &) { ignoreException(); }
+        auto cpuMax = readFile(cpuFile);
+        auto cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " \n");
+        auto quota = cpuMaxParts[0];
+        auto period = cpuMaxParts[1];
+        if (quota != "max")
+                return std::ceil(std::stoi(quota) / std::stof(period));
+    } catch (Error &) { ignoreException(lvlDebug); }
     #endif
 
     return 0;
@@ -929,6 +873,20 @@ void AutoCloseFD::close()
             throw SysError("closing file descriptor %1%", fd);
         fd = -1;
     }
+}
+
+void AutoCloseFD::fsync()
+{
+  if (fd != -1) {
+      int result;
+#if __APPLE__
+      result = ::fcntl(fd, F_FULLFSYNC);
+#else
+      result = ::fsync(fd);
+#endif
+      if (result == -1)
+          throw SysError("fsync file descriptor %1%", fd);
+  }
 }
 
 
@@ -1126,9 +1084,19 @@ static pid_t doFork(bool allowVfork, std::function<void()> fun)
 }
 
 
+#if __linux__
+static int childEntry(void * arg)
+{
+    auto main = (std::function<void()> *) arg;
+    (*main)();
+    return 1;
+}
+#endif
+
+
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 {
-    auto wrapper = [&]() {
+    std::function<void()> wrapper = [&]() {
         if (!options.allowVfork)
             logger = makeSimpleLogger();
         try {
@@ -1148,7 +1116,27 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
             _exit(1);
     };
 
-    pid_t pid = doFork(options.allowVfork, wrapper);
+    pid_t pid = -1;
+
+    if (options.cloneFlags) {
+        #ifdef __linux__
+        // Not supported, since then we don't know when to free the stack.
+        assert(!(options.cloneFlags & CLONE_VM));
+
+        size_t stackSize = 1 * 1024 * 1024;
+        auto stack = (char *) mmap(0, stackSize,
+            PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
+        if (stack == MAP_FAILED) throw SysError("allocating stack");
+
+        Finally freeStack([&]() { munmap(stack, stackSize); });
+
+        pid = clone(childEntry, stack + stackSize, options.cloneFlags | SIGCHLD, &wrapper);
+        #else
+        throw Error("clone flags are only supported on Linux");
+        #endif
+    } else
+        pid = doFork(options.allowVfork, wrapper);
+
     if (pid == -1) throw SysError("unable to fork");
 
     return pid;
@@ -1164,9 +1152,9 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
 }
 
 std::string runProgram(Path program, bool searchPath, const Strings & args,
-    const std::optional<std::string> & input)
+    const std::optional<std::string> & input, bool isInteractive)
 {
-    auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input});
+    auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input, .isInteractive = isInteractive});
 
     if (!statusOk(res.first))
         throw ExecError(res.first, "program '%1%' %2%", program, statusToString(res.first));
@@ -1215,6 +1203,16 @@ void runProgram2(const RunOptions & options)
     // be shared (technically this is undefined, but in practice that's the
     // case), so we can't use it if we alter the environment
     processOptions.allowVfork = !options.environment;
+
+    std::optional<Finally<std::function<void()>>> resumeLoggerDefer;
+    if (options.isInteractive) {
+        logger->pause();
+        resumeLoggerDefer.emplace(
+            []() {
+                logger->resume();
+            }
+        );
+    }
 
     /* Fork. */
     Pid pid = startProcess([&]() {
@@ -1427,14 +1425,14 @@ std::string statusToString(int status)
 {
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
         if (WIFEXITED(status))
-            return (format("failed with exit code %1%") % WEXITSTATUS(status)).str();
+            return fmt("failed with exit code %1%", WEXITSTATUS(status));
         else if (WIFSIGNALED(status)) {
             int sig = WTERMSIG(status);
 #if HAVE_STRSIGNAL
             const char * description = strsignal(sig);
-            return (format("failed due to signal %1% (%2%)") % sig % description).str();
+            return fmt("failed due to signal %1% (%2%)", sig, description);
 #else
-            return (format("failed due to signal %1%") % sig).str();
+            return fmt("failed due to signal %1%", sig);
 #endif
         }
         else
@@ -1483,7 +1481,7 @@ std::string shellEscape(const std::string_view s)
 }
 
 
-void ignoreException()
+void ignoreException(Verbosity lvl)
 {
     /* Make sure no exceptions leave this function.
        printError() also throws when remote is closed. */
@@ -1491,7 +1489,7 @@ void ignoreException()
         try {
             throw;
         } catch (std::exception & e) {
-            printError("error (ignored): %1%", e.what());
+            printMsg(lvl, "error (ignored): %1%", e.what());
         }
     } catch (...) { }
 }
@@ -1503,7 +1501,7 @@ bool shouldANSI()
         && !getEnv("NO_COLOR").has_value();
 }
 
-std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned int width)
+std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int width)
 {
     std::string t, e;
     size_t w = 0;
@@ -1673,6 +1671,21 @@ std::string stripIndentation(std::string_view s)
 }
 
 
+std::pair<std::string_view, std::string_view> getLine(std::string_view s)
+{
+    auto newline = s.find('\n');
+
+    if (newline == s.npos) {
+        return {s, ""};
+    } else {
+        auto line = s.substr(0, newline);
+        if (!line.empty() && line[line.size() - 1] == '\r')
+            line = line.substr(0, line.size() - 1);
+        return {line, s.substr(newline + 1)};
+    }
+}
+
+
 //////////////////////////////////////////////////////////////////////
 
 static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
@@ -1755,13 +1768,39 @@ void triggerInterrupt()
 }
 
 static sigset_t savedSignalMask;
+static bool savedSignalMaskIsSet = false;
+
+void setChildSignalMask(sigset_t * sigs)
+{
+    assert(sigs); // C style function, but think of sigs as a reference
+
+#if _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE
+    sigemptyset(&savedSignalMask);
+    // There's no "assign" or "copy" function, so we rely on (math) idempotence
+    // of the or operator: a or a = a.
+    sigorset(&savedSignalMask, sigs, sigs);
+#else
+    // Without sigorset, our best bet is to assume that sigset_t is a type that
+    // can be assigned directly, such as is the case for a sigset_t defined as
+    // an integer type.
+    savedSignalMask = *sigs;
+#endif
+
+    savedSignalMaskIsSet = true;
+}
+
+void saveSignalMask() {
+    if (sigprocmask(SIG_BLOCK, nullptr, &savedSignalMask))
+        throw SysError("querying signal mask");
+
+    savedSignalMaskIsSet = true;
+}
 
 void startSignalHandlerThread()
 {
     updateWindowSize();
 
-    if (sigprocmask(SIG_BLOCK, nullptr, &savedSignalMask))
-        throw SysError("querying signal mask");
+    saveSignalMask();
 
     sigset_t set;
     sigemptyset(&set);
@@ -1778,6 +1817,20 @@ void startSignalHandlerThread()
 
 static void restoreSignals()
 {
+    // If startSignalHandlerThread wasn't called, that means we're not running
+    // in a proper libmain process, but a process that presumably manages its
+    // own signal handlers. Such a process should call either
+    //  - initNix(), to be a proper libmain process
+    //  - startSignalHandlerThread(), to resemble libmain regarding signal
+    //    handling only
+    //  - saveSignalMask(), for processes that define their own signal handling
+    //    thread
+    // TODO: Warn about this? Have a default signal mask? The latter depends on
+    //       whether we should generally inherit signal masks from the caller.
+    //       I don't know what the larger unix ecosystem expects from us here.
+    if (!savedSignalMaskIsSet)
+        return;
+
     if (sigprocmask(SIG_SETMASK, &savedSignalMask, nullptr))
         throw SysError("restoring signals");
 }
@@ -1800,6 +1853,7 @@ void setStackSize(size_t stackSize)
 
 #if __linux__
 static AutoCloseFD fdSavedMountNamespace;
+static AutoCloseFD fdSavedRoot;
 #endif
 
 void saveMountNamespace()
@@ -1807,10 +1861,11 @@ void saveMountNamespace()
 #if __linux__
     static std::once_flag done;
     std::call_once(done, []() {
-        AutoCloseFD fd = open("/proc/self/ns/mnt", O_RDONLY);
-        if (!fd)
+        fdSavedMountNamespace = open("/proc/self/ns/mnt", O_RDONLY);
+        if (!fdSavedMountNamespace)
             throw SysError("saving parent mount namespace");
-        fdSavedMountNamespace = std::move(fd);
+
+        fdSavedRoot = open("/proc/self/root", O_RDONLY);
     });
 #endif
 }
@@ -1823,9 +1878,16 @@ void restoreMountNamespace()
 
         if (fdSavedMountNamespace && setns(fdSavedMountNamespace.get(), CLONE_NEWNS) == -1)
             throw SysError("restoring parent mount namespace");
-        if (chdir(savedCwd.c_str()) == -1) {
-            throw SysError("restoring cwd");
+
+        if (fdSavedRoot) {
+            if (fchdir(fdSavedRoot.get()))
+                throw SysError("chdir into saved root");
+            if (chroot("."))
+                throw SysError("chroot into saved root");
         }
+
+        if (chdir(savedCwd.c_str()) == -1)
+            throw SysError("restoring cwd");
     } catch (Error & e) {
         debug(e.msg());
     }
@@ -1979,7 +2041,7 @@ std::string showBytes(uint64_t bytes)
 
 
 // FIXME: move to libstore/build
-void commonChildInit(Pipe & logPipe)
+void commonChildInit()
 {
     logger = makeSimpleLogger();
 
@@ -1992,10 +2054,6 @@ void commonChildInit(Pipe & logPipe)
        terminal signals. */
     if (setsid() == -1)
         throw SysError("creating a new session");
-
-    /* Dup the write side of the logger pipe into stderr. */
-    if (dup2(logPipe.writeSide.get(), STDERR_FILENO) == -1)
-        throw SysError("cannot pipe standard error into log file");
 
     /* Dup stderr to stdout. */
     if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)

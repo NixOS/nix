@@ -72,6 +72,7 @@ static int main_build_remote(int argc, char * * argv)
             settings.set(name, value);
         }
 
+        auto maxBuildJobs = settings.maxBuildJobs;
         settings.maxBuildJobs.set("1"); // hack to make tests with local?root= work
 
         initPlugins();
@@ -112,10 +113,14 @@ static int main_build_remote(int argc, char * * argv)
             drvPath = store->parseStorePath(readString(source));
             auto requiredFeatures = readStrings<std::set<std::string>>(source);
 
-            auto canBuildLocally = amWilling
+            /* It would be possible to build locally after some builds clear out,
+               so don't show the warning now: */
+            bool couldBuildLocally = maxBuildJobs > 0
                  &&  (  neededSystem == settings.thisSystem
                      || settings.extraPlatforms.get().count(neededSystem) > 0)
                  &&  allSupportedLocally(*store, requiredFeatures);
+            /* It's possible to build this locally right now: */
+            bool canBuildLocally = amWilling && couldBuildLocally;
 
             /* Error ignored here, will be caught later */
             mkdir(currentLoad.c_str(), 0777);
@@ -186,12 +191,12 @@ static int main_build_remote(int argc, char * * argv)
                         // build the hint template.
                         std::string errorText =
                             "Failed to find a machine for remote build!\n"
-                            "derivation: %s\nrequired (system, features): (%s, %s)";
+                            "derivation: %s\nrequired (system, features): (%s, [%s])";
                         errorText += "\n%s available machines:";
                         errorText += "\n(systems, maxjobs, supportedFeatures, mandatoryFeatures)";
 
                         for (unsigned int i = 0; i < machines.size(); ++i)
-                            errorText += "\n(%s, %s, %s, %s)";
+                            errorText += "\n([%s], %s, [%s], [%s])";
 
                         // add the template values.
                         std::string drvstr;
@@ -214,7 +219,7 @@ static int main_build_remote(int argc, char * * argv)
                                 % concatStringsSep<StringSet>(", ", m.supportedFeatures)
                                 % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);
 
-                        printMsg(canBuildLocally ? lvlChatty : lvlWarn, error);
+                        printMsg(couldBuildLocally ? lvlChatty : lvlWarn, error.str());
 
                         std::cerr << "# decline\n";
                     }
@@ -253,6 +258,8 @@ static int main_build_remote(int argc, char * * argv)
 connected:
         close(5);
 
+        assert(sshStore);
+
         std::cerr << "# accept\n" << storeUri << "\n";
 
         auto inputs = readStrings<PathSet>(source);
@@ -281,33 +288,61 @@ connected:
         uploadLock = -1;
 
         auto drv = store->readDerivation(*drvPath);
+
+        std::optional<BuildResult> optResult;
+
+        // If we don't know whether we are trusted (e.g. `ssh://`
+        // stores), we assume we are. This is necessary for backwards
+        // compat.
+        bool trustedOrLegacy = ({
+            std::optional trusted = sshStore->isTrustedClient();
+            !trusted || *trusted;
+        });
+
+        // See the very large comment in `case WorkerProto::Op::BuildDerivation:` in
+        // `src/libstore/daemon.cc` that explains the trust model here.
+        //
+        // This condition mirrors that: that code enforces the "rules" outlined there;
+        // we do the best we can given those "rules".
+        if (trustedOrLegacy || drv.type().isCA())  {
+            // Hijack the inputs paths of the derivation to include all
+            // the paths that come from the `inputDrvs` set. We don’t do
+            // that for the derivations whose `inputDrvs` is empty
+            // because:
+            //
+            // 1. It’s not needed
+            //
+            // 2. Changing the `inputSrcs` set changes the associated
+            //    output ids, which break CA derivations
+            if (!drv.inputDrvs.empty())
+                drv.inputSrcs = store->parseStorePathSet(inputs);
+            optResult = sshStore->buildDerivation(*drvPath, (const BasicDerivation &) drv);
+            auto & result = *optResult;
+            if (!result.success())
+                throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
+        } else {
+            copyClosure(*store, *sshStore, StorePathSet {*drvPath}, NoRepair, NoCheckSigs, substitute);
+            auto res = sshStore->buildPathsWithResults({ DerivedPath::Built { *drvPath, OutputsSpec::All {} } });
+            // One path to build should produce exactly one build result
+            assert(res.size() == 1);
+            optResult = std::move(res[0]);
+        }
+
+
         auto outputHashes = staticOutputHashes(*store, drv);
-
-        // Hijack the inputs paths of the derivation to include all the paths
-        // that come from the `inputDrvs` set.
-        // We don’t do that for the derivations whose `inputDrvs` is empty
-        // because
-        // 1. It’s not needed
-        // 2. Changing the `inputSrcs` set changes the associated output ids,
-        //  which break CA derivations
-        if (!drv.inputDrvs.empty())
-            drv.inputSrcs = store->parseStorePathSet(inputs);
-
-        auto result = sshStore->buildDerivation(*drvPath, drv);
-
-        if (!result.success())
-            throw Error("build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
-
         std::set<Realisation> missingRealisations;
         StorePathSet missingPaths;
-        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations) && !drv.type().hasKnownOutputPaths()) {
+        if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations) && !drv.type().hasKnownOutputPaths()) {
             for (auto & outputName : wantedOutputs) {
                 auto thisOutputHash = outputHashes.at(outputName);
                 auto thisOutputId = DrvOutput{ thisOutputHash, outputName };
                 if (!store->queryRealisation(thisOutputId)) {
                     debug("missing output %s", outputName);
-                    assert(result.builtOutputs.count(thisOutputId));
-                    auto newRealisation = result.builtOutputs.at(thisOutputId);
+                    assert(optResult);
+                    auto & result = *optResult;
+                    auto i = result.builtOutputs.find(outputName);
+                    assert(i != result.builtOutputs.end());
+                    auto & newRealisation = i->second;
                     missingRealisations.insert(newRealisation);
                     missingPaths.insert(newRealisation.outPath);
                 }
@@ -332,7 +367,7 @@ connected:
         for (auto & realisation : missingRealisations) {
             // Should hold, because if the feature isn't enabled the set
             // of missing realisations should be empty
-            settings.requireExperimentalFeature(Xp::CaDerivations);
+            experimentalFeatureSettings.require(Xp::CaDerivations);
             store->registerDrvOutput(realisation);
         }
 

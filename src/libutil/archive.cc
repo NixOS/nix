@@ -35,10 +35,6 @@ static ArchiveSettings archiveSettings;
 
 static GlobalConfig::Register rArchiveSettings(&archiveSettings);
 
-const std::string narVersionMagic1 = "nix-archive-1";
-
-static std::string caseHackSuffix = "~nix~case~hack~";
-
 PathFilter defaultPathFilter = [](const Path &) { return true; };
 
 
@@ -91,7 +87,7 @@ static time_t dump(const Path & path, Sink & sink, PathFilter & filter)
                 std::string name(i.name);
                 size_t pos = i.name.find(caseHackSuffix);
                 if (pos != std::string::npos) {
-                    debug(format("removing case hack suffix from '%1%'") % (path + "/" + i.name));
+                    debug("removing case hack suffix from '%1%'", path + "/" + i.name);
                     name.erase(pos);
                 }
                 if (!unhacked.emplace(name, i.name).second)
@@ -234,6 +230,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
 
         else if (s == "contents" && type == tpRegular) {
             parseContents(sink, source, path);
+            sink.closeRegularFile();
         }
 
         else if (s == "executable" && type == tpRegular) {
@@ -265,7 +262,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
                     if (archiveSettings.useCaseHack) {
                         auto i = names.find(name);
                         if (i != names.end()) {
-                            debug(format("case collision between '%1%' and '%2%'") % i->first % name);
+                            debug("case collision between '%1%' and '%2%'", i->first, name);
                             name += caseHackSuffix;
                             name += std::to_string(++i->second);
                         } else
@@ -322,6 +319,12 @@ struct RestoreSink : ParseSink
         Path p = dstPath + path;
         fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
         if (!fd) throw SysError("creating file '%1%'", p);
+    }
+
+    void closeRegularFile() override
+    {
+        /* Call close explicitly to make sure the error is checked */
+        fd.close();
     }
 
     void isExecutable() override

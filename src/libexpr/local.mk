@@ -6,6 +6,7 @@ libexpr_DIR := $(d)
 
 libexpr_SOURCES := \
   $(wildcard $(d)/*.cc) \
+  $(wildcard $(d)/value/*.cc) \
   $(wildcard $(d)/primops/*.cc) \
   $(wildcard $(d)/flake/*.cc) \
   $(d)/lexer-tab.cc \
@@ -37,9 +38,13 @@ clean-files += $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexe
 
 $(eval $(call install-file-in, $(d)/nix-expr.pc, $(libdir)/pkgconfig, 0644))
 
+$(foreach i, $(wildcard src/libexpr/value/*.hh), \
+  $(eval $(call install-file-in, $(i), $(includedir)/nix/value, 0644)))
 $(foreach i, $(wildcard src/libexpr/flake/*.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix/flake, 0644)))
 
 $(d)/primops.cc: $(d)/imported-drv-to-derivation.nix.gen.hh $(d)/primops/derivation.nix.gen.hh $(d)/fetchurl.nix.gen.hh
 
 $(d)/flake/flake.cc: $(d)/flake/call-flake.nix.gen.hh
+
+src/libexpr/primops/fromTOML.o:	ERROR_SWITCH_ENUM =

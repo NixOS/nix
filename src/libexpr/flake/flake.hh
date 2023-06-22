@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "types.hh"
 #include "flakeref.hh"
@@ -17,7 +18,8 @@ struct FlakeInput;
 
 typedef std::map<FlakeId, FlakeInput> FlakeInputs;
 
-/* FlakeInput is the 'Flake'-level parsed form of the "input" entries
+/**
+ * FlakeInput is the 'Flake'-level parsed form of the "input" entries
  * in the flake file.
  *
  * A FlakeInput is normally constructed by the 'parseFlakeInput'
@@ -41,7 +43,12 @@ typedef std::map<FlakeId, FlakeInput> FlakeInputs;
 struct FlakeInput
 {
     std::optional<FlakeRef> ref;
-    bool isFlake = true;  // true = process flake to get outputs, false = (fetched) static source path
+    /**
+     * true = process flake to get outputs
+     *
+     * false = (fetched) static source path
+     */
+    bool isFlake = true;
     std::optional<InputPath> follows;
     FlakeInputs overrides;
 };
@@ -55,23 +62,42 @@ struct ConfigFile
     void apply();
 };
 
-/* The contents of a flake.nix file. */
+/**
+ * The contents of a flake.nix file.
+ */
 struct Flake
 {
-    FlakeRef originalRef; // the original flake specification (by the user)
-    FlakeRef resolvedRef; // registry references and caching resolved to the specific underlying flake
-    FlakeRef lockedRef; // the specific local store result of invoking the fetcher
-    bool forceDirty = false; // pretend that 'lockedRef' is dirty
+    /**
+     * The original flake specification (by the user)
+     */
+    FlakeRef originalRef;
+    /**
+     * registry references and caching resolved to the specific underlying flake
+     */
+    FlakeRef resolvedRef;
+    /**
+     * the specific local store result of invoking the fetcher
+     */
+    FlakeRef lockedRef;
+    /**
+     * pretend that 'lockedRef' is dirty
+     */
+    bool forceDirty = false;
     std::optional<std::string> description;
     std::shared_ptr<const fetchers::Tree> sourceInfo;
     FlakeInputs inputs;
-    ConfigFile config; // 'nixConfig' attribute
+    /**
+     * 'nixConfig' attribute
+     */
+    ConfigFile config;
     ~Flake();
 };
 
 Flake getFlake(EvalState & state, const FlakeRef & flakeRef, bool allowLookup);
 
-/* Fingerprint of a locked flake; used as a cache key. */
+/**
+ * Fingerprint of a locked flake; used as a cache key.
+ */
 typedef Hash Fingerprint;
 
 struct LockedFlake
@@ -84,44 +110,72 @@ struct LockedFlake
 
 struct LockFlags
 {
-    /* Whether to ignore the existing lock file, creating a new one
-       from scratch. */
+    /**
+     * Whether to ignore the existing lock file, creating a new one
+     * from scratch.
+     */
     bool recreateLockFile = false;
 
-    /* Whether to update the lock file at all. If set to false, if any
-       change to the lock file is needed (e.g. when an input has been
-       added to flake.nix), you get a fatal error. */
+    /**
+     * Whether to update the lock file at all. If set to false, if any
+     * change to the lock file is needed (e.g. when an input has been
+     * added to flake.nix), you get a fatal error.
+     */
     bool updateLockFile = true;
 
-    /* Whether to write the lock file to disk. If set to true, if the
-       any changes to the lock file are needed and the flake is not
-       writable (i.e. is not a local Git working tree or similar), you
-       get a fatal error. If set to false, Nix will use the modified
-       lock file in memory only, without writing it to disk. */
+    /**
+     * Whether to write the lock file to disk. If set to true, if the
+     * any changes to the lock file are needed and the flake is not
+     * writable (i.e. is not a local Git working tree or similar), you
+     * get a fatal error. If set to false, Nix will use the modified
+     * lock file in memory only, without writing it to disk.
+     */
     bool writeLockFile = true;
 
-    /* Whether to use the registries to lookup indirect flake
-       references like 'nixpkgs'. */
+    /**
+     * Whether to use the registries to lookup indirect flake
+     * references like 'nixpkgs'.
+     */
     std::optional<bool> useRegistries = std::nullopt;
 
-    /* Whether to apply flake's nixConfig attribute to the configuration */
+    /**
+     * Whether to apply flake's nixConfig attribute to the configuration
+     */
 
     bool applyNixConfig = false;
 
-    /* Whether mutable flake references (i.e. those without a Git
-       revision or similar) without a corresponding lock are
-       allowed. Mutable flake references with a lock are always
-       allowed. */
-    bool allowMutable = true;
+    /**
+     * Whether unlocked flake references (i.e. those without a Git
+     * revision or similar) without a corresponding lock are
+     * allowed. Unlocked flake references with a lock are always
+     * allowed.
+     */
+    bool allowUnlocked = true;
 
-    /* Whether to commit changes to flake.lock. */
+    /**
+     * Whether to commit changes to flake.lock.
+     */
     bool commitLockFile = false;
 
-    /* Flake inputs to be overridden. */
+    /**
+     * The path to a lock file to read instead of the `flake.lock` file in the top-level flake
+     */
+    std::optional<std::string> referenceLockFilePath;
+
+    /**
+     * The path to a lock file to write to instead of the `flake.lock` file in the top-level flake
+     */
+    std::optional<Path> outputLockFilePath;
+
+    /**
+     * Flake inputs to be overridden.
+     */
     std::map<InputPath, FlakeRef> inputOverrides;
 
-    /* Flake inputs to be updated. This means that any existing lock
-       for those inputs will be ignored. */
+    /**
+     * Flake inputs to be updated. This means that any existing lock
+     * for those inputs will be ignored.
+     */
     std::set<InputPath> inputUpdates;
 };
 

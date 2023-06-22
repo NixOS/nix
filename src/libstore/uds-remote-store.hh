@@ -1,6 +1,8 @@
 #pragma once
+///@file
 
 #include "remote-store.hh"
+#include "remote-store-connection.hh"
 #include "local-fs-store.hh"
 
 namespace nix {
@@ -15,6 +17,8 @@ struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreCon
     }
 
     const std::string name() override { return "Local Daemon Store"; }
+
+    std::string doc() override;
 };
 
 class UDSRemoteStore : public virtual UDSRemoteStoreConfig, public virtual LocalFSStore, public virtual RemoteStore
@@ -28,9 +32,6 @@ public:
 
     static std::set<std::string> uriSchemes()
     { return {"unix"}; }
-
-    bool sameMachine() override
-    { return true; }
 
     ref<FSAccessor> getFSAccessor() override
     { return LocalFSStore::getFSAccessor(); }

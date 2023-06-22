@@ -27,18 +27,17 @@ std::map<StorePath, StorePath> makeContentAddressed(
 
         StringMap rewrites;
 
-        StorePathSet references;
-        bool hasSelfReference = false;
+        StoreReferences refs;
         for (auto & ref : oldInfo->references) {
             if (ref == path)
-                hasSelfReference = true;
+                refs.self = true;
             else {
                 auto i = remappings.find(ref);
                 auto replacement = i != remappings.end() ? i->second : ref;
                 // FIXME: warn about unremapped paths?
                 if (replacement != ref)
                     rewrites.insert_or_assign(srcStore.printStorePath(ref), srcStore.printStorePath(replacement));
-                references.insert(std::move(replacement));
+                refs.others.insert(std::move(replacement));
             }
         }
 
@@ -49,24 +48,28 @@ std::map<StorePath, StorePath> makeContentAddressed(
 
         auto narModuloHash = hashModuloSink.finish().first;
 
-        auto dstPath = dstStore.makeFixedOutputPath(
-            FileIngestionMethod::Recursive, narModuloHash, path.name(), references, hasSelfReference);
+        ValidPathInfo info {
+            dstStore,
+            path.name(),
+            FixedOutputInfo {
+                .hash = {
+                    .method = FileIngestionMethod::Recursive,
+                    .hash = narModuloHash,
+                },
+                .references = std::move(refs),
+            },
+            Hash::dummy,
+        };
 
-        printInfo("rewriting '%s' to '%s'", pathS, srcStore.printStorePath(dstPath));
+        printInfo("rewriting '%s' to '%s'", pathS, dstStore.printStorePath(info.path));
 
         StringSink sink2;
-        RewritingSink rsink2(oldHashPart, std::string(dstPath.hashPart()), sink2);
+        RewritingSink rsink2(oldHashPart, std::string(info.path.hashPart()), sink2);
         rsink2(sink.s);
         rsink2.flush();
 
-        ValidPathInfo info { dstPath, hashString(htSHA256, sink2.s) };
-        info.references = std::move(references);
-        if (hasSelfReference) info.references.insert(info.path);
+        info.narHash = hashString(htSHA256, sink2.s);
         info.narSize = sink.s.size();
-        info.ca = FixedOutputHash {
-            .method = FileIngestionMethod::Recursive,
-            .hash = narModuloHash,
-        };
 
         StringSource source(sink2.s);
         dstStore.addToStore(info, source);

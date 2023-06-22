@@ -2,13 +2,21 @@ source common.sh
 
 export TEST_VAR=foo # for eval-okay-getenv.nix
 export NIX_REMOTE=dummy://
+export NIX_STORE_DIR=/nix/store
 
-nix-instantiate --eval -E 'builtins.trace "Hello" 123' 2>&1 | grep -q Hello
+nix-instantiate --eval -E 'builtins.trace "Hello" 123' 2>&1 | grepQuiet Hello
+nix-instantiate --eval -E 'builtins.trace "Hello" 123' 2>/dev/null | grepQuiet 123
 nix-instantiate --eval -E 'builtins.addErrorContext "Hello" 123' 2>&1
-nix-instantiate --trace-verbose --eval -E 'builtins.traceVerbose "Hello" 123' 2>&1 | grep -q Hello
-(! nix-instantiate --eval -E 'builtins.traceVerbose "Hello" 123' 2>&1 | grep -q Hello)
-(! nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" 123' 2>&1 | grep -q Hello)
-nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" (throw "Foo")' 2>&1 | grep -q Hello
+nix-instantiate --trace-verbose --eval -E 'builtins.traceVerbose "Hello" 123' 2>&1 | grepQuiet Hello
+nix-instantiate --eval -E 'builtins.traceVerbose "Hello" 123' 2>&1 | grepQuietInverse Hello
+nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" 123' 2>&1 | grepQuietInverse Hello
+expectStderr 1 nix-instantiate --show-trace --eval -E 'builtins.addErrorContext "Hello" (throw "Foo")' | grepQuiet Hello
+
+nix-instantiate --eval -E 'let x = builtins.trace { x = x; } true; in x' \
+  2>&1 | grepQuiet -E 'trace: { x = «potential infinite recursion»; }'
+
+nix-instantiate --eval -E 'let x = { repeating = x; tracing = builtins.trace x true; }; in x.tracing'\
+  2>&1 | grepQuiet -F 'trace: { repeating = «repeated»; tracing = «potential infinite recursion»; }'
 
 set +x
 
@@ -50,10 +58,10 @@ for i in lang/eval-okay-*.nix; do
         if test -e lang/$i.flags; then
             flags=$(cat lang/$i.flags)
         fi
-        if ! expect 0 env NIX_PATH=lang/dir3:lang/dir4 nix-instantiate $flags --eval --strict lang/$i.nix > lang/$i.out; then
+        if ! expect 0 env NIX_PATH=lang/dir3:lang/dir4 HOME=/fake-home nix-instantiate $flags --eval --strict lang/$i.nix > lang/$i.out; then
             echo "FAIL: $i should evaluate"
             fail=1
-        elif ! diff lang/$i.out lang/$i.exp; then
+        elif ! diff <(< lang/$i.out sed -e "s|$(pwd)|/pwd|g") lang/$i.exp; then
             echo "FAIL: evaluation result of $i not as expected"
             fail=1
         fi

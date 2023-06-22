@@ -153,13 +153,15 @@ hash of `<pre>`; the hash part of the store name
     `<id>` is the name of the output (usually, "out").
     For content-addressed store objects, `<id>`, is always "out".
 
-- `<inner-digest>` = base-16 representation of a SHA-256 hash of:
+- `<inner-digest>` = base-16 representation of a SHA-256 hash of `<inner-pre>`
+
+- `<inner-pre>` = one of the following based on `<type>`:
 
   - if `<type>` = `text:...`:
 
     the string written to the resulting store path.
 
-  - if `<type>` = `source`:
+  - if `<type>` = `source:...`:
 
     the serialisation of the path from which this store path is copied, as returned by hashPath()
 

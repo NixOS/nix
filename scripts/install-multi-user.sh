@@ -37,6 +37,19 @@ readonly PROFILE_TARGETS=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/zshrc" "/e
 readonly PROFILE_BACKUP_SUFFIX=".backup-before-nix"
 readonly PROFILE_NIX_FILE="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
 
+# Fish has different syntax than zsh/bash, treat it separate
+readonly PROFILE_FISH_SUFFIX="conf.d/nix.fish"
+readonly PROFILE_FISH_PREFIXES=(
+    # each of these are common values of $__fish_sysconf_dir,
+    # under which Fish will look for a file named
+    # $PROFILE_FISH_SUFFIX.
+    "/etc/fish"              # standard
+    "/usr/local/etc/fish"    # their installer .pkg for macOS
+    "/opt/homebrew/etc/fish" # homebrew
+    "/opt/local/etc/fish"    # macports
+)
+readonly PROFILE_NIX_FILE_FISH="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.fish"
+
 readonly NIX_INSTALLED_NIX="@nix@"
 readonly NIX_INSTALLED_CACERT="@cacert@"
 #readonly NIX_INSTALLED_NIX="/nix/store/j8dbv5w6jl34caywh2ygdy88knx1mdf7-nix-2.3.6"
@@ -45,7 +58,7 @@ readonly EXTRACTED_NIX_PATH="$(dirname "$0")"
 
 readonly ROOT_HOME=~root
 
-if [ -t 0 ]; then
+if [ -t 0 ] && [ -z "${NIX_INSTALLER_YES:-}" ]; then
     readonly IS_HEADLESS='no'
 else
     readonly IS_HEADLESS='yes'
@@ -59,14 +72,35 @@ headless() {
     fi
 }
 
+is_root() {
+    if [ "$EUID" -eq 0 ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+is_os_linux() {
+    if [ "$(uname -s)" = "Linux" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+is_os_darwin() {
+    if [ "$(uname -s)" = "Darwin" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 contact_us() {
-    echo "You can open an issue at https://github.com/nixos/nix/issues"
+    echo "You can open an issue at"
+    echo "https://github.com/NixOS/nix/issues/new?labels=installer&template=installer.md"
     echo ""
-    echo "Or feel free to contact the team:"
-    echo " - Matrix: #nix:nixos.org"
-    echo " - IRC: in #nixos on irc.libera.chat"
-    echo " - twitter: @nixos_org"
-    echo " - forum: https://discourse.nixos.org"
+    echo "Or get in touch with the community: https://nixos.org/community"
 }
 get_help() {
     echo "We'd love to help if you need it."
@@ -102,7 +136,7 @@ EOF
     cat <<EOF
 $step. Delete the files Nix added to your system:
 
-  sudo rm -rf /etc/nix $NIX_ROOT $ROOT_HOME/.nix-profile $ROOT_HOME/.nix-defexpr $ROOT_HOME/.nix-channels $HOME/.nix-profile $HOME/.nix-defexpr $HOME/.nix-channels
+  sudo rm -rf "/etc/nix" "$NIX_ROOT" "$ROOT_HOME/.nix-profile" "$ROOT_HOME/.nix-defexpr" "$ROOT_HOME/.nix-channels" "$ROOT_HOME/.local/state/nix" "$ROOT_HOME/.cache/nix" "$HOME/.nix-profile" "$HOME/.nix-defexpr" "$HOME/.nix-channels" "$HOME/.local/state/nix" "$HOME/.cache/nix"
 
 and that is it.
 
@@ -212,8 +246,15 @@ printf -v _OLD_LINE_FMT "%b" $'\033[1;7;31m-'"$ESC ${RED}%L${ESC}"
 printf -v _NEW_LINE_FMT "%b" $'\033[1;7;32m+'"$ESC ${GREEN}%L${ESC}"
 
 _diff() {
+    # macOS Ventura doesn't ship with GNU diff. Print similar output except
+    # without +/- markers or dimming
+    if diff --version | grep -q "Apple diff"; then
+        printf -v CHANGED_GROUP_FORMAT "%b" "${GREEN}%>${RED}%<${ESC}"
+        diff --changed-group-format="$CHANGED_GROUP_FORMAT" "$@"
+    else
     # simple colorized diff comatible w/ pre `--color` versions
-    diff --unchanged-group-format="$_UNCHANGED_GRP_FMT" --old-line-format="$_OLD_LINE_FMT" --new-line-format="$_NEW_LINE_FMT" --unchanged-line-format="  %L" "$@"
+        diff --unchanged-group-format="$_UNCHANGED_GRP_FMT" --old-line-format="$_OLD_LINE_FMT" --new-line-format="$_NEW_LINE_FMT" --unchanged-line-format="  %L" "$@"
+    fi
 }
 
 confirm_rm() {
@@ -313,14 +354,23 @@ __sudo() {
 _sudo() {
     local expl="$1"
     shift
-    if ! headless; then
+    if ! headless || is_root; then
         __sudo "$expl" "$*" >&2
     fi
-    sudo "$@"
+
+    if is_root; then
+        env "$@"
+    else
+        sudo "$@"
+    fi
 }
 
+# Ensure that $TMPDIR exists if defined.
+if [[ -n "${TMPDIR:-}" ]] && [[ ! -d "${TMPDIR:-}" ]]; then
+    mkdir -m 0700 -p "${TMPDIR:-}"
+fi
 
-readonly SCRATCH=$(mktemp -d "${TMPDIR:-/tmp/}tmp.XXXXXXXXXX")
+readonly SCRATCH=$(mktemp -d)
 finish_cleanup() {
     rm -rf "$SCRATCH"
 }
@@ -329,7 +379,7 @@ finish_fail() {
     finish_cleanup
 
     failure <<EOF
-Jeeze, something went wrong. If you can take all the output and open
+Oh no, something went wrong. If you can take all the output and open
 an issue, we'd love to fix the problem so nobody else has this issue.
 
 :(
@@ -423,7 +473,7 @@ EOF
         fi
     done
 
-    if [ "$(uname -s)" = "Linux" ] && [ ! -e /run/systemd/system ]; then
+    if is_os_linux && [ ! -e /run/systemd/system ]; then
         warning <<EOF
 We did not detect systemd on your system. With a multi-user install
 without systemd you will have to manually configure your init system to
@@ -532,7 +582,7 @@ EOF
     # to extract _just_ the user's note, instead it is prefixed with
     # some plist junk. This was causing the user note to always be set,
     # even if there was no reason for it.
-    if ! poly_user_note_get "$username" | grep -q "Nix build user $coreid"; then
+    if poly_user_note_get "$username" | grep -q "Nix build user $coreid"; then
         row "              Note" "Nix build user $coreid"
     else
         poly_user_note_set "$username" "Nix build user $coreid"
@@ -640,7 +690,7 @@ place_channel_configuration() {
 
 check_selinux() {
     if command -v getenforce > /dev/null 2>&1; then
-        if ! [ "$(getenforce)" = "Disabled" ]; then
+        if [ "$(getenforce)" = "Enforcing" ]; then
             failure <<EOF
 Nix does not work with selinux enabled yet!
 see https://github.com/NixOS/nix/issues/2374
@@ -650,6 +700,10 @@ EOF
 }
 
 welcome_to_nix() {
+    local -r NIX_UID_RANGES="${NIX_FIRST_BUILD_UID}..$((NIX_FIRST_BUILD_UID + NIX_USER_COUNT - 1))"
+    local -r RANGE_TEXT=$(echo -ne "${BLUE}(uids [${NIX_UID_RANGES}])${ESC}")
+    local -r GROUP_TEXT=$(echo -ne "${BLUE}(gid ${NIX_BUILD_GROUP_ID})${ESC}")
+
     ok "Welcome to the Multi-User Nix Installation"
 
     cat <<EOF
@@ -663,8 +717,8 @@ manager. This will happen in a few stages:
 2. Show you what I am going to install and where. Then I will ask
    if you are ready to continue.
 
-3. Create the system users and groups that the Nix daemon uses to run
-   builds.
+3. Create the system users ${RANGE_TEXT} and groups ${GROUP_TEXT}
+   that the Nix daemon uses to run builds.
 
 4. Perform the basic installation of the Nix files daemon.
 
@@ -777,7 +831,7 @@ EOF
         fi
 
         _sudo "to load data for the first time in to the Nix Database" \
-              "$NIX_INSTALLED_NIX/bin/nix-store" --load-db < ./.reginfo
+              HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-store" --load-db < ./.reginfo
 
         echo "      Just finished getting the nix database ready."
     )
@@ -790,6 +844,19 @@ shell_source_lines() {
 if [ -e '$PROFILE_NIX_FILE' ]; then
   . '$PROFILE_NIX_FILE'
 fi
+# End Nix
+
+EOF
+}
+
+# Fish has differing syntax
+fish_source_lines() {
+    cat <<EOF
+
+# Nix
+if test -e '$PROFILE_NIX_FILE_FISH'
+  . '$PROFILE_NIX_FILE_FISH'
+end
 # End Nix
 
 EOF
@@ -816,6 +883,27 @@ configure_shell_profile() {
                         tee -a "$profile_target"
         fi
     done
+
+    task "Setting up shell profiles for Fish with ${PROFILE_FISH_SUFFIX} inside ${PROFILE_FISH_PREFIXES[*]}"
+    for fish_prefix in "${PROFILE_FISH_PREFIXES[@]}"; do
+        if [ ! -d "$fish_prefix" ]; then
+            # this specific prefix (ie: /etc/fish) is very likely to exist
+            # if Fish is installed with this sysconfdir.
+            continue
+        fi
+
+        profile_target="${fish_prefix}/${PROFILE_FISH_SUFFIX}"
+        conf_dir=$(dirname "$profile_target")
+        if [ ! -d "$conf_dir" ]; then
+            _sudo "create $conf_dir for our Fish hook" \
+                mkdir "$conf_dir"
+        fi
+
+        fish_source_lines \
+            | _sudo "write nix-daemon settings to $profile_target" \
+                    tee "$profile_target"
+    done
+
     # TODO: should we suggest '. $PROFILE_NIX_FILE'? It would get them on
     # their way less disruptively, but a counter-argument is that they won't
     # immediately notice if something didn't get set up right?
@@ -865,24 +953,14 @@ EOF
           install -m 0664 "$SCRATCH/nix.conf" /etc/nix/nix.conf
 }
 
-main() {
-    # TODO: I've moved this out of validate_starting_assumptions so we
-    # can fail faster in this case. Sourcing install-darwin... now runs
-    # `touch /` to detect Read-only root, but it could update times on
-    # pre-Catalina macOS if run as root user.
-    if [ "$EUID" -eq 0 ]; then
-        failure <<EOF
-Please do not run this script with root privileges. I will call sudo
-when I need to.
-EOF
-    fi
 
+main() {
     check_selinux
 
-    if [ "$(uname -s)" = "Darwin" ]; then
+    if is_os_darwin; then
         # shellcheck source=./install-darwin-multi-user.sh
         . "$EXTRACTED_NIX_PATH/install-darwin-multi-user.sh"
-    elif [ "$(uname -s)" = "Linux" ]; then
+    elif is_os_linux; then
         # shellcheck source=./install-systemd-multi-user.sh
         . "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh" # most of this works on non-systemd distros also
     else
@@ -890,7 +968,10 @@ EOF
     fi
 
     welcome_to_nix
-    chat_about_sudo
+
+    if ! is_root; then
+        chat_about_sudo
+    fi
 
     cure_artifacts
     # TODO: there's a tension between cure and validate. I moved the

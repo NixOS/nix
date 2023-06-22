@@ -13,14 +13,10 @@ ifdef HOST_LINUX
  libstore_LDFLAGS += -ldl
 endif
 
-ifdef HOST_DARWIN
-libstore_FILES = sandbox-defaults.sb sandbox-minimal.sb sandbox-network.sb
-endif
-
 $(foreach file,$(libstore_FILES),$(eval $(call install-data-in,$(d)/$(file),$(datadir)/nix/sandbox)))
 
 ifeq ($(ENABLE_S3), 1)
-	libstore_LDFLAGS += -laws-cpp-sdk-transfer -laws-cpp-sdk-s3 -laws-cpp-sdk-core
+	libstore_LDFLAGS += -laws-cpp-sdk-transfer -laws-cpp-sdk-s3 -laws-cpp-sdk-core -laws-crt-cpp
 endif
 
 ifdef HOST_SOLARIS
@@ -60,12 +56,6 @@ endif
 $(d)/local-store.cc: $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh
 
 $(d)/build.cc:
-
-%.gen.hh: %
-	@echo 'R"foo(' >> $@.tmp
-	$(trace-gen) cat $< >> $@.tmp
-	@echo ')foo"' >> $@.tmp
-	@mv $@.tmp $@
 
 clean-files += $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh
 

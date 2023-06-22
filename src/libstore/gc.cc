@@ -34,14 +34,11 @@ static void makeSymlink(const Path & link, const Path & target)
     createDirs(dirOf(link));
 
     /* Create the new symlink. */
-    Path tempLink = (format("%1%.tmp-%2%-%3%")
-        % link % getpid() % random()).str();
+    Path tempLink = fmt("%1%.tmp-%2%-%3%", link, getpid(), random());
     createSymlink(target, tempLink);
 
     /* Atomically replace the old one. */
-    if (rename(tempLink.c_str(), link.c_str()) == -1)
-        throw SysError("cannot rename '%1%' to '%2%'",
-            tempLink , link);
+    renameFile(tempLink, link);
 }
 
 
@@ -79,60 +76,78 @@ Path LocalFSStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot
 }
 
 
-void LocalStore::addTempRoot(const StorePath & path)
+void LocalStore::createTempRootsFile()
 {
-    auto state(_state.lock());
+    auto fdTempRoots(_fdTempRoots.lock());
 
     /* Create the temporary roots file for this process. */
-    if (!state->fdTempRoots) {
+    if (*fdTempRoots) return;
 
-        while (1) {
-            if (pathExists(fnTempRoots))
-                /* It *must* be stale, since there can be no two
-                   processes with the same pid. */
-                unlink(fnTempRoots.c_str());
+    while (1) {
+        if (pathExists(fnTempRoots))
+            /* It *must* be stale, since there can be no two
+               processes with the same pid. */
+            unlink(fnTempRoots.c_str());
 
-            state->fdTempRoots = openLockFile(fnTempRoots, true);
+        *fdTempRoots = openLockFile(fnTempRoots, true);
 
-            debug("acquiring write lock on '%s'", fnTempRoots);
-            lockFile(state->fdTempRoots.get(), ltWrite, true);
+        debug("acquiring write lock on '%s'", fnTempRoots);
+        lockFile(fdTempRoots->get(), ltWrite, true);
 
-            /* Check whether the garbage collector didn't get in our
-               way. */
-            struct stat st;
-            if (fstat(state->fdTempRoots.get(), &st) == -1)
-                throw SysError("statting '%1%'", fnTempRoots);
-            if (st.st_size == 0) break;
+        /* Check whether the garbage collector didn't get in our
+           way. */
+        struct stat st;
+        if (fstat(fdTempRoots->get(), &st) == -1)
+            throw SysError("statting '%1%'", fnTempRoots);
+        if (st.st_size == 0) break;
 
-            /* The garbage collector deleted this file before we could
-               get a lock.  (It won't delete the file after we get a
-               lock.)  Try again. */
-        }
+        /* The garbage collector deleted this file before we could get
+           a lock.  (It won't delete the file after we get a lock.)
+           Try again. */
+    }
+}
 
+
+void LocalStore::addTempRoot(const StorePath & path)
+{
+    if (readOnly) {
+      debug("Read-only store doesn't support creating lock files for temp roots, but nothing can be deleted anyways.");
+      return;
     }
 
-    if (!state->fdGCLock)
-        state->fdGCLock = openGCLock();
+    createTempRootsFile();
+
+    /* Open/create the global GC lock file. */
+    {
+        auto fdGCLock(_fdGCLock.lock());
+        if (!*fdGCLock)
+            *fdGCLock = openGCLock();
+    }
 
  restart:
-    FdLock gcLock(state->fdGCLock.get(), ltRead, false, "");
+    /* Try to acquire a shared global GC lock (non-blocking). This
+       only succeeds if the garbage collector is not currently
+       running. */
+    FdLock gcLock(_fdGCLock.lock()->get(), ltRead, false, "");
 
     if (!gcLock.acquired) {
         /* We couldn't get a shared global GC lock, so the garbage
            collector is running. So we have to connect to the garbage
            collector and inform it about our root. */
-        if (!state->fdRootsSocket) {
+        auto fdRootsSocket(_fdRootsSocket.lock());
+
+        if (!*fdRootsSocket) {
             auto socketPath = stateDir.get() + gcSocketPath;
             debug("connecting to '%s'", socketPath);
-            state->fdRootsSocket = createUnixDomainSocket();
+            *fdRootsSocket = createUnixDomainSocket();
             try {
-                nix::connect(state->fdRootsSocket.get(), socketPath);
+                nix::connect(fdRootsSocket->get(), socketPath);
             } catch (SysError & e) {
                 /* The garbage collector may have exited, so we need to
                    restart. */
                 if (e.errNo == ECONNREFUSED) {
                     debug("GC socket connection refused");
-                    state->fdRootsSocket.close();
+                    fdRootsSocket->close();
                     goto restart;
                 }
                 throw;
@@ -141,30 +156,31 @@ void LocalStore::addTempRoot(const StorePath & path)
 
         try {
             debug("sending GC root '%s'", printStorePath(path));
-            writeFull(state->fdRootsSocket.get(), printStorePath(path) + "\n", false);
+            writeFull(fdRootsSocket->get(), printStorePath(path) + "\n", false);
             char c;
-            readFull(state->fdRootsSocket.get(), &c, 1);
+            readFull(fdRootsSocket->get(), &c, 1);
             assert(c == '1');
             debug("got ack for GC root '%s'", printStorePath(path));
         } catch (SysError & e) {
             /* The garbage collector may have exited, so we need to
                restart. */
-            if (e.errNo == EPIPE) {
+            if (e.errNo == EPIPE || e.errNo == ECONNRESET) {
                 debug("GC socket disconnected");
-                state->fdRootsSocket.close();
+                fdRootsSocket->close();
                 goto restart;
             }
             throw;
         } catch (EndOfFile & e) {
             debug("GC socket disconnected");
-            state->fdRootsSocket.close();
+            fdRootsSocket->close();
             goto restart;
         }
     }
 
-    /* Append the store path to the temporary roots file. */
+    /* Record the store path in the temporary roots file so it will be
+       seen by a future run of the garbage collector. */
     auto s = printStorePath(path) + '\0';
-    writeFull(state->fdTempRoots.get(), s);
+    writeFull(_fdTempRoots.lock()->get(), s);
 }
 
 
@@ -185,7 +201,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
 
         pid_t pid = std::stoi(i.name);
 
-        debug(format("reading temporary root file '%1%'") % path);
+        debug("reading temporary root file '%1%'", path);
         AutoCloseFD fd(open(path.c_str(), O_CLOEXEC | O_RDWR, 0666));
         if (!fd) {
             /* It's okay if the file has disappeared. */
@@ -251,7 +267,7 @@ void LocalStore::findRoots(const Path & path, unsigned char type, Roots & roots)
                 target = absPath(target, dirOf(path));
                 if (!pathExists(target)) {
                     if (isInDir(path, stateDir + "/" + gcRootsDir + "/auto")) {
-                        printInfo(format("removing stale link from '%1%' to '%2%'") % path % target);
+                        printInfo("removing stale link from '%1%' to '%2%'", path, target);
                         unlink(path.c_str());
                     }
                 } else {
@@ -360,29 +376,29 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
         while (errno = 0, ent = readdir(procDir.get())) {
             checkInterrupt();
             if (std::regex_match(ent->d_name, digitsRegex)) {
-                readProcLink(fmt("/proc/%s/exe" ,ent->d_name), unchecked);
-                readProcLink(fmt("/proc/%s/cwd", ent->d_name), unchecked);
-
-                auto fdStr = fmt("/proc/%s/fd", ent->d_name);
-                auto fdDir = AutoCloseDir(opendir(fdStr.c_str()));
-                if (!fdDir) {
-                    if (errno == ENOENT || errno == EACCES)
-                        continue;
-                    throw SysError("opening %1%", fdStr);
-                }
-                struct dirent * fd_ent;
-                while (errno = 0, fd_ent = readdir(fdDir.get())) {
-                    if (fd_ent->d_name[0] != '.')
-                        readProcLink(fmt("%s/%s", fdStr, fd_ent->d_name), unchecked);
-                }
-                if (errno) {
-                    if (errno == ESRCH)
-                        continue;
-                    throw SysError("iterating /proc/%1%/fd", ent->d_name);
-                }
-                fdDir.reset();
-
                 try {
+                    readProcLink(fmt("/proc/%s/exe" ,ent->d_name), unchecked);
+                    readProcLink(fmt("/proc/%s/cwd", ent->d_name), unchecked);
+
+                    auto fdStr = fmt("/proc/%s/fd", ent->d_name);
+                    auto fdDir = AutoCloseDir(opendir(fdStr.c_str()));
+                    if (!fdDir) {
+                        if (errno == ENOENT || errno == EACCES)
+                            continue;
+                        throw SysError("opening %1%", fdStr);
+                    }
+                    struct dirent * fd_ent;
+                    while (errno = 0, fd_ent = readdir(fdDir.get())) {
+                        if (fd_ent->d_name[0] != '.')
+                            readProcLink(fmt("%s/%s", fdStr, fd_ent->d_name), unchecked);
+                    }
+                    if (errno) {
+                        if (errno == ESRCH)
+                            continue;
+                        throw SysError("iterating /proc/%1%/fd", ent->d_name);
+                    }
+                    fdDir.reset();
+
                     auto mapFile = fmt("/proc/%s/maps", ent->d_name);
                     auto mapLines = tokenizeString<std::vector<std::string>>(readFile(mapFile), "\n");
                     for (const auto & line : mapLines) {
@@ -508,6 +524,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         Finally cleanup([&]() {
             debug("GC roots server shutting down");
+            fdServer.close();
             while (true) {
                 auto item = remove_begin(*connections.lock());
                 if (!item) break;
@@ -551,7 +568,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                     /* On macOS, accepted sockets inherit the
                        non-blocking flag from the server socket, so
                        explicitly make it blocking. */
-                    if (fcntl(fdServer.get(), F_SETFL, fcntl(fdServer.get(), F_GETFL) & ~O_NONBLOCK) == -1)
+                    if (fcntl(fdClient.get(), F_SETFL, fcntl(fdClient.get(), F_GETFL) & ~O_NONBLOCK) == -1)
                         abort();
 
                     while (true) {
@@ -620,6 +637,17 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     {
         Path path = storeDir + "/" + std::string(baseName);
         Path realPath = realStoreDir + "/" + std::string(baseName);
+
+        /* There may be temp directories in the store that are still in use
+           by another process. We need to be sure that we can acquire an
+           exclusive lock before deleting them. */
+        if (baseName.find("tmp-", 0) == 0) {
+            AutoCloseFD tmpDirFd = open(realPath.c_str(), O_RDONLY | O_DIRECTORY);
+            if (tmpDirFd.get() == -1 || !lockFile(tmpDirFd.get(), ltWrite, false)) {
+                debug("skipping locked tempdir '%s'", realPath);
+                return;
+            }
+        }
 
         printInfo("deleting '%1%'", path);
 
@@ -839,7 +867,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 continue;
             }
 
-            printMsg(lvlTalkative, format("deleting unused link '%1%'") % path);
+            printMsg(lvlTalkative, "deleting unused link '%1%'", path);
 
             if (unlink(path.c_str()) == -1)
                 throw SysError("deleting '%1%'", path);

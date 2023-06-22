@@ -9,7 +9,7 @@ std::string FixedOutputHash::printMethodAlgo() const
     return makeFileIngestionPrefix(method) + printHashType(hash.type);
 }
 
-std::string makeFileIngestionPrefix(const FileIngestionMethod m)
+std::string makeFileIngestionPrefix(FileIngestionMethod m)
 {
     switch (m) {
     case FileIngestionMethod::Flat:
@@ -21,41 +21,58 @@ std::string makeFileIngestionPrefix(const FileIngestionMethod m)
     }
 }
 
-std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
-{
-    return "fixed:"
-        + makeFileIngestionPrefix(method)
-        + hash.to_string(Base32, true);
-}
-
-std::string renderContentAddress(ContentAddress ca)
+std::string ContentAddressMethod::renderPrefix() const
 {
     return std::visit(overloaded {
-        [](TextHash & th) {
-            return "text:" + th.hash.to_string(Base32, true);
+        [](TextIngestionMethod) -> std::string { return "text:"; },
+        [](FileIngestionMethod m2) {
+             /* Not prefixed for back compat with things that couldn't produce text before. */
+            return makeFileIngestionPrefix(m2);
         },
-        [](FixedOutputHash & fsh) {
-            return makeFixedOutputCA(fsh.method, fsh.hash);
-        }
-    }, ca);
+    }, raw);
 }
 
-std::string renderContentAddressMethod(ContentAddressMethod cam)
+ContentAddressMethod ContentAddressMethod::parsePrefix(std::string_view & m)
+{
+    ContentAddressMethod method = FileIngestionMethod::Flat;
+    if (splitPrefix(m, "r:"))
+        method = FileIngestionMethod::Recursive;
+    else if (splitPrefix(m, "text:"))
+        method = TextIngestionMethod {};
+    return method;
+}
+
+std::string ContentAddress::render() const
 {
     return std::visit(overloaded {
-        [](TextHashMethod & th) {
-            return std::string{"text:"} + printHashType(htSHA256);
+        [](const TextHash & th) {
+            return "text:"
+                + th.hash.to_string(Base32, true);
         },
-        [](FixedOutputHashMethod & fshm) {
-            return "fixed:" + makeFileIngestionPrefix(fshm.fileIngestionMethod) + printHashType(fshm.hashType);
+        [](const FixedOutputHash & fsh) {
+            return "fixed:"
+                + makeFileIngestionPrefix(fsh.method)
+                + fsh.hash.to_string(Base32, true);
         }
-    }, cam);
+    }, raw);
 }
 
-/*
-  Parses content address strings up to the hash.
+std::string ContentAddressMethod::render(HashType ht) const
+{
+    return std::visit(overloaded {
+        [&](const TextIngestionMethod & th) {
+            return std::string{"text:"} + printHashType(ht);
+        },
+        [&](const FileIngestionMethod & fim) {
+            return "fixed:" + makeFileIngestionPrefix(fim) + printHashType(ht);
+        }
+    }, raw);
+}
+
+/**
+ * Parses content address strings up to the hash.
  */
-static ContentAddressMethod parseContentAddressMethodPrefix(std::string_view & rest)
+static std::pair<ContentAddressMethod, HashType> parseContentAddressMethodPrefix(std::string_view & rest)
 {
     std::string_view wholeInput { rest };
 
@@ -79,46 +96,47 @@ static ContentAddressMethod parseContentAddressMethodPrefix(std::string_view & r
     if (prefix == "text") {
         // No parsing of the ingestion method, "text" only support flat.
         HashType hashType = parseHashType_();
-        if (hashType != htSHA256)
-            throw Error("text content address hash should use %s, but instead uses %s",
-                printHashType(htSHA256), printHashType(hashType));
-        return TextHashMethod {};
+        return {
+            TextIngestionMethod {},
+            std::move(hashType),
+        };
     } else if (prefix == "fixed") {
         // Parse method
         auto method = FileIngestionMethod::Flat;
         if (splitPrefix(rest, "r:"))
             method = FileIngestionMethod::Recursive;
         HashType hashType = parseHashType_();
-        return FixedOutputHashMethod {
-            .fileIngestionMethod = method,
-            .hashType = std::move(hashType),
+        return {
+            std::move(method),
+            std::move(hashType),
         };
     } else
         throw UsageError("content address prefix '%s' is unrecognized. Recogonized prefixes are 'text' or 'fixed'", prefix);
 }
 
-ContentAddress parseContentAddress(std::string_view rawCa) {
+ContentAddress ContentAddress::parse(std::string_view rawCa)
+{
     auto rest = rawCa;
 
-    ContentAddressMethod caMethod = parseContentAddressMethodPrefix(rest);
+    auto [caMethod, hashType_] = parseContentAddressMethodPrefix(rest);
+    auto hashType = hashType_; // work around clang bug
 
-    return std::visit(
-        overloaded {
-            [&](TextHashMethod & thm) {
-                return ContentAddress(TextHash {
-                    .hash = Hash::parseNonSRIUnprefixed(rest, htSHA256)
-                });
-            },
-            [&](FixedOutputHashMethod & fohMethod) {
-                return ContentAddress(FixedOutputHash {
-                    .method = fohMethod.fileIngestionMethod,
-                    .hash = Hash::parseNonSRIUnprefixed(rest, std::move(fohMethod.hashType)),
-                });
-            },
-        }, caMethod);
+    return std::visit(overloaded {
+        [&](TextIngestionMethod &) {
+            return ContentAddress(TextHash {
+                .hash = Hash::parseNonSRIUnprefixed(rest, hashType)
+            });
+        },
+        [&](FileIngestionMethod & fim) {
+            return ContentAddress(FixedOutputHash {
+                .method = fim,
+                .hash = Hash::parseNonSRIUnprefixed(rest, hashType),
+            });
+        },
+    }, caMethod.raw);
 }
 
-ContentAddressMethod parseContentAddressMethod(std::string_view caMethod)
+std::pair<ContentAddressMethod, HashType> ContentAddressMethod::parse(std::string_view caMethod)
 {
     std::string asPrefix = std::string{caMethod} + ":";
     // parseContentAddressMethodPrefix takes its argument by reference
@@ -126,26 +144,144 @@ ContentAddressMethod parseContentAddressMethod(std::string_view caMethod)
     return parseContentAddressMethodPrefix(asPrefixView);
 }
 
-std::optional<ContentAddress> parseContentAddressOpt(std::string_view rawCaOpt)
+std::optional<ContentAddress> ContentAddress::parseOpt(std::string_view rawCaOpt)
 {
-    return rawCaOpt == "" ? std::optional<ContentAddress>() : parseContentAddress(rawCaOpt);
+    return rawCaOpt == ""
+        ? std::nullopt
+        : std::optional { ContentAddress::parse(rawCaOpt) };
 };
 
 std::string renderContentAddress(std::optional<ContentAddress> ca)
 {
-    return ca ? renderContentAddress(*ca) : "";
+    return ca ? ca->render() : "";
 }
 
-Hash getContentAddressHash(const ContentAddress & ca)
+ContentAddress ContentAddress::fromParts(
+    ContentAddressMethod method, Hash hash) noexcept
 {
     return std::visit(overloaded {
-        [](const TextHash & th) {
+        [&](TextIngestionMethod _) -> ContentAddress {
+            return TextHash {
+                .hash = std::move(hash),
+            };
+        },
+        [&](FileIngestionMethod m2) -> ContentAddress {
+            return FixedOutputHash {
+                .method = std::move(m2),
+                .hash = std::move(hash),
+            };
+        },
+    }, method.raw);
+}
+
+ContentAddressMethod ContentAddress::getMethod() const
+{
+    return std::visit(overloaded {
+        [](const TextHash & th) -> ContentAddressMethod {
+            return TextIngestionMethod {};
+        },
+        [](const FixedOutputHash & fsh) -> ContentAddressMethod {
+            return fsh.method;
+        },
+    }, raw);
+}
+
+const Hash & ContentAddress::getHash() const
+{
+    return std::visit(overloaded {
+        [](const TextHash & th) -> auto & {
             return th.hash;
         },
-        [](const FixedOutputHash & fsh) {
+        [](const FixedOutputHash & fsh) -> auto & {
             return fsh.hash;
-        }
-    }, ca);
+        },
+    }, raw);
+}
+
+std::string ContentAddress::printMethodAlgo() const
+{
+    return getMethod().renderPrefix()
+        + printHashType(getHash().type);
+}
+
+bool StoreReferences::empty() const
+{
+    return !self && others.empty();
+}
+
+size_t StoreReferences::size() const
+{
+    return (self ? 1 : 0) + others.size();
+}
+
+ContentAddressWithReferences ContentAddressWithReferences::withoutRefs(const ContentAddress & ca) noexcept
+{
+    return std::visit(overloaded {
+        [&](const TextHash & h) -> ContentAddressWithReferences {
+            return TextInfo {
+                .hash = h,
+                .references = {},
+            };
+        },
+        [&](const FixedOutputHash & h) -> ContentAddressWithReferences {
+            return FixedOutputInfo {
+                .hash = h,
+                .references = {},
+            };
+        },
+    }, ca.raw);
+}
+
+std::optional<ContentAddressWithReferences> ContentAddressWithReferences::fromPartsOpt(
+    ContentAddressMethod method, Hash hash, StoreReferences refs) noexcept
+{
+    return std::visit(overloaded {
+        [&](TextIngestionMethod _) -> std::optional<ContentAddressWithReferences> {
+            if (refs.self)
+                return std::nullopt;
+            return ContentAddressWithReferences {
+                TextInfo {
+                    .hash = { .hash = std::move(hash) },
+                    .references = std::move(refs.others),
+                }
+            };
+        },
+        [&](FileIngestionMethod m2) -> std::optional<ContentAddressWithReferences> {
+            return ContentAddressWithReferences {
+                FixedOutputInfo {
+                    .hash = {
+                        .method = m2,
+                        .hash = std::move(hash),
+                    },
+                    .references = std::move(refs),
+                }
+            };
+        },
+    }, method.raw);
+}
+
+ContentAddressMethod ContentAddressWithReferences::getMethod() const
+{
+    return std::visit(overloaded {
+        [](const TextInfo & th) -> ContentAddressMethod {
+            return TextIngestionMethod {};
+        },
+        [](const FixedOutputInfo & fsh) -> ContentAddressMethod {
+            return fsh.hash.method;
+        },
+    }, raw);
+}
+
+Hash ContentAddressWithReferences::getHash() const
+{
+    return std::visit(overloaded {
+        [](const TextInfo & th) {
+            return th.hash.hash;
+        },
+        [](const FixedOutputInfo & fsh) {
+            return fsh.hash.hash;
+        },
+    }, raw);
 }
 
 }

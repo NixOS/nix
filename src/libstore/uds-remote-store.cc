@@ -13,6 +13,14 @@
 
 namespace nix {
 
+std::string UDSRemoteStoreConfig::doc()
+{
+    return
+        #include "uds-remote-store.md"
+        ;
+}
+
+
 UDSRemoteStore::UDSRemoteStore(const Params & params)
     : StoreConfig(params)
     , LocalFSStoreConfig(params)
@@ -26,9 +34,9 @@ UDSRemoteStore::UDSRemoteStore(const Params & params)
 
 
 UDSRemoteStore::UDSRemoteStore(
-        const std::string scheme,
-        std::string socket_path,
-        const Params & params)
+    const std::string scheme,
+    std::string socket_path,
+    const Params & params)
     : UDSRemoteStore(params)
 {
     path.emplace(socket_path);

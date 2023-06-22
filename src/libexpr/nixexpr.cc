@@ -3,50 +3,70 @@
 #include "eval.hh"
 #include "symbol-table.hh"
 #include "util.hh"
+#include "print.hh"
 
 #include <cstdlib>
 
 namespace nix {
 
-/* Displaying abstract syntax trees. */
-
-static void showString(std::ostream & str, std::string_view s)
+struct PosAdapter : AbstractPos
 {
-    str << '"';
-    for (auto c : s)
-        if (c == '"' || c == '\\' || c == '$') str << "\\" << c;
-        else if (c == '\n') str << "\\n";
-        else if (c == '\r') str << "\\r";
-        else if (c == '\t') str << "\\t";
-        else str << c;
-    str << '"';
+    Pos::Origin origin;
+
+    PosAdapter(Pos::Origin origin)
+        : origin(std::move(origin))
+    {
+    }
+
+    std::optional<std::string> getSource() const override
+    {
+        return std::visit(overloaded {
+            [](const Pos::none_tag &) -> std::optional<std::string> {
+                return std::nullopt;
+            },
+            [](const Pos::Stdin & s) -> std::optional<std::string> {
+                // Get rid of the null terminators added by the parser.
+                return std::string(s.source->c_str());
+            },
+            [](const Pos::String & s) -> std::optional<std::string> {
+                // Get rid of the null terminators added by the parser.
+                return std::string(s.source->c_str());
+            },
+            [](const SourcePath & path) -> std::optional<std::string> {
+                try {
+                    return path.readFile();
+                } catch (Error &) {
+                    return std::nullopt;
+                }
+            }
+        }, origin);
+    }
+
+    void print(std::ostream & out) const override
+    {
+        std::visit(overloaded {
+            [&](const Pos::none_tag &) { out << "«none»"; },
+            [&](const Pos::Stdin &) { out << "«stdin»"; },
+            [&](const Pos::String & s) { out << "«string»"; },
+            [&](const SourcePath & path) { out << path; }
+        }, origin);
+    }
+};
+
+Pos::operator std::shared_ptr<AbstractPos>() const
+{
+    auto pos = std::make_shared<PosAdapter>(origin);
+    pos->line = line;
+    pos->column = column;
+    return pos;
 }
 
+// FIXME: remove, because *symbols* are abstract and do not have a single
+//        textual representation; see printIdentifier()
 std::ostream & operator <<(std::ostream & str, const SymbolStr & symbol)
 {
     std::string_view s = symbol;
-
-    if (s.empty())
-        str << "\"\"";
-    else if (s == "if") // FIXME: handle other keywords
-        str << '"' << s << '"';
-    else {
-        char c = s[0];
-        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_')) {
-            showString(str, s);
-            return str;
-        }
-        for (auto c : s)
-            if (!((c >= 'a' && c <= 'z') ||
-                  (c >= 'A' && c <= 'Z') ||
-                  (c >= '0' && c <= '9') ||
-                  c == '_' || c == '\'' || c == '-')) {
-                showString(str, s);
-                return str;
-            }
-        str << s;
-    }
-    return str;
+    return printIdentifier(str, s);
 }
 
 void Expr::show(const SymbolTable & symbols, std::ostream & str) const
@@ -66,7 +86,7 @@ void ExprFloat::show(const SymbolTable & symbols, std::ostream & str) const
 
 void ExprString::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    showString(str, s);
+    printLiteralString(str, s);
 }
 
 void ExprPath::show(const SymbolTable & symbols, std::ostream & str) const
@@ -248,24 +268,10 @@ void ExprPos::show(const SymbolTable & symbols, std::ostream & str) const
 
 std::ostream & operator << (std::ostream & str, const Pos & pos)
 {
-    if (!pos)
+    if (auto pos2 = (std::shared_ptr<AbstractPos>) pos) {
+        str << *pos2;
+    } else
         str << "undefined position";
-    else
-    {
-        auto f = format(ANSI_BOLD "%1%" ANSI_NORMAL ":%2%:%3%");
-        switch (pos.origin) {
-            case foFile:
-                f % (const std::string &) pos.file;
-                break;
-            case foStdin:
-            case foString:
-                f % "(string)";
-                break;
-            default:
-                throw Error("unhandled Pos origin!");
-        }
-        str << (f % pos.line % pos.column).str();
-    }
 
     return str;
 }
@@ -287,7 +293,6 @@ std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
     }
     return out.str();
 }
-
 
 
 /* Computing levels/displacements for variables. */

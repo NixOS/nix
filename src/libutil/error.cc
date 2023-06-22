@@ -9,9 +9,9 @@ namespace nix {
 
 const std::string nativeSystem = SYSTEM;
 
-void BaseError::addTrace(std::optional<ErrPos> e, hintformat hint)
+void BaseError::addTrace(std::shared_ptr<AbstractPos> && e, hintformat hint, bool frame)
 {
-    err.traces.push_front(Trace { .pos = e, .hint = hint });
+    err.traces.push_front(Trace { .pos = std::move(e), .hint = hint, .frame = frame });
 }
 
 // c++ std::exception descendants must have a 'const char* what()' function.
@@ -30,91 +30,46 @@ const std::string & BaseError::calcWhat() const
 
 std::optional<std::string> ErrorInfo::programName = std::nullopt;
 
-std::ostream & operator<<(std::ostream & os, const hintformat & hf)
+std::ostream & operator <<(std::ostream & os, const hintformat & hf)
 {
     return os << hf.str();
 }
 
-std::string showErrPos(const ErrPos & errPos)
+std::ostream & operator <<(std::ostream & str, const AbstractPos & pos)
 {
-    if (errPos.line > 0) {
-        if (errPos.column > 0) {
-            return fmt("%d:%d", errPos.line, errPos.column);
-        } else {
-            return fmt("%d", errPos.line);
-        }
-    }
-    else {
-        return "";
-    }
+    pos.print(str);
+    str << ":" << pos.line;
+    if (pos.column > 0)
+        str << ":" << pos.column;
+    return str;
 }
 
-std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos)
+std::optional<LinesOfCode> AbstractPos::getCodeLines() const
 {
-    if (errPos.line <= 0)
+    if (line == 0)
         return std::nullopt;
 
-    if (errPos.origin == foFile) {
-        LinesOfCode loc;
-        try {
-            // FIXME: when running as the daemon, make sure we don't
-            // open a file to which the client doesn't have access.
-            AutoCloseFD fd = open(errPos.file.c_str(), O_RDONLY | O_CLOEXEC);
-            if (!fd) return {};
+    if (auto source = getSource()) {
 
-            // count the newlines.
-            int count = 0;
-            std::string line;
-            int pl = errPos.line - 1;
-            do
-            {
-                line = readLine(fd.get());
-                ++count;
-                if (count < pl)
-                    ;
-                else if (count == pl)
-                    loc.prevLineOfCode = line;
-                else if (count == pl + 1)
-                    loc.errLineOfCode = line;
-                else if (count == pl + 2) {
-                    loc.nextLineOfCode = line;
-                    break;
-                }
-            } while (true);
-            return loc;
-        }
-        catch (EndOfFile & eof) {
-            if (loc.errLineOfCode.has_value())
-                return loc;
-            else
-                return std::nullopt;
-        }
-        catch (std::exception & e) {
-            return std::nullopt;
-        }
-    } else {
-        std::istringstream iss(errPos.file);
+        std::istringstream iss(*source);
         // count the newlines.
         int count = 0;
-        std::string line;
-        int pl = errPos.line - 1;
+        std::string curLine;
+        int pl = line - 1;
 
         LinesOfCode loc;
 
-        do
-        {
-            std::getline(iss, line);
+        do {
+            std::getline(iss, curLine);
             ++count;
             if (count < pl)
-            {
                 ;
-            }
             else if (count == pl) {
-                loc.prevLineOfCode = line;
+                loc.prevLineOfCode = curLine;
             } else if (count == pl + 1) {
-                loc.errLineOfCode = line;
+                loc.errLineOfCode = curLine;
             } else if (count == pl + 2) {
-                loc.nextLineOfCode = line;
+                loc.nextLineOfCode = curLine;
                 break;
             }
 
@@ -124,12 +79,14 @@ std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos)
 
         return loc;
     }
+
+    return std::nullopt;
 }
 
 // print lines of code to the ostream, indicating the error column.
 void printCodeLines(std::ostream & out,
     const std::string & prefix,
-    const ErrPos & errPos,
+    const AbstractPos & errPos,
     const LinesOfCode & loc)
 {
     // previous line of code.
@@ -173,28 +130,6 @@ void printCodeLines(std::ostream & out,
             prefix,
             (errPos.line + 1),
             *loc.nextLineOfCode);
-    }
-}
-
-void printAtPos(const ErrPos & pos, std::ostream & out)
-{
-    if (pos) {
-        switch (pos.origin) {
-            case foFile: {
-                out << fmt(ANSI_BLUE "at " ANSI_WARNING "%s:%s" ANSI_NORMAL ":", pos.file, showErrPos(pos));
-                break;
-            }
-            case foString: {
-                out << fmt(ANSI_BLUE "at " ANSI_WARNING "«string»:%s" ANSI_NORMAL ":", showErrPos(pos));
-                break;
-            }
-            case foStdin: {
-                out << fmt(ANSI_BLUE "at " ANSI_WARNING "«stdin»:%s" ANSI_NORMAL ":", showErrPos(pos));
-                break;
-            }
-            default:
-                throw Error("invalid FileOrigin in errPos");
-        }
     }
 }
 
@@ -262,47 +197,158 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
         prefix += ":" ANSI_NORMAL " ";
 
     std::ostringstream oss;
+
+    auto noSource = ANSI_ITALIC " (source not available)" ANSI_NORMAL "\n";
+
+    /*
+     * Traces
+     * ------
+     *
+     *  The semantics of traces is a bit weird. We have only one option to
+     *  print them and to make them verbose (--show-trace). In the code they
+     *  are always collected, but they are not printed by default. The code
+     *  also collects more traces when the option is on. This means that there
+     *  is no way to print the simplified traces at all.
+     *
+     *  I (layus) designed the code to attach positions to a restricted set of
+     *  messages. This means that we have  a lot of traces with no position at
+     *  all, including most of the base error messages. For example "type
+     *  error: found a string while a set was expected" has no position, but
+     *  will come with several traces detailing it's precise relation to the
+     *  closest know position. This makes erroring without printing traces
+     *  quite useless.
+     *
+     *  This is why I introduced the idea to always print a few traces on
+     *  error. The number 3 is quite arbitrary, and was selected so as not to
+     *  clutter the console on error. For the same reason, a trace with an
+     *  error position takes more space, and counts as two traces towards the
+     *  limit.
+     *
+     *  The rest is truncated, unless --show-trace is passed. This preserves
+     *  the same bad semantics of --show-trace to both show the trace and
+     *  augment it with new data. Not too sure what is the best course of
+     *  action.
+     *
+     *  The issue is that it is fundamentally hard to provide a trace for a
+     *  lazy language. The trace will only cover the current spine of the
+     *  evaluation, missing things that have been evaluated before. For
+     *  example, most type errors are hard to inspect because there is not
+     *  trace for the faulty value. These errors should really print the faulty
+     *  value itself.
+     *
+     *  In function calls, the --show-trace flag triggers extra traces for each
+     *  function invocation. These work as scopes, allowing to follow the
+     *  current spine of the evaluation graph. Without that flag, the error
+     *  trace should restrict itself to a restricted prefix of that trace,
+     *  until the first scope. If we ever get to such a precise error
+     *  reporting, there would be no need to add an arbitrary limit here. We
+     *  could always print the full trace, and it would just be small without
+     *  the flag.
+     *
+     *  One idea I had is for XxxError.addTrace() to perform nothing if one
+     *  scope has already been traced. Alternatively, we could stop here when
+     *  we encounter such a scope instead of after an arbitrary number of
+     *  traces. This however requires to augment traces with the notion of
+     *  "scope".
+     *
+     *  This is particularly visible in code like evalAttrs(...) where we have
+     *  to make a decision between the two following options.
+     *
+     *  ``` long traces
+     *  inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const Pos & pos, std::string_view errorCtx)
+     *  {
+     *      try {
+     *          e->eval(*this, env, v);
+     *          if (v.type() != nAttrs)
+     *              throwTypeError("value is %1% while a set was expected", v);
+     *      } catch (Error & e) {
+     *          e.addTrace(pos, errorCtx);
+     *          throw;
+     *      }
+     *  }
+     *  ```
+     *
+     *  ``` short traces
+     *  inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const Pos & pos, std::string_view errorCtx)
+     *  {
+     *      e->eval(*this, env, v);
+     *      try {
+     *          if (v.type() != nAttrs)
+     *              throwTypeError("value is %1% while a set was expected", v);
+     *      } catch (Error & e) {
+     *          e.addTrace(pos, errorCtx);
+     *          throw;
+     *      }
+     *  }
+     *  ```
+     *
+     *  The second example can be rewritten more concisely, but kept in this
+     *  form to highlight the symmetry. The first option adds more information,
+     *  because whatever caused an error down the line, in the generic eval
+     *  function, will get annotated with the code location that uses and
+     *  required it. The second option is less verbose, but does not provide
+     *  any context at all as to where and why a failing value was required.
+     *
+     *  Scopes would fix that, by adding context only when --show-trace is
+     *  passed, and keeping the trace terse otherwise.
+     *
+     */
+
+    // Enough indent to align with with the `... `
+    // prepended to each element of the trace
+    auto ellipsisIndent = "  ";
+
+    bool frameOnly = false;
+    if (!einfo.traces.empty()) {
+        size_t count = 0;
+        for (const auto & trace : einfo.traces) {
+            if (trace.hint.str().empty()) continue;
+            if (frameOnly && !trace.frame) continue;
+
+            if (!showTrace && count > 3) {
+                oss << "\n" << ANSI_WARNING "(stack trace truncated; use '--show-trace' to show the full trace)" ANSI_NORMAL << "\n";
+                break;
+            }
+
+            count++;
+            frameOnly = trace.frame;
+
+            oss << "\n" << "… " << trace.hint.str() << "\n";
+
+            if (trace.pos) {
+                count++;
+
+                oss << "\n" << ellipsisIndent << ANSI_BLUE << "at " ANSI_WARNING << *trace.pos << ANSI_NORMAL << ":";
+
+                if (auto loc = trace.pos->getCodeLines()) {
+                    oss << "\n";
+                    printCodeLines(oss, "", *trace.pos, *loc);
+                    oss << "\n";
+                } else
+                    oss << noSource;
+            }
+        }
+        oss << "\n" << prefix;
+    }
+
     oss << einfo.msg << "\n";
 
-    if (einfo.errPos.has_value() && *einfo.errPos) {
-        oss << "\n";
-        printAtPos(*einfo.errPos, oss);
+    if (einfo.errPos) {
+        oss << "\n" << ANSI_BLUE << "at " ANSI_WARNING << *einfo.errPos << ANSI_NORMAL << ":";
 
-        auto loc = getCodeLines(*einfo.errPos);
-
-        // lines of code.
-        if (loc.has_value()) {
+        if (auto loc = einfo.errPos->getCodeLines()) {
             oss << "\n";
             printCodeLines(oss, "", *einfo.errPos, *loc);
             oss << "\n";
-        }
+        } else
+            oss << noSource;
     }
 
     auto suggestions = einfo.suggestions.trim();
-    if (! suggestions.suggestions.empty()){
+    if (!suggestions.suggestions.empty()) {
         oss << "Did you mean " <<
             suggestions.trim() <<
             "?" << std::endl;
-    }
-
-    // traces
-    if (showTrace && !einfo.traces.empty()) {
-        for (auto iter = einfo.traces.rbegin(); iter != einfo.traces.rend(); ++iter) {
-            oss << "\n" << "… " << iter->hint.str() << "\n";
-
-            if (iter->pos.has_value() && (*iter->pos)) {
-                auto pos = iter->pos.value();
-                oss << "\n";
-                printAtPos(pos, oss);
-
-                auto loc = getCodeLines(pos);
-                if (loc.has_value()) {
-                    oss << "\n";
-                    printCodeLines(oss, "", pos, *loc);
-                    oss << "\n";
-                }
-            }
-        }
     }
 
     out << indent(prefix, std::string(filterANSIEscapes(prefix, true).size(), ' '), chomp(oss.str()));

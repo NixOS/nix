@@ -11,6 +11,13 @@ struct LocalBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
     using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
 
     const std::string name() override { return "Local Binary Cache Store"; }
+
+    std::string doc() override
+    {
+        return
+          #include "local-binary-cache-store.md"
+          ;
+    }
 };
 
 class LocalBinaryCacheStore : public virtual LocalBinaryCacheStoreConfig, public virtual BinaryCacheStore
@@ -57,8 +64,7 @@ protected:
         AutoDelete del(tmp, false);
         StreamToSourceAdapter source(istream);
         writeFile(tmp, source);
-        if (rename(tmp.c_str(), path2.c_str()))
-            throw SysError("renaming '%1%' to '%2%'", tmp, path2);
+        renameFile(tmp, path2);
         del.cancel();
     }
 
@@ -89,6 +95,10 @@ protected:
         return paths;
     }
 
+    std::optional<TrustedFlag> isTrustedClient() override
+    {
+        return Trusted;
+    }
 };
 
 void LocalBinaryCacheStore::init()

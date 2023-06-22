@@ -1,12 +1,16 @@
 #pragma once
+///@file
 
 #include <cassert>
 
 #include "symbol-table.hh"
+#include "value/context.hh"
+#include "input-accessor.hh"
 
 #if HAVE_BOEHMGC
 #include <gc/gc_allocator.h>
 #endif
+#include <nlohmann/json_fwd.hpp>
 
 namespace nix {
 
@@ -33,9 +37,11 @@ typedef enum {
     tFloat
 } InternalType;
 
-// This type abstracts over all actual value types in the language,
-// grouping together implementation details like tList*, different function
-// types, and types in non-normal form (so thunks and co.)
+/**
+ * This type abstracts over all actual value types in the language,
+ * grouping together implementation details like tList*, different function
+ * types, and types in non-normal form (so thunks and co.)
+ */
 typedef enum {
     nThunk,
     nInt,
@@ -62,48 +68,58 @@ class StorePath;
 class Store;
 class EvalState;
 class XMLWriter;
-class JSONPlaceholder;
 
 
 typedef int64_t NixInt;
 typedef double NixFloat;
-typedef std::pair<StorePath, std::string> NixStringContextElem;
-typedef std::vector<NixStringContextElem> NixStringContext;
 
-/* External values must descend from ExternalValueBase, so that
+/**
+ * External values must descend from ExternalValueBase, so that
  * type-agnostic nix functions (e.g. showType) can be implemented
  */
 class ExternalValueBase
 {
     friend std::ostream & operator << (std::ostream & str, const ExternalValueBase & v);
     protected:
-    /* Print out the value */
+    /**
+     * Print out the value
+     */
     virtual std::ostream & print(std::ostream & str) const = 0;
 
     public:
-    /* Return a simple string describing the type */
+    /**
+     * Return a simple string describing the type
+     */
     virtual std::string showType() const = 0;
 
-    /* Return a string to be used in builtins.typeOf */
+    /**
+     * Return a string to be used in builtins.typeOf
+     */
     virtual std::string typeOf() const = 0;
 
-    /* Coerce the value to a string. Defaults to uncoercable, i.e. throws an
+    /**
+     * Coerce the value to a string. Defaults to uncoercable, i.e. throws an
      * error.
      */
-    virtual std::string coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore) const;
+    virtual std::string coerceToString(const Pos & pos, NixStringContext & context, bool copyMore, bool copyToStore) const;
 
-    /* Compare to another value of the same type. Defaults to uncomparable,
+    /**
+     * Compare to another value of the same type. Defaults to uncomparable,
      * i.e. always false.
      */
     virtual bool operator ==(const ExternalValueBase & b) const;
 
-    /* Print the value as JSON. Defaults to unconvertable, i.e. throws an error */
-    virtual void printValueAsJSON(EvalState & state, bool strict,
-        JSONPlaceholder & out, PathSet & context) const;
+    /**
+     * Print the value as JSON. Defaults to unconvertable, i.e. throws an error
+     */
+    virtual nlohmann::json printValueAsJSON(EvalState & state, bool strict,
+        NixStringContext & context, bool copyToStore = true) const;
 
-    /* Print the value as XML. Defaults to unevaluated */
+    /**
+     * Print the value as XML. Defaults to unevaluated
+     */
     virtual void printValueAsXML(EvalState & state, bool strict, bool location,
-        XMLWriter & doc, PathSet & context, PathSet & drvsSeen,
+        XMLWriter & doc, NixStringContext & context, PathSet & drvsSeen,
         const PosIdx pos) const;
 
     virtual ~ExternalValueBase()
@@ -146,32 +162,34 @@ public:
         NixInt integer;
         bool boolean;
 
-        /* Strings in the evaluator carry a so-called `context' which
-           is a list of strings representing store paths.  This is to
-           allow users to write things like
+        /**
+         * Strings in the evaluator carry a so-called `context` which
+         * is a list of strings representing store paths.  This is to
+         * allow users to write things like
 
-             "--with-freetype2-library=" + freetype + "/lib"
+         *   "--with-freetype2-library=" + freetype + "/lib"
 
-           where `freetype' is a derivation (or a source to be copied
-           to the store).  If we just concatenated the strings without
-           keeping track of the referenced store paths, then if the
-           string is used as a derivation attribute, the derivation
-           will not have the correct dependencies in its inputDrvs and
-           inputSrcs.
+         * where `freetype` is a derivation (or a source to be copied
+         * to the store).  If we just concatenated the strings without
+         * keeping track of the referenced store paths, then if the
+         * string is used as a derivation attribute, the derivation
+         * will not have the correct dependencies in its inputDrvs and
+         * inputSrcs.
 
-           The semantics of the context is as follows: when a string
-           with context C is used as a derivation attribute, then the
-           derivations in C will be added to the inputDrvs of the
-           derivation, and the other store paths in C will be added to
-           the inputSrcs of the derivations.
+         * The semantics of the context is as follows: when a string
+         * with context C is used as a derivation attribute, then the
+         * derivations in C will be added to the inputDrvs of the
+         * derivation, and the other store paths in C will be added to
+         * the inputSrcs of the derivations.
 
-           For canonicity, the store paths should be in sorted order. */
+         * For canonicity, the store paths should be in sorted order.
+         */
         struct {
             const char * s;
             const char * * context; // must be in sorted order
         } string;
 
-        const char * path;
+        const char * _path;
         Bindings * attrs;
         struct {
             size_t size;
@@ -197,8 +215,10 @@ public:
         NixFloat fpoint;
     };
 
-    // Returns the normal type of a Value. This only returns nThunk if the
-    // Value hasn't been forceValue'd
+    /**
+     * Returns the normal type of a Value. This only returns nThunk if
+     * the Value hasn't been forceValue'd
+     */
     inline ValueType type() const
     {
         switch (internalType) {
@@ -217,8 +237,10 @@ public:
         abort();
     }
 
-    /* After overwriting an app node, be sure to clear pointers in the
-       Value to ensure that the target isn't kept alive unnecessarily. */
+    /**
+     * After overwriting an app node, be sure to clear pointers in the
+     * Value to ensure that the target isn't kept alive unnecessarily.
+     */
     inline void clearValue()
     {
         app.left = app.right = 0;
@@ -247,18 +269,23 @@ public:
 
     void mkString(std::string_view s);
 
-    void mkString(std::string_view s, const PathSet & context);
+    void mkString(std::string_view s, const NixStringContext & context);
 
-    void mkStringMove(const char * s, const PathSet & context);
+    void mkStringMove(const char * s, const NixStringContext & context);
 
-    inline void mkPath(const char * s)
+    inline void mkString(const Symbol & s)
+    {
+        mkString(((const std::string &) s).c_str());
+    }
+
+    void mkPath(const SourcePath & path);
+
+    inline void mkPath(const char * path)
     {
         clearValue();
         internalType = tPath;
-        path = s;
+        _path = path;
     }
-
-    void mkPath(std::string_view s);
 
     inline void mkNull()
     {
@@ -366,12 +393,12 @@ public:
 
     PosIdx determinePos(const PosIdx pos) const;
 
-    /* Check whether forcing this value requires a trivial amount of
-       computation. In particular, function applications are
-       non-trivial. */
+    /**
+     * Check whether forcing this value requires a trivial amount of
+     * computation. In particular, function applications are
+     * non-trivial.
+     */
     bool isTrivial() const;
-
-    NixStringContext getContext(const Store &);
 
     auto listItems()
     {
@@ -400,6 +427,18 @@ public:
         auto begin = listElems();
         return ConstListIterable { begin, begin + listSize() };
     }
+
+    SourcePath path() const
+    {
+        assert(internalType == tPath);
+        return SourcePath{CanonPath(_path)};
+    }
+
+    std::string_view str() const
+    {
+        assert(internalType == tString);
+        return std::string_view(string.s);
+    }
 };
 
 
@@ -414,7 +453,9 @@ typedef std::map<Symbol, ValueVector> ValueVectorMap;
 #endif
 
 
-/* A value allocated in traceable memory. */
+/**
+ * A value allocated in traceable memory.
+ */
 typedef std::shared_ptr<Value *> RootValue;
 
 RootValue allocRootValue(Value * v);

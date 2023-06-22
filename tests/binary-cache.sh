@@ -15,15 +15,15 @@ outPath=$(nix-build dependencies.nix --no-out-link)
 nix copy --to file://$cacheDir $outPath
 
 # Test copying build logs to the binary cache.
-nix log --store file://$cacheDir $outPath 2>&1 | grep 'is not available'
+expect 1 nix log --store file://$cacheDir $outPath 2>&1 | grep 'is not available'
 nix store copy-log --to file://$cacheDir $outPath
 nix log --store file://$cacheDir $outPath | grep FOO
 rm -rf $TEST_ROOT/var/log/nix
-nix log $outPath 2>&1 | grep 'is not available'
+expect 1 nix log $outPath 2>&1 | grep 'is not available'
 nix log --substituters file://$cacheDir $outPath | grep FOO
 
 # Test copying build logs from the binary cache.
-nix store copy-log --from file://$cacheDir $(nix-store -qd $outPath)
+nix store copy-log --from file://$cacheDir $(nix-store -qd $outPath)^'*'
 nix log $outPath | grep FOO
 
 basicDownloadTests() {
@@ -78,8 +78,8 @@ mv $nar $nar.good
 mkdir -p $TEST_ROOT/empty
 nix-store --dump $TEST_ROOT/empty | xz > $nar
 
-nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -o $TEST_ROOT/result 2>&1 | tee $TEST_ROOT/log
-grep -q "hash mismatch" $TEST_ROOT/log
+expect 1 nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -o $TEST_ROOT/result 2>&1 | tee $TEST_ROOT/log
+grepQuiet "hash mismatch" $TEST_ROOT/log
 
 mv $nar.good $nar
 
@@ -126,9 +126,9 @@ clearStore
 rm -v $(grep -l "StorePath:.*dependencies-input-2" $cacheDir/*.narinfo)
 
 nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -o $TEST_ROOT/result 2>&1 | tee $TEST_ROOT/log
-grep -q "copying path.*input-0" $TEST_ROOT/log
-grep -q "copying path.*input-2" $TEST_ROOT/log
-grep -q "copying path.*top" $TEST_ROOT/log
+grepQuiet "copying path.*input-0" $TEST_ROOT/log
+grepQuiet "copying path.*input-2" $TEST_ROOT/log
+grepQuiet "copying path.*top" $TEST_ROOT/log
 
 
 # Idem, but without cached .narinfo.
@@ -136,11 +136,11 @@ clearStore
 clearCacheCache
 
 nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -o $TEST_ROOT/result 2>&1 | tee $TEST_ROOT/log
-grep -q "don't know how to build" $TEST_ROOT/log
-grep -q "building.*input-1" $TEST_ROOT/log
-grep -q "building.*input-2" $TEST_ROOT/log
-grep -q "copying path.*input-0" $TEST_ROOT/log
-grep -q "copying path.*top" $TEST_ROOT/log
+grepQuiet "don't know how to build" $TEST_ROOT/log
+grepQuiet "building.*input-1" $TEST_ROOT/log
+grepQuiet "building.*input-2" $TEST_ROOT/log
+grepQuiet "copying path.*input-0" $TEST_ROOT/log
+grepQuiet "copying path.*top" $TEST_ROOT/log
 
 
 # Create a signed binary cache.

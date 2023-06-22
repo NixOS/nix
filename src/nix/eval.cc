@@ -1,22 +1,23 @@
-#include "command.hh"
+#include "command-installable-value.hh"
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
-#include "json.hh"
 #include "value-to-json.hh"
 #include "progress-bar.hh"
 
+#include <nlohmann/json.hpp>
+
 using namespace nix;
 
-struct CmdEval : MixJSON, InstallableCommand
+struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 {
     bool raw = false;
     std::optional<std::string> apply;
     std::optional<Path> writeTo;
 
-    CmdEval() : InstallableCommand(true /* supportReadOnlyMode */)
+    CmdEval() : InstallableValueCommand()
     {
         addFlag({
             .longName = "raw",
@@ -53,7 +54,7 @@ struct CmdEval : MixJSON, InstallableCommand
 
     Category category() override { return catSecondary; }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<InstallableValue> installable) override
     {
         if (raw && json)
             throw UsageError("--raw and --json are mutually exclusive");
@@ -61,11 +62,11 @@ struct CmdEval : MixJSON, InstallableCommand
         auto state = getEvalState();
 
         auto [v, pos] = installable->toValue(*state);
-        PathSet context;
+        NixStringContext context;
 
         if (apply) {
             auto vApply = state->allocValue();
-            state->eval(state->parseExprFromString(*apply, absPath(".")), *vApply);
+            state->eval(state->parseExprFromString(*apply, state->rootPath(CanonPath::fromCwd())), *vApply);
             auto vRes = state->allocValue();
             state->callFunction(*vApply, *v, *vRes, noPos);
             v = vRes;
@@ -111,12 +112,11 @@ struct CmdEval : MixJSON, InstallableCommand
 
         else if (raw) {
             stopProgressBar();
-            std::cout << *state->coerceToString(noPos, *v, context);
+            writeFull(STDOUT_FILENO, *state->coerceToString(noPos, *v, context, "while generating the eval command output"));
         }
 
         else if (json) {
-            JSONPlaceholder jsonOut(std::cout);
-            printValueAsJSON(*state, true, *v, pos, jsonOut, context);
+            logger->cout("%s", printValueAsJSON(*state, true, *v, pos, context, false));
         }
 
         else {

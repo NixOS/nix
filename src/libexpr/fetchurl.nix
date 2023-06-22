@@ -12,13 +12,13 @@
 , executable ? false
 , unpack ? false
 , name ? baseNameOf (toString url)
+, impure ? false
 }:
 
-derivation {
+derivation ({
   builder = "builtin:fetchurl";
 
   # New-style output content requirements.
-  inherit outputHashAlgo outputHash;
   outputHashMode = if unpack || executable then "recursive" else "flat";
 
   inherit name url executable unpack;
@@ -38,4 +38,6 @@ derivation {
 
   # To make "nix-prefetch-url" work.
   urls = [ url ];
-}
+} // (if impure
+      then { __impure = true; }
+      else { inherit outputHashAlgo outputHash; }))

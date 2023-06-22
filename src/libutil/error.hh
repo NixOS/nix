@@ -1,4 +1,19 @@
 #pragma once
+/**
+ * @file
+ *
+ * @brief This file defines two main structs/classes used in nix error handling.
+ *
+ * ErrorInfo provides a standard payload of error information, with conversion to string
+ * happening in the logger rather than at the call site.
+ *
+ * BaseError is the ancestor of nix specific exceptions (and Interrupted), and contains
+ * an ErrorInfo.
+ *
+ * ErrorInfo structs are sent to the logger as part of an exception, or directly with the
+ * logError or logWarning macros.
+ * See libutil/tests/logging.cc for usage examples.
+ */
 
 #include "suggestions.hh"
 #include "ref.hh"
@@ -26,22 +41,6 @@
 
 namespace nix {
 
-/*
-
-   This file defines two main structs/classes used in nix error handling.
-
-   ErrorInfo provides a standard payload of error information, with conversion to string
-   happening in the logger rather than at the call site.
-
-   BaseError is the ancestor of nix specific exceptions (and Interrupted), and contains
-   an ErrorInfo.
-
-   ErrorInfo structs are sent to the logger as part of an exception, or directly with the
-   logError or logWarning macros.
-
-   See libutil/tests/logging.cc for usage examples.
-
- */
 
 typedef enum {
     lvlError = 0,
@@ -54,68 +53,53 @@ typedef enum {
     lvlVomit
 } Verbosity;
 
-/* adjust Pos::origin bit width when adding stuff here */
-typedef enum {
-    foFile,
-    foStdin,
-    foString
-} FileOrigin;
-
-// the lines of code surrounding an error.
+/**
+ * The lines of code surrounding an error.
+ */
 struct LinesOfCode {
     std::optional<std::string> prevLineOfCode;
     std::optional<std::string> errLineOfCode;
     std::optional<std::string> nextLineOfCode;
 };
 
-// ErrPos indicates the location of an error in a nix file.
-struct ErrPos {
-    int line = 0;
-    int column = 0;
-    std::string file;
-    FileOrigin origin;
+/**
+ * An abstract type that represents a location in a source file.
+ */
+struct AbstractPos
+{
+    uint32_t line = 0;
+    uint32_t column = 0;
 
-    operator bool() const
-    {
-        return line != 0;
-    }
+    /**
+     * Return the contents of the source file.
+     */
+    virtual std::optional<std::string> getSource() const
+    { return std::nullopt; };
 
-    // convert from the Pos struct, found in libexpr.
-    template <class P>
-    ErrPos & operator=(const P & pos)
-    {
-        origin = pos.origin;
-        line = pos.line;
-        column = pos.column;
-        file = pos.file;
-        return *this;
-    }
+    virtual void print(std::ostream & out) const = 0;
 
-    template <class P>
-    ErrPos(const P & p)
-    {
-        *this = p;
-    }
+    std::optional<LinesOfCode> getCodeLines() const;
+
+    virtual ~AbstractPos() = default;
 };
 
-std::optional<LinesOfCode> getCodeLines(const ErrPos & errPos);
+std::ostream & operator << (std::ostream & str, const AbstractPos & pos);
 
 void printCodeLines(std::ostream & out,
     const std::string & prefix,
-    const ErrPos & errPos,
+    const AbstractPos & errPos,
     const LinesOfCode & loc);
 
-void printAtPos(const ErrPos & pos, std::ostream & out);
-
 struct Trace {
-    std::optional<ErrPos> pos;
+    std::shared_ptr<AbstractPos> pos;
     hintformat hint;
+    bool frame;
 };
 
 struct ErrorInfo {
     Verbosity level;
     hintformat msg;
-    std::optional<ErrPos> errPos;
+    std::shared_ptr<AbstractPos> errPos;
     std::list<Trace> traces;
 
     Suggestions suggestions;
@@ -125,8 +109,10 @@ struct ErrorInfo {
 
 std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace);
 
-/* BaseError should generally not be caught, as it has Interrupted as
-   a subclass. Catch Error instead. */
+/**
+ * BaseError should generally not be caught, as it has Interrupted as
+ * a subclass. Catch Error instead.
+ */
 class BaseError : public std::exception
 {
 protected:
@@ -137,6 +123,8 @@ protected:
 
 public:
     unsigned int status = 1; // exit status
+
+    BaseError(const BaseError &) = default;
 
     template<typename... Args>
     BaseError(unsigned int status, const Args & ... args)
@@ -176,15 +164,22 @@ public:
     const std::string & msg() const { return calcWhat(); }
     const ErrorInfo & info() const { calcWhat(); return err; }
 
-    template<typename... Args>
-    void addTrace(std::optional<ErrPos> e, const std::string & fs, const Args & ... args)
+    void pushTrace(Trace trace)
     {
-        addTrace(e, hintfmt(fs, args...));
+        err.traces.push_front(trace);
     }
 
-    void addTrace(std::optional<ErrPos> e, hintformat hint);
+    template<typename... Args>
+    void addTrace(std::shared_ptr<AbstractPos> && e, std::string_view fs, const Args & ... args)
+    {
+        addTrace(std::move(e), hintfmt(std::string(fs), args...));
+    }
+
+    void addTrace(std::shared_ptr<AbstractPos> && e, hintformat hint, bool frame = false);
 
     bool hasTrace() const { return !err.traces.empty(); }
+
+    const ErrorInfo & info() { return err; };
 };
 
 #define MakeError(newClass, superClass) \

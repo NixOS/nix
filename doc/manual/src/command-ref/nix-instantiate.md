@@ -17,12 +17,13 @@
 
 # Description
 
-The command `nix-instantiate` generates [store
-derivations](../glossary.md) from (high-level) Nix expressions. It
-evaluates the Nix expressions in each of *files* (which defaults to
+The command `nix-instantiate` produces [store derivation]s from (high-level) Nix expressions.
+It evaluates the Nix expressions in each of *files* (which defaults to
 *./default.nix*). Each top-level expression should evaluate to a
 derivation, a list of derivations, or a set of derivations. The paths
 of the resulting store derivations are printed on standard output.
+
+[store derivation]: ../glossary.md#gloss-store-derivation
 
 If *files* is the character `-`, then a Nix expression will be read from
 standard input.
@@ -75,18 +76,19 @@ standard input.
     this option is not enabled, there may be uninstantiated store paths
     in the final output.
 
-<!-- end list -->
+{{#include ./opt-common.md}}
+
+{{#include ./env-common.md}}
 
 # Examples
 
-Instantiating store derivations from a Nix expression, and building them
-using `nix-store`:
+Instantiate [store derivation]s from a Nix expression, and build them using `nix-store`:
 
 ```console
 $ nix-instantiate test.nix (instantiate)
 /nix/store/cigxbmvy6dzix98dxxh9b6shg7ar5bvs-perl-BerkeleyDB-0.26.drv
 
-$ nix-store -r $(nix-instantiate test.nix) (build)
+$ nix-store --realise $(nix-instantiate test.nix) (build)
 ...
 /nix/store/qhqk4n8ci095g3sdp93x7rgwyh9rdvgk-perl-BerkeleyDB-0.26 (output path)
 
@@ -98,30 +100,30 @@ dr-xr-xr-x    2 eelco    users        4096 1970-01-01 01:00 lib
 You can also give a Nix expression on the command line:
 
 ```console
-$ nix-instantiate -E 'with import <nixpkgs> { }; hello'
+$ nix-instantiate --expr 'with import <nixpkgs> { }; hello'
 /nix/store/j8s4zyv75a724q38cb0r87rlczaiag4y-hello-2.8.drv
 ```
 
 This is equivalent to:
 
 ```console
-$ nix-instantiate '<nixpkgs>' -A hello
+$ nix-instantiate '<nixpkgs>' --attr hello
 ```
 
 Parsing and evaluating Nix expressions:
 
 ```console
-$ nix-instantiate --parse -E '1 + 2'
+$ nix-instantiate --parse --expr '1 + 2'
 1 + 2
 ```
 
 ```console
-$ nix-instantiate --eval -E '1 + 2'
+$ nix-instantiate --eval --expr '1 + 2'
 3
 ```
 
 ```console
-$ nix-instantiate --eval --xml -E '1 + 2'
+$ nix-instantiate --eval --xml --expr '1 + 2'
 <?xml version='1.0' encoding='utf-8'?>
 <expr>
   <int value="3" />
@@ -131,7 +133,7 @@ $ nix-instantiate --eval --xml -E '1 + 2'
 The difference between non-strict and strict evaluation:
 
 ```console
-$ nix-instantiate --eval --xml -E 'rec { x = "foo"; y = x; }'
+$ nix-instantiate --eval --xml --expr 'rec { x = "foo"; y = x; }'
 ...
   <attr name="x">
     <string value="foo" />
@@ -146,7 +148,7 @@ Note that `y` is left unevaluated (the XML representation doesn’t
 attempt to show non-normal forms).
 
 ```console
-$ nix-instantiate --eval --xml --strict -E 'rec { x = "foo"; y = x; }'
+$ nix-instantiate --eval --xml --strict --expr 'rec { x = "foo"; y = x; }'
 ...
   <attr name="x">
     <string value="foo" />

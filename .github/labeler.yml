@@ -1,0 +1,23 @@
+"documentation":
+  - doc/manual/*
+  - src/nix/**/*.md
+
+"store":
+  - src/libstore/store-api.*
+  - src/libstore/*-store.*
+
+"fetching":
+  - src/libfetchers/**/*
+
+"repl":
+  - src/libcmd/repl.*
+  - src/nix/repl.*
+
+"new-cli":
+  - src/nix/**/*
+
+"tests":
+  # Unit tests
+  - src/*/tests/**/*
+  # Functional and integration tests
+  - tests/**/*

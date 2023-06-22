@@ -1,15 +1,20 @@
 #pragma once
+///@file
 
 #include "args.hh"
+#include "common-args.hh"
 
 namespace nix {
 
 class Store;
 class EvalState;
 class Bindings;
+struct SourcePath;
 
-struct MixEvalArgs : virtual Args
+struct MixEvalArgs : virtual Args, virtual MixRepair
 {
+    static constexpr auto category = "Common evaluation options";
+
     MixEvalArgs();
 
     Bindings * getAutoArgs(EvalState & state);
@@ -22,6 +27,6 @@ private:
     std::map<std::string, std::string> autoArgs;
 };
 
-Path lookupFileArg(EvalState & state, std::string_view s);
+SourcePath lookupFileArg(EvalState & state, std::string_view s);
 
 }

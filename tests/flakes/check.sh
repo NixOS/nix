@@ -41,9 +41,9 @@ nix flake check $flakeDir
 cat > $flakeDir/flake.nix <<EOF
 {
   outputs = { self }: {
-    nixosModules.foo = {
+    nixosModules.foo = assert false; {
       a.b.c = 123;
-      foo = assert false; true;
+      foo = true;
     };
   };
 }
@@ -66,24 +66,14 @@ nix flake check $flakeDir
 cat > $flakeDir/flake.nix <<EOF
 {
   outputs = { self }: {
-    nixosModule = { config, pkgs }: {
-      a.b.c = 123;
-    };
-  };
-}
-EOF
-
-(! nix flake check $flakeDir)
-
-cat > $flakeDir/flake.nix <<EOF
-{
-  outputs = { self }: {
     packages.system-1.default = "foo";
     packages.system-2.default = "bar";
   };
 }
 EOF
 
-checkRes=$(nix flake check --keep-going $flakeDir 2>&1 && fail "nix flake check should have failed" || true)
-echo "$checkRes" | grep -q "packages.system-1.default"
-echo "$checkRes" | grep -q "packages.system-2.default"
+nix flake check $flakeDir
+
+checkRes=$(nix flake check --all-systems --keep-going $flakeDir 2>&1 && fail "nix flake check --all-systems should have failed" || true)
+echo "$checkRes" | grepQuiet "packages.system-1.default"
+echo "$checkRes" | grepQuiet "packages.system-2.default"

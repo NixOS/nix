@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <functional>
 #include <string>
@@ -10,19 +11,44 @@ struct sqlite3_stmt;
 
 namespace nix {
 
-/* RAII wrapper to close a SQLite database automatically. */
+enum class SQLiteOpenMode {
+    /**
+     * Open the database in read-write mode.
+     * If the database does not exist, it will be created.
+     */
+    Normal,
+    /**
+     * Open the database in read-write mode.
+     * Fails with an error if the database does not exist.
+     */
+    NoCreate,
+    /**
+     * Open the database in immutable mode.
+     * In addition to the database being read-only,
+     * no wal or journal files will be created by sqlite.
+     * Use this mode if the database is on a read-only filesystem.
+     * Fails with an error if the database does not exist.
+     */
+    Immutable,
+};
+
+/**
+ * RAII wrapper to close a SQLite database automatically.
+ */
 struct SQLite
 {
     sqlite3 * db = 0;
     SQLite() { }
-    SQLite(const Path & path, bool create = true);
+    SQLite(const Path & path, SQLiteOpenMode mode = SQLiteOpenMode::Normal);
     SQLite(const SQLite & from) = delete;
     SQLite& operator = (const SQLite & from) = delete;
     SQLite& operator = (SQLite && from) { db = from.db; from.db = 0; return *this; }
     ~SQLite();
     operator sqlite3 * () { return db; }
 
-    /* Disable synchronous mode, set truncate journal mode. */
+    /**
+     * Disable synchronous mode, set truncate journal mode.
+     */
     void isCache();
 
     void exec(const std::string & stmt);
@@ -30,7 +56,9 @@ struct SQLite
     uint64_t getLastInsertedRowId();
 };
 
-/* RAII wrapper to create and destroy SQLite prepared statements. */
+/**
+ * RAII wrapper to create and destroy SQLite prepared statements.
+ */
 struct SQLiteStmt
 {
     sqlite3 * db = 0;
@@ -42,7 +70,9 @@ struct SQLiteStmt
     ~SQLiteStmt();
     operator sqlite3_stmt * () { return stmt; }
 
-    /* Helper for binding / executing statements. */
+    /**
+     * Helper for binding / executing statements.
+     */
     class Use
     {
         friend struct SQLiteStmt;
@@ -55,7 +85,9 @@ struct SQLiteStmt
 
         ~Use();
 
-        /* Bind the next parameter. */
+        /**
+         * Bind the next parameter.
+         */
         Use & operator () (std::string_view value, bool notNull = true);
         Use & operator () (const unsigned char * data, size_t len, bool notNull = true);
         Use & operator () (int64_t value, bool notNull = true);
@@ -63,11 +95,15 @@ struct SQLiteStmt
 
         int step();
 
-        /* Execute a statement that does not return rows. */
+        /**
+         * Execute a statement that does not return rows.
+         */
         void exec();
 
-        /* For statements that return 0 or more rows. Returns true iff
-           a row is available. */
+        /**
+         * For statements that return 0 or more rows. Returns true iff
+         * a row is available.
+         */
         bool next();
 
         std::string getStr(int col);
@@ -81,8 +117,10 @@ struct SQLiteStmt
     }
 };
 
-/* RAII helper that ensures transactions are aborted unless explicitly
-   committed. */
+/**
+ * RAII helper that ensures transactions are aborted unless explicitly
+ * committed.
+ */
 struct SQLiteTxn
 {
     bool active = false;
@@ -98,21 +136,22 @@ struct SQLiteTxn
 
 struct SQLiteError : Error
 {
-    const char *path;
-    int errNo, extendedErrNo;
+    std::string path;
+    std::string errMsg;
+    int errNo, extendedErrNo, offset;
 
     template<typename... Args>
     [[noreturn]] static void throw_(sqlite3 * db, const std::string & fs, const Args & ... args) {
         throw_(db, hintfmt(fs, args...));
     }
 
-    SQLiteError(const char *path, int errNo, int extendedErrNo, hintformat && hf);
+    SQLiteError(const char *path, const char *errMsg, int errNo, int extendedErrNo, int offset, hintformat && hf);
 
 protected:
 
     template<typename... Args>
-    SQLiteError(const char *path, int errNo, int extendedErrNo, const std::string & fs, const Args & ... args)
-      : SQLiteError(path, errNo, extendedErrNo, hintfmt(fs, args...))
+    SQLiteError(const char *path, const char *errMsg, int errNo, int extendedErrNo, int offset, const std::string & fs, const Args & ... args)
+      : SQLiteError(path, errNo, extendedErrNo, offset, hintfmt(fs, args...))
     { }
 
     [[noreturn]] static void throw_(sqlite3 * db, hintformat && hf);
@@ -121,18 +160,22 @@ protected:
 
 MakeError(SQLiteBusy, SQLiteError);
 
-void handleSQLiteBusy(const SQLiteBusy & e);
+void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning);
 
-/* Convenience function for retrying a SQLite transaction when the
-   database is busy. */
+/**
+ * Convenience function for retrying a SQLite transaction when the
+ * database is busy.
+ */
 template<typename T, typename F>
 T retrySQLite(F && fun)
 {
+    time_t nextWarning = time(0) + 1;
+
     while (true) {
         try {
             return fun();
         } catch (SQLiteBusy & e) {
-            handleSQLiteBusy(e);
+            handleSQLiteBusy(e, nextWarning);
         }
     }
 }

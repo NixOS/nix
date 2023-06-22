@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <boost/format.hpp>
 #include <string>
@@ -8,30 +9,25 @@
 namespace nix {
 
 
-/* Inherit some names from other namespaces for convenience. */
+/**
+ * Inherit some names from other namespaces for convenience.
+ */
 using boost::format;
 
 
-/* A variadic template that does nothing. Useful to call a function
-   for all variadic arguments but ignoring the result. */
+/**
+ * A variadic template that does nothing. Useful to call a function
+ * for all variadic arguments but ignoring the result.
+ */
 struct nop { template<typename... T> nop(T...) {} };
 
 
-struct FormatOrString
-{
-    std::string s;
-    FormatOrString(std::string s) : s(std::move(s)) { };
-    template<class F>
-    FormatOrString(const F & f) : s(f.str()) { };
-    FormatOrString(const char * s) : s(s) { };
-};
-
-
-/* A helper for formatting strings. ‘fmt(format, a_0, ..., a_n)’ is
-   equivalent to ‘boost::format(format) % a_0 % ... %
-   ... a_n’. However, ‘fmt(s)’ is equivalent to ‘s’ (so no %-expansion
-   takes place). */
-
+/**
+ * A helper for formatting strings. ‘fmt(format, a_0, ..., a_n)’ is
+ * equivalent to ‘boost::format(format) % a_0 % ... %
+ * ... a_n’. However, ‘fmt(s)’ is equivalent to ‘s’ (so no %-expansion
+ * takes place).
+ */
 template<class F>
 inline void formatHelper(F & f)
 {
@@ -51,11 +47,6 @@ inline std::string fmt(const std::string & s)
 inline std::string fmt(const char * s)
 {
     return s;
-}
-
-inline std::string fmt(const FormatOrString & fs)
-{
-    return fs.s;
 }
 
 template<typename... Args>
@@ -148,7 +139,7 @@ inline hintformat hintfmt(const std::string & fs, const Args & ... args)
     return f;
 }
 
-inline hintformat hintfmt(std::string plain_string)
+inline hintformat hintfmt(const std::string & plain_string)
 {
     // we won't be receiving any args in this case, so just print the original string
     return hintfmt("%s", normaltxt(plain_string));

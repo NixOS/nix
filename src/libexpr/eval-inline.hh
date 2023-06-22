@@ -1,10 +1,13 @@
 #pragma once
+///@file
 
 #include "eval.hh"
 
 namespace nix {
 
-/* Note: Various places expect the allocated memory to be zeroed. */
+/**
+ * Note: Various places expect the allocated memory to be zeroed.
+ */
 [[gnu::always_inline]]
 inline void * allocBytes(size_t n)
 {
@@ -103,33 +106,36 @@ void EvalState::forceValue(Value & v, Callable getPos)
     else if (v.isApp())
         callFunction(*v.app.left, *v.app.right, v, noPos);
     else if (v.isBlackhole())
-        throwEvalError(getPos(), "infinite recursion encountered");
+        error("infinite recursion encountered").atPos(getPos()).template debugThrow<EvalError>();
 }
 
 
 [[gnu::always_inline]]
-inline void EvalState::forceAttrs(Value & v, const PosIdx pos)
+inline void EvalState::forceAttrs(Value & v, const PosIdx pos, std::string_view errorCtx)
 {
-    forceAttrs(v, [&]() { return pos; });
+    forceAttrs(v, [&]() { return pos; }, errorCtx);
 }
 
 
 template <typename Callable>
 [[gnu::always_inline]]
-inline void EvalState::forceAttrs(Value & v, Callable getPos)
+inline void EvalState::forceAttrs(Value & v, Callable getPos, std::string_view errorCtx)
 {
-    forceValue(v, getPos);
-    if (v.type() != nAttrs)
-        throwTypeError(getPos(), "value is %1% while a set was expected", v);
+    forceValue(v, noPos);
+    if (v.type() != nAttrs) {
+        PosIdx pos = getPos();
+        error("value is %1% while a set was expected", showType(v)).withTrace(pos, errorCtx).debugThrow<TypeError>();
+    }
 }
 
 
 [[gnu::always_inline]]
-inline void EvalState::forceList(Value & v, const PosIdx pos)
+inline void EvalState::forceList(Value & v, const PosIdx pos, std::string_view errorCtx)
 {
-    forceValue(v, pos);
-    if (!v.isList())
-        throwTypeError(pos, "value is %1% while a list was expected", v);
+    forceValue(v, noPos);
+    if (!v.isList()) {
+        error("value is %1% while a list was expected", showType(v)).withTrace(pos, errorCtx).debugThrow<TypeError>();
+    }
 }
 
 

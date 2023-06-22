@@ -52,20 +52,20 @@ R""(
 * Search for packages containing `neovim` but hide ones containing either `gui` or `python`:
 
   ```console
-  # nix search nixpkgs neovim -e 'python|gui'
+  # nix search nixpkgs neovim --exclude 'python|gui'
   ```
   or
 
   ```console
-  # nix search nixpkgs neovim -e 'python' -e 'gui'
+  # nix search nixpkgs neovim --exclude 'python' --exclude 'gui'
   ```
 
 # Description
 
-`nix search` searches *installable* (which must be evaluatable, e.g. a
-flake) for packages whose name or description matches all of the
+`nix search` searches [*installable*](./nix.md#installables) (which can be evaluated, that is, a
+flake or Nix expression, but not a store path or store derivation path) for packages whose name or description matches all of the
 regular expressions *regex*.  For each matching package, It prints the
-full attribute name (from the root of the installable), the version
+full attribute name (from the root of the [installable](./nix.md#installables)), the version
 and the `meta.description` field, highlighting the substrings that
 were matched by the regular expressions. If no regular expressions are
 specified, all packages are shown.

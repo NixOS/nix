@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "util.hh"
 #include "sync.hh"
@@ -27,6 +28,7 @@ private:
     Sync<State> state_;
 
     void addCommonSSHOpts(Strings & args);
+    bool isMasterRunning();
 
 public:
 

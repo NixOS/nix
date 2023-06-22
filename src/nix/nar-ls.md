@@ -5,7 +5,7 @@ R""(
 * To list a specific file in a NAR:
 
   ```console
-  # nix nar ls -l ./hello.nar /bin/hello
+  # nix nar ls --long ./hello.nar /bin/hello
   -r-xr-xr-x                38184 hello
   ```
 
@@ -13,7 +13,7 @@ R""(
   format:
 
   ```console
-  # nix nar ls --json -R ./hello.nar /bin
+  # nix nar ls --json --recursive ./hello.nar /bin
   {"type":"directory","entries":{"hello":{"type":"regular","size":38184,"executable":true,"narOffset":400}}}
   ```
 

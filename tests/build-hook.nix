@@ -1,15 +1,22 @@
-{ busybox }:
+{ busybox, contentAddressed ? false }:
 
 with import ./config.nix;
 
 let
+
+  caArgs = if contentAddressed then {
+      outputHashMode = "recursive";
+      outputHashAlgo = "sha256";
+      __contentAddressed = true;
+    } else {};
 
   mkDerivation = args:
     derivation ({
       inherit system;
       builder = busybox;
       args = ["sh" "-e" args.builder or (builtins.toFile "builder-${args.name}.sh" "if [ -e .attrs.sh ]; then source .attrs.sh; fi; eval \"$buildCommand\"")];
-    } // removeAttrs args ["builder" "meta" "passthru"])
+    } // removeAttrs args ["builder" "meta" "passthru"]
+    // caArgs)
     // { meta = args.meta or {}; passthru = args.passthru or {}; };
 
   input1 = mkDerivation {

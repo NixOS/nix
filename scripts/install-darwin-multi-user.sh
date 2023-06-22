@@ -100,7 +100,7 @@ poly_extra_try_me_commands() {
 poly_configure_nix_daemon_service() {
     task "Setting up the nix-daemon LaunchDaemon"
     _sudo "to set up the nix-daemon as a LaunchDaemon" \
-          /bin/cp -f "/nix/var/nix/profiles/default$NIX_DAEMON_DEST" "$NIX_DAEMON_DEST"
+          /usr/bin/install -m -rw-r--r-- "/nix/var/nix/profiles/default$NIX_DAEMON_DEST" "$NIX_DAEMON_DEST"
 
     _sudo "to load the LaunchDaemon plist for nix-daemon" \
           launchctl load /Library/LaunchDaemons/org.nixos.nix-daemon.plist
@@ -167,7 +167,7 @@ poly_user_shell_get() {
 }
 
 poly_user_shell_set() {
-    _sudo "in order to give $1 a safe home directory" \
+    _sudo "in order to give $1 a safe shell" \
           /usr/bin/dscl . -create "/Users/$1" "UserShell" "$2"
 }
 

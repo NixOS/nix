@@ -202,7 +202,7 @@ namespace nix {
     }
 
     TEST(pathExists, bogusPathDoesNotExist) {
-        ASSERT_FALSE(pathExists("/home/schnitzel/darmstadt/pommes"));
+        ASSERT_FALSE(pathExists("/schnitzel/darmstadt/pommes"));
     }
 
     /* ----------------------------------------------------------------------------
@@ -309,6 +309,42 @@ namespace nix {
 
     TEST(base64Decode, decodeThrowsOnInvalidChar) {
         ASSERT_THROW(base64Decode("cXVvZCBlcm_0IGRlbW9uc3RyYW5kdW0="), Error);
+    }
+
+    /* ----------------------------------------------------------------------------
+     * getLine
+     * --------------------------------------------------------------------------*/
+
+    TEST(getLine, all) {
+        {
+            auto [line, rest] = getLine("foo\nbar\nxyzzy");
+            ASSERT_EQ(line, "foo");
+            ASSERT_EQ(rest, "bar\nxyzzy");
+        }
+
+        {
+            auto [line, rest] = getLine("foo\r\nbar\r\nxyzzy");
+            ASSERT_EQ(line, "foo");
+            ASSERT_EQ(rest, "bar\r\nxyzzy");
+        }
+
+        {
+            auto [line, rest] = getLine("foo\n");
+            ASSERT_EQ(line, "foo");
+            ASSERT_EQ(rest, "");
+        }
+
+        {
+            auto [line, rest] = getLine("foo");
+            ASSERT_EQ(line, "foo");
+            ASSERT_EQ(rest, "");
+        }
+
+        {
+            auto [line, rest] = getLine("");
+            ASSERT_EQ(line, "");
+            ASSERT_EQ(rest, "");
+        }
     }
 
     /* ----------------------------------------------------------------------------

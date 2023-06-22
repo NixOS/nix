@@ -13,41 +13,9 @@
   returns and tabs can be written as `\n`, `\r` and `\t`,
   respectively.
 
-  You can include the result of an expression into a string by
-  enclosing it in `${...}`, a feature known as *antiquotation*. The
-  enclosed expression must evaluate to something that can be coerced
-  into a string (meaning that it must be a string, a path, or a
-  derivation). For instance, rather than writing
+  You can include the results of other expressions into a string by enclosing them in `${ }`, a feature known as [string interpolation].
 
-  ```nix
-  "--with-freetype2-library=" + freetype + "/lib"
-  ```
-
-  (where `freetype` is a derivation), you can instead write the more
-  natural
-
-  ```nix
-  "--with-freetype2-library=${freetype}/lib"
-  ```
-
-  The latter is automatically translated to the former. A more
-  complicated example (from the Nix expression for
-  [Qt](http://www.trolltech.com/products/qt)):
-
-  ```nix
-  configureFlags = "
-    -system-zlib -system-libpng -system-libjpeg
-    ${if openglSupport then "-dlopen-opengl
-      -L${mesa}/lib -I${mesa}/include
-      -L${libXmu}/lib -I${libXmu}/include" else ""}
-    ${if threadSupport then "-thread" else "-no-thread"}
-  ";
-  ```
-
-  Note that Nix expressions and strings can be arbitrarily nested; in
-  this case the outer string contains various antiquotations that
-  themselves contain strings (e.g., `"-thread"`), some of which in
-  turn contain expressions (e.g., `${mesa}`).
+  [string interpolation]: ./string-interpolation.md
 
   The second way to write string literals is as an *indented string*,
   which is enclosed between pairs of *double single-quotes*, like so:
@@ -75,7 +43,7 @@
   Note that the whitespace and newline following the opening `''` is
   ignored if there is no non-whitespace text on the initial line.
 
-  Antiquotation (`${expr}`) is supported in indented strings.
+  Indented strings support [string interpolation].
 
   Since `${` and `''` have special meaning in indented strings, you
   need a way to quote them. `$` can be escaped by prefixing it with
@@ -117,9 +85,10 @@
   Numbers, which can be *integers* (like `123`) or *floating point*
   (like `123.43` or `.27e13`).
 
-  Numbers are type-compatible: pure integer operations will always
-  return integers, whereas any operation involving at least one
-  floating point number will have a floating point number as a result.
+  See [arithmetic] and [comparison] operators for semantics.
+
+  [arithmetic]: ./operators.md#arithmetic
+  [comparison]: ./operators.md#comparison
 
 - <a id="type-path" href="#type-path">Path</a>
 
@@ -143,12 +112,23 @@
   environment variable `NIX_PATH` will be searched for the given file
   or directory name.
 
-  Antiquotation is supported in any paths except those in angle brackets.
-  `./${foo}-${bar}.nix` is a more convenient way of writing
-  `./. + "/" + foo + "-" + bar + ".nix"` or `./. + "/${foo}-${bar}.nix"`. At
-  least one slash must appear *before* any antiquotations for this to be
-  recognized as a path. `a.${foo}/b.${bar}` is a syntactically valid division
-  operation. `./a.${foo}/b.${bar}` is a path.
+  When an [interpolated string][string interpolation] evaluates to a path, the path is first copied into the Nix store and the resulting string is the [store path] of the newly created [store object].
+
+  [store path]: ../glossary.md#gloss-store-path
+  [store object]: ../glossary.md#gloss-store-object
+
+  For instance, evaluating `"${./foo.txt}"` will cause `foo.txt` in the current directory to be copied into the Nix store and result in the string `"/nix/store/<hash>-foo.txt"`.
+
+  Note that the Nix language assumes that all input files will remain _unchanged_ while  evaluating a Nix expression.
+  For example, assume you used a file path in an interpolated string during a `nix repl` session.
+  Later in the same session, after having changed the file contents, evaluating the interpolated string with the file path again might not return a new store path, since Nix might not re-read the file contents.
+
+  Paths themselves, except those in angle brackets (`< >`), support [string interpolation].
+
+  At least one slash (`/`) must appear *before* any interpolated expression for the result to be recognized as a path.
+
+  `a.${foo}/b.${bar}` is a syntactically valid division operation.
+  `./a.${foo}/b.${bar}` is a path.
 
 - <a id="type-boolean" href="#type-boolean">Boolean</a>
 
@@ -184,8 +164,16 @@ Note that lists are only lazy in values, and they are strict in length.
 
 An attribute set is a collection of name-value-pairs (called *attributes*) enclosed in curly brackets (`{ }`).
 
+An attribute name can be an identifier or a [string](#string).
+An identifier must start with a letter (`a-z`, `A-Z`) or underscore (`_`), and can otherwise contain letters (`a-z`, `A-Z`), numbers (`0-9`), underscores (`_`), apostrophes (`'`), or dashes (`-`).
+
+> *name* = *identifier* | *string* \
+> *identifier* ~ `[a-zA-Z_][a-zA-Z0-9_'-]*`
+
 Names and values are separated by an equal sign (`=`).
 Each value is an arbitrary expression terminated by a semicolon (`;`).
+
+> *attrset* = `{` [ *name* `=` *expr* `;` `]`... `}`
 
 Attributes can appear in any order.
 An attribute name may only occur once.
@@ -202,42 +190,60 @@ Example:
 
 This defines a set with attributes named `x`, `text`, `y`.
 
-Attributes can be selected from a set using the `.` operator. For
-instance,
+Attributes can be accessed with the [`.` operator](./operators.md#attribute-selection).
+
+Example:
 
 ```nix
 { a = "Foo"; b = "Bar"; }.a
 ```
 
-evaluates to `"Foo"`. It is possible to provide a default value in an
-attribute selection using the `or` keyword. For example,
+This evaluates to `"Foo"`.
+
+It is possible to provide a default value in an attribute selection using the `or` keyword.
+
+Example:
 
 ```nix
 { a = "Foo"; b = "Bar"; }.c or "Xyzzy"
 ```
 
-will evaluate to `"Xyzzy"` because there is no `c` attribute in the set.
+```nix
+{ a = "Foo"; b = "Bar"; }.c.d.e.f.g or "Xyzzy"
+```
+
+will both evaluate to `"Xyzzy"` because there is no `c` attribute in the set.
 
 You can use arbitrary double-quoted strings as attribute names:
 
 ```nix
-{ "foo ${bar}" = 123; "nix-1.0" = 456; }."foo ${bar}"
+{ "$!@#?" = 123; }."$!@#?"
 ```
-
-This will evaluate to `123` (Assuming `bar` is antiquotable). In the
-case where an attribute name is just a single antiquotation, the quotes
-can be dropped:
 
 ```nix
-{ foo = 123; }.${bar} or 456
+let bar = "bar"; in
+{ "foo ${bar}" = 123; }."foo ${bar}"
 ```
 
-This will evaluate to `123` if `bar` evaluates to `"foo"` when coerced
-to a string and `456` otherwise (again assuming `bar` is antiquotable).
+Both will evaluate to `123`.
+
+Attribute names support [string interpolation]:
+
+```nix
+let bar = "foo"; in
+{ foo = 123; }.${bar}
+```
+
+```nix
+let bar = "foo"; in
+{ ${bar} = 123; }.foo
+```
+
+Both will evaluate to `123`.
 
 In the special case where an attribute name inside of a set declaration
-evaluates to `null` (which is normally an error, as `null` is not
-antiquotable), that attribute is simply not added to the set:
+evaluates to `null` (which is normally an error, as `null` cannot be coerced to
+a string), that attribute is simply not added to the set:
 
 ```nix
 { ${if foo then "bar" else null} = true; }
