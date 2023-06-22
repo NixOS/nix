@@ -347,6 +347,14 @@ const redirects = {
   "contributing/hacking.html": {
     "nix-with-flakes": "#building-nix-with-flakes",
     "classic-nix": "#building-nix",
+    "running-tests": "testing.html#running-tests",
+    "unit-tests": "testing.html#unit-tests",
+    "functional-tests": "testing.html#functional-tests",
+    "debugging-failing-functional-tests": "testing.html#debugging-failing-functional-tests",
+    "integration-tests": "testing.html#integration-tests",
+    "installer-tests": "testing.html#installer-tests",
+    "one-time-setup": "testing.html#one-time-setup",
+    "using-the-ci-generated-installer-for-manual-testing": "testing.html#using-the-ci-generated-installer-for-manual-testing",
   }
 };
 
