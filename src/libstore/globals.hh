@@ -197,10 +197,7 @@ public:
           Nix will only build [derivations](@docroot@/language/derivations.md) whose `system` attribute equals the value specified here.
 
           The default value is set when Nix itself is compiled for the system it will run on.
-          In general, it never makes sense to modify this value.
-          While you can force Nix to run a Darwin-specific `builder` executable on a Linux machine, the result would obviously be wrong.
-
-          The following system types are widely used, as Nix is actively supported on these platforms:
+          The following system types are widely used, as [Nix is actively supported on these platforms](@docroot@/contributing/hacking.md#platforms):
 
           - `x86_64-linux`
           - `x86_64-darwin`
@@ -210,6 +207,10 @@ public:
           - `armv6l-linux`
           - `armv7l-linux`
 
+          In general, it never makes sense to modify this value when building derivations.
+          While you can force Nix to run a Darwin-specific `builder` executable on a Linux machine, the result would obviously be wrong.
+
+          This value is available in the Nix language as [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem).
         )"};
 
     Setting<time_t> maxSilentTime{
