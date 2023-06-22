@@ -208,6 +208,44 @@
 
     See [installables](./command-ref/new-cli/nix.md#installables) for [`nix` commands](./command-ref/new-cli/nix.md) (experimental) for details.
 
+  - [build system]{#gloss-build-system}
+
+    [build system]: #gloss-build-system
+
+    A representation of the processor architecture and platform that performs the build or compilation, typically a dash-separated string.
+
+    This is based on the [GCC system terminology](#gloss-gcc-system-terminology).
+
+    Programs that are produced by a [derivation] were configured to have a [build system] that can be executed by the [derivation system](language/derivations.md#attr-system). When using the program, only its [host system] is still relevant.
+
+  - [host system]{#gloss-host-system}
+
+    [host system]: #gloss-host-system
+
+    A representation of the processor architecture and platform where build products will run on, typically a dash-separated string.
+
+    This is based on the [GCC system terminology](#gloss-gcc-system-terminology).
+
+    Programs that run natively in a [derivation] must be configured with a [host system] that can by executed by the [derivation system](language/derivations.md#attr-system).
+
+  - [target system]{#gloss-target-system}
+
+    [target system]: #gloss-target-system
+
+    A representation of the processor architecture and platform that a compiler will produce, typically a dash-separated string.
+
+    When discussing a build that does not produce a compiler, we only use [build system] and [host system] to describe it; we try to avoid discussing the actual build from the perspective its compiler's configuration.
+
+    This is based on the [GCC system terminology](#gloss-gcc-system-terminology).
+
+    If the output of a compiler is to be run in a [derivation], the compiler's [target system] must be executable by the [derivation system](language/derivations.md#attr-system).
+
+  - [GCC system terminology]{#gloss-gcc-system-terminology}
+
+    The Nix ecosystem uses the [GCC system terminology](https://gcc.gnu.org/onlinedocs/gccint/Configure-Terms.html) for the names and roles of _build_, _host_, and _target_, but may apply the term _cross_ more loosely.
+
+    See [host system], [build system] and [target system] for how each relates to [derivation].
+
   - [NAR]{#gloss-nar}\
     A *N*ix *AR*chive. This is a serialisation of a path in the Nix
     store. It can contain regular files, directories and symbolic
