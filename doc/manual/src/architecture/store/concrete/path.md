@@ -22,9 +22,11 @@ It is rendered to a file system path as the concatenation of
 
 Example:
 
-      /nix/store/b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z-firefox-33.1
-      |--------| |------------------------------| |----------|
-    store directory            digest                 name
+```
+  /nix/store/b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z-firefox-33.1
+  |--------| |------------------------------| |----------|
+store directory            digest                 name
+```
 
 ## Store Directory
 
@@ -41,11 +43,9 @@ It is important which store a given store object belongs to:
 Files in the store object can contain store paths, and processes may read these paths.
 Nix can only guarantee [referential integrity](closure.md) if store paths do not cross store boundaries.
 
-Therefore one can only copy store objects to a different store if
+Therefore one can only copy store objects to a different store if either
 
 - the source and target stores' directories match
-
-  or
 
 - the store object in question has no references, that is, contains no store paths.
 
