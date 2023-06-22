@@ -31,11 +31,11 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
     }
 
     if (failed.size() == 1 && ex) {
-        ex->status = worker.exitStatus();
+        ex->status = worker.failingExitStatus();
         throw std::move(*ex);
     } else if (!failed.empty()) {
         if (ex) logError(ex->info());
-        throw Error(worker.exitStatus(), "build of %s failed", showPaths(failed));
+        throw Error(worker.failingExitStatus(), "build of %s failed", showPaths(failed));
     }
 }
 
@@ -102,10 +102,10 @@ void Store::ensurePath(const StorePath & path)
 
     if (goal->exitCode != Goal::ecSuccess) {
         if (goal->ex) {
-            goal->ex->status = worker.exitStatus();
+            goal->ex->status = worker.failingExitStatus();
             throw std::move(*goal->ex);
         } else
-            throw Error(worker.exitStatus(), "path '%s' does not exist and cannot be created", printStorePath(path));
+            throw Error(worker.failingExitStatus(), "path '%s' does not exist and cannot be created", printStorePath(path));
     }
 }
 
@@ -128,7 +128,7 @@ void Store::repairPath(const StorePath & path)
             goals.insert(worker.makeDerivationGoal(*info->deriver, OutputsSpec::All { }, bmRepair));
             worker.run(goals);
         } else
-            throw Error(worker.exitStatus(), "cannot repair path '%s'", printStorePath(path));
+            throw Error(worker.failingExitStatus(), "cannot repair path '%s'", printStorePath(path));
     }
 }
 
