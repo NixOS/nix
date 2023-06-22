@@ -167,4 +167,70 @@ TEST_F(ValuePrintingTests, vBlackhole)
     test(vBlackhole, "«potential infinite recursion»");
 }
 
+TEST_F(ValuePrintingTests, depthAttrs)
+{
+    Value vOne;
+    vOne.mkInt(1);
+
+    Value vTwo;
+    vTwo.mkInt(2);
+
+    BindingsBuilder builder(state, state.allocBindings(10));
+    builder.insert(state.symbols.create("one"), &vOne);
+    builder.insert(state.symbols.create("two"), &vTwo);
+
+    Value vAttrs;
+    vAttrs.mkAttrs(builder.finish());
+
+    BindingsBuilder builder2(state, state.allocBindings(10));
+    builder2.insert(state.symbols.create("one"), &vOne);
+    builder2.insert(state.symbols.create("two"), &vTwo);
+    builder2.insert(state.symbols.create("nested"), &vAttrs);
+
+    Value vNested;
+    vNested.mkAttrs(builder2.finish());
+
+    test(vNested, "{ nested = «too deep»; one = «too deep»; two = «too deep»; }", false, 1);
+    test(vNested, "{ nested = { one = «too deep»; two = «too deep»; }; one = 1; two = 2; }", false, 2);
+    test(vNested, "{ nested = { one = 1; two = 2; }; one = 1; two = 2; }", false, 3);
+    test(vNested, "{ nested = { one = 1; two = 2; }; one = 1; two = 2; }", false, 4);
+}
+
+TEST_F(ValuePrintingTests, depthList)
+{
+    Value vOne;
+    vOne.mkInt(1);
+
+    Value vTwo;
+    vTwo.mkInt(2);
+
+    BindingsBuilder builder(state, state.allocBindings(10));
+    builder.insert(state.symbols.create("one"), &vOne);
+    builder.insert(state.symbols.create("two"), &vTwo);
+
+    Value vAttrs;
+    vAttrs.mkAttrs(builder.finish());
+
+    BindingsBuilder builder2(state, state.allocBindings(10));
+    builder2.insert(state.symbols.create("one"), &vOne);
+    builder2.insert(state.symbols.create("two"), &vTwo);
+    builder2.insert(state.symbols.create("nested"), &vAttrs);
+
+    Value vNested;
+    vNested.mkAttrs(builder2.finish());
+
+    Value vList;
+    state.mkList(vList, 5);
+    vList.bigList.elems[0] = &vOne;
+    vList.bigList.elems[1] = &vTwo;
+    vList.bigList.elems[2] = &vNested;
+    vList.bigList.size = 3;
+
+    test(vList, "[ «too deep» «too deep» «too deep» ]", false, 1);
+    test(vList, "[ 1 2 { nested = «too deep»; one = «too deep»; two = «too deep»; } ]", false, 2);
+    test(vList, "[ 1 2 { nested = { one = «too deep»; two = «too deep»; }; one = 1; two = 2; } ]", false, 3);
+    test(vList, "[ 1 2 { nested = { one = 1; two = 2; }; one = 1; two = 2; } ]", false, 4);
+    test(vList, "[ 1 2 { nested = { one = 1; two = 2; }; one = 1; two = 2; } ]", false, 5);
+}
+
 } // namespace nix

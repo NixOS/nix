@@ -2,6 +2,7 @@
 ///@file
 
 #include <cassert>
+#include <climits>
 
 #include "symbol-table.hh"
 #include "value/context.hh"
@@ -137,11 +138,11 @@ private:
 
     friend std::string showType(const Value & v);
 
-    void print(const SymbolTable & symbols, std::ostream & str, std::set<const void *> * seen) const;
+    void print(const SymbolTable &symbols, std::ostream &str, std::set<const void *> *seen, int depth) const;
 
 public:
 
-    void print(const SymbolTable & symbols, std::ostream & str, bool showRepeated = false) const;
+    void print(const SymbolTable &symbols, std::ostream &str, bool showRepeated = false, int depth = INT_MAX) const;
 
     // Functions needed to distinguish the type
     // These should be removed eventually, by putting the functionality that's
