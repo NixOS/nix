@@ -65,8 +65,12 @@ std::string printValue(const EvalState & state, const Value & v);
 std::ostream & operator << (std::ostream & os, const ValueType t);
 
 
-// FIXME: maybe change this to an std::variant<SourcePath, URL>.
-typedef std::pair<std::string, std::string> SearchPathElem;
+struct SearchPathElem
+{
+    std::string prefix;
+    // FIXME: maybe change this to an std::variant<SourcePath, URL>.
+    std::string path;
+};
 typedef std::list<SearchPathElem> SearchPath;
 
 
