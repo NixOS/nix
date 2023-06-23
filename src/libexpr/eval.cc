@@ -571,22 +571,22 @@ EvalState::EvalState(
         allowedPaths = PathSet();
 
         for (auto & i : searchPath) {
-            auto r = resolveSearchPathElem(i);
-            if (!r.first) continue;
+            auto r = resolveSearchPathElem(i.path);
+            if (!r) continue;
 
-            auto path = r.second;
+            auto path = *std::move(r);
 
-            if (store->isInStore(r.second)) {
+            if (store->isInStore(path)) {
                 try {
                     StorePathSet closure;
-                    store->computeFSClosure(store->toStorePath(r.second).first, closure);
+                    store->computeFSClosure(store->toStorePath(path).first, closure);
                     for (auto & path : closure)
                         allowPath(path);
                 } catch (InvalidPath &) {
-                    allowPath(r.second);
+                    allowPath(path);
                 }
             } else
-                allowPath(r.second);
+                allowPath(path);
         }
     }
 

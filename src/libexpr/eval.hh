@@ -317,7 +317,7 @@ private:
 
     SearchPath searchPath;
 
-    std::map<std::string, std::pair<bool, std::string>> searchPathResolved;
+    std::map<std::string, std::optional<std::string>> searchPathResolved;
 
     /**
      * Cache used by checkSourcePath().
@@ -434,9 +434,13 @@ public:
     SourcePath findFile(SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
 
     /**
+     * Try to resolve a search path value (not the optinal key part)
+     *
      * If the specified search path element is a URI, download it.
+     *
+     * If it is not found, return `std::nullopt`
      */
-    std::pair<bool, std::string> resolveSearchPathElem(const SearchPathElem & elem);
+    std::optional<std::string> resolveSearchPathElem(const std::string & value);
 
     /**
      * Evaluate an expression to normal form
