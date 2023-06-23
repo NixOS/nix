@@ -734,22 +734,9 @@ Expr * EvalState::parseStdin()
 }
 
 
-void EvalState::addToSearchPath(const std::string & s)
+void EvalState::addToSearchPath(SearchPath::Elem && elem)
 {
-    size_t pos = s.find('=');
-    std::string prefix;
-    Path path;
-    if (pos == std::string::npos) {
-        path = s;
-    } else {
-        prefix = std::string(s, 0, pos);
-        path = std::string(s, pos + 1);
-    }
-
-    searchPath.emplace_back(SearchPathElem {
-        .prefix = prefix,
-        .path = path,
-    });
+    searchPath.elements.emplace_back(std::move(elem));
 }
 
 
@@ -759,22 +746,19 @@ SourcePath EvalState::findFile(const std::string_view path)
 }
 
 
-SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view path, const PosIdx pos)
+SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_view path, const PosIdx pos)
 {
-    for (auto & i : searchPath) {
-        std::string suffix;
-        if (i.prefix.empty())
-            suffix = concatStrings("/", path);
-        else {
-            auto s = i.prefix.size();
-            if (path.compare(0, s, i.prefix) != 0 ||
-                (path.size() > s && path[s] != '/'))
-                continue;
-            suffix = path.size() == s ? "" : concatStrings("/", path.substr(s));
-        }
-        auto r = resolveSearchPathElem(i.path);
-        if (!r) continue;
-        Path res = *r + suffix;
+    for (auto & i : searchPath.elements) {
+        auto suffixOpt = i.prefix.suffixIfPotentialMatch(path);
+
+        if (!suffixOpt) continue;
+        auto suffix = *suffixOpt;
+
+        auto rOpt = resolveSearchPathPath(i.path);
+        if (!rOpt) continue;
+        auto r = *rOpt;
+
+        Path res = suffix == "" ? r : concatStrings(r, "/", suffix);
         if (pathExists(res)) return CanonPath(canonPath(res));
     }
 
@@ -791,8 +775,9 @@ SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view p
 }
 
 
-std::optional<std::string> EvalState::resolveSearchPathElem(const std::string & value)
+std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Path & value0)
 {
+    auto & value = value0.s;
     auto i = searchPathResolved.find(value);
     if (i != searchPathResolved.end()) return i->second;
 

@@ -9,6 +9,7 @@
 #include "config.hh"
 #include "experimental-features.hh"
 #include "input-accessor.hh"
+#include "search-path.hh"
 
 #include <map>
 #include <optional>
@@ -120,15 +121,6 @@ void copyContext(const Value & v, NixStringContext & context);
 
 std::string printValue(const EvalState & state, const Value & v);
 std::ostream & operator << (std::ostream & os, const ValueType t);
-
-
-struct SearchPathElem
-{
-    std::string prefix;
-    // FIXME: maybe change this to an std::variant<SourcePath, URL>.
-    std::string path;
-};
-typedef std::list<SearchPathElem> SearchPath;
 
 
 /**
@@ -344,12 +336,12 @@ private:
 public:
 
     EvalState(
-        const Strings & _searchPath,
+        const SearchPath & _searchPath,
         ref<Store> store,
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
 
-    void addToSearchPath(const std::string & s);
+    void addToSearchPath(SearchPath::Elem && elem);
 
     SearchPath getSearchPath() { return searchPath; }
 
@@ -431,7 +423,7 @@ public:
      * Look up a file in the search path.
      */
     SourcePath findFile(const std::string_view path);
-    SourcePath findFile(SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
+    SourcePath findFile(const SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
 
     /**
      * Try to resolve a search path value (not the optinal key part)
@@ -440,7 +432,7 @@ public:
      *
      * If it is not found, return `std::nullopt`
      */
-    std::optional<std::string> resolveSearchPathElem(const std::string & value);
+    std::optional<std::string> resolveSearchPathPath(const SearchPath::Path & path);
 
     /**
      * Evaluate an expression to normal form
