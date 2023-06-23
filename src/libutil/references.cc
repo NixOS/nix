@@ -31,6 +31,9 @@ static void search(
             isBase32[(unsigned char) base32Chars[i]] = true;
     });
 
+    /* Nested loops, but the inner loop also advances i, so
+       this is an asymptotically optimal solution for finding
+       hash-like substrings. */
     for (size_t i = 0; i + refLength <= s.size(); ) {
         /* Check whether the next `refLength` bytes are a possible
            reference (because they are all base-32 characters). */
