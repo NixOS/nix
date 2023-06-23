@@ -208,44 +208,85 @@
 
     See [installables](./command-ref/new-cli/nix.md#installables) for [`nix` commands](./command-ref/new-cli/nix.md) (experimental) for details.
 
-  - [build system]{#gloss-build-system}
+  - [platform]{#gloss-platform}
 
-    [build system]: #gloss-build-system
+    [platform]: #gloss-platform
 
-    A representation of the processor architecture and platform that performs the build or compilation, typically a dash-separated string.
+    A set of execution environments capable of executing some set of software. A platform is typically described by attributes such as instruction set architecture, operating system, and application binary interface.
 
-    This is based on the [GCC system terminology](#gloss-gcc-system-terminology).
+    Nix is not intimately aware of all possible platforms.
+    Rather, it abstracts the platform into
+     - [system type]{#gloss-system-type} string
+     - [system features](command-ref/conf-file.md#system-features), to a lesser extent, as these are often thought of as additions to a platform, rather being part of the platform definition.
 
-    A program that is produced by a [derivation] is built with a [build system] that can be executed by the [derivation system](language/derivations.md#attr-system).
-    After it has been built, the [build system] is no longer relevant.
+  - [system type]:{#gloss-system-type}
 
-  - [host system]{#gloss-host-system}
+    An identifier for a specific [platform] or (in rare cases) a class of compatible platforms, such as `x86_64-v3-linux`.
 
-    [host system]: #gloss-host-system
+    To build a derivation locally, the [derivation `system` field](language/derivations.md#attr-system) must occur in the local Nix installation's [`system`](command-ref/conf-file.md#conf-system) or [`extra-platforms`](command-ref/conf-file.md#conf-extra-platforms) settings, among other rules.
+    Otherwise, a [remote build](advanced-topics/distributed-builds.md) is needed.
 
-    A representation of the processor architecture and platform where build products will run on, typically a dash-separated string.
+  - [build platform]{#gloss-build-platform}
 
-    This is based on the [GCC system terminology](#gloss-gcc-system-terminology).
+    [build platform]: #gloss-build-platform
 
-    Programs that run natively in a [derivation] must be configured with a [host system] that can by executed by the [derivation system](language/derivations.md#attr-system).
+    The [platform] that performs the build or compilation, typically a dash-separated string.
 
-  - [target system]{#gloss-target-system}
+    A program that is produced by a [derivation] has a [build configuration] with a [build platform] that can be executed by the [derivation system](language/derivations.md#attr-system).
+    After it has been built, the [build platform] is no longer relevant.
 
-    [target system]: #gloss-target-system
+    This term is based on the [GCC system terminology](#gloss-gcc-system-terminology).
 
-    A representation of the processor architecture and platform that a compiler will produce, typically a dash-separated string.
+  - [host platform]{#gloss-host-platform}
 
-    When discussing a build that does not produce a compiler, we only use [build system] and [host system] to describe it; we try to avoid discussing the actual build from the perspective its compiler's configuration.
+    [host platform]: #gloss-host-platform
 
-    This is based on the [GCC system terminology](#gloss-gcc-system-terminology).
+    The [platform] where build products will run on, typically a dash-separated string.
 
-    If the output of a compiler is to be run in a [derivation], the compiler's [target system] must be executable by the [derivation system](language/derivations.md#attr-system).
+    Programs that run natively in a [derivation] must have a [build configuration] with a [host platform] that can by executed by the [derivation system](language/derivations.md#attr-system).
+
+    This term is based on the [GCC system terminology](#gloss-gcc-system-terminology).
+
+  - [target platform]{#gloss-target-platform}
+
+    [target platform]: #gloss-target-platform
+
+    The [platform] for which a compiler will generate code, typically a dash-separated string.
+
+    When discussing a build that does not produce a compiler, we only use [build platform] and [host platform] to describe it. This also applies to compilers with a dynamic target, which is not part of the [build configuration].
+
+    We try to avoid discussing the actual build from the perspective of its compiler, instead focusing on the build itself.
+    Otherwise we won't have a term to distinguish the actual [target platform] from what we should have called the [host platform].
+
+    If the output of a compiler is to be run in a [derivation], the compiler's [target platform] must be executable by the [derivation system](language/derivations.md#attr-system).
+
+    This term is based on the [GCC system terminology](#gloss-gcc-system-terminology).
 
   - [GCC system terminology]{#gloss-gcc-system-terminology}
 
     The Nix ecosystem uses the [GCC system terminology](https://gcc.gnu.org/onlinedocs/gccint/Configure-Terms.html) for the names and roles of _build_, _host_, and _target_, but may apply the term _cross_ more loosely.
 
-    See [host system], [build system] and [target system] for how each relates to [derivation].
+    See [host platform], [build platform] and [target platform] for how each relates to [derivation].
+
+  - [build configuration]{#gloss-build-configuration}
+
+    [build configuration]: #gloss-build-configuration
+
+    The software configuration whose effects enable the build process and most of which also influence the [build product](#gloss-build-product).
+
+    Build configuration does not have a single agreed upon definition, but consists of a potentially broad set of settings that include:
+    - [build platform], often implicitly
+    - [host platform]
+    - [target platform], only when building a compiler with a static target platform
+    - options passed to a compiler, such optimization settings and the host platform (when using a compiler with a dynamic target platform)
+    - dependency options, such as which build tools and dependencies to use
+    - anything specified in a custom build script
+
+    In the context of Nix, the [build configuration] can be thought of as a [derivation] minus the source code, plus intentional build impurities.
+
+  - [build product]{#gloss-build-product}
+
+    The result of running a build process. When a build process runs in a [derivation], build products are typically copied into the [output path](#gloss-output-path)(s).
 
   - [NAR]{#gloss-nar}\
     A *N*ix *AR*chive. This is a serialisation of a path in the Nix
