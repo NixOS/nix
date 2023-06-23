@@ -216,8 +216,8 @@
 
     This is based on the [GCC system terminology](#gloss-gcc-system-terminology).
 
-    Programs that are produced by a [derivation] were configured when they were being built to have a [build system] that can be executed by the [derivation system](language/derivations.md#attr-system).
-    Conversely, when using the program after it is been built, the [build system] is no longer relevant.
+    A program that is produced by a [derivation] is built with a [build system] that can be executed by the [derivation system](language/derivations.md#attr-system).
+    After it has been built, the [build system] is no longer relevant.
 
   - [host system]{#gloss-host-system}
 
