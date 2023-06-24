@@ -179,6 +179,8 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
             j["locked"] = fetchers::attrsToJSON(flake.lockedRef.toAttrs());
             if (auto rev = flake.lockedRef.input.getRev())
                 j["revision"] = rev->to_string(Base16, false);
+            if (auto dirtyRev = fetchers::maybeGetStrAttr(flake.lockedRef.toAttrs(), "dirtyRev"))
+                j["dirtyRevision"] = *dirtyRev;
             if (auto revCount = flake.lockedRef.input.getRevCount())
                 j["revCount"] = *revCount;
             if (auto lastModified = flake.lockedRef.input.getLastModified())
@@ -204,6 +206,10 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 logger->cout(
                     ANSI_BOLD "Revision:" ANSI_NORMAL "      %s",
                     rev->to_string(Base16, false));
+            if (auto dirtyRev = fetchers::maybeGetStrAttr(flake.lockedRef.toAttrs(), "dirtyRev"))
+                logger->cout(
+                    ANSI_BOLD "Revision:" ANSI_NORMAL "      %s",
+                    *dirtyRev);
             if (auto revCount = flake.lockedRef.input.getRevCount())
                 logger->cout(
                     ANSI_BOLD "Revisions:" ANSI_NORMAL "     %s",
