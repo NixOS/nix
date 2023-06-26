@@ -782,7 +782,7 @@ void callFlake(EvalState & state,
 
         override
             .alloc(state.symbols.create("dir"))
-            .mkString(lockedNode ? lockedNode->lockedRef.subdir : lockedFlake.flake.lockedRef.subdir);
+            .mkString(sourcePath.path.rel());
 
         overrides.alloc(state.symbols.create(key->second)).mkAttrs(override);
     }

@@ -7,6 +7,7 @@ nix_tests = \
   flakes/circular.sh \
   flakes/init.sh \
   flakes/inputs.sh \
+  flakes/relative-paths.sh \
   flakes/follow-paths.sh \
   flakes/bundle.sh \
   flakes/check.sh \
