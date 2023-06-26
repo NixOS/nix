@@ -96,7 +96,7 @@ public:
 
     Setting<std::string> gcSocketPath {
         this,
-        getEnv("NIX_GC_SOCKET_PATH").value_or("auto"),
+        "auto",
         "gc-socket-path",
         "Path to the socket used to communicate with an external GC."
     };
