@@ -1656,7 +1656,10 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
             }));
         }
 
-        searchPath.emplace_back(prefix, path);
+        searchPath.emplace_back(SearchPathElem {
+            .prefix = prefix,
+            .path = path,
+        });
     }
 
     auto path = state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument passed to builtins.findFile");
@@ -4129,8 +4132,8 @@ void EvalState::createBaseEnv()
     int n = 0;
     for (auto & i : searchPath) {
         auto attrs = buildBindings(2);
-        attrs.alloc("path").mkString(i.second);
-        attrs.alloc("prefix").mkString(i.first);
+        attrs.alloc("path").mkString(i.path);
+        attrs.alloc("prefix").mkString(i.prefix);
         (v.listElems()[n++] = allocValue())->mkAttrs(attrs);
     }
     addConstant("__nixPath", v);
