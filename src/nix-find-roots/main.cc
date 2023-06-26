@@ -23,7 +23,8 @@ TracerConfig parseCmdLine(int argc, char** argv)
     fs::path socketPath = "/nix/var/nix/gc-trace-socket/socket";
 
     auto usage = [&]() {
-        std::cerr << "Usage: " << string(argv[0]) << " [--verbose|-v] [-s storeDir] [-d stateDir] [-l socketPath]" << std::endl;
+        std::string programName = argc > 0 ? argv[0] : "nix-find-roots";
+        std::cerr << "Usage: " << programName << " [--verbose|-v] [-s storeDir] [-d stateDir] [-l socketPath]" << std::endl;
         exit(1);
     };
     static struct option long_options[] = {
