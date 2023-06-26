@@ -335,7 +335,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <pathStart> path_start
 %type <e> string_parts string_attr
 %type <id> attr
-%token <id> ID ATTRPATH
+%token <id> ID
 %token <str> STR IND_STR
 %token <n> INT
 %token <nf> FLOAT
@@ -756,7 +756,10 @@ void EvalState::addToSearchPath(const std::string & s)
         path = std::string(s, pos + 1);
     }
 
-    searchPath.emplace_back(prefix, path);
+    searchPath.emplace_back(SearchPathElem {
+        .prefix = prefix,
+        .path = path,
+    });
 }
 
 
@@ -770,11 +773,11 @@ SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view p
 {
     for (auto & i : searchPath) {
         std::string suffix;
-        if (i.first.empty())
+        if (i.prefix.empty())
             suffix = concatStrings("/", path);
         else {
-            auto s = i.first.size();
-            if (path.compare(0, s, i.first) != 0 ||
+            auto s = i.prefix.size();
+            if (path.compare(0, s, i.prefix) != 0 ||
                 (path.size() > s && path[s] != '/'))
                 continue;
             suffix = path.size() == s ? "" : concatStrings("/", path.substr(s));
@@ -800,35 +803,35 @@ SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view p
 
 std::optional<SourcePath> EvalState::resolveSearchPathElem(const SearchPathElem & elem, bool initAccessControl)
 {
-    auto i = searchPathResolved.find(elem.second);
+    auto i = searchPathResolved.find(elem.path);
     if (i != searchPathResolved.end()) return i->second;
 
     std::optional<SourcePath> res;
 
-    if (EvalSettings::isPseudoUrl(elem.second)) {
+    if (EvalSettings::isPseudoUrl(elem.path)) {
         try {
             auto storePath = fetchers::downloadTarball(
-                store, EvalSettings::resolvePseudoUrl(elem.second), "source", false).storePath;
+                store, EvalSettings::resolvePseudoUrl(elem.path), "source", false).storePath;
             auto accessor = makeStorePathAccessor(store, storePath);
             registerAccessor(accessor);
             res.emplace(accessor->root());
         } catch (FileTransferError & e) {
             logWarning({
-                .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second)
+                .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.path)
             });
         }
     }
 
-    else if (hasPrefix(elem.second, "flake:")) {
+    else if (hasPrefix(elem.path, "flake:")) {
         experimentalFeatureSettings.require(Xp::Flakes);
-        auto flakeRef = parseFlakeRef(elem.second.substr(6), {}, true, false);
-        debug("fetching flake search path element '%s''", elem.second);
+        auto flakeRef = parseFlakeRef(elem.path.substr(6), {}, true, false);
+        debug("fetching flake search path element '%s''", elem.path);
         auto [accessor, _] = flakeRef.resolve(store).lazyFetch(store);
         res.emplace(accessor->root());
     }
 
     else {
-        auto path = rootPath(CanonPath::fromCwd(elem.second));
+        auto path = rootPath(CanonPath::fromCwd(elem.path));
 
         /* Allow access to paths in the search path. */
         if (initAccessControl) {
@@ -847,15 +850,15 @@ std::optional<SourcePath> EvalState::resolveSearchPathElem(const SearchPathElem 
             res.emplace(path);
         else {
             logWarning({
-                .msg = hintfmt("Nix search path entry '%1%' does not exist, ignoring", elem.second)
+                .msg = hintfmt("Nix search path entry '%1%' does not exist, ignoring", elem.path)
             });
         }
     }
 
     if (res)
-        debug("resolved search path element '%s' to '%s'", elem.second, *res);
+        debug("resolved search path element '%s' to '%s'", elem.path, *res);
 
-    searchPathResolved.emplace(elem.second, res);
+    searchPathResolved.emplace(elem.path, res);
     return res;
 }
 

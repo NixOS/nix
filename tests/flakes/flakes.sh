@@ -96,11 +96,16 @@ json=$(nix flake metadata flake1 --json | jq .)
 [[ $(echo "$json" | jq -r .lastModified) = $(git -C $flake1Dir log -n1 --format=%ct) ]]
 hash1=$(echo "$json" | jq -r .revision)
 
+echo foo > $flake1Dir/foo
+git -C $flake1Dir add $flake1Dir/foo
+[[ $(nix flake metadata flake1 --json --refresh | jq -r .dirtyRevision) == "$hash1-dirty" ]]
+
 echo -n '# foo' >> $flake1Dir/flake.nix
 flake1OriginalCommit=$(git -C $flake1Dir rev-parse HEAD)
 git -C $flake1Dir commit -a -m 'Foo'
 flake1NewCommit=$(git -C $flake1Dir rev-parse HEAD)
 hash2=$(nix flake metadata flake1 --json --refresh | jq -r .revision)
+[[ $(nix flake metadata flake1 --json --refresh | jq -r .dirtyRevision) == "null" ]]
 [[ $hash1 != $hash2 ]]
 
 # Test 'nix build' on a flake.

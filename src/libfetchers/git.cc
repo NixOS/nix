@@ -177,7 +177,7 @@ struct GitInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "git") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name")
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name" && name != "dirtyRev" && name != "dirtyShortRev")
                 throw Error("unsupported Git input attribute '%s'", name);
 
         parseURL(getStrAttr(attrs, "url"));
@@ -616,8 +616,16 @@ struct GitInputScheme : InputScheme
             input.attrs.insert_or_assign("rev", rev.gitRev());
 
             input.attrs.insert_or_assign("revCount", getRevCount(repoInfo, repoInfo.url, rev));
-        } else
+        } else {
             repoInfo.warnDirty();
+
+            if (repoInfo.workdirInfo.headRev) {
+                input.attrs.insert_or_assign("dirtyRev",
+                    repoInfo.workdirInfo.headRev->gitRev() + "-dirty");
+                input.attrs.insert_or_assign("dirtyShortRev",
+                    repoInfo.workdirInfo.headRev->gitShortRev() + "-dirty");
+            }
+        }
 
         input.attrs.insert_or_assign(
             "lastModified",

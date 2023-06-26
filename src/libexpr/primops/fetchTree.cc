@@ -21,7 +21,7 @@ static void emitTreeAttrs(
     bool emptyRevFallback,
     bool forceDirty)
 {
-    auto attrs = state.buildBindings(8);
+    auto attrs = state.buildBindings(10);
 
     setOutPath(attrs.alloc(state.sOutPath));
 
@@ -51,6 +51,11 @@ static void emitTreeAttrs(
         else if (emptyRevFallback)
             attrs.alloc("revCount").mkInt(0);
 
+    }
+
+    if (auto dirtyRev = fetchers::maybeGetStrAttr(input.attrs, "dirtyRev")) {
+        attrs.alloc("dirtyRev").mkString(*dirtyRev);
+        attrs.alloc("dirtyShortRev").mkString(*fetchers::maybeGetStrAttr(input.attrs, "dirtyShortRev"));
     }
 
     if (auto lastModified = input.getLastModified()) {

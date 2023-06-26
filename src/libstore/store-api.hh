@@ -114,7 +114,7 @@ struct StoreConfig : public Config
         return "";
     }
 
-    const PathSetting storeDir_{this, false, settings.nixStore,
+    const PathSetting storeDir_{this, settings.nixStore,
         "store",
         R"(
           Logical location of the Nix store, usually

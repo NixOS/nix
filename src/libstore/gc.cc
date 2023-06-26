@@ -110,6 +110,11 @@ void LocalStore::createTempRootsFile()
 
 void LocalStore::addTempRoot(const StorePath & path)
 {
+    if (readOnly) {
+      debug("Read-only store doesn't support creating lock files for temp roots, but nothing can be deleted anyways.");
+      return;
+    }
+
     createTempRootsFile();
 
     /* Open/create the global GC lock file. */
@@ -563,7 +568,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                     /* On macOS, accepted sockets inherit the
                        non-blocking flag from the server socket, so
                        explicitly make it blocking. */
-                    if (fcntl(fdServer.get(), F_SETFL, fcntl(fdServer.get(), F_GETFL) & ~O_NONBLOCK) == -1)
+                    if (fcntl(fdClient.get(), F_SETFL, fcntl(fdClient.get(), F_GETFL) & ~O_NONBLOCK) == -1)
                         abort();
 
                     while (true) {

@@ -4,6 +4,7 @@
 #include "shared.hh"
 #include "local-store.hh"
 #include "remote-store.hh"
+#include "remote-store-connection.hh"
 #include "util.hh"
 #include "serialise.hh"
 #include "archive.hh"
@@ -55,19 +56,16 @@ struct AuthorizationSettings : Config {
     Setting<Strings> trustedUsers{
         this, {"root"}, "trusted-users",
         R"(
-          A list of names of users (separated by whitespace) that have
-          additional rights when connecting to the Nix daemon, such as the
-          ability to specify additional binary caches, or to import unsigned
-          NARs. You can also specify groups by prefixing them with `@`; for
-          instance, `@wheel` means all users in the `wheel` group. The default
-          is `root`.
+          A list of user names, separated by whitespace.
+          These users will have additional rights when connecting to the Nix daemon, such as the ability to specify additional [substituters](#conf-substituters), or to import unsigned [NARs](@docroot@/glossary.md#gloss-nar).
+
+          You can also specify groups by prefixing names with `@`.
+          For instance, `@wheel` means all users in the `wheel` group.
 
           > **Warning**
           >
-          > Adding a user to `trusted-users` is essentially equivalent to
-          > giving that user root access to the system. For example, the user
-          > can set `sandbox-paths` and thereby obtain read access to
-          > directories that are otherwise inacessible to them.
+          > Adding a user to `trusted-users` is essentially equivalent to giving that user root access to the system.
+          > For example, the user can access or replace store path contents that are critical for system security.
         )"};
 
     /**
@@ -76,12 +74,16 @@ struct AuthorizationSettings : Config {
     Setting<Strings> allowedUsers{
         this, {"*"}, "allowed-users",
         R"(
-          A list of names of users (separated by whitespace) that are allowed
-          to connect to the Nix daemon. As with the `trusted-users` option,
-          you can specify groups by prefixing them with `@`. Also, you can
-          allow all users by specifying `*`. The default is `*`.
+          A list user names, separated by whitespace.
+          These users are allowed to connect to the Nix daemon.
 
-          Note that trusted users are always allowed to connect.
+          You can specify groups by prefixing names with `@`.
+          For instance, `@wheel` means all users in the `wheel` group.
+          Also, you can allow all users by specifying `*`.
+
+          > **Note**
+          >
+          > Trusted users (set in [`trusted-users`](#conf-trusted-users)) can always connect to the Nix daemon.
         )"};
 };
 

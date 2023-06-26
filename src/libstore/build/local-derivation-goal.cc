@@ -10,7 +10,6 @@
 #include "archive.hh"
 #include "compression.hh"
 #include "daemon.hh"
-#include "worker-protocol.hh"
 #include "topo-sort.hh"
 #include "callback.hh"
 #include "json-utils.hh"
@@ -65,8 +64,9 @@ void handleDiffHook(
     const Path & tryA, const Path & tryB,
     const Path & drvPath, const Path & tmpDir)
 {
-    auto diffHook = settings.diffHook;
-    if (diffHook != "" && settings.runDiffHook) {
+    auto & diffHookOpt = settings.diffHook.get();
+    if (diffHookOpt && settings.runDiffHook) {
+        auto & diffHook = *diffHookOpt;
         try {
             auto diffRes = runProgram(RunOptions {
                 .program = diffHook,
@@ -1428,7 +1428,8 @@ void LocalDerivationGoal::startDaemon()
     Store::Params params;
     params["path-info-cache-size"] = "0";
     params["store"] = worker.store.storeDir;
-    params["root"] = getLocalStore().rootDir;
+    if (auto & optRoot = getLocalStore().rootDir.get())
+        params["root"] = *optRoot;
     params["state"] = "/no-such-path";
     params["log"] = "/no-such-path";
     auto store = make_ref<RestrictedStore>(params,
