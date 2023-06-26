@@ -7,19 +7,9 @@ namespace nix::roots_tracer {
 namespace fs = std::filesystem;
 using std::set, std::map, std::string;
 
-class Error : public std::exception {
-private:
-    const string message;
-
+class Error : public std::runtime_error {
 public:
-    Error(std::string message)
-        : message(message)
-    {}
-
-    const char* what() const noexcept override
-    {
-        return message.c_str();
-    }
+    using std::runtime_error::runtime_error;
 };
 
 inline void logNone(std::string_view)
