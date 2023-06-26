@@ -80,11 +80,11 @@ std::string escape(std::string original)
 {
     map<string, string> replacements = {
         {"\n", "\\n"},
-        {"\n", "\\t"},
+        {"\t", "\\t"},
     };
     for (auto [oldStr, newStr] : replacements) {
         size_t currentPos = 0;
-        while ((currentPos = original.find(oldStr)) != std::string::npos) {
+        while ((currentPos = original.find(oldStr, currentPos)) != std::string::npos) {
             original.replace(currentPos, oldStr.length(), newStr);
             currentPos += newStr.length();
         }
@@ -109,19 +109,27 @@ int main(int argc, char * * argv)
     auto rawListenFds = std::getenv("LISTEN_FDS");
     if (rawListenFds) {
         auto listenFds = std::string(rawListenFds);
-        if (std::getenv("LISTEN_PID") != std::to_string(getpid()) || listenFds != "1")
+        auto listenPid = std::getenv("LISTEN_PID");
+        if (listenPid == nullptr || listenPid != std::to_string(getpid()) || listenFds != "1")
             throw Error("unexpected systemd environment variables");
         mySock = SD_LISTEN_FDS_START;
     } else {
         mySock = socket(PF_UNIX, SOCK_STREAM, 0);
-        if (mySock == 0) {
-            throw Error("Cannot create Unix domain socket");
+        if (mySock == -1) {
+            throw Error(std::string("Cannot create Unix domain socket, got") +
+                    std::strerror(errno));
         }
         struct sockaddr_un addr;
         addr.sun_family = AF_UNIX;
 
         auto socketDir = opts.socketPath.parent_path();
         auto socketFilename = opts.socketPath.filename();
+        if (socketFilename.string().size() > sizeof(addr.sun_path))
+            throw Error(
+                    "Socket filename " + socketFilename.string() +
+                    " is too long, should be at most " +
+                    std::to_string(sizeof(addr.sun_path))
+                    );
         chdir(socketDir.c_str());
 
         fs::remove(socketFilename);
