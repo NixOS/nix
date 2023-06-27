@@ -217,18 +217,20 @@ three kinds of patterns:
     
     > **Warning**
     > 
-    > The `args@` expression is bound to the argument passed to the
-    > function which means that attributes with defaults that aren't
-    > explicitly specified in the function call won't cause an
-    > evaluation error, but won't exist in `args`.
+    > The `args@` expression is bound to the argument that is passed to the
+    > function. This does not take default values into account.
+    >
+    > Attributes with default values that aren't
+    > specified in the function call won't cause an
+    > evaluation error. But they also won't exist in `args`.
     > 
     > For instance
     > 
     > ```nix
     > let
-    >   function = args@{ a ? 23, ... }: args;
+    >   f = args@{ a ? 23, ... }: args;
     > in
-    >   function {}
+    >   f {}
     > ````
     > 
     > will evaluate to an empty attribute set.
