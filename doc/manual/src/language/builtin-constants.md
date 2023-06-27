@@ -9,7 +9,8 @@ These constants are built into the Nix language evaluator:
   Since built-in functions were added over time, [testing for attributes](./operators.md#has-attribute) in `builtins` can be used for graceful fallback on older Nix installations:
 
   ```nix
-  if builtins ? getEnv then builtins.getEnv "PATH" else ""
+  # if hasContext is not available, we assume `s` has a context
+  if builtins ? hasContext then builtins.hasContext s else true
   ```
 
 - [`builtins.currentSystem`]{#builtins-currentSystem} (string)
