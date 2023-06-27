@@ -217,13 +217,9 @@ three kinds of patterns:
     
     > **Warning**
     > 
-    > The `args@` expression is bound to the argument that is passed to the
-    > function. This does not take default values into account.
+    > `args@` binds the name `args` to the attribute set that is passed to the function.
+    > In particular, `args` does *not* include any default values specified with `?` in the function's set pattern.
     >
-    > Attributes with default values that aren't
-    > specified in the function call won't cause an
-    > evaluation error. But they also won't exist in `args`.
-    > 
     > For instance
     > 
     > ```nix
