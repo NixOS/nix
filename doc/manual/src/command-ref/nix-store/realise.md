@@ -10,7 +10,7 @@
 
 Ensure that the given [store paths] are [valid].
 
-Realisation of a store path works as follows:
+Each of *paths* is processed as follows:
 
 - If the path is already valid, do nothing.
 - If the path leads to a [store derivation]:
