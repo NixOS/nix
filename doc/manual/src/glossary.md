@@ -218,6 +218,19 @@
 
   [output path]: #gloss-output-path
 
+- [deriving path]{#gloss-deriving-path}
+
+  A [store]-level expression (not Nix language expression) that denotes a [store object].
+  There are two forms:
+
+  - *constant*: A constant deriving path is just a [store path]
+    It can be made valid by copying it into the store, from the evaluator, command line interface or another store.
+
+  - *output*: An output deriving path is a pair of a [store path] to a [derivation] and an [output] name.
+
+  Deriving paths are necessary because in general, we do not know what the [output path] path of an [output] will be until it is [realise]d.
+  Deriving paths provide a way to refer to unrealised outputs in order to be able to tell Nix to realise them.
+
 - [deriver]{#gloss-deriver}
 
   The [store derivation] that produced an [output path].
