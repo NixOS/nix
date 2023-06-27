@@ -11,7 +11,7 @@
 
 Each of *paths* is processed as follows:
 
-- If the path is already valid, do nothing.
+- If the path is already [valid], do nothing.
 - If the path leads to a [store derivation]:
   1. Realise the store derivation file itself, as a regular store path.
   2. Realise its [output paths]:
