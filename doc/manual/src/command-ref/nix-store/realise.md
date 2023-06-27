@@ -8,7 +8,6 @@
 
 # Description
 
-Ensure that the given [store paths] are [valid].
 
 Each of *paths* is processed as follows:
 
