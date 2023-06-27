@@ -27,7 +27,7 @@ static std::string filterPrintable(const std::string & s)
     return res;
 }
 
-struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
+struct CmdWhyDepends : SourceExprCommand
 {
     std::string _package, _dependency;
     bool all = false;
@@ -78,7 +78,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
     void run(ref<Store> store) override
     {
         auto package = parseInstallable(store, _package);
-        auto packagePath = Installable::toStorePath(getEvalStore(), store, Realise::Outputs, operateOn, package);
+        auto packagePath = Installable::toStorePath(getEvalStore(), store, Realise::Outputs, package);
 
         /* We don't need to build `dependency`. We try to get the store
          * path if it's already known, and if not, then it's not a dependency.
@@ -93,7 +93,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
         auto dependency = parseInstallable(store, _dependency);
         auto optDependencyPath = [&]() -> std::optional<StorePath> {
             try {
-                return {Installable::toStorePath(getEvalStore(), store, Realise::Derivation, operateOn, dependency)};
+                return {Installable::toStorePath(getEvalStore(), store, Realise::Derivation, dependency)};
             } catch (MissingRealisation &) {
                 return std::nullopt;
             }

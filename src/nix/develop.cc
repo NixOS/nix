@@ -374,7 +374,7 @@ struct Common : InstallableCommand, MixProfile
             auto dir = absPath(dir_);
             auto installable = parseInstallable(store, installable_);
             auto builtPaths = Installable::toStorePaths(
-                getEvalStore(), store, Realise::Nothing, OperateOn::Output, {installable});
+                getEvalStore(), store, Realise::Nothing, {installable});
             for (auto & path: builtPaths) {
                 auto from = store->printStorePath(path);
                 if (script.find(from) == std::string::npos)
@@ -628,7 +628,7 @@ struct CmdDevelop : Common, MixEnvironment
 
             bool found = false;
 
-            for (auto & path : Installable::toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, {bashInstallable})) {
+            for (auto & path : Installable::toStorePaths(getEvalStore(), store, Realise::Outputs, {bashInstallable})) {
                 auto s = store->printStorePath(path) + "/bin/bash";
                 if (pathExists(s)) {
                     shell = s;

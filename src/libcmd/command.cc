@@ -130,16 +130,6 @@ ref<EvalState> EvalCommand::getEvalState()
     return ref<EvalState>(evalState);
 }
 
-MixOperateOnOptions::MixOperateOnOptions()
-{
-    addFlag({
-        .longName = "derivation",
-        .description = "Operate on the [store derivation](../../glossary.md#gloss-store-derivation) rather than its outputs.",
-        .category = installablesCategory,
-        .handler = {&operateOn, OperateOn::Derivation},
-    });
-}
-
 BuiltPathsCommand::BuiltPathsCommand(bool recursive)
     : recursive(recursive)
 {
@@ -177,7 +167,7 @@ void BuiltPathsCommand::run(ref<Store> store, Installables && installables)
         for (auto & p : store->queryAllValidPaths())
             paths.push_back(BuiltPath::Opaque{p});
     } else {
-        paths = Installable::toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);
+        paths = Installable::toBuiltPaths(getEvalStore(), store, realiseMode, installables);
         if (recursive) {
             // XXX: This only computes the store path closure, ignoring
             // intermediate realisations
