@@ -4,7 +4,7 @@ These constants are built into the Nix language evaluator:
 
 - [`builtins`]{#builtins-builtins} (attribute set)
 
-  Contains all the [built-in functions](./builtins.md) and values, in order to avoid polluting the global scope.
+  Contains all the [built-in functions](./builtins.md) and values.
 
   Since built-in functions were added over time, [testing for attributes](./operators.md#has-attribute) in `builtins` can be used for graceful fallback on older Nix installations:
 
