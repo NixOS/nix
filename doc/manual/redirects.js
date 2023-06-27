@@ -330,23 +330,23 @@ const redirects = {
     "ssec-relnotes-2.0": "release-notes/rl-2.0.html",
     "ssec-relnotes-2.1": "release-notes/rl-2.1.html",
     "ssec-relnotes-2.2": "release-notes/rl-2.2.html",
-    "ssec-relnotes-2.3": "release-notes/rl-2.3.html"
+    "ssec-relnotes-2.3": "release-notes/rl-2.3.html",
   },
   "language/values.html": {
     "simple-values": "#primitives",
     "lists": "#list",
     "strings": "#string",
     "lists": "#list",
-    "attribute-sets": "#attribute-set"
+    "attribute-sets": "#attribute-set",
   },
   "installation/installing-binary.html": {
     "linux": "uninstall.html#linux",
     "macos": "uninstall.html#macos",
-    "uninstalling": "uninstall.html"
+    "uninstalling": "uninstall.html",
   }
   "contributing/hacking.html": {
-    "nix-with-flakes": "#building-nix-with-flakes"
-    "classic-nix": "#building-nix"
+    "nix-with-flakes": "#building-nix-with-flakes",
+    "classic-nix": "#building-nix",
   }
 };
 
