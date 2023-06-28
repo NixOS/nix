@@ -475,6 +475,9 @@ struct GitInputScheme : InputScheme
 
             repoDir = actualUrl;
         } else {
+            if (fetchSettings.offline && parseURL(actualUrl).scheme != "file")
+                throw Error("cannot fetch Git input '%s' while offline", actualUrl);
+
             const bool useHeadRef = !input.getRef();
             if (useHeadRef) {
                 auto head = readHeadCached(actualUrl);

@@ -154,6 +154,9 @@ struct MercurialInputScheme : InputScheme
         auto [isLocal, actualUrl_] = getActualUrl(input);
         auto actualUrl = actualUrl_; // work around clang bug
 
+        if (!isLocal && fetchSettings.offline)
+            throw Error("cannot fetch Mercurial input '%s' while offline", actualUrl);
+
         // FIXME: return lastModified.
 
         // FIXME: don't clone local repositories.

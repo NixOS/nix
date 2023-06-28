@@ -11,6 +11,7 @@
 #include "finally.hh"
 #include "loggers.hh"
 #include "markdown.hh"
+#include "fetch-settings.hh"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -56,7 +57,6 @@ std::string programPath;
 
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
 {
-    bool useNet = true;
     bool refresh = false;
     bool helpRequested = false;
     bool showVersion = false;
@@ -94,11 +94,12 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         });
 
         addFlag({
+            // this flag would be created implicitly but here an alias and description is defined
             .longName = "offline",
             .aliases = {"no-net"}, // FIXME: remove
             .description = "Disable substituters and consider all previously downloaded files up-to-date.",
             .category = miscCategory,
-            .handler = {[&]() { useNet = false; }},
+            .handler = {[&]() { fetchSettings.offline = true; }},
             .experimentalFeature = Xp::NixCommand,
         });
 
@@ -432,12 +433,12 @@ void mainWrapped(int argc, char * * argv)
     experimentalFeatureSettings.require(
         args.command->second->experimentalFeature());
 
-    if (args.useNet && !haveInternet()) {
+    if (!fetchSettings.offline && !haveInternet()) {
         warn("you don't have Internet access; disabling some network-dependent features");
-        args.useNet = false;
+        fetchSettings.offline = true;
     }
 
-    if (!args.useNet) {
+    if (fetchSettings.offline) {
         // FIXME: should check for command line overrides only.
         if (!settings.useSubstitutes.overridden)
             settings.useSubstitutes = false;

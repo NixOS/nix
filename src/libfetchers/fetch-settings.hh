@@ -95,6 +95,12 @@ struct FetchSettings : public Config
           empty, the summary is generated based on the action performed.
         )",
         {}, true, Xp::Flakes};
+
+    Setting<bool> offline{
+        this, false, "offline",
+        R"(
+          If set to `true` then Nix will avoid using any network resources.
+        )"};
 };
 
 // FIXME: don't use a global variable.
