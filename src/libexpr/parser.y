@@ -275,7 +275,12 @@ static Expr * stripIndentation(const PosIdx pos, SymbolTable & symbols,
     }
 
     /* If this is a single string, then don't do a concatenation. */
-    return es2->size() == 1 && dynamic_cast<ExprString *>((*es2)[0].second) ? (*es2)[0].second : new ExprConcatStrings(pos, true, es2);
+    if (es2->size() == 1 && dynamic_cast<ExprString *>((*es2)[0].second)) {
+        auto *const result = (*es2)[0].second;
+        delete es2;
+        return result;
+    }
+    return new ExprConcatStrings(pos, true, es2);
 }
 
 
