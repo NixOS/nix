@@ -6,3 +6,5 @@
   [`builtins.flakeRefToString`](@docroot@/language/builtins.md#builtins-flakeRefToString),
   have been added.
   These functions are useful for converting between flake references encoded as attribute sets and URLs.
+
+- [`builtins.toJSON`](@docroot@/language/builtins.md#builtins-parseFlakeRef) now prints [--show-trace](@docroot@/command-ref/conf-file.html#conf-show-trace) items for the path in which it finds an evaluation error.
