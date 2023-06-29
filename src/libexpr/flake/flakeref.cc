@@ -127,6 +127,8 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
 
                     // Save device to detect filesystem boundary
                     dev_t device = lstat(path).st_dev;
+                    // Fix for the Nix equivalent of CVE-2022-24765
+                    uid_t currentUser = geteuid();
                     bool found = false;
                     while (path != "/") {
                         if (pathExists(path + "/flake.nix")) {
@@ -134,11 +136,13 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                             break;
                         } else if (pathExists(path + "/.git"))
                             throw Error("path '%s' is not part of a flake (neither it nor its parent directories contain a 'flake.nix' file)", path);
-                        else {
-                            if (lstat(path).st_dev != device)
-                                throw Error("unable to find a flake before encountering filesystem boundary at '%s'", path);
-                        }
                         path = dirOf(path);
+                        auto pathStat = lstat(path);
+                        if (pathStat.st_dev != device)
+                            throw Error("unable to find a flake before encountering filesystem boundary at '%s'", path);
+                        if (pathStat.st_uid != currentUser) {
+                            throw Error("unable to find a flake before encountering a directory not owned by us at '%s'", path);
+                        }
                     }
                     if (!found)
                         throw BadURL("could not find a flake.nix file");
