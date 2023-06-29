@@ -831,7 +831,7 @@ EOF
         fi
 
         _sudo "to load data for the first time in to the Nix Database" \
-              HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-store" --load-db < ./.reginfo
+              env HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-store" --load-db < ./.reginfo
 
         echo "      Just finished getting the nix database ready."
     )
@@ -921,11 +921,11 @@ cert_in_store() {
 setup_default_profile() {
     task "Setting up the default profile"
     _sudo "to install a bootstrapping Nix in to the default profile" \
-          HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_NIX"
+          env HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_NIX"
 
     if [ -z "${NIX_SSL_CERT_FILE:-}" ] || ! [ -f "${NIX_SSL_CERT_FILE:-}" ] || cert_in_store; then
         _sudo "to install a bootstrapping SSL certificate just for Nix in to the default profile" \
-              HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_CACERT"
+              env HOME="$ROOT_HOME" "$NIX_INSTALLED_NIX/bin/nix-env" -i "$NIX_INSTALLED_CACERT"
         export NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt
     fi
 
@@ -934,7 +934,7 @@ setup_default_profile() {
         # otherwise it will be lost in environments where sudo doesn't pass
         # all the environment variables by default.
         if ! _sudo "to update the default channel in the default profile" \
-            HOME="$ROOT_HOME" NIX_SSL_CERT_FILE="$NIX_SSL_CERT_FILE" "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs; then
+            env HOME="$ROOT_HOME" NIX_SSL_CERT_FILE="$NIX_SSL_CERT_FILE" "$NIX_INSTALLED_NIX/bin/nix-channel" --update nixpkgs; then
             reminder <<EOF
 I had trouble fetching the nixpkgs channel (are you offline?)
 To try again later, run: sudo -i nix-channel --update nixpkgs
