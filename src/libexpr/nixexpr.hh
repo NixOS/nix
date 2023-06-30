@@ -403,7 +403,7 @@ struct ExprOpNot : Expr
     COMMON_METHODS
 };
 
-#define MakeBinOp(name, s) \
+#define BinOp(name, s) \
     struct name : Expr \
     { \
         PosIdx pos; \
@@ -414,21 +414,13 @@ struct ExprOpNot : Expr
         { \
             str << "("; e1->show(symbols, str); str << " " s " "; e2->show(symbols, str); str << ")"; \
         } \
-        void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override \
-        { \
-            e1->bindVars(es, env); e2->bindVars(es, env);    \
-        } \
+        void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override; \
         void eval(EvalState & state, Env & env, Value & v) override; \
         PosIdx getPos() const override { return pos; } \
     };
 
-MakeBinOp(ExprOpEq, "==")
-MakeBinOp(ExprOpNEq, "!=")
-MakeBinOp(ExprOpAnd, "&&")
-MakeBinOp(ExprOpOr, "||")
-MakeBinOp(ExprOpImpl, "->")
-MakeBinOp(ExprOpUpdate, "//")
-MakeBinOp(ExprOpConcatLists, "++")
+#include "binops.inc.hh"
+#undef BinOp
 
 struct ExprConcatStrings : Expr
 {

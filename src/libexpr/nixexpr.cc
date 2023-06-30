@@ -584,4 +584,14 @@ size_t SymbolTable::totalSize() const
     return n;
 }
 
+#define BinOp(OP, S) \
+    void OP::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) \
+    { \
+        if (es.debugRepl) \
+            es.exprEnvs.insert(std::make_pair(this, env)); \
+        e1->bindVars(es, env); \
+        e2->bindVars(es, env); \
+    }
+#include "binops.inc.hh"
+#undef BinOp
 }
