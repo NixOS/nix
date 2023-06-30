@@ -1,6 +1,7 @@
 ca-tests := \
   $(d)/build-with-garbage-path.sh \
   $(d)/build.sh \
+  $(d)/build-cache.sh \
   $(d)/concurrent-builds.sh \
   $(d)/derivation-json.sh \
   $(d)/duplicate-realisation-in-closure.sh \
