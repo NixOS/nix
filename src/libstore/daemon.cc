@@ -864,8 +864,6 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto path = store->parseStorePath(readString(from));
         StringSet sigs = readStrings<StringSet>(from);
         logger->startWork();
-        if (!trusted)
-            throw Error("you are not privileged to add signatures");
         store->addSignatures(path, sigs);
         logger->stopWork();
         to << 1;
