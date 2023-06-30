@@ -6,6 +6,7 @@
 #include "print.hh"
 
 #include <cstdlib>
+#include <optional>
 
 namespace nix {
 
@@ -335,10 +336,11 @@ void ExprVar::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
        set its level and displacement. */
     const StaticEnv * curEnv;
     Level level;
-    int withLevel = -1;
+    std::optional<Level> withLevel;
     for (curEnv = env.get(), level = 0; curEnv; curEnv = curEnv->up, level++) {
         if (curEnv->isWith) {
-            if (withLevel == -1) withLevel = level;
+            if (!withLevel)
+                withLevel = level;
         } else {
             auto i = curEnv->find(name);
             if (i != curEnv->vars.end()) {
@@ -353,13 +355,13 @@ void ExprVar::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
     /* Otherwise, the variable must be obtained from the nearest
        enclosing `with'.  If there is no `with', then we can issue an
        "undefined variable" error now. */
-    if (withLevel == -1)
+    if (!withLevel)
         throw UndefinedVarError({
             .msg = hintfmt("undefined variable '%1%'", es.symbols[name]),
             .errPos = es.positions[pos]
         });
     fromWith = true;
-    this->level = withLevel;
+    this->level = *withLevel;
 }
 
 void ExprSelect::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
