@@ -1343,7 +1343,12 @@ Value * ExprList::maybeThunk(EvalState & state, Env & env)
 void ExprVar::eval(EvalState & state, Env & env, Value & v)
 {
     Value * v2 = state.lookupVar(&env, *this, false);
-    state.forceValue(*v2, pos);
+    try {
+        state.forceValue(*v2, pos);
+    } catch (Error & e) {
+        e.addTrace(&v, state.positions[pos], "while evaluating variable '%1%'", state.symbols[name]);
+        throw;
+    }
     v = *v2;
 }
 

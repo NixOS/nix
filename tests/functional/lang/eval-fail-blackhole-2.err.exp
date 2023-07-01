@@ -1,4 +1,13 @@
 error:
+       … while evaluating variable 'P'
+
+         at /pwd/lang/eval-fail-blackhole-2.nix:15:4:
+
+           14|
+           15| in P
+             |    ^
+           16|
+
        … from call site
          at /pwd/lang/eval-fail-blackhole-2.nix:5:7:
             4|   # this part is ok
