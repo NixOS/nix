@@ -102,6 +102,14 @@ poly_configure_nix_daemon_service() {
     _sudo "to set up the nix-daemon as a LaunchDaemon" \
           /usr/bin/install -m -rw-r--r-- "/nix/var/nix/profiles/default$NIX_DAEMON_DEST" "$NIX_DAEMON_DEST"
 
+    vars="http_proxy https_proxy ftp_proxy no_proxy HTTP_PROXY HTTPS_PROXY FTP_PROXY NO_PROXY"
+    for v in $vars; do
+        if [ "x${!v:-}" != "x" ]; then
+            _sudo "to set the ${v} setting for nix-daemon" \
+                plutil -replace "EnvironmentVariables.${v}" -string "${!v}" "$NIX_DAEMON_DEST"
+        fi
+    done
+
     _sudo "to load the LaunchDaemon plist for nix-daemon" \
           launchctl load /Library/LaunchDaemons/org.nixos.nix-daemon.plist
 
