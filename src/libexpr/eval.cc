@@ -95,11 +95,16 @@ RootValue allocRootValue(Value * v)
 #endif
 }
 
-void Value::print(const SymbolTable & symbols, std::ostream & str,
-    std::set<const void *> * seen) const
+void Value::print(const SymbolTable &symbols, std::ostream &str,
+                  std::set<const void *> *seen, int depth) const
+
 {
     checkInterrupt();
 
+    if (depth <= 0) {
+        str << "«too deep»";
+        return;
+    }
     switch (internalType) {
     case tInt:
         str << integer;
@@ -123,7 +128,7 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
             str << "{ ";
             for (auto & i : attrs->lexicographicOrder(symbols)) {
                 str << symbols[i->name] << " = ";
-                i->value->print(symbols, str, seen);
+                i->value->print(symbols, str, seen, depth - 1);
                 str << "; ";
             }
             str << "}";
@@ -139,7 +144,7 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
             str << "[ ";
             for (auto v2 : listItems()) {
                 if (v2)
-                    v2->print(symbols, str, seen);
+                    v2->print(symbols, str, seen, depth - 1);
                 else
                     str << "(nullptr)";
                 str << " ";
@@ -181,11 +186,10 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
     }
 }
 
-
-void Value::print(const SymbolTable & symbols, std::ostream & str, bool showRepeated) const
-{
+void Value::print(const SymbolTable &symbols, std::ostream &str,
+                  bool showRepeated, int depth) const {
     std::set<const void *> seen;
-    print(symbols, str, showRepeated ? nullptr : &seen);
+    print(symbols, str, showRepeated ? nullptr : &seen, depth);
 }
 
 // Pretty print types for assertion errors
