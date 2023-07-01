@@ -348,6 +348,12 @@ ErrorBuilder & ErrorBuilder::withTrace(PosIdx pos, const std::string_view text)
     return *this;
 }
 
+ErrorBuilder & ErrorBuilder::withTrace(Value *vRes, PosIdx pos, const std::string_view text)
+{
+    info.traces.push_front(Trace{ .pos = state.positions[pos], .hint = hintformat(std::string(text)), .frame = false, .valuePtr = vRes });
+    return *this;
+}
+
 ErrorBuilder & ErrorBuilder::withFrameTrace(PosIdx pos, const std::string_view text)
 {
     info.traces.push_front(Trace{ .pos = state.positions[pos], .hint = hintformat(std::string(text)), .frame = true });
@@ -357,6 +363,12 @@ ErrorBuilder & ErrorBuilder::withFrameTrace(PosIdx pos, const std::string_view t
 ErrorBuilder & ErrorBuilder::withSuggestions(Suggestions & s)
 {
     info.suggestions = s;
+    return *this;
+}
+
+ErrorBuilder & ErrorBuilder::withInfiniteRecursion(Value *v)
+{
+    info.recursionPtr = v;
     return *this;
 }
 
@@ -832,6 +844,11 @@ void EvalState::addErrorTrace(Error & e, const PosIdx pos, const char * s, const
     e.addTrace(positions[pos], hintfmt(s, s2), frame);
 }
 
+void EvalState::addErrorTrace(Value * vRes, Error & e, const PosIdx pos, const char * s, const std::string & s2, bool frame) const
+{
+    e.addTrace(vRes, positions[pos], hintfmt(s, s2), frame);
+}
+
 static std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(
     EvalState & state,
     Expr & expr,
@@ -1169,7 +1186,7 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const PosIdx po
         if (v.type() != nAttrs)
             error("value is %1% while a set was expected", showType(v)).withFrame(env, *e).debugThrow<TypeError>();
     } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+        e.addTrace(&v, positions[pos], errorCtx);
         throw;
     }
 }
@@ -1404,7 +1421,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             auto pos2r = state.positions[pos2];
             auto origin = std::get_if<SourcePath>(&pos2r.origin);
             if (!(origin && *origin == state.derivationInternal))
-                state.addErrorTrace(e, pos2, "while evaluating the attribute '%1%'",
+                state.addErrorTrace(&v, e, pos2, "while evaluating the attribute '%1%'",
                     showAttrPath(state, env, attrPath));
         }
         throw;
@@ -1505,7 +1522,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                 try {
                     forceAttrs(*args[0], lambda.pos, "while evaluating the value passed for the lambda argument");
                 } catch (Error & e) {
-                    if (pos) e.addTrace(positions[pos], "from call site");
+                    if (pos) e.addTrace(&vRes, positions[pos], "from call site");
                     throw;
                 }
 
@@ -1524,7 +1541,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                                              (lambda.name ? std::string(symbols[lambda.name]) : "anonymous lambda"),
                                              symbols[i.name])
                                     .atPos(lambda.pos)
-                                    .withTrace(pos, "from call site")
+                                    .withTrace(&vRes, pos, "from call site")
                                     .withFrame(*fun.lambda.env, lambda)
                                     .debugThrow<TypeError>();
                         }
@@ -1550,7 +1567,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                                              (lambda.name ? std::string(symbols[lambda.name]) : "anonymous lambda"),
                                              symbols[i.name])
                                 .atPos(lambda.pos)
-                                .withTrace(pos, "from call site")
+                                .withTrace(&vRes, pos, "from call site")
                                 .withSuggestions(suggestions)
                                 .withFrame(*fun.lambda.env, lambda)
                                 .debugThrow<TypeError>();
@@ -1584,7 +1601,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                         ? concatStrings("'", symbols[lambda.name], "'")
                         : "anonymous lambda",
                         true);
-                    if (pos) addErrorTrace(e, pos, "from call site%s", "", true);
+                    if (pos) addErrorTrace(&vRes, e, pos, "from call site%s", "", true);
                 }
                 throw;
             }
@@ -1677,7 +1694,7 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
             try {
                 callFunction(*functor->value, 2, args2, vCur, functor->pos);
             } catch (Error & e) {
-                e.addTrace(positions[pos], "while calling a functor (an attribute set with a '__functor' attribute)");
+                e.addTrace(&vRes, positions[pos], "while calling a functor (an attribute set with a '__functor' attribute)");
                 throw;
             }
             nrArgs--;
@@ -2014,6 +2031,7 @@ void ExprPos::eval(EvalState & state, Env & env, Value & v)
 void ExprBlackHole::eval(EvalState & state, Env & env, Value & v)
 {
     state.error("infinite recursion encountered")
+        .withInfiniteRecursion(&v)
         .debugThrow<InfiniteRecursionError>();
 }
 
@@ -2056,7 +2074,7 @@ void EvalState::forceValueDeep(Value & v)
 
                     recurse(*i.value);
                 } catch (Error & e) {
-                    addErrorTrace(e, i.pos, "while evaluating the attribute '%1%'", symbols[i.name]);
+                    addErrorTrace(&v, e, i.pos, "while evaluating the attribute '%1%'", symbols[i.name]);
                     throw;
                 }
         }
@@ -2079,7 +2097,7 @@ NixInt EvalState::forceInt(Value & v, const PosIdx pos, std::string_view errorCt
             error("value is %1% while an integer was expected", showType(v)).debugThrow<TypeError>();
         return v.integer;
     } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+        e.addTrace(&v, positions[pos], errorCtx);
         throw;
     }
 }
@@ -2095,7 +2113,7 @@ NixFloat EvalState::forceFloat(Value & v, const PosIdx pos, std::string_view err
             error("value is %1% while a float was expected", showType(v)).debugThrow<TypeError>();
         return v.fpoint;
     } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+        e.addTrace(&v, positions[pos], errorCtx);
         throw;
     }
 }
@@ -2109,7 +2127,7 @@ bool EvalState::forceBool(Value & v, const PosIdx pos, std::string_view errorCtx
             error("value is %1% while a Boolean was expected", showType(v)).debugThrow<TypeError>();
         return v.boolean;
     } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+        e.addTrace(&v, positions[pos], errorCtx);
         throw;
     }
 }
@@ -2128,7 +2146,7 @@ void EvalState::forceFunction(Value & v, const PosIdx pos, std::string_view erro
         if (v.type() != nFunction && !isFunctor(v))
             error("value is %1% while a function was expected", showType(v)).debugThrow<TypeError>();
     } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+        e.addTrace(&v, positions[pos], errorCtx);
         throw;
     }
 }
@@ -2142,7 +2160,7 @@ std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string
             error("value is %1% while a string was expected", showType(v)).debugThrow<TypeError>();
         return v.string_view();
     } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+        e.addTrace(&v, positions[pos], errorCtx);
         throw;
     }
 }
@@ -2245,7 +2263,7 @@ BackedStringView EvalState::coerceToString(
         try {
             return v.external->coerceToString(positions[pos], context, coerceMore, copyToStore);
         } catch (Error & e) {
-            e.addTrace(nullptr, errorCtx);
+            e.addTrace(&v, nullptr, errorCtx);
             throw;
         }
     }
@@ -2267,7 +2285,7 @@ BackedStringView EvalState::coerceToString(
                             "while evaluating one element of the list",
                             coerceMore, copyToStore, canonicalizePath);
                 } catch (Error & e) {
-                    e.addTrace(positions[pos], errorCtx);
+                    e.addTrace(&v, positions[pos], errorCtx);
                     throw;
                 }
                 if (n < v.listSize() - 1

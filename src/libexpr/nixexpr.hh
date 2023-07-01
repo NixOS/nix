@@ -22,6 +22,12 @@ MakeError(TypeError, EvalError);
 MakeError(UndefinedVarError, Error);
 MakeError(MissingArgumentError, EvalError);
 
+/**
+ * Thrown when an infinite recursion is detected.
+ *
+ * These are detected by checking for a tBlackhole.
+ * It is not thrown for a stack overflow.
+ */
 class InfiniteRecursionError : public EvalError
 {
     friend class EvalState;

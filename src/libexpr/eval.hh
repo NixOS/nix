@@ -176,6 +176,9 @@ class ErrorBuilder
         ErrorBuilder & withTrace(PosIdx pos, const std::string_view text);
 
         [[nodiscard, gnu::noinline]]
+        ErrorBuilder & withTrace(Value *vRes, PosIdx pos, const std::string_view text);
+
+        [[nodiscard, gnu::noinline]]
         ErrorBuilder & withFrameTrace(PosIdx pos, const std::string_view text);
 
         [[nodiscard, gnu::noinline]]
@@ -184,9 +187,16 @@ class ErrorBuilder
         [[nodiscard, gnu::noinline]]
         ErrorBuilder & withFrame(const Env & e, const Expr & ex);
 
+        [[nodiscard, gnu::noinline]]
+        ErrorBuilder & withInfiniteRecursion(Value *v);
+
         template<class ErrorType>
         [[gnu::noinline, gnu::noreturn]]
         void debugThrow();
+
+        inline ErrorInfo &getErrorInfo() {
+            return info;
+        }
 };
 
 
@@ -495,6 +505,8 @@ public:
     void addErrorTrace(Error & e, const char * s, const std::string & s2) const;
     [[gnu::noinline]]
     void addErrorTrace(Error & e, const PosIdx pos, const char * s, const std::string & s2, bool frame = false) const;
+    [[gnu::noinline]]
+    void addErrorTrace(Value *vRes, Error & e, const PosIdx pos, const char * s, const std::string & s2, bool frame = false) const;
 
 public:
     /**

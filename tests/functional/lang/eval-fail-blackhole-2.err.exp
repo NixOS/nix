@@ -1,0 +1,107 @@
+error:
+       … from call site
+         at /pwd/lang/eval-fail-blackhole-2.nix:5:7:
+            4|   # this part is ok
+            5|   P = increment Q;
+             |       ^
+            6|   Q = increment R;
+
+       … while calling 'increment'
+         at /pwd/lang/eval-fail-blackhole-2.nix:2:15:
+            1| let
+            2|   increment = x: x + 1;
+             |               ^
+            3|
+
+       … from call site
+         at /pwd/lang/eval-fail-blackhole-2.nix:6:7:
+            5|   P = increment Q;
+            6|   Q = increment R;
+             |       ^
+            7|   R = increment a;
+
+       … while calling 'increment'
+         at /pwd/lang/eval-fail-blackhole-2.nix:2:15:
+            1| let
+            2|   increment = x: x + 1;
+             |               ^
+            3|
+
+       … from call site
+         at /pwd/lang/eval-fail-blackhole-2.nix:7:7:
+            6|   Q = increment R;
+            7|   R = increment a;
+             |       ^
+            8|
+
+       … entering the infinite recursion
+
+       … while calling 'increment'
+         at /pwd/lang/eval-fail-blackhole-2.nix:2:15:
+            1| let
+            2|   increment = x: x + 1;
+             |               ^
+            3|
+
+       … from call site
+         at /pwd/lang/eval-fail-blackhole-2.nix:10:7:
+            9|   # `a` is where it loops back to
+           10|   a = increment b;
+             |       ^
+           11|   b = increment c;
+
+       … while calling 'increment'
+         at /pwd/lang/eval-fail-blackhole-2.nix:2:15:
+            1| let
+            2|   increment = x: x + 1;
+             |               ^
+            3|
+
+       … from call site
+         at /pwd/lang/eval-fail-blackhole-2.nix:11:7:
+           10|   a = increment b;
+           11|   b = increment c;
+             |       ^
+           12|   c = increment d;
+
+       … while calling 'increment'
+         at /pwd/lang/eval-fail-blackhole-2.nix:2:15:
+            1| let
+            2|   increment = x: x + 1;
+             |               ^
+            3|
+
+       … from call site
+         at /pwd/lang/eval-fail-blackhole-2.nix:12:7:
+           11|   b = increment c;
+           12|   c = increment d;
+             |       ^
+           13|   d = increment a;
+
+       … while calling 'increment'
+         at /pwd/lang/eval-fail-blackhole-2.nix:2:15:
+            1| let
+            2|   increment = x: x + 1;
+             |               ^
+            3|
+
+       … from call site
+         at /pwd/lang/eval-fail-blackhole-2.nix:13:7:
+           12|   c = increment d;
+           13|   d = increment a;
+             |       ^
+           14|
+
+       … while calling 'increment'
+         at /pwd/lang/eval-fail-blackhole-2.nix:2:15:
+            1| let
+            2|   increment = x: x + 1;
+             |               ^
+            3|
+
+       error: infinite recursion encountered
+       at /pwd/lang/eval-fail-blackhole-2.nix:2:18:
+            1| let
+            2|   increment = x: x + 1;
+             |                  ^
+            3|

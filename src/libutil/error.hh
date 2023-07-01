@@ -70,10 +70,20 @@ void printCodeLines(std::ostream & out,
     const Pos & errPos,
     const LinesOfCode & loc);
 
+// For libutil's purposes, any pointer would do, but we prefer to help the upper layers to be more type safe.
+struct Value;
+
 struct Trace {
     std::shared_ptr<Pos> pos;
     hintformat hint;
     bool frame;
+
+    /**
+     * Memory location of the Value that was evaluated in this trace item.
+     *
+     * This info allows to reconstruct where an infinite recursion started.
+     */
+    Value * valuePtr;
 };
 
 inline bool operator<(const Trace& lhs, const Trace& rhs);
@@ -86,6 +96,12 @@ struct ErrorInfo {
     hintformat msg;
     std::shared_ptr<Pos> errPos;
     std::list<Trace> traces;
+
+    /**
+     * Memory location of the Value that contained the tBlackhole when we detected
+     * an infinite recursion.
+     */
+    Value * recursionPtr;
 
     Suggestions suggestions;
 
@@ -155,12 +171,23 @@ public:
     }
 
     template<typename... Args>
-    void addTrace(std::shared_ptr<Pos> && e, std::string_view fs, const Args & ... args)
+    void addTrace(Value * v, std::shared_ptr<Pos> && e, std::string_view fs, const Args & ... args)
     {
-        addTrace(std::move(e), hintfmt(std::string(fs), args...));
+        addTrace(v, std::move(e), hintfmt(std::string(fs), args...));
     }
 
-    void addTrace(std::shared_ptr<Pos> && e, hintformat hint, bool frame = false);
+    void addTrace(Value * v, std::shared_ptr<Pos> && e, hintformat hint, bool frame = false);
+
+    template<typename... Args>
+    void addTrace(std::shared_ptr<Pos> && e, std::string_view fs, const Args & ... args)
+    {
+        addTrace(nullptr, std::move(e), fs, args...);
+    }
+
+    inline void addTrace(std::shared_ptr<Pos> && e, hintformat hint, bool frame = false)
+    {
+        addTrace(nullptr, std::move(e), hint, frame);
+    }
 
     bool hasTrace() const { return !err.traces.empty(); }
 
