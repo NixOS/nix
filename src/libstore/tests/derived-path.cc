@@ -49,7 +49,6 @@ class DerivedPathTest : public LibStoreTest
 // no a real fixture.
 //
 // See https://github.com/emil-e/rapidcheck/blob/master/doc/gtest.md#rc_gtest_fixture_propfixture-name-args
-#if 0
 TEST_F(DerivedPathTest, force_init)
 {
 }
@@ -69,6 +68,5 @@ RC_GTEST_FIXTURE_PROP(
 {
     RC_ASSERT(o == DerivedPath::parse(*store, o.to_string(*store)));
 }
-#endif
 
 }
