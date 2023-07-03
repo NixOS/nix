@@ -395,8 +395,9 @@ static void linkOrCopy(const Path & from, const Path & to)
            bind-mount in this case?
 
            It can also fail with EPERM in BeegFS v7 and earlier versions
+           or fail with EXDEV in OpenAFS
            which don't allow hard-links to other directories */
-        if (errno != EMLINK && errno != EPERM)
+        if (errno != EMLINK && errno != EPERM && errno != EXDEV)
             throw SysError("linking '%s' to '%s'", to, from);
         copyPath(from, to);
     }

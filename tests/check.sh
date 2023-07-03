@@ -18,6 +18,9 @@ clearStore
 nix-build dependencies.nix --no-out-link
 nix-build dependencies.nix --no-out-link --check
 
+# Build failure exit codes (100, 104, etc.) are from
+# doc/manual/src/command-ref/status-build-failure.md
+
 # check for dangling temporary build directories
 # only retain if build fails and --keep-failed is specified, or...
 # ...build is non-deterministic and --check and --keep-failed are both specified

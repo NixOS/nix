@@ -275,7 +275,12 @@ static Expr * stripIndentation(const PosIdx pos, SymbolTable & symbols,
     }
 
     /* If this is a single string, then don't do a concatenation. */
-    return es2->size() == 1 && dynamic_cast<ExprString *>((*es2)[0].second) ? (*es2)[0].second : new ExprConcatStrings(pos, true, es2);
+    if (es2->size() == 1 && dynamic_cast<ExprString *>((*es2)[0].second)) {
+        auto *const result = (*es2)[0].second;
+        delete es2;
+        return result;
+    }
+    return new ExprConcatStrings(pos, true, es2);
 }
 
 
@@ -330,7 +335,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <ind_string_parts> ind_string_parts
 %type <e> path_start string_parts string_attr
 %type <id> attr
-%token <id> ID ATTRPATH
+%token <id> ID
 %token <str> STR IND_STR
 %token <n> INT
 %token <nf> FLOAT
@@ -741,7 +746,10 @@ void EvalState::addToSearchPath(const std::string & s)
         path = std::string(s, pos + 1);
     }
 
-    searchPath.emplace_back(prefix, path);
+    searchPath.emplace_back(SearchPathElem {
+        .prefix = prefix,
+        .path = path,
+    });
 }
 
 
@@ -755,11 +763,11 @@ SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view p
 {
     for (auto & i : searchPath) {
         std::string suffix;
-        if (i.first.empty())
+        if (i.prefix.empty())
             suffix = concatStrings("/", path);
         else {
-            auto s = i.first.size();
-            if (path.compare(0, s, i.first) != 0 ||
+            auto s = i.prefix.size();
+            if (path.compare(0, s, i.prefix) != 0 ||
                 (path.size() > s && path[s] != '/'))
                 continue;
             suffix = path.size() == s ? "" : concatStrings("/", path.substr(s));
@@ -785,47 +793,47 @@ SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view p
 
 std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathElem & elem)
 {
-    auto i = searchPathResolved.find(elem.second);
+    auto i = searchPathResolved.find(elem.path);
     if (i != searchPathResolved.end()) return i->second;
 
     std::pair<bool, std::string> res;
 
-    if (EvalSettings::isPseudoUrl(elem.second)) {
+    if (EvalSettings::isPseudoUrl(elem.path)) {
         try {
             auto storePath = fetchers::downloadTarball(
-                store, EvalSettings::resolvePseudoUrl(elem.second), "source", false).tree.storePath;
+                store, EvalSettings::resolvePseudoUrl(elem.path), "source", false).tree.storePath;
             res = { true, store->toRealPath(storePath) };
         } catch (FileTransferError & e) {
             logWarning({
-                .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.second)
+                .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.path)
             });
             res = { false, "" };
         }
     }
 
-    else if (hasPrefix(elem.second, "flake:")) {
+    else if (hasPrefix(elem.path, "flake:")) {
         experimentalFeatureSettings.require(Xp::Flakes);
-        auto flakeRef = parseFlakeRef(elem.second.substr(6), {}, true, false);
-        debug("fetching flake search path element '%s''", elem.second);
+        auto flakeRef = parseFlakeRef(elem.path.substr(6), {}, true, false);
+        debug("fetching flake search path element '%s''", elem.path);
         auto storePath = flakeRef.resolve(store).fetchTree(store).first.storePath;
         res = { true, store->toRealPath(storePath) };
     }
 
     else {
-        auto path = absPath(elem.second);
+        auto path = absPath(elem.path);
         if (pathExists(path))
             res = { true, path };
         else {
             logWarning({
-                .msg = hintfmt("Nix search path entry '%1%' does not exist, ignoring", elem.second)
+                .msg = hintfmt("Nix search path entry '%1%' does not exist, ignoring", elem.path)
             });
             res = { false, "" };
         }
     }
 
-    debug("resolved search path element '%s' to '%s'", elem.second, res.second);
+    debug("resolved search path element '%s' to '%s'", elem.path, res.second);
 
-    searchPathResolved[elem.second] = res;
+    searchPathResolved[elem.path] = res;
     return res;
 }
 

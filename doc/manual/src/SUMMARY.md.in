@@ -124,6 +124,7 @@
 - [Glossary](glossary.md)
 - [Contributing](contributing/contributing.md)
   - [Hacking](contributing/hacking.md)
+  - [Testing](contributing/testing.md)
   - [Experimental Features](contributing/experimental-features.md)
   - [CLI guideline](contributing/cli-guideline.md)
   - [C++ style guide](contributing/cxx.md)

@@ -238,7 +238,7 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
     }
 }
 
-static RegisterPrimOp primop_scopedImport(RegisterPrimOp::Info {
+static RegisterPrimOp primop_scopedImport(PrimOp {
     .name = "scopedImport",
     .arity = 2,
     .fun = [](EvalState & state, const PosIdx pos, Value * * args, Value & v)
@@ -692,7 +692,7 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value * * a
         v.listElems()[n++] = i;
 }
 
-static RegisterPrimOp primop_genericClosure(RegisterPrimOp::Info {
+static RegisterPrimOp primop_genericClosure(PrimOp {
     .name = "__genericClosure",
     .args = {"attrset"},
     .arity = 1,
@@ -809,7 +809,7 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value * * 
     }
 }
 
-static RegisterPrimOp primop_addErrorContext(RegisterPrimOp::Info {
+static RegisterPrimOp primop_addErrorContext(PrimOp {
     .name = "__addErrorContext",
     .arity = 2,
     .fun = prim_addErrorContext,
@@ -1400,7 +1400,7 @@ drvName, Bindings * attrs, Value & v)
     v.mkAttrs(result);
 }
 
-static RegisterPrimOp primop_derivationStrict(RegisterPrimOp::Info {
+static RegisterPrimOp primop_derivationStrict(PrimOp {
     .name = "derivationStrict",
     .arity = 1,
     .fun = prim_derivationStrict,
@@ -1656,7 +1656,10 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
             }));
         }
 
-        searchPath.emplace_back(prefix, path);
+        searchPath.emplace_back(SearchPathElem {
+            .prefix = prefix,
+            .path = path,
+        });
     }
 
     auto path = state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument passed to builtins.findFile");
@@ -1664,9 +1667,52 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
     v.mkPath(state.checkSourcePath(state.findFile(searchPath, path, pos)));
 }
 
-static RegisterPrimOp primop_findFile(RegisterPrimOp::Info {
+static RegisterPrimOp primop_findFile(PrimOp {
     .name = "__findFile",
-    .arity = 2,
+    .args = {"search path", "lookup path"},
+    .doc = R"(
+      Look up the given path with the given search path.
+
+      A search path is represented list of [attribute sets](./values.md#attribute-set) with two attributes, `prefix`, and `path`.
+      `prefix` is a relative path.
+      `path` denotes a file system location; the exact syntax depends on the command line interface.
+
+      Examples of search path attribute sets:
+
+      - ```
+        {
+          prefix = "nixos-config";
+          path = "/etc/nixos/configuration.nix";
+        }
+        ```
+
+      - ```
+        {
+          prefix = "";
+          path = "/nix/var/nix/profiles/per-user/root/channels";
+        }
+        ```
+
+      The lookup algorithm checks each entry until a match is found, returning a [path value](@docroot@/language/values.html#type-path) of the match.
+
+      This is the process for each entry:
+      If the lookup path matches `prefix`, then the remainder of the lookup path (the "suffix") is searched for within the directory denoted by `patch`.
+      Note that the `path` may need to be downloaded at this point to look inside.
+      If the suffix is found inside that directory, then the entry is a match;
+      the combined absolute path of the directory (now downloaded if need be) and the suffix is returned.
+
+      The syntax
+
+      ```nix
+      <nixpkgs>
+      ```
+
+      is equivalent to:
+
+      ```nix
+      builtins.findFile builtins.nixPath "nixpkgs"
+      ```
+    )",
     .fun = prim_findFile,
 });
 
@@ -2385,7 +2431,7 @@ static void prim_unsafeGetAttrPos(EvalState & state, const PosIdx pos, Value * *
         state.mkPos(v, i->pos);
 }
 
-static RegisterPrimOp primop_unsafeGetAttrPos(RegisterPrimOp::Info {
+static RegisterPrimOp primop_unsafeGetAttrPos(PrimOp {
     .name = "__unsafeGetAttrPos",
     .arity = 2,
     .fun = prim_unsafeGetAttrPos,
@@ -4058,10 +4104,10 @@ static RegisterPrimOp primop_splitVersion({
 RegisterPrimOp::PrimOps * RegisterPrimOp::primOps;
 
 
-RegisterPrimOp::RegisterPrimOp(Info && info)
+RegisterPrimOp::RegisterPrimOp(PrimOp && primOp)
 {
     if (!primOps) primOps = new PrimOps;
-    primOps->push_back(std::move(info));
+    primOps->push_back(std::move(primOp));
 }
 
 
@@ -4074,54 +4120,202 @@ void EvalState::createBaseEnv()
 
     /* `builtins' must be first! */
     v.mkAttrs(buildBindings(128).finish());
-    addConstant("builtins", v);
+    addConstant("builtins", v, {
+        .type = nAttrs,
+        .doc = R"(
+          Contains all the [built-in functions](@docroot@/language/builtins.md) and values.
+
+          Since built-in functions were added over time, [testing for attributes](./operators.md#has-attribute) in `builtins` can be used for graceful fallback on older Nix installations:
+
+          ```nix
+          # if hasContext is not available, we assume `s` has a context
+          if builtins ? hasContext then builtins.hasContext s else true
+          ```
+        )",
+    });
 
     v.mkBool(true);
-    addConstant("true", v);
+    addConstant("true", v, {
+        .type = nBool,
+        .doc = R"(
+          Primitive value.
+
+          It can be returned by
+          [comparison operators](@docroot@/language/operators.md#Comparison)
+          and used in
+          [conditional expressions](@docroot@/language/constructs.md#Conditionals).
+
+          The name `true` is not special, and can be shadowed:
+
+          ```nix-repl
+          nix-repl> let true = 1; in true
+          1
+          ```
+        )",
+    });
 
     v.mkBool(false);
-    addConstant("false", v);
+    addConstant("false", v, {
+        .type = nBool,
+        .doc = R"(
+          Primitive value.
+
+          It can be returned by
+          [comparison operators](@docroot@/language/operators.md#Comparison)
+          and used in
+          [conditional expressions](@docroot@/language/constructs.md#Conditionals).
+
+          The name `false` is not special, and can be shadowed:
+
+          ```nix-repl
+          nix-repl> let false = 1; in false
+          1
+          ```
+        )",
+    });
 
     v.mkNull();
-    addConstant("null", v);
+    addConstant("null", v, {
+        .type = nNull,
+        .doc = R"(
+          Primitive value.
+
+          The name `null` is not special, and can be shadowed:
+
+          ```nix-repl
+          nix-repl> let null = 1; in null
+          1
+          ```
+        )",
+    });
 
     if (!evalSettings.pureEval) {
         v.mkInt(time(0));
-        addConstant("__currentTime", v);
-
-        v.mkString(settings.thisSystem.get());
-        addConstant("__currentSystem", v);
     }
+    addConstant("__currentTime", v, {
+        .type = nInt,
+        .doc = R"(
+          Return the [Unix time](https://en.wikipedia.org/wiki/Unix_time) at first evaluation.
+          Repeated references to that name will re-use the initially obtained value.
+
+          Example:
+
+          ```console
+          $ nix repl
+          Welcome to Nix 2.15.1 Type :? for help.
+
+          nix-repl> builtins.currentTime
+          1683705525
+
+          nix-repl> builtins.currentTime
+          1683705525
+          ```
+
+          The [store path](@docroot@/glossary.md#gloss-store-path) of a derivation depending on `currentTime` will differ for each evaluation, unless both evaluate `builtins.currentTime` in the same second.
+        )",
+        .impureOnly = true,
+    });
+
+    if (!evalSettings.pureEval) {
+        v.mkString(settings.thisSystem.get());
+    }
+    addConstant("__currentSystem", v, {
+        .type = nString,
+        .doc = R"(
+          The value of the [`system` configuration option](@docroot@/command-ref/conf-file.md#conf-pure-eval).
+
+          It can be used to set the `system` attribute for [`builtins.derivation`](@docroot@/language/derivations.md) such that the resulting derivation can be built on the same system that evaluates the Nix expression:
+
+          ```nix
+           builtins.derivation {
+             # ...
+             system = builtins.currentSystem;
+          }
+          ```
+
+          It can be overridden in order to create derivations for different system than the current one:
+
+          ```console
+          $ nix-instantiate --system "mips64-linux" --eval --expr 'builtins.currentSystem'
+          "mips64-linux"
+          ```
+        )",
+        .impureOnly = true,
+    });
 
     v.mkString(nixVersion);
-    addConstant("__nixVersion", v);
+    addConstant("__nixVersion", v, {
+        .type = nString,
+        .doc = R"(
+          The version of Nix.
+
+          For example, where the command line returns the current Nix version,
+
+          ```shell-session
+          $ nix --version
+          nix (Nix) 2.16.0
+          ```
+
+          the Nix language evaluator returns the same value:
+
+          ```nix-repl
+          nix-repl> builtins.nixVersion
+          "2.16.0"
+          ```
+        )",
+    });
 
     v.mkString(store->storeDir);
-    addConstant("__storeDir", v);
+    addConstant("__storeDir", v, {
+        .type = nString,
+        .doc = R"(
+          Logical file system location of the [Nix store](@docroot@/glossary.md#gloss-store) currently in use.
+
+          This value is determined by the `store` parameter in [Store URLs](@docroot@/command-ref/new-cli/nix3-help-stores.md):
+
+          ```shell-session
+          $ nix-instantiate --store 'dummy://?store=/blah' --eval --expr builtins.storeDir
+          "/blah"
+          ```
+        )",
+    });
 
     /* Language version.  This should be increased every time a new
        language feature gets added.  It's not necessary to increase it
        when primops get added, because you can just use `builtins ?
        primOp' to check. */
     v.mkInt(6);
-    addConstant("__langVersion", v);
+    addConstant("__langVersion", v, {
+        .type = nInt,
+        .doc = R"(
+          The current version of the Nix language.
+        )",
+    });
 
     // Miscellaneous
     if (evalSettings.enableNativeCode) {
-        addPrimOp("__importNative", 2, prim_importNative);
-        addPrimOp("__exec", 1, prim_exec);
+        addPrimOp({
+            .name = "__importNative",
+            .arity = 2,
+            .fun = prim_importNative,
+        });
+        addPrimOp({
+            .name = "__exec",
+            .arity = 1,
+            .fun = prim_exec,
+        });
     }
 
     addPrimOp({
-        .fun = evalSettings.traceVerbose ? prim_trace : prim_second,
-        .arity = 2,
         .name = "__traceVerbose",
         .args = { "e1", "e2" },
+        .arity = 2,
         .doc = R"(
           Evaluate *e1* and print its abstract syntax representation on standard
           error if `--trace-verbose` is enabled. Then return *e2*. This function
           is useful for debugging.
         )",
+        .fun = evalSettings.traceVerbose ? prim_trace : prim_second,
     });
 
     /* Add a value containing the current Nix expression search path. */
@@ -4129,30 +4323,50 @@ void EvalState::createBaseEnv()
     int n = 0;
     for (auto & i : searchPath) {
         auto attrs = buildBindings(2);
-        attrs.alloc("path").mkString(i.second);
-        attrs.alloc("prefix").mkString(i.first);
+        attrs.alloc("path").mkString(i.path);
+        attrs.alloc("prefix").mkString(i.prefix);
         (v.listElems()[n++] = allocValue())->mkAttrs(attrs);
     }
-    addConstant("__nixPath", v);
+    addConstant("__nixPath", v, {
+        .type = nList,
+        .doc = R"(
+          The search path used to resolve angle bracket path lookups.
+
+          Angle bracket expressions can be
+          [desugared](https://en.wikipedia.org/wiki/Syntactic_sugar)
+          using this and
+          [`builtins.findFile`](./builtins.html#builtins-findFile):
+
+          ```nix
+          <nixpkgs>
+          ```
+
+          is equivalent to:
+
+          ```nix
+          builtins.findFile builtins.nixPath "nixpkgs"
+          ```
+        )",
+    });
 
     if (RegisterPrimOp::primOps)
         for (auto & primOp : *RegisterPrimOp::primOps)
-            if (!primOp.experimentalFeature
-                || experimentalFeatureSettings.isEnabled(*primOp.experimentalFeature))
+            if (experimentalFeatureSettings.isEnabled(primOp.experimentalFeature))
             {
-                addPrimOp({
-                    .fun = primOp.fun,
-                    .arity = std::max(primOp.args.size(), primOp.arity),
-                    .name = primOp.name,
-                    .args = primOp.args,
-                    .doc = primOp.doc,
-                });
+                auto primOpAdjusted = primOp;
+                primOpAdjusted.arity = std::max(primOp.args.size(), primOp.arity);
+                addPrimOp(std::move(primOpAdjusted));
             }
 
     /* Add a wrapper around the derivation primop that computes the
-       `drvPath' and `outPath' attributes lazily. */
+       `drvPath' and `outPath' attributes lazily.
+
+       Null docs because it is documented separately.
+       */
     auto vDerivation = allocValue();
-    addConstant("derivation", vDerivation);
+    addConstant("derivation", vDerivation, {
+        .type = nFunction,
+    });
 
     /* Now that we've added all primops, sort the `builtins' set,
        because attribute lookups expect it to be sorted. */
