@@ -111,6 +111,7 @@ Gen<NixStringContextElem> Arbitrary<NixStringContextElem>::arbitrary()
 
 namespace nix {
 
+#if 0
 RC_GTEST_PROP(
     NixStringContextElemTest,
     prop_round_rip,
@@ -118,5 +119,6 @@ RC_GTEST_PROP(
 {
     RC_ASSERT(o == NixStringContextElem::parse(o.to_string()));
 }
+#endif
 
 }

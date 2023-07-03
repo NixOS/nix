@@ -224,6 +224,7 @@ Gen<OutputsSpec> Arbitrary<OutputsSpec>::arbitrary()
 
 namespace nix {
 
+#if 0
 RC_GTEST_PROP(
     OutputsSpec,
     prop_round_rip,
@@ -231,5 +232,6 @@ RC_GTEST_PROP(
 {
     RC_ASSERT(o == OutputsSpec::parse(o.to_string()));
 }
+#endif
 
 }

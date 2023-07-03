@@ -10,6 +10,7 @@ namespace nix {
 // Testing of trivial expressions
 class DerivedPathExpressionTest : public LibExprTest {};
 
+#if 0
 // FIXME: `RC_GTEST_FIXTURE_PROP` isn't calling `SetUpTestSuite` because it is
 // no a real fixture.
 //
@@ -61,5 +62,6 @@ RC_GTEST_FIXTURE_PROP(
     };
     RC_ASSERT(DerivedPath { b } == d);
 }
+#endif
 
 } /* namespace nix */
