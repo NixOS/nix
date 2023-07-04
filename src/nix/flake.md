@@ -97,8 +97,8 @@ Flakes corresponding to a local path can also be referred to by a direct path re
 
 The semantic of such a path is as follows:
 
-* If the directory is part of a `Git` repository, then the input will be treated as a `git+file:` URL, otherwise it will be treated as a `path:` url;
-* If the directory doesn't contain a `flake.nix` file, then Nix will search for such a file upwards in the file system hierarchy until it stumbles across either:
+* If the directory is part of a Git repository, then the input will be treated as a `git+file:` URL, otherwise it will be treated as a `path:` url;
+* If the directory doesn't contain a `flake.nix` file, then Nix will search for such a file upwards in the file system hierarchy until it finds any of:
     1. The Git repository root, or
     2. The filesystem root (/), or
     3. A folder on a different mount point.
