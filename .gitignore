@@ -138,3 +138,6 @@ nix-rust/target
 result
 
 .vscode/
+
+# clangd and possibly more
+.cache/
