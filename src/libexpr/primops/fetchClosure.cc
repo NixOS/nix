@@ -74,7 +74,10 @@ static void runFetchClosureWithContentAddressedPath(EvalState & state, const Pos
         throw Error({
             .msg = hintfmt(
                 "The 'fromPath' value '%s' is input-addressed, but 'inputAddressed' is set to 'false' (default).\n\n"
-                "If you do intend to fetch an input-addressed store path, add 'inputAddressed = true;' to the 'fetchClosure' arguments. Note that content addressing does not require users to configure a trusted binary cache public key on their systems, and is therefore preferred.",
+                "If you do intend to fetch an input-addressed store path, add\n\n"
+                "    inputAddressed = true;\n\n"
+                "to the 'fetchClosure' arguments.\n\n"
+                "Note that to ensure authenticity input-addressed store paths, users must configure a trusted binary cache public key on their systems. This is not needed for content-addressed paths.",
                 state.store->printStorePath(fromPath)),
             .errPos = state.positions[pos]
         });
@@ -226,7 +229,7 @@ static RegisterPrimOp primop_fetchClosure({
 
       - Fetch a content-addressed store path.
 
-Example:
+      Example:
 
         ```nix
         builtins.fetchClosure {
@@ -263,7 +266,7 @@ Example:
       rewrote '/nix/store/r2jd6ygnmirm2g803mksqqjm4y39yi6i-git-2.33.1' to '/nix/store/ldbhlwhh39wha58rm61bkiiwm6j7211j-git-2.33.1'
       ```
 
-      Alternatively, you may set `toPath = ""` and find the correct `toPath` in the error message.
+      Alternatively, set `toPath = ""` and find the correct `toPath` in the error message.
 
       **Not rewriting**
 
@@ -279,13 +282,7 @@ Example:
       allows you to use a previously built store path in a Nix
       expression. However, it is more reproducible because it requires
       specifying a binary cache from which the path can be fetched.
-      Also, the default requirement of a content-addressed final store path
-      avoids the need for users to configure [`trusted-public-keys`](@docroot@/command-ref/conf-file.md#conf-trusted-public-keys).
-
-      **Experimental feature**
-
-      This function is only available if you enable the experimental
-      feature `fetch-closure`.
+      Also, using content-addressed store paths does not require users to configure [`trusted-public-keys`](@docroot@/command-ref/conf-file.md#conf-trusted-public-keys) to ensure their authenticity.
     )",
     .fun = prim_fetchClosure,
     .experimentalFeature = Xp::FetchClosure,
