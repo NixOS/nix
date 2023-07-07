@@ -195,7 +195,7 @@ expect() {
     shift
     "$@" && res=0 || res="$?"
     if [[ $res -ne $expected ]]; then
-        echo "Expected '$expected' but got '$res' while running '${*@Q}'" >&2
+        echo "Expected exit code '$expected' but got '$res' from command ${*@Q}" >&2
         return 1
     fi
     return 0
@@ -209,7 +209,7 @@ expectStderr() {
     shift
     "$@" 2>&1 && res=0 || res="$?"
     if [[ $res -ne $expected ]]; then
-        echo "Expected '$expected' but got '$res' while running '${*@Q}'" >&2
+        echo "Expected exit code '$expected' but got '$res' from command ${*@Q}" >&2
         return 1
     fi
     return 0
