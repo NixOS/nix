@@ -137,6 +137,7 @@ static void addAttr(ExprAttrs * attrs, AttrPath && attrPath,
                         dupAttr(state, ad.first, j2->second.pos, ad.second.pos);
                     jAttrs->attrs.emplace(ad.first, ad.second);
                 }
+                jAttrs->dynamicAttrs.insert(jAttrs->dynamicAttrs.end(), ae->dynamicAttrs.begin(), ae->dynamicAttrs.end());
             } else {
                 dupAttr(state, attrPath, pos, j->second.pos);
             }
