@@ -793,6 +793,46 @@ static RegisterPrimOp r2({
     .experimentalFeature = Xp::Flakes,
 });
 
+static void prim_parseFlakeRef(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    std::string flakeRefS(state.forceStringNoCtx(
+        *args[0], pos,
+        "while evaluating the argument passed to builtins.parseFlakeRef"));
+    auto attrs = parseFlakeRef(flakeRefS, {}, true).toAttrs();
+    auto binds = state.buildBindings(attrs.size());
+    for ( const auto & [key, value] : attrs ) {
+        Symbol  s  = state.symbols.create(key);
+        Value & vv = binds.alloc(s);
+        if (std::holds_alternative<std::string>(value)) {
+            vv.mkString(std::get<std::string>(value));
+        }
+        else if (std::holds_alternative<uint64_t>(value)) {
+            vv.mkInt(std::get<uint64_t>(value));
+        }
+        else { /* bool */
+            vv.mkBool(std::get<Explicit<bool>>(value).t);
+        }
+
+    }
+    v.mkAttrs(binds);
+}
+
+static RegisterPrimOp r3({
+    .name =  "__parseFlakeRef",
+    .args = {"args"},
+    .doc = R"(
+      Parse a flake reference, and return its exploded form. For example:
+
+      ```nix
+      builtins.parseFlakeRef "github:NixOS/nixpkgs/23.05?dir=lib"
+      # ==> { type = "github"; owner = "NixOS"; repo = "nixpkgs"; ref = "23.05";
+      #       dir = "lib"; }
+      ```
+    )",
+    .fun = prim_parseFlakeRef,
+    .experimentalFeature = Xp::Flakes,
+});
+
 }
 
 Fingerprint LockedFlake::getFingerprint() const
