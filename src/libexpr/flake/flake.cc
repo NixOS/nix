@@ -833,6 +833,63 @@ static RegisterPrimOp r3({
     .experimentalFeature = Xp::Flakes,
 });
 
+
+static void prim_flakeRefToString(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    state.forceAttrs(*args[0], noPos, "while evaluating the argument passed to builtins.flakeRefToString");
+    fetchers::Attrs attrs;
+    for (const auto & attr : *args[0]->attrs) {
+        fetchers::Attr value;
+        switch (attr.value->type())
+        {
+            case nInt:
+                value = (uint64_t) attr.value->integer;
+                break;
+            case nBool:
+                value = Explicit(attr.value->boolean);
+                break;
+            case nString:
+                value = std::string(attr.value->str());
+                break;
+            case nThunk:
+            case nFloat:
+            case nPath:
+            case nNull:
+            case nAttrs:
+            case nList:
+            case nFunction:
+            case nExternal:
+            default:
+                state.error(
+                    "flake-ref attr sets may only contain integers, booleans, "
+                    "and strings, but attribute %s is %s",
+                    state.symbols[attr.name],
+                    showType(*attr.value)).debugThrow<EvalError>();
+                break;
+        }
+        attrs.emplace(state.symbols[attr.name], value);
+    }
+    auto flakeRef = FlakeRef::fromAttrs(attrs);
+    v.mkString(flakeRef.to_string());
+}
+
+static RegisterPrimOp r4({
+    .name =  "__flakeRefToString",
+    .args = {"attrs"},
+    .doc = R"(
+      Stringize an exploded flake reference, and return its url form.
+      For example:
+
+      ```nix
+      builtins.flakeRefToString { dir = "lib"; owner = "NixOS"; ref = "23.05";
+                                  repo = "nixpkgs"; type = "github"; }
+      # ==> "github:NixOS/nixpkgs/23.05?dir=lib"
+      ```
+    )",
+    .fun = prim_flakeRefToString,
+    .experimentalFeature = Xp::Flakes,
+});
+
 }
 
 Fingerprint LockedFlake::getFingerprint() const
