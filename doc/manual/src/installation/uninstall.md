@@ -2,11 +2,51 @@
 
 ## Single User
 
-If you have a [single-user installation](./installing-binary.md#single-user-installation) of Nix, uninstall it by running:
+### Alternative:
+ #### Step 1: 
+ Run the script located at `scripts/uninstall-single-user.sh`
 
-```console
-$ rm -rf /nix
-```
+ #### Step 2:
+
+ Check the expected files no longer exist on your system. For example:
+      
+       ls /etc/nix
+
+### Manual Method
+
+#### Step 1: Restore Modified Files (if applicable)
+
+1. Nix may have modified certain files on your system. If you have created backup copies of these files before installing Nix, you can restore them. Here are the instructions for bash and zsh files:
+
+   - Bash: Nix may have modified the `/etc/bash.bashrc` or `~/.bash_profile` file. If you have created a backup of this file before installing Nix, you can restore it using the following commands:
+
+     ```bash
+     sudo cp /etc/bash.bashrc.backup-before-nix /etc/bash.bashrc
+     sudo cp ~/.bash_profile.backup-before-nix ~/.bash_profile
+     ```
+
+     Note: After restoring the file, you may need to close and reopen any bash terminal sessions to ensure they are using the restored configurations.
+
+   - Zsh: Nix may have modified the `~/.zshrc` file. If you have created a backup of this file before installing Nix, you can restore it using the following command:
+
+     ```bash
+     sudo cp ~/.zshrc.backup-before-nix ~/.zshrc
+     ```
+
+     Note: After restoring the file, you may need to close and reopen any zsh terminal sessions to ensure they are using the restored configurations.
+
+
+### Step 2: Delete Nix Files
+
+1. Run the following command in a terminal to delete the files that Nix added to your system:
+   ```
+   sudo rm -rf "/etc/nix" "$NIX_ROOT" "$HOME/.nix-profile" "$HOME/.nix-defexpr" "$HOME/.nix-channels" "$HOME/.local/state/nix" "$HOME/.cache/nix" "$HOME/.nix-profile" "$HOME/.nix-defexpr" "$HOME/.nix-channels" "$HOME/.local/state/nix" "$HOME/.cache/nix"
+   ```
+
+You have successfully uninstalled Nix from your system. Remember to double-check the commands before executing them and ensure that you have the necessary permissions to perform the uninstallation steps.
+
+If you ever need to use Nix again in the future, you can reinstall it following the installation instructions provided by the Nix documentation.
+
 
 ## Multi User
 
