@@ -47,7 +47,7 @@ cp ./config.nix $flake1Dir/
 
 # Test upgrading from nix-env.
 nix-env -f ./user-envs.nix -i foo-1.0
-nix profile list | grep -A2 'Index:.*0' | grep 'Store paths:.*foo-1.0'
+nix profile list | grep -A2 'Name:.*foo' | grep 'Store paths:.*foo-1.0'
 nix profile install $flake1Dir -L
 nix profile list | grep -A4 'Index:.*1' | grep 'Locked flake URL:.*narHash'
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello World" ]]
@@ -81,7 +81,7 @@ nix profile rollback
 
 # Test uninstall.
 [ -e $TEST_HOME/.nix-profile/bin/foo ]
-nix profile remove 0
+nix profile remove foo
 (! [ -e $TEST_HOME/.nix-profile/bin/foo ])
 nix profile history | grep 'foo: 1.0 -> ∅'
 nix profile diff-closures | grep 'Version 3 -> 4'
@@ -92,6 +92,13 @@ nix profile install --file ./simple.nix ''
 nix profile remove 1
 nix profile install $(nix-build --no-out-link ./simple.nix)
 [[ $(cat $TEST_HOME/.nix-profile/hello) = "Hello World!" ]]
+
+# Test packages with same name from different sources
+mkdir $TEST_ROOT/simple-too
+cp ./simple.nix ./config.nix simple.builder.sh $TEST_ROOT/simple-too
+nix profile install --file $TEST_ROOT/simple-too/simple.nix ''
+nix profile list | grep -A4 'Name:.*simple' | grep 'Name:.*simple1'
+nix profile remove simple1
 
 # Test wipe-history.
 nix profile wipe-history
@@ -104,7 +111,7 @@ nix profile upgrade 0
 nix profile history | grep "packages.$system.default: 1.0, 1.0-man -> 3.0, 3.0-man"
 
 # Test new install of CA package.
-nix profile remove 0
+nix profile remove flake1
 printf 4.0 > $flake1Dir/version
 printf Utrecht > $flake1Dir/who
 nix profile install $flake1Dir
@@ -112,26 +119,26 @@ nix profile install $flake1Dir
 [[ $(nix path-info --json $(realpath $TEST_HOME/.nix-profile/bin/hello) | jq -r .[].ca) =~ fixed:r:sha256: ]]
 
 # Override the outputs.
-nix profile remove 0 1
+nix profile remove simple flake1
 nix profile install "$flake1Dir^*"
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello Utrecht" ]]
 [ -e $TEST_HOME/.nix-profile/share/man ]
 [ -e $TEST_HOME/.nix-profile/include ]
 
 printf Nix > $flake1Dir/who
-nix profile upgrade 0
+nix profile upgrade flake1
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello Nix" ]]
 [ -e $TEST_HOME/.nix-profile/share/man ]
 [ -e $TEST_HOME/.nix-profile/include ]
 
-nix profile remove 0
+nix profile remove flake1
 nix profile install "$flake1Dir^man"
 (! [ -e $TEST_HOME/.nix-profile/bin/hello ])
 [ -e $TEST_HOME/.nix-profile/share/man ]
 (! [ -e $TEST_HOME/.nix-profile/include ])
 
 # test priority
-nix profile remove 0
+nix profile remove flake1
 
 # Make another flake.
 flake2Dir=$TEST_ROOT/flake2
