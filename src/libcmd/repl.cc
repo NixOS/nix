@@ -1008,10 +1008,18 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
         }
         break;
 
-    case nFloat:
-        str << v.fpoint;
-        break;
+    case nFloat: {
+        std::streamsize p = str.precision();
 
+        // ensure "integer" values like 1.0 are represented as "1.0"
+        if (ceil(v.fpoint) == v.fpoint) {
+            str.precision(1);
+        }
+
+        str << std::fixed << v.fpoint;
+        str.precision(p);
+        break;
+    }
     case nThunk:
     case nExternal:
     default:
