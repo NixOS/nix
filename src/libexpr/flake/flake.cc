@@ -839,17 +839,19 @@ static void prim_flakeRefToString(EvalState & state, const PosIdx pos, Value * *
     state.forceAttrs(*args[0], noPos, "while evaluating the argument passed to builtins.flakeRefToString");
     fetchers::Attrs attrs;
     for (const auto & attr : *args[0]->attrs) {
-        fetchers::Attr value;
         switch (attr.value->type())
         {
             case nInt:
-                value = (uint64_t) attr.value->integer;
+                attrs.emplace(state.symbols[attr.name],
+                              (uint64_t) attr.value->integer);
                 break;
             case nBool:
-                value = Explicit(attr.value->boolean);
+                attrs.emplace(state.symbols[attr.name],
+                              Explicit<bool> { attr.value->boolean });
                 break;
             case nString:
-                value = std::string(attr.value->str());
+                attrs.emplace(state.symbols[attr.name],
+                              std::string(attr.value->str()));
                 break;
             case nThunk:
             case nFloat:
@@ -867,7 +869,6 @@ static void prim_flakeRefToString(EvalState & state, const PosIdx pos, Value * *
                     showType(*attr.value)).debugThrow<EvalError>();
                 break;
         }
-        attrs.emplace(state.symbols[attr.name], value);
     }
     auto flakeRef = FlakeRef::fromAttrs(attrs);
     v.mkString(flakeRef.to_string());
