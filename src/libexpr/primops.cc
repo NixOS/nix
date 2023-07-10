@@ -1502,6 +1502,8 @@ static RegisterPrimOp primop_storePath({
       in a new path (e.g. `/nix/store/ld01dnzc…-source-source`).
 
       Not available in [pure evaluation mode](@docroot@/command-ref/conf-file.md#conf-pure-eval).
+
+      See also [`builtins.fetchClosure`](#builtins-fetchClosure).
     )",
     .fun = prim_storePath,
 });
