@@ -793,7 +793,11 @@ static RegisterPrimOp r2({
     .experimentalFeature = Xp::Flakes,
 });
 
-static void prim_parseFlakeRef(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_parseFlakeRef(
+    EvalState & state,
+    const PosIdx pos,
+    Value * * args,
+    Value & v)
 {
     std::string flakeRefS(state.forceStringNoCtx(
         *args[0], pos,
@@ -834,40 +838,32 @@ static RegisterPrimOp r3({
 });
 
 
-static void prim_flakeRefToString(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+static void prim_flakeRefToString(
+    EvalState & state,
+    const PosIdx pos,
+    Value * * args,
+    Value & v)
 {
-    state.forceAttrs(*args[0], noPos, "while evaluating the argument passed to builtins.flakeRefToString");
+    state.forceAttrs(*args[0], noPos,
+        "while evaluating the argument passed to builtins.flakeRefToString");
     fetchers::Attrs attrs;
     for (const auto & attr : *args[0]->attrs) {
-        switch (attr.value->type())
-        {
-            case nInt:
-                attrs.emplace(state.symbols[attr.name],
-                              (uint64_t) attr.value->integer);
-                break;
-            case nBool:
-                attrs.emplace(state.symbols[attr.name],
-                              Explicit<bool> { attr.value->boolean });
-                break;
-            case nString:
-                attrs.emplace(state.symbols[attr.name],
-                              std::string(attr.value->str()));
-                break;
-            case nThunk:
-            case nFloat:
-            case nPath:
-            case nNull:
-            case nAttrs:
-            case nList:
-            case nFunction:
-            case nExternal:
-            default:
-                state.error(
-                    "flake-ref attr sets may only contain integers, booleans, "
-                    "and strings, but attribute %s is %s",
-                    state.symbols[attr.name],
-                    showType(*attr.value)).debugThrow<EvalError>();
-                break;
+        auto t = attr.value->type();
+        if (t == nInt) {
+            attrs.emplace(state.symbols[attr.name],
+                          (uint64_t) attr.value->integer);
+        } else if (t == nBool) {
+            attrs.emplace(state.symbols[attr.name],
+                          Explicit<bool> { attr.value->boolean });
+        } else if (t == nString) {
+            attrs.emplace(state.symbols[attr.name],
+                          std::string(attr.value->str()));
+        } else {
+            state.error(
+                "flake-ref attr sets may only contain integers, booleans, "
+                "and strings, but attribute %s is %s",
+                state.symbols[attr.name],
+                showType(*attr.value)).debugThrow<EvalError>();
         }
     }
     auto flakeRef = FlakeRef::fromAttrs(attrs);
