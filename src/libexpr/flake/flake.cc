@@ -799,8 +799,7 @@ static void prim_parseFlakeRef(
     Value * * args,
     Value & v)
 {
-    std::string flakeRefS(state.forceStringNoCtx(
-        *args[0], pos,
+    std::string flakeRefS(state.forceStringNoCtx(*args[0], pos,
         "while evaluating the argument passed to builtins.parseFlakeRef"));
     auto attrs = parseFlakeRef(flakeRefS, {}, true).toAttrs();
     auto binds = state.buildBindings(attrs.size());
