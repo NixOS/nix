@@ -663,7 +663,7 @@ Expr * EvalState::parse(
     ParseData data {
         .state = *this,
         .symbols = symbols,
-        .basePath = std::move(basePath),
+        .basePath = basePath,
         .origin = {origin},
     };
 
