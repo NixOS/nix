@@ -498,7 +498,7 @@ ErrorBuilder & ErrorBuilder::withFrame(const Env & env, const Expr & expr)
 
 
 EvalState::EvalState(
-    const Strings & _searchPath,
+    const SearchPath & _searchPath,
     ref<Store> store,
     std::shared_ptr<Store> buildStore)
     : sWith(symbols.create("<with>"))
@@ -563,30 +563,32 @@ EvalState::EvalState(
 
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
-        for (auto & i : _searchPath) addToSearchPath(i);
-        for (auto & i : evalSettings.nixPath.get()) addToSearchPath(i);
+        for (auto & i : _searchPath.elements)
+            addToSearchPath(SearchPath::Elem {i});
+        for (auto & i : evalSettings.nixPath.get())
+            addToSearchPath(SearchPath::Elem::parse(i));
     }
 
     if (evalSettings.restrictEval || evalSettings.pureEval) {
         allowedPaths = PathSet();
 
-        for (auto & i : searchPath) {
-            auto r = resolveSearchPathElem(i);
-            if (!r.first) continue;
+        for (auto & i : searchPath.elements) {
+            auto r = resolveSearchPathPath(i.path);
+            if (!r) continue;
 
-            auto path = r.second;
+            auto path = *std::move(r);
 
-            if (store->isInStore(r.second)) {
+            if (store->isInStore(path)) {
                 try {
                     StorePathSet closure;
-                    store->computeFSClosure(store->toStorePath(r.second).first, closure);
+                    store->computeFSClosure(store->toStorePath(path).first, closure);
                     for (auto & path : closure)
                         allowPath(path);
                 } catch (InvalidPath &) {
-                    allowPath(r.second);
+                    allowPath(path);
                 }
             } else
-                allowPath(r.second);
+                allowPath(path);
         }
     }
 

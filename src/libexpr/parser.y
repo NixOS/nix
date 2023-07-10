@@ -734,22 +734,9 @@ Expr * EvalState::parseStdin()
 }
 
 
-void EvalState::addToSearchPath(const std::string & s)
+void EvalState::addToSearchPath(SearchPath::Elem && elem)
 {
-    size_t pos = s.find('=');
-    std::string prefix;
-    Path path;
-    if (pos == std::string::npos) {
-        path = s;
-    } else {
-        prefix = std::string(s, 0, pos);
-        path = std::string(s, pos + 1);
-    }
-
-    searchPath.emplace_back(SearchPathElem {
-        .prefix = prefix,
-        .path = path,
-    });
+    searchPath.elements.emplace_back(std::move(elem));
 }
 
 
@@ -759,22 +746,19 @@ SourcePath EvalState::findFile(const std::string_view path)
 }
 
 
-SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view path, const PosIdx pos)
+SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_view path, const PosIdx pos)
 {
-    for (auto & i : searchPath) {
-        std::string suffix;
-        if (i.prefix.empty())
-            suffix = concatStrings("/", path);
-        else {
-            auto s = i.prefix.size();
-            if (path.compare(0, s, i.prefix) != 0 ||
-                (path.size() > s && path[s] != '/'))
-                continue;
-            suffix = path.size() == s ? "" : concatStrings("/", path.substr(s));
-        }
-        auto r = resolveSearchPathElem(i);
-        if (!r.first) continue;
-        Path res = r.second + suffix;
+    for (auto & i : searchPath.elements) {
+        auto suffixOpt = i.prefix.suffixIfPotentialMatch(path);
+
+        if (!suffixOpt) continue;
+        auto suffix = *suffixOpt;
+
+        auto rOpt = resolveSearchPathPath(i.path);
+        if (!rOpt) continue;
+        auto r = *rOpt;
+
+        Path res = suffix == "" ? r : concatStrings(r, "/", suffix);
         if (pathExists(res)) return CanonPath(canonPath(res));
     }
 
@@ -791,49 +775,53 @@ SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view p
 }
 
 
-std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathElem & elem)
+std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Path & value0)
 {
-    auto i = searchPathResolved.find(elem.path);
+    auto & value = value0.s;
+    auto i = searchPathResolved.find(value);
     if (i != searchPathResolved.end()) return i->second;
 
-    std::pair<bool, std::string> res;
+    std::optional<std::string> res;
 
-    if (EvalSettings::isPseudoUrl(elem.path)) {
+    if (EvalSettings::isPseudoUrl(value)) {
         try {
             auto storePath = fetchers::downloadTarball(
-                store, EvalSettings::resolvePseudoUrl(elem.path), "source", false).tree.storePath;
-            res = { true, store->toRealPath(storePath) };
+                store, EvalSettings::resolvePseudoUrl(value), "source", false).tree.storePath;
+            res = { store->toRealPath(storePath) };
         } catch (FileTransferError & e) {
             logWarning({
-                .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.path)
+                .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)
             });
-            res = { false, "" };
+            res = std::nullopt;
         }
     }
 
-    else if (hasPrefix(elem.path, "flake:")) {
+    else if (hasPrefix(value, "flake:")) {
         experimentalFeatureSettings.require(Xp::Flakes);
-        auto flakeRef = parseFlakeRef(elem.path.substr(6), {}, true, false);
-        debug("fetching flake search path element '%s''", elem.path);
+        auto flakeRef = parseFlakeRef(value.substr(6), {}, true, false);
+        debug("fetching flake search path element '%s''", value);
         auto storePath = flakeRef.resolve(store).fetchTree(store).first.storePath;
-        res = { true, store->toRealPath(storePath) };
+        res = { store->toRealPath(storePath) };
     }
 
     else {
-        auto path = absPath(elem.path);
+        auto path = absPath(value);
         if (pathExists(path))
-            res = { true, path };
+            res = { path };
         else {
             logWarning({
-                .msg = hintfmt("Nix search path entry '%1%' does not exist, ignoring", elem.path)
+                .msg = hintfmt("Nix search path entry '%1%' does not exist, ignoring", value)
             });
-            res = { false, "" };
+            res = std::nullopt;
         }
     }
 
-    debug("resolved search path element '%s' to '%s'", elem.path, res.second);
+    if (res)
+        debug("resolved search path element '%s' to '%s'", value, *res);
+    else
+        debug("failed to resolve search path element '%s'", value);
 
-    searchPathResolved[elem.path] = res;
+    searchPathResolved[value] = res;
     return res;
 }
 
