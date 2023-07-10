@@ -100,7 +100,10 @@ Settings::Settings()
     if (!pathExists(nixExePath)) {
         nixExePath = getSelfExe().value_or("nix");
     }
-    buildHook = nixExePath + " __build-remote";
+    buildHook = {
+        nixExePath,
+        "__build-remote",
+    };
 }
 
 void loadConfFile()

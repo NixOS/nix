@@ -20,22 +20,30 @@ This operation deletes the specified generations of the current profile.
 
 - The special value <span id="generations-old">`old`</span>
 
-  Delete all generations older than the current one.
+  Delete all generations except the current one.
 
-- <span id="generations-days">`<days>d`</span>:\
-  The last *days* days
+  > **WARNING**
+  >
+  > Older *and newer* generations will be deleted by this operation.
+  >
+  > One might expect this to just delete older generations than the curent one, but that is only true if the current generation is also the latest.
+  > Because one can roll back to a previous generation, it is possible to have generations newer than the current one.
+  > They will also be deleted.
+
+- <span id="generations-time">`<number>d`</span>:\
+  The last *number* days
 
   *Example*: `30d`
 
-  Delete all generations older than *days* days.
-  The generation that was active at that point in time is excluded, and will not be deleted.
+  Delete all generations created more than *number* days ago, except the most recent one of them.
+  This allows rolling back to generations that were available within the specified period.
 
-- <span id="generations-count">`+<count>`</span>:\
-  The last *count* generations up to the present
+- <span id="generations-count">`+<number>`</span>:\
+  The last *number* generations up to the present
 
   *Example*: `+5`
 
-  Keep the last *count* generations, along with any newer than current.
+  Keep the last *number* generations, along with any newer than current.
 
 Periodically deleting old generations is important to make garbage collection
 effective.
@@ -61,7 +69,7 @@ $ nix-env --delete-generations 3 4 8
 
 Delete the generations numbered 3, 4, and 8, so long as the current active generation is not any of those.
 
-## Keep most-recent by count count
+## Keep most-recent by count (number of generations)
 
 ```console
 $ nix-env --delete-generations +5
@@ -72,7 +80,7 @@ Suppose `30` is the current generation, and we currently have generations number
 Then this command will delete generations `20` through `25` (`<= 30 - 5`),
 and keep generations `26` through `31` (`> 30 - 5`).
 
-## Keep most-recent in days
+## Keep most-recent by time (number of days)
 
 ```console
 $ nix-env --delete-generations 30d

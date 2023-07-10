@@ -236,7 +236,7 @@ public:
         )",
         {"build-timeout"}};
 
-    PathSetting buildHook{this, true, "", "build-hook",
+    Setting<Strings> buildHook{this, {}, "build-hook",
         R"(
           The path to the helper program that executes remote builds.
 
@@ -575,8 +575,8 @@ public:
           line.
         )"};
 
-    PathSetting diffHook{
-        this, true, "", "diff-hook",
+    OptionalPathSetting diffHook{
+        this, std::nullopt, "diff-hook",
         R"(
           Absolute path to an executable capable of diffing build
           results. The hook is executed if `run-diff-hook` is true, and the
@@ -719,8 +719,8 @@ public:
 
           At least one of the following conditions must be met for Nix to use a substituter:
 
-          - the substituter is in the [`trusted-substituters`](#conf-trusted-substituters) list
-          - the user calling Nix is in the [`trusted-users`](#conf-trusted-users) list
+          - The substituter is in the [`trusted-substituters`](#conf-trusted-substituters) list
+          - The user calling Nix is in the [`trusted-users`](#conf-trusted-users) list
 
           In addition, each store path should be trusted as described in [`trusted-public-keys`](#conf-trusted-public-keys)
         )",
@@ -729,12 +729,10 @@ public:
     Setting<StringSet> trustedSubstituters{
         this, {}, "trusted-substituters",
         R"(
-          A list of [URLs of Nix stores](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format),
-          separated by whitespace. These are
-          not used by default, but can be enabled by users of the Nix daemon
-          by specifying `--option substituters urls` on the command
-          line. Unprivileged users are only allowed to pass a subset of the
-          URLs listed in `substituters` and `trusted-substituters`.
+          A list of [Nix store URLs](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format), separated by whitespace.
+          These are not used by default, but users of the Nix daemon can enable them by specifying [`substituters`](#conf-substituters).
+
+          Unprivileged users (those set in only [`allowed-users`](#conf-allowed-users) but not [`trusted-users`](#conf-trusted-users)) can pass as `substituters` only those URLs listed in `trusted-substituters`.
         )",
         {"trusted-binary-caches"}};
 

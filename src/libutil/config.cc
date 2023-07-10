@@ -219,29 +219,6 @@ void AbstractSetting::convertToArg(Args & args, const std::string & category)
 {
 }
 
-template<typename T>
-void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
-{
-    args.addFlag({
-        .longName = name,
-        .description = fmt("Set the `%s` setting.", name),
-        .category = category,
-        .labels = {"value"},
-        .handler = {[this](std::string s) { overridden = true; set(s); }},
-        .experimentalFeature = experimentalFeature,
-    });
-
-    if (isAppendable())
-        args.addFlag({
-            .longName = "extra-" + name,
-            .description = fmt("Append to the `%s` setting.", name),
-            .category = category,
-            .labels = {"value"},
-            .handler = {[this](std::string s) { overridden = true; set(s, true); }},
-            .experimentalFeature = experimentalFeature,
-        });
-}
-
 template<> std::string BaseSetting<std::string>::parse(const std::string & str) const
 {
     return str;
@@ -252,21 +229,17 @@ template<> std::string BaseSetting<std::string>::to_string() const
     return value;
 }
 
-template<typename T>
-T BaseSetting<T>::parse(const std::string & str) const
+template<> std::optional<std::string> BaseSetting<std::optional<std::string>>::parse(const std::string & str) const
 {
-    static_assert(std::is_integral<T>::value, "Integer required.");
-    if (auto n = string2Int<T>(str))
-        return *n;
+    if (str == "")
+        return std::nullopt;
     else
-        throw UsageError("setting '%s' has invalid value '%s'", name, str);
+        return { str };
 }
 
-template<typename T>
-std::string BaseSetting<T>::to_string() const
+template<> std::string BaseSetting<std::optional<std::string>>::to_string() const
 {
-    static_assert(std::is_integral<T>::value, "Integer required.");
-    return std::to_string(value);
+    return value ? *value : "";
 }
 
 template<> bool BaseSetting<bool>::parse(const std::string & str) const
@@ -403,15 +376,25 @@ template class BaseSetting<StringSet>;
 template class BaseSetting<StringMap>;
 template class BaseSetting<std::set<ExperimentalFeature>>;
 
+static Path parsePath(const AbstractSetting & s, const std::string & str)
+{
+    if (str == "")
+        throw UsageError("setting '%s' is a path and paths cannot be empty", s.name);
+    else
+        return canonPath(str);
+}
+
 Path PathSetting::parse(const std::string & str) const
 {
-    if (str == "") {
-        if (allowEmpty)
-            return "";
-        else
-            throw UsageError("setting '%s' cannot be empty", name);
-    } else
-        return canonPath(str);
+    return parsePath(*this, str);
+}
+
+std::optional<Path> OptionalPathSetting::parse(const std::string & str) const
+{
+    if (str == "")
+        return std::nullopt;
+    else
+        return parsePath(*this, str);
 }
 
 bool GlobalConfig::set(const std::string & name, const std::string & value)

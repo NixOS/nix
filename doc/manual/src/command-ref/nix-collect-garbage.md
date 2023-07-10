@@ -57,7 +57,7 @@ These options are for deleting old [profiles] prior to deleting unreachable [sto
   Delete all generations of profiles older than the specified amount (except for the generations that were active at that point in time).
   *period* is a value such as `30d`, which would mean 30 days.
 
-  This is the equivalent of invoking [`nix-env --delete-generations <period>`](@docroot@/command-ref/nix-env/delete-generations.md#generations-days) on each found profile.
+  This is the equivalent of invoking [`nix-env --delete-generations <period>`](@docroot@/command-ref/nix-env/delete-generations.md#generations-time) on each found profile.
   See the documentation of that command for additional information about the *period* argument.
 
 {{#include ./opt-common.md}}

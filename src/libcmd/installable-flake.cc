@@ -151,7 +151,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
             },
             ExtraPathInfoFlake::Flake {
                 .originalRef = flakeRef,
-                .resolvedRef = getLockedFlake()->flake.lockedRef,
+                .lockedRef = getLockedFlake()->flake.lockedRef,
             }),
     }};
 }

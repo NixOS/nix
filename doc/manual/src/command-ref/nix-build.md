@@ -70,6 +70,8 @@ except for `--arg` and `--attr` / `-A` which are passed to [`nix-instantiate`](n
     Change the name of the symlink to the output path created from
     `result` to *outlink*.
 
+{{#include ./status-build-failure.md}}
+
 {{#include ./opt-common.md}}
 
 {{#include ./env-common.md}}

@@ -788,9 +788,6 @@ static RegisterPrimOp r2({
       ```nix
       (builtins.getFlake "github:edolstra/dwarffs").rev
       ```
-
-      This function is only available if you enable the experimental feature
-      `flakes`.
     )",
     .fun = prim_getFlake,
     .experimentalFeature = Xp::Flakes,

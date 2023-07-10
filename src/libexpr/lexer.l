@@ -36,7 +36,7 @@ static inline PosIdx makeCurPos(const YYLTYPE & loc, ParseData * data)
 #define CUR_POS makeCurPos(*yylloc, data)
 
 // backup to recover from yyless(0)
-YYLTYPE prev_yylloc;
+thread_local YYLTYPE prev_yylloc;
 
 static void initLoc(YYLTYPE * loc)
 {
