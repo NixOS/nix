@@ -524,7 +524,7 @@ public:
     Setting<bool> sandboxFallback{this, true, "sandbox-fallback",
         "Whether to disable sandboxing when the kernel doesn't allow it."};
 
-    Setting<bool> dropSupplementaryGroups{this, getuid() == 0, "drop-supplementary-groups",
+    Setting<bool> requireDropSupplementaryGroups{this, true, "require-drop-supplementary-groups",
         R"(
           Whether to drop supplementary groups when building with sandboxing.
           This is normally a good idea if we are root and have the capability to
