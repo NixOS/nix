@@ -524,7 +524,7 @@ public:
     Setting<bool> sandboxFallback{this, true, "sandbox-fallback",
         "Whether to disable sandboxing when the kernel doesn't allow it."};
 
-    Setting<bool> requireDropSupplementaryGroups{this, true, "require-drop-supplementary-groups",
+    Setting<bool> requireDropSupplementaryGroups{this, getuid() == 0, "require-drop-supplementary-groups",
         R"(
           Following the principle of least privilege,
           Nix will attempt to drop supplementary groups when building with sandboxing.
