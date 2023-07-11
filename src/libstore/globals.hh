@@ -536,6 +536,10 @@ public:
           If you encounter such a failure, setting this option to `false` will let you ignore it and continue.
           But before doing so, you should consider the security implications carefully.
           Not dropping supplementary groups means the build sandbox will be less restricted than intended.
+
+          This option defaults to `true` when the user is root
+          (since root usually has permissions to call setgroups)
+          and `false` otherwise.
         )"};
 
 #if __linux__
