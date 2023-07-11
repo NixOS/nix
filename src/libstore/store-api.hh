@@ -114,7 +114,7 @@ struct StoreConfig : public Config
         return "";
     }
 
-    const PathSetting storeDir_{this, false, settings.nixStore,
+    const PathSetting storeDir_{this, settings.nixStore,
         "store",
         R"(
           Logical location of the Nix store, usually
@@ -679,8 +679,7 @@ public:
      * Repair the contents of the given path by redownloading it using
      * a substituter (if available).
      */
-    virtual void repairPath(const StorePath & path)
-    { unsupported("repairPath"); }
+    virtual void repairPath(const StorePath & path);
 
     /**
      * Add signatures to the specified store path. The signatures are

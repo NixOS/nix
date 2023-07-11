@@ -11,7 +11,7 @@ The following options are allowed for all `nix-store` operations, but may not al
   be created in `/nix/var/nix/gcroots/auto/`. For instance,
 
   ```console
-  $ nix-store --add-root /home/eelco/bla/result -r ...
+  $ nix-store --add-root /home/eelco/bla/result --realise ...
 
   $ ls -l /nix/var/nix/gcroots/auto
   lrwxrwxrwx    1 ... 2005-03-13 21:10 dn54lcypm8f8... -> /home/eelco/bla/result

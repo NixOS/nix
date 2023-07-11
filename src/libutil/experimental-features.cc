@@ -12,7 +12,7 @@ struct ExperimentalFeatureDetails
     std::string_view description;
 };
 
-constexpr std::array<ExperimentalFeatureDetails, 13> xpFeatureDetails = {{
+constexpr std::array<ExperimentalFeatureDetails, 15> xpFeatureDetails = {{
     {
         .tag = Xp::CaDerivations,
         .name = "ca-derivations",
@@ -50,6 +50,8 @@ constexpr std::array<ExperimentalFeatureDetails, 13> xpFeatureDetails = {{
             or other impure derivations can rely on impure derivations. Finally,
             an impure derivation cannot also be
             [content-addressed](#xp-feature-ca-derivations).
+
+            This is a more explicit alternative to using [`builtins.currentTime`](@docroot@/language/builtin-constants.md#builtins-currentTime).
         )",
     },
     {
@@ -207,6 +209,23 @@ constexpr std::array<ExperimentalFeatureDetails, 13> xpFeatureDetails = {{
 
               - "text hashing" derivation outputs, so we can build .drv
                 files.
+
+              - dependencies in derivations on the outputs of
+                derivations that are themselves derivations outputs.
+        )",
+    },
+    {
+        .tag = Xp::ParseTomlTimestamps,
+        .name = "parse-toml-timestamps",
+        .description = R"(
+            Allow parsing of timestamps in builtins.fromTOML.
+        )",
+    },
+    {
+        .tag = Xp::ReadOnlyLocalStore,
+        .name = "read-only-local-store",
+        .description = R"(
+            Allow the use of the `read-only` parameter in [local store](@docroot@/command-ref/new-cli/nix3-help-stores.md#local-store) URIs.
         )",
     },
 }};
@@ -243,7 +262,7 @@ std::string_view showExperimentalFeature(const ExperimentalFeature tag)
     return xpFeatureDetails[(size_t)tag].name;
 }
 
-nlohmann::json documentExperimentalFeatures() 
+nlohmann::json documentExperimentalFeatures()
 {
     StringMap res;
     for (auto & xpFeature : xpFeatureDetails)

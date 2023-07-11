@@ -1,12 +1,11 @@
 # Nix Language
 
-The Nix language is
+The Nix language is designed for conveniently creating and composing *derivations* – precise descriptions of how contents of existing files are used to derive new files.
+It is:
 
 - *domain-specific*
 
-  It only exists for the Nix package manager:
-  to describe packages and configurations as well as their variants and compositions.
-  It is not intended for general purpose use.
+  It comes with [built-in functions](@docroot@/language/builtins.md) to integrate with the Nix store, which manages files and performs the derivations declared in the Nix language.
 
 - *declarative*
 
@@ -25,7 +24,7 @@ The Nix language is
 
 - *lazy*
 
-  Expressions are only evaluated when their value is needed.
+  Values are only computed when they are needed.
 
 - *dynamically typed*
 

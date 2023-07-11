@@ -4,13 +4,12 @@
 #include "worker.hh"
 #include "builtins.hh"
 #include "builtins/buildenv.hh"
-#include "references.hh"
+#include "path-references.hh"
 #include "finally.hh"
 #include "util.hh"
 #include "archive.hh"
 #include "compression.hh"
 #include "daemon.hh"
-#include "worker-protocol.hh"
 #include "topo-sort.hh"
 #include "callback.hh"
 #include "json-utils.hh"
@@ -65,8 +64,9 @@ void handleDiffHook(
     const Path & tryA, const Path & tryB,
     const Path & drvPath, const Path & tmpDir)
 {
-    auto diffHook = settings.diffHook;
-    if (diffHook != "" && settings.runDiffHook) {
+    auto & diffHookOpt = settings.diffHook.get();
+    if (diffHookOpt && settings.runDiffHook) {
+        auto & diffHook = *diffHookOpt;
         try {
             auto diffRes = runProgram(RunOptions {
                 .program = diffHook,
@@ -357,7 +357,7 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
         for (auto & [_, status] : initialOutputs) {
             if (!status.known) continue;
             if (buildMode != bmCheck && status.known->isValid()) continue;
-            auto p = worker.store.printStorePath(status.known->path);
+            auto p = worker.store.toRealPath(status.known->path);
             if (pathExists(chrootRootDir + p))
                 renameFile((chrootRootDir + p), p);
         }
@@ -395,8 +395,9 @@ static void linkOrCopy(const Path & from, const Path & to)
            bind-mount in this case?
 
            It can also fail with EPERM in BeegFS v7 and earlier versions
+           or fail with EXDEV in OpenAFS
            which don't allow hard-links to other directories */
-        if (errno != EMLINK && errno != EPERM)
+        if (errno != EMLINK && errno != EPERM && errno != EXDEV)
             throw SysError("linking '%s' to '%s'", to, from);
         copyPath(from, to);
     }
@@ -1423,7 +1424,8 @@ void LocalDerivationGoal::startDaemon()
     Store::Params params;
     params["path-info-cache-size"] = "0";
     params["store"] = worker.store.storeDir;
-    params["root"] = getLocalStore().rootDir;
+    if (auto & optRoot = getLocalStore().rootDir.get())
+        params["root"] = *optRoot;
     params["state"] = "/no-such-path";
     params["log"] = "/no-such-path";
     auto store = make_ref<RestrictedStore>(params,
@@ -1452,7 +1454,7 @@ void LocalDerivationGoal::startDaemon()
                 (struct sockaddr *) &remoteAddr, &remoteAddrLen);
             if (!remote) {
                 if (errno == EINTR || errno == EAGAIN) continue;
-                if (errno == EINVAL) break;
+                if (errno == EINVAL || errno == ECONNABORTED) break;
                 throw SysError("accepting connection");
             }
 
@@ -1482,8 +1484,22 @@ void LocalDerivationGoal::startDaemon()
 
 void LocalDerivationGoal::stopDaemon()
 {
-    if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1)
-        throw SysError("shutting down daemon socket");
+    if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1) {
+        // According to the POSIX standard, the 'shutdown' function should
+        // return an ENOTCONN error when attempting to shut down a socket that
+        // hasn't been connected yet. This situation occurs when the 'accept'
+        // function is called on a socket without any accepted connections,
+        // leaving the socket unconnected. While Linux doesn't seem to produce
+        // an error for sockets that have only been accepted, more
+        // POSIX-compliant operating systems like OpenBSD, macOS, and others do
+        // return the ENOTCONN error. Therefore, we handle this error here to
+        // avoid raising an exception for compliant behaviour.
+        if (errno == ENOTCONN) {
+            daemonSocket.close();
+        } else {
+            throw SysError("shutting down daemon socket");
+        }
+    }
 
     if (daemonThread.joinable())
         daemonThread.join();
@@ -1494,7 +1510,8 @@ void LocalDerivationGoal::stopDaemon()
         thread.join();
     daemonWorkerThreads.clear();
 
-    daemonSocket = -1;
+    // release the socket.
+    daemonSocket.close();
 }
 
 
@@ -1771,6 +1788,9 @@ void LocalDerivationGoal::runChild()
                 for (auto & path : { "/etc/resolv.conf", "/etc/services", "/etc/hosts" })
                     if (pathExists(path))
                         ss.push_back(path);
+
+                if (settings.caFile != "")
+                    dirsInChroot.try_emplace("/etc/ssl/certs/ca-certificates.crt", settings.caFile, true);
             }
 
             for (auto & i : ss) dirsInChroot.emplace(i, i);
@@ -2371,18 +2391,21 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             continue;
         auto references = *referencesOpt;
 
-        auto rewriteOutput = [&]() {
+        auto rewriteOutput = [&](const StringMap & rewrites) {
             /* Apply hash rewriting if necessary. */
-            if (!outputRewrites.empty()) {
+            if (!rewrites.empty()) {
                 debug("rewriting hashes in '%1%'; cross fingers", actualPath);
 
-                /* FIXME: this is in-memory. */
-                StringSink sink;
-                dumpPath(actualPath, sink);
+                /* FIXME: Is this actually streaming? */
+                auto source = sinkToSource([&](Sink & nextSink) {
+                    RewritingSink rsink(rewrites, nextSink);
+                    dumpPath(actualPath, rsink);
+                    rsink.flush();
+                });
+                Path tmpPath = actualPath + ".tmp";
+                restorePath(tmpPath, *source);
                 deletePath(actualPath);
-                sink.s = rewriteStrings(sink.s, outputRewrites);
-                StringSource source(sink.s);
-                restorePath(actualPath, source);
+                movePath(tmpPath, actualPath);
 
                 /* FIXME: set proper permissions in restorePath() so
                    we don't have to do another traversal. */
@@ -2431,7 +2454,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                         "since recursive hashing is not enabled (one of outputHashMode={flat,text} is true)",
                         actualPath);
             }
-            rewriteOutput();
+            rewriteOutput(outputRewrites);
             /* FIXME optimize and deduplicate with addToStore */
             std::string oldHashPart { scratchPath->hashPart() };
             HashModuloSink caSink { outputHash.hashType, oldHashPart };
@@ -2469,16 +2492,14 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 Hash::dummy,
             };
             if (*scratchPath != newInfo0.path) {
-                // Also rewrite the output path
-                auto source = sinkToSource([&](Sink & nextSink) {
-                    RewritingSink rsink2(oldHashPart, std::string(newInfo0.path.hashPart()), nextSink);
-                    dumpPath(actualPath, rsink2);
-                    rsink2.flush();
-                });
-                Path tmpPath = actualPath + ".tmp";
-                restorePath(tmpPath, *source);
-                deletePath(actualPath);
-                movePath(tmpPath, actualPath);
+                // If the path has some self-references, we need to rewrite
+                // them.
+                // (note that this doesn't invalidate the ca hash we calculated
+                // above because it's computed *modulo the self-references*, so
+                // it already takes this rewrite into account).
+                rewriteOutput(
+                    StringMap{{oldHashPart,
+                               std::string(newInfo0.path.hashPart())}});
             }
 
             HashResult narHashAndSize = hashPath(htSHA256, actualPath);
@@ -2500,7 +2521,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                     outputRewrites.insert_or_assign(
                         std::string { scratchPath->hashPart() },
                         std::string { requiredFinalPath.hashPart() });
-                rewriteOutput();
+                rewriteOutput(outputRewrites);
                 auto narHashAndSize = hashPath(htSHA256, actualPath);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;

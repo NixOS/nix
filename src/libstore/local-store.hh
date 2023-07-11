@@ -46,6 +46,23 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
         "require-sigs",
         "Whether store paths copied into this store should have a trusted signature."};
 
+    Setting<bool> readOnly{(StoreConfig*) this,
+        false,
+        "read-only",
+        R"(
+          Allow this store to be opened when its [database](@docroot@/glossary.md#gloss-nix-database) is on a read-only filesystem.
+
+          Normally Nix will attempt to open the store database in read-write mode, even for querying (when write access is not needed), causing it to fail if the database is on a read-only filesystem.
+
+          Enable read-only mode to disable locking and open the SQLite database with the [`immutable` parameter](https://www.sqlite.org/c3ref/open.html) set.
+
+          > **Warning**
+          > Do not use this unless the filesystem is read-only.
+          >
+          > Using it when the filesystem is writable can cause incorrect query results or corruption errors if the database is changed by another process.
+          > While the filesystem the database resides on might appear to be read-only, consider whether another user or system might have write access to it.
+        )"};
+
     const std::string name() override { return "Local Store"; }
 
     std::string doc() override;
@@ -240,8 +257,6 @@ public:
 
     void vacuumDB();
 
-    void repairPath(const StorePath & path) override;
-
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
     /**
@@ -271,6 +286,10 @@ public:
 
 private:
 
+    /**
+     * Retrieve the current version of the database schema.
+     * If the database does not exist yet, the version returned will be 0.
+     */
     int getSchema();
 
     void openDB(State & state, bool create);

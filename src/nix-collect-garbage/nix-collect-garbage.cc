@@ -41,9 +41,10 @@ void removeOldGenerations(std::string dir)
             }
             if (link.find("link") != std::string::npos) {
                 printInfo("removing old generations of profile %s", path);
-                if (deleteOlderThan != "")
-                    deleteGenerationsOlderThan(path, deleteOlderThan, dryRun);
-                else
+                if (deleteOlderThan != "") {
+                    auto t = parseOlderThanTimeSpec(deleteOlderThan);
+                    deleteGenerationsOlderThan(path, t, dryRun);
+                } else
                     deleteOldGenerations(path, dryRun);
             }
         } else if (type == DT_DIR) {
@@ -77,7 +78,12 @@ static int main_nix_collect_garbage(int argc, char * * argv)
             return true;
         });
 
-        if (removeOld) removeOldGenerations(profilesDir());
+        if (removeOld) {
+            std::set<Path> dirsToClean = {
+                profilesDir(), settings.nixStateDir + "/profiles", dirOf(getDefaultProfile())};
+            for (auto & dir : dirsToClean)
+                removeOldGenerations(dir);
+        }
 
         // Run the actual garbage collector.
         if (!dryRun) {

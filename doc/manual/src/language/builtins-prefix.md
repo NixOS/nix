@@ -3,7 +3,7 @@
 This section lists the functions built into the Nix language evaluator.
 All built-in functions are available through the global [`builtins`](./builtin-constants.md#builtins-builtins) constant.
 
-For convenience, some built-ins are can be accessed directly:
+For convenience, some built-ins can be accessed directly:
 
 - [`derivation`](#builtins-derivation)
 - [`import`](#builtins-import)

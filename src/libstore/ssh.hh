@@ -28,6 +28,7 @@ private:
     Sync<State> state_;
 
     void addCommonSSHOpts(Strings & args);
+    bool isMasterRunning();
 
 public:
 

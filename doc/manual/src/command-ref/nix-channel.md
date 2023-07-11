@@ -4,7 +4,7 @@
 
 # Synopsis
 
-`nix-channel` {`--add` url [*name*] | `--remove` *name* | `--list` | `--update` [*names…*] | `--rollback` [*generation*] }
+`nix-channel` {`--add` url [*name*] | `--remove` *name* | `--list` | `--update` [*names…*] | `--list-generations` | `--rollback` [*generation*] }
 
 # Description
 
@@ -39,6 +39,15 @@ This command has the following operations:
     for `nix-env` operations (by symlinking them from the directory
     `~/.nix-defexpr`).
 
+  - `--list-generations`\
+    Prints a list of all the current existing generations for the
+    channel profile.
+
+    Works the same way as
+    ```
+    nix-env --profile /nix/var/nix/profiles/per-user/$USER/channels --list-generations
+    ```
+
   - `--rollback` \[*generation*\]\
     Reverts the previous call to `nix-channel
                     --update`. Optionally, you can specify a specific channel generation
@@ -52,6 +61,12 @@ The list of subscribed channels is stored in `~/.nix-channels`.
 
 {{#include ./env-common.md}}
 
+# Files
+
+`nix-channel` operates on the following files.
+
+{{#include ./files/channels.md}}
+
 # Examples
 
 To subscribe to the Nixpkgs channel and install the GNU Hello package:
@@ -59,18 +74,18 @@ To subscribe to the Nixpkgs channel and install the GNU Hello package:
 ```console
 $ nix-channel --add https://nixos.org/channels/nixpkgs-unstable
 $ nix-channel --update
-$ nix-env -iA nixpkgs.hello
+$ nix-env --install --attr nixpkgs.hello
 ```
 
 You can revert channel updates using `--rollback`:
 
 ```console
-$ nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
+$ nix-instantiate --eval --expr '(import <nixpkgs> {}).lib.version'
 "14.04.527.0e935f1"
 
 $ nix-channel --rollback
 switching from generation 483 to 482
 
-$ nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
+$ nix-instantiate --eval --expr '(import <nixpkgs> {}).lib.version'
 "14.04.526.dbadfad"
 ```

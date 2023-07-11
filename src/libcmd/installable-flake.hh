@@ -19,7 +19,7 @@ struct ExtraPathInfoFlake : ExtraPathInfoValue
      */
     struct Flake {
         FlakeRef originalRef;
-        FlakeRef resolvedRef;
+        FlakeRef lockedRef;
     };
 
     Flake flake;

@@ -266,6 +266,17 @@ bool pathExists(const Path & path)
     return false;
 }
 
+bool pathAccessible(const Path & path)
+{
+    try {
+        return pathExists(path);
+    } catch (SysError & e) {
+        // swallow EPERM
+        if (e.errNo == EPERM) return false;
+        throw;
+    }
+}
+
 
 Path readLink(const Path & path)
 {
@@ -1141,9 +1152,9 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
 }
 
 std::string runProgram(Path program, bool searchPath, const Strings & args,
-    const std::optional<std::string> & input)
+    const std::optional<std::string> & input, bool isInteractive)
 {
-    auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input});
+    auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input, .isInteractive = isInteractive});
 
     if (!statusOk(res.first))
         throw ExecError(res.first, "program '%1%' %2%", program, statusToString(res.first));
@@ -1192,6 +1203,16 @@ void runProgram2(const RunOptions & options)
     // be shared (technically this is undefined, but in practice that's the
     // case), so we can't use it if we alter the environment
     processOptions.allowVfork = !options.environment;
+
+    std::optional<Finally<std::function<void()>>> resumeLoggerDefer;
+    if (options.isInteractive) {
+        logger->pause();
+        resumeLoggerDefer.emplace(
+            []() {
+                logger->resume();
+            }
+        );
+    }
 
     /* Fork. */
     Pid pid = startProcess([&]() {
@@ -1832,6 +1853,7 @@ void setStackSize(size_t stackSize)
 
 #if __linux__
 static AutoCloseFD fdSavedMountNamespace;
+static AutoCloseFD fdSavedRoot;
 #endif
 
 void saveMountNamespace()
@@ -1839,10 +1861,11 @@ void saveMountNamespace()
 #if __linux__
     static std::once_flag done;
     std::call_once(done, []() {
-        AutoCloseFD fd = open("/proc/self/ns/mnt", O_RDONLY);
-        if (!fd)
+        fdSavedMountNamespace = open("/proc/self/ns/mnt", O_RDONLY);
+        if (!fdSavedMountNamespace)
             throw SysError("saving parent mount namespace");
-        fdSavedMountNamespace = std::move(fd);
+
+        fdSavedRoot = open("/proc/self/root", O_RDONLY);
     });
 #endif
 }
@@ -1855,9 +1878,16 @@ void restoreMountNamespace()
 
         if (fdSavedMountNamespace && setns(fdSavedMountNamespace.get(), CLONE_NEWNS) == -1)
             throw SysError("restoring parent mount namespace");
-        if (chdir(savedCwd.c_str()) == -1) {
-            throw SysError("restoring cwd");
+
+        if (fdSavedRoot) {
+            if (fchdir(fdSavedRoot.get()))
+                throw SysError("chdir into saved root");
+            if (chroot("."))
+                throw SysError("chroot into saved root");
         }
+
+        if (chdir(savedCwd.c_str()) == -1)
+            throw SysError("restoring cwd");
     } catch (Error & e) {
         debug(e.msg());
     }

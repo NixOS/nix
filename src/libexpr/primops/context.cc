@@ -12,7 +12,11 @@ static void prim_unsafeDiscardStringContext(EvalState & state, const PosIdx pos,
     v.mkString(*s);
 }
 
-static RegisterPrimOp primop_unsafeDiscardStringContext("__unsafeDiscardStringContext", 1, prim_unsafeDiscardStringContext);
+static RegisterPrimOp primop_unsafeDiscardStringContext({
+    .name = "__unsafeDiscardStringContext",
+    .arity = 1,
+    .fun = prim_unsafeDiscardStringContext
+});
 
 
 static void prim_hasContext(EvalState & state, const PosIdx pos, Value * * args, Value & v)
@@ -22,7 +26,16 @@ static void prim_hasContext(EvalState & state, const PosIdx pos, Value * * args,
     v.mkBool(!context.empty());
 }
 
-static RegisterPrimOp primop_hasContext("__hasContext", 1, prim_hasContext);
+static RegisterPrimOp primop_hasContext({
+    .name = "__hasContext",
+    .args = {"s"},
+    .doc = R"(
+      Return `true` if string *s* has a non-empty context. The
+      context can be obtained with
+      [`getContext`](#builtins-getContext).
+    )",
+    .fun = prim_hasContext
+});
 
 
 /* Sometimes we want to pass a derivation path (i.e. pkg.drvPath) to a
@@ -51,7 +64,11 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx p
     v.mkString(*s, context2);
 }
 
-static RegisterPrimOp primop_unsafeDiscardOutputDependency("__unsafeDiscardOutputDependency", 1, prim_unsafeDiscardOutputDependency);
+static RegisterPrimOp primop_unsafeDiscardOutputDependency({
+    .name = "__unsafeDiscardOutputDependency",
+    .arity = 1,
+    .fun = prim_unsafeDiscardOutputDependency
+});
 
 
 /* Extract the context of a string as a structured Nix value.
@@ -119,7 +136,30 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
     v.mkAttrs(attrs);
 }
 
-static RegisterPrimOp primop_getContext("__getContext", 1, prim_getContext);
+static RegisterPrimOp primop_getContext({
+    .name = "__getContext",
+    .args = {"s"},
+    .doc = R"(
+      Return the string context of *s*.
+
+      The string context tracks references to derivations within a string.
+      It is represented as an attribute set of [store derivation](@docroot@/glossary.md#gloss-store-derivation) paths mapping to output names.
+
+      Using [string interpolation](@docroot@/language/string-interpolation.md) on a derivation will add that derivation to the string context.
+      For example,
+
+      ```nix
+      builtins.getContext "${derivation { name = "a"; builder = "b"; system = "c"; }}"
+      ```
+
+      evaluates to
+
+      ```
+      { "/nix/store/arhvjaf6zmlyn8vh8fgn55rpwnxq0n7l-a.drv" = { outputs = [ "out" ]; }; }
+      ```
+    )",
+    .fun = prim_getContext
+});
 
 
 /* Append the given context to a given string.
@@ -192,6 +232,10 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
     v.mkString(orig, context);
 }
 
-static RegisterPrimOp primop_appendContext("__appendContext", 2, prim_appendContext);
+static RegisterPrimOp primop_appendContext({
+    .name = "__appendContext",
+    .arity = 2,
+    .fun = prim_appendContext
+});
 
 }

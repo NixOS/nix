@@ -9,6 +9,7 @@
 #include "config.hh"
 #include "experimental-features.hh"
 #include "input-accessor.hh"
+#include "search-path.hh"
 
 #include <map>
 #include <optional>
@@ -25,15 +26,72 @@ struct DerivedPath;
 enum RepairFlag : bool;
 
 
+/**
+ * Function that implements a primop.
+ */
 typedef void (* PrimOpFun) (EvalState & state, const PosIdx pos, Value * * args, Value & v);
 
+/**
+ * Info about a primitive operation, and its implementation
+ */
 struct PrimOp
 {
-    PrimOpFun fun;
-    size_t arity;
+    /**
+     * Name of the primop. `__` prefix is treated specially.
+     */
     std::string name;
+
+    /**
+     * Names of the parameters of a primop, for primops that take a
+     * fixed number of arguments to be substituted for these parameters.
+     */
     std::vector<std::string> args;
+
+    /**
+     * Aritiy of the primop.
+     *
+     * If `args` is not empty, this field will be computed from that
+     * field instead, so it doesn't need to be manually set.
+     */
+    size_t arity = 0;
+
+    /**
+     * Optional free-form documentation about the primop.
+     */
     const char * doc = nullptr;
+
+    /**
+     * Implementation of the primop.
+     */
+    PrimOpFun fun;
+
+    /**
+     * Optional experimental for this to be gated on.
+     */
+    std::optional<ExperimentalFeature> experimentalFeature;
+};
+
+/**
+ * Info about a constant
+ */
+struct Constant
+{
+    /**
+     * Optional type of the constant (known since it is a fixed value).
+     *
+     * @todo we should use an enum for this.
+     */
+    ValueType type = nThunk;
+
+    /**
+     * Optional free-form documentation about the constant.
+     */
+    const char * doc = nullptr;
+
+    /**
+     * Whether the constant is impure, and not available in pure mode.
+     */
+    bool impureOnly = false;
 };
 
 #if HAVE_BOEHMGC
@@ -63,11 +121,6 @@ void copyContext(const Value & v, NixStringContext & context);
 
 std::string printValue(const EvalState & state, const Value & v);
 std::ostream & operator << (std::ostream & os, const ValueType t);
-
-
-// FIXME: maybe change this to an std::variant<SourcePath, URL>.
-typedef std::pair<std::string, std::string> SearchPathElem;
-typedef std::list<SearchPathElem> SearchPath;
 
 
 /**
@@ -256,7 +309,7 @@ private:
 
     SearchPath searchPath;
 
-    std::map<std::string, std::pair<bool, std::string>> searchPathResolved;
+    std::map<std::string, std::optional<std::string>> searchPathResolved;
 
     /**
      * Cache used by checkSourcePath().
@@ -283,12 +336,12 @@ private:
 public:
 
     EvalState(
-        const Strings & _searchPath,
+        const SearchPath & _searchPath,
         ref<Store> store,
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
 
-    void addToSearchPath(const std::string & s);
+    void addToSearchPath(SearchPath::Elem && elem);
 
     SearchPath getSearchPath() { return searchPath; }
 
@@ -370,12 +423,16 @@ public:
      * Look up a file in the search path.
      */
     SourcePath findFile(const std::string_view path);
-    SourcePath findFile(SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
+    SourcePath findFile(const SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
 
     /**
+     * Try to resolve a search path value (not the optinal key part)
+     *
      * If the specified search path element is a URI, download it.
+     *
+     * If it is not found, return `std::nullopt`
      */
-    std::pair<bool, std::string> resolveSearchPathElem(const SearchPathElem & elem);
+    std::optional<std::string> resolveSearchPathPath(const SearchPath::Path & path);
 
     /**
      * Evaluate an expression to normal form
@@ -483,7 +540,7 @@ public:
      * Coerce to `DerivedPath`.
      *
      * Must be a string which is either a literal store path or a
-     * "placeholder (see `downstreamPlaceholder()`).
+     * "placeholder (see `DownstreamPlaceholder`).
      *
      * Even more importantly, the string context must be exactly one
      * element, which is either a `NixStringContextElem::Opaque` or
@@ -509,18 +566,23 @@ public:
      */
     std::shared_ptr<StaticEnv> staticBaseEnv; // !!! should be private
 
+    /**
+     * Name and documentation about every constant.
+     *
+     * Constants from primops are hard to crawl, and their docs will go
+     * here too.
+     */
+    std::vector<std::pair<std::string, Constant>> constantInfos;
+
 private:
 
     unsigned int baseEnvDispl = 0;
 
     void createBaseEnv();
 
-    Value * addConstant(const std::string & name, Value & v);
+    Value * addConstant(const std::string & name, Value & v, Constant info);
 
-    void addConstant(const std::string & name, Value * v);
-
-    Value * addPrimOp(const std::string & name,
-        size_t arity, PrimOpFun primOp);
+    void addConstant(const std::string & name, Value * v, Constant info);
 
     Value * addPrimOp(PrimOp && primOp);
 
@@ -534,6 +596,10 @@ public:
         std::optional<std::string> name;
         size_t arity;
         std::vector<std::string> args;
+        /**
+         * Unlike the other `doc` fields in this file, this one should never be
+         * `null`.
+         */
         const char * doc;
     };
 
@@ -622,7 +688,7 @@ public:
      * @param optOutputPath Optional output path for that string. Must
      * be passed if and only if output store object is input-addressed.
      * Will be printed to form string if passed, otherwise a placeholder
-     * will be used (see `downstreamPlaceholder()`).
+     * will be used (see `DownstreamPlaceholder`).
      */
     void mkOutputString(
         Value & value,
@@ -700,8 +766,11 @@ struct DebugTraceStacker {
 
 /**
  * @return A string representing the type of the value `v`.
+ *
+ * @param withArticle Whether to begin with an english article, e.g. "an
+ * integer" vs "integer".
  */
-std::string_view showType(ValueType type);
+std::string_view showType(ValueType type, bool withArticle = true);
 std::string showType(const Value & v);
 
 /**
@@ -733,7 +802,12 @@ struct EvalSettings : Config
 
     Setting<Strings> nixPath{
         this, getDefaultNixPath(), "nix-path",
-        "List of directories to be searched for `<...>` file references."};
+        R"(
+          List of directories to be searched for `<...>` file references
+
+          In particular, outside of [pure evaluation mode](#conf-pure-evaluation), this determines the value of
+          [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtin-constants-nixPath).
+        )"};
 
     Setting<bool> restrictEval{
         this, false, "restrict-eval",
@@ -741,11 +815,18 @@ struct EvalSettings : Config
           If set to `true`, the Nix evaluator will not allow access to any
           files outside of the Nix search path (as set via the `NIX_PATH`
           environment variable or the `-I` option), or to URIs outside of
-          `allowed-uri`. The default is `false`.
+          [`allowed-uris`](../command-ref/conf-file.md#conf-allowed-uris).
+          The default is `false`.
         )"};
 
     Setting<bool> pureEval{this, false, "pure-eval",
-        "Whether to restrict file system and network access to files specified by cryptographic hash."};
+        R"(
+          Pure evaluation mode ensures that the result of Nix expressions is fully determined by explicitly declared inputs, and not influenced by external state:
+
+          - Restrict file system and network access to files specified by cryptographic hash
+          - Disable [`bultins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem) and [`builtins.currentTime`](@docroot@/language/builtin-constants.md#builtins-currentTime)
+        )"
+        };
 
     Setting<bool> enableImportFromDerivation{
         this, true, "allow-import-from-derivation",

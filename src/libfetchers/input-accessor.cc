@@ -75,22 +75,28 @@ SourcePath SourcePath::resolveSymlinks() const
 
     int linksAllowed = 1024;
 
-    for (auto & component : path) {
-        res.path.push(component);
-        while (true) {
-            if (auto st = res.maybeLstat()) {
+    std::list<std::string> todo;
+    for (auto & c : path)
+        todo.push_back(std::string(c));
+
+    while (!todo.empty()) {
+        auto c = *todo.begin();
+        todo.pop_front();
+        if (c == "" || c == ".")
+            ;
+        else if (c == "..")
+            res.path.pop();
+        else {
+            res.path.push(c);
+            if (auto st = res.maybeLstat(); st && st->type == InputAccessor::tSymlink) {
                 if (!linksAllowed--)
                     throw Error("infinite symlink recursion in path '%s'", path);
-                if (st->type != InputAccessor::tSymlink) break;
                 auto target = res.readLink();
+                res.path.pop();
                 if (hasPrefix(target, "/"))
-                    res = CanonPath(target);
-                else {
-                    res.path.pop();
-                    res.path.extend(CanonPath(target));
-                }
-            } else
-                break;
+                    res.path = CanonPath::root;
+                todo.splice(todo.begin(), tokenizeString<std::list<std::string>>(target, "/"));
+            }
         }
     }
 

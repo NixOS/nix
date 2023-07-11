@@ -299,7 +299,7 @@ connected:
             !trusted || *trusted;
         });
 
-        // See the very large comment in `case wopBuildDerivation:` in
+        // See the very large comment in `case WorkerProto::Op::BuildDerivation:` in
         // `src/libstore/daemon.cc` that explains the trust model here.
         //
         // This condition mirrors that: that code enforces the "rules" outlined there;

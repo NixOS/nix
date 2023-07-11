@@ -16,6 +16,7 @@ nix_tests = \
   flakes/flake-in-submodule.sh \
   ca/gc.sh \
   gc.sh \
+  nix-collect-garbage-d.sh \
   remote-store.sh \
   legacy-ssh-store.sh \
   lang.sh \
@@ -135,7 +136,9 @@ nix_tests = \
   flakes/show.sh \
   impure-derivations.sh \
   path-from-hash-part.sh \
-  toString-path.sh
+  test-libstoreconsumer.sh \
+  toString-path.sh \
+  read-only-store.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh
@@ -153,6 +156,7 @@ test-deps += \
   tests/common/vars-and-functions.sh \
   tests/config.nix \
   tests/ca/config.nix \
+  tests/test-libstoreconsumer/test-libstoreconsumer \
   tests/dyn-drv/config.nix
 
 ifeq ($(BUILD_SHARED_LIBS), 1)

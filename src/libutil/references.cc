@@ -6,6 +6,7 @@
 #include <map>
 #include <cstdlib>
 #include <mutex>
+#include <algorithm>
 
 
 namespace nix {
@@ -66,69 +67,20 @@ void RefScanSink::operator () (std::string_view data)
 }
 
 
-PathRefScanSink::PathRefScanSink(StringSet && hashes, std::map<std::string, StorePath> && backMap)
-    : RefScanSink(std::move(hashes))
-    , backMap(std::move(backMap))
-{ }
-
-PathRefScanSink PathRefScanSink::fromPaths(const StorePathSet & refs)
-{
-    StringSet hashes;
-    std::map<std::string, StorePath> backMap;
-
-    for (auto & i : refs) {
-        std::string hashPart(i.hashPart());
-        auto inserted = backMap.emplace(hashPart, i).second;
-        assert(inserted);
-        hashes.insert(hashPart);
-    }
-
-    return PathRefScanSink(std::move(hashes), std::move(backMap));
-}
-
-StorePathSet PathRefScanSink::getResultPaths()
-{
-    /* Map the hashes found back to their store paths. */
-    StorePathSet found;
-    for (auto & i : getResult()) {
-        auto j = backMap.find(i);
-        assert(j != backMap.end());
-        found.insert(j->second);
-    }
-
-    return found;
-}
-
-
-std::pair<StorePathSet, HashResult> scanForReferences(
-    const std::string & path,
-    const StorePathSet & refs)
-{
-    HashSink hashSink { htSHA256 };
-    auto found = scanForReferences(hashSink, path, refs);
-    auto hash = hashSink.finish();
-    return std::pair<StorePathSet, HashResult>(found, hash);
-}
-
-StorePathSet scanForReferences(
-    Sink & toTee,
-    const Path & path,
-    const StorePathSet & refs)
-{
-    PathRefScanSink refsSink = PathRefScanSink::fromPaths(refs);
-    TeeSink sink { refsSink, toTee };
-
-    /* Look for the hashes in the NAR dump of the path. */
-    dumpPath(path, sink);
-
-    return refsSink.getResultPaths();
-}
-
-
 RewritingSink::RewritingSink(const std::string & from, const std::string & to, Sink & nextSink)
-    : from(from), to(to), nextSink(nextSink)
+    : RewritingSink({{from, to}}, nextSink)
 {
-    assert(from.size() == to.size());
+}
+
+RewritingSink::RewritingSink(const StringMap & rewrites, Sink & nextSink)
+    : rewrites(rewrites), nextSink(nextSink)
+{
+    std::string::size_type maxRewriteSize = 0;
+    for (auto & [from, to] : rewrites) {
+        assert(from.size() == to.size());
+        maxRewriteSize = std::max(maxRewriteSize, from.size());
+    }
+    this->maxRewriteSize = maxRewriteSize;
 }
 
 void RewritingSink::operator () (std::string_view data)
@@ -136,13 +88,13 @@ void RewritingSink::operator () (std::string_view data)
     std::string s(prev);
     s.append(data);
 
-    size_t j = 0;
-    while ((j = s.find(from, j)) != std::string::npos) {
-        matches.push_back(pos + j);
-        s.replace(j, from.size(), to);
-    }
+    s = rewriteStrings(s, rewrites);
 
-    prev = s.size() < from.size() ? s : std::string(s, s.size() - from.size() + 1, from.size() - 1);
+    prev = s.size() < maxRewriteSize
+        ? s
+        : maxRewriteSize == 0
+            ? ""
+            : std::string(s, s.size() - maxRewriteSize + 1, maxRewriteSize - 1);
 
     auto consumed = s.size() - prev.size();
 

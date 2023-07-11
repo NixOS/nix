@@ -44,7 +44,7 @@ R""(
   `release.nix`:
 
   ```console
-  # nix build -f release.nix build.x86_64-linux
+  # nix build --file release.nix build.x86_64-linux
   ```
 
 * Build a NixOS system configuration from a flake, and make a profile

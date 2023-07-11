@@ -46,16 +46,16 @@ To prevent the currently installed Firefox from being upgraded:
 $ nix-env --set-flag keep true firefox
 ```
 
-After this, `nix-env -u` will ignore Firefox.
+After this, `nix-env --upgrade ` will ignore Firefox.
 
 To disable the currently installed Firefox, then install a new Firefox
 while the old remains part of the profile:
 
 ```console
-$ nix-env -q
+$ nix-env --query
 firefox-2.0.0.9 (the current one)
 
-$ nix-env --preserve-installed -i firefox-2.0.0.11
+$ nix-env --preserve-installed --install firefox-2.0.0.11
 installing `firefox-2.0.0.11'
 building path(s) `/nix/store/myy0y59q3ig70dgq37jqwg1j0rsapzsl-user-environment'
 collision between `/nix/store/...-firefox-2.0.0.11/bin/firefox'
@@ -65,10 +65,10 @@ collision between `/nix/store/...-firefox-2.0.0.11/bin/firefox'
 $ nix-env --set-flag active false firefox
 setting flag on `firefox-2.0.0.9'
 
-$ nix-env --preserve-installed -i firefox-2.0.0.11
+$ nix-env --preserve-installed --install firefox-2.0.0.11
 installing `firefox-2.0.0.11'
 
-$ nix-env -q
+$ nix-env --query
 firefox-2.0.0.11 (the enabled one)
 firefox-2.0.0.9 (the disabled one)
 ```

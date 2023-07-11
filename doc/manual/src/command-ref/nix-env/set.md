@@ -25,6 +25,6 @@ The following updates a profile such that its current generation will
 contain just Firefox:
 
 ```console
-$ nix-env -p /nix/var/nix/profiles/browser --set firefox
+$ nix-env --profile /nix/var/nix/profiles/browser --set firefox
 ```
 

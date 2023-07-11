@@ -121,6 +121,14 @@ struct stat lstat(const Path & path);
 bool pathExists(const Path & path);
 
 /**
+ * A version of pathExists that returns false on a permission error.
+ * Useful for inferring default paths across directories that might not
+ * be readable.
+ * @return true iff the given path can be accessed and exists
+ */
+bool pathAccessible(const Path & path);
+
+/**
  * Read the contents (target) of a symbolic link.  The result is not
  * in any way canonicalised.
  */
@@ -248,14 +256,12 @@ inline Paths createDirs(PathView path)
 /**
  * Create a symlink.
  */
-void createSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime = {});
+void createSymlink(const Path & target, const Path & link);
 
 /**
  * Atomically create or replace a symlink.
  */
-void replaceSymlink(const Path & target, const Path & link,
-    std::optional<time_t> mtime = {});
+void replaceSymlink(const Path & target, const Path & link);
 
 void renameFile(const Path & src, const Path & dst);
 
@@ -415,7 +421,7 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
  */
 std::string runProgram(Path program, bool searchPath = false,
     const Strings & args = Strings(),
-    const std::optional<std::string> & input = {});
+    const std::optional<std::string> & input = {}, bool isInteractive = false);
 
 struct RunOptions
 {
@@ -430,6 +436,7 @@ struct RunOptions
     Source * standardIn = nullptr;
     Sink * standardOut = nullptr;
     bool mergeStderrToStdout = false;
+    bool isInteractive = false;
 };
 
 std::pair<int, std::string> runProgram(RunOptions && options);

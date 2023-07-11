@@ -50,20 +50,3 @@ if test -e $outPath/foobar; then false; fi
 # Check that the store is empty.
 rmdir $NIX_STORE_DIR/.links
 rmdir $NIX_STORE_DIR
-
-## Test `nix-collect-garbage -d`
-# `nix-env` doesn't work with CA derivations, so let's ignore that bit if we're
-# using them
-if [[ -z "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
-    clearProfiles
-    # Run two `nix-env` commands, should create two generations of
-    # the profile
-    nix-env -f ./user-envs.nix -i foo-1.0
-    nix-env -f ./user-envs.nix -i foo-2.0pre1
-    [[ $(nix-env --list-generations | wc -l) -eq 2 ]]
-
-    # Clear the profile history. There should be only one generation
-    # left
-    nix-collect-garbage -d
-    [[ $(nix-env --list-generations | wc -l) -eq 1 ]]
-fi

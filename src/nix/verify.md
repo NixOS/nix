@@ -12,7 +12,7 @@ R""(
   signatures:
 
   ```console
-  # nix store verify -r -n2 --no-contents $(type -p firefox)
+  # nix store verify --recursive --sigs-needed 2 --no-contents $(type -p firefox)
   ```
 
 * Verify a store path in the binary cache `https://cache.nixos.org/`:

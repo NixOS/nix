@@ -21,7 +21,7 @@ struct ProfileElementSource
 {
     FlakeRef originalRef;
     // FIXME: record original attrpath.
-    FlakeRef resolvedRef;
+    FlakeRef lockedRef;
     std::string attrPath;
     ExtendedOutputsSpec outputs;
 
@@ -30,6 +30,11 @@ struct ProfileElementSource
         return
             std::tuple(originalRef.to_string(), attrPath, outputs) <
             std::tuple(other.originalRef.to_string(), other.attrPath, other.outputs);
+    }
+
+    std::string to_string() const
+    {
+        return fmt("%s#%s%s", originalRef, attrPath, outputs.to_string());
     }
 };
 
@@ -42,14 +47,28 @@ struct ProfileElement
     bool active = true;
     int priority = defaultPriority;
 
-    std::string describe() const
+    std::string identifier() const
     {
         if (source)
-            return fmt("%s#%s%s", source->originalRef, source->attrPath, source->outputs.to_string());
+            return source->to_string();
         StringSet names;
         for (auto & path : storePaths)
             names.insert(DrvName(path.name()).name);
         return concatStringsSep(", ", names);
+    }
+
+    /**
+     * Return a string representing an installable corresponding to the current
+     * element, either a flakeref or a plain store path
+     */
+    std::set<std::string> toInstallables(Store & store)
+    {
+        if (source)
+            return {source->to_string()};
+        StringSet rawPaths;
+        for (auto & path : storePaths)
+            rawPaths.insert(store.printStorePath(path));
+        return rawPaths;
     }
 
     std::string versions() const
@@ -62,7 +81,7 @@ struct ProfileElement
 
     bool operator < (const ProfileElement & other) const
     {
-        return std::tuple(describe(), storePaths) < std::tuple(other.describe(), other.storePaths);
+        return std::tuple(identifier(), storePaths) < std::tuple(other.identifier(), other.storePaths);
     }
 
     void updateStorePaths(
@@ -149,7 +168,7 @@ struct ProfileManifest
         }
     }
 
-    std::string toJSON(Store & store) const
+    nlohmann::json toJSON(Store & store) const
     {
         auto array = nlohmann::json::array();
         for (auto & element : elements) {
@@ -162,7 +181,7 @@ struct ProfileManifest
             obj["priority"] = element.priority;
             if (element.source) {
                 obj["originalUrl"] = element.source->originalRef.to_string();
-                obj["url"] = element.source->resolvedRef.to_string();
+                obj["url"] = element.source->lockedRef.to_string();
                 obj["attrPath"] = element.source->attrPath;
                 obj["outputs"] = element.source->outputs;
             }
@@ -171,7 +190,7 @@ struct ProfileManifest
         nlohmann::json json;
         json["version"] = 2;
         json["elements"] = array;
-        return json.dump();
+        return json;
     }
 
     StorePath build(ref<Store> store)
@@ -191,7 +210,7 @@ struct ProfileManifest
 
         buildProfile(tempDir, std::move(pkgs));
 
-        writeFile(tempDir + "/manifest.json", toJSON(*store));
+        writeFile(tempDir + "/manifest.json", toJSON(*store).dump());
 
         /* Add the symlink tree to the store. */
         StringSink sink;
@@ -237,13 +256,13 @@ struct ProfileManifest
         bool changes = false;
 
         while (i != prevElems.end() || j != curElems.end()) {
-            if (j != curElems.end() && (i == prevElems.end() || i->describe() > j->describe())) {
-                logger->cout("%s%s: ∅ -> %s", indent, j->describe(), j->versions());
+            if (j != curElems.end() && (i == prevElems.end() || i->identifier() > j->identifier())) {
+                logger->cout("%s%s: ∅ -> %s", indent, j->identifier(), j->versions());
                 changes = true;
                 ++j;
             }
-            else if (i != prevElems.end() && (j == curElems.end() || i->describe() < j->describe())) {
-                logger->cout("%s%s: %s -> ∅", indent, i->describe(), i->versions());
+            else if (i != prevElems.end() && (j == curElems.end() || i->identifier() < j->identifier())) {
+                logger->cout("%s%s: %s -> ∅", indent, i->identifier(), i->versions());
                 changes = true;
                 ++i;
             }
@@ -251,7 +270,7 @@ struct ProfileManifest
                 auto v1 = i->versions();
                 auto v2 = j->versions();
                 if (v1 != v2) {
-                    logger->cout("%s%s: %s -> %s", indent, i->describe(), v1, v2);
+                    logger->cout("%s%s: %s -> %s", indent, i->identifier(), v1, v2);
                     changes = true;
                 }
                 ++i;
@@ -330,7 +349,7 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
             if (auto * info2 = dynamic_cast<ExtraPathInfoFlake *>(&*info)) {
                 element.source = ProfileElementSource {
                     .originalRef = info2->flake.originalRef,
-                    .resolvedRef = info2->flake.resolvedRef,
+                    .lockedRef = info2->flake.lockedRef,
                     .attrPath = info2->value.attrPath,
                     .outputs = info2->value.extendedOutputsSpec,
                 };
@@ -363,10 +382,10 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                     auto profileElement = *it;
                     for (auto & storePath : profileElement.storePaths) {
                         if (conflictError.fileA.starts_with(store->printStorePath(storePath))) {
-                            return std::pair(conflictError.fileA, profileElement.source->originalRef);
+                            return std::pair(conflictError.fileA, profileElement.toInstallables(*store));
                         }
                         if (conflictError.fileB.starts_with(store->printStorePath(storePath))) {
-                            return std::pair(conflictError.fileB, profileElement.source->originalRef);
+                            return std::pair(conflictError.fileB, profileElement.toInstallables(*store));
                         }
                     }
                 }
@@ -375,9 +394,9 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
             // There are 2 conflicting files. We need to find out which one is from the already installed package and
             // which one is the package that is the new package that is being installed.
             // The first matching package is the one that was already installed (original).
-            auto [originalConflictingFilePath, originalConflictingRef] = findRefByFilePath(manifest.elements.begin(), manifest.elements.end());
+            auto [originalConflictingFilePath, originalConflictingRefs] = findRefByFilePath(manifest.elements.begin(), manifest.elements.end());
             // The last matching package is the one that was going to be installed (new).
-            auto [newConflictingFilePath, newConflictingRef] = findRefByFilePath(manifest.elements.rbegin(), manifest.elements.rend());
+            auto [newConflictingFilePath, newConflictingRefs] = findRefByFilePath(manifest.elements.rbegin(), manifest.elements.rend());
 
             throw Error(
                 "An existing package already provides the following file:\n"
@@ -403,8 +422,8 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
                 "  nix profile install %4% --priority %7%\n",
                 originalConflictingFilePath,
                 newConflictingFilePath,
-                originalConflictingRef.to_string(),
-                newConflictingRef.to_string(),
+                concatStringsSep(" ", originalConflictingRefs),
+                concatStringsSep(" ", newConflictingRefs),
                 conflictError.priority,
                 conflictError.priority - 1,
                 conflictError.priority + 1
@@ -491,7 +510,7 @@ struct CmdProfileRemove : virtual EvalCommand, MixDefaultProfile, MixProfileElem
             if (!matches(*store, element, i, matchers)) {
                 newManifest.elements.push_back(std::move(element));
             } else {
-                notice("removing '%s'", element.describe());
+                notice("removing '%s'", element.identifier());
             }
         }
 
@@ -569,14 +588,14 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                 assert(infop);
                 auto & info = *infop;
 
-                if (element.source->resolvedRef == info.flake.resolvedRef) continue;
+                if (element.source->lockedRef == info.flake.lockedRef) continue;
 
                 printInfo("upgrading '%s' from flake '%s' to '%s'",
-                    element.source->attrPath, element.source->resolvedRef, info.flake.resolvedRef);
+                    element.source->attrPath, element.source->lockedRef, info.flake.lockedRef);
 
                 element.source = ProfileElementSource {
                     .originalRef = installable->flakeRef,
-                    .resolvedRef = info.flake.resolvedRef,
+                    .lockedRef = info.flake.lockedRef,
                     .attrPath = info.value.attrPath,
                     .outputs = installable->extendedOutputsSpec,
                 };
@@ -616,7 +635,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
     }
 };
 
-struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultProfile
+struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultProfile, MixJSON
 {
     std::string description() override
     {
@@ -634,12 +653,22 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
     {
         ProfileManifest manifest(*getEvalState(), *profile);
 
-        for (size_t i = 0; i < manifest.elements.size(); ++i) {
-            auto & element(manifest.elements[i]);
-            logger->cout("%d %s %s %s", i,
-                element.source ? element.source->originalRef.to_string() + "#" + element.source->attrPath + element.source->outputs.to_string() : "-",
-                element.source ? element.source->resolvedRef.to_string() + "#" + element.source->attrPath + element.source->outputs.to_string() : "-",
-                concatStringsSep(" ", store->printStorePathSet(element.storePaths)));
+        if (json) {
+            std::cout << manifest.toJSON(*store).dump() << "\n";
+        } else {
+            for (size_t i = 0; i < manifest.elements.size(); ++i) {
+                auto & element(manifest.elements[i]);
+                if (i) logger->cout("");
+                logger->cout("Index:              " ANSI_BOLD "%s" ANSI_NORMAL "%s",
+                    i,
+                    element.active ? "" : " " ANSI_RED "(inactive)" ANSI_NORMAL);
+                if (element.source) {
+                    logger->cout("Flake attribute:    %s%s", element.source->attrPath, element.source->outputs.to_string());
+                    logger->cout("Original flake URL: %s", element.source->originalRef.to_string());
+                    logger->cout("Locked flake URL:   %s", element.source->lockedRef.to_string());
+                }
+                logger->cout("Store paths:        %s", concatStringsSep(" ", store->printStorePathSet(element.storePaths)));
+            }
         }
     }
 };
@@ -787,9 +816,10 @@ struct CmdProfileWipeHistory : virtual StoreCommand, MixDefaultProfile, MixDryRu
 
     void run(ref<Store> store) override
     {
-        if (minAge)
-            deleteGenerationsOlderThan(*profile, *minAge, dryRun);
-        else
+        if (minAge) {
+            auto t = parseOlderThanTimeSpec(*minAge);
+            deleteGenerationsOlderThan(*profile, t, dryRun);
+        } else
             deleteOldGenerations(*profile, dryRun);
     }
 };

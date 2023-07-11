@@ -27,6 +27,18 @@ EOF
 
 cat > $flakeDir/flake.nix <<EOF
 {
+  outputs = { self, ... }: {
+    overlays.x86_64-linux.foo = final: prev: {
+    };
+  };
+}
+EOF
+
+checkRes=$(nix flake check $flakeDir 2>&1 && fail "nix flake check --all-systems should have failed" || true)
+echo "$checkRes" | grepQuiet "error: overlay is not a function, but a set instead"
+
+cat > $flakeDir/flake.nix <<EOF
+{
   outputs = { self }: {
     nixosModules.foo = {
       a.b.c = 123;
@@ -72,6 +84,8 @@ cat > $flakeDir/flake.nix <<EOF
 }
 EOF
 
-checkRes=$(nix flake check --keep-going $flakeDir 2>&1 && fail "nix flake check should have failed" || true)
+nix flake check $flakeDir
+
+checkRes=$(nix flake check --all-systems --keep-going $flakeDir 2>&1 && fail "nix flake check --all-systems should have failed" || true)
 echo "$checkRes" | grepQuiet "packages.system-1.default"
 echo "$checkRes" | grepQuiet "packages.system-2.default"
