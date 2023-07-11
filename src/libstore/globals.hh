@@ -526,21 +526,15 @@ public:
 
     Setting<bool> requireDropSupplementaryGroups{this, true, "require-drop-supplementary-groups",
         R"(
-          Whether to drop supplementary groups when building with sandboxing.
-          This is normally a good idea if we are root and have the capability to
-          do so.
+          Following the principle of least privilege,
+          Nix will attempt to drop supplementary groups when building with sandboxing.
 
-          But if this "root" is mapped from a non-root user in a larger
-          namespace, we won't be able drop additional groups; they will be
-          mapped to nogroup in the child namespace. There does not seem to be a
-          workaround for this.
+          However this can fail under some circumstances.
+          For example, if the user lacks the CAP_SETGID capability.
+          Search setgroups(2) for EPERM to find more detailed information on this.
 
-          (But who can tell from reading user_namespaces(7)? See also https://lwn.net/Articles/621612/.)
-
-          TODO: It might be good to create a middle ground option that allows
-          `setgroups` to fail if all additional groups are "nogroup" / the value
-          of `/proc/sys/fs/overflowuid`. This would handle the common
-          nested-sandboxing case identified above.
+          If you encounter such a failure,
+          you can instruct Nix to continue without dropping supplementary groups by setting this option to `false`.
         )"};
 
 #if __linux__
