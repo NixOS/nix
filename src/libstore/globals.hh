@@ -533,8 +533,9 @@ public:
           For example, if the user lacks the CAP_SETGID capability.
           Search setgroups(2) for EPERM to find more detailed information on this.
 
-          If you encounter such a failure,
-          you can instruct Nix to continue without dropping supplementary groups by setting this option to `false`.
+          If you encounter such a failure, setting this option to `false` will let you ignore it and continue.
+          But before doing so, you should consider the security implications carefully.
+          Not dropping supplementary groups means the build sandbox will be less restricted than intended.
         )"};
 
 #if __linux__
