@@ -538,7 +538,7 @@ public:
           Not dropping supplementary groups means the build sandbox will be less restricted than intended.
 
           This option defaults to `true` when the user is root
-          (since root usually has permissions to call setgroups)
+          (since `root` usually has permissions to call setgroups)
           and `false` otherwise.
         )"};
 
