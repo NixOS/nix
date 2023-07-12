@@ -2,9 +2,36 @@
 
 ## Single User
 
-### Alternative:
- #### Step 1: 
- Run the script located at `scripts/uninstall-single-user.sh`
+### Automatic Method
+
+To automatically uninstall a single-user Nix installation, you can download and run a script provided in the Nix repository. Here's how you do it:
+
+1. Download the uninstall script:
+
+    ```bash
+    curl -O https://raw.githubusercontent.com/NixOS/nix/master/scripts/uninstall-single-user.sh
+    ```
+
+2. Make the script executable:
+
+    ```bash
+    chmod +x uninstall-single-user.sh
+    ```
+
+3. Run the script:
+
+    ```bash
+    ./uninstall-single-user.sh
+    ```
+
+4. Verify that the expected files no longer exist on your system:
+
+    ```bash
+    ls /etc/nix
+    ```
+
+If the `ls` command doesn't display any files or directories, then you've successfully uninstalled Nix.
+
 
  #### Step 2:
 
