@@ -1,0 +1,7 @@
+error: attribute 'x' already defined at «stdin»:9:5
+
+       at «stdin»:10:17:
+
+            9|     x = 789;
+           10|     inherit (as) x;
+             |                 ^
