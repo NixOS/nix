@@ -227,7 +227,7 @@ three kinds of patterns:
     >   f = args@{ a ? 23, ... }: args;
     > in
     >   f {}
-    > ````
+    > ```
     > 
     > will evaluate to an empty attribute set.
 
