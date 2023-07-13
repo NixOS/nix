@@ -12,6 +12,7 @@
 #include <gc/gc_allocator.h>
 #endif
 #include <nlohmann/json_fwd.hpp>
+#include "../toml11/toml/types.hpp"
 
 namespace nix {
 
@@ -114,6 +115,12 @@ class ExternalValueBase
      * Print the value as JSON. Defaults to unconvertable, i.e. throws an error
      */
     virtual nlohmann::json printValueAsJSON(EvalState & state, bool strict,
+        NixStringContext & context, bool copyToStore = true) const;
+
+    /**
+     * Print the value as TOML. Defaults to unconvertable, i.e. throws an error
+     */
+    virtual toml::basic_value<toml::discard_comments, std::map, std::vector> printValueAsTOML(EvalState & state, bool strict,
         NixStringContext & context, bool copyToStore = true) const;
 
     /**

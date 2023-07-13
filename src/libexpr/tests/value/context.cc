@@ -113,7 +113,7 @@ namespace nix {
 
 RC_GTEST_PROP(
     NixStringContextElemTest,
-    prop_round_rip,
+    prop_round_trip,
     (const NixStringContextElem & o))
 {
     RC_ASSERT(o == NixStringContextElem::parse(o.to_string()));

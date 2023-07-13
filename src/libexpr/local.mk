@@ -47,4 +47,5 @@ $(d)/primops.cc: $(d)/imported-drv-to-derivation.nix.gen.hh $(d)/primops/derivat
 
 $(d)/flake/flake.cc: $(d)/flake/call-flake.nix.gen.hh
 
-src/libexpr/primops/fromTOML.o:	ERROR_SWITCH_ENUM =
+$(d)/primops/fromTOML.o: ERROR_SWITCH_ENUM =
+$(d)/value-to-toml.o: ERROR_SWITCH_ENUM =
