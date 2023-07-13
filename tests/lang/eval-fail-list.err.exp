@@ -1,0 +1,10 @@
+error:
+       … while evaluating one of the elements to concatenate
+
+         at /pwd/lang/eval-fail-list.nix:1:2:
+
+            1| 8++1
+             |  ^
+            2|
+
+       error: value is an integer while a list was expected
