@@ -49,3 +49,5 @@ output="$(nix eval --raw --restrict-eval -I "$traverseDir" \
     2>&1 || :)"
 echo "$output" | grep "is forbidden"
 echo "$output" | grepInverse -F restricted-secret
+
+expectStderr 1 nix-instantiate --restrict-eval true ./dependencies.nix | grepQuiet "forbidden in restricted mode"

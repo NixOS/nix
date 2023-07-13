@@ -1,6 +1,6 @@
 let
 
-  overrides = { a = 2; };
+  overrides = { a = 2; b = 3; };
 
 in (rec {
   __overrides = overrides;

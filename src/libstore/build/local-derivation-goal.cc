@@ -909,9 +909,12 @@ void LocalDerivationGoal::startBuilder()
 
             /* Drop additional groups here because we can't do it
                after we've created the new user namespace. */
-            if (settings.dropSupplementaryGroups)
-                if (setgroups(0, 0) == -1)
-                    throw SysError("setgroups failed. Set the drop-supplementary-groups option to false to skip this step.");
+            if (setgroups(0, 0) == -1) {
+                if (errno != EPERM)
+                    throw SysError("setgroups failed");
+                if (settings.requireDropSupplementaryGroups)
+                    throw Error("setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
+            }
 
             ProcessOptions options;
             options.cloneFlags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;

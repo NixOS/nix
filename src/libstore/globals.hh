@@ -524,23 +524,22 @@ public:
     Setting<bool> sandboxFallback{this, true, "sandbox-fallback",
         "Whether to disable sandboxing when the kernel doesn't allow it."};
 
-    Setting<bool> dropSupplementaryGroups{this, getuid() == 0, "drop-supplementary-groups",
+    Setting<bool> requireDropSupplementaryGroups{this, getuid() == 0, "require-drop-supplementary-groups",
         R"(
-          Whether to drop supplementary groups when building with sandboxing.
-          This is normally a good idea if we are root and have the capability to
-          do so.
+          Following the principle of least privilege,
+          Nix will attempt to drop supplementary groups when building with sandboxing.
 
-          But if this "root" is mapped from a non-root user in a larger
-          namespace, we won't be able drop additional groups; they will be
-          mapped to nogroup in the child namespace. There does not seem to be a
-          workaround for this.
+          However this can fail under some circumstances.
+          For example, if the user lacks the `CAP_SETGID` capability.
+          Search `setgroups(2)` for `EPERM` to find more detailed information on this.
 
-          (But who can tell from reading user_namespaces(7)? See also https://lwn.net/Articles/621612/.)
+          If you encounter such a failure, setting this option to `false` will let you ignore it and continue.
+          But before doing so, you should consider the security implications carefully.
+          Not dropping supplementary groups means the build sandbox will be less restricted than intended.
 
-          TODO: It might be good to create a middle ground option that allows
-          `setgroups` to fail if all additional groups are "nogroup" / the value
-          of `/proc/sys/fs/overflowuid`. This would handle the common
-          nested-sandboxing case identified above.
+          This option defaults to `true` when the user is root
+          (since `root` usually has permissions to call setgroups)
+          and `false` otherwise.
         )"};
 
 #if __linux__
