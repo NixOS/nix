@@ -52,9 +52,10 @@ for i in lang/parse-okay-*.nix; do
     i=$(basename "$i" .nix)
     if
         expect 0 nix-instantiate --parse - < "lang/$i.nix" \
-            1> >(sed "s!$(pwd)!/pwd!g" > "lang/$i.out") \
-            2> >(sed "s!$(pwd)!/pwd!g" > "lang/$i.err")
+            1> "lang/$i.out" \
+            2> "lang/$i.err"
     then
+        sed "s!$(pwd)!/pwd!g" "lang/$i.out" "lang/$i.err"
         diffAndAccept "$i" out exp
         diffAndAccept "$i" err err.exp
     else
