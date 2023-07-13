@@ -11,8 +11,10 @@ std::string DownstreamPlaceholder::render() const
 
 DownstreamPlaceholder DownstreamPlaceholder::unknownCaOutput(
     const StorePath & drvPath,
-    std::string_view outputName)
+    std::string_view outputName,
+    const ExperimentalFeatureSettings & xpSettings)
 {
+    xpSettings.require(Xp::CaDerivations);
     auto drvNameWithExtension = drvPath.name();
     auto drvName = drvNameWithExtension.substr(0, drvNameWithExtension.size() - 4);
     auto clearText = "nix-upstream-output:" + std::string { drvPath.hashPart() } + ":" + outputPathName(drvName, outputName);

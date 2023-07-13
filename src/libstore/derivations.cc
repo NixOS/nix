@@ -878,9 +878,11 @@ std::optional<BasicDerivation> Derivation::tryResolve(
     for (auto & [inputDrv, inputOutputs] : inputDrvs) {
         for (auto & outputName : inputOutputs) {
             if (auto actualPath = get(inputDrvOutputs, { inputDrv, outputName })) {
-                inputRewrites.emplace(
-                    DownstreamPlaceholder::unknownCaOutput(inputDrv, outputName).render(),
-                    store.printStorePath(*actualPath));
+                if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
+                    inputRewrites.emplace(
+                        DownstreamPlaceholder::unknownCaOutput(inputDrv, outputName).render(),
+                        store.printStorePath(*actualPath));
+                }
                 resolved.inputSrcs.insert(*actualPath);
             } else {
                 warn("output '%s' of input '%s' missing, aborting the resolving",

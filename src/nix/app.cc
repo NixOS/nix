@@ -22,11 +22,12 @@ StringPairs resolveRewrites(
     StringPairs res;
     for (auto & dep : dependencies)
         if (auto drvDep = std::get_if<BuiltPathBuilt>(&dep.path))
-            for (auto & [ outputName, outputPath ] : drvDep->outputs)
-                res.emplace(
-                    DownstreamPlaceholder::unknownCaOutput(drvDep->drvPath, outputName).render(),
-                    store.printStorePath(outputPath)
-                );
+            if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
+                for (auto & [ outputName, outputPath ] : drvDep->outputs)
+                    res.emplace(
+                        DownstreamPlaceholder::unknownCaOutput(drvDep->drvPath, outputName).render(),
+                        store.printStorePath(outputPath)
+                    );
     return res;
 }
 

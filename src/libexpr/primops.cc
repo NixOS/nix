@@ -83,22 +83,21 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
     for (auto & d : drvs) buildReqs.emplace_back(DerivedPath { d });
     store->buildPaths(buildReqs);
 
-    /* Get all the output paths corresponding to the placeholders we had */
     for (auto & drv : drvs) {
         auto outputs = resolveDerivedPath(*store, drv);
         for (auto & [outputName, outputPath] : outputs) {
-            res.insert_or_assign(
-                DownstreamPlaceholder::unknownCaOutput(drv.drvPath, outputName).render(),
-                store->printStorePath(outputPath)
-            );
-        }
-    }
-
-    /* Add the output of this derivations to the allowed
-       paths. */
-    if (allowedPaths) {
-        for (auto & [_placeholder, outputPath] : res) {
-            allowPath(store->toRealPath(outputPath));
+            /* Add the output of this derivations to the allowed
+               paths. */
+            if (allowedPaths) {
+                allowPath(outputPath);
+            }
+            /* Get all the output paths corresponding to the placeholders we had */
+            if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
+                res.insert_or_assign(
+                    DownstreamPlaceholder::unknownCaOutput(drv.drvPath, outputName).render(),
+                    store->printStorePath(outputPath)
+                );
+            }
         }
     }
 

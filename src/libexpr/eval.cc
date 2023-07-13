@@ -1068,14 +1068,15 @@ void EvalState::mkOutputString(
     Value & value,
     const StorePath & drvPath,
     const std::string outputName,
-    std::optional<StorePath> optOutputPath)
+    std::optional<StorePath> optOutputPath,
+    const ExperimentalFeatureSettings & xpSettings)
 {
     value.mkString(
         optOutputPath
             ? store->printStorePath(*std::move(optOutputPath))
             /* Downstream we would substitute this for an actual path once
                we build the floating CA derivation */
-            : DownstreamPlaceholder::unknownCaOutput(drvPath, outputName).render(),
+            : DownstreamPlaceholder::unknownCaOutput(drvPath, outputName, xpSettings).render(),
         NixStringContext {
             NixStringContextElem::Built {
                 .drvPath = drvPath,
