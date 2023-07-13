@@ -16,7 +16,7 @@ function diffAndAcceptInner() {
     fi
 
     # Diff so we get a nice message
-    if ! diff "$got" "$expectedOrEmpty"; then
+    if ! diff --unified "$got" "$expectedOrEmpty"; then
         echo "FAIL: evaluation result of $testName not as expected"
         badDiff=1
     fi
