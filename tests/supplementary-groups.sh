@@ -5,6 +5,10 @@ requireSandboxSupport
 if ! command -p -v unshare; then skipTest "Need unshare"; fi
 needLocalStore "The test uses --store always so we would just be bypassing the daemon"
 
+# Avoid store dir being inside sandbox build-dir
+unset NIX_STORE_DIR
+unset NIX_STATE_DIR
+
 unshare --mount --map-root-user bash <<EOF
   source common.sh
 
