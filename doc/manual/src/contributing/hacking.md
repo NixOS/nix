@@ -166,7 +166,7 @@ When Nix is built such that `./configure` is passed any of the `--host`, `--buil
 <cpu>-<vendor>[-<kernel>]-<os>
 ```
 
-For historic reasons and backward-compatibility, some CPU and OS identifiers are transformed as follows in [`configure.ac`](https://github.com/nixos/nix/blob/master/config/config.sub):
+For historic reasons and backward-compatibility, some CPU and OS identifiers are translated from the GNU Autotools naming convention in [`configure.ac`](https://github.com/nixos/nix/blob/master/config/config.sub) as follows:
 
 | `config.guess`             | Nix                 |
 |----------------------------|---------------------|
