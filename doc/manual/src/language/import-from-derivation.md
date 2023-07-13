@@ -1,6 +1,6 @@
 # Import From Derivation
 
-The value of a Nix expression can depend on the contents of a [store object] produced by a [derivation].
+The value of a Nix expression can depend on the contents of a [store object].
 In this case, when that store object is needed, evaluation will be paused, the store object [realised], and then evaluation resumed.
 
 [store object]: /glossary.md#gloss-store-object
@@ -10,18 +10,18 @@ In this case, when that store object is needed, evaluation will be paused, the s
 This has performance implications:
 Since evaluation is sequential, each required store object that is not already in the store will also be realised sequentially.
 
-Passing a derivation `drv` to any built-in function that reads from the filesystem constitutes Import From Derivation:
+Passing an expression `expr` which evaluates to a store path to any built-in function that reads from the filesystem constitutes Import From Derivation:
 
-- [`import`](./language/builtins.md#builtins-import)` drv`
-- [`builtins.readFile`](./language/builtins.md#builtins-readFile)` drv`
-- [`builtins.readDir`](./language/builtins.md#builtins-readDir)` drv`
-- [`builtins.pathExists`](./language/builtins.md#builtins-pathExists)` drv`
-- [`builtins.filterSource`](./language/builtins.md#builtins-filterSource)` f drv`
-- [`builtins.path`](./language/builtins.md#builtins-path)` { path = drv; }`
-- [`builtins.hashFile`](./language/builtins.md#builtins-hashFile)` t drv`
+- [`import`](./language/builtins.md#builtins-import)` expr`
+- [`builtins.readFile`](./language/builtins.md#builtins-readFile)` expr`
+- [`builtins.readDir`](./language/builtins.md#builtins-readDir)` expr`
+- [`builtins.pathExists`](./language/builtins.md#builtins-pathExists)` expr`
+- [`builtins.filterSource`](./language/builtins.md#builtins-filterSource)` f expr`
+- [`builtins.path`](./language/builtins.md#builtins-path)` { path = expr; }`
+- [`builtins.hashFile`](./language/builtins.md#builtins-hashFile)` t expr`
 - `builtins.scopedImport x drv`
 
-Building during evaluation can be disabled by setting [`allow-import-from-derivation`](../command-ref/conf-file.md#conf-allow-import-from-derivation) to `false`.
+Realising store objects during evaluation can be disabled by setting [`allow-import-from-derivation`](../command-ref/conf-file.md#conf-allow-import-from-derivation) to `false`.
 
 ## Example
 
