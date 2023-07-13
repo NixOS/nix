@@ -48,6 +48,19 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
 6. Do not expect your pull request to be reviewed immediately.
    Nix maintainers follow a [structured process for reviews and design decisions](https://github.com/NixOS/nix/tree/master/maintainers#project-board-protocol), which may or may not prioritise your work.
 
+   Following this checklist will make the process smoother for everyone:
+
+   - [ ] Fixes an [idea approved](https://github.com/NixOS/nix/labels/idea%20approved) issue
+   - [ ] Tests, as appropriate:
+     - Functional tests – [`tests/**.sh`](./tests)
+     - Unit tests – [`src/*/tests`](./src/)
+     - Integration tests – [`tests/nixos/*`](./tests/nixos)
+   - [ ] User documentation in the [manual](..doc/manual/src)
+   - [ ] API documentation in header files
+   - [ ] Code and comments are self-explanatory
+   - [ ] Commit message explains **why** the change was made
+   - [ ] New feature or incompatible change: updated [release notes](./doc/manual/src/release-notes/rl-next.md)
+
 7. If you need additional feedback or help to getting pull request into shape, ask other contributors using [@mentions](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#mentioning-people-and-teams).
 
 ## Making changes to the Nix manual
