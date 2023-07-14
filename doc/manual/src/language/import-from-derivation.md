@@ -3,22 +3,22 @@
 The value of a Nix expression can depend on the contents of a [store object].
 In this case, when that store object is needed, evaluation will be paused, the store object [realised], and then evaluation resumed.
 
-[store object]: /glossary.md#gloss-store-object
-[derivation]: /glossary.md#gloss-derivation
-[realised]: /glossary.md#gloss-realise
+[store object]: @docroot@/glossary.md#gloss-store-object
+[derivation]: @docroot@/glossary.md#gloss-derivation
+[realised]: @docroot@/glossary.md#gloss-realise
 
 This has performance implications:
 Since evaluation is sequential, each required store object that is not already in the store will also be realised sequentially.
 
 Passing an expression `expr` which evaluates to a store path to any built-in function that reads from the filesystem constitutes Import From Derivation:
 
-- [`import`](./language/builtins.md#builtins-import)` expr`
-- [`builtins.readFile`](./language/builtins.md#builtins-readFile)` expr`
-- [`builtins.readDir`](./language/builtins.md#builtins-readDir)` expr`
-- [`builtins.pathExists`](./language/builtins.md#builtins-pathExists)` expr`
-- [`builtins.filterSource`](./language/builtins.md#builtins-filterSource)` f expr`
-- [`builtins.path`](./language/builtins.md#builtins-path)` { path = expr; }`
-- [`builtins.hashFile`](./language/builtins.md#builtins-hashFile)` t expr`
+- [`import`](./builtins.md#builtins-import)` expr`
+- [`builtins.readFile`](./builtins.md#builtins-readFile)` expr`
+- [`builtins.readDir`](./builtins.md#builtins-readDir)` expr`
+- [`builtins.pathExists`](./builtins.md#builtins-pathExists)` expr`
+- [`builtins.filterSource`](./builtins.md#builtins-filterSource)` f expr`
+- [`builtins.path`](./builtins.md#builtins-path)` { path = expr; }`
+- [`builtins.hashFile`](./builtins.md#builtins-hashFile)` t expr`
 - `builtins.scopedImport x drv`
 
 Realising store objects during evaluation can be disabled by setting [`allow-import-from-derivation`](../command-ref/conf-file.md#conf-allow-import-from-derivation) to `false`.
