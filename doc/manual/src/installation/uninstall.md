@@ -1,7 +1,20 @@
 # Uninstalling Nix
 
-## Single User
+## Sections
+- [Single User](#single-user)
+  - [If you have a single-user installation of Nix](#if-you-have-a-single-user-installation-of-nix)
+  - [Manual Method](#manual-method)
+    - [Step 1: Unload the service](#step-1-unload-the-service)
+    - [Step 2: Restore Modified Files (if applicable)](#step-2-restore-modified-files-if-applicable)
+    - [Step 3: Remove the users and groups](#step-3-remove-the-users-and-groups)
+    - [Step 4: Delete Nix Files](#step-4-delete-nix-files)
+- [Multi User](#multi-user)
+    - [Linux](#linux)
+    - [macOS](#macos)
 
+
+## Single User
+### If you have a [single-user installation](./installing-binary.md#single-user-installation) of Nix
 ### Manual Method
 
 #### Step 1: Unload the service
