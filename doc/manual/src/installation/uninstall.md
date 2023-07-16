@@ -2,46 +2,37 @@
 
 ## Single User
 
-### Automatic Method
-
-To automatically uninstall a single-user Nix installation, you can download and run a script provided in the Nix repository. Here's how you do it:
-
-1. Download the uninstall script:
-
-    ```bash
-    curl -O https://raw.githubusercontent.com/NixOS/nix/master/scripts/uninstall-single-user.sh
-    ```
-
-2. Make the script executable:
-
-    ```bash
-    chmod +x uninstall-single-user.sh
-    ```
-
-3. Run the script:
-
-    ```bash
-    ./uninstall-single-user.sh
-    ```
-
-4. Verify that the expected files no longer exist on your system:
-
-    ```bash
-    ls /etc/nix
-    ```
-
-If the `ls` command doesn't display any files or directories, then you've successfully uninstalled Nix.
-
-
- #### Step 2:
-
- Check the expected files no longer exist on your system. For example:
-      
-       ls /etc/nix
-
 ### Manual Method
 
-#### Step 1: Restore Modified Files (if applicable)
+#### Step 1: Unload the service
+
+1. The first step targets what's called the Nix service "daemon". In computing, a "daemon" is a program that runs behind the scenes instead of directly under a user's control. For Nix, the daemon helps with tasks like updating packages. When uninstalling Nix, it's crucial to stop and delete this daemon first, to prevent it from trying to do tasks during the uninstall process.
+   ```bash
+   PLIST="/Library/LaunchDaemons/org.nixos.nix-daemon.plist"; if sudo launchctl list | grep -q nix-daemon; then sudo launchctl unload "$PLIST"; fi; if [ -f "$PLIST" ]; then sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist; fi
+   ```
+
+      ##### The Command Explained
+      1. This sets the path of the Nix daemon's property list file to a variable for easier referencing:
+
+         `PLIST="/Library/LaunchDaemons/org.nixos.nix-daemon.plist"`
+
+      2. This checks if the nix-daemon service is running:
+
+         `sudo launchctl list | grep -q nix-daemon`
+
+      3.  If the Nix service is running, this command unloads it: 
+         
+            `sudo launchctl unload "$PLIST"`
+      
+      4.  This checks if the property list file exists:
+      
+          `[ -f "$PLIST" ]`
+
+      5.  If the property list file exists, this command deletes it:
+      
+            `sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist`
+
+#### Step 2: Restore Modified Files (if applicable)
 
 1. Nix may have modified certain files on your system. If you have created backup copies of these files before installing Nix, you can restore them. Here are the instructions for bash and zsh files:
 
@@ -63,11 +54,34 @@ If the `ls` command doesn't display any files or directories, then you've succes
      Note: After restoring the file, you may need to close and reopen any zsh terminal sessions to ensure they are using the restored configurations.
 
 
-### Step 2: Delete Nix Files
+#### Step 3: Remove the users and groups
+
+1. This step is used to remove any user and group accounts associated with the Nix service. 
+   ```bash
+   for i in $(seq 1 $(sysctl -n hw.ncpu)); do sudo /usr/bin/dscl . -delete "/Users/nixbld$i" || true; done; sudo /usr/bin/dscl . -delete "/Groups/nixbld" || true
+   ```
+
+   ##### The Command Explained
+      1. This generates a sequence of numbers from 1 to the number of logical CPUs on the system. Nix creates a build user for each CPU to parallelize builds, so this ensures that all build users are deleted.
+
+         `seq 1 $(sysctl -n hw.ncpu)`
+
+      2. 
+         This deletes each user named "nixbld" followed by a number. If the user doesn't exist (which would cause an error), the || true part causes the command to succeed anyway.
+
+         `sudo /usr/bin/dscl . -delete "/Users/nixbld$i" || true; done`
+      
+      3.
+         This deletes the "nixbld" group. If the group doesn't exist (which would cause an error), the || true part causes the command to succeed anyway: 
+
+         `sudo /usr/bin/dscl . -delete "/Groups/nixbld" || true`
+
+
+#### Step 4: Delete Nix Files
 
 1. Run the following command in a terminal to delete the files that Nix added to your system:
-   ```
-   sudo rm -rf "/etc/nix" "$NIX_ROOT" "$HOME/.nix-profile" "$HOME/.nix-defexpr" "$HOME/.nix-channels" "$HOME/.local/state/nix" "$HOME/.cache/nix" "$HOME/.nix-profile" "$HOME/.nix-defexpr" "$HOME/.nix-channels" "$HOME/.local/state/nix" "$HOME/.cache/nix"
+   ```bash
+   sudo rm -rf "/etc/nix" "$HOME/.nix-profile" "$HOME/.nix-defexpr" "$HOME/.nix-channels" "$HOME/.cache/nix" "$NIX_ROOT" "/nix"
    ```
 
 You have successfully uninstalled Nix from your system. Remember to double-check the commands before executing them and ensure that you have the necessary permissions to perform the uninstallation steps.

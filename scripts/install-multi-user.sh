@@ -109,13 +109,6 @@ get_help() {
     contact_us
 }
 
-if [ -d "/nix" ]; then
-    echo "$(tput setaf 1)Error: /nix already exists on your system.$(tput sgr0)"
-    uninstall_directions
-    echo "$(tput setaf 2)Alternatively, run the uninstall script located at scripts/uninstall-single-user.sh"
-    exit 1
-fi
-
 uninstall_directions() {
     subheader "Uninstalling nix:"
     local step=0
