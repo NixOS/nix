@@ -331,7 +331,7 @@
             name = "nix-${version}";
             inherit version;
 
-            src = sourceByRegexInverted [ "tests/nixos/.*" "tests/installer/.*" ] self;
+            src = sourceByRegexInverted [ "tests/nixos/.*" "tests/installer/.*" "python/*" "flake.nix" ] self;
             VERSION_SUFFIX = versionSuffix;
 
             outputs = [ "out" "dev" "doc" ];
@@ -439,6 +439,8 @@
               postUnpack = "sourceRoot=$sourceRoot/perl";
             });
 
+            passthru.python-bindings = prev.callPackage ./python { };
+
             meta.platforms = lib.platforms.unix;
           });
 
@@ -499,6 +501,10 @@
 
         # Perl bindings for various platforms.
         perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nix.perl-bindings);
+
+        pythonBindings = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix.python-bindings);
+        # TODO: recurseIntoAttrs or combine multiple tests into a single one
+        pythonBindingsTests = nixpkgs.lib.genAttrs systems (system: self.packages.${system}.nix.python-bindings.tests.example-buildPythonApplication);
 
         # Binary tarball for various platforms, containing a Nix store
         # with the closure of 'nix' package, and the second half of
@@ -647,6 +653,7 @@
       checks = forAllSystems (system: {
         binaryTarball = self.hydraJobs.binaryTarball.${system};
         perlBindings = self.hydraJobs.perlBindings.${system};
+        pythonBindings = self.hydraJobs.pythonBindings.${system};
         installTests = self.hydraJobs.installTests.${system};
         nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
@@ -729,6 +736,7 @@
             (forAllCrossSystems (crossSystem: let pkgs = nixpkgsFor.${system}.cross.${crossSystem}; in makeShell pkgs pkgs.stdenv)) //
             {
               default = self.devShells.${system}.native-stdenvPackages;
+              python = self.packages.${system}.nix.python-bindings.shell;
             }
         );
   };
