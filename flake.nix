@@ -648,9 +648,10 @@
         binaryTarball = self.hydraJobs.binaryTarball.${system};
         perlBindings = self.hydraJobs.perlBindings.${system};
         installTests = self.hydraJobs.installTests.${system};
-        nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
       } // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
         dockerImage = self.hydraJobs.dockerImage.${system};
+      } // (lib.optionalAttrs (!lib.hasSuffix "darwin" system)) {
+        nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
       });
 
       packages = forAllSystems (system: rec {
