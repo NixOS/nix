@@ -58,7 +58,7 @@ The following diagram shows how evaluation is interrupted by a build, if the val
 
 ```
 +----------------------+             +------------------------+
-| Nix language         |             | Nix store              |
+| Nix evaluator        |             | Nix store              |
 |  .----------------.  |             |                        |
 |  | Nix expression |  |             |                        |
 |  '----------------'  |             |                        |
