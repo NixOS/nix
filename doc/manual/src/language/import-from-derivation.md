@@ -33,7 +33,7 @@ In the following Nix expression, the inner derivation `drv` produces a file cont
 let
   drv = derivation {
     name = "hello";
-    builder = /bin/sh;
+    builder = "/bin/sh";
     args = [ "-c" ''echo \"hello\" > $out'' ];
     system = builtins.currentSystem;
   };
