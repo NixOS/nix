@@ -136,19 +136,22 @@ struct StoreConfig : public Config
 
     Setting<int> priority{this, 0, "priority",
         R"(
-          Priority of this store when used as a substituter. A lower value means a higher priority.
+          Priority of this store when used as a [substituter](@docroot@/command-ref/conf-file.md#conf-substituters).
+          A lower value means a higher priority.
         )"};
 
     Setting<bool> wantMassQuery{this, false, "want-mass-query",
         R"(
-          Whether this store (when used as a substituter) can be
-          queried efficiently for path validity.
+          Whether this store can be queried efficiently for path validity when used as a [substituter](@docroot@/command-ref/conf-file.md#conf-substituters).
         )"};
 
     Setting<StringSet> systemFeatures{this, getDefaultSystemFeatures(),
         "system-features",
-        "Optional features that the system this store builds on implements (like \"kvm\")."};
+        R"(
+          Optional [system features](@docroot@/command-ref/conf-file.md#conf-system-features) available on the system this store uses to build derivations.
 
+          Example: `"kvm"`
+        )" };
 };
 
 class Store : public std::enable_shared_from_this<Store>, public virtual StoreConfig
