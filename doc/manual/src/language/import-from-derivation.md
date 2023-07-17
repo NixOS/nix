@@ -10,7 +10,7 @@ In this case, when that store object is needed, evaluation will be paused, the s
 This has performance implications:
 Since evaluation is sequential, each required store object that is not already in the store will also be realised sequentially.
 
-Passing an expression `expr` which evaluates to a store path to any built-in function that reads from the filesystem constitutes Import From Derivation:
+Passing a store path to any built-in function that reads from the filesystem constitutes Import From Derivation:
 
 - [`import`](./builtins.md#builtins-import)` expr`
 - [`builtins.readFile`](./builtins.md#builtins-readFile)` expr`
