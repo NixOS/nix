@@ -557,6 +557,8 @@ EvalState::EvalState(
 {
     countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
+    validateNondeterminism = getEnv("NIX_VALIDATE_EVAL_NONDETERMINISM").value_or("0") != "0";
+
     assert(gcInitialised);
 
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
@@ -2464,11 +2466,24 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
 
             /* Otherwise, compare the attributes one by one. */
             Bindings::iterator i, j;
-            for (i = v1.attrs->begin(), j = v2.attrs->begin(); i != v1.attrs->end(); ++i, ++j)
+            bool result = true;
+            for (i = v1.attrs->begin(), j = v2.attrs->begin(); i != v1.attrs->end(); ++i, ++j) {
                 if (i->name != j->name || !eqValues(*i->value, *j->value, pos, errorCtx))
-                    return false;
+                    result = false;
+                /* Do not short-cut comparison to catch attrset
+                 * non-determinism caused by thrown exceptions
+                 * when attribute sets are compared. Example:
+                 *   > { a = 1; b = assert false; 1; } == { a = 2; b = 1; }
+                 *   false
+                 *   > { b = 1; a = assert false; 1; } == { b = 2; a = 1; }
+                 *   error: assertion 'false' failed
+                 *
+                 * Exhaustive check should catch such non-determinism.
+                 */
+                if (!result && !validateNondeterminism) return result;
+            }
 
-            return true;
+            return result;
         }
 
         /* Functions are incomparable. */

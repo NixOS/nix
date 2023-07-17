@@ -30,3 +30,7 @@ expectStderr 1 nix-instantiate --eval -E '[]' -A 'x' | grepQuiet "should be a se
 expectStderr 1 nix-instantiate --eval -E '{}' -A '1' | grepQuiet "should be a list"
 expectStderr 1 nix-instantiate --eval -E '{}' -A '.' | grepQuiet "empty attribute name"
 expectStderr 1 nix-instantiate --eval -E '[]' -A '1' | grepQuiet "out of range"
+
+# Validate deterministic attrset comparison:
+NIX_VALIDATE_EVAL_NONDETERMINISM=1 expectStderr 1 nix-instantiate --eval -E '{ a = 1; b = assert false; 1; } == { a = 2; b = 1; }' | grepQuiet "assertion 'false' failed"
+NIX_VALIDATE_EVAL_NONDETERMINISM=1 expectStderr 1 nix-instantiate --eval -E '{ b = 1; a = assert false; 1; } == { b = 2; a = 1; }' | grepQuiet "assertion 'false' failed"

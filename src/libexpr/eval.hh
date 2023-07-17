@@ -727,6 +727,8 @@ private:
 
     bool countCalls;
 
+    bool validateNondeterminism;
+
     typedef std::map<std::string, size_t> PrimOpCalls;
     PrimOpCalls primOpCalls;
 
