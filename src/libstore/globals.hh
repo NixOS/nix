@@ -524,6 +524,24 @@ public:
     Setting<bool> sandboxFallback{this, true, "sandbox-fallback",
         "Whether to disable sandboxing when the kernel doesn't allow it."};
 
+    Setting<bool> requireDropSupplementaryGroups{this, getuid() == 0, "require-drop-supplementary-groups",
+        R"(
+          Following the principle of least privilege,
+          Nix will attempt to drop supplementary groups when building with sandboxing.
+
+          However this can fail under some circumstances.
+          For example, if the user lacks the `CAP_SETGID` capability.
+          Search `setgroups(2)` for `EPERM` to find more detailed information on this.
+
+          If you encounter such a failure, setting this option to `false` will let you ignore it and continue.
+          But before doing so, you should consider the security implications carefully.
+          Not dropping supplementary groups means the build sandbox will be less restricted than intended.
+
+          This option defaults to `true` when the user is root
+          (since `root` usually has permissions to call setgroups)
+          and `false` otherwise.
+        )"};
+
 #if __linux__
     Setting<std::string> sandboxShmSize{
         this, "50%", "sandbox-dev-shm-size",

@@ -912,15 +912,13 @@ void LocalDerivationGoal::startBuilder()
             openSlave();
 
             /* Drop additional groups here because we can't do it
-               after we've created the new user namespace.  FIXME:
-               this means that if we're not root in the parent
-               namespace, we can't drop additional groups; they will
-               be mapped to nogroup in the child namespace. There does
-               not seem to be a workaround for this. (But who can tell
-               from reading user_namespaces(7)?)
-               See also https://lwn.net/Articles/621612/. */
-            if (getuid() == 0 && setgroups(0, 0) == -1)
-                throw SysError("setgroups failed");
+               after we've created the new user namespace. */
+            if (setgroups(0, 0) == -1) {
+                if (errno != EPERM)
+                    throw SysError("setgroups failed");
+                if (settings.requireDropSupplementaryGroups)
+                    throw Error("setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
+            }
 
             ProcessOptions options;
             options.cloneFlags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;

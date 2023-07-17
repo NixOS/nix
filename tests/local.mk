@@ -95,6 +95,7 @@ nix_tests = \
   misc.sh \
   dump-db.sh \
   linux-sandbox.sh \
+  supplementary-groups.sh \
   build-dry.sh \
   structured-attrs.sh \
   shell.sh \
