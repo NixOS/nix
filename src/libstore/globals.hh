@@ -689,19 +689,21 @@ public:
         getDefaultSystemFeatures(),
         "system-features",
         R"(
-          A set of system “features” supported by this machine, e.g. `kvm`.
-          Derivations can express a dependency on such features through the
-          derivation attribute `requiredSystemFeatures`. For example, the
-          attribute
+          A set of system “features” supported by this machine.
+          Derivations can express a dependency on such features through the derivation attribute `requiredSystemFeatures`.
+
+          For example, the attribute
 
               requiredSystemFeatures = [ "kvm" ];
 
-          ensures that the derivation can only be built on a machine with the
-          `kvm` feature.
+          ensures that the derivation can only be built on a machine with the `kvm` feature.
 
-          This setting by default includes `kvm` if `/dev/kvm` is accessible,
-          and the pseudo-features `nixos-test`, `benchmark` and `big-parallel`
-          that are used in Nixpkgs to route builds to specific machines.
+          This setting by default includes
+          - `kvm` if `/dev/kvm` is accessible
+          - historical pseudo-features for backwards compatibility, used in Nixpkgs to route Hydra builds to specific machines
+            - `nixos-test`
+            - `benchmark`
+            - `big-parallel`
         )", {}, false};
 
     Setting<Strings> substituters{
