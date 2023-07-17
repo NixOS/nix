@@ -14,6 +14,7 @@ Passing an expression `expr` which evaluates to a store path to any built-in fun
 
 - [`import`](./builtins.md#builtins-import)` expr`
 - [`builtins.readFile`](./builtins.md#builtins-readFile)` expr`
+- [`builtins.readFileType`](./builtins.md#builtins-readFileType)` expr`
 - [`builtins.readDir`](./builtins.md#builtins-readDir)` expr`
 - [`builtins.pathExists`](./builtins.md#builtins-pathExists)` expr`
 - [`builtins.filterSource`](./builtins.md#builtins-filterSource)` f expr`
