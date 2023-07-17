@@ -92,10 +92,10 @@ In this fragment from `all-packages.nix`,
 ```nix
 graphviz = (import ../tools/graphics/graphviz) {
   inherit fetchurl stdenv libpng libjpeg expat x11 yacc;
-  inherit (xlibs) libXaw;
+  inherit (xorg) libXaw;
 };
 
-xlibs = {
+xorg = {
   libX11 = ...;
   libXaw = ...;
   ...
@@ -109,7 +109,7 @@ libjpg = ...;
 the set used in the function call to the function defined in
 `../tools/graphics/graphviz` inherits a number of variables from the
 surrounding scope (`fetchurl` ... `yacc`), but also inherits `libXaw`
-(the X Athena Widgets) from the `xlibs` (X11 client-side libraries) set.
+(the X Athena Widgets) from the `xorg` set.
 
 Summarizing the fragment
 

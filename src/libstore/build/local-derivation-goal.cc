@@ -594,6 +594,10 @@ void LocalDerivationGoal::startBuilder()
             else
                 dirsInChroot[i.substr(0, p)] = {i.substr(p + 1), optional};
         }
+        if (hasPrefix(worker.store.storeDir, tmpDirInSandbox))
+        {
+            throw Error("`sandbox-build-dir` must not contain the storeDir");
+        }
         dirsInChroot[tmpDirInSandbox] = tmpDir;
 
         /* Add the closure of store paths to the chroot. */

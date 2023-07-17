@@ -95,6 +95,7 @@ perl/Makefile.config
 # /tests/lang/
 /tests/lang/*.out
 /tests/lang/*.out.xml
+/tests/lang/*.err
 /tests/lang/*.ast
 
 /perl/lib/Nix/Config.pm

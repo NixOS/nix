@@ -1502,6 +1502,8 @@ static RegisterPrimOp primop_storePath({
       in a new path (e.g. `/nix/store/ld01dnzc…-source-source`).
 
       Not available in [pure evaluation mode](@docroot@/command-ref/conf-file.md#conf-pure-eval).
+
+      See also [`builtins.fetchClosure`](#builtins-fetchClosure).
     )",
     .fun = prim_storePath,
 });
@@ -1656,9 +1658,9 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
             }));
         }
 
-        searchPath.emplace_back(SearchPathElem {
-            .prefix = prefix,
-            .path = path,
+        searchPath.elements.emplace_back(SearchPath::Elem {
+            .prefix = SearchPath::Prefix { .s = prefix },
+            .path = SearchPath::Path { .s = path },
         });
     }
 
@@ -4319,12 +4321,12 @@ void EvalState::createBaseEnv()
     });
 
     /* Add a value containing the current Nix expression search path. */
-    mkList(v, searchPath.size());
+    mkList(v, searchPath.elements.size());
     int n = 0;
-    for (auto & i : searchPath) {
+    for (auto & i : searchPath.elements) {
         auto attrs = buildBindings(2);
-        attrs.alloc("path").mkString(i.path);
-        attrs.alloc("prefix").mkString(i.prefix);
+        attrs.alloc("path").mkString(i.path.s);
+        attrs.alloc("prefix").mkString(i.prefix.s);
         (v.listElems()[n++] = allocValue())->mkAttrs(attrs);
     }
     addConstant("__nixPath", v, {

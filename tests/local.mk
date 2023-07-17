@@ -20,6 +20,7 @@ nix_tests = \
   remote-store.sh \
   legacy-ssh-store.sh \
   lang.sh \
+  lang-test-infra.sh \
   experimental-features.sh \
   fetchMercurial.sh \
   gc-auto.sh \
@@ -137,7 +138,8 @@ nix_tests = \
   path-from-hash-part.sh \
   test-libstoreconsumer.sh \
   toString-path.sh \
-  read-only-store.sh
+  read-only-store.sh \
+  nested-sandboxing.sh
 
 ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh
