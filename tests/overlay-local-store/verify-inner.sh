@@ -16,17 +16,24 @@ initLowerStore
 
 mountOverlayfs
 
-#path=$(nix-store --store "$storeB" --add ../dummy)
+# Realise a derivation from the lower store to propagate paths to overlay DB
+nix-store --store "$storeB" --realise $drvPath
 
-path=$(nix-build --store $storeB ../hermetic.nix --arg busybox "$busybox" --arg seed 1)
+# Also ensure dummy file exists in overlay DB
+dummyPath=$(nix-store --store "$storeB" --add ../dummy)
 
-inputDrvPath=$(find "$storeA" -name "*-hermetic-input-1.drv")
-rm -v "$inputDrvPath"
+# Verify should be successful at this point
+nix-store --store "$storeB" --verify --check-contents
 
-#tree "$TEST_ROOT"
+# Now delete one of the derivation inputs in the lower store
+inputDrvFullPath=$(find "$storeA" -name "*-hermetic-input-1.drv")
+inputDrvPath=${inputDrvFullPath/*\/nix\/store\///nix/store/}
+rm -v "$inputDrvFullPath"
 
-#rm -v "$TEST_ROOT/store-a/$path"
+# And truncate the contents of dummy file in lower store
+find "$storeA" -name "*-dummy" -exec truncate -s 0 {} \;
 
-nix-store --store "$storeB" --verify
-
-echo "SUCCESS"
+# Verify should fail with the messages about missing input and modified dummy file
+verifyOutput=$(expectStderr 1 nix-store --store "$storeB" --verify --check-contents)
+<<<"$verifyOutput" grepQuiet "path '$inputDrvPath' disappeared, but it still has valid referrers!"
+<<<"$verifyOutput" grepQuiet "path '$dummyPath' was modified! expected hash"
