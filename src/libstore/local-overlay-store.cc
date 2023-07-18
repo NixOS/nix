@@ -188,6 +188,11 @@ void LocalOverlayStore::deleteGCPath(const Path & path, uint64_t & bytesFreed)
     }
 }
 
+void LocalOverlayStore::optimiseStore()
+{
+    warn("not implemented");
+}
+
 bool LocalOverlayStore::verifyStore(bool checkContents, RepairFlag repair)
 {
     if (repair)
