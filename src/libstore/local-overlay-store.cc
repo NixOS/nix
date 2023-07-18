@@ -188,6 +188,13 @@ void LocalOverlayStore::deleteGCPath(const Path & path, uint64_t & bytesFreed)
     }
 }
 
+bool LocalOverlayStore::verifyStore(bool checkContents, RepairFlag repair)
+{
+    if (repair)
+        warn("local-overlay: store does not support --verify --repair");
+    return LocalStore::verifyStore(checkContents, NoRepair);
+}
+
 static RegisterStoreImplementation<LocalOverlayStore, LocalOverlayStoreConfig> regLocalOverlayStore;
 
 }

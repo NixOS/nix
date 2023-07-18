@@ -34,6 +34,7 @@ rm -v "$inputDrvFullPath"
 find "$storeA" -name "*-dummy" -exec truncate -s 0 {} \;
 
 # Verify should fail with the messages about missing input and modified dummy file
-verifyOutput=$(expectStderr 1 nix-store --store "$storeB" --verify --check-contents)
+verifyOutput=$(expectStderr 1 nix-store --store "$storeB" --verify --check-contents --repair)
 <<<"$verifyOutput" grepQuiet "path '$inputDrvPath' disappeared, but it still has valid referrers!"
 <<<"$verifyOutput" grepQuiet "path '$dummyPath' was modified! expected hash"
+<<<"$verifyOutput" grepQuiet "store does not support --verify --repair"
