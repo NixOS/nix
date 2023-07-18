@@ -8,7 +8,7 @@ requireEnvironment () {
 }
 
 setupConfig () {
-  echo "drop-supplementary-groups = false" >> "$NIX_CONF_DIR"/nix.conf
+  echo "require-drop-supplementary-groups = false" >> "$NIX_CONF_DIR"/nix.conf
   echo "build-users-group = " >> "$NIX_CONF_DIR"/nix.conf
 }
 
@@ -53,4 +53,13 @@ initLowerStore () {
 
 execUnshare () {
   exec unshare --mount --map-root-user "$@"
+}
+
+addTextToStore() {
+  storeDir=$1; shift
+  filename=$1; shift
+  content=$1; shift
+  filePath="$TEST_HOME/$filename"
+  echo "$content" > "$filePath"
+  nix-store --store "$storeDir" --add "$filePath"
 }

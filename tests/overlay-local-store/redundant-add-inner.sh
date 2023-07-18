@@ -7,7 +7,7 @@ set -x
 source common.sh
 
 # Avoid store dir being inside sandbox build-dir
-unset NIX_STORE_DIR
+unset NIX_STORE_DIR  # TODO: This causes toRealPath to fail (it expects this var to be set)
 unset NIX_STATE_DIR
 
 storeDirs
@@ -27,4 +27,5 @@ path=$(nix-store --store "$storeB" --add ../dummy)
 stat $(toRealPath "$storeA/nix/store" "$path")
 
 # upper layer should still not have it (no redundant copy)
-expect 1 stat $(toRealPath "$storeB/nix/store" "$path")
+expect 1 stat $(toRealPath "$storeB/nix/store" "$path")  # TODO: Check this is failing for the right reason.
+                                                         # $storeB is a store URI not a directory path
