@@ -1,97 +1,135 @@
 # Derivations
 
-The most important built-in function is `derivation`, which is used to
-describe a single derivation (a build task). It takes as input a set,
-the attributes of which specify the inputs of the build.
+The most important built-in function is `derivation`, which is used to describe a single derivation:
+a build task to run a process on precisely defined input files and repeatably produce output files at uniquely determined file system paths.
 
-  - There must be an attribute named [`system`]{#attr-system} whose value must be a
-    string specifying a Nix system type, such as `"i686-linux"` or
-    `"x86_64-darwin"`. (To figure out your system type, run `nix -vv
-    --version`.) The build can only be performed on a machine and
-    operating system matching the system type. (Nix can automatically
-    [forward builds for other
-    platforms](../advanced-topics/distributed-builds.md) by forwarding
-    them to other machines.)
+It takes as input an attribute set, the attributes of which specify the inputs to the build.
+It outputs an attribute set, and produces a [store derivation](@docroot@/glossary.md#gloss-store-derivation) as a side effect of evaluation.
 
-  - There must be an attribute named `name` whose value must be a
-    string. This is used as a symbolic name for the package by
-    `nix-env`, and it is appended to the output paths of the derivation.
+<!-- FIXME: add a section on output attributes -->
 
-  - There must be an attribute named [`builder`]{#attr-builder} that identifies the
-    program that is executed to perform the build. It can be either a
-    derivation or a source (a local file reference, e.g.,
-    `./builder.sh`).
+## Input attributes
 
-  - Every attribute is passed as an environment variable to the builder.
-    Attribute values are translated to environment variables as follows:
-    
-      - Strings and numbers are just passed verbatim.
-    
-      - A *path* (e.g., `../foo/sources.tar`) causes the referenced file
-        to be copied to the store; its location in the store is put in
-        the environment variable. The idea is that all sources should
-        reside in the Nix store, since all inputs to a derivation should
-        reside in the Nix store.
-    
-      - A *derivation* causes that derivation to be built prior to the
-        present derivation; its default output path is put in the
-        environment variable.
-    
-      - Lists of the previous types are also allowed. They are simply
-        concatenated, separated by spaces.
-    
-      - `true` is passed as the string `1`, `false` and `null` are
-        passed as an empty string.
+### Required
 
-  - The optional attribute `args` specifies command-line arguments to be
-    passed to the builder. It should be a list.
+- [`name`]{#attr-name} ([String](@docroot@/language/values.md#type-string))
 
-  - The optional attribute `outputs` specifies a list of symbolic
-    outputs of the derivation. By default, a derivation produces a
-    single output path, denoted as `out`. However, derivations can
-    produce multiple output paths. This is useful because it allows
-    outputs to be downloaded or garbage-collected separately. For
-    instance, imagine a library package that provides a dynamic library,
-    header files, and documentation. A program that links against the
-    library doesn’t need the header files and documentation at runtime,
-    and it doesn’t need the documentation at build time. Thus, the
-    library package could specify:
-    
-    ```nix
-    outputs = [ "lib" "headers" "doc" ];
-    ```
-    
-    This will cause Nix to pass environment variables `lib`, `headers`
-    and `doc` to the builder containing the intended store paths of each
-    output. The builder would typically do something like
-    
-    ```bash
-    ./configure \
-      --libdir=$lib/lib \
-      --includedir=$headers/include \
-      --docdir=$doc/share/doc
-    ```
-    
-    for an Autoconf-style package. You can refer to each output of a
-    derivation by selecting it as an attribute, e.g.
-    
-    ```nix
-    buildInputs = [ pkg.lib pkg.headers ];
-    ```
-    
-    The first element of `outputs` determines the *default output*.
-    Thus, you could also write
-    
-    ```nix
-    buildInputs = [ pkg pkg.headers ];
-    ```
-    
-    since `pkg` is equivalent to `pkg.lib`.
+  Symbolic name for the derivation.
+  It is appended to the [store paths](@docroot@/glossary.md#gloss-store-path) of the resulting store derivation and its [output paths][output path].
 
-The function `mkDerivation` in the Nixpkgs standard environment is a
-wrapper around `derivation` that adds a default value for `system` and
-always uses Bash as the builder, to which the supplied builder is passed
-as a command-line argument. See the Nixpkgs manual for details.
+  Example: `name = "hello";`
+
+- [`system`]{#attr-system} ([String](@docroot@/language/values.md#type-string))
+
+  The system type on which the [`builder`](#attr-builder) executable can be run.
+
+  Nix will only build derivations where the `system` attribute matches the current [`system` configuration option].
+  It can automatically [build on other platforms](../advanced-topics/distributed-builds.md) by forwarding build requests to other machines.
+
+  Examples:
+
+  `system = "x86_64-linux";`
+
+  `system = builtins.currentSystem;`
+
+  [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem) has the value of the [`system` configuration option], and defaults to the system type of the current Nix installation.
+
+  [`system` configuration option]: @docroot@/command-ref/conf-file.md#conf-system
+
+- [`builder`]{#attr-builder} ([Path](@docroot@/language/values.md#type-path) | [String](@docroot@/language/values.md#type-string))
+
+  Path to an executable that will perform the build.
+
+  Examples:
+
+  `builder = "/bin/bash";`
+
+  `builder = ./builder.sh;`
+
+  `builder = "${pkgs.python}/bin/python";`
+
+### Optional
+
+- [`args`]{#attr-args} ([List](@docroot@/language/values.md#list) of [String](@docroot@/language/values.md#type-string)) Default: `[ ]`
+
+  Command-line arguments to be passed to the [`builder`](#attr-builder) executable.
+
+  Example: `args = [ "-c" "echo hello world > $out" ];`
+
+- [`outputs`]{#attr-outputs} ([List](@docroot@/language/values.md#list) of [String](@docroot@/language/values.md#type-string)) Default: `[ "out" ]`
+
+  Symbolic outputs of the derivation.
+  Each output name is passed to the [`builder`](#attr-builder) executable as an environment variable with its value set to the corresponding [output path].
+
+  [output path]: @docroot@/glossary.md#gloss-output-path
+
+  By default, a derivation produces a single output path called `out`.
+  However, derivations can produce multiple output paths.
+  This allows the associated [store objects](@docroot@/glossary.md#gloss-store-object) and their [closures](@docroot@/glossary.md#gloss-closure) to be copied or garbage-collected separately.
+
+  Examples:
+
+  Imagine a library package that provides a dynamic library, header files, and documentation.
+  A program that links against the library doesn’t need the header files and documentation at runtime, and it doesn’t need the documentation at build time.
+  Thus, the library package could specify:
+
+  ```nix
+  outputs = [ "lib" "headers" "doc" ];
+  ```
+
+  This will cause Nix to pass environment variables `lib`, `headers`, and `doc` to the builder containing the intended store paths of each output.
+  The builder would typically do something like
+
+  ```bash
+  ./configure \
+    --libdir=$lib/lib \
+    --includedir=$headers/include \
+    --docdir=$doc/share/doc
+  ```
+
+  for an Autoconf-style package.
+
+  You can refer to each output of a
+  derivation by selecting it as an attribute, e.g.
+
+  ```nix
+  buildInputs = [ pkg.lib pkg.headers ];
+  ```
+  <!-- FIXME: move this to the output attributes section when we have one -->
+
+  The first element of `outputs` determines the *default output*.
+  Thus, you could also write
+
+  ```nix
+  buildInputs = [ pkg pkg.headers ];
+  ```
+
+  since `pkg` is equivalent to `pkg.lib`.
+
+- See [Advanced Attributes](./advanced-attributes.md) for more, infrequently used, optional attributes.
+
+  <!-- FIXME: This should be moved here -->
+
+- Every other attribute is passed as an environment variable to the builder.
+  Attribute values are translated to environment variables as follows:
+
+    - Strings and numbers are just passed verbatim.
+
+    - A *path* (e.g., `../foo/sources.tar`) causes the referenced file
+      to be copied to the store; its location in the store is put in
+      the environment variable. The idea is that all sources should
+      reside in the Nix store, since all inputs to a derivation should
+      reside in the Nix store.
+
+    - A *derivation* causes that derivation to be built prior to the
+      present derivation; its default output path is put in the
+      environment variable.
+
+    - Lists of the previous types are also allowed. They are simply
+      concatenated, separated by spaces.
+
+    - `true` is passed as the string `1`, `false` and `null` are
+      passed as an empty string.
 
 ## Builder execution
 
