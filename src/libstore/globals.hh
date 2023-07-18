@@ -207,7 +207,7 @@ public:
           - `armv6l-linux`
           - `armv7l-linux`
 
-          In general, it never makes sense to modify this value when building derivations.
+          In general, you do not have to modify this setting.
           While you can force Nix to run a Darwin-specific `builder` executable on a Linux machine, the result would obviously be wrong.
 
           This value is available in the Nix language as [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem).
