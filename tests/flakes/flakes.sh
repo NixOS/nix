@@ -110,10 +110,18 @@ hash2=$(nix flake metadata flake1 --json --refresh | jq -r .revision)
 # Test 'nix build' on a flake.
 nix build -o $TEST_ROOT/result flake1#foo
 [[ -e $TEST_ROOT/result/hello ]]
+rm $TEST_ROOT/result
 
 # Test packages.default.
 nix build -o $TEST_ROOT/result flake1
 [[ -e $TEST_ROOT/result/hello ]]
+rm $TEST_ROOT/result
+
+# Test --absolute
+expectStderr 1 nix build -o $TEST_ROOT/result --absolute flake1#foo | grep -F "does not provide attribute 'foo'"
+nix build -o $TEST_ROOT/result --absolute flake1#packages.$system.foo
+[[ -e $TEST_ROOT/result/hello ]]
+rm $TEST_ROOT/result
 
 nix build -o $TEST_ROOT/result $flake1Dir
 nix build -o $TEST_ROOT/result git+file://$flake1Dir

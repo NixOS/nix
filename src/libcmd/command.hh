@@ -99,6 +99,10 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
 {
     std::optional<Path> file;
     std::optional<std::string> expr;
+    /**
+     * Disables attribute lookup in places like `packages.${system}`.
+     */
+    bool absoluteLookup = false;
 
     SourceExprCommand();
 
@@ -108,8 +112,46 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
     ref<Installable> parseInstallable(
         ref<Store> store, const std::string & installable);
 
+    /**
+     * @brief Attribute paths to use for looking up installable attributes
+     *
+     * Example path: `"defaultPackage." + currentSystem`
+     *
+     * @return List of attribute paths represented by strings. Empty when `absoluteLookup` is true.
+     */
+    Strings getFlakeAttrPaths();
+
+    /**
+     * @brief Attribute path prefixes to use for looking up installable attributes
+     *
+     * Example path: `"packages." + currentSystem` + "."
+     *
+     * @return List of attribute paths represented by strings. Empty when `absoluteLookup` is true.
+     */
+    Strings getFlakeAttrPathPrefixes();
+
+    /**
+     * @brief Attributes to look for when the installable has no attribute
+     *
+     * To be defined by command implementations. Call getFlakeAttrPaths() instead.
+     *
+     * The default implementation behaves like `nix build`.
+     *
+     * @return List of attribute paths represented by strings
+     */
     virtual Strings getDefaultFlakeAttrPaths();
 
+    /**
+     * @brief Attribute path prefixes to use for looking up installable attributes
+     *
+     * To be defined by command implementations. Call getFlakeAttrPathPrefixes() instead.
+     *
+     * Example path: `"packages." + currentSystem` + "."
+     *
+     * The default implementation behaves like `nix build`.
+     *
+     * @return List of attribute paths represented by strings
+     */
     virtual Strings getDefaultFlakeAttrPathPrefixes();
 
     void completeInstallable(std::string_view prefix);

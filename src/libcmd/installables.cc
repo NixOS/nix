@@ -185,6 +185,13 @@ SourceExprCommand::SourceExprCommand()
     });
 
     addFlag({
+        .longName = "absolute",
+        .description = "Look up [*installable*](@docroot@/command-ref/new-cli/nix.md#installables) attribute paths from the root only; do not look in e.g. `packages.${system}`.",
+        .category = installablesCategory,
+        .handler = {&absoluteLookup, true}
+    });
+
+    addFlag({
         .longName = "expr",
         .description = "Interpret [*installables*](@docroot@/command-ref/new-cli/nix.md#installables) as attribute paths relative to the Nix expression *expr*.",
         .category = installablesCategory,
@@ -205,6 +212,21 @@ MixReadOnlyOption::MixReadOnlyOption()
     });
 }
 
+Strings SourceExprCommand::getFlakeAttrPaths() {
+    if (absoluteLookup)
+        return {};
+    else
+        return getDefaultFlakeAttrPaths();
+}
+
+Strings SourceExprCommand::getFlakeAttrPathPrefixes() {
+    if (absoluteLookup)
+        return {};
+    else
+        return getDefaultFlakeAttrPathPrefixes();
+}
+
+// Default implementation, like `nix build`
 Strings SourceExprCommand::getDefaultFlakeAttrPaths()
 {
     return {
@@ -213,6 +235,7 @@ Strings SourceExprCommand::getDefaultFlakeAttrPaths()
     };
 }
 
+// Default implementation, like `nix build`
 Strings SourceExprCommand::getDefaultFlakeAttrPathPrefixes()
 {
     return {
@@ -274,8 +297,8 @@ void SourceExprCommand::completeInstallable(std::string_view prefix)
             completeFlakeRefWithFragment(
                 getEvalState(),
                 lockFlags,
-                getDefaultFlakeAttrPathPrefixes(),
-                getDefaultFlakeAttrPaths(),
+                getFlakeAttrPathPrefixes(),
+                getFlakeAttrPaths(),
                 prefix);
         }
     } catch (EvalError&) {
@@ -491,8 +514,8 @@ Installables SourceExprCommand::parseInstallables(
                         std::move(flakeRef),
                         fragment,
                         extendedOutputsSpec,
-                        getDefaultFlakeAttrPaths(),
-                        getDefaultFlakeAttrPathPrefixes(),
+                        getFlakeAttrPaths(),
+                        getFlakeAttrPathPrefixes(),
                         lockFlags));
                 continue;
             } catch (...) {
