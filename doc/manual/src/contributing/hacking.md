@@ -130,7 +130,7 @@ platform. Common solutions include [remote builders] and [binary format emulatio
 [remote builders]: ../advanced-topics/distributed-builds.md
 [binfmt emulation]: https://nixos.org/manual/nixos/stable/options.html#opt-boot.binfmt.emulatedSystems
 
-Given such a setup, executing the build only requires selecting the respective output attribute.
+Given such a setup, executing the build only requires selecting the respective attribute.
 For example, to compile for `aarch64-linux`:
 
 ```console
