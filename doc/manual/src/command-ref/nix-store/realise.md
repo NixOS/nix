@@ -1,6 +1,6 @@
 # Name
 
-`nix-store --realise` - realise specified store paths
+`nix-store --realise` - build or fetch store objects
 
 # Synopsis
 
