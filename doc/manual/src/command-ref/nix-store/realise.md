@@ -11,9 +11,8 @@
 
 Each of *paths* is processed as follows:
 
-- If the path is already [valid], do nothing.
 - If the path leads to a [store derivation]:
-  1. Realise the store derivation file itself, as a regular store path.
+  1. If it is not [valid], substitute the store derivation file itself.
   2. Realise its [output paths]:
     - Try to fetch from [substituters] the [store objects] associated with the output paths in the store derivation's [closure].
       - With [content-addressed derivations] (experimental): Determine the output paths to realise by querying build certificates in the [Nix database].
