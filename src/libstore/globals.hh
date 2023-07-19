@@ -194,7 +194,7 @@ public:
         this, SYSTEM, "system",
         R"(
           The system type of the current Nix installation.
-          Nix will only build a given [derivation](@docroot@/language/derivations.md) locally when its `system` attribute equals the value specified here or in [`extra-platforms`](@docroot@/command-ref/conf-file.html#conf-extra-platforms).
+          Nix will only build a given [derivation](@docroot@/language/derivations.md) locally when its `system` attribute equals any of the values specified here or in [`extra-platforms`](#conf-extra-platforms).
 
           The default value is set when Nix itself is compiled for the system it will run on.
           The following system types are widely used, as [Nix is actively supported on these platforms](@docroot@/contributing/hacking.md#platforms):
@@ -676,18 +676,20 @@ public:
         getDefaultExtraPlatforms(),
         "extra-platforms",
         R"(
-          Platforms other than the native one which this machine is capable of
-          building for. This can be useful for supporting additional
-          architectures on compatible machines: i686-linux can be built on
-          x86\_64-linux machines (and the default for this setting reflects
-          this); armv7 is backwards-compatible with armv6 and armv5tel; some
-          aarch64 machines can also natively run 32-bit ARM code; and
-          qemu-user may be used to support non-native platforms (though this
-          may be slow and buggy). Most values for this are not enabled by
-          default because build systems will often misdetect the target
-          platform and generate incompatible code, so you may wish to
-          cross-check the results of using this option against proper
-          natively-built versions of your derivations.
+          System types of executables that can be run on this machine.
+
+          Nix will only build a given [derivation](@docroot@/language/derivations.md) locally when its `system` attribute equals any of the values specified here or in the [`system` option](#conf-system).
+
+          Setting this can be useful to build derivations locally on compatible machines:
+          - `i686-linux` executables can be run on `x86_64-linux` machines (set by default)
+          - `x86_64-darwin` executables can be run on macOS `aarch64-darwin` with Rosetta 2 (set by default where applicable)
+          - `armv6` and `armv5tel` executables can be run on `armv7`
+          - some `aarch64` machines can also natively run 32-bit ARM code
+          - `qemu-user` may be used to support non-native platforms (though this
+          may be slow and buggy)
+
+          Build systems will usually detect the target platform to be the current physical system and therefore produce machine code incompatible with what may be intended in the derivation.
+          You should design your derivation's `builder` accordingly and cross-check the results when using this option against natively-built versions of your derivation.
         )", {}, false};
 
     Setting<StringSet> systemFeatures{
