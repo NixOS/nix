@@ -28,7 +28,8 @@ ran test tests/bar.sh... [PASS]
 ### Grouping tests
 
 Sometimes it is useful to group related tests so they can be easily run together without running the entire test suite.
-For example, `tests/ca/local.mk` defines a "ca" test group for tests relating to content-addressed derivation outputs.
+Each test group is in a subdirectory of `tests`.
+For example, `tests/ca/local.mk` defines a `ca` test group for content-addressed derivation outputs.
 
 That test group can be run like this:
 
@@ -39,7 +40,7 @@ ran test tests/ca/import-derivation.sh... [PASS]
 ...
 ```
 
-The testgroup is defined in Make like this:
+The test group is defined in Make like this:
 ```makefile
 $(test-group-name)-tests := \
   $(d)/test0.sh \

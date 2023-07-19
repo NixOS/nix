@@ -162,6 +162,14 @@ ifdef libs-list
 	@echo ""
 	@for i in $(libs-list); do echo "  $$i"; done
 endif
+ifdef install-tests-groups
+	@echo ""
+	@echo "The following groups of functional tests can be run:"
+	@echo ""
+	@for i in $(install-tests-groups); do echo "  $$i.test-group"; done
+	@echo ""
+	@echo "(installcheck includes tests in test groups too.)"
+endif
 	@echo ""
 	@echo "The following variables control the build:"
 	@echo ""
