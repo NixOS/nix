@@ -57,5 +57,5 @@ initLowerStore () {
 }
 
 execUnshare () {
-  exec unshare --mount --map-root-user "$@"
+  exec unshare --mount --map-root-user "$SHELL" "$@"
 }
