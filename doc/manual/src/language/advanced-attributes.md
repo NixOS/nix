@@ -345,3 +345,15 @@ Derivations can declare some infrequently used optional attributes.
     This is useful, for example, when generating self-contained filesystem images with
     their own embedded Nix store: hashes found inside such an image refer
     to the embedded store and not to the host's Nix store.
+
+- [`requiredSystemFeatures`]{#adv-attr-requiredSystemFeatures}\
+
+  If a derivation has the `requiredSystemFeatures` attribute, then Nix will only build it on a machine that has the corresponding features set in its [`system-features` configuration](@docroot@/command-ref/conf-file.md#conf-system-features).
+
+  For example, setting
+
+  ```nix
+  requiredSystemFeatures = [ "kvm" ];
+  ```
+
+  ensures that the derivation can only be built on a machine with the `kvm` feature.

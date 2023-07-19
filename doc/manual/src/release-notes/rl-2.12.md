@@ -2,20 +2,8 @@
 
 * On Linux, Nix can now run builds in a user namespace where they run
   as root (UID 0) and have 65,536 UIDs available.
-  <!-- FIXME: move this to its own section about system features -->
-  This is primarily useful for running containers such as `systemd-nspawn`
-  inside a Nix build. For an example, see [`tests/systemd-nspawn/nix`][nspawn].
 
-  [nspawn]: https://github.com/NixOS/nix/blob/67bcb99700a0da1395fa063d7c6586740b304598/tests/systemd-nspawn.nix.
-
-  A build can enable this by setting the derivation attribute:
-
-  ```
-  requiredSystemFeatures = [ "uid-range" ];
-  ```
-
-  The `uid-range` [system feature] requires the [`auto-allocate-uids`]
-  setting to be enabled.
+  This can be used by requiring `uid-range` [system feature] in derivations.
 
   [system feature]: ../command-ref/conf-file.md#conf-system-features
 
