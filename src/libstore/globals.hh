@@ -194,7 +194,7 @@ public:
         this, SYSTEM, "system",
         R"(
           The system type of the current Nix installation.
-          Nix will only build [derivations](@docroot@/language/derivations.md) whose `system` attribute equals the value specified here.
+          Nix will only build a given [derivation](@docroot@/language/derivations.md) locally when its `system` attribute equals the value specified here or in [`extra-platforms`](@docroot@/command-ref/conf-file.html#conf-extra-platforms).
 
           The default value is set when Nix itself is compiled for the system it will run on.
           The following system types are widely used, as [Nix is actively supported on these platforms](@docroot@/contributing/hacking.md#platforms):
