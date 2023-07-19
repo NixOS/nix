@@ -1,4 +1,5 @@
 #include "derived-path.hh"
+#include "realisation.hh"
 
 namespace nix {
 
