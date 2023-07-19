@@ -25,7 +25,7 @@ or completely new ones.)
 
 You can manually download the latest version of Nixpkgs from
 <https://github.com/NixOS/nixpkgs>. However, it’s much more
-convenient to use the Nixpkgs [*channel*](channels.md), since it makes
+convenient to use the Nixpkgs [*channel*](../command-ref/nix-channel.md), since it makes
 it easy to stay up to date with new versions of Nixpkgs. Nixpkgs is
 automatically added to your list of “subscribed” channels when you
 install Nix. If this is not the case for some reason, you can add it

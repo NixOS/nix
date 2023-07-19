@@ -8,36 +8,46 @@
 
 # Description
 
-A Nix channel is a mechanism that allows you to automatically stay
-up-to-date with a set of pre-built Nix expressions. A Nix channel is
-just a URL that points to a place containing a set of Nix expressions.
+Channels are a mechanism for referencing remote Nix expressions and conveniently retrieving their latest version.
 
-To see the list of official NixOS channels, visit
-<https://nixos.org/channels>.
+The moving parts of channels are:
+- The official channels listed at <https://nixos.org/channels>
+- The user-specific list of [subscribed channels](#subscribed-channels)
+- The [downloaded channel contents](#channels)
+- The [Nix expression search path](@docroot@/command-ref/conf-file.md#conf-nix-path), set with the [`-I` option](#opt-i) or the [`NIX_PATH` environment variable](#env-NIX_PATH)
+
+> **Note**
+>
+> The state of a subscribed channel is external to the Nix expressions relying on it.
+> This may limit reproducibility.
+>
+> Dependencies on other Nix expressions can be declared explicitly with:
+> - [`fetchurl`](@docroot@/language/builtins.md#builtins-fetchurl), [`fetchTarball`](@docroot@/language/builtins.md#builtins-fetchTarball), or [`fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit) in Nix expressions
+> - the [`-I` option](@docroot@/command-ref/opt-common.md#opt-I) in command line invocations
 
 This command has the following operations:
 
   - `--add` *url* \[*name*\]\
-    Adds a channel named *name* with URL *url* to the list of subscribed
-    channels. If *name* is omitted, it defaults to the last component of
-    *url*, with the suffixes `-stable` or `-unstable` removed.
+    Add a channel *name* located at *url* to the list of subscribed channels.
+    If *name* is omitted, default to the last component of *url*, with the suffixes `-stable` or `-unstable` removed.
+
+    > **Note**
+    >
+    > `--add` does not automatically perform an update.
+    > Use `--update` explicitly.
 
     A channel URL must point to a directory containing a file `nixexprs.tar.gz`.
     At the top level, that tarball must contain a single directory with a `default.nix` file that serves as the channel’s entry point.
 
   - `--remove` *name*\
-    Removes the channel named *name* from the list of subscribed
-    channels.
+    Remove the channel *name* from the list of subscribed channels.
 
   - `--list`\
-    Prints the names and URLs of all subscribed channels on standard
-    output.
+    Print the names and URLs of all subscribed channels on standard output.
 
   - `--update` \[*names*…\]\
-    Downloads the Nix expressions of all subscribed channels (or only
-    those included in *names* if specified) and makes them the default
-    for `nix-env` operations (by symlinking them from the directory
-    `~/.nix-defexpr`).
+    Download the Nix expressions of subscribed channels and create a new generation.
+    Update all channels if none is specified, and only those included in *names* otherwise.
 
   - `--list-generations`\
     Prints a list of all the current existing generations for the
@@ -49,13 +59,8 @@ This command has the following operations:
     ```
 
   - `--rollback` \[*generation*\]\
-    Reverts the previous call to `nix-channel
-                    --update`. Optionally, you can specify a specific channel generation
-    number to restore.
-
-Note that `--add` does not automatically perform an update.
-
-The list of subscribed channels is stored in `~/.nix-channels`.
+    Revert channels to the state before the last call to `nix-channel --update`.
+    Optionally, you can specify a specific channel *generation* number to restore.
 
 {{#include ./opt-common.md}}
 
@@ -69,23 +74,33 @@ The list of subscribed channels is stored in `~/.nix-channels`.
 
 # Examples
 
-To subscribe to the Nixpkgs channel and install the GNU Hello package:
+Subscribe to the Nixpkgs channel and run `hello` from the GNU Hello package:
 
 ```console
 $ nix-channel --add https://nixos.org/channels/nixpkgs-unstable
+$ nix-channel --list
+nixpkgs https://nixos.org/channels/nixpkgs
 $ nix-channel --update
-$ nix-env --install --attr nixpkgs.hello
+$ nix-shell -p hello --run hello
+hello
 ```
 
-You can revert channel updates using `--rollback`:
+Revert channel updates using `--rollback`:
 
 ```console
-$ nix-instantiate --eval --expr '(import <nixpkgs> {}).lib.version'
-"14.04.527.0e935f1"
+$ nix-instantiate --eval '<nixpkgs>' --attr lib.version
+"22.11pre296212.530a53dcbc9"
 
 $ nix-channel --rollback
 switching from generation 483 to 482
 
-$ nix-instantiate --eval --expr '(import <nixpkgs> {}).lib.version'
-"14.04.526.dbadfad"
+$ nix-instantiate --eval '<nixpkgs>' --attr lib.version
+"22.11pre281526.d0419badfad"
+```
+
+Remove a channel:
+
+```console
+$ nix-channel --remove nixpkgs
+$ nix-channel --list
 ```
