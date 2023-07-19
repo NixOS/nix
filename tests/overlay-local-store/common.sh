@@ -22,11 +22,12 @@ storeDirs () {
 
 # Mounting Overlay Store
 mountOverlayfs () {
+  mergedStorePath="$TEST_ROOT/merged-store/nix/store"
   mount -t overlay overlay \
     -o lowerdir="$storeA/nix/store" \
     -o upperdir="$storeBTop" \
     -o workdir="$TEST_ROOT/workdir" \
-    "$TEST_ROOT/merged-store/nix/store" \
+    "$mergedStorePath" \
     || skipTest "overlayfs is not supported"
 
   cleanupOverlay () {
@@ -34,6 +35,10 @@ mountOverlayfs () {
     rm -r $TEST_ROOT/workdir
   }
   trap cleanupOverlay EXIT
+}
+
+remountOverlayfs () {
+  mount -o remount "$mergedStorePath"
 }
 
 toRealPath () {
@@ -53,13 +58,4 @@ initLowerStore () {
 
 execUnshare () {
   exec unshare --mount --map-root-user "$@"
-}
-
-addTextToStore() {
-  storeDir=$1; shift
-  filename=$1; shift
-  content=$1; shift
-  filePath="$TEST_HOME/$filename"
-  echo "$content" > "$filePath"
-  nix-store --store "$storeDir" --add "$filePath"
 }
