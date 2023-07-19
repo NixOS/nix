@@ -190,7 +190,23 @@ void LocalOverlayStore::deleteGCPath(const Path & path, uint64_t & bytesFreed)
 
 void LocalOverlayStore::optimiseStore()
 {
-    warn("not implemented");
+    Activity act(*logger, actOptimiseStore);
+
+    // Note for LocalOverlayStore, queryAllValidPaths only returns paths in upper layer
+    auto paths = queryAllValidPaths();
+
+    act.progress(0, paths.size());
+
+    uint64_t done = 0;
+
+    for (auto & path : paths) {
+        if (lowerStore->isValidPath(path)) {
+            // Deduplicate store path
+            deletePath(toUpperPath(path));
+        }
+        done++;
+        act.progress(done, paths.size());
+    }
 }
 
 bool LocalOverlayStore::verifyStore(bool checkContents, RepairFlag repair)

@@ -45,8 +45,7 @@ overlayInode=$(stat -c %i "$overlayPath")
 nix-store --store "$storeB" --optimise
 remountOverlayfs
 
+# Check path only exists in lower store
 stat "$lowerPath"
 stat "$overlayPath"
 expect 1 stat "$upperPath"
-
-#expect 1 stat $(toRealPath "$storeA/nix/store" "$path")
