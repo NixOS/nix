@@ -1,10 +1,11 @@
 ## Channels
 
-[`nix-channel`] uses a [profile](@docroot@/command-ref/files/profiles.md) to store channels:
+A directory containing symlinks to Nix channels, managed by [`nix-channel`]:
 
 - `$XDG_STATE_HOME/nix/profiles/channels` for regular users
 - `$NIX_STATE_DIR/profiles/per-user/root/channels` for `root`
 
+[`nix-channel`] uses a [profile](@docroot@/command-ref/files/profiles.md) to store channels.
 This profile contains symlinks to the contents of those channels.
 
 ## Subscribed channels
