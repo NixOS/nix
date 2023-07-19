@@ -1010,7 +1010,7 @@ public:
           | `~/.nix-defexpr`  | `$XDG_STATE_HOME/nix/defexpr`  |
           | `~/.nix-channels` | `$XDG_STATE_HOME/nix/channels` |
 
-          If you already have Nix installed and are using [profiles](@docroot@/package-management/profiles.md) or [channels](@docroot@/package-management/channels.md), you should migrate manually when you enable this option.
+          If you already have Nix installed and are using [profiles](@docroot@/package-management/profiles.md) or [channels](@docroot@/command-ref/nix-channel.md), you should migrate manually when you enable this option.
           If `$XDG_STATE_HOME` is not set, use `$HOME/.local/state/nix` instead of `$XDG_STATE_HOME/nix`.
           This can be achieved with the following shell commands:
 
