@@ -693,25 +693,27 @@ public:
 
           This complements the [`system`](#conf-system) and [`extra-platforms`](#conf-extra-platforms) configuration options and the corresponding [`system`](@docroot@/language/derivations.md#attr-system) attribute on derivations.
 
-          Derivations can require system features in the derivation attribute [`requiredSystemFeatures`](@docroot@/language/advanced-attributes.md#adv-attr-requiredSystemFeatures).
+          A derivation can require system features in the [`requiredSystemFeatures` attribute](@docroot@/language/advanced-attributes.md#adv-attr-requiredSystemFeatures), and the machine to build the derivation must have them.
 
-          System features are generally user-defined, but the following have special treatment:
+          System features are user-defined, but Nix sets the following defaults:
 
           - `kvm`
 
-            Set by default if `/dev/kvm` is accessible.
+            Included by default if `/dev/kvm` is accessible.
 
           - `nixos-test`, `benchmark`, `big-parallel`
 
-            These historical pseudo-features are always enabled for backwards compatibility, used in Nixpkgs to route Hydra builds to specific machines.
+            These historical pseudo-features are always enabled for backwards compatibility, as they are used in Nixpkgs to route Hydra builds to specific machines.
 
           - `ca-derivations`
 
-            Set by default if the [`ca-derivations` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-ca-derivations) is enabled.
+            Included by default if the [`ca-derivations` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-ca-derivations) is enabled.
+
+            This system feature is implicitly required by derivations with the [`__contentAddressed` attribute](@docroot@/language/advanced-attributes.md#adv-attr-__contentAddressed).
 
           - `recursive-nix`
 
-            Set by default if the [`recursive-nix` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-recursive-nix) is enabled.
+            Included by default if the [`recursive-nix` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-recursive-nix) is enabled.
 
           - `uid-range`
 
@@ -720,7 +722,7 @@ public:
 
             [nspawn]: https://github.com/NixOS/nix/blob/67bcb99700a0da1395fa063d7c6586740b304598/tests/systemd-nspawn.nix.
 
-            Set by default on Linux if the [`auto-allocate-uids`](#conf-auto-allocate-uids) setting is enabled.
+            Included by default on Linux if the [`auto-allocate-uids`](#conf-auto-allocate-uids) setting is enabled.
         )", {}, false};
 
     Setting<Strings> substituters{

@@ -229,6 +229,8 @@ Derivations can declare some infrequently used optional attributes.
     [`outputHashAlgo`](#adv-attr-outputHashAlgo)
     like for *fixed-output derivations* (see above).
 
+    It also implicitly requires that the machine to build the derivation must have the `ca-derivations` [system feature](@docroot@/command-ref/conf-file.md#conf-system-features).
+
   - [`passAsFile`]{#adv-attr-passAsFile}\
     A list of names of attributes that should be passed via files rather
     than environment variables. For example, if you have
