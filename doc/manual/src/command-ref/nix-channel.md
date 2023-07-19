@@ -9,7 +9,12 @@
 # Description
 
 Channels are a mechanism for referencing remote Nix expressions and conveniently retrieving their latest version.
-For the list of official channels, visit <https://nixos.org/channels>.
+
+The moving parts of channels are:
+- The official channels listed at <https://nixos.org/channels>
+- The user-specific list of [subscribed channels](#subscribed-channels)
+- The [downloaded channel contents](#channels)
+- The [Nix expression search path](@docroot@/command-ref/conf-file.md#conf-nix-path), set with the [`-I` option](#opt-i) or the [`NIX_PATH` environment variable](#env-NIX_PATH)
 
 > **Note**
 >
