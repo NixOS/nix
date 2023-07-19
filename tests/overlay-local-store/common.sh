@@ -59,3 +59,12 @@ initLowerStore () {
 execUnshare () {
   exec unshare --mount --map-root-user "$SHELL" "$@"
 }
+
+addTextToStore() {
+  storeDir=$1; shift
+  filename=$1; shift
+  content=$1; shift
+  filePath="$TEST_HOME/$filename"
+  echo "$content" > "$filePath"
+  nix-store --store "$storeDir" --add "$filePath"
+}
