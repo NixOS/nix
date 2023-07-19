@@ -13,26 +13,29 @@ setupConfig () {
 }
 
 storeDirs () {
-  storeA="$TEST_ROOT/store-a"
-  storeBTop="$TEST_ROOT/store-b"
-  storeB="local-overlay?root=$TEST_ROOT/merged-store&lower-store=$storeA&upper-layer=$storeBTop"
+  storesRoot="$TEST_ROOT/stores"
+  mkdir -p "$storesRoot"
+  mount -t tmpfs tmpfs "$storesRoot"
+  storeA="$storesRoot/store-a"
+  storeBTop="$storesRoot/store-b"
+  storeB="local-overlay?root=$storesRoot/merged-store&lower-store=$storeA&upper-layer=$storeBTop"
   # Creating testing directories
-  mkdir -p "$TEST_ROOT"/{store-a/nix/store,store-b,merged-store/nix/store,workdir}
+  mkdir -p "$storesRoot"/{store-a/nix/store,store-b,merged-store/nix/store,workdir}
 }
 
 # Mounting Overlay Store
 mountOverlayfs () {
-  mergedStorePath="$TEST_ROOT/merged-store/nix/store"
+  mergedStorePath="$storesRoot/merged-store/nix/store"
   mount -t overlay overlay \
     -o lowerdir="$storeA/nix/store" \
     -o upperdir="$storeBTop" \
-    -o workdir="$TEST_ROOT/workdir" \
+    -o workdir="$storesRoot/workdir" \
     "$mergedStorePath" \
     || skipTest "overlayfs is not supported"
 
   cleanupOverlay () {
-    umount "$TEST_ROOT/merged-store/nix/store"
-    rm -r $TEST_ROOT/workdir
+    umount "$storesRoot/merged-store/nix/store"
+    rm -r $storesRoot/workdir
   }
   trap cleanupOverlay EXIT
 }
