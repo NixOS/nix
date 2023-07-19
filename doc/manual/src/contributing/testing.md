@@ -14,6 +14,8 @@ You can run the whole testsuite with `make check`, or the tests for a specific c
 The functional tests reside under the `tests` directory and are listed in `tests/local.mk`.
 Each test is a bash script.
 
+### Running the whole test suite
+
 The whole test suite can be run with:
 
 ```shell-session
@@ -22,6 +24,33 @@ ran test tests/foo.sh... [PASS]
 ran test tests/bar.sh... [PASS]
 ...
 ```
+
+### Grouping tests
+
+Sometimes it is useful to group related tests so they can be easily run together without running the entire test suite.
+Each test group is in a subdirectory of `tests`.
+For example, `tests/ca/local.mk` defines a `ca` test group for content-addressed derivation outputs.
+
+That test group can be run like this:
+
+```shell-session
+$ make ca.test-group -j50
+ran test tests/ca/nix-run.sh... [PASS]
+ran test tests/ca/import-derivation.sh... [PASS]
+...
+```
+
+The test group is defined in Make like this:
+```makefile
+$(test-group-name)-tests := \
+  $(d)/test0.sh \
+  $(d)/test1.sh \
+  ...
+
+install-tests-groups += $(test-group-name)
+```
+
+### Running individual tests
 
 Individual tests can be run with `make`:
 
