@@ -26,7 +26,7 @@ Realising store objects during evaluation can be disabled by setting [`allow-imp
 
 ## Example
 
-In the following Nix expression, the inner derivation `drv` produces a file containing `"hello"`.
+In the following Nix expression, the inner derivation `drv` produces a file with contents `hello`.
 
 ```nix
 # IFD.nix
@@ -34,10 +34,10 @@ let
   drv = derivation {
     name = "hello";
     builder = "/bin/sh";
-    args = [ "-c" ''echo \"hello\" > $out'' ];
+    args = [ "-c" "echo -n hello > $out" ];
     system = builtins.currentSystem;
   };
-in "${import drv} world"
+in "${builtins.readFile drv} world"
 ```
 
 ```shellSession
@@ -54,7 +54,8 @@ That requires reading from the output [store path](@docroot@/glossary.md#gloss-s
 
 ## Illustration
 
-The following diagram shows how evaluation is interrupted by a build, if the value of a Nix expression depends on realising a store object.
+As a first approximation, the following data flow graph shows how evaluation and building are interleaved, if the value of a Nix expression depends on realising a store object.
+Boxes are data structures, arrow labels are transformations.
 
 ```
 +----------------------+             +------------------------+
@@ -84,4 +85,53 @@ The following diagram shows how evaluation is interrupted by a build, if the val
 |    |   value    |    |             |                        |
 |    '------------'    |             |                        |
 +----------------------+             +------------------------+
+```
+
+In more detail, the following sequence diagram shows how the expression is evaluated step by step, and where evaluation is blocked to wait for the build output to appear.
+
+```
+.-------.     .-------------.                        .---------.
+|Nix CLI|     |Nix evaluator|                        |Nix store|
+'-------'     '-------------'                        '---------'
+    |                |                                    |
+    |evaluate IFD.nix|                                    |
+    |--------------->|                                    |
+    |                |                                    |
+    |  evaluate `"${readFile drv} world"`                 |
+    |                |                                    |
+    |    evaluate `readFile drv`                          |
+    |                |                                    |
+    |   evaluate `drv` as string                          |
+    |                |                                    |
+    |                |instantiate /nix/store/...-hello.drv|
+    |                |----------------------------------->|
+    |                :                                    |
+    |                :  realise /nix/store/...-hello.drv  |
+    |                :----------------------------------->|
+    |                :                                    |
+    |                                                     |--------.
+    |                :                                    |        |
+    |      (evaluation blocked)                           |  echo hello > $out
+    |                :                                    |        |
+    |                                                     |<-------'
+    |                :        /nix/store/...-hello        |
+    |                |<-----------------------------------|
+    |                |                                    |
+    |  resume `readFile /nix/store/...-hello`             |
+    |                |                                    |
+    |                |   readFile /nix/store/...-hello    |
+    |                |----------------------------------->|
+    |                |                                    |
+    |                |               hello                |
+    |                |<-----------------------------------|
+    |                |                                    |
+    |      resume `"${"hello"} world"`                    |
+    |                |                                    |
+    |        resume `"hello world"`                       |
+    |                |                                    |
+    | "hello world"  |                                    |
+    |<---------------|                                    |
+.-------.     .-------------.                        .---------.
+|Nix CLI|     |Nix evaluator|                        |Nix store|
+'-------'     '-------------'                        '---------'
 ```
