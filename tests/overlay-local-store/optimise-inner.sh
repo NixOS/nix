@@ -32,7 +32,7 @@ remountOverlayfs
 dupFilename="${dupFileStorePath#/nix/store}"
 lowerPath="$storeA/$dupFileStorePath"
 upperPath="$storeBTop/$dupFilename"
-overlayPath="$mergedStorePath/$dupFilename"
+overlayPath="$storeBRoot/nix/store/$dupFilename"
 
 # Check store path exists in both layers and overlay
 lowerInode=$(stat -c %i "$lowerPath")
