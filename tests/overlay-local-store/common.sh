@@ -8,16 +8,26 @@ requireEnvironment () {
 }
 
 setupConfig () {
-  echo "drop-supplementary-groups = false" >> "$NIX_CONF_DIR"/nix.conf
+  echo "require-drop-supplementary-groups = false" >> "$NIX_CONF_DIR"/nix.conf
   echo "build-users-group = " >> "$NIX_CONF_DIR"/nix.conf
 }
 
+
+
 storeDirs () {
-  storeA="$TEST_ROOT/store-a"
-  storeBTop="$TEST_ROOT/store-b"
-  storeB="local-overlay?root=$TEST_ROOT/merged-store&lower-store=$storeA&upper-layer=$storeBTop"
+  # Attempt to create store dirs on tmpfs volume.
+  # This ensures lowerdir, upperdir and workdir will be on
+  # a consistent filesystem that fully supports OverlayFS.
+  storeVolume="$TEST_ROOT/stores"
+  mkdir -p "$storeVolume"
+  mount -t tmpfs tmpfs "$storeVolume" || true  # But continue anyway if that fails.
+
+  storeA="$storeVolume/store-a"
+  storeBTop="$storeVolume/store-b"
+  storeBRoot="$storeVolume/merged-store"
+  storeB="local-overlay?root=$storeBRoot&lower-store=$storeA&upper-layer=$storeBTop"
   # Creating testing directories
-  mkdir -p "$TEST_ROOT"/{store-a/nix/store,store-b,merged-store/nix/store,workdir}
+  mkdir -p "$storeVolume"/{store-a/nix/store,store-b,merged-store/nix/store,workdir}
 }
 
 # Mounting Overlay Store
@@ -25,21 +35,25 @@ mountOverlayfs () {
   mount -t overlay overlay \
     -o lowerdir="$storeA/nix/store" \
     -o upperdir="$storeBTop" \
-    -o workdir="$TEST_ROOT/workdir" \
-    "$TEST_ROOT/merged-store/nix/store" \
+    -o workdir="$storeVolume/workdir" \
+    "$storeBRoot/nix/store" \
     || skipTest "overlayfs is not supported"
 
   cleanupOverlay () {
-    umount "$TEST_ROOT/merged-store/nix/store"
-    rm -r $TEST_ROOT/workdir
+    umount "$storeBRoot/nix/store"
+    rm -r $storeVolume/workdir
   }
   trap cleanupOverlay EXIT
+}
+
+remountOverlayfs () {
+  mount -o remount "$storeBRoot/nix/store"
 }
 
 toRealPath () {
   storeDir=$1; shift
   storePath=$1; shift
-  echo $storeDir$(echo $storePath | sed "s^$NIX_STORE_DIR^^")
+  echo $storeDir$(echo $storePath | sed "s^${NIX_STORE_DIR:-/nix/store}^^")
 }
 
 initLowerStore () {
@@ -52,5 +66,14 @@ initLowerStore () {
 }
 
 execUnshare () {
-  exec unshare --mount --map-root-user "$@"
+  exec unshare --mount --map-root-user "$SHELL" "$@"
+}
+
+addTextToStore() {
+  storeDir=$1; shift
+  filename=$1; shift
+  content=$1; shift
+  filePath="$TEST_HOME/$filename"
+  echo "$content" > "$filePath"
+  nix-store --store "$storeDir" --add "$filePath"
 }

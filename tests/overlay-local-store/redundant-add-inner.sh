@@ -27,4 +27,4 @@ path=$(nix-store --store "$storeB" --add ../dummy)
 stat $(toRealPath "$storeA/nix/store" "$path")
 
 # upper layer should still not have it (no redundant copy)
-expect 1 stat $(toRealPath "$storeB/nix/store" "$path")
+expect 1 stat $(toRealPath "$storeBTop" "$path")

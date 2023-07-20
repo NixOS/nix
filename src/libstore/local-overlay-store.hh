@@ -112,6 +112,10 @@ private:
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
     void deleteGCPath(const Path & path, uint64_t & bytesFreed) override;
+
+    void optimiseStore() override;
+
+    bool verifyStore(bool checkContents, RepairFlag repair) override;
 };
 
 }
