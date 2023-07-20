@@ -9,6 +9,7 @@ In this case, when that store object is needed, evaluation will be paused, the s
 
 This has performance implications:
 Since evaluation is sequential, each required store object that is not already in the store will also be realised sequentially.
+Usually, if store objects are not already present, realisation is orders of magnitude slower than evaluation.
 
 Passing an expression `expr` that evaluates to a store path to any built-in function which reads from the filesystem constitutes Import From Derivation:
 
@@ -23,6 +24,7 @@ Passing an expression `expr` that evaluates to a store path to any built-in func
 - `builtins.scopedImport x drv`
 
 Realising store objects during evaluation can be disabled by setting [`allow-import-from-derivation`](../command-ref/conf-file.md#conf-allow-import-from-derivation) to `false`.
+Without IFD it is ensured that evaluation is complete and Nix can produce a build plan before starting any realisation.
 
 ## Example
 
