@@ -1022,9 +1022,8 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 
 
 std::map<std::string, std::optional<StorePath>>
-LocalStore::queryPartialDerivationOutputMap(const StorePath & path_)
+LocalStore::queryPartialDerivationOutputMap(const StorePath & path)
 {
-    auto path = path_;
     auto outputs = retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
         auto state(_state.lock());
         std::map<std::string, std::optional<StorePath>> outputs;
