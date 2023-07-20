@@ -17,7 +17,7 @@ initLowerStore
 mountOverlayfs
 
 # Create a file to add to store
-dupFilePath="$storesRoot/dup-file"
+dupFilePath="$TEST_ROOT/dup-file"
 echo Duplicate > "$dupFilePath"
 
 # Add it to the overlay store (it will be written to the upper layer)

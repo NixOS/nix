@@ -25,7 +25,7 @@ stat $(toRealPath "$storeA/nix/store" "$path")
 expect 1 stat $(toRealPath "$storeBTop" "$path")
 
 # Checking for path in overlay store matching lower layer
-diff $(toRealPath "$storeA/nix/store" "$path") $(toRealPath "$TEST_ROOT/merged-store/nix/store" "$path")
+diff $(toRealPath "$storeA/nix/store" "$path") $(toRealPath "$storeVolume/merged-store/nix/store" "$path")
 
 # Checking requisites query agreement
 [[ \

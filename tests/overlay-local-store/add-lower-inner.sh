@@ -18,14 +18,14 @@ mountOverlayfs
 
 # Add something to the overlay store
 overlayPath=$(addTextToStore "$storeB" "overlay-file" "Add to overlay store")
-stat "$TEST_ROOT/merged-store/$overlayPath"
+stat "$storeVolume/merged-store/$overlayPath"
 
 # Now add something to the lower store
 lowerPath=$(addTextToStore "$storeA" "lower-file" "Add to lower store")
-stat "$TEST_ROOT/store-a/$lowerPath"
+stat "$storeVolume/store-a/$lowerPath"
 
 # Remount overlayfs to ensure synchronization
-mount -o remount "$TEST_ROOT/merged-store/nix/store"
+mount -o remount "$storeVolume/merged-store/nix/store"
 
 # Path should be accessible via overlay store
-stat "$TEST_ROOT/merged-store/$lowerPath"
+stat "$storeVolume/merged-store/$lowerPath"
