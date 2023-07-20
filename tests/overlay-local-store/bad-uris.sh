@@ -7,8 +7,8 @@ storeDirs
 mkdir -p $TEST_ROOT/bad_test
 badTestRoot=$TEST_ROOT/bad_test
 storeBadRoot="local-overlay?root=$badTestRoot&lower-store=$storeA&upper-layer=$storeBTop"
-storeBadLower="local-overlay?root=$storeVolume/merged-store&lower-store=$badTestRoot&upper-layer=$storeBTop"
-storeBadUpper="local-overlay?root=$storeVolume/merged-store&lower-store=$storeA&upper-layer=$badTestRoot"
+storeBadLower="local-overlay?root=$storeBRoot&lower-store=$badTestRoot&upper-layer=$storeBTop"
+storeBadUpper="local-overlay?root=$storeBRoot&lower-store=$storeA&upper-layer=$badTestRoot"
 
 declare -a storesBad=(
     "$storeBadRoot" "$storeBadLower" "$storeBadUpper"

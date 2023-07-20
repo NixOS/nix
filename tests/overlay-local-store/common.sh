@@ -24,30 +24,30 @@ storeDirs () {
 
   storeA="$storeVolume/store-a"
   storeBTop="$storeVolume/store-b"
-  storeB="local-overlay?root=$storeVolume/merged-store&lower-store=$storeA&upper-layer=$storeBTop"
+  storeBRoot="$storeVolume/merged-store"
+  storeB="local-overlay?root=$storeBRoot&lower-store=$storeA&upper-layer=$storeBTop"
   # Creating testing directories
   mkdir -p "$storeVolume"/{store-a/nix/store,store-b,merged-store/nix/store,workdir}
 }
 
 # Mounting Overlay Store
 mountOverlayfs () {
-  mergedStorePath="$storeVolume/merged-store/nix/store"
   mount -t overlay overlay \
     -o lowerdir="$storeA/nix/store" \
     -o upperdir="$storeBTop" \
     -o workdir="$storeVolume/workdir" \
-    "$mergedStorePath" \
+    "$storeBRoot/nix/store" \
     || skipTest "overlayfs is not supported"
 
   cleanupOverlay () {
-    umount "$storeVolume/merged-store/nix/store"
+    umount "$storeBRoot/nix/store"
     rm -r $storeVolume/workdir
   }
   trap cleanupOverlay EXIT
 }
 
 remountOverlayfs () {
-  mount -o remount "$mergedStorePath"
+  mount -o remount "$storeBRoot/nix/store"
 }
 
 toRealPath () {
