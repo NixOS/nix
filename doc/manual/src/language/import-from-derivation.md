@@ -11,7 +11,7 @@ This has performance implications:
 Since evaluation is sequential, each required store object that is not already in the store will also be realised sequentially.
 Usually, if store objects are not already present, realisation is orders of magnitude slower than evaluation.
 
-Passing an expression `expr` that evaluates to a store path to any built-in function which reads from the filesystem constitutes Import From Derivation:
+Passing an expression `expr` that evaluates to a [store path](@docroot@/glossary.md#gloss-store-path) to any built-in function which reads from the filesystem constitutes Import From Derivation:
 
 - [`import`](./builtins.md#builtins-import)` expr`
 - [`builtins.readFile`](./builtins.md#builtins-readFile)` expr`
@@ -51,8 +51,8 @@ building '/nix/store/348q1cal6sdgfxs8zqi9v8llrsn4kqkq-hello.drv'...
 "hello world"
 ```
 
-Since `"hello"` is a valid Nix expression, it can be [`import`](./builtins.md#builtins-import)ed.
-That requires reading from the output [store path](@docroot@/glossary.md#gloss-store-path) of `drv`, which has to be [realised] before its contents can be read and evaluated.
+The contents of the derivation's [output path](@docroot@/glossary.md#gloss-output-path) have to be [realised] before they can be read with [`readFile`](./builtins.md#builtins-readFile).
+Only then evaluation can continue to produce the final result.
 
 ## Illustration
 
