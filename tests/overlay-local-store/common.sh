@@ -53,7 +53,7 @@ remountOverlayfs () {
 toRealPath () {
   storeDir=$1; shift
   storePath=$1; shift
-  echo $storeDir$(echo $storePath | sed "s^$NIX_STORE_DIR^^")
+  echo $storeDir$(echo $storePath | sed "s^${NIX_STORE_DIR:-/nix/store}^^")
 }
 
 initLowerStore () {

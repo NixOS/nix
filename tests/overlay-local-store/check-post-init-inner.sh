@@ -62,7 +62,7 @@ nix-store --verify-path --store "$storeA" "$path"
 # Verifying path in merged-store
 nix-store --verify-path --store "$storeB" "$path"
 
-hashPart=$(echo $path | sed "s^$NIX_STORE_DIR/^^" | sed 's/-.*//')
+hashPart=$(echo $path | sed "s^${NIX_STORE_DIR:-/nix/store}/^^" | sed 's/-.*//')
 
 # Lower store can find from hash part
 [[ $(nix store --store $storeA path-from-hash-part $hashPart) == $path ]]
