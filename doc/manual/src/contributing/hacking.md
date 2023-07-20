@@ -128,7 +128,7 @@ platform. Common solutions include [remote builders] and [binary format emulatio
 (only supported on NixOS).
 
 [remote builders]: ../advanced-topics/distributed-builds.md
-[binfmt emulation]: https://nixos.org/manual/nixos/stable/options.html#opt-boot.binfmt.emulatedSystems
+[binary format emulation]: https://nixos.org/manual/nixos/stable/options.html#opt-boot.binfmt.emulatedSystems
 
 Given such a setup, executing the build only requires selecting the respective attribute.
 For example, to compile for `aarch64-linux`:
@@ -166,7 +166,7 @@ When Nix is built such that `./configure` is passed any of the `--host`, `--buil
 <cpu>-<vendor>[-<kernel>]-<os>
 ```
 
-For historic reasons and backward-compatibility, some CPU and OS identifiers are translated from the GNU Autotools naming convention in [`configure.ac`](https://github.com/nixos/nix/blob/master/config/config.sub) as follows:
+For historic reasons and backward-compatibility, some CPU and OS identifiers are translated from the GNU Autotools naming convention in [`configure.ac`](https://github.com/nixos/nix/blob/master/configure.ac) as follows:
 
 | `config.guess`             | Nix                 |
 |----------------------------|---------------------|
