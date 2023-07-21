@@ -425,7 +425,20 @@ public:
      * derivation. All outputs are mentioned so ones mising the mapping
      * are mapped to `std::nullopt`.
      */
-    virtual std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path);
+    virtual std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(
+        const StorePath & path,
+        Store * evalStore = nullptr);
+
+    /**
+     * Like `queryPartialDerivationOutputMap` but only considers
+     * statically known output paths (i.e. those that can be gotten from
+     * the derivation itself.
+     *
+     * Just a helper function for implementing
+     * `queryPartialDerivationOutputMap`.
+     */
+    virtual std::map<std::string, std::optional<StorePath>> queryStaticPartialDerivationOutputMap(
+        const StorePath & path);
 
     /**
      * Query the mapping outputName=>outputPath for the given derivation.

@@ -1022,10 +1022,9 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 
 
 std::map<std::string, std::optional<StorePath>>
-LocalStore::queryPartialDerivationOutputMap(const StorePath & path_)
+LocalStore::queryStaticPartialDerivationOutputMap(const StorePath & path)
 {
-    auto path = path_;
-    auto outputs = retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
+    return retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
         auto state(_state.lock());
         std::map<std::string, std::optional<StorePath>> outputs;
         uint64_t drvId;
@@ -1037,21 +1036,6 @@ LocalStore::queryPartialDerivationOutputMap(const StorePath & path_)
 
         return outputs;
     });
-
-    if (!experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
-        return outputs;
-
-    auto drv = readInvalidDerivation(path);
-    auto drvHashes = staticOutputHashes(*this, drv);
-    for (auto& [outputName, hash] : drvHashes) {
-        auto realisation = queryRealisation(DrvOutput{hash, outputName});
-        if (realisation)
-            outputs.insert_or_assign(outputName, realisation->outPath);
-        else
-            outputs.insert({outputName, std::nullopt});
-    }
-
-    return outputs;
 }
 
 std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & hashPart)

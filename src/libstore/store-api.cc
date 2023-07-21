@@ -492,13 +492,41 @@ bool Store::PathInfoCacheValue::isKnownNow()
     return std::chrono::steady_clock::now() < time_point + ttl;
 }
 
-std::map<std::string, std::optional<StorePath>> Store::queryPartialDerivationOutputMap(const StorePath & path)
+std::map<std::string, std::optional<StorePath>> Store::queryStaticPartialDerivationOutputMap(const StorePath & path)
 {
     std::map<std::string, std::optional<StorePath>> outputs;
     auto drv = readInvalidDerivation(path);
-    for (auto& [outputName, output] : drv.outputsAndOptPaths(*this)) {
+    for (auto & [outputName, output] : drv.outputsAndOptPaths(*this)) {
         outputs.emplace(outputName, output.second);
     }
+    return outputs;
+}
+
+std::map<std::string, std::optional<StorePath>> Store::queryPartialDerivationOutputMap(
+    const StorePath & path,
+    Store * evalStore_)
+{
+    auto & evalStore = evalStore_ ? *evalStore_ : *this;
+
+    auto outputs = evalStore.queryStaticPartialDerivationOutputMap(path);
+
+    if (!experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
+        return outputs;
+
+    auto drv = evalStore.readInvalidDerivation(path);
+    auto drvHashes = staticOutputHashes(*this, drv);
+    for (auto & [outputName, hash] : drvHashes) {
+        auto realisation = queryRealisation(DrvOutput{hash, outputName});
+        if (realisation) {
+            outputs.insert_or_assign(outputName, realisation->outPath);
+        } else {
+            // queryStaticPartialDerivationOutputMap is not guaranteed
+            // to return std::nullopt for outputs which are not
+            // statically known.
+            outputs.insert({outputName, std::nullopt});
+        }
+    }
+
     return outputs;
 }
 
@@ -507,7 +535,7 @@ OutputPathMap Store::queryDerivationOutputMap(const StorePath & path) {
     OutputPathMap result;
     for (auto & [outName, optOutPath] : resp) {
         if (!optOutPath)
-            throw Error("output '%s' of derivation '%s' has no store path mapped to it", outName, printStorePath(path));
+            throw MissingRealisation(printStorePath(path), outName);
         result.insert_or_assign(outName, *optOutPath);
     }
     return result;
