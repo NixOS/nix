@@ -29,14 +29,14 @@ std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithRef
         return std::nullopt;
 
     return std::visit(overloaded {
-        [&](const TextHash & th) -> ContentAddressWithReferences {
+        [&](const TextIngestionMethod &) -> ContentAddressWithReferences {
             assert(references.count(path) == 0);
             return TextInfo {
-                .hash = th,
+                .hash = ca->hash,
                 .references = references,
             };
         },
-        [&](const FixedOutputHash & foh) -> ContentAddressWithReferences {
+        [&](const FileIngestionMethod & m2) -> ContentAddressWithReferences {
             auto refs = references;
             bool hasSelfReference = false;
             if (refs.count(path)) {
@@ -44,14 +44,15 @@ std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithRef
                 refs.erase(path);
             }
             return FixedOutputInfo {
-                .hash = foh,
+                .method = m2,
+                .hash = ca->hash,
                 .references = {
                     .others = std::move(refs),
                     .self = hasSelfReference,
                 },
             };
         },
-    }, ca->raw);
+    }, ca->method.raw);
 }
 
 bool ValidPathInfo::isContentAddressed(const Store & store) const
@@ -110,13 +111,19 @@ ValidPathInfo::ValidPathInfo(
     std::visit(overloaded {
         [this](TextInfo && ti) {
             this->references = std::move(ti.references);
-            this->ca = std::move((TextHash &&) ti);
+            this->ca = ContentAddress {
+                .method = TextIngestionMethod {},
+                .hash = std::move(ti.hash),
+            };
         },
         [this](FixedOutputInfo && foi) {
             this->references = std::move(foi.references.others);
             if (foi.references.self)
                 this->references.insert(path);
-            this->ca = std::move((FixedOutputHash &&) foi);
+            this->ca = ContentAddress {
+                .method = std::move(foi.method),
+                .hash = std::move(foi.hash),
+            };
         },
     }, std::move(ca).raw);
 }

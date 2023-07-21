@@ -345,13 +345,13 @@ private:
     void signRealisation(Realisation &);
 
     // XXX: Make a generic `Store` method
-    FixedOutputHash hashCAPath(
-        const FileIngestionMethod & method,
+    ContentAddress hashCAPath(
+        const ContentAddressMethod & method,
         const HashType & hashType,
         const StorePath & path);
 
-    FixedOutputHash hashCAPath(
-        const FileIngestionMethod & method,
+    ContentAddress hashCAPath(
+        const ContentAddressMethod & method,
         const HashType & hashType,
         const Path & path,
         const std::string_view pathHash

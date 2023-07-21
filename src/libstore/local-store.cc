@@ -1249,27 +1249,17 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
                     printStorePath(info.path), info.narSize, hashResult.second);
 
             if (info.ca) {
-                if (auto foHash = std::get_if<FixedOutputHash>(&info.ca->raw)) {
-                    auto actualFoHash = hashCAPath(
-                        foHash->method,
-                        foHash->hash.type,
-                        info.path
-                    );
-                    if (foHash->hash != actualFoHash.hash) {
-                        throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                            printStorePath(info.path),
-                            foHash->hash.to_string(Base32, true),
-                            actualFoHash.hash.to_string(Base32, true));
-                    }
-                }
-                if (auto textHash = std::get_if<TextHash>(&info.ca->raw)) {
-                    auto actualTextHash = hashString(htSHA256, readFile(realPath));
-                    if (textHash->hash != actualTextHash) {
-                        throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                            printStorePath(info.path),
-                            textHash->hash.to_string(Base32, true),
-                            actualTextHash.to_string(Base32, true));
-                    }
+                auto & specified = *info.ca;
+                auto actualHash = hashCAPath(
+                    specified.method,
+                    specified.hash.type,
+                    info.path
+                );
+                if (specified.hash != actualHash.hash) {
+                    throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+                        printStorePath(info.path),
+                        specified.hash.to_string(Base32, true),
+                        actualHash.hash.to_string(Base32, true));
                 }
             }
 
@@ -1349,10 +1339,8 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
     auto [hash, size] = hashSink->finish();
 
     ContentAddressWithReferences desc = FixedOutputInfo {
-        .hash = {
-            .method = method,
-            .hash = hash,
-        },
+        .method = method,
+        .hash = hash,
         .references = {
             .others = references,
             // caller is not capable of creating a self-reference, because this is content-addressed without modulus
@@ -1428,8 +1416,8 @@ StorePath LocalStore::addTextToStore(
 {
     auto hash = hashString(htSHA256, s);
     auto dstPath = makeTextPath(name, TextInfo {
-        { .hash = hash },
-        references,
+        .hash = hash,
+        .references = references,
     });
 
     addTempRoot(dstPath);
@@ -1459,7 +1447,10 @@ StorePath LocalStore::addTextToStore(
             ValidPathInfo info { dstPath, narHash };
             info.narSize = sink.s.size();
             info.references = references;
-            info.ca = TextHash { .hash = hash };
+            info.ca = {
+                .method = TextIngestionMethod {},
+                .hash = hash,
+            };
             registerValidPath(info);
         }
 
@@ -1856,33 +1847,39 @@ void LocalStore::queryRealisationUncached(const DrvOutput & id,
     }
 }
 
-FixedOutputHash LocalStore::hashCAPath(
-    const FileIngestionMethod & method, const HashType & hashType,
+ContentAddress LocalStore::hashCAPath(
+    const ContentAddressMethod & method, const HashType & hashType,
     const StorePath & path)
 {
     return hashCAPath(method, hashType, Store::toRealPath(path), path.hashPart());
 }
 
-FixedOutputHash LocalStore::hashCAPath(
-    const FileIngestionMethod & method,
+ContentAddress LocalStore::hashCAPath(
+    const ContentAddressMethod & method,
     const HashType & hashType,
     const Path & path,
     const std::string_view pathHash
 )
 {
     HashModuloSink caSink ( hashType, std::string(pathHash) );
-    switch (method) {
-    case FileIngestionMethod::Recursive:
-        dumpPath(path, caSink);
-        break;
-    case FileIngestionMethod::Flat:
-        readFile(path, caSink);
-        break;
-    }
-    auto hash = caSink.finish().first;
-    return FixedOutputHash{
+    std::visit(overloaded {
+        [&](const TextIngestionMethod &) {
+            readFile(path, caSink);
+        },
+        [&](const FileIngestionMethod & m2) {
+            switch (m2) {
+            case FileIngestionMethod::Recursive:
+                dumpPath(path, caSink);
+                break;
+            case FileIngestionMethod::Flat:
+                readFile(path, caSink);
+                break;
+            }
+        },
+    }, method.raw);
+    return ContentAddress {
         .method = method,
-        .hash = hash,
+        .hash = caSink.finish().first,
     };
 }
 

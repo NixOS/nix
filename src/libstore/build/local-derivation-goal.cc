@@ -2540,16 +2540,16 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             },
 
             [&](const DerivationOutput::CAFixed & dof) {
-                auto wanted = dof.ca.getHash();
+                auto & wanted = dof.ca.hash;
 
                 auto newInfo0 = newInfoFromCA(DerivationOutput::CAFloating {
-                    .method = dof.ca.getMethod(),
+                    .method = dof.ca.method,
                     .hashType = wanted.type,
                 });
 
                 /* Check wanted hash */
                 assert(newInfo0.ca);
-                auto got = newInfo0.ca->getHash();
+                auto & got = newInfo0.ca->hash;
                 if (wanted != got) {
                     /* Throw an error after registering the path as
                        valid. */

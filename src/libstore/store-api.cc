@@ -184,15 +184,15 @@ static std::string makeType(
 
 StorePath Store::makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const
 {
-    if (info.hash.hash.type == htSHA256 && info.hash.method == FileIngestionMethod::Recursive) {
-        return makeStorePath(makeType(*this, "source", info.references), info.hash.hash, name);
+    if (info.hash.type == htSHA256 && info.method == FileIngestionMethod::Recursive) {
+        return makeStorePath(makeType(*this, "source", info.references), info.hash, name);
     } else {
         assert(info.references.size() == 0);
         return makeStorePath("output:out",
             hashString(htSHA256,
                 "fixed:out:"
-                + makeFileIngestionPrefix(info.hash.method)
-                + info.hash.hash.to_string(Base16, true) + ":"),
+                + makeFileIngestionPrefix(info.method)
+                + info.hash.to_string(Base16, true) + ":"),
             name);
     }
 }
@@ -200,13 +200,13 @@ StorePath Store::makeFixedOutputPath(std::string_view name, const FixedOutputInf
 
 StorePath Store::makeTextPath(std::string_view name, const TextInfo & info) const
 {
-    assert(info.hash.hash.type == htSHA256);
+    assert(info.hash.type == htSHA256);
     return makeStorePath(
         makeType(*this, "text", StoreReferences {
             .others = info.references,
             .self = false,
         }),
-        info.hash.hash,
+        info.hash,
         name);
 }
 
@@ -232,10 +232,8 @@ std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
         ? hashPath(hashAlgo, srcPath, filter).first
         : hashFile(hashAlgo, srcPath);
     FixedOutputInfo caInfo {
-        .hash = {
-            .method = method,
-            .hash = h,
-        },
+        .method = method,
+        .hash = h,
         .references = {},
     };
     return std::make_pair(makeFixedOutputPath(name, caInfo), h);
@@ -248,8 +246,8 @@ StorePath Store::computeStorePathForText(
     const StorePathSet & references) const
 {
     return makeTextPath(name, TextInfo {
-        { .hash = hashString(htSHA256, s) },
-        references,
+        .hash = hashString(htSHA256, s),
+        .references = references,
     });
 }
 
@@ -441,10 +439,8 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
         *this,
         name,
         FixedOutputInfo {
-            .hash = {
-                .method = method,
-                .hash = hash,
-            },
+            .method = method,
+            .hash = hash,
             .references = {},
         },
         narHash,
