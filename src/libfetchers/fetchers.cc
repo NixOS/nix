@@ -217,10 +217,8 @@ StorePath Input::computeStorePath(Store & store) const
     if (!narHash)
         throw Error("cannot compute store path for unlocked input '%s'", to_string());
     return store.makeFixedOutputPath(getName(), FixedOutputInfo {
-        .hash = {
-            .method = FileIngestionMethod::Recursive,
-            .hash = *narHash,
-        },
+        .method = FileIngestionMethod::Recursive,
+        .hash = *narHash,
         .references = {},
     });
 }

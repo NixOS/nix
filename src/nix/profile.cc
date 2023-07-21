@@ -222,10 +222,8 @@ struct ProfileManifest
             *store,
             "profile",
             FixedOutputInfo {
-                .hash = {
-                    .method = FileIngestionMethod::Recursive,
-                    .hash = narHash,
-                },
+                .method = FileIngestionMethod::Recursive,
+                .hash = narHash,
                 .references = {
                     .others = std::move(references),
                     // profiles never refer to themselves

@@ -45,10 +45,8 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             *store,
             std::move(*namePart),
             FixedOutputInfo {
-                .hash = {
-                    .method = std::move(ingestionMethod),
-                    .hash = std::move(hash),
-                },
+                .method = std::move(ingestionMethod),
+                .hash = std::move(hash),
                 .references = {},
             },
             narHash,
