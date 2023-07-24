@@ -87,7 +87,7 @@ void LocalOverlayStore::queryPathInfoUncached(const StorePath & path,
 
 
 void LocalOverlayStore::queryRealisationUncached(const DrvOutput & drvOutput,
-    Callback<std::shared_ptr<const Realisation>> callback) noexcept 
+    Callback<std::shared_ptr<const Realisation>> callback) noexcept
 {
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
