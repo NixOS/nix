@@ -15,6 +15,9 @@ if test -n "$dot"; then
     $dot < $TEST_ROOT/graph
 fi
 
+# Test GraphML graph generation
+nix-store -q --graphml "$drvPath" > $TEST_ROOT/graphml
+
 outPath=$(nix-store -rvv "$drvPath") || fail "build failed"
 
 # Test Graphviz graph generation.

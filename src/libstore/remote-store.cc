@@ -378,27 +378,36 @@ StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
 }
 
 
-std::map<std::string, std::optional<StorePath>> RemoteStore::queryPartialDerivationOutputMap(const StorePath & path)
+std::map<std::string, std::optional<StorePath>> RemoteStore::queryPartialDerivationOutputMap(const StorePath & path, Store * evalStore_)
 {
     if (GET_PROTOCOL_MINOR(getProtocol()) >= 0x16) {
-        auto conn(getConnection());
-        conn->to << WorkerProto::Op::QueryDerivationOutputMap << printStorePath(path);
-        conn.processStderr();
-        return WorkerProto::Serialise<std::map<std::string, std::optional<StorePath>>>::read(*this, *conn);
+        if (!evalStore_) {
+            auto conn(getConnection());
+            conn->to << WorkerProto::Op::QueryDerivationOutputMap << printStorePath(path);
+            conn.processStderr();
+            return WorkerProto::Serialise<std::map<std::string, std::optional<StorePath>>>::read(*this, *conn);
+        } else {
+            auto & evalStore = *evalStore_;
+            auto outputs = evalStore.queryStaticPartialDerivationOutputMap(path);
+            // union with the first branch overriding the statically-known ones
+            // when non-`std::nullopt`.
+            for (auto && [outputName, optPath] : queryPartialDerivationOutputMap(path, nullptr)) {
+                if (optPath)
+                    outputs.insert_or_assign(std::move(outputName), std::move(optPath));
+                else
+                    outputs.insert({std::move(outputName), std::nullopt});
+            }
+            return outputs;
+        }
     } else {
+        auto & evalStore = evalStore_ ? *evalStore_ : *this;
         // Fallback for old daemon versions.
         // For floating-CA derivations (and their co-dependencies) this is an
         // under-approximation as it only returns the paths that can be inferred
         // from the derivation itself (and not the ones that are known because
         // the have been built), but as old stores don't handle floating-CA
         // derivations this shouldn't matter
-        auto derivation = readDerivation(path);
-        auto outputsWithOptPaths = derivation.outputsAndOptPaths(*this);
-        std::map<std::string, std::optional<StorePath>> ret;
-        for (auto & [outputName, outputAndPath] : outputsWithOptPaths) {
-            ret.emplace(outputName, outputAndPath.second);
-        }
-        return ret;
+        return evalStore.queryStaticPartialDerivationOutputMap(path);
     }
 }
 

@@ -14,6 +14,8 @@ You can run the whole testsuite with `make check`, or the tests for a specific c
 The functional tests reside under the `tests` directory and are listed in `tests/local.mk`.
 Each test is a bash script.
 
+### Running the whole test suite
+
 The whole test suite can be run with:
 
 ```shell-session
@@ -22,6 +24,33 @@ ran test tests/foo.sh... [PASS]
 ran test tests/bar.sh... [PASS]
 ...
 ```
+
+### Grouping tests
+
+Sometimes it is useful to group related tests so they can be easily run together without running the entire test suite.
+Each test group is in a subdirectory of `tests`.
+For example, `tests/ca/local.mk` defines a `ca` test group for content-addressed derivation outputs.
+
+That test group can be run like this:
+
+```shell-session
+$ make ca.test-group -j50
+ran test tests/ca/nix-run.sh... [PASS]
+ran test tests/ca/import-derivation.sh... [PASS]
+...
+```
+
+The test group is defined in Make like this:
+```makefile
+$(test-group-name)-tests := \
+  $(d)/test0.sh \
+  $(d)/test1.sh \
+  ...
+
+install-tests-groups += $(test-group-name)
+```
+
+### Running individual tests
 
 Individual tests can be run with `make`:
 
@@ -85,6 +114,31 @@ GNU gdb (GDB) 12.1
 
 One can debug the Nix invocation in all the usual ways.
 For example, enter `run` to start the Nix invocation.
+
+### Characterization testing
+
+Occasionally, Nix utilizes a technique called [Characterization Testing](https://en.wikipedia.org/wiki/Characterization_test) as part of the functional tests.
+This technique is to include the exact output/behavior of a former version of Nix in a test in order to check that Nix continues to produce the same behavior going forward.
+
+For example, this technique is used for the language tests, to check both the printed final value if evaluation was successful, and any errors and warnings encountered.
+
+It is frequently useful to regenerate the expected output.
+To do that, rerun the failed test with `_NIX_TEST_ACCEPT=1`.
+(At least, this is the convention we've used for `tests/lang.sh`.
+If we add more characterization testing we should always strive to be consistent.)
+
+An interesting situation to document is the case when these tests are "overfitted".
+The language tests are, again, an example of this.
+The expected successful output of evaluation is supposed to be highly stable – we do not intend to make breaking changes to (the stable parts of) the Nix language.
+However, the errors and warnings during evaluation (successful or not) are not stable in this way.
+We are free to change how they are displayed at any time.
+
+It may be surprising that we would test non-normative behavior like diagnostic outputs.
+Diagnostic outputs are indeed not a stable interface, but they still are important to users.
+By recording the expected output, the test suite guards against accidental changes, and ensure the *result* (not just the code that implements it) of the diagnostic code paths are under code review.
+Regressions are caught, and improvements always show up in code review.
+
+To ensure that characterization testing doesn't make it harder to intentionally change these interfaces, there always must be an easy way to regenerate the expected output, as we do with `_NIX_TEST_ACCEPT=1`.
 
 ## Integration tests
 

@@ -4,8 +4,6 @@ test-deps =
 
 define run-install-test
 
-  installcheck: $1.test
-
   .PHONY: $1.test
   $1.test: $1 $(test-deps)
 	@env BASH=$(bash) $(bash) mk/run-test.sh $1 < /dev/null
@@ -13,6 +11,12 @@ define run-install-test
   .PHONY: $1.test-debug
   $1.test-debug: $1 $(test-deps)
 	@env BASH=$(bash) $(bash) mk/debug-test.sh $1 < /dev/null
+
+endef
+
+define run-install-test-group
+
+  .PHONY: $1.test-group
 
 endef
 

@@ -1,0 +1,12 @@
+error:
+       … while calling the 'fromTOML' builtin
+
+         at /pwd/lang/eval-fail-fromTOML-timestamps.nix:1:1:
+
+            1| builtins.fromTOML ''
+             | ^
+            2|   key = "value"
+
+       error: while parsing a TOML string: Dates and times are not supported
+
+       at «none»:0: (source not available)

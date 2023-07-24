@@ -71,10 +71,8 @@ std::tuple<StorePath, Hash> prefetchFile(
     if (expectedHash) {
         hashType = expectedHash->type;
         storePath = store->makeFixedOutputPath(*name, FixedOutputInfo {
-            .hash = {
-                .method = ingestionMethod,
-                .hash = *expectedHash,
-            },
+            .method = ingestionMethod,
+            .hash = *expectedHash,
             .references = {},
         });
         if (store->isValidPath(*storePath))
@@ -127,7 +125,7 @@ std::tuple<StorePath, Hash> prefetchFile(
         auto info = store->addToStoreSlow(*name, tmpFile, ingestionMethod, hashType, expectedHash);
         storePath = info.path;
         assert(info.ca);
-        hash = info.ca->getHash();
+        hash = info.ca->hash;
     }
 
     return {storePath.value(), hash.value()};

@@ -105,7 +105,9 @@ MixEvalArgs::MixEvalArgs()
   )",
         .category = category,
         .labels = {"path"},
-        .handler = {[&](std::string s) { searchPath.push_back(s); }}
+        .handler = {[&](std::string s) {
+            searchPath.elements.emplace_back(SearchPath::Elem::parse(s));
+        }}
     });
 
     addFlag({

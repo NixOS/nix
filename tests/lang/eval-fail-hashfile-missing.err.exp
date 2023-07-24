@@ -1,0 +1,19 @@
+error:
+       … while calling the 'toString' builtin
+
+         at /pwd/lang/eval-fail-hashfile-missing.nix:4:3:
+
+            3| in
+            4|   toString (builtins.concatLists (map (hash: map (builtins.hashFile hash) paths) ["md5" "sha1" "sha256" "sha512"]))
+             |   ^
+            5|
+
+       … while evaluating the first argument passed to builtins.toString
+
+         at «none»:0: (source not available)
+
+       … while calling the 'hashFile' builtin
+
+         at «none»:0: (source not available)
+
+       error: opening file '/pwd/lang/this-file-is-definitely-not-there-7392097': No such file or directory

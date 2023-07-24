@@ -9,6 +9,7 @@
 #include "config.hh"
 #include "experimental-features.hh"
 #include "input-accessor.hh"
+#include "search-path.hh"
 
 #include <map>
 #include <optional>
@@ -120,15 +121,6 @@ void copyContext(const Value & v, NixStringContext & context);
 
 std::string printValue(const EvalState & state, const Value & v);
 std::ostream & operator << (std::ostream & os, const ValueType t);
-
-
-struct SearchPathElem
-{
-    std::string prefix;
-    // FIXME: maybe change this to an std::variant<SourcePath, URL>.
-    std::string path;
-};
-typedef std::list<SearchPathElem> SearchPath;
 
 
 /**
@@ -317,7 +309,7 @@ private:
 
     SearchPath searchPath;
 
-    std::map<std::string, std::pair<bool, std::string>> searchPathResolved;
+    std::map<std::string, std::optional<std::string>> searchPathResolved;
 
     /**
      * Cache used by checkSourcePath().
@@ -344,12 +336,12 @@ private:
 public:
 
     EvalState(
-        const Strings & _searchPath,
+        const SearchPath & _searchPath,
         ref<Store> store,
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
 
-    void addToSearchPath(const std::string & s);
+    void addToSearchPath(SearchPath::Elem && elem);
 
     SearchPath getSearchPath() { return searchPath; }
 
@@ -431,12 +423,16 @@ public:
      * Look up a file in the search path.
      */
     SourcePath findFile(const std::string_view path);
-    SourcePath findFile(SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
+    SourcePath findFile(const SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
 
     /**
+     * Try to resolve a search path value (not the optinal key part)
+     *
      * If the specified search path element is a URI, download it.
+     *
+     * If it is not found, return `std::nullopt`
      */
-    std::pair<bool, std::string> resolveSearchPathElem(const SearchPathElem & elem);
+    std::optional<std::string> resolveSearchPathPath(const SearchPath::Path & path);
 
     /**
      * Evaluate an expression to normal form
@@ -810,7 +806,7 @@ struct EvalSettings : Config
           List of directories to be searched for `<...>` file references
 
           In particular, outside of [pure evaluation mode](#conf-pure-evaluation), this determines the value of
-          [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtin-constants-nixPath).
+          [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath).
         )"};
 
     Setting<bool> restrictEval{

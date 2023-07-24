@@ -165,7 +165,7 @@ public:
 
     StorePathSet queryValidDerivers(const StorePath & path) override;
 
-    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path) override;
+    std::map<std::string, std::optional<StorePath>> queryStaticPartialDerivationOutputMap(const StorePath & path) override;
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
@@ -345,13 +345,13 @@ private:
     void signRealisation(Realisation &);
 
     // XXX: Make a generic `Store` method
-    FixedOutputHash hashCAPath(
-        const FileIngestionMethod & method,
+    ContentAddress hashCAPath(
+        const ContentAddressMethod & method,
         const HashType & hashType,
         const StorePath & path);
 
-    FixedOutputHash hashCAPath(
-        const FileIngestionMethod & method,
+    ContentAddress hashCAPath(
+        const ContentAddressMethod & method,
         const HashType & hashType,
         const Path & path,
         const std::string_view pathHash
