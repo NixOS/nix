@@ -803,9 +803,9 @@ static void prim_parseFlakeRef(
         "while evaluating the argument passed to builtins.parseFlakeRef"));
     auto attrs = parseFlakeRef(flakeRefS, {}, true).toAttrs();
     auto binds = state.buildBindings(attrs.size());
-    for ( const auto & [key, value] : attrs ) {
-        Symbol  s  = state.symbols.create(key);
-        Value & vv = binds.alloc(s);
+    for (const auto & [key, value] : attrs) {
+        auto s = state.symbols.create(key);
+        auto & vv = binds.alloc(s);
         if (std::holds_alternative<std::string>(value)) {
             vv.mkString(std::get<std::string>(value));
         }
