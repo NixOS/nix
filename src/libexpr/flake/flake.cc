@@ -873,7 +873,7 @@ static RegisterPrimOp r4({
     .name =  "__flakeRefToString",
     .args = {"attrs"},
     .doc = R"(
-      Stringize an exploded flake reference, and return its url form.
+      Convert a flake reference from attribute set format to URL format.
       For example:
 
       ```nix
