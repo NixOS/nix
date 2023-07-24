@@ -859,8 +859,8 @@ static void prim_flakeRefToString(
                           std::string(attr.value->str()));
         } else {
             state.error(
-                "flake-ref attr sets may only contain integers, booleans, "
-                "and strings, but attribute %s is %s",
+                "flake reference attribute sets may only contain integers, Booleans, "
+                "and strings, but attribute '%s' is %s",
                 state.symbols[attr.name],
                 showType(*attr.value)).debugThrow<EvalError>();
         }
