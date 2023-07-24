@@ -49,7 +49,7 @@ bool SSHMaster::isMasterRunning() {
     return res.first == 0;
 }
 
-std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string & command)
+std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string & command, Strings & args)
 {
     Path socketPath = startMaster();
 
@@ -79,21 +79,58 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
         if (logFD != -1 && dup2(logFD, STDERR_FILENO) == -1)
             throw SysError("duping over stderr");
 
-        Strings args;
+        Strings execargs;
 
         if (fakeSSH) {
-            args = { "bash", "-c" };
+            execargs.push_back(command);
+            execargs.splice(execargs.end(), args);
         } else {
-            args = { "ssh", host.c_str(), "-x" };
-            addCommonSSHOpts(args);
+            std::string escapedCommand = shellEscape(command);
+
+            std::string script = {escapedCommand};
+
+            for (std::string arg: args) {
+                script.push_back(' ');
+                script.append(shellEscape(arg));
+            }
+
+            // This is really ugly, but it's less ugly then trying to catch the
+            // error thrown by this process when ssh it can't find the command.
+            // We would have to first of all catch this error (which is not
+            // trivial, since it will only be thrown to the parent process
+            // during blocking communication), then redirect the stderr, search
+            // it for "command not found" and then ssh again and try to find the
+            // command.
+            script.append(
+                fmt(
+                    " || ( \
+                    code=$?;\
+                    if ! [ $code -eq 127 ]; then exit $code; fi;\
+                    PATH=\"$PATH:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin\";\
+                    cmd=\"$(command -v %s)\";\
+                    if [ -n \"$cmd\" ]; then\
+                        printf \"Executable %s not found in PATH on the remote host, but it was found in %%s.\\nPerhaps try adding '\\e[35;1m&remote-program=%%s\\e[0m' at the end of your SSH url.\n\" \"$cmd\" \"$cmd\" > /dev/stderr; \
+                    else\
+                        printf \"Executable %s was not found on the remote host. Are you sure you have Nix installed there?\n\" > /dev/stderr;\
+                    fi;\
+                    exit $code;\
+                    )",
+                    escapedCommand,
+                    escapedCommand,
+                    escapedCommand
+                )
+            );
+
+            execargs = { "ssh", host.c_str(), "-x" };
+            addCommonSSHOpts(execargs);
             if (socketPath != "")
-                args.insert(args.end(), {"-S", socketPath});
+                execargs.insert(args.end(), {"-S", socketPath});
             if (verbosity >= lvlChatty)
-                args.push_back("-v");
+                execargs.push_back("-v");
+            execargs.push_back(script);
         }
 
-        args.push_back(command);
-        execvp(args.begin()->c_str(), stringsToCharPtrs(args).data());
+        execvp(execargs.begin()->c_str(), stringsToCharPtrs(execargs).data());
 
         // could not exec ssh/bash
         throw SysError("unable to execute '%s'", args.front());

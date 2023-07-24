@@ -119,9 +119,12 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     ref<Connection> openConnection()
     {
         auto conn = make_ref<Connection>();
-        conn->sshConn = master.startCommand(
-            fmt("%s --serve --write", remoteProgram)
-            + (remoteStore.get() == "" ? "" : " --store " + shellEscape(remoteStore.get())));
+        Strings args = {"--serve", "--write"};
+        if (remoteStore.get() != "") {
+            args.push_back("--store");
+            args.push_back(remoteStore.get());
+        }
+        conn->sshConn = master.startCommand(remoteProgram, args);
         conn->to = FdSink(conn->sshConn->in.get());
         conn->from = FdSource(conn->sshConn->out.get());
 

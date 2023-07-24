@@ -93,9 +93,12 @@ private:
 ref<RemoteStore::Connection> SSHStore::openConnection()
 {
     auto conn = make_ref<Connection>();
-    conn->sshConn = master.startCommand(
-        fmt("%s --stdio", remoteProgram)
-        + (remoteStore.get() == "" ? "" : " --store " + shellEscape(remoteStore.get())));
+    Strings args = {"--stdio"};
+    if (remoteStore.get() != "") {
+        args.push_back("--store");
+        args.push_back(remoteStore.get());
+    }
+    conn->sshConn = master.startCommand(remoteProgram, args);
     conn->to = FdSink(conn->sshConn->in.get());
     conn->from = FdSource(conn->sshConn->out.get());
     return conn;

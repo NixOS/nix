@@ -40,7 +40,7 @@ public:
         AutoCloseFD out, in;
     };
 
-    std::unique_ptr<Connection> startCommand(const std::string & command);
+    std::unique_ptr<Connection> startCommand(const std::string & command, Strings args);
 
     Path startMaster();
 };
