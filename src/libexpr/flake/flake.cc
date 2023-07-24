@@ -815,7 +815,6 @@ static void prim_parseFlakeRef(
         else { /* bool */
             vv.mkBool(std::get<Explicit<bool>>(value).t);
         }
-
     }
     v.mkAttrs(binds);
 }
