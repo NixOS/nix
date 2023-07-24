@@ -806,15 +806,11 @@ static void prim_parseFlakeRef(
     for (const auto & [key, value] : attrs) {
         auto s = state.symbols.create(key);
         auto & vv = binds.alloc(s);
-        if (std::holds_alternative<std::string>(value)) {
-            vv.mkString(std::get<std::string>(value));
-        }
-        else if (std::holds_alternative<uint64_t>(value)) {
-            vv.mkInt(std::get<uint64_t>(value));
-        }
-        else { /* bool */
-            vv.mkBool(std::get<Explicit<bool>>(value).t);
-        }
+        std::visit(overloaded {
+            [&vv](const std::string    & value) { vv.mkString(value); },
+            [&vv](const uint64_t       & value) { vv.mkInt(value);    },
+            [&vv](const Explicit<bool> & value) { vv.mkBool(value.t); }
+        }, value);
     }
     v.mkAttrs(binds);
 }
