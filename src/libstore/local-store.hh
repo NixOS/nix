@@ -5,8 +5,7 @@
 
 #include "pathlocks.hh"
 #include "store-api.hh"
-#include "local-fs-store.hh"
-#include "gc-store.hh"
+#include "indirect-root-store.hh"
 #include "sync.hh"
 #include "util.hh"
 
@@ -68,7 +67,9 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
     std::string doc() override;
 };
 
-class LocalStore : public virtual LocalStoreConfig, public virtual LocalFSStore, public virtual GcStore
+class LocalStore : public virtual LocalStoreConfig
+    , public virtual IndirectRootStore
+    , public virtual GcStore
 {
 private:
 
@@ -209,6 +210,12 @@ private:
 
 public:
 
+    /**
+     * Implementation of IndirectRootStore::addIndirectRoot().
+     *
+     * The weak reference merely is a symlink to `path' from
+     * /nix/var/nix/gcroots/auto/<hash of `path'>.
+     */
     void addIndirectRoot(const Path & path) override;
 
 private:
