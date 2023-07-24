@@ -1,5 +1,5 @@
 #include "local-derivation-goal.hh"
-#include "gc-store.hh"
+#include "indirect-root-store.hh"
 #include "hook-instance.hh"
 #include "worker.hh"
 #include "builtins.hh"
@@ -1200,7 +1200,7 @@ struct RestrictedStoreConfig : virtual LocalFSStoreConfig
 /* A wrapper around LocalStore that only allows building/querying of
    paths that are in the input closures of the build or were added via
    recursive Nix calls. */
-struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual LocalFSStore, public virtual GcStore
+struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual IndirectRootStore, public virtual GcStore
 {
     ref<LocalStore> next;
 
@@ -1251,11 +1251,13 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override
     { }
 
-    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path) override
+    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(
+        const StorePath & path,
+        Store * evalStore = nullptr) override
     {
         if (!goal.isAllowed(path))
             throw InvalidPath("cannot query output map for unknown path '%s' in recursive Nix", printStorePath(path));
-        return next->queryPartialDerivationOutputMap(path);
+        return next->queryPartialDerivationOutputMap(path, evalStore);
     }
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
@@ -2540,16 +2542,16 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             },
 
             [&](const DerivationOutput::CAFixed & dof) {
-                auto wanted = dof.ca.getHash();
+                auto & wanted = dof.ca.hash;
 
                 auto newInfo0 = newInfoFromCA(DerivationOutput::CAFloating {
-                    .method = dof.ca.getMethod(),
+                    .method = dof.ca.method,
                     .hashType = wanted.type,
                 });
 
                 /* Check wanted hash */
                 assert(newInfo0.ca);
-                auto got = newInfo0.ca->getHash();
+                auto & got = newInfo0.ca->hash;
                 if (wanted != got) {
                     /* Throw an error after registering the path as
                        valid. */

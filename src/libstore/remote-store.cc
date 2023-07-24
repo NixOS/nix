@@ -159,49 +159,25 @@ void RemoteStore::setOptions(Connection & conn)
 }
 
 
-/* A wrapper around Pool<RemoteStore::Connection>::Handle that marks
-   the connection as bad (causing it to be closed) if a non-daemon
-   exception is thrown before the handle is closed. Such an exception
-   causes a deviation from the expected protocol and therefore a
-   desynchronization between the client and daemon. */
-struct ConnectionHandle
+RemoteStore::ConnectionHandle::~ConnectionHandle()
 {
-    Pool<RemoteStore::Connection>::Handle handle;
-    bool daemonException = false;
-
-    ConnectionHandle(Pool<RemoteStore::Connection>::Handle && handle)
-        : handle(std::move(handle))
-    { }
-
-    ConnectionHandle(ConnectionHandle && h)
-        : handle(std::move(h.handle))
-    { }
-
-    ~ConnectionHandle()
-    {
-        if (!daemonException && std::uncaught_exceptions()) {
-            handle.markBad();
-            debug("closing daemon connection because of an exception");
-        }
+    if (!daemonException && std::uncaught_exceptions()) {
+        handle.markBad();
+        debug("closing daemon connection because of an exception");
     }
+}
 
-    RemoteStore::Connection * operator -> () { return &*handle; }
-    RemoteStore::Connection & operator * () { return *handle; }
-
-    void processStderr(Sink * sink = 0, Source * source = 0, bool flush = true)
-    {
-        auto ex = handle->processStderr(sink, source, flush);
-        if (ex) {
-            daemonException = true;
-            std::rethrow_exception(ex);
-        }
+void RemoteStore::ConnectionHandle::processStderr(Sink * sink, Source * source, bool flush)
+{
+    auto ex = handle->processStderr(sink, source, flush);
+    if (ex) {
+        daemonException = true;
+        std::rethrow_exception(ex);
     }
-
-    void withFramedSink(std::function<void(Sink & sink)> fun);
-};
+}
 
 
-ConnectionHandle RemoteStore::getConnection()
+RemoteStore::ConnectionHandle RemoteStore::getConnection()
 {
     return ConnectionHandle(connections->get());
 }
@@ -378,27 +354,36 @@ StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
 }
 
 
-std::map<std::string, std::optional<StorePath>> RemoteStore::queryPartialDerivationOutputMap(const StorePath & path)
+std::map<std::string, std::optional<StorePath>> RemoteStore::queryPartialDerivationOutputMap(const StorePath & path, Store * evalStore_)
 {
     if (GET_PROTOCOL_MINOR(getProtocol()) >= 0x16) {
-        auto conn(getConnection());
-        conn->to << WorkerProto::Op::QueryDerivationOutputMap << printStorePath(path);
-        conn.processStderr();
-        return WorkerProto::Serialise<std::map<std::string, std::optional<StorePath>>>::read(*this, *conn);
+        if (!evalStore_) {
+            auto conn(getConnection());
+            conn->to << WorkerProto::Op::QueryDerivationOutputMap << printStorePath(path);
+            conn.processStderr();
+            return WorkerProto::Serialise<std::map<std::string, std::optional<StorePath>>>::read(*this, *conn);
+        } else {
+            auto & evalStore = *evalStore_;
+            auto outputs = evalStore.queryStaticPartialDerivationOutputMap(path);
+            // union with the first branch overriding the statically-known ones
+            // when non-`std::nullopt`.
+            for (auto && [outputName, optPath] : queryPartialDerivationOutputMap(path, nullptr)) {
+                if (optPath)
+                    outputs.insert_or_assign(std::move(outputName), std::move(optPath));
+                else
+                    outputs.insert({std::move(outputName), std::nullopt});
+            }
+            return outputs;
+        }
     } else {
+        auto & evalStore = evalStore_ ? *evalStore_ : *this;
         // Fallback for old daemon versions.
         // For floating-CA derivations (and their co-dependencies) this is an
         // under-approximation as it only returns the paths that can be inferred
         // from the derivation itself (and not the ones that are known because
         // the have been built), but as old stores don't handle floating-CA
         // derivations this shouldn't matter
-        auto derivation = readDerivation(path);
-        auto outputsWithOptPaths = derivation.outputsAndOptPaths(*this);
-        std::map<std::string, std::optional<StorePath>> ret;
-        for (auto & [outputName, outputAndPath] : outputsWithOptPaths) {
-            ret.emplace(outputName, outputAndPath.second);
-        }
-        return ret;
+        return evalStore.queryStaticPartialDerivationOutputMap(path);
     }
 }
 
@@ -837,15 +822,6 @@ void RemoteStore::addTempRoot(const StorePath & path)
 }
 
 
-void RemoteStore::addIndirectRoot(const Path & path)
-{
-    auto conn(getConnection());
-    conn->to << WorkerProto::Op::AddIndirectRoot << path;
-    conn.processStderr();
-    readInt(conn->from);
-}
-
-
 Roots RemoteStore::findRoots(bool censor)
 {
     auto conn(getConnection());
@@ -1090,7 +1066,7 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
     return nullptr;
 }
 
-void ConnectionHandle::withFramedSink(std::function<void(Sink & sink)> fun)
+void RemoteStore::ConnectionHandle::withFramedSink(std::function<void(Sink & sink)> fun)
 {
     (*this)->to.flush();
 

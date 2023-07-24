@@ -1,7 +1,6 @@
 #include "derivations.hh"
 #include "globals.hh"
 #include "local-store.hh"
-#include "local-fs-store.hh"
 #include "finally.hh"
 
 #include <functional>
@@ -50,7 +49,7 @@ void LocalStore::addIndirectRoot(const Path & path)
 }
 
 
-Path LocalFSStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot)
+Path IndirectRootStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot)
 {
     Path gcRoot(canonPath(_gcRoot));
 

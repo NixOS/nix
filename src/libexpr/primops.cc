@@ -1300,9 +1300,10 @@ drvName, Bindings * attrs, Value & v)
         auto method = ingestionMethod.value_or(FileIngestionMethod::Flat);
 
         DerivationOutput::CAFixed dof {
-            .ca = ContentAddress::fromParts(
-                std::move(method),
-                std::move(h)),
+            .ca = ContentAddress {
+                .method = std::move(method),
+                .hash = std::move(h),
+            },
         };
 
         drv.env["out"] = state.store->printStorePath(dof.path(*state.store, drvName, "out"));
@@ -2164,10 +2165,8 @@ static void addPath(
         std::optional<StorePath> expectedStorePath;
         if (expectedHash)
             expectedStorePath = state.store->makeFixedOutputPath(name, FixedOutputInfo {
-                .hash = {
-                    .method = method,
-                    .hash = *expectedHash,
-                },
+                .method = method,
+                .hash = *expectedHash,
                 .references = {},
             });
 

@@ -310,43 +310,34 @@ std::map<DrvOutput, StorePath> drvOutputReferences(
 
 OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd, Store * evalStore_)
 {
-    auto & evalStore = evalStore_ ? *evalStore_ : store;
+    auto outputsOpt_ = store.queryPartialDerivationOutputMap(bfd.drvPath, evalStore_);
 
-    OutputPathMap outputs;
-    auto drv = evalStore.readDerivation(bfd.drvPath);
-    auto outputHashes = staticOutputHashes(store, drv);
-    auto drvOutputs = drv.outputsAndOptPaths(store);
-    auto outputNames = std::visit(overloaded {
+    auto outputsOpt = std::visit(overloaded {
         [&](const OutputsSpec::All &) {
-            StringSet names;
-            for (auto & [outputName, _] : drv.outputs)
-                names.insert(outputName);
-            return names;
+            // Keep all outputs
+            return std::move(outputsOpt_);
         },
         [&](const OutputsSpec::Names & names) {
-            return static_cast<std::set<std::string>>(names);
+            // Get just those mentioned by name
+            std::map<std::string, std::optional<StorePath>> outputsOpt;
+            for (auto & output : names) {
+                auto * pOutputPathOpt = get(outputsOpt_, output);
+                if (!pOutputPathOpt)
+                    throw Error(
+                        "the derivation '%s' doesn't have an output named '%s'",
+                        store.printStorePath(bfd.drvPath), output);
+                outputsOpt.insert_or_assign(output, std::move(*pOutputPathOpt));
+            }
+            return outputsOpt;
         },
     }, bfd.outputs.raw());
-    for (auto & output : outputNames) {
-        auto outputHash = get(outputHashes, output);
-        if (!outputHash)
-            throw Error(
-                "the derivation '%s' doesn't have an output named '%s'",
-                store.printStorePath(bfd.drvPath), output);
-        if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
-            DrvOutput outputId { *outputHash, output };
-            auto realisation = store.queryRealisation(outputId);
-            if (!realisation)
-                throw MissingRealisation(outputId);
-            outputs.insert_or_assign(output, realisation->outPath);
-        } else {
-            // If ca-derivations isn't enabled, assume that
-            // the output path is statically known.
-            auto drvOutput = get(drvOutputs, output);
-            assert(drvOutput);
-            assert(drvOutput->second);
-            outputs.insert_or_assign(output, *drvOutput->second);
-        }
+
+    OutputPathMap outputs;
+    for (auto & [outputName, outputPathOpt] : outputsOpt) {
+        if (!outputPathOpt)
+            throw MissingRealisation(store.printStorePath(bfd.drvPath), outputName);
+        auto & outputPath = *outputPathOpt;
+        outputs.insert_or_assign(outputName, outputPath);
     }
     return outputs;
 }

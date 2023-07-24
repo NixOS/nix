@@ -114,37 +114,6 @@ struct ContentAddressMethod
  */
 
 /**
- * Somewhat obscure, used by \ref Derivation derivations and
- * `builtins.toFile` currently.
- */
-struct TextHash {
-    /**
-     * Hash of the contents of the text/file.
-     */
-    Hash hash;
-
-    GENERATE_CMP(TextHash, me->hash);
-};
-
-/**
- * Used by most store objects that are content-addressed.
- */
-struct FixedOutputHash {
-    /**
-     * How the file system objects are serialized
-     */
-    FileIngestionMethod method;
-    /**
-     * Hash of that serialization
-     */
-    Hash hash;
-
-    std::string printMethodAlgo() const;
-
-    GENERATE_CMP(FixedOutputHash, me->method, me->hash);
-};
-
-/**
  * We've accumulated several types of content-addressed paths over the
  * years; fixed-output derivations support multiple hash algorithms and
  * serialisation methods (flat file vs NAR). Thus, ‘ca’ has one of the
@@ -158,19 +127,17 @@ struct FixedOutputHash {
  */
 struct ContentAddress
 {
-    typedef std::variant<
-        TextHash,
-        FixedOutputHash
-    > Raw;
+    /**
+     * How the file system objects are serialized
+     */
+    ContentAddressMethod method;
 
-    Raw raw;
+    /**
+     * Hash of that serialization
+     */
+    Hash hash;
 
-    GENERATE_CMP(ContentAddress, me->raw);
-
-    /* The moral equivalent of `using Raw::Raw;` */
-    ContentAddress(auto &&... arg)
-        : raw(std::forward<decltype(arg)>(arg)...)
-    { }
+    GENERATE_CMP(ContentAddress, me->method, me->hash);
 
     /**
      * Compute the content-addressability assertion
@@ -182,20 +149,6 @@ struct ContentAddress
     static ContentAddress parse(std::string_view rawCa);
 
     static std::optional<ContentAddress> parseOpt(std::string_view rawCaOpt);
-
-    /**
-     * Create a `ContentAddress` from 2 parts:
-     *
-     * @param method Way ingesting the file system data.
-     *
-     * @param hash Hash of ingested file system data.
-     */
-    static ContentAddress fromParts(
-        ContentAddressMethod method, Hash hash) noexcept;
-
-    ContentAddressMethod getMethod() const;
-
-    const Hash & getHash() const;
 
     std::string printMethodAlgo() const;
 };
@@ -219,7 +172,8 @@ std::string renderContentAddress(std::optional<ContentAddress> ca);
  * References to other store objects are tracked with store paths, self
  * references however are tracked with a boolean.
  */
-struct StoreReferences {
+struct StoreReferences
+{
     /**
      * References to other store objects
      */
@@ -246,8 +200,13 @@ struct StoreReferences {
 };
 
 // This matches the additional info that we need for makeTextPath
-struct TextInfo {
-    TextHash hash;
+struct TextInfo
+{
+    /**
+     * Hash of the contents of the text/file.
+     */
+    Hash hash;
+
     /**
      * References to other store objects only; self references
      * disallowed
@@ -257,8 +216,18 @@ struct TextInfo {
     GENERATE_CMP(TextInfo, me->hash, me->references);
 };
 
-struct FixedOutputInfo {
-    FixedOutputHash hash;
+struct FixedOutputInfo
+{
+    /**
+     * How the file system objects are serialized
+     */
+    FileIngestionMethod method;
+
+    /**
+     * Hash of that serialization
+     */
+    Hash hash;
+
     /**
      * References to other store objects or this one.
      */
