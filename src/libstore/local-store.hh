@@ -231,6 +231,18 @@ public:
     void collectGarbage(const GCOptions & options, GCResults & results) override;
 
     /**
+     * Called by `collectGarbage` to trace in reverse.
+     *
+     * Using this rather than `queryReferrers` directly allows us to
+     * fine-tune which referrers we consider for garbage collection;
+     * some store implementations take advantage of this.
+     */
+    virtual void queryGCReferrers(const StorePath & path, StorePathSet & referrers)
+    {
+        return queryReferrers(path, referrers);
+    }
+
+    /**
      * Called by `collectGarbage` to recursively delete a path.
      * The default implementation simply calls `deletePath`, but it can be
      * overridden by stores that wish to provide their own deletion behaviour.

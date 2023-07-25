@@ -115,7 +115,16 @@ private:
 
     void optimiseStore() override;
 
+    /**
+     * For lower-store paths, we used the lower store location. This avoids the
+     * wasteful "copying up" that would otherwise happen.
+     */
     Path toRealPathForHardLink(const StorePath & storePath) override;
+
+    /**
+     * Deletion only effects the upper layer, so we ignore lower-layer referrers.
+     */
+    void queryGCReferrers(const StorePath & path, StorePathSet & referrers) override;
 };
 
 }

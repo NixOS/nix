@@ -138,6 +138,12 @@ void LocalOverlayStore::queryReferrers(const StorePath & path, StorePathSet & re
 }
 
 
+void LocalOverlayStore::queryGCReferrers(const StorePath & path, StorePathSet & referrers)
+{
+    LocalStore::queryReferrers(path, referrers);
+}
+
+
 StorePathSet LocalOverlayStore::queryValidDerivers(const StorePath & path)
 {
     auto res = LocalStore::queryValidDerivers(path);
@@ -188,6 +194,7 @@ void LocalOverlayStore::deleteGCPath(const Path & path, uint64_t & bytesFreed)
     }
 }
 
+
 void LocalOverlayStore::optimiseStore()
 {
     Activity act(*logger, actOptimiseStore);
@@ -215,6 +222,7 @@ Path LocalOverlayStore::toRealPathForHardLink(const StorePath & path)
         ? lowerStore->Store::toRealPath(path)
         : Store::toRealPath(path);
 }
+
 
 static RegisterStoreImplementation<LocalOverlayStore, LocalOverlayStoreConfig> regLocalOverlayStore;
 
