@@ -37,7 +37,7 @@ let
     buildCommand = ''
       echo hi-input3
       read x < ${input2}
-      echo $x BAZ > $out
+      echo ${input2} $x BAZ > $out
     '';
   };
 
@@ -51,6 +51,6 @@ in
       ''
         read x < ${input1}
         read y < ${input3}
-        echo "$x $y" > $out
+        echo ${input1} ${input3} "$x $y" > $out
       '';
   }
