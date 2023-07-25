@@ -869,12 +869,16 @@ static RegisterPrimOp r4({
     .args = {"attrs"},
     .doc = R"(
       Convert a flake reference from attribute set format to URL format.
-      For example:
 
+      For example:
       ```nix
-      builtins.flakeRefToString { dir = "lib"; owner = "NixOS"; ref = "23.05";
-                                  repo = "nixpkgs"; type = "github"; }
-      # ==> "github:NixOS/nixpkgs/23.05?dir=lib"
+      builtins.flakeRefToString {
+        dir = "lib"; owner = "NixOS"; ref = "23.05"; repo = "nixpkgs"; type = "github";
+      }
+      ```
+      evaluates to
+      ```nix
+       "github:NixOS/nixpkgs/23.05?dir=lib"
       ```
     )",
     .fun = prim_flakeRefToString,
