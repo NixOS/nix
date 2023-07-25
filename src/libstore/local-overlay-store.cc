@@ -209,13 +209,6 @@ void LocalOverlayStore::optimiseStore()
     }
 }
 
-bool LocalOverlayStore::verifyStore(bool checkContents, RepairFlag repair)
-{
-    if (repair)
-        warn("local-overlay: store does not support --verify --repair");
-    return LocalStore::verifyStore(checkContents, NoRepair);
-}
-
 static RegisterStoreImplementation<LocalOverlayStore, LocalOverlayStoreConfig> regLocalOverlayStore;
 
 }

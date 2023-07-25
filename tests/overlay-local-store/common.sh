@@ -7,9 +7,13 @@ requireEnvironment () {
   needLocalStore "The test uses --store always so we would just be bypassing the daemon"
 }
 
+addConfig () {
+    echo "$1" >> "$NIX_CONF_DIR/nix.conf"
+}
+
 setupConfig () {
-  echo "require-drop-supplementary-groups = false" >> "$NIX_CONF_DIR"/nix.conf
-  echo "build-users-group = " >> "$NIX_CONF_DIR"/nix.conf
+  addConfig "require-drop-supplementary-groups = false"
+  addConfig "build-users-group = "
 }
 
 
