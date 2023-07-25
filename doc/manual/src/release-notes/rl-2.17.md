@@ -11,8 +11,12 @@
 
   ```nix
   {
-    nested = { foo = 1; };
-    nested = { ${"ba" + "r"} = 2; };
+    nested = {
+      foo = 1;
+    };
+    nested = {
+      ${"ba" + "r"} = 2;
+    };
   }
   ```
 
@@ -22,8 +26,17 @@
   { nested = { bar = 2; foo = 1; }; }
   ```
 
-  Note that the feature of merging multiple attribute set declarations is of questionable value.
+  Note that the feature of merging multiple *full declarations* of attribute sets like `nested` in the example is of questionable value.
   It allows writing expressions that are very hard to read, for instance when there are many lines of code between two declarations of the same attribute.
   This has been around for a long time and is therefore supported for backwards compatibility, but should not be relied upon.
+
+  Instead, consider using the *nested attribute path* syntax:
+
+  ```nix
+  {
+    nested.foo = 1;
+    nested.${"ba" + "r"} = 2;
+  }
+  ```
 
 * Tarball flakes can now redirect to an "immutable" URL that will be recorded in lock files. This allows the use of "mutable" tarball URLs like `https://example.org/hello/latest.tar.gz` in flakes. See the [tarball fetcher](../protocols/tarball-fetcher.md) for details.
