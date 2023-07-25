@@ -7,6 +7,7 @@
 #include "store-cast.hh"
 #include "gc-store.hh"
 #include "log-store.hh"
+#include "indirect-root-store.hh"
 #include "path-with-outputs.hh"
 #include "finally.hh"
 #include "archive.hh"
@@ -675,8 +676,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         Path path = absPath(readString(from));
 
         logger->startWork();
-        auto & gcStore = require<GcStore>(*store);
-        gcStore.addIndirectRoot(path);
+        auto & indirectRootStore = require<IndirectRootStore>(*store);
+        indirectRootStore.addIndirectRoot(path);
         logger->stopWork();
 
         to << 1;

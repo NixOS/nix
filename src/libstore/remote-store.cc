@@ -159,49 +159,25 @@ void RemoteStore::setOptions(Connection & conn)
 }
 
 
-/* A wrapper around Pool<RemoteStore::Connection>::Handle that marks
-   the connection as bad (causing it to be closed) if a non-daemon
-   exception is thrown before the handle is closed. Such an exception
-   causes a deviation from the expected protocol and therefore a
-   desynchronization between the client and daemon. */
-struct ConnectionHandle
+RemoteStore::ConnectionHandle::~ConnectionHandle()
 {
-    Pool<RemoteStore::Connection>::Handle handle;
-    bool daemonException = false;
-
-    ConnectionHandle(Pool<RemoteStore::Connection>::Handle && handle)
-        : handle(std::move(handle))
-    { }
-
-    ConnectionHandle(ConnectionHandle && h)
-        : handle(std::move(h.handle))
-    { }
-
-    ~ConnectionHandle()
-    {
-        if (!daemonException && std::uncaught_exceptions()) {
-            handle.markBad();
-            debug("closing daemon connection because of an exception");
-        }
+    if (!daemonException && std::uncaught_exceptions()) {
+        handle.markBad();
+        debug("closing daemon connection because of an exception");
     }
+}
 
-    RemoteStore::Connection * operator -> () { return &*handle; }
-    RemoteStore::Connection & operator * () { return *handle; }
-
-    void processStderr(Sink * sink = 0, Source * source = 0, bool flush = true)
-    {
-        auto ex = handle->processStderr(sink, source, flush);
-        if (ex) {
-            daemonException = true;
-            std::rethrow_exception(ex);
-        }
+void RemoteStore::ConnectionHandle::processStderr(Sink * sink, Source * source, bool flush)
+{
+    auto ex = handle->processStderr(sink, source, flush);
+    if (ex) {
+        daemonException = true;
+        std::rethrow_exception(ex);
     }
-
-    void withFramedSink(std::function<void(Sink & sink)> fun);
-};
+}
 
 
-ConnectionHandle RemoteStore::getConnection()
+RemoteStore::ConnectionHandle RemoteStore::getConnection()
 {
     return ConnectionHandle(connections->get());
 }
@@ -846,15 +822,6 @@ void RemoteStore::addTempRoot(const StorePath & path)
 }
 
 
-void RemoteStore::addIndirectRoot(const Path & path)
-{
-    auto conn(getConnection());
-    conn->to << WorkerProto::Op::AddIndirectRoot << path;
-    conn.processStderr();
-    readInt(conn->from);
-}
-
-
 Roots RemoteStore::findRoots(bool censor)
 {
     auto conn(getConnection());
@@ -1099,7 +1066,7 @@ std::exception_ptr RemoteStore::Connection::processStderr(Sink * sink, Source * 
     return nullptr;
 }
 
-void ConnectionHandle::withFramedSink(std::function<void(Sink & sink)> fun)
+void RemoteStore::ConnectionHandle::withFramedSink(std::function<void(Sink & sink)> fun)
 {
     (*this)->to.flush();
 
