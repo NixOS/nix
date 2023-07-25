@@ -114,6 +114,8 @@ private:
     void deleteGCPath(const Path & path, uint64_t & bytesFreed) override;
 
     void optimiseStore() override;
+
+    Path toRealPathForHardLink(const StorePath & storePath) override;
 };
 
 }

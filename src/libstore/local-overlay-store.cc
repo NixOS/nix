@@ -209,6 +209,13 @@ void LocalOverlayStore::optimiseStore()
     }
 }
 
+Path LocalOverlayStore::toRealPathForHardLink(const StorePath & path)
+{
+    return lowerStore->isValidPath(path)
+        ? lowerStore->Store::toRealPath(path)
+        : Store::toRealPath(path);
+}
+
 static RegisterStoreImplementation<LocalOverlayStore, LocalOverlayStoreConfig> regLocalOverlayStore;
 
 }

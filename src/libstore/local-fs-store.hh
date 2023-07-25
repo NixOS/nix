@@ -73,6 +73,16 @@ public:
         return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);
     }
 
+    /**
+     * If the real path is hardlinked with something else, we might
+     * prefer to refer to the other path instead. This is the case with
+     * overlayfs, for example.
+     */
+    virtual Path toRealPathForHardLink(const StorePath & storePath)
+    {
+        return Store::toRealPath(storePath);
+    }
+
     std::optional<std::string> getBuildLogExact(const StorePath & path) override;
 
 };
