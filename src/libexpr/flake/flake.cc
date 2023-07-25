@@ -881,7 +881,7 @@ static RegisterPrimOp r4({
       ```
       evaluates to
       ```nix
-       "github:NixOS/nixpkgs/23.05?dir=lib"
+      "github:NixOS/nixpkgs/23.05?dir=lib"
       ```
     )",
     .fun = prim_flakeRefToString,
