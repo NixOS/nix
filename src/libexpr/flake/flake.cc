@@ -819,12 +819,15 @@ static RegisterPrimOp r3({
     .name =  "__parseFlakeRef",
     .args = {"flake-ref"},
     .doc = R"(
-      Parse a flake reference, and return its exploded form. For example:
+      Parse a flake reference, and return its exploded form.
 
+      For example:
       ```nix
       builtins.parseFlakeRef "github:NixOS/nixpkgs/23.05?dir=lib"
-      # ==> { dir = "lib"; owner = "NixOS"; ref = "23.05"; repo = "nixpkgs";
-      #       type = "github"; }
+      ```
+      evaluates to:
+      ```nix
+      { dir = "lib"; owner = "NixOS"; ref = "23.05"; repo = "nixpkgs"; type = "github"; }
       ```
     )",
     .fun = prim_parseFlakeRef,
