@@ -41,6 +41,13 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           default, but can be disabled if needed.
         )"};
 
+    const PathSetting remountHook{(StoreConfig*) this, "", "remount-hook",
+        R"(
+          Script or program to run when overlay filesystem needs remounting.
+
+          TODO: Document this in more detail.
+        )"};
+
     const std::string name() override { return "Experimental Local Overlay Store"; }
 
     std::string doc() override
