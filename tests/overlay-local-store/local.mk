@@ -4,7 +4,7 @@ overlay-local-store-tests := \
   $(d)/build.sh \
   $(d)/bad-uris.sh \
   $(d)/add-lower.sh \
-  $(d)/delete.sh \
+  $(d)/delete-refs.sh \
   $(d)/gc.sh \
   $(d)/verify.sh \
   $(d)/optimise.sh
