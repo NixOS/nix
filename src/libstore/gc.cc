@@ -653,7 +653,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         results.paths.insert(path);
 
         uint64_t bytesFreed;
-        deleteGCPath(realPath, bytesFreed);
+        deleteStorePath(realPath, bytesFreed);
 
         results.bytesFreed += bytesFreed;
 

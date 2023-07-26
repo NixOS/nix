@@ -176,7 +176,7 @@ void LocalOverlayStore::registerValidPaths(const ValidPathInfos & infos)
 }
 
 
-void LocalOverlayStore::deleteGCPath(const Path & path, uint64_t & bytesFreed)
+void LocalOverlayStore::deleteStorePath(const Path & path, uint64_t & bytesFreed)
 {
     auto mergedDir = realStoreDir.get() + "/";
     if (path.substr(0, mergedDir.length()) != mergedDir) {
@@ -198,7 +198,7 @@ void LocalOverlayStore::deleteGCPath(const Path & path, uint64_t & bytesFreed)
         } else {
             // Path does not exist in lower store.
             // So we can delete via overlayfs and not need to remount.
-            LocalStore::deleteGCPath(path, bytesFreed);
+            LocalStore::deleteStorePath(path, bytesFreed);
         }
     }
 }
@@ -217,8 +217,9 @@ void LocalOverlayStore::optimiseStore()
 
     for (auto & path : paths) {
         if (lowerStore->isValidPath(path)) {
+            uint64_t bytesFreed = 0;
             // Deduplicate store path
-            deletePath(toUpperPath(path));
+            deleteStorePath(Store::toRealPath(path), bytesFreed);
         }
         done++;
         act.progress(done, paths.size());
