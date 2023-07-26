@@ -741,7 +741,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 auto i = referrersCache.find(*path);
                 if (i == referrersCache.end()) {
                     StorePathSet referrers;
-                    queryReferrers(*path, referrers);
+                    queryGCReferrers(*path, referrers);
                     referrersCache.emplace(*path, std::move(referrers));
                     i = referrersCache.find(*path);
                 }

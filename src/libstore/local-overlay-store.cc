@@ -138,6 +138,12 @@ void LocalOverlayStore::queryReferrers(const StorePath & path, StorePathSet & re
 }
 
 
+void LocalOverlayStore::queryGCReferrers(const StorePath & path, StorePathSet & referrers)
+{
+    LocalStore::queryReferrers(path, referrers);
+}
+
+
 StorePathSet LocalOverlayStore::queryValidDerivers(const StorePath & path)
 {
     auto res = LocalStore::queryValidDerivers(path);
