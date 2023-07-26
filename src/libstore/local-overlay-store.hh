@@ -128,7 +128,7 @@ private:
 
     void remountIfNecessary();
 
-    bool _remountRequired = false;
+    std::atomic_bool _remountRequired = false;
 };
 
 }
