@@ -247,6 +247,8 @@ Path LocalOverlayStore::toRealPathForHardLink(const StorePath & path)
 
 void LocalOverlayStore::remountIfNecessary()
 {
+    if (!_remountRequired) return;
+
     if (remountHook.get().empty()) {
         warn("'%s' needs remounting, set remount-hook to do this automatically", realStoreDir.get());
     } else {
