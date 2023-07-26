@@ -17,8 +17,8 @@ initLowerStore
 mountOverlayfs
 
 # Add to overlay before lower to ensure file is duplicated
-upperPath=$(nix-store --store "$storeB" --add delete.sh)
-lowerPath=$(nix-store --store "$storeA" --add delete.sh)
+upperPath=$(nix-store --store "$storeB" --add delete-duplicate.sh)
+lowerPath=$(nix-store --store "$storeA" --add delete-duplicate.sh)
 [[ "$upperPath" = "$lowerPath" ]]
 
 # Check there really are two files with different inodes

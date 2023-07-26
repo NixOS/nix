@@ -7,6 +7,6 @@ overlay-local-store-tests := \
   $(d)/gc.sh \
   $(d)/verify.sh \
   $(d)/optimise.sh \
-  $(d)/delete.sh
+  $(d)/delete-duplicate.sh
 
 install-tests-groups += overlay-local-store

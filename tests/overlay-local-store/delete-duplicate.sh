@@ -2,4 +2,4 @@ source common.sh
 
 requireEnvironment
 setupConfig
-execUnshare ./delete-inner.sh
+execUnshare ./delete-duplicate-inner.sh
