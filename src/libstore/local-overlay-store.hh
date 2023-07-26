@@ -123,6 +123,8 @@ private:
     void optimiseStore() override;
 
     Path toRealPathForHardLink(const StorePath & storePath) override;
+
+    bool _remountRequired = false;
 };
 
 }

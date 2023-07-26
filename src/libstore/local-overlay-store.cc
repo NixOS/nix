@@ -183,10 +183,26 @@ void LocalOverlayStore::deleteGCPath(const Path & path, uint64_t & bytesFreed)
         warn("local-overlay: unexpected gc path '%s' ", path);
         return;
     }
-    if (pathExists(toUpperPath({path.substr(mergedDir.length())}))) {
-        LocalStore::deleteGCPath(path, bytesFreed);
+
+    StorePath storePath = {path.substr(mergedDir.length())};
+    auto upperPath = toUpperPath(storePath);
+
+    if (pathExists(upperPath)) {
+        std::cerr << "    upper exists" << std::endl;
+        if (lowerStore->isValidPath(storePath)) {
+            std::cerr << "    lower exists" << std::endl;
+            // Path also exists in lower store.
+            // We must delete via upper layer to avoid creating a whiteout.
+            deletePath(upperPath, bytesFreed);
+            _remountRequired = true;
+        } else {
+            // Path does not exist in lower store.
+            // So we can delete via overlayfs and not need to remount.
+            LocalStore::deleteGCPath(path, bytesFreed);
+        }
     }
 }
+
 
 void LocalOverlayStore::optimiseStore()
 {
@@ -209,12 +225,14 @@ void LocalOverlayStore::optimiseStore()
     }
 }
 
+
 Path LocalOverlayStore::toRealPathForHardLink(const StorePath & path)
 {
     return lowerStore->isValidPath(path)
         ? lowerStore->Store::toRealPath(path)
         : Store::toRealPath(path);
 }
+
 
 static RegisterStoreImplementation<LocalOverlayStore, LocalOverlayStoreConfig> regLocalOverlayStore;
 

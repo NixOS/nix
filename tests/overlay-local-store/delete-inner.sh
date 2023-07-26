@@ -28,6 +28,7 @@ lowerInode=$(stat -c %i "$storeA/$lowerPath")
 
 # Now delete file via the overlay store
 nix-store --store "$storeB" --delete "$upperPath"
+remountOverlayfs
 
 # Check there is no longer a file in upper layer
 expect 1 stat "$storeBTop/${upperPath##/nix/store/}"
