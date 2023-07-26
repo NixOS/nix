@@ -118,11 +118,15 @@ private:
     void queryRealisationUncached(const DrvOutput&,
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
+    void collectGarbage(const GCOptions & options, GCResults & results) override;
+
     void deleteStorePath(const Path & path, uint64_t & bytesFreed) override;
 
     void optimiseStore() override;
 
     Path toRealPathForHardLink(const StorePath & storePath) override;
+
+    void remountIfNecessary();
 
     bool _remountRequired = false;
 };

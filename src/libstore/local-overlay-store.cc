@@ -176,6 +176,14 @@ void LocalOverlayStore::registerValidPaths(const ValidPathInfos & infos)
 }
 
 
+void LocalOverlayStore::collectGarbage(const GCOptions & options, GCResults & results)
+{
+    LocalStore::collectGarbage(options, results);
+
+    remountIfNecessary();
+}
+
+
 void LocalOverlayStore::deleteStorePath(const Path & path, uint64_t & bytesFreed)
 {
     auto mergedDir = realStoreDir.get() + "/";
@@ -224,6 +232,8 @@ void LocalOverlayStore::optimiseStore()
         done++;
         act.progress(done, paths.size());
     }
+
+    remountIfNecessary();
 }
 
 
@@ -232,6 +242,18 @@ Path LocalOverlayStore::toRealPathForHardLink(const StorePath & path)
     return lowerStore->isValidPath(path)
         ? lowerStore->Store::toRealPath(path)
         : Store::toRealPath(path);
+}
+
+
+void LocalOverlayStore::remountIfNecessary()
+{
+    if (remountHook.get().empty()) {
+        warn("'%s' needs remounting, set remount-hook to do this automatically", realStoreDir.get());
+    } else {
+        runProgram(remountHook, false, {realStoreDir});
+    }
+
+    _remountRequired = false;
 }
 
 
