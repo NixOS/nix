@@ -457,7 +457,7 @@ AutoCloseFD LocalStore::openGCLock()
 }
 
 
-void LocalStore::deleteGCPath(const Path & path, uint64_t & bytesFreed)
+void LocalStore::deleteStorePath(const Path & path, uint64_t & bytesFreed)
 {
     deletePath(path, bytesFreed);
 }

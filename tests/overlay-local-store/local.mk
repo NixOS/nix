@@ -5,6 +5,7 @@ overlay-local-store-tests := \
   $(d)/bad-uris.sh \
   $(d)/add-lower.sh \
   $(d)/delete-refs.sh \
+  $(d)/delete-duplicate.sh \
   $(d)/gc.sh \
   $(d)/verify.sh \
   $(d)/optimise.sh

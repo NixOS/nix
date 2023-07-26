@@ -182,15 +182,38 @@ void LocalOverlayStore::registerValidPaths(const ValidPathInfos & infos)
 }
 
 
-void LocalOverlayStore::deleteGCPath(const Path & path, uint64_t & bytesFreed)
+void LocalOverlayStore::collectGarbage(const GCOptions & options, GCResults & results)
+{
+    LocalStore::collectGarbage(options, results);
+
+    remountIfNecessary();
+}
+
+
+void LocalOverlayStore::deleteStorePath(const Path & path, uint64_t & bytesFreed)
 {
     auto mergedDir = realStoreDir.get() + "/";
     if (path.substr(0, mergedDir.length()) != mergedDir) {
         warn("local-overlay: unexpected gc path '%s' ", path);
         return;
     }
-    if (pathExists(toUpperPath({path.substr(mergedDir.length())}))) {
-        LocalStore::deleteGCPath(path, bytesFreed);
+
+    StorePath storePath = {path.substr(mergedDir.length())};
+    auto upperPath = toUpperPath(storePath);
+
+    if (pathExists(upperPath)) {
+        debug("upper exists: %s", path);
+        if (lowerStore->isValidPath(storePath)) {
+            debug("lower exists: %s", storePath.to_string());
+            // Path also exists in lower store.
+            // We must delete via upper layer to avoid creating a whiteout.
+            deletePath(upperPath, bytesFreed);
+            _remountRequired = true;
+        } else {
+            // Path does not exist in lower store.
+            // So we can delete via overlayfs and not need to remount.
+            LocalStore::deleteStorePath(path, bytesFreed);
+        }
     }
 }
 
@@ -208,19 +231,37 @@ void LocalOverlayStore::optimiseStore()
 
     for (auto & path : paths) {
         if (lowerStore->isValidPath(path)) {
+            uint64_t bytesFreed = 0;
             // Deduplicate store path
-            deletePath(toUpperPath(path));
+            deleteStorePath(Store::toRealPath(path), bytesFreed);
         }
         done++;
         act.progress(done, paths.size());
     }
+
+    remountIfNecessary();
 }
+
 
 Path LocalOverlayStore::toRealPathForHardLink(const StorePath & path)
 {
     return lowerStore->isValidPath(path)
         ? lowerStore->Store::toRealPath(path)
         : Store::toRealPath(path);
+}
+
+
+void LocalOverlayStore::remountIfNecessary()
+{
+    if (!_remountRequired) return;
+
+    if (remountHook.get().empty()) {
+        warn("'%s' needs remounting, set remount-hook to do this automatically", realStoreDir.get());
+    } else {
+        runProgram(remountHook, false, {realStoreDir});
+    }
+
+    _remountRequired = false;
 }
 
 

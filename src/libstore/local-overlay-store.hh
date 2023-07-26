@@ -41,6 +41,13 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           default, but can be disabled if needed.
         )"};
 
+    const PathSetting remountHook{(StoreConfig*) this, "", "remount-hook",
+        R"(
+          Script or program to run when overlay filesystem needs remounting.
+
+          TODO: Document this in more detail.
+        )"};
+
     const std::string name() override { return "Experimental Local Overlay Store"; }
 
     std::string doc() override
@@ -111,7 +118,9 @@ private:
     void queryRealisationUncached(const DrvOutput&,
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
-    void deleteGCPath(const Path & path, uint64_t & bytesFreed) override;
+    void collectGarbage(const GCOptions & options, GCResults & results) override;
+
+    void deleteStorePath(const Path & path, uint64_t & bytesFreed) override;
 
     void optimiseStore() override;
 
@@ -125,6 +134,10 @@ private:
      * Deletion only effects the upper layer, so we ignore lower-layer referrers.
      */
     void queryGCReferrers(const StorePath & path, StorePathSet & referrers) override;
+
+    void remountIfNecessary();
+
+    std::atomic_bool _remountRequired = false;
 };
 
 }
