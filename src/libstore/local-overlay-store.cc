@@ -196,9 +196,9 @@ void LocalOverlayStore::deleteStorePath(const Path & path, uint64_t & bytesFreed
     auto upperPath = toUpperPath(storePath);
 
     if (pathExists(upperPath)) {
-        std::cerr << "    upper exists" << std::endl;
+        debug("upper exists: %s", path);
         if (lowerStore->isValidPath(storePath)) {
-            std::cerr << "    lower exists" << std::endl;
+            debug("lower exists: %s", storePath.to_string());
             // Path also exists in lower store.
             // We must delete via upper layer to avoid creating a whiteout.
             deletePath(upperPath, bytesFreed);
