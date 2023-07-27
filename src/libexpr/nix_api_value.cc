@@ -386,16 +386,13 @@ nix_err nix_copy_value(nix_c_context *context, Value *value, Value *source) {
   NIXC_CATCH_ERRS
 }
 
-typedef std::shared_ptr<nix::BindingsBuilder> BindingsBuilder_Inner;
-
 nix_err nix_make_attrs(nix_c_context *context, Value *value,
                        BindingsBuilder *b) {
   if (context)
     context->last_err_code = NIX_OK;
   try {
     auto &v = check_value_not_null(value);
-    nix::BindingsBuilder &builder = **(BindingsBuilder_Inner *)b;
-    v.mkAttrs(builder);
+    v.mkAttrs(b->builder);
   }
   NIXC_CATCH_ERRS
 }
@@ -406,10 +403,11 @@ BindingsBuilder *nix_make_bindings_builder(nix_c_context *context, State *state,
     context->last_err_code = NIX_OK;
   try {
     auto bb = state->state.buildBindings(capacity);
-    auto res = new BindingsBuilder_Inner();
-    *res = std::allocate_shared<nix::BindingsBuilder>(
-        traceable_allocator<nix::BindingsBuilder>(), bb);
-    return res;
+    return new
+#if HAVE_BOEHMGC
+        (NoGC)
+#endif
+            BindingsBuilder{std::move(bb)};
   }
   NIXC_CATCH_ERRS_NULL
 }
@@ -419,14 +417,17 @@ nix_err nix_bindings_builder_insert(nix_c_context *context, BindingsBuilder *b,
   if (context)
     context->last_err_code = NIX_OK;
   try {
-    nix::BindingsBuilder &builder = **(BindingsBuilder_Inner *)b;
     auto &v = check_value_not_null(value);
-    nix::Symbol s = builder.state.symbols.create(name);
-    builder.insert(s, &v);
+    nix::Symbol s = b->builder.state.symbols.create(name);
+    b->builder.insert(s, &v);
   }
   NIXC_CATCH_ERRS
 }
 
-void nix_bindings_builder_unref(BindingsBuilder *bb) {
-  delete (BindingsBuilder_Inner *)bb;
+void nix_bindings_builder_free(BindingsBuilder *bb) {
+#if HAVE_BOEHMGC
+  GC_FREE((nix::BindingsBuilder *)bb);
+#else
+  delete (nix::BindingsBuilder *)bb;
+#endif
 }

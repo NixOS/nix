@@ -36,11 +36,12 @@ typedef struct State State;
 typedef struct GCRef GCRef;
 // type defs
 /** @brief Stores an under-construction set of bindings
- * Reference-counted
- * @see nix_make_bindings_builder, nix_bindings_builder_unref, nix_make_attrs
+ *
+ * Do not reuse.
+ * @see nix_make_bindings_builder, nix_bindings_builder_free, nix_make_attrs
  * @see nix_bindings_builder_insert
  */
-typedef void BindingsBuilder;
+typedef struct BindingsBuilder BindingsBuilder;
 
 /** @brief PrimOp function
  *
@@ -328,13 +329,12 @@ BindingsBuilder *nix_make_bindings_builder(nix_c_context *context, State *state,
 nix_err nix_bindings_builder_insert(nix_c_context *context,
                                     BindingsBuilder *builder, const char *name,
                                     Value *value);
-/** @brief Unref a bindings builder
+/** @brief Free a bindings builder
  *
  * Does not fail.
- * It'll be deallocated when all references are gone.
- * @param[in] builder the builder to unref
+ * @param[in] builder the builder to free
  */
-void nix_bindings_builder_unref(BindingsBuilder *builder);
+void nix_bindings_builder_free(BindingsBuilder *builder);
 
 // cffi end
 #ifdef __cplusplus
