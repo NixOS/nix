@@ -14,12 +14,6 @@ extern "C" {
 
 // Type definitions
 /**
- * @brief Represents a parsed nix Expression, can be evaluated into a Value.
- *
- * Owned by the GC.
- */
-typedef void Expr; // nix::Expr
-/**
  * @brief Represents a nix evaluator state.
  *
  * Multiple can be created for multi-threaded
@@ -54,34 +48,19 @@ typedef struct GCRef GCRef; // void*
 nix_err nix_libexpr_init(nix_c_context *context);
 
 /**
- * @brief Parses a Nix expression from a string.
- *
- * The returned expression is owned by the garbage collector.
- * Pass a gcref to keep a reference.
- *
- * @param[out] context Optional, stores error information
- * @param[in] state Evaluator state.
- * @param[in] expr The Nix expression to parse.
- * @param[in] path The file path to associate with the expression.
- * @param[out] ref Optional, will store a reference to the returned value.
- * @return A parsed expression or NULL on failure.
- */
-Expr *nix_parse_expr_from_string(nix_c_context *context, State *state,
-                                 const char *expr, const char *path,
-                                 GCRef *ref);
-
-/**
- * @brief Evaluates a parsed Nix expression.
+ * @brief Parses and evaluates a Nix expression from a string.
  *
  * @param[out] context Optional, stores error information
  * @param[in] state The state of the evaluation.
- * @param[in] expr The Nix expression to evaluate.
+ * @param[in] expr The Nix expression to parse.
+ * @param[in] path The file path to associate with the expression.
  * @param[out] value The result of the evaluation. You should allocate this
  * yourself.
  * @return NIX_OK if the evaluation was successful, an error code otherwise.
  */
-nix_err nix_expr_eval(nix_c_context *context, State *state, Expr *expr,
-                      Value *value);
+nix_err nix_expr_eval_from_string(nix_c_context *context, State *state,
+                                  const char *expr, const char *path,
+                                  Value *value);
 
 /**
  * @brief Calls a Nix function with an argument.

@@ -39,27 +39,15 @@ nix_err nix_libexpr_init(nix_c_context *context) {
   NIXC_CATCH_ERRS
 }
 
-Expr *nix_parse_expr_from_string(nix_c_context *context, State *state,
-                                 const char *expr, const char *path,
-                                 GCRef *ref) {
+nix_err nix_expr_eval_from_string(nix_c_context *context, State *state,
+                                  const char *expr, const char *path,
+                                  Value *value) {
   if (context)
     context->last_err_code = NIX_OK;
   try {
-    Expr *result = state->state.parseExprFromString(
+    nix::Expr *parsedExpr = state->state.parseExprFromString(
         expr, state->state.rootPath(nix::CanonPath(path)));
-    if (ref)
-      ref->ptr = result;
-    return result;
-  }
-  NIXC_CATCH_ERRS_NULL
-}
-
-nix_err nix_expr_eval(nix_c_context *context, State *state, Expr *expr,
-                      Value *value) {
-  if (context)
-    context->last_err_code = NIX_OK;
-  try {
-    state->state.eval((nix::Expr *)expr, *(nix::Value *)value);
+    state->state.eval(parsedExpr, *(nix::Value *)value);
   }
   NIXC_CATCH_ERRS
 }

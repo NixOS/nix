@@ -32,7 +32,6 @@ typedef enum {
 
 // forward declarations
 typedef void Value;
-typedef void Expr;
 typedef struct State State;
 typedef struct GCRef GCRef;
 // type defs
@@ -307,16 +306,6 @@ nix_err nix_set_primop(nix_c_context *context, Value *value, PrimOp *op);
  * @return error code, NIX_OK on success.
  */
 nix_err nix_copy_value(nix_c_context *context, Value *value, Value *source);
-/** @brief Make a thunk from an expr.
- *
- * Expr will be evaluated when the value is forced
- * @param[out] context Optional, stores error information
- * @param[out] value Nix value to modify
- * @param[in] expr the expr to thunk
- * @return error code, NIX_OK on success.
- */
-nix_err nix_set_thunk(nix_c_context *context, State *s, Value *value,
-                      Expr *expr);
 /**@}*/
 
 /** @brief Create a bindings builder
