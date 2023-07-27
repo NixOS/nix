@@ -386,17 +386,6 @@ nix_err nix_copy_value(nix_c_context *context, Value *value, Value *source) {
   NIXC_CATCH_ERRS
 }
 
-nix_err nix_set_thunk(nix_c_context *context, State *s, Value *value,
-                      Expr *expr) {
-  if (context)
-    context->last_err_code = NIX_OK;
-  try {
-    auto &v = check_value_not_null(value);
-    s->state.mkThunk_(v, (nix::Expr *)expr);
-  }
-  NIXC_CATCH_ERRS
-}
-
 typedef std::shared_ptr<nix::BindingsBuilder> BindingsBuilder_Inner;
 
 nix_err nix_make_attrs(nix_c_context *context, Value *value,
