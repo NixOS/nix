@@ -151,7 +151,7 @@ unsigned int nix_get_attrs_size(nix_c_context *context, const Value *value);
  * @param[in] value Nix value to inspect
  * @return float contents, error info via context
  */
-double nix_get_double(nix_c_context *context, const Value *value);
+double nix_get_float(nix_c_context *context, const Value *value);
 /** @brief Get int value
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
@@ -236,13 +236,13 @@ nix_err nix_set_string(nix_c_context *context, Value *value, const char *str);
  */
 nix_err nix_set_path_string(nix_c_context *context, Value *value,
                             const char *str);
-/** @brief Set a double
+/** @brief Set a float
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify
- * @param[in] d the double
+ * @param[in] d the float, 64-bits
  * @return error code, NIX_OK on success.
  */
-nix_err nix_set_double(nix_c_context *context, Value *value, double d);
+nix_err nix_set_float(nix_c_context *context, Value *value, double d);
 /** @brief Set an int
  * @param[out] context Optional, stores error information
  * @param[out] value Nix value to modify
