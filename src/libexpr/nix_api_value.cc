@@ -170,7 +170,7 @@ unsigned int nix_get_attrs_size(nix_c_context *context, const Value *value) {
   NIXC_CATCH_ERRS_RES(0);
 }
 
-double nix_get_double(nix_c_context *context, const Value *value) {
+double nix_get_float(nix_c_context *context, const Value *value) {
   if (context)
     context->last_err_code = NIX_OK;
   try {
@@ -299,7 +299,7 @@ nix_err nix_set_path_string(nix_c_context *context, Value *value,
   NIXC_CATCH_ERRS
 }
 
-nix_err nix_set_double(nix_c_context *context, Value *value, double d) {
+nix_err nix_set_float(nix_c_context *context, Value *value, double d) {
   if (context)
     context->last_err_code = NIX_OK;
   try {
