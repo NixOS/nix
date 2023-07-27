@@ -139,7 +139,7 @@ public:
     }
     nix_string_context ctx{context};
     std::unique_ptr<nix_returned_string> r(
-        desc.printValueAsJSON((State *)&state, strict, &ctx, copyToStore));
+        desc.printValueAsJSON(v, (State *)&state, strict, &ctx, copyToStore));
     if (!r) {
       return nix::ExternalValueBase::printValueAsJSON(state, strict, context,
                                                       copyToStore);
@@ -160,7 +160,7 @@ public:
           state, strict, location, doc, context, drvsSeen, pos);
     }
     nix_string_context ctx{context};
-    desc.printValueAsXML((State *)&state, strict, location, &doc, &ctx,
+    desc.printValueAsXML(v, (State *)&state, strict, location, &doc, &ctx,
                          &drvsSeen, *reinterpret_cast<const uint32_t *>(&pos));
   }
 
