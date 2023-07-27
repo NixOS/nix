@@ -98,10 +98,13 @@ bool nix_store_is_valid_path(nix_c_context *context, Store *store,
  * @param[out] context Optional, stores error information
  * @param[in] store nix store reference
  * @param[in] path Path to build
+ * @param[in] userdata data to pass to every callback invocation
  * @param[in] cb called for every built output
  */
 nix_err nix_store_build(nix_c_context *context, Store *store, StorePath *path,
-                        void (*cb)(const char *outname, const char *out));
+                        void *userdata,
+                        void (*cb)(void *userdata, const char *outname,
+                                   const char *out));
 
 /**
  * @brief get the version of a nix store
