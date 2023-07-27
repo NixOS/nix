@@ -132,6 +132,7 @@ typedef struct NixCExternalValueDesc {
    * @brief Convert the external value to json
    *
    * Optional, the default is to throw an error
+   * @param[in] self the void* passed to nix_create_external_value
    * @param[in] state The evaluator state
    * @param[in] strict boolean Whether to force the value before printing
    * @param[out] c writable string context for the resulting string
@@ -140,7 +141,7 @@ typedef struct NixCExternalValueDesc {
    * @returns string that gets parsed as json. Optional, returning NULL will
    * make the conversion throw an error.
    */
-  nix_returned_string *(*printValueAsJSON)(State *, int strict,
+  nix_returned_string *(*printValueAsJSON)(void *self, State *, int strict,
                                            nix_string_context *c,
                                            bool copyToStore);
   /**
@@ -149,6 +150,7 @@ typedef struct NixCExternalValueDesc {
    * Optional, the default is to throw an error
    * @todo The mechanisms for this call are incomplete. There are no C
    *       bindings to work with XML, pathsets and positions.
+   * @param[in] self the void* passed to nix_create_external_value
    * @param[in] state The evaluator state
    * @param[in] strict boolean Whether to force the value before printing
    * @param[in] location boolean Whether to include position information in the
@@ -158,8 +160,9 @@ typedef struct NixCExternalValueDesc {
    * @param[in,out] drvsSeen a path set to avoid duplicating derivations
    * @param[in] pos The position of the call.
    */
-  void (*printValueAsXML)(State *, int strict, int location, void *doc,
-                          nix_string_context *c, void *drvsSeen, int pos);
+  void (*printValueAsXML)(void *self, State *, int strict, int location,
+                          void *doc, nix_string_context *c, void *drvsSeen,
+                          int pos);
 } NixCExternalValueDesc;
 
 /**
