@@ -194,7 +194,7 @@ Value *nix_get_attr_byname(nix_c_context *context, const Value *value,
  * @param[in] value Nix value to inspect
  * @param[in] state nix evaluator state
  * @param[in] name attribute name
- * @return value, NULL in case of errors
+ * @return value, error info via context
  */
 bool nix_has_attr_byname(nix_c_context *context, const Value *value,
                          State *state, const char *name);
