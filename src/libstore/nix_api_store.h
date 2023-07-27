@@ -1,7 +1,7 @@
 #ifndef NIX_API_STORE_H
 #define NIX_API_STORE_H
 /** @file
- * @brief Main entry for the libexpr C bindings
+ * @brief Main entry for the libstore C bindings
  */
 
 #include "nix_api_util.h"

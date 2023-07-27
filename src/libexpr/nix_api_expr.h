@@ -41,7 +41,7 @@ typedef void Value; // nix::Value
  */
 typedef struct GCRef GCRef; // void*
 
-// Function propotypes
+// Function prototypes
 /**
  * @brief Initializes the Nix expression evaluator.
  *
@@ -76,7 +76,8 @@ Expr *nix_parse_expr_from_string(nix_c_context *context, State *state,
  * @param[out] context Optional, stores error information
  * @param[in] state The state of the evaluation.
  * @param[in] expr The Nix expression to evaluate.
- * @param[in] value The result of the evaluation.
+ * @param[out] value The result of the evaluation. You should allocate this
+ * yourself.
  * @return NIX_OK if the evaluation was successful, an error code otherwise.
  */
 nix_err nix_expr_eval(nix_c_context *context, State *state, Expr *expr,
