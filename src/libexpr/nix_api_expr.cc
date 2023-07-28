@@ -132,9 +132,12 @@ void nix_gc_decref(const void *p) {
   // todo: else { throw? }
 }
 
+void nix_gc_now() { GC_gcollect(); }
+
 #else
-void nix_gc_incref(const void *){};
-void nix_gc_decref(const void *){};
+void nix_gc_incref(const void *) {}
+void nix_gc_decref(const void *) {}
+void nix_gc_now() {}
 #endif
 
 void nix_gc_register_finalizer(void *obj, void *cd,

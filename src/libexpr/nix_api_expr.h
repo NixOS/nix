@@ -129,6 +129,13 @@ void nix_gc_incref(const void *);
 void nix_gc_decref(const void *);
 
 /**
+ * @brief Trigger the garbage collector manually
+ *
+ * You should not need to do this, but it can be useful for debugging.
+ */
+void nix_gc_now();
+
+/**
  * @brief Register a callback that gets called when the object is garbage
  * collected.
  * @note objects can only have a single finalizer. This function overwrites
