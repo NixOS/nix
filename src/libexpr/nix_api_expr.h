@@ -26,14 +26,6 @@ typedef struct State State; // nix::EvalState
  * Owned by the GC.
  */
 typedef void Value; // nix::Value
-/**
- * @brief Reference for the GC
- *
- * Nix uses a garbage collector that may not be able to see into
- * your stack and heap. Keep GCRef objects around for every
- * garbage-collected object that you want to keep alive.
- */
-typedef struct GCRef GCRef; // void*
 
 // Function prototypes
 /**
@@ -119,22 +111,22 @@ State *nix_state_create(nix_c_context *context, const char **searchPath,
 void nix_state_free(State *state);
 
 /**
- * @brief Creates a new garbage collector reference.
+ * @brief Increase the GC refcount.
  *
- * @param[out] context Optional, stores error information
- * @param[in] obj The object to create a reference for.
- * @return A new garbage collector reference or NULL on failure.
+ * The nix C api keeps alive objects by refcounting.
+ * When you're done with a refcounted pointer, call nix_gc_decref.
+ *
+ * Does not fail
+ *
+ * @param[in] object The object to keep alive
  */
-GCRef *nix_gc_ref(nix_c_context *context, void *obj);
-
+void nix_gc_incref(const void *);
 /**
- * @brief Frees a garbage collector reference.
+ * @brief Decrease the GC refcount
  *
- * Does not fail.
- *
- * @param[in] ref The reference to free.
+ * @param[in] object The object to stop referencing
  */
-void nix_gc_free(GCRef *ref);
+void nix_gc_decref(const void *);
 
 /**
  * @brief Register a callback that gets called when the object is garbage

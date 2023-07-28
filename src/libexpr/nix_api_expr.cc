@@ -16,6 +16,7 @@
 #include "nix_api_util_internal.h"
 
 #ifdef HAVE_BOEHMGC
+#include <mutex>
 #define GC_INCLUDE_NEW 1
 #include "gc_cpp.h"
 #endif
@@ -100,26 +101,41 @@ State *nix_state_create(nix_c_context *context, const char **searchPath_c,
 
 void nix_state_free(State *state) { delete state; }
 
-GCRef *nix_gc_ref(nix_c_context *context, void *obj) {
-  if (context)
-    context->last_err_code = NIX_OK;
-  try {
-#if HAVE_BOEHMGC
-    return new (NoGC) GCRef{obj};
-#else
-    return new GCRef{obj};
-#endif
+#ifdef HAVE_BOEHMGC
+std::unordered_map<
+    const void *, unsigned int, std::hash<const void *>,
+    std::equal_to<const void *>,
+    traceable_allocator<std::pair<const void *const, unsigned int>>>
+    nix_refcounts;
+
+std::mutex nix_refcount_lock;
+
+void nix_gc_incref(const void *p) {
+  std::scoped_lock lock(nix_refcount_lock);
+  auto f = nix_refcounts.find(p);
+  if (f != nix_refcounts.end()) {
+    f->second++;
+  } else {
+    nix_refcounts[p] = 1;
   }
-  NIXC_CATCH_ERRS_NULL
 }
 
-void nix_gc_free(GCRef *ref) {
-#if HAVE_BOEHMGC
-  GC_FREE(ref);
-#else
-  delete ref;
-#endif
+void nix_gc_decref(const void *p) {
+  std::scoped_lock lock(nix_refcount_lock);
+  auto f = nix_refcounts.find(p);
+  if (f != nix_refcounts.end()) {
+    if (f->second == 1)
+      nix_refcounts.erase(f);
+    else
+      f->second--;
+  }
+  // todo: else { throw? }
 }
+
+#else
+void nix_gc_incref(const void *){};
+void nix_gc_decref(const void *){};
+#endif
 
 void nix_gc_register_finalizer(void *obj, void *cd,
                                void (*finalizer)(void *obj, void *cd)) {

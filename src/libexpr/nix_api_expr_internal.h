@@ -11,10 +11,6 @@ struct State {
   nix::EvalState state;
 };
 
-struct GCRef {
-  void *ptr;
-};
-
 struct BindingsBuilder {
   nix::BindingsBuilder builder;
 };
