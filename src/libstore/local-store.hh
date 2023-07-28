@@ -312,6 +312,11 @@ public:
 
     std::optional<std::string> getVersion() override;
 
+protected:
+
+    void verifyPath(const StorePath & path, std::function<bool(const StorePath &)> existsInStoreDir,
+        StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
+
 private:
 
     /**
@@ -334,9 +339,6 @@ private:
      * Delete a path from the Nix store.
      */
     void invalidatePathChecked(const StorePath & path);
-
-    void verifyPath(const StorePath & path, std::function<bool(const StorePath &)> existsInStoreDir,
-        StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
 
     std::shared_ptr<const ValidPathInfo> queryPathInfoInternal(State & state, const StorePath & path);
 

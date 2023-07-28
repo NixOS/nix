@@ -124,6 +124,8 @@ private:
 
     void optimiseStore() override;
 
+    bool verifyAllValidPaths(RepairFlag repair, StorePathSet & validPaths) override;
+
     /**
      * For lower-store paths, we used the lower store location. This avoids the
      * wasteful "copying up" that would otherwise happen.

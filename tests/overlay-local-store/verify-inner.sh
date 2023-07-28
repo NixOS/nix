@@ -50,6 +50,9 @@ find "$storeA" -name "*-dummy" -exec truncate -s 0 {} \;
 # Also truncate the file that only exists in lower store
 truncate -s 0 "$storeA/$lowerOnlyPath"
 
+# Ensure overlayfs is synchronised
+remountOverlayfs
+
 
 ## Now test that verify and repair work as expected
 

@@ -243,6 +243,22 @@ void LocalOverlayStore::optimiseStore()
 }
 
 
+bool LocalOverlayStore::verifyAllValidPaths(RepairFlag repair, StorePathSet & validPaths)
+{
+    StorePathSet done;
+    bool errors = false;
+
+    auto existsInStoreDir = [&](const StorePath & storePath) {
+        return pathExists(realStoreDir.get() + "/" + storePath.to_string());
+    };
+
+    for (auto & i : queryAllValidPaths())
+        verifyPath(i, existsInStoreDir, done, validPaths, repair, errors);
+
+    return errors;
+}
+
+
 Path LocalOverlayStore::toRealPathForHardLink(const StorePath & path)
 {
     return lowerStore->isValidPath(path)
