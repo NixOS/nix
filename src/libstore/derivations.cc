@@ -993,6 +993,7 @@ DerivationOutput DerivationOutput::fromJSON(
     const ExperimentalFeatureSettings & xpSettings)
 {
     std::set<std::string_view> keys;
+    ensureType(_json, nlohmann::detail::value_t::object);
     auto json = (std::map<std::string, nlohmann::json>) _json;
 
     for (const auto & [key, _] : json)
@@ -1097,36 +1098,51 @@ Derivation Derivation::fromJSON(
     const Store & store,
     const nlohmann::json & json)
 {
+    using nlohmann::detail::value_t;
+
     Derivation res;
 
-    res.name = json["name"];
+    ensureType(json, value_t::object);
 
-    {
-        auto & outputsObj = json["outputs"];
+    res.name = ensureType(valueAt(json, "name"), value_t::string);
+
+    try {
+        auto & outputsObj = ensureType(valueAt(json, "outputs"), value_t::object);
         for (auto & [outputName, output] : outputsObj.items()) {
             res.outputs.insert_or_assign(
                 outputName,
                 DerivationOutput::fromJSON(store, res.name, outputName, output));
         }
+    } catch (Error & e) {
+        e.addTrace({}, "while reading key 'outputs'");
+        throw;
     }
 
-    {
-        auto & inputsList = json["inputSrcs"];
+    try {
+        auto & inputsList = ensureType(valueAt(json, "inputSrcs"), value_t::array);
         for (auto & input : inputsList)
             res.inputSrcs.insert(store.parseStorePath(static_cast<const std::string &>(input)));
+    } catch (Error & e) {
+        e.addTrace({}, "while reading key 'inputSrcs'");
+        throw;
     }
 
-    {
-        auto & inputDrvsObj = json["inputDrvs"];
-        for (auto & [inputDrvPath, inputOutputs] : inputDrvsObj.items())
+    try {
+        auto & inputDrvsObj = ensureType(valueAt(json, "inputDrvs"), value_t::object);
+        for (auto & [inputDrvPath, inputOutputs] : inputDrvsObj.items()) {
+            ensureType(inputOutputs, value_t::array);
             res.inputDrvs[store.parseStorePath(inputDrvPath)] =
                 static_cast<const StringSet &>(inputOutputs);
+        }
+    } catch (Error & e) {
+        e.addTrace({}, "while reading key 'inputDrvs'");
+        throw;
     }
 
-    res.platform = json["system"];
-    res.builder = json["builder"];
-    res.args = json["args"];
-    res.env = json["env"];
+    res.platform = ensureType(valueAt(json, "system"), value_t::string);
+    res.builder = ensureType(valueAt(json, "builder"), value_t::string);
+    res.args = ensureType(valueAt(json, "args"), value_t::array);
+    res.env = ensureType(valueAt(json, "env"), value_t::object);
 
     return res;
 }
