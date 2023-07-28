@@ -22,3 +22,5 @@
 
 - Introduce a new [`outputOf`](@docroot@/language/builtins.md#builtins-outputOf) builtin.
   It is part of the [`dynamic-derivations`](@docroot@/contributing/experimental-features.md#xp-feature-dynamic-derivations) experimental feature.
+
+- [`derivation add` can add multiple derivations at once by reading the output of `derivation show`](@docroot@/command-ref/new-cli/nix3-derivation-add.md)
