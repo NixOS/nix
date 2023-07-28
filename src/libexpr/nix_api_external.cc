@@ -178,7 +178,7 @@ ExternalValue *nix_create_external_value(nix_c_context *context,
         (GC)
 #endif
             NixCExternalValue(*desc, v);
-    nix_gc_incref(ret);
+    nix_gc_incref(nullptr, ret);
     return (ExternalValue *)ret;
   }
   NIXC_CATCH_ERRS_NULL

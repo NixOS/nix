@@ -120,13 +120,13 @@ void nix_state_free(State *state);
  *
  * @param[in] object The object to keep alive
  */
-void nix_gc_incref(const void *);
+nix_err nix_gc_incref(nix_c_context *, const void *);
 /**
  * @brief Decrease the GC refcount
  *
  * @param[in] object The object to stop referencing
  */
-void nix_gc_decref(const void *);
+nix_err nix_gc_decref(nix_c_context *, const void *);
 
 /**
  * @brief Trigger the garbage collector manually

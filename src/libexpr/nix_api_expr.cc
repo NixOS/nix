@@ -110,33 +110,50 @@ std::unordered_map<
 
 std::mutex nix_refcount_lock;
 
-void nix_gc_incref(const void *p) {
-  std::scoped_lock lock(nix_refcount_lock);
-  auto f = nix_refcounts.find(p);
-  if (f != nix_refcounts.end()) {
-    f->second++;
-  } else {
-    nix_refcounts[p] = 1;
+nix_err nix_gc_incref(nix_c_context *context, const void *p) {
+  if (context)
+    context->last_err_code = NIX_OK;
+  try {
+    std::scoped_lock lock(nix_refcount_lock);
+    auto f = nix_refcounts.find(p);
+    if (f != nix_refcounts.end()) {
+      f->second++;
+    } else {
+      nix_refcounts[p] = 1;
+    }
   }
+  NIXC_CATCH_ERRS
 }
 
-void nix_gc_decref(const void *p) {
-  std::scoped_lock lock(nix_refcount_lock);
-  auto f = nix_refcounts.find(p);
-  if (f != nix_refcounts.end()) {
-    if (f->second == 1)
-      nix_refcounts.erase(f);
-    else
-      f->second--;
+nix_err nix_gc_decref(nix_c_context *context, const void *p) {
+
+  if (context)
+    context->last_err_code = NIX_OK;
+  try {
+    std::scoped_lock lock(nix_refcount_lock);
+    auto f = nix_refcounts.find(p);
+    if (f != nix_refcounts.end()) {
+      if (--f->second == 0)
+        nix_refcounts.erase(f);
+    } else
+      throw std::runtime_error("nix_gc_decref: object was not referenced");
   }
-  // todo: else { throw? }
+  NIXC_CATCH_ERRS
 }
 
 void nix_gc_now() { GC_gcollect(); }
 
 #else
-void nix_gc_incref(const void *) {}
-void nix_gc_decref(const void *) {}
+void nix_gc_incref(nix_c_context *context, const void *) {
+  if (context)
+    context->last_err_code = NIX_OK;
+  return NIX_OK;
+}
+void nix_gc_decref(nix_c_context *context, const void *) {
+  if (context)
+    context->last_err_code = NIX_OK;
+  return NIX_OK;
+}
 void nix_gc_now() {}
 #endif
 
