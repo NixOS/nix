@@ -49,7 +49,7 @@ PrimOp *nix_alloc_primop(nix_c_context *context, PrimOpFun fun, int arity,
     if (args)
       for (size_t i = 0; args[i]; i++)
         p->args.emplace_back(*args);
-    nix_gc_incref(p);
+    nix_gc_incref(nullptr, p);
     return (PrimOp *)p;
   }
   NIXC_CATCH_ERRS_NULL
@@ -60,7 +60,7 @@ Value *nix_alloc_value(nix_c_context *context, State *state) {
     context->last_err_code = NIX_OK;
   try {
     Value *res = state->state.allocValue();
-    nix_gc_incref(res);
+    nix_gc_incref(nullptr, res);
     return res;
   }
   NIXC_CATCH_ERRS_NULL
@@ -208,7 +208,7 @@ Value *nix_get_list_byidx(nix_c_context *context, const Value *value,
     auto &v = check_value_not_null(value);
     assert(v.type() == nix::nList);
     auto *p = v.listElems()[ix];
-    nix_gc_incref(p);
+    nix_gc_incref(nullptr, p);
     return (Value *)p;
   }
   NIXC_CATCH_ERRS_NULL
@@ -224,7 +224,7 @@ Value *nix_get_attr_byname(nix_c_context *context, const Value *value,
     nix::Symbol s = state->state.symbols.create(name);
     auto attr = v.attrs->get(s);
     if (attr) {
-      nix_gc_incref(attr->value);
+      nix_gc_incref(nullptr, attr->value);
       return attr->value;
     }
     nix_set_err_msg(context, NIX_ERR_KEY, "missing attribute");
@@ -257,7 +257,7 @@ Value *nix_get_attr_byidx(nix_c_context *context, const Value *value,
     auto &v = check_value_not_null(value);
     const nix::Attr &a = (*v.attrs)[i];
     *name = ((const std::string &)(state->state.symbols[a.name])).c_str();
-    nix_gc_incref(a.value);
+    nix_gc_incref(nullptr, a.value);
     return a.value;
   }
   NIXC_CATCH_ERRS_NULL
