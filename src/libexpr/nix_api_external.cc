@@ -169,8 +169,7 @@ public:
 };
 
 ExternalValue *nix_create_external_value(nix_c_context *context,
-                                         NixCExternalValueDesc *desc, void *v,
-                                         GCRef *gc) {
+                                         NixCExternalValueDesc *desc, void *v) {
   if (context)
     context->last_err_code = NIX_OK;
   try {
@@ -179,8 +178,7 @@ ExternalValue *nix_create_external_value(nix_c_context *context,
         (GC)
 #endif
             NixCExternalValue(*desc, v);
-    if (gc)
-      gc->ptr = ret;
+    nix_gc_incref(ret);
     return (ExternalValue *)ret;
   }
   NIXC_CATCH_ERRS_NULL

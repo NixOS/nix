@@ -33,7 +33,6 @@ typedef enum {
 // forward declarations
 typedef void Value;
 typedef struct State State;
-typedef struct GCRef GCRef;
 // type defs
 /** @brief Stores an under-construction set of bindings
  *
@@ -67,8 +66,7 @@ typedef void (*PrimOpFun)(State *state, int pos, Value **args, Value *v);
 
 /** @brief Allocate a primop
  *
- * Owned by the GC
- * Pass a gcref to keep a reference.
+ * Owned by the GC. Use nix_gc_decref when you're done with the pointer
  *
  * @param[out] context Optional, stores error information
  * @param[in] fun callback
@@ -76,27 +74,23 @@ typedef void (*PrimOpFun)(State *state, int pos, Value **args, Value *v);
  * @param[in] name function name
  * @param[in] args array of argument names
  * @param[in] doc optional, documentation for this primop
- * @param[out] ref Optional, will store a reference to the returned value.
  * @return primop, or null in case of errors
  * @see nix_set_primop
  */
 PrimOp *nix_alloc_primop(nix_c_context *context, PrimOpFun fun, int arity,
-                         const char *name, const char **args, const char *doc,
-                         GCRef *ref);
+                         const char *name, const char **args, const char *doc);
 
 // Function prototypes
 
 /** @brief Allocate a Nix value
  *
- * Owned by the GC
- * Pass a gcref to keep a reference.
+ * Owned by the GC. Use nix_gc_decref when you're done with the pointer
  * @param[out] context Optional, stores error information
  * @param[in] state nix evaluator state
- * @param[out] ref Optional, will store a reference to the returned value.
  * @return value, or null in case of errors
  *
  */
-Value *nix_alloc_value(nix_c_context *context, State *state, GCRef *ref);
+Value *nix_alloc_value(nix_c_context *context, State *state);
 /** @name Getters
  */
 /**@{*/
@@ -167,27 +161,25 @@ ExternalValue *nix_get_external(nix_c_context *context, Value *);
 
 /** @brief Get the ix'th element of a list
  *
- * Pass a gcref to keep a reference.
+ * Owned by the GC. Use nix_gc_decref when you're done with the pointer
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @param[in] ix list element to get
- * @param[out] ref Optional, will store a reference to the returned value.
  * @return value, NULL in case of errors
  */
 Value *nix_get_list_byidx(nix_c_context *context, const Value *value,
-                          unsigned int ix, GCRef *ref);
+                          unsigned int ix);
 /** @brief Get an attr by name
  *
- * Pass a gcref to keep a reference.
+ * Owned by the GC. Use nix_gc_decref when you're done with the pointer
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @param[in] state nix evaluator state
  * @param[in] name attribute name
- * @param[out] ref Optional, will store a reference to the returned value.
  * @return value, NULL in case of errors
  */
 Value *nix_get_attr_byname(nix_c_context *context, const Value *value,
-                           State *state, const char *name, GCRef *ref);
+                           State *state, const char *name);
 
 /** @brief Check if an attribute name exists on a value
  * @param[out] context Optional, stores error information
@@ -200,6 +192,8 @@ bool nix_has_attr_byname(nix_c_context *context, const Value *value,
                          State *state, const char *name);
 
 /** @brief Get an attribute by index in the sorted bindings
+ *
+ * Owned by the GC. Use nix_gc_decref when you're done with the pointer
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @param[in] state nix evaluator state
@@ -208,8 +202,7 @@ bool nix_has_attr_byname(nix_c_context *context, const Value *value,
  * @return value, NULL in case of errors
  */
 Value *nix_get_attr_byidx(nix_c_context *context, const Value *value,
-                          State *state, unsigned int i, const char **name,
-                          GCRef *ref);
+                          State *state, unsigned int i, const char **name);
 /**@}*/
 /** @name Setters
  */

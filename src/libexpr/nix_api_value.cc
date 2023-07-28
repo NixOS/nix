@@ -32,8 +32,7 @@ static nix::Value &check_value_not_null(Value *value) {
 }
 
 PrimOp *nix_alloc_primop(nix_c_context *context, PrimOpFun fun, int arity,
-                         const char *name, const char **args, const char *doc,
-                         GCRef *ref) {
+                         const char *name, const char **args, const char *doc) {
   if (context)
     context->last_err_code = NIX_OK;
   try {
@@ -50,20 +49,18 @@ PrimOp *nix_alloc_primop(nix_c_context *context, PrimOpFun fun, int arity,
     if (args)
       for (size_t i = 0; args[i]; i++)
         p->args.emplace_back(*args);
-    if (ref)
-      ref->ptr = p;
+    nix_gc_incref(p);
     return (PrimOp *)p;
   }
   NIXC_CATCH_ERRS_NULL
 }
 
-Value *nix_alloc_value(nix_c_context *context, State *state, GCRef *ref) {
+Value *nix_alloc_value(nix_c_context *context, State *state) {
   if (context)
     context->last_err_code = NIX_OK;
   try {
     Value *res = state->state.allocValue();
-    if (ref)
-      ref->ptr = res;
+    nix_gc_incref(res);
     return res;
   }
   NIXC_CATCH_ERRS_NULL
@@ -204,19 +201,21 @@ ExternalValue *nix_get_external(nix_c_context *context, Value *value) {
 }
 
 Value *nix_get_list_byidx(nix_c_context *context, const Value *value,
-                          unsigned int ix, GCRef *ref) {
+                          unsigned int ix) {
   if (context)
     context->last_err_code = NIX_OK;
   try {
     auto &v = check_value_not_null(value);
     assert(v.type() == nix::nList);
-    return (Value *)v.listElems()[ix];
+    auto *p = v.listElems()[ix];
+    nix_gc_incref(p);
+    return (Value *)p;
   }
   NIXC_CATCH_ERRS_NULL
 }
 
 Value *nix_get_attr_byname(nix_c_context *context, const Value *value,
-                           State *state, const char *name, GCRef *ref) {
+                           State *state, const char *name) {
   if (context)
     context->last_err_code = NIX_OK;
   try {
@@ -225,8 +224,7 @@ Value *nix_get_attr_byname(nix_c_context *context, const Value *value,
     nix::Symbol s = state->state.symbols.create(name);
     auto attr = v.attrs->get(s);
     if (attr) {
-      if (ref)
-        ref->ptr = attr->value;
+      nix_gc_incref(attr->value);
       return attr->value;
     }
     nix_set_err_msg(context, NIX_ERR_KEY, "missing attribute");
@@ -252,16 +250,14 @@ bool nix_has_attr_byname(nix_c_context *context, const Value *value,
 }
 
 Value *nix_get_attr_byidx(nix_c_context *context, const Value *value,
-                          State *state, unsigned int i, const char **name,
-                          GCRef *ref) {
+                          State *state, unsigned int i, const char **name) {
   if (context)
     context->last_err_code = NIX_OK;
   try {
     auto &v = check_value_not_null(value);
     const nix::Attr &a = (*v.attrs)[i];
     *name = ((const std::string &)(state->state.symbols[a.name])).c_str();
-    if (ref)
-      ref->ptr = a.value;
+    nix_gc_incref(a.value);
     return a.value;
   }
   NIXC_CATCH_ERRS_NULL

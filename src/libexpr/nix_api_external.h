@@ -159,18 +159,17 @@ typedef struct NixCExternalValueDesc {
 /**
  * @brief Create an external value, that can be given to nix_set_external
  *
- * Pass a gcref to keep a reference.
+ * Owned by the GC. Use nix_gc_decref when you're done with the pointer.
+ *
  * @param[out] context Optional, stores error information
  * @param[in] desc a NixCExternalValueDesc, you should keep this alive as long
  * as the ExternalValue lives
  * @param[in] v the value to store
- * @param[out] ref Optional, will store a reference to the returned value.
  * @returns external value, owned by the garbage collector
  * @see nix_set_external
  */
 ExternalValue *nix_create_external_value(nix_c_context *context,
-                                         NixCExternalValueDesc *desc, void *v,
-                                         GCRef *ref);
+                                         NixCExternalValueDesc *desc, void *v);
 
 /**
  * @brief Extract the pointer from a nix c external value.
