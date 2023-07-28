@@ -265,6 +265,8 @@ public:
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
+    virtual bool verifyAllValidPaths(RepairFlag repair, StorePathSet & validPaths);
+
     /**
      * Register the validity of a path, i.e., that `path` exists, that
      * the paths referenced by it exists, and in the case of an output
@@ -333,8 +335,8 @@ private:
      */
     void invalidatePathChecked(const StorePath & path);
 
-    void verifyPath(const Path & path, const StringSet & store,
-        PathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
+    void verifyPath(const StorePath & path, std::function<bool(const StorePath &)> existsInStoreDir,
+        StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
 
     std::shared_ptr<const ValidPathInfo> queryPathInfoInternal(State & state, const StorePath & path);
 

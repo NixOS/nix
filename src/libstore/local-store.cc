@@ -1498,24 +1498,14 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 {
     printInfo("reading the Nix store...");
 
-    bool errors = false;
-
     /* Acquire the global GC lock to get a consistent snapshot of
        existing and valid paths. */
     auto fdGCLock = openGCLock();
     FdLock gcLock(fdGCLock.get(), ltRead, true, "waiting for the big garbage collector lock...");
 
-    StringSet store;
-    for (auto & i : readDirectory(realStoreDir)) store.insert(i.name);
-
-    /* Check whether all valid paths actually exist. */
-    printInfo("checking path existence...");
-
     StorePathSet validPaths;
-    PathSet done;
 
-    for (auto & i : queryAllValidPaths())
-        verifyPath(printStorePath(i), store, done, validPaths, repair, errors);
+    bool errors = verifyAllValidPaths(repair, validPaths);
 
     /* Optionally, check the content hashes (slow). */
     if (checkContents) {
@@ -1601,28 +1591,45 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 }
 
 
-void LocalStore::verifyPath(const Path & pathS, const StringSet & store,
-    PathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors)
+bool LocalStore::verifyAllValidPaths(RepairFlag repair, StorePathSet & validPaths)
+{
+    StringSet store;
+    for (auto & i : readDirectory(realStoreDir)) store.insert(i.name);
+
+    /* Check whether all valid paths actually exist. */
+    printInfo("checking path existence...");
+
+    StorePathSet done;
+    bool errors = false;
+
+    auto existsInStoreDir = [&](const StorePath & storePath) {
+        return store.count(std::string(storePath.to_string()));
+    };
+
+    for (auto & i : queryAllValidPaths())
+        verifyPath(i, existsInStoreDir, done, validPaths, repair, errors);
+
+    return errors;
+}
+
+
+void LocalStore::verifyPath(const StorePath & path, std::function<bool(const StorePath &)> existsInStoreDir,
+    StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors)
 {
     checkInterrupt();
 
-    if (!done.insert(pathS).second) return;
+    if (!done.insert(path).second) return;
 
-    if (!isStorePath(pathS)) {
-        printError("path '%s' is not in the Nix store", pathS);
-        return;
-    }
+    auto pathS = printStorePath(path);
 
-    auto path = parseStorePath(pathS);
-
-    if (!store.count(std::string(path.to_string()))) {
+    if (!existsInStoreDir(path)) {
         /* Check any referrers first.  If we can invalidate them
            first, then we can invalidate this path as well. */
         bool canInvalidate = true;
         StorePathSet referrers; queryReferrers(path, referrers);
         for (auto & i : referrers)
             if (i != path) {
-                verifyPath(printStorePath(i), store, done, validPaths, repair, errors);
+                verifyPath(i, existsInStoreDir, done, validPaths, repair, errors);
                 if (validPaths.count(i))
                     canInvalidate = false;
             }
