@@ -17,9 +17,10 @@ extern "C" {
 // cffi start
 
 /**
- * @brief Represents a string meant for consumption by nix.
+ * @brief Represents a string owned by nix.
+ * @see nix_set_owned_string
  */
-typedef struct nix_returned_string nix_returned_string;
+typedef struct nix_string_return nix_string_return;
 /**
  * @brief Wraps a stream that can output multiple string pieces.
  */
@@ -30,23 +31,13 @@ typedef struct nix_printer nix_printer;
 typedef struct nix_string_context nix_string_context;
 
 /**
- * @brief Allocate a nix_returned_string from a const char*.
+ * @brief Sets the contents of a nix_string_return
  *
  * Copies the passed string.
- * @param[in] c The string to copy
- * @returns A nix_returned_string*
+ * @param[out] str the nix_string_return to write to
+ * @param[in]  c   The string to copy
  */
-nix_returned_string *nix_external_alloc_string(const char *c);
-
-/**
- * @brief Deallocate a nix_returned_string
- *
- * There's generally no need to call this, since
- * returning the string will pass ownership to nix,
- * but you can use it in case of errors.
- * @param[in] str The string to deallocate
- */
-void nix_external_dealloc_string(nix_returned_string *str);
+void nix_set_string_return(nix_string_return *str, const char *c);
 
 /**
  * Print to the nix_printer
@@ -91,15 +82,15 @@ typedef struct NixCExternalValueDesc {
   /**
    * @brief Called on :t
    * @param[in] self the void* passed to nix_create_external_value
-   * @returns a nix_returned_string, ownership passed to nix
+   * @param[out] res the return value
    */
-  nix_returned_string *(*showType)(void *self); // std::string
+  void (*showType)(void *self, nix_string_return *res);
   /**
    * @brief Called on `builtins.typeOf`
    * @param self the void* passed to nix_create_external_value
-   * @returns a nix_returned_string, ownership passed to nix
+   * @param[out] res the return value
    */
-  nix_returned_string *(*typeOf)(void *self); // std::string
+  void (*typeOf)(void *self, nix_string_return *res);
   /**
    * @brief Called on "${str}" and builtins.toString.
    *
@@ -111,11 +102,11 @@ typedef struct NixCExternalValueDesc {
    * instead of throwing an error
    * @param[in] copyToStore boolean, whether to copy referenced paths to store
    * or keep them as-is
-   * @returns a nix_returned_string, ownership passed to nix. Optional,
-   * returning NULL will make the conversion throw an error.
+   * @param[out] res the return value. Not touching this, or setting it to the
+   * empty string, will make the conversion throw an error.
    */
-  nix_returned_string *(*coerceToString)(void *self, nix_string_context *c,
-                                         int coerceMore, int copyToStore);
+  void (*coerceToString)(void *self, nix_string_context *c, int coerceMore,
+                         int copyToStore, nix_string_return *res);
   /**
    * @brief Try to compare two external values
    *
@@ -138,12 +129,12 @@ typedef struct NixCExternalValueDesc {
    * @param[out] c writable string context for the resulting string
    * @param[in] copyToStore whether to copy referenced paths to store or keep
    * them as-is
-   * @returns string that gets parsed as json. Optional, returning NULL will
-   * make the conversion throw an error.
+   * @param[out] res the return value. Gets parsed as JSON. Not touching this,
+   * or setting it to the empty string, will make the conversion throw an error.
    */
-  nix_returned_string *(*printValueAsJSON)(void *self, State *, int strict,
-                                           nix_string_context *c,
-                                           bool copyToStore);
+  void (*printValueAsJSON)(void *self, State *, int strict,
+                           nix_string_context *c, bool copyToStore,
+                           nix_string_return *res);
   /**
    * @brief Convert the external value to XML
    *
