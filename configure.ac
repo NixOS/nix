@@ -300,7 +300,9 @@ AC_ARG_VAR([RAPIDCHECK_HEADERS], [include path of gtest headers shipped by RAPID
 # No pkg-config yet, https://github.com/emil-e/rapidcheck/issues/302
 AC_LANG_PUSH(C++)
 AC_SUBST(RAPIDCHECK_HEADERS)
-[CXXFLAGS="-I $RAPIDCHECK_HEADERS $CXXFLAGS"]
+if test "x$RAPIDCHECK_HEADERS" != "x"; then
+   [CXXFLAGS="-I $RAPIDCHECK_HEADERS $CXXFLAGS"]
+fi
 [LIBS="-lrapidcheck -lgtest $LIBS"]
 AC_CHECK_HEADERS([rapidcheck/gtest.h], [], [], [#include <gtest/gtest.h>])
 dnl AC_CHECK_LIB doesn't work for C++ libs with mangled symbols
