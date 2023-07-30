@@ -1,6 +1,9 @@
 #ifndef NIX_API_VALUE_H
 #define NIX_API_VALUE_H
 
+/** @addtogroup libexpr
+ * @{
+ */
 /** @file
  * @brief libexpr C bindings dealing with values
  */
@@ -35,6 +38,7 @@ typedef void Value;
 typedef struct State State;
 // type defs
 /** @brief Stores an under-construction set of bindings
+ * @ingroup value_manip
  *
  * Do not reuse.
  * @see nix_make_bindings_builder, nix_bindings_builder_free, nix_make_attrs
@@ -43,18 +47,23 @@ typedef struct State State;
 typedef struct BindingsBuilder BindingsBuilder;
 
 /** @brief PrimOp function
+ * @ingroup primops
  *
  * Owned by the GC
  * @see nix_alloc_primop, nix_set_primop
  */
 typedef struct PrimOp PrimOp;
 /** @brief External Value
+ * @ingroup Externals
  *
  * Owned by the GC
- * @see nix_api_external.h
  */
 typedef struct ExternalValue ExternalValue;
 
+/** @defgroup primops
+ * @brief Create your own primops
+ * @{
+ */
 /** @brief Function pointer for primops
  * @param[in] state Evaluator state
  * @param[in] pos position of function call
@@ -79,6 +88,7 @@ typedef void (*PrimOpFun)(State *state, int pos, Value **args, Value *v);
  */
 PrimOp *nix_alloc_primop(nix_c_context *context, PrimOpFun fun, int arity,
                          const char *name, const char **args, const char *doc);
+/** @} */
 
 // Function prototypes
 
@@ -91,6 +101,10 @@ PrimOp *nix_alloc_primop(nix_c_context *context, PrimOpFun fun, int arity,
  *
  */
 Value *nix_alloc_value(nix_c_context *context, State *state);
+/** @addtogroup value_manip Manipulating values
+ * @brief Functions to inspect and change nix Value's
+ * @{
+ */
 /** @name Getters
  */
 /**@{*/
@@ -328,10 +342,12 @@ nix_err nix_bindings_builder_insert(nix_c_context *context,
  * @param[in] builder the builder to free
  */
 void nix_bindings_builder_free(BindingsBuilder *builder);
+/**@}*/
 
 // cffi end
 #ifdef __cplusplus
 }
 #endif
 
+/** @} */
 #endif // NIX_API_VALUE_H

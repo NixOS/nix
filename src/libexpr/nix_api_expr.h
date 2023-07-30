@@ -1,5 +1,26 @@
 #ifndef NIX_API_EXPR_H
 #define NIX_API_EXPR_H
+/** @defgroup libexpr libexpr
+ * @brief Bindings to the Nix evaluator
+ *
+ * Example (without error handling):
+ * @code{.c}
+ * int main() {
+ *    nix_libexpr_init(NULL);
+ *
+ *    Store* store = nix_store_open(NULL, "dummy", NULL);
+ *    State* state = nix_state_create(NULL, NULL /* empty NIX_PATH */, store);
+*Value *value = nix_alloc_value(NULL, state);
+**nix_expr_eval_from_string(NULL, state, "builtins.nixVersion", ".", value);
+*nix_value_force(NULL, state, value);
+*printf("nix version: %s\n", nix_get_string(NULL, value));
+**nix_gc_decref(NULL, value);
+*nix_state_free(state);
+*nix_store_unref(store);
+*return 0;
+*
+}
+*@endcode *@{* /
 /** @file
  * @brief Main entry for the libexpr C bindings
  */
@@ -8,22 +29,25 @@
 #include "nix_api_util.h"
 
 #ifdef __cplusplus
-extern "C" {
+             extern "C" {
 #endif
-// cffi start
+                 // cffi start
 
-// Type definitions
-/**
- * @brief Represents a nix evaluator state.
- *
- * Multiple can be created for multi-threaded
- * operation.
- */
-typedef struct State State; // nix::EvalState
+                 // Type definitions
+                 /**
+                  * @brief Represents a nix evaluator state.
+                  *
+                  * Multiple can be created for multi-threaded
+                  * operation.
+                  * @struct State
+                  */
+                 typedef struct State State; // nix::EvalState
 /**
  * @brief Represents a nix value.
  *
  * Owned by the GC.
+ * @struct Value
+ * @see value_manip
  */
 typedef void Value; // nix::Value
 
@@ -110,23 +134,36 @@ State *nix_state_create(nix_c_context *context, const char **searchPath,
  */
 void nix_state_free(State *state);
 
+/** @addtogroup GC
+ * @brief Reference counting and garbage collector operations
+ *
+ * Nix's evaluator uses a garbage collector. To ease C interop, we implement
+ * a reference counting scheme, where objects will be deallocated
+ * when there are no references from the Nix side, and the reference count kept
+ * by the C API reaches `0`.
+ *
+ * Functions returning a garbage-collected object will automatically increase
+ * the refcount for you. You should make sure to call `nix_gc_decref` when
+ * you're done.
+ * @{
+ */
 /**
  * @brief Increase the GC refcount.
  *
  * The nix C api keeps alive objects by refcounting.
  * When you're done with a refcounted pointer, call nix_gc_decref.
  *
- * Does not fail
- *
+ * @param[out] context Optional, stores error information
  * @param[in] object The object to keep alive
  */
-nix_err nix_gc_incref(nix_c_context *, const void *);
+nix_err nix_gc_incref(nix_c_context *context, const void *object);
 /**
  * @brief Decrease the GC refcount
  *
+ * @param[out] context Optional, stores error information
  * @param[in] object The object to stop referencing
  */
-nix_err nix_gc_decref(nix_c_context *, const void *);
+nix_err nix_gc_decref(nix_c_context *context, const void *object);
 
 /**
  * @brief Trigger the garbage collector manually
@@ -147,9 +184,12 @@ void nix_gc_now();
 void nix_gc_register_finalizer(void *obj, void *cd,
                                void (*finalizer)(void *obj, void *cd));
 
+/** @} */
 // cffi end
 #ifdef __cplusplus
 }
 #endif
+
+/** @} */
 
 #endif // NIX_API_EXPR_H

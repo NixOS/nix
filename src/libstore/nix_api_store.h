@@ -1,5 +1,12 @@
 #ifndef NIX_API_STORE_H
 #define NIX_API_STORE_H
+/**
+ * @defgroup libstore libstore
+ * @brief C bindings for nix libstore
+ *
+ * libstore is used for talking to a Nix store
+ * @{
+ */
 /** @file
  * @brief Main entry for the libstore C bindings
  */
@@ -121,5 +128,7 @@ nix_err nix_store_get_version(nix_c_context *, Store *store, char *dest,
 #ifdef __cplusplus
 }
 #endif
-
+/**
+ * @}
+ */
 #endif // NIX_API_STORE_H
