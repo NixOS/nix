@@ -1,6 +1,13 @@
 #ifndef NIX_API_UTIL_H
 #define NIX_API_UTIL_H
-
+/**
+ * @defgroup libutil libutil
+ * @brief C bindings for nix libutil
+ *
+ * libutil is used for functionality shared between
+ * different Nix modules.
+ * @{
+ */
 /** @file
  * @brief Main entry for the libutil C bindings
  *
@@ -12,6 +19,31 @@ extern "C" {
 #endif
 // cffi start
 
+/** @defgroup errors Handling errors
+ * @brief Dealing with errors from the Nix side
+ *
+ * To handle errors that can be returned from the Nix API
+ * nix_c_context can be passed any function that potentially returns an error.
+ *
+ * Error information will be stored in this context, and can be retrieved
+ * using nix_err_code, nix_err_msg.
+ *
+ * Passing NULL instead will cause the API to throw C++ errors.
+ *
+ * Example:
+ * @code{.c}
+ * int main() {
+ *     nix_c_context* ctx = nix_c_context_create();
+ *     nix_libutil_init(ctx);
+ *     if (nix_err_code(ctx) != NIX_OK) {
+ *         printf("error: %s\n", nix_err_msg(NULL, ctx, NULL));
+ *         return 1;
+ *     }
+ *     return 0;
+ * }
+ * @endcode
+ *  @{
+ */
 // Error codes
 /**
  * @brief Type for error codes in the NIX system
@@ -67,6 +99,7 @@ typedef int nix_err;
 
 /**
  * @brief This object stores error state.
+ * @struct nix_c_context
  *
  * Passed as a first parameter to C functions that can fail, will store error
  * information. Optional wherever it is used, passing NULL will throw a C++
@@ -92,6 +125,9 @@ nix_c_context *nix_c_context_create();
  * @param[out] context The context to free, mandatory.
  */
 void nix_c_context_free(nix_c_context *context);
+/**
+ *  @}
+ */
 
 /**
  * @brief Initializes nix_libutil and its dependencies.
@@ -105,6 +141,9 @@ void nix_c_context_free(nix_c_context *context);
  */
 nix_err nix_libutil_init(nix_c_context *context);
 
+/** @defgroup settings
+ *  @{
+ */
 /**
  * @brief Retrieves a setting from the nix global configuration.
  *
@@ -128,8 +167,8 @@ nix_err nix_setting_get(nix_c_context *context, const char *key, char *value,
  *
  * Use "extra-<setting name>" to append to the setting's value.
  *
- * Settings only apply for new States. Call nix_plugins_init() when you are done
- * with the settings to load any plugins.
+ * Settings only apply for new State%s. Call nix_plugins_init() when you are
+ * done with the settings to load any plugins.
  *
  * @param[out] context optional, Stores error information
  * @param[in] key The key of the setting to set.
@@ -140,6 +179,9 @@ nix_err nix_setting_get(nix_c_context *context, const char *key, char *value,
 nix_err nix_setting_set(nix_c_context *context, const char *key,
                         const char *value);
 
+/**
+ *  @}
+ */
 // todo: nix_plugins_init()
 
 /**
@@ -150,6 +192,9 @@ nix_err nix_setting_set(nix_c_context *context, const char *key,
  */
 const char *nix_version_get();
 
+/** @addtogroup errors
+ *  @{
+ */
 /**
  * @brief Retrieves the most recent error message from a context.
  *
@@ -215,9 +260,14 @@ nix_err nix_err_name(nix_c_context *context, const nix_c_context *read_context,
  */
 nix_err nix_err_code(nix_c_context *context, const nix_c_context *read_context);
 
+/**
+ *  @}
+ */
+
 // cffi end
 #ifdef __cplusplus
 }
 #endif
 
+/** @} */
 #endif // NIX_API_UTIL_H

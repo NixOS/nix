@@ -1,5 +1,10 @@
 #ifndef NIX_API_EXTERNAL_H
 #define NIX_API_EXTERNAL_H
+/** @ingroup libexpr
+ * @addtogroup Externals
+ * @brief Deal with external values
+ * @{
+ */
 /** @file
  * @brief libexpr C bindings dealing with external values
  */
@@ -184,5 +189,6 @@ void *nix_get_external_value_content(nix_c_context *context, ExternalValue *b);
 #ifdef __cplusplus
 }
 #endif
+/** @} */
 
 #endif // NIX_API_EXTERNAL_H
