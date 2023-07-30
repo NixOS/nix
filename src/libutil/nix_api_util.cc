@@ -127,10 +127,7 @@ nix_err nix_err_info_msg(nix_c_context *context,
                                n);
 }
 
-nix_err nix_err_code(nix_c_context *context,
-                     const nix_c_context *read_context) {
-  if (context)
-    context->last_err_code = NIX_OK;
+nix_err nix_err_code(const nix_c_context *read_context) {
   return read_context->last_err_code;
 }
 
