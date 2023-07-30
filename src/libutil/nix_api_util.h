@@ -253,12 +253,12 @@ nix_err nix_err_name(nix_c_context *context, const nix_c_context *read_context,
  *
  * Equivalent to reading the first field of the context.
  *
- * @param[out] context optional, the context to store errors in if this function
- * fails
+ * Does not fail
+ *
  * @param[in] read_context the context to retrieve the error message from
  * @return most recent error code stored in the context.
  */
-nix_err nix_err_code(nix_c_context *context, const nix_c_context *read_context);
+nix_err nix_err_code(const nix_c_context *read_context);
 
 /**
  *  @}
