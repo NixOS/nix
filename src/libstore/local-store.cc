@@ -1499,8 +1499,12 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
     auto fdGCLock = openGCLock();
     FdLock gcLock(fdGCLock.get(), ltRead, true, "waiting for the big garbage collector lock...");
 
-    StringSet store;
-    for (auto & i : readDirectory(realStoreDir)) store.insert(i.name);
+    StorePathSet store;
+    for (auto & i : readDirectory(realStoreDir)) {
+        try {
+            store.insert({i.name});
+        } catch (BadStorePath &) { }
+    }
 
     /* Check whether all valid paths actually exist. */
     printInfo("checking path existence...");
@@ -1595,14 +1599,14 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 }
 
 
-void LocalStore::verifyPath(const StorePath & path, const StringSet & store,
+void LocalStore::verifyPath(const StorePath & path, const StorePathSet & store,
     StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors)
 {
     checkInterrupt();
 
     if (!done.insert(path).second) return;
 
-    if (!store.count(std::string(path.to_string()))) {
+    if (!store.count(path)) {
         /* Check any referrers first.  If we can invalidate them
            first, then we can invalidate this path as well. */
         bool canInvalidate = true;
