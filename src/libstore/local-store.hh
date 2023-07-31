@@ -314,8 +314,8 @@ private:
      */
     void invalidatePathChecked(const StorePath & path);
 
-    void verifyPath(const Path & path, const StringSet & store,
-        PathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
+    void verifyPath(const StorePath & path, const StringSet & store,
+        StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
 
     std::shared_ptr<const ValidPathInfo> queryPathInfoInternal(State & state, const StorePath & path);
 

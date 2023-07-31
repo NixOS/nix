@@ -1506,10 +1506,10 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
     printInfo("checking path existence...");
 
     StorePathSet validPaths;
-    PathSet done;
+    StorePathSet done;
 
     for (auto & i : queryAllValidPaths())
-        verifyPath(printStorePath(i), store, done, validPaths, repair, errors);
+        verifyPath(i, store, done, validPaths, repair, errors);
 
     /* Optionally, check the content hashes (slow). */
     if (checkContents) {
@@ -1595,19 +1595,12 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 }
 
 
-void LocalStore::verifyPath(const Path & pathS, const StringSet & store,
-    PathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors)
+void LocalStore::verifyPath(const StorePath & path, const StringSet & store,
+    StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors)
 {
     checkInterrupt();
 
-    if (!done.insert(pathS).second) return;
-
-    if (!isStorePath(pathS)) {
-        printError("path '%s' is not in the Nix store", pathS);
-        return;
-    }
-
-    auto path = parseStorePath(pathS);
+    if (!done.insert(path).second) return;
 
     if (!store.count(std::string(path.to_string()))) {
         /* Check any referrers first.  If we can invalidate them
@@ -1616,10 +1609,12 @@ void LocalStore::verifyPath(const Path & pathS, const StringSet & store,
         StorePathSet referrers; queryReferrers(path, referrers);
         for (auto & i : referrers)
             if (i != path) {
-                verifyPath(printStorePath(i), store, done, validPaths, repair, errors);
+                verifyPath(i, store, done, validPaths, repair, errors);
                 if (validPaths.count(i))
                     canInvalidate = false;
             }
+
+        auto pathS = printStorePath(path);
 
         if (canInvalidate) {
             printInfo("path '%s' disappeared, removing from database...", pathS);
