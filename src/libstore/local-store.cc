@@ -1499,21 +1499,24 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
     auto fdGCLock = openGCLock();
     FdLock gcLock(fdGCLock.get(), ltRead, true, "waiting for the big garbage collector lock...");
 
-    StorePathSet store;
-    for (auto & i : readDirectory(realStoreDir)) {
-        try {
-            store.insert({i.name});
-        } catch (BadStorePath &) { }
-    }
-
-    /* Check whether all valid paths actually exist. */
-    printInfo("checking path existence...");
-
     StorePathSet validPaths;
-    StorePathSet done;
 
-    for (auto & i : queryAllValidPaths())
-        verifyPath(i, store, done, validPaths, repair, errors);
+    {
+        StorePathSet store;
+        for (auto & i : readDirectory(realStoreDir)) {
+            try {
+                store.insert({i.name});
+            } catch (BadStorePath &) { }
+        }
+
+        /* Check whether all valid paths actually exist. */
+        printInfo("checking path existence...");
+
+        StorePathSet done;
+
+        for (auto & i : queryAllValidPaths())
+            verifyPath(i, store, done, validPaths, repair, errors);
+    }
 
     /* Optionally, check the content hashes (slow). */
     if (checkContents) {
