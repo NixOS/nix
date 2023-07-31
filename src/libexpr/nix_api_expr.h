@@ -9,18 +9,21 @@
  *    nix_libexpr_init(NULL);
  *
  *    Store* store = nix_store_open(NULL, "dummy", NULL);
- *    State* state = nix_state_create(NULL, NULL /* empty NIX_PATH */, store);
-*Value *value = nix_alloc_value(NULL, state);
-**nix_expr_eval_from_string(NULL, state, "builtins.nixVersion", ".", value);
-*nix_value_force(NULL, state, value);
-*printf("nix version: %s\n", nix_get_string(NULL, value));
-**nix_gc_decref(NULL, value);
-*nix_state_free(state);
-*nix_store_unref(store);
-*return 0;
-*
-}
-*@endcode *@{* /
+ *    State* state = nix_state_create(NULL, NULL, store); // empty nix path
+ *    Value *value = nix_alloc_value(NULL, state);
+ *
+ *    nix_expr_eval_from_string(NULL, state, "builtins.nixVersion", ".", value);
+ *    nix_value_force(NULL, state, value);
+ *    printf("nix version: %s\n", nix_get_string(NULL, value));
+ *
+ *    nix_gc_decref(NULL, value);
+ *    nix_state_free(state);
+ *    nix_store_unref(store);
+ *    return 0;
+ *    }
+ * @endcode
+ * @{
+ */
 /** @file
  * @brief Main entry for the libexpr C bindings
  */
@@ -29,19 +32,19 @@
 #include "nix_api_util.h"
 
 #ifdef __cplusplus
-             extern "C" {
+extern "C" {
 #endif
-                 // cffi start
+// cffi start
 
-                 // Type definitions
-                 /**
-                  * @brief Represents a nix evaluator state.
-                  *
-                  * Multiple can be created for multi-threaded
-                  * operation.
-                  * @struct State
-                  */
-                 typedef struct State State; // nix::EvalState
+// Type definitions
+/**
+ * @brief Represents a nix evaluator state.
+ *
+ * Multiple can be created for multi-threaded
+ * operation.
+ * @struct State
+ */
+typedef struct State State; // nix::EvalState
 /**
  * @brief Represents a nix value.
  *

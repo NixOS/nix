@@ -22,11 +22,11 @@ extern "C" {
 /** @defgroup errors Handling errors
  * @brief Dealing with errors from the Nix side
  *
- * To handle errors that can be returned from the Nix API
- * nix_c_context can be passed any function that potentially returns an error.
+ * To handle errors that can be returned from the Nix API,
+ * a nix_c_context can be passed to any function that potentially returns an error.
  *
  * Error information will be stored in this context, and can be retrieved
- * using nix_err_code, nix_err_msg.
+ * using nix_err_code and nix_err_msg.
  *
  * Passing NULL instead will cause the API to throw C++ errors.
  *
@@ -101,10 +101,17 @@ typedef int nix_err;
  * @brief This object stores error state.
  * @struct nix_c_context
  *
- * Passed as a first parameter to C functions that can fail, will store error
- * information. Optional wherever it is used, passing NULL will throw a C++
- * exception instead. The first field is a nix_err, that can be read directly to
- * check for errors.
+ * Passed as a first parameter to functions that can fail, to store error
+ * information.
+ *
+ * Optional wherever it can be used, passing NULL instead will throw a C++
+ * exception.
+ *
+ * The struct is laid out so that it can also be cast to nix_err* to inspect
+ * directly:
+ * @code{.c}
+ * assert(*(nix_err*)ctx == NIX_OK);
+ * @endcode
  * @note These can be reused between different function calls,
  *  but make sure not to use them for multiple calls simultaneously (which can
  * happen in callbacks).
