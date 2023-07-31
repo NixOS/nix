@@ -3,6 +3,7 @@
 #include "store-api.hh"
 #include "filetransfer.hh"
 #include "eval.hh"
+#include "eval-settings.hh"
 #include "attr-path.hh"
 #include "names.hh"
 #include "progress-bar.hh"

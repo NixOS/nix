@@ -11,6 +11,7 @@
 #include "derivations.hh"
 #include "eval-inline.hh"
 #include "eval.hh"
+#include "eval-settings.hh"
 #include "get-drvs.hh"
 #include "store-api.hh"
 #include "shared.hh"

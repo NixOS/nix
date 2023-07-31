@@ -1,5 +1,6 @@
 #include "flake.hh"
 #include "eval.hh"
+#include "eval-settings.hh"
 #include "lockfile.hh"
 #include "primops.hh"
 #include "eval-inline.hh"
