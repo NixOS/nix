@@ -1,5 +1,7 @@
 source common.sh
 
+needLocalStore "uses some low-level store manipulations that aren’t available through the daemon"
+
 clearStore
 
 max=500

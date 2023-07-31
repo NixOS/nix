@@ -1,25 +1,37 @@
+#include "ssh-store-config.hh"
 #include "archive.hh"
 #include "pool.hh"
 #include "remote-store.hh"
 #include "serve-protocol.hh"
+#include "build-result.hh"
 #include "store-api.hh"
+#include "path-with-outputs.hh"
 #include "worker-protocol.hh"
+#include "worker-protocol-impl.hh"
 #include "ssh.hh"
 #include "derivations.hh"
 #include "callback.hh"
 
 namespace nix {
 
-struct LegacySSHStoreConfig : virtual StoreConfig
+struct LegacySSHStoreConfig : virtual CommonSSHStoreConfig
 {
-    using StoreConfig::StoreConfig;
-    const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections", "maximum number of concurrent SSH connections"};
-    const Setting<Path> sshKey{(StoreConfig*) this, "", "ssh-key", "path to an SSH private key"};
-    const Setting<bool> compress{(StoreConfig*) this, false, "compress", "whether to compress the connection"};
-    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-store", "remote-program", "path to the nix-store executable on the remote system"};
-    const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
+    using CommonSSHStoreConfig::CommonSSHStoreConfig;
 
-    const std::string name() override { return "Legacy SSH Store"; }
+    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-store", "remote-program",
+        "Path to the `nix-store` executable on the remote machine."};
+
+    const Setting<int> maxConnections{(StoreConfig*) this, 1, "max-connections",
+        "Maximum number of concurrent SSH connections."};
+
+    const std::string name() override { return "SSH Store"; }
+
+    std::string doc() override
+    {
+        return
+          #include "legacy-ssh-store.md"
+          ;
+    }
 };
 
 struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Store
@@ -36,6 +48,42 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         FdSource from;
         int remoteVersion;
         bool good = true;
+
+        /**
+         * Coercion to `WorkerProto::ReadConn`. This makes it easy to use the
+         * factored out worker protocol searlizers with a
+         * `LegacySSHStore::Connection`.
+         *
+         * The worker protocol connection types are unidirectional, unlike
+         * this type.
+         *
+         * @todo Use server protocol serializers, not worker protocol
+         * serializers, once we have made that distiction.
+         */
+        operator WorkerProto::ReadConn ()
+        {
+            return WorkerProto::ReadConn {
+                .from = from,
+            };
+        }
+
+        /*
+         * Coercion to `WorkerProto::WriteConn`. This makes it easy to use the
+         * factored out worker protocol searlizers with a
+         * `LegacySSHStore::Connection`.
+         *
+         * The worker protocol connection types are unidirectional, unlike
+         * this type.
+         *
+         * @todo Use server protocol serializers, not worker protocol
+         * serializers, once we have made that distiction.
+         */
+        operator WorkerProto::WriteConn ()
+        {
+            return WorkerProto::WriteConn {
+                .to = to,
+            };
+        }
     };
 
     std::string host;
@@ -46,8 +94,9 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
     static std::set<std::string> uriSchemes() { return {"ssh"}; }
 
-    LegacySSHStore(const string & scheme, const string & host, const Params & params)
+    LegacySSHStore(const std::string & scheme, const std::string & host, const Params & params)
         : StoreConfig(params)
+        , CommonSSHStoreConfig(params)
         , LegacySSHStoreConfig(params)
         , Store(params)
         , host(host)
@@ -59,6 +108,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         , master(
             host,
             sshKey,
+            sshPublicHostKey,
             // Use SSH master only if using more than 1 connection.
             connections->capacity() > 1,
             compress,
@@ -79,9 +129,20 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             conn->to << SERVE_MAGIC_1 << SERVE_PROTOCOL_VERSION;
             conn->to.flush();
 
-            unsigned int magic = readInt(conn->from);
-            if (magic != SERVE_MAGIC_2)
-                throw Error("protocol mismatch with 'nix-store --serve' on '%s'", host);
+            StringSink saved;
+            try {
+                TeeSource tee(conn->from, saved);
+                unsigned int magic = readInt(tee);
+                if (magic != SERVE_MAGIC_2)
+                    throw Error("'nix-store --serve' protocol mismatch from '%s'", host);
+            } catch (SerialisationError & e) {
+                /* In case the other side is waiting for our input,
+                   close it. */
+                conn->sshConn->in.close();
+                auto msg = conn->from.drain();
+                throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'",
+                    host, chomp(saved.s + msg));
+            }
             conn->remoteVersion = readInt(conn->from);
             if (GET_PROTOCOL_MAJOR(conn->remoteVersion) != 0x200)
                 throw Error("unsupported 'nix-store --serve' protocol version on '%s'", host);
@@ -93,7 +154,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         return conn;
     };
 
-    string getUri() override
+    std::string getUri() override
     {
         return *uriSchemes().begin() + "://" + host;
     }
@@ -109,7 +170,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
             debug("querying remote host '%s' for info on '%s'", host, printStorePath(path));
 
-            conn->to << cmdQueryPathInfos << PathSet{printStorePath(path)};
+            conn->to << ServeProto::Command::QueryPathInfos << PathSet{printStorePath(path)};
             conn->to.flush();
 
             auto p = readString(conn->from);
@@ -119,11 +180,10 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             /* Hash will be set below. FIXME construct ValidPathInfo at end. */
             auto info = std::make_shared<ValidPathInfo>(path, Hash::dummy);
 
-            PathSet references;
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info->deriver = parseStorePath(deriver);
-            info->references = worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+            info->references = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
             readLongLong(conn->from); // download size
             info->narSize = readLongLong(conn->from);
 
@@ -133,7 +193,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
                     throw Error("NAR hash is now mandatory");
                 info->narHash = Hash::parseAnyPrefixed(s);
             }
-            info->ca = parseContentAddressOpt(readString(conn->from));
+            info->ca = ContentAddress::parseOpt(readString(conn->from));
             info->sigs = readStrings<StringSet>(conn->from);
 
             auto s = readString(conn->from);
@@ -153,11 +213,11 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 5) {
 
             conn->to
-                << cmdAddToStoreNar
+                << ServeProto::Command::AddToStoreNar
                 << printStorePath(info.path)
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << info.narHash.to_string(Base16, false);
-            worker_proto::write(*this, conn->to, info.references);
+            WorkerProto::write(*this, *conn, info.references);
             conn->to
                 << info.registrationTime
                 << info.narSize
@@ -175,7 +235,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         } else {
 
             conn->to
-                << cmdImportPaths
+                << ServeProto::Command::ImportPaths
                 << 1;
             try {
                 copyNAR(source, conn->to);
@@ -186,7 +246,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             conn->to
                 << exportMagic
                 << printStorePath(info.path);
-            worker_proto::write(*this, conn->to, info.references);
+            WorkerProto::write(*this, *conn, info.references);
             conn->to
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << 0
@@ -203,7 +263,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     {
         auto conn(connections->get());
 
-        conn->to << cmdDumpStorePath << printStorePath(path);
+        conn->to << ServeProto::Command::DumpStorePath << printStorePath(path);
         conn->to.flush();
         copyNAR(conn->from, sink);
     }
@@ -211,13 +271,21 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
     { unsupported("queryPathFromHashPart"); }
 
-    StorePath addToStore(const string & name, const Path & srcPath,
-        FileIngestionMethod method, HashType hashAlgo,
-        PathFilter & filter, RepairFlag repair) override
+    StorePath addToStore(
+        std::string_view name,
+        const Path & srcPath,
+        FileIngestionMethod method,
+        HashType hashAlgo,
+        PathFilter & filter,
+        RepairFlag repair,
+        const StorePathSet & references) override
     { unsupported("addToStore"); }
 
-    StorePath addTextToStore(const string & name, const string & s,
-        const StorePathSet & references, RepairFlag repair) override
+    StorePath addTextToStore(
+        std::string_view name,
+        std::string_view s,
+        const StorePathSet & references,
+        RepairFlag repair) override
     { unsupported("addTextToStore"); }
 
 private:
@@ -232,8 +300,12 @@ private:
                 << settings.maxLogSize;
         if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 3)
             conn.to
-                << settings.buildRepeat
-                << settings.enforceDeterminism;
+                << 0 // buildRepeat hasn't worked for ages anyway
+                << 0;
+
+        if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 7) {
+            conn.to << ((int) settings.keepFailed);
+        }
     }
 
 public:
@@ -244,7 +316,7 @@ public:
         auto conn(connections->get());
 
         conn->to
-            << cmdBuildDerivation
+            << ServeProto::Command::BuildDerivation
             << printStorePath(drvPath);
         writeDerivation(conn->to, *this, drv);
 
@@ -258,18 +330,36 @@ public:
 
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
             conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
-
+        if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 6) {
+            auto builtOutputs = WorkerProto::Serialise<DrvOutputs>::read(*this, *conn);
+            for (auto && [output, realisation] : builtOutputs)
+                status.builtOutputs.insert_or_assign(
+                    std::move(output.outputName),
+                    std::move(realisation));
+        }
         return status;
     }
 
-    void buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode) override
+    void buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override
     {
+        if (evalStore && evalStore.get() != this)
+            throw Error("building on an SSH store is incompatible with '--eval-store'");
+
         auto conn(connections->get());
 
-        conn->to << cmdBuildPaths;
+        conn->to << ServeProto::Command::BuildPaths;
         Strings ss;
-        for (auto & p : drvPaths)
-            ss.push_back(p.to_string(*this));
+        for (auto & p : drvPaths) {
+            auto sOrDrvPath = StorePathWithOutputs::tryFromDerivedPath(p);
+            std::visit(overloaded {
+                [&](const StorePathWithOutputs & s) {
+                    ss.push_back(s.to_string(*this));
+                },
+                [&](const StorePath & drvPath) {
+                    throw Error("wanted to fetch '%s' but the legacy ssh protocol doesn't support merely substituting drv files via the build paths command. It would build them instead. Try using ssh-ng://", printStorePath(drvPath));
+                },
+            }, sOrDrvPath);
+        }
         conn->to << ss;
 
         putBuildSettings(*conn);
@@ -288,6 +378,20 @@ public:
     void ensurePath(const StorePath & path) override
     { unsupported("ensurePath"); }
 
+    virtual ref<FSAccessor> getFSAccessor() override
+    { unsupported("getFSAccessor"); }
+
+    /**
+     * The default instance would schedule the work on the client side, but
+     * for consistency with `buildPaths` and `buildDerivation` it should happen
+     * on the remote side.
+     *
+     * We make this fail for now so we can add implement this properly later
+     * without it being a breaking change.
+     */
+    void repairPath(const StorePath & path) override
+    { unsupported("repairPath"); }
+
     void computeFSClosure(const StorePathSet & paths,
         StorePathSet & out, bool flipDirection = false,
         bool includeOutputs = false, bool includeDerivers = false) override
@@ -300,12 +404,12 @@ public:
         auto conn(connections->get());
 
         conn->to
-            << cmdQueryClosure
+            << ServeProto::Command::QueryClosure
             << includeOutputs;
-        worker_proto::write(*this, conn->to, paths);
+        WorkerProto::write(*this, *conn, paths);
         conn->to.flush();
 
-        for (auto & i : worker_proto::read(*this, conn->from, Phantom<StorePathSet> {}))
+        for (auto & i : WorkerProto::Serialise<StorePathSet>::read(*this, *conn))
             out.insert(i);
     }
 
@@ -315,13 +419,13 @@ public:
         auto conn(connections->get());
 
         conn->to
-            << cmdQueryValidPaths
+            << ServeProto::Command::QueryValidPaths
             << false // lock
             << maybeSubstitute;
-        worker_proto::write(*this, conn->to, paths);
+        WorkerProto::write(*this, *conn, paths);
         conn->to.flush();
 
-        return worker_proto::read(*this, conn->from, Phantom<StorePathSet> {});
+        return WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
     }
 
     void connect() override
@@ -335,7 +439,17 @@ public:
         return conn->remoteVersion;
     }
 
-    std::optional<const Realisation> queryRealisation(const DrvOutput&) override
+    /**
+     * The legacy ssh protocol doesn't support checking for trusted-user.
+     * Try using ssh-ng:// instead if you want to know.
+     */
+    std::optional<TrustedFlag> isTrustedClient() override
+    {
+        return std::nullopt;
+    }
+
+    void queryRealisationUncached(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept override
     // TODO: Implement
     { unsupported("queryRealisation"); }
 };

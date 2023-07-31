@@ -1,11 +1,11 @@
 #pragma once
+///@file
 
-#include "installables.hh"
+#include "installable-value.hh"
 #include "args.hh"
 #include "common-eval-args.hh"
 #include "path.hh"
 #include "flake/lockfile.hh"
-#include "store-api.hh"
 
 #include <optional>
 
@@ -19,16 +19,20 @@ class EvalState;
 struct Pos;
 class Store;
 
+static constexpr Command::Category catHelp = -1;
 static constexpr Command::Category catSecondary = 100;
 static constexpr Command::Category catUtility = 101;
 static constexpr Command::Category catNixInstallation = 102;
 
-static constexpr auto installablesCategory = "Options that change the interpretation of installables";
+static constexpr auto installablesCategory = "Options that change the interpretation of [installables](@docroot@/command-ref/new-cli/nix.md#installables)";
 
 struct NixMultiCommand : virtual MultiCommand, virtual Command
 {
     nlohmann::json toJSON() override;
 };
+
+// For the overloaded run methods
+#pragma GCC diagnostic ignored "-Woverloaded-virtual"
 
 /* A command that requires a Nix store. */
 struct StoreCommand : virtual Command
@@ -43,9 +47,34 @@ private:
     std::shared_ptr<Store> _store;
 };
 
+/* A command that copies something between `--from` and `--to`
+   stores. */
+struct CopyCommand : virtual StoreCommand
+{
+    std::string srcUri, dstUri;
+
+    CopyCommand();
+
+    ref<Store> createStore() override;
+
+    ref<Store> getDstStore();
+};
+
 struct EvalCommand : virtual StoreCommand, MixEvalArgs
 {
+    bool startReplOnEvalErrors = false;
+    bool ignoreExceptionsDuringTry = false;
+
+    EvalCommand();
+
+    ~EvalCommand();
+
+    ref<Store> getEvalStore();
+
     ref<EvalState> getEvalState();
+
+private:
+    std::shared_ptr<Store> evalStore;
 
     std::shared_ptr<EvalState> evalState;
 };
@@ -54,18 +83,16 @@ struct MixFlakeOptions : virtual Args, EvalCommand
 {
     flake::LockFlags lockFlags;
 
+    std::optional<std::string> needsFlakeInputCompletion = {};
+
     MixFlakeOptions();
 
-    virtual std::optional<FlakeRef> getFlakeRefForCompletion()
+    virtual std::vector<std::string> getFlakesForCompletion()
     { return {}; }
-};
 
-/* How to handle derivations in commands that operate on store paths. */
-enum class OperateOn {
-    /* Operate on the output path. */
-    Output,
-    /* Operate on the .drv path. */
-    Derivation
+    void completeFlakeInput(std::string_view prefix);
+
+    void completionHook() override;
 };
 
 struct SourceExprCommand : virtual Args, MixFlakeOptions
@@ -73,15 +100,12 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
     std::optional<Path> file;
     std::optional<std::string> expr;
 
-    // FIXME: move this; not all commands (e.g. 'nix run') use it.
-    OperateOn operateOn = OperateOn::Output;
-
     SourceExprCommand();
 
-    std::vector<std::shared_ptr<Installable>> parseInstallables(
+    Installables parseInstallables(
         ref<Store> store, std::vector<std::string> ss);
 
-    std::shared_ptr<Installable> parseInstallable(
+    ref<Installable> parseInstallable(
         ref<Store> store, const std::string & installable);
 
     virtual Strings getDefaultFlakeAttrPaths();
@@ -91,48 +115,52 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
     void completeInstallable(std::string_view prefix);
 };
 
-enum class Realise {
-    /* Build the derivation. Postcondition: the
-       derivation outputs exist. */
-    Outputs,
-    /* Don't build the derivation. Postcondition: the store derivation
-       exists. */
-    Derivation,
-    /* Evaluate in dry-run mode. Postcondition: nothing. */
-    Nothing
+struct MixReadOnlyOption : virtual Args
+{
+    MixReadOnlyOption();
 };
 
-/* A command that operates on a list of "installables", which can be
-   store paths, attribute paths, Nix expressions, etc. */
-struct InstallablesCommand : virtual Args, SourceExprCommand
+/* Like InstallablesCommand but the installables are not loaded */
+struct RawInstallablesCommand : virtual Args, SourceExprCommand
 {
-    std::vector<std::shared_ptr<Installable>> installables;
+    RawInstallablesCommand();
 
-    InstallablesCommand();
+    virtual void run(ref<Store> store, std::vector<std::string> && rawInstallables) = 0;
 
-    void prepare() override;
+    void run(ref<Store> store) override;
 
-    virtual bool useDefaultInstallables() { return true; }
+    // FIXME make const after CmdRepl's override is fixed up
+    virtual void applyDefaultInstallables(std::vector<std::string> & rawInstallables);
 
-    std::optional<FlakeRef> getFlakeRefForCompletion() override;
+    bool readFromStdIn = false;
+
+    std::vector<std::string> getFlakesForCompletion() override;
 
 private:
 
-    std::vector<std::string> _installables;
+    std::vector<std::string> rawInstallables;
+};
+/* A command that operates on a list of "installables", which can be
+   store paths, attribute paths, Nix expressions, etc. */
+struct InstallablesCommand : RawInstallablesCommand
+{
+    virtual void run(ref<Store> store, Installables && installables) = 0;
+
+    void run(ref<Store> store, std::vector<std::string> && rawInstallables) override;
 };
 
 /* A command that operates on exactly one "installable" */
 struct InstallableCommand : virtual Args, SourceExprCommand
 {
-    std::shared_ptr<Installable> installable;
-
     InstallableCommand();
 
-    void prepare() override;
+    virtual void run(ref<Store> store, ref<Installable> installable) = 0;
 
-    std::optional<FlakeRef> getFlakeRefForCompletion() override
+    void run(ref<Store> store) override;
+
+    std::vector<std::string> getFlakesForCompletion() override
     {
-        return parseFlakeRef(_installable, absPath("."));
+        return {_installable};
     }
 
 private:
@@ -140,8 +168,15 @@ private:
     std::string _installable{"."};
 };
 
+struct MixOperateOnOptions : virtual Args
+{
+    OperateOn operateOn = OperateOn::Output;
+
+    MixOperateOnOptions();
+};
+
 /* A command that operates on zero or more store paths. */
-struct RealisedPathsCommand : public InstallablesCommand
+struct BuiltPathsCommand : InstallablesCommand, virtual MixOperateOnOptions
 {
 private:
 
@@ -154,36 +189,30 @@ protected:
 
 public:
 
-    RealisedPathsCommand(bool recursive = false);
+    BuiltPathsCommand(bool recursive = false);
 
-    using StoreCommand::run;
+    virtual void run(ref<Store> store, BuiltPaths && paths) = 0;
 
-    virtual void run(ref<Store> store, std::vector<RealisedPath> paths) = 0;
+    void run(ref<Store> store, Installables && installables) override;
 
-    void run(ref<Store> store) override;
-
-    bool useDefaultInstallables() override { return !all; }
+    void applyDefaultInstallables(std::vector<std::string> & rawInstallables) override;
 };
 
-struct StorePathsCommand : public RealisedPathsCommand
+struct StorePathsCommand : public BuiltPathsCommand
 {
     StorePathsCommand(bool recursive = false);
 
-    using RealisedPathsCommand::run;
+    virtual void run(ref<Store> store, StorePaths && storePaths) = 0;
 
-    virtual void run(ref<Store> store, std::vector<StorePath> storePaths) = 0;
-
-    void run(ref<Store> store, std::vector<RealisedPath> paths) override;
+    void run(ref<Store> store, BuiltPaths && paths) override;
 };
 
 /* A command that operates on exactly one store path. */
-struct StorePathCommand : public InstallablesCommand
+struct StorePathCommand : public StorePathsCommand
 {
-    using StoreCommand::run;
-
     virtual void run(ref<Store> store, const StorePath & storePath) = 0;
 
-    void run(ref<Store> store) override;
+    void run(ref<Store> store, StorePaths && storePaths) override;
 };
 
 /* A helper class for registering commands globally. */
@@ -214,31 +243,6 @@ static RegisterCommand registerCommand2(std::vector<std::string> && name)
     return RegisterCommand(std::move(name), [](){ return make_ref<T>(); });
 }
 
-Buildables build(ref<Store> store, Realise mode,
-    std::vector<std::shared_ptr<Installable>> installables, BuildMode bMode = bmNormal);
-
-std::set<StorePath> toStorePaths(ref<Store> store,
-    Realise mode, OperateOn operateOn,
-    std::vector<std::shared_ptr<Installable>> installables);
-
-StorePath toStorePath(ref<Store> store,
-    Realise mode, OperateOn operateOn,
-    std::shared_ptr<Installable> installable);
-
-std::set<StorePath> toDerivations(ref<Store> store,
-    std::vector<std::shared_ptr<Installable>> installables,
-    bool useDeriver = false);
-
-std::set<RealisedPath> toRealisedPaths(
-    ref<Store> store,
-    Realise mode,
-    OperateOn operateOn,
-    std::vector<std::shared_ptr<Installable>> installables);
-
-/* Helper function to generate args that invoke $EDITOR on
-   filename:lineno. */
-Strings editorFor(const Pos & pos);
-
 struct MixProfile : virtual StoreCommand
 {
     std::optional<Path> profile;
@@ -250,7 +254,7 @@ struct MixProfile : virtual StoreCommand
 
     /* If 'profile' is set, make it point at the store path produced
        by 'buildables'. */
-    void updateProfile(const Buildables & buildables);
+    void updateProfile(const BuiltPaths & buildables);
 };
 
 struct MixDefaultProfile : MixProfile

@@ -41,7 +41,7 @@ struct CmdVerify : StorePathsCommand
         addFlag({
             .longName = "sigs-needed",
             .shortName = 'n',
-            .description = "Require that each path has at least *n* valid signatures.",
+            .description = "Require that each path is signed by at least *n* different keys.",
             .labels = {"n"},
             .handler = {&sigsNeeded}
         });
@@ -59,7 +59,7 @@ struct CmdVerify : StorePathsCommand
           ;
     }
 
-    void run(ref<Store> store, StorePaths storePaths) override
+    void run(ref<Store> store, StorePaths && storePaths) override
     {
         std::vector<ref<Store>> substituters;
         for (auto & s : substituterUris)
@@ -81,14 +81,14 @@ struct CmdVerify : StorePathsCommand
 
         ThreadPool pool;
 
-        auto doPath = [&](const Path & storePath) {
+        auto doPath = [&](const StorePath & storePath) {
             try {
                 checkInterrupt();
 
                 MaintainCount<std::atomic<size_t>> mcActive(active);
                 update();
 
-                auto info = store->queryPathInfo(store->parseStorePath(storePath));
+                auto info = store->queryPathInfo(storePath);
 
                 // Note: info->path can be different from storePath
                 // for binary cache stores when using --all (since we
@@ -97,15 +97,11 @@ struct CmdVerify : StorePathsCommand
 
                 if (!noContents) {
 
-                    std::unique_ptr<AbstractHashSink> hashSink;
-                    if (!info->ca)
-                        hashSink = std::make_unique<HashSink>(info->narHash.type);
-                    else
-                        hashSink = std::make_unique<HashModuloSink>(info->narHash.type, std::string(info->path.hashPart()));
+                    auto hashSink = HashSink(info->narHash.type);
 
-                    store->narFromPath(info->path, *hashSink);
+                    store->narFromPath(info->path, hashSink);
 
-                    auto hash = hashSink->finish();
+                    auto hash = hashSink.finish();
 
                     if (hash.first != info->narHash) {
                         corrupted++;
@@ -177,7 +173,7 @@ struct CmdVerify : StorePathsCommand
         };
 
         for (auto & storePath : storePaths)
-            pool.enqueue(std::bind(doPath, store->printStorePath(storePath)));
+            pool.enqueue(std::bind(doPath, storePath));
 
         pool.process();
 

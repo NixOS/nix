@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "util.hh"
 #include "sync.hh"
@@ -12,6 +13,7 @@ private:
     const std::string host;
     bool fakeSSH;
     const std::string keyFile;
+    const std::string sshPublicHostKey;
     const bool useMaster;
     const bool compress;
     const int logFD;
@@ -26,10 +28,11 @@ private:
     Sync<State> state_;
 
     void addCommonSSHOpts(Strings & args);
+    bool isMasterRunning();
 
 public:
 
-    SSHMaster(const std::string & host, const std::string & keyFile, bool useMaster, bool compress, int logFD = -1);
+    SSHMaster(const std::string & host, const std::string & keyFile, const std::string & sshPublicHostKey, bool useMaster, bool compress, int logFD = -1);
 
     struct Connection
     {

@@ -1,28 +1,31 @@
 #include "globals.hh"
 #include "shared.hh"
 #include "store-api.hh"
+#include "gc-store.hh"
 #include "util.hh"
 #include "loggers.hh"
+#include "progress-bar.hh"
 
 #include <algorithm>
 #include <cctype>
 #include <exception>
 #include <iostream>
-#include <mutex>
 
 #include <cstdlib>
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>
+#ifdef __linux__
+#include <features.h>
+#endif
 
 #include <openssl/crypto.h>
-
-#include <sodium.h>
 
 
 namespace nix {
 
+char * * savedArgv;
 
 static bool gcWarning = true;
 
@@ -36,7 +39,7 @@ void printGCWarning()
 }
 
 
-void printMissing(ref<Store> store, const std::vector<StorePathWithOutputs> & paths, Verbosity lvl)
+void printMissing(ref<Store> store, const std::vector<DerivedPath> & paths, Verbosity lvl)
 {
     uint64_t downloadSize, narSize;
     StorePathSet willBuild, willSubstitute, unknown;
@@ -51,65 +54,58 @@ void printMissing(ref<Store> store, const StorePathSet & willBuild,
 {
     if (!willBuild.empty()) {
         if (willBuild.size() == 1)
-            printMsg(lvl, fmt("this derivation will be built:"));
+            printMsg(lvl, "this derivation will be built:");
         else
-            printMsg(lvl, fmt("these %d derivations will be built:", willBuild.size()));
+            printMsg(lvl, "these %d derivations will be built:", willBuild.size());
         auto sorted = store->topoSortPaths(willBuild);
         reverse(sorted.begin(), sorted.end());
         for (auto & i : sorted)
-            printMsg(lvl, fmt("  %s", store->printStorePath(i)));
+            printMsg(lvl, "  %s", store->printStorePath(i));
     }
 
     if (!willSubstitute.empty()) {
         const float downloadSizeMiB = downloadSize / (1024.f * 1024.f);
         const float narSizeMiB = narSize / (1024.f * 1024.f);
         if (willSubstitute.size() == 1) {
-            printMsg(lvl, fmt("this path will be fetched (%.2f MiB download, %.2f MiB unpacked):",
+            printMsg(lvl, "this path will be fetched (%.2f MiB download, %.2f MiB unpacked):",
                 downloadSizeMiB,
-                narSizeMiB));
+                narSizeMiB);
         } else {
-            printMsg(lvl, fmt("these %d paths will be fetched (%.2f MiB download, %.2f MiB unpacked):",
+            printMsg(lvl, "these %d paths will be fetched (%.2f MiB download, %.2f MiB unpacked):",
                 willSubstitute.size(),
                 downloadSizeMiB,
-                narSizeMiB));
+                narSizeMiB);
         }
-        for (auto & i : willSubstitute)
-            printMsg(lvl, fmt("  %s", store->printStorePath(i)));
+        std::vector<const StorePath *> willSubstituteSorted = {};
+        std::for_each(willSubstitute.begin(), willSubstitute.end(),
+                   [&](const StorePath &p) { willSubstituteSorted.push_back(&p); });
+        std::sort(willSubstituteSorted.begin(), willSubstituteSorted.end(),
+                  [](const StorePath *lhs, const StorePath *rhs) {
+                    if (lhs->name() == rhs->name())
+                      return lhs->to_string() < rhs->to_string();
+                    else
+                      return lhs->name() < rhs->name();
+                  });
+        for (auto p : willSubstituteSorted)
+            printMsg(lvl, "  %s", store->printStorePath(*p));
     }
 
     if (!unknown.empty()) {
-        printMsg(lvl, fmt("don't know how to build these paths%s:",
-                (settings.readOnlyMode ? " (may be caused by read-only store access)" : "")));
+        printMsg(lvl, "don't know how to build these paths%s:",
+                (settings.readOnlyMode ? " (may be caused by read-only store access)" : ""));
         for (auto & i : unknown)
-            printMsg(lvl, fmt("  %s", store->printStorePath(i)));
+            printMsg(lvl, "  %s", store->printStorePath(i));
     }
 }
 
 
-string getArg(const string & opt,
+std::string getArg(const std::string & opt,
     Strings::iterator & i, const Strings::iterator & end)
 {
     ++i;
     if (i == end) throw UsageError("'%1%' requires an argument", opt);
     return *i;
 }
-
-
-#if OPENSSL_VERSION_NUMBER < 0x10101000L
-/* OpenSSL is not thread-safe by default - it will randomly crash
-   unless the user supplies a mutex locking function. So let's do
-   that. */
-static std::vector<std::mutex> opensslLocks;
-
-static void opensslLockCallback(int mode, int type, const char * file, int line)
-{
-    if (mode & CRYPTO_LOCK)
-        opensslLocks[type].lock();
-    else
-        opensslLocks[type].unlock();
-}
-#endif
-
 
 static void sigHandler(int signo) { }
 
@@ -122,24 +118,16 @@ void initNix()
     std::cerr.rdbuf()->pubsetbuf(buf, sizeof(buf));
 #endif
 
-#if OPENSSL_VERSION_NUMBER < 0x10101000L
-    /* Initialise OpenSSL locking. */
-    opensslLocks = std::vector<std::mutex>(CRYPTO_num_locks());
-    CRYPTO_set_locking_callback(opensslLockCallback);
-#endif
-
-    if (sodium_init() == -1)
-        throw Error("could not initialise libsodium");
-
-    loadConfFile();
+    initLibStore();
 
     startSignalHandlerThread();
 
     /* Reset SIGCHLD to its default. */
     struct sigaction act;
     sigemptyset(&act.sa_mask);
-    act.sa_handler = SIG_DFL;
     act.sa_flags = 0;
+
+    act.sa_handler = SIG_DFL;
     if (sigaction(SIGCHLD, &act, 0))
         throw SysError("resetting SIGCHLD");
 
@@ -151,12 +139,26 @@ void initNix()
     /* HACK: on darwin, we need can’t use sigprocmask with SIGWINCH.
      * Instead, add a dummy sigaction handler, and signalHandlerThread
      * can handle the rest. */
-    struct sigaction sa;
-    sa.sa_handler = sigHandler;
-    if (sigaction(SIGWINCH, &sa, 0)) throw SysError("handling SIGWINCH");
+    act.sa_handler = sigHandler;
+    if (sigaction(SIGWINCH, &act, 0)) throw SysError("handling SIGWINCH");
+
+    /* Disable SA_RESTART for interrupts, so that system calls on this thread
+     * error with EINTR like they do on Linux.
+     * Most signals on BSD systems default to SA_RESTART on, but Nix
+     * expects EINTR from syscalls to properly exit. */
+    act.sa_handler = SIG_DFL;
+    if (sigaction(SIGINT, &act, 0)) throw SysError("handling SIGINT");
+    if (sigaction(SIGTERM, &act, 0)) throw SysError("handling SIGTERM");
+    if (sigaction(SIGHUP, &act, 0)) throw SysError("handling SIGHUP");
+    if (sigaction(SIGPIPE, &act, 0)) throw SysError("handling SIGPIPE");
+    if (sigaction(SIGQUIT, &act, 0)) throw SysError("handling SIGQUIT");
+    if (sigaction(SIGTRAP, &act, 0)) throw SysError("handling SIGTRAP");
 #endif
 
-    /* Register a SIGSEGV handler to detect stack overflows. */
+    /* Register a SIGSEGV handler to detect stack overflows.
+       Why not initLibExpr()? initGC() is essentially that, but
+       detectStackOverflow is not an instance of the init function concept, as
+       it may have to be invoked more than once per process. */
     detectStackOverflow();
 
     /* There is no privacy in the Nix system ;-)  At least not for
@@ -169,13 +171,6 @@ void initNix()
     gettimeofday(&tv, 0);
     srandom(tv.tv_usec);
 
-    /* On macOS, don't use the per-session TMPDIR (as set e.g. by
-       sshd). This breaks build users because they don't have access
-       to the TMPDIR, in particular in ‘nix-store --serve’. */
-#if __APPLE__
-    if (hasPrefix(getEnv("TMPDIR").value_or("/tmp"), "/var/folders/"))
-        unsetenv("TMPDIR");
-#endif
 }
 
 
@@ -238,7 +233,7 @@ LegacyArgs::LegacyArgs(const std::string & programName,
     addFlag({
         .longName = "no-gc-warning",
         .description = "Disable warnings about not using `--add-root`.",
-        .handler = {&gcWarning, true},
+        .handler = {&gcWarning, false},
     });
 
     addFlag({
@@ -278,16 +273,16 @@ void parseCmdLine(int argc, char * * argv,
 }
 
 
-void parseCmdLine(const string & programName, const Strings & args,
+void parseCmdLine(const std::string & programName, const Strings & args,
     std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
 {
     LegacyArgs(programName, parseArg).parseCmdline(args);
 }
 
 
-void printVersion(const string & programName)
+void printVersion(const std::string & programName)
 {
-    std::cout << format("%1% (Nix) %2%") % programName % nixVersion << std::endl;
+    std::cout << fmt("%1% (Nix) %2%", programName, nixVersion) << std::endl;
     if (verbosity > lvlInfo) {
         Strings cfg;
 #if HAVE_BOEHMGC
@@ -303,27 +298,28 @@ void printVersion(const string & programName)
             << "\n";
         std::cout << "Store directory: " << settings.nixStore << "\n";
         std::cout << "State directory: " << settings.nixStateDir << "\n";
+        std::cout << "Data directory: " << settings.nixDataDir << "\n";
     }
     throw Exit();
 }
 
 
-void showManPage(const string & name)
+void showManPage(const std::string & name)
 {
-    restoreSignals();
+    restoreProcessContext();
     setenv("MANPATH", settings.nixManDir.c_str(), 1);
     execlp("man", "man", name.c_str(), nullptr);
     throw SysError("command 'man %1%' failed", name.c_str());
 }
 
 
-int handleExceptions(const string & programName, std::function<void()> fun)
+int handleExceptions(const std::string & programName, std::function<void()> fun)
 {
     ReceiveInterrupts receiveInterrupts; // FIXME: need better place for this
 
     ErrorInfo::programName = baseNameOf(programName);
 
-    string error = ANSI_RED "error:" ANSI_NORMAL " ";
+    std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
     try {
         try {
             fun();
@@ -343,8 +339,6 @@ int handleExceptions(const string & programName, std::function<void()> fun)
         return 1;
     } catch (BaseError & e) {
         logError(e.info());
-        if (e.hasTrace() && !loggerSettings.showTrace.get())
-            printError("(use '--show-trace' to show detailed location information)");
         return e.status;
     } catch (std::bad_alloc & e) {
         printError(error + "out of memory");
@@ -363,7 +357,9 @@ RunPager::RunPager()
     if (!isatty(STDOUT_FILENO)) return;
     char * pager = getenv("NIX_PAGER");
     if (!pager) pager = getenv("PAGER");
-    if (pager && ((string) pager == "" || (string) pager == "cat")) return;
+    if (pager && ((std::string) pager == "" || (std::string) pager == "cat")) return;
+
+    stopProgressBar();
 
     Pipe toPager;
     toPager.create();
@@ -373,7 +369,7 @@ RunPager::RunPager()
             throw SysError("dupping stdin");
         if (!getenv("LESS"))
             setenv("LESS", "FRSXMK", 1);
-        restoreSignals();
+        restoreProcessContext();
         if (pager)
             execl("/bin/sh", "sh", "-c", pager, nullptr);
         execlp("pager", "pager", nullptr);
@@ -383,7 +379,7 @@ RunPager::RunPager()
     });
 
     pid.setKillSignal(SIGINT);
-
+    stdout = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC, 0);
     if (dup2(toPager.writeSide.get(), STDOUT_FILENO) == -1)
         throw SysError("dupping stdout");
 }
@@ -394,7 +390,7 @@ RunPager::~RunPager()
     try {
         if (pid != -1) {
             std::cout.flush();
-            close(STDOUT_FILENO);
+            dup2(stdout, STDOUT_FILENO);
             pid.wait();
         }
     } catch (...) {

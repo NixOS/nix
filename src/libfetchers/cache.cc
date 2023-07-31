@@ -52,13 +52,13 @@ struct CacheImpl : Cache
         const Attrs & inAttrs,
         const Attrs & infoAttrs,
         const StorePath & storePath,
-        bool immutable) override
+        bool locked) override
     {
         _state.lock()->add.use()
             (attrsToJSON(inAttrs).dump())
             (attrsToJSON(infoAttrs).dump())
             (store->printStorePath(storePath))
-            (immutable)
+            (locked)
             (time(0)).exec();
     }
 
@@ -91,7 +91,7 @@ struct CacheImpl : Cache
 
         auto infoJSON = stmt.getStr(0);
         auto storePath = store->parseStorePath(stmt.getStr(1));
-        auto immutable = stmt.getInt(2) != 0;
+        auto locked = stmt.getInt(2) != 0;
         auto timestamp = stmt.getInt(3);
 
         store->addTempRoot(storePath);
@@ -105,7 +105,7 @@ struct CacheImpl : Cache
             inAttrsJSON, infoJSON, store->printStorePath(storePath));
 
         return Result {
-            .expired = !immutable && (settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0)),
+            .expired = !locked && (settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0)),
             .infoAttrs = jsonToAttrs(nlohmann::json::parse(infoJSON)),
             .storePath = std::move(storePath)
         };

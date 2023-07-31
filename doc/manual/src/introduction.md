@@ -76,7 +76,7 @@ there after an upgrade.  This means that you can _roll back_ to the
 old version:
 
 ```console
-$ nix-env --upgrade some-packages
+$ nix-env --upgrade --attr nixpkgs.some-package
 $ nix-env --rollback
 ```
 
@@ -104,7 +104,7 @@ a currently running program.
 
 Packages are built from _Nix expressions_, which is a simple
 functional language.  A Nix expression describes everything that goes
-into a package build action (a “derivation”): other packages, sources,
+into a package build task (a “derivation”): other packages, sources,
 the build script, environment variables for the build script, etc.
 Nix tries very hard to ensure that Nix expressions are
 _deterministic_: building a Nix expression twice should yield the same
@@ -122,12 +122,12 @@ Nix expressions generally describe how to build a package from
 source, so an installation action like
 
 ```console
-$ nix-env --install firefox
+$ nix-env --install --attr nixpkgs.firefox
 ```
 
 _could_ cause quite a bit of build activity, as not only Firefox but
 also all its dependencies (all the way up to the C library and the
-compiler) would have to built, at least if they are not already in the
+compiler) would have to be built, at least if they are not already in the
 Nix store.  This is a _source deployment model_.  For most users,
 building from source is not very pleasant as it takes far too long.
 However, Nix can automatically skip building from source and instead
@@ -158,7 +158,7 @@ Pan newsreader, as described by [its
 Nix expression](https://github.com/NixOS/nixpkgs/blob/master/pkgs/applications/networking/newsreaders/pan/default.nix):
 
 ```console
-$ nix-shell '<nixpkgs>' -A pan
+$ nix-shell '<nixpkgs>' --attr pan
 ```
 
 You’re then dropped into a shell where you can edit, build and test

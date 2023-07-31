@@ -10,37 +10,35 @@ using std::cout;
 namespace nix {
 
 
-static string dotQuote(std::string_view s)
+static std::string dotQuote(std::string_view s)
 {
     return "\"" + std::string(s) + "\"";
 }
 
 
-static string nextColour()
+static const std::string & nextColour()
 {
     static int n = 0;
-    static string colours[] =
+    static std::vector<std::string> colours
         { "black", "red", "green", "blue"
         , "magenta", "burlywood" };
-    return colours[n++ % (sizeof(colours) / sizeof(string))];
+    return colours[n++ % colours.size()];
 }
 
 
-static string makeEdge(const string & src, const string & dst)
+static std::string makeEdge(std::string_view src, std::string_view dst)
 {
-    format f = format("%1% -> %2% [color = %3%];\n")
-        % dotQuote(src) % dotQuote(dst) % dotQuote(nextColour());
-    return f.str();
+    return fmt("%1% -> %2% [color = %3%];\n",
+        dotQuote(src), dotQuote(dst), dotQuote(nextColour()));
 }
 
 
-static string makeNode(const string & id, std::string_view label,
-    const string & colour)
+static std::string makeNode(std::string_view id, std::string_view label,
+    std::string_view colour)
 {
-    format f = format("%1% [label = %2%, shape = box, "
-        "style = filled, fillcolor = %3%];\n")
-        % dotQuote(id) % dotQuote(label) % dotQuote(colour);
-    return f.str();
+    return fmt("%1% [label = %2%, shape = box, "
+        "style = filled, fillcolor = %3%];\n",
+        dotQuote(id), dotQuote(label), dotQuote(colour));
 }
 
 

@@ -2,7 +2,7 @@ R""(
 
 # Description
 
-`nix flake` provides subcommands for managing *flake
+`nix registry` provides subcommands for managing *flake
 registries*. Flake registries are a convenience feature that allows
 you to refer to flakes using symbolic identifiers such as `nixpkgs`,
 rather than full URLs such as `git://github.com/NixOS/nixpkgs`. You
@@ -29,7 +29,7 @@ highest precedence:
   can be specified using the NixOS option `nix.registry`.
 
 * The user registry `~/.config/nix/registry.json`. This registry can
-  be modified by commands such as `nix flake pin`.
+  be modified by commands such as `nix registry pin`.
 
 * Overrides specified on the command line using the option
   `--override-flake`.
@@ -41,7 +41,7 @@ A registry is a JSON file with the following format:
 ```json
 {
   "version": 2,
-  [
+  "flakes": [
     {
       "from": {
         "type": "indirect",

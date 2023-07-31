@@ -1,21 +1,24 @@
 #include "machines.hh"
 #include "worker.hh"
 #include "substitution-goal.hh"
-#include "derivation-goal.hh"
+#include "drv-output-substitution-goal.hh"
+#include "local-derivation-goal.hh"
 #include "hook-instance.hh"
 
 #include <poll.h>
 
 namespace nix {
 
-Worker::Worker(Store & store)
+Worker::Worker(Store & store, Store & evalStore)
     : act(*logger, actRealise)
     , actDerivations(*logger, actBuilds)
     , actSubstitutions(*logger, actCopyPaths)
     , store(store)
+    , evalStore(evalStore)
 {
     /* Debugging: prevent recursive workers. */
     nrLocalBuilds = 0;
+    nrSubstitutions = 0;
     lastWokenUp = steady_time_point::min();
     permanentFailure = false;
     timedOut = false;
@@ -40,7 +43,7 @@ Worker::~Worker()
 
 std::shared_ptr<DerivationGoal> Worker::makeDerivationGoalCommon(
     const StorePath & drvPath,
-    const StringSet & wantedOutputs,
+    const OutputsSpec & wantedOutputs,
     std::function<std::shared_ptr<DerivationGoal>()> mkDrvGoal)
 {
     std::weak_ptr<DerivationGoal> & goal_weak = derivationGoals[drvPath];
@@ -57,37 +60,68 @@ std::shared_ptr<DerivationGoal> Worker::makeDerivationGoalCommon(
 
 
 std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(const StorePath & drvPath,
-    const StringSet & wantedOutputs, BuildMode buildMode)
+    const OutputsSpec & wantedOutputs, BuildMode buildMode)
 {
-    return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() {
-        return std::make_shared<DerivationGoal>(drvPath, wantedOutputs, *this, buildMode);
+    return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
+        return !dynamic_cast<LocalStore *>(&store)
+            ? std::make_shared</* */DerivationGoal>(drvPath, wantedOutputs, *this, buildMode)
+            : std::make_shared<LocalDerivationGoal>(drvPath, wantedOutputs, *this, buildMode);
     });
 }
 
 
 std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath & drvPath,
-    const BasicDerivation & drv, const StringSet & wantedOutputs, BuildMode buildMode)
+    const BasicDerivation & drv, const OutputsSpec & wantedOutputs, BuildMode buildMode)
 {
-    return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() {
-        return std::make_shared<DerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
+    return makeDerivationGoalCommon(drvPath, wantedOutputs, [&]() -> std::shared_ptr<DerivationGoal> {
+        return !dynamic_cast<LocalStore *>(&store)
+            ? std::make_shared</* */DerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode)
+            : std::make_shared<LocalDerivationGoal>(drvPath, drv, wantedOutputs, *this, buildMode);
     });
 }
 
 
-std::shared_ptr<SubstitutionGoal> Worker::makeSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
+std::shared_ptr<PathSubstitutionGoal> Worker::makePathSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
 {
-    std::weak_ptr<SubstitutionGoal> & goal_weak = substitutionGoals[path];
+    std::weak_ptr<PathSubstitutionGoal> & goal_weak = substitutionGoals[path];
     auto goal = goal_weak.lock(); // FIXME
     if (!goal) {
-        goal = std::make_shared<SubstitutionGoal>(path, *this, repair, ca);
+        goal = std::make_shared<PathSubstitutionGoal>(path, *this, repair, ca);
         goal_weak = goal;
         wakeUp(goal);
     }
     return goal;
 }
 
-template<typename G>
-static void removeGoal(std::shared_ptr<G> goal, std::map<StorePath, std::weak_ptr<G>> & goalMap)
+
+std::shared_ptr<DrvOutputSubstitutionGoal> Worker::makeDrvOutputSubstitutionGoal(const DrvOutput& id, RepairFlag repair, std::optional<ContentAddress> ca)
+{
+    std::weak_ptr<DrvOutputSubstitutionGoal> & goal_weak = drvOutputSubstitutionGoals[id];
+    auto goal = goal_weak.lock(); // FIXME
+    if (!goal) {
+        goal = std::make_shared<DrvOutputSubstitutionGoal>(id, *this, repair, ca);
+        goal_weak = goal;
+        wakeUp(goal);
+    }
+    return goal;
+}
+
+
+GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)
+{
+    return std::visit(overloaded {
+        [&](const DerivedPath::Built & bfd) -> GoalPtr {
+            return makeDerivationGoal(bfd.drvPath, bfd.outputs, buildMode);
+        },
+        [&](const DerivedPath::Opaque & bo) -> GoalPtr {
+            return makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair);
+        },
+    }, req.raw());
+}
+
+
+template<typename K, typename G>
+static void removeGoal(std::shared_ptr<G> goal, std::map<K, std::weak_ptr<G>> & goalMap)
 {
     /* !!! inefficient */
     for (auto i = goalMap.begin();
@@ -105,10 +139,13 @@ void Worker::removeGoal(GoalPtr goal)
 {
     if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal))
         nix::removeGoal(drvGoal, derivationGoals);
-    else if (auto subGoal = std::dynamic_pointer_cast<SubstitutionGoal>(goal))
+    else if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal))
         nix::removeGoal(subGoal, substitutionGoals);
+    else if (auto subGoal = std::dynamic_pointer_cast<DrvOutputSubstitutionGoal>(goal))
+        nix::removeGoal(subGoal, drvOutputSubstitutionGoals);
     else
         assert(false);
+
     if (topGoals.find(goal) != topGoals.end()) {
         topGoals.erase(goal);
         /* If a top-level goal failed, then kill all other goals
@@ -140,7 +177,13 @@ unsigned Worker::getNrLocalBuilds()
 }
 
 
-void Worker::childStarted(GoalPtr goal, const set<int> & fds,
+unsigned Worker::getNrSubstitutions()
+{
+    return nrSubstitutions;
+}
+
+
+void Worker::childStarted(GoalPtr goal, const std::set<int> & fds,
     bool inBuildSlot, bool respectTimeouts)
 {
     Child child;
@@ -151,7 +194,10 @@ void Worker::childStarted(GoalPtr goal, const set<int> & fds,
     child.inBuildSlot = inBuildSlot;
     child.respectTimeouts = respectTimeouts;
     children.emplace_back(child);
-    if (inBuildSlot) nrLocalBuilds++;
+    if (inBuildSlot) {
+        if (goal->jobCategory() == JobCategory::Substitution) nrSubstitutions++;
+        else nrLocalBuilds++;
+    }
 }
 
 
@@ -162,8 +208,13 @@ void Worker::childTerminated(Goal * goal, bool wakeSleepers)
     if (i == children.end()) return;
 
     if (i->inBuildSlot) {
-        assert(nrLocalBuilds > 0);
-        nrLocalBuilds--;
+        if (goal->jobCategory() == JobCategory::Substitution) {
+            assert(nrSubstitutions > 0);
+            nrSubstitutions--;
+        } else {
+            assert(nrLocalBuilds > 0);
+            nrLocalBuilds--;
+        }
     }
 
     children.erase(i);
@@ -184,7 +235,9 @@ void Worker::childTerminated(Goal * goal, bool wakeSleepers)
 void Worker::waitForBuildSlot(GoalPtr goal)
 {
     debug("wait for build slot");
-    if (getNrLocalBuilds() < settings.maxBuildJobs)
+    bool isSubstitutionGoal = goal->jobCategory() == JobCategory::Substitution;
+    if ((!isSubstitutionGoal && getNrLocalBuilds() < settings.maxBuildJobs) ||
+        (isSubstitutionGoal && getNrSubstitutions() < settings.maxSubstitutionJobs))
         wakeUp(goal); /* we can do it right away */
     else
         addToWeakGoals(wantingToBuild, goal);
@@ -207,18 +260,18 @@ void Worker::waitForAWhile(GoalPtr goal)
 
 void Worker::run(const Goals & _topGoals)
 {
-    std::vector<nix::StorePathWithOutputs> topPaths;
+    std::vector<nix::DerivedPath> topPaths;
 
     for (auto & i : _topGoals) {
         topGoals.insert(i);
         if (auto goal = dynamic_cast<DerivationGoal *>(i.get())) {
-            topPaths.push_back({goal->drvPath, goal->wantedOutputs});
-        } else if (auto goal = dynamic_cast<SubstitutionGoal *>(i.get())) {
-            topPaths.push_back({goal->storePath});
+            topPaths.push_back(DerivedPath::Built{goal->drvPath, goal->wantedOutputs});
+        } else if (auto goal = dynamic_cast<PathSubstitutionGoal *>(i.get())) {
+            topPaths.push_back(DerivedPath::Opaque{goal->storePath});
         }
     }
 
-    /* Call queryMissing() efficiently query substitutes. */
+    /* Call queryMissing() to efficiently query substitutes. */
     StorePathSet willBuild, willSubstitute, unknown;
     uint64_t downloadSize, narSize;
     store.queryMissing(topPaths, willBuild, willSubstitute, unknown, downloadSize, narSize);
@@ -255,16 +308,16 @@ void Worker::run(const Goals & _topGoals)
         if (!children.empty() || !waitingForAWhile.empty())
             waitForInput();
         else {
-            if (awake.empty() && 0 == settings.maxBuildJobs)
+            if (awake.empty() && 0U == settings.maxBuildJobs)
             {
                 if (getMachines().empty())
                    throw Error("unable to start any build; either increase '--max-jobs' "
                             "or enable remote builds."
-                            "\nhttps://nixos.org/nix/manual/#chap-distributed-builds");
+                            "\nhttps://nixos.org/manual/nix/stable/advanced-topics/distributed-builds.html");
                 else
                    throw Error("unable to start any build; remote machines may not have "
                             "all required system features."
-                            "\nhttps://nixos.org/nix/manual/#chap-distributed-builds");
+                            "\nhttps://nixos.org/manual/nix/stable/advanced-topics/distributed-builds.html");
 
             }
             assert(!awake.empty());
@@ -329,7 +382,7 @@ void Worker::waitForInput()
        become `available'.  Note that `available' (i.e., non-blocking)
        includes EOF. */
     std::vector<struct pollfd> pollStatus;
-    std::map <int, int> fdToPollStatus;
+    std::map<int, size_t> fdToPollStatus;
     for (auto & i : children) {
         for (auto & j : i.fds) {
             pollStatus.push_back((struct pollfd) { .fd = j, .events = POLLIN });
@@ -356,10 +409,13 @@ void Worker::waitForInput()
         GoalPtr goal = j->goal.lock();
         assert(goal);
 
-        set<int> fds2(j->fds);
+        std::set<int> fds2(j->fds);
         std::vector<unsigned char> buffer(4096);
         for (auto & k : fds2) {
-            if (pollStatus.at(fdToPollStatus.at(k)).revents) {
+            const auto fdPollStatusId = get(fdToPollStatus, k);
+            assert(fdPollStatusId);
+            assert(*fdPollStatusId < pollStatus.size());
+            if (pollStatus.at(*fdPollStatusId).revents) {
                 ssize_t rd = ::read(k, buffer.data(), buffer.size());
                 // FIXME: is there a cleaner way to handle pt close
                 // than EIO? Is this even standard?
@@ -373,7 +429,7 @@ void Worker::waitForInput()
                 } else {
                     printMsg(lvlVomit, "%1%: read %2% bytes",
                         goal->getName(), rd);
-                    string data((char *) buffer.data(), rd);
+                    std::string data((char *) buffer.data(), rd);
                     j->lastOutput = after;
                     goal->handleChildOutput(k, data);
                 }
@@ -412,16 +468,9 @@ void Worker::waitForInput()
 }
 
 
-unsigned int Worker::exitStatus()
+unsigned int Worker::failingExitStatus()
 {
-    /*
-     * 1100100
-     *    ^^^^
-     *    |||`- timeout
-     *    ||`-- output hash mismatch
-     *    |`--- build failure
-     *    `---- not deterministic
-     */
+    // See API docs in header for explanation
     unsigned int mask = 0;
     bool buildFailure = permanentFailure || timedOut || hashMismatch;
     if (buildFailure)
@@ -467,7 +516,10 @@ void Worker::markContentsGood(const StorePath & path)
 }
 
 
-GoalPtr upcast_goal(std::shared_ptr<SubstitutionGoal> subGoal) {
+GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal) {
+    return subGoal;
+}
+GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal) {
     return subGoal;
 }
 

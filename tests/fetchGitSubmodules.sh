@@ -2,10 +2,7 @@ source common.sh
 
 set -u
 
-if [[ -z $(type -p git) ]]; then
-    echo "Git not installed; skipping Git submodule tests"
-    exit 99
-fi
+requireGit
 
 clearStore
 
@@ -13,6 +10,15 @@ rootRepo=$TEST_ROOT/gitSubmodulesRoot
 subRepo=$TEST_ROOT/gitSubmodulesSub
 
 rm -rf ${rootRepo} ${subRepo} $TEST_HOME/.cache/nix
+
+# Submodules can't be fetched locally by default, which can cause
+# information leakage vulnerabilities, but for these tests our
+# submodule is intentionally local and it's all trusted, so we
+# disable this restriction. Setting it per repo is not sufficient, as
+# the repo-local config does not apply to the commands run from
+# outside the repos by Nix.
+export XDG_CONFIG_HOME=$TEST_HOME/.config
+git config --global protocol.file.allow always
 
 initGitRepo() {
     git init $1
@@ -95,3 +101,28 @@ noSubmoduleRepoBaseline=$(nix eval --raw --expr "(builtins.fetchGit { url = file
 noSubmoduleRepo=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$subRepo; rev = \"$subRev\"; submodules = true; }).outPath")
 
 [[ $noSubmoduleRepoBaseline == $noSubmoduleRepo ]]
+
+# Test relative submodule URLs.
+rm $TEST_HOME/.cache/nix/fetcher-cache*
+rm -rf $rootRepo/.git $rootRepo/.gitmodules $rootRepo/sub
+initGitRepo $rootRepo
+git -C $rootRepo submodule add ../gitSubmodulesSub sub
+git -C $rootRepo commit -m "Add submodule"
+rev2=$(git -C $rootRepo rev-parse HEAD)
+pathWithRelative=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev2\"; submodules = true; }).outPath")
+diff -r -x .gitmodules $pathWithSubmodules $pathWithRelative
+
+# Test clones that have an upstream with relative submodule URLs.
+rm $TEST_HOME/.cache/nix/fetcher-cache*
+cloneRepo=$TEST_ROOT/a/b/gitSubmodulesClone # NB /a/b to make the relative path not work relative to $cloneRepo
+git clone $rootRepo $cloneRepo
+pathIndirect=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$cloneRepo; rev = \"$rev2\"; submodules = true; }).outPath")
+[[ $pathIndirect = $pathWithRelative ]]
+
+# Test that if the clone has the submodule already, we're not fetching
+# it again.
+git -C $cloneRepo submodule update --init
+rm $TEST_HOME/.cache/nix/fetcher-cache*
+rm -rf $subRepo
+pathSubmoduleGone=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$cloneRepo; rev = \"$rev2\"; submodules = true; }).outPath")
+[[ $pathSubmoduleGone = $pathWithRelative ]]

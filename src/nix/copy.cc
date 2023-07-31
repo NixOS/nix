@@ -1,40 +1,18 @@
 #include "command.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "sync.hh"
-#include "thread-pool.hh"
-
-#include <atomic>
 
 using namespace nix;
 
-struct CmdCopy : StorePathsCommand
+struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand
 {
-    std::string srcUri, dstUri;
-
     CheckSigsFlag checkSigs = CheckSigs;
 
     SubstituteFlag substitute = NoSubstitute;
 
-    using StorePathsCommand::run;
-
     CmdCopy()
-        : StorePathsCommand(true)
+        : BuiltPathsCommand(true)
     {
-        addFlag({
-            .longName = "from",
-            .description = "URL of the source Nix store.",
-            .labels = {"store-uri"},
-            .handler = {&srcUri},
-        });
-
-        addFlag({
-            .longName = "to",
-            .description = "URL of the destination Nix store.",
-            .labels = {"store-uri"},
-            .handler = {&dstUri},
-        });
-
         addFlag({
             .longName = "no-check-sigs",
             .description = "Do not require that paths are signed by trusted keys.",
@@ -65,25 +43,19 @@ struct CmdCopy : StorePathsCommand
 
     Category category() override { return catSecondary; }
 
-    ref<Store> createStore() override
+    void run(ref<Store> srcStore, BuiltPaths && paths) override
     {
-        return srcUri.empty() ? StoreCommand::createStore() : openStore(srcUri);
-    }
+        auto dstStore = getDstStore();
 
-    void run(ref<Store> store) override
-    {
-        if (srcUri.empty() && dstUri.empty())
-            throw UsageError("you must pass '--from' and/or '--to'");
+        RealisedPath::Set stuffToCopy;
 
-        StorePathsCommand::run(store);
-    }
+        for (auto & builtPath : paths) {
+            auto theseRealisations = builtPath.toRealisedPaths(*srcStore);
+            stuffToCopy.insert(theseRealisations.begin(), theseRealisations.end());
+        }
 
-    void run(ref<Store> srcStore, StorePaths storePaths) override
-    {
-        ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
-
-        copyPaths(srcStore, dstStore, StorePathSet(storePaths.begin(), storePaths.end()),
-            NoRepair, checkSigs, substitute);
+        copyPaths(
+            *srcStore, *dstStore, stuffToCopy, NoRepair, checkSigs, substitute);
     }
 };
 

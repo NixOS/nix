@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "eval.hh"
 
@@ -10,11 +11,16 @@ namespace nix {
 MakeError(AttrPathNotFound, Error);
 MakeError(NoPositionInfo, Error);
 
-std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attrPath,
-    Bindings & autoArgs, Value & vIn);
+std::pair<Value *, PosIdx> findAlongAttrPath(
+    EvalState & state,
+    const std::string & attrPath,
+    Bindings & autoArgs,
+    Value & vIn);
 
-/* Heuristic to find the filename and lineno or a nix value. */
-Pos findDerivationFilename(EvalState & state, Value & v, std::string what);
+/**
+ * Heuristic to find the filename and lineno or a nix value.
+ */
+std::pair<SourcePath, uint32_t> findPackageFilename(EvalState & state, Value & v, std::string what);
 
 std::vector<Symbol> parseAttrPath(EvalState & state, std::string_view s);
 

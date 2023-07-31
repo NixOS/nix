@@ -12,7 +12,14 @@ struct HttpBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 {
     using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
 
-    const std::string name() override { return "Http Binary Cache Store"; }
+    const std::string name() override { return "HTTP Binary Cache Store"; }
+
+    std::string doc() override
+    {
+        return
+          #include "http-binary-cache-store.md"
+          ;
+    }
 };
 
 class HttpBinaryCacheStore : public virtual HttpBinaryCacheStoreConfig, public virtual BinaryCacheStore
@@ -56,9 +63,9 @@ public:
     void init() override
     {
         // FIXME: do this lazily?
-        if (auto cacheInfo = diskCache->cacheExists(cacheUri)) {
-            wantMassQuery.setDefault(cacheInfo->wantMassQuery ? "true" : "false");
-            priority.setDefault(fmt("%d", cacheInfo->priority));
+        if (auto cacheInfo = diskCache->upToDateCacheExists(cacheUri)) {
+            wantMassQuery.setDefault(cacheInfo->wantMassQuery);
+            priority.setDefault(cacheInfo->priority);
         } else {
             try {
                 BinaryCacheStore::init();
@@ -126,7 +133,7 @@ protected:
         const std::string & mimeType) override
     {
         auto req = makeRequest(path);
-        req.data = std::make_shared<string>(StreamToSourceAdapter(istream).drain());
+        req.data = StreamToSourceAdapter(istream).drain();
         req.mimeType = mimeType;
         try {
             getFileTransfer()->upload(req);
@@ -159,9 +166,14 @@ protected:
     }
 
     void getFile(const std::string & path,
-        Callback<std::shared_ptr<std::string>> callback) noexcept override
+        Callback<std::optional<std::string>> callback) noexcept override
     {
-        checkEnabled();
+        try {
+            checkEnabled();
+        } catch (...) {
+            callback.rethrow();
+            return;
+        }
 
         auto request(makeRequest(path));
 
@@ -170,10 +182,10 @@ protected:
         getFileTransfer()->enqueueFileTransfer(request,
             {[callbackPtr, this](std::future<FileTransferResult> result) {
                 try {
-                    (*callbackPtr)(result.get().data);
+                    (*callbackPtr)(std::move(result.get().data));
                 } catch (FileTransferError & e) {
                     if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
-                        return (*callbackPtr)(std::shared_ptr<std::string>());
+                        return (*callbackPtr)({});
                     maybeDisable();
                     callbackPtr->rethrow();
                 } catch (...) {
@@ -182,6 +194,18 @@ protected:
             }});
     }
 
+    /**
+     * This isn't actually necessary read only. We support "upsert" now, so we
+     * have a notion of authentication via HTTP POST/PUT.
+     *
+     * For now, we conservatively say we don't know.
+     *
+     * \todo try to expose our HTTP authentication status.
+     */
+    std::optional<TrustedFlag> isTrustedClient() override
+    {
+        return std::nullopt;
+    }
 };
 
 static RegisterStoreImplementation<HttpBinaryCacheStore, HttpBinaryCacheStoreConfig> regHttpBinaryCacheStore;

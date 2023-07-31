@@ -5,3 +5,7 @@ h1:not(:first-of-type) {
 h2 {
     margin-top: 1em;
 }
+
+.hljs-meta {
+    user-select: none;
+}

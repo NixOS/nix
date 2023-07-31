@@ -19,20 +19,20 @@ static inline std::string_view xmlQuote(std::string_view s)
 }
 
 
-static string symbolicName(const std::string & p)
+static std::string symbolicName(std::string_view p)
 {
-    return string(p, p.find('-') + 1);
+    return std::string(p.substr(0, p.find('-') + 1));
 }
 
 
-static string makeEdge(std::string_view src, std::string_view dst)
+static std::string makeEdge(std::string_view src, std::string_view dst)
 {
     return fmt("  <edge source=\"%1%\" target=\"%2%\"/>\n",
         xmlQuote(src), xmlQuote(dst));
 }
 
 
-static string makeNode(const ValidPathInfo & info)
+static std::string makeNode(const ValidPathInfo & info)
 {
     return fmt(
         "  <node id=\"%1%\">\n"
@@ -57,7 +57,7 @@ void printGraphML(ref<Store> store, StorePathSet && roots)
          << "<graphml xmlns='http://graphml.graphdrawing.org/xmlns'\n"
          << "    xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'\n"
          << "    xsi:schemaLocation='http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd'>\n"
-         << "<key id='narSize' for='node' attr.name='narSize' attr.type='int'/>"
+         << "<key id='narSize' for='node' attr.name='narSize' attr.type='long'/>"
          << "<key id='name' for='node' attr.name='name' attr.type='string'/>"
          << "<key id='type' for='node' attr.name='type' attr.type='string'/>"
          << "<graph id='G' edgedefault='directed'>\n";

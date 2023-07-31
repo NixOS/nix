@@ -5,9 +5,9 @@ namespace nix {
 
 /* ----------- tests for url.hh --------------------------------------------------*/
 
-    string print_map(std::map<string, string> m) {
-        std::map<string, string>::iterator it;
-        string s = "{ ";
+    std::string print_map(std::map<std::string, std::string> m) {
+        std::map<std::string, std::string>::iterator it;
+        std::string s = "{ ";
         for (it = m.begin(); it != m.end(); ++it) {
             s += "{ ";
             s += it->first;
@@ -99,6 +99,27 @@ namespace nix {
         ASSERT_EQ(parsed, expected);
     }
 
+    TEST(parseURL, parsesFilePlusHttpsUrl) {
+        auto s = "file+https://www.example.org/video.mp4";
+        auto parsed = parseURL(s);
+
+        ParsedURL expected {
+            .url = "file+https://www.example.org/video.mp4",
+            .base = "https://www.example.org/video.mp4",
+            .scheme = "file+https",
+            .authority = "www.example.org",
+            .path = "/video.mp4",
+            .query = (StringMap) { },
+            .fragment = "",
+        };
+
+        ASSERT_EQ(parsed, expected);
+    }
+
+    TEST(parseURL, rejectsAuthorityInUrlsWithFileTransportation) {
+        auto s = "file://www.example.org/video.mp4";
+        ASSERT_THROW(parseURL(s), Error);
+    }
 
     TEST(parseURL, parseIPv4Address) {
         auto s = "http://127.0.0.1:8080/file.tar.gz?download=fast&when=now#hello";
@@ -115,6 +136,24 @@ namespace nix {
         };
 
         ASSERT_EQ(parsed, expected);
+    }
+
+    TEST(parseURL, parseScopedRFC4007IPv6Address) {
+        auto s = "http://[fe80::818c:da4d:8975:415c\%enp0s25]:8080";
+        auto parsed = parseURL(s);
+
+        ParsedURL expected {
+            .url = "http://[fe80::818c:da4d:8975:415c\%enp0s25]:8080",
+            .base = "http://[fe80::818c:da4d:8975:415c\%enp0s25]:8080",
+            .scheme = "http",
+            .authority = "[fe80::818c:da4d:8975:415c\%enp0s25]:8080",
+            .path = "",
+            .query = (StringMap) { },
+            .fragment = "",
+        };
+
+        ASSERT_EQ(parsed, expected);
+
     }
 
     TEST(parseURL, parseIPv6Address) {
@@ -160,7 +199,7 @@ namespace nix {
     }
 
     TEST(parseURL, parseFileURLWithQueryAndFragment) {
-        auto s = "file:///none/of/your/business";
+        auto s = "file:///none/of//your/business";
         auto parsed = parseURL(s);
 
         ParsedURL expected {
@@ -168,7 +207,7 @@ namespace nix {
             .base = "",
             .scheme = "file",
             .authority = "",
-            .path = "/none/of/your/business",
+            .path = "/none/of//your/business",
             .query = (StringMap) { },
             .fragment = "",
         };
@@ -244,21 +283,54 @@ namespace nix {
      * --------------------------------------------------------------------------*/
 
     TEST(percentDecode, decodesUrlEncodedString) {
-        string s = "==@==";
-        string d = percentDecode("%3D%3D%40%3D%3D");
+        std::string s = "==@==";
+        std::string d = percentDecode("%3D%3D%40%3D%3D");
         ASSERT_EQ(d, s);
     }
 
     TEST(percentDecode, multipleDecodesAreIdempotent) {
-        string once = percentDecode("%3D%3D%40%3D%3D");
-        string twice = percentDecode(once);
+        std::string once = percentDecode("%3D%3D%40%3D%3D");
+        std::string twice = percentDecode(once);
 
         ASSERT_EQ(once, twice);
     }
 
     TEST(percentDecode, trailingPercent) {
-        string s = "==@==%";
-        string d = percentDecode("%3D%3D%40%3D%3D%25");
+        std::string s = "==@==%";
+        std::string d = percentDecode("%3D%3D%40%3D%3D%25");
+
+        ASSERT_EQ(d, s);
+    }
+
+
+    /* ----------------------------------------------------------------------------
+     * percentEncode
+     * --------------------------------------------------------------------------*/
+
+    TEST(percentEncode, encodesUrlEncodedString) {
+        std::string s = percentEncode("==@==");
+        std::string d = "%3D%3D%40%3D%3D";
+        ASSERT_EQ(d, s);
+    }
+
+    TEST(percentEncode, keepArgument) {
+        std::string a = percentEncode("abd / def");
+        std::string b = percentEncode("abd / def", "/");
+        ASSERT_EQ(a, "abd%20%2F%20def");
+        ASSERT_EQ(b, "abd%20/%20def");
+    }
+
+    TEST(percentEncode, inverseOfDecode) {
+        std::string original = "%3D%3D%40%3D%3D";
+        std::string once = percentEncode(original);
+        std::string back = percentDecode(once);
+
+        ASSERT_EQ(back, original);
+    }
+
+    TEST(percentEncode, trailingPercent) {
+        std::string s = percentEncode("==@==%");
+        std::string d = "%3D%3D%40%3D%3D%25";
 
         ASSERT_EQ(d, s);
     }

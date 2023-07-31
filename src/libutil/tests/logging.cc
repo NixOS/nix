@@ -336,7 +336,7 @@ namespace nix {
 
         ASSERT_STREQ(
             hintfmt("only one arg %1% %2%", "fulfilled").str().c_str(),
-            "only one arg " ANSI_YELLOW "fulfilled" ANSI_NORMAL " ");
+            "only one arg " ANSI_WARNING "fulfilled" ANSI_NORMAL " ");
 
     }
 
@@ -344,7 +344,7 @@ namespace nix {
 
         ASSERT_STREQ(
             hintfmt("what about this %1% %2%", "%3%", "one", "two").str().c_str(),
-            "what about this " ANSI_YELLOW "%3%" ANSI_NORMAL " " ANSI_YELLOW "one" ANSI_NORMAL);
+            "what about this " ANSI_WARNING "%3%" ANSI_NORMAL " " ANSI_YELLOW "one" ANSI_NORMAL);
 
     }
 
@@ -359,7 +359,7 @@ namespace nix {
 
       // constructing without access violation.
       ErrPos ep(invalid);
-    
+
       // assignment without access violation.
       ep = invalid;
 

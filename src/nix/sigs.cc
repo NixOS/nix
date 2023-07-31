@@ -27,7 +27,7 @@ struct CmdCopySigs : StorePathsCommand
         return "copy store path signatures from substituters";
     }
 
-    void run(ref<Store> store, StorePaths storePaths) override
+    void run(ref<Store> store, StorePaths && storePaths) override
     {
         if (substituterUris.empty())
             throw UsageError("you must specify at least one substituter using '-s'");
@@ -45,7 +45,7 @@ struct CmdCopySigs : StorePathsCommand
         //logger->setExpected(doneLabel, storePaths.size());
 
         auto doPath = [&](const Path & storePathS) {
-            //Activity act(*logger, lvlInfo, format("getting signatures for '%s'") % storePath);
+            //Activity act(*logger, lvlInfo, "getting signatures for '%s'", storePath);
 
             checkInterrupt();
 
@@ -113,7 +113,7 @@ struct CmdSign : StorePathsCommand
         return "sign store paths";
     }
 
-    void run(ref<Store> store, StorePaths storePaths) override
+    void run(ref<Store> store, StorePaths && storePaths) override
     {
         if (secretKeyFile.empty())
             throw UsageError("you must specify a secret key file using '-k'");
@@ -173,7 +173,7 @@ struct CmdKeyGenerateSecret : Command
         if (!keyName)
             throw UsageError("required argument '--key-name' is missing");
 
-        std::cout << SecretKey::generate(*keyName).to_string();
+        writeFull(STDOUT_FILENO, SecretKey::generate(*keyName).to_string());
     }
 };
 
@@ -194,7 +194,7 @@ struct CmdKeyConvertSecretToPublic : Command
     void run() override
     {
         SecretKey secretKey(drainFD(STDIN_FILENO));
-        std::cout << secretKey.toPublicKey().to_string();
+        writeFull(STDOUT_FILENO, secretKey.toPublicKey().to_string());
     }
 };
 
@@ -218,9 +218,7 @@ struct CmdKey : NixMultiCommand
     void run() override
     {
         if (!command)
-            throw UsageError("'nix flake' requires a sub-command.");
-        settings.requireExperimentalFeature("flakes");
-        command->second->prepare();
+            throw UsageError("'nix key' requires a sub-command.");
         command->second->run();
     }
 };

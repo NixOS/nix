@@ -9,7 +9,7 @@ namespace nix {
 static Strings parseAttrPath(std::string_view s)
 {
     Strings res;
-    string cur;
+    std::string cur;
     auto i = s.begin();
     while (i != s.end()) {
         if (*i == '.') {
@@ -19,7 +19,7 @@ static Strings parseAttrPath(std::string_view s)
             ++i;
             while (1) {
                 if (i == s.end())
-                    throw Error("missing closing quote in selection path '%1%'", s);
+                    throw ParseError("missing closing quote in selection path '%1%'", s);
                 if (*i == '"') break;
                 cur.push_back(*i++);
             }
@@ -41,13 +41,13 @@ std::vector<Symbol> parseAttrPath(EvalState & state, std::string_view s)
 }
 
 
-std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attrPath,
+std::pair<Value *, PosIdx> findAlongAttrPath(EvalState & state, const std::string & attrPath,
     Bindings & autoArgs, Value & vIn)
 {
     Strings tokens = parseAttrPath(attrPath);
 
     Value * v = &vIn;
-    Pos pos = noPos;
+    PosIdx pos = noPos;
 
     for (auto & attr : tokens) {
 
@@ -58,7 +58,7 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
         Value * vNew = state.allocValue();
         state.autoCallFunction(autoArgs, *v, *vNew);
         v = vNew;
-        state.forceValue(*v);
+        state.forceValue(*v, noPos);
 
         /* It should evaluate to either a set or an expression,
            according to what is specified in the attrPath. */
@@ -74,10 +74,16 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
                 throw Error("empty attribute name in selection path '%1%'", attrPath);
 
             Bindings::iterator a = v->attrs->find(state.symbols.create(attr));
-            if (a == v->attrs->end())
-                throw AttrPathNotFound("attribute '%1%' in selection path '%2%' not found", attr, attrPath);
+            if (a == v->attrs->end()) {
+                std::set<std::string> attrNames;
+                for (auto & attr : *v->attrs)
+                    attrNames.insert(state.symbols[attr.name]);
+
+                auto suggestions = Suggestions::bestMatches(attrNames, attr);
+                throw AttrPathNotFound(suggestions, "attribute '%1%' in selection path '%2%' not found", attr, attrPath);
+            }
             v = &*a->value;
-            pos = *a->pos;
+            pos = a->pos;
         }
 
         else {
@@ -100,7 +106,7 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
 }
 
 
-Pos findDerivationFilename(EvalState & state, Value & v, std::string what)
+std::pair<SourcePath, uint32_t> findPackageFilename(EvalState & state, Value & v, std::string what)
 {
     Value * v2;
     try {
@@ -112,23 +118,25 @@ Pos findDerivationFilename(EvalState & state, Value & v, std::string what)
 
     // FIXME: is it possible to extract the Pos object instead of doing this
     //        toString + parsing?
-    auto pos = state.forceString(*v2);
+    NixStringContext context;
+    auto path = state.coerceToPath(noPos, *v2, context, "while evaluating the 'meta.position' attribute of a derivation");
 
-    auto colon = pos.rfind(':');
-    if (colon == std::string::npos)
-        throw Error("cannot parse meta.position attribute '%s'", pos);
+    auto fn = path.path.abs();
 
-    std::string filename(pos, 0, colon);
-    unsigned int lineno;
+    auto fail = [fn]() {
+        throw ParseError("cannot parse 'meta.position' attribute '%s'", fn);
+    };
+
     try {
-        lineno = std::stoi(std::string(pos, colon + 1));
+        auto colon = fn.rfind(':');
+        if (colon == std::string::npos) fail();
+        std::string filename(fn, 0, colon);
+        auto lineno = std::stoi(std::string(fn, colon + 1, std::string::npos));
+        return {CanonPath(fn.substr(0, colon)), lineno};
     } catch (std::invalid_argument & e) {
-        throw Error("cannot parse line number '%s'", pos);
+        fail();
+        abort();
     }
-
-    Symbol file = state.symbols.create(filename);
-
-    return { foFile, file, lineno, 0 };
 }
 
 

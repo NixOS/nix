@@ -15,6 +15,7 @@
 #include "crypto.hh"
 
 #include <sodium.h>
+#include <nlohmann/json.hpp>
 
 
 using namespace nix;
@@ -25,8 +26,7 @@ static ref<Store> store()
     static std::shared_ptr<Store> _store;
     if (!_store) {
         try {
-            loadConfFile();
-            settings.lockCPU = false;
+            initLibStore();
             _store = openStore();
         } catch (Error & e) {
             croak("%s", e.what());
@@ -119,6 +119,18 @@ SV * queryPathInfo(char * path, int base32)
         } catch (Error & e) {
             croak("%s", e.what());
         }
+
+SV * queryRawRealisation(char * outputId)
+    PPCODE:
+      try {
+        auto realisation = store()->queryRealisation(DrvOutput::parse(outputId));
+        if (realisation)
+            XPUSHs(sv_2mortal(newSVpv(realisation->toJSON().dump().c_str(), 0)));
+        else
+            XPUSHs(sv_2mortal(newSVpv("", 0)));
+      } catch (Error & e) {
+        croak("%s", e.what());
+      }
 
 
 SV * queryPathFromHashPart(char * hashPart)
@@ -227,7 +239,7 @@ SV * convertHash(char * algo, char * s, int toBase32)
     PPCODE:
         try {
             auto h = Hash::parseAny(s, parseHashType(algo));
-            string s = h.to_string(toBase32 ? Base32 : Base16, false);
+            auto s = h.to_string(toBase32 ? Base32 : Base16, false);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());
@@ -281,7 +293,11 @@ SV * makeFixedOutputPath(int recursive, char * algo, char * hash, char * name)
         try {
             auto h = Hash::parseAny(hash, parseHashType(algo));
             auto method = recursive ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
-            auto path = store()->makeFixedOutputPath(method, h, name);
+            auto path = store()->makeFixedOutputPath(name, FixedOutputInfo {
+                .method = method,
+                .hash = h,
+                .references = {},
+            });
             XPUSHs(sv_2mortal(newSVpv(store()->printStorePath(path).c_str(), 0)));
         } catch (Error & e) {
             croak("%s", e.what());

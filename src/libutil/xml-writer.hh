@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <iostream>
 #include <string>
@@ -8,12 +9,8 @@
 
 namespace nix {
 
-using std::string;
-using std::map;
-using std::list;
 
-
-typedef map<string, string> XMLAttrs;
+typedef std::map<std::string, std::string> XMLAttrs;
 
 
 class XMLWriter
@@ -25,7 +22,7 @@ private:
     bool indent;
     bool closed;
 
-    list<string> pendingElems;
+    std::list<std::string> pendingElems;
 
 public:
 
@@ -34,11 +31,11 @@ public:
 
     void close();
 
-    void openElement(const string & name,
+    void openElement(std::string_view name,
         const XMLAttrs & attrs = XMLAttrs());
     void closeElement();
 
-    void writeEmptyElement(const string & name,
+    void writeEmptyElement(std::string_view name,
         const XMLAttrs & attrs = XMLAttrs());
 
 private:
@@ -53,7 +50,7 @@ class XMLOpenElement
 private:
     XMLWriter & writer;
 public:
-    XMLOpenElement(XMLWriter & writer, const string & name,
+    XMLOpenElement(XMLWriter & writer, std::string_view name,
         const XMLAttrs & attrs = XMLAttrs())
         : writer(writer)
     {

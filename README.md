@@ -20,15 +20,16 @@ Information on additional installation methods is available on the [Nix download
 
 ## Building And Developing
 
-See our [Hacking guide](https://hydra.nixos.org/job/nix/master/build.x86_64-linux/latest/download-by-type/doc/manual/contributing/hacking.html) in our manual for instruction on how to
-build nix from source with nix-build or how to get a development environment.
+See our [Hacking guide](https://nixos.org/manual/nix/unstable/contributing/hacking.html) in our manual for instruction on how to
+to set up a development environment and build Nix from source.
 
 ## Additional Resources
 
 - [Nix manual](https://nixos.org/nix/manual)
 - [Nix jobsets on hydra.nixos.org](https://hydra.nixos.org/project/nix)
 - [NixOS Discourse](https://discourse.nixos.org/)
-- [IRC - #nixos on freenode.net](irc://irc.freenode.net/#nixos)
+- [Matrix - #nix:nixos.org](https://matrix.to/#/#nix:nixos.org)
+- [IRC - #nixos on libera.chat](irc://irc.libera.chat/#nixos)
 
 ## License
 

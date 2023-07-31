@@ -7,7 +7,7 @@ std::regex flakeRegex("[a-zA-Z][a-zA-Z0-9_-]*", std::regex::ECMAScript);
 
 struct IndirectInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url) override
+    std::optional<Input> inputFromURL(const ParsedURL & url) const override
     {
         if (url.scheme != "flake") return {};
 
@@ -50,7 +50,7 @@ struct IndirectInputScheme : InputScheme
         return input;
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) override
+    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
         if (maybeGetStrAttr(attrs, "type") != "indirect") return {};
 
@@ -68,7 +68,7 @@ struct IndirectInputScheme : InputScheme
         return input;
     }
 
-    ParsedURL toURL(const Input & input) override
+    ParsedURL toURL(const Input & input) const override
     {
         ParsedURL url;
         url.scheme = "flake";
@@ -78,7 +78,7 @@ struct IndirectInputScheme : InputScheme
         return url;
     }
 
-    bool hasAllInfo(const Input & input) override
+    bool hasAllInfo(const Input & input) const override
     {
         return false;
     }
@@ -86,7 +86,7 @@ struct IndirectInputScheme : InputScheme
     Input applyOverrides(
         const Input & _input,
         std::optional<std::string> ref,
-        std::optional<Hash> rev) override
+        std::optional<Hash> rev) const override
     {
         auto input(_input);
         if (rev) input.attrs.insert_or_assign("rev", rev->gitRev());
@@ -94,7 +94,7 @@ struct IndirectInputScheme : InputScheme
         return input;
     }
 
-    std::pair<Tree, Input> fetch(ref<Store> store, const Input & input) override
+    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
     {
         throw Error("indirect input '%s' cannot be fetched directly", input.to_string());
     }

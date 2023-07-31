@@ -1,12 +1,14 @@
+#pragma once
+///@file
+
 #include <cassert>
 #include <map>
 #include <set>
 
-#include "types.hh"
-
 #include <nlohmann/json_fwd.hpp>
 
-#pragma once
+#include "types.hh"
+#include "experimental-features.hh"
 
 namespace nix {
 
@@ -71,9 +73,9 @@ public:
     /**
      * Adds the currently known settings to the given result map `res`.
      * - res: map to store settings in
-     * - overridenOnly: when set to true only overridden settings will be added to `res`
+     * - overriddenOnly: when set to true only overridden settings will be added to `res`
      */
-    virtual void getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly = false) = 0;
+    virtual void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) = 0;
 
     /**
      * Parses the configuration in `contents` and applies it
@@ -91,13 +93,19 @@ public:
     /**
      * Resets the `overridden` flag of all Settings
      */
-    virtual void resetOverriden() = 0;
+    virtual void resetOverridden() = 0;
 
     /**
      * Outputs all settings to JSON
      * - out: JSONObject to write the configuration to
      */
     virtual nlohmann::json toJSON() = 0;
+
+    /**
+     * Outputs all settings in a key-value pair format suitable to be used as
+     * `nix.conf`
+     */
+    virtual std::string toKeyValue() = 0;
 
     /**
      * Converts settings to `Args` to be used on the command line interface
@@ -117,21 +125,21 @@ public:
     void reapplyUnknownSettings();
 };
 
-/* A class to simplify providing configuration settings. The typical
-   use is to inherit Config and add Setting<T> members:
-
-   class MyClass : private Config
-   {
-     Setting<int> foo{this, 123, "foo", "the number of foos to use"};
-     Setting<std::string> bar{this, "blabla", "bar", "the name of the bar"};
-
-     MyClass() : Config(readConfigFile("/etc/my-app.conf"))
-     {
-       std::cout << foo << "\n"; // will print 123 unless overriden
-     }
-   };
-*/
-
+/**
+ * A class to simplify providing configuration settings. The typical
+ * use is to inherit Config and add Setting<T> members:
+ *
+ * class MyClass : private Config
+ * {
+ *   Setting<int> foo{this, 123, "foo", "the number of foos to use"};
+ *   Setting<std::string> bar{this, "blabla", "bar", "the name of the bar"};
+ *
+ *   MyClass() : Config(readConfigFile("/etc/my-app.conf"))
+ *   {
+ *     std::cout << foo << "\n"; // will print 123 unless overridden
+ *   }
+ * };
+ */
 class Config : public AbstractConfig
 {
     friend class AbstractSetting;
@@ -163,11 +171,13 @@ public:
 
     void addSetting(AbstractSetting * setting);
 
-    void getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly = false) override;
+    void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) override;
 
-    void resetOverriden() override;
+    void resetOverridden() override;
 
     nlohmann::json toJSON() override;
+
+    std::string toKeyValue() override;
 
     void convertToArgs(Args & args, const std::string & category) override;
 };
@@ -184,16 +194,17 @@ public:
 
     int created = 123;
 
-    bool overriden = false;
+    bool overridden = false;
 
-    void setDefault(const std::string & str);
+    std::optional<ExperimentalFeature> experimentalFeature;
 
 protected:
 
     AbstractSetting(
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases);
+        const std::set<std::string> & aliases,
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt);
 
     virtual ~AbstractSetting()
     {
@@ -204,8 +215,11 @@ protected:
 
     virtual void set(const std::string & value, bool append = false) = 0;
 
-    virtual bool isAppendable()
-    { return false; }
+    /**
+     * Whether the type is appendable; i.e. whether the `append`
+     * parameter to `set()` is allowed to be `true`.
+     */
+    virtual bool isAppendable() = 0;
 
     virtual std::string to_string() const = 0;
 
@@ -215,10 +229,12 @@ protected:
 
     virtual void convertToArg(Args & args, const std::string & category);
 
-    bool isOverriden() const { return overriden; }
+    bool isOverridden() const { return overridden; }
 };
 
-/* A setting of type T. */
+/**
+ * A setting of type T.
+ */
 template<typename T>
 class BaseSetting : public AbstractSetting
 {
@@ -226,33 +242,75 @@ protected:
 
     T value;
     const T defaultValue;
+    const bool documentDefault;
+
+    /**
+     * Parse the string into a `T`.
+     *
+     * Used by `set()`.
+     */
+    virtual T parse(const std::string & str) const;
+
+    /**
+     * Append or overwrite `value` with `newValue`.
+     *
+     * Some types to do not support appending in which case `append`
+     * should never be passed. The default handles this case.
+     *
+     * @param append Whether to append or overwrite.
+     */
+    virtual void appendOrSet(T && newValue, bool append);
 
 public:
 
     BaseSetting(const T & def,
+        const bool documentDefault,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : AbstractSetting(name, description, aliases)
+        const std::set<std::string> & aliases = {},
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
+        : AbstractSetting(name, description, aliases, experimentalFeature)
         , value(def)
         , defaultValue(def)
+        , documentDefault(documentDefault)
     { }
 
     operator const T &() const { return value; }
     operator T &() { return value; }
     const T & get() const { return value; }
-    bool operator ==(const T & v2) const { return value == v2; }
-    bool operator !=(const T & v2) const { return value != v2; }
-    void operator =(const T & v) { assign(v); }
+    template<typename U>
+    bool operator ==(const U & v2) const { return value == v2; }
+    template<typename U>
+    bool operator !=(const U & v2) const { return value != v2; }
+    template<typename U>
+    void operator =(const U & v) { assign(v); }
     virtual void assign(const T & v) { value = v; }
+    template<typename U>
+    void setDefault(const U & v) { if (!overridden) value = v; }
 
-    void set(const std::string & str, bool append = false) override;
+    /**
+     * Require any experimental feature the setting depends on
+     *
+     * Uses `parse()` to get the value from `str`, and `appendOrSet()`
+     * to set it.
+     */
+    void set(const std::string & str, bool append = false) override final;
 
-    bool isAppendable() override;
+    /**
+     * C++ trick; This is template-specialized to compile-time indicate whether
+     * the type is appendable.
+     */
+    struct trait;
+
+    /**
+     * Always defined based on the C++ magic
+     * with `trait` above.
+     */
+    bool isAppendable() override final;
 
     virtual void override(const T & v)
     {
-        overriden = true;
+        overridden = true;
         value = v;
     }
 
@@ -281,8 +339,10 @@ public:
         const T & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : BaseSetting<T>(def, name, description, aliases)
+        const std::set<std::string> & aliases = {},
+        const bool documentDefault = true,
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
+        : BaseSetting<T>(def, documentDefault, name, description, aliases, experimentalFeature)
     {
         options->addSetting(this);
     }
@@ -290,31 +350,56 @@ public:
     void operator =(const T & v) { this->assign(v); }
 };
 
-/* A special setting for Paths. These are automatically canonicalised
-   (e.g. "/foo//bar/" becomes "/foo/bar"). */
+/**
+ * A special setting for Paths. These are automatically canonicalised
+ * (e.g. "/foo//bar/" becomes "/foo/bar").
+ *
+ * It is mandatory to specify a path; i.e. the empty string is not
+ * permitted.
+ */
 class PathSetting : public BaseSetting<Path>
 {
-    bool allowEmpty;
-
 public:
 
     PathSetting(Config * options,
-        bool allowEmpty,
         const Path & def,
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {})
-        : BaseSetting<Path>(def, name, description, aliases)
-        , allowEmpty(allowEmpty)
+        : BaseSetting<Path>(def, true, name, description, aliases)
     {
         options->addSetting(this);
     }
 
-    void set(const std::string & str, bool append = false) override;
+    Path parse(const std::string & str) const override;
 
     Path operator +(const char * p) const { return value + p; }
 
     void operator =(const Path & v) { this->assign(v); }
+};
+
+/**
+ * Like `PathSetting`, but the absence of a path is also allowed.
+ *
+ * `std::optional` is used instead of the empty string for clarity.
+ */
+class OptionalPathSetting : public BaseSetting<std::optional<Path>>
+{
+public:
+
+    OptionalPathSetting(Config * options,
+        const std::optional<Path> & def,
+        const std::string & name,
+        const std::string & description,
+        const std::set<std::string> & aliases = {})
+        : BaseSetting<std::optional<Path>>(def, true, name, description, aliases)
+    {
+        options->addSetting(this);
+    }
+
+    std::optional<Path> parse(const std::string & str) const override;
+
+    void operator =(const std::optional<Path> & v) { this->assign(v); }
 };
 
 struct GlobalConfig : public AbstractConfig
@@ -324,11 +409,13 @@ struct GlobalConfig : public AbstractConfig
 
     bool set(const std::string & name, const std::string & value) override;
 
-    void getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly = false) override;
+    void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) override;
 
-    void resetOverriden() override;
+    void resetOverridden() override;
 
     nlohmann::json toJSON() override;
+
+    std::string toKeyValue() override;
 
     void convertToArgs(Args & args, const std::string & category) override;
 
@@ -339,5 +426,53 @@ struct GlobalConfig : public AbstractConfig
 };
 
 extern GlobalConfig globalConfig;
+
+
+struct ExperimentalFeatureSettings : Config {
+
+    Setting<std::set<ExperimentalFeature>> experimentalFeatures{
+        this, {}, "experimental-features",
+        R"(
+          Experimental features that are enabled.
+
+          Example:
+
+          ```
+          experimental-features = nix-command flakes
+          ```
+
+          The following experimental features are available:
+
+          {{#include experimental-features-shortlist.md}}
+
+          Experimental features are [further documented in the manual](@docroot@/contributing/experimental-features.md).
+        )"};
+
+    /**
+     * Check whether the given experimental feature is enabled.
+     */
+    bool isEnabled(const ExperimentalFeature &) const;
+
+    /**
+     * Require an experimental feature be enabled, throwing an error if it is
+     * not.
+     */
+    void require(const ExperimentalFeature &) const;
+
+    /**
+     * `std::nullopt` pointer means no feature, which means there is nothing that could be
+     * disabled, and so the function returns true in that case.
+     */
+    bool isEnabled(const std::optional<ExperimentalFeature> &) const;
+
+    /**
+     * `std::nullopt` pointer means no feature, which means there is nothing that could be
+     * disabled, and so the function does nothing in that case.
+     */
+    void require(const std::optional<ExperimentalFeature> &) const;
+};
+
+// FIXME: don't use a global variable.
+extern ExperimentalFeatureSettings experimentalFeatureSettings;
 
 }

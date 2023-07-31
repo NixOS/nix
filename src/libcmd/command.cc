@@ -4,6 +4,7 @@
 #include "derivations.hh"
 #include "nixexpr.hh"
 #include "profiles.hh"
+#include "repl.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -54,7 +55,92 @@ void StoreCommand::run()
     run(getStore());
 }
 
-RealisedPathsCommand::RealisedPathsCommand(bool recursive)
+CopyCommand::CopyCommand()
+{
+    addFlag({
+        .longName = "from",
+        .description = "URL of the source Nix store.",
+        .labels = {"store-uri"},
+        .handler = {&srcUri},
+    });
+
+    addFlag({
+        .longName = "to",
+        .description = "URL of the destination Nix store.",
+        .labels = {"store-uri"},
+        .handler = {&dstUri},
+    });
+}
+
+ref<Store> CopyCommand::createStore()
+{
+    return srcUri.empty() ? StoreCommand::createStore() : openStore(srcUri);
+}
+
+ref<Store> CopyCommand::getDstStore()
+{
+    if (srcUri.empty() && dstUri.empty())
+        throw UsageError("you must pass '--from' and/or '--to'");
+
+    return dstUri.empty() ? openStore() : openStore(dstUri);
+}
+
+EvalCommand::EvalCommand()
+{
+    addFlag({
+        .longName = "debugger",
+        .description = "Start an interactive environment if evaluation fails.",
+        .category = MixEvalArgs::category,
+        .handler = {&startReplOnEvalErrors, true},
+    });
+}
+
+EvalCommand::~EvalCommand()
+{
+    if (evalState)
+        evalState->printStats();
+}
+
+ref<Store> EvalCommand::getEvalStore()
+{
+    if (!evalStore)
+        evalStore = evalStoreUrl ? openStore(*evalStoreUrl) : getStore();
+    return ref<Store>(evalStore);
+}
+
+ref<EvalState> EvalCommand::getEvalState()
+{
+    if (!evalState) {
+        evalState =
+            #if HAVE_BOEHMGC
+            std::allocate_shared<EvalState>(traceable_allocator<EvalState>(),
+                searchPath, getEvalStore(), getStore())
+            #else
+            std::make_shared<EvalState>(
+                searchPath, getEvalStore(), getStore())
+            #endif
+            ;
+
+        evalState->repair = repair;
+
+        if (startReplOnEvalErrors) {
+            evalState->debugRepl = &AbstractNixRepl::runSimple;
+        };
+    }
+    return ref<EvalState>(evalState);
+}
+
+MixOperateOnOptions::MixOperateOnOptions()
+{
+    addFlag({
+        .longName = "derivation",
+        .description = "Operate on the [store derivation](../../glossary.md#gloss-store-derivation) rather than its outputs.",
+        .category = installablesCategory,
+        .handler = {&operateOn, OperateOn::Derivation},
+    });
+}
+
+BuiltPathsCommand::BuiltPathsCommand(bool recursive)
     : recursive(recursive)
 {
     if (recursive)
@@ -81,71 +167,65 @@ RealisedPathsCommand::RealisedPathsCommand(bool recursive)
     });
 }
 
-void RealisedPathsCommand::run(ref<Store> store)
+void BuiltPathsCommand::run(ref<Store> store, Installables && installables)
 {
-    std::vector<RealisedPath> paths;
+    BuiltPaths paths;
     if (all) {
         if (installables.size())
             throw UsageError("'--all' does not expect arguments");
         // XXX: Only uses opaque paths, ignores all the realisations
         for (auto & p : store->queryAllValidPaths())
-            paths.push_back(p);
+            paths.push_back(BuiltPath::Opaque{p});
     } else {
-        auto pathSet = toRealisedPaths(store, realiseMode, operateOn, installables);
+        paths = Installable::toBuiltPaths(getEvalStore(), store, realiseMode, operateOn, installables);
         if (recursive) {
-            auto roots = std::move(pathSet);
-            pathSet = {};
-            RealisedPath::closure(*store, roots, pathSet);
+            // XXX: This only computes the store path closure, ignoring
+            // intermediate realisations
+            StorePathSet pathsRoots, pathsClosure;
+            for (auto & root : paths) {
+                auto rootFromThis = root.outPaths();
+                pathsRoots.insert(rootFromThis.begin(), rootFromThis.end());
+            }
+            store->computeFSClosure(pathsRoots, pathsClosure);
+            for (auto & path : pathsClosure)
+                paths.push_back(BuiltPath::Opaque{path});
         }
-        for (auto & path : pathSet)
-            paths.push_back(path);
     }
 
     run(store, std::move(paths));
 }
 
 StorePathsCommand::StorePathsCommand(bool recursive)
-    : RealisedPathsCommand(recursive)
+    : BuiltPathsCommand(recursive)
 {
 }
 
-void StorePathsCommand::run(ref<Store> store, std::vector<RealisedPath> paths)
+void StorePathsCommand::run(ref<Store> store, BuiltPaths && paths)
 {
-    StorePaths storePaths;
-    for (auto & p : paths)
-        storePaths.push_back(p.path());
+    StorePathSet storePaths;
+    for (auto & builtPath : paths)
+        for (auto & p : builtPath.outPaths())
+            storePaths.insert(p);
 
-    run(store, std::move(storePaths));
+    auto sorted = store->topoSortPaths(storePaths);
+    std::reverse(sorted.begin(), sorted.end());
+
+    run(store, std::move(sorted));
 }
 
-void StorePathCommand::run(ref<Store> store)
+void StorePathCommand::run(ref<Store> store, StorePaths && storePaths)
 {
-    auto storePaths = toStorePaths(store, Realise::Nothing, operateOn, installables);
-
     if (storePaths.size() != 1)
         throw UsageError("this command requires exactly one store path");
 
     run(store, *storePaths.begin());
 }
 
-Strings editorFor(const Pos & pos)
-{
-    auto editor = getEnv("EDITOR").value_or("cat");
-    auto args = tokenizeString<Strings>(editor);
-    if (pos.line > 0 && (
-        editor.find("emacs") != std::string::npos ||
-        editor.find("nano") != std::string::npos ||
-        editor.find("vim") != std::string::npos))
-        args.push_back(fmt("+%d", pos.line));
-    args.push_back(pos.file);
-    return args;
-}
-
 MixProfile::MixProfile()
 {
     addFlag({
         .longName = "profile",
-        .description = "The profile to update.",
+        .description = "The profile to operate on.",
         .labels = {"path"},
         .handler = {&profile},
         .completer = completePath
@@ -159,35 +239,30 @@ void MixProfile::updateProfile(const StorePath & storePath)
     if (!store) throw Error("'--profile' is not supported for this Nix store");
     auto profile2 = absPath(*profile);
     switchLink(profile2,
-        createGeneration(
-            ref<LocalFSStore>(store),
-            profile2, storePath));
+        createGeneration(*store, profile2, storePath));
 }
 
-void MixProfile::updateProfile(const Buildables & buildables)
+void MixProfile::updateProfile(const BuiltPaths & buildables)
 {
     if (!profile) return;
 
-    std::vector<StorePath> result;
+    StorePaths result;
 
     for (auto & buildable : buildables) {
         std::visit(overloaded {
-            [&](BuildableOpaque bo) {
+            [&](const BuiltPath::Opaque & bo) {
                 result.push_back(bo.path);
             },
-            [&](BuildableFromDrv bfd) {
+            [&](const BuiltPath::Built & bfd) {
                 for (auto & output : bfd.outputs) {
-                    /* Output path should be known because we just tried to
-                       build it. */
-                    assert(output.second);
-                    result.push_back(*output.second);
+                    result.push_back(output.second);
                 }
             },
-        }, buildable);
+        }, buildable.raw());
     }
 
     if (result.size() != 1)
-        throw Error("'--profile' requires that the arguments produce a single store path, but there are %d", result.size());
+        throw UsageError("'--profile' requires that the arguments produce a single store path, but there are %d", result.size());
 
     updateProfile(result[0]);
 }

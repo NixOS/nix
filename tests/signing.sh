@@ -81,9 +81,13 @@ info=$(nix path-info --store file://$cacheDir --json $outPath2)
 [[ $info =~ 'cache1.example.org' ]]
 [[ $info =~ 'cache2.example.org' ]]
 
-# Copying to a diverted store should fail due to a lack of valid signatures.
+# Copying to a diverted store should fail due to a lack of signatures by trusted keys.
 chmod -R u+w $TEST_ROOT/store0 || true
 rm -rf $TEST_ROOT/store0
+
+# Fails or very flaky only on GHA + macOS:
+#     expectStderr 1 nix copy --to $TEST_ROOT/store0 $outPath | grepQuiet -E 'cannot add path .* because it lacks a signature by a trusted key'
+# but this works:
 (! nix copy --to $TEST_ROOT/store0 $outPath)
 
 # But succeed if we supply the public keys.

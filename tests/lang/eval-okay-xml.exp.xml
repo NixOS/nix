@@ -31,9 +31,9 @@
     <attr name="f">
       <function>
         <attrspat>
-          <attr name="z" />
           <attr name="x" />
           <attr name="y" />
+          <attr name="z" />
         </attrspat>
       </function>
     </attr>

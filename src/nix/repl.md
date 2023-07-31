@@ -24,10 +24,34 @@ R""(
 * Interact with Nixpkgs in the REPL:
 
   ```console
-  # nix repl '<nixpkgs>'
+  # nix repl --file example.nix
+  Loading Installable ''...
+  Added 3 variables.
 
-  Loading '<nixpkgs>'...
-  Added 12428 variables.
+  # nix repl --expr '{a={b=3;c=4;};}'
+  Loading Installable ''...
+  Added 1 variables.
+
+  # nix repl --expr '{a={b=3;c=4;};}' a
+  Loading Installable ''...
+  Added 1 variables.
+
+  # nix repl --extra-experimental-features 'flakes repl-flake' nixpkgs
+  Loading Installable 'flake:nixpkgs#'...
+  Added 5 variables.
+
+  nix-repl> legacyPackages.x86_64-linux.emacs.name
+  "emacs-27.1"
+
+  nix-repl> legacyPackages.x86_64-linux.emacs.name
+  "emacs-27.1"
+
+  nix-repl> :q
+
+  # nix repl --expr 'import <nixpkgs>{}'
+
+  Loading Installable ''...
+  Added 12439 variables.
 
   nix-repl> emacs.name
   "emacs-27.1"
@@ -35,14 +59,17 @@ R""(
   nix-repl> emacs.drvPath
   "/nix/store/lp0sjrhgg03y2n0l10n70rg0k7hhyz0l-emacs-27.1.drv"
 
-  nix-repl> drv = runCommand "hello" { buildInputs = [ hello ]; } "hello > $out"
+  nix-repl> drv = runCommand "hello" { buildInputs = [ hello ]; } "hello; hello > $out"
 
-  nix-repl> :b x
+  nix-repl> :b drv
   this derivation produced the following outputs:
     out -> /nix/store/0njwbgwmkwls0w5dv9mpc1pq5fj39q0l-hello
 
   nix-repl> builtins.readFile drv
   "Hello, world!\n"
+
+  nix-repl> :log drv
+  Hello, world!
   ```
 
 # Description

@@ -1,11 +1,12 @@
 #include "fetchers.hh"
 #include "store-api.hh"
+#include "archive.hh"
 
 namespace nix::fetchers {
 
 struct PathInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url) override
+    std::optional<Input> inputFromURL(const ParsedURL & url) const override
     {
         if (url.scheme != "path") return {};
 
@@ -31,7 +32,7 @@ struct PathInputScheme : InputScheme
         return input;
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) override
+    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
         if (maybeGetStrAttr(attrs, "type") != "path") return {};
 
@@ -53,7 +54,7 @@ struct PathInputScheme : InputScheme
         return input;
     }
 
-    ParsedURL toURL(const Input & input) override
+    ParsedURL toURL(const Input & input) const override
     {
         auto query = attrsToQuery(input.attrs);
         query.erase("path");
@@ -65,7 +66,7 @@ struct PathInputScheme : InputScheme
         };
     }
 
-    bool hasAllInfo(const Input & input) override
+    bool hasAllInfo(const Input & input) const override
     {
         return true;
     }
@@ -80,25 +81,49 @@ struct PathInputScheme : InputScheme
         // nothing to do
     }
 
-    std::pair<Tree, Input> fetch(ref<Store> store, const Input & input) override
+    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
     {
+        Input input(_input);
+        std::string absPath;
         auto path = getStrAttr(input.attrs, "path");
 
-        // FIXME: check whether access to 'path' is allowed.
+        if (path[0] != '/') {
+            if (!input.parent)
+                throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
 
-        auto storePath = store->maybeParseStorePath(path);
+            auto parent = canonPath(*input.parent);
+
+            // the path isn't relative, prefix it
+            absPath = nix::absPath(path, parent);
+
+            // for security, ensure that if the parent is a store path, it's inside it
+            if (store->isInStore(parent)) {
+                auto storePath = store->printStorePath(store->toStorePath(parent).first);
+                if (!isDirOrInDir(absPath, storePath))
+                    throw BadStorePath("relative path '%s' points outside of its parent's store path '%s'", path, storePath);
+            }
+        } else
+            absPath = path;
+
+        Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s'", absPath));
+
+        // FIXME: check whether access to 'path' is allowed.
+        auto storePath = store->maybeParseStorePath(absPath);
 
         if (storePath)
             store->addTempRoot(*storePath);
 
-        if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath))
+        time_t mtime = 0;
+        if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath)) {
             // FIXME: try to substitute storePath.
-            storePath = store->addToStore("source", path);
+            auto src = sinkToSource([&](Sink & sink) {
+                mtime = dumpPathAndGetMtime(absPath, sink, defaultPathFilter);
+            });
+            storePath = store->addToStoreFromDump(*src, "source");
+        }
+        input.attrs.insert_or_assign("lastModified", uint64_t(mtime));
 
-        return {
-            Tree(store->toRealPath(*storePath), std::move(*storePath)),
-            input
-        };
+        return {std::move(*storePath), input};
     }
 };
 

@@ -4,7 +4,7 @@
 
 namespace nix {
 
-MixCommonArgs::MixCommonArgs(const string & programName)
+MixCommonArgs::MixCommonArgs(const std::string & programName)
     : programName(programName)
 {
     addFlag({
@@ -32,6 +32,7 @@ MixCommonArgs::MixCommonArgs(const string & programName)
     addFlag({
         .longName = "option",
         .description = "Set the Nix configuration setting *name* to *value* (overriding `nix.conf`).",
+        .category = miscCategory,
         .labels = {"name", "value"},
         .handler = {[](std::string name, std::string value) {
             try {
@@ -78,5 +79,12 @@ MixCommonArgs::MixCommonArgs(const string & programName)
 
     hiddenCategories.insert(cat);
 }
+
+void MixCommonArgs::initialFlagsProcessed()
+{
+    initPlugins();
+    pluginsInited();
+}
+
 
 }

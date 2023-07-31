@@ -4,6 +4,7 @@
 #include "globals.hh"
 
 #include <sqlite3.h>
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -38,6 +39,15 @@ create table if not exists NARs (
     foreign key (cache) references BinaryCaches(id) on delete cascade
 );
 
+create table if not exists Realisations (
+    cache integer not null,
+    outputId text not null,
+    content blob, -- Json serialisation of the realisation, or null if the realisation is absent
+    timestamp        integer not null,
+    primary key (cache, outputId),
+    foreign key (cache) references BinaryCaches(id) on delete cascade
+);
+
 create table if not exists LastPurge (
     dummy            text primary key,
     value            integer
@@ -52,6 +62,9 @@ public:
     /* How often to purge expired entries from the cache. */
     const int purgeInterval = 24 * 3600;
 
+    /* How long to cache binary cache info (i.e. /nix-cache-info) */
+    const int cacheInfoTtl = 7 * 24 * 3600;
+
     struct Cache
     {
         int id;
@@ -63,17 +76,18 @@ public:
     struct State
     {
         SQLite db;
-        SQLiteStmt insertCache, queryCache, insertNAR, insertMissingNAR, queryNAR, purgeCache;
+        SQLiteStmt insertCache, queryCache, insertNAR, insertMissingNAR,
+            queryNAR, insertRealisation, insertMissingRealisation,
+            queryRealisation, purgeCache;
         std::map<std::string, Cache> caches;
     };
 
     Sync<State> _state;
 
-    NarInfoDiskCacheImpl()
+    NarInfoDiskCacheImpl(Path dbPath = getCacheDir() + "/nix/binary-cache-v6.sqlite")
     {
         auto state(_state.lock());
 
-        Path dbPath = getCacheDir() + "/nix/binary-cache-v6.sqlite";
         createDirs(dirOf(dbPath));
 
         state->db = SQLite(dbPath);
@@ -83,10 +97,10 @@ public:
         state->db.exec(schema);
 
         state->insertCache.create(state->db,
-            "insert or replace into BinaryCaches(url, timestamp, storeDir, wantMassQuery, priority) values (?, ?, ?, ?, ?)");
+            "insert into BinaryCaches(url, timestamp, storeDir, wantMassQuery, priority) values (?1, ?2, ?3, ?4, ?5) on conflict (url) do update set timestamp = ?2, storeDir = ?3, wantMassQuery = ?4, priority = ?5 returning id;");
 
         state->queryCache.create(state->db,
-            "select id, storeDir, wantMassQuery, priority from BinaryCaches where url = ?");
+            "select id, storeDir, wantMassQuery, priority from BinaryCaches where url = ? and timestamp > ?");
 
         state->insertNAR.create(state->db,
             "insert or replace into NARs(cache, hashPart, namePart, url, compression, fileHash, fileSize, narHash, "
@@ -97,6 +111,26 @@ public:
 
         state->queryNAR.create(state->db,
             "select present, namePart, url, compression, fileHash, fileSize, narHash, narSize, refs, deriver, sigs, ca from NARs where cache = ? and hashPart = ? and ((present = 0 and timestamp > ?) or (present = 1 and timestamp > ?))");
+
+        state->insertRealisation.create(state->db,
+            R"(
+                insert or replace into Realisations(cache, outputId, content, timestamp)
+                    values (?, ?, ?, ?)
+            )");
+
+        state->insertMissingRealisation.create(state->db,
+            R"(
+                insert or replace into Realisations(cache, outputId, timestamp)
+                    values (?, ?, ?)
+            )");
+
+        state->queryRealisation.create(state->db,
+            R"(
+                select content from Realisations
+                    where cache = ? and outputId = ?  and
+                        ((content is null and timestamp > ?) or
+                         (content is not null and timestamp > ?))
+            )");
 
         /* Periodically purge expired entries from the database. */
         retrySQLite<void>([&]() {
@@ -131,38 +165,71 @@ public:
         return i->second;
     }
 
-    void createCache(const std::string & uri, const Path & storeDir, bool wantMassQuery, int priority) override
+private:
+
+    std::optional<Cache> queryCacheRaw(State & state, const std::string & uri)
     {
-        retrySQLite<void>([&]() {
+        auto i = state.caches.find(uri);
+        if (i == state.caches.end()) {
+            auto queryCache(state.queryCache.use()(uri)(time(0) - cacheInfoTtl));
+            if (!queryCache.next())
+                return std::nullopt;
+            auto cache = Cache {
+                .id = (int) queryCache.getInt(0),
+                .storeDir = queryCache.getStr(1),
+                .wantMassQuery = queryCache.getInt(2) != 0,
+                .priority = (int) queryCache.getInt(3),
+            };
+            state.caches.emplace(uri, cache);
+        }
+        return getCache(state, uri);
+    }
+
+public:
+    int createCache(const std::string & uri, const Path & storeDir, bool wantMassQuery, int priority) override
+    {
+        return retrySQLite<int>([&]() {
             auto state(_state.lock());
+            SQLiteTxn txn(state->db);
 
-            // FIXME: race
+            // To avoid the race, we have to check if maybe someone hasn't yet created
+            // the cache for this URI in the meantime.
+            auto cache(queryCacheRaw(*state, uri));
 
-            state->insertCache.use()(uri)(time(0))(storeDir)(wantMassQuery)(priority).exec();
-            assert(sqlite3_changes(state->db) == 1);
-            state->caches[uri] = Cache{(int) sqlite3_last_insert_rowid(state->db), storeDir, wantMassQuery, priority};
+            if (cache)
+                return cache->id;
+
+            Cache ret {
+                .id = -1, // set below
+                .storeDir = storeDir,
+                .wantMassQuery = wantMassQuery,
+                .priority = priority,
+            };
+
+            {
+                auto r(state->insertCache.use()(uri)(time(0))(storeDir)(wantMassQuery)(priority));
+                assert(r.next());
+                ret.id = (int) r.getInt(0);
+            }
+
+            state->caches[uri] = ret;
+
+            txn.commit();
+            return ret.id;
         });
     }
 
-    std::optional<CacheInfo> cacheExists(const std::string & uri) override
+    std::optional<CacheInfo> upToDateCacheExists(const std::string & uri) override
     {
         return retrySQLite<std::optional<CacheInfo>>([&]() -> std::optional<CacheInfo> {
             auto state(_state.lock());
-
-            auto i = state->caches.find(uri);
-            if (i == state->caches.end()) {
-                auto queryCache(state->queryCache.use()(uri));
-                if (!queryCache.next())
-                    return std::nullopt;
-                state->caches.emplace(uri,
-                    Cache{(int) queryCache.getInt(0), queryCache.getStr(1), queryCache.getInt(2) != 0, (int) queryCache.getInt(3)});
-            }
-
-            auto & cache(getCache(*state, uri));
-
+            auto cache(queryCacheRaw(*state, uri));
+            if (!cache)
+                return std::nullopt;
             return CacheInfo {
-                .wantMassQuery = cache.wantMassQuery,
-                .priority = cache.priority
+                .id = cache->id,
+                .wantMassQuery = cache->wantMassQuery,
+                .priority = cache->priority
             };
         });
     }
@@ -206,9 +273,41 @@ public:
                 narInfo->deriver = StorePath(queryNAR.getStr(9));
             for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(10), " "))
                 narInfo->sigs.insert(sig);
-            narInfo->ca = parseContentAddressOpt(queryNAR.getStr(11));
+            narInfo->ca = ContentAddress::parseOpt(queryNAR.getStr(11));
 
             return {oValid, narInfo};
+        });
+    }
+
+    std::pair<Outcome, std::shared_ptr<Realisation>> lookupRealisation(
+        const std::string & uri, const DrvOutput & id) override
+    {
+        return retrySQLite<std::pair<Outcome, std::shared_ptr<Realisation>>>(
+            [&]() -> std::pair<Outcome, std::shared_ptr<Realisation>> {
+            auto state(_state.lock());
+
+            auto & cache(getCache(*state, uri));
+
+            auto now = time(0);
+
+            auto queryRealisation(state->queryRealisation.use()
+                (cache.id)
+                (id.to_string())
+                (now - settings.ttlNegativeNarInfoCache)
+                (now - settings.ttlPositiveNarInfoCache));
+
+            if (!queryRealisation.next())
+                return {oUnknown, 0};
+
+            if (queryRealisation.isNull(0))
+                return {oInvalid, 0};
+
+            auto realisation =
+                std::make_shared<Realisation>(Realisation::fromJSON(
+                    nlohmann::json::parse(queryRealisation.getStr(0)),
+                    "Local disk cache"));
+
+            return {oValid, realisation};
         });
     }
 
@@ -251,12 +350,50 @@ public:
             }
         });
     }
+
+    void upsertRealisation(
+        const std::string & uri,
+        const Realisation & realisation) override
+    {
+        retrySQLite<void>([&]() {
+            auto state(_state.lock());
+
+            auto & cache(getCache(*state, uri));
+
+            state->insertRealisation.use()
+                (cache.id)
+                (realisation.id.to_string())
+                (realisation.toJSON().dump())
+                (time(0)).exec();
+        });
+
+    }
+
+    virtual void upsertAbsentRealisation(
+        const std::string & uri,
+        const DrvOutput & id) override
+    {
+        retrySQLite<void>([&]() {
+            auto state(_state.lock());
+
+            auto & cache(getCache(*state, uri));
+            state->insertMissingRealisation.use()
+                (cache.id)
+                (id.to_string())
+                (time(0)).exec();
+        });
+    }
 };
 
 ref<NarInfoDiskCache> getNarInfoDiskCache()
 {
     static ref<NarInfoDiskCache> cache = make_ref<NarInfoDiskCacheImpl>();
     return cache;
+}
+
+ref<NarInfoDiskCache> getTestNarInfoDiskCache(Path dbPath)
+{
+    return make_ref<NarInfoDiskCacheImpl>(dbPath);
 }
 
 }

@@ -1,8 +1,12 @@
 #pragma once
+///@file
 
 #if ENABLE_S3
 
 #include "ref.hh"
+
+#include <optional>
+#include <string>
 
 namespace Aws { namespace Client { class ClientConfiguration; } }
 namespace Aws { namespace S3 { class S3Client; } }
@@ -20,7 +24,7 @@ struct S3Helper
 
     struct FileTransferResult
     {
-        std::shared_ptr<std::string> data;
+        std::optional<std::string> data;
         unsigned int durationMs;
     };
 

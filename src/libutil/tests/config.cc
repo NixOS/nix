@@ -29,20 +29,20 @@ namespace nix {
         std::map<std::string, Config::SettingInfo> settings;
         Setting<std::string> foo{&config, value, "name-of-the-setting", "description"};
 
-        config.getSettings(settings, /* overridenOnly = */ false);
+        config.getSettings(settings, /* overriddenOnly = */ false);
         const auto iter = settings.find("name-of-the-setting");
         ASSERT_NE(iter, settings.end());
         ASSERT_EQ(iter->second.value, "");
         ASSERT_EQ(iter->second.description, "description\n");
     }
 
-    TEST(Config, getDefinedOverridenSettingNotSet) {
+    TEST(Config, getDefinedOverriddenSettingNotSet) {
         Config config;
         std::string value;
         std::map<std::string, Config::SettingInfo> settings;
         Setting<std::string> foo{&config, value, "name-of-the-setting", "description"};
 
-        config.getSettings(settings, /* overridenOnly = */ true);
+        config.getSettings(settings, /* overriddenOnly = */ true);
         const auto e = settings.find("name-of-the-setting");
         ASSERT_EQ(e, settings.end());
     }
@@ -55,7 +55,7 @@ namespace nix {
 
         setting.assign("value");
 
-        config.getSettings(settings, /* overridenOnly = */ false);
+        config.getSettings(settings, /* overriddenOnly = */ false);
         const auto iter = settings.find("name-of-the-setting");
         ASSERT_NE(iter, settings.end());
         ASSERT_EQ(iter->second.value, "value");
@@ -69,7 +69,7 @@ namespace nix {
 
         ASSERT_TRUE(config.set("name-of-the-setting", "value"));
 
-        config.getSettings(settings, /* overridenOnly = */ false);
+        config.getSettings(settings, /* overriddenOnly = */ false);
         const auto e = settings.find("name-of-the-setting");
         ASSERT_NE(e, settings.end());
         ASSERT_EQ(e->second.value, "value");
@@ -82,6 +82,7 @@ namespace nix {
             TestSetting() : AbstractSetting("test", "test", {}) {}
             void set(const std::string & value, bool append) override {}
             std::string to_string() const override { return {}; }
+            bool isAppendable() override { return false; }
         };
 
         Config config;
@@ -90,6 +91,7 @@ namespace nix {
         ASSERT_FALSE(config.set("test", "value"));
         config.addSetting(&setting);
         ASSERT_TRUE(config.set("test", "value"));
+        ASSERT_FALSE(config.set("extra-test", "value"));
     }
 
     TEST(Config, withInitialValue) {
@@ -100,7 +102,7 @@ namespace nix {
 
         {
             std::map<std::string, Config::SettingInfo> settings;
-            config.getSettings(settings, /* overridenOnly = */ false);
+            config.getSettings(settings, /* overriddenOnly = */ false);
             ASSERT_EQ(settings.find("key"), settings.end());
         }
 
@@ -108,17 +110,17 @@ namespace nix {
 
         {
             std::map<std::string, Config::SettingInfo> settings;
-            config.getSettings(settings, /* overridenOnly = */ false);
+            config.getSettings(settings, /* overriddenOnly = */ false);
             ASSERT_EQ(settings["key"].value, "value");
         }
     }
 
-    TEST(Config, resetOverriden) {
+    TEST(Config, resetOverridden) {
         Config config;
-        config.resetOverriden();
+        config.resetOverridden();
     }
 
-    TEST(Config, resetOverridenWithSetting) {
+    TEST(Config, resetOverriddenWithSetting) {
         Config config;
         Setting<std::string> setting{&config, "", "name-of-the-setting", "description"};
 
@@ -127,7 +129,7 @@ namespace nix {
 
             setting.set("foo");
             ASSERT_EQ(setting.get(), "foo");
-            config.getSettings(settings, /* overridenOnly = */ true);
+            config.getSettings(settings, /* overriddenOnly = */ true);
             ASSERT_TRUE(settings.empty());
         }
 
@@ -135,18 +137,18 @@ namespace nix {
             std::map<std::string, Config::SettingInfo> settings;
 
             setting.override("bar");
-            ASSERT_TRUE(setting.overriden);
+            ASSERT_TRUE(setting.overridden);
             ASSERT_EQ(setting.get(), "bar");
-            config.getSettings(settings, /* overridenOnly = */ true);
+            config.getSettings(settings, /* overriddenOnly = */ true);
             ASSERT_FALSE(settings.empty());
         }
 
         {
             std::map<std::string, Config::SettingInfo> settings;
 
-            config.resetOverriden();
-            ASSERT_FALSE(setting.overriden);
-            config.getSettings(settings, /* overridenOnly = */ true);
+            config.resetOverridden();
+            ASSERT_FALSE(setting.overridden);
+            config.getSettings(settings, /* overriddenOnly = */ true);
             ASSERT_TRUE(settings.empty());
         }
     }
@@ -156,12 +158,54 @@ namespace nix {
     }
 
     TEST(Config, toJSONOnNonEmptyConfig) {
+        using nlohmann::literals::operator "" _json;
         Config config;
-        std::map<std::string, Config::SettingInfo> settings;
-        Setting<std::string> setting{&config, "", "name-of-the-setting", "description"};
+        Setting<std::string> setting{
+            &config,
+            "",
+            "name-of-the-setting",
+            "description",
+        };
         setting.assign("value");
 
-        ASSERT_EQ(config.toJSON().dump(), R"#({"name-of-the-setting":{"aliases":[],"defaultValue":"","description":"description\n","value":"value"}})#");
+        ASSERT_EQ(config.toJSON(),
+          R"#({
+            "name-of-the-setting": {
+              "aliases": [],
+              "defaultValue": "",
+              "description": "description\n",
+              "documentDefault": true,
+              "value": "value",
+              "experimentalFeature": null
+            }
+          })#"_json);
+    }
+
+    TEST(Config, toJSONOnNonEmptyConfigWithExperimentalSetting) {
+        using nlohmann::literals::operator "" _json;
+        Config config;
+        Setting<std::string> setting{
+            &config,
+            "",
+            "name-of-the-setting",
+            "description",
+            {},
+            true,
+            Xp::Flakes,
+        };
+        setting.assign("value");
+
+        ASSERT_EQ(config.toJSON(),
+          R"#({
+            "name-of-the-setting": {
+              "aliases": [],
+              "defaultValue": "",
+              "description": "description\n",
+              "documentDefault": true,
+              "value": "value",
+              "experimentalFeature": "flakes"
+            }
+          })#"_json);
     }
 
     TEST(Config, setSettingAlias) {

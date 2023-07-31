@@ -6,6 +6,7 @@
 #include "archive.hh"
 #include "tarfile.hh"
 #include "types.hh"
+#include "split.hh"
 
 namespace nix::fetchers {
 
@@ -13,7 +14,7 @@ DownloadFileResult downloadFile(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
-    bool immutable,
+    bool locked,
     const Headers & headers)
 {
     // FIXME: check store
@@ -31,7 +32,8 @@ DownloadFileResult downloadFile(
         return {
             .storePath = std::move(cached->storePath),
             .etag = getStrAttr(cached->infoAttrs, "etag"),
-            .effectiveUrl = getStrAttr(cached->infoAttrs, "url")
+            .effectiveUrl = getStrAttr(cached->infoAttrs, "url"),
+            .immutableUrl = maybeGetStrAttr(cached->infoAttrs, "immutableUrl"),
         };
     };
 
@@ -54,11 +56,13 @@ DownloadFileResult downloadFile(
     }
 
     // FIXME: write to temporary file.
-
     Attrs infoAttrs({
         {"etag", res.etag},
         {"url", res.effectiveUri},
     });
+
+    if (res.immutableUrl)
+        infoAttrs.emplace("immutableUrl", *res.immutableUrl);
 
     std::optional<StorePath> storePath;
 
@@ -67,18 +71,20 @@ DownloadFileResult downloadFile(
         storePath = std::move(cached->storePath);
     } else {
         StringSink sink;
-        dumpString(*res.data, sink);
-        auto hash = hashString(htSHA256, *res.data);
+        dumpString(res.data, sink);
+        auto hash = hashString(htSHA256, res.data);
         ValidPathInfo info {
-            store->makeFixedOutputPath(FileIngestionMethod::Flat, hash, name),
-            hashString(htSHA256, *sink.s),
+            *store,
+            name,
+            FixedOutputInfo {
+                .method = FileIngestionMethod::Flat,
+                .hash = hash,
+                .references = {},
+            },
+            hashString(htSHA256, sink.s),
         };
-        info.narSize = sink.s->size();
-        info.ca = FixedOutputHash {
-            .method = FileIngestionMethod::Flat,
-            .hash = hash,
-        };
-        auto source = StringSource { *sink.s };
+        info.narSize = sink.s.size();
+        auto source = StringSource { sink.s };
         store->addToStore(info, source, NoRepair, NoCheckSigs);
         storePath = std::move(info.path);
     }
@@ -88,7 +94,7 @@ DownloadFileResult downloadFile(
         inAttrs,
         infoAttrs,
         *storePath,
-        immutable);
+        locked);
 
     if (url != res.effectiveUri)
         getCache()->add(
@@ -100,20 +106,21 @@ DownloadFileResult downloadFile(
             },
             infoAttrs,
             *storePath,
-            immutable);
+            locked);
 
     return {
         .storePath = std::move(*storePath),
         .etag = res.etag,
         .effectiveUrl = res.effectiveUri,
+        .immutableUrl = res.immutableUrl,
     };
 }
 
-std::pair<Tree, time_t> downloadTarball(
+DownloadTarballResult downloadTarball(
     ref<Store> store,
     const std::string & url,
     const std::string & name,
-    bool immutable,
+    bool locked,
     const Headers & headers)
 {
     Attrs inAttrs({
@@ -126,11 +133,12 @@ std::pair<Tree, time_t> downloadTarball(
 
     if (cached && !cached->expired)
         return {
-            Tree(store->toRealPath(cached->storePath), std::move(cached->storePath)),
-            getIntAttr(cached->infoAttrs, "lastModified")
+            .tree = Tree { .actualPath = store->toRealPath(cached->storePath), .storePath = std::move(cached->storePath) },
+            .lastModified = (time_t) getIntAttr(cached->infoAttrs, "lastModified"),
+            .immutableUrl = maybeGetStrAttr(cached->infoAttrs, "immutableUrl"),
         };
 
-    auto res = downloadFile(store, url, name, immutable, headers);
+    auto res = downloadFile(store, url, name, locked, headers);
 
     std::optional<StorePath> unpackedStorePath;
     time_t lastModified;
@@ -155,81 +163,158 @@ std::pair<Tree, time_t> downloadTarball(
         {"etag", res.etag},
     });
 
+    if (res.immutableUrl)
+        infoAttrs.emplace("immutableUrl", *res.immutableUrl);
+
     getCache()->add(
         store,
         inAttrs,
         infoAttrs,
         *unpackedStorePath,
-        immutable);
+        locked);
 
     return {
-        Tree(store->toRealPath(*unpackedStorePath), std::move(*unpackedStorePath)),
-        lastModified,
+        .tree = Tree { .actualPath = store->toRealPath(*unpackedStorePath), .storePath = std::move(*unpackedStorePath) },
+        .lastModified = lastModified,
+        .immutableUrl = res.immutableUrl,
     };
 }
 
-struct TarballInputScheme : InputScheme
+// An input scheme corresponding to a curl-downloadable resource.
+struct CurlInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url) override
-    {
-        if (url.scheme != "file" && url.scheme != "http" && url.scheme != "https") return {};
+    virtual const std::string inputType() const = 0;
+    const std::set<std::string> transportUrlSchemes = {"file", "http", "https"};
 
-        if (!hasSuffix(url.path, ".zip")
-            && !hasSuffix(url.path, ".tar")
-            && !hasSuffix(url.path, ".tar.gz")
-            && !hasSuffix(url.path, ".tar.xz")
-            && !hasSuffix(url.path, ".tar.bz2"))
-            return {};
+    const bool hasTarballExtension(std::string_view path) const
+    {
+        return hasSuffix(path, ".zip") || hasSuffix(path, ".tar")
+            || hasSuffix(path, ".tgz") || hasSuffix(path, ".tar.gz")
+            || hasSuffix(path, ".tar.xz") || hasSuffix(path, ".tar.bz2")
+            || hasSuffix(path, ".tar.zst");
+    }
+
+    virtual bool isValidURL(const ParsedURL & url) const = 0;
+
+    std::optional<Input> inputFromURL(const ParsedURL & _url) const override
+    {
+        if (!isValidURL(_url))
+            return std::nullopt;
 
         Input input;
-        input.attrs.insert_or_assign("type", "tarball");
-        input.attrs.insert_or_assign("url", url.to_string());
+
+        auto url = _url;
+
+        url.scheme = parseUrlScheme(url.scheme).transport;
+
         auto narHash = url.query.find("narHash");
         if (narHash != url.query.end())
             input.attrs.insert_or_assign("narHash", narHash->second);
+
+        if (auto i = get(url.query, "rev"))
+            input.attrs.insert_or_assign("rev", *i);
+
+        if (auto i = get(url.query, "revCount"))
+            if (auto n = string2Int<uint64_t>(*i))
+                input.attrs.insert_or_assign("revCount", *n);
+
+        url.query.erase("rev");
+        url.query.erase("revCount");
+
+        input.attrs.insert_or_assign("type", inputType());
+        input.attrs.insert_or_assign("url", url.to_string());
         return input;
     }
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) override
+    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
-        if (maybeGetStrAttr(attrs, "type") != "tarball") return {};
+        auto type = maybeGetStrAttr(attrs, "type");
+        if (type != inputType()) return {};
 
+        // FIXME: some of these only apply to TarballInputScheme.
+        std::set<std::string> allowedNames = {"type", "url", "narHash", "name", "unpack", "rev", "revCount"};
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && /* name != "hash" && */ name != "narHash")
-                throw Error("unsupported tarball input attribute '%s'", name);
+            if (!allowedNames.count(name))
+                throw Error("unsupported %s input attribute '%s'", *type, name);
 
         Input input;
         input.attrs = attrs;
-        //input.immutable = (bool) maybeGetStrAttr(input.attrs, "hash");
+
+        //input.locked = (bool) maybeGetStrAttr(input.attrs, "hash");
         return input;
     }
 
-    ParsedURL toURL(const Input & input) override
+    ParsedURL toURL(const Input & input) const override
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
-        // NAR hashes are preferred over file hashes since tar/zip files
-        // don't have a canonical representation.
+        // NAR hashes are preferred over file hashes since tar/zip
+        // files don't have a canonical representation.
         if (auto narHash = input.getNarHash())
             url.query.insert_or_assign("narHash", narHash->to_string(SRI, true));
-        /*
-        else if (auto hash = maybeGetStrAttr(input.attrs, "hash"))
-            url.query.insert_or_assign("hash", Hash(*hash).to_string(SRI, true));
-        */
         return url;
     }
 
-    bool hasAllInfo(const Input & input) override
+    bool hasAllInfo(const Input & input) const override
     {
         return true;
     }
 
-    std::pair<Tree, Input> fetch(ref<Store> store, const Input & input) override
+};
+
+struct FileInputScheme : CurlInputScheme
+{
+    const std::string inputType() const override { return "file"; }
+
+    bool isValidURL(const ParsedURL & url) const override
     {
-        auto tree = downloadTarball(store, getStrAttr(input.attrs, "url"), "source", false).first;
-        return {std::move(tree), input};
+        auto parsedUrlScheme = parseUrlScheme(url.scheme);
+        return transportUrlSchemes.count(std::string(parsedUrlScheme.transport))
+            && (parsedUrlScheme.application
+                    ? parsedUrlScheme.application.value() == inputType()
+                    : !hasTarballExtension(url.path));
+    }
+
+    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
+    {
+        auto file = downloadFile(store, getStrAttr(input.attrs, "url"), input.getName(), false);
+        return {std::move(file.storePath), input};
+    }
+};
+
+struct TarballInputScheme : CurlInputScheme
+{
+    const std::string inputType() const override { return "tarball"; }
+
+    bool isValidURL(const ParsedURL & url) const override
+    {
+        auto parsedUrlScheme = parseUrlScheme(url.scheme);
+
+        return transportUrlSchemes.count(std::string(parsedUrlScheme.transport))
+            && (parsedUrlScheme.application
+                    ? parsedUrlScheme.application.value() == inputType()
+                    : hasTarballExtension(url.path));
+    }
+
+    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
+    {
+        Input input(_input);
+        auto url = getStrAttr(input.attrs, "url");
+        auto result = downloadTarball(store, url, input.getName(), false);
+
+        if (result.immutableUrl) {
+            auto immutableInput = Input::fromURL(*result.immutableUrl);
+            // FIXME: would be nice to support arbitrary flakerefs
+            // here, e.g. git flakes.
+            if (immutableInput.getType() != "tarball")
+                throw Error("tarball 'Link' headers that redirect to non-tarball URLs are not supported");
+            input = immutableInput;
+        }
+
+        return {result.tree.storePath, std::move(input)};
     }
 };
 
 static auto rTarballInputScheme = OnStartup([] { registerInputScheme(std::make_unique<TarballInputScheme>()); });
+static auto rFileInputScheme = OnStartup([] { registerInputScheme(std::make_unique<FileInputScheme>()); });
 
 }

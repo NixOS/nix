@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "eval.hh"
 
@@ -8,7 +9,7 @@ namespace nix {
 
 struct FunctionCallTrace
 {
-    const Pos & pos;
+    const Pos pos;
     FunctionCallTrace(const Pos & pos);
     ~FunctionCallTrace();
 };

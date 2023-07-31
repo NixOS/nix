@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstring>
 
+#include <openssl/crypto.h>
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 
@@ -15,7 +16,6 @@
 #include <fcntl.h>
 
 namespace nix {
-
 
 static size_t regularHashSize(HashType type) {
     switch (type) {
@@ -66,31 +66,32 @@ bool Hash::operator < (const Hash & h) const
 }
 
 
-const string base16Chars = "0123456789abcdef";
+const std::string base16Chars = "0123456789abcdef";
 
 
-static string printHash16(const Hash & hash)
+static std::string printHash16(const Hash & hash)
 {
-    char buf[hash.hashSize * 2];
+    std::string buf;
+    buf.reserve(hash.hashSize * 2);
     for (unsigned int i = 0; i < hash.hashSize; i++) {
-        buf[i * 2] = base16Chars[hash.hash[i] >> 4];
-        buf[i * 2 + 1] = base16Chars[hash.hash[i] & 0x0f];
+        buf.push_back(base16Chars[hash.hash[i] >> 4]);
+        buf.push_back(base16Chars[hash.hash[i] & 0x0f]);
     }
-    return string(buf, hash.hashSize * 2);
+    return buf;
 }
 
 
 // omitted: E O U T
-const string base32Chars = "0123456789abcdfghijklmnpqrsvwxyz";
+const std::string base32Chars = "0123456789abcdfghijklmnpqrsvwxyz";
 
 
-static string printHash32(const Hash & hash)
+static std::string printHash32(const Hash & hash)
 {
     assert(hash.hashSize);
     size_t len = hash.base32Len();
     assert(len);
 
-    string s;
+    std::string s;
     s.reserve(len);
 
     for (int n = (int) len - 1; n >= 0; n--) {
@@ -107,7 +108,7 @@ static string printHash32(const Hash & hash)
 }
 
 
-string printHash16or32(const Hash & hash)
+std::string printHash16or32(const Hash & hash)
 {
     assert(hash.type);
     return hash.to_string(hash.type == htMD5 ? Base16 : Base32, false);
@@ -130,7 +131,7 @@ std::string Hash::to_string(Base base, bool includeType) const
         break;
     case Base64:
     case SRI:
-        s += base64Encode(std::string((const char *) hash, hashSize));
+        s += base64Encode(std::string_view((const char *) hash, hashSize));
         break;
     }
     return s;
@@ -151,10 +152,11 @@ Hash Hash::parseSRI(std::string_view original) {
 }
 
 // Mutates the string to eliminate the prefixes when found
-static std::pair<std::optional<HashType>, bool> getParsedTypeAndSRI(std::string_view & rest) {
+static std::pair<std::optional<HashType>, bool> getParsedTypeAndSRI(std::string_view & rest)
+{
     bool isSRI = false;
 
-    // Parse the has type before the separater, if there was one.
+    // Parse the hash type before the separator, if there was one.
     std::optional<HashType> optParsedType;
     {
         auto hashRaw = splitPrefixTo(rest, ':');
@@ -259,7 +261,7 @@ Hash::Hash(std::string_view rest, HashType type, bool isSRI)
         throw BadHash("hash '%s' has wrong length for hash type '%s'", rest, printHashType(this->type));
 }
 
-Hash newHashAllowEmpty(std::string hashStr, std::optional<HashType> ht)
+Hash newHashAllowEmpty(std::string_view hashStr, std::optional<HashType> ht)
 {
     if (hashStr.empty()) {
         if (!ht)
@@ -341,7 +343,7 @@ HashSink::~HashSink()
     delete ctx;
 }
 
-void HashSink::write(std::string_view data)
+void HashSink::writeUnbuffered(std::string_view data)
 {
     bytes += data.size();
     update(ht, *ctx, data);
@@ -402,7 +404,7 @@ HashType parseHashType(std::string_view s)
         throw UsageError("unknown hash algorithm '%1%'", s);
 }
 
-string printHashType(HashType ht)
+std::string_view printHashType(HashType ht)
 {
     switch (ht) {
     case htMD5: return "md5";

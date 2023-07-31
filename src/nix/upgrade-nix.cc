@@ -32,9 +32,17 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         });
     }
 
+    /**
+     * This command is stable before the others
+     */
+    std::optional<ExperimentalFeature> experimentalFeature() override
+    {
+        return std::nullopt;
+    }
+
     std::string description() override
     {
-        return "upgrade Nix to the latest stable version";
+        return "upgrade Nix to the stable version declared in Nixpkgs";
     }
 
     std::string doc() override
@@ -138,13 +146,13 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         auto req = FileTransferRequest(storePathsUrl);
         auto res = getFileTransfer()->download(req);
 
-        auto state = std::make_unique<EvalState>(Strings(), store);
+        auto state = std::make_unique<EvalState>(SearchPath{}, store);
         auto v = state->allocValue();
-        state->eval(state->parseExprFromString(*res.data, "/no-such-path"), *v);
+        state->eval(state->parseExprFromString(res.data, state->rootPath(CanonPath("/no-such-path"))), *v);
         Bindings & bindings(*state->allocBindings(0));
         auto v2 = findAlongAttrPath(*state, settings.thisSystem, bindings, *v).first;
 
-        return store->parseStorePath(state->forceString(*v2));
+        return store->parseStorePath(state->forceString(*v2, noPos, "while evaluating the path tho latest nix version"));
     }
 };
 

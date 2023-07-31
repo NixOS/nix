@@ -16,7 +16,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
         writeFile(settings.netrcFile, netrcData, 0600);
     }
 
-    auto getAttr = [&](const string & name) {
+    auto getAttr = [&](const std::string & name) {
         auto i = drv.env.find(name);
         if (i == drv.env.end()) throw Error("attribute '%s' missing", name);
         return i->second;
@@ -24,7 +24,7 @@ void builtinFetchurl(const BasicDerivation & drv, const std::string & netrcData)
 
     Path storePath = getAttr("out");
     auto mainUrl = getAttr("url");
-    bool unpack = get(drv.env, "unpack").value_or("") == "1";
+    bool unpack = getOr(drv.env, "unpack", "") == "1";
 
     /* Note: have to use a fresh fileTransfer here because we're in
        a forked process. */

@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "get-drvs.hh"
 
@@ -8,6 +9,6 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv);
 
 bool createUserEnv(EvalState & state, DrvInfos & elems,
     const Path & profile, bool keepDerivations,
-    const string & lockToken);
+    const std::string & lockToken);
 
 }

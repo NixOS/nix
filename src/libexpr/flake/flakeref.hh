@@ -1,8 +1,10 @@
 #pragma once
+///@file
 
 #include "types.hh"
 #include "hash.hh"
 #include "fetchers.hh"
+#include "outputs-spec.hh"
 
 #include <variant>
 
@@ -12,7 +14,8 @@ class Store;
 
 typedef std::string FlakeId;
 
-/* A flake reference specifies how to fetch a flake or raw source
+/**
+ * A flake reference specifies how to fetch a flake or raw source
  * (e.g. from a Git repository).  It is created from a URL-like syntax
  * (e.g. 'github:NixOS/patchelf'), an attrset representation (e.g. '{
  * type="github"; owner = "NixOS"; repo = "patchelf"; }'), or a local
@@ -27,18 +30,21 @@ typedef std::string FlakeId;
  * object that fetcher generates (usually via
  * FlakeRef::fromAttrs(attrs) or parseFlakeRef(url) calls).
  *
- * The actual fetch not have been performed yet (i.e. a FlakeRef may
+ * The actual fetch may not have been performed yet (i.e. a FlakeRef may
  * be lazy), but the fetcher can be invoked at any time via the
  * FlakeRef to ensure the store is populated with this input.
  */
-
 struct FlakeRef
 {
-    /* fetcher-specific representation of the input, sufficient to
-       perform the fetch operation. */
+    /**
+     * Fetcher-specific representation of the input, sufficient to
+     * perform the fetch operation.
+     */
     fetchers::Input input;
 
-    /* sub-path within the fetched input that represents this input */
+    /**
+     * sub-path within the fetched input that represents this input
+     */
     Path subdir;
 
     bool operator==(const FlakeRef & other) const;
@@ -62,15 +68,28 @@ struct FlakeRef
 std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);
 
 FlakeRef parseFlakeRef(
-    const std::string & url, const std::optional<Path> & baseDir = {}, bool allowMissing = false);
+    const std::string & url,
+    const std::optional<Path> & baseDir = {},
+    bool allowMissing = false,
+    bool isFlake = true);
 
 std::optional<FlakeRef> maybeParseFlake(
     const std::string & url, const std::optional<Path> & baseDir = {});
 
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
-    const std::string & url, const std::optional<Path> & baseDir = {}, bool allowMissing = false);
+    const std::string & url,
+    const std::optional<Path> & baseDir = {},
+    bool allowMissing = false,
+    bool isFlake = true);
 
 std::optional<std::pair<FlakeRef, std::string>> maybeParseFlakeRefWithFragment(
     const std::string & url, const std::optional<Path> & baseDir = {});
+
+std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragmentAndExtendedOutputsSpec(
+    const std::string & url,
+    const std::optional<Path> & baseDir = {},
+    bool allowMissing = false,
+    bool isFlake = true);
+
 
 }

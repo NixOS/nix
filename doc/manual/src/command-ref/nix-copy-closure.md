@@ -30,26 +30,28 @@ Since `nix-copy-closure` calls `ssh`, you may be asked to type in the
 appropriate password or passphrase.  In fact, you may be asked _twice_
 because `nix-copy-closure` currently connects twice to the remote
 machine, first to get the set of paths missing on the target machine,
-and second to send the dump of those paths.  If this bothers you, use
-`ssh-agent`.
+and second to send the dump of those paths.  When using public key
+authentication, you can avoid typing the passphrase with `ssh-agent`.
 
 # Options
 
-  - `--to`  
+  - `--to`\
     Copy the closure of _paths_ from the local Nix store to the Nix
     store on _machine_. This is the default.
 
-  - `--from`  
+  - `--from`\
     Copy the closure of _paths_ from the Nix store on _machine_ to the
     local Nix store.
 
-  - `--gzip`  
+  - `--gzip`\
     Enable compression of the SSH connection.
 
-  - `--include-outputs`  
-    Also copy the outputs of store derivations included in the closure.
+  - `--include-outputs`\
+    Also copy the outputs of [store derivation]s included in the closure.
 
-  - `--use-substitutes` / `-s`  
+    [store derivation]: ../glossary.md#gloss-store-derivation
+
+  - `--use-substitutes` / `-s`\
     Attempt to download missing paths on the target machine using Nix’s
     substitute mechanism.  Any paths that cannot be substituted on the
     target are still copied normally from the source.  This is useful,
@@ -58,14 +60,18 @@ and second to send the dump of those paths.  If this bothers you, use
     `nixos.org` (the default binary cache server) is
     fast.
 
-  - `-v`  
+  - `-v`\
     Show verbose output.
+
+{{#include ./opt-common.md}}
 
 # Environment variables
 
-  - `NIX_SSHOPTS`  
+  - `NIX_SSHOPTS`\
     Additional options to be passed to `ssh` on the command
     line.
+
+{{#include ./env-common.md}}
 
 # Examples
 
@@ -81,5 +87,5 @@ environment:
 ```console
 $ nix-copy-closure --from alice@itchy.labs \
     /nix/store/0dj0503hjxy5mbwlafv1rsbdiyx1gkdy-subversion-1.4.4
-$ nix-env -i /nix/store/0dj0503hjxy5mbwlafv1rsbdiyx1gkdy-subversion-1.4.4
+$ nix-env --install /nix/store/0dj0503hjxy5mbwlafv1rsbdiyx1gkdy-subversion-1.4.4
 ```

@@ -40,12 +40,12 @@ struct S3Error : public Error
 /* Helper: given an Outcome<R, E>, return R in case of success, or
    throw an exception in case of an error. */
 template<typename R, typename E>
-R && checkAws(const FormatOrString & fs, Aws::Utils::Outcome<R, E> && outcome)
+R && checkAws(std::string_view s, Aws::Utils::Outcome<R, E> && outcome)
 {
     if (!outcome.IsSuccess())
         throw S3Error(
             outcome.GetError().GetErrorType(),
-            fs.s + ": " + outcome.GetError().GetMessage());
+            s + ": " + outcome.GetError().GetMessage());
     return outcome.GetResultWithOwnership();
 }
 
@@ -87,7 +87,11 @@ static void initAWS()
     });
 }
 
-S3Helper::S3Helper(const string & profile, const string & region, const string & scheme, const string & endpoint)
+S3Helper::S3Helper(
+    const std::string & profile,
+    const std::string & region,
+    const std::string & scheme,
+    const std::string & endpoint)
     : config(makeConfig(region, scheme, endpoint))
     , client(make_ref<Aws::S3::S3Client>(
             profile == ""
@@ -121,7 +125,10 @@ class RetryStrategy : public Aws::Client::DefaultRetryStrategy
     }
 };
 
-ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(const string & region, const string & scheme, const string & endpoint)
+ref<Aws::Client::ClientConfiguration> S3Helper::makeConfig(
+    const std::string & region,
+    const std::string & scheme,
+    const std::string & endpoint)
 {
     initAWS();
     auto res = make_ref<Aws::Client::ClientConfiguration>();
@@ -185,19 +192,72 @@ S3BinaryCacheStore::S3BinaryCacheStore(const Params & params)
 struct S3BinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
 {
     using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
-    const Setting<std::string> profile{(StoreConfig*) this, "", "profile", "The name of the AWS configuration profile to use."};
-    const Setting<std::string> region{(StoreConfig*) this, Aws::Region::US_EAST_1, "region", {"aws-region"}};
-    const Setting<std::string> scheme{(StoreConfig*) this, "", "scheme", "The scheme to use for S3 requests, https by default."};
-    const Setting<std::string> endpoint{(StoreConfig*) this, "", "endpoint", "An optional override of the endpoint to use when talking to S3."};
-    const Setting<std::string> narinfoCompression{(StoreConfig*) this, "", "narinfo-compression", "compression method for .narinfo files"};
-    const Setting<std::string> lsCompression{(StoreConfig*) this, "", "ls-compression", "compression method for .ls files"};
-    const Setting<std::string> logCompression{(StoreConfig*) this, "", "log-compression", "compression method for log/* files"};
+
+    const Setting<std::string> profile{(StoreConfig*) this, "", "profile",
+        R"(
+          The name of the AWS configuration profile to use. By default
+          Nix will use the `default` profile.
+        )"};
+
+    const Setting<std::string> region{(StoreConfig*) this, Aws::Region::US_EAST_1, "region",
+        R"(
+          The region of the S3 bucket. If your bucket is not in
+          `us–east-1`, you should always explicitly specify the region
+          parameter.
+        )"};
+
+    const Setting<std::string> scheme{(StoreConfig*) this, "", "scheme",
+        R"(
+          The scheme used for S3 requests, `https` (default) or `http`. This
+          option allows you to disable HTTPS for binary caches which don't
+          support it.
+
+          > **Note**
+          > 
+          > HTTPS should be used if the cache might contain sensitive
+          > information.
+        )"};
+
+    const Setting<std::string> endpoint{(StoreConfig*) this, "", "endpoint",
+        R"(
+          The URL of the endpoint of an S3-compatible service such as MinIO.
+          Do not specify this setting if you're using Amazon S3.
+
+          > **Note**
+          > 
+          > This endpoint must support HTTPS and will use path-based
+          > addressing instead of virtual host based addressing.
+        )"};
+
+    const Setting<std::string> narinfoCompression{(StoreConfig*) this, "", "narinfo-compression",
+        "Compression method for `.narinfo` files."};
+
+    const Setting<std::string> lsCompression{(StoreConfig*) this, "", "ls-compression",
+        "Compression method for `.ls` files."};
+
+    const Setting<std::string> logCompression{(StoreConfig*) this, "", "log-compression",
+        R"(
+          Compression method for `log/*` files. It is recommended to
+          use a compression method supported by most web browsers
+          (e.g. `brotli`).
+        )"};
+
     const Setting<bool> multipartUpload{
-        (StoreConfig*) this, false, "multipart-upload", "whether to use multi-part uploads"};
+        (StoreConfig*) this, false, "multipart-upload",
+        "Whether to use multi-part uploads."};
+
     const Setting<uint64_t> bufferSize{
-        (StoreConfig*) this, 5 * 1024 * 1024, "buffer-size", "size (in bytes) of each part in multi-part uploads"};
+        (StoreConfig*) this, 5 * 1024 * 1024, "buffer-size",
+        "Size (in bytes) of each part in multi-part uploads."};
 
     const std::string name() override { return "S3 Binary Cache Store"; }
+
+    std::string doc() override
+    {
+        return
+          #include "s3-binary-cache-store.md"
+          ;
+    }
 };
 
 struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual S3BinaryCacheStore
@@ -209,7 +269,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     S3Helper s3Helper;
 
     S3BinaryCacheStoreImpl(
-        const std::string & scheme,
+        const std::string & uriScheme,
         const std::string & bucketName,
         const Params & params)
         : StoreConfig(params)
@@ -231,9 +291,9 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
     void init() override
     {
-        if (auto cacheInfo = diskCache->cacheExists(getUri())) {
-            wantMassQuery.setDefault(cacheInfo->wantMassQuery ? "true" : "false");
-            priority.setDefault(fmt("%d", cacheInfo->priority));
+        if (auto cacheInfo = diskCache->upToDateCacheExists(getUri())) {
+            wantMassQuery.setDefault(cacheInfo->wantMassQuery);
+            priority.setDefault(cacheInfo->priority);
         } else {
             BinaryCacheStore::init();
             diskCache->createCache(getUri(), storeDir, wantMassQuery, priority);
@@ -385,7 +445,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         auto compress = [&](std::string compression)
         {
             auto compressed = nix::compress(compression, StreamToSourceAdapter(istream).drain());
-            return std::make_shared<std::stringstream>(std::move(*compressed));
+            return std::make_shared<std::stringstream>(std::move(compressed));
         };
 
         if (narinfoCompression != "" && hasSuffix(path, ".narinfo"))
@@ -423,9 +483,9 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         std::string marker;
 
         do {
-            debug(format("listing bucket 's3://%s' from key '%s'...") % bucketName % marker);
+            debug("listing bucket 's3://%s' from key '%s'...", bucketName, marker);
 
-            auto res = checkAws(format("AWS error listing bucket '%s'") % bucketName,
+            auto res = checkAws(fmt("AWS error listing bucket '%s'", bucketName),
                 s3Helper.client->ListObjects(
                     Aws::S3::Model::ListObjectsRequest()
                     .WithBucket(bucketName)
@@ -434,8 +494,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
 
             auto & contents = res.GetContents();
 
-            debug(format("got %d keys, next marker '%s'")
-                % contents.size() % res.GetNextMarker());
+            debug("got %d keys, next marker '%s'",
+                contents.size(), res.GetNextMarker());
 
             for (auto object : contents) {
                 auto & key = object.GetKey();
@@ -447,6 +507,16 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         } while (!marker.empty());
 
         return paths;
+    }
+
+    /**
+     * For now, we conservatively say we don't know.
+     *
+     * \todo try to expose our S3 authentication status.
+     */
+    std::optional<TrustedFlag> isTrustedClient() override
+    {
+        return std::nullopt;
     }
 
     static std::set<std::string> uriSchemes() { return {"s3"}; }

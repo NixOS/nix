@@ -12,14 +12,14 @@ machine is accessible via SSH and that it has Nix installed. You can
 test whether connecting to the remote Nix instance works, e.g.
 
 ```console
-$ nix ping-store --store ssh://mac
+$ nix store ping --store ssh://mac
 ```
 
 will try to connect to the machine named `mac`. It is possible to
 specify an SSH identity file as part of the remote store URI, e.g.
 
 ```console
-$ nix ping-store --store ssh://mac?ssh-key=/home/alice/my-key
+$ nix store ping --store ssh://mac?ssh-key=/home/alice/my-key
 ```
 
 Since builds should be non-interactive, the key should not have a
@@ -37,12 +37,10 @@ then you need to ensure that the `PATH` of non-interactive login shells
 contains Nix.
 
 > **Warning**
-> 
-> If you are building via the Nix daemon, it is the Nix daemon user
-> account (that is, `root`) that should have SSH access to the remote
-> machine. If you can’t or don’t want to configure `root` to be able to
-> access to remote machine, you can use a private Nix store instead by
-> passing e.g. `--store ~/my-nix`.
+>
+> If you are building via the Nix daemon, it is the Nix daemon user account (that is, `root`) that should have SSH access to a user (not necessarily `root`) on the remote machine.
+>
+> If you can’t or don’t want to configure `root` to be able to access the remote machine, you can use a private Nix store instead by passing e.g. `--store ~/my-nix` when running a Nix command from the local machine.
 
 The list of remote machines can be specified on the command line or in
 the Nix configuration file. The former is convenient for testing. For
@@ -52,9 +50,9 @@ example, the following command allows you to build a derivation for
 ```console
 $ uname
 Linux
-    
-$ nix build \
-  '(with import <nixpkgs> { system = "x86_64-darwin"; }; runCommand "foo" {} "uname > $out")' \
+
+$ nix build --impure \
+  --expr '(with import <nixpkgs> { system = "x86_64-darwin"; }; runCommand "foo" {} "uname > $out")' \
   --builders 'ssh://mac x86_64-darwin'
 [1/0/1 built, 0.0 MiB DL] building foo on ssh://mac
 
@@ -103,14 +101,18 @@ default, set it to `-`.
     ```nix
     requiredSystemFeatures = [ "kvm" ];
     ```
-    
+
     will cause the build to be performed on a machine that has the `kvm`
     feature.
 
 7.  A comma-separated list of *mandatory features*. A machine will only
     be used to build a derivation if all of the machine’s mandatory
     features appear in the derivation’s `requiredSystemFeatures`
-    attribute..
+    attribute.
+
+8.  The (base64-encoded) public host key of the remote machine. If omitted, SSH
+    will use its regular known-hosts file. Specifically, the field is calculated
+    via `base64 -w0 /etc/ssh/ssh_host_ed25519_key.pub`.
 
 For example, the machine specification
 

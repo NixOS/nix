@@ -1,10 +1,14 @@
 #pragma once
+///@file
 
 #include "types.hh"
+#include "hash.hh"
 
 #include <variant>
 
 #include <nlohmann/json_fwd.hpp>
+
+#include <optional>
 
 namespace nix::fetchers {
 

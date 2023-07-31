@@ -1,93 +1,113 @@
 #include "primops.hh"
 #include "eval-inline.hh"
 
-#include "../../cpptoml/cpptoml.h"
+#include "../../toml11/toml.hpp"
+
+#include <sstream>
 
 namespace nix {
 
-static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Value & v)
+static void prim_fromTOML(EvalState & state, const PosIdx pos, Value * * args, Value & val)
 {
-    using namespace cpptoml;
+    auto toml = state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.fromTOML");
 
-    auto toml = state.forceStringNoCtx(*args[0], pos);
+    std::istringstream tomlStream(std::string{toml});
 
-    std::istringstream tomlStream(toml);
+    std::function<void(Value &, toml::value)> visit;
 
-    std::function<void(Value &, std::shared_ptr<base>)> visit;
+    visit = [&](Value & v, toml::value t) {
 
-    visit = [&](Value & v, std::shared_ptr<base> t) {
+        switch(t.type())
+        {
+            case toml::value_t::table:
+                {
+                    auto table = toml::get<toml::table>(t);
 
-        if (auto t2 = t->as_table()) {
+                    size_t size = 0;
+                    for (auto & i : table) { (void) i; size++; }
 
-            size_t size = 0;
-            for (auto & i : *t2) { (void) i; size++; }
+                    auto attrs = state.buildBindings(size);
 
-            state.mkAttrs(v, size);
+                    for(auto & elem : table)
+                        visit(attrs.alloc(elem.first), elem.second);
 
-            for (auto & i : *t2) {
-                auto & v2 = *state.allocAttr(v, state.symbols.create(i.first));
-
-                if (auto i2 = i.second->as_table_array()) {
-                    size_t size2 = i2->get().size();
-                    state.mkList(v2, size2);
-                    for (size_t j = 0; j < size2; ++j)
-                        visit(*(v2.listElems()[j] = state.allocValue()), i2->get()[j]);
+                    v.mkAttrs(attrs);
                 }
-                else
-                    visit(v2, i.second);
-            }
+                break;;
+            case toml::value_t::array:
+                {
+                    auto array = toml::get<std::vector<toml::value>>(t);
 
-            v.attrs->sort();
+                    size_t size = array.size();
+                    state.mkList(v, size);
+                    for (size_t i = 0; i < size; ++i)
+                        visit(*(v.listElems()[i] = state.allocValue()), array[i]);
+                }
+                break;;
+            case toml::value_t::boolean:
+                v.mkBool(toml::get<bool>(t));
+                break;;
+            case toml::value_t::integer:
+                v.mkInt(toml::get<int64_t>(t));
+                break;;
+            case toml::value_t::floating:
+                v.mkFloat(toml::get<NixFloat>(t));
+                break;;
+            case toml::value_t::string:
+                v.mkString(toml::get<std::string>(t));
+                break;;
+            case toml::value_t::local_datetime:
+            case toml::value_t::offset_datetime:
+            case toml::value_t::local_date:
+            case toml::value_t::local_time:
+                {
+                    if (experimentalFeatureSettings.isEnabled(Xp::ParseTomlTimestamps)) {
+                        auto attrs = state.buildBindings(2);
+                        attrs.alloc("_type").mkString("timestamp");
+                        std::ostringstream s;
+                        s << t;
+                        attrs.alloc("value").mkString(s.str());
+                        v.mkAttrs(attrs);
+                    } else {
+                        throw std::runtime_error("Dates and times are not supported");
+                    }
+                }
+                break;;
+            case toml::value_t::empty:
+                v.mkNull();
+                break;;
+
         }
-
-        else if (auto t2 = t->as_array()) {
-            size_t size = t2->get().size();
-
-            state.mkList(v, size);
-
-            for (size_t i = 0; i < size; ++i)
-                visit(*(v.listElems()[i] = state.allocValue()), t2->get()[i]);
-        }
-
-        // Handle cases like 'a = [[{ a = true }]]', which IMHO should be
-        // parsed as a array containing an array containing a table,
-        // but instead are parsed as an array containing a table array
-        // containing a table.
-        else if (auto t2 = t->as_table_array()) {
-            size_t size = t2->get().size();
-
-            state.mkList(v, size);
-
-            for (size_t j = 0; j < size; ++j)
-                visit(*(v.listElems()[j] = state.allocValue()), t2->get()[j]);
-        }
-
-        else if (t->is_value()) {
-            if (auto val = t->as<int64_t>())
-                mkInt(v, val->get());
-            else if (auto val = t->as<NixFloat>())
-                mkFloat(v, val->get());
-            else if (auto val = t->as<bool>())
-                mkBool(v, val->get());
-            else if (auto val = t->as<std::string>())
-                mkString(v, val->get());
-            else
-                throw EvalError("unsupported value type in TOML");
-        }
-
-        else abort();
     };
 
     try {
-        visit(v, parser(tomlStream).parse());
-    } catch (std::runtime_error & e) {
+        visit(val, toml::parse(tomlStream, "fromTOML" /* the "filename" */));
+    } catch (std::exception & e) { // TODO: toml::syntax_error
         throw EvalError({
             .msg = hintfmt("while parsing a TOML string: %s", e.what()),
-            .errPos = pos
+            .errPos = state.positions[pos]
         });
     }
 }
 
-static RegisterPrimOp primop_fromTOML("fromTOML", 1, prim_fromTOML);
+static RegisterPrimOp primop_fromTOML({
+    .name = "fromTOML",
+    .args = {"e"},
+    .doc = R"(
+      Convert a TOML string to a Nix value. For example,
+
+      ```nix
+      builtins.fromTOML ''
+        x=1
+        s="a"
+        [table]
+        y=2
+      ''
+      ```
+
+      returns the value `{ s = "a"; table = { y = 2; }; x = 1; }`.
+    )",
+    .fun = prim_fromTOML
+});
 
 }

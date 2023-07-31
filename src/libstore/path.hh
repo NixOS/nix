@@ -1,21 +1,33 @@
 #pragma once
+///@file
 
-#include "content-address.hh"
+#include <string_view>
+
 #include "types.hh"
 
 namespace nix {
 
-class Store;
 struct Hash;
 
+/**
+ * \ref StorePath "Store path" is the fundamental reference type of Nix.
+ * A store paths refers to a Store object.
+ *
+ * See glossary.html#gloss-store-path for more information on a
+ * conceptual level.
+ */
 class StorePath
 {
     std::string baseName;
 
 public:
 
-    /* Size of the hash part of store paths, in base-32 characters. */
+    /**
+     * Size of the hash part of store paths, in base-32 characters.
+     */
     constexpr static size_t HashLen = 32; // i.e. 160 bits
+
+    constexpr static size_t MaxPathLen = 211;
 
     StorePath() = delete;
 
@@ -43,8 +55,9 @@ public:
         return baseName != other.baseName;
     }
 
-    /* Check whether a file name ends with the extension for
-       derivations. */
+    /**
+     * Check whether a file name ends with the extension for derivations.
+     */
     bool isDerivation() const;
 
     std::string_view name() const
@@ -58,26 +71,18 @@ public:
     }
 
     static StorePath dummy;
+
+    static StorePath random(std::string_view name);
 };
 
 typedef std::set<StorePath> StorePathSet;
 typedef std::vector<StorePath> StorePaths;
-typedef std::map<string, StorePath> OutputPathMap;
 
-typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
-
-/* Extension of derivations in the Nix store. */
+/**
+ * The file extension of \ref Derivation derivations when serialized
+ * into store objects.
+ */
 const std::string drvExtension = ".drv";
-
-struct StorePathWithOutputs
-{
-    StorePath path;
-    std::set<std::string> outputs;
-
-    std::string to_string(const Store & store) const;
-};
-
-std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s);
 
 }
 

@@ -27,21 +27,41 @@ static std::string filterPrintable(const std::string & s)
     return res;
 }
 
-struct CmdWhyDepends : SourceExprCommand
+struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
 {
     std::string _package, _dependency;
     bool all = false;
+    bool precise = false;
 
     CmdWhyDepends()
     {
-        expectArg("package", &_package);
-        expectArg("dependency", &_dependency);
+        expectArgs({
+            .label = "package",
+            .handler = {&_package},
+            .completer = {[&](size_t, std::string_view prefix) {
+                completeInstallable(prefix);
+            }}
+        });
+
+        expectArgs({
+            .label = "dependency",
+            .handler = {&_dependency},
+            .completer = {[&](size_t, std::string_view prefix) {
+                completeInstallable(prefix);
+            }}
+        });
 
         addFlag({
             .longName = "all",
             .shortName = 'a',
             .description = "Show all edges in the dependency graph leading from *package* to *dependency*, rather than just a shortest path.",
             .handler = {&all, true},
+        });
+
+        addFlag({
+            .longName = "precise",
+            .description = "For each edge in the dependency graph, show the files in the parent that cause the dependency.",
+            .handler = {&precise, true},
         });
     }
 
@@ -62,20 +82,37 @@ struct CmdWhyDepends : SourceExprCommand
     void run(ref<Store> store) override
     {
         auto package = parseInstallable(store, _package);
-        auto packagePath = toStorePath(store, Realise::Outputs, operateOn, package);
+        auto packagePath = Installable::toStorePath(getEvalStore(), store, Realise::Outputs, operateOn, package);
+
+        /* We don't need to build `dependency`. We try to get the store
+         * path if it's already known, and if not, then it's not a dependency.
+         *
+         * Why? If `package` does depends on `dependency`, then getting the
+         * store path of `package` above necessitated having the store path
+         * of `dependency`. The contrapositive is, if the store path of
+         * `dependency` is not already known at this point (i.e. it's a CA
+         * derivation which hasn't been built), then `package` did not need it
+         * to build.
+         */
         auto dependency = parseInstallable(store, _dependency);
-        auto dependencyPath = toStorePath(store, Realise::Derivation, operateOn, dependency);
-        auto dependencyPathHash = dependencyPath.hashPart();
+        auto optDependencyPath = [&]() -> std::optional<StorePath> {
+            try {
+                return {Installable::toStorePath(getEvalStore(), store, Realise::Derivation, operateOn, dependency)};
+            } catch (MissingRealisation &) {
+                return std::nullopt;
+            }
+        }();
 
         StorePathSet closure;
         store->computeFSClosure({packagePath}, closure, false, false);
 
-        if (!closure.count(dependencyPath)) {
-            printError("'%s' does not depend on '%s'",
-                store->printStorePath(packagePath),
-                store->printStorePath(dependencyPath));
+        if (!optDependencyPath.has_value() || !closure.count(*optDependencyPath)) {
+            printError("'%s' does not depend on '%s'", package->what(), dependency->what());
             return;
         }
+
+        auto dependencyPath = *optDependencyPath;
+        auto dependencyPathHash = dependencyPath.hashPart();
 
         stopProgressBar(); // FIXME
 
@@ -137,26 +174,28 @@ struct CmdWhyDepends : SourceExprCommand
            closure (i.e., that have a non-infinite distance to
            'dependency'). Print every edge on a path between `package`
            and `dependency`. */
-        std::function<void(Node &, const string &, const string &)> printNode;
+        std::function<void(Node &, const std::string &, const std::string &)> printNode;
 
         struct BailOut { };
 
-        printNode = [&](Node & node, const string & firstPad, const string & tailPad) {
+        printNode = [&](Node & node, const std::string & firstPad, const std::string & tailPad) {
             auto pathS = store->printStorePath(node.path);
 
             assert(node.dist != inf);
-            logger->cout("%s%s%s%s" ANSI_NORMAL,
-                firstPad,
-                node.visited ? "\e[38;5;244m" : "",
-                firstPad != "" ? "→ " : "",
-                pathS);
+            if (precise) {
+                logger->cout("%s%s%s%s" ANSI_NORMAL,
+                    firstPad,
+                    node.visited ? "\e[38;5;244m" : "",
+                    firstPad != "" ? "→ " : "",
+                    pathS);
+            }
 
             if (node.path == dependencyPath && !all
                 && packagePath != dependencyPath)
                 throw BailOut();
 
             if (node.visited) return;
-            node.visited = true;
+            if (precise) node.visited = true;
 
             /* Sort the references by distance to `dependency` to
                ensure that the shortest path is printed first. */
@@ -224,9 +263,8 @@ struct CmdWhyDepends : SourceExprCommand
 
             // FIXME: should use scanForReferences().
 
-            visitPath(pathS);
+            if (precise) visitPath(pathS);
 
-            RunPager pager;
             for (auto & ref : refs) {
                 std::string hash(ref.second->path.hashPart());
 
@@ -240,13 +278,27 @@ struct CmdWhyDepends : SourceExprCommand
                     if (!all) break;
                 }
 
+                if (!precise) {
+                    auto pathS = store->printStorePath(ref.second->path);
+                    logger->cout("%s%s%s%s" ANSI_NORMAL,
+                        firstPad,
+                        ref.second->visited ? "\e[38;5;244m" : "",
+                        last ? treeLast : treeConn,
+                        pathS);
+                    node.visited = true;
+                }
+
                 printNode(*ref.second,
                     tailPad + (last ? treeNull : treeLine),
                     tailPad + (last ? treeNull : treeLine));
             }
         };
 
+        RunPager pager;
         try {
+            if (!precise) {
+                logger->cout("%s", store->printStorePath(graph.at(packagePath).path));
+            }
             printNode(graph.at(packagePath), "", "");
         } catch (BailOut & ) { }
     }

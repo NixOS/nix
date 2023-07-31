@@ -26,7 +26,7 @@ static void makeWritable(const Path & path)
 struct MakeReadOnly
 {
     Path path;
-    MakeReadOnly(const Path & path) : path(path) { }
+    MakeReadOnly(const PathView path) : path(path) { }
     ~MakeReadOnly()
     {
         try {
@@ -55,7 +55,7 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
     }
     if (errno) throw SysError("reading directory '%1%'", linksDir);
 
-    printMsg(lvlTalkative, format("loaded %1% hash inodes") % inodeHash.size());
+    printMsg(lvlTalkative, "loaded %1% hash inodes", inodeHash.size());
 
     return inodeHash;
 }
@@ -73,11 +73,11 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
         checkInterrupt();
 
         if (inodeHash.count(dirent->d_ino)) {
-            debug(format("'%1%' is already linked") % dirent->d_name);
+            debug("'%1%' is already linked", dirent->d_name);
             continue;
         }
 
-        string name = dirent->d_name;
+        std::string name = dirent->d_name;
         if (name == "." || name == "..") continue;
         names.push_back(name);
     }
@@ -88,7 +88,7 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
 
 
 void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
-    const Path & path, InodeHash & inodeHash)
+    const Path & path, InodeHash & inodeHash, RepairFlag repair)
 {
     checkInterrupt();
 
@@ -102,7 +102,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
 
     if (std::regex_search(path, std::regex("\\.app/Contents/.+$")))
     {
-        debug(format("'%1%' is not allowed to be linked in macOS") % path);
+        debug("'%1%' is not allowed to be linked in macOS", path);
         return;
     }
 #endif
@@ -110,7 +110,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectoryIgnoringInodes(path, inodeHash);
         for (auto & i : names)
-            optimisePath_(act, stats, path + "/" + i, inodeHash);
+            optimisePath_(act, stats, path + "/" + i, inodeHash, repair);
         return;
     }
 
@@ -146,12 +146,25 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
        contents of the symlink (i.e. the result of readlink()), not
        the contents of the target (which may not even exist). */
     Hash hash = hashPath(htSHA256, path).first;
-    debug(format("'%1%' has hash '%2%'") % path % hash.to_string(Base32, true));
+    debug("'%1%' has hash '%2%'", path, hash.to_string(Base32, true));
 
     /* Check if this is a known hash. */
     Path linkPath = linksDir + "/" + hash.to_string(Base32, false);
 
- retry:
+    /* Maybe delete the link, if it has been corrupted. */
+    if (pathExists(linkPath)) {
+        auto stLink = lstat(linkPath);
+        if (st.st_size != stLink.st_size
+            || (repair && hash != hashPath(htSHA256, linkPath).first))
+        {
+            // XXX: Consider overwriting linkPath with our valid version.
+            warn("removing corrupted link '%s'", linkPath);
+            warn("There may be more corrupted paths."
+                 "\nYou should run `nix-store --verify --check-contents --repair` to fix them all");
+            unlink(linkPath.c_str());
+        }
+    }
+
     if (!pathExists(linkPath)) {
         /* Nope, create a hard link in the links directory. */
         if (link(path.c_str(), linkPath.c_str()) == 0) {
@@ -183,30 +196,24 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     auto stLink = lstat(linkPath);
 
     if (st.st_ino == stLink.st_ino) {
-        debug(format("'%1%' is already linked to '%2%'") % path % linkPath);
+        debug("'%1%' is already linked to '%2%'", path, linkPath);
         return;
     }
 
-    if (st.st_size != stLink.st_size) {
-        warn("removing corrupted link '%s'", linkPath);
-        unlink(linkPath.c_str());
-        goto retry;
-    }
-
-    printMsg(lvlTalkative, format("linking '%1%' to '%2%'") % path % linkPath);
+    printMsg(lvlTalkative, "linking '%1%' to '%2%'", path, linkPath);
 
     /* Make the containing directory writable, but only if it's not
        the store itself (we don't want or need to mess with its
        permissions). */
-    bool mustToggle = dirOf(path) != realStoreDir;
-    if (mustToggle) makeWritable(dirOf(path));
+    const Path dirOfPath(dirOf(path));
+    bool mustToggle = dirOfPath != realStoreDir.get();
+    if (mustToggle) makeWritable(dirOfPath);
 
     /* When we're done, make the directory read-only again and reset
        its timestamp back to 0. */
-    MakeReadOnly makeReadOnly(mustToggle ? dirOf(path) : "");
+    MakeReadOnly makeReadOnly(mustToggle ? dirOfPath : "");
 
-    Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
-        % realStoreDir % getpid() % random()).str();
+    Path tempLink = fmt("%1%/.tmp-link-%2%-%3%", realStoreDir, getpid(), random());
 
     if (link(linkPath.c_str(), tempLink.c_str()) == -1) {
         if (errno == EMLINK) {
@@ -214,14 +221,16 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
                systems).  This is likely to happen with empty files.
                Just shrug and ignore. */
             if (st.st_size)
-                printInfo(format("'%1%' has maximum number of links") % linkPath);
+                printInfo("'%1%' has maximum number of links", linkPath);
             return;
         }
         throw SysError("cannot link '%1%' to '%2%'", tempLink, linkPath);
     }
 
     /* Atomically replace the old file with the new hard link. */
-    if (rename(tempLink.c_str(), path.c_str()) == -1) {
+    try {
+        renameFile(tempLink, path);
+    } catch (SysError & e) {
         if (unlink(tempLink.c_str()) == -1)
             printError("unable to unlink '%1%'", tempLink);
         if (errno == EMLINK) {
@@ -232,7 +241,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
             debug("'%s' has reached maximum number of links", linkPath);
             return;
         }
-        throw SysError("cannot rename '%1%' to '%2%'", tempLink, path);
+        throw;
     }
 
     stats.filesLinked++;
@@ -260,7 +269,7 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
         if (!isValidPath(i)) continue; /* path was GC'ed, probably */
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
-            optimisePath_(&act, stats, realStoreDir + "/" + std::string(i.to_string()), inodeHash);
+            optimisePath_(&act, stats, realStoreDir + "/" + std::string(i.to_string()), inodeHash, NoRepair);
         }
         done++;
         act.progress(done, paths.size());
@@ -278,12 +287,12 @@ void LocalStore::optimiseStore()
         stats.filesLinked);
 }
 
-void LocalStore::optimisePath(const Path & path)
+void LocalStore::optimisePath(const Path & path, RepairFlag repair)
 {
     OptimiseStats stats;
     InodeHash inodeHash;
 
-    if (settings.autoOptimiseStore) optimisePath_(nullptr, stats, path, inodeHash);
+    if (settings.autoOptimiseStore) optimisePath_(nullptr, stats, path, inodeHash, repair);
 }
 
 

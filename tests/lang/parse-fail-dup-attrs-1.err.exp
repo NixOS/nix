@@ -1,0 +1,7 @@
+error: attribute 'x' already defined at «stdin»:1:3
+
+       at «stdin»:3:3:
+
+            2|   y = 456;
+            3|   x = 789;
+             |   ^

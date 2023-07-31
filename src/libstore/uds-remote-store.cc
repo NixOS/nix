@@ -1,4 +1,5 @@
 #include "uds-remote-store.hh"
+#include "worker-protocol.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -13,6 +14,14 @@
 
 namespace nix {
 
+std::string UDSRemoteStoreConfig::doc()
+{
+    return
+        #include "uds-remote-store.md"
+        ;
+}
+
+
 UDSRemoteStore::UDSRemoteStore(const Params & params)
     : StoreConfig(params)
     , LocalFSStoreConfig(params)
@@ -26,9 +35,9 @@ UDSRemoteStore::UDSRemoteStore(const Params & params)
 
 
 UDSRemoteStore::UDSRemoteStore(
-        const std::string scheme,
-        std::string socket_path,
-        const Params & params)
+    const std::string scheme,
+    std::string socket_path,
+    const Params & params)
     : UDSRemoteStore(params)
 {
     path.emplace(socket_path);
@@ -45,30 +54,20 @@ std::string UDSRemoteStore::getUri()
 }
 
 
+void UDSRemoteStore::Connection::closeWrite()
+{
+    shutdown(fd.get(), SHUT_WR);
+}
+
+
 ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
 {
     auto conn = make_ref<Connection>();
 
     /* Connect to a daemon that does the privileged work for us. */
-    conn->fd = socket(PF_UNIX, SOCK_STREAM
-        #ifdef SOCK_CLOEXEC
-        | SOCK_CLOEXEC
-        #endif
-        , 0);
-    if (!conn->fd)
-        throw SysError("cannot create Unix domain socket");
-    closeOnExec(conn->fd.get());
+    conn->fd = createUnixDomainSocket();
 
-    string socketPath = path ? *path : settings.nixDaemonSocketFile;
-
-    struct sockaddr_un addr;
-    addr.sun_family = AF_UNIX;
-    if (socketPath.size() + 1 >= sizeof(addr.sun_path))
-        throw Error("socket path '%1%' is too long", socketPath);
-    strcpy(addr.sun_path, socketPath.c_str());
-
-    if (::connect(conn->fd.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
-        throw SysError("cannot connect to daemon at '%1%'", socketPath);
+    nix::connect(conn->fd.get(), path ? *path : settings.nixDaemonSocketFile);
 
     conn->from.fd = conn->fd.get();
     conn->to.fd = conn->fd.get();
@@ -76,6 +75,15 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     conn->startTime = std::chrono::steady_clock::now();
 
     return conn;
+}
+
+
+void UDSRemoteStore::addIndirectRoot(const Path & path)
+{
+    auto conn(getConnection());
+    conn->to << WorkerProto::Op::AddIndirectRoot << path;
+    conn.processStderr();
+    readInt(conn->from);
 }
 
 

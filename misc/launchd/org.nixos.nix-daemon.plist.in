@@ -4,8 +4,6 @@
   <dict>
     <key>EnvironmentVariables</key>
     <dict>
-      <key>NIX_SSL_CERT_FILE</key>
-      <string>/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt</string>
       <key>OBJC_DISABLE_INITIALIZE_FORK_SAFETY</key>
       <string>YES</string>
     </dict>
@@ -19,11 +17,16 @@
     <array>
       <string>/bin/sh</string>
       <string>-c</string>
-      <string>/bin/wait4path /nix/var/nix/profiles/default/bin/nix-daemon &amp;&amp; /nix/var/nix/profiles/default/bin/nix-daemon</string>
+      <string>/bin/wait4path /nix/var/nix/profiles/default/bin/nix-daemon &amp;&amp; exec /nix/var/nix/profiles/default/bin/nix-daemon</string>
     </array>
     <key>StandardErrorPath</key>
     <string>/var/log/nix-daemon.log</string>
     <key>StandardOutPath</key>
     <string>/dev/null</string>
+    <key>SoftResourceLimits</key>
+    <dict>
+      <key>NumberOfFiles</key>
+      <integer>1048576</integer>
+    </dict>
   </dict>
 </plist>

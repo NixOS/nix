@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <iostream>
 #include <map>
@@ -12,18 +13,28 @@ namespace nix {
 
 enum HashType : char;
 
+class MultiCommand;
+
 class Args
 {
 public:
 
-    /* Parse the command line, throwing a UsageError if something goes
-       wrong. */
+    /**
+     * Parse the command line, throwing a UsageError if something goes
+     * wrong.
+     */
     void parseCmdline(const Strings & cmdline);
 
-    /* Return a short one-line description of the command. */
+    /**
+     * Return a short one-line description of the command.
+     */
     virtual std::string description() { return ""; }
 
-    /* Return documentation about this command, in Markdown format. */
+    virtual bool forceImpureByDefault() { return false; }
+
+    /**
+     * Return documentation about this command, in Markdown format.
+     */
     virtual std::string doc() { return ""; }
 
 protected:
@@ -89,6 +100,14 @@ protected:
               })
             , arity(1)
         { }
+
+        template<class I>
+        Handler(std::optional<I> * dest)
+            : fun([=](std::vector<std::string> ss) {
+                *dest = string2IntWithUnitPrefix<I>(ss[0]);
+            })
+            , arity(1)
+        { }
     };
 
     /* Options. */
@@ -97,12 +116,15 @@ protected:
         typedef std::shared_ptr<Flag> ptr;
 
         std::string longName;
+        std::set<std::string> aliases;
         char shortName = 0;
         std::string description;
         std::string category;
         Strings labels;
         Handler handler;
         std::function<void(size_t, std::string_view)> completer;
+
+        std::optional<ExperimentalFeature> experimentalFeature;
 
         static Flag mkHashTypeFlag(std::string && longName, HashType * ht);
         static Flag mkHashTypeOptFlag(std::string && longName, std::optional<HashType> * oht);
@@ -131,17 +153,34 @@ protected:
 
     std::set<std::string> hiddenCategories;
 
+    /**
+     * Called after all command line flags before the first non-flag
+     * argument (if any) have been processed.
+     */
+    virtual void initialFlagsProcessed() {}
+
+    /**
+     * Called after the command line has been processed if we need to generate
+     * completions. Useful for commands that need to know the whole command line
+     * in order to know what completions to generate.
+     */
+    virtual void completionHook() { }
+
 public:
 
     void addFlag(Flag && flag);
+
+    void removeFlag(const std::string & longName);
 
     void expectArgs(ExpectedArg && arg)
     {
         expectedArgs.emplace_back(std::move(arg));
     }
 
-    /* Expect a string argument. */
-    void expectArg(const std::string & label, string * dest, bool optional = false)
+    /**
+     * Expect a string argument.
+     */
+    void expectArg(const std::string & label, std::string * dest, bool optional = false)
     {
         expectArgs({
             .label = label,
@@ -150,7 +189,9 @@ public:
         });
     }
 
-    /* Expect 0 or more arguments. */
+    /**
+     * Expect 0 or more arguments.
+     */
     void expectArgs(const std::string & label, std::vector<std::string> * dest)
     {
         expectArgs({
@@ -162,38 +203,60 @@ public:
     virtual nlohmann::json toJSON();
 
     friend class MultiCommand;
+
+    MultiCommand * parent = nullptr;
+
+private:
+
+    /**
+     * Experimental features needed when parsing args. These are checked
+     * after flag parsing is completed in order to support enabling
+     * experimental features coming after the flag that needs the
+     * experimental feature.
+     */
+    std::set<ExperimentalFeature> flagExperimentalFeatures;
 };
 
-/* A command is an argument parser that can be executed by calling its
-   run() method. */
-struct Command : virtual Args
+/**
+ * A command is an argument parser that can be executed by calling its
+ * run() method.
+ */
+struct Command : virtual public Args
 {
     friend class MultiCommand;
 
     virtual ~Command() { }
 
-    virtual void prepare() { };
+    /**
+     * Entry point to the command
+     */
     virtual void run() = 0;
 
     typedef int Category;
 
     static constexpr Category catDefault = 0;
 
+    virtual std::optional<ExperimentalFeature> experimentalFeature ();
+
     virtual Category category() { return catDefault; }
 };
 
 typedef std::map<std::string, std::function<ref<Command>()>> Commands;
 
-/* An argument parser that supports multiple subcommands,
-   i.e. ‘<command> <subcommand>’. */
-class MultiCommand : virtual Args
+/**
+ * An argument parser that supports multiple subcommands,
+ * i.e. ‘<command> <subcommand>’.
+ */
+class MultiCommand : virtual public Args
 {
 public:
     Commands commands;
 
     std::map<Command::Category, std::string> categories;
 
-    // Selected command, if any.
+    /**
+     * Selected command, if any.
+     */
     std::optional<std::pair<std::string, ref<Command>>> command;
 
     MultiCommand(const Commands & commands);
@@ -201,6 +264,8 @@ public:
     bool processFlag(Strings::iterator & pos, Strings::iterator end) override;
 
     bool processArgs(const Strings & args, bool finish) override;
+
+    void completionHook() override;
 
     nlohmann::json toJSON() override;
 };
@@ -218,9 +283,13 @@ public:
     void add(std::string completion, std::string description = "");
 };
 extern std::shared_ptr<Completions> completions;
-extern bool pathCompletions;
 
-std::optional<std::string> needsCompletion(std::string_view s);
+enum CompletionType {
+    ctNormal,
+    ctFilenames,
+    ctAttrs
+};
+extern CompletionType completionType;
 
 void completePath(size_t, std::string_view prefix);
 

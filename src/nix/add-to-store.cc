@@ -32,7 +32,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         StringSink sink;
         dumpPath(path, sink);
 
-        auto narHash = hashString(htSHA256, *sink.s);
+        auto narHash = hashString(htSHA256, sink.s);
 
         Hash hash = narHash;
         if (ingestionMethod == FileIngestionMethod::Flat) {
@@ -42,17 +42,19 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         }
 
         ValidPathInfo info {
-            store->makeFixedOutputPath(ingestionMethod, hash, *namePart),
+            *store,
+            std::move(*namePart),
+            FixedOutputInfo {
+                .method = std::move(ingestionMethod),
+                .hash = std::move(hash),
+                .references = {},
+            },
             narHash,
         };
-        info.narSize = sink.s->size();
-        info.ca = std::optional { FixedOutputHash {
-            .method = ingestionMethod,
-            .hash = hash,
-        } };
+        info.narSize = sink.s.size();
 
         if (!dryRun) {
-            auto source = StringSource { *sink.s };
+            auto source = StringSource(sink.s);
             store->addToStore(info, source);
         }
 

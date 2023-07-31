@@ -17,7 +17,7 @@ struct MixCat : virtual Args
         if (st.type != FSAccessor::Type::tRegular)
             throw Error("path '%1%' is not a regular file", path);
 
-        std::cout << accessor->readFile(path);
+        writeFull(STDOUT_FILENO, accessor->readFile(path));
     }
 };
 
@@ -78,7 +78,7 @@ struct CmdCatNar : StoreCommand, MixCat
 
     void run(ref<Store> store) override
     {
-        cat(makeNarAccessor(make_ref<std::string>(readFile(narPath))));
+        cat(makeNarAccessor(readFile(narPath)));
     }
 };
 

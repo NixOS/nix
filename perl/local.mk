@@ -28,7 +28,7 @@ Store_CXXFLAGS = \
 
 Store_LDFLAGS := $(SODIUM_LIBS) $(NIX_LIBS)
 
-ifeq (CYGWIN,$(findstring CYGWIN,$(OS)))
+ifdef HOST_CYGWIN
   archlib = $(shell perl -E 'use Config; print $$Config{archlib};')
   libperl = $(shell perl -E 'use Config; print $$Config{libperl};')
   Store_LDFLAGS += $(shell find ${archlib} -name ${libperl})

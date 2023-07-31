@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "flakeref.hh"
 
@@ -15,19 +16,23 @@ typedef std::vector<FlakeId> InputPath;
 
 struct LockedNode;
 
-/* A node in the lock file. It has outgoing edges to other nodes (its
-   inputs). Only the root node has this type; all other nodes have
-   type LockedNode. */
+/**
+ * A node in the lock file. It has outgoing edges to other nodes (its
+ * inputs). Only the root node has this type; all other nodes have
+ * type LockedNode.
+ */
 struct Node : std::enable_shared_from_this<Node>
 {
-    typedef std::variant<std::shared_ptr<LockedNode>, InputPath> Edge;
+    typedef std::variant<ref<LockedNode>, InputPath> Edge;
 
     std::map<FlakeId, Edge> inputs;
 
     virtual ~Node() { }
 };
 
-/* A non-root node in the lock file. */
+/**
+ * A non-root node in the lock file.
+ */
 struct LockedNode : Node
 {
     FlakeRef lockedRef, originalRef;
@@ -47,10 +52,12 @@ struct LockedNode : Node
 
 struct LockFile
 {
-    std::shared_ptr<Node> root = std::make_shared<Node>();
+    ref<Node> root = make_ref<Node>();
 
     LockFile() {};
     LockFile(const nlohmann::json & json, const Path & path);
+
+    typedef std::map<ref<const Node>, std::string> KeyMap;
 
     nlohmann::json toJSON() const;
 
@@ -60,9 +67,15 @@ struct LockFile
 
     void write(const Path & path) const;
 
-    bool isImmutable() const;
+    /**
+     * Check whether this lock file has any unlocked inputs.
+     */
+    std::optional<FlakeRef> isUnlocked() const;
 
     bool operator ==(const LockFile & other) const;
+    // Needed for old gcc versions that don't synthesize it (like gcc 8.2.2
+    // that is still the default on aarch64-linux)
+    bool operator !=(const LockFile & other) const;
 
     std::shared_ptr<Node> findInput(const InputPath & path);
 
@@ -70,7 +83,9 @@ struct LockFile
 
     static std::string diff(const LockFile & oldLocks, const LockFile & newLocks);
 
-    /* Check that every 'follows' input target exists. */
+    /**
+     * Check that every 'follows' input target exists.
+     */
     void check();
 };
 

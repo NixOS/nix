@@ -1,5 +1,8 @@
+#include "ssh-store-config.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "remote-store.hh"
+#include "remote-store-connection.hh"
 #include "remote-fs-accessor.hh"
 #include "archive.hh"
 #include "worker-protocol.hh"
@@ -8,16 +11,22 @@
 
 namespace nix {
 
-struct SSHStoreConfig : virtual RemoteStoreConfig
+struct SSHStoreConfig : virtual RemoteStoreConfig, virtual CommonSSHStoreConfig
 {
     using RemoteStoreConfig::RemoteStoreConfig;
+    using CommonSSHStoreConfig::CommonSSHStoreConfig;
 
-    const Setting<Path> sshKey{(StoreConfig*) this, "", "ssh-key", "path to an SSH private key"};
-    const Setting<bool> compress{(StoreConfig*) this, false, "compress", "whether to compress the connection"};
-    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-daemon", "remote-program", "path to the nix-daemon executable on the remote system"};
-    const Setting<std::string> remoteStore{(StoreConfig*) this, "", "remote-store", "URI of the store on the remote system"};
+    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-daemon", "remote-program",
+        "Path to the `nix-daemon` executable on the remote machine."};
 
-    const std::string name() override { return "SSH Store"; }
+    const std::string name() override { return "Experimental SSH Store"; }
+
+    std::string doc() override
+    {
+        return
+          #include "ssh-store.md"
+          ;
+    }
 };
 
 class SSHStore : public virtual SSHStoreConfig, public virtual RemoteStore
@@ -27,6 +36,7 @@ public:
     SSHStore(const std::string & scheme, const std::string & host, const Params & params)
         : StoreConfig(params)
         , RemoteStoreConfig(params)
+        , CommonSSHStoreConfig(params)
         , SSHStoreConfig(params)
         , Store(params)
         , RemoteStore(params)
@@ -34,6 +44,7 @@ public:
         , master(
             host,
             sshKey,
+            sshPublicHostKey,
             // Use SSH master only if using more than 1 connection.
             connections->capacity() > 1,
             compress)
@@ -47,14 +58,20 @@ public:
         return *uriSchemes().begin() + "://" + host;
     }
 
-    bool sameMachine() override
-    { return false; }
+    // FIXME extend daemon protocol, move implementation to RemoteStore
+    std::optional<std::string> getBuildLogExact(const StorePath & path) override
+    { unsupported("getBuildLogExact"); }
 
-private:
+protected:
 
     struct Connection : RemoteStore::Connection
     {
         std::unique_ptr<SSHMaster::Connection> sshConn;
+
+        void closeWrite() override
+        {
+            sshConn->in.close();
+        }
     };
 
     ref<RemoteStore::Connection> openConnection() override;
@@ -77,9 +94,12 @@ private:
 ref<RemoteStore::Connection> SSHStore::openConnection()
 {
     auto conn = make_ref<Connection>();
-    conn->sshConn = master.startCommand(
-        fmt("%s --stdio", remoteProgram)
-        + (remoteStore.get() == "" ? "" : " --store " + shellEscape(remoteStore.get())));
+
+    std::string command = remoteProgram + " --stdio";
+    if (remoteStore.get() != "")
+        command += " --store " + shellEscape(remoteStore.get());
+
+    conn->sshConn = master.startCommand(command);
     conn->to = FdSink(conn->sshConn->in.get());
     conn->from = FdSource(conn->sshConn->out.get());
     return conn;

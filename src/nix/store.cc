@@ -18,7 +18,6 @@ struct CmdStore : virtual NixMultiCommand
     {
         if (!command)
             throw UsageError("'nix store' requires a sub-command.");
-        command->second->prepare();
         command->second->run();
     }
 };

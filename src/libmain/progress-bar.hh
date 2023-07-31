@@ -1,12 +1,13 @@
 #pragma once
+///@file
 
 #include "logging.hh"
 
 namespace nix {
 
-Logger * makeProgressBar(bool printBuildLogs = false);
+Logger * makeProgressBar();
 
-void startProgressBar(bool printBuildLogs = false);
+void startProgressBar();
 
 void stopProgressBar();
 

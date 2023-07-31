@@ -22,7 +22,7 @@ static int main_nix_copy_closure(int argc, char ** argv)
                 printVersion("nix-copy-closure");
             else if (*arg == "--gzip" || *arg == "--bzip2" || *arg == "--xz") {
                 if (*arg != "--gzip")
-                    printMsg(lvlError, format("Warning: '%1%' is not implemented, falling back to gzip") % *arg);
+                    warn("'%1%' is not implemented, falling back to gzip", *arg);
                 gzip = true;
             } else if (*arg == "--from")
                 toMode = false;
@@ -43,8 +43,6 @@ static int main_nix_copy_closure(int argc, char ** argv)
             return true;
         });
 
-        initPlugins();
-
         if (sshHost.empty())
             throw UsageError("no host name specified");
 
@@ -52,14 +50,11 @@ static int main_nix_copy_closure(int argc, char ** argv)
         auto to = toMode ? openStore(remoteUri) : openStore();
         auto from = toMode ? openStore() : openStore(remoteUri);
 
-        StorePathSet storePaths2;
+        RealisedPath::Set storePaths2;
         for (auto & path : storePaths)
             storePaths2.insert(from->followLinksToStorePath(path));
 
-        StorePathSet closure;
-        from->computeFSClosure(storePaths2, closure, false, includeOutputs);
-
-        copyPaths(from, to, closure, NoRepair, NoCheckSigs, useSubstitutes);
+        copyClosure(*from, *to, storePaths2, NoRepair, NoCheckSigs, useSubstitutes);
 
         return 0;
     }
