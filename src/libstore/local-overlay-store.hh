@@ -127,9 +127,11 @@ private:
     /**
      * Check all paths registered in the upper DB.
      *
-     * Note that this includes store objects that reside in either overlayfs layer; just enumerating the contents of the upper layer would skip them.
+     * Note that this includes store objects that reside in either overlayfs layer;
+     * just enumerating the contents of the upper layer would skip them.
      * 
-     * We don't verify the contents of both layers on the assumption that the lower layer is far bigger, and also the observation that anything not in the upper db the overlayfs doesn't yet care about.  
+     * We don't verify the contents of both layers on the assumption that the lower layer is far bigger,
+     * and also the observation that anything not in the upper db the overlayfs doesn't yet care about.
      */
     bool verifyAllValidPaths(RepairFlag repair, StorePathSet & validPaths) override;
 
