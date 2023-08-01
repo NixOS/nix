@@ -793,6 +793,101 @@ static RegisterPrimOp r2({
     .experimentalFeature = Xp::Flakes,
 });
 
+static void prim_parseFlakeRef(
+    EvalState & state,
+    const PosIdx pos,
+    Value * * args,
+    Value & v)
+{
+    std::string flakeRefS(state.forceStringNoCtx(*args[0], pos,
+        "while evaluating the argument passed to builtins.parseFlakeRef"));
+    auto attrs = parseFlakeRef(flakeRefS, {}, true).toAttrs();
+    auto binds = state.buildBindings(attrs.size());
+    for (const auto & [key, value] : attrs) {
+        auto s = state.symbols.create(key);
+        auto & vv = binds.alloc(s);
+        std::visit(overloaded {
+            [&vv](const std::string    & value) { vv.mkString(value); },
+            [&vv](const uint64_t       & value) { vv.mkInt(value);    },
+            [&vv](const Explicit<bool> & value) { vv.mkBool(value.t); }
+        }, value);
+    }
+    v.mkAttrs(binds);
+}
+
+static RegisterPrimOp r3({
+    .name =  "__parseFlakeRef",
+    .args = {"flake-ref"},
+    .doc = R"(
+      Parse a flake reference, and return its exploded form.
+
+      For example:
+      ```nix
+      builtins.parseFlakeRef "github:NixOS/nixpkgs/23.05?dir=lib"
+      ```
+      evaluates to:
+      ```nix
+      { dir = "lib"; owner = "NixOS"; ref = "23.05"; repo = "nixpkgs"; type = "github"; }
+      ```
+    )",
+    .fun = prim_parseFlakeRef,
+    .experimentalFeature = Xp::Flakes,
+});
+
+
+static void prim_flakeRefToString(
+    EvalState & state,
+    const PosIdx pos,
+    Value * * args,
+    Value & v)
+{
+    state.forceAttrs(*args[0], noPos,
+        "while evaluating the argument passed to builtins.flakeRefToString");
+    fetchers::Attrs attrs;
+    for (const auto & attr : *args[0]->attrs) {
+        auto t = attr.value->type();
+        if (t == nInt) {
+            attrs.emplace(state.symbols[attr.name],
+                          (uint64_t) attr.value->integer);
+        } else if (t == nBool) {
+            attrs.emplace(state.symbols[attr.name],
+                          Explicit<bool> { attr.value->boolean });
+        } else if (t == nString) {
+            attrs.emplace(state.symbols[attr.name],
+                          std::string(attr.value->str()));
+        } else {
+            state.error(
+                "flake reference attribute sets may only contain integers, Booleans, "
+                "and strings, but attribute '%s' is %s",
+                state.symbols[attr.name],
+                showType(*attr.value)).debugThrow<EvalError>();
+        }
+    }
+    auto flakeRef = FlakeRef::fromAttrs(attrs);
+    v.mkString(flakeRef.to_string());
+}
+
+static RegisterPrimOp r4({
+    .name =  "__flakeRefToString",
+    .args = {"attrs"},
+    .doc = R"(
+      Convert a flake reference from attribute set format to URL format.
+
+      For example:
+      ```nix
+      builtins.flakeRefToString {
+        dir = "lib"; owner = "NixOS"; ref = "23.05"; repo = "nixpkgs"; type = "github";
+      }
+      ```
+      evaluates to
+      ```nix
+      "github:NixOS/nixpkgs/23.05?dir=lib"
+      ```
+    )",
+    .fun = prim_flakeRefToString,
+    .experimentalFeature = Xp::Flakes,
+});
+
 }
 
 Fingerprint LockedFlake::getFingerprint() const

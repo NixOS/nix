@@ -1634,6 +1634,8 @@ void LocalStore::verifyPath(const StorePath & path, std::function<bool(const Sto
                     canInvalidate = false;
             }
 
+        auto pathS = printStorePath(path);
+
         if (canInvalidate) {
             printInfo("path '%s' disappeared, removing from database...", pathS);
             auto state(_state.lock());
