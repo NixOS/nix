@@ -43,9 +43,15 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
 
     const PathSetting remountHook{(StoreConfig*) this, "", "remount-hook",
         R"(
-          Script or program to run when overlay filesystem needs remounting.
+          Script or other executable to run when overlay filesystem needs remounting.
 
-          TODO: Document this in more detail.
+          This is occasionally necessary when deleting a store path that exists in both upper and lower layers.
+          In such a situation, bypassing OverlayFS and deleting the path in the upper layer directly
+          is the only way to perform the deletion without creating a "whiteout".
+          However this causes the OverlayFS kernel data structures to get out-of-sync,
+          and can lead to 'stale file handle' errors; remounting solves the problem.
+
+          The store directory is passed as an argument to the invoked executable.
         )"};
 
     const std::string name() override { return "Experimental Local Overlay Store"; }
