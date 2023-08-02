@@ -244,6 +244,11 @@ void LocalDerivationGoal::tryLocalBuild()
         worker.permanentFailure = true;
         done(BuildResult::InputRejected, {}, std::move(e));
         return;
+    } catch (MissingFeatures & e) {
+        outputLocks.unlock();
+        buildUser.reset();
+        done(BuildResult::PermanentFailure, {}, std::move(e));
+        return;
     }
 
     /* This state will be reached when we get EOF on the child's
@@ -467,7 +472,7 @@ void LocalDerivationGoal::startBuilder()
 
     /* Right platform? */
     if (!parsedDrv->canBuildLocally(worker.store))
-        throw Error("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
+        throw MissingFeatures("a '%s' with features {%s} is required to build '%s', but I am a '%s' with features {%s}",
             drv->platform,
             concatStringsSep(", ", parsedDrv->getRequiredSystemFeatures()),
             worker.store.printStorePath(drvPath),
@@ -561,7 +566,7 @@ void LocalDerivationGoal::startBuilder()
             auto fileName = *i++;
             static std::regex regex("[A-Za-z_][A-Za-z0-9_.-]*");
             if (!std::regex_match(fileName, regex))
-                throw Error("invalid file name '%s' in 'exportReferencesGraph'", fileName);
+                throw BuildError("invalid file name '%s' in 'exportReferencesGraph'", fileName);
 
             auto storePathS = *i++;
             if (!worker.store.isInStore(storePathS))
@@ -636,7 +641,7 @@ void LocalDerivationGoal::startBuilder()
                 }
             }
             if (!found)
-                throw Error("derivation '%s' requested impure path '%s', but it was not in allowed-impure-host-deps",
+                throw BuildError("derivation '%s' requested impure path '%s', but it was not in allowed-impure-host-deps",
                     worker.store.printStorePath(drvPath), i);
 
             /* Allow files in __impureHostDeps to be missing; e.g.
@@ -741,21 +746,21 @@ void LocalDerivationGoal::startBuilder()
 
 #else
         if (parsedDrv->useUidRange())
-            throw Error("feature 'uid-range' is not supported on this platform");
+            throw MissingFeatures("feature 'uid-range' is not supported on this platform");
         #if __APPLE__
             /* We don't really have any parent prep work to do (yet?)
                All work happens in the child, instead. */
         #else
-            throw Error("sandboxing builds is not supported on this platform");
+            throw MissingFeatures("sandboxing builds is not supported on this platform");
         #endif
 #endif
     } else {
         if (parsedDrv->useUidRange())
-            throw Error("feature 'uid-range' is only supported in sandboxed builds");
+            throw MissingFeatures("feature 'uid-range' is only supported in sandboxed builds");
     }
 
     if (needsHashRewrite() && pathExists(homeDir))
-        throw Error("home directory '%1%' exists; please remove it to assure purity of builds without sandboxing", homeDir);
+        throw BuildError("home directory '%1%' exists; please remove it to assure purity of builds without sandboxing", homeDir);
 
     if (useChroot && settings.preBuildHook != "" && dynamic_cast<Derivation *>(drv.get())) {
         printMsg(lvlChatty, "executing pre-build hook '%1%'", settings.preBuildHook);

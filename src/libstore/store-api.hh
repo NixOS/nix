@@ -60,6 +60,7 @@ MakeError(SubstError, Error);
  * denotes a permanent build failure
  */
 MakeError(BuildError, Error);
+MakeError(MissingFeatures, Error);
 MakeError(InvalidPath, Error);
 MakeError(Unsupported, Error);
 MakeError(SubstituteGone, Error);
