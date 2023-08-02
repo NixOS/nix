@@ -3,6 +3,7 @@
 #include "downstream-placeholder.hh"
 #include "eval-inline.hh"
 #include "eval.hh"
+#include "eval-settings.hh"
 #include "globals.hh"
 #include "json-to-value.hh"
 #include "names.hh"

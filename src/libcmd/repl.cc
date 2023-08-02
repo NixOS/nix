@@ -26,6 +26,7 @@ extern "C" {
 #include "eval.hh"
 #include "eval-cache.hh"
 #include "eval-inline.hh"
+#include "eval-settings.hh"
 #include "attr-path.hh"
 #include "store-api.hh"
 #include "log-store.hh"

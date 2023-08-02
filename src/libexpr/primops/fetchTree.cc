@@ -1,5 +1,6 @@
 #include "primops.hh"
 #include "eval-inline.hh"
+#include "eval-settings.hh"
 #include "store-api.hh"
 #include "fetchers.hh"
 #include "filetransfer.hh"

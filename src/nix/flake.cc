@@ -4,6 +4,7 @@
 #include "shared.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
+#include "eval-settings.hh"
 #include "flake/flake.hh"
 #include "get-drvs.hh"
 #include "store-api.hh"

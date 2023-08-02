@@ -22,6 +22,7 @@
 
 #include "nixexpr.hh"
 #include "eval.hh"
+#include "eval-settings.hh"
 #include "globals.hh"
 
 namespace nix {

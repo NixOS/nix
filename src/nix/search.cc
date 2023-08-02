@@ -2,6 +2,7 @@
 #include "globals.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
+#include "eval-settings.hh"
 #include "names.hh"
 #include "get-drvs.hh"
 #include "common-args.hh"

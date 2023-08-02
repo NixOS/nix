@@ -3,6 +3,7 @@
 #include "command.hh"
 #include "common-args.hh"
 #include "eval.hh"
+#include "eval-settings.hh"
 #include "globals.hh"
 #include "legacy.hh"
 #include "shared.hh"

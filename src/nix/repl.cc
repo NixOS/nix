@@ -1,4 +1,5 @@
 #include "eval.hh"
+#include "eval-settings.hh"
 #include "globals.hh"
 #include "command.hh"
 #include "installable-value.hh"
