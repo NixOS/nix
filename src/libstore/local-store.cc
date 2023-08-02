@@ -1503,6 +1503,15 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
     {
         StorePathSet storePathsInStoreDir;
+        /* Why aren't we using `queryAllValidPaths`? Because that would
+           tell us about all the paths than the database knows about. Here we
+           want to know about all the store paths in the store directory,
+           regardless of what the database thinks.
+
+           We will end up cross-referencing these two sources of truth (the
+           database and the filesystem) in the loop below, in order to catch
+           invalid states.
+         */
         for (auto & i : readDirectory(realStoreDir)) {
             try {
                 storePathsInStoreDir.insert({i.name});
