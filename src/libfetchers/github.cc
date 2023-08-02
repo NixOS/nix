@@ -4,7 +4,6 @@
 #include "store-api.hh"
 #include "types.hh"
 #include "url-parts.hh"
-#include "url.hh"
 #include "git.hh"
 #include "fetchers.hh"
 #include "fetch-settings.hh"
@@ -12,6 +11,7 @@
 #include <optional>
 #include <nlohmann/json.hpp>
 #include <fstream>
+#include <regex>
 
 namespace nix::fetchers {
 
@@ -333,7 +333,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
-        auto repo = percentEncode(getStrAttr(input.attrs, "repo"));
+        auto repo = std::regex_replace(getStrAttr(input.attrs, "repo"), std::regex("/"), "%2F");
         // See rate limiting note below
         auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/commits?ref_name=%s",
             host, getStrAttr(input.attrs, "owner"), repo, *input.getRef());
@@ -357,7 +357,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         // is 10 reqs/sec/ip-addr.  See
         // https://docs.gitlab.com/ee/user/gitlab_com/index.html#gitlabcom-specific-rate-limits
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
-        auto repo = percentEncode(getStrAttr(input.attrs, "repo"));
+        auto repo = std::regex_replace(getStrAttr(input.attrs, "repo"), std::regex("/"), "%2F");
         auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/archive.tar.gz?sha=%s",
             host, getStrAttr(input.attrs, "owner"), repo,
             input.getRev()->to_string(Base16, false));
@@ -369,7 +369,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
     void clone(const Input & input, const Path & destDir) const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
-        auto repo = percentEncode(getStrAttr(input.attrs, "repo"));
+        auto repo = std::regex_replace(getStrAttr(input.attrs, "repo"), std::regex("/"), "%2F");
         // FIXME: get username somewhere
         Input::fromURL(fmt("git+https://%s/%s/%s.git",
                 host, getStrAttr(input.attrs, "owner"), repo))
