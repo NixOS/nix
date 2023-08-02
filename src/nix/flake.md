@@ -277,6 +277,15 @@ Currently the `type` attribute can be one of the following:
 
   * `gitlab:veloren%2Fdev/rfcs`
 
+  However, if using Attribute set representation slashes are permitted as the ``repo`` value:
+  ```nix
+  inputs.nixpkgs = {
+    type  = "gitlab";
+    owner = "gitlab-org";
+    repo  = "release/tasks";
+  };
+  ```
+
 * `sourcehut`: Similar to `github`, is a more efficient way to fetch
   SourceHut repositories. The following attributes are required:
 
