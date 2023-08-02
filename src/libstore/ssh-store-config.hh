@@ -20,7 +20,7 @@ struct CommonSSHStoreConfig : virtual StoreConfig
 
     const Setting<std::string> remoteStore{this, "", "remote-store",
         R"(
-          [Store URL](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
+          [Store URL](@docroot@/store-types.md#store-url-format)
           to be used on the remote machine. The default is `auto`
           (i.e. use the Nix daemon or `/nix/store` directly).
         )"};

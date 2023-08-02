@@ -235,8 +235,12 @@ operate are determined as follows:
 
 # Nix stores
 
-Most `nix` subcommands operate on a *Nix store*. These are documented
-in [`nix help-stores`](./nix3-help-stores.md).
+Most `nix` subcommands operate on a *Nix store*.
+The various store types are documented in the
+[Store Types](@docroot@/store-types.md)
+section of the manual.
+
+The same information is also available from the [`nix help-stores`](./nix3-help-stores.md) command.
 
 # Shebang interpreter 
 

@@ -20,7 +20,7 @@
 
 namespace nix {
 
-/* TODO: Separate these store impls into different files, give them better names */
+/* TODO: Separate these store types into different files, give them better names */
 RemoteStore::RemoteStore(const Params & params)
     : RemoteStoreConfig(params)
     , Store(params)

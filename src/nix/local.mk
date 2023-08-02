@@ -43,11 +43,13 @@ src/nix/generated-doc/files/%.md: doc/manual/src/command-ref/files/%.md
 
 src/nix/profile.cc: src/nix/profile.md src/nix/generated-doc/files/profiles.md.gen.hh
 
-src/nix/generated-doc/help-stores.md: doc/manual/src/store/types/index.md.in
+src/nix/generated-doc/help-stores.md: doc/manual/src/store/types/index.md
 	@mkdir -p $$(dirname $@)
 	@echo 'R"(' >> $@.tmp
-	@echo >> $@.tmp
+	@echo '' >> $@.tmp
 	@cat $^ >> $@.tmp
-	@echo >> $@.tmp
+	@echo '' >> $@.tmp
+	@echo '@stores@' >> $@.tmp
+	@echo '' >> $@.tmp
 	@echo ')"' >> $@.tmp
 	@mv $@.tmp $@

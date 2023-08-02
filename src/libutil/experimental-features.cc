@@ -252,7 +252,7 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .tag = Xp::ReadOnlyLocalStore,
         .name = "read-only-local-store",
         .description = R"(
-            Allow the use of the `read-only` parameter in [local store](@docroot@/command-ref/new-cli/nix3-help-stores.md#local-store) URIs.
+            Allow the use of the `read-only` parameter in [local store](@docroot@/store-types/Local-Store.md) URIs.
         )",
     },
     {

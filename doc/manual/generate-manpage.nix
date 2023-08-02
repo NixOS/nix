@@ -10,7 +10,6 @@ let
     lessThan
     listToAttrs
     mapAttrs
-    match
     replaceStrings
     sort
     ;
@@ -95,7 +94,18 @@ let
       # store parameters should not be part of command documentation to begin
       # with, but instead be rendered on separate pages.
       maybeStoreDocs = optionalString (details ? doc)
-        (replaceStrings [ "@stores@" ] [ (showStoreDocs inlineHTML commandInfo.stores) ] details.doc);
+        (replaceStrings
+          [ "@stores@" ]
+          [
+            (let
+               storePages = builtins.removeAttrs (showStoreDocs {
+                 inherit inlineHTML;
+                 inherit (commandInfo) stores;
+                 headingLevel = "##";
+               }) [ "SUMMARY.md" ];
+             in concatStrings (attrValues storePages))
+          ]
+          details.doc);
 
       maybeOptions = let
         allVisibleOptions = filterAttrs

@@ -38,5 +38,3 @@ store as follows:
   does not exist.
 
 * Otherwise, use the [local store](#local-store) `/nix/store`.
-
-@stores@
