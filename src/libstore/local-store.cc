@@ -1502,10 +1502,10 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
     StorePathSet validPaths;
 
     {
-        StorePathSet store;
+        StorePathSet storePathsInStoreDir;
         for (auto & i : readDirectory(realStoreDir)) {
             try {
-                store.insert({i.name});
+                storePathsInStoreDir.insert({i.name});
             } catch (BadStorePath &) { }
         }
 
@@ -1515,7 +1515,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         StorePathSet done;
 
         for (auto & i : queryAllValidPaths())
-            verifyPath(i, store, done, validPaths, repair, errors);
+            verifyPath(i, storePathsInStoreDir, done, validPaths, repair, errors);
     }
 
     /* Optionally, check the content hashes (slow). */
@@ -1602,21 +1602,21 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 }
 
 
-void LocalStore::verifyPath(const StorePath & path, const StorePathSet & store,
+void LocalStore::verifyPath(const StorePath & path, const StorePathSet & storePathsInStoreDir,
     StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors)
 {
     checkInterrupt();
 
     if (!done.insert(path).second) return;
 
-    if (!store.count(path)) {
+    if (!storePathsInStoreDir.count(path)) {
         /* Check any referrers first.  If we can invalidate them
            first, then we can invalidate this path as well. */
         bool canInvalidate = true;
         StorePathSet referrers; queryReferrers(path, referrers);
         for (auto & i : referrers)
             if (i != path) {
-                verifyPath(i, store, done, validPaths, repair, errors);
+                verifyPath(i, storePathsInStoreDir, done, validPaths, repair, errors);
                 if (validPaths.count(i))
                     canInvalidate = false;
             }
