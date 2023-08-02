@@ -1503,9 +1503,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
     auto fdGCLock = openGCLock();
     FdLock gcLock(fdGCLock.get(), ltRead, true, "waiting for the big garbage collector lock...");
 
-    StorePathSet validPaths;
-
-    bool errors = verifyAllValidPaths(repair, validPaths);
+    auto [errors, validPaths] = verifyAllValidPaths(repair);
 
     /* Optionally, check the content hashes (slow). */
     if (checkContents) {
@@ -1591,7 +1589,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 }
 
 
-bool LocalStore::verifyAllValidPaths(RepairFlag repair, StorePathSet & validPaths)
+std::pair<bool, StorePathSet> LocalStore::verifyAllValidPaths(RepairFlag repair)
 {
     StorePathSet storePathsInStoreDir;
     /* Why aren't we using `queryAllValidPaths`? Because that would
@@ -1613,16 +1611,18 @@ bool LocalStore::verifyAllValidPaths(RepairFlag repair, StorePathSet & validPath
     printInfo("checking path existence...");
 
     StorePathSet done;
-    bool errors = false;
 
     auto existsInStoreDir = [&](const StorePath & storePath) {
         return storePathsInStoreDir.count(storePath);
     };
 
+    bool errors = false;
+    StorePathSet validPaths;
+
     for (auto & i : queryAllValidPaths())
         verifyPath(i, existsInStoreDir, done, validPaths, repair, errors);
 
-    return errors;
+    return { errors, validPaths };
 }
 
 

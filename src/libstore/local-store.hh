@@ -265,7 +265,12 @@ public:
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
-    virtual bool verifyAllValidPaths(RepairFlag repair, StorePathSet & validPaths);
+    /**
+     * @return A pair of whether any errors were encountered, and a set of
+     * (so-far) valid paths. The store objects pointed to by those paths are
+     * suitable for further validation checking.
+     */
+    virtual std::pair<bool, StorePathSet> verifyAllValidPaths(RepairFlag repair);
 
     /**
      * Register the validity of a path, i.e., that `path` exists, that
