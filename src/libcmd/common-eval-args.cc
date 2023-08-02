@@ -1,3 +1,4 @@
+#include "eval-settings.hh"
 #include "common-eval-args.hh"
 #include "shared.hh"
 #include "filetransfer.hh"
