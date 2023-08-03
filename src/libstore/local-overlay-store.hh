@@ -68,7 +68,10 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
 };
 
 /**
- * Variation of local store using overlayfs for the store dir.
+ * Variation of local store using OverlayFS for the store directory.
+ *
+ * Documentation on overridden methods states how they differ from their
+ * `LocalStore` counterparts.
  */
 class LocalOverlayStore : public virtual LocalOverlayStoreConfig, public virtual LocalStore
 {
@@ -99,30 +102,77 @@ public:
     }
 
 private:
-    // Overridden methods…
-
+    /**
+     * First copy up any lower store realisation with the same key, so we
+     * merge rather than mask it.
+     */
     void registerDrvOutput(const Realisation & info) override;
 
+    /**
+     * Check lower store if upper DB does not have.
+     */
     void queryPathInfoUncached(const StorePath & path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
+    /**
+     * Check lower store if upper DB does not have.
+     *
+     * In addition, copy up metadata for lower store objects (and their
+     * closure). (I.e. Optimistically cache in the upper DB.)
+     */
     bool isValidPathUncached(const StorePath & path) override;
 
+    /**
+     * Check the lower store and upper DB.
+     */
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override;
 
+    /**
+     * Check the lower store and upper DB.
+     */
     StorePathSet queryValidDerivers(const StorePath & path) override;
 
+    /**
+     * Check lower store if upper DB does not have.
+     */
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
+    /**
+     * First copy up any lower store realisation with the same key, so we
+     * merge rather than mask it.
+     */
     void registerValidPaths(const ValidPathInfos & infos) override;
 
+    /**
+     * Check lower store if upper DB does not have.
+     */
     void queryRealisationUncached(const DrvOutput&,
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
+    /**
+     * Call `remountIfNecessary` after collecting garbage normally.
+     */
     void collectGarbage(const GCOptions & options, GCResults & results) override;
 
+    /**
+     * Check which layers the store object exists in to try to avoid
+     * needing to remount.
+     */
     void deleteStorePath(const Path & path, uint64_t & bytesFreed) override;
 
+    /**
+     * Deduplicate by removing store objects from the upper layer that
+     * are now in the lower layer.
+     *
+     * This implementation will not cause duplications, but addition of
+     * new store objects to the lower layer can instill induce them
+     * (there is no way to prevent that). This cleans up those
+     * duplications.
+     *
+     * @note We do not yet optomise the upper layer in the normal way
+     * (hardlink) yet. We would like to, but it requires more
+     * refactoring of existing code to support this sustainably.
+     */
     void optimiseStore() override;
 
     /**
@@ -147,8 +197,16 @@ private:
      */
     void queryGCReferrers(const StorePath & path, StorePathSet & referrers) override;
 
+    /**
+     * Call the `remountHook` if we have done something such that the
+     * OverlayFS needed to be remounted. See that hook's user-facing
+     * documentation for further details.
+     */
     void remountIfNecessary();
 
+    /**
+     * State for `remountIfNecessary`
+     */
     std::atomic_bool _remountRequired = false;
 };
 
