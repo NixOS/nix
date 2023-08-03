@@ -7,9 +7,6 @@ namespace nix {
  */
 struct LocalOverlayStoreConfig : virtual LocalStoreConfig
 {
-    // FIXME why doesn't this work?
-    // using LocalStoreConfig::LocalStoreConfig;
-
     LocalOverlayStoreConfig(const StringMap & params)
         : StoreConfig(params)
         , LocalFSStoreConfig(params)
