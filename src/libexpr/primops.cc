@@ -1,4 +1,5 @@
 #include "archive.hh"
+#include "comment.hh"
 #include "derivations.hh"
 #include "downstream-placeholder.hh"
 #include "eval-inline.hh"
@@ -2437,6 +2438,27 @@ static RegisterPrimOp primop_unsafeGetAttrPos(PrimOp {
     .name = "__unsafeGetAttrPos",
     .arity = 2,
     .fun = prim_unsafeGetAttrPos,
+});
+
+void prim_unsafeGetLambdaDoc(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    state.forceFunction(*args[0], pos, "while evaluating the first argument to builtins.unsafeGetLambdaDoc");
+
+    Pos funPos = state.positions[args[0]->lambda.fun->pos];
+
+    Comment::Doc doc = Comment::lookupDoc(funPos);
+
+    if(doc.comment.empty()) {
+        v.mkNull();
+    } else {
+        v.mkString(doc.comment);
+    }
+}
+
+static RegisterPrimOp primop_unsafeGetLambdaDoc(PrimOp {
+    .name = "__unsafeGetLambdaDoc",
+    .arity = 1,
+    .fun = prim_unsafeGetLambdaDoc,
 });
 
 /* Dynamic version of the `?' operator. */
