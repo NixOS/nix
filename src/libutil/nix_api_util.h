@@ -23,7 +23,8 @@ extern "C" {
  * @brief Dealing with errors from the Nix side
  *
  * To handle errors that can be returned from the Nix API,
- * a nix_c_context can be passed to any function that potentially returns an error.
+ * a nix_c_context can be passed to any function that potentially returns an
+ * error.
  *
  * Error information will be stored in this context, and can be retrieved
  * using nix_err_code and nix_err_msg.
