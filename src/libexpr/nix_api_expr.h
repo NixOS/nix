@@ -97,9 +97,15 @@ nix_err nix_value_call(nix_c_context *context, State *state, Value *fn,
 /**
  * @brief Forces the evaluation of a Nix value.
  *
+ * The Nix interpreter is lazy, and not-yet-evaluated Values can be
+ * of type NIX_TYPE_THUNK instead of their actual value.
+ *
+ * This function converts Values into their final type.
+ *
  * @param[out] context Optional, stores error information
  * @param[in] state The state of the evaluation.
  * @param[in,out] value The Nix value to force.
+ * @post values is not of type NIX_TYPE_THUNK
  * @return NIX_OK if the force operation was successful, an error code
  * otherwise.
  */
@@ -108,6 +114,11 @@ nix_err nix_value_force(nix_c_context *context, State *state, Value *value);
 /**
  * @brief Forces the deep evaluation of a Nix value.
  *
+ * Recursively calls nix_value_force
+ *
+ * @see nix_value_force
+ * @warning Calling this function on a recursive data structure will cause a
+ * stack overflow.
  * @param[out] context Optional, stores error information
  * @param[in] state The state of the evaluation.
  * @param[in,out] value The Nix value to force.
