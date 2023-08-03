@@ -4,7 +4,7 @@ if [[ -z "${COMMON_VARS_AND_FUNCTIONS_SH_SOURCED-}" ]]; then
 
 COMMON_VARS_AND_FUNCTIONS_SH_SOURCED=1
 
-export PS4='+(${BASH_SOURCE[0]}:$LINENO) '
+export PS4='+(${BASH_SOURCE[0]-$0}:$LINENO) '
 
 export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)/${TEST_NAME:-default}
 export NIX_STORE_DIR

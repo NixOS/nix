@@ -10,6 +10,7 @@ bin-scripts :=
 noinst-scripts :=
 man-pages :=
 install-tests :=
+install-tests-groups :=
 
 ifdef HOST_OS
   HOST_KERNEL = $(firstword $(subst -, ,$(HOST_OS)))
@@ -121,7 +122,16 @@ $(foreach script, $(bin-scripts), $(eval $(call install-program-in,$(script),$(b
 $(foreach script, $(bin-scripts), $(eval programs-list += $(script)))
 $(foreach script, $(noinst-scripts), $(eval programs-list += $(script)))
 $(foreach template, $(template-files), $(eval $(call instantiate-template,$(template))))
-$(foreach test, $(install-tests), $(eval $(call run-install-test,$(test))))
+$(foreach test, $(install-tests), \
+  $(eval $(call run-install-test,$(test))) \
+  $(eval installcheck: $(test).test))
+$(foreach test-group, $(install-tests-groups), \
+  $(eval $(call run-install-test-group,$(test-group))) \
+  $(eval installcheck: $(test-group).test-group) \
+  $(foreach test, $($(test-group)-tests), \
+    $(eval $(call run-install-test,$(test))) \
+    $(eval $(test-group).test-group: $(test).test)))
+
 $(foreach file, $(man-pages), $(eval $(call install-data-in, $(file), $(mandir)/man$(patsubst .%,%,$(suffix $(file))))))
 
 
@@ -151,6 +161,14 @@ ifdef libs-list
 	@echo "The following libraries can be built:"
 	@echo ""
 	@for i in $(libs-list); do echo "  $$i"; done
+endif
+ifdef install-tests-groups
+	@echo ""
+	@echo "The following groups of functional tests can be run:"
+	@echo ""
+	@for i in $(install-tests-groups); do echo "  $$i.test-group"; done
+	@echo ""
+	@echo "(installcheck includes tests in test groups too.)"
 endif
 	@echo ""
 	@echo "The following variables control the build:"

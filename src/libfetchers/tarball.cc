@@ -80,10 +80,8 @@ DownloadFileResult downloadFile(
             *store,
             name,
             FixedOutputInfo {
-                .hash = {
-                    .method = FileIngestionMethod::Flat,
-                    .hash = hash,
-                },
+                .method = FileIngestionMethod::Flat,
+                .hash = hash,
                 .references = {},
             },
             hashString(htSHA256, sink.s),

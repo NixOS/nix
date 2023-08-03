@@ -5,8 +5,7 @@
 
 #include "pathlocks.hh"
 #include "store-api.hh"
-#include "local-fs-store.hh"
-#include "gc-store.hh"
+#include "indirect-root-store.hh"
 #include "sync.hh"
 #include "util.hh"
 
@@ -68,7 +67,9 @@ struct LocalStoreConfig : virtual LocalFSStoreConfig
     std::string doc() override;
 };
 
-class LocalStore : public virtual LocalStoreConfig, public virtual LocalFSStore, public virtual GcStore
+class LocalStore : public virtual LocalStoreConfig
+    , public virtual IndirectRootStore
+    , public virtual GcStore
 {
 private:
 
@@ -165,7 +166,7 @@ public:
 
     StorePathSet queryValidDerivers(const StorePath & path) override;
 
-    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path) override;
+    std::map<std::string, std::optional<StorePath>> queryStaticPartialDerivationOutputMap(const StorePath & path) override;
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
@@ -209,6 +210,12 @@ private:
 
 public:
 
+    /**
+     * Implementation of IndirectRootStore::addIndirectRoot().
+     *
+     * The weak reference merely is a symlink to `path' from
+     * /nix/var/nix/gcroots/auto/<hash of `path'>.
+     */
     void addIndirectRoot(const Path & path) override;
 
 private:
@@ -307,8 +314,8 @@ private:
      */
     void invalidatePathChecked(const StorePath & path);
 
-    void verifyPath(const Path & path, const StringSet & store,
-        PathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
+    void verifyPath(const StorePath & path, const StorePathSet & store,
+        StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
 
     std::shared_ptr<const ValidPathInfo> queryPathInfoInternal(State & state, const StorePath & path);
 
@@ -345,13 +352,13 @@ private:
     void signRealisation(Realisation &);
 
     // XXX: Make a generic `Store` method
-    FixedOutputHash hashCAPath(
-        const FileIngestionMethod & method,
+    ContentAddress hashCAPath(
+        const ContentAddressMethod & method,
         const HashType & hashType,
         const StorePath & path);
 
-    FixedOutputHash hashCAPath(
-        const FileIngestionMethod & method,
+    ContentAddress hashCAPath(
+        const ContentAddressMethod & method,
         const HashType & hashType,
         const Path & path,
         const std::string_view pathHash

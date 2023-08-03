@@ -81,7 +81,7 @@ TEST_JSON(DerivationTest, caFixedFlat,
         "path": "/nix/store/rhcg9h16sqvlbpsa6dqm57sbr2al6nzg-drv-name-output-name"
     })",
     (DerivationOutput::CAFixed {
-        .ca = FixedOutputHash {
+        .ca = {
             .method = FileIngestionMethod::Flat,
             .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
         },
@@ -95,7 +95,7 @@ TEST_JSON(DerivationTest, caFixedNAR,
         "path": "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-drv-name-output-name"
     })",
     (DerivationOutput::CAFixed {
-        .ca = FixedOutputHash {
+        .ca = {
             .method = FileIngestionMethod::Recursive,
             .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
         },
@@ -109,7 +109,7 @@ TEST_JSON(DynDerivationTest, caFixedText,
         "path": "/nix/store/6s1zwabh956jvhv4w9xcdb5jiyanyxg1-drv-name-output-name"
     })",
     (DerivationOutput::CAFixed {
-        .ca = TextHash {
+        .ca = {
             .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
         },
     }),

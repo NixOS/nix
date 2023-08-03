@@ -40,6 +40,7 @@ class LocalFSStore : public virtual LocalFSStoreConfig,
     public virtual LogStore
 {
 public:
+    inline static std::string operationName = "Local Filesystem Store";
 
     const static std::string drvsLogDir;
 
@@ -49,9 +50,20 @@ public:
     ref<FSAccessor> getFSAccessor() override;
 
     /**
-     * Register a permanent GC root.
+     * Creates symlink from the `gcRoot` to the `storePath` and
+     * registers the `gcRoot` as a permanent GC root. The `gcRoot`
+     * symlink lives outside the store and is created and owned by the
+     * user.
+     *
+     * @param gcRoot The location of the symlink.
+     *
+     * @param storePath The store object being rooted. The symlink will
+     * point to `toRealPath(store.printStorePath(storePath))`.
+     *
+     * How the permanent GC root corresponding to this symlink is
+     * managed is implementation-specific.
      */
-    Path addPermRoot(const StorePath & storePath, const Path & gcRoot);
+    virtual Path addPermRoot(const StorePath & storePath, const Path & gcRoot) = 0;
 
     virtual Path getRealStoreDir() { return realStoreDir; }
 

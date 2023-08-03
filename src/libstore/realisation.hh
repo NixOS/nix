@@ -5,6 +5,7 @@
 
 #include "hash.hh"
 #include "path.hh"
+#include "derived-path.hh"
 #include <nlohmann/json_fwd.hpp>
 #include "comparator.hh"
 #include "crypto.hh"
@@ -143,9 +144,13 @@ class MissingRealisation : public Error
 {
 public:
     MissingRealisation(DrvOutput & outputId)
-        : Error( "cannot operate on an output of the "
+        : MissingRealisation(outputId.outputName, outputId.strHash())
+    {}
+    MissingRealisation(std::string_view drv, std::string outputName)
+        : Error( "cannot operate on output '%s' of the "
                 "unbuilt derivation '%s'",
-                outputId.to_string())
+                outputName,
+                drv)
     {}
 };
 

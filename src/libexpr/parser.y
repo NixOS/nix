@@ -22,6 +22,7 @@
 
 #include "nixexpr.hh"
 #include "eval.hh"
+#include "eval-settings.hh"
 #include "globals.hh"
 
 namespace nix {
@@ -137,6 +138,7 @@ static void addAttr(ExprAttrs * attrs, AttrPath && attrPath,
                         dupAttr(state, ad.first, j2->second.pos, ad.second.pos);
                     jAttrs->attrs.emplace(ad.first, ad.second);
                 }
+                jAttrs->dynamicAttrs.insert(jAttrs->dynamicAttrs.end(), ae->dynamicAttrs.begin(), ae->dynamicAttrs.end());
             } else {
                 dupAttr(state, attrPath, pos, j->second.pos);
             }
@@ -275,7 +277,12 @@ static Expr * stripIndentation(const PosIdx pos, SymbolTable & symbols,
     }
 
     /* If this is a single string, then don't do a concatenation. */
-    return es2->size() == 1 && dynamic_cast<ExprString *>((*es2)[0].second) ? (*es2)[0].second : new ExprConcatStrings(pos, true, es2);
+    if (es2->size() == 1 && dynamic_cast<ExprString *>((*es2)[0].second)) {
+        auto *const result = (*es2)[0].second;
+        delete es2;
+        return result;
+    }
+    return new ExprConcatStrings(pos, true, es2);
 }
 
 
@@ -744,22 +751,9 @@ Expr * EvalState::parseStdin()
 }
 
 
-void EvalState::addToSearchPath(const std::string & s)
+void EvalState::addToSearchPath(SearchPath::Elem && elem)
 {
-    size_t pos = s.find('=');
-    std::string prefix;
-    Path path;
-    if (pos == std::string::npos) {
-        path = s;
-    } else {
-        prefix = std::string(s, 0, pos);
-        path = std::string(s, pos + 1);
-    }
-
-    searchPath.emplace_back(SearchPathElem {
-        .prefix = prefix,
-        .path = path,
-    });
+    searchPath.elements.emplace_back(std::move(elem));
 }
 
 
@@ -769,23 +763,20 @@ SourcePath EvalState::findFile(const std::string_view path)
 }
 
 
-SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view path, const PosIdx pos)
+SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_view path, const PosIdx pos)
 {
-    for (auto & i : searchPath) {
-        std::string suffix;
-        if (i.prefix.empty())
-            suffix = concatStrings("/", path);
-        else {
-            auto s = i.prefix.size();
-            if (path.compare(0, s, i.prefix) != 0 ||
-                (path.size() > s && path[s] != '/'))
-                continue;
-            suffix = path.size() == s ? "" : concatStrings("/", path.substr(s));
-        }
-        if (auto path = resolveSearchPathElem(i)) {
-            auto res = *path + CanonPath(suffix);
-            if (res.pathExists()) return res;
-        }
+    for (auto & i : searchPath.elements) {
+        auto suffixOpt = i.prefix.suffixIfPotentialMatch(path);
+
+        if (!suffixOpt) continue;
+        auto suffix = *suffixOpt;
+
+        auto rOpt = resolveSearchPathPath(i.path);
+        if (!rOpt) continue;
+        auto r = *rOpt;
+
+        auto res = r + CanonPath(suffix);
+        if (res.pathExists()) return res;
     }
 
     if (hasPrefix(path, "nix/"))
@@ -801,37 +792,38 @@ SourcePath EvalState::findFile(SearchPath & searchPath, const std::string_view p
 }
 
 
-std::optional<SourcePath> EvalState::resolveSearchPathElem(const SearchPathElem & elem, bool initAccessControl)
+std::optional<SourcePath> EvalState::resolveSearchPathPath(const SearchPath::Path & value0, bool initAccessControl)
 {
-    auto i = searchPathResolved.find(elem.path);
+    auto & value = value0.s;
+    auto i = searchPathResolved.find(value);
     if (i != searchPathResolved.end()) return i->second;
 
     std::optional<SourcePath> res;
 
-    if (EvalSettings::isPseudoUrl(elem.path)) {
+    if (EvalSettings::isPseudoUrl(value)) {
         try {
             auto storePath = fetchers::downloadTarball(
-                store, EvalSettings::resolvePseudoUrl(elem.path), "source", false).storePath;
+                store, EvalSettings::resolvePseudoUrl(value), "source", false).storePath;
             auto accessor = makeStorePathAccessor(store, storePath);
             registerAccessor(accessor);
             res.emplace(accessor->root());
         } catch (FileTransferError & e) {
             logWarning({
-                .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", elem.path)
+                .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)
             });
         }
     }
 
-    else if (hasPrefix(elem.path, "flake:")) {
+    else if (hasPrefix(value, "flake:")) {
         experimentalFeatureSettings.require(Xp::Flakes);
-        auto flakeRef = parseFlakeRef(elem.path.substr(6), {}, true, false);
-        debug("fetching flake search path element '%s''", elem.path);
+        auto flakeRef = parseFlakeRef(value.substr(6), {}, true, false);
+        debug("fetching flake search path element '%s''", value);
         auto [accessor, _] = flakeRef.resolve(store).lazyFetch(store);
         res.emplace(accessor->root());
     }
 
     else {
-        auto path = rootPath(CanonPath::fromCwd(elem.path));
+        auto path = rootPath(CanonPath::fromCwd(value));
 
         /* Allow access to paths in the search path. */
         if (initAccessControl) {
@@ -850,15 +842,15 @@ std::optional<SourcePath> EvalState::resolveSearchPathElem(const SearchPathElem 
             res.emplace(path);
         else {
             logWarning({
-                .msg = hintfmt("Nix search path entry '%1%' does not exist, ignoring", elem.path)
+                .msg = hintfmt("Nix search path entry '%1%' does not exist, ignoring", value)
             });
         }
     }
 
     if (res)
-        debug("resolved search path element '%s' to '%s'", elem.path, *res);
+        debug("resolved search path element '%s' to '%s'", value, *res);
 
-    searchPathResolved.emplace(elem.path, res);
+    searchPathResolved.emplace(value, res);
     return res;
 }
 

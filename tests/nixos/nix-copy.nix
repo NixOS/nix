@@ -79,6 +79,15 @@ in {
     server.copy_from_host("key.pub", "/root/.ssh/authorized_keys")
     server.succeed("systemctl restart sshd")
     client.succeed(f"ssh -o StrictHostKeyChecking=no {server.name} 'echo hello world'")
+    client.succeed(f"ssh -O check {server.name}")
+    client.succeed(f"ssh -O exit {server.name}")
+    client.fail(f"ssh -O check {server.name}")
+
+    # Check that an explicit master will work
+    client.succeed(f"ssh -MNfS /tmp/master {server.name}")
+    client.succeed(f"ssh -S /tmp/master -O check {server.name}")
+    client.succeed("NIX_SSHOPTS='-oControlPath=/tmp/master' nix copy --to ssh://server ${pkgA} >&2")
+    client.succeed(f"ssh -S /tmp/master -O exit {server.name}")
 
     # Copy the closure of package B from the server to the client, using ssh-ng.
     client.fail("nix-store --check-validity ${pkgB}")

@@ -26,6 +26,7 @@ extern "C" {
 #include "eval.hh"
 #include "eval-cache.hh"
 #include "eval-inline.hh"
+#include "eval-settings.hh"
 #include "attr-path.hh"
 #include "store-api.hh"
 #include "log-store.hh"
@@ -68,7 +69,7 @@ struct NixRepl
 
     const Path historyFile;
 
-    NixRepl(const Strings & searchPath, nix::ref<Store> store,ref<EvalState> state,
+    NixRepl(const SearchPath & searchPath, nix::ref<Store> store,ref<EvalState> state,
             std::function<AnnotatedValues()> getValues);
     virtual ~NixRepl();
 
@@ -104,7 +105,7 @@ std::string removeWhitespace(std::string s)
 }
 
 
-NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store, ref<EvalState> state,
+NixRepl::NixRepl(const SearchPath & searchPath, nix::ref<Store> store, ref<EvalState> state,
             std::function<NixRepl::AnnotatedValues()> getValues)
     : AbstractNixRepl(state)
     , debugTraceIndex(0)
@@ -1024,7 +1025,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
 
 std::unique_ptr<AbstractNixRepl> AbstractNixRepl::create(
-   const Strings & searchPath, nix::ref<Store> store, ref<EvalState> state,
+   const SearchPath & searchPath, nix::ref<Store> store, ref<EvalState> state,
    std::function<AnnotatedValues()> getValues)
 {
     return std::make_unique<NixRepl>(
@@ -1044,7 +1045,7 @@ void AbstractNixRepl::runSimple(
         NixRepl::AnnotatedValues values;
         return values;
     };
-    const Strings & searchPath = {};
+    SearchPath searchPath = {};
     auto repl = std::make_unique<NixRepl>(
             searchPath,
             openStore(),

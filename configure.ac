@@ -5,7 +5,14 @@ AC_CONFIG_AUX_DIR(config)
 
 AC_PROG_SED
 
-# Construct a Nix system name (like "i686-linux").
+# Construct a Nix system name (like "i686-linux"):
+# https://www.gnu.org/software/autoconf/manual/html_node/Canonicalizing.html#index-AC_005fCANONICAL_005fHOST-1
+# The inital value is produced by the `config/config.guess` script:
+# upstream: https://git.savannah.gnu.org/cgit/config.git/tree/config.guess
+# It has the following form, which is not documented anywhere:
+# <cpu>-<vendor>-<os>[<version>][-<abi>]
+# If `./configure` is passed any of the `--host`, `--build`, `--target` options, the value comes from `config/config.sub` instead:
+# upstream: https://git.savannah.gnu.org/cgit/config.git/tree/config.sub
 AC_CANONICAL_HOST
 AC_MSG_CHECKING([for the canonical Nix system name])
 

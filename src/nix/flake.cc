@@ -4,6 +4,7 @@
 #include "shared.hh"
 #include "eval.hh"
 #include "eval-inline.hh"
+#include "eval-settings.hh"
 #include "flake/flake.hh"
 #include "get-drvs.hh"
 #include "store-api.hh"
@@ -382,8 +383,10 @@ struct CmdFlakeCheck : FlakeCommand
         auto checkOverlay = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
                 state->forceValue(v, pos);
-                if (!v.isLambda()
-                    || v.lambda.fun->hasFormals()
+                if (!v.isLambda()) {
+                    throw Error("overlay is not a function, but %s instead", showType(v));
+                }
+                if (v.lambda.fun->hasFormals()
                     || !argHasName(v.lambda.fun->arg, "final"))
                     throw Error("overlay does not take an argument named 'final'");
                 auto body = dynamic_cast<ExprLambda *>(v.lambda.fun->body);

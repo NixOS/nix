@@ -1,5 +1,6 @@
 #include "primops.hh"
 #include "eval-inline.hh"
+#include "eval-settings.hh"
 #include "store-api.hh"
 #include "fetchers.hh"
 #include "filetransfer.hh"
@@ -290,10 +291,8 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
         auto expectedPath = state.store->makeFixedOutputPath(
             name,
             FixedOutputInfo {
-                .hash = {
-                    .method = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat,
-                    .hash = *expectedHash,
-                },
+                .method = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat,
+                .hash = *expectedHash,
                 .references = {}
             });
 

@@ -309,10 +309,8 @@ StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, std::string_view n
             *this,
             name,
             FixedOutputInfo {
-                .hash = {
-                    .method = method,
-                    .hash = nar.first,
-                },
+                .method = method,
+                .hash = nar.first,
                 .references = {
                     .others = references,
                     // caller is not capable of creating a self-reference, because this is content-addressed without modulus
@@ -428,10 +426,8 @@ StorePath BinaryCacheStore::addToStore(
             *this,
             name,
             FixedOutputInfo {
-                .hash = {
-                    .method = method,
-                    .hash = h,
-                },
+                .method = method,
+                .hash = h,
                 .references = {
                     .others = references,
                     // caller is not capable of creating a self-reference, because this is content-addressed without modulus
@@ -465,8 +461,8 @@ StorePath BinaryCacheStore::addTextToStore(
             *this,
             std::string { name },
             TextInfo {
-                { .hash = textHash },
-                references,
+                .hash = textHash,
+                .references = references,
             },
             nar.first,
         };

@@ -1,0 +1,7 @@
+error: syntax error, unexpected ':', expecting '}'
+
+       at «stdin»:3:13:
+
+            2|
+            3|   f = {x, y :
+             |             ^

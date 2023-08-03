@@ -2,6 +2,9 @@ programs += test-libstoreconsumer
 
 test-libstoreconsumer_DIR := $(d)
 
+# do not install
+test-libstoreconsumer_INSTALL_DIR :=
+
 test-libstoreconsumer_SOURCES := \
   $(wildcard $(d)/*.cc) \
 

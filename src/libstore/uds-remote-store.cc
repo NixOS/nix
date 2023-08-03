@@ -1,4 +1,5 @@
 #include "uds-remote-store.hh"
+#include "worker-protocol.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -74,6 +75,15 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     conn->startTime = std::chrono::steady_clock::now();
 
     return conn;
+}
+
+
+void UDSRemoteStore::addIndirectRoot(const Path & path)
+{
+    auto conn(getConnection());
+    conn->to << WorkerProto::Op::AddIndirectRoot << path;
+    conn.processStderr();
+    readInt(conn->from);
 }
 
 

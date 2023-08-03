@@ -1,4 +1,5 @@
 #include "eval.hh"
+#include "eval-settings.hh"
 #include "hash.hh"
 #include "types.hh"
 #include "util.hh"
@@ -96,11 +97,16 @@ RootValue allocRootValue(Value * v)
 #endif
 }
 
-void Value::print(const SymbolTable & symbols, std::ostream & str,
-    std::set<const void *> * seen) const
+void Value::print(const SymbolTable &symbols, std::ostream &str,
+                  std::set<const void *> *seen, int depth) const
+
 {
     checkInterrupt();
 
+    if (depth <= 0) {
+        str << "«too deep»";
+        return;
+    }
     switch (internalType) {
     case tInt:
         str << integer;
@@ -124,7 +130,7 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
             str << "{ ";
             for (auto & i : attrs->lexicographicOrder(symbols)) {
                 str << symbols[i->name] << " = ";
-                i->value->print(symbols, str, seen);
+                i->value->print(symbols, str, seen, depth - 1);
                 str << "; ";
             }
             str << "}";
@@ -140,7 +146,7 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
             str << "[ ";
             for (auto v2 : listItems()) {
                 if (v2)
-                    v2->print(symbols, str, seen);
+                    v2->print(symbols, str, seen, depth - 1);
                 else
                     str << "(nullptr)";
                 str << " ";
@@ -182,11 +188,10 @@ void Value::print(const SymbolTable & symbols, std::ostream & str,
     }
 }
 
-
-void Value::print(const SymbolTable & symbols, std::ostream & str, bool showRepeated) const
-{
+void Value::print(const SymbolTable &symbols, std::ostream &str,
+                  bool showRepeated, int depth) const {
     std::set<const void *> seen;
-    print(symbols, str, showRepeated ? nullptr : &seen);
+    print(symbols, str, showRepeated ? nullptr : &seen, depth);
 }
 
 // Pretty print types for assertion errors
@@ -212,20 +217,21 @@ const Value * getPrimOp(const Value &v) {
     return primOp;
 }
 
-std::string_view showType(ValueType type)
+std::string_view showType(ValueType type, bool withArticle)
 {
+    #define WA(a, w) withArticle ? a " " w : w
     switch (type) {
-        case nInt: return "an integer";
-        case nBool: return "a Boolean";
-        case nString: return "a string";
-        case nPath: return "a path";
+        case nInt: return WA("an", "integer");
+        case nBool: return WA("a", "Boolean");
+        case nString: return WA("a", "string");
+        case nPath: return WA("a", "path");
         case nNull: return "null";
-        case nAttrs: return "a set";
-        case nList: return "a list";
-        case nFunction: return "a function";
-        case nExternal: return "an external value";
-        case nFloat: return "a float";
-        case nThunk: return "a thunk";
+        case nAttrs: return WA("a", "set");
+        case nList: return WA("a", "list");
+        case nFunction: return WA("a", "function");
+        case nExternal: return WA("an", "external value");
+        case nFloat: return WA("a", "float");
+        case nThunk: return WA("a", "thunk");
     }
     abort();
 }
@@ -416,44 +422,6 @@ void initGC()
 }
 
 
-/* Very hacky way to parse $NIX_PATH, which is colon-separated, but
-   can contain URLs (e.g. "nixpkgs=https://bla...:foo=https://"). */
-static Strings parseNixPath(const std::string & s)
-{
-    Strings res;
-
-    auto p = s.begin();
-
-    while (p != s.end()) {
-        auto start = p;
-        auto start2 = p;
-
-        while (p != s.end() && *p != ':') {
-            if (*p == '=') start2 = p + 1;
-            ++p;
-        }
-
-        if (p == s.end()) {
-            if (p != start) res.push_back(std::string(start, p));
-            break;
-        }
-
-        if (*p == ':') {
-            auto prefix = std::string(start2, s.end());
-            if (EvalSettings::isPseudoUrl(prefix) || hasPrefix(prefix, "flake:")) {
-                ++p;
-                while (p != s.end() && *p != ':') ++p;
-            }
-            res.push_back(std::string(start, p));
-            if (p == s.end()) break;
-        }
-
-        ++p;
-    }
-
-    return res;
-}
-
 ErrorBuilder & ErrorBuilder::atPos(PosIdx pos)
 {
     info.errPos = state.positions[pos];
@@ -494,7 +462,7 @@ ErrorBuilder & ErrorBuilder::withFrame(const Env & env, const Expr & expr)
 
 
 EvalState::EvalState(
-    const Strings & _searchPath,
+    const SearchPath & _searchPath,
     ref<Store> store,
     std::shared_ptr<Store> buildStore)
     : sWith(symbols.create("<with>"))
@@ -584,14 +552,16 @@ EvalState::EvalState(
 
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
-        for (auto & i : _searchPath) addToSearchPath(i);
-        for (auto & i : evalSettings.nixPath.get()) addToSearchPath(i);
+        for (auto & i : _searchPath.elements)
+            addToSearchPath(SearchPath::Elem {i});
+        for (auto & i : evalSettings.nixPath.get())
+            addToSearchPath(SearchPath::Elem::parse(i));
     }
 
     /* Allow access to all paths in the search path. */
     if (rootFS->hasAccessControl())
-        for (auto & i : searchPath)
-            resolveSearchPathElem(i, true);
+        for (auto & i : searchPath.elements)
+            resolveSearchPathPath(i.path, true);
 
     corepkgsFS->addFile(
         CanonPath("fetchurl.nix"),
@@ -666,28 +636,34 @@ Path EvalState::toRealPath(const Path & path, const NixStringContext & context)
 }
 
 
-Value * EvalState::addConstant(const std::string & name, Value & v)
+Value * EvalState::addConstant(const std::string & name, Value & v, Constant info)
 {
     Value * v2 = allocValue();
     *v2 = v;
-    addConstant(name, v2);
+    addConstant(name, v2, info);
     return v2;
 }
 
 
-void EvalState::addConstant(const std::string & name, Value * v)
+void EvalState::addConstant(const std::string & name, Value * v, Constant info)
 {
-    staticBaseEnv->vars.emplace_back(symbols.create(name), baseEnvDispl);
-    baseEnv.values[baseEnvDispl++] = v;
     auto name2 = name.substr(0, 2) == "__" ? name.substr(2) : name;
-    baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v));
-}
 
+    constantInfos.push_back({name2, info});
 
-Value * EvalState::addPrimOp(const std::string & name,
-    size_t arity, PrimOpFun primOp)
-{
-    return addPrimOp(PrimOp { .fun = primOp, .arity = arity, .name = name });
+    if (!(evalSettings.pureEval && info.impureOnly)) {
+        /* Check the type, if possible.
+
+           We might know the type of a thunk in advance, so be allowed
+           to just write it down in that case. */
+        if (auto gotType = v->type(true); gotType != nThunk)
+            assert(info.type == gotType);
+
+        /* Install value the base environment. */
+        staticBaseEnv->vars.emplace_back(symbols.create(name), baseEnvDispl);
+        baseEnv.values[baseEnvDispl++] = v;
+        baseEnv.values[0]->attrs->push_back(Attr(symbols.create(name2), v));
+    }
 }
 
 
@@ -701,7 +677,10 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
         vPrimOp->mkPrimOp(new PrimOp(primOp));
         Value v;
         v.mkApp(vPrimOp, vPrimOp);
-        return addConstant(primOp.name, v);
+        return addConstant(primOp.name, v, {
+            .type = nThunk, // FIXME
+            .doc = primOp.doc,
+        });
     }
 
     auto envName = symbols.create(primOp.name);
@@ -727,13 +706,13 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 {
     if (v.isPrimOp()) {
         auto v2 = &v;
-        if (v2->primOp->doc)
+        if (auto * doc = v2->primOp->doc)
             return Doc {
                 .pos = {},
                 .name = v2->primOp->name,
                 .arity = v2->primOp->arity,
                 .args = v2->primOp->args,
-                .doc = v2->primOp->doc,
+                .doc = doc,
             };
     }
     return {};
@@ -2595,56 +2574,6 @@ bool ExternalValueBase::operator==(const ExternalValueBase & b) const
 std::ostream & operator << (std::ostream & str, const ExternalValueBase & v) {
     return v.print(str);
 }
-
-
-EvalSettings::EvalSettings()
-{
-    auto var = getEnv("NIX_PATH");
-    if (var) nixPath = parseNixPath(*var);
-}
-
-Strings EvalSettings::getDefaultNixPath()
-{
-    Strings res;
-    auto add = [&](const Path & p, const std::string & s = std::string()) {
-        if (pathAccessible(p)) {
-            if (s.empty()) {
-                res.push_back(p);
-            } else {
-                res.push_back(s + "=" + p);
-            }
-        }
-    };
-
-    if (!evalSettings.restrictEval && !evalSettings.pureEval) {
-        add(settings.useXDGBaseDirectories ? getStateDir() + "/nix/defexpr/channels" : getHome() + "/.nix-defexpr/channels");
-        add(rootChannelsDir() + "/nixpkgs", "nixpkgs");
-        add(rootChannelsDir());
-    }
-
-    return res;
-}
-
-bool EvalSettings::isPseudoUrl(std::string_view s)
-{
-    if (s.compare(0, 8, "channel:") == 0) return true;
-    size_t pos = s.find("://");
-    if (pos == std::string::npos) return false;
-    std::string scheme(s, 0, pos);
-    return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "channel" || scheme == "git" || scheme == "s3" || scheme == "ssh";
-}
-
-std::string EvalSettings::resolvePseudoUrl(std::string_view url)
-{
-    if (hasPrefix(url, "channel:"))
-        return "https://nixos.org/channels/" + std::string(url.substr(8)) + "/nixexprs.tar.xz";
-    else
-        return std::string(url);
-}
-
-EvalSettings evalSettings;
-
-static GlobalConfig::Register rEvalSettings(&evalSettings);
 
 
 }
