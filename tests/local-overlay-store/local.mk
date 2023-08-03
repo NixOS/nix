@@ -1,4 +1,4 @@
-overlay-local-store-tests := \
+local-overlay-store-tests := \
   $(d)/check-post-init.sh \
   $(d)/redundant-add.sh \
   $(d)/build.sh \
@@ -11,4 +11,4 @@ overlay-local-store-tests := \
   $(d)/optimise.sh \
   $(d)/stale-file-handle.sh
 
-install-tests-groups += overlay-local-store
+install-tests-groups += local-overlay-store

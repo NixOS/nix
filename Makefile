@@ -29,7 +29,7 @@ makefiles += \
   tests/local.mk \
   tests/ca/local.mk \
   tests/dyn-drv/local.mk \
-  tests/overlay-local-store/local.mk \
+  tests/local-overlay-store/local.mk \
   tests/test-libstoreconsumer/local.mk \
   tests/plugins/local.mk
 else
