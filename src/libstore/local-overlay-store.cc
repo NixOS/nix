@@ -5,6 +5,13 @@
 
 namespace nix {
 
+std::string LocalOverlayStoreConfig::doc()
+{
+    return
+        #include "local-overlay-store.md"
+        ;
+}
+
 Path LocalOverlayStoreConfig::toUpperPath(const StorePath & path) {
     return upperLayer + "/" + path.to_string();
 }

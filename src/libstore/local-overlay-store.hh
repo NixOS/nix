@@ -61,14 +61,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
         return ExperimentalFeature::LocalOverlayStore;
     }
 
-    std::string doc() override
-    {
-        return
-          ""
-          // FIXME write docs
-          //#include "local-overlay-store.md"
-          ;
-    }
+    std::string doc() override;
 
     /**
      * Given a store path, get its location (if it is exists) in the
