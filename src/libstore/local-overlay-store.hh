@@ -56,6 +56,11 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
 
     const std::string name() override { return "Experimental Local Overlay Store"; }
 
+    std::optional<ExperimentalFeature> experimentalFeature() const override
+    {
+        return ExperimentalFeature::LocalOverlayStore;
+    }
+
     std::string doc() override
     {
         return

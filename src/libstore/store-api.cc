@@ -1444,7 +1444,9 @@ std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Para
     } else if (uri == "local") {
         return std::make_shared<LocalStore>(params);
     } else if (uri == "local-overlay") {
-        return std::make_shared<LocalOverlayStore>(params);
+        auto store = std::make_shared<LocalOverlayStore>(params);
+        experimentalFeatureSettings.require(store->experimentalFeature());
+        return store;
     } else if (isNonUriPath(uri)) {
         Store::Params params2 = params;
         params2["root"] = absPath(uri);
@@ -1512,6 +1514,7 @@ ref<Store> openStore(const std::string & uri_,
         params.insert(uriParams.begin(), uriParams.end());
 
         if (auto store = openFromNonUri(uri, params)) {
+            experimentalFeatureSettings.require(store->experimentalFeature());
             store->warnUnknownSettings();
             return ref<Store>(store);
         }

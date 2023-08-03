@@ -16,7 +16,7 @@ setupConfig () {
   addConfig "build-users-group = "
 }
 
-
+enableFeatures "local-overlay-store"
 
 storeDirs () {
   # Attempt to create store dirs on tmpfs volume.
