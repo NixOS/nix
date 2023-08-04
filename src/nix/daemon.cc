@@ -500,6 +500,45 @@ static RegisterLegacyCommand r_nix_daemon("nix-daemon", main_nix_daemon);
 
 struct CmdDaemon : StoreCommand
 {
+    bool stdio = false;
+    std::optional<TrustedFlag> isTrustedOpt = std::nullopt;
+
+    CmdDaemon()
+    {
+        addFlag({
+            .longName = "stdio",
+            .description = "Attach to standard I/O instead of listening on a socket.",
+            .handler = {&stdio, true},
+        });
+
+        addFlag({
+            .longName = "force-trusted",
+            .description = "Causes the daemon to blindly foward the connection to the next daemon.",
+            .handler = {[&]() {
+                experimentalFeatureSettings.require(Xp::DaemonTrustOverride);
+                isTrustedOpt = Trusted;
+            }},
+        });
+
+        addFlag({
+            .longName = "force-untrusted",
+            .description = "Causes the daemon to process the connection itself, instead of blindly forwarding it to the next daemon.",
+            .handler = {[&]() {
+                experimentalFeatureSettings.require(Xp::DaemonTrustOverride);
+                isTrustedOpt = NotTrusted;
+            }},
+        });
+
+        addFlag({
+            .longName = "default-trust",
+            .description = "Use Nix's default trust.",
+            .handler = {[&]() {
+                experimentalFeatureSettings.require(Xp::DaemonTrustOverride);
+                isTrustedOpt = std::nullopt;
+            }},
+        });
+    }
+
     std::string description() override
     {
         return "daemon to perform store operations on behalf of non-root clients";
@@ -516,7 +555,7 @@ struct CmdDaemon : StoreCommand
 
     void run(ref<Store> store) override
     {
-        runDaemon(false, std::nullopt);
+        runDaemon(stdio, isTrustedOpt);
     }
 };
 
