@@ -43,7 +43,7 @@ nix_err nix_context_error(nix_c_context *context) {
 nix_err nix_set_err_msg(nix_c_context *context, nix_err err, const char *msg) {
   if (context == nullptr) {
     // todo last_err_code
-    throw new nix::Error("Nix C api error", msg);
+    throw nix::Error("Nix C api error: %s", msg);
   }
   context->last_err_code = err;
   context->last_err = msg;
