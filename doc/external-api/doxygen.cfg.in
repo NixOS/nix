@@ -38,9 +38,10 @@ GENERATE_LATEX         = NO
 INPUT                  = \
   src/libutil/c \
   src/libexpr/c \
-  src/libstore/c
+  src/libstore/c \
+  doc/external-api/README.md
 
-FILE_PATTERNS = nix_api_*.h
+FILE_PATTERNS = nix_api_*.h *.md
 
 # The INCLUDE_PATH tag can be used to specify one or more directories that
 # contain include files that are not input files but should be processed by the
@@ -52,3 +53,5 @@ INCLUDE_PATH           = @RAPIDCHECK_HEADERS@
 EXCLUDE_PATTERNS = *_internal.h
 GENERATE_TREEVIEW = YES
 OPTIMIZE_OUTPUT_FOR_C  = YES
+
+USE_MDFILE_AS_MAINPAGE = doc/external-api/README.md
