@@ -49,6 +49,7 @@ nix_err nix_expr_eval_from_string(nix_c_context *context, State *state,
     nix::Expr *parsedExpr = state->state.parseExprFromString(
         expr, state->state.rootPath(nix::CanonPath(path)));
     state->state.eval(parsedExpr, *(nix::Value *)value);
+    state->state.forceValue(*(nix::Value *)value, nix::noPos);
   }
   NIXC_CATCH_ERRS
 }
@@ -60,6 +61,7 @@ nix_err nix_value_call(nix_c_context *context, State *state, Value *fn,
   try {
     state->state.callFunction(*(nix::Value *)fn, *(nix::Value *)arg,
                               *(nix::Value *)value, nix::noPos);
+    state->state.forceValue(*(nix::Value *)value, nix::noPos);
   }
   NIXC_CATCH_ERRS
 }

@@ -178,11 +178,12 @@ ExternalValue *nix_get_external(nix_c_context *context, Value *);
  * Owned by the GC. Use nix_gc_decref when you're done with the pointer
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
+ * @param[in] state nix evaluator state
  * @param[in] ix list element to get
  * @return value, NULL in case of errors
  */
 Value *nix_get_list_byidx(nix_c_context *context, const Value *value,
-                          unsigned int ix);
+                          State *state, unsigned int ix);
 /** @brief Get an attr by name
  *
  * Owned by the GC. Use nix_gc_decref when you're done with the pointer
