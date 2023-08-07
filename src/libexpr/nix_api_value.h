@@ -208,6 +208,8 @@ bool nix_has_attr_byname(nix_c_context *context, const Value *value,
 
 /** @brief Get an attribute by index in the sorted bindings
  *
+ * Also gives you the name.
+ *
  * Owned by the GC. Use nix_gc_decref when you're done with the pointer
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
@@ -218,6 +220,20 @@ bool nix_has_attr_byname(nix_c_context *context, const Value *value,
  */
 Value *nix_get_attr_byidx(nix_c_context *context, const Value *value,
                           State *state, unsigned int i, const char **name);
+
+/** @brief Get an attribute name by index in the sorted bindings
+ *
+ * Useful when you want the name but want to avoid evaluation.
+ *
+ * Owned by the nix State
+ * @param[out] context Optional, stores error information
+ * @param[in] value Nix value to inspect
+ * @param[in] state nix evaluator state
+ * @param[in] i attribute index
+ * @return name, NULL in case of errors
+ */
+const char *nix_get_attr_name_byidx(nix_c_context *context, const Value *value,
+                                    State *state, unsigned int i);
 /**@}*/
 /** @name Setters
  */

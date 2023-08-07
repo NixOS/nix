@@ -266,6 +266,18 @@ Value *nix_get_attr_byidx(nix_c_context *context, const Value *value,
   NIXC_CATCH_ERRS_NULL
 }
 
+const char *nix_get_attr_name_byidx(nix_c_context *context, const Value *value,
+                                    State *state, unsigned int i) {
+  if (context)
+    context->last_err_code = NIX_OK;
+  try {
+    auto &v = check_value_not_null(value);
+    const nix::Attr &a = (*v.attrs)[i];
+    return ((const std::string &)(state->state.symbols[a.name])).c_str();
+  }
+  NIXC_CATCH_ERRS_NULL
+}
+
 nix_err nix_set_bool(nix_c_context *context, Value *value, bool b) {
   if (context)
     context->last_err_code = NIX_OK;
