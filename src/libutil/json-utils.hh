@@ -11,6 +11,28 @@ const nlohmann::json * get(const nlohmann::json & map, const std::string & key);
 nlohmann::json * get(nlohmann::json & map, const std::string & key);
 
 /**
+ * Get the value of a json object at a key safely, failing
+ * with a Nix Error if the key does not exist.
+ *
+ * Use instead of nlohmann::json::at() to avoid ugly exceptions.
+ *
+ * _Does not check whether `map` is an object_, use `ensureType` for that.
+ */
+const nlohmann::json & valueAt(
+    const nlohmann::json & map,
+    const std::string & key);
+
+/**
+ * Ensure the type of a json object is what you expect, failing
+ * with a Nix Error if it isn't.
+ *
+ * Use before type conversions and element access to avoid ugly exceptions.
+ */
+const nlohmann::json & ensureType(
+    const nlohmann::json & value,
+    nlohmann::json::value_type expectedType);
+
+/**
  * For `adl_serializer<std::optional<T>>` below, we need to track what
  * types are not already using `null`. Only for them can we use `null`
  * to represent `std::nullopt`.
