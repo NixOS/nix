@@ -36,9 +36,9 @@ GENERATE_LATEX         = NO
 # so they can expand variables despite configure variables.
 
 INPUT                  = \
-  src/libutil \
-  src/libexpr \
-  src/libstore
+  src/libutil/c \
+  src/libexpr/c \
+  src/libstore/c
 
 FILE_PATTERNS = nix_api_*.h
 
