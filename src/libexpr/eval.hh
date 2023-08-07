@@ -689,12 +689,15 @@ public:
      * be passed if and only if output store object is input-addressed.
      * Will be printed to form string if passed, otherwise a placeholder
      * will be used (see `DownstreamPlaceholder`).
+     *
+     * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
     void mkOutputString(
         Value & value,
         const StorePath & drvPath,
         const std::string outputName,
-        std::optional<StorePath> optOutputPath);
+        std::optional<StorePath> optOutputPath,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     void concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos, std::string_view errorCtx);
 
