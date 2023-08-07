@@ -42,8 +42,10 @@ nix-build -o $RESULT check-refs.nix -A test7
 nix-build -o $RESULT check-refs.nix -A test10
 
 if isDaemonNewer 2.12pre20230103; then
-    enableFeatures discard-references
-    restartDaemon
+    if ! isDaemonNewer 2.16.0; then
+        enableFeatures discard-references
+        restartDaemon
+    fi
 
     # test11 should succeed.
     test11=$(nix-build -o $RESULT check-refs.nix -A test11)
