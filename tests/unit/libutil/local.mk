@@ -22,7 +22,7 @@ libutil-tests_EXTRA_INCLUDES = \
 
 libutil-tests_CXXFLAGS += $(libutil-tests_EXTRA_INCLUDES)
 
-libutil-tests_LIBS = libutil-test-support libutil
+libutil-tests_LIBS = libutil-test-support libutil libutilc
 
 libutil-tests_LDFLAGS := -lrapidcheck $(GTEST_LIBS)
 
