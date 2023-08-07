@@ -88,6 +88,20 @@ typedef void (*PrimOpFun)(State *state, int pos, Value **args, Value *v);
  */
 PrimOp *nix_alloc_primop(nix_c_context *context, PrimOpFun fun, int arity,
                          const char *name, const char **args, const char *doc);
+
+/** @brief add a primop to builtins
+ *
+ * Only applies to new States.
+ *
+ * Moves your primop into the global
+ * registry, meaning your input primOp is no longer usable
+ * (but still possibly subject to garbage collection).
+ *
+ * @param[out] context Optional, stores error information
+ * @return primop, or null in case of errors
+ *
+ */
+nix_err nix_register_primop(nix_c_context *context, PrimOp *primOp);
 /** @} */
 
 // Function prototypes
