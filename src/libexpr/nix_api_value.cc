@@ -3,6 +3,7 @@
 #include "eval.hh"
 #include "gc/gc.h"
 #include "globals.hh"
+#include "primops.hh"
 #include "value.hh"
 
 #include "nix_api_expr.h"
@@ -53,6 +54,15 @@ PrimOp *nix_alloc_primop(nix_c_context *context, PrimOpFun fun, int arity,
     return (PrimOp *)p;
   }
   NIXC_CATCH_ERRS_NULL
+}
+
+nix_err nix_register_primop(nix_c_context *context, PrimOp *primOp) {
+  if (context)
+    context->last_err_code = NIX_OK;
+  try {
+    nix::RegisterPrimOp r(std::move(*((nix::PrimOp *)primOp)));
+  }
+  NIXC_CATCH_ERRS
 }
 
 Value *nix_alloc_value(nix_c_context *context, State *state) {
