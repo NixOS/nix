@@ -36,6 +36,17 @@ typedef struct StorePath StorePath;
 nix_err nix_libstore_init(nix_c_context *context);
 
 /**
+ * @brief Loads plugins specified in the settings
+ *
+ * Call this once, after calling your desired init functions and setting
+ * relevant settings.
+ *
+ * @param[out] context Optional, stores error information
+ * @return NIX_OK if the initialization was successful, an error code otherwise.
+ */
+nix_err nix_init_plugins(nix_c_context *context);
+
+/**
  * @brief Open a nix store
  * @param[out] context Optional, stores error information
  * @param[in] uri URI of the nix store, copied
