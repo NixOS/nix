@@ -44,9 +44,9 @@ struct Input
     std::optional<Path> parent;
 
 public:
-    static Input fromURL(const std::string & url);
+    static Input fromURL(const std::string & url, bool requireTree = true);
 
-    static Input fromURL(const ParsedURL & url);
+    static Input fromURL(const ParsedURL & url, bool requireTree = true);
 
     static Input fromAttrs(Attrs && attrs);
 
@@ -129,7 +129,7 @@ struct InputScheme
     virtual ~InputScheme()
     { }
 
-    virtual std::optional<Input> inputFromURL(const ParsedURL & url) const = 0;
+    virtual std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const = 0;
 
     virtual std::optional<Input> inputFromAttrs(const Attrs & attrs) const = 0;
 
