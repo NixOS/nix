@@ -201,7 +201,7 @@ ExternalValue *nix_get_external(nix_c_context *context, Value *value) {
 }
 
 Value *nix_get_list_byidx(nix_c_context *context, const Value *value,
-                          unsigned int ix) {
+                          State *state, unsigned int ix) {
   if (context)
     context->last_err_code = NIX_OK;
   try {
@@ -209,6 +209,7 @@ Value *nix_get_list_byidx(nix_c_context *context, const Value *value,
     assert(v.type() == nix::nList);
     auto *p = v.listElems()[ix];
     nix_gc_incref(nullptr, p);
+    state->state.forceValue(*p, nix::noPos);
     return (Value *)p;
   }
   NIXC_CATCH_ERRS_NULL
@@ -225,6 +226,7 @@ Value *nix_get_attr_byname(nix_c_context *context, const Value *value,
     auto attr = v.attrs->get(s);
     if (attr) {
       nix_gc_incref(nullptr, attr->value);
+      state->state.forceValue(*attr->value, nix::noPos);
       return attr->value;
     }
     nix_set_err_msg(context, NIX_ERR_KEY, "missing attribute");
@@ -258,6 +260,7 @@ Value *nix_get_attr_byidx(nix_c_context *context, const Value *value,
     const nix::Attr &a = (*v.attrs)[i];
     *name = ((const std::string &)(state->state.symbols[a.name])).c_str();
     nix_gc_incref(nullptr, a.value);
+    state->state.forceValue(*a.value, nix::noPos);
     return a.value;
   }
   NIXC_CATCH_ERRS_NULL

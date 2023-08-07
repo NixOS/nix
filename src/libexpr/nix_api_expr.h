@@ -100,7 +100,11 @@ nix_err nix_value_call(nix_c_context *context, State *state, Value *fn,
  * The Nix interpreter is lazy, and not-yet-evaluated Values can be
  * of type NIX_TYPE_THUNK instead of their actual value.
  *
- * This function converts Values into their final type.
+ * This function converts these Values into their final type.
+ *
+ * @note You don't need this function for basic API usage, since all functions
+ * that return a value call it for you. The only place you will see a
+ * NIX_TYPE_THUNK is in the primop callback.
  *
  * @param[out] context Optional, stores error information
  * @param[in] state The state of the evaluation.
