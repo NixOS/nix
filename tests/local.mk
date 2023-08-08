@@ -90,6 +90,7 @@ nix_tests = \
   zstd.sh \
   compression-levels.sh \
   nix-copy-ssh.sh \
+  nix-copy-ssh-ng.sh \
   post-hook.sh \
   function-trace.sh \
   flakes/config.sh \
