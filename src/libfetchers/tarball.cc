@@ -194,11 +194,11 @@ struct CurlInputScheme : InputScheme
             || hasSuffix(path, ".tar.zst");
     }
 
-    virtual bool isValidURL(const ParsedURL & url) const = 0;
+    virtual bool isValidURL(const ParsedURL & url, bool requireTree) const = 0;
 
-    std::optional<Input> inputFromURL(const ParsedURL & _url) const override
+    std::optional<Input> inputFromURL(const ParsedURL & _url, bool requireTree) const override
     {
-        if (!isValidURL(_url))
+        if (!isValidURL(_url, requireTree))
             return std::nullopt;
 
         Input input;
@@ -265,13 +265,13 @@ struct FileInputScheme : CurlInputScheme
 {
     const std::string inputType() const override { return "file"; }
 
-    bool isValidURL(const ParsedURL & url) const override
+    bool isValidURL(const ParsedURL & url, bool requireTree) const override
     {
         auto parsedUrlScheme = parseUrlScheme(url.scheme);
         return transportUrlSchemes.count(std::string(parsedUrlScheme.transport))
             && (parsedUrlScheme.application
-                    ? parsedUrlScheme.application.value() == inputType()
-                    : !hasTarballExtension(url.path));
+                ? parsedUrlScheme.application.value() == inputType()
+                : (!requireTree && !hasTarballExtension(url.path)));
     }
 
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
@@ -285,14 +285,14 @@ struct TarballInputScheme : CurlInputScheme
 {
     const std::string inputType() const override { return "tarball"; }
 
-    bool isValidURL(const ParsedURL & url) const override
+    bool isValidURL(const ParsedURL & url, bool requireTree) const override
     {
         auto parsedUrlScheme = parseUrlScheme(url.scheme);
 
         return transportUrlSchemes.count(std::string(parsedUrlScheme.transport))
             && (parsedUrlScheme.application
-                    ? parsedUrlScheme.application.value() == inputType()
-                    : hasTarballExtension(url.path));
+                ? parsedUrlScheme.application.value() == inputType()
+                : (requireTree || hasTarballExtension(url.path)));
     }
 
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override

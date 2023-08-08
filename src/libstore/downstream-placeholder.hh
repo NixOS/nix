@@ -52,10 +52,13 @@ public:
      *
      * The derivation itself is known (we have a store path for it), but
      * the output doesn't yet have a known store path.
+     *
+     * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
     static DownstreamPlaceholder unknownCaOutput(
         const StorePath & drvPath,
-        std::string_view outputName);
+        std::string_view outputName,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     /**
      * Create a placehold for the output of an unknown derivation.

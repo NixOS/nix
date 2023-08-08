@@ -37,8 +37,15 @@ RC_GTEST_FIXTURE_PROP(
     prop_built_path_placeholder_round_trip,
     (const StorePath & drvPath, const StorePathName & outputName))
 {
+    /**
+     * We set these in tests rather than the regular globals so we don't have
+     * to worry about race conditions if the tests run concurrently.
+     */
+    ExperimentalFeatureSettings mockXpSettings;
+    mockXpSettings.set("experimental-features", "ca-derivations");
+
     auto * v = state.allocValue();
-    state.mkOutputString(*v, drvPath, outputName.name, std::nullopt);
+    state.mkOutputString(*v, drvPath, outputName.name, std::nullopt, mockXpSettings);
     auto [d, _] = state.coerceToDerivedPathUnchecked(noPos, *v, "");
     DerivedPath::Built b {
         .drvPath = drvPath,

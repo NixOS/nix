@@ -239,7 +239,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                         if (pos != std::string::npos) {
                             size_t margin = 32;
                             auto pos2 = pos >= margin ? pos - margin : 0;
-                            hits[hash].emplace_back(fmt("%s: …%s…\n",
+                            hits[hash].emplace_back(fmt("%s: …%s…",
                                     p2,
                                     hilite(filterPrintable(
                                             std::string(contents, pos2, pos - pos2 + hash.size() + margin)),
@@ -255,7 +255,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                     for (auto & hash : hashes) {
                         auto pos = target.find(hash);
                         if (pos != std::string::npos)
-                            hits[hash].emplace_back(fmt("%s -> %s\n", p2,
+                            hits[hash].emplace_back(fmt("%s -> %s", p2,
                                     hilite(target, pos, StorePath::HashLen, getColour(hash))));
                     }
                 }
@@ -272,9 +272,9 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
 
                 for (auto & hit : hits[hash]) {
                     bool first = hit == *hits[hash].begin();
-                    std::cout << tailPad
-                              << (first ? (last ? treeLast : treeConn) : (last ? treeNull : treeLine))
-                              << hit;
+                    logger->cout("%s%s%s", tailPad,
+                              (first ? (last ? treeLast : treeConn) : (last ? treeNull : treeLine)),
+                              hit);
                     if (!all) break;
                 }
 
