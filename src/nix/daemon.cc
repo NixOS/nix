@@ -532,8 +532,8 @@ struct CmdDaemon : StoreCommand
         addFlag({
             .longName = "default-trust",
             .description = "Use Nix's default trust.",
+            .experimentalFeature = Xp::DaemonTrustOverride,
             .handler = {[&]() {
-                experimentalFeatureSettings.require(Xp::DaemonTrustOverride);
                 isTrustedOpt = std::nullopt;
             }},
         });
