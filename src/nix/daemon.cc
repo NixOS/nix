@@ -514,8 +514,8 @@ struct CmdDaemon : StoreCommand
         addFlag({
             .longName = "force-trusted",
             .description = "Causes the daemon to blindly forward the connection to the next daemon.",
+            .experimentalFeature = Xp::DaemonTrustOverride,
             .handler = {[&]() {
-                experimentalFeatureSettings.require(Xp::DaemonTrustOverride);
                 isTrustedOpt = Trusted;
             }},
         });
