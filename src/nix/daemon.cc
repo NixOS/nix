@@ -507,13 +507,13 @@ struct CmdDaemon : StoreCommand
     {
         addFlag({
             .longName = "stdio",
-            .description = "Attach to standard I/O instead of listening on a socket.",
+            .description = "Attach to standard I/O, instead of trying to bind to a UNIX socket.",
             .handler = {&stdio, true},
         });
 
         addFlag({
             .longName = "force-trusted",
-            .description = "Causes the daemon to blindly forward the connection to the next daemon.",
+            .description = "Forces the daemon to trust connecting clients, forwarding the connection without the receiving daemon processing it.",
             .experimentalFeature = Xp::DaemonTrustOverride,
             .handler = {[&]() {
                 isTrustedOpt = Trusted;
@@ -522,7 +522,7 @@ struct CmdDaemon : StoreCommand
 
         addFlag({
             .longName = "force-untrusted",
-            .description = "Causes the daemon to process the connection itself, instead of blindly forwarding it to the next daemon.",
+            .description = "Forces the daemon to not trust connecting clients, the connection will be processed by the receiving daemon before forwarding commands.",
             .experimentalFeature = Xp::DaemonTrustOverride,
             .handler = {[&]() {
                 isTrustedOpt = NotTrusted;
