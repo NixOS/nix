@@ -523,8 +523,8 @@ struct CmdDaemon : StoreCommand
         addFlag({
             .longName = "force-untrusted",
             .description = "Causes the daemon to process the connection itself, instead of blindly forwarding it to the next daemon.",
+            .experimentalFeature = Xp::DaemonTrustOverride,
             .handler = {[&]() {
-                experimentalFeatureSettings.require(Xp::DaemonTrustOverride);
                 isTrustedOpt = NotTrusted;
             }},
         });
