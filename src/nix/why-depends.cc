@@ -3,6 +3,7 @@
 #include "progress-bar.hh"
 #include "fs-accessor.hh"
 #include "shared.hh"
+#include "loggers.cc"
 
 #include <queue>
 

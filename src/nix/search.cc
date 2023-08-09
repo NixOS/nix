@@ -10,6 +10,7 @@
 #include "eval-cache.hh"
 #include "attr-path.hh"
 #include "hilite.hh"
+#include "loggers.hh"
 
 #include <regex>
 #include <fstream>
@@ -64,6 +65,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
 
     void run(ref<Store> store, ref<InstallableValue> installable) override
     {
+        RunPager pager;
         settings.readOnlyMode = true;
         evalSettings.enableImportFromDerivation.setDefault(false);
 

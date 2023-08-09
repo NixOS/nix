@@ -7,6 +7,7 @@
 #include "eval-settings.hh"
 #include "flake/flake.hh"
 #include "get-drvs.hh"
+#include "loggers.hh"
 #include "store-api.hh"
 #include "derivations.hh"
 #include "outputs-spec.hh"
@@ -167,6 +168,8 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
     {
         auto lockedFlake = lockFlake();
         auto & flake = lockedFlake.flake;
+
+        RunPager pager;
 
         if (json) {
             nlohmann::json j;
@@ -1137,6 +1140,9 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
             Activity act(*logger, lvlInfo, actUnknown,
                 fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
 
+            std::optional<RunPager> pager = json
+                ? std::nullopt
+                : std::make_optional<RunPager>();
             try {
                 auto recurse = [&]()
                 {

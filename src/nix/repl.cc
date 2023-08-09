@@ -3,6 +3,7 @@
 #include "globals.hh"
 #include "command.hh"
 #include "installable-value.hh"
+#include "loggers.hh"
 #include "repl.hh"
 
 namespace nix {
