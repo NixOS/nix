@@ -514,28 +514,28 @@ struct CmdDaemon : StoreCommand
         addFlag({
             .longName = "force-trusted",
             .description = "Forces the daemon to trust connecting clients, forwarding the connection without the receiving daemon processing it.",
-            .experimentalFeature = Xp::DaemonTrustOverride,
             .handler = {[&]() {
                 isTrustedOpt = Trusted;
             }},
+            .experimentalFeature = Xp::DaemonTrustOverride,
         });
 
         addFlag({
             .longName = "force-untrusted",
             .description = "Forces the daemon to not trust connecting clients, the connection will be processed by the receiving daemon before forwarding commands.",
-            .experimentalFeature = Xp::DaemonTrustOverride,
             .handler = {[&]() {
                 isTrustedOpt = NotTrusted;
             }},
+            .experimentalFeature = Xp::DaemonTrustOverride,
         });
 
         addFlag({
             .longName = "default-trust",
             .description = "Use Nix's default trust.",
-            .experimentalFeature = Xp::DaemonTrustOverride,
             .handler = {[&]() {
                 isTrustedOpt = std::nullopt;
             }},
+            .experimentalFeature = Xp::DaemonTrustOverride,
         });
     }
 
