@@ -272,8 +272,10 @@ struct LocalDerivationGoal : public DerivationGoal
 
     /**
      * Forcibly kill the child process, if any.
+     *
+     * Called by destructor, can't be overridden
      */
-    void killChild() override;
+    void killChild() override final;
 
     /**
      * Kill any processes running under the build user UID or in the
