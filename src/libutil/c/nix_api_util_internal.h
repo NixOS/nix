@@ -2,11 +2,10 @@
 #define NIX_API_UTIL_INTERNAL_H
 
 #include <string>
+#include <optional>
 
-// forward declaration
-namespace nix {
-class Error;
-};
+#include "error.hh"
+#include "nix_api_util.h"
 
 struct nix_c_context {
   nix_err last_err_code = NIX_OK;
