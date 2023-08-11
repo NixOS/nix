@@ -132,6 +132,9 @@ subcommands, these are `packages.`*system*,
 attributes `packages.x86_64-linux.hello`,
 `legacyPackages.x86_64-linux.hello` and `hello`.
 
+If the resolved attribute is a function, it will be automatically
+be called, optionally with [caller-provided arguments](@docroot@/command-ref/opt-common.md#opt-arg).
+
 ### Store path
 
 Example: `/nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10`

@@ -19,3 +19,6 @@
 
 - The JSON output for derived paths with are store paths is now a string, not an object with a single `path` field.
   This only affects `nix-build --json` when "building" non-derivation things like fetched sources, which is a no-op.
+
+- [Installables](@docroot@/glossary.md#gloss-installable) resolving to a function will automatically
+  be called, optionally with [caller-provided arguments](@docroot@/command-ref/opt-common.md#opt-arg).

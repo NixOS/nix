@@ -31,6 +31,7 @@ struct ExtraPathInfoFlake : ExtraPathInfoValue
 
 struct InstallableFlake : InstallableValue
 {
+    SourceExprCommand * cmd;
     FlakeRef flakeRef;
     Strings attrPaths;
     Strings prefixes;

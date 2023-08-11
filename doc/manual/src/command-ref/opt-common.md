@@ -141,7 +141,8 @@ Most Nix commands accept the following command-line options:
 
   - <span id="opt-arg">[`--arg`](#opt-arg)</span> *name* *value*\
     This option is accepted by `nix-env`, `nix-instantiate`,
-    `nix-shell` and `nix-build`. When evaluating Nix expressions, the
+    `nix-shell` and `nix-build`, as well as any command expecting [installables](@docroot@/glossary.md#gloss-installable).
+    When evaluating Nix expressions, the
     expression evaluator will automatically try to call functions that
     it encounters. It can automatically call functions for which every
     argument has a [default

@@ -72,14 +72,13 @@ InstallableFlake::InstallableFlake(
     Strings prefixes,
     const flake::LockFlags & lockFlags)
     : InstallableValue(state),
+      cmd(cmd),
       flakeRef(flakeRef),
       attrPaths(fragment == "" ? attrPaths : Strings{(std::string) fragment}),
       prefixes(fragment == "" ? Strings{} : prefixes),
       extendedOutputsSpec(std::move(extendedOutputsSpec)),
       lockFlags(lockFlags)
 {
-    if (cmd && cmd->getAutoArgs(*state)->size())
-        throw UsageError("'--arg' and '--argstr' are incompatible with flakes");
 }
 
 DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
@@ -90,6 +89,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
 
     auto attrPath = attr->getAttrPathStr();
 
+    StorePath drvPath(Hash(htSHA1), "dummy");
     if (!attr->isDerivation()) {
 
         // FIXME: use eval cache?
@@ -102,11 +102,19 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
         {
             return { *derivedPathWithInfo };
         }
-        else
-            throw Error("flake output attribute '%s' is not a derivation or path", attrPath);
-    }
 
-    auto drvPath = attr->forceDerivation();
+        auto emptyBindings = state->allocBindings(0);
+        Bindings * autoArgs = cmd ? cmd->getAutoArgs(*state) : emptyBindings;
+        Value v2;
+        state->autoCallFunction(*autoArgs, v, v2);
+        auto maybeDrv = getDerivation(*state, v2, false);
+        if (maybeDrv) {
+            drvPath = maybeDrv->requireDrvPath();
+        } else
+            throw Error("flake output attribute '%s' is not a derivation or path", attrPath);
+    } else {
+        drvPath = attr->forceDerivation();
+    }
 
     std::optional<NixInt> priority;
 
