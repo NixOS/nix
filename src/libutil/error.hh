@@ -214,4 +214,8 @@ public:
     }
 };
 
+/** Throw an exception for the purpose of checking that exception handling works; see 'initLibUtil()'.
+ */
+void throwExceptionSelfCheck();
+
 }
