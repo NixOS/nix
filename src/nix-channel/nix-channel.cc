@@ -5,6 +5,7 @@
 #include "store-api.hh"
 #include "legacy.hh"
 #include "fetchers.hh"
+#include "eval-settings.hh" // for defexpr
 #include "util.hh"
 
 #include <fcntl.h>
@@ -165,7 +166,7 @@ static int main_nix_channel(int argc, char ** argv)
         // Figure out the name of the `.nix-channels' file to use
         auto home = getHome();
         channelsList = settings.useXDGBaseDirectories ? createNixStateDir() + "/channels" : home + "/.nix-channels";
-        nixDefExpr = settings.useXDGBaseDirectories ? createNixStateDir() + "/defexpr" : home + "/.nix-defexpr";
+        nixDefExpr = getNixDefExpr();
 
         // Figure out the name of the channels profile.
         profile = profilesDir() +  "/channels";

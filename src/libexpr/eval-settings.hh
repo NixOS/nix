@@ -95,4 +95,9 @@ struct EvalSettings : Config
 
 extern EvalSettings evalSettings;
 
+/**
+ * Conventionally part of the default nix path in impure mode.
+ */
+Path getNixDefExpr();
+
 }

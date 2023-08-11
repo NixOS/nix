@@ -15,6 +15,7 @@
 #include "value-to-json.hh"
 #include "xml-writer.hh"
 #include "legacy.hh"
+#include "eval-settings.hh" // for defexpr
 
 #include <cerrno>
 #include <ctime>
@@ -1399,7 +1400,7 @@ static int main_nix_env(int argc, char * * argv)
         globals.instSource.type = srcUnknown;
         globals.instSource.systemFilter = "*";
 
-        Path nixExprPath = settings.useXDGBaseDirectories ? createNixStateDir() + "/defexpr" : getHome() + "/.nix-defexpr";
+        Path nixExprPath = getNixDefExpr();
 
         if (!pathExists(nixExprPath)) {
             try {
