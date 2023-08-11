@@ -6,9 +6,14 @@ R""(
   lock file:
 
   ```console
-  # nix flake update --commit-lock-file
-  * Updated 'nix': 'github:NixOS/nix/9fab14adbc3810d5cc1f88672fde1eee4358405c' -> 'github:NixOS/nix/8927cba62f5afb33b01016d5c4f7f8b7d0adde3c'
-  * Updated 'nixpkgs': 'github:NixOS/nixpkgs/3d2d8f281a27d466fa54b469b5993f7dde198375' -> 'github:NixOS/nixpkgs/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293'
+  # nix flake update
+  warning: updating lock file '/home/myself/repos/testflake/flake.lock':
+  • Updated input 'nix':
+      'github:NixOS/nix/9fab14adbc3810d5cc1f88672fde1eee4358405c' (2023-06-28)
+    → 'github:NixOS/nix/8927cba62f5afb33b01016d5c4f7f8b7d0adde3c' (2023-07-11)
+  • Updated input 'nixpkgs':
+      'github:NixOS/nixpkgs/3d2d8f281a27d466fa54b469b5993f7dde198375' (2023-06-30)
+    → 'github:NixOS/nixpkgs/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293' (2023-07-05)
   …
   warning: committed new revision '158bcbd9d6cc08ab859c0810186c1beebc982aad'
   ```
