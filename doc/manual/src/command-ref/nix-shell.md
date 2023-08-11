@@ -61,14 +61,15 @@ All options not listed here are passed to `nix-store
 `nix-instantiate`.
 
   - `--command` *cmd*\
-    In the environment of the derivation, run the shell command *cmd*.
-    This command is executed in an interactive shell. (Use `--run` to
-    use a non-interactive shell instead.) However, a call to `exit` is
-    implicitly added to the command, so the shell will exit after
-    running the command. To prevent this, add `return` at the end;
-    e.g.  `--command "echo Hello; return"` will print `Hello` and then
-    drop you into the interactive shell. This can be useful for doing
-    any additional initialisation.
+    Run the shell command *cmd*.  The command is executed in the
+    environment of the derivation, but using the shell from the host
+    environment.  The shell is started in an interactive mode (use
+    `--run` to use a non-interactive shell instead).  However, a call
+    to `exit` is implicitly added to the command, so the shell will
+    exit after running the command. To prevent this, add `return` at
+    the end; e.g.  `--command "echo Hello; return"` will print `Hello`
+    and then drop you into the interactive shell. This can be useful
+    for doing any additional initialisation.
 
   - `--run` *cmd*\
     Like `--command`, but executes the command in a non-interactive
@@ -82,9 +83,11 @@ All options not listed here are passed to `nix-store
   - `--pure`\
     If this flag is specified, the environment is almost entirely
     cleared before the interactive shell is started, so you get an
-    environment that more closely corresponds to the “real” Nix build. A
-    few variables, in particular `HOME`, `USER` and `DISPLAY`, are
-    retained.
+    environment that more closely corresponds to the “real” Nix
+    build. A few variables, in particular `HOME`, `USER` and
+    `DISPLAY`, are retained.  Note that the shell used to run commands
+    is still obtained from the host environment, and therefore not
+    affected by `--pure`.
 
   - `--packages` / `-p` *packages*…\
     Set up an environment in which the specified packages are present.
