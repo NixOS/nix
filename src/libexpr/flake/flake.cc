@@ -651,14 +651,14 @@ LockedFlake lockFlake(
 
                             bool lockFileExists = pathExists(outputLockFilePath);
 
+                            auto s = chomp(diff);
                             if (lockFileExists) {
-                                auto s = chomp(diff);
                                 if (s.empty())
                                     warn("updating lock file '%s'", outputLockFilePath);
                                 else
                                     warn("updating lock file '%s':\n%s", outputLockFilePath, s);
                             } else
-                                warn("creating lock file '%s'", outputLockFilePath);
+                                warn("creating lock file '%s': \n%s", outputLockFilePath, s);
 
                             std::optional<std::string> commitMessage = std::nullopt;
 
