@@ -22,7 +22,7 @@ namespace nix {
 class Store;
 class EvalState;
 class StorePath;
-struct DerivedPath;
+struct SingleDerivedPath;
 enum RepairFlag : bool;
 
 
@@ -532,12 +532,12 @@ public:
     StorePath coerceToStorePath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx);
 
     /**
-     * Part of `coerceToDerivedPath()` without any store IO which is exposed for unit testing only.
+     * Part of `coerceToSingleDerivedPath()` without any store IO which is exposed for unit testing only.
      */
-    std::pair<DerivedPath, std::string_view> coerceToDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx);
+    std::pair<SingleDerivedPath, std::string_view> coerceToSingleDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx);
 
     /**
-     * Coerce to `DerivedPath`.
+     * Coerce to `SingleDerivedPath`.
      *
      * Must be a string which is either a literal store path or a
      * "placeholder (see `DownstreamPlaceholder`).
@@ -551,7 +551,7 @@ public:
      * source of truth, and ultimately tells us what we want, and then
      * we ensure the string corresponds to it.
      */
-    DerivedPath coerceToDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx);
+    SingleDerivedPath coerceToSingleDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx);
 
 public:
 

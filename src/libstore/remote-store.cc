@@ -656,6 +656,9 @@ static void writeDerivedPaths(RemoteStore & store, RemoteStore::Connection & con
                         GET_PROTOCOL_MAJOR(conn.daemonVersion),
                         GET_PROTOCOL_MINOR(conn.daemonVersion));
                 },
+                [&](std::monostate) {
+                    throw Error("wanted to build a derivation that is itself a build product, but the legacy 'ssh://' protocol doesn't support that. Try using 'ssh-ng://'");
+                },
             }, sOrDrvPath);
         }
         conn.to << ss;
@@ -670,9 +673,16 @@ void RemoteStore::copyDrvsFromEvalStore(
         /* The remote doesn't have a way to access evalStore, so copy
            the .drvs. */
         RealisedPath::Set drvPaths2;
-        for (auto & i : paths)
-            if (auto p = std::get_if<DerivedPath::Built>(&i))
-                drvPaths2.insert(p->drvPath);
+        for (const auto & i : paths) {
+            std::visit(overloaded {
+                [&](const DerivedPath::Opaque & bp) {
+                    // Do nothing, path is hopefully there already
+                },
+                [&](const DerivedPath::Built & bp) {
+                    drvPaths2.insert(bp.drvPath->getBaseStorePath());
+                },
+            }, i.raw());
+        }
         copyClosure(*evalStore, *this, drvPaths2);
     }
 }
@@ -742,7 +752,8 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
                         };
 
                         OutputPathMap outputs;
-                        auto drv = evalStore->readDerivation(bfd.drvPath);
+                        auto drvPath = resolveDerivedPath(*evalStore, *bfd.drvPath);
+                        auto drv = evalStore->readDerivation(drvPath);
                         const auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
                         auto built = resolveDerivedPath(*this, bfd, &*evalStore);
                         for (auto & [output, outputPath] : built) {
@@ -750,7 +761,7 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
                             if (!outputHash)
                                 throw Error(
                                     "the derivation '%s' doesn't have an output named '%s'",
-                                    printStorePath(bfd.drvPath), output);
+                                    printStorePath(drvPath), output);
                             auto outputId = DrvOutput{ *outputHash, output };
                             if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
                                 auto realisation =

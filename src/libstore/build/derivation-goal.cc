@@ -65,7 +65,7 @@ namespace nix {
 
 DerivationGoal::DerivationGoal(const StorePath & drvPath,
     const OutputsSpec & wantedOutputs, Worker & worker, BuildMode buildMode)
-    : Goal(worker, DerivedPath::Built { .drvPath = drvPath, .outputs = wantedOutputs })
+    : Goal(worker, DerivedPath::Built { .drvPath = makeConstantStorePathRef(drvPath), .outputs = wantedOutputs })
     , useDerivation(true)
     , drvPath(drvPath)
     , wantedOutputs(wantedOutputs)
@@ -74,7 +74,7 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath,
     state = &DerivationGoal::getDerivation;
     name = fmt(
         "building of '%s' from .drv file",
-        DerivedPath::Built { drvPath, wantedOutputs }.to_string(worker.store));
+        DerivedPath::Built { makeConstantStorePathRef(drvPath), wantedOutputs }.to_string(worker.store));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
@@ -84,7 +84,7 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath,
 
 DerivationGoal::DerivationGoal(const StorePath & drvPath, const BasicDerivation & drv,
     const OutputsSpec & wantedOutputs, Worker & worker, BuildMode buildMode)
-    : Goal(worker, DerivedPath::Built { .drvPath = drvPath, .outputs = wantedOutputs })
+    : Goal(worker, DerivedPath::Built { .drvPath = makeConstantStorePathRef(drvPath), .outputs = wantedOutputs })
     , useDerivation(false)
     , drvPath(drvPath)
     , wantedOutputs(wantedOutputs)
@@ -95,7 +95,7 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath, const BasicDerivation 
     state = &DerivationGoal::haveDerivation;
     name = fmt(
         "building of '%s' from in-memory derivation",
-        DerivedPath::Built { drvPath, drv.outputNames() }.to_string(worker.store));
+        DerivedPath::Built { makeConstantStorePathRef(drvPath), drv.outputNames() }.to_string(worker.store));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
@@ -1490,7 +1490,7 @@ void DerivationGoal::waiteeDone(GoalPtr waitee, ExitCode result)
 
     for (auto & outputName : outputs->second) {
         auto buildResult = dg->getBuildResult(DerivedPath::Built {
-            .drvPath = dg->drvPath,
+            .drvPath = makeConstantStorePathRef(dg->drvPath),
             .outputs = OutputsSpec::Names { outputName },
         });
         if (buildResult.success()) {

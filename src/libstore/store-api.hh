@@ -945,6 +945,7 @@ void removeTempRoots();
  * Resolve the derived path completely, failing if any derivation output
  * is unknown.
  */
+StorePath resolveDerivedPath(Store &, const SingleDerivedPath &, Store * evalStore = nullptr);
 OutputPathMap resolveDerivedPath(Store &, const DerivedPath::Built &, Store * evalStore = nullptr);
 
 

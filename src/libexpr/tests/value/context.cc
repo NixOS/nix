@@ -8,6 +8,8 @@
 
 namespace nix {
 
+// Test a few cases of invalid string context elements.
+
 TEST(NixStringContextElemTest, empty_invalid) {
     EXPECT_THROW(
         NixStringContextElem::parse(""),
@@ -38,6 +40,10 @@ TEST(NixStringContextElemTest, slash_invalid) {
         BadStorePath);
 }
 
+/**
+ * Round trip (string <-> data structure) test for
+ * `NixStringContextElem::Opaque`.
+ */
 TEST(NixStringContextElemTest, opaque) {
     std::string_view opaque = "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x";
     auto elem = NixStringContextElem::parse(opaque);
@@ -47,6 +53,10 @@ TEST(NixStringContextElemTest, opaque) {
     ASSERT_EQ(elem.to_string(), opaque);
 }
 
+/**
+ * Round trip (string <-> data structure) test for
+ * `NixStringContextElem::DrvDeep`.
+ */
 TEST(NixStringContextElemTest, drvDeep) {
     std::string_view drvDeep = "=g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv";
     auto elem = NixStringContextElem::parse(drvDeep);
@@ -56,14 +66,55 @@ TEST(NixStringContextElemTest, drvDeep) {
     ASSERT_EQ(elem.to_string(), drvDeep);
 }
 
-TEST(NixStringContextElemTest, built) {
+/**
+ * Round trip (string <-> data structure) test for a simpler
+ * `NixStringContextElem::Built`.
+ */
+TEST(NixStringContextElemTest, built_opaque) {
     std::string_view built = "!foo!g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv";
     auto elem = NixStringContextElem::parse(built);
     auto * p = std::get_if<NixStringContextElem::Built>(&elem);
     ASSERT_TRUE(p);
     ASSERT_EQ(p->output, "foo");
-    ASSERT_EQ(p->drvPath, StorePath { built.substr(5) });
+    ASSERT_EQ(*p->drvPath, ((SingleDerivedPath) SingleDerivedPath::Opaque {
+        .path = StorePath { built.substr(5) },
+    }));
     ASSERT_EQ(elem.to_string(), built);
+}
+
+/**
+ * Round trip (string <-> data structure) test for a more complex,
+ * inductive `NixStringContextElem::Built`.
+ */
+TEST(NixStringContextElemTest, built_built) {
+    /**
+     * We set these in tests rather than the regular globals so we don't have
+     * to worry about race conditions if the tests run concurrently.
+     */
+    ExperimentalFeatureSettings mockXpSettings;
+    mockXpSettings.set("experimental-features", "dynamic-derivations ca-derivations");
+
+    std::string_view built = "!foo!bar!g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv";
+    auto elem = NixStringContextElem::parse(built, mockXpSettings);
+    auto * p = std::get_if<NixStringContextElem::Built>(&elem);
+    ASSERT_TRUE(p);
+    ASSERT_EQ(p->output, "foo");
+    auto * drvPath = std::get_if<SingleDerivedPath::Built>(&*p->drvPath);
+    ASSERT_TRUE(drvPath);
+    ASSERT_EQ(drvPath->output, "bar");
+    ASSERT_EQ(*drvPath->drvPath, ((SingleDerivedPath) SingleDerivedPath::Opaque {
+        .path = StorePath { built.substr(9) },
+    }));
+    ASSERT_EQ(elem.to_string(), built);
+}
+
+/**
+ * Without the right experimental features enabled, we cannot parse a
+ * complex inductive string context element.
+ */
+TEST(NixStringContextElemTest, built_built_xp) {
+    ASSERT_THROW(
+        NixStringContextElem::parse("!foo!bar!g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv"),        MissingExperimentalFeature);
 }
 
 }
@@ -71,25 +122,10 @@ TEST(NixStringContextElemTest, built) {
 namespace rc {
 using namespace nix;
 
-Gen<NixStringContextElem::Opaque> Arbitrary<NixStringContextElem::Opaque>::arbitrary()
-{
-    return gen::just(NixStringContextElem::Opaque {
-        .path = *gen::arbitrary<StorePath>(),
-    });
-}
-
 Gen<NixStringContextElem::DrvDeep> Arbitrary<NixStringContextElem::DrvDeep>::arbitrary()
 {
     return gen::just(NixStringContextElem::DrvDeep {
         .drvPath = *gen::arbitrary<StorePath>(),
-    });
-}
-
-Gen<NixStringContextElem::Built> Arbitrary<NixStringContextElem::Built>::arbitrary()
-{
-    return gen::just(NixStringContextElem::Built {
-        .drvPath = *gen::arbitrary<StorePath>(),
-        .output = (*gen::arbitrary<StorePathName>()).name,
     });
 }
 
