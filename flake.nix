@@ -656,7 +656,9 @@
         tests.nixpkgsLibTests =
           forAllSystems (system:
             import (nixpkgs + "/lib/tests/release.nix")
-              { pkgs = nixpkgsFor.${system}.native; }
+              { pkgs = nixpkgsFor.${system}.native;
+                nixVersions = [ self.packages.${system}.nix ];
+              }
           );
 
         metrics.nixpkgs = import "${nixpkgs-regression}/pkgs/top-level/metrics.nix" {
