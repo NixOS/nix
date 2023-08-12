@@ -333,10 +333,11 @@ struct GitLabInputScheme : GitArchiveInputScheme
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
+        auto owner = boost::replace_all_copy(getStrAttr(input.attrs, "owner"), "/", "%2F");
         auto repo = boost::replace_all_copy(getStrAttr(input.attrs, "repo"), "/", "%2F");
         // See rate limiting note below
         auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/commits?ref_name=%s",
-            host, getStrAttr(input.attrs, "owner"), repo, *input.getRef());
+            host, owner, repo, *input.getRef());
 
         Headers headers = makeHeadersWithAuthTokens(host);
 
@@ -357,9 +358,10 @@ struct GitLabInputScheme : GitArchiveInputScheme
         // is 10 reqs/sec/ip-addr.  See
         // https://docs.gitlab.com/ee/user/gitlab_com/index.html#gitlabcom-specific-rate-limits
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
+        auto owner = boost::replace_all_copy(getStrAttr(input.attrs, "owner"), "/", "%2F");
         auto repo = boost::replace_all_copy(getStrAttr(input.attrs, "repo"), "/", "%2F");
         auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/archive.tar.gz?sha=%s",
-            host, getStrAttr(input.attrs, "owner"), repo,
+            host, owner, repo,
             input.getRev()->to_string(Base16, false));
 
         Headers headers = makeHeadersWithAuthTokens(host);
@@ -369,10 +371,11 @@ struct GitLabInputScheme : GitArchiveInputScheme
     void clone(const Input & input, const Path & destDir) const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
+        auto owner = boost::replace_all_copy(getStrAttr(input.attrs, "owner"), "/", "%2F");
         auto repo = boost::replace_all_copy(getStrAttr(input.attrs, "repo"), "/", "%2F");
         // FIXME: get username somewhere
         Input::fromURL(fmt("git+https://%s/%s/%s.git",
-                host, getStrAttr(input.attrs, "owner"), repo))
+                host, owner, repo))
             .applyOverrides(input.getRef(), input.getRev())
             .clone(destDir);
     }
