@@ -259,16 +259,17 @@ template<> std::string BaseSetting<bool>::to_string() const
 
 template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string & category)
 {
+    auto indentedDescription = indent(2, description);
     args.addFlag({
         .longName = name,
-        .description = fmt("Enable the `%s` setting.", name),
+        .description = fmt("Enable the `%s` setting:\n%s", name, indentedDescription),
         .category = category,
         .handler = {[this]() { override(true); }},
         .experimentalFeature = experimentalFeature,
     });
     args.addFlag({
         .longName = "no-" + name,
-        .description = fmt("Disable the `%s` setting.", name),
+        .description = fmt("Disable the `%s` setting:\n%s", name, indentedDescription),
         .category = category,
         .handler = {[this]() { override(false); }},
         .experimentalFeature = experimentalFeature,

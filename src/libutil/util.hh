@@ -749,6 +749,11 @@ std::string base64Decode(std::string_view s);
  */
 std::string stripIndentation(std::string_view s);
 
+/**
+ * Indent string by specified number of spaces.
+ * This works for multiline strings as well.
+ */
+std::string indent(u_int8_t indentationSize, const std::string & str);
 
 /**
  * Get the prefix of 's' up to and excluding the next line break (LF

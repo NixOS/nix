@@ -79,9 +79,10 @@ template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string &
 template<typename T>
 void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
 {
+    auto indentedDescription = indent(2, description);
     args.addFlag({
         .longName = name,
-        .description = fmt("Set the `%s` setting.", name),
+        .description = fmt("Set the `%s` setting:\n%s", name, indentedDescription),
         .category = category,
         .labels = {"value"},
         .handler = {[this](std::string s) { overridden = true; set(s); }},
@@ -91,7 +92,7 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
     if (isAppendable())
         args.addFlag({
             .longName = "extra-" + name,
-            .description = fmt("Append to the `%s` setting.", name),
+            .description = fmt("Append to the `%s` setting:\n%s", name, indentedDescription),
             .category = category,
             .labels = {"value"},
             .handler = {[this](std::string s) { overridden = true; set(s, true); }},

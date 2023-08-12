@@ -14,6 +14,7 @@
 #include <future>
 #include <iostream>
 #include <mutex>
+#include <regex>
 #include <sstream>
 #include <thread>
 
@@ -1670,6 +1671,12 @@ std::string stripIndentation(std::string_view s)
     return res;
 }
 
+std::string indent(u_int8_t indentationSize, const std::string & str)
+{
+    static const std::regex indentRegex {"(^|\r?\n)(.+?)(?=\r?\n|$)"};
+    std::string indent (indentationSize, ' ');
+    return std::regex_replace(str, indentRegex, "$1" + indent + "$2");
+}
 
 std::pair<std::string_view, std::string_view> getLine(std::string_view s)
 {
