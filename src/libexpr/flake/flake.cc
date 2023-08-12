@@ -447,8 +447,8 @@ LockedFlake lockFlake(
 
                     assert(input.ref);
 
-                    /* Do we have an entry in the existing lock file? And we
-                       don't have a --update-input flag for this input? */
+                    /* Do we have an entry in the existing lock file?
+                       And the input is not in updateInputs? */
                     std::shared_ptr<LockedNode> oldLock;
 
                     updatesUsed.insert(inputPath);
@@ -472,9 +472,8 @@ LockedFlake lockFlake(
 
                         node->inputs.insert_or_assign(id, childNode);
 
-                        /* If we have an --update-input flag for an input
-                           of this input, then we must fetch the flake to
-                           update it. */
+                        /* If we have this input in updateInputs, then we
+                           must fetch the flake to update it. */
                         auto lb = lockFlags.inputUpdates.lower_bound(inputPath);
 
                         auto mustRefetch =
@@ -616,7 +615,7 @@ LockedFlake lockFlake(
 
         for (auto & i : lockFlags.inputUpdates)
             if (!updatesUsed.count(i))
-                warn("the flag '--update-input %s' does not match any input", printInputPath(i));
+                warn("'%s' does not match any input of this flake", printInputPath(i));
 
         /* Check 'follows' inputs. */
         newLockFile.check();
