@@ -668,36 +668,45 @@ public:
     /**
      * Create a string representing a store path.
      *
-     * The string is the printed store path with a context containing a single
-     * `NixStringContextElem::Opaque` element of that store path.
+     * The string is the printed store path with a context containing a
+     * single `NixStringContextElem::Opaque` element of that store path.
      */
     void mkStorePathString(const StorePath & storePath, Value & v);
 
     /**
-     * Create a string representing a `DerivedPath::Built`.
+     * Create a string representing a `SingleDerivedPath::Built`.
      *
-     * The string is the printed store path with a context containing a single
-     * `NixStringContextElem::Built` element of the drv path and output name.
+     * The string is the printed store path with a context containing a
+     * single `NixStringContextElem::Built` element of the drv path and
+     * output name.
      *
      * @param value Value we are settings
      *
-     * @param drvPath Path the drv whose output we are making a string for
+     * @param b the drv whose output we are making a string for, and the
+     * output
      *
-     * @param outputName Name of the output
-     *
-     * @param optOutputPath Optional output path for that string. Must
-     * be passed if and only if output store object is input-addressed.
-     * Will be printed to form string if passed, otherwise a placeholder
-     * will be used (see `DownstreamPlaceholder`).
+     * @param optStaticOutputPath Optional output path for that string.
+     * Must be passed if and only if output store object is
+     * input-addressed or fixed output. Will be printed to form string
+     * if passed, otherwise a placeholder will be used (see
+     * `DownstreamPlaceholder`).
      *
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
     void mkOutputString(
         Value & value,
-        const StorePath & drvPath,
-        const std::string outputName,
-        std::optional<StorePath> optOutputPath,
+        const SingleDerivedPath::Built & b,
+        std::optional<StorePath> optStaticOutputPath,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+    /**
+     * Create a string representing a `SingleDerivedPath`.
+     *
+     * A combination of `mkStorePathString` and `mkOutputString`.
+     */
+    void mkSingleDerivedPathString(
+        const SingleDerivedPath & p,
+        Value & v);
 
     void concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos, std::string_view errorCtx);
 
@@ -713,6 +722,22 @@ public:
     [[nodiscard]] StringMap realiseContext(const NixStringContext & context);
 
 private:
+
+    /**
+     * Like `mkOutputString` but just creates a raw string, not an
+     * string Value, which would also have a string context.
+     */
+    std::string mkOutputStringRaw(
+        const SingleDerivedPath::Built & b,
+        std::optional<StorePath> optStaticOutputPath,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+    /**
+     * Like `mkSingleDerivedPathStringRaw` but just creates a raw string
+     * Value, which would also have a string context.
+     */
+    std::string mkSingleDerivedPathStringRaw(
+        const SingleDerivedPath & p);
 
     unsigned long nrEnvs = 0;
     unsigned long nrValuesInEnvs = 0;

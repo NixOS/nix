@@ -39,16 +39,18 @@ DownstreamPlaceholder DownstreamPlaceholder::unknownDerivation(
 }
 
 DownstreamPlaceholder DownstreamPlaceholder::fromSingleDerivedPathBuilt(
-    const SingleDerivedPath::Built & b)
+    const SingleDerivedPath::Built & b,
+    const ExperimentalFeatureSettings & xpSettings)
 {
     return std::visit(overloaded {
         [&](const SingleDerivedPath::Opaque & o) {
-            return DownstreamPlaceholder::unknownCaOutput(o.path, b.output);
+            return DownstreamPlaceholder::unknownCaOutput(o.path, b.output, xpSettings);
         },
         [&](const SingleDerivedPath::Built & b2) {
             return DownstreamPlaceholder::unknownDerivation(
-                DownstreamPlaceholder::fromSingleDerivedPathBuilt(b2),
-                b.output);
+                DownstreamPlaceholder::fromSingleDerivedPathBuilt(b2, xpSettings),
+                b.output,
+                xpSettings);
         },
     }, b.drvPath->raw());
 }
