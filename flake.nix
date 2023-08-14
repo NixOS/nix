@@ -40,6 +40,52 @@
             })
             stdenvs);
 
+      # Experimental fileset library: https://github.com/NixOS/nixpkgs/pull/222981
+      # Not an "idiomatic" flake input because:
+      #  - Propagation to dependent locks: https://github.com/NixOS/nix/issues/7730
+      #  - Subflake would download redundant and huge parent flake
+      #  - No git tree hash support: https://github.com/NixOS/nix/issues/6044
+      inherit (import (builtins.fetchTarball { url = "https://github.com/NixOS/nixpkgs/archive/1bdcd7fc8a6a40b2e805bad759b36e64e911036b.tar.gz"; sha256 = "sha256:14ljlpdsp4x7h1fkhbmc4bd3vsqnx8zdql4h3037wh09ad6a0893"; }))
+        fileset;
+
+      baseFiles =
+        # .gitignore has already been processed, so any changes in it are irrelevant
+        # at this point. It is not represented verbatim for test purposes because
+        # that would interfere with repo semantics.
+        fileset.fileFilter (f: f.name != ".gitignore") ./.;
+
+      nixSrc = fileset.toSource {
+        root = ./.;
+        fileset = fileset.intersect baseFiles (
+          fileset.difference
+            (fileset.unions [
+              ./.version
+              ./boehmgc-coroutine-sp-fallback.diff
+              ./bootstrap.sh
+              ./configure.ac
+              ./doc
+              ./local.mk
+              ./m4
+              ./Makefile
+              ./Makefile.config.in
+              ./misc
+              ./mk
+              ./precompiled-headers.h
+              ./src
+              ./tests
+              ./COPYING
+              ./scripts/local.mk
+              (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
+              # TODO: do we really need README.md? It doesn't seem used in the build.
+              ./README.md
+            ])
+            (fileset.unions [
+              # Removed file sets
+              ./tests/nixos
+              ./tests/installer
+            ])
+        );
+      };
 
       # Memoize nixpkgs for different platforms for efficiency.
       nixpkgsFor = forAllSystems
@@ -209,7 +255,7 @@
             "-${client.version}-against-${daemon.version}";
         inherit version;
 
-        src = self;
+        src = nixSrc;
 
         VERSION_SUFFIX = versionSuffix;
 
@@ -320,18 +366,11 @@
           };
           let
             canRunInstalled = currentStdenv.buildPlatform.canExecute currentStdenv.hostPlatform;
-
-            sourceByRegexInverted = rxs: origSrc: final.lib.cleanSourceWith {
-              filter = (path: type:
-                let relPath = final.lib.removePrefix (toString origSrc + "/") (toString path);
-                in ! lib.any (re: builtins.match re relPath != null) rxs);
-              src = origSrc;
-            };
           in currentStdenv.mkDerivation (finalAttrs: {
             name = "nix-${version}";
             inherit version;
 
-            src = sourceByRegexInverted [ "tests/nixos/.*" "tests/installer/.*" ] self;
+            src = nixSrc;
             VERSION_SUFFIX = versionSuffix;
 
             outputs = [ "out" "dev" "doc" ];
@@ -529,7 +568,7 @@
           releaseTools.coverageAnalysis {
             name = "nix-coverage-${version}";
 
-            src = self;
+            src = nixSrc;
 
             configureFlags = testConfigureFlags;
 
@@ -557,7 +596,7 @@
             pname = "nix-internal-api-docs";
             inherit version;
 
-            src = self;
+            src = nixSrc;
 
             configureFlags = testConfigureFlags ++ internalApiDocsConfigureFlags;
 
