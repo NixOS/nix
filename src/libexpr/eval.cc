@@ -1031,12 +1031,12 @@ void EvalState::mkOutputString(
     Value & value,
     const StorePath & drvPath,
     const std::string outputName,
-    std::optional<StorePath> optOutputPath,
+    std::optional<StorePath> optStaticOutputPath,
     const ExperimentalFeatureSettings & xpSettings)
 {
     value.mkString(
-        optOutputPath
-            ? store->printStorePath(*std::move(optOutputPath))
+        optStaticOutputPath
+            ? store->printStorePath(*std::move(optStaticOutputPath))
             /* Downstream we would substitute this for an actual path once
                we build the floating CA derivation */
             : DownstreamPlaceholder::unknownCaOutput(drvPath, outputName, xpSettings).render(),
@@ -2349,10 +2349,10 @@ SingleDerivedPath EvalState::coerceToSingleDerivedPath(const PosIdx pos, Value &
                     auto i = drv.outputs.find(b.output);
                     if (i == drv.outputs.end())
                         throw Error("derivation '%s' does not have output '%s'", b.drvPath->to_string(*store), b.output);
-                    auto optOutputPath = i->second.path(*store, drv.name, b.output);
+                    auto optStaticOutputPath = i->second.path(*store, drv.name, b.output);
                     // This is testing for the case of CA derivations
-                    return optOutputPath
-                        ? store->printStorePath(*optOutputPath)
+                    return optStaticOutputPath
+                        ? store->printStorePath(*optStaticOutputPath)
                         : DownstreamPlaceholder::fromSingleDerivedPathBuilt(b).render();
                 },
                 [&](const SingleDerivedPath::Built & o) {

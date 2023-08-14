@@ -685,7 +685,7 @@ public:
      *
      * @param outputName Name of the output
      *
-     * @param optOutputPath Optional output path for that string. Must
+     * @param optStaticOutputPath Optional output path for that string. Must
      * be passed if and only if output store object is input-addressed.
      * Will be printed to form string if passed, otherwise a placeholder
      * will be used (see `DownstreamPlaceholder`).
@@ -696,7 +696,7 @@ public:
         Value & value,
         const StorePath & drvPath,
         const std::string outputName,
-        std::optional<StorePath> optOutputPath,
+        std::optional<StorePath> optStaticOutputPath,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     void concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos, std::string_view errorCtx);
