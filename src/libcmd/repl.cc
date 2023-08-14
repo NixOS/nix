@@ -42,6 +42,7 @@ extern "C" {
 #include "local-fs-store.hh"
 #include "progress-bar.hh"
 #include "print.hh"
+#include "comment.hh"
 
 #if HAVE_BOEHMGC
 #define GC_INCLUDE_NEW
@@ -94,6 +95,10 @@ struct NixRepl
     typedef std::set<Value *> ValuesSeen;
     std::ostream & printValue(std::ostream & str, Value & v, unsigned int maxDepth);
     std::ostream & printValue(std::ostream & str, Value & v, unsigned int maxDepth, ValuesSeen & seen);
+    std::ostream &  printValueAndDoc(std::ostream & str, Value & v, unsigned int maxDepth);
+
+    // Only prints if a comment is found preceding the position.
+    void tryPrintDoc(std::ostream & str, Pos & pos);
 };
 
 std::string removeWhitespace(std::string s)
@@ -764,7 +769,7 @@ bool NixRepl::processLine(std::string line)
         } else {
             Value v;
             evalString(line, v);
-            printValue(std::cout, v, 1) << std::endl;
+            printValueAndDoc(std::cout, v, 1) << std::endl;
         }
     }
 
@@ -883,6 +888,57 @@ void NixRepl::evalString(std::string s, Value & v)
     Expr * e = parseString(s);
     e->eval(*state, *env, v);
     state->forceValue(v, [&]() { return v.determinePos(noPos); });
+}
+
+
+std::ostream & NixRepl::printValueAndDoc(std::ostream & str, Value & v, unsigned int maxDepth)
+{
+    printValue(str, v, maxDepth);
+
+    if(v.isLambda()) {
+        auto pos = state->positions[v.lambda.fun->pos];
+        tryPrintDoc(str, pos);
+    }
+    return str;
+}
+
+
+void NixRepl::tryPrintDoc(std::ostream & str, Pos & pos) {
+
+    Comment::Doc doc = Comment::lookupDoc(pos);
+
+    if (!doc.name.empty()) {
+        str << std::endl;
+        str << std::endl << "| " << ANSI_BOLD << doc.name << ANSI_NORMAL << std::endl;
+        str << "| ";
+        for (size_t i = 0; i < doc.name.length(); i++) {
+            str << '-';
+        }
+        str << std::endl;
+        str << "| " << std::endl;
+    }
+
+    // If we're showing any form of doc at all, we need to inform
+    // user about partially applied functions.
+    if (!doc.name.empty() || !doc.comment.empty()) {
+
+        if (doc.timesApplied > 0) {
+            str << "| " << ANSI_YELLOW << "NOTE: " << ANSI_BOLD << "This function has already been applied!" << ANSI_NORMAL << std::endl
+                << "|       You should ignore the first "
+                               << ANSI_BOLD << std::to_string(doc.timesApplied) << ANSI_NORMAL
+                               << " parameter(s) in this documentation," << std::endl
+                << "|       because they have already been applied." << std::endl
+                << "|" << std::endl;
+        }
+    }
+
+    if (!doc.comment.empty()) {
+        std::stringstream commentStream(doc.comment);
+        std::string line;
+        while(std::getline(commentStream,line,'\n')){
+            str << "| " << line << std::endl;
+        }
+    }
 }
 
 

@@ -131,3 +131,165 @@ echo "changingThing"
 ) | nix repl ./flake --experimental-features 'flakes repl-flake')
 echo "$replResult" | grepQuiet -s beforeChange
 echo "$replResult" | grepQuiet -s afterChange
+
+# Comments
+testReplResponse "(import $testDir/comments.nix).f" '
+| f
+| -
+|
+| Just a function.
+'
+
+testReplResponse "(import $testDir/comments.nix).nested.f" '
+| f
+| -
+|
+| Just a function in an attrset.
+'
+
+testReplResponse "(import ./comments.nix).g" '
+| g
+| -
+|
+| A nice function.
+'
+
+testReplResponse "(import ./comments.nix).h" '
+| h
+| -
+|
+| A somewhat nice function.
+'
+
+testReplResponse "(import ./comments.nix).i" '
+| i
+| -
+|
+| A nice function.
+'
+
+testReplResponse "(import ./comments.nix).j" '
+| j
+| -
+|
+| A nice function.
+'
+
+testReplResponse "(import ./comments.nix).k" '
+| k
+| -
+|
+| A nice function.
+'
+
+testReplResponse "(import ./comments.nix).l" '
+| l
+| -
+|
+| A nice function.
+'
+
+testReplResponse "(import ./comments.nix).m" '
+| m
+| -
+|
+| A nice function.
+'
+
+testReplResponse "(import ./comments.nix).n" '
+| n
+| -
+|
+| One
+| Two
+'
+
+testReplResponse "(import ./comments.nix).o" '
+| o
+| -
+|
+| Bullets:
+|
+|  * Are lethal.
+|  * Are made of metal.
+'
+
+testReplResponse "(import ./comments.nix).p" '
+| p
+| -
+|
+| Bullets:
+|
+|  * Are lethal.
+|  * Are made of metal.
+'
+
+testReplResponse "(import ./comments.nix).q" '
+| q
+| -
+|
+| Useful stuff
+'
+
+
+testReplResponse "(import ./comments.nix).r" '
+| r
+| -
+|
+| Useful
+| stuff
+'
+
+testReplResponse "(import ./comments.nix).unicode1" '
+| unicode1
+| --------
+|
+| ßuper toll.
+'
+
+testReplResponse "(import ./comments.nix).unicode2" '
+| unicode2
+| --------
+|
+| 🤢
+'
+
+testReplResponse "(import ./comments.nix).curried" '
+| curried
+| -------
+|
+| Apply me twice.
+'
+
+testReplResponse "(import ./comments.nix).curried true" '
+| curried
+| -------
+|
+| NOTE: This function has already been applied!
+|       You should ignore the first 1 parameter(s) in this documentation,
+|       because they have already been applied.
+|
+| Apply me twice.
+'
+
+testReplResponse "(import ./comments.nix).curried2 true false" '
+| curried2
+| --------
+|
+| NOTE: This function has already been applied!
+|       You should ignore the first 2 parameter(s) in this documentation,
+|       because they have already been applied.
+|
+| You can give 3 arguments.
+'
+
+testReplResponse "(import ./comments.nix).curried2 true" '
+| curried2
+| --------
+|
+| NOTE: This function has already been applied!
+|       You should ignore the first 1 parameter(s) in this documentation,
+|       because they have already been applied.
+|
+| You can give 3 arguments.
+'
