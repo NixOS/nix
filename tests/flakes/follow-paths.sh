@@ -150,6 +150,25 @@ nix flake lock $flakeFollowsA 2>&1 | grep "warning: input 'B' has an override fo
 nix flake lock $flakeFollowsA 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid2'"
 
 # Now test follow path overloading
+# This tests a lockfile checking regression https://github.com/NixOS/nix/pull/8819
+#
+# We construct the following graph, where p->q means p has input q.
+# A double edge means that the edge gets overridden using `follows`.
+#
+#      A
+#     / \
+#    /   \
+#   v     v
+#   B ==> C   --- follows declared in A
+#    \\  /
+#     \\/     --- follows declared in B
+#      v
+#      D
+#
+# The message was
+#    error: input 'B/D' follows a non-existent input 'B/C/D'
+# 
+# Note that for `B` to resolve its follow for `D`, it needs `C/D`, for which it needs to resolve the follow on `C` first.
 flakeFollowsOverloadA=$TEST_ROOT/follows/overload/flakeA
 flakeFollowsOverloadB=$TEST_ROOT/follows/overload/flakeA/flakeB
 flakeFollowsOverloadC=$TEST_ROOT/follows/overload/flakeA/flakeB/flakeC
