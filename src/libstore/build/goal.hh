@@ -162,6 +162,10 @@ public:
 
     virtual void cleanup() { }
 
+    /**
+     * @brief Hint for the scheduler, which concurrency limit applies.
+     * @see JobCategory
+     */
     virtual JobCategory jobCategory() = 0;
 };
 
