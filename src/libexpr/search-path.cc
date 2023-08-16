@@ -10,7 +10,7 @@ std::optional<std::string_view> SearchPath::Prefix::suffixIfPotentialMatch(
 
     /* Non-empty prefix and suffix must be separated by a /, or the
        prefix is not a valid path prefix. */
-    bool needSeparator = n > 0 && (path.size() - n) > 0;
+    bool needSeparator = n > 0 && n < path.size();
 
     if (needSeparator && path[n] != '/') {
         return std::nullopt;
