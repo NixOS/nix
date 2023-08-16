@@ -114,10 +114,10 @@ void loadConfFile()
        ~/.nix/nix.conf or the command line. */
     globalConfig.resetOverridden();
 
-    /* If the environment config has elements inherited from the environment,
-       consider it overridden, so that when we connect to the daemon we send
-       these elements over. */
-    settings.environment.overridden = settings.environment.hasInherited;
+    /* Alway consider this option as overridden so environment
+       variables inherited from current environment can be sent to
+       daemon. */
+    settings.environment.overridden = true;
 
     auto files = settings.nixUserConfFiles;
     for (auto file = files.rbegin(); file != files.rend(); file++) {
@@ -289,44 +289,22 @@ Paths PluginFilesSetting::parse(const std::string & str) const
 }
 
 
-void EnvironmentSetting::set(const std::string & str, bool append)
+StringMap EnvironmentSetting::parse(const std::string & str) const
 {
-    if (! append) {
-        for (auto & [name, oldValue] : oldEnvironment) {
-            if (oldValue.has_value()) {
-                setenv(name.c_str(), oldValue->c_str(), 1);
-            } else {
-                unsetenv(name.c_str());
-            }
-        }
-        oldEnvironment.clear();
-        value.clear();
-        hasInherited = false;
-    }
-
-    StringMap newValues;
-
+    StringMap res;
     for (auto & elem : tokenizeString<Strings>(str)) {
-        size_t pos = elem.find('=');
-        if (pos == std::string::npos) {
-            // name
+        auto eq = elem.find_first_of('=');
+        if (std::string::npos != eq) {
+            res.emplace(std::string(elem, 0, eq), std::string(elem, eq + 1));
+        }
+        else {
             auto envValue = getEnv(elem.c_str());
             if (envValue.has_value()) {
-                newValues.insert_or_assign(elem, envValue.value());
-                hasInherited = true;
-                overridden = true;
+                res.emplace(elem, envValue.value());
             }
-        } else {
-            // name=value
-            newValues.insert_or_assign(elem.substr(0, pos), elem.substr(pos + 1));
         }
     }
-
-    for (auto & [name, newValue] : newValues) {
-        oldEnvironment.emplace(name, getEnv(name));
-        setenv(name.c_str(), newValue.c_str(), 1);
-        value.insert_or_assign(name, newValue);
-    }
+    return res;
 }
 
 

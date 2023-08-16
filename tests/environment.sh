@@ -1,7 +1,7 @@
 source common.sh
 
 # Needs the config option 'environment' to work
-requireDaemonNewerThan "2.6.0pre20220109"
+requireDaemonNewerThan "2.18.0pre20230816"
 
 varTest() {
     local var="$1"; shift

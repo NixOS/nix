@@ -48,9 +48,6 @@ struct PluginFilesSetting : public BaseSetting<Paths>
 
 struct EnvironmentSetting : public BaseSetting<StringMap>
 {
-    std::map<std::string, std::optional<std::string>> oldEnvironment;
-    bool hasInherited = false;
-
     EnvironmentSetting(Config * options,
         const StringMap & def,
         const std::string & name,
@@ -61,7 +58,7 @@ struct EnvironmentSetting : public BaseSetting<StringMap>
         options->addSetting(this);
     }
 
-    void set(const std::string & str, bool append = false) override;
+    StringMap parse(const std::string & str) const override;
 };
 
 const uint32_t maxIdsPerBuild =
@@ -1080,20 +1077,13 @@ public:
           - `name`: Inherit environment variable `name` from current
             environment.
 
-          If the user is trusted (see `trusted-users` option), the daemon
-          worker process that handles the operation will also have these
-          environment variables set.
+          If the user is trusted (see `trusted-users` option), when building
+          a fixed-output derivation, environment variables set in this option
+          will be passed to the builder if they are listed in `impureEnvVars`.
 
           This option is useful for, e.g., setting `https_proxy` for
-          fixed-output derivations and substituter downloads in a multi-user
-          Nix installation.
-
-          > **Warning**
-          >
-          > Arbitrarily modifying the environment can lead to unexpected
-          > behavior. Modifying the environment variables of a daemon worker
-          > process can have security consequences, so this option is only
-          > available for trusted users.
+          fixed-output derivations and in a multi-user Nix installation, or
+          setting private access tokens when fetching a private repository.
         )"};
 };
 
