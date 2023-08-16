@@ -45,7 +45,7 @@
       #  - Propagation to dependent locks: https://github.com/NixOS/nix/issues/7730
       #  - Subflake would download redundant and huge parent flake
       #  - No git tree hash support: https://github.com/NixOS/nix/issues/6044
-      inherit (import (builtins.fetchTarball { url = "https://github.com/NixOS/nixpkgs/archive/1bdcd7fc8a6a40b2e805bad759b36e64e911036b.tar.gz"; sha256 = "sha256:14ljlpdsp4x7h1fkhbmc4bd3vsqnx8zdql4h3037wh09ad6a0893"; }))
+      inherit (import (builtins.fetchTarball { url = "https://github.com/NixOS/nix/archive/1bdcd7fc8a6a40b2e805bad759b36e64e911036b.tar.gz"; sha256 = "sha256:14ljlpdsp4x7h1fkhbmc4bd3vsqnx8zdql4h3037wh09ad6a0893"; }))
         fileset;
 
       baseFiles =
