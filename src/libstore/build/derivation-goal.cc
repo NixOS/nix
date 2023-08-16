@@ -521,7 +521,7 @@ void DerivationGoal::inputsRealised()
             [&](const DerivationType::Impure &) {
                 return true;
             }
-        }, drvType.raw());
+        }, drvType.raw);
 
         if (resolveDrv && !fullDrv.inputDrvs.empty()) {
             experimentalFeatureSettings.require(Xp::CaDerivations);
@@ -996,10 +996,11 @@ void DerivationGoal::buildDone()
         }
 
         else {
+            assert(derivationType);
             st =
                 dynamic_cast<NotDeterministic*>(&e) ? BuildResult::NotDeterministic :
                 statusOk(status) ? BuildResult::OutputRejected :
-                !derivationType.isSandboxed() || diskFull ? BuildResult::TransientFailure :
+                !derivationType->isSandboxed() || diskFull ? BuildResult::TransientFailure :
                 BuildResult::PermanentFailure;
         }
 
@@ -1358,7 +1359,7 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
         [&](const OutputsSpec::Names & names) {
             return static_cast<StringSet>(names);
         },
-    }, wantedOutputs.raw());
+    }, wantedOutputs.raw);
     SingleDrvOutputs validOutputs;
 
     for (auto & i : queryPartialDerivationOutputMap()) {

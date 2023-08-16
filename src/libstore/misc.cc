@@ -88,7 +88,7 @@ const ContentAddress * getDerivationCA(const BasicDerivation & drv)
     auto out = drv.outputs.find("out");
     if (out == drv.outputs.end())
         return nullptr;
-    if (auto dof = std::get_if<DerivationOutput::CAFixed>(&out->second)) {
+    if (auto dof = std::get_if<DerivationOutput::CAFixed>(&out->second.raw)) {
         return &dof->ca;
     }
     return nullptr;
@@ -370,7 +370,7 @@ OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd, 
             }
             return outputsOpt;
         },
-    }, bfd.outputs.raw());
+    }, bfd.outputs.raw);
 
     OutputPathMap outputs;
     for (auto & [outputName, outputPathOpt] : outputsOpt) {
@@ -418,7 +418,7 @@ OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd)
         [&](const OutputsSpec::Names & names) {
             return static_cast<StringSet>(names);
         },
-    }, bfd.outputs.raw());
+    }, bfd.outputs.raw);
     for (auto iter = outputMap.begin(); iter != outputMap.end();) {
         auto & outputName = iter->first;
         if (bfd.outputs.contains(outputName)) {
@@ -431,7 +431,7 @@ OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd)
     if (!outputsLeft.empty())
         throw Error("derivation '%s' does not have an outputs %s",
             store.printStorePath(drvPath),
-            concatStringsSep(", ", quoteStrings(std::get<OutputsSpec::Names>(bfd.outputs))));
+            concatStringsSep(", ", quoteStrings(std::get<OutputsSpec::Names>(bfd.outputs.raw))));
     return outputMap;
 }
 

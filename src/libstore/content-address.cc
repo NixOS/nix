@@ -115,7 +115,7 @@ ContentAddress ContentAddress::parse(std::string_view rawCa)
     auto [caMethod, hashType] = parseContentAddressMethodPrefix(rest);
 
     return ContentAddress {
-        .method = std::move(caMethod).raw,
+        .method = std::move(caMethod),
         .hash = Hash::parseNonSRIUnprefixed(rest, hashType),
     };
 }
