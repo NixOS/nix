@@ -38,20 +38,6 @@ std::vector<std::string> InstallableFlake::getActualAttrPaths()
     return res;
 }
 
-Value * InstallableFlake::getFlakeOutputs(EvalState & state, const flake::LockedFlake & lockedFlake)
-{
-    auto vFlake = state.allocValue();
-
-    callFlake(state, lockedFlake, *vFlake);
-
-    auto aOutputs = vFlake->attrs->get(state.symbols.create("outputs"));
-    assert(aOutputs);
-
-    state.forceValue(*aOutputs->value, [&]() { return aOutputs->value->determinePos(noPos); });
-
-    return aOutputs->value;
-}
-
 static std::string showAttrPaths(const std::vector<std::string> & paths)
 {
     std::string s;
