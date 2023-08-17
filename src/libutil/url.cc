@@ -44,7 +44,7 @@ ParsedURL parseURL(const std::string & url)
             .base = base,
             .scheme = scheme,
             .authority = authority,
-            .path = path,
+            .path = percentDecode(path),
             .query = decodeQuery(query),
             .fragment = percentDecode(std::string(fragment))
         };
