@@ -6,7 +6,7 @@
 
 #include <hash.hh>
 
-#include "tests/hash.hh"
+#include "libutil-test/hash.hh"
 
 namespace nix {
 

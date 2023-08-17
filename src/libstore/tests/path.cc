@@ -7,7 +7,7 @@
 #include "path-regex.hh"
 #include "store-api.hh"
 
-#include "tests/hash.hh"
+#include "libutil-test/hash.hh"
 #include "tests/libstore.hh"
 #include "tests/path.hh"
 

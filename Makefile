@@ -23,7 +23,7 @@ makefiles = \
 
 ifeq ($(tests), yes)
 makefiles += \
-  src/libutil/tests/local.mk \
+  tests/libutil/local.mk \
   src/libstore/tests/local.mk \
   src/libexpr/tests/local.mk \
   tests/local.mk \
