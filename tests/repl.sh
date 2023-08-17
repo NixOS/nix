@@ -54,11 +54,17 @@ testRepl
 # Same thing (kind-of), but with a remote store.
 testRepl --store "$TEST_ROOT/store?real=$NIX_STORE_DIR"
 
-testReplResponse () {
+# Remove ANSI escape sequences. They can prevent grep from finding a match.
+stripColors () {
+    sed -E 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g'
+}
+
+testReplResponseGeneral () {
+    local grepMode="$1"; shift
     local commands="$1"; shift
     local expectedResponse="$1"; shift
-    local response="$(nix repl "$@" <<< "$commands")"
-    echo "$response" | grepQuiet -s "$expectedResponse" \
+    local response="$(nix repl "$@" <<< "$commands" | stripColors)"
+    echo "$response" | grepQuiet "$grepMode" -s "$expectedResponse" \
       || fail "repl command set:
 
 $commands
@@ -69,7 +75,16 @@ $expectedResponse
 
 but with:
 
-$response"
+$response
+"
+}
+
+testReplResponse () {
+    testReplResponseGeneral --basic-regexp "$@"
+}
+
+testReplResponseNoRegex () {
+    testReplResponseGeneral --fixed-strings "$@"
 }
 
 # :a uses the newest version of a symbol
@@ -83,9 +98,9 @@ testReplResponse '
 # note the escaped \,
 #    \\
 # because the second argument is a regex
-testReplResponse '
+testReplResponseNoRegex '
 "$" + "{hi}"
-' '"\\${hi}"'
+' '"\${hi}"'
 
 testReplResponse '
 drvPath
@@ -131,3 +146,34 @@ echo "changingThing"
 ) | nix repl ./flake --experimental-features 'flakes repl-flake')
 echo "$replResult" | grepQuiet -s beforeChange
 echo "$replResult" | grepQuiet -s afterChange
+
+# Test recursive printing and formatting
+# Normal output should print attributes in lexicographical order non-recursively
+testReplResponseNoRegex '
+{ a = { b = 2; }; l = [ 1 2 3 ]; s = "string"; n = 1234; x = rec { y = { z = { inherit y; }; }; }; }
+' '{ a = { ... }; l = [ ... ]; n = 1234; s = "string"; x = { ... }; }'
+
+# Same for lists, but order is preserved
+testReplResponseNoRegex '
+[ 42 1 "thingy" ({ a = 1; }) ([ 1 2 3 ]) ]
+' '[ 42 1 "thingy" { ... } [ ... ] ]'
+
+# Same for let expressions
+testReplResponseNoRegex '
+let x = { y = { a = 1; }; inherit x; }; in x
+' '{ x = { ... }; y = { ... }; }'
+
+# The :p command should recursively print sets, but prevent infinite recursion
+testReplResponseNoRegex '
+:p { a = { b = 2; }; s = "string"; n = 1234; x = rec { y = { z = { inherit y; }; }; }; }
+' '{ a = { b = 2; }; n = 1234; s = "string"; x = { y = { z = { y = «repeated»; }; }; }; }'
+
+# Same for lists
+testReplResponseNoRegex '
+:p [ 42 1 "thingy" (rec { a = 1; b = { inherit a; inherit b; }; }) ([ 1 2 3 ]) ]
+' '[ 42 1 "thingy" { a = 1; b = { a = 1; b = «repeated»; }; } [ 1 2 3 ] ]'
+
+# Same for let expressions
+testReplResponseNoRegex '
+:p let x = { y = { a = 1; }; inherit x; }; in x
+' '{ x = { x = «repeated»; y = { a = 1; }; }; y = «repeated»; }'
