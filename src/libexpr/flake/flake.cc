@@ -47,6 +47,11 @@ void warnUnusedOverrides(const FlakeInputs & overrides, const InputPath & inputP
                 "input '%s' has an override for a non-existent input '%s'",
                 printInputPath(inputPathPrefix), id);
         }
+        if (input.follows) {
+            warn(
+                "input '%s' has a follows for a non-existent input '%s'",
+                printInputPath(inputPathPrefix), id);
+        }
         warnUnusedOverrides(input.overrides, inputPath);
     }
 }
