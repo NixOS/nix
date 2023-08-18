@@ -173,7 +173,7 @@ struct CmdKeyGenerateSecret : Command
         if (!keyName)
             throw UsageError("required argument '--key-name' is missing");
 
-        writeFull(STDOUT_FILENO, SecretKey::generate(*keyName).to_string());
+        logger->cout(SecretKey::generate(*keyName).to_string());
     }
 };
 
@@ -194,7 +194,7 @@ struct CmdKeyConvertSecretToPublic : Command
     void run() override
     {
         SecretKey secretKey(drainFD(STDIN_FILENO));
-        writeFull(STDOUT_FILENO, secretKey.toPublicKey().to_string());
+        logger->cout(secretKey.toPublicKey().to_string());
     }
 };
 
