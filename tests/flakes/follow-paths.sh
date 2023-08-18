@@ -146,8 +146,8 @@ EOF
 
 git -C $flakeFollowsA add flake.nix
 
-nix flake lock $flakeFollowsA 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid'"
-nix flake lock $flakeFollowsA 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid2'"
+nix flake lock "$flakeFollowsA" 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid'"
+nix flake lock "$flakeFollowsA" 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid2'"
 
 # Now test follow path overloading
 # This tests a lockfile checking regression https://github.com/NixOS/nix/pull/8819
@@ -169,18 +169,18 @@ nix flake lock $flakeFollowsA 2>&1 | grep "warning: input 'B' has an override fo
 #    error: input 'B/D' follows a non-existent input 'B/C/D'
 # 
 # Note that for `B` to resolve its follow for `D`, it needs `C/D`, for which it needs to resolve the follow on `C` first.
-flakeFollowsOverloadA=$TEST_ROOT/follows/overload/flakeA
-flakeFollowsOverloadB=$TEST_ROOT/follows/overload/flakeA/flakeB
-flakeFollowsOverloadC=$TEST_ROOT/follows/overload/flakeA/flakeB/flakeC
-flakeFollowsOverloadD=$TEST_ROOT/follows/overload/flakeA/flakeB/flakeC/flakeD
+flakeFollowsOverloadA="$TEST_ROOT/follows/overload/flakeA"
+flakeFollowsOverloadB="$TEST_ROOT/follows/overload/flakeA/flakeB"
+flakeFollowsOverloadC="$TEST_ROOT/follows/overload/flakeA/flakeB/flakeC"
+flakeFollowsOverloadD="$TEST_ROOT/follows/overload/flakeA/flakeB/flakeC/flakeD"
 
 # Test following path flakerefs.
-createGitRepo $flakeFollowsOverloadA
-mkdir -p $flakeFollowsOverloadB
-mkdir -p $flakeFollowsOverloadC
-mkdir -p $flakeFollowsOverloadD
+createGitRepo "$flakeFollowsOverloadA"
+mkdir -p "$flakeFollowsOverloadB"
+mkdir -p "$flakeFollowsOverloadC"
+mkdir -p "$flakeFollowsOverloadD"
 
-cat > $flakeFollowsOverloadD/flake.nix <<EOF
+cat > "$flakeFollowsOverloadD/flake.nix" <<EOF
 {
     description = "Flake D";
     inputs = {};
@@ -188,7 +188,7 @@ cat > $flakeFollowsOverloadD/flake.nix <<EOF
 }
 EOF
 
-cat > $flakeFollowsOverloadC/flake.nix <<EOF
+cat > "$flakeFollowsOverloadC/flake.nix" <<EOF
 {
     description = "Flake C";
     inputs.D.url = "path:./flakeD";
@@ -196,7 +196,7 @@ cat > $flakeFollowsOverloadC/flake.nix <<EOF
 }
 EOF
 
-cat > $flakeFollowsOverloadB/flake.nix <<EOF
+cat > "$flakeFollowsOverloadB/flake.nix" <<EOF
 {
     description = "Flake B";
     inputs = {
@@ -210,7 +210,7 @@ cat > $flakeFollowsOverloadB/flake.nix <<EOF
 EOF
 
 # input B/D should be able to be found...
-cat > $flakeFollowsOverloadA/flake.nix <<EOF
+cat > "$flakeFollowsOverloadA/flake.nix" <<EOF
 {
     description = "Flake A";
     inputs = {
@@ -224,9 +224,9 @@ cat > $flakeFollowsOverloadA/flake.nix <<EOF
 }
 EOF
 
-git -C $flakeFollowsOverloadA add flake.nix flakeB/flake.nix \
+git -C "$flakeFollowsOverloadA" add flake.nix flakeB/flake.nix \
   flakeB/flakeC/flake.nix flakeB/flakeC/flakeD/flake.nix
 
-nix flake metadata $flakeFollowsOverloadA
-nix flake update $flakeFollowsOverloadA
-nix flake lock $flakeFollowsOverloadA
+nix flake metadata "$flakeFollowsOverloadA"
+nix flake update "$flakeFollowsOverloadA"
+nix flake lock "$flakeFollowsOverloadA"
