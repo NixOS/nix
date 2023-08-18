@@ -141,7 +141,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
                 [&](const ExtendedOutputsSpec::Explicit & e) -> OutputsSpec {
                     return e;
                 },
-            }, extendedOutputsSpec.raw()),
+            }, extendedOutputsSpec.raw),
         },
         .info = make_ref<ExtraPathInfoFlake>(
             ExtraPathInfoValue::Value {

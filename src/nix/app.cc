@@ -81,7 +81,7 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
                         .path = o.path,
                     };
                 },
-            }, c.raw()));
+            }, c.raw));
         }
 
         return UnresolvedApp{App {

@@ -80,7 +80,7 @@ DerivedPathsWithInfo InstallableAttrPath::toDerivedPaths()
             [&](const ExtendedOutputsSpec::Explicit & e) -> OutputsSpec {
                 return e;
             },
-        }, extendedOutputsSpec.raw());
+        }, extendedOutputsSpec.raw);
 
         auto [iter, didInsert] = byDrvPath.emplace(*drvPath, newOutputs);
 
@@ -96,6 +96,7 @@ DerivedPathsWithInfo InstallableAttrPath::toDerivedPaths()
                 .outputs = outputs,
             },
             .info = make_ref<ExtraPathInfoValue>(ExtraPathInfoValue::Value {
+                .extendedOutputsSpec = outputs,
                 /* FIXME: reconsider backwards compatibility above
                    so we can fill in this info. */
             }),
@@ -114,7 +115,7 @@ InstallableAttrPath InstallableAttrPath::parse(
     return {
         state, cmd, v,
         prefix == "." ? "" : std::string { prefix },
-        extendedOutputsSpec
+        std::move(extendedOutputsSpec),
     };
 }
 

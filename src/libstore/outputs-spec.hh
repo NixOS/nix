@@ -6,61 +6,56 @@
 #include <set>
 #include <variant>
 
+#include "comparator.hh"
 #include "json-impls.hh"
+#include "comparator.hh"
+#include "variant-wrapper.hh"
 
 namespace nix {
 
-/**
- * A non-empty set of outputs, specified by name
- */
-struct OutputNames : std::set<std::string> {
-    using std::set<std::string>::set;
+struct OutputsSpec {
+    /**
+     * A non-empty set of outputs, specified by name
+     */
+    struct Names : std::set<std::string> {
+        using std::set<std::string>::set;
 
-    /* These need to be "inherited manually" */
+        /* These need to be "inherited manually" */
 
-    OutputNames(const std::set<std::string> & s)
-        : std::set<std::string>(s)
-    { assert(!empty()); }
+        Names(const std::set<std::string> & s)
+            : std::set<std::string>(s)
+        { assert(!empty()); }
+
+        /**
+         * Needs to be "inherited manually"
+         */
+        Names(std::set<std::string> && s)
+            : std::set<std::string>(s)
+        { assert(!empty()); }
+
+        /* This set should always be non-empty, so we delete this
+           constructor in order make creating empty ones by mistake harder.
+           */
+        Names() = delete;
+    };
 
     /**
-     * Needs to be "inherited manually"
+     * The set of all outputs, without needing to name them explicitly
      */
-    OutputNames(std::set<std::string> && s)
-        : std::set<std::string>(s)
-    { assert(!empty()); }
+    struct All : std::monostate { };
 
-    /* This set should always be non-empty, so we delete this
-       constructor in order make creating empty ones by mistake harder.
-       */
-    OutputNames() = delete;
-};
+    typedef std::variant<All, Names> Raw;
 
-/**
- * The set of all outputs, without needing to name them explicitly
- */
-struct AllOutputs : std::monostate { };
+    Raw raw;
 
-typedef std::variant<AllOutputs, OutputNames> _OutputsSpecRaw;
+    GENERATE_CMP(OutputsSpec, me->raw);
 
-struct OutputsSpec : _OutputsSpecRaw {
-    using Raw = _OutputsSpecRaw;
-    using Raw::Raw;
+    MAKE_WRAPPER_CONSTRUCTOR(OutputsSpec);
 
     /**
      * Force choosing a variant
      */
     OutputsSpec() = delete;
-
-    using Names = OutputNames;
-    using All = AllOutputs;
-
-    inline const Raw & raw() const {
-        return static_cast<const Raw &>(*this);
-    }
-
-    inline Raw & raw() {
-        return static_cast<Raw &>(*this);
-    }
 
     bool contains(const std::string & output) const;
 
@@ -84,20 +79,22 @@ struct OutputsSpec : _OutputsSpecRaw {
     std::string to_string() const;
 };
 
-struct DefaultOutputs : std::monostate { };
-
-typedef std::variant<DefaultOutputs, OutputsSpec> _ExtendedOutputsSpecRaw;
-
-struct ExtendedOutputsSpec : _ExtendedOutputsSpecRaw {
-    using Raw = _ExtendedOutputsSpecRaw;
-    using Raw::Raw;
-
-    using Default = DefaultOutputs;
+struct ExtendedOutputsSpec {
+    struct Default : std::monostate { };
     using Explicit = OutputsSpec;
 
-    inline const Raw & raw() const {
-        return static_cast<const Raw &>(*this);
-    }
+    typedef std::variant<Default, Explicit> Raw;
+
+    Raw raw;
+
+    GENERATE_CMP(ExtendedOutputsSpec, me->raw);
+
+    MAKE_WRAPPER_CONSTRUCTOR(ExtendedOutputsSpec);
+
+    /**
+     * Force choosing a variant
+     */
+    ExtendedOutputsSpec() = delete;
 
     /**
      * Parse a string of the form 'prefix^output1,...outputN' or

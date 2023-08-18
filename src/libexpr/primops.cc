@@ -69,7 +69,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
                 res.insert_or_assign(ctxS, ctxS);
                 ensureValid(d.drvPath);
             },
-        }, c.raw());
+        }, c.raw);
     }
 
     if (drvs.empty()) return {};
@@ -1265,7 +1265,7 @@ drvName, Bindings * attrs, Value & v)
             [&](const NixStringContextElem::Opaque & o) {
                 drv.inputSrcs.insert(o.path);
             },
-        }, c.raw());
+        }, c.raw);
     }
 
     /* Do we have all required attributes? */
@@ -1334,13 +1334,13 @@ drvName, Bindings * attrs, Value & v)
             if (isImpure)
                 drv.outputs.insert_or_assign(i,
                     DerivationOutput::Impure {
-                        .method = method.raw,
+                        .method = method,
                         .hashType = ht,
                     });
             else
                 drv.outputs.insert_or_assign(i,
                     DerivationOutput::CAFloating {
-                        .method = method.raw,
+                        .method = method,
                         .hashType = ht,
                     });
         }
@@ -1373,7 +1373,7 @@ drvName, Bindings * attrs, Value & v)
                 drv.env[i] = state.store->printStorePath(outPath);
                 drv.outputs.insert_or_assign(
                     i,
-                    DerivationOutputInputAddressed {
+                    DerivationOutput::InputAddressed {
                         .path = std::move(outPath),
                     });
             }
@@ -1381,7 +1381,7 @@ drvName, Bindings * attrs, Value & v)
             ;
         case DrvHash::Kind::Deferred:
             for (auto & i : outputs) {
-                drv.outputs.insert_or_assign(i, DerivationOutputDeferred {});
+                drv.outputs.insert_or_assign(i, DerivationOutput::Deferred {});
             }
         }
     }
@@ -2054,7 +2054,7 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Val
     StorePathSet refs;
 
     for (auto c : context) {
-        if (auto p = std::get_if<NixStringContextElem::Opaque>(&c))
+        if (auto p = std::get_if<NixStringContextElem::Opaque>(&c.raw))
             refs.insert(p->path);
         else
             state.debugThrowLastTrace(EvalError({

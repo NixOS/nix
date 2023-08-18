@@ -9,6 +9,7 @@
 #include "derived-path.hh"
 #include "sync.hh"
 #include "comparator.hh"
+#include "variant-wrapper.hh"
 
 #include <map>
 #include <variant>
@@ -21,107 +22,109 @@ class Store;
 /* Abstract syntax of derivations. */
 
 /**
- * The traditional non-fixed-output derivation type.
- */
-struct DerivationOutputInputAddressed
-{
-    StorePath path;
-
-    GENERATE_CMP(DerivationOutputInputAddressed, me->path);
-};
-
-/**
- * Fixed-output derivations, whose output paths are content
- * addressed according to that fixed output.
- */
-struct DerivationOutputCAFixed
-{
-    /**
-     * Method and hash used for expected hash computation.
-     *
-     * References are not allowed by fiat.
-     */
-    ContentAddress ca;
-
-    /**
-     * Return the \ref StorePath "store path" corresponding to this output
-     *
-     * @param drvName The name of the derivation this is an output of, without the `.drv`.
-     * @param outputName The name of this output.
-     */
-    StorePath path(const Store & store, std::string_view drvName, std::string_view outputName) const;
-
-    GENERATE_CMP(DerivationOutputCAFixed, me->ca);
-};
-
-/**
- * Floating-output derivations, whose output paths are content
- * addressed, but not fixed, and so are dynamically calculated from
- * whatever the output ends up being.
- * */
-struct DerivationOutputCAFloating
-{
-    /**
-     * How the file system objects will be serialized for hashing
-     */
-    ContentAddressMethod method;
-
-    /**
-     * How the serialization will be hashed
-     */
-    HashType hashType;
-
-    GENERATE_CMP(DerivationOutputCAFloating, me->method, me->hashType);
-};
-
-/**
- * Input-addressed output which depends on a (CA) derivation whose hash
- * isn't known yet.
- */
-struct DerivationOutputDeferred {
-    GENERATE_CMP(DerivationOutputDeferred);
-};
-
-/**
- * Impure output which is moved to a content-addressed location (like
- * CAFloating) but isn't registered as a realization.
- */
-struct DerivationOutputImpure
-{
-    /**
-     * How the file system objects will be serialized for hashing
-     */
-    ContentAddressMethod method;
-
-    /**
-     * How the serialization will be hashed
-     */
-    HashType hashType;
-
-    GENERATE_CMP(DerivationOutputImpure, me->method, me->hashType);
-};
-
-typedef std::variant<
-    DerivationOutputInputAddressed,
-    DerivationOutputCAFixed,
-    DerivationOutputCAFloating,
-    DerivationOutputDeferred,
-    DerivationOutputImpure
-> _DerivationOutputRaw;
-
-/**
  * A single output of a BasicDerivation (and Derivation).
  */
-struct DerivationOutput : _DerivationOutputRaw
+struct DerivationOutput
 {
-    using Raw = _DerivationOutputRaw;
-    using Raw::Raw;
+    /**
+     * The traditional non-fixed-output derivation type.
+     */
+    struct InputAddressed
+    {
+        StorePath path;
 
-    using InputAddressed = DerivationOutputInputAddressed;
-    using CAFixed = DerivationOutputCAFixed;
-    using CAFloating = DerivationOutputCAFloating;
-    using Deferred = DerivationOutputDeferred;
-    using Impure = DerivationOutputImpure;
+        GENERATE_CMP(InputAddressed, me->path);
+    };
+
+    /**
+     * Fixed-output derivations, whose output paths are content
+     * addressed according to that fixed output.
+     */
+    struct CAFixed
+    {
+        /**
+         * Method and hash used for expected hash computation.
+         *
+         * References are not allowed by fiat.
+         */
+        ContentAddress ca;
+
+        /**
+         * Return the \ref StorePath "store path" corresponding to this output
+         *
+         * @param drvName The name of the derivation this is an output of, without the `.drv`.
+         * @param outputName The name of this output.
+         */
+        StorePath path(const Store & store, std::string_view drvName, std::string_view outputName) const;
+
+        GENERATE_CMP(CAFixed, me->ca);
+    };
+
+    /**
+     * Floating-output derivations, whose output paths are content
+     * addressed, but not fixed, and so are dynamically calculated from
+     * whatever the output ends up being.
+     * */
+    struct CAFloating
+    {
+        /**
+         * How the file system objects will be serialized for hashing
+         */
+        ContentAddressMethod method;
+
+        /**
+         * How the serialization will be hashed
+         */
+        HashType hashType;
+
+        GENERATE_CMP(CAFloating, me->method, me->hashType);
+    };
+
+    /**
+     * Input-addressed output which depends on a (CA) derivation whose hash
+     * isn't known yet.
+     */
+    struct Deferred {
+        GENERATE_CMP(Deferred);
+    };
+
+    /**
+     * Impure output which is moved to a content-addressed location (like
+     * CAFloating) but isn't registered as a realization.
+     */
+    struct Impure
+    {
+        /**
+         * How the file system objects will be serialized for hashing
+         */
+        ContentAddressMethod method;
+
+        /**
+         * How the serialization will be hashed
+         */
+        HashType hashType;
+
+        GENERATE_CMP(Impure, me->method, me->hashType);
+    };
+
+    typedef std::variant<
+        InputAddressed,
+        CAFixed,
+        CAFloating,
+        Deferred,
+        Impure
+    > Raw;
+
+    Raw raw;
+
+    GENERATE_CMP(DerivationOutput, me->raw);
+
+    MAKE_WRAPPER_CONSTRUCTOR(DerivationOutput);
+
+    /**
+     * Force choosing a variant
+     */
+    DerivationOutput() = delete;
 
     /**
      * \note when you use this function you should make sure that you're
@@ -130,10 +133,6 @@ struct DerivationOutput : _DerivationOutputRaw
      * BasicDerivation::outputsAndOptPaths
      */
     std::optional<StorePath> path(const Store & store, std::string_view drvName, std::string_view outputName) const;
-
-    inline const Raw & raw() const {
-        return static_cast<const Raw &>(*this);
-    }
 
     nlohmann::json toJSON(
         const Store & store,
@@ -167,61 +166,71 @@ typedef std::map<std::string, std::pair<DerivationOutput, std::optional<StorePat
  */
 typedef std::map<StorePath, StringSet> DerivationInputs;
 
-/**
- * Input-addressed derivation types
- */
-struct DerivationType_InputAddressed {
+struct DerivationType {
     /**
-     * True iff the derivation type can't be determined statically,
-     * for instance because it (transitively) depends on a content-addressed
-     * derivation.
-    */
-    bool deferred;
-};
-
-/**
- * Content-addressed derivation types
- */
-struct DerivationType_ContentAddressed {
-    /**
-     * Whether the derivation should be built safely inside a sandbox.
+     * Input-addressed derivation types
      */
-    bool sandboxed;
+    struct InputAddressed {
+        /**
+         * True iff the derivation type can't be determined statically,
+         * for instance because it (transitively) depends on a content-addressed
+         * derivation.
+        */
+        bool deferred;
+
+        GENERATE_CMP(InputAddressed, me->deferred);
+    };
+
     /**
-     * Whether the derivation's outputs' content-addresses are "fixed"
-     * or "floating.
-     *
-     *  - Fixed: content-addresses are written down as part of the
-     *    derivation itself. If the outputs don't end up matching the
-     *    build fails.
-     *
-     *  - Floating: content-addresses are not written down, we do not
-     *    know them until we perform the build.
+     * Content-addressed derivation types
      */
-    bool fixed;
-};
+    struct ContentAddressed {
+        /**
+         * Whether the derivation should be built safely inside a sandbox.
+         */
+        bool sandboxed;
+        /**
+         * Whether the derivation's outputs' content-addresses are "fixed"
+         * or "floating".
+         *
+         *  - Fixed: content-addresses are written down as part of the
+         *    derivation itself. If the outputs don't end up matching the
+         *    build fails.
+         *
+         *  - Floating: content-addresses are not written down, we do not
+         *    know them until we perform the build.
+         */
+        bool fixed;
 
-/**
- * Impure derivation type
- *
- * This is similar at buil-time to the content addressed, not standboxed, not fixed
- * type, but has some restrictions on its usage.
- */
-struct DerivationType_Impure {
-};
+        GENERATE_CMP(ContentAddressed, me->sandboxed, me->fixed);
+    };
 
-typedef std::variant<
-    DerivationType_InputAddressed,
-    DerivationType_ContentAddressed,
-    DerivationType_Impure
-> _DerivationTypeRaw;
+    /**
+     * Impure derivation type
+     *
+     * This is similar at buil-time to the content addressed, not standboxed, not fixed
+     * type, but has some restrictions on its usage.
+     */
+    struct Impure {
+        GENERATE_CMP(Impure);
+    };
 
-struct DerivationType : _DerivationTypeRaw {
-    using Raw = _DerivationTypeRaw;
-    using Raw::Raw;
-    using InputAddressed = DerivationType_InputAddressed;
-    using ContentAddressed = DerivationType_ContentAddressed;
-    using Impure = DerivationType_Impure;
+    typedef std::variant<
+        InputAddressed,
+        ContentAddressed,
+        Impure
+    > Raw;
+
+    Raw raw;
+
+    GENERATE_CMP(DerivationType, me->raw);
+
+    MAKE_WRAPPER_CONSTRUCTOR(DerivationType);
+
+    /**
+     * Force choosing a variant
+     */
+    DerivationType() = delete;
 
     /**
      * Do the outputs of the derivation have paths calculated from their
@@ -257,10 +266,6 @@ struct DerivationType : _DerivationTypeRaw {
      * closure, or if fixed output.
      */
     bool hasKnownOutputPaths() const;
-
-    inline const Raw & raw() const {
-        return static_cast<const Raw &>(*this);
-    }
 };
 
 struct BasicDerivation

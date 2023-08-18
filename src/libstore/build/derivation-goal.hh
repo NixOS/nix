@@ -184,7 +184,7 @@ struct DerivationGoal : public Goal
     /**
      * The sort of derivation we are building.
      */
-    DerivationType derivationType;
+    std::optional<DerivationType> derivationType;
 
     typedef void (DerivationGoal::*GoalState)();
     GoalState state;
