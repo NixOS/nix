@@ -64,8 +64,8 @@ EOF
 git -C "$flakeC2" add flake.nix
 git -C "$flakeC2" commit -a -m 'initial'
 
-[[ $(nix eval --raw "$flakeB#foo" --recreate-lock-file) = "B C" ]]
-[[ $(nix eval --raw "$flakeA#foo" --recreate-lock-file) = "A B C2" ]]
+[[ $(nix eval --raw "$flakeB#foo") = "B C" ]]
+[[ $(nix eval --raw "$flakeA#foo") = "A B C2" ]]
 
 # Test simple override from command line
 # A -> B -> C
@@ -83,7 +83,7 @@ git -C "$flakeA" commit -a -m 'initial'
 
 # B, C, and C2 same as previous test
 [[ $(nix eval --raw "$flakeA#foo" --recreate-lock-file) = "A B C" ]]
-[[ $(nix eval --raw "$flakeA#foo" --recreate-lock-file --override-input b/c git+file://$flakeC2) = "A B C2" ]]
+[[ $(nix eval --raw "$flakeA#foo" --override-input b/c git+file://$flakeC2) = "A B C2" ]]
 
 # Test unused overrides detected
 # A(override B.X=A, B.X.X=B, B.Y=C, B.C.Z=D) -> B -> C
@@ -103,12 +103,12 @@ git -C "$flakeA" add flake.nix
 git -C "$flakeA" commit -a -m 'initial'
 
 # B and C same as previous test
-[[ $(nix eval --raw "$flakeA#foo" --recreate-lock-file) = "A B C" ]]
+[[ $(nix eval --raw "$flakeA#foo") = "A B C" ]]
 expectedOutputRegex="warning: input 'b/c' has an override for a non-existent input 'z'
 warning: input 'b' has an override for a non-existent input 'x'
 warning: input 'b/x' has an override for a non-existent input 'x'
 warning: input 'b' has an override for a non-existent input 'y'"
-[[ $(nix eval "$flakeA#foo" --recreate-lock-file 2>&1 | grep "has an override") =~ $expectedOutputRegex ]]
+[[ $(nix eval "$flakeA#foo" 2>&1 | grep "has an override") =~ $expectedOutputRegex ]]
 
 # Test multi-level overrides
 # A(override B.C.D=D2) -> B -> C -> D
@@ -208,9 +208,9 @@ git -C "$flakeD3" commit -a -m 'initial'
 
 # C, D, and D2 same as previous test
 
-[[ $(nix eval --raw "$flakeC#foo" --recreate-lock-file) = "C D" ]]
-[[ $(nix eval --raw "$flakeB#foo" --recreate-lock-file) = "B C D2" ]]
-[[ $(nix eval --raw "$flakeA#foo" --recreate-lock-file) = "A B C D3" ]]
+[[ $(nix eval --raw "$flakeC#foo") = "C D" ]]
+[[ $(nix eval --raw "$flakeB#foo") = "B C D2" ]]
+[[ $(nix eval --raw "$flakeA#foo") = "A B C D3" ]]
 
 # Test overrides are merged
 # A(override B.C.D.E=E2) -> B (override C.D=D2)-> C -> D -> E
@@ -294,7 +294,7 @@ git -C "$flakeE2" add flake.nix
 git -C "$flakeE2" commit -a -m 'initial'
 
 [[ $(nix eval --raw "$flakeC#foo" --recreate-lock-file) = "C D E" ]]
-[[ $(nix eval --raw "$flakeB#foo" --recreate-lock-file) = "B C D2 E" ]]
+[[ $(nix eval --raw "$flakeB#foo") = "B C D2 E" ]]
 [[ $(nix eval --raw "$flakeA#foo" --recreate-lock-file) = "A B C D2 E2" ]]
 
 # Test overrides set by an override are used
@@ -353,8 +353,8 @@ git -C "$flakeC2" commit -a -m 'initial'
 # TODO is there a bug around when to update inputs?
 # The tests fail without removing these locks.
 rm -f {$flakeA,$flakeB}/flake.lock
-[[ $(nix eval --raw "$flakeC#foo" --recreate-lock-file) = "C D E" ]]
-[[ $(nix eval --raw "$flakeA#foo" --recreate-lock-file) = "A B C2 D E2" ]]
+[[ $(nix eval --raw "$flakeC#foo") = "C D E" ]]
+[[ $(nix eval --raw "$flakeA#foo") = "A B C2 D E2" ]]
 
 # Test overrides of overridden inputs get discarded
 # A(override B.C=C2) -> B -> C(override D.E=E2) -> D -> E
@@ -388,5 +388,5 @@ git -C "$flakeC2" commit -a -m 'initial'
 
 # D, E, and E2 same as previous test
 
-[[ $(nix eval --raw "$flakeC#foo" --recreate-lock-file) = "C D E2" ]]
+[[ $(nix eval --raw "$flakeC#foo") = "C D E2" ]]
 [[ $(nix eval --raw "$flakeA#foo" --recreate-lock-file) = "A B C2 D E" ]]
