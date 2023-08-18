@@ -11,6 +11,8 @@ readonly SOCKET_DEST=/etc/systemd/system/nix-daemon.socket
 
 readonly TMPFILES_SRC=/lib/tmpfiles.d/nix-daemon.conf
 readonly TMPFILES_DEST=/etc/tmpfiles.d/nix-daemon.conf
+readonly TMPFILES_SRC=/lib/tmpfiles.d/nix-daemon.conf
+readonly TMPFILES_DEST=/etc/tmpfiles.d/nix-daemon.conf
 
 # Path for the systemd override unit file to contain the proxy settings
 readonly SERVICE_OVERRIDE=${SERVICE_DEST}.d/override.conf
@@ -29,11 +31,17 @@ escape_systemd_env() {
     echo "${temp_var//\%/%%}"
 }
 
+escape_systemd_env() {
+    temp_var="${1//\'/\\\'}"
+    echo "${temp_var//\%/%%}"
+}
+
 # Gather all non-empty proxy environment variables into a string
 create_systemd_proxy_env() {
     vars="http_proxy https_proxy ftp_proxy no_proxy HTTP_PROXY HTTPS_PROXY FTP_PROXY NO_PROXY"
     for v in $vars; do
         if [ "x${!v:-}" != "x" ]; then
+            echo "Environment=${v}=$(escape_systemd_env ${!v})"
             echo "Environment=${v}=$(escape_systemd_env ${!v})"
         fi
     done

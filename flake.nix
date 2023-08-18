@@ -91,19 +91,36 @@
 
         configureFlags =
           lib.optionals stdenv.isLinux [
-            "--with-boost=${boost}/lib"
-            "--with-sandbox-shell=${sh}/bin/busybox"
-          ]
-          ++ lib.optionals (stdenv.isLinux && !(isStatic && stdenv.system == "aarch64-linux")) [
-            "LDFLAGS=-fuse-ld=gold"
+            "-Dwith_sandbox_shell=${sh}/bin/busybox"
+            # ++ lib.optionals (stdenv.isLinux && !(isStatic && stdenv.system == "aarch64-linux")) [
+            #   "LDFLAGS=-fuse-ld=gold"
+            # ]
+
+            # rapidcheck is required for now. need to make optional based
+            # on whether tests are being built.
+            "-Drapidcheck_dir=${lib.getDev pkgs.rapidcheck}"
+
+            # hardcode aws as it is currently not optional
+            "-Daws_sdk_cpp_include_dir=${lib.getDev (pkgs.aws-sdk-cpp.override {
+              apis = ["s3" "transfer"];
+              customMemoryManagement = false;
+            })}/include"
+
+            "-Daws_sdk_cpp_lib_dir=${lib.getLib (pkgs.aws-sdk-cpp.override {
+              apis = ["s3" "transfer"];
+              customMemoryManagement = false;
+            })}/lib"
           ];
 
         testConfigureFlags = [
-          "RAPIDCHECK_HEADERS=${lib.getDev rapidcheck}/extras/gtest/include"
+          "-Drapidcheck_dir=${lib.getDev pkgs.rapidcheck}"
+
+
+
         ];
 
         internalApiDocsConfigureFlags = [
-          "--enable-internal-api-docs"
+          "-Denable-internal-api-docs"
         ];
 
         nativeBuildDeps =
@@ -113,8 +130,8 @@
             (lib.getBin buildPackages.lowdown-nix)
             buildPackages.mdbook
             buildPackages.mdbook-linkcheck
-            buildPackages.autoconf-archive
-            buildPackages.autoreconfHook
+            buildPackages.meson
+            buildPackages.ninja
             buildPackages.pkg-config
 
             # Tests
@@ -125,12 +142,16 @@
           ++ lib.optionals stdenv.hostPlatform.isLinux [(buildPackages.util-linuxMinimal or buildPackages.utillinuxMinimal)];
 
         buildDeps =
-          [ curl
-            bzip2 xz brotli editline
-            openssl sqlite
-            libarchive
+          [ libarchive
             boost
-            lowdown-nix
+            brotli
+            bzip2
+            curl
+            editline
+            (lib.getBin buildPackages.lowdown-nix)
+            openssl
+            sqlite
+            xz
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
@@ -342,6 +363,21 @@
               ++ lib.optionals (currentStdenv.hostPlatform == currentStdenv.buildPlatform) awsDeps
               ++ lib.optionals finalAttrs.doCheck checkDeps;
 
+            # Meson is no longer able to pick up Boost automatically.
+            # https://github.com/NixOS/nixpkgs/issues/86131
+            BOOST_INCLUDEDIR = "${lib.getDev pkgs.boost}/include";
+            BOOST_LIBRARYDIR = "${lib.getLib pkgs.boost}/lib";
+            BOOST_ROOT = "${lib.getDev pkgs.boost}";
+
+            AWS_SDK_INCLUDEDIR = "${lib.getDev (pkgs.aws-sdk-cpp.override {
+                apis = ["s3" "transfer"];
+                customMemoryManagement = false;
+            })}/include";
+            AWS_SDK_LIBRARYDIR = "${lib.getLib (pkgs.aws-sdk-cpp.override {
+                apis = ["s3" "transfer"];
+                customMemoryManagement = false;
+            })}/lib";
+
             propagatedBuildInputs = propagatedDeps;
 
             disallowedReferences = [ boost ];
@@ -367,16 +403,15 @@
                 ''}
               '';
 
-            configureFlags = configureFlags ++
-              [ "--sysconfdir=/etc" ] ++
-              lib.optional stdenv.hostPlatform.isStatic "--enable-embedded-sandbox-shell" ++
-              [ (lib.enableFeature finalAttrs.doCheck "tests") ] ++
-              lib.optionals finalAttrs.doCheck testConfigureFlags ++
-              lib.optional (!canRunInstalled) "--disable-doc-gen";
+            mesonFlags = configureFlags ++
+              [ "-Dsysconfdir=/etc" "-DPRECOMPILE_HEADERS=true" ]
+              ++ lib.optional stdenv.hostPlatform.isStatic "-Denable-embedded-sandbox-shell"
+              ++ lib.optionals finalAttrs.doCheck testConfigureFlags
+              ++ lib.optional (!canRunInstalled) "-Ddisable-doc-gen";
 
             enableParallelBuilding = true;
 
-            makeFlags = "profiledir=$(out)/etc/profile.d PRECOMPILE_HEADERS=1";
+            makeFlags = "profiledir=$(out)/etc/profile.d ";
 
             doCheck = true;
 
@@ -487,7 +522,7 @@
         buildCross = forAllCrossSystems (crossSystem:
           lib.genAttrs ["x86_64-linux"] (system: self.packages.${system}."nix-${crossSystem}"));
 
-        buildNoGc = forAllSystems (system: self.packages.${system}.nix.overrideAttrs (a: { configureFlags = (a.configureFlags or []) ++ ["--enable-gc=no"];}));
+        buildNoGc = forAllSystems (system: self.packages.${system}.nix.overrideAttrs (a: { configureFlags = (a.configureFlags or []) ++ ["-Denable-gc=no"];}));
 
         buildNoTests = forAllSystems (system:
           self.packages.${system}.nix.overrideAttrs (a: {
@@ -705,6 +740,15 @@
             enableParallelBuilding = true;
 
             installFlags = "sysconfdir=$(out)/etc";
+
+            AWS_SDK_INCLUDEDIR = "${lib.getDev (pkgs.aws-sdk-cpp.override {
+              apis = ["s3" "transfer"];
+              customMemoryManagement = false;
+            })}/include";
+            AWS_SDK_LIBRARYDIR = "${lib.getLib (pkgs.aws-sdk-cpp.override {
+              apis = ["s3" "transfer"];
+              customMemoryManagement = false;
+            })}/lib";
 
             shellHook =
               ''
