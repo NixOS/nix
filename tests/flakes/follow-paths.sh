@@ -146,5 +146,5 @@ EOF
 
 git -C $flakeFollowsA add flake.nix
 
-nix flake lock $flakeFollowsA 2>&1 | grep "warning: input 'B' follows a non-existent input 'invalid'"
+nix flake lock $flakeFollowsA 2>&1 | grep "warning: input 'B/invalid' does not exist but follows 'D'"
 nix flake lock $flakeFollowsA 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid2'"
