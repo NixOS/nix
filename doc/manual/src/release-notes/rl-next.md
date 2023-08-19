@@ -22,3 +22,5 @@
 
 - Introduce a new [`outputOf`](@docroot@/language/builtins.md#builtins-outputOf) builtin.
   It is part of the [`dynamic-derivations`](@docroot@/contributing/experimental-features.md#xp-feature-dynamic-derivations) experimental feature.
+
+- Introduce new flake installable syntax `flakeref#.attrPath` where the "." prefix denotes no searching of default attribute prefixes like `packages.<SYSTEM>` or `legacyPackages.<SYSTEM>`.
