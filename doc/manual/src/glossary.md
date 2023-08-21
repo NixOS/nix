@@ -180,6 +180,25 @@
 
     [output path]: #gloss-output-path
 
+  - [output closure]{#gloss-output-closure}\
+    The [closure] of an [output path]. This is sometimes loosely referred to as the [runtime closure].
+
+    While any kind of store object may be referenced and can therefore become part of the output closure, you may observe that commonly
+    - The closure consists of output paths and perhaps some sources. <!-- TODO define source -->
+    - The closure ideally equals the set of all runtime dependencies. Fewer would imply non-hermeticity, and more could indicate for example that a build tool has leaked a [reference] to itself in the output. See the [allowedReferences](./language/advanced-attributes.md#adv-attr-allowedReferences) family of derivation attributes.
+    - [Store derivations](#gloss-store-derivation) are not part of the closure. While such a reference can be constructed, it is uncommon.
+
+    [output closure]: #gloss-output-closure
+
+  - [runtime closure]{#gloss-runtime-closure}\
+    A closure that is constructed from a runtime dependency relation.
+
+    Commonly, the implied runtime dependency relation is the store [reference], and the starting set is an [output path], so that loose use of this term is equivalent to [output closure].
+
+    An example of a runtime closure that is not the [output closure] is the file-level dependency closure used by NixOS's systemd-based initrd generator. It is more efficient and fragile than the [output closure], but it is a runtime closure nonetheless. Another example is the closure formed by a set of loaded dynamic libraries.
+
+    [runtime closure]: #gloss-runtime-closure
+
   - [deriver]{#gloss-deriver}\
     The [store derivation] that produced an [output path].
 
