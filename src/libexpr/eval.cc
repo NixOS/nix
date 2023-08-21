@@ -527,9 +527,9 @@ EvalState::EvalState(
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
         for (auto & i : _searchPath.elements)
-            addToSearchPath(SearchPath::Elem {i});
+            searchPath.elements.emplace_back(SearchPath::Elem {i});
         for (auto & i : evalSettings.nixPath.get())
-            addToSearchPath(SearchPath::Elem::parse(i));
+            searchPath.elements.emplace_back(SearchPath::Elem::parse(i));
     }
 
     if (evalSettings.restrictEval || evalSettings.pureEval) {
