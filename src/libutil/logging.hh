@@ -171,7 +171,7 @@ extern Logger * logger;
 
 Logger * makeSimpleLogger(bool printBuildLogs = true);
 
-Logger * makeJSONLogger(Logger & prevLogger);
+Logger * makeJSONLogger(Logger & prevLogger, bool internalJSON = true);
 
 std::optional<nlohmann::json> parseJSONMessage(const std::string & msg);
 

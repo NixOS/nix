@@ -150,8 +150,9 @@ void to_json(nlohmann::json & json, std::shared_ptr<AbstractPos> pos)
 
 struct JSONLogger : Logger {
     Logger & prevLogger;
+    bool internalJSON;
 
-    JSONLogger(Logger & prevLogger) : prevLogger(prevLogger) { }
+    JSONLogger(Logger & prevLogger, bool internalJSON) : prevLogger(prevLogger) { }
 
     bool isVerbose() override {
         return true;
@@ -172,7 +173,11 @@ struct JSONLogger : Logger {
 
     void write(const nlohmann::json & json)
     {
-        prevLogger.log(lvlError, "@nix " + json.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace));
+        if (internalJSON) {
+            prevLogger.log(lvlError, "@nix " + json.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace));
+        } else {
+            prevLogger.log(lvlError, json.dump(-1, ' ', true, nlohmann::json::error_handler_t::replace));
+        }
     }
 
     void log(Verbosity lvl, std::string_view s) override
@@ -244,9 +249,9 @@ struct JSONLogger : Logger {
     }
 };
 
-Logger * makeJSONLogger(Logger & prevLogger)
+Logger * makeJSONLogger(Logger & prevLogger, bool internalJSON)
 {
-    return new JSONLogger(prevLogger);
+    return new JSONLogger(prevLogger, internalJSON);
 }
 
 static Logger::Fields getFields(nlohmann::json & json)
