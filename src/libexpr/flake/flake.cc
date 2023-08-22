@@ -654,11 +654,11 @@ LockedFlake lockFlake(
                         if (lockFileExists) {
                             auto s = chomp(diff);
                             if (s.empty())
-                                warn("updating lock file '%s'", *outputLockFilePath);
+                                notice("updating lock file '%s'", *outputLockFilePath);
                             else
-                                warn("updating lock file '%s':\n%s", *outputLockFilePath, s);
+                                notice("updating lock file '%s':\n%s", *outputLockFilePath, s);
                         } else
-                            warn("creating lock file '%s'", *outputLockFilePath);
+                            notice("creating lock file '%s'", *outputLockFilePath);
 
                         newLockFile.write(*outputLockFilePath);
 
@@ -694,7 +694,7 @@ LockedFlake lockFlake(
                         if (lockFlags.commitLockFile &&
                             flake.lockedRef.input.getRev() &&
                             prevLockedRef.input.getRev() != flake.lockedRef.input.getRev())
-                            warn("committed new revision '%s'", flake.lockedRef.input.getRev()->gitRev());
+                            notice("committed new revision '%s'", flake.lockedRef.input.getRev()->gitRev());
 
                         /* Make sure that we picked up the change,
                            i.e. the tree should usually be dirty
