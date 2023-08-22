@@ -230,7 +230,7 @@ struct CurlInputScheme : InputScheme
         if (type != inputType()) return {};
 
         // FIXME: some of these only apply to TarballInputScheme.
-        std::set<std::string> allowedNames = {"type", "url", "narHash", "name", "unpack", "rev", "revCount"};
+        std::set<std::string> allowedNames = {"type", "url", "narHash", "name", "unpack", "rev", "revCount", "lastModified"};
         for (auto & [name, value] : attrs)
             if (!allowedNames.count(name))
                 throw Error("unsupported %s input attribute '%s'", *type, name);
@@ -307,6 +307,9 @@ struct TarballInputScheme : CurlInputScheme
                 throw Error("tarball 'Link' headers that redirect to non-tarball URLs are not supported");
             input = immutableInput;
         }
+
+        if (result.lastModified && !input.attrs.contains("lastModified"))
+            input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
 
         return {result.tree.storePath, std::move(input)};
     }
