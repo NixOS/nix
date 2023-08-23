@@ -2,7 +2,7 @@ with import ./config.nix;
 
 rec {
 
-  dep = import ./dependencies.nix;
+  dep = import ./dependencies.nix {};
 
   makeTest = nr: args: mkDerivation ({
     name = "check-refs-" + toString nr;

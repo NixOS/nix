@@ -22,3 +22,7 @@
 
 - Introduce a new [`outputOf`](@docroot@/language/builtins.md#builtins-outputOf) builtin.
   It is part of the [`dynamic-derivations`](@docroot@/contributing/experimental-features.md#xp-feature-dynamic-derivations) experimental feature.
+
+- [`nix-store --query`](@docroot@/command-ref/nix-store/query.md) gained a new type of query: `--valid-derivers`. It returns all `.drv` files in the local store that *can be* used to build the output passed in argument.
+This is in contrast to `--deriver`, which returns the single `.drv` file that *was actually* used to build the output passed in argument. In case the output was substituted from a binary cache,
+this `.drv` file may only exist on said binary cache and not locally.
