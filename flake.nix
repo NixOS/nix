@@ -73,6 +73,7 @@
           ./precompiled-headers.h
           ./src
           ./tests/functional
+          ./tests/unit
           ./COPYING
           ./scripts/local.mk
           (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)

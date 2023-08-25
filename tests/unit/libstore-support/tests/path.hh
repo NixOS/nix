@@ -11,6 +11,9 @@ struct StorePathName {
     std::string name;
 };
 
+// For rapidcheck
+void showValue(const StorePath & p, std::ostream & os);
+
 }
 
 namespace rc {

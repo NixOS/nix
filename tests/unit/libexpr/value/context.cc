@@ -117,36 +117,6 @@ TEST(NixStringContextElemTest, built_built_xp) {
         NixStringContextElem::parse("!foo!bar!g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv"),        MissingExperimentalFeature);
 }
 
-}
-
-namespace rc {
-using namespace nix;
-
-Gen<NixStringContextElem::DrvDeep> Arbitrary<NixStringContextElem::DrvDeep>::arbitrary()
-{
-    return gen::just(NixStringContextElem::DrvDeep {
-        .drvPath = *gen::arbitrary<StorePath>(),
-    });
-}
-
-Gen<NixStringContextElem> Arbitrary<NixStringContextElem>::arbitrary()
-{
-    switch (*gen::inRange<uint8_t>(0, std::variant_size_v<NixStringContextElem::Raw>)) {
-    case 0:
-        return gen::just<NixStringContextElem>(*gen::arbitrary<NixStringContextElem::Opaque>());
-    case 1:
-        return gen::just<NixStringContextElem>(*gen::arbitrary<NixStringContextElem::DrvDeep>());
-    case 2:
-        return gen::just<NixStringContextElem>(*gen::arbitrary<NixStringContextElem::Built>());
-    default:
-        assert(false);
-    }
-}
-
-}
-
-namespace nix {
-
 #ifndef COVERAGE
 
 RC_GTEST_PROP(

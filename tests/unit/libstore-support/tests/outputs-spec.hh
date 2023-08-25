@@ -5,7 +5,7 @@
 
 #include <outputs-spec.hh>
 
-#include <tests/path.hh>
+#include "tests/path.hh"
 
 namespace rc {
 using namespace nix;

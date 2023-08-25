@@ -1,12 +1,8 @@
 #include <regex>
 
-#include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
-#include <rapidcheck/gtest.h>
 
-#include <hash.hh>
-
-#include "tests/hash.hh"
+#include "hash.hh"
 
 namespace nix {
 
@@ -68,7 +64,6 @@ namespace nix {
                 "7ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd"
                 "454d4423643ce80e2a9ac94fa54ca49f");
     }
-
     TEST(hashString, testKnownSHA512Hashes2) {
         // values taken from: https://tools.ietf.org/html/rfc4634
         auto s = "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu";
@@ -79,17 +74,4 @@ namespace nix {
                 "7299aeadb6889018501d289e4900f7e4331b99dec4b5433a"
                 "c7d329eeb6dd26545e96e55b874be909");
     }
-}
-
-namespace rc {
-using namespace nix;
-
-Gen<Hash> Arbitrary<Hash>::arbitrary()
-{
-    Hash hash(htSHA1);
-    for (size_t i = 0; i < hash.hashSize; ++i)
-        hash.hash[i] = *gen::arbitrary<uint8_t>();
-    return gen::just(hash);
-}
-
 }

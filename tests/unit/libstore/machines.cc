@@ -137,7 +137,7 @@ TEST(machines, getMachinesWithIncorrectFormat) {
 }
 
 TEST(machines, getMachinesWithCorrectFileReference) {
-    auto path = absPath("src/libstore/tests/test-data/machines.valid");
+    auto path = absPath("tests/unit/libstore/test-data/machines.valid");
     ASSERT_TRUE(pathExists(path));
 
     settings.builders = std::string("@") + path;
@@ -164,6 +164,6 @@ TEST(machines, getMachinesWithIncorrectFileReference) {
 }
 
 TEST(machines, getMachinesWithCorrectFileReferenceToIncorrectFile) {
-    settings.builders = std::string("@") + absPath("src/libstore/tests/test-data/machines.bad_format");
+    settings.builders = std::string("@") + absPath("tests/unit/libstore/test-data/machines.bad_format");
     EXPECT_THROW(getMachines(), FormatError);
 }

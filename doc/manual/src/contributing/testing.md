@@ -3,12 +3,24 @@
 ## Unit-tests
 
 The unit-tests for each Nix library (`libexpr`, `libstore`, etc..) are defined
-under `src/{library_name}/tests` using the
+under `tests/unit/{library_name}/tests` using the
 [googletest](https://google.github.io/googletest/) and
 [rapidcheck](https://github.com/emil-e/rapidcheck) frameworks.
 
 You can run the whole testsuite with `make check`, or the tests for a specific component with `make libfoo-tests_RUN`.
 Finer-grained filtering is also possible using the [--gtest_filter](https://google.github.io/googletest/advanced.html#running-a-subset-of-the-tests) command-line option, or the `GTEST_FILTER` environment variable.
+
+### Unit test support libraries
+
+There are headers and code which are not just used to test the library in question, but also downstream libraries.
+For example, we do [property testing] with the [rapidcheck] library.
+This requires writing `Arbitrary` "instances", which are used to describe how to generate values of a given type for the sake of running property tests.
+Because types contain other types, `Arbitrary` "instances" for some type are not just useful for testing that type, but also any other type that contains it.
+Downstream types frequently contain upstream types, so it is very important that we share arbitrary instances so that downstream libraries' property tests can also use them.
+
+It is important that these testing libraries don't contain any actual tests themselves.
+On some platforms they would be run as part of every test executable that uses them, which is redundant.
+On other platforms they wouldn't be run at all.
 
 ## Functional tests
 

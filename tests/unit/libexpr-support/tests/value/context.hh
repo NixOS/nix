@@ -3,7 +3,7 @@
 
 #include <rapidcheck/gen/Arbitrary.h>
 
-#include <value/context.hh>
+#include "value/context.hh"
 
 namespace rc {
 using namespace nix;
