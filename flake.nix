@@ -89,7 +89,7 @@
           ./misc
           ./precompiled-headers.h
           ./src
-          ./unit-test-data
+          ./tests/unit
           ./COPYING
           ./scripts/local.mk
           functionalTestFiles

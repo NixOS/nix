@@ -25,11 +25,13 @@ makefiles = \
 endif
 
 ifeq ($(ENABLE_BUILD)_$(ENABLE_TESTS), yes_yes)
-UNIT_TEST_ENV = _NIX_TEST_UNIT_DATA=unit-test-data
 makefiles += \
-  src/libutil/tests/local.mk \
-  src/libstore/tests/local.mk \
-  src/libexpr/tests/local.mk
+  tests/unit/libutil/local.mk \
+  tests/unit/libutil-support/local.mk \
+  tests/unit/libstore/local.mk \
+  tests/unit/libstore-support/local.mk \
+  tests/unit/libexpr/local.mk \
+  tests/unit/libexpr-support/local.mk
 endif
 
 ifeq ($(ENABLE_TESTS), yes)

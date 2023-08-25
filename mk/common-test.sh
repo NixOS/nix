@@ -1,7 +1,7 @@
 # Remove overall test dir (at most one of the two should match) and
 # remove file extension.
 test_name=$(echo -n "$test" | sed \
-    -e "s|^unit-test-data/||" \
+    -e "s|^tests/unit/[^/]*/data/||" \
     -e "s|^tests/functional/||" \
     -e "s|\.sh$||" \
     )
