@@ -203,7 +203,24 @@ static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, 
 static RegisterPrimOp primop_fetchTree({
     .name = "fetchTree",
     .arity = 1,
-    .fun = prim_fetchTree
+    .doc = R"(
+      Fetches a source tree using any backends supported by the fetcher infrastructure. It subsumes the functionality of existing built-ins like fetchGit, fetchMercurial and fetchTarball.
+
+      Examples:
+
+      ```nix
+      builtins.fetchTree { type = "github"; owner = "NixOS"; repo = "nixpkgs"; }
+      ```
+
+      ```nix
+      builtins.fetchTree { type = "git"; url = "file:////tmp/nix/git"; }
+      ```
+
+      ```nix
+      builtins.fetchTree { type = "sourcehut"; owner = "~NixOS"; repo = "nixpkgs"; }
+      ```
+    )",
+    .fun = prim_fetchTree,
 });
 
 static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v,
