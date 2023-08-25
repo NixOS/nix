@@ -71,7 +71,7 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath,
     , wantedOutputs(wantedOutputs)
     , buildMode(buildMode)
 {
-    state = &DerivationGoal::getDerivation;
+    state = &DerivationGoal::loadDerivation;
     name = fmt(
         "building of '%s' from .drv file",
         DerivedPath::Built { makeConstantStorePathRef(drvPath), wantedOutputs }.to_string(worker.store));
@@ -161,24 +161,6 @@ void DerivationGoal::addWantedOutputs(const OutputsSpec & outputs)
         break;
     };
     wantedOutputs = newWanted;
-}
-
-
-void DerivationGoal::getDerivation()
-{
-    trace("init");
-
-    /* The first thing to do is to make sure that the derivation
-       exists.  If it doesn't, it may be created through a
-       substitute. */
-    if (buildMode == bmNormal && worker.evalStore.isValidPath(drvPath)) {
-        loadDerivation();
-        return;
-    }
-
-    addWaitee(upcast_goal(worker.makePathSubstitutionGoal(drvPath)));
-
-    state = &DerivationGoal::loadDerivation;
 }
 
 
@@ -380,7 +362,12 @@ void DerivationGoal::gaveUpOnSubstitution()
                         worker.store.printStorePath(i.first));
             }
 
-            addWaitee(worker.makeDerivationGoal(i.first, i.second, buildMode == bmRepair ? bmRepair : bmNormal));
+            addWaitee(worker.makeGoal(
+                DerivedPath::Built {
+                    .drvPath = makeConstantStorePathRef(i.first),
+                    .outputs = i.second,
+                },
+                buildMode == bmRepair ? bmRepair : bmNormal));
         }
 
     /* Copy the input sources from the eval store to the build
@@ -452,7 +439,12 @@ void DerivationGoal::repairClosure()
         if (drvPath2 == outputsToDrv.end())
             addWaitee(upcast_goal(worker.makePathSubstitutionGoal(i, Repair)));
         else
-            addWaitee(worker.makeDerivationGoal(drvPath2->second, OutputsSpec::All(), bmRepair));
+            addWaitee(worker.makeGoal(
+                DerivedPath::Built {
+                    .drvPath = makeConstantStorePathRef(drvPath2->second),
+                    .outputs = OutputsSpec::All { },
+                },
+                bmRepair));
     }
 
     if (waitees.empty()) {
@@ -1483,7 +1475,7 @@ void DerivationGoal::waiteeDone(GoalPtr waitee, ExitCode result)
     if (!useDerivation) return;
     auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
 
-    auto * dg = dynamic_cast<DerivationGoal *>(&*waitee);
+    auto * dg = tryGetConcreteDrvGoal(waitee);
     if (!dg) return;
 
     auto outputs = fullDrv.inputDrvs.find(dg->drvPath);

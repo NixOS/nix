@@ -41,8 +41,24 @@ typedef std::map<StorePath, WeakGoalPtr> WeakGoalMap;
  * of each category in parallel.
  */
 enum struct JobCategory {
+    /**
+     * A build of a derivation; it will use CPU and disk resources.
+     */
     Build,
+    /**
+     * A substitution an arbitrary store object; it will use network resources.
+     */
     Substitution,
+    /**
+     * A goal that does no "real" work by itself, and just exists to depend on
+     * other goals which *do* do real work. These goals therefore are not
+     * limited.
+     *
+     * These goals cannot infinitely create themselves, so there is no risk of
+     * a "fork bomb" type situation (which would be a problem even though the
+     * goal do no real work) either.
+     */
+    Administration,
 };
 
 struct Goal : public std::enable_shared_from_this<Goal>
@@ -110,7 +126,7 @@ public:
      * sake of both privacy and determinism, and this "safe accessor"
      * ensures we don't.
      */
-    BuildResult getBuildResult(const DerivedPath &);
+    BuildResult getBuildResult(const DerivedPath &) const;
 
     /**
      * Exception containing an error message, if any.
@@ -144,7 +160,7 @@ public:
 
     void trace(std::string_view s);
 
-    std::string getName()
+    std::string getName() const
     {
         return name;
     }
@@ -166,7 +182,7 @@ public:
      * @brief Hint for the scheduler, which concurrency limit applies.
      * @see JobCategory
      */
-    virtual JobCategory jobCategory() = 0;
+    virtual JobCategory jobCategory() const = 0;
 };
 
 void addToWeakGoals(WeakGoals & goals, GoalPtr p);

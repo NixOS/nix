@@ -297,7 +297,7 @@ struct LocalDerivationGoal : public DerivationGoal
      * @todo Add option to randomize, so we can audit whether our
      * rewrites caught everything
      */
-    StorePath makeFallbackPath(std::string_view outputName);
+    StorePath makeFallbackPath(OutputNameView outputName);
 };
 
 }

@@ -399,8 +399,7 @@ StorePath resolveDerivedPath(Store & store, const SingleDerivedPath & req, Store
                     store.printStorePath(drvPath), bfd.output);
             auto & optPath = outputPaths.at(bfd.output);
             if (!optPath)
-                throw Error("'%s' does not yet map to a known concrete store path",
-                    bfd.to_string(store));
+                throw MissingRealisation(bfd.drvPath->to_string(store), bfd.output);
             return *optPath;
         },
     }, req.raw());
