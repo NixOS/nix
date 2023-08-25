@@ -11,7 +11,7 @@ std::string DownstreamPlaceholder::render() const
 
 DownstreamPlaceholder DownstreamPlaceholder::unknownCaOutput(
     const StorePath & drvPath,
-    std::string_view outputName,
+    OutputNameView outputName,
     const ExperimentalFeatureSettings & xpSettings)
 {
     xpSettings.require(Xp::CaDerivations);
@@ -25,7 +25,7 @@ DownstreamPlaceholder DownstreamPlaceholder::unknownCaOutput(
 
 DownstreamPlaceholder DownstreamPlaceholder::unknownDerivation(
     const DownstreamPlaceholder & placeholder,
-    std::string_view outputName,
+    OutputNameView outputName,
     const ExperimentalFeatureSettings & xpSettings)
 {
     xpSettings.require(Xp::DynamicDerivations);

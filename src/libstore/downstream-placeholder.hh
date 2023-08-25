@@ -58,7 +58,7 @@ public:
      */
     static DownstreamPlaceholder unknownCaOutput(
         const StorePath & drvPath,
-        std::string_view outputName,
+        OutputNameView outputName,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     /**
@@ -72,7 +72,7 @@ public:
      */
     static DownstreamPlaceholder unknownDerivation(
         const DownstreamPlaceholder & drvPlaceholder,
-        std::string_view outputName,
+        OutputNameView outputName,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     /**

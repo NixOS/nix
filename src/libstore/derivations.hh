@@ -55,7 +55,7 @@ struct DerivationOutput
          * @param drvName The name of the derivation this is an output of, without the `.drv`.
          * @param outputName The name of this output.
          */
-        StorePath path(const Store & store, std::string_view drvName, std::string_view outputName) const;
+        StorePath path(const Store & store, std::string_view drvName, OutputNameView outputName) const;
 
         GENERATE_CMP(CAFixed, me->ca);
     };
@@ -132,19 +132,19 @@ struct DerivationOutput
      * the safer interface provided by
      * BasicDerivation::outputsAndOptPaths
      */
-    std::optional<StorePath> path(const Store & store, std::string_view drvName, std::string_view outputName) const;
+    std::optional<StorePath> path(const Store & store, std::string_view drvName, OutputNameView outputName) const;
 
     nlohmann::json toJSON(
         const Store & store,
         std::string_view drvName,
-        std::string_view outputName) const;
+        OutputNameView outputName) const;
     /**
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
     static DerivationOutput fromJSON(
         const Store & store,
         std::string_view drvName,
-        std::string_view outputName,
+        OutputNameView outputName,
         const nlohmann::json & json,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 };
@@ -405,7 +405,7 @@ bool isDerivation(std::string_view fileName);
  * This is usually <drv-name>-<output-name>, but is just <drv-name> when
  * the output name is "out".
  */
-std::string outputPathName(std::string_view drvName, std::string_view outputName);
+std::string outputPathName(std::string_view drvName, OutputNameView outputName);
 
 
 /**
@@ -499,7 +499,7 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
  * own outputs without needing to use the hash of a derivation in
  * itself, making the hash near-impossible to calculate.
  */
-std::string hashPlaceholder(const std::string_view outputName);
+std::string hashPlaceholder(const OutputNameView outputName);
 
 extern const Hash impureOutputHash;
 

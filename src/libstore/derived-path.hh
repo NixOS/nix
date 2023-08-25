@@ -42,7 +42,7 @@ struct SingleDerivedPath;
  */
 struct SingleDerivedPathBuilt {
     ref<SingleDerivedPath> drvPath;
-    std::string output;
+    OutputName output;
 
     /**
      * Get the store path this is ultimately derived from (by realising
@@ -71,7 +71,7 @@ struct SingleDerivedPathBuilt {
      */
     static SingleDerivedPathBuilt parse(
         const Store & store, ref<SingleDerivedPath> drvPath,
-        std::string_view outputs,
+        OutputNameView outputs,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     nlohmann::json toJSON(Store & store) const;
 

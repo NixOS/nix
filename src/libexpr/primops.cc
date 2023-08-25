@@ -1843,7 +1843,7 @@ static void prim_outputOf(EvalState & state, const PosIdx pos, Value * * args, V
 {
     SingleDerivedPath drvPath = state.coerceToSingleDerivedPath(pos, *args[0], "while evaluating the first argument to builtins.outputOf");
 
-    std::string_view outputName = state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument to builtins.outputOf");
+    OutputNameView outputName = state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument to builtins.outputOf");
 
     state.mkSingleDerivedPathString(
         SingleDerivedPath::Built {
