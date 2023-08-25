@@ -170,16 +170,14 @@ static I forceIntChecked(EvalState & state, Value & v, const PosIdx pos, std::st
 
     try {
         return boost::numeric_cast<I>(result);
+    } catch(boost::numeric::negative_overflow& e) {
+        state.error("integer %1% is too low", result)
+            .withTrace(pos, errorCtx)
+            .debugThrow<TypeError>();
     } catch(boost::bad_numeric_cast& e) {
-        if (dynamic_cast<boost::numeric::negative_overflow*>(&e)) {
-            state.error("integer %1% is too low", result)
-                .withTrace(pos, errorCtx)
-                .debugThrow<TypeError>();
-        } else {
-            state.error("integer %1% is too high", result)
-                .withTrace(pos, errorCtx)
-                .debugThrow<TypeError>();
-        }
+        state.error("integer %1% is too high", result)
+            .withTrace(pos, errorCtx)
+            .debugThrow<TypeError>();
     }
 }
 
