@@ -22,3 +22,5 @@
 
 - Introduce a new [`outputOf`](@docroot@/language/builtins.md#builtins-outputOf) builtin.
   It is part of the [`dynamic-derivations`](@docroot@/contributing/experimental-features.md#xp-feature-dynamic-derivations) experimental feature.
+
+- Flake follow paths at depths greater than 2 are now handled correctly, preventing "follows a non-existent input" errors.
