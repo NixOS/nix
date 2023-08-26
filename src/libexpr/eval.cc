@@ -454,7 +454,7 @@ ErrorBuilder & ErrorBuilder::withFrame(const Env & env, const Expr & expr)
         .expr = expr,
         .env = env,
         .hint = hintformat("Fake frame for debugging purposes"),
-        .isError = true
+        .verbosity = std::nullopt
     });
     return *this;
 }
@@ -859,7 +859,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
                 .expr = expr,
                 .env = env,
                 .hint = error->info().msg,
-                .isError = true
+                .verbosity = std::make_optional(error->info().level),
             })
         : nullptr;
 
@@ -904,7 +904,7 @@ static std::unique_ptr<DebugTraceStacker> makeDebugTraceStacker(
             .expr = expr,
             .env = env,
             .hint = hintfmt(s, s2),
-            .isError = false
+            .verbosity = std::nullopt
         });
 }
 
@@ -2066,12 +2066,12 @@ void EvalState::forceValueDeep(Value & v)
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
                     auto dts = debugRepl && i.value->isThunk()
                         ? makeDebugTraceStacker(*this, *i.value->thunk.expr, *i.value->thunk.env, positions[i.pos],
-                            "while evaluating the attribute '%1%'", symbols[i.name])
+                            "while fully evaluating the attribute '%1%'", symbols[i.name])
                         : nullptr;
 
                     recurse(*i.value);
                 } catch (Error & e) {
-                    addErrorTrace(e, i.pos, "while evaluating the attribute '%1%'", symbols[i.name]);
+                    addErrorTrace(e, i.pos, "while fully evaluating the attribute '%1%'", symbols[i.name]);
                     throw;
                 }
         }

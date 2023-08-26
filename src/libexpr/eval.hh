@@ -138,10 +138,8 @@ struct DebugTrace {
     const Expr & expr;
     const Env & env;
     hintformat hint;
-    bool isError;
+    std::optional<Verbosity> verbosity;
 };
-
-void debugError(Error * e, Env & env, Expr & expr);
 
 class ErrorBuilder
 {

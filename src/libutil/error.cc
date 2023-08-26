@@ -150,45 +150,42 @@ static std::string indent(std::string_view indentFirst, std::string_view indentR
     return res;
 }
 
-std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace)
+// return verbosity to a string of the appropriate colorl; doesn't revert to ANSI_NORMAL.
+std::string showVerbosity(Verbosity v)
 {
-    std::string prefix;
-    switch (einfo.level) {
+    switch (v) {
         case Verbosity::lvlError: {
-            prefix = ANSI_RED "error";
-            break;
+            return ANSI_RED "error";
         }
         case Verbosity::lvlNotice: {
-            prefix = ANSI_RED "note";
-            break;
+            return ANSI_RED "note";
         }
         case Verbosity::lvlWarn: {
-            prefix = ANSI_WARNING "warning";
-            break;
+            return ANSI_WARNING "warning";
         }
         case Verbosity::lvlInfo: {
-            prefix = ANSI_GREEN "info";
-            break;
+            return ANSI_GREEN "info";
         }
         case Verbosity::lvlTalkative: {
-            prefix = ANSI_GREEN "talk";
-            break;
+            return ANSI_GREEN "talk";
         }
         case Verbosity::lvlChatty: {
-            prefix = ANSI_GREEN "chat";
-            break;
+            return ANSI_GREEN "chat";
         }
         case Verbosity::lvlVomit: {
-            prefix = ANSI_GREEN "vomit";
-            break;
+            return ANSI_GREEN "vomit";
         }
         case Verbosity::lvlDebug: {
-            prefix = ANSI_WARNING "debug";
-            break;
+            return ANSI_WARNING "debug";
         }
         default:
             assert(false);
     }
+}
+
+std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace)
+{
+    std::string prefix = showVerbosity(einfo.level);
 
     // FIXME: show the program name as part of the trace?
     if (einfo.programName && einfo.programName != ErrorInfo::programName)

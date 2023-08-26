@@ -212,8 +212,8 @@ namespace {
 
 static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positions, const DebugTrace & dt)
 {
-    if (dt.isError)
-        out << ANSI_RED "error: " << ANSI_NORMAL;
+    if (dt.verbosity.has_value())
+        out << showVerbosity(dt.verbosity.value()) << ": " << ANSI_NORMAL;
     out << dt.hint.str() << "\n";
 
     // prefer direct pos, but if noPos then try the expr.
