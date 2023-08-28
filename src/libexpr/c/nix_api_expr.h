@@ -1,7 +1,7 @@
 #ifndef NIX_API_EXPR_H
 #define NIX_API_EXPR_H
 /** @defgroup libexpr libexpr
- * @brief Bindings to the Nix evaluator
+ * @brief Bindings to the Nix language evaluator
  *
  * Example (without error handling):
  * @code{.c}
@@ -38,17 +38,18 @@ extern "C" {
 
 // Type definitions
 /**
- * @brief Represents a nix evaluator state.
+ * @brief Represents a state of the Nix language evaluator.
  *
- * Multiple can be created for multi-threaded
+ * Multiple states can be created for multi-threaded
  * operation.
  * @struct State
+ * @see nix_state_create
  */
 typedef struct State State; // nix::EvalState
 /**
- * @brief Represents a nix value.
+ * @brief Represents a value in the Nix language.
  *
- * Owned by the GC.
+ * Owned by the garbage collector.
  * @struct Value
  * @see value_manip
  */
@@ -56,7 +57,7 @@ typedef void Value; // nix::Value
 
 // Function prototypes
 /**
- * @brief Initializes the Nix expression evaluator.
+ * @brief Initialize the Nix language evaluator.
  *
  * This function should be called before creating a State.
  * This function can be called multiple times.
@@ -73,6 +74,7 @@ nix_err nix_libexpr_init(nix_c_context *context);
  * @param[in] state The state of the evaluation.
  * @param[in] expr The Nix expression to parse.
  * @param[in] path The file path to associate with the expression.
+ * This is required for expressions that contain relative paths (such as `./.`) that are resolved relative to the given directory.
  * @param[out] value The result of the evaluation. You should allocate this
  * yourself.
  * @return NIX_OK if the evaluation was successful, an error code otherwise.
@@ -109,7 +111,7 @@ nix_err nix_value_call(nix_c_context *context, State *state, Value *fn,
  * @param[out] context Optional, stores error information
  * @param[in] state The state of the evaluation.
  * @param[in,out] value The Nix value to force.
- * @post values is not of type NIX_TYPE_THUNK
+ * @post value is not of type NIX_TYPE_THUNK
  * @return NIX_OK if the force operation was successful, an error code
  * otherwise.
  */
@@ -133,10 +135,10 @@ nix_err nix_value_force_deep(nix_c_context *context, State *state,
                              Value *value);
 
 /**
- * @brief Creates a new Nix state.
+ * @brief Create a new Nix language evaluator state.
  *
  * @param[out] context Optional, stores error information
- * @param[in] searchPath The NIX_PATH.
+ * @param[in] searchPath Array of strings corresponding to entries in NIX_PATH.
  * @param[in] store The Nix store to use.
  * @return A new Nix state or NULL on failure.
  */
@@ -155,28 +157,28 @@ void nix_state_free(State *state);
 /** @addtogroup GC
  * @brief Reference counting and garbage collector operations
  *
- * Nix's evaluator uses a garbage collector. To ease C interop, we implement
+ * The Nix language evaluator uses a garbage collector. To ease C interop, we implement
  * a reference counting scheme, where objects will be deallocated
  * when there are no references from the Nix side, and the reference count kept
  * by the C API reaches `0`.
  *
  * Functions returning a garbage-collected object will automatically increase
  * the refcount for you. You should make sure to call `nix_gc_decref` when
- * you're done.
+ * you're done with a value returned by the evaluator.
  * @{
  */
 /**
- * @brief Increase the GC refcount.
+ * @brief Increment the garbage collector reference counter for the given object.
  *
- * The nix C api keeps alive objects by refcounting.
- * When you're done with a refcounted pointer, call nix_gc_decref.
+ * The Nix language evaluator C API keeps track of alive objects by reference counting.
+ * When you're done with a refcounted pointer, call nix_gc_decref().
  *
  * @param[out] context Optional, stores error information
  * @param[in] object The object to keep alive
  */
 nix_err nix_gc_incref(nix_c_context *context, const void *object);
 /**
- * @brief Decrease the GC refcount
+ * @brief Decrement the garbage collector reference counter for the given object
  *
  * @param[out] context Optional, stores error information
  * @param[in] object The object to stop referencing
@@ -193,7 +195,7 @@ void nix_gc_now();
 /**
  * @brief Register a callback that gets called when the object is garbage
  * collected.
- * @note objects can only have a single finalizer. This function overwrites
+ * @note Objects can only have a single finalizer. This function overwrites existing values
  * silently.
  * @param[in] obj the object to watch
  * @param[in] cd the data to pass to the finalizer

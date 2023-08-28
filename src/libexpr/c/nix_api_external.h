@@ -22,7 +22,7 @@ extern "C" {
 // cffi start
 
 /**
- * @brief Represents a string owned by nix.
+ * @brief Represents a string owned by the Nix language evaluator.
  * @see nix_set_owned_string
  */
 typedef struct nix_string_return nix_string_return;

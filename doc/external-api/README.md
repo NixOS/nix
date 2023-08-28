@@ -1,11 +1,27 @@
 # Getting started
 
-There are two ways to interface with nix: embedding it, or as a plugin. Embedding means you link one of the nix libraries in your program and use it from there, while being a plugin means you make a library that gets loaded by the nix evaluator, specified through a configuration option.
+These C bindings are **experimental** at the moment, which means they can still change any time or get removed again, but the plan is to provide a stable external C API to the Nix language and the Nix store.
+
+The language library allows evaluating Nix expressions and interacting with Nix language values.
+The Nix store API is still rudimentary, and only allows initialising and connecting to a store for the Nix language evaluator to interact with.
+
+Currently there are two ways to interface with the Nix language evaluator programmatically:
+1. Embedding the evaluator
+2. Writing language plug-ins
+
+Embedding means you link the Nix C libraries in your program and use them from there.
+Adding a plug-in means you make a library that gets loaded by the Nix language evaluator, specified through a configuration option.
+
+Many of the components and mechanisms involved are not yet documented, therefore please refer to the [Nix source code](https://github.com/NixOS/nix/) for details.
+Additions to in-code documentation and the reference manual are highly appreciated.
+
+
+The following examples, for simplicity, don't include error handling.
+See the [Handling errors](@ref errors) section for more information.
 
 # Embedding the Nix Evaluator
 
-These examples don't include error handling.
-See the [Handling errors](@ref errors) section for more information.
+In this example we programmatically start the Nix language evaluator with a dummy store (that has no store paths and cannot be written to), and evaluate the Nix expression `builtins.nixVersion`.
 
 **main.c:**
 ```C
@@ -18,7 +34,7 @@ int main() {
    nix_libexpr_init(NULL);
 
    Store* store = nix_store_open(NULL, "dummy://", NULL);
-   State* state = nix_state_create(NULL, NULL, store); // empty nix path
+   State* state = nix_state_create(NULL, NULL, store); // empty search path (NIX_PATH)
    Value *value = nix_alloc_value(NULL, state);
 
    nix_expr_eval_from_string(NULL, state, "builtins.nixVersion", ".", value);
@@ -40,7 +56,9 @@ nix version 1.2.3
 ```
 
 
-# Writing a Nix Plugin
+# Writing a Nix language plug-in
+In this example we add a custom primitive operation (*primop*) to `builtins`.
+It will increment the argument if it is an integer and return `null` otherwise.
 
 **plugin.c:**
 ```C
@@ -59,7 +77,7 @@ void increment(State* state, int pos, Value** args, Value* v) {
  
 void nix_plugin_entry() {
   const char* args[] = {"n", NULL};
-  PrimOp *p = nix_alloc_primop(NULL, increment, 1, "increment", args, "Example nix plugin function: increments an int");
+  PrimOp *p = nix_alloc_primop(NULL, increment, 1, "increment", args, "Example custom built-in function: increments an integer");
   nix_register_primop(NULL, p);
   nix_gc_decref(NULL, p);
 }
