@@ -42,7 +42,12 @@ static nix::Value & check_value_not_null(Value * value)
 static void nix_c_primop_wrapper(
     PrimOpFun f, void * userdata, nix::EvalState & state, const nix::PosIdx pos, nix::Value ** args, nix::Value & v)
 {
-    f(userdata, (State *) &state, *reinterpret_cast<const int *>(&pos), (Value **) args, (Value *) &v);
+    nix_c_context ctx;
+    f(userdata, &ctx, (State *) &state, (Value **) args, (Value *) &v);
+    /* TODO: In the future, this should throw different errors depending on the error code */
+    if (ctx.last_err_code != NIX_OK)
+        state.debugThrowLastTrace(nix::Error(
+            {.msg = nix::hintfmt("Error from builtin function: %s", *ctx.last_err), .errPos = state.positions[pos]}));
 }
 
 PrimOp * nix_alloc_primop(

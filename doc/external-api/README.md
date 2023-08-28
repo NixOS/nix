@@ -58,7 +58,7 @@ Nix version: 2.17
 
 # Writing a Nix language plug-in
 In this example we add a custom primitive operation (*primop*) to `builtins`.
-It will increment the argument if it is an integer and return `null` otherwise.
+It will increment the argument if it is an integer and throw an error otherwise.
 
 **plugin.c:**
 ```C
@@ -66,18 +66,18 @@ It will increment the argument if it is an integer and return `null` otherwise.
 #include <nix_api_expr.h>
 #include <nix_api_value.h>
  
-void increment(State* state, int pos, Value** args, Value* v) {
+void increment(void* user_data, nix_c_context* ctx, State* state, Value** args, Value* v) {
     nix_value_force(NULL, state, args[0]);
     if (nix_get_type(NULL, args[0]) == NIX_TYPE_INT) {
       nix_set_int(NULL, v, nix_get_int(NULL, args[0]) + 1);
     } else {
-      nix_set_null(NULL, v);
+      nix_set_err_msg(ctx, NIX_ERR_UNKNOWN, "First argument should be an integer.");
     }
 }
  
 void nix_plugin_entry() {
   const char* args[] = {"n", NULL};
-  PrimOp *p = nix_alloc_primop(NULL, increment, 1, "increment", args, "Example custom built-in function: increments an integer");
+  PrimOp *p = nix_alloc_primop(NULL, increment, 1, "increment", args, "Example custom built-in function: increments an integer", NULL);
   nix_register_primop(NULL, p);
   nix_gc_decref(NULL, p);
 }

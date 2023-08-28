@@ -20,18 +20,6 @@ nix_err nix_context_error(nix_c_context * context);
 /**
  * Internal use only.
  *
- * Sets the most recent error message.
- *
- * @param context context to write the error message to, or NULL
- * @param err The error code to set and return
- * @param msg The error message to set.
- * @returns the error code set
- */
-nix_err nix_set_err_msg(nix_c_context * context, nix_err err, const char * msg);
-
-/**
- * Internal use only.
- *
  * Export a std::string across the C api boundary
  * @param context optional, the context to store errors in if this function
  * fails
