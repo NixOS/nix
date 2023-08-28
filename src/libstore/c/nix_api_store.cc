@@ -3,6 +3,7 @@
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"
 
+#include "path.hh"
 #include "store-api.hh"
 
 #include "globals.hh"
@@ -118,7 +119,7 @@ nix_err nix_store_build(
     try {
         store->ptr->buildPaths({
             nix::DerivedPath::Built{
-                .drvPath = path->path,
+                .drvPath = nix::makeConstantStorePathRef(path->path),
                 .outputs = nix::OutputsSpec::All{},
             },
         });
