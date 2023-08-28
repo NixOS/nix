@@ -18,7 +18,7 @@ PROJECT_NUMBER         = @PACKAGE_VERSION@
 # for a project that appears at the top of each page and should give viewer a
 # quick idea about the purpose of the project. Keep the description short.
 
-PROJECT_BRIEF          = "Nix, the purely functional package manager; stable external interfaces"
+PROJECT_BRIEF          = "Nix, the purely functional package manager: C API (experimental)"
 
 # If the GENERATE_LATEX tag is set to YES, doxygen will generate LaTeX output.
 # The default value is: YES.

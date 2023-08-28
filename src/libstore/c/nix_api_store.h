@@ -19,9 +19,9 @@ extern "C" {
 #endif
 // cffi start
 
-/** @brief reference to a nix store */
+/** @brief Reference to a Nix store */
 typedef struct Store Store;
-/** @brief nix store path */
+/** @brief Nix store path */
 typedef struct StorePath StorePath;
 
 /**
@@ -79,9 +79,9 @@ nix_err nix_store_get_uri(nix_c_context *context, Store *store, char *dest,
 
 // returns: owned StorePath*
 /**
- * @brief parse a nix store path into a StorePath
+ * @brief Parse a Nix store path into a StorePath
  *
- * Don't forget to free this path using nix_store_path_free
+ * @note Don't forget to free this path using nix_store_path_free()!
  * @param[out] context Optional, stores error information
  * @param[in] store nix store reference
  * @param[in] path Path string to parse, copied
@@ -90,7 +90,7 @@ nix_err nix_store_get_uri(nix_c_context *context, Store *store, char *dest,
 StorePath *nix_store_parse_path(nix_c_context *context, Store *store,
                                 const char *path);
 
-/** @brief Deallocate a nix StorePath
+/** @brief Deallocate a StorePath
  *
  * Does not fail.
  * @param[in] p the path to free
@@ -98,9 +98,9 @@ StorePath *nix_store_parse_path(nix_c_context *context, Store *store,
 void nix_store_path_free(StorePath *p);
 
 /**
- * @brief check if a storepath is valid (exists in the store)
+ * @brief Check if a StorePath is valid (i.e. that corresponding store object and its closure of references exists in the store)
  * @param[out] context Optional, stores error information
- * @param[in] store nix store reference
+ * @param[in] store Nix Store reference
  * @param[in] path Path to check
  * @return true or false, error info in context
  */
@@ -109,12 +109,12 @@ bool nix_store_is_valid_path(nix_c_context *context, Store *store,
 // nix_err nix_store_ensure(Store*, const char*);
 // nix_err nix_store_build_paths(Store*);
 /**
- * @brief Build a nix store path
+ * @brief Realise a Nix store path
  *
  * Blocking, calls cb once for each built output
  *
  * @param[out] context Optional, stores error information
- * @param[in] store nix store reference
+ * @param[in] store Nix Store reference
  * @param[in] path Path to build
  * @param[in] userdata data to pass to every callback invocation
  * @param[in] cb called for every built output

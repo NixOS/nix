@@ -3,7 +3,7 @@ libdir=@libdir@
 includedir=@includedir@
 
 Name: Nix
-Description: Nix Package Manager - C API
+Description: Nix Store - C API
 Version: @PACKAGE_VERSION@
 Libs: -L${libdir} -lnixstorec -lnixutilc
 Cflags: -I${includedir}/nix

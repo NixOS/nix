@@ -3,7 +3,7 @@ libdir=@libdir@
 includedir=@includedir@
 
 Name: Nix
-Description: Nix Package Manager - C API
+Description: Nix Language Evaluator - C API
 Version: @PACKAGE_VERSION@
 Requires: nix-store-c
 Libs: -L${libdir} -lnixexprc

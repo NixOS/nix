@@ -73,9 +73,10 @@ typedef struct ExternalValue ExternalValue;
  */
 typedef void (*PrimOpFun)(State *state, int pos, Value **args, Value *v);
 
-/** @brief Allocate a primop
+/** @brief Allocate a PrimOp
  *
- * Owned by the GC. Use nix_gc_decref when you're done with the pointer
+ * Owned by the garbage collector.
+ * Use nix_gc_decref() when you're done with the returned PrimOp.
  *
  * @param[out] context Optional, stores error information
  * @param[in] fun callback
@@ -89,12 +90,12 @@ typedef void (*PrimOpFun)(State *state, int pos, Value **args, Value *v);
 PrimOp *nix_alloc_primop(nix_c_context *context, PrimOpFun fun, int arity,
                          const char *name, const char **args, const char *doc);
 
-/** @brief add a primop to builtins
+/** @brief add a primop to the `builtins` attribute set
  *
- * Only applies to new States.
+ * Only applies to States created after this call.
  *
- * Moves your primop into the global
- * registry, meaning your input primOp is no longer usable
+ * Moves your PrimOp into the global evaluator
+ * registry, meaning your input PrimOp pointer is no longer usable
  * (but still possibly subject to garbage collection).
  *
  * @param[out] context Optional, stores error information
@@ -108,7 +109,7 @@ nix_err nix_register_primop(nix_c_context *context, PrimOp *primOp);
 
 /** @brief Allocate a Nix value
  *
- * Owned by the GC. Use nix_gc_decref when you're done with the pointer
+ * Owned by the GC. Use nix_gc_decref() when you're done with the pointer
  * @param[out] context Optional, stores error information
  * @param[in] state nix evaluator state
  * @return value, or null in case of errors
@@ -116,7 +117,7 @@ nix_err nix_register_primop(nix_c_context *context, PrimOp *primOp);
  */
 Value *nix_alloc_value(nix_c_context *context, State *state);
 /** @addtogroup value_manip Manipulating values
- * @brief Functions to inspect and change nix Value's
+ * @brief Functions to inspect and change Nix language values, represented by Value.
  * @{
  */
 /** @name Getters
@@ -128,7 +129,7 @@ Value *nix_alloc_value(nix_c_context *context, State *state);
  * @return type of nix value
  */
 ValueType nix_get_type(nix_c_context *context, const Value *value);
-/** @brief Get type name of value
+/** @brief Get type name of value as defined in the evaluator
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @return type name, owned string
