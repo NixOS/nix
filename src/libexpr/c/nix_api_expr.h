@@ -59,8 +59,9 @@ typedef void Value; // nix::Value
 /**
  * @brief Initialize the Nix language evaluator.
  *
- * This function should be called before creating a State.
- * This function can be called multiple times.
+ * This function must be called at least once,
+ * at some point before constructing a State for the first time.
+ * This function can be called multiple times, and is idempotent.
  *
  * @param[out] context Optional, stores error information
  * @return NIX_OK if the initialization was successful, an error code otherwise.
@@ -106,7 +107,8 @@ nix_err nix_value_call(nix_c_context *context, State *state, Value *fn,
  *
  * @note You don't need this function for basic API usage, since all functions
  * that return a value call it for you. The only place you will see a
- * NIX_TYPE_THUNK is in the primop callback.
+ * NIX_TYPE_THUNK is in the arguments that are passed to a PrimOp function
+ * you supplied to nix_alloc_primop.
  *
  * @param[out] context Optional, stores error information
  * @param[in] state The state of the evaluation.

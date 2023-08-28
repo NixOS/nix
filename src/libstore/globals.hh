@@ -1156,9 +1156,10 @@ public:
         this, {}, "plugin-files",
         R"(
           A list of plugin files to be loaded by Nix. Each of these files will
-          be dlopened by Nix, allowing them to affect execution through static
-          initialization. In particular, these plugins may construct static
-          instances of RegisterPrimOp to add new primops or constants to the
+          be dlopened by Nix. If they contain the symbol `nix_plugin_entry()`,
+          this symbol will be called. Alternatively, they can affect execution
+          through static initialization. In particular, these plugins may construct
+          static instances of RegisterPrimOp to add new primops or constants to the
           expression language, RegisterStoreImplementation to add new store
           implementations, RegisterCommand to add new subcommands to the `nix`
           command, and RegisterSetting to add new nix config settings. See the
