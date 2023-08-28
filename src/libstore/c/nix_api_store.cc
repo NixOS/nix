@@ -103,7 +103,7 @@ StorePath *nix_store_parse_path(nix_c_context *context, Store *store,
 
 nix_err nix_store_build(nix_c_context *context, Store *store, StorePath *path,
                         void *userdata,
-                        void (*iter)(void *userdata, const char *,
+                        void (*callback)(void *userdata, const char *,
                                      const char *)) {
   if (context)
     context->last_err_code = NIX_OK;
@@ -114,11 +114,11 @@ nix_err nix_store_build(nix_c_context *context, Store *store, StorePath *path,
             .outputs = nix::OutputsSpec::All{},
         },
     });
-    if (iter) {
+    if (callback) {
       for (auto &[outputName, outputPath] :
            store->ptr->queryDerivationOutputMap(path->path)) {
         auto op = store->ptr->printStorePath(outputPath);
-        iter(userdata, outputName.c_str(), op.c_str());
+        callback(userdata, outputName.c_str(), op.c_str());
       }
     }
   }

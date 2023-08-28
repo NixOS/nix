@@ -36,7 +36,7 @@ typedef struct StorePath StorePath;
 nix_err nix_libstore_init(nix_c_context *context);
 
 /**
- * @brief Loads plugins specified in the settings
+ * @brief Loads the plugins specified in Nix's plugin-files setting.
  *
  * Call this once, after calling your desired init functions and setting
  * relevant settings.
@@ -111,17 +111,17 @@ bool nix_store_is_valid_path(nix_c_context *context, Store *store,
 /**
  * @brief Realise a Nix store path
  *
- * Blocking, calls cb once for each built output
+ * Blocking, calls callback once for each realisedoutput
  *
  * @param[out] context Optional, stores error information
  * @param[in] store Nix Store reference
  * @param[in] path Path to build
  * @param[in] userdata data to pass to every callback invocation
- * @param[in] cb called for every built output
+ * @param[in] callback called for every realised output
  */
 nix_err nix_store_build(nix_c_context *context, Store *store, StorePath *path,
                         void *userdata,
-                        void (*cb)(void *userdata, const char *outname,
+                        void (*callback)(void *userdata, const char *outname,
                                    const char *out));
 
 /**

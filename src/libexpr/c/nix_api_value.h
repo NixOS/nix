@@ -66,12 +66,12 @@ typedef struct ExternalValue ExternalValue;
  */
 /** @brief Function pointer for primops
  * @param[in] state Evaluator state
- * @param[in] pos position of function call
- * @param[in] args list of arguments
- * @param[out] v return value
+ * @param[in] pos Call position, opaque index into the state's position table.
+ * @param[in] args list of arguments. Note that these can be thunks and should be forced using nix_value_force before use.
+ * @param[out] ret return value
  * @see nix_alloc_primop, nix_set_primop
  */
-typedef void (*PrimOpFun)(State *state, int pos, Value **args, Value *v);
+typedef void (*PrimOpFun)(State *state, int pos, Value **args, Value *ret);
 
 /** @brief Allocate a PrimOp
  *
@@ -80,9 +80,9 @@ typedef void (*PrimOpFun)(State *state, int pos, Value **args, Value *v);
  *
  * @param[out] context Optional, stores error information
  * @param[in] fun callback
- * @param[in] arity expected amount of function arguments
+ * @param[in] arity expected number of function arguments
  * @param[in] name function name
- * @param[in] args array of argument names
+ * @param[in] args array of argument names, NULL-terminated
  * @param[in] doc optional, documentation for this primop
  * @return primop, or null in case of errors
  * @see nix_set_primop
