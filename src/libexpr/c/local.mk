@@ -9,7 +9,7 @@ libexprc_SOURCES := \
 
 libexprc_CXXFLAGS += -I src/libutil -Isrc/libfetchers -I src/libstore -I src/libstorec -I src/libexpr -I src/libutil/c -I src/libstore/c
 
-libexprc_LIBS = libutil libutilc libstorec libexpr
+libexprc_LIBS = libutil libutilc libstore libstorec libexpr
 
 libexprc_LDFLAGS += -pthread
 
