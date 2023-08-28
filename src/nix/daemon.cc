@@ -513,7 +513,7 @@ struct CmdDaemon : StoreCommand
 
         addFlag({
             .longName = "force-trusted",
-            .description = "Forces the daemon to trust connecting clients, forwarding the connection without the receiving daemon processing it.",
+            .description = "Force the daemon to trust connecting clients.",
             .handler = {[&]() {
                 isTrustedOpt = Trusted;
             }},
@@ -522,7 +522,7 @@ struct CmdDaemon : StoreCommand
 
         addFlag({
             .longName = "force-untrusted",
-            .description = "Forces the daemon to not trust connecting clients, the connection will be processed by the receiving daemon before forwarding commands.",
+            .description = "Force the daemon to not trust connecting clients. The connection will be processed by the receiving daemon before forwarding commands.",
             .handler = {[&]() {
                 isTrustedOpt = NotTrusted;
             }},
