@@ -58,36 +58,55 @@
 
       nixSrc = fileset.toSource {
         root = ./.;
-        fileset = fileset.intersect baseFiles (
-          fileset.difference
-            (fileset.unions [
-              ./.version
-              ./boehmgc-coroutine-sp-fallback.diff
-              ./bootstrap.sh
-              ./configure.ac
-              ./doc
-              ./local.mk
-              ./m4
-              ./Makefile
-              ./Makefile.config.in
-              ./misc
-              ./mk
-              ./precompiled-headers.h
-              ./src
-              ./tests
-              ./COPYING
-              ./scripts/local.mk
-              (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
-              # TODO: do we really need README.md? It doesn't seem used in the build.
-              ./README.md
-            ])
-            (fileset.unions [
-              # Removed file sets
-              ./tests/nixos
-              ./tests/installer
-            ])
+        fileset = nixFileset;
+      };
+
+      nixSrcNoTest = fileset.toSource {
+        root = ./.;
+        fileset = fileset.difference nixFileset (
+          fileset.unions [
+            ./tests
+            ./src/libexpr/tests
+            ./src/libstore/tests
+            ./src/libutil/tests
+          ]
         );
       };
+
+      nixSrcForPkg = finalAttrs:
+        if finalAttrs.doCheck or false || finalAttrs.doInstallCheck or false
+        then nixSrc
+        else nixSrcNoTest;
+
+      nixFileset = fileset.intersect baseFiles (
+        fileset.difference
+          (fileset.unions [
+            ./.version
+            ./boehmgc-coroutine-sp-fallback.diff
+            ./bootstrap.sh
+            ./configure.ac
+            ./doc
+            ./local.mk
+            ./m4
+            ./Makefile
+            ./Makefile.config.in
+            ./misc
+            ./mk
+            ./precompiled-headers.h
+            ./src
+            ./tests
+            ./COPYING
+            ./scripts/local.mk
+            (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
+            # TODO: do we really need README.md? It doesn't seem used in the build.
+            ./README.md
+          ])
+          (fileset.unions [
+            # Removed file sets
+            ./tests/nixos
+            ./tests/installer
+          ])
+      );
 
       # Memoize nixpkgs for different platforms for efficiency.
       nixpkgsFor = forAllSystems
@@ -372,7 +391,7 @@
             name = "nix-${version}";
             inherit version;
 
-            src = nixSrc;
+            src = nixSrcForPkg finalAttrs;
             VERSION_SUFFIX = versionSuffix;
 
             outputs = [ "out" "dev" "doc" ];
