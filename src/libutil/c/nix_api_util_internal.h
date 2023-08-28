@@ -7,14 +7,15 @@
 #include "error.hh"
 #include "nix_api_util.h"
 
-struct nix_c_context {
-  nix_err last_err_code = NIX_OK;
-  std::optional<std::string> last_err = {};
-  std::optional<nix::ErrorInfo> info = {};
-  std::string name = "";
+struct nix_c_context
+{
+    nix_err last_err_code = NIX_OK;
+    std::optional<std::string> last_err = {};
+    std::optional<nix::ErrorInfo> info = {};
+    std::string name = "";
 };
 
-nix_err nix_context_error(nix_c_context *context);
+nix_err nix_context_error(nix_c_context * context);
 
 /**
  * Internal use only.
@@ -26,7 +27,7 @@ nix_err nix_context_error(nix_c_context *context);
  * @param msg The error message to set.
  * @returns the error code set
  */
-nix_err nix_set_err_msg(nix_c_context *context, nix_err err, const char *msg);
+nix_err nix_set_err_msg(nix_c_context * context, nix_err err, const char * msg);
 
 /**
  * Internal use only.
@@ -40,21 +41,21 @@ nix_err nix_set_err_msg(nix_c_context *context, nix_err err, const char *msg);
  * @return NIX_OK if there were no errors, NIX_ERR_OVERFLOW if the string length
  * exceeds `n`.
  */
-nix_err nix_export_std_string(nix_c_context *context,
-                              const std::string_view str, char *dest,
-                              unsigned int n);
+nix_err nix_export_std_string(nix_c_context * context, const std::string_view str, char * dest, unsigned int n);
 
-#define NIXC_CATCH_ERRS                                                        \
-  catch (...) {                                                                \
-    return nix_context_error(context);                                         \
-  }                                                                            \
-  return NIX_OK;
+#define NIXC_CATCH_ERRS \
+    catch (...) \
+    { \
+        return nix_context_error(context); \
+    } \
+    return NIX_OK;
 
-#define NIXC_CATCH_ERRS_RES(def)                                               \
-  catch (...) {                                                                \
-    nix_context_error(context);                                                \
-    return def;                                                                \
-  }
+#define NIXC_CATCH_ERRS_RES(def) \
+    catch (...) \
+    { \
+        nix_context_error(context); \
+        return def; \
+    }
 #define NIXC_CATCH_ERRS_NULL NIXC_CATCH_ERRS_RES(nullptr)
 
 #endif // NIX_API_UTIL_INTERNAL_H

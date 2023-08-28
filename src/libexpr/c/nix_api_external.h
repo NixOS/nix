@@ -42,7 +42,7 @@ typedef struct nix_string_context nix_string_context;
  * @param[out] str the nix_string_return to write to
  * @param[in]  c   The string to copy
  */
-void nix_set_string_return(nix_string_return *str, const char *c);
+void nix_set_string_return(nix_string_return * str, const char * c);
 
 /**
  * Print to the nix_printer
@@ -52,8 +52,7 @@ void nix_set_string_return(nix_string_return *str, const char *c);
  * @param[in] str The string to print
  * @returns NIX_OK if everything worked
  */
-nix_err nix_external_print(nix_c_context *context, nix_printer *printer,
-                           const char *str);
+nix_err nix_external_print(nix_c_context * context, nix_printer * printer, const char * str);
 
 /**
  * Add string context to the nix_string_context object
@@ -62,9 +61,7 @@ nix_err nix_external_print(nix_c_context *context, nix_printer *printer,
  * @param[in] c The context string to add
  * @returns NIX_OK if everything worked
  */
-nix_err nix_external_add_string_context(nix_c_context *context,
-                                        nix_string_context *string_context,
-                                        const char *c);
+nix_err nix_external_add_string_context(nix_c_context * context, nix_string_context * string_context, const char * c);
 
 /**
  * @brief Definition for a class of external values
@@ -76,89 +73,88 @@ nix_err nix_external_add_string_context(nix_c_context *context,
  *
  * @see nix_create_external_value
  */
-typedef struct NixCExternalValueDesc {
-  /**
-   * @brief Called when printing the external value
-   *
-   * @param[in] self the void* passed to nix_create_external_value
-   * @param[out] printer The printer to print to, pass to nix_external_print
-   */
-  void (*print)(void *self, nix_printer *printer);
-  /**
-   * @brief Called on :t
-   * @param[in] self the void* passed to nix_create_external_value
-   * @param[out] res the return value
-   */
-  void (*showType)(void *self, nix_string_return *res);
-  /**
-   * @brief Called on `builtins.typeOf`
-   * @param self the void* passed to nix_create_external_value
-   * @param[out] res the return value
-   */
-  void (*typeOf)(void *self, nix_string_return *res);
-  /**
-   * @brief Called on "${str}" and builtins.toString.
-   *
-   * The latter with coerceMore=true
-   * Optional, the default is to throw an error.
-   * @param[in] self the void* passed to nix_create_external_value
-   * @param[out] c writable string context for the resulting string
-   * @param[in] coerceMore boolean, try to coerce to strings in more cases
-   * instead of throwing an error
-   * @param[in] copyToStore boolean, whether to copy referenced paths to store
-   * or keep them as-is
-   * @param[out] res the return value. Not touching this, or setting it to the
-   * empty string, will make the conversion throw an error.
-   */
-  void (*coerceToString)(void *self, nix_string_context *c, int coerceMore,
-                         int copyToStore, nix_string_return *res);
-  /**
-   * @brief Try to compare two external values
-   *
-   * Optional, the default is always false.
-   * If the other object was not a Nix C external value, this comparison will
-   * also return false
-   * @param[in] self the void* passed to nix_create_external_value
-   * @param[in] other the void* passed to the other object's
-   * nix_create_external_value
-   * @returns true if the objects are deemed to be equal
-   */
-  int (*equal)(void *self, void *other);
-  /**
-   * @brief Convert the external value to json
-   *
-   * Optional, the default is to throw an error
-   * @param[in] self the void* passed to nix_create_external_value
-   * @param[in] state The evaluator state
-   * @param[in] strict boolean Whether to force the value before printing
-   * @param[out] c writable string context for the resulting string
-   * @param[in] copyToStore whether to copy referenced paths to store or keep
-   * them as-is
-   * @param[out] res the return value. Gets parsed as JSON. Not touching this,
-   * or setting it to the empty string, will make the conversion throw an error.
-   */
-  void (*printValueAsJSON)(void *self, State *, int strict,
-                           nix_string_context *c, bool copyToStore,
-                           nix_string_return *res);
-  /**
-   * @brief Convert the external value to XML
-   *
-   * Optional, the default is to throw an error
-   * @todo The mechanisms for this call are incomplete. There are no C
-   *       bindings to work with XML, pathsets and positions.
-   * @param[in] self the void* passed to nix_create_external_value
-   * @param[in] state The evaluator state
-   * @param[in] strict boolean Whether to force the value before printing
-   * @param[in] location boolean Whether to include position information in the
-   * xml
-   * @param[out] doc XML document to output to
-   * @param[out] c writable string context for the resulting string
-   * @param[in,out] drvsSeen a path set to avoid duplicating derivations
-   * @param[in] pos The position of the call.
-   */
-  void (*printValueAsXML)(void *self, State *, int strict, int location,
-                          void *doc, nix_string_context *c, void *drvsSeen,
-                          int pos);
+typedef struct NixCExternalValueDesc
+{
+    /**
+     * @brief Called when printing the external value
+     *
+     * @param[in] self the void* passed to nix_create_external_value
+     * @param[out] printer The printer to print to, pass to nix_external_print
+     */
+    void (*print)(void * self, nix_printer * printer);
+    /**
+     * @brief Called on :t
+     * @param[in] self the void* passed to nix_create_external_value
+     * @param[out] res the return value
+     */
+    void (*showType)(void * self, nix_string_return * res);
+    /**
+     * @brief Called on `builtins.typeOf`
+     * @param self the void* passed to nix_create_external_value
+     * @param[out] res the return value
+     */
+    void (*typeOf)(void * self, nix_string_return * res);
+    /**
+     * @brief Called on "${str}" and builtins.toString.
+     *
+     * The latter with coerceMore=true
+     * Optional, the default is to throw an error.
+     * @param[in] self the void* passed to nix_create_external_value
+     * @param[out] c writable string context for the resulting string
+     * @param[in] coerceMore boolean, try to coerce to strings in more cases
+     * instead of throwing an error
+     * @param[in] copyToStore boolean, whether to copy referenced paths to store
+     * or keep them as-is
+     * @param[out] res the return value. Not touching this, or setting it to the
+     * empty string, will make the conversion throw an error.
+     */
+    void (*coerceToString)(
+        void * self, nix_string_context * c, int coerceMore, int copyToStore, nix_string_return * res);
+    /**
+     * @brief Try to compare two external values
+     *
+     * Optional, the default is always false.
+     * If the other object was not a Nix C external value, this comparison will
+     * also return false
+     * @param[in] self the void* passed to nix_create_external_value
+     * @param[in] other the void* passed to the other object's
+     * nix_create_external_value
+     * @returns true if the objects are deemed to be equal
+     */
+    int (*equal)(void * self, void * other);
+    /**
+     * @brief Convert the external value to json
+     *
+     * Optional, the default is to throw an error
+     * @param[in] self the void* passed to nix_create_external_value
+     * @param[in] state The evaluator state
+     * @param[in] strict boolean Whether to force the value before printing
+     * @param[out] c writable string context for the resulting string
+     * @param[in] copyToStore whether to copy referenced paths to store or keep
+     * them as-is
+     * @param[out] res the return value. Gets parsed as JSON. Not touching this,
+     * or setting it to the empty string, will make the conversion throw an error.
+     */
+    void (*printValueAsJSON)(
+        void * self, State *, int strict, nix_string_context * c, bool copyToStore, nix_string_return * res);
+    /**
+     * @brief Convert the external value to XML
+     *
+     * Optional, the default is to throw an error
+     * @todo The mechanisms for this call are incomplete. There are no C
+     *       bindings to work with XML, pathsets and positions.
+     * @param[in] self the void* passed to nix_create_external_value
+     * @param[in] state The evaluator state
+     * @param[in] strict boolean Whether to force the value before printing
+     * @param[in] location boolean Whether to include position information in the
+     * xml
+     * @param[out] doc XML document to output to
+     * @param[out] c writable string context for the resulting string
+     * @param[in,out] drvsSeen a path set to avoid duplicating derivations
+     * @param[in] pos The position of the call.
+     */
+    void (*printValueAsXML)(
+        void * self, State *, int strict, int location, void * doc, nix_string_context * c, void * drvsSeen, int pos);
 } NixCExternalValueDesc;
 
 /**
@@ -173,8 +169,7 @@ typedef struct NixCExternalValueDesc {
  * @returns external value, owned by the garbage collector
  * @see nix_set_external
  */
-ExternalValue *nix_create_external_value(nix_c_context *context,
-                                         NixCExternalValueDesc *desc, void *v);
+ExternalValue * nix_create_external_value(nix_c_context * context, NixCExternalValueDesc * desc, void * v);
 
 /**
  * @brief Extract the pointer from a nix c external value.
@@ -183,7 +178,7 @@ ExternalValue *nix_create_external_value(nix_c_context *context,
  * @returns The pointer, or null if the external value was not from nix c.
  * @see nix_get_external
  */
-void *nix_get_external_value_content(nix_c_context *context, ExternalValue *b);
+void * nix_get_external_value_content(nix_c_context * context, ExternalValue * b);
 
 // cffi end
 #ifdef __cplusplus

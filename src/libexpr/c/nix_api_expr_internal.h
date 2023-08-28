@@ -4,12 +4,14 @@
 #include "eval.hh"
 #include "attr-set.hh"
 
-struct State {
-  nix::EvalState state;
+struct State
+{
+    nix::EvalState state;
 };
 
-struct BindingsBuilder {
-  nix::BindingsBuilder builder;
+struct BindingsBuilder
+{
+    nix::BindingsBuilder builder;
 };
 
 #endif // NIX_API_EXPR_INTERNAL_H
