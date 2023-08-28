@@ -33,7 +33,7 @@ typedef struct StorePath StorePath;
  * @param[out] context Optional, stores error information
  * @return NIX_OK if the initialization was successful, an error code otherwise.
  */
-nix_err nix_libstore_init(nix_c_context *context);
+nix_err nix_libstore_init(nix_c_context * context);
 
 /**
  * @brief Loads the plugins specified in Nix's plugin-files setting.
@@ -44,7 +44,7 @@ nix_err nix_libstore_init(nix_c_context *context);
  * @param[out] context Optional, stores error information
  * @return NIX_OK if the initialization was successful, an error code otherwise.
  */
-nix_err nix_init_plugins(nix_c_context *context);
+nix_err nix_init_plugins(nix_c_context * context);
 
 /**
  * @brief Open a nix store
@@ -55,7 +55,7 @@ nix_err nix_init_plugins(nix_c_context *context);
  * @return ref-counted Store pointer, NULL in case of errors
  * @see nix_store_unref
  */
-Store *nix_store_open(nix_c_context *, const char *uri, const char ***params);
+Store * nix_store_open(nix_c_context *, const char * uri, const char *** params);
 
 /**
  * @brief Unref a nix store
@@ -64,7 +64,7 @@ Store *nix_store_open(nix_c_context *, const char *uri, const char ***params);
  * It'll be closed and deallocated when all references are gone.
  * @param[in] builder the store to unref
  */
-void nix_store_unref(Store *store);
+void nix_store_unref(Store * store);
 
 /**
  * @brief get the URI of a nix store
@@ -74,8 +74,7 @@ void nix_store_unref(Store *store);
  * @param[in] n Maximum size of the returned string.
  * @return error code, NIX_OK on success.
  */
-nix_err nix_store_get_uri(nix_c_context *context, Store *store, char *dest,
-                          unsigned int n);
+nix_err nix_store_get_uri(nix_c_context * context, Store * store, char * dest, unsigned int n);
 
 // returns: owned StorePath*
 /**
@@ -87,25 +86,24 @@ nix_err nix_store_get_uri(nix_c_context *context, Store *store, char *dest,
  * @param[in] path Path string to parse, copied
  * @return owned store path, NULL on error
  */
-StorePath *nix_store_parse_path(nix_c_context *context, Store *store,
-                                const char *path);
+StorePath * nix_store_parse_path(nix_c_context * context, Store * store, const char * path);
 
 /** @brief Deallocate a StorePath
  *
  * Does not fail.
  * @param[in] p the path to free
  */
-void nix_store_path_free(StorePath *p);
+void nix_store_path_free(StorePath * p);
 
 /**
- * @brief Check if a StorePath is valid (i.e. that corresponding store object and its closure of references exists in the store)
+ * @brief Check if a StorePath is valid (i.e. that corresponding store object and its closure of references exists in
+ * the store)
  * @param[out] context Optional, stores error information
  * @param[in] store Nix Store reference
  * @param[in] path Path to check
  * @return true or false, error info in context
  */
-bool nix_store_is_valid_path(nix_c_context *context, Store *store,
-                             StorePath *path);
+bool nix_store_is_valid_path(nix_c_context * context, Store * store, StorePath * path);
 // nix_err nix_store_ensure(Store*, const char*);
 // nix_err nix_store_build_paths(Store*);
 /**
@@ -119,10 +117,12 @@ bool nix_store_is_valid_path(nix_c_context *context, Store *store,
  * @param[in] userdata data to pass to every callback invocation
  * @param[in] callback called for every realised output
  */
-nix_err nix_store_build(nix_c_context *context, Store *store, StorePath *path,
-                        void *userdata,
-                        void (*callback)(void *userdata, const char *outname,
-                                   const char *out));
+nix_err nix_store_build(
+    nix_c_context * context,
+    Store * store,
+    StorePath * path,
+    void * userdata,
+    void (*callback)(void * userdata, const char * outname, const char * out));
 
 /**
  * @brief get the version of a nix store
@@ -132,8 +132,7 @@ nix_err nix_store_build(nix_c_context *context, Store *store, StorePath *path,
  * @param[in] n Maximum size of the returned string.
  * @return error code, NIX_OK on success.
  */
-nix_err nix_store_get_version(nix_c_context *, Store *store, char *dest,
-                              unsigned int n);
+nix_err nix_store_get_version(nix_c_context *, Store * store, char * dest, unsigned int n);
 
 // cffi end
 #ifdef __cplusplus

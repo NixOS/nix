@@ -66,7 +66,7 @@ typedef void Value; // nix::Value
  * @param[out] context Optional, stores error information
  * @return NIX_OK if the initialization was successful, an error code otherwise.
  */
-nix_err nix_libexpr_init(nix_c_context *context);
+nix_err nix_libexpr_init(nix_c_context * context);
 
 /**
  * @brief Parses and evaluates a Nix expression from a string.
@@ -75,14 +75,14 @@ nix_err nix_libexpr_init(nix_c_context *context);
  * @param[in] state The state of the evaluation.
  * @param[in] expr The Nix expression to parse.
  * @param[in] path The file path to associate with the expression.
- * This is required for expressions that contain relative paths (such as `./.`) that are resolved relative to the given directory.
+ * This is required for expressions that contain relative paths (such as `./.`) that are resolved relative to the given
+ * directory.
  * @param[out] value The result of the evaluation. You should allocate this
  * yourself.
  * @return NIX_OK if the evaluation was successful, an error code otherwise.
  */
-nix_err nix_expr_eval_from_string(nix_c_context *context, State *state,
-                                  const char *expr, const char *path,
-                                  Value *value);
+nix_err
+nix_expr_eval_from_string(nix_c_context * context, State * state, const char * expr, const char * path, Value * value);
 
 /**
  * @brief Calls a Nix function with an argument.
@@ -94,8 +94,7 @@ nix_err nix_expr_eval_from_string(nix_c_context *context, State *state,
  * @param[out] value The result of the function call.
  * @return NIX_OK if the function call was successful, an error code otherwise.
  */
-nix_err nix_value_call(nix_c_context *context, State *state, Value *fn,
-                       Value *arg, Value *value);
+nix_err nix_value_call(nix_c_context * context, State * state, Value * fn, Value * arg, Value * value);
 
 /**
  * @brief Forces the evaluation of a Nix value.
@@ -117,7 +116,7 @@ nix_err nix_value_call(nix_c_context *context, State *state, Value *fn,
  * @return NIX_OK if the force operation was successful, an error code
  * otherwise.
  */
-nix_err nix_value_force(nix_c_context *context, State *state, Value *value);
+nix_err nix_value_force(nix_c_context * context, State * state, Value * value);
 
 /**
  * @brief Forces the deep evaluation of a Nix value.
@@ -133,8 +132,7 @@ nix_err nix_value_force(nix_c_context *context, State *state, Value *value);
  * @return NIX_OK if the deep force operation was successful, an error code
  * otherwise.
  */
-nix_err nix_value_force_deep(nix_c_context *context, State *state,
-                             Value *value);
+nix_err nix_value_force_deep(nix_c_context * context, State * state, Value * value);
 
 /**
  * @brief Create a new Nix language evaluator state.
@@ -144,8 +142,7 @@ nix_err nix_value_force_deep(nix_c_context *context, State *state,
  * @param[in] store The Nix store to use.
  * @return A new Nix state or NULL on failure.
  */
-State *nix_state_create(nix_c_context *context, const char **searchPath,
-                        Store *store);
+State * nix_state_create(nix_c_context * context, const char ** searchPath, Store * store);
 
 /**
  * @brief Frees a Nix state.
@@ -154,7 +151,7 @@ State *nix_state_create(nix_c_context *context, const char **searchPath,
  *
  * @param[in] state The state to free.
  */
-void nix_state_free(State *state);
+void nix_state_free(State * state);
 
 /** @addtogroup GC
  * @brief Reference counting and garbage collector operations
@@ -178,14 +175,14 @@ void nix_state_free(State *state);
  * @param[out] context Optional, stores error information
  * @param[in] object The object to keep alive
  */
-nix_err nix_gc_incref(nix_c_context *context, const void *object);
+nix_err nix_gc_incref(nix_c_context * context, const void * object);
 /**
  * @brief Decrement the garbage collector reference counter for the given object
  *
  * @param[out] context Optional, stores error information
  * @param[in] object The object to stop referencing
  */
-nix_err nix_gc_decref(nix_c_context *context, const void *object);
+nix_err nix_gc_decref(nix_c_context * context, const void * object);
 
 /**
  * @brief Trigger the garbage collector manually
@@ -203,8 +200,7 @@ void nix_gc_now();
  * @param[in] cd the data to pass to the finalizer
  * @param[in] finalizer the callback function, called with obj and cd
  */
-void nix_gc_register_finalizer(void *obj, void *cd,
-                               void (*finalizer)(void *obj, void *cd));
+void nix_gc_register_finalizer(void * obj, void * cd, void (*finalizer)(void * obj, void * cd));
 
 /** @} */
 // cffi end

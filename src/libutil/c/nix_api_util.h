@@ -127,12 +127,12 @@ typedef struct nix_c_context nix_c_context;
  * @return allocated nix_c_context, owned by the caller. Free using
  * `nix_c_context_free`.
  */
-nix_c_context *nix_c_context_create();
+nix_c_context * nix_c_context_create();
 /**
  * @brief Free a nix_c_context. Does not fail.
  * @param[out] context The context to free, mandatory.
  */
-void nix_c_context_free(nix_c_context *context);
+void nix_c_context_free(nix_c_context * context);
 /**
  *  @}
  */
@@ -147,7 +147,7 @@ void nix_c_context_free(nix_c_context *context);
  * @return NIX_OK if the initialization is successful, or an error code
  * otherwise.
  */
-nix_err nix_libutil_init(nix_c_context *context);
+nix_err nix_libutil_init(nix_c_context * context);
 
 /** @defgroup settings
  *  @{
@@ -167,8 +167,7 @@ nix_err nix_libutil_init(nix_c_context *context);
  * provided buffer is too short, or NIX_OK if the setting was retrieved
  * successfully.
  */
-nix_err nix_setting_get(nix_c_context *context, const char *key, char *value,
-                        int n);
+nix_err nix_setting_get(nix_c_context * context, const char * key, char * value, int n);
 
 /**
  * @brief Sets a setting in the nix global configuration.
@@ -184,8 +183,7 @@ nix_err nix_setting_get(nix_c_context *context, const char *key, char *value,
  * @return NIX_ERR_KEY if the setting is unknown, or NIX_OK if the setting was
  * set successfully.
  */
-nix_err nix_setting_set(nix_c_context *context, const char *key,
-                        const char *value);
+nix_err nix_setting_set(nix_c_context * context, const char * key, const char * value);
 
 /**
  *  @}
@@ -198,7 +196,7 @@ nix_err nix_setting_set(nix_c_context *context, const char *key,
  * Does not fail.
  * @return A static string representing the version of the nix library.
  */
-const char *nix_version_get();
+const char * nix_version_get();
 
 /** @addtogroup errors
  *  @{
@@ -217,8 +215,7 @@ const char *nix_version_get();
  * @return nullptr if no error message was ever set,
  *         a borrowed pointer to the error message otherwise.
  */
-const char *nix_err_msg(nix_c_context *context, const nix_c_context *ctx,
-                        unsigned int *n);
+const char * nix_err_msg(nix_c_context * context, const nix_c_context * ctx, unsigned int * n);
 
 /**
  * @brief Retrieves the error message from errorInfo in a context.
@@ -235,8 +232,7 @@ const char *nix_err_msg(nix_c_context *context, const nix_c_context *ctx,
  * @param[in] n Maximum size of the returned string.
  * @return NIX_OK if there were no errors, an error code otherwise.
  */
-nix_err nix_err_info_msg(nix_c_context *context,
-                         const nix_c_context *read_context, char *value, int n);
+nix_err nix_err_info_msg(nix_c_context * context, const nix_c_context * read_context, char * value, int n);
 
 /**
  * @brief Retrieves the error name from a context.
@@ -253,8 +249,7 @@ nix_err nix_err_info_msg(nix_c_context *context,
  * @param[in] n Maximum size of the returned string.
  * @return NIX_OK if there were no errors, an error code otherwise.
  */
-nix_err nix_err_name(nix_c_context *context, const nix_c_context *read_context,
-                     char *value, int n);
+nix_err nix_err_name(nix_c_context * context, const nix_c_context * read_context, char * value, int n);
 
 /**
  * @brief Retrieves the most recent error code from a nix_c_context
@@ -266,7 +261,7 @@ nix_err nix_err_name(nix_c_context *context, const nix_c_context *read_context,
  * @param[in] read_context the context to retrieve the error message from
  * @return most recent error code stored in the context.
  */
-nix_err nix_err_code(const nix_c_context *read_context);
+nix_err nix_err_code(const nix_c_context * read_context);
 
 /**
  *  @}
