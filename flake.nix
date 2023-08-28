@@ -524,12 +524,34 @@
 
       # https://nixos.org/manual/nixos/unstable/index.html#sec-calling-nixos-tests
       runNixOSTestFor = system: test: nixos-lib.runTest {
-        imports = [ test ];
+        imports = [
+          test
+          # For fast cycle when you don't need the regular tests:
+          # (useNixWithoutRegularTests system)
+        ];
         hostPkgs = nixpkgsFor.${system}.native;
         defaults = {
           nixpkgs.pkgs = nixpkgsFor.${system}.native;
         };
         _module.args.nixpkgs = nixpkgs;
+      };
+
+      # A module that makes a NixOS VM test use a Nix package without tests.
+      useNixWithoutRegularTests = system: {
+        defaults = {
+          # TODO: `.extend` is slightly inefficient.
+          #       Make NixOS use `nix.package` consistently instead, and set that instead of doing `.extend`.
+          #       `system` parameter can then be removed.
+          nixpkgs.pkgs = lib.mkForce (
+            nixpkgsFor.${system}.native.extend (self: super: {
+              nix = super.nix.overrideAttrs(old: { doCheck = false; });
+            })
+          );
+          system.systemBuilderArgs.disallowedRequisites = [
+            # Avoid building `pkgs.nix`, which is the regular build with tests which we want to avoid.
+            (builtins.unsafeDiscardStringContext (lib.getBin nixpkgsFor.${system}.native.nix))
+          ];
+        };
       };
 
     in {
