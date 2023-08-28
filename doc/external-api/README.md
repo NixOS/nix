@@ -39,7 +39,7 @@ int main() {
 
    nix_expr_eval_from_string(NULL, state, "builtins.nixVersion", ".", value);
    nix_value_force(NULL, state, value);
-   printf("nix version: %s\n", nix_get_string(NULL, value));
+   printf("Nix version: %s\n", nix_get_string(NULL, value));
 
    nix_gc_decref(NULL, value);
    nix_state_free(state);
@@ -52,7 +52,7 @@ int main() {
 ```
 $ gcc main.c $(pkg-config nix-expr-c --libs --cflags) -o main
 $ ./main
-nix version 1.2.3
+Nix version: 2.17
 ```
 
 
