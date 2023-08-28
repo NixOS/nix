@@ -264,6 +264,20 @@ nix_err nix_err_name(nix_c_context * context, const nix_c_context * read_context
 nix_err nix_err_code(const nix_c_context * read_context);
 
 /**
+ * @brief Set an error message on a nix context.
+ *
+ * This should be used when you want to throw an error from a PrimOp callback.
+ *
+ * All other use is internal to the API.
+ *
+ * @param context context to write the error message to, or NULL
+ * @param err The error code to set and return
+ * @param msg The error message to set.
+ * @returns the error code set
+ */
+nix_err nix_set_err_msg(nix_c_context * context, nix_err err, const char * msg);
+
+/**
  *  @}
  */
 
