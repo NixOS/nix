@@ -155,7 +155,7 @@ fi
 # Building without tests is useful for bootstrapping with a smaller footprint
 # or running the tests in a separate derivation. Otherwise, we do compile and
 # run them.
-AC_ARG_ENABLE(tests, AS_HELP_STRING([--disable-tests],[Do not build the tests]),
+AC_ARG_ENABLE(tests, AS_HELP_STRING([--disable-tests],[Do not build or run any tests]),
   tests=$enableval, tests=yes)
 AC_SUBST(tests)
 
