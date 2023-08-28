@@ -65,6 +65,7 @@ typedef struct ExternalValue ExternalValue;
  * @{
  */
 /** @brief Function pointer for primops
+ * @param[in] user_data Arbitrary data, passed to nix_alloc_primop and stored.
  * @param[in] state Evaluator state
  * @param[in] pos Call position, opaque index into the state's position table.
  * @param[in] args list of arguments. Note that these can be thunks and should be forced using nix_value_force before
@@ -72,7 +73,7 @@ typedef struct ExternalValue ExternalValue;
  * @param[out] ret return value
  * @see nix_alloc_primop, nix_set_primop
  */
-typedef void (*PrimOpFun)(State * state, int pos, Value ** args, Value * ret);
+typedef void (*PrimOpFun)(void * user_data, State * state, int pos, Value ** args, Value * ret);
 
 /** @brief Allocate a PrimOp
  *
@@ -85,19 +86,27 @@ typedef void (*PrimOpFun)(State * state, int pos, Value ** args, Value * ret);
  * @param[in] name function name
  * @param[in] args array of argument names, NULL-terminated
  * @param[in] doc optional, documentation for this primop
+ * @param[in] user_data optional, arbitrary data, passed to the function when it's called
  * @return primop, or null in case of errors
  * @see nix_set_primop
  */
 PrimOp * nix_alloc_primop(
-    nix_c_context * context, PrimOpFun fun, int arity, const char * name, const char ** args, const char * doc);
+    nix_c_context * context,
+    PrimOpFun fun,
+    int arity,
+    const char * name,
+    const char ** args,
+    const char * doc,
+    void * user_data);
 
 /** @brief add a primop to the `builtins` attribute set
  *
  * Only applies to States created after this call.
  *
- * Moves your PrimOp into the global evaluator
- * registry, meaning your input PrimOp pointer is no longer usable
- * (but still possibly subject to garbage collection).
+ * Moves your PrimOp content into the global evaluator
+ * registry, meaning your input PrimOp pointer is no longer usable.
+ * You are free to remove your references to it,
+ * after which it will be garbage collected.
  *
  * @param[out] context Optional, stores error information
  * @return primop, or null in case of errors

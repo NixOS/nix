@@ -34,18 +34,39 @@ static nix::Value & check_value_not_null(Value * value)
     return *((nix::Value *) value);
 }
 
+/**
+ * Helper function to convert calls from nix into C API.
+ *
+ * Deals with errors and converts arguments from C++ into C types.
+ */
+static void nix_c_primop_wrapper(
+    PrimOpFun f, void * userdata, nix::EvalState & state, const nix::PosIdx pos, nix::Value ** args, nix::Value & v)
+{
+    f(userdata, (State *) &state, *reinterpret_cast<const int *>(&pos), (Value **) args, (Value *) &v);
+}
+
 PrimOp * nix_alloc_primop(
-    nix_c_context * context, PrimOpFun fun, int arity, const char * name, const char ** args, const char * doc)
+    nix_c_context * context,
+    PrimOpFun fun,
+    int arity,
+    const char * name,
+    const char ** args,
+    const char * doc,
+    void * user_data)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto fun2 = (nix::PrimOpFun) fun;
         auto p = new
 #ifdef HAVE_BOEHMGC
             (GC)
 #endif
-                nix::PrimOp{.name = name, .args = {}, .arity = (size_t) arity, .doc = doc, .fun = fun2};
+                nix::PrimOp{
+                    .name = name,
+                    .args = {},
+                    .arity = (size_t) arity,
+                    .doc = doc,
+                    .fun = std::bind_front(nix_c_primop_wrapper, fun, user_data)};
         if (args)
             for (size_t i = 0; args[i]; i++)
                 p->args.emplace_back(*args);
