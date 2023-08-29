@@ -27,6 +27,7 @@
 
 #include <sys/resource.h>
 #include <nlohmann/json.hpp>
+#include <pthread.h>
 
 #if HAVE_BOEHMGC
 
@@ -44,6 +45,47 @@
 using json = nlohmann::json;
 
 namespace nix {
+
+// Custom stack protection in addition to virtual memory-assisted stack overflow check (nix::sigsegvHandler)
+// This has the benefit of being able to throw a proper exception, and support the debugger.
+
+// TODO: move into evalstate
+static void * stackProtectLow = nullptr;
+static void * stackProtectHigh = nullptr;
+
+// TODO: make public in evalstate. setCurrentStack?
+static void initStack() {
+    pthread_attr_t attr;
+    size_t stackSize = 0;
+    void * stackLow = nullptr;
+    size_t guardSize = 0;
+
+    pthread_t self = pthread_self();
+    pthread_getattr_np(self, &attr);
+
+    pthread_attr_getstack(&attr, &stackLow, &stackSize);
+
+    // The guard page should be irrelevant according to POSIX, but on Linux it's within the `getstack` region!
+    pthread_attr_getguardsize(&attr, &guardSize);
+
+    stackProtectLow = stackLow;
+
+    // TODO: 32k seems high. Why is that?
+    // TODO: make this handle small stacks better?
+    // TODO: require a minimum stack size? The language does not define a max recursion depth, but for an evaluator to be practical, a stack that's too small is a problem that should be reported as such.
+    stackProtectHigh = (char*)stackLow + guardSize + std::min<size_t>(1024 * 32, stackSize / 4);
+}
+
+static inline void checkStack() {
+    int dummy;
+    void *sp = &dummy;
+    if (sp >= stackProtectLow && sp < stackProtectHigh) {
+        // No pos. A pos would be a red herring because the cause is never near the exception for stack overflows.
+        // TODO move into evalstate so we can do 
+        // error("stack overflow", path).debugThrow<EvalError>();
+        throw EvalError("stack overflow");
+    }
+}
 
 static char * allocString(size_t size)
 {
@@ -523,6 +565,8 @@ EvalState::EvalState(
     assert(gcInitialised);
 
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
+
+    initStack();
 
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
@@ -1511,6 +1555,8 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
     auto trace = evalSettings.traceFunctionCalls
         ? std::make_unique<FunctionCallTrace>(positions[pos])
         : nullptr;
+
+    checkStack();
 
     forceValue(fun, pos);
 
