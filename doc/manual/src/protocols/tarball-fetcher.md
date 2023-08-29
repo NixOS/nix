@@ -20,8 +20,8 @@ Link: <flakeref>; rel="immutable"
 
 (Note the required `<` and `>` characters around *flakeref*.)
 
-*flakeref* must be a tarball flakeref. It can contain flake attributes
-such as `narHash`, `rev` and `revCount`. If `narHash` is included, its
+*flakeref* must be a tarball flakeref. It can contain the tarball flake attributes
+`narHash`, `rev`, `revCount` and `lastModified`. If `narHash` is included, its
 value must be the NAR hash of the unpacked tarball (as computed via
 `nix hash path`). Nix checks the contents of the returned tarball
 against the `narHash` attribute. The `rev` and `revCount` attributes
