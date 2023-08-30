@@ -468,13 +468,17 @@ struct CmdFlakeCheck : FlakeCommand
                         }
                     }
 
-                    if (auto isFlakeCheck = leaf->maybeGetAttr("isFlakeCheck")) {
-                        if (isFlakeCheck->getBool()) {
-                            auto drvPath = leaf->getAttr("derivation")->forceDerivation();
-                            drvPaths.push_back(DerivedPath::Built {
-                                .drvPath = makeConstantStorePathRef(drvPath),
-                                .outputs = OutputsSpec::All { },
-                            });
+                    if (auto drv = flake_schemas::derivation(leaf)) {
+                        drv->getAttr(state->sName)->getString();
+
+                        if (auto isFlakeCheck = leaf->maybeGetAttr("isFlakeCheck")) {
+                            if (isFlakeCheck->getBool()) {
+                                auto drvPath = drv->forceDerivation();
+                                drvPaths.push_back(DerivedPath::Built {
+                                    .drvPath = makeConstantStorePathRef(drvPath),
+                                    .outputs = OutputsSpec::All { },
+                                });
+                            }
                         }
                     }
                 },

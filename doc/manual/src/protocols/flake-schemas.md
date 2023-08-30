@@ -23,7 +23,7 @@ Non-leaf nodes must have the following attribute:
 
 Leaf nodes can have the following attributes:
 
-* `derivation`: The main derivation of this node, if any.
+* `derivation`: The main derivation of this node, if any. It must evaluate for `nix flake check` and `nix flake show` to succeed.
 
 * `evalChecks`: An attribute set of Boolean values, used by `nix flake check`. Each attribute must evaluate to `true`.
 
@@ -42,5 +42,19 @@ Both leaf and non-leaf nodes can have the following attributes:
 Here is a schema that checks that every element of the `nixosConfigurations` flake output evaluates and builds correctly (meaning that it has a `config.system.build.toplevel` attribute that yields a buildable derivation).
 
 ```
-TODO
+outputs = {
+  schemas.nixosConfigurations = {
+    version = 1;
+    doc = ''
+      The `nixosConfigurations` flake output defines NixOS system configurations.
+    '';
+    inventory = output: {
+      children = builtins.mapAttrs (configName: machine:
+        {
+          what = "NixOS configuration";
+          derivation = machine.config.system.build.toplevel;
+        }) output;
+    };
+  };
+};
 ```
