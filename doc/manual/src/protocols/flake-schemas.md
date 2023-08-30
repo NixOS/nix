@@ -41,7 +41,7 @@ Both leaf and non-leaf nodes can have the following attributes:
 
 Here is a schema that checks that every element of the `nixosConfigurations` flake output evaluates and builds correctly (meaning that it has a `config.system.build.toplevel` attribute that yields a buildable derivation).
 
-```
+```nix
 outputs = {
   schemas.nixosConfigurations = {
     version = 1;
