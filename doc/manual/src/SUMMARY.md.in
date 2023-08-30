@@ -100,6 +100,7 @@
   - [File System Object](architecture/file-system-object.md)
 - [Protocols](protocols/protocols.md)
   - [Serving Tarball Flakes](protocols/tarball-fetcher.md)
+  - [Flake Schemas](protocols/flake-schemas.md)
 - [Glossary](glossary.md)
 - [Contributing](contributing/contributing.md)
   - [Hacking](contributing/hacking.md)

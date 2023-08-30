@@ -16,6 +16,21 @@
         "type": "github"
       }
     },
+    "flake-schemas": {
+      "locked": {
+        "lastModified": 1693392497,
+        "narHash": "sha256-/fuUqkWIfRHaZb9cFTWWVHqSxpq/n6NlAvXqBuFTJqs=",
+        "owner": "DeterminateSystems",
+        "repo": "flake-schemas",
+        "rev": "9af39734fcd4813be17cadef98fc47285eaf7888",
+        "type": "github"
+      },
+      "original": {
+        "owner": "DeterminateSystems",
+        "repo": "flake-schemas",
+        "type": "github"
+      }
+    },
     "lowdown-src": {
       "flake": false,
       "locked": {
@@ -67,6 +82,7 @@
     "root": {
       "inputs": {
         "flake-compat": "flake-compat",
+        "flake-schemas": "flake-schemas",
         "lowdown-src": "lowdown-src",
         "nixpkgs": "nixpkgs",
         "nixpkgs-regression": "nixpkgs-regression"

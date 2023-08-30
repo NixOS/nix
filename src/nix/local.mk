@@ -38,3 +38,5 @@ src/nix/doc/files/%.md: doc/manual/src/command-ref/files/%.md
 	@cp $< $@
 
 src/nix/profile.cc: src/nix/profile.md src/nix/doc/files/profiles.md.gen.hh
+
+src/nix/flake.cc: src/nix/call-flake-schemas.nix.gen.hh
