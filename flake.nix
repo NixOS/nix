@@ -186,7 +186,9 @@
             libarchive
             boost
             lowdown-nix
+            libsodium
           ]
+<<<<<<< HEAD
           ++ lib.optionals stdenv.isDarwin [darwin.apple_sdk.libs.sandbox]
           ++ lib.optionals stdenv.isLinux [(libseccomp.overrideAttrs (_: rec {
             version = "2.5.5";
@@ -196,6 +198,9 @@
             };
           }))]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
+=======
+          ++ lib.optionals stdenv.isLinux [libseccomp]
+>>>>>>> 564392b57 (Make libsodium an unconditional dependency)
           ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 
         checkDeps = [
