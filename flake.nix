@@ -750,7 +750,11 @@
             outputs = [ "out" "dev" "doc" ];
 
             nativeBuildInputs = nativeBuildDeps
-                                ++ (lib.optionals stdenv.cc.isClang [ pkgs.bear pkgs.clang-tools ]);
+              ++ lib.optional stdenv.cc.isClang pkgs.buildPackages.bear
+              ++ lib.optional
+                (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform)
+                pkgs.buildPackages.clang-tools
+              ;
 
             buildInputs = buildDeps ++ propagatedDeps
               ++ awsDeps ++ checkDeps ++ internalApiDocsDeps;
