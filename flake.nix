@@ -25,8 +25,11 @@
       linuxSystems = linux32BitSystems ++ linux64BitSystems;
       darwinSystems = [ "x86_64-darwin" "aarch64-darwin" ];
       systems = linuxSystems ++ darwinSystems;
-      
-      crossSystems = [ "armv6l-linux" "armv7l-linux" ];
+
+      crossSystems = [
+        "armv6l-linux" "armv7l-linux"
+        "x86_64-freebsd13" "x86_64-netbsd"
+      ];
 
       stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" "ccacheStdenv" ];
 
@@ -94,7 +97,14 @@
       nixpkgsFor = forAllSystems
         (system: let
           make-pkgs = crossSystem: stdenv: import nixpkgs {
-            inherit system crossSystem;
+            localSystem = {
+              inherit system;
+            };
+            crossSystem = if crossSystem == null then null else {
+              system = crossSystem;
+            } // lib.optionalAttrs (crossSystem == "x86_64-freebsd13") {
+              useLLVM = true;
+            };
             overlays = [
               (overlayFor (p: p.${stdenv}))
             ];
