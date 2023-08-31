@@ -25,7 +25,14 @@
       darwinSystems = [ "x86_64-darwin" "aarch64-darwin" ];
       systems = linuxSystems ++ darwinSystems;
 
+<<<<<<< HEAD
       crossSystems = [ "armv6l-linux" "armv7l-linux" ];
+=======
+      crossSystems = [
+        "armv6l-linux" "armv7l-linux"
+        "x86_64-freebsd13" "x86_64-netbsd"
+      ];
+>>>>>>> e44d2a6bb (Add FreeBSD and NetBSD cross to Nix's flake)
 
       stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" "ccacheStdenv" ];
 
@@ -86,7 +93,14 @@
       nixpkgsFor = forAllSystems
         (system: let
           make-pkgs = crossSystem: stdenv: import nixpkgs {
-            inherit system crossSystem;
+            localSystem = {
+              inherit system;
+            };
+            crossSystem = if crossSystem == null then null else {
+              system = crossSystem;
+            } // lib.optionalAttrs (crossSystem == "x86_64-freebsd13") {
+              useLLVM = true;
+            };
             overlays = [
               (overlayFor (p: p.${stdenv}))
             ];
