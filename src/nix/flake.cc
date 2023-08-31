@@ -327,7 +327,7 @@ void forEachOutput(
                 isUnknown ? "" : output->getAttr("doc")->getString(),
                 i + 1 == outputNames.size());
         } catch (Error & e) {
-            e.addTrace(nullptr, "while evaluating the flake output '%s':", inventory->root->state.symbols[outputName]);
+            e.addTrace(nullptr, "while evaluating the flake output '%s':", toAttrPathStr(output));
             throw;
         }
     }
@@ -364,11 +364,9 @@ void visit(
                     f(attrName, children->getAttr(attrName), i + 1 == attrNames.size());
                 } catch (Error & e) {
                     // FIXME: make it a flake schema attribute whether to ignore evaluation errors.
-                    //if (!(attrPath.size() > 0 && attrPathS[0] == "legacyPackages")) {
-                    if (true) {
+                    if (node->root->state.symbols[toAttrPath(node)[0]] != "legacyPackages") {
                         e.addTrace(nullptr, "while evaluating the flake output attribute '%s':",
-                            node->root->state.symbols[attrName]);
-                        //concatStringsSep(".", attrName));
+                            toAttrPathStr(node));
                         throw;
                     }
                 }
