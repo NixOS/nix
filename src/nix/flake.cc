@@ -912,7 +912,9 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
             {
                 auto j = nlohmann::json::object();
 
-                if (output) {
+                if (!showLegacy && state->symbols[outputName] == "legacyPackages") {
+                    j.emplace("skipped", true);
+                } else if (output) {
                     j.emplace("doc", doc);
                     auto j2 = nlohmann::json::object();
                     visit(ref(output), j2);
@@ -980,7 +982,14 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     ANSI_GREEN "%s" ANSI_NORMAL ANSI_BOLD "%s" ANSI_NORMAL,
                     isLast ? treeLast : treeConn, state->symbols[outputName]);
 
-                if (output) {
+                if (!showLegacy && state->symbols[outputName] == "legacyPackages") {
+                    logger->cout(headerPrefix);
+                    logger->cout(
+                        ANSI_GREEN "%s" "%s" ANSI_NORMAL ANSI_ITALIC "%s" ANSI_NORMAL,
+                        isLast ? treeNull : treeLine,
+                        treeLast,
+                        "(skipped; use '--legacy' to show)");
+                } else if (output) {
                     visit(ref(output), headerPrefix, isLast ? treeNull : treeLine);
                 } else {
                     logger->cout(headerPrefix);
