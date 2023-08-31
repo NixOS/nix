@@ -34,7 +34,7 @@ rec {
       (outputName: output:
         if schemas ? ${outputName} && schemas.${outputName}.version == 1
         then
-          { children = schemas.${outputName}.inventory output;
+          { output = schemas.${outputName}.inventory output;
             inherit (schemas.${outputName}) doc;
           }
         else

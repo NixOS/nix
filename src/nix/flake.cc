@@ -282,6 +282,32 @@ call(
     return {cache, cache->getRoot()->getAttr("inventory")};
 }
 
+/* Derive the flake output attribute path from the cursor used to
+   traverse the inventory. We do this so we don't have to maintain a
+   separate attrpath for that. */
+std::vector<Symbol> toAttrPath(ref<AttrCursor> cursor)
+{
+    auto attrPath = cursor->getAttrPath();
+    std::vector<Symbol> res;
+    auto i = attrPath.begin();
+    assert(i != attrPath.end());
+    ++i; // skip "inventory"
+    assert(i != attrPath.end());
+    res.push_back(*i++); // copy output name
+    if (i != attrPath.end()) ++i; // skip "outputs"
+    while (i != attrPath.end()) {
+        ++i; // skip "children"
+        if (i != attrPath.end())
+            res.push_back(*i++);
+    }
+    return res;
+}
+
+std::string toAttrPathStr(ref<AttrCursor> cursor)
+{
+    return concatStringsSep(".", cursor->root->state.symbols.resolve(toAttrPath(cursor)));
+}
+
 void forEachOutput(
     ref<AttrCursor> inventory,
     std::function<void(Symbol outputName, std::shared_ptr<AttrCursor> output, const std::string & doc, bool isLast)> f)
@@ -294,8 +320,10 @@ void forEachOutput(
         auto output = inventory->getAttr(outputName);
         try {
             auto isUnknown = (bool) output->maybeGetAttr("unknown");
+            Activity act(*logger, lvlInfo, actUnknown,
+                fmt("evaluating '%s'", toAttrPathStr(output)));
             f(outputName,
-                isUnknown ? std::shared_ptr<AttrCursor>() : output->getAttr("children"),
+                isUnknown ? std::shared_ptr<AttrCursor>() : output->getAttr("output"),
                 isUnknown ? "" : output->getAttr("doc")->getString(),
                 i + 1 == outputNames.size());
         } catch (Error & e) {
@@ -314,10 +342,8 @@ void visit(
     std::function<void(std::function<void(ForEachChild)>)> visitNonLeaf,
     std::function<void(ref<AttrCursor> node, const std::vector<std::string> & systems)> visitFiltered)
 {
-    #if 0
     Activity act(*logger, lvlInfo, actUnknown,
-        fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
-    #endif
+        fmt("evaluating '%s'", toAttrPathStr(node)));
 
     /* Apply the system type filter. */
     if (system) {
@@ -433,8 +459,6 @@ struct CmdFlakeCheck : FlakeCommand
 
         bool hasErrors = false;
 
-        // FIXME: keep-going
-        #if 0
         auto reportError = [&](const Error & e) {
             try {
                 throw e;
@@ -447,7 +471,6 @@ struct CmdFlakeCheck : FlakeCommand
                     throw;
             }
         };
-        #endif
 
         visit = [&](ref<eval_cache::AttrCursor> node)
         {
@@ -464,7 +487,7 @@ struct CmdFlakeCheck : FlakeCommand
                             auto b = evalChecks->getAttr(checkName)->getBool();
                             if (!b)
                                 // FIXME: show full attrpath
-                                warn("Evaluation check '%s' failed.", state->symbols[checkName]);
+                                reportError(Error("Evaluation check '%s' failed.", state->symbols[checkName]));
                         }
                     }
 
@@ -510,7 +533,7 @@ struct CmdFlakeCheck : FlakeCommand
                 concatStringsSep(", ", uncheckedOutputs)); // FIXME: quote
 
         if (build && !drvPaths.empty()) {
-            Activity act(*logger, lvlInfo, actUnknown, "running flake checks");
+            Activity act(*logger, lvlInfo, actUnknown, "building flake checks");
             store->buildPaths(drvPaths);
         }
 
