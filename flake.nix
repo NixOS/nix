@@ -743,6 +743,9 @@
 
       devShells = let
         makeShell = pkgs: stdenv:
+          let
+            canRunInstalled = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
+          in
           with commonDeps { inherit pkgs; };
           stdenv.mkDerivation {
             name = "nix";
@@ -760,7 +763,8 @@
               ++ awsDeps ++ checkDeps ++ internalApiDocsDeps;
 
             configureFlags = configureFlags
-              ++ testConfigureFlags ++ internalApiDocsConfigureFlags;
+              ++ testConfigureFlags ++ internalApiDocsConfigureFlags
+              ++ lib.optional (!canRunInstalled) "--disable-doc-gen";
 
             enableParallelBuilding = true;
 
