@@ -395,6 +395,8 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkDerivation = [&](const std::string & attrPath, Value & v, const PosIdx pos) -> std::optional<StorePath> {
             try {
+                Activity act(*logger, lvlInfo, actUnknown,
+                    fmt("checking derivation %s", attrPath));
                 auto packageInfo = getDerivation(*state, v, false);
                 if (!packageInfo)
                     throw Error("flake attribute '%s' is not a derivation", attrPath);
@@ -427,6 +429,8 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkOverlay = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
+                Activity act(*logger, lvlInfo, actUnknown,
+                    fmt("checking overlay %s", attrPath));
                 state->forceValue(v, pos);
                 if (!v.isLambda()) {
                     throw Error("overlay is not a function, but %s instead", showType(v));
@@ -449,6 +453,8 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkModule = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
+                Activity act(*logger, lvlInfo, actUnknown,
+                    fmt("checking NixOS module %s", attrPath));
                 state->forceValue(v, pos);
             } catch (Error & e) {
                 e.addTrace(resolve(pos), hintfmt("while checking the NixOS module '%s'", attrPath));
@@ -460,6 +466,8 @@ struct CmdFlakeCheck : FlakeCommand
 
         checkHydraJobs = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
+                Activity act(*logger, lvlInfo, actUnknown,
+                    fmt("checking Hydra job %s", attrPath));
                 state->forceAttrs(v, pos, "");
 
                 if (state->isDerivation(v))
@@ -469,7 +477,7 @@ struct CmdFlakeCheck : FlakeCommand
                     state->forceAttrs(*attr.value, attr.pos, "");
                     auto attrPath2 = concatStrings(attrPath, ".", state->symbols[attr.name]);
                     if (state->isDerivation(*attr.value)) {
-                        Activity act(*logger, lvlChatty, actUnknown,
+                        Activity act(*logger, lvlInfo, actUnknown,
                             fmt("checking Hydra job '%s'", attrPath2));
                         checkDerivation(attrPath2, *attr.value, attr.pos);
                     } else
@@ -484,7 +492,7 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkNixOSConfiguration = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
-                Activity act(*logger, lvlChatty, actUnknown,
+                Activity act(*logger, lvlInfo, actUnknown,
                     fmt("checking NixOS configuration '%s'", attrPath));
                 Bindings & bindings(*state->allocBindings(0));
                 auto vToplevel = findAlongAttrPath(*state, "config.system.build.toplevel", bindings, v).first;
@@ -499,7 +507,7 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkTemplate = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
-                Activity act(*logger, lvlChatty, actUnknown,
+                Activity act(*logger, lvlInfo, actUnknown,
                     fmt("checking template '%s'", attrPath));
 
                 state->forceAttrs(v, pos, "");
@@ -533,6 +541,8 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkBundler = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
+                Activity act(*logger, lvlInfo, actUnknown,
+                    fmt("checking bundler %s", attrPath));
                 state->forceValue(v, pos);
                 if (!v.isLambda())
                     throw Error("bundler must be a function");
@@ -552,7 +562,7 @@ struct CmdFlakeCheck : FlakeCommand
             enumerateOutputs(*state,
                 *vFlake,
                 [&](const std::string & name, Value & vOutput, const PosIdx pos) {
-                    Activity act(*logger, lvlChatty, actUnknown,
+                    Activity act(*logger, lvlInfo, actUnknown,
                         fmt("checking flake output '%s'", name));
 
                     try {
