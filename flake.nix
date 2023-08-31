@@ -190,9 +190,9 @@
             libarchive
             boost
             lowdown-nix
+            libsodium
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
-          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
           ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 
         checkDeps = [
