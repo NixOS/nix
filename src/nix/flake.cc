@@ -781,7 +781,8 @@ struct CmdFlakeCheck : FlakeCommand
         }
 
         if (build && !drvPaths.empty()) {
-            Activity act(*logger, lvlInfo, actUnknown, "running flake checks");
+            Activity act(*logger, lvlInfo, actUnknown,
+                fmt("running %d flake checks", drvPaths.size()));
             store->buildPaths(drvPaths);
         }
         if (hasErrors)
