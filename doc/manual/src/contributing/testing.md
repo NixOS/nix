@@ -7,7 +7,8 @@ under `src/{library_name}/tests` using the
 [googletest](https://google.github.io/googletest/) and
 [rapidcheck](https://github.com/emil-e/rapidcheck) frameworks.
 
-You can run the whole testsuite with `make check`, or the tests for a specific component with `make libfoo-tests_RUN`. Finer-grained filtering is also possible using the [--gtest_filter](https://google.github.io/googletest/advanced.html#running-a-subset-of-the-tests) command-line option.
+You can run the whole testsuite with `make check`, or the tests for a specific component with `make libfoo-tests_RUN`.
+Finer-grained filtering is also possible using the [--gtest_filter](https://google.github.io/googletest/advanced.html#running-a-subset-of-the-tests) command-line option, or the `GTEST_FILTER` environment variable.
 
 ## Functional tests
 

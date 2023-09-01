@@ -167,7 +167,7 @@ void drvRequireExperiment(
 
 SingleDerivedPath::Built SingleDerivedPath::Built::parse(
     const Store & store, ref<SingleDerivedPath> drv,
-    std::string_view output,
+    OutputNameView output,
     const ExperimentalFeatureSettings & xpSettings)
 {
     drvRequireExperiment(*drv, xpSettings);
@@ -179,7 +179,7 @@ SingleDerivedPath::Built SingleDerivedPath::Built::parse(
 
 DerivedPath::Built DerivedPath::Built::parse(
     const Store & store, ref<SingleDerivedPath> drv,
-    std::string_view outputsS,
+    OutputNameView outputsS,
     const ExperimentalFeatureSettings & xpSettings)
 {
     drvRequireExperiment(*drv, xpSettings);

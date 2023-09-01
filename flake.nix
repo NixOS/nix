@@ -19,10 +19,12 @@
         then ""
         else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
 
+      linux32BitSystems = [ "i686-linux" ];
       linux64BitSystems = [ "x86_64-linux" "aarch64-linux" ];
-      linuxSystems = linux64BitSystems ++ [ "i686-linux" ];
-      systems = linuxSystems ++ [ "x86_64-darwin" "aarch64-darwin" ];
-
+      linuxSystems = linux32BitSystems ++ linux64BitSystems;
+      darwinSystems = [ "x86_64-darwin" "aarch64-darwin" ];
+      systems = linuxSystems ++ darwinSystems;
+      
       crossSystems = [ "armv6l-linux" "armv7l-linux" ];
 
       stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" "ccacheStdenv" ];

@@ -12,7 +12,7 @@
 
 namespace nix {
 
-std::optional<StorePath> DerivationOutput::path(const Store & store, std::string_view drvName, std::string_view outputName) const
+std::optional<StorePath> DerivationOutput::path(const Store & store, std::string_view drvName, OutputNameView outputName) const
 {
     return std::visit(overloaded {
         [](const DerivationOutput::InputAddressed & doi) -> std::optional<StorePath> {
@@ -36,7 +36,7 @@ std::optional<StorePath> DerivationOutput::path(const Store & store, std::string
 }
 
 
-StorePath DerivationOutput::CAFixed::path(const Store & store, std::string_view drvName, std::string_view outputName) const
+StorePath DerivationOutput::CAFixed::path(const Store & store, std::string_view drvName, OutputNameView outputName) const
 {
     return store.makeFixedOutputPathFromCA(
         outputPathName(drvName, outputName),
@@ -466,7 +466,7 @@ bool isDerivation(std::string_view fileName)
 }
 
 
-std::string outputPathName(std::string_view drvName, std::string_view outputName) {
+std::string outputPathName(std::string_view drvName, OutputNameView outputName) {
     std::string res { drvName };
     if (outputName != "out") {
         res += "-";
@@ -810,7 +810,7 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
 }
 
 
-std::string hashPlaceholder(const std::string_view outputName)
+std::string hashPlaceholder(const OutputNameView outputName)
 {
     // FIXME: memoize?
     return "/" + hashString(htSHA256, concatStrings("nix-output:", outputName)).to_string(Base32, false);
@@ -963,7 +963,7 @@ void Derivation::checkInvariants(Store & store, const StorePath & drvPath) const
 const Hash impureOutputHash = hashString(htSHA256, "impure");
 
 nlohmann::json DerivationOutput::toJSON(
-    const Store & store, std::string_view drvName, std::string_view outputName) const
+    const Store & store, std::string_view drvName, OutputNameView outputName) const
 {
     nlohmann::json res = nlohmann::json::object();
     std::visit(overloaded {
@@ -990,7 +990,7 @@ nlohmann::json DerivationOutput::toJSON(
 
 
 DerivationOutput DerivationOutput::fromJSON(
-    const Store & store, std::string_view drvName, std::string_view outputName,
+    const Store & store, std::string_view drvName, OutputNameView outputName,
     const nlohmann::json & _json,
     const ExperimentalFeatureSettings & xpSettings)
 {
