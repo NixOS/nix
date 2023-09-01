@@ -96,7 +96,7 @@ void CreateDerivationAndRealiseGoal::getDerivation()
         auto drvPath = StorePath::dummy;
         try {
             drvPath = resolveDerivedPath(worker.store, *drvReq);
-        } catch (MissingRealisation) {
+        } catch (MissingRealisation &) {
             return std::nullopt;
         }
         return worker.evalStore.isValidPath(drvPath) || worker.store.isValidPath(drvPath)
