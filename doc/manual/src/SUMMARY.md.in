@@ -34,7 +34,7 @@
   - [Derivations](language/derivations.md)
     - [Advanced Attributes](language/advanced-attributes.md)
   - [Built-in Constants](language/builtin-constants.md)
-  - [Built-in Functions](language/builtins.md)
+  - [Built-in Functions](language/builtins-prefix.md)
 - [Advanced Topics](advanced-topics/advanced-topics.md)
   - [Remote Builds](advanced-topics/distributed-builds.md)
   - [Tuning Cores and Jobs](advanced-topics/cores-vs-jobs.md)
