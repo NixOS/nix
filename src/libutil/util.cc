@@ -60,7 +60,7 @@ void initLibUtil() {
     bool caught = false;
     try {
         throwExceptionSelfCheck();
-    } catch (nix::Error _e) {
+    } catch (const nix::Error & _e) {
         caught = true;
     }
     // This is not actually the main point of this check, but let's make sure anyway:
