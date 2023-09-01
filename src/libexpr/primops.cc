@@ -1520,15 +1520,25 @@ static RegisterPrimOp primop_storePath({
 
 static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    auto & arg = *args[0];
+
     /* We don’t check the path right now, because we don’t want to
        throw if the path isn’t allowed, but just return false (and we
        can’t just catch the exception here because we still want to
-       throw if something in the evaluation of `*args[0]` tries to
+       throw if something in the evaluation of `arg` tries to
        access an unauthorized path). */
-    auto path = realisePath(state, pos, *args[0], { .checkForPureEval = false });
+    auto path = realisePath(state, pos, arg, { .checkForPureEval = false });
+
+    /* SourcePath doesn't know about trailing slash. */
+    auto mustBeDir = arg.type() == nString && arg.str().ends_with("/");
 
     try {
-        v.mkBool(state.checkSourcePath(path).pathExists());
+        auto checked = state.checkSourcePath(path);
+        auto exists = checked.pathExists();
+        if (exists && mustBeDir) {
+            exists = checked.lstat().type == InputAccessor::tDirectory;
+        }
+        v.mkBool(exists);
     } catch (SysError & e) {
         /* Don't give away info from errors while canonicalising
            ‘path’ in restricted mode. */
