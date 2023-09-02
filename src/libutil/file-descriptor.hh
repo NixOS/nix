@@ -4,6 +4,11 @@
 #include "types.hh"
 #include "error.hh"
 
+#ifdef _WIN32
+# define WIN32_LEAN_AND_MEAN
+# include <windows.h>
+#endif
+
 namespace nix {
 
 struct Sink;
@@ -12,9 +17,21 @@ struct Source;
 /**
  * Operating System capability
  */
-typedef int Descriptor;
+typedef
+#if _WIN32
+    HANDLE
+#else
+    int
+#endif
+    Descriptor;
 
-const Descriptor INVALID_DESCRIPTOR = -1;
+const Descriptor INVALID_DESCRIPTOR =
+#if _WIN32
+    INVALID_HANDLE_VALUE
+#else
+    -1
+#endif
+    ;
 
 /**
  * Convert a native `Descriptor` to a POSIX file descriptor
@@ -23,17 +40,26 @@ const Descriptor INVALID_DESCRIPTOR = -1;
  */
 static inline Descriptor toDescriptor(int fd)
 {
+#ifdef _WIN32
+    return (HANDLE) _get_osfhandle(fd);
+#else
     return fd;
+#endif
 }
 
 /**
- * Convert a POSIX file descriptor to a native `Descriptor`
+ * Convert a POSIX file descriptor to a native `Descriptor` in read-only
+ * mode.
  *
  * This is a no-op except on Windows.
  */
-static inline int fromDescriptor(Descriptor fd, int flags)
+static inline int fromDescriptorReadOnly(Descriptor fd)
 {
+#ifdef _WIN32
+    return _open_osfhandle((intptr_t) fd, _O_RDONLY);
+#else
     return fd;
+#endif
 }
 
 /**
@@ -64,11 +90,24 @@ void writeLine(Descriptor fd, std::string s);
  */
 std::string drainFD(Descriptor fd, bool block = true, const size_t reserveSize=0);
 
-void drainFD(Descriptor fd, Sink & sink, bool block = true);
+/**
+ * The Windows version is always blocking.
+ */
+void drainFD(
+      Descriptor fd
+    , Sink & sink
+#ifndef _WIN32
+    , bool block = true
+#endif
+    );
 
 [[gnu::always_inline]]
 inline Descriptor getStandardOut() {
+#ifndef _WIN32
     return STDOUT_FILENO;
+#else
+    return GetStdHandle(STD_OUTPUT_HANDLE);
+#endif
 }
 
 /**
@@ -100,6 +139,8 @@ public:
     void close();
 };
 
+#ifndef _WIN32 // Not needed on Windows, where we don't fork
+
 /**
  * Close all file descriptors except those listed in the given set.
  * Good practice in child processes.
@@ -110,6 +151,15 @@ void closeMostFDs(const std::set<Descriptor> & exceptions);
  * Set the close-on-exec flag for the given file descriptor.
  */
 void closeOnExec(Descriptor fd);
+
+#endif
+
+#ifdef _WIN32
+# if _WIN32_WINNT >= 0x0600
+Path handleToPath(Descriptor handle);
+std::wstring handleToFileName(Descriptor handle);
+# endif
+#endif
 
 MakeError(EndOfFile, Error);
 

@@ -33,14 +33,16 @@
 #include <optional>
 #include <unistd.h>
 #include <sys/time.h>
-#include <sys/resource.h>
 #include <fstream>
 #include <functional>
 #include <iostream>
 
-#include <sys/resource.h>
 #include <nlohmann/json.hpp>
 #include <boost/container/small_vector.hpp>
+
+#ifndef _WIN32 // TODO use portable implementation
+# include <sys/resource.h>
+#endif
 
 #if HAVE_BOEHMGC
 
@@ -2627,9 +2629,11 @@ void EvalState::maybePrintStats()
 
 void EvalState::printStatistics()
 {
+#ifndef _WIN32 // TODO use portable implementation
     struct rusage buf;
     getrusage(RUSAGE_SELF, &buf);
     float cpuTime = buf.ru_utime.tv_sec + ((float) buf.ru_utime.tv_usec / 1000000);
+#endif
 
     uint64_t bEnvs = nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *);
     uint64_t bLists = nrListElems * sizeof(Value *);
@@ -2646,7 +2650,9 @@ void EvalState::printStatistics()
     if (outPath != "-")
         fs.open(outPath, std::fstream::out);
     json topObj = json::object();
+#ifndef _WIN32 // TODO implement
     topObj["cpuTime"] = cpuTime;
+#endif
     topObj["envs"] = {
         {"number", nrEnvs},
         {"elements", nrValuesInEnvs},

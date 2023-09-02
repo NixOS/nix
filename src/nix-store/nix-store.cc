@@ -4,10 +4,8 @@
 #include "globals.hh"
 #include "build-result.hh"
 #include "store-cast.hh"
-#include "gc-store.hh"
+#include "local-fs-store.hh"
 #include "log-store.hh"
-#include "local-store.hh"
-#include "monitor-fd.hh"
 #include "serve-protocol.hh"
 #include "serve-protocol-impl.hh"
 #include "shared.hh"
@@ -15,7 +13,12 @@
 #include "legacy.hh"
 #include "posix-source-accessor.hh"
 #include "path-with-outputs.hh"
-#include "posix-fs-canonicalise.hh"
+
+#ifndef _WIN32 // TODO implement on Windows or provide allowed-to-noop interface
+# include "local-store.hh"
+# include "monitor-fd.hh"
+# include "posix-fs-canonicalise.hh"
+#endif
 
 #include <iostream>
 #include <algorithm>
@@ -43,12 +46,14 @@ static bool noOutput = false;
 static std::shared_ptr<Store> store;
 
 
+#ifndef _WIN32 // TODO reenable on Windows once we have `LocalStore` there
 ref<LocalStore> ensureLocalStore()
 {
     auto store2 = std::dynamic_pointer_cast<LocalStore>(store);
     if (!store2) throw Error("you don't have sufficient rights to use this command");
     return ref<LocalStore>(store2);
 }
+#endif
 
 
 static StorePath useDeriver(const StorePath & path)
@@ -550,7 +555,11 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         if (!store->isValidPath(info->path) || reregister) {
             /* !!! races */
             if (canonicalise)
+#ifdef _WIN32 // TODO implement on Windows
+                throw UnimplementedError("file attribute canonicalisation Is not implemented on Windows");
+#else
                 canonicalisePathMetaData(store->printStorePath(info->path), {});
+#endif
             if (!hashGiven) {
                 HashResult hash = hashPath(
                     *store->getFSAccessor(false), CanonPath { store->printStorePath(info->path) },
@@ -563,7 +572,9 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         }
     }
 
+#ifndef _WIN32 // TODO reenable on Windows once we have `LocalStore` there
     ensureLocalStore()->registerValidPaths(infos);
+#endif
 }
 
 
@@ -684,7 +695,7 @@ static void opDump(Strings opFlags, Strings opArgs)
     if (!opFlags.empty()) throw UsageError("unknown flag");
     if (opArgs.size() != 1) throw UsageError("only one argument allowed");
 
-    FdSink sink(STDOUT_FILENO);
+    FdSink sink(getStandardOut());
     std::string path = *opArgs.begin();
     dumpPath(path, sink);
     sink.flush();
@@ -712,7 +723,7 @@ static void opExport(Strings opFlags, Strings opArgs)
     for (auto & i : opArgs)
         paths.insert(store->followLinksToStorePath(i));
 
-    FdSink sink(STDOUT_FILENO);
+    FdSink sink(getStandardOut());
     store->exportPaths(paths, sink);
     sink.flush();
 }
@@ -825,7 +836,7 @@ static void opServe(Strings opFlags, Strings opArgs)
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
     FdSource in(STDIN_FILENO);
-    FdSink out(STDOUT_FILENO);
+    FdSink out(getStandardOut());
 
     /* Exchange the greeting. */
     ServeProto::Version clientVersion =
@@ -946,7 +957,9 @@ static void opServe(Strings opFlags, Strings opArgs)
                 getBuildSettings();
 
                 try {
+#ifndef _WIN32 // TODO figure out if Windows needs something similar
                     MonitorFdHup monitor(in.fd);
+#endif
                     store->buildPaths(toDerivedPaths(paths));
                     out << 0;
                 } catch (Error & e) {
@@ -966,7 +979,9 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 getBuildSettings();
 
+#ifndef _WIN32 // TODO figure out if Windows needs something similar
                 MonitorFdHup monitor(in.fd);
+#endif
                 auto status = store->buildDerivation(drvPath, drv);
 
                 ServeProto::write(*store, wconn, status);

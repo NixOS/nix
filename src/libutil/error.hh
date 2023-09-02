@@ -247,6 +247,23 @@ public:
     }
 };
 
+#ifdef _WIN32
+class WinError;
+#endif
+
+/**
+ * Convenience alias for when we use a `errno`-based error handling
+ * function on Unix, and `GetLastError()`-based error handling on on
+ * Windows.
+ */
+using NativeSysError =
+#ifdef _WIN32
+    WinError
+#else
+    SysError
+#endif
+    ;
+
 /**
  * Throw an exception for the purpose of checking that exception
  * handling works; see 'initLibUtil()'.

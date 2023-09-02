@@ -151,11 +151,11 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         initLibGit2();
 
-        if (pathExists(path.native())) {
-            if (git_repository_open(Setter(repo), path.c_str()))
+        if (pathExists(path.string())) {
+            if (git_repository_open(Setter(repo), path.string().c_str()))
                 throw Error("opening Git repository '%s': %s", path, git_error_last()->message);
         } else {
-            if (git_repository_init(Setter(repo), path.c_str(), bare))
+            if (git_repository_init(Setter(repo), path.string().c_str(), bare))
                 throw Error("creating Git repository '%s': %s", path, git_error_last()->message);
         }
     }
@@ -216,7 +216,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     std::vector<Submodule> parseSubmodules(const std::filesystem::path & configFile)
     {
         GitConfig config;
-        if (git_config_open_ondisk(Setter(config), configFile.c_str()))
+        if (git_config_open_ondisk(Setter(config), configFile.string().c_str()))
             throw Error("parsing .gitmodules file: %s", git_error_last()->message);
 
         ConfigIterator it;
@@ -288,7 +288,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
         /* Get submodule info. */
         auto modulesFile = path / ".gitmodules";
-        if (pathExists(modulesFile))
+        if (pathExists(modulesFile.string()))
             info.submodules = parseSubmodules(modulesFile);
 
         return info;
@@ -377,10 +377,10 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         auto dir = this->path;
         Strings gitArgs;
         if (shallow) {
-            gitArgs = { "-C", dir, "fetch", "--quiet", "--force", "--depth", "1", "--", url, refspec };
+            gitArgs = { "-C", dir.string(), "fetch", "--quiet", "--force", "--depth", "1", "--", url, refspec };
         }
         else {
-            gitArgs = { "-C", dir, "fetch", "--quiet", "--force", "--", url, refspec };
+            gitArgs = { "-C", dir.string(), "fetch", "--quiet", "--force", "--", url, refspec };
         }
 
         runProgram(RunOptions {
@@ -426,7 +426,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
                 .args = {
                     "-c",
                     "gpg.ssh.allowedSignersFile=" + allowedSignersFile,
-                    "-C", path,
+                    "-C", path.string(),
                     "verify-commit",
                     rev.gitRev()
                 },

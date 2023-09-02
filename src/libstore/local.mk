@@ -4,9 +4,12 @@ libstore_NAME = libnixstore
 
 libstore_DIR := $(d)
 
-libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc $(d)/build/*.cc)
+libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc)
 ifdef HOST_UNIX
-  libstore_SOURCES += $(wildcard $(d)/unix/*.cc)
+  libstore_SOURCES += $(wildcard $(d)/unix/*.cc $(d)/unix/builtins/*.cc $(d)/unix/build/*.cc)
+endif
+ifdef HOST_WINDOWS
+  libstore_SOURCES += $(wildcard $(d)/windows/*.cc)
 endif
 
 libstore_LIBS = libutil
@@ -55,9 +58,9 @@ libstore_CXXFLAGS += \
 ifeq ($(embedded_sandbox_shell),yes)
 libstore_CXXFLAGS += -DSANDBOX_SHELL=\"__embedded_sandbox_shell__\"
 
-$(d)/build/local-derivation-goal.cc: $(d)/embedded-sandbox-shell.gen.hh
+$(d)/unix/build/local-derivation-goal.cc: $(d)/unix/embedded-sandbox-shell.gen.hh
 
-$(d)/embedded-sandbox-shell.gen.hh: $(sandbox_shell)
+$(d)/unix/embedded-sandbox-shell.gen.hh: $(sandbox_shell)
 	$(trace-gen) hexdump -v -e '1/1 "0x%x," "\n"' < $< > $@.tmp
 	@mv $@.tmp $@
 else
@@ -66,11 +69,11 @@ else
   endif
 endif
 
-$(d)/local-store.cc: $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh
+$(d)/unix/local-store.cc: $(d)/unix/schema.sql.gen.hh $(d)/unix/ca-specific-schema.sql.gen.hh
 
-$(d)/build.cc:
+$(d)/unix/build.cc:
 
-clean-files += $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh
+clean-files += $(d)/unix/schema.sql.gen.hh $(d)/unix/ca-specific-schema.sql.gen.hh
 
 $(eval $(call install-file-in, $(buildprefix)$(d)/nix-store.pc, $(libdir)/pkgconfig, 0644))
 

@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "file-descriptor.hh"
 #include "processes.hh"
 #include "args.hh"
 #include "args/root.hh"
@@ -89,8 +90,10 @@ public:
     ~RunPager();
 
 private:
+#ifndef _WIN32 // TODO re-enable on Windows, once we can start processes.
     Pid pid;
-    int std_out;
+#endif
+    Descriptor std_out;
 };
 
 extern volatile ::sig_atomic_t blockInt;
@@ -112,6 +115,7 @@ struct PrintFreed
 };
 
 
+#ifndef _WIN32
 /**
  * Install a SIGSEGV handler to detect stack overflows.
  */
@@ -141,5 +145,6 @@ extern std::function<void(siginfo_t * info, void * ctx)> stackOverflowHandler;
  * logger. Exits the process immediately after.
  */
 void defaultStackOverflowHandler(siginfo_t * info, void * ctx);
+#endif
 
 }

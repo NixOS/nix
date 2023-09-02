@@ -3,9 +3,9 @@
 #include "finally.hh"
 #include "terminal.hh"
 
-#include <sys/queue.h>
 #if HAVE_LOWDOWN
-#include <lowdown.h>
+# include <sys/queue.h>
+# include <lowdown.h>
 #endif
 
 namespace nix {

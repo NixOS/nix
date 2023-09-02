@@ -26,7 +26,7 @@ ref<InputAccessor> makeStorePathAccessor(
     // FIXME: should use `store->getFSAccessor()`
     auto root = std::filesystem::path { store->toRealPath(storePath) };
     auto accessor = makeFSInputAccessor(root);
-    accessor->setPathDisplay(root);
+    accessor->setPathDisplay(root.string());
     return accessor;
 }
 

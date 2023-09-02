@@ -9,10 +9,13 @@
 #include <map>
 #include <mutex>
 #include <thread>
-#include <dlfcn.h>
-#include <sys/utsname.h>
 
 #include <nlohmann/json.hpp>
+
+#ifndef _WIN32
+# include <dlfcn.h>
+# include <sys/utsname.h>
+#endif
 
 #ifdef __GLIBC__
 # include <gnu/lib-names.h>
@@ -56,7 +59,9 @@ Settings::Settings()
     , nixManDir(canonPath(NIX_MAN_DIR))
     , nixDaemonSocketFile(canonPath(getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
 {
+#ifndef _WIN32
     buildUsersGroup = isRootUser() ? "nixbld" : "";
+#endif
     allowSymlinkedStore = getEnv("NIX_IGNORE_SYMLINK_STORE") == "1";
 
     auto sslOverride = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
@@ -239,11 +244,15 @@ StringSet Settings::getDefaultExtraPlatforms()
 
 bool Settings::isWSL1()
 {
+#if __linux__
     struct utsname utsbuf;
     uname(&utsbuf);
     // WSL1 uses -Microsoft suffix
     // WSL2 uses -microsoft-standard suffix
     return hasSuffix(utsbuf.release, "-Microsoft");
+#else
+    return false;
+#endif
 }
 
 Path Settings::getDefaultSSLCertFile()
@@ -341,6 +350,7 @@ void initPlugins()
         for (const auto & file : pluginFiles) {
             /* handle is purposefully leaked as there may be state in the
                DSO needed by the action of the plugin. */
+#ifndef _WIN32 // TODO implement via DLL loading on Windows
             void *handle =
                 dlopen(file.c_str(), RTLD_LAZY | RTLD_LOCAL);
             if (!handle)
@@ -351,6 +361,9 @@ void initPlugins()
             void (*nix_plugin_entry)() = (void (*)())dlsym(handle, "nix_plugin_entry");
             if (nix_plugin_entry)
                 nix_plugin_entry();
+#else
+                throw Error("could not dynamically open plugin file '%s'", file);
+#endif
         }
     }
 
