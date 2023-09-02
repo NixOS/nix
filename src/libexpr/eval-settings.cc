@@ -1,6 +1,8 @@
 #include "users.hh"
 #include "globals.hh"
-#include "profiles.hh"
+#ifndef _WIN32
+# include "profiles.hh"
+#endif
 #include "eval.hh"
 #include "eval-settings.hh"
 
@@ -65,8 +67,10 @@ Strings EvalSettings::getDefaultNixPath()
 
     if (!evalSettings.restrictEval && !evalSettings.pureEval) {
         add(getNixDefExpr() + "/channels");
+        #ifndef _WIN32
         add(rootChannelsDir() + "/nixpkgs", "nixpkgs");
         add(rootChannelsDir());
+        #endif
     }
 
     return res;

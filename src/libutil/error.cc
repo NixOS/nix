@@ -18,7 +18,7 @@ void BaseError::addTrace(std::shared_ptr<Pos> && e, HintFmt hint)
 
 void throwExceptionSelfCheck(){
     // This is meant to be caught in initLibUtil()
-    throw SysError("C++ exception handling is broken. This would appear to be a problem with the way Nix was compiled and/or linked and/or loaded.");
+    throw Error("C++ exception handling is broken. This would appear to be a problem with the way Nix was compiled and/or linked and/or loaded.");
 }
 
 // c++ std::exception descendants must have a 'const char* what()' function.

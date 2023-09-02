@@ -14,6 +14,9 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
+#ifdef _WIN32
+# include <windef.h>
+#endif
 #include <signal.h>
 
 #include <boost/lexical_cast.hpp>

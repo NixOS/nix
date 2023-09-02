@@ -2,7 +2,6 @@
 
 #include "args/root.hh"
 #include "current-process.hh"
-#include "namespaces.hh"
 #include "command.hh"
 #include "common-args.hh"
 #include "eval.hh"
@@ -23,6 +22,10 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <regex>
+
+#if __linux__
+# include "namespaces.hh"
+#endif
 
 #include <nlohmann/json.hpp>
 

@@ -46,11 +46,13 @@ AC_DEFUN([ENSURE_NO_GCC_BUG_80431],
       ]])],
     [status_80431=0],
     [status_80431=$?],
-    [
-      # Assume we're bug-free when cross-compiling
-    ])
+    [status_80431=''])
   AC_LANG_POP(C++)
   AS_CASE([$status_80431],
+    [''],[
+      AC_MSG_RESULT(cannot check because cross compiling)
+      AC_MSG_NOTICE(assume we are bug free)
+    ],
     [0],[
       AC_MSG_RESULT(yes)
     ],

@@ -81,8 +81,10 @@ void ThreadPool::doWork(bool mainThread)
 {
     ReceiveInterrupts receiveInterrupts;
 
+#ifndef _WIN32
     if (!mainThread)
         interruptCheck = [&]() { return (bool) quit; };
+#endif
 
     bool didWork = false;
     std::exception_ptr exc;
@@ -109,7 +111,10 @@ void ThreadPool::doWork(bool mainThread)
                         try {
                             std::rethrow_exception(exc);
                         } catch (std::exception & e) {
-                            if (!dynamic_cast<Interrupted*>(&e) &&
+                            if (true &&
+#ifndef _WIN32
+                                !dynamic_cast<Interrupted*>(&e) &&
+#endif
                                 !dynamic_cast<ThreadPoolShutDown*>(&e))
                                 ignoreException();
                         } catch (...) {

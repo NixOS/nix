@@ -1,5 +1,6 @@
 #include "environment-variables.hh"
 #include "file-system.hh"
+#include "file-path.hh"
 #include "file-path-impl.hh"
 #include "signals.hh"
 #include "finally.hh"
@@ -17,6 +18,10 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <unistd.h>
+
+#ifdef _WIN32
+# include <io.h>
+#endif
 
 namespace fs = std::filesystem;
 
@@ -128,10 +133,10 @@ std::string_view baseNameOf(std::string_view path)
         return "";
 
     auto last = path.size() - 1;
-    while (last > 0 && path[last] == '/')
+    while (last > 0 && NativePathTrait::isPathSep(path[last]))
         last -= 1;
 
-    auto pos = path.rfind('/', last);
+    auto pos = NativePathTrait::rfindPathSep(path, last);
     if (pos == path.npos)
         pos = 0;
     else
@@ -164,11 +169,16 @@ struct stat stat(const Path & path)
     return st;
 }
 
+#ifdef _WIN32
+# define STAT stat
+#else
+# define STAT lstat
+#endif
 
 struct stat lstat(const Path & path)
 {
     struct stat st;
-    if (lstat(path.c_str(), &st))
+    if (STAT(path.c_str(), &st))
         throw SysError("getting status of '%1%'", path);
     return st;
 }
@@ -176,9 +186,8 @@ struct stat lstat(const Path & path)
 
 bool pathExists(const Path & path)
 {
-    int res;
     struct stat st;
-    res = lstat(path.c_str(), &st);
+    int res = STAT(path.c_str(), &st);
     if (!res) return true;
     if (errno != ENOENT && errno != ENOTDIR)
         throw SysError("getting status of %1%", path);
@@ -199,6 +208,7 @@ bool pathAccessible(const Path & path)
 
 Path readLink(const Path & path)
 {
+#ifndef _WIN32
     checkInterrupt();
     std::vector<char> buf;
     for (ssize_t bufSize = PATH_MAX/4; true; bufSize += bufSize/2) {
@@ -212,13 +222,16 @@ Path readLink(const Path & path)
         else if (rlSize < bufSize)
             return std::string(buf.data(), rlSize);
     }
+#else
+    // TODO
+    throw UnimplementedError("reading symbolic link '%1%'", path);
+#endif
 }
 
 
 bool isLink(const Path & path)
 {
-    struct stat st = lstat(path);
-    return S_ISLNK(st.st_mode);
+    return getFileType(path) == DT_LNK;
 }
 
 
@@ -258,7 +271,9 @@ unsigned char getFileType(const Path & path)
 {
     struct stat st = lstat(path);
     if (S_ISDIR(st.st_mode)) return DT_DIR;
+#ifndef _WIN32
     if (S_ISLNK(st.st_mode)) return DT_LNK;
+#endif
     if (S_ISREG(st.st_mode)) return DT_REG;
     return DT_UNKNOWN;
 }
@@ -266,7 +281,12 @@ unsigned char getFileType(const Path & path)
 
 std::string readFile(const Path & path)
 {
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    AutoCloseFD fd = toDesc(open(path.c_str(), O_RDONLY
+// TODO
+#ifndef _WIN32
+       | O_CLOEXEC
+#endif
+       ));
     if (!fd)
         throw SysError("opening file '%1%'", path);
     return readFile(fd.get());
@@ -275,7 +295,12 @@ std::string readFile(const Path & path)
 
 void readFile(const Path & path, Sink & sink)
 {
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    AutoCloseFD fd = toDesc(open(path.c_str(), O_RDONLY
+// TODO
+#ifndef _WIN32
+       | O_CLOEXEC
+#endif
+       ));
     if (!fd)
         throw SysError("opening file '%s'", path);
     drainFD(fd.get(), sink);
@@ -284,7 +309,12 @@ void readFile(const Path & path, Sink & sink)
 
 void writeFile(const Path & path, std::string_view s, mode_t mode, bool sync)
 {
-    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
+    AutoCloseFD fd = toDesc(open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT
+// TODO
+#ifndef _WIN32
+       | O_CLOEXEC
+#endif
+       , mode));
     if (!fd)
         throw SysError("opening file '%1%'", path);
     try {
@@ -304,7 +334,12 @@ void writeFile(const Path & path, std::string_view s, mode_t mode, bool sync)
 
 void writeFile(const Path & path, Source & source, mode_t mode, bool sync)
 {
-    AutoCloseFD fd = open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC, mode);
+    AutoCloseFD fd = toDesc(open(path.c_str(), O_WRONLY | O_TRUNC | O_CREAT
+// TODO
+#ifndef _WIN32
+       | O_CLOEXEC
+#endif
+       , mode));
     if (!fd)
         throw SysError("opening file '%1%'", path);
 
@@ -331,21 +366,23 @@ void writeFile(const Path & path, Source & source, mode_t mode, bool sync)
 
 void syncParent(const Path & path)
 {
-    AutoCloseFD fd = open(dirOf(path).c_str(), O_RDONLY, 0);
+    AutoCloseFD fd = toDesc(open(dirOf(path).c_str(), O_RDONLY, 0));
     if (!fd)
         throw SysError("opening file '%1%'", path);
     fd.fsync();
 }
 
 
-static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
+static void _deletePath(Descriptor parentfd, const Path & path, uint64_t & bytesFreed)
 {
+#ifndef _WIN32
     checkInterrupt();
 
     std::string name(baseNameOf(path));
 
     struct stat st;
-    if (fstatat(parentfd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) == -1) {
+    if (fstatat(parentfd, name.c_str(), &st,
+            AT_SYMLINK_NOFOLLOW) == -1) {
         if (errno == ENOENT) return;
         throw SysError("getting status of '%1%'", path);
     }
@@ -397,6 +434,9 @@ static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
         if (errno == ENOENT) return;
         throw SysError("cannot unlink '%1%'", path);
     }
+#else
+    throw UnimplementedError("_deletePath");
+#endif
 }
 
 static void _deletePath(const Path & path, uint64_t & bytesFreed)
@@ -405,7 +445,7 @@ static void _deletePath(const Path & path, uint64_t & bytesFreed)
     if (dir == "")
         dir = "/";
 
-    AutoCloseFD dirfd{open(dir.c_str(), O_RDONLY)};
+    AutoCloseFD dirfd = toDesc(open(dir.c_str(), O_RDONLY));
     if (!dirfd) {
         if (errno == ENOENT) return;
         throw SysError("opening directory '%1%'", path);
@@ -428,16 +468,22 @@ Paths createDirs(const Path & path)
     if (path == "/") return created;
 
     struct stat st;
-    if (lstat(path.c_str(), &st) == -1) {
+    if (STAT(path.c_str(), &st) == -1) {
         created = createDirs(dirOf(path));
-        if (mkdir(path.c_str(), 0777) == -1 && errno != EEXIST)
+        if (mkdir(path.c_str()
+#ifndef _WIN32
+            , 0777
+#endif
+            ) == -1 && errno != EEXIST)
             throw SysError("creating directory '%1%'", path);
-        st = lstat(path);
+        st = STAT(path);
         created.push_back(path);
     }
 
+#ifndef _WIN32
     if (S_ISLNK(st.st_mode) && stat(path.c_str(), &st) == -1)
         throw SysError("statting symlink '%1%'", path);
+#endif
 
     if (!S_ISDIR(st.st_mode)) throw Error("'%1%' is not a directory", path);
 
@@ -518,7 +564,11 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix,
     while (1) {
         checkInterrupt();
         Path tmpDir = tempName(tmpRoot, prefix, includePid, counter);
-        if (mkdir(tmpDir.c_str(), mode) == 0) {
+        if (mkdir(tmpDir.c_str()
+#ifndef _WIN32
+                    , mode
+#endif
+                    ) == 0) {
 #if __FreeBSD__
             /* Explicitly set the group of the directory.  This is to
                work around around problems caused by BSD's group
@@ -544,17 +594,23 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
     Path tmpl(defaultTempDir() + "/" + prefix + ".XXXXXX");
     // Strictly speaking, this is UB, but who cares...
     // FIXME: use O_TMPFILE.
-    AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
+    AutoCloseFD fd = toDesc(mkstemp((char *) tmpl.c_str()));
     if (!fd)
         throw SysError("creating temporary file '%s'", tmpl);
+#ifndef _WIN32
     closeOnExec(fd.get());
+#endif
     return {std::move(fd), tmpl};
 }
 
 void createSymlink(const Path & target, const Path & link)
 {
+#ifndef _WIN32
     if (symlink(target.c_str(), link.c_str()))
         throw SysError("creating symlink from '%1%' to '%2%'", link, target);
+#else
+    throw UnimplementedError("createSymlink");
+#endif
 }
 
 void replaceSymlink(const Path & target, const Path & link)
@@ -575,7 +631,8 @@ void replaceSymlink(const Path & target, const Path & link)
     }
 }
 
-void setWriteTime(const fs::path & p, const struct stat & st)
+#ifndef _WIN32
+static void setWriteTime(const fs::path & p, const struct stat & st)
 {
     struct timeval times[2];
     times[0] = {
@@ -589,11 +646,14 @@ void setWriteTime(const fs::path & p, const struct stat & st)
     if (lutimes(p.c_str(), times) != 0)
         throw SysError("changing modification time of '%s'", p);
 }
+#endif
 
 void copy(const fs::directory_entry & from, const fs::path & to, bool andDelete)
 {
+#ifndef _WIN32
     // TODO: Rewrite the `is_*` to use `symlink_status()`
     auto statOfFrom = lstat(from.path().c_str());
+#endif
     auto fromStatus = from.symlink_status();
 
     // Mark the directory as writable so that we can delete its children
@@ -613,7 +673,9 @@ void copy(const fs::directory_entry & from, const fs::path & to, bool andDelete)
         throw Error("file '%s' has an unsupported type", from.path());
     }
 
+#ifndef _WIN32
     setWriteTime(to, statOfFrom);
+#endif
     if (andDelete) {
         if (!fs::is_symlink(fromStatus))
             fs::permissions(from.path(), fs::perms::owner_write, fs::perm_options::add | fs::perm_options::nofollow);
@@ -640,14 +702,18 @@ void moveFile(const Path & oldName, const Path & newName)
         auto newPath = fs::path(newName);
         // For the move to be as atomic as possible, copy to a temporary
         // directory
-        fs::path temp = createTempDir(newPath.parent_path(), "rename-tmp");
+        fs::path temp = createTempDir(
+            os_string_to_string(PathViewNG { newPath.parent_path() }),
+            "rename-tmp");
         Finally removeTemp = [&]() { fs::remove(temp); };
         auto tempCopyTarget = temp / "copy-target";
         if (e.code().value() == EXDEV) {
             fs::remove(newPath);
             warn("Can’t rename %s as %s, copying instead", oldName, newName);
             copy(fs::directory_entry(oldPath), tempCopyTarget, true);
-            renameFile(tempCopyTarget, newPath);
+            renameFile(
+                os_string_to_string(PathViewNG { tempCopyTarget }),
+                os_string_to_string(PathViewNG { newPath }));
         }
     }
 }

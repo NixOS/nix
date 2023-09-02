@@ -39,10 +39,10 @@ std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s);
  * (/nix/store/hash-foo!out1,out2,...) into the derivation path
  * and the outputs.
  */
-StorePathWithOutputs parsePathWithOutputs(const StoreDirConfig & store, std::string_view pathWithOutputs);
+StorePathWithOutputs parsePathWithOutputs(const StoreDirConfig & store, std::string_view pathNGithOutputs);
 
 class Store;
 
-StorePathWithOutputs followLinksToStorePathWithOutputs(const Store & store, std::string_view pathWithOutputs);
+StorePathWithOutputs followLinksToStorePathWithOutputs(const Store & store, std::string_view pathNGithOutputs);
 
 }

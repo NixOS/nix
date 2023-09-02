@@ -8,6 +8,9 @@
 
 namespace nix {
 
+// Do not want the windows macro (alias to `SearchPathA`)
+#undef SearchPath
+
 /**
  * A "search path" is a list of ways look for something, used with
  * `builtins.findFile` and `< >` lookup expressions.

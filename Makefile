@@ -7,6 +7,8 @@ clean-files += $(buildprefix)Makefile.config
 
 # List makefiles
 
+include mk/platform.mk
+
 ifeq ($(ENABLE_BUILD), yes)
 makefiles = \
   mk/precompiled-headers.mk \
@@ -14,8 +16,11 @@ makefiles = \
   src/libutil/local.mk \
   src/libstore/local.mk \
   src/libfetchers/local.mk \
+  src/libexpr/local.mk
+
+ifdef HOST_UNIX
+makefiles += \
   src/libmain/local.mk \
-  src/libexpr/local.mk \
   src/libcmd/local.mk \
   src/nix/local.mk \
   src/resolve-system-dependencies/local.mk \
@@ -26,6 +31,7 @@ makefiles = \
   misc/systemd/local.mk \
   misc/launchd/local.mk \
   misc/upstart/local.mk
+endif
 endif
 
 ifeq ($(ENABLE_UNIT_TESTS), yes)
@@ -39,6 +45,7 @@ makefiles += \
 endif
 
 ifeq ($(ENABLE_FUNCTIONAL_TESTS), yes)
+ifdef HOST_UNIX
 makefiles += \
   tests/functional/local.mk \
   tests/functional/ca/local.mk \
@@ -46,6 +53,7 @@ makefiles += \
   tests/functional/dyn-drv/local.mk \
   tests/functional/test-libstoreconsumer/local.mk \
   tests/functional/plugins/local.mk
+endif
 endif
 
 # Some makefiles require access to built programs and must be included late.
@@ -70,8 +78,6 @@ else
   GLOBAL_CXXFLAGS += -O0 -U_FORTIFY_SOURCE
   unexport NIX_HARDENING_ENABLE
 endif
-
-include mk/platform.mk
 
 ifdef HOST_WINDOWS
   # Windows DLLs are stricter about symbol visibility than Unix shared
