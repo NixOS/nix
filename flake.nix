@@ -36,10 +36,10 @@
       systems = linuxSystems ++ darwinSystems;
 
       crossSystems = [
-        "armv6l-linux"
-        "armv7l-linux"
-        "x86_64-freebsd13"
-        "x86_64-netbsd"
+        "armv6l-unknown-linux-gnueabihf"
+        "armv7l-unknown-linux-gnueabihf"
+        "x86_64-unknown-freebsd13"
+        "x86_64-unknown-netbsd"
       ];
 
       stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" "ccacheStdenv" ];
@@ -116,8 +116,8 @@
               inherit system;
             };
             crossSystem = if crossSystem == null then null else {
-              system = crossSystem;
-            } // lib.optionalAttrs (crossSystem == "x86_64-freebsd13") {
+              config = crossSystem;
+            } // lib.optionalAttrs (crossSystem == "x86_64-unknown-freebsd13") {
               useLLVM = true;
             };
             overlays = [
@@ -585,16 +585,16 @@
           self.hydraJobs.binaryTarball."x86_64-darwin"
           self.hydraJobs.binaryTarball."aarch64-darwin"
           # Cross
-          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-linux"
-          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-linux"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-unknown-linux-gnueabihf"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
         ];
         installerScriptForGHA = installScriptFor [
           # Native
           self.hydraJobs.binaryTarball."x86_64-linux"
           self.hydraJobs.binaryTarball."x86_64-darwin"
           # Cross
-          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-linux"
-          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-linux"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-unknown-linux-gnueabihf"
+          self.hydraJobs.binaryTarballCross."x86_64-linux"."armv7l-unknown-linux-gnueabihf"
         ];
 
         # docker image with Nix inside
