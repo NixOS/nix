@@ -230,6 +230,15 @@
           }
         );
 
+        # Toggles some settings for better coverage. Windows needs these
+        # library combinations, and Debian build Nix with GNU readline too.
+        buildReadlineNoMarkdown = forAllSystems (system:
+          self.packages.${system}.nix.override {
+            enableMarkdown = false;
+            readlineFlavor = "readline";
+          }
+        );
+
         # Perl bindings for various platforms.
         perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nix.perl-bindings);
 
