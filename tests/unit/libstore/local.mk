@@ -19,8 +19,8 @@ libstore-tests_SOURCES := $(wildcard $(d)/*.cc)
 libstore-tests_EXTRA_INCLUDES = \
     -I tests/unit/libstore-support \
     -I tests/unit/libutil-support \
-    -I src/libstore \
-    -I src/libutil
+    $(INCLUDE_libstore) \
+    $(INCLUDE_libutil)
 
 libstore-tests_CXXFLAGS += $(libstore-tests_EXTRA_INCLUDES)
 
