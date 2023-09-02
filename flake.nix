@@ -210,7 +210,7 @@
 
         buildDeps =
           [ curl
-            bzip2 xz brotli editline
+            bzip2 xz brotli
             openssl sqlite
             libarchive
             (pkgs.libgit2.overrideAttrs (attrs: {
@@ -219,10 +219,13 @@
               cmakeFlags = (attrs.cmakeFlags or []) ++ ["-DUSE_SSH=exec"];
             }))
             boost
-            lowdown-nix
             libsodium
           ]
-          ++ lib.optionals stdenv.isLinux [libseccomp]
+          ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
+            editline
+            lowdown-nix
+          ]
+          ++ lib.optional stdenv.isLinux libseccomp
           ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 
         checkDeps = [
@@ -510,7 +513,7 @@
               stdenv = currentStdenv;
             };
 
-            meta.platforms = lib.platforms.unix;
+            meta.platforms = lib.platforms.unix ++ lib.platforms.windows;
             meta.mainProgram = "nix";
           });
 
