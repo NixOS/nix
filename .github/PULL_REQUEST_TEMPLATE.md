@@ -21,8 +21,13 @@ Maintainers: tick if completed or explain if not relevant
  - [ ] tests, as appropriate
    - functional tests - `tests/**.sh`
    - unit tests - `src/*/tests`
-   - integration tests
+   - integration tests - `tests/nixos/*`
  - [ ] documentation in the manual
+ - [ ] documentation in the internal API docs
  - [ ] code and comments are self-explanatory
  - [ ] commit message explains why the change was made
- - [ ] new feature or bug fix: updated release notes
+ - [ ] new feature or incompatible change: updated release notes
+
+# Priorities
+
+Add :+1: to [pull requests you find important](https://github.com/NixOS/nix/pulls?q=is%3Aopen+sort%3Areactions-%2B1-desc).

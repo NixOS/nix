@@ -1,0 +1,12 @@
+error:
+       … while calling the 'substring' builtin
+
+         at /pwd/lang/eval-fail-substring.nix:1:1:
+
+            1| builtins.substring (builtins.sub 0 1) 1 "x"
+             | ^
+            2|
+
+       error: negative start position in 'substring'
+
+       at «none»:0: (source not available)

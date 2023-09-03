@@ -4,7 +4,7 @@ case $system in
     *linux*)
         ;;
     *)
-        exit 99;
+        skipTest "Not running Linux";
 esac
 
 set -m # enable job control, needed for kill

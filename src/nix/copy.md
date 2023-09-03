@@ -15,7 +15,7 @@ R""(
   SSH:
 
   ```console
-  # nix copy -s --to ssh://server /run/current-system
+  # nix copy --substitute-on-destination --to ssh://server /run/current-system
   ```
 
   The `-s` flag causes the remote machine to try to substitute missing

@@ -51,3 +51,8 @@ exp_features=$(nix show-config | grep '^experimental-features' | cut -d '=' -f 2
 [[ $prev != $exp_cores ]]
 [[ $exp_cores == "4242" ]]
 [[ $exp_features == "flakes nix-command" ]]
+
+# Test that it's possible to retrieve a single setting's value
+val=$(nix show-config | grep '^warn-dirty' | cut -d '=' -f  2 | xargs)
+val2=$(nix show-config warn-dirty)
+[[ $val == $val2 ]]

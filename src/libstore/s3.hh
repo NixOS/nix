@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #if ENABLE_S3
 

@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "sync.hh"
 #include "hash.hh"
@@ -109,8 +110,10 @@ public:
 
     ref<AttrCursor> getAttr(std::string_view name);
 
-    /* Get an attribute along a chain of attrsets. Note that this does
-       not auto-call functors or functions. */
+    /**
+     * Get an attribute along a chain of attrsets. Note that this does
+     * not auto-call functors or functions.
+     */
     OrSuggestions<ref<AttrCursor>> findAlongAttrPath(const std::vector<Symbol> & attrPath, bool force = false);
 
     std::string getString();
@@ -129,7 +132,9 @@ public:
 
     Value & forceValue();
 
-    /* Force creation of the .drv file in the Nix store. */
+    /**
+     * Force creation of the .drv file in the Nix store.
+     */
     StorePath forceDerivation();
 };
 

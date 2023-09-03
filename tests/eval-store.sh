@@ -2,7 +2,7 @@ source common.sh
 
 # Using `--eval-store` with the daemon will eventually copy everything
 # to the build store, invalidating most of the tests here
-needLocalStore
+needLocalStore "“--eval-store” doesn't achieve much with the daemon"
 
 eval_store=$TEST_ROOT/eval-store
 

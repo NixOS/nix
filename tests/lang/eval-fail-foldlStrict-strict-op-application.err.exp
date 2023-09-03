@@ -1,0 +1,38 @@
+error:
+       … while calling the 'foldl'' builtin
+
+         at /pwd/lang/eval-fail-foldlStrict-strict-op-application.nix:2:1:
+
+            1| # Tests that the result of applying op is forced even if the value is never used
+            2| builtins.foldl'
+             | ^
+            3|   (_: f: f null)
+
+       … while calling anonymous lambda
+
+         at /pwd/lang/eval-fail-foldlStrict-strict-op-application.nix:3:7:
+
+            2| builtins.foldl'
+            3|   (_: f: f null)
+             |       ^
+            4|   null
+
+       … from call site
+
+         at /pwd/lang/eval-fail-foldlStrict-strict-op-application.nix:3:10:
+
+            2| builtins.foldl'
+            3|   (_: f: f null)
+             |          ^
+            4|   null
+
+       … while calling anonymous lambda
+
+         at /pwd/lang/eval-fail-foldlStrict-strict-op-application.nix:5:6:
+
+            4|   null
+            5|   [ (_: throw "Not the final value, but is still forced!") (_: 23) ]
+             |      ^
+            6|
+
+       error: Not the final value, but is still forced!

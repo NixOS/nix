@@ -1,5 +1,6 @@
 #include "flake.hh"
 #include "eval.hh"
+#include "eval-settings.hh"
 #include "lockfile.hh"
 #include "primops.hh"
 #include "eval-inline.hh"
@@ -125,6 +126,9 @@ static FlakeInput parseFlakeInput(EvalState & state,
                 follows.insert(follows.begin(), lockRootPath.begin(), lockRootPath.end());
                 input.follows = follows;
             } else {
+                // Allow selecting a subset of enum values
+                #pragma GCC diagnostic push
+                #pragma GCC diagnostic ignored "-Wswitch-enum"
                 switch (attr.value->type()) {
                     case nString:
                         attrs.emplace(state.symbols[attr.name], attr.value->string.s);
@@ -139,6 +143,7 @@ static FlakeInput parseFlakeInput(EvalState & state,
                         throw TypeError("flake input attribute '%s' is %s while a string, Boolean, or integer is expected",
                             state.symbols[attr.name], showType(*attr.value));
                 }
+                #pragma GCC diagnostic pop
             }
         } catch (Error & e) {
             e.addTrace(
@@ -218,9 +223,9 @@ static Flake getFlake(
         throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", lockedRef, lockedRef.subdir);
 
     Value vInfo;
-    state.evalFile(flakeFile, vInfo, true); // FIXME: symlink attack
+    state.evalFile(CanonPath(flakeFile), vInfo, true); // FIXME: symlink attack
 
-    expectType(state, nAttrs, vInfo, state.positions.add({flakeFile}, 1, 1));
+    expectType(state, nAttrs, vInfo, state.positions.add({CanonPath(flakeFile)}, 1, 1));
 
     if (auto description = vInfo.attrs->get(state.sDescription)) {
         expectType(state, nString, *description->value, description->pos);
@@ -261,7 +266,7 @@ static Flake getFlake(
                     state.symbols[setting.name],
                     std::string(state.forceStringNoCtx(*setting.value, setting.pos, "")));
             else if (setting.value->type() == nPath) {
-                PathSet emptyContext = {};
+                NixStringContext emptyContext = {};
                 flake.config.settings.emplace(
                     state.symbols[setting.name],
                     state.coerceToString(setting.pos, *setting.value, emptyContext, "", false, true, true) .toOwned());
@@ -320,7 +325,7 @@ LockedFlake lockFlake(
     const FlakeRef & topRef,
     const LockFlags & lockFlags)
 {
-    settings.requireExperimentalFeature(Xp::Flakes);
+    experimentalFeatureSettings.require(Xp::Flakes);
 
     FlakeCache flakeCache;
 
@@ -334,10 +339,14 @@ LockedFlake lockFlake(
     }
 
     try {
+        if (!fetchSettings.allowDirty && lockFlags.referenceLockFilePath) {
+            throw Error("reference lock file was provided, but the `allow-dirty` setting is set to false");
+        }
 
         // FIXME: symlink attack
         auto oldLockFile = LockFile::read(
-            flake.sourceInfo->actualPath + "/" + flake.lockedRef.subdir + "/flake.lock");
+            lockFlags.referenceLockFilePath.value_or(
+                flake.sourceInfo->actualPath + "/" + flake.lockedRef.subdir + "/flake.lock"));
 
         debug("old lock file: %s", oldLockFile);
 
@@ -619,13 +628,20 @@ LockedFlake lockFlake(
 
         debug("new lock file: %s", newLockFile);
 
+        auto relPath = (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock";
+        auto sourcePath = topRef.input.getSourcePath();
+        auto outputLockFilePath = sourcePath ? std::optional{*sourcePath + "/" + relPath} : std::nullopt;
+        if (lockFlags.outputLockFilePath) {
+            outputLockFilePath = lockFlags.outputLockFilePath;
+        }
+
         /* Check whether we need to / can write the new lock file. */
-        if (!(newLockFile == oldLockFile)) {
+        if (newLockFile != oldLockFile || lockFlags.outputLockFilePath) {
 
             auto diff = LockFile::diff(oldLockFile, newLockFile);
 
             if (lockFlags.writeLockFile) {
-                if (auto sourcePath = topRef.input.getSourcePath()) {
+                if (outputLockFilePath) {
                     if (auto unlockedInput = newLockFile.isUnlocked()) {
                         if (fetchSettings.warnDirty)
                             warn("will not write lock file of flake '%s' because it has an unlocked input ('%s')", topRef, *unlockedInput);
@@ -633,25 +649,24 @@ LockedFlake lockFlake(
                         if (!lockFlags.updateLockFile)
                             throw Error("flake '%s' requires lock file changes but they're not allowed due to '--no-update-lock-file'", topRef);
 
-                        auto relPath = (topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock";
-
-                        auto path = *sourcePath + "/" + relPath;
-
-                        bool lockFileExists = pathExists(path);
+                        bool lockFileExists = pathExists(*outputLockFilePath);
 
                         if (lockFileExists) {
                             auto s = chomp(diff);
                             if (s.empty())
-                                warn("updating lock file '%s'", path);
+                                warn("updating lock file '%s'", *outputLockFilePath);
                             else
-                                warn("updating lock file '%s':\n%s", path, s);
+                                warn("updating lock file '%s':\n%s", *outputLockFilePath, s);
                         } else
-                            warn("creating lock file '%s'", path);
+                            warn("creating lock file '%s'", *outputLockFilePath);
 
-                        newLockFile.write(path);
+                        newLockFile.write(*outputLockFilePath);
 
                         std::optional<std::string> commitMessage = std::nullopt;
                         if (lockFlags.commitLockFile) {
+                            if (lockFlags.outputLockFilePath) {
+                                throw Error("--commit-lock-file and --output-lock-file are currently incompatible");
+                            }
                             std::string cm;
 
                             cm = fetchSettings.commitLockFileSummary.get();
@@ -731,7 +746,7 @@ void callFlake(EvalState & state,
         state.vCallFlake = allocRootValue(state.allocValue());
         state.eval(state.parseExprFromString(
             #include "call-flake.nix.gen.hh"
-            , "/"), **state.vCallFlake);
+            , CanonPath::root), **state.vCallFlake);
     }
 
     state.callFunction(**state.vCallFlake, *vLocks, *vTmp1, noPos);
@@ -774,11 +789,103 @@ static RegisterPrimOp r2({
       ```nix
       (builtins.getFlake "github:edolstra/dwarffs").rev
       ```
-
-      This function is only available if you enable the experimental feature
-      `flakes`.
     )",
     .fun = prim_getFlake,
+    .experimentalFeature = Xp::Flakes,
+});
+
+static void prim_parseFlakeRef(
+    EvalState & state,
+    const PosIdx pos,
+    Value * * args,
+    Value & v)
+{
+    std::string flakeRefS(state.forceStringNoCtx(*args[0], pos,
+        "while evaluating the argument passed to builtins.parseFlakeRef"));
+    auto attrs = parseFlakeRef(flakeRefS, {}, true).toAttrs();
+    auto binds = state.buildBindings(attrs.size());
+    for (const auto & [key, value] : attrs) {
+        auto s = state.symbols.create(key);
+        auto & vv = binds.alloc(s);
+        std::visit(overloaded {
+            [&vv](const std::string    & value) { vv.mkString(value); },
+            [&vv](const uint64_t       & value) { vv.mkInt(value);    },
+            [&vv](const Explicit<bool> & value) { vv.mkBool(value.t); }
+        }, value);
+    }
+    v.mkAttrs(binds);
+}
+
+static RegisterPrimOp r3({
+    .name =  "__parseFlakeRef",
+    .args = {"flake-ref"},
+    .doc = R"(
+      Parse a flake reference, and return its exploded form.
+
+      For example:
+      ```nix
+      builtins.parseFlakeRef "github:NixOS/nixpkgs/23.05?dir=lib"
+      ```
+      evaluates to:
+      ```nix
+      { dir = "lib"; owner = "NixOS"; ref = "23.05"; repo = "nixpkgs"; type = "github"; }
+      ```
+    )",
+    .fun = prim_parseFlakeRef,
+    .experimentalFeature = Xp::Flakes,
+});
+
+
+static void prim_flakeRefToString(
+    EvalState & state,
+    const PosIdx pos,
+    Value * * args,
+    Value & v)
+{
+    state.forceAttrs(*args[0], noPos,
+        "while evaluating the argument passed to builtins.flakeRefToString");
+    fetchers::Attrs attrs;
+    for (const auto & attr : *args[0]->attrs) {
+        auto t = attr.value->type();
+        if (t == nInt) {
+            attrs.emplace(state.symbols[attr.name],
+                          (uint64_t) attr.value->integer);
+        } else if (t == nBool) {
+            attrs.emplace(state.symbols[attr.name],
+                          Explicit<bool> { attr.value->boolean });
+        } else if (t == nString) {
+            attrs.emplace(state.symbols[attr.name],
+                          std::string(attr.value->str()));
+        } else {
+            state.error(
+                "flake reference attribute sets may only contain integers, Booleans, "
+                "and strings, but attribute '%s' is %s",
+                state.symbols[attr.name],
+                showType(*attr.value)).debugThrow<EvalError>();
+        }
+    }
+    auto flakeRef = FlakeRef::fromAttrs(attrs);
+    v.mkString(flakeRef.to_string());
+}
+
+static RegisterPrimOp r4({
+    .name =  "__flakeRefToString",
+    .args = {"attrs"},
+    .doc = R"(
+      Convert a flake reference from attribute set format to URL format.
+
+      For example:
+      ```nix
+      builtins.flakeRefToString {
+        dir = "lib"; owner = "NixOS"; ref = "23.05"; repo = "nixpkgs"; type = "github";
+      }
+      ```
+      evaluates to
+      ```nix
+      "github:NixOS/nixpkgs/23.05?dir=lib"
+      ```
+    )",
+    .fun = prim_flakeRefToString,
     .experimentalFeature = Xp::Flakes,
 });
 

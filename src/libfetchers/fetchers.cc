@@ -13,9 +13,9 @@ void registerInputScheme(std::shared_ptr<InputScheme> && inputScheme)
     inputSchemes->push_back(std::move(inputScheme));
 }
 
-Input Input::fromURL(const std::string & url)
+Input Input::fromURL(const std::string & url, bool requireTree)
 {
-    return fromURL(parseURL(url));
+    return fromURL(parseURL(url), requireTree);
 }
 
 static void fixupInput(Input & input)
@@ -31,10 +31,10 @@ static void fixupInput(Input & input)
         input.locked = true;
 }
 
-Input Input::fromURL(const ParsedURL & url)
+Input Input::fromURL(const ParsedURL & url, bool requireTree)
 {
     for (auto & inputScheme : *inputSchemes) {
-        auto res = inputScheme->inputFromURL(url);
+        auto res = inputScheme->inputFromURL(url, requireTree);
         if (res) {
             res->scheme = inputScheme;
             fixupInput(*res);
@@ -159,6 +159,12 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
                 input.to_string(), *prevLastModified);
     }
 
+    if (auto prevRev = getRev()) {
+        if (input.getRev() != prevRev)
+            throw Error("'rev' attribute mismatch in input '%s', expected %s",
+                input.to_string(), prevRev->gitRev());
+    }
+
     if (auto prevRevCount = getRevCount()) {
         if (input.getRevCount() != prevRevCount)
             throw Error("'revCount' attribute mismatch in input '%s', expected %d",
@@ -211,10 +217,8 @@ StorePath Input::computeStorePath(Store & store) const
     if (!narHash)
         throw Error("cannot compute store path for unlocked input '%s'", to_string());
     return store.makeFixedOutputPath(getName(), FixedOutputInfo {
-        {
-            .method = FileIngestionMethod::Recursive,
-            .hash = *narHash,
-        },
+        .method = FileIngestionMethod::Recursive,
+        .hash = *narHash,
         .references = {},
     });
 }

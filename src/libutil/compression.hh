@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "ref.hh"
 #include "types.hh"
@@ -11,7 +12,7 @@ namespace nix {
 struct CompressionSink : BufferedSink, FinishSink
 {
     using BufferedSink::operator ();
-    using BufferedSink::write;
+    using BufferedSink::writeUnbuffered;
     using FinishSink::finish;
 };
 

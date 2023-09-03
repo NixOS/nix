@@ -72,6 +72,7 @@ private:
         uint64_t corruptedPaths = 0, untrustedPaths = 0;
 
         bool active = true;
+        bool paused = false;
         bool haveUpdate = true;
     };
 
@@ -107,7 +108,8 @@ public:
         stop();
     }
 
-    void stop() override
+    /* Called by destructor, can't be overridden */
+    void stop() override final
     {
         {
             auto state(state_.lock());
@@ -120,16 +122,28 @@ public:
         updateThread.join();
     }
 
+    void pause() override {
+        state_.lock()->paused = true;
+        writeToStderr("\r\e[K");
+    }
+
+    void resume() override {
+        state_.lock()->paused = false;
+        writeToStderr("\r\e[K");
+        state_.lock()->haveUpdate = true;
+        updateCV.notify_one();
+    }
+
     bool isVerbose() override
     {
         return printBuildLogs;
     }
 
-    void log(Verbosity lvl, const FormatOrString & fs) override
+    void log(Verbosity lvl, std::string_view s) override
     {
         if (lvl > verbosity) return;
         auto state(state_.lock());
-        log(*state, lvl, fs.s);
+        log(*state, lvl, s);
     }
 
     void logEI(const ErrorInfo & ei) override
@@ -142,7 +156,7 @@ public:
         log(*state, ei.level, oss.str());
     }
 
-    void log(State & state, Verbosity lvl, const std::string & s)
+    void log(State & state, Verbosity lvl, std::string_view s)
     {
         if (state.active) {
             writeToStderr("\r\e[K" + filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n");
@@ -339,7 +353,7 @@ public:
         auto nextWakeup = std::chrono::milliseconds::max();
 
         state.haveUpdate = false;
-        if (!state.active) return nextWakeup;
+        if (state.paused || !state.active) return nextWakeup;
 
         std::string line;
 

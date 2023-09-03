@@ -1,67 +1,107 @@
 #include "value/context.hh"
-#include "store-api.hh"
 
 #include <optional>
 
 namespace nix {
 
-NixStringContextElem NixStringContextElem::parse(const Store & store, std::string_view s0)
+NixStringContextElem NixStringContextElem::parse(
+    std::string_view s0,
+    const ExperimentalFeatureSettings & xpSettings)
 {
     std::string_view s = s0;
+
+    std::function<SingleDerivedPath()> parseRest;
+    parseRest = [&]() -> SingleDerivedPath {
+        // Case on whether there is a '!'
+        size_t index = s.find("!");
+        if (index == std::string_view::npos) {
+            return SingleDerivedPath::Opaque {
+                .path = StorePath { s },
+            };
+        } else {
+            std::string output { s.substr(0, index) };
+            // Advance string to parse after the '!'
+            s = s.substr(index + 1);
+            auto drv = make_ref<SingleDerivedPath>(parseRest());
+            drvRequireExperiment(*drv, xpSettings);
+            return SingleDerivedPath::Built {
+                .drvPath = std::move(drv),
+                .output = std::move(output),
+            };
+        }
+    };
 
     if (s.size() == 0) {
         throw BadNixStringContextElem(s0,
             "String context element should never be an empty string");
     }
+
     switch (s.at(0)) {
     case '!': {
-        s = s.substr(1); // advance string to parse after first !
-        size_t index = s.find("!");
-        // This makes index + 1 safe. Index can be the length (one after index
-        // of last character), so given any valid character index --- a
-        // successful find --- we can add one.
-        if (index == std::string_view::npos) {
+        // Advance string to parse after the '!'
+        s = s.substr(1);
+
+        // Find *second* '!'
+        if (s.find("!") == std::string_view::npos) {
             throw BadNixStringContextElem(s0,
                 "String content element beginning with '!' should have a second '!'");
         }
-        return NixStringContextElem::Built {
-            .drvPath = store.parseStorePath(s.substr(index + 1)),
-            .output = std::string(s.substr(0, index)),
-        };
+
+        return std::visit(
+            [&](auto x) -> NixStringContextElem { return std::move(x); },
+            parseRest());
     }
     case '=': {
         return NixStringContextElem::DrvDeep {
-            .drvPath = store.parseStorePath(s.substr(1)),
+            .drvPath = StorePath { s.substr(1) },
         };
     }
     default: {
-        return NixStringContextElem::Opaque {
-            .path = store.parseStorePath(s),
-        };
+        // Ensure no '!'
+        if (s.find("!") != std::string_view::npos) {
+            throw BadNixStringContextElem(s0,
+                "String content element not beginning with '!' should not have a second '!'");
+        }
+        return std::visit(
+            [&](auto x) -> NixStringContextElem { return std::move(x); },
+            parseRest());
     }
     }
 }
 
-std::string NixStringContextElem::to_string(const Store & store) const {
-    return std::visit(overloaded {
+std::string NixStringContextElem::to_string() const
+{
+    std::string res;
+
+    std::function<void(const SingleDerivedPath &)> toStringRest;
+    toStringRest = [&](auto & p) {
+        std::visit(overloaded {
+            [&](const SingleDerivedPath::Opaque & o) {
+                res += o.path.to_string();
+            },
+            [&](const SingleDerivedPath::Built & o) {
+                res += o.output;
+                res += '!';
+                toStringRest(*o.drvPath);
+            },
+        }, p.raw());
+    };
+
+    std::visit(overloaded {
         [&](const NixStringContextElem::Built & b) {
-            std::string res;
             res += '!';
-            res += b.output;
-            res += '!';
-            res += store.printStorePath(b.drvPath);
-            return res;
-        },
-        [&](const NixStringContextElem::DrvDeep & d) {
-            std::string res;
-            res += '=';
-            res += store.printStorePath(d.drvPath);
-            return res;
+            toStringRest(b);
         },
         [&](const NixStringContextElem::Opaque & o) {
-            return store.printStorePath(o.path);
+            toStringRest(o);
         },
-    }, raw());
+        [&](const NixStringContextElem::DrvDeep & d) {
+            res += '=';
+            res += d.drvPath.to_string();
+        },
+    }, raw);
+
+    return res;
 }
 
 }

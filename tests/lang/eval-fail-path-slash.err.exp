@@ -1,0 +1,8 @@
+error: path has a trailing slash
+
+       at /pwd/lang/eval-fail-path-slash.nix:6:12:
+
+            5| # and https://nixos.org/nix-dev/2016-June/020829.html
+            6| /nix/store/
+             |            ^
+            7|

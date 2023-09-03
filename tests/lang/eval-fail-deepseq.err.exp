@@ -1,0 +1,26 @@
+error:
+       … while calling the 'deepSeq' builtin
+
+         at /pwd/lang/eval-fail-deepseq.nix:1:1:
+
+            1| builtins.deepSeq { x = abort "foo"; } 456
+             | ^
+            2|
+
+       … while evaluating the attribute 'x'
+
+         at /pwd/lang/eval-fail-deepseq.nix:1:20:
+
+            1| builtins.deepSeq { x = abort "foo"; } 456
+             |                    ^
+            2|
+
+       … while calling the 'abort' builtin
+
+         at /pwd/lang/eval-fail-deepseq.nix:1:24:
+
+            1| builtins.deepSeq { x = abort "foo"; } 456
+             |                        ^
+            2|
+
+       error: evaluation aborted with the following error message: 'foo'

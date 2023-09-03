@@ -76,17 +76,17 @@ nix registry add --registry $registry nixpkgs flake1
 
 # Test 'nix registry list'.
 [[ $(nix registry list | wc -l) == 5 ]]
-nix registry list | grep -q    '^global'
-nix registry list | grep -q -v '^user' # nothing in user registry
+nix registry list | grep        '^global'
+nix registry list | grepInverse '^user' # nothing in user registry
 
 # Test 'nix flake metadata'.
 nix flake metadata flake1
-nix flake metadata flake1 | grep -q 'Locked URL:.*flake1.*'
+nix flake metadata flake1 | grepQuiet 'Locked URL:.*flake1.*'
 
 # Test 'nix flake metadata' on a local flake.
-(cd $flake1Dir && nix flake metadata) | grep -q 'URL:.*flake1.*'
-(cd $flake1Dir && nix flake metadata .) | grep -q 'URL:.*flake1.*'
-nix flake metadata $flake1Dir | grep -q 'URL:.*flake1.*'
+(cd $flake1Dir && nix flake metadata) | grepQuiet 'URL:.*flake1.*'
+(cd $flake1Dir && nix flake metadata .) | grepQuiet 'URL:.*flake1.*'
+nix flake metadata $flake1Dir | grepQuiet 'URL:.*flake1.*'
 
 # Test 'nix flake metadata --json'.
 json=$(nix flake metadata flake1 --json | jq .)
@@ -95,9 +95,16 @@ json=$(nix flake metadata flake1 --json | jq .)
 [[ $(echo "$json" | jq -r .lastModified) = $(git -C $flake1Dir log -n1 --format=%ct) ]]
 hash1=$(echo "$json" | jq -r .revision)
 
+echo foo > $flake1Dir/foo
+git -C $flake1Dir add $flake1Dir/foo
+[[ $(nix flake metadata flake1 --json --refresh | jq -r .dirtyRevision) == "$hash1-dirty" ]]
+
 echo -n '# foo' >> $flake1Dir/flake.nix
+flake1OriginalCommit=$(git -C $flake1Dir rev-parse HEAD)
 git -C $flake1Dir commit -a -m 'Foo'
+flake1NewCommit=$(git -C $flake1Dir rev-parse HEAD)
 hash2=$(nix flake metadata flake1 --json --refresh | jq -r .revision)
+[[ $(nix flake metadata flake1 --json --refresh | jq -r .dirtyRevision) == "null" ]]
 [[ $hash1 != $hash2 ]]
 
 # Test 'nix build' on a flake.
@@ -134,11 +141,11 @@ nix build -o $TEST_ROOT/result flake2#bar --impure --no-write-lock-file
 nix eval --expr "builtins.getFlake \"$flake2Dir\"" --impure
 
 # Building a local flake with an unlocked dependency should fail with --no-update-lock-file.
-nix build -o $TEST_ROOT/result $flake2Dir#bar --no-update-lock-file 2>&1 | grep 'requires lock file changes'
+expect 1 nix build -o $TEST_ROOT/result $flake2Dir#bar --no-update-lock-file 2>&1 | grep 'requires lock file changes'
 
 # But it should succeed without that flag.
 nix build -o $TEST_ROOT/result $flake2Dir#bar --no-write-lock-file
-nix build -o $TEST_ROOT/result $flake2Dir#bar --no-update-lock-file 2>&1 | grep 'requires lock file changes'
+expect 1 nix build -o $TEST_ROOT/result $flake2Dir#bar --no-update-lock-file 2>&1 | grep 'requires lock file changes'
 nix build -o $TEST_ROOT/result $flake2Dir#bar --commit-lock-file
 [[ -e $flake2Dir/flake.lock ]]
 [[ -z $(git -C $flake2Dir diff main || echo failed) ]]
@@ -196,10 +203,10 @@ git -C $flake3Dir add flake.lock
 git -C $flake3Dir commit -m 'Add lockfile'
 
 # Test whether registry caching works.
-nix registry list --flake-registry file://$registry | grep -q flake3
+nix registry list --flake-registry file://$registry | grepQuiet flake3
 mv $registry $registry.tmp
 nix store gc
-nix registry list --flake-registry file://$registry --refresh | grep -q flake3
+nix registry list --flake-registry file://$registry --refresh | grepQuiet flake3
 mv $registry.tmp $registry
 
 # Test whether flakes are registered as GC roots for offline use.
@@ -346,8 +353,8 @@ nix registry remove flake1
 nix registry add user-flake1 git+file://$flake1Dir
 nix registry add user-flake2 git+file://$flake2Dir
 [[ $(nix --flake-registry "" registry list | wc -l) == 2 ]]
-nix --flake-registry "" registry list | grep -q -v '^global' # nothing in global registry
-nix --flake-registry "" registry list | grep -q    '^user'
+nix --flake-registry "" registry list | grepQuietInverse '^global' # nothing in global registry
+nix --flake-registry "" registry list | grepQuiet '^user'
 nix registry remove user-flake1
 nix registry remove user-flake2
 [[ $(nix registry list | wc -l) == 5 ]]
@@ -454,7 +461,7 @@ url=$(nix flake metadata --json file://$TEST_ROOT/flake.tar.gz | jq -r .url)
 nix build -o $TEST_ROOT/result $url
 
 # Building with an incorrect SRI hash should fail.
-nix build -o $TEST_ROOT/result "file://$TEST_ROOT/flake.tar.gz?narHash=sha256-qQ2Zz4DNHViCUrp6gTS7EE4+RMqFQtUfWF2UNUtJKS0=" 2>&1 | grep 'NAR hash mismatch'
+expectStderr 102 nix build -o $TEST_ROOT/result "file://$TEST_ROOT/flake.tar.gz?narHash=sha256-qQ2Zz4DNHViCUrp6gTS7EE4+RMqFQtUfWF2UNUtJKS0=" | grep 'NAR hash mismatch'
 
 # Test --override-input.
 git -C $flake3Dir reset --hard
@@ -491,3 +498,14 @@ nix store delete $(nix store add-path $badFlakeDir)
 [[ $(nix-instantiate --eval flake:git+file://$flake3Dir -A x) = 123 ]]
 [[ $(nix-instantiate -I flake3=flake:flake3 --eval '<flake3>' -A x) = 123 ]]
 [[ $(NIX_PATH=flake3=flake:flake3 nix-instantiate --eval '<flake3>' -A x) = 123 ]]
+
+# Test alternate lockfile paths.
+nix flake lock $flake2Dir --output-lock-file $TEST_ROOT/flake2.lock
+cmp $flake2Dir/flake.lock $TEST_ROOT/flake2.lock >/dev/null # lockfiles should be identical, since we're referencing flake2's original one
+
+nix flake lock $flake2Dir --output-lock-file $TEST_ROOT/flake2-overridden.lock --override-input flake1 git+file://$flake1Dir?rev=$flake1OriginalCommit
+expectStderr 1 cmp $flake2Dir/flake.lock $TEST_ROOT/flake2-overridden.lock
+nix flake metadata $flake2Dir --reference-lock-file $TEST_ROOT/flake2-overridden.lock | grepQuiet $flake1OriginalCommit
+
+# reference-lock-file can only be used if allow-dirty is set.
+expectStderr 1 nix flake metadata $flake2Dir --no-allow-dirty --reference-lock-file $TEST_ROOT/flake2-overridden.lock

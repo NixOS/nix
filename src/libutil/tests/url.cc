@@ -99,6 +99,27 @@ namespace nix {
         ASSERT_EQ(parsed, expected);
     }
 
+    TEST(parseURL, parsesFilePlusHttpsUrl) {
+        auto s = "file+https://www.example.org/video.mp4";
+        auto parsed = parseURL(s);
+
+        ParsedURL expected {
+            .url = "file+https://www.example.org/video.mp4",
+            .base = "https://www.example.org/video.mp4",
+            .scheme = "file+https",
+            .authority = "www.example.org",
+            .path = "/video.mp4",
+            .query = (StringMap) { },
+            .fragment = "",
+        };
+
+        ASSERT_EQ(parsed, expected);
+    }
+
+    TEST(parseURL, rejectsAuthorityInUrlsWithFileTransportation) {
+        auto s = "file://www.example.org/video.mp4";
+        ASSERT_THROW(parseURL(s), Error);
+    }
 
     TEST(parseURL, parseIPv4Address) {
         auto s = "http://127.0.0.1:8080/file.tar.gz?download=fast&when=now#hello";
@@ -277,6 +298,39 @@ namespace nix {
     TEST(percentDecode, trailingPercent) {
         std::string s = "==@==%";
         std::string d = percentDecode("%3D%3D%40%3D%3D%25");
+
+        ASSERT_EQ(d, s);
+    }
+
+
+    /* ----------------------------------------------------------------------------
+     * percentEncode
+     * --------------------------------------------------------------------------*/
+
+    TEST(percentEncode, encodesUrlEncodedString) {
+        std::string s = percentEncode("==@==");
+        std::string d = "%3D%3D%40%3D%3D";
+        ASSERT_EQ(d, s);
+    }
+
+    TEST(percentEncode, keepArgument) {
+        std::string a = percentEncode("abd / def");
+        std::string b = percentEncode("abd / def", "/");
+        ASSERT_EQ(a, "abd%20%2F%20def");
+        ASSERT_EQ(b, "abd%20/%20def");
+    }
+
+    TEST(percentEncode, inverseOfDecode) {
+        std::string original = "%3D%3D%40%3D%3D";
+        std::string once = percentEncode(original);
+        std::string back = percentDecode(once);
+
+        ASSERT_EQ(back, original);
+    }
+
+    TEST(percentEncode, trailingPercent) {
+        std::string s = percentEncode("==@==%");
+        std::string d = "%3D%3D%40%3D%3D%25";
 
         ASSERT_EQ(d, s);
     }

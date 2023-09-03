@@ -1,9 +1,11 @@
 #pragma once
+///@file
 
 #include <variant>
 
 #include "hash.hh"
 #include "path.hh"
+#include "derived-path.hh"
 #include <nlohmann/json_fwd.hpp>
 #include "comparator.hh"
 #include "crypto.hh"
@@ -11,11 +13,28 @@
 namespace nix {
 
 class Store;
+struct OutputsSpec;
 
+/**
+ * A general `Realisation` key.
+ *
+ * This is similar to a `DerivedPath::Opaque`, but the derivation is
+ * identified by its "hash modulo" instead of by its store path.
+ */
 struct DrvOutput {
-    // The hash modulo of the derivation
+    /**
+     * The hash modulo of the derivation.
+     *
+     * Computed from the derivation itself for most types of
+     * derivations, but computed from the (fixed) content address of the
+     * output for fixed-output derivations.
+     */
     Hash drvHash;
-    std::string outputName;
+
+    /**
+     * The name of the output.
+     */
+    OutputName outputName;
 
     std::string to_string() const;
 
@@ -59,7 +78,30 @@ struct Realisation {
     GENERATE_CMP(Realisation, me->id, me->outPath);
 };
 
+/**
+ * Collection type for a single derivation's outputs' `Realisation`s.
+ *
+ * Since these are the outputs of a single derivation, we know the
+ * output names are unique so we can use them as the map key.
+ */
+typedef std::map<OutputName, Realisation> SingleDrvOutputs;
+
+/**
+ * Collection type for multiple derivations' outputs' `Realisation`s.
+ *
+ * `DrvOutput` is used because in general the derivations are not all
+ * the same, so we need to identify firstly which derivation, and
+ * secondly which output of that derivation.
+ */
 typedef std::map<DrvOutput, Realisation> DrvOutputs;
+
+/**
+ * Filter a SingleDrvOutputs to include only specific output names
+ *
+ * Moves the `outputs` input.
+ */
+SingleDrvOutputs filterDrvOutputs(const OutputsSpec&, SingleDrvOutputs&&);
+
 
 struct OpaquePath {
     StorePath path;
@@ -102,9 +144,13 @@ class MissingRealisation : public Error
 {
 public:
     MissingRealisation(DrvOutput & outputId)
-        : Error( "cannot operate on an output of the "
+        : MissingRealisation(outputId.outputName, outputId.strHash())
+    {}
+    MissingRealisation(std::string_view drv, OutputName outputName)
+        : Error( "cannot operate on output '%s' of the "
                 "unbuilt derivation '%s'",
-                outputId.to_string())
+                outputName,
+                drv)
     {}
 };
 

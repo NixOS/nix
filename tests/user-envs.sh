@@ -1,6 +1,6 @@
 source common.sh
 
-if [ -z "$storeCleared" ]; then
+if [ -z "${storeCleared-}" ]; then
     clearStore
 fi
 
@@ -28,13 +28,13 @@ nix-env -f ./user-envs.nix -qa --json --out-path | jq -e '.[] | select(.name == 
 ] | all'
 
 # Query descriptions.
-nix-env -f ./user-envs.nix -qa '*' --description | grep -q silly
+nix-env -f ./user-envs.nix -qa '*' --description | grepQuiet silly
 rm -rf $HOME/.nix-defexpr
 ln -s $(pwd)/user-envs.nix $HOME/.nix-defexpr
-nix-env -qa '*' --description | grep -q silly
+nix-env -qa '*' --description | grepQuiet silly
 
 # Query the system.
-nix-env -qa '*' --system | grep -q $system
+nix-env -qa '*' --system | grepQuiet $system
 
 # Install "foo-1.0".
 nix-env -i foo-1.0
@@ -42,19 +42,19 @@ nix-env -i foo-1.0
 # Query installed: should contain foo-1.0 now (which should be
 # executable).
 test "$(nix-env -q '*' | wc -l)" -eq 1
-nix-env -q '*' | grep -q foo-1.0
+nix-env -q '*' | grepQuiet foo-1.0
 test "$($profiles/test/bin/foo)" = "foo-1.0"
 
 # Test nix-env -qc to compare installed against available packages, and vice versa.
-nix-env -qc '*' | grep -q '< 2.0'
-nix-env -qac '*' | grep -q '> 1.0'
+nix-env -qc '*' | grepQuiet '< 2.0'
+nix-env -qac '*' | grepQuiet '> 1.0'
 
 # Test the -b flag to filter out source-only packages.
 [ "$(nix-env -qab | wc -l)" -eq 1 ]
 
 # Test the -s flag to get package status.
-nix-env -qas | grep -q 'IP-  foo-1.0'
-nix-env -qas | grep -q -- '---  bar-0.1'
+nix-env -qas | grepQuiet 'IP-  foo-1.0'
+nix-env -qas | grepQuiet -- '---  bar-0.1'
 
 # Disable foo.
 nix-env --set-flag active false foo
@@ -74,15 +74,15 @@ nix-env -i foo-2.0pre1
 
 # Query installed: should contain foo-2.0pre1 now.
 test "$(nix-env -q '*' | wc -l)" -eq 1
-nix-env -q '*' | grep -q foo-2.0pre1
+nix-env -q '*' | grepQuiet foo-2.0pre1
 test "$($profiles/test/bin/foo)" = "foo-2.0pre1"
 
 # Upgrade "foo": should install foo-2.0.
-NIX_PATH=nixpkgs=./user-envs.nix:$NIX_PATH nix-env -f '<nixpkgs>' -u foo
+NIX_PATH=nixpkgs=./user-envs.nix:${NIX_PATH-} nix-env -f '<nixpkgs>' -u foo
 
 # Query installed: should contain foo-2.0 now.
 test "$(nix-env -q '*' | wc -l)" -eq 1
-nix-env -q '*' | grep -q foo-2.0
+nix-env -q '*' | grepQuiet foo-2.0
 test "$($profiles/test/bin/foo)" = "foo-2.0"
 
 # Store the path of foo-2.0.
@@ -94,20 +94,20 @@ nix-env -i bar-0.1
 nix-env -e foo
 
 # Query installed: should only contain bar-0.1 now.
-if nix-env -q '*' | grep -q foo; then false; fi
-nix-env -q '*' | grep -q bar
+if nix-env -q '*' | grepQuiet foo; then false; fi
+nix-env -q '*' | grepQuiet bar
 
 # Rollback: should bring "foo" back.
 oldGen="$(nix-store -q --resolve $profiles/test)"
 nix-env --rollback
 [ "$(nix-store -q --resolve $profiles/test)" != "$oldGen" ]
-nix-env -q '*' | grep -q foo-2.0
-nix-env -q '*' | grep -q bar
+nix-env -q '*' | grepQuiet foo-2.0
+nix-env -q '*' | grepQuiet bar
 
 # Rollback again: should remove "bar".
 nix-env --rollback
-nix-env -q '*' | grep -q foo-2.0
-if nix-env -q '*' | grep -q bar; then false; fi
+nix-env -q '*' | grepQuiet foo-2.0
+if nix-env -q '*' | grepQuiet bar; then false; fi
 
 # Count generations.
 nix-env --list-generations
@@ -129,7 +129,7 @@ nix-env --switch-generation 7
 
 # Install foo-1.0, now using its store path.
 nix-env -i "$outPath10"
-nix-env -q '*' | grep -q foo-1.0
+nix-env -q '*' | grepQuiet foo-1.0
 nix-store -qR $profiles/test | grep "$outPath10"
 nix-store -q --referrers-closure $profiles/test | grep "$(nix-store -q --resolve $profiles/test)"
 [ "$(nix-store -q --deriver "$outPath10")" = $drvPath10 ]
@@ -137,12 +137,12 @@ nix-store -q --referrers-closure $profiles/test | grep "$(nix-store -q --resolve
 # Uninstall foo-1.0, using a symlink to its store path.
 ln -sfn $outPath10/bin/foo $TEST_ROOT/symlink
 nix-env -e $TEST_ROOT/symlink
-if nix-env -q '*' | grep -q foo; then false; fi
-(! nix-store -qR $profiles/test | grep "$outPath10")
+if nix-env -q '*' | grepQuiet foo; then false; fi
+nix-store -qR $profiles/test | grepInverse "$outPath10"
 
 # Install foo-1.0, now using a symlink to its store path.
 nix-env -i $TEST_ROOT/symlink
-nix-env -q '*' | grep -q foo
+nix-env -q '*' | grepQuiet foo
 
 # Delete all old generations.
 nix-env --delete-generations old
@@ -160,7 +160,7 @@ test "$(nix-env -q '*' | wc -l)" -eq 0
 # Installing "foo" should only install the newest foo.
 nix-env -i foo
 test "$(nix-env -q '*' | grep foo- | wc -l)" -eq 1
-nix-env -q '*' | grep -q foo-2.0
+nix-env -q '*' | grepQuiet foo-2.0
 
 # On the other hand, this should install both (and should fail due to
 # a collision).
@@ -171,8 +171,8 @@ nix-env -e '*'
 nix-env -e '*'
 nix-env -i '*'
 test "$(nix-env -q '*' | wc -l)" -eq 2
-nix-env -q '*' | grep -q foo-2.0
-nix-env -q '*' | grep -q bar-0.1.1
+nix-env -q '*' | grepQuiet foo-2.0
+nix-env -q '*' | grepQuiet bar-0.1.1
 
 # Test priorities: foo-0.1 has a lower priority than foo-1.0, so it
 # should be possible to install both without a collision.  Also test

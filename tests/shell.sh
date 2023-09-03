@@ -10,7 +10,7 @@ nix shell -f shell-hello.nix hello -c hello NixOS | grep 'Hello NixOS'
 nix shell -f shell-hello.nix hello^dev -c hello2 | grep 'Hello2'
 nix shell -f shell-hello.nix 'hello^*' -c hello2 | grep 'Hello2'
 
-if ! canUseSandbox; then exit 99; fi
+requireSandboxSupport
 
 chmod -R u+w $TEST_ROOT/store0 || true
 rm -rf $TEST_ROOT/store0

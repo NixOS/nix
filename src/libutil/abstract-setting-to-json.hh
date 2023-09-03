@@ -1,7 +1,9 @@
 #pragma once
+///@file
 
 #include <nlohmann/json.hpp>
 #include "config.hh"
+#include "json-utils.hh"
 
 namespace nix {
 template<typename T>

@@ -82,6 +82,7 @@ namespace nix {
             TestSetting() : AbstractSetting("test", "test", {}) {}
             void set(const std::string & value, bool append) override {}
             std::string to_string() const override { return {}; }
+            bool isAppendable() override { return false; }
         };
 
         Config config;
@@ -90,6 +91,7 @@ namespace nix {
         ASSERT_FALSE(config.set("test", "value"));
         config.addSetting(&setting);
         ASSERT_TRUE(config.set("test", "value"));
+        ASSERT_FALSE(config.set("extra-test", "value"));
     }
 
     TEST(Config, withInitialValue) {
@@ -156,12 +158,54 @@ namespace nix {
     }
 
     TEST(Config, toJSONOnNonEmptyConfig) {
+        using nlohmann::literals::operator "" _json;
         Config config;
-        std::map<std::string, Config::SettingInfo> settings;
-        Setting<std::string> setting{&config, "", "name-of-the-setting", "description"};
+        Setting<std::string> setting{
+            &config,
+            "",
+            "name-of-the-setting",
+            "description",
+        };
         setting.assign("value");
 
-        ASSERT_EQ(config.toJSON().dump(), R"#({"name-of-the-setting":{"aliases":[],"defaultValue":"","description":"description\n","documentDefault":true,"value":"value"}})#");
+        ASSERT_EQ(config.toJSON(),
+          R"#({
+            "name-of-the-setting": {
+              "aliases": [],
+              "defaultValue": "",
+              "description": "description\n",
+              "documentDefault": true,
+              "value": "value",
+              "experimentalFeature": null
+            }
+          })#"_json);
+    }
+
+    TEST(Config, toJSONOnNonEmptyConfigWithExperimentalSetting) {
+        using nlohmann::literals::operator "" _json;
+        Config config;
+        Setting<std::string> setting{
+            &config,
+            "",
+            "name-of-the-setting",
+            "description",
+            {},
+            true,
+            Xp::Flakes,
+        };
+        setting.assign("value");
+
+        ASSERT_EQ(config.toJSON(),
+          R"#({
+            "name-of-the-setting": {
+              "aliases": [],
+              "defaultValue": "",
+              "description": "description\n",
+              "documentDefault": true,
+              "value": "value",
+              "experimentalFeature": "flakes"
+            }
+          })#"_json);
     }
 
     TEST(Config, setSettingAlias) {

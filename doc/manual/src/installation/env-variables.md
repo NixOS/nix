@@ -27,7 +27,7 @@ Set the environment variable and install Nix
 
 ```console
 $ export NIX_SSL_CERT_FILE=/etc/ssl/my-certificate-bundle.crt
-$ sh <(curl -L https://nixos.org/nix/install)
+$ curl -L https://nixos.org/nix/install | sh
 ```
 
 In the shell profile and rc files (for example, `/etc/bashrc`,
@@ -38,18 +38,15 @@ export NIX_SSL_CERT_FILE=/etc/ssl/my-certificate-bundle.crt
 ```
 
 > **Note**
-> 
+>
 > You must not add the export and then do the install, as the Nix
 > installer will detect the presence of Nix configuration, and abort.
 
-## `NIX_SSL_CERT_FILE` with macOS and the Nix daemon
+If you use the Nix daemon, you should also add the following to
+`/etc/nix/nix.conf`:
 
-On macOS you must specify the environment variable for the Nix daemon
-service, then restart it:
-
-```console
-$ sudo launchctl setenv NIX_SSL_CERT_FILE /etc/ssl/my-certificate-bundle.crt
-$ sudo launchctl kickstart -k system/org.nixos.nix-daemon
+```
+ssl-cert-file = /etc/ssl/my-certificate-bundle.crt
 ```
 
 ## Proxy Environment Variables

@@ -21,7 +21,7 @@ struct DownloadUrl
 };
 
 // A github, gitlab, or sourcehut host
-const static std::string hostRegexS = "[a-zA-Z0-9.]*"; // FIXME: check
+const static std::string hostRegexS = "[a-zA-Z0-9.-]*"; // FIXME: check
 std::regex hostRegex(hostRegexS, std::regex::ECMAScript);
 
 struct GitArchiveInputScheme : InputScheme
@@ -30,7 +30,7 @@ struct GitArchiveInputScheme : InputScheme
 
     virtual std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const = 0;
 
-    std::optional<Input> inputFromURL(const ParsedURL & url) const override
+    std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
     {
         if (url.scheme != type()) return {};
 
@@ -207,21 +207,21 @@ struct GitArchiveInputScheme : InputScheme
 
         auto url = getDownloadUrl(input);
 
-        auto [tree, lastModified] = downloadTarball(store, url.url, input.getName(), true, url.headers);
+        auto result = downloadTarball(store, url.url, input.getName(), true, url.headers);
 
-        input.attrs.insert_or_assign("lastModified", uint64_t(lastModified));
+        input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
 
         getCache()->add(
             store,
             lockedAttrs,
             {
                 {"rev", rev->gitRev()},
-                {"lastModified", uint64_t(lastModified)}
+                {"lastModified", uint64_t(result.lastModified)}
             },
-            tree.storePath,
+            result.tree.storePath,
             true);
 
-        return {std::move(tree.storePath), input};
+        return {result.tree.storePath, input};
     }
 };
 

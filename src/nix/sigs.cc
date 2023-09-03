@@ -45,7 +45,7 @@ struct CmdCopySigs : StorePathsCommand
         //logger->setExpected(doneLabel, storePaths.size());
 
         auto doPath = [&](const Path & storePathS) {
-            //Activity act(*logger, lvlInfo, format("getting signatures for '%s'") % storePath);
+            //Activity act(*logger, lvlInfo, "getting signatures for '%s'", storePath);
 
             checkInterrupt();
 
@@ -173,7 +173,7 @@ struct CmdKeyGenerateSecret : Command
         if (!keyName)
             throw UsageError("required argument '--key-name' is missing");
 
-        std::cout << SecretKey::generate(*keyName).to_string();
+        writeFull(STDOUT_FILENO, SecretKey::generate(*keyName).to_string());
     }
 };
 
@@ -194,7 +194,7 @@ struct CmdKeyConvertSecretToPublic : Command
     void run() override
     {
         SecretKey secretKey(drainFD(STDIN_FILENO));
-        std::cout << secretKey.toPublicKey().to_string();
+        writeFull(STDOUT_FILENO, secretKey.toPublicKey().to_string());
     }
 };
 
@@ -219,7 +219,6 @@ struct CmdKey : NixMultiCommand
     {
         if (!command)
             throw UsageError("'nix key' requires a sub-command.");
-        command->second->prepare();
         command->second->run();
     }
 };

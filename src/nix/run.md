@@ -35,7 +35,7 @@ R""(
 
 # Description
 
-`nix run` builds and runs *installable*, which must evaluate to an
+`nix run` builds and runs [*installable*](./nix.md#installables), which must evaluate to an
 *app* or a regular Nix derivation.
 
 If *installable* evaluates to an *app* (see below), it executes the

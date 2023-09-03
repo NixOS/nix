@@ -1,5 +1,6 @@
 #include "primops.hh"
 #include "eval-inline.hh"
+#include "eval-settings.hh"
 #include "store-api.hh"
 #include "fetchers.hh"
 #include "url.hh"
@@ -13,7 +14,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     std::optional<Hash> rev;
     std::optional<std::string> ref;
     std::string_view name = "source";
-    PathSet context;
+    NixStringContext context;
 
     state.forceValue(*args[0], pos);
 
@@ -73,8 +74,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     auto [tree, input2] = input.fetch(state.store);
 
     auto attrs2 = state.buildBindings(8);
-    auto storePath = state.store->printStorePath(tree.storePath);
-    attrs2.alloc(state.sOutPath).mkString(storePath, {storePath});
+    state.mkStorePathString(tree.storePath, attrs2.alloc(state.sOutPath));
     if (input2.getRef())
         attrs2.alloc("branch").mkString(*input2.getRef());
     // Backward compatibility: set 'rev' to
@@ -89,6 +89,10 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value * * a
     state.allowPath(tree.storePath);
 }
 
-static RegisterPrimOp r_fetchMercurial("fetchMercurial", 1, prim_fetchMercurial);
+static RegisterPrimOp r_fetchMercurial({
+    .name = "fetchMercurial",
+    .arity = 1,
+    .fun = prim_fetchMercurial
+});
 
 }

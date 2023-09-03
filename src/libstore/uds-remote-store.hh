@@ -1,13 +1,15 @@
 #pragma once
+///@file
 
 #include "remote-store.hh"
-#include "local-fs-store.hh"
+#include "remote-store-connection.hh"
+#include "indirect-root-store.hh"
 
 namespace nix {
 
 struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreConfig
 {
-    UDSRemoteStoreConfig(const Store::Params & params)
+    UDSRemoteStoreConfig(const Params & params)
         : StoreConfig(params)
         , LocalFSStoreConfig(params)
         , RemoteStoreConfig(params)
@@ -15,9 +17,13 @@ struct UDSRemoteStoreConfig : virtual LocalFSStoreConfig, virtual RemoteStoreCon
     }
 
     const std::string name() override { return "Local Daemon Store"; }
+
+    std::string doc() override;
 };
 
-class UDSRemoteStore : public virtual UDSRemoteStoreConfig, public virtual LocalFSStore, public virtual RemoteStore
+class UDSRemoteStore : public virtual UDSRemoteStoreConfig
+    , public virtual IndirectRootStore
+    , public virtual RemoteStore
 {
 public:
 
@@ -29,14 +35,21 @@ public:
     static std::set<std::string> uriSchemes()
     { return {"unix"}; }
 
-    bool sameMachine() override
-    { return true; }
-
     ref<FSAccessor> getFSAccessor() override
     { return LocalFSStore::getFSAccessor(); }
 
     void narFromPath(const StorePath & path, Sink & sink) override
     { LocalFSStore::narFromPath(path, sink); }
+
+    /**
+     * Implementation of `IndirectRootStore::addIndirectRoot()` which
+     * delegates to the remote store.
+     *
+     * The idea is that the client makes the direct symlink, so it is
+     * owned managed by the client's user account, and the server makes
+     * the indirect symlink.
+     */
+    void addIndirectRoot(const Path & path) override;
 
 private:
 
