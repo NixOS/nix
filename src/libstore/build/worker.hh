@@ -2,13 +2,28 @@
 
 #include "types.hh"
 #include "lock.hh"
-#include "local-store.hh"
+#include "store-api.hh"
 #include "goal.hh"
+
+#include <future>
+#include <thread>
 
 namespace nix {
 
 /* Forward definition. */
-class DerivationGoal;
+struct DerivationGoal;
+struct SubstitutionGoal;
+
+/* Workaround for not being able to declare a something like
+
+     class SubstitutionGoal : public Goal;
+
+   even when Goal is a complete type.
+
+   This is still a static cast. The purpose of exporting it is to define it in
+   a place where `SubstitutionGoal` is concrete, and use it in a place where it
+   is opaque. */
+GoalPtr upcast_goal(std::shared_ptr<SubstitutionGoal> subGoal);
 
 typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
 
@@ -56,8 +71,8 @@ private:
 
     /* Maps used to prevent multiple instantiations of a goal for the
        same derivation / path. */
-    WeakGoalMap derivationGoals;
-    WeakGoalMap substitutionGoals;
+    std::map<StorePath, std::weak_ptr<DerivationGoal>> derivationGoals;
+    std::map<StorePath, std::weak_ptr<SubstitutionGoal>> substitutionGoals;
 
     /* Goals waiting for busy paths to be unlocked. */
     WeakGoals waitingForAnyGoal;
@@ -90,7 +105,7 @@ public:
     /* Set if at least one derivation is not deterministic in check mode. */
     bool checkMismatch;
 
-    LocalStore & store;
+    Store & store;
 
     std::unique_ptr<HookInstance> hook;
 
@@ -112,7 +127,7 @@ public:
        it answers with "decline-permanently", we don't try again. */
     bool tryBuildHook = true;
 
-    Worker(LocalStore & store);
+    Worker(Store & store);
     ~Worker();
 
     /* Make a goal (with caching). */
@@ -131,7 +146,7 @@ public:
         const StringSet & wantedOutputs, BuildMode buildMode = bmNormal);
 
     /* substitution goal */
-    GoalPtr makeSubstitutionGoal(StorePathOrDesc storePath, RepairFlag repair = NoRepair);
+    std::shared_ptr<SubstitutionGoal> makeSubstitutionGoal(StorePathOrDesc storePath, RepairFlag repair = NoRepair);
 
     /* Remove a dead goal. */
     void removeGoal(GoalPtr goal);

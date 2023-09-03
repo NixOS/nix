@@ -40,7 +40,7 @@ struct CmdWhyDepends : SourceExprCommand
         addFlag({
             .longName = "all",
             .shortName = 'a',
-            .description = "show all edges in the dependency graph leading from 'package' to 'dependency', rather than just a shortest path",
+            .description = "Show all edges in the dependency graph leading from *package* to *dependency*, rather than just a shortest path.",
             .handler = {&all, true},
         });
     }
@@ -50,22 +50,11 @@ struct CmdWhyDepends : SourceExprCommand
         return "show why a package has another package in its closure";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To show one path through the dependency graph leading from Hello to Glibc:",
-                "nix why-depends nixpkgs#hello nixpkgs#glibc"
-            },
-            Example{
-                "To show all files and paths in the dependency graph leading from Thunderbird to libX11:",
-                "nix why-depends --all nixpkgs#thunderbird nixpkgs#xorg.libX11"
-            },
-            Example{
-                "To show why Glibc depends on itself:",
-                "nix why-depends nixpkgs#glibc nixpkgs#glibc"
-            },
-        };
+        return
+          #include "why-depends.md"
+          ;
     }
 
     Category category() override { return catSecondary; }
@@ -156,7 +145,7 @@ struct CmdWhyDepends : SourceExprCommand
             auto pathS = store->printStorePath(node.path);
 
             assert(node.dist != inf);
-            logger->stdout("%s%s%s%s" ANSI_NORMAL,
+            logger->cout("%s%s%s%s" ANSI_NORMAL,
                 firstPad,
                 node.visited ? "\e[38;5;244m" : "",
                 firstPad != "" ? "→ " : "",

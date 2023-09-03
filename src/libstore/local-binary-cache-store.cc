@@ -11,7 +11,7 @@ struct LocalBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
     const std::string name() override { return "Local Binary Cache Store"; }
 };
 
-class LocalBinaryCacheStore : public BinaryCacheStore, public virtual LocalBinaryCacheStoreConfig
+class LocalBinaryCacheStore : public virtual LocalBinaryCacheStoreConfig, public virtual BinaryCacheStore
 {
 private:
 
@@ -24,6 +24,9 @@ public:
         const Path & binaryCacheDir,
         const Params & params)
         : StoreConfig(params)
+        , BinaryCacheStoreConfig(params)
+        , LocalBinaryCacheStoreConfig(params)
+        , Store(params)
         , BinaryCacheStore(params)
         , binaryCacheDir(binaryCacheDir)
     {
@@ -87,6 +90,7 @@ protected:
 void LocalBinaryCacheStore::init()
 {
     createDirs(binaryCacheDir + "/nar");
+    createDirs(binaryCacheDir + realisationsPrefix);
     if (writeDebugInfo)
         createDirs(binaryCacheDir + "/debuginfo");
     BinaryCacheStore::init();

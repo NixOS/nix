@@ -1,6 +1,6 @@
 { nixpkgs, system, overlay }:
 
-with import (nixpkgs + "/nixos/lib/testing.nix") {
+with import (nixpkgs + "/nixos/lib/testing-python.nix") {
   inherit system;
   extraConfigurations = [ { nixpkgs.overlays = [ overlay ]; } ];
 };
@@ -64,6 +64,7 @@ in
 makeTest (
 
 {
+  name = "github-flakes";
 
   nodes =
     { # Impersonate github.com and api.github.com.
@@ -113,36 +114,37 @@ makeTest (
         };
     };
 
-  testScript = { nodes }:
-    ''
-      use POSIX qw(strftime);
+  testScript = { nodes }: ''
+    # fmt: off
+    import json
+    import time
 
-      startAll;
+    start_all()
 
-      $github->waitForUnit("httpd.service");
+    github.wait_for_unit("httpd.service")
 
-      $client->succeed("curl -v https://github.com/ >&2");
+    client.succeed("curl -v https://github.com/ >&2")
+    client.succeed("nix registry list | grep nixpkgs")
 
-      $client->succeed("nix registry list | grep nixpkgs");
+    rev = client.succeed("nix flake info nixpkgs --json | jq -r .revision")
+    assert rev.strip() == "${nixpkgs.rev}", "revision mismatch"
 
-      $client->succeed("nix flake info nixpkgs --json | jq -r .revision") eq "${nixpkgs.rev}\n"
-        or die "revision mismatch";
+    client.succeed("nix registry pin nixpkgs")
 
-      $client->succeed("nix registry pin nixpkgs");
+    client.succeed("nix flake info nixpkgs --tarball-ttl 0 >&2")
 
-      $client->succeed("nix flake info nixpkgs --tarball-ttl 0 >&2");
+    # Shut down the web server. The flake should be cached on the client.
+    github.succeed("systemctl stop httpd.service")
 
-      # Shut down the web server. The flake should be cached on the client.
-      $github->succeed("systemctl stop httpd.service");
+    info = json.loads(client.succeed("nix flake info nixpkgs --json"))
+    date = time.strftime("%Y%m%d%H%M%S", time.gmtime(info['lastModified']))
+    assert date == "${nixpkgs.lastModifiedDate}", "time mismatch"
 
-      my $date = $client->succeed("nix flake info nixpkgs --json | jq -M .lastModified");
-      strftime("%Y%m%d%H%M%S", gmtime($date)) eq "${nixpkgs.lastModifiedDate}" or die "time mismatch";
+    client.succeed("nix build nixpkgs#hello")
 
-      $client->succeed("nix build nixpkgs#hello");
-
-      # The build shouldn't fail even with --tarball-ttl 0 (the server
-      # being down should not be a fatal error).
-      $client->succeed("nix build nixpkgs#fuse --tarball-ttl 0");
-    '';
+    # The build shouldn't fail even with --tarball-ttl 0 (the server
+    # being down should not be a fatal error).
+    client.succeed("nix build nixpkgs#fuse --tarball-ttl 0")
+  '';
 
 })

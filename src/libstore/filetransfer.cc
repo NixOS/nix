@@ -95,18 +95,18 @@ struct curlFileTransfer : public FileTransfer
                 fmt(request.data ? "uploading '%s'" : "downloading '%s'", request.uri),
                 {request.uri}, request.parentAct)
             , callback(std::move(callback))
-            , finalSink([this](const unsigned char * data, size_t len) {
+            , finalSink([this](std::string_view data) {
                 if (this->request.dataCallback) {
                     auto httpStatus = getHTTPStatus();
 
                     /* Only write data to the sink if this is a
                        successful response. */
                     if (successfulStatuses.count(httpStatus)) {
-                        writtenToSink += len;
-                        this->request.dataCallback((char *) data, len);
+                        writtenToSink += data.size();
+                        this->request.dataCallback(data);
                     }
                 } else
-                    this->result.data->append((char *) data, len);
+                    this->result.data->append(data);
               })
         {
             if (!request.expectedETag.empty())
@@ -171,8 +171,8 @@ struct curlFileTransfer : public FileTransfer
                 }
 
                 if (errorSink)
-                    (*errorSink)((unsigned char *) contents, realSize);
-                (*decompressionSink)((unsigned char *) contents, realSize);
+                    (*errorSink)({(char *) contents, realSize});
+                (*decompressionSink)({(char *) contents, realSize});
 
                 return realSize;
             } catch (...) {
@@ -375,6 +375,13 @@ struct curlFileTransfer : public FileTransfer
             else if (code == CURLE_OK && successfulStatuses.count(httpStatus))
             {
                 result.cached = httpStatus == 304;
+
+                // In 2021, GitHub responds to If-None-Match with 304,
+                // but omits ETag. We just use the If-None-Match etag
+                // since 304 implies they are the same.
+                if (httpStatus == 304 && result.etag == "")
+                    result.etag = request.expectedETag;
+
                 act.progress(result.bodySize, result.bodySize);
                 done = true;
                 callback(std::move(result));
@@ -632,11 +639,7 @@ struct curlFileTransfer : public FileTransfer
             workerThreadMain();
         } catch (nix::Interrupted & e) {
         } catch (std::exception & e) {
-            logError({
-                .name = "File transfer",
-                .hint = hintfmt("unexpected error in download thread: %s",
-                                e.what())
-            });
+            printError("unexpected error in download thread: %s", e.what());
         }
 
         {
@@ -776,7 +779,7 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
         state->request.notify_one();
     });
 
-    request.dataCallback = [_state](char * buf, size_t len) {
+    request.dataCallback = [_state](std::string_view data) {
 
         auto state(_state->lock());
 
@@ -794,7 +797,7 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
 
         /* Append data to the buffer and wake up the calling
            thread. */
-        state->data.append(buf, len);
+        state->data.append(data);
         state->avail.notify_one();
     };
 
@@ -840,7 +843,7 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
            if it's blocked on a full buffer. We don't hold the state
            lock while doing this to prevent blocking the download
            thread if sink() takes a long time. */
-        sink((unsigned char *) chunk.data(), chunk.size());
+        sink(chunk);
     }
 }
 
@@ -852,11 +855,10 @@ FileTransferError::FileTransferError(FileTransfer::Error error, std::shared_ptr<
     // FIXME: Due to https://github.com/NixOS/nix/issues/3841 we don't know how
     // to print different messages for different verbosity levels. For now
     // we add some heuristics for detecting when we want to show the response.
-    if (response && (response->size() < 1024 || response->find("<html>") != string::npos)) {
-            err.hint = hintfmt("%1%\n\nresponse body:\n\n%2%", normaltxt(hf.str()), *response);
-    } else {
-        err.hint = hf;
-    }
+    if (response && (response->size() < 1024 || response->find("<html>") != string::npos))
+        err.msg = hintfmt("%1%\n\nresponse body:\n\n%2%", normaltxt(hf.str()), chomp(*response));
+    else
+        err.msg = hf;
 }
 
 bool isUri(const string & s)

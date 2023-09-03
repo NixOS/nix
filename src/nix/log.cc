@@ -13,22 +13,11 @@ struct CmdLog : InstallableCommand
         return "show the build log of the specified packages or paths, if available";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To get the build log of GNU Hello:",
-                "nix log nixpkgs#hello"
-            },
-            Example{
-                "To get the build log of a specific path:",
-                "nix log /nix/store/lmngj4wcm9rkv3w4dfhzhcyij3195hiq-thunderbird-52.2.1"
-            },
-            Example{
-                "To get a build log from a specific binary cache:",
-                "nix log --store https://cache.nixos.org nixpkgs#hello"
-            },
-        };
+        return
+          #include "log.md"
+          ;
     }
 
     Category category() override { return catSecondary; }

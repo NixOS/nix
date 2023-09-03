@@ -154,10 +154,10 @@ struct TunnelSink : Sink
 {
     Sink & to;
     TunnelSink(Sink & to) : to(to) { }
-    virtual void operator () (const unsigned char * data, size_t len)
+    void operator () (std::string_view data)
     {
         to << STDERR_WRITE;
-        writeString(data, len, to);
+        writeString(data, to);
     }
 };
 
@@ -166,7 +166,7 @@ struct TunnelSource : BufferedSource
     Source & from;
     BufferedSink & to;
     TunnelSource(Source & from, BufferedSink & to) : from(from), to(to) { }
-    size_t readUnbuffered(unsigned char * data, size_t len) override
+    size_t readUnbuffered(char * data, size_t len) override
     {
         to << STDERR_READ << len;
         to.flush();
@@ -216,6 +216,8 @@ struct ClientSettings
                 for (auto & s : ss)
                     if (trusted.count(s))
                         subs.push_back(s);
+                    else if (!hasSuffix(s, "/") && trusted.count(s + "/"))
+                        subs.push_back(s + "/");
                     else
                         warn("ignoring untrusted substituter '%s'", s);
                 res = subs;
@@ -231,8 +233,6 @@ struct ClientSettings
                     || (name == "builders" && value == ""))
                     settings.set(name, value);
                 else if (setSubstituters(settings.substituters))
-                    ;
-                else if (setSubstituters(settings.extraSubstituters))
                     ;
                 else
                     debug("ignoring the client-specified setting '%s', because it is a restricted setting and you are not a trusted user", name);
@@ -277,8 +277,17 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopQueryValidPaths: {
         auto paths = worker_proto::read(*store, from, Phantom<StorePathSet> {});
+
+        SubstituteFlag substitute = NoSubstitute;
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 27) {
+            substitute = readInt(from) ? Substitute : NoSubstitute;
+        }
+
         logger->startWork();
-        auto res = store->queryValidPaths(paths);
+        if (substitute) {
+            store->substitutePaths(paths);
+        }
+        auto res = store->queryValidPaths(paths, substitute);
         logger->stopWork();
         worker_proto::write(*store, to, res);
         break;
@@ -859,6 +868,28 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         worker_proto::write(*store, to, willSubstitute);
         worker_proto::write(*store, to, unknown);
         to << downloadSize << narSize;
+        break;
+    }
+
+    case wopRegisterDrvOutput: {
+        logger->startWork();
+        auto outputId = DrvOutput::parse(readString(from));
+        auto outputPath = StorePath(readString(from));
+        auto resolvedDrv = StorePath(readString(from));
+        store->registerDrvOutput(Realisation{
+            .id = outputId, .outPath = outputPath});
+        logger->stopWork();
+        break;
+    }
+
+    case wopQueryRealisation: {
+        logger->startWork();
+        auto outputId = DrvOutput::parse(readString(from));
+        auto info = store->queryRealisation(outputId);
+        logger->stopWork();
+        std::set<StorePath> outPaths;
+        if (info) outPaths.insert(info->outPath);
+        worker_proto::write(*store, to, outPaths);
         break;
     }
 

@@ -16,3 +16,12 @@ here=$(readlink -f "$(dirname "${BASH_SOURCE[0]}")")
 export NIX_USER_CONF_FILES=$here/config/nix-with-substituters.conf
 var=$(nix show-config | grep '^substituters =' | cut -d '=' -f 2 | xargs)
 [[ $var == https://example.com ]]
+
+# Test that it's possible to load config from the environment
+prev=$(nix show-config | grep '^cores' | cut -d '=' -f 2 | xargs)
+export NIX_CONFIG="cores = 4242"$'\n'"experimental-features = nix-command flakes"
+exp_cores=$(nix show-config | grep '^cores' | cut -d '=' -f 2 | xargs)
+exp_features=$(nix show-config | grep '^experimental-features' | cut -d '=' -f 2 | xargs)
+[[ $prev != $exp_cores ]]
+[[ $exp_cores == "4242" ]]
+[[ $exp_features == "nix-command flakes" ]]

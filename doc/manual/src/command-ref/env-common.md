@@ -81,6 +81,11 @@ Most Nix commands interpret the following environment variables:
     Overrides the location of the system Nix configuration directory
     (default `prefix/etc/nix`).
 
+  - `NIX_CONFIG`  
+    Applies settings from Nix configuration from the environment.
+    The content is treated as if it was read from a Nix configuration file.
+    Settings are separated by the newline character.
+
   - `NIX_USER_CONF_FILES`  
     Overrides the location of the user Nix configuration files to load
     from (defaults to the XDG spec locations). The variable is treated

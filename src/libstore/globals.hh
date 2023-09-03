@@ -25,7 +25,24 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
         options->addSetting(this);
     }
 
-    void set(const std::string & str) override;
+    void set(const std::string & str, bool append = false) override;
+};
+
+struct PluginFilesSetting : public BaseSetting<Paths>
+{
+    bool pluginsLoaded = false;
+
+    PluginFilesSetting(Config * options,
+        const Paths & def,
+        const std::string & name,
+        const std::string & description,
+        const std::set<std::string> & aliases = {})
+        : BaseSetting<Paths>(def, name, description, aliases)
+    {
+        options->addSetting(this);
+    }
+
+    void set(const std::string & str, bool append = false) override;
 };
 
 class Settings : public Config {
@@ -33,6 +50,8 @@ class Settings : public Config {
     unsigned int getDefaultCores();
 
     StringSet getDefaultSystemFeatures();
+
+    StringSet getDefaultExtraPlatforms();
 
     bool isWSL1();
 
@@ -413,14 +432,6 @@ public:
     Setting<bool> sandboxFallback{this, true, "sandbox-fallback",
         "Whether to disable sandboxing when the kernel doesn't allow it."};
 
-    Setting<PathSet> extraSandboxPaths{
-        this, {}, "extra-sandbox-paths",
-        R"(
-          A list of additional paths appended to `sandbox-paths`. Useful if
-          you want to extend its default value.
-        )",
-        {"build-extra-chroot-dirs", "build-extra-sandbox-paths"}};
-
     Setting<size_t> buildRepeat{
         this, 0, "repeat",
         R"(
@@ -553,7 +564,7 @@ public:
 
     Setting<StringSet> extraPlatforms{
         this,
-        std::string{SYSTEM} == "x86_64-linux" && !isWSL1() ? StringSet{"i686-linux"} : StringSet{},
+        getDefaultExtraPlatforms(),
         "extra-platforms",
         R"(
           Platforms other than the native one which this machine is capable of
@@ -591,24 +602,13 @@ public:
 
     Setting<Strings> substituters{
         this,
-        nixStore == "/nix/store" ? Strings{"https://cache.nixos.org/"} : Strings(),
+        Strings{"https://cache.nixos.org/"},
         "substituters",
         R"(
           A list of URLs of substituters, separated by whitespace. The default
           is `https://cache.nixos.org`.
         )",
         {"binary-caches"}};
-
-    // FIXME: provide a way to add to option values.
-    Setting<Strings> extraSubstituters{
-        this, {}, "extra-substituters",
-        R"(
-          Additional binary caches appended to those specified in
-          `substituters`. When used by unprivileged users, untrusted
-          substituters (i.e. those not listed in `trusted-substituters`) are
-          silently ignored.
-        )",
-        {"extra-binary-caches"}};
 
     Setting<StringSet> trustedSubstituters{
         this, {}, "trusted-substituters",
@@ -836,7 +836,7 @@ public:
     Setting<uint64_t> minFreeCheckInterval{this, 5, "min-free-check-interval",
         "Number of seconds between checking free disk space."};
 
-    Setting<Paths> pluginFiles{
+    PluginFilesSetting pluginFiles{
         this, {}, "plugin-files",
         R"(
           A list of plugin files to be loaded by Nix. Each of these files will
@@ -847,6 +847,9 @@ public:
           implementations, RegisterCommand to add new subcommands to the `nix`
           command, and RegisterSetting to add new nix config settings. See the
           constructors for those types for more details.
+
+          Warning! These APIs are inherently unstable and may change from
+          release to release.
 
           Since these files are loaded into the same address space as Nix
           itself, they must be DSOs compatible with the instance of Nix
@@ -886,7 +889,7 @@ public:
           Example `~/.config/nix/nix.conf`:
 
           ```
-          access-tokens = "github.com=23ac...b289 gitlab.mycompany.com=PAT:A123Bp_Cd..EfG gitlab.com=OAuth2:1jklw3jk"
+          access-tokens = github.com=23ac...b289 gitlab.mycompany.com=PAT:A123Bp_Cd..EfG gitlab.com=OAuth2:1jklw3jk
           ```
 
           Example `~/code/flake.nix`:

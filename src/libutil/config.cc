@@ -8,9 +8,18 @@ namespace nix {
 
 bool Config::set(const std::string & name, const std::string & value)
 {
+    bool append = false;
     auto i = _settings.find(name);
-    if (i == _settings.end()) return false;
-    i->second.setting->set(value);
+    if (i == _settings.end()) {
+        if (hasPrefix(name, "extra-")) {
+            i = _settings.find(std::string(name, 6));
+            if (i == _settings.end() || !i->second.setting->isAppendable())
+                return false;
+            append = true;
+        } else
+            return false;
+    }
+    i->second.setting->set(value, append);
     i->second.setting->overriden = true;
     return true;
 }
@@ -181,18 +190,33 @@ void AbstractSetting::convertToArg(Args & args, const std::string & category)
 }
 
 template<typename T>
+bool BaseSetting<T>::isAppendable()
+{
+    return false;
+}
+
+template<typename T>
 void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
 {
     args.addFlag({
         .longName = name,
-        .description = description,
+        .description = fmt("Set the `%s` setting.", name),
         .category = category,
         .labels = {"value"},
         .handler = {[=](std::string s) { overriden = true; set(s); }},
     });
+
+    if (isAppendable())
+        args.addFlag({
+            .longName = "extra-" + name,
+            .description = fmt("Append to the `%s` setting.", name),
+            .category = category,
+            .labels = {"value"},
+            .handler = {[=](std::string s) { overriden = true; set(s, true); }},
+        });
 }
 
-template<> void BaseSetting<std::string>::set(const std::string & str)
+template<> void BaseSetting<std::string>::set(const std::string & str, bool append)
 {
     value = str;
 }
@@ -203,10 +227,12 @@ template<> std::string BaseSetting<std::string>::to_string() const
 }
 
 template<typename T>
-void BaseSetting<T>::set(const std::string & str)
+void BaseSetting<T>::set(const std::string & str, bool append)
 {
     static_assert(std::is_integral<T>::value, "Integer required.");
-    if (!string2Int(str, value))
+    if (auto n = string2Int<T>(str))
+        value = *n;
+    else
         throw UsageError("setting '%s' has invalid value '%s'", name, str);
 }
 
@@ -217,7 +243,7 @@ std::string BaseSetting<T>::to_string() const
     return std::to_string(value);
 }
 
-template<> void BaseSetting<bool>::set(const std::string & str)
+template<> void BaseSetting<bool>::set(const std::string & str, bool append)
 {
     if (str == "true" || str == "yes" || str == "1")
         value = true;
@@ -236,21 +262,28 @@ template<> void BaseSetting<bool>::convertToArg(Args & args, const std::string &
 {
     args.addFlag({
         .longName = name,
-        .description = description,
+        .description = fmt("Enable the `%s` setting.", name),
         .category = category,
         .handler = {[=]() { override(true); }}
     });
     args.addFlag({
         .longName = "no-" + name,
-        .description = description,
+        .description = fmt("Disable the `%s` setting.", name),
         .category = category,
         .handler = {[=]() { override(false); }}
     });
 }
 
-template<> void BaseSetting<Strings>::set(const std::string & str)
+template<> void BaseSetting<Strings>::set(const std::string & str, bool append)
 {
-    value = tokenizeString<Strings>(str);
+    auto ss = tokenizeString<Strings>(str);
+    if (!append) value.clear();
+    for (auto & s : ss) value.push_back(std::move(s));
+}
+
+template<> bool BaseSetting<Strings>::isAppendable()
+{
+    return true;
 }
 
 template<> std::string BaseSetting<Strings>::to_string() const
@@ -258,9 +291,16 @@ template<> std::string BaseSetting<Strings>::to_string() const
     return concatStringsSep(" ", value);
 }
 
-template<> void BaseSetting<StringSet>::set(const std::string & str)
+template<> void BaseSetting<StringSet>::set(const std::string & str, bool append)
 {
-    value = tokenizeString<StringSet>(str);
+    if (!append) value.clear();
+    for (auto & s : tokenizeString<StringSet>(str))
+        value.insert(s);
+}
+
+template<> bool BaseSetting<StringSet>::isAppendable()
+{
+    return true;
 }
 
 template<> std::string BaseSetting<StringSet>::to_string() const
@@ -268,16 +308,20 @@ template<> std::string BaseSetting<StringSet>::to_string() const
     return concatStringsSep(" ", value);
 }
 
-template<> void BaseSetting<StringMap>::set(const std::string & str)
+template<> void BaseSetting<StringMap>::set(const std::string & str, bool append)
 {
-    auto kvpairs = tokenizeString<Strings>(str);
-    for (auto & s : kvpairs)
-    {
+    if (!append) value.clear();
+    for (auto & s : tokenizeString<Strings>(str)) {
         auto eq = s.find_first_of('=');
         if (std::string::npos != eq)
             value.emplace(std::string(s, 0, eq), std::string(s, eq + 1));
         // else ignored
     }
+}
+
+template<> bool BaseSetting<StringMap>::isAppendable()
+{
+    return true;
 }
 
 template<> std::string BaseSetting<StringMap>::to_string() const
@@ -300,7 +344,7 @@ template class BaseSetting<Strings>;
 template class BaseSetting<StringSet>;
 template class BaseSetting<StringMap>;
 
-void PathSetting::set(const std::string & str)
+void PathSetting::set(const std::string & str, bool append)
 {
     if (str == "") {
         if (allowEmpty)

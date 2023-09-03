@@ -86,8 +86,7 @@ void BinaryCacheStore::getFile(const std::string & path, Sink & sink)
                 promise.set_exception(std::current_exception());
             }
         }});
-    auto data = promise.get_future().get();
-    sink((unsigned char *) data->data(), data->size());
+    sink(*promise.get_future().get());
 }
 
 std::shared_ptr<std::string> BinaryCacheStore::getFile(const std::string & path)
@@ -455,7 +454,9 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
     if (!repair && isValidPath(path))
         return path;
 
-    auto source = StringSource { s };
+    StringSink sink;
+    dumpString(s, sink);
+    auto source = StringSource { *sink.s };
     return addToStoreCommon(source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
             *this,
@@ -472,6 +473,24 @@ StorePath BinaryCacheStore::addTextToStore(const string & name, const string & s
         info.ca = TextHash { textHash };
         return info;
     })->path;
+}
+
+std::optional<const Realisation> BinaryCacheStore::queryRealisation(const DrvOutput & id)
+{
+    auto outputInfoFilePath = realisationsPrefix + "/" + id.to_string() + ".doi";
+    auto rawOutputInfo = getFile(outputInfoFilePath);
+
+    if (rawOutputInfo) {
+        return {Realisation::fromJSON(
+            nlohmann::json::parse(*rawOutputInfo), outputInfoFilePath)};
+    } else {
+        return std::nullopt;
+    }
+}
+
+void BinaryCacheStore::registerDrvOutput(const Realisation& info) {
+    auto filePath = realisationsPrefix + "/" + info.id.to_string() + ".doi";
+    upsertFile(filePath, info.toJSON().dump(), "application/json");
 }
 
 ref<FSAccessor> BinaryCacheStore::getFSAccessor()

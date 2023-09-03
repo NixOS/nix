@@ -15,15 +15,17 @@ rec {
     '';
   };
   rootCA = mkDerivation {
-    name = "dependent";
-    outputs = [ "out" "dev" ];
+    name = "rootCA";
+    outputs = [ "out" "dev" "foo"];
     buildCommand = ''
       echo "building a CA derivation"
       echo "The seed is ${toString seed}"
       mkdir -p $out
       echo ${rootLegacy}/hello > $out/dep
-      # test symlink at root
+      ln -s $out $out/self
+      # test symlinks at root
       ln -s $out $dev
+      ln -s $out $foo
     '';
     __contentAddressed = true;
     outputHashMode = "recursive";
@@ -34,7 +36,8 @@ rec {
     buildCommand = ''
       echo "building a dependent derivation"
       mkdir -p $out
-      echo ${rootCA}/hello > $out/dep
+      cat ${rootCA}/self/dep
+      echo ${rootCA}/self/dep > $out/dep
     '';
     __contentAddressed = true;
     outputHashMode = "recursive";
@@ -50,5 +53,25 @@ rec {
     __contentAddressed = true;
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
+  };
+  dependentNonCA = mkDerivation {
+    name = "dependent-non-ca";
+    buildCommand = ''
+      echo "Didn't cut-off"
+      echo "building dependent-non-ca"
+      mkdir -p $out
+      echo ${rootCA}/non-ca-hello > $out/dep
+    '';
+  };
+  dependentFixedOutput = mkDerivation {
+    name = "dependent-fixed-output";
+    outputHashMode = "recursive";
+    outputHashAlgo = "sha256";
+    outputHash = "sha256-QvtAMbUl/uvi+LCObmqOhvNOapHdA2raiI4xG5zI5pA=";
+    buildCommand = ''
+      cat ${dependentCA}/dep
+      echo foo > $out
+    '';
+
   };
 }

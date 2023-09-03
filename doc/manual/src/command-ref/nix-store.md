@@ -226,7 +226,7 @@ control what gets deleted and in what order:
     or TiB units.
 
 The behaviour of the collector is also influenced by the
-`keep-outputs` and `keep-derivations` variables in the Nix
+`keep-outputs` and `keep-derivations` settings in the Nix
 configuration file.
 
 By default, the collector prints the total number of freed bytes when it

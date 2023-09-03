@@ -6,13 +6,11 @@
 
 namespace nix {
 
-class S3BinaryCacheStore : public BinaryCacheStore
+class S3BinaryCacheStore : public virtual BinaryCacheStore
 {
 protected:
 
-    S3BinaryCacheStore(const Params & params)
-        : BinaryCacheStore(params)
-    { }
+    S3BinaryCacheStore(const Params & params);
 
 public:
 

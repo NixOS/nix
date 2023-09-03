@@ -159,7 +159,7 @@ public:
     HashSink(HashType ht);
     HashSink(const HashSink & h);
     ~HashSink();
-    void write(const unsigned char * data, size_t len) override;
+    void write(std::string_view data) override;
     HashResult finish() override;
     HashResult currentHash();
 };

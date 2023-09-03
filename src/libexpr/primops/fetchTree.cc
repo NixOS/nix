@@ -45,7 +45,7 @@ void emitTreeAttrs(
         // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
         auto emptyHash = Hash(htSHA1);
         mkString(*state.allocAttr(v, state.symbols.create("rev")), emptyHash.gitRev());
-        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitRev());
+        mkString(*state.allocAttr(v, state.symbols.create("shortRev")), emptyHash.gitShortRev());
     }
 
     if (auto treeHash = input.getTreeHash()) {
@@ -54,7 +54,8 @@ void emitTreeAttrs(
     }
 
     if (input.getType() == "git")
-        mkBool(*state.allocAttr(v, state.symbols.create("submodules")), maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
+        mkBool(*state.allocAttr(v, state.symbols.create("submodules")),
+            fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
 
     if (auto revCount = input.getRevCount())
         mkInt(*state.allocAttr(v, state.symbols.create("revCount")), *revCount);
@@ -95,26 +96,26 @@ static void fetchTree(
 
     state.forceValue(*args[0]);
 
-    if (args[0]->type == tAttrs) {
+    if (args[0]->type() == nAttrs) {
         state.forceAttrs(*args[0], pos);
 
         fetchers::Attrs attrs;
 
         for (auto & attr : *args[0]->attrs) {
             state.forceValue(*attr.value);
-            if (attr.value->type == tPath || attr.value->type == tString)
+            if (attr.value->type() == nPath || attr.value->type() == nString)
                 addURI(
                     state,
                     attrs,
                     attr.name,
                     state.coerceToString(*attr.pos, *attr.value, context, false, false)
                 );
-            else if (attr.value->type == tString)
+            else if (attr.value->type() == nString)
                 addURI(state, attrs, attr.name, attr.value->string.s);
-            else if (attr.value->type == tBool)
-                attrs.emplace(attr.name, fetchers::Explicit<bool>{attr.value->boolean});
-            else if (attr.value->type == tInt)
-                attrs.emplace(attr.name, attr.value->integer);
+            else if (attr.value->type() == nBool)
+                attrs.emplace(attr.name, Explicit<bool>{attr.value->boolean});
+            else if (attr.value->type() == nInt)
+                attrs.emplace(attr.name, uint64_t(attr.value->integer));
             else
                 throw TypeError("fetchTree argument '%s' is %s while a string, Boolean or integer is expected",
                     attr.name, showType(*attr.value));
@@ -125,7 +126,7 @@ static void fetchTree(
 
         if (!attrs.count("type"))
             throw Error({
-                .hint = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
+                .msg = hintfmt("attribute 'type' is missing in call to 'fetchTree'"),
                 .errPos = pos
             });
 
@@ -163,6 +164,7 @@ static void prim_fetchTree(EvalState & state, const Pos & pos, Value * * args, V
     fetchTree(state, pos, args, v, std::nullopt);
 }
 
+// FIXME: document
 static RegisterPrimOp primop_fetchTree("fetchTree", 1, prim_fetchTree);
 
 static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
@@ -173,7 +175,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
 
     state.forceValue(*args[0]);
 
-    if (args[0]->type == tAttrs) {
+    if (args[0]->type() == nAttrs) {
 
         state.forceAttrs(*args[0], pos);
 
@@ -187,14 +189,14 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
                 name = state.forceStringNoCtx(*attr.value, *attr.pos);
             else
                 throw EvalError({
-                    .hint = hintfmt("unsupported argument '%s' to '%s'", attr.name, who),
+                    .msg = hintfmt("unsupported argument '%s' to '%s'", attr.name, who),
                     .errPos = *attr.pos
                 });
             }
 
         if (!url)
             throw EvalError({
-                .hint = hintfmt("'url' argument required"),
+                .msg = hintfmt("'url' argument required"),
                 .errPos = pos
             });
     } else
@@ -236,7 +238,7 @@ static void fetch(EvalState & state, const Pos & pos, Value * * args, Value & v,
             ? state.store->queryPathInfo(storePath)->narHash
             : hashFile(htSHA256, path);
         if (hash != *expectedHash)
-            throw Error((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  wanted: %s\n  got:    %s",
+            throw Error((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
                 *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true));
     }
 
@@ -347,6 +349,11 @@ static RegisterPrimOp primop_fetchGit({
         - submodules  
           A Boolean parameter that specifies whether submodules should be
           checked out. Defaults to `false`.
+
+        - allRefs  
+          Whether to fetch all refs of the repository. With this argument being
+          true, it's possible to load a `rev` from *any* `ref` (by default only
+          `rev`s from the specified `ref` are supported).
 
       Here are some examples of how to use `fetchGit`.
 

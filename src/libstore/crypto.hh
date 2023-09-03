@@ -13,32 +13,40 @@ struct Key
 
     /* Construct Key from a string in the format
        ‘<name>:<key-in-base64>’. */
-    Key(const std::string & s);
+    Key(std::string_view s);
+
+    std::string to_string() const;
 
 protected:
-    Key(const std::string & name, const std::string & key)
-        : name(name), key(key) { }
+    Key(std::string_view name, std::string && key)
+        : name(name), key(std::move(key)) { }
 };
 
 struct PublicKey;
 
 struct SecretKey : Key
 {
-    SecretKey(const std::string & s);
+    SecretKey(std::string_view s);
 
     /* Return a detached signature of the given string. */
-    std::string signDetached(const std::string & s) const;
+    std::string signDetached(std::string_view s) const;
 
     PublicKey toPublicKey() const;
+
+    static SecretKey generate(std::string_view name);
+
+private:
+    SecretKey(std::string_view name, std::string && key)
+        : Key(name, std::move(key)) { }
 };
 
 struct PublicKey : Key
 {
-    PublicKey(const std::string & data);
+    PublicKey(std::string_view data);
 
 private:
-    PublicKey(const std::string & name, const std::string & key)
-        : Key(name, key) { }
+    PublicKey(std::string_view name, std::string && key)
+        : Key(name, std::move(key)) { }
     friend struct SecretKey;
 };
 

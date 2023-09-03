@@ -39,20 +39,21 @@ void parseGit(ParseSink & sink, Source & source, const Path & realStoreDir, cons
 static string getStringUntil(Source & source, char byte)
 {
     string s;
-    unsigned char n[1];
-    source(n, 1);
+    char n[1];
+    source(std::string_view { n, 1 });
     while (*n != byte) {
         s += *n;
-        source(n, 1);
+        source(std::string_view { n, 1 });
     }
     return s;
 }
 
 static string getString(Source & source, int n)
 {
-    std::vector<unsigned char> v(n);
-    source(v.data(), n);
-    return std::string(v.begin(), v.end());
+    std::string v;
+    v.resize(n);
+    source(v);
+    return v;
 }
 
 // Unfortunately, no access to libstore headers here.
@@ -77,15 +78,15 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
         sink.preallocateContents(size);
 
         unsigned long long left = size;
-        std::vector<unsigned char> buf(65536);
+        std::string buf;
+        buf.reserve(65536);
 
         while (left) {
             checkInterrupt();
-            auto n = buf.size();
-            if ((unsigned long long)n > left) n = left;
-            source(buf.data(), n);
-            sink.receiveContents(buf.data(), n);
-            left -= n;
+            buf.resize(std::min((unsigned long long)buf.capacity(), left));
+            source(buf);
+            sink.receiveContents(buf);
+            left -= buf.size();
         }
     } else if (type == "tree ") {
         unsigned long long size = std::stoi(getStringUntil(source, 0));
@@ -144,9 +145,9 @@ GitMode dumpGitBlob(const Path & path, const struct stat st, Sink & sink)
 {
     auto s = fmt("blob %d\0%s"s, std::to_string(st.st_size), readFile(path));
 
-    vector<uint8_t> v;
+    std::string v;
     std::copy(s.begin(), s.end(), std::back_inserter(v));
-    sink(v.data(), v.size());
+    sink(v);
     return st.st_mode & S_IXUSR
         ? GitMode::Executable
         : GitMode::Regular;
@@ -172,13 +173,13 @@ GitMode dumpGitTree(const GitTree & entries, Sink & sink)
         std::copy(i.second.second.hash, i.second.second.hash + 20, std::back_inserter(v1));
     }
 
-    vector<uint8_t> v2;
+    std::string v2;
     auto s2 = fmt("tree %d"s, v1.size());
     std::copy(s2.begin(), s2.end(), std::back_inserter(v2));
     v2.push_back(0);
     std::copy(v1.begin(), v1.end(), std::back_inserter(v2));
 
-    sink(v2.data(), v2.size());
+    sink(v2);
 
     return GitMode::Directory;
 }

@@ -15,6 +15,9 @@ hg init $repo
 echo '[ui]' >> $repo/.hg/hgrc
 echo 'username = Foobar <foobar@example.org>' >> $repo/.hg/hgrc
 
+# Set ui.tweakdefaults to ensure HGPLAIN is being set.
+echo 'tweakdefaults = True' >> $repo/.hg/hgrc
+
 echo utrecht > $repo/hello
 touch $repo/.hgignore
 hg add --cwd $repo hello .hgignore

@@ -5,9 +5,11 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 
+#include <nlohmann/json.hpp>
+
 using namespace nix;
 
-struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
+struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
 {
     Path outLink = "result";
     BuildMode buildMode = bmNormal;
@@ -17,7 +19,7 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
         addFlag({
             .longName = "out-link",
             .shortName = 'o',
-            .description = "path of the symlink to the build result",
+            .description = "Use *path* as prefix for the symlinks to the build results. It defaults to `result`.",
             .labels = {"path"},
             .handler = {&outLink},
             .completer = completePath
@@ -25,13 +27,13 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
 
         addFlag({
             .longName = "no-link",
-            .description = "do not create a symlink to the build result",
+            .description = "Do not create symlinks to the build results.",
             .handler = {&outLink, Path("")},
         });
 
         addFlag({
             .longName = "rebuild",
-            .description = "rebuild an already built package and compare the result to the existing store paths",
+            .description = "Rebuild an already built package and compare the result to the existing store paths.",
             .handler = {&buildMode, bmCheck},
         });
     }
@@ -41,22 +43,11 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
         return "build a derivation or fetch a store path";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To build and run GNU Hello from NixOS 17.03:",
-                "nix build -f channel:nixos-17.03 hello; ./result/bin/hello"
-            },
-            Example{
-                "To build the build.x86_64-linux attribute from release.nix:",
-                "nix build -f release.nix build.x86_64-linux"
-            },
-            Example{
-                "To make a profile point at GNU Hello:",
-                "nix build --profile /tmp/profile nixpkgs#hello"
-            },
-        };
+        return
+          #include "build.md"
+          ;
     }
 
     void run(ref<Store> store) override
@@ -67,7 +58,8 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
 
         if (outLink != "")
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
-                for (size_t i = 0; i < buildables.size(); ++i)
+                for (const auto & [_i, buildable] : enumerate(buildables)) {
+                    auto i = _i;
                     std::visit(overloaded {
                         [&](BuildableOpaque bo) {
                             std::string symlink = outLink;
@@ -83,9 +75,12 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixProfile
                                 store2->addPermRoot(output.second, absPath(symlink));
                             }
                         },
-                    }, buildables[i]);
+                    }, buildable);
+                }
 
         updateProfile(buildables);
+
+        if (json) logger->cout("%s", buildablesToJSON(buildables, store).dump());
     }
 };
 

@@ -18,8 +18,6 @@ namespace nix {
 /* The traditional non-fixed-output derivation type. */
 struct DerivationOutputInputAddressed
 {
-    /* Will need to become `std::optional<StorePath>` once input-addressed
-       derivations are allowed to depend on cont-addressed derivations */
     StorePath path;
 };
 
@@ -41,12 +39,18 @@ struct DerivationOutputCAFloating
     HashType hashType;
 };
 
+/* Input-addressed output which depends on a (CA) derivation whose hash isn't
+ * known atm
+ */
+struct DerivationOutputDeferred {};
+
 struct DerivationOutput
 {
     std::variant<
         DerivationOutputInputAddressed,
         DerivationOutputCAFixed,
-        DerivationOutputCAFloating
+        DerivationOutputCAFloating,
+        DerivationOutputDeferred
     > output;
     std::optional<HashType> hashAlgoOpt(const Store & store) const;
     /* Note, when you use this function you should make sure that you're passing
@@ -72,6 +76,7 @@ typedef std::map<string, string> StringPairs;
 
 enum struct DerivationType : uint8_t {
     InputAddressed,
+    DeferredInputAddressed,
     CAFixed,
     CAFloating,
 };
@@ -167,9 +172,12 @@ std::string outputPathName(std::string_view drvName, std::string_view outputName
 // whose output hashes are always known since they are fixed up-front.
 typedef std::map<std::string, Hash> CaOutputHashes;
 
+struct DeferredHash { Hash hash; };
+
 typedef std::variant<
     Hash, // regular DRV normalized hash
-    CaOutputHashes
+    CaOutputHashes, // Fixed-output derivation hashes
+    DeferredHash // Deferred hashes for floating outputs drvs and their dependencies
 > DrvHashModulo;
 
 /* Returns hashes with the details of fixed-output subderivations
@@ -197,20 +205,17 @@ typedef std::variant<
  */
 DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs);
 
+/*
+   Return a map associating each output to a hash that uniquely identifies its
+   derivation (modulo the self-references).
+ */
+std::map<std::string, Hash> staticOutputHashes(Store& store, const Derivation& drv);
+
 /* Memoisation of hashDerivationModulo(). */
 typedef std::map<StorePath, DrvHashModulo> DrvHashes;
 
-extern DrvHashes drvHashes; // FIXME: global, not thread-safe
-
-/* Memoisation of `readDerivation(..).resove()`. */
-typedef std::map<
-    StorePath,
-    std::optional<StorePath>
-> DrvPathResolutions;
-
 // FIXME: global, though at least thread-safe.
-// FIXME: arguably overlaps with hashDerivationModulo memo table.
-extern Sync<DrvPathResolutions> drvPathResolutions;
+extern Sync<DrvHashes> drvHashes;
 
 bool wantOutput(const string & output, const std::set<string> & wanted);
 

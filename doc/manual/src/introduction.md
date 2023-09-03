@@ -165,10 +165,10 @@ You’re then dropped into a shell where you can edit, build and test
 the package:
 
 ```console
-[nix-shell]$ tar xf $src
+[nix-shell]$ unpackPhase
 [nix-shell]$ cd pan-*
-[nix-shell]$ ./configure
-[nix-shell]$ make
+[nix-shell]$ configurePhase
+[nix-shell]$ buildPhase
 [nix-shell]$ ./pan/gui/pan
 ```
 

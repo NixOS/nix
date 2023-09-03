@@ -16,30 +16,30 @@ void printValueAsJSON(EvalState & state, bool strict,
 
     if (strict) state.forceValue(v);
 
-    switch (v.type) {
+    switch (v.type()) {
 
-        case tInt:
+        case nInt:
             out.write(v.integer);
             break;
 
-        case tBool:
+        case nBool:
             out.write(v.boolean);
             break;
 
-        case tString:
+        case nString:
             copyContext(v, context);
             out.write(v.string.s);
             break;
 
-        case tPath:
+        case nPath:
             out.write(state.copyPathToStore(context, v.path));
             break;
 
-        case tNull:
+        case nNull:
             out.write(nullptr);
             break;
 
-        case tAttrs: {
+        case nAttrs: {
             auto maybeString = state.tryAttrsToString(noPos, v, context, false, false);
             if (maybeString) {
                 out.write(*maybeString);
@@ -61,7 +61,7 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
         }
 
-        case tList1: case tList2: case tListN: {
+        case nList: {
             auto list(out.list());
             for (unsigned int n = 0; n < v.listSize(); ++n) {
                 auto placeholder(list.placeholder());
@@ -70,15 +70,18 @@ void printValueAsJSON(EvalState & state, bool strict,
             break;
         }
 
-        case tExternal:
+        case nExternal:
             v.external->printValueAsJSON(state, strict, out, context);
             break;
 
-        case tFloat:
+        case nFloat:
             out.write(v.fpoint);
             break;
 
-        default:
+        case nThunk:
+            throw TypeError("cannot convert %1% to JSON", showType(v));
+
+        case nFunction:
             throw TypeError("cannot convert %1% to JSON", showType(v));
     }
 }

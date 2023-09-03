@@ -276,18 +276,18 @@ git -C $flake3Dir commit -m 'Add lockfile'
 # Test whether registry caching works.
 nix registry list --flake-registry file://$registry | grep -q flake3
 mv $registry $registry.tmp
-nix-store --gc
+nix store gc
 nix registry list --flake-registry file://$registry --refresh | grep -q flake3
 mv $registry.tmp $registry
 
 # Test whether flakes are registered as GC roots for offline use.
 # FIXME: use tarballs rather than git.
 rm -rf $TEST_HOME/.cache
-nix-store --gc # get rid of copies in the store to ensure they get fetched to our git cache
+nix store gc # get rid of copies in the store to ensure they get fetched to our git cache
 _NIX_FORCE_HTTP=1 nix build -o $TEST_ROOT/result git+file://$flake2Dir#bar
 mv $flake1Dir $flake1Dir.tmp
 mv $flake2Dir $flake2Dir.tmp
-nix-store --gc
+nix store gc
 _NIX_FORCE_HTTP=1 nix build -o $TEST_ROOT/result git+file://$flake2Dir#bar
 _NIX_FORCE_HTTP=1 nix build -o $TEST_ROOT/result git+file://$flake2Dir#bar --refresh
 mv $flake1Dir.tmp $flake1Dir

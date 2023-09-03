@@ -52,9 +52,7 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
     for (auto & attr : tokens) {
 
         /* Is i an index (integer) or a normal attribute name? */
-        enum { apAttr, apIndex } apType = apAttr;
-        unsigned int attrIndex;
-        if (string2Int(attr, attrIndex)) apType = apIndex;
+        auto attrIndex = string2Int<unsigned int>(attr);
 
         /* Evaluate the expression. */
         Value * vNew = state.allocValue();
@@ -65,9 +63,9 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
         /* It should evaluate to either a set or an expression,
            according to what is specified in the attrPath. */
 
-        if (apType == apAttr) {
+        if (!attrIndex) {
 
-            if (v->type != tAttrs)
+            if (v->type() != nAttrs)
                 throw TypeError(
                     "the expression selected by the selection path '%1%' should be a set but is %2%",
                     attrPath,
@@ -82,17 +80,17 @@ std::pair<Value *, Pos> findAlongAttrPath(EvalState & state, const string & attr
             pos = *a->pos;
         }
 
-        else if (apType == apIndex) {
+        else {
 
             if (!v->isList())
                 throw TypeError(
                     "the expression selected by the selection path '%1%' should be a list but is %2%",
                     attrPath,
                     showType(*v));
-            if (attrIndex >= v->listSize())
-                throw AttrPathNotFound("list index %1% in selection path '%2%' is out of range", attrIndex, attrPath);
+            if (*attrIndex >= v->listSize())
+                throw AttrPathNotFound("list index %1% in selection path '%2%' is out of range", *attrIndex, attrPath);
 
-            v = v->listElems()[attrIndex];
+            v = v->listElems()[*attrIndex];
             pos = noPos;
         }
 

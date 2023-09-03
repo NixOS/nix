@@ -50,7 +50,7 @@ let pkgs = rec {
   # ruby "interpreter" that outputs "$@"
   ruby = runCommand "ruby" {} ''
     mkdir -p $out/bin
-    echo 'printf -- "$*"' > $out/bin/ruby
+    echo 'printf %s "$*"' > $out/bin/ruby
     chmod a+rx $out/bin/ruby
   '';
 

@@ -77,7 +77,7 @@ public:
         auto a = get(name);
         if (!a)
             throw Error({
-                .hint = hintfmt("attribute '%s' missing", name),
+                .msg = hintfmt("attribute '%s' missing", name),
                 .errPos = pos
             });
 

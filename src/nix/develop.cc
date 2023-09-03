@@ -11,6 +11,19 @@
 
 using namespace nix;
 
+struct DevelopSettings : Config
+{
+    Setting<std::string> bashPrompt{this, "", "bash-prompt",
+        "The bash prompt (`PS1`) in `nix develop` shells."};
+
+    Setting<std::string> bashPromptSuffix{this, "", "bash-prompt-suffix",
+        "Suffix appended to the `PS1` environment variable in `nix develop` shells."};
+};
+
+static DevelopSettings developSettings;
+
+static GlobalConfig::Register rDevelopSettings(&developSettings);
+
 struct Var
 {
     bool exported = true;
@@ -39,21 +52,24 @@ BuildEnvironment readEnvironment(const Path & path)
     static std::string varNameRegex =
         R"re((?:[a-zA-Z_][a-zA-Z0-9_]*))re";
 
-    static std::regex declareRegex(
-        "^declare -x (" + varNameRegex + ")" +
-        R"re((?:="((?:[^"\\]|\\.)*)")?\n)re");
-
     static std::string simpleStringRegex =
         R"re((?:[a-zA-Z0-9_/:\.\-\+=]*))re";
 
-    static std::string quotedStringRegex =
-        R"re((?:\$?'(?:[^'\\]|\\[abeEfnrtv\\'"?])*'))re";
+    static std::string dquotedStringRegex =
+        R"re((?:\$?"(?:[^"\\]|\\[$`"\\\n])*"))re";
+
+    static std::string squotedStringRegex =
+        R"re((?:\$?(?:'(?:[^'\\]|\\[abeEfnrtv\\'"?])*'|\\')+))re";
 
     static std::string indexedArrayRegex =
         R"re((?:\(( *\[[0-9]+\]="(?:[^"\\]|\\.)*")*\)))re";
 
+    static std::regex declareRegex(
+        "^declare -a?x (" + varNameRegex + ")(=(" +
+        dquotedStringRegex + "|" + indexedArrayRegex + "))?\n");
+
     static std::regex varRegex(
-        "^(" + varNameRegex + ")=(" + simpleStringRegex + "|" + quotedStringRegex + "|" + indexedArrayRegex + ")\n");
+        "^(" + varNameRegex + ")=(" + simpleStringRegex + "|" + squotedStringRegex + "|" + indexedArrayRegex + ")\n");
 
     /* Note: we distinguish between an indexed and associative array
        using the space before the closing parenthesis. Will
@@ -182,7 +198,22 @@ struct Common : InstallableCommand, MixProfile
         "UID",
     };
 
+    std::vector<std::pair<std::string, std::string>> redirects;
+
+    Common()
+    {
+        addFlag({
+            .longName = "redirect",
+            .description = "Redirect a store path to a mutable location.",
+            .labels = {"installable", "outputs-dir"},
+            .handler = {[&](std::string installable, std::string outputsDir) {
+                redirects.push_back({installable, outputsDir});
+            }}
+        });
+    }
+
     std::string makeRcScript(
+        ref<Store> store,
         const BuildEnvironment & buildEnvironment,
         const Path & outputsDir = absPath(".") + "/outputs")
     {
@@ -208,11 +239,13 @@ struct Common : InstallableCommand, MixProfile
 
         out << buildEnvironment.bashFunctions << "\n";
 
-        out << "export NIX_BUILD_TOP=\"$(mktemp -d --tmpdir nix-shell.XXXXXX)\"\n";
+        out << "export NIX_BUILD_TOP=\"$(mktemp -d -t nix-shell.XXXXXX)\"\n";
         for (auto & i : {"TMP", "TMPDIR", "TEMP", "TEMPDIR"})
             out << fmt("export %s=\"$NIX_BUILD_TOP\"\n", i);
 
         out << "eval \"$shellHook\"\n";
+
+        auto script = out.str();
 
         /* Substitute occurrences of output paths. */
         auto outputs = buildEnvironment.env.find("outputs");
@@ -227,7 +260,33 @@ struct Common : InstallableCommand, MixProfile
             rewrites.insert({from->second.quoted, outputsDir + "/" + outputName});
         }
 
-        return rewriteStrings(out.str(), rewrites);
+        /* Substitute redirects. */
+        for (auto & [installable_, dir_] : redirects) {
+            auto dir = absPath(dir_);
+            auto installable = parseInstallable(store, installable_);
+            auto buildable = installable->toBuildable();
+            auto doRedirect = [&](const StorePath & path)
+            {
+                auto from = store->printStorePath(path);
+                if (script.find(from) == std::string::npos)
+                    warn("'%s' (path '%s') is not used by this build environment", installable->what(), from);
+                else {
+                    printInfo("redirecting '%s' to '%s'", from, dir);
+                    rewrites.insert({from, dir});
+                }
+            };
+            std::visit(overloaded {
+                [&](const BuildableOpaque & bo) {
+                    doRedirect(bo.path);
+                },
+                [&](const BuildableFromDrv & bfd) {
+                    for (auto & [outputName, path] : bfd.outputs)
+                        if (path) doRedirect(*path);
+                },
+            }, buildable);
+        }
+
+        return rewriteStrings(script, rewrites);
     }
 
     Strings getDefaultFlakeAttrPaths() override
@@ -275,7 +334,7 @@ struct CmdDevelop : Common, MixEnvironment
         addFlag({
             .longName = "command",
             .shortName = 'c',
-            .description = "command and arguments to be executed instead of an interactive shell",
+            .description = "Instead of starting an interactive shell, start the specified command and arguments.",
             .labels = {"command", "args"},
             .handler = {[&](std::vector<std::string> ss) {
                 if (ss.empty()) throw UsageError("--command requires at least one argument");
@@ -285,38 +344,38 @@ struct CmdDevelop : Common, MixEnvironment
 
         addFlag({
             .longName = "phase",
-            .description = "phase to run (e.g. `build` or `configure`)",
+            .description = "The stdenv phase to run (e.g. `build` or `configure`).",
             .labels = {"phase-name"},
             .handler = {&phase},
         });
 
         addFlag({
             .longName = "configure",
-            .description = "run the configure phase",
+            .description = "Run the `configure` phase.",
             .handler = {&phase, {"configure"}},
         });
 
         addFlag({
             .longName = "build",
-            .description = "run the build phase",
+            .description = "Run the `build` phase.",
             .handler = {&phase, {"build"}},
         });
 
         addFlag({
             .longName = "check",
-            .description = "run the check phase",
+            .description = "Run the `check` phase.",
             .handler = {&phase, {"check"}},
         });
 
         addFlag({
             .longName = "install",
-            .description = "run the install phase",
+            .description = "Run the `install` phase.",
             .handler = {&phase, {"install"}},
         });
 
         addFlag({
             .longName = "installcheck",
-            .description = "run the installcheck phase",
+            .description = "Run the `installcheck` phase.",
             .handler = {&phase, {"installCheck"}},
         });
     }
@@ -326,26 +385,11 @@ struct CmdDevelop : Common, MixEnvironment
         return "run a bash shell that provides the build environment of a derivation";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To get the build environment of GNU hello:",
-                "nix develop nixpkgs#hello"
-            },
-            Example{
-                "To get the build environment of the default package of flake in the current directory:",
-                "nix develop"
-            },
-            Example{
-                "To store the build environment in a profile:",
-                "nix develop --profile /tmp/my-shell nixpkgs#hello"
-            },
-            Example{
-                "To use a build environment previously recorded in a profile:",
-                "nix develop /tmp/my-shell"
-            },
-        };
+        return
+          #include "develop.md"
+          ;
     }
 
     void run(ref<Store> store) override
@@ -354,7 +398,7 @@ struct CmdDevelop : Common, MixEnvironment
 
         auto [rcFileFd, rcFilePath] = createTempFile("nix-shell");
 
-        auto script = makeRcScript(buildEnvironment);
+        auto script = makeRcScript(store, buildEnvironment);
 
         if (verbosity >= lvlDebug)
             script += "set -x\n";
@@ -368,7 +412,6 @@ struct CmdDevelop : Common, MixEnvironment
             // rid of that.
             script += fmt("foundMakefile=1\n");
             script += fmt("runHook %1%Phase\n", *phase);
-            script += fmt("exit 0\n", *phase);
         }
 
         else if (!command.empty()) {
@@ -380,6 +423,10 @@ struct CmdDevelop : Common, MixEnvironment
 
         else {
             script += "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;\n";
+            if (developSettings.bashPrompt != "")
+                script += fmt("[ -n \"$PS1\" ] && PS1=%s;\n", shellEscape(developSettings.bashPrompt));
+            if (developSettings.bashPromptSuffix != "")
+                script += fmt("[ -n \"$PS1\" ] && PS1+=%s;\n", shellEscape(developSettings.bashPromptSuffix));
         }
 
         writeFull(rcFileFd.get(), script);
@@ -396,6 +443,7 @@ struct CmdDevelop : Common, MixEnvironment
             auto state = getEvalState();
 
             auto bashInstallable = std::make_shared<InstallableFlake>(
+                this,
                 state,
                 installable->nixpkgsFlakeRef(),
                 Strings{"bashInteractive"},
@@ -408,7 +456,10 @@ struct CmdDevelop : Common, MixEnvironment
             ignoreException();
         }
 
-        auto args = Strings{std::string(baseNameOf(shell)), "--rcfile", rcFilePath};
+        // If running a phase or single command, don't want an interactive shell running after
+        // Ctrl-C, so don't pass --rcfile
+        auto args = phase || !command.empty() ? Strings{std::string(baseNameOf(shell)), rcFilePath}
+            : Strings{std::string(baseNameOf(shell)), "--rcfile", rcFilePath};
 
         restoreAffinity();
         restoreSignals();
@@ -426,14 +477,11 @@ struct CmdPrintDevEnv : Common
         return "print shell code that can be sourced by bash to reproduce the build environment of a derivation";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To apply the build environment of GNU hello to the current shell:",
-                ". <(nix print-dev-env nixpkgs#hello)"
-            },
-        };
+        return
+          #include "print-dev-env.md"
+          ;
     }
 
     Category category() override { return catUtility; }
@@ -444,7 +492,7 @@ struct CmdPrintDevEnv : Common
 
         stopProgressBar();
 
-        std::cout << makeRcScript(buildEnvironment);
+        std::cout << makeRcScript(store, buildEnvironment);
     }
 };
 

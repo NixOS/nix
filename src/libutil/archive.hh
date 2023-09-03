@@ -59,17 +59,17 @@ struct RetrieveRegularNARSink : ParseSink
 
     RetrieveRegularNARSink(Sink & sink) : sink(sink) { }
 
-    void createDirectory(const Path & path)
+    void createDirectory(const Path & path) override
     {
         regular = false;
     }
 
-    void receiveContents(unsigned char * data, size_t len)
+    void receiveContents(std::string_view data) override
     {
-        sink(data, len);
+        sink(data);
     }
 
-    void createSymlink(const Path & path, const string & target)
+    void createSymlink(const Path & path, const string & target) override
     {
         regular = false;
     }

@@ -27,6 +27,8 @@ struct ArchiveSettings : Config
         #endif
         "use-case-hack",
         "Whether to enable a Darwin-specific hack for dealing with file name collisions."};
+    Setting<bool> preallocateContents{this, false, "preallocate-contents",
+        "Whether to preallocate files when writing objects with known size."};
 };
 
 static ArchiveSettings archiveSettings;
@@ -48,14 +50,14 @@ static void dumpContents(const Path & path, size_t size,
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd) throw SysError("opening file '%1%'", path);
 
-    std::vector<unsigned char> buf(65536);
+    std::vector<char> buf(65536);
     size_t left = size;
 
     while (left > 0) {
         auto n = std::min(left, buf.size());
         readFull(fd.get(), buf.data(), n);
         left -= n;
-        sink(buf.data(), n);
+        sink({buf.data(), n});
     }
 
     writePadding(size, sink);
@@ -153,14 +155,14 @@ static void parseContents(ParseSink & sink, Source & source, const Path & path)
     sink.preallocateContents(size);
 
     uint64_t left = size;
-    std::vector<unsigned char> buf(65536);
+    std::vector<char> buf(65536);
 
     while (left) {
         checkInterrupt();
         auto n = buf.size();
         if ((uint64_t)n > left) n = left;
         source(buf.data(), n);
-        sink.receiveContents(buf.data(), n);
+        sink.receiveContents({buf.data(), n});
         left -= n;
     }
 

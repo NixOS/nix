@@ -65,9 +65,9 @@ void RestoreSink::preallocateContents(uint64_t len)
 #endif
 }
 
-void RestoreSink::receiveContents(unsigned char * data, size_t len)
+void RestoreSink::receiveContents(std::string_view data)
 {
-    writeFull(fd.get(), data, len);
+    writeFull(fd.get(), data);
 }
 
 void RestoreSink::createSymlink(const Path & path, const string & target)

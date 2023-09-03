@@ -184,7 +184,7 @@ struct JSONLogger : Logger {
         json["action"] = "msg";
         json["level"] = ei.level;
         json["msg"] = oss.str();
-        json["raw_msg"] = ei.hint->str();
+        json["raw_msg"] = ei.msg.str();
 
         if (ei.errPos.has_value() && (*ei.errPos)) {
             json["line"] = ei.errPos->line;
@@ -305,10 +305,7 @@ bool handleJSONLogMessage(const std::string & msg,
         }
 
     } catch (std::exception & e) {
-        logError({
-            .name = "Json log message",
-            .hint = hintfmt("bad log message from builder: %s", e.what())
-        });
+        printError("bad JSON log message from builder: %s", e.what());
     }
 
     return true;

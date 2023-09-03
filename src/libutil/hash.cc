@@ -193,7 +193,7 @@ Hash Hash::parseAny(std::string_view original, std::optional<HashType> optType)
     // Either the string or user must provide the type, if they both do they
     // must agree.
     if (!optParsedType && !optType)
-        throw BadHash("hash '%s' does not include a type, nor is the type otherwise known from context.", rest);
+        throw BadHash("hash '%s' does not include a type, nor is the type otherwise known from context", rest);
     else if (optParsedType && optType && *optParsedType != *optType)
         throw BadHash("hash '%s' should have type '%s'", original, printHashType(*optType));
 
@@ -292,12 +292,12 @@ static void start(HashType ht, Ctx & ctx)
 
 
 static void update(HashType ht, Ctx & ctx,
-    const unsigned char * bytes, size_t len)
+    std::string_view data)
 {
-    if (ht == htMD5) MD5_Update(&ctx.md5, bytes, len);
-    else if (ht == htSHA1) SHA1_Update(&ctx.sha1, bytes, len);
-    else if (ht == htSHA256) SHA256_Update(&ctx.sha256, bytes, len);
-    else if (ht == htSHA512) SHA512_Update(&ctx.sha512, bytes, len);
+    if (ht == htMD5) MD5_Update(&ctx.md5, data.data(), data.size());
+    else if (ht == htSHA1) SHA1_Update(&ctx.sha1, data.data(), data.size());
+    else if (ht == htSHA256) SHA256_Update(&ctx.sha256, data.data(), data.size());
+    else if (ht == htSHA512) SHA512_Update(&ctx.sha512, data.data(), data.size());
 }
 
 
@@ -315,7 +315,7 @@ Hash hashString(HashType ht, std::string_view s)
     Ctx ctx;
     Hash hash(ht);
     start(ht, ctx);
-    update(ht, ctx, (const unsigned char *) s.data(), s.length());
+    update(ht, ctx, s);
     finish(ht, ctx, hash.hash);
     return hash;
 }
@@ -342,10 +342,10 @@ HashSink::~HashSink()
     delete ctx;
 }
 
-void HashSink::write(const unsigned char * data, size_t len)
+void HashSink::write(std::string_view data)
 {
-    bytes += len;
-    update(ht, *ctx, data, len);
+    bytes += data.size();
+    update(ht, *ctx, data);
 }
 
 HashResult HashSink::finish()

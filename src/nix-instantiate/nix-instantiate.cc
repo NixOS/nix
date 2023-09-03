@@ -10,7 +10,7 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 #include "common-eval-args.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 
 #include <map>
 #include <iostream>
@@ -148,8 +148,6 @@ static int main_nix_instantiate(int argc, char * * argv)
         });
 
         myArgs.parseCmdline(argvToStrings(argc, argv));
-
-        initPlugins();
 
         if (evalOnly && !wantsReadWrite)
             settings.readOnlyMode = true;

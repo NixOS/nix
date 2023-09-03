@@ -60,12 +60,13 @@ struct GitInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "git") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "gitIngestion" && name != "treeHash" && name != "lastModified" && name != "revCount" && name != "narHash")
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "gitIngestion" && name != "treeHash" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs")
                 throw Error("unsupported Git input attribute '%s'", name);
 
         parseURL(getStrAttr(attrs, "url"));
         maybeGetBoolAttr(attrs, "shallow");
         maybeGetBoolAttr(attrs, "submodules");
+        maybeGetBoolAttr(attrs, "allRefs");
 
         if (auto ref = maybeGetStrAttr(attrs, "ref")) {
             if (std::regex_search(*ref, badGitRefRegex))
@@ -180,10 +181,12 @@ struct GitInputScheme : InputScheme
 
         bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
         bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
+        bool allRefs = maybeGetBoolAttr(input.attrs, "allRefs").value_or(false);
 
         std::string cacheType = "git";
         if (shallow) cacheType += "-shallow";
         if (submodules) cacheType += "-submodules";
+        if (allRefs) cacheType += "-all-refs";
 
         auto ingestionMethod =
             maybeGetBoolAttr(input.attrs, "gitIngestion").value_or((bool) input.getTreeHash())
@@ -304,7 +307,7 @@ struct GitInputScheme : InputScheme
 
                 return {
                     Tree {
-                        store->printStorePath(storePath),
+                        store->toRealPath(storePath),
                         std::move(storePathDesc),
                     },
                     input
@@ -398,11 +401,15 @@ struct GitInputScheme : InputScheme
                     }
                 }
             } else {
-                /* If the local ref is older than ‘tarball-ttl’ seconds, do a
-                   git fetch to update the local ref to the remote ref. */
-                struct stat st;
-                doFetch = stat(localRefFile.c_str(), &st) != 0 ||
-                    (uint64_t) st.st_mtime + settings.tarballTtl <= (uint64_t) now;
+                if (allRefs) {
+                    doFetch = true;
+                } else {
+                    /* If the local ref is older than ‘tarball-ttl’ seconds, do a
+                       git fetch to update the local ref to the remote ref. */
+                    struct stat st;
+                    doFetch = stat(localRefFile.c_str(), &st) != 0 ||
+                        (uint64_t) st.st_mtime + settings.tarballTtl <= (uint64_t) now;
+                }
             }
 
             if (doFetch) {
@@ -412,9 +419,11 @@ struct GitInputScheme : InputScheme
                 // we're using --quiet for now. Should process its stderr.
                 try {
                     auto ref = input.getRef();
-                    auto fetchRef = ref->compare(0, 5, "refs/") == 0
-                        ? *ref
-                        : "refs/heads/" + *ref;
+                    auto fetchRef = allRefs
+                        ? "refs/*"
+                        : ref->compare(0, 5, "refs/") == 0
+                            ? *ref
+                            : "refs/heads/" + *ref;
                     runProgram("git", true, { "-C", repoDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", fetchRef, fetchRef) });
                 } catch (Error & e) {
                     if (!pathExists(localRefFile)) throw;
@@ -465,13 +474,43 @@ struct GitInputScheme : InputScheme
         AutoDelete delTmpDir(tmpDir, true);
         PathFilter filter = defaultPathFilter;
 
-        if (submodules) {
-            if (input.getTreeHash())
-                throw Error("Cannot fetch specific tree hashes if there are submodules");
-            warn("Nix's computed git tree hash will be different when submodules are converted to regular directories");
+        auto [gitHash, gitHashType] = input.getTreeHash()
+            ? (std::pair { input.getTreeHash().value(), true })
+            : (std::pair { input.getRev().value(), false });
+
+        RunOptions checkCommitOpts(
+            "git",
+            {
+                "-C", repoDir,
+                "cat-file",
+                gitHashType ? "tree" : "commit",
+                gitHash.gitRev(),
+            }
+        );
+        checkCommitOpts.searchPath = true;
+        checkCommitOpts.mergeStderrToStdout = true;
+
+        auto result = runProgram(checkCommitOpts);
+        if (WEXITSTATUS(result.first) == 128
+            && result.second.find("bad file") != std::string::npos
+        ) {
+            throw Error(
+                "Cannot find Git revision '%s' in ref '%s' of repository '%s'! "
+                    "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the "
+                    ANSI_BOLD "ref" ANSI_NORMAL " you've specified or add " ANSI_BOLD
+                    "allRefs = true;" ANSI_NORMAL " to " ANSI_BOLD "fetchGit" ANSI_NORMAL ".",
+                gitHash.gitRev(),
+                *input.getRef(),
+                actualUrl
+            );
         }
 
         if (submodules) {
+            if (input.getTreeHash())
+                throw Error("Cannot fetch specific tree hashes if there are submodules");
+            if (ingestionMethod == FileIngestionMethod::Git)
+                warn("Nix's computed git tree hash will be different when submodules are converted to regular directories");
+
             Path tmpGitDir = createTempDir();
             AutoDelete delTmpGitDir(tmpGitDir, true);
 

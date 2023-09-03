@@ -2,9 +2,9 @@ source common.sh
 
 clearStore
 
-garbage1=$(nix add-to-store --name garbage1 ./nar-access.sh)
-garbage2=$(nix add-to-store --name garbage2 ./nar-access.sh)
-garbage3=$(nix add-to-store --name garbage3 ./nar-access.sh)
+garbage1=$(nix store add-path --name garbage1 ./nar-access.sh)
+garbage2=$(nix store add-path --name garbage2 ./nar-access.sh)
+garbage3=$(nix store add-path --name garbage3 ./nar-access.sh)
 
 ls -l $garbage3
 POSIXLY_CORRECT=1 du $garbage3

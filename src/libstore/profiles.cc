@@ -21,9 +21,8 @@ static std::optional<GenerationNumber> parseName(const string & profileName, con
     string s = string(name, profileName.size() + 1);
     string::size_type p = s.find("-link");
     if (p == string::npos) return {};
-    unsigned int n;
-    if (string2Int(string(s, 0, p), n) && n >= 0)
-        return n;
+    if (auto n = string2Int<unsigned int>(s.substr(0, p)))
+        return *n;
     else
         return {};
 }
@@ -214,12 +213,12 @@ void deleteGenerationsOlderThan(const Path & profile, const string & timeSpec, b
 {
     time_t curTime = time(0);
     string strDays = string(timeSpec, 0, timeSpec.size() - 1);
-    int days;
+    auto days = string2Int<int>(strDays);
 
-    if (!string2Int(strDays, days) || days < 1)
+    if (!days || *days < 1)
         throw Error("invalid number of days specifier '%1%'", timeSpec);
 
-    time_t oldTime = curTime - days * 24 * 3600;
+    time_t oldTime = curTime - *days * 24 * 3600;
 
     deleteGenerationsOlderThan(profile, oldTime, dryRun);
 }

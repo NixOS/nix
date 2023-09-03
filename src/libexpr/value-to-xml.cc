@@ -58,31 +58,31 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 
     if (strict) state.forceValue(v);
 
-    switch (v.type) {
+    switch (v.type()) {
 
-        case tInt:
+        case nInt:
             doc.writeEmptyElement("int", singletonAttrs("value", (format("%1%") % v.integer).str()));
             break;
 
-        case tBool:
+        case nBool:
             doc.writeEmptyElement("bool", singletonAttrs("value", v.boolean ? "true" : "false"));
             break;
 
-        case tString:
+        case nString:
             /* !!! show the context? */
             copyContext(v, context);
             doc.writeEmptyElement("string", singletonAttrs("value", v.string.s));
             break;
 
-        case tPath:
+        case nPath:
             doc.writeEmptyElement("path", singletonAttrs("value", v.path));
             break;
 
-        case tNull:
+        case nNull:
             doc.writeEmptyElement("null");
             break;
 
-        case tAttrs:
+        case nAttrs:
             if (state.isDerivation(v)) {
                 XMLAttrs xmlAttrs;
 
@@ -92,14 +92,14 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
                 a = v.attrs->find(state.sDrvPath);
                 if (a != v.attrs->end()) {
                     if (strict) state.forceValue(*a->value);
-                    if (a->value->type == tString)
+                    if (a->value->type() == nString)
                         xmlAttrs["drvPath"] = drvPath = a->value->string.s;
                 }
 
                 a = v.attrs->find(state.sOutPath);
                 if (a != v.attrs->end()) {
                     if (strict) state.forceValue(*a->value);
-                    if (a->value->type == tString)
+                    if (a->value->type() == nString)
                         xmlAttrs["outPath"] = a->value->string.s;
                 }
 
@@ -118,14 +118,19 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
 
             break;
 
-        case tList1: case tList2: case tListN: {
+        case nList: {
             XMLOpenElement _(doc, "list");
             for (unsigned int n = 0; n < v.listSize(); ++n)
                 printValueAsXML(state, strict, location, *v.listElems()[n], doc, context, drvsSeen);
             break;
         }
 
-        case tLambda: {
+        case nFunction: {
+            if (!v.isLambda()) {
+                // FIXME: Serialize primops and primopapps
+                doc.writeEmptyElement("unevaluated");
+                break;
+            }
             XMLAttrs xmlAttrs;
             if (location) posToXML(xmlAttrs, v.lambda.fun->pos);
             XMLOpenElement _(doc, "function", xmlAttrs);
@@ -143,15 +148,15 @@ static void printValueAsXML(EvalState & state, bool strict, bool location,
             break;
         }
 
-        case tExternal:
+        case nExternal:
             v.external->printValueAsXML(state, strict, location, doc, context, drvsSeen);
             break;
 
-        case tFloat:
+        case nFloat:
             doc.writeEmptyElement("float", singletonAttrs("value", (format("%1%") % v.fpoint).str()));
             break;
 
-        default:
+        case nThunk:
             doc.writeEmptyElement("unevaluated");
     }
 }

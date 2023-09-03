@@ -2,7 +2,7 @@
 #include "profiles.hh"
 #include "shared.hh"
 #include "globals.hh"
-#include "../nix/legacy.hh"
+#include "legacy.hh"
 
 #include <iostream>
 #include <cerrno>
@@ -73,8 +73,6 @@ static int main_nix_collect_garbage(int argc, char * * argv)
                 return false;
             return true;
         });
-
-        initPlugins();
 
         auto profilesDir = settings.nixStateDir + "/profiles";
         if (removeOld) removeOldGenerations(profilesDir);

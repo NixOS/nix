@@ -14,7 +14,7 @@ struct ParseSink
     virtual void createExecutableFile(const Path & path) { };
     virtual void isExecutable() { };
     virtual void preallocateContents(uint64_t size) { };
-    virtual void receiveContents(unsigned char * data, size_t len) { };
+    virtual void receiveContents(std::string_view data) { };
 
     virtual void createSymlink(const Path & path, const string & target) { };
 
@@ -34,7 +34,7 @@ struct RestoreSink : ParseSink
     void createExecutableFile(const Path & path) override;
     void isExecutable() override;
     void preallocateContents(uint64_t size) override;
-    void receiveContents(unsigned char * data, size_t len) override;
+    void receiveContents(std::string_view data) override;
 
     void createSymlink(const Path & path, const string & target) override;
 

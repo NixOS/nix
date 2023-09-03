@@ -39,7 +39,7 @@ Nix store is also printed.
 
   - `--type` *hashAlgo*  
     Use the specified cryptographic hash algorithm, which can be one of
-    `md5`, `sha1`, and `sha256`.
+    `md5`, `sha1`, `sha256`, and `sha512`.
 
   - `--print-path`  
     Print the store path of the downloaded file on standard output.

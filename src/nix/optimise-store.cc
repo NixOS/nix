@@ -13,17 +13,12 @@ struct CmdOptimiseStore : StoreCommand
         return "replace identical files in the store by hard links";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To optimise the Nix store:",
-                "nix optimise-store"
-            },
-        };
+        return
+          #include "optimise-store.md"
+          ;
     }
-
-    Category category() override { return catUtility; }
 
     void run(ref<Store> store) override
     {
@@ -31,4 +26,4 @@ struct CmdOptimiseStore : StoreCommand
     }
 };
 
-static auto rCmdOptimiseStore = registerCommand<CmdOptimiseStore>("optimise-store");
+static auto rCmdOptimiseStore = registerCommand2<CmdOptimiseStore>({"store", "optimise"});

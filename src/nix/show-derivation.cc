@@ -1,4 +1,5 @@
 // FIXME: integrate this with nix path-info?
+// FIXME: rename to 'nix store show-derivation' or 'nix debug show-derivation'?
 
 #include "command.hh"
 #include "common-args.hh"
@@ -18,7 +19,7 @@ struct CmdShowDerivation : InstallablesCommand
         addFlag({
             .longName = "recursive",
             .shortName = 'r',
-            .description = "include the dependencies of the specified derivations",
+            .description = "Include the dependencies of the specified derivations.",
             .handler = {&recursive, true}
         });
     }
@@ -28,18 +29,11 @@ struct CmdShowDerivation : InstallablesCommand
         return "show the contents of a store derivation";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To show the store derivation that results from evaluating the Hello package:",
-                "nix show-derivation nixpkgs#hello"
-            },
-            Example{
-                "To show the full derivation graph (if available) that produced your NixOS system:",
-                "nix show-derivation -r /run/current-system"
-            },
-        };
+        return
+          #include "show-derivation.md"
+          ;
     }
 
     Category category() override { return catUtility; }
@@ -82,6 +76,7 @@ struct CmdShowDerivation : InstallablesCommand
                         [&](DerivationOutputCAFloating dof) {
                             outputObj.attr("hashAlgo", makeFileIngestionPrefix(dof.method) + printHashType(dof.hashType));
                         },
+                        [&](DerivationOutputDeferred) {},
                     }, output.output);
                 }
             }
@@ -101,7 +96,7 @@ struct CmdShowDerivation : InstallablesCommand
                 }
             }
 
-            drvObj.attr("platform", drv.platform);
+            drvObj.attr("system", drv.platform);
             drvObj.attr("builder", drv.builder);
 
             {

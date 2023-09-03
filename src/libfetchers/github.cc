@@ -37,15 +37,29 @@ struct GitArchiveInputScheme : InputScheme
         std::optional<std::string> ref;
         std::optional<std::string> host_url;
 
-        if (path.size() == 2) {
-        } else if (path.size() == 3) {
+        auto size = path.size();
+        if (size == 3) {
             if (std::regex_match(path[2], revRegex))
                 rev = Hash::parseAny(path[2], htSHA1);
             else if (std::regex_match(path[2], refRegex))
                 ref = path[2];
             else
                 throw BadURL("in URL '%s', '%s' is not a commit hash or branch/tag name", url.url, path[2]);
-        } else
+        } else if (size > 3) {
+            std::string rs;
+            for (auto i = std::next(path.begin(), 2); i != path.end(); i++) {
+                rs += *i;
+                if (std::next(i) != path.end()) {
+                    rs += "/";
+                }
+            }
+
+            if (std::regex_match(rs, refRegex)) {
+                ref = rs;
+            } else {
+                throw BadURL("in URL '%s', '%s' is not a branch/tag name", url.url, rs);
+            }
+        } else if (size < 2)
             throw BadURL("URL '%s' is invalid", url.url);
 
         for (auto &[name, value] : url.query) {
@@ -198,14 +212,14 @@ struct GitArchiveInputScheme : InputScheme
 
         auto [tree, lastModified] = downloadTarball(store, url.url, "source", true, url.headers);
 
-        input.attrs.insert_or_assign("lastModified", lastModified);
+        input.attrs.insert_or_assign("lastModified", uint64_t(lastModified));
 
         getCache()->add(
             store,
             immutableAttrs,
             {
                 {"rev", rev->gitRev()},
-                {"lastModified", lastModified}
+                {"lastModified", uint64_t(lastModified)}
             },
             tree.storePath,
             true);

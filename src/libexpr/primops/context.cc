@@ -147,7 +147,7 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
     for (auto & i : *args[1]->attrs) {
         if (!state.store->isStorePath(i.name))
             throw EvalError({
-                .hint = hintfmt("Context key '%s' is not a store path", i.name),
+                .msg = hintfmt("Context key '%s' is not a store path", i.name),
                 .errPos = *i.pos
             });
         if (!settings.readOnlyMode) {
@@ -166,7 +166,7 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
             if (state.forceBool(*iter->value, *iter->pos)) {
                 if (!isDerivation(i.name)) {
                     throw EvalError({
-                        .hint = hintfmt("Tried to add all-outputs context of %s, which is not a derivation, to a string", i.name),
+                        .msg = hintfmt("Tried to add all-outputs context of %s, which is not a derivation, to a string", i.name),
                         .errPos = *i.pos
                     });
                 }
@@ -179,7 +179,7 @@ static void prim_appendContext(EvalState & state, const Pos & pos, Value * * arg
             state.forceList(*iter->value, *iter->pos);
             if (iter->value->listSize() && !isDerivation(i.name)) {
                 throw EvalError({
-                    .hint = hintfmt("Tried to add derivation output context of %s, which is not a derivation, to a string", i.name),
+                    .msg = hintfmt("Tried to add derivation output context of %s, which is not a derivation, to a string", i.name),
                     .errPos = *i.pos
                 });
             }

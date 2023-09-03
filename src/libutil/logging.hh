@@ -100,12 +100,15 @@ public:
     virtual void writeToStdout(std::string_view s);
 
     template<typename... Args>
-    inline void stdout(const std::string & fs, const Args & ... args)
+    inline void cout(const std::string & fs, const Args & ... args)
     {
         boost::format f(fs);
         formatHelper(f, args...);
         writeToStdout(f.str());
     }
+
+    virtual std::optional<char> ask(std::string_view s)
+    { return {}; }
 };
 
 ActivityId getCurActivity();
@@ -175,8 +178,8 @@ extern Verbosity verbosity; /* suppress msgs > this */
    lightweight status messages. */
 #define logErrorInfo(level, errorInfo...) \
     do { \
-        if (level <= nix::verbosity) { \
-            logger->logEI(level, errorInfo); \
+        if ((level) <= nix::verbosity) {     \
+            logger->logEI((level), errorInfo);  \
         } \
     } while (0)
 
@@ -188,12 +191,14 @@ extern Verbosity verbosity; /* suppress msgs > this */
    arguments are evaluated lazily. */
 #define printMsg(level, args...) \
     do { \
-        if (level <= nix::verbosity) { \
-            logger->log(level, fmt(args)); \
+        auto __lvl = level; \
+        if (__lvl <= nix::verbosity) { \
+            logger->log(__lvl, fmt(args)); \
         } \
     } while (0)
 
 #define printError(args...) printMsg(lvlError, args)
+#define notice(args...) printMsg(lvlNotice, args)
 #define printInfo(args...) printMsg(lvlInfo, args)
 #define printTalkative(args...) printMsg(lvlTalkative, args)
 #define debug(args...) printMsg(lvlDebug, args)

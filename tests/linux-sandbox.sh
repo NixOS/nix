@@ -22,9 +22,9 @@ outPath=$(nix-build dependencies.nix --no-out-link --sandbox-paths /nix/store)
 
 nix path-info -r $outPath | grep input-2
 
-nix ls-store -R -l $outPath | grep foobar
+nix store ls -R -l $outPath | grep foobar
 
-nix cat-store $outPath/foobar | grep FOOBAR
+nix store cat $outPath/foobar | grep FOOBAR
 
 # Test --check without hash rewriting.
 nix-build dependencies.nix --no-out-link --check --sandbox-paths /nix/store

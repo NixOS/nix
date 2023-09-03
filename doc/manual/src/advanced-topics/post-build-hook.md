@@ -53,7 +53,7 @@ set -f # disable globbing
 export IFS=' '
 
 echo "Signing paths" $OUT_PATHS
-nix sign-paths --key-file /etc/nix/key.private $OUT_PATHS
+nix store sign --key-file /etc/nix/key.private $OUT_PATHS
 echo "Uploading paths" $OUT_PATHS
 exec nix copy --to 's3://example-nix-cache' $OUT_PATHS
 ```
@@ -63,7 +63,7 @@ exec nix copy --to 's3://example-nix-cache' $OUT_PATHS
 > The `$OUT_PATHS` variable is a space-separated list of Nix store
 > paths. In this case, we expect and want the shell to perform word
 > splitting to make each output path its own argument to `nix
-> sign-paths`. Nix guarantees the paths will not contain any spaces,
+> store sign`. Nix guarantees the paths will not contain any spaces,
 > however a store path might contain glob characters. The `set -f`
 > disables globbing in the shell.
 

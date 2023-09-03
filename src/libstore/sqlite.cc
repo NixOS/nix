@@ -147,14 +147,14 @@ void SQLiteStmt::Use::exec()
     int r = step();
     assert(r != SQLITE_ROW);
     if (r != SQLITE_DONE)
-        throwSQLiteError(stmt.db, fmt("executing SQLite statement '%s'", stmt.sql));
+        throwSQLiteError(stmt.db, fmt("executing SQLite statement '%s'", sqlite3_expanded_sql(stmt.stmt)));
 }
 
 bool SQLiteStmt::Use::next()
 {
     int r = step();
     if (r != SQLITE_DONE && r != SQLITE_ROW)
-        throwSQLiteError(stmt.db, fmt("executing SQLite query '%s'", stmt.sql));
+        throwSQLiteError(stmt.db, fmt("executing SQLite query '%s'", sqlite3_expanded_sql(stmt.stmt)));
     return r == SQLITE_ROW;
 }
 
@@ -211,7 +211,7 @@ void handleSQLiteBusy(const SQLiteBusy & e)
         lastWarned = now;
         logWarning({
             .name = "Sqlite busy",
-            .hint = hintfmt(e.what())
+            .msg = hintfmt(e.what())
         });
     }
 

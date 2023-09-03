@@ -2,7 +2,7 @@ source common.sh
 
 try () {
     printf "%s" "$2" > $TEST_ROOT/vector
-    hash=$(nix hash-file --base16 $EXTRA --type "$1" $TEST_ROOT/vector)
+    hash=$(nix hash file --base16 $EXTRA --type "$1" $TEST_ROOT/vector)
     if test "$hash" != "$3"; then
         echo "hash $1, expected $3, got $hash"
         exit 1
@@ -69,17 +69,17 @@ try2 md5 "f78b733a68f5edbdf9413899339eaa4a"
 
 # Conversion.
 try3() {
-    h64=$(nix to-base64 --type "$1" "$2")
+    h64=$(nix hash to-base64 --type "$1" "$2")
     [ "$h64" = "$4" ]
-    sri=$(nix to-sri --type "$1" "$2")
+    sri=$(nix hash to-sri --type "$1" "$2")
     [ "$sri" = "$1-$4" ]
     h32=$(nix-hash --type "$1" --to-base32 "$2")
     [ "$h32" = "$3" ]
     h16=$(nix-hash --type "$1" --to-base16 "$h32")
     [ "$h16" = "$2" ]
-    h16=$(nix to-base16 --type "$1" "$h64")
+    h16=$(nix hash to-base16 --type "$1" "$h64")
     [ "$h16" = "$2" ]
-    h16=$(nix to-base16 "$sri")
+    h16=$(nix hash to-base16 "$sri")
     [ "$h16" = "$2" ]
 }
 try3 sha1 "800d59cfcd3c05e900cb4e214be48f6b886a08df" "vw46m23bizj4n8afrc0fj19wrp7mj3c0" "gA1Zz808BekAy04hS+SPa4hqCN8="

@@ -11,6 +11,36 @@ using namespace std::string_literals;
 
 namespace nix::fetchers {
 
+namespace {
+
+RunOptions hgOptions(const Strings & args) {
+	RunOptions opts("hg", args);
+	opts.searchPath = true;
+
+	auto env = getEnv();
+	// Set HGPLAIN: this means we get consistent output from hg and avoids leakage from a user or system .hgrc.
+	env["HGPLAIN"] = "";
+	opts.environment = env;
+
+	return opts;
+}
+
+// runProgram wrapper that uses hgOptions instead of stock RunOptions.
+string runHg(const Strings & args, const std::optional<std::string> & input = {})
+{
+	RunOptions opts = hgOptions(args);
+	opts.input = input;
+
+	auto res = runProgram(opts);
+
+	if (!statusOk(res.first))
+		throw ExecError(res.first, fmt("hg %1%", statusToString(res.first)));
+
+	return res.second;
+}
+
+}
+
 struct MercurialInputScheme : InputScheme
 {
     std::optional<Input> inputFromURL(const ParsedURL & url) override
@@ -101,11 +131,11 @@ struct MercurialInputScheme : InputScheme
         assert(sourcePath);
 
         // FIXME: shut up if file is already tracked.
-        runProgram("hg", true,
+        runHg(
             { "add", *sourcePath + "/" + std::string(file) });
 
         if (commitMsg)
-            runProgram("hg", true,
+            runHg(
                 { "commit", *sourcePath + "/" + std::string(file), "-m", *commitMsg });
     }
 
@@ -131,7 +161,7 @@ struct MercurialInputScheme : InputScheme
 
         if (!input.getRef() && !input.getRev() && isLocal && pathExists(actualUrl + "/.hg")) {
 
-            bool clean = runProgram("hg", true, { "status", "-R", actualUrl, "--modified", "--added", "--removed" }) == "";
+            bool clean = runHg({ "status", "-R", actualUrl, "--modified", "--added", "--removed" }) == "";
 
             if (!clean) {
 
@@ -144,10 +174,10 @@ struct MercurialInputScheme : InputScheme
                 if (settings.warnDirty)
                     warn("Mercurial tree '%s' is unclean", actualUrl);
 
-                input.attrs.insert_or_assign("ref", chomp(runProgram("hg", true, { "branch", "-R", actualUrl })));
+                input.attrs.insert_or_assign("ref", chomp(runHg({ "branch", "-R", actualUrl })));
 
                 auto files = tokenizeString<std::set<std::string>>(
-                    runProgram("hg", true, { "status", "-R", actualUrl, "--clean", "--modified", "--added", "--no-status", "--print0" }), "\0"s);
+                    runHg({ "status", "-R", actualUrl, "--clean", "--modified", "--added", "--no-status", "--print0" }), "\0"s);
 
                 PathFilter filter = [&](const Path & p) -> bool {
                     assert(hasPrefix(p, actualUrl));
@@ -171,7 +201,7 @@ struct MercurialInputScheme : InputScheme
 
                 return {
                     Tree {
-                        store->printStorePath(storePath),
+                        store->toRealPath(storePath),
                         std::move(storePathDesc),
                     },
                     input
@@ -234,33 +264,33 @@ struct MercurialInputScheme : InputScheme
         if (!(input.getRev()
                 && pathExists(cacheDir)
                 && runProgram(
-                    RunOptions("hg", { "log", "-R", cacheDir, "-r", input.getRev()->gitRev(), "--template", "1" })
+                    hgOptions({ "log", "-R", cacheDir, "-r", input.getRev()->gitRev(), "--template", "1" })
                     .killStderr(true)).second == "1"))
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Mercurial repository '%s'", actualUrl));
 
             if (pathExists(cacheDir)) {
                 try {
-                    runProgram("hg", true, { "pull", "-R", cacheDir, "--", actualUrl });
+                    runHg({ "pull", "-R", cacheDir, "--", actualUrl });
                 }
                 catch (ExecError & e) {
                     string transJournal = cacheDir + "/.hg/store/journal";
                     /* hg throws "abandoned transaction" error only if this file exists */
                     if (pathExists(transJournal)) {
-                        runProgram("hg", true, { "recover", "-R", cacheDir });
-                        runProgram("hg", true, { "pull", "-R", cacheDir, "--", actualUrl });
+                        runHg({ "recover", "-R", cacheDir });
+                        runHg({ "pull", "-R", cacheDir, "--", actualUrl });
                     } else {
                         throw ExecError(e.status, fmt("'hg pull' %s", statusToString(e.status)));
                     }
                 }
             } else {
                 createDirs(dirOf(cacheDir));
-                runProgram("hg", true, { "clone", "--noupdate", "--", actualUrl, cacheDir });
+                runHg({ "clone", "--noupdate", "--", actualUrl, cacheDir });
             }
         }
 
         auto tokens = tokenizeString<std::vector<std::string>>(
-            runProgram("hg", true, { "log", "-R", cacheDir, "-r", revOrRef, "--template", "{node} {rev} {branch}" }));
+            runHg({ "log", "-R", cacheDir, "-r", revOrRef, "--template", "{node} {rev} {branch}" }));
         assert(tokens.size() == 3);
 
         input.attrs.insert_or_assign("rev", Hash::parseAny(tokens[0], htSHA1).gitRev());
@@ -273,7 +303,7 @@ struct MercurialInputScheme : InputScheme
         Path tmpDir = createTempDir();
         AutoDelete delTmpDir(tmpDir, true);
 
-        runProgram("hg", true, { "archive", "-R", cacheDir, "-r", input.getRev()->gitRev(), tmpDir });
+        runHg({ "archive", "-R", cacheDir, "-r", input.getRev()->gitRev(), tmpDir });
 
         deletePath(tmpDir + "/.hg_archival.txt");
 
@@ -284,7 +314,7 @@ struct MercurialInputScheme : InputScheme
 
         Attrs infoAttrs({
             {"rev", input.getRev()->gitRev()},
-            {"revCount", (int64_t) revCount},
+            {"revCount", (uint64_t) revCount},
         });
 
         if (!_input.getRev())

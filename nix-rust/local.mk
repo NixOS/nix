@@ -30,8 +30,6 @@ ifeq ($(OS), Darwin)
 	install_name_tool -id $@ $@
 endif
 
-dist-files += $(d)/vendor
-
 clean: clean-rust
 
 clean-rust:

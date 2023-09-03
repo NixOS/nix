@@ -174,11 +174,15 @@ PKG_CHECK_MODULES([OPENSSL], [libcrypto], [CXXFLAGS="$OPENSSL_CFLAGS $CXXFLAGS"]
 
 # Look for libbz2, a required dependency.
 AC_CHECK_LIB([bz2], [BZ2_bzWriteOpen], [true],
-  [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See https://web.archive.org/web/20180624184756/http://www.bzip.org/.])])
+  [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See https://sourceware.org/bzip2/.])])
 AC_CHECK_HEADERS([bzlib.h], [true],
-  [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See https://web.archive.org/web/20180624184756/http://www.bzip.org/.])])
+  [AC_MSG_ERROR([Nix requires libbz2, which is part of bzip2.  See https://sourceware.org/bzip2/.])])
 # Checks for libarchive
 PKG_CHECK_MODULES([LIBARCHIVE], [libarchive >= 3.1.2], [CXXFLAGS="$LIBARCHIVE_CFLAGS $CXXFLAGS"])
+# Workaround until https://github.com/libarchive/libarchive/issues/1446 is fixed
+if test "$shared" != yes; then
+    LIBARCHIVE_LIBS+=' -lz'
+fi
 
 # Look for SQLite, a required dependency.
 PKG_CHECK_MODULES([SQLITE3], [sqlite3 >= 3.6.19], [CXXFLAGS="$SQLITE3_CFLAGS $CXXFLAGS"])
@@ -199,11 +203,7 @@ PKG_CHECK_MODULES([EDITLINE], [libeditline], [CXXFLAGS="$EDITLINE_CFLAGS $CXXFLA
 ])
 
 # Look for libsodium, an optional dependency.
-PKG_CHECK_MODULES([SODIUM], [libsodium],
-  [AC_DEFINE([HAVE_SODIUM], [1], [Whether to use libsodium for cryptography.])
-   CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"
-   have_sodium=1], [have_sodium=])
-AC_SUBST(HAVE_SODIUM, [$have_sodium])
+PKG_CHECK_MODULES([SODIUM], [libsodium], [CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"])
 
 # Look for liblzma, a required dependency.
 PKG_CHECK_MODULES([LIBLZMA], [liblzma], [CXXFLAGS="$LIBLZMA_CFLAGS $CXXFLAGS"])
@@ -217,6 +217,14 @@ LDFLAGS="-lz $LDFLAGS"
 
 # Look for libbrotli{enc,dec}.
 PKG_CHECK_MODULES([LIBBROTLI], [libbrotlienc libbrotlidec], [CXXFLAGS="$LIBBROTLI_CFLAGS $CXXFLAGS"])
+
+# Look for libcpuid.
+if test "$machine_name" = "x86_64"; then
+  PKG_CHECK_MODULES([LIBCPUID], [libcpuid], [CXXFLAGS="$LIBCPUID_CFLAGS $CXXFLAGS"])
+  have_libcpuid=1
+  AC_DEFINE([HAVE_LIBCPUID], [1], [Use libcpuid])
+fi
+AC_SUBST(HAVE_LIBCPUID, [$have_libcpuid])
 
 
 # Look for libseccomp, required for Linux sandboxing.
@@ -251,6 +259,7 @@ if test -n "$enable_s3"; then
   declare -a aws_version_tokens=($(printf '#include <aws/core/VersionConfig.h>\nAWS_SDK_VERSION_STRING' | $CPP $CPPFLAGS - | grep -v '^#.*' | sed 's/"//g' | tr '.' ' '))
   AC_DEFINE_UNQUOTED([AWS_VERSION_MAJOR], ${aws_version_tokens@<:@0@:>@}, [Major version of aws-sdk-cpp.])
   AC_DEFINE_UNQUOTED([AWS_VERSION_MINOR], ${aws_version_tokens@<:@1@:>@}, [Minor version of aws-sdk-cpp.])
+  AC_DEFINE_UNQUOTED([AWS_VERSION_PATCH], ${aws_version_tokens@<:@2@:>@}, [Patch version of aws-sdk-cpp.])
 fi
 
 
