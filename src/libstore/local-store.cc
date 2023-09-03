@@ -1146,8 +1146,8 @@ void LocalStore::querySubstitutablePathInfos(const StorePathSet & paths, const s
             auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
                 std::shared_ptr<const ValidPathInfo>(info));
             infos.insert_or_assign(localPath, SubstitutablePathInfo {
-                { *info },
                 info->deriver,
+                info->references,
                 narInfo ? narInfo->fileSize : 0,
                 info->narSize,
             });
@@ -1234,7 +1234,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         topoSort(paths,
             {[&](const StorePath & path) {
                 auto i = infos.find(path);
-                return i == infos.end() ? StorePathSet() : i->second.references;
+                return i == infos.end() ? StorePathSet() : i->second.references.others;
             }},
             {[&](const StorePath & path, const StorePath & parent) {
                 return BuildError(
@@ -1433,8 +1433,8 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
                 .hash = hash,
             },
             .references = {
-                .references = references,
-                .hasSelfReference = false,
+                .others = references,
+                .self = false,
             },
         },
     };
@@ -1532,7 +1532,8 @@ StorePath LocalStore::addTextToStore(
 
             ValidPathInfo info { dstPath, narHash };
             info.narSize = sink.s.size();
-            info.references = references;
+            // No self reference allowed with text-hashing
+            info.references.others = references;
             info.ca = TextHash { .hash = hash };
             registerValidPath(info);
         }

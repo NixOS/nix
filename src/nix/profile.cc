@@ -205,12 +205,14 @@ struct ProfileManifest
                         .method = FileIngestionMethod::Recursive,
                         .hash = narHash,
                     },
-                    .references = { references },
+                    .references = {
+                        .others = std::move(references),
+                        .self = false,
+                    },
                 },
             },
             narHash,
         };
-        info.references = std::move(references);
         info.narSize = sink.s.size();
 
         StringSource source(sink.s);

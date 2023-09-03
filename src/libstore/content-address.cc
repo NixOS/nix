@@ -18,7 +18,7 @@ std::string makeFileIngestionPrefix(FileIngestionMethod m)
     case FileIngestionMethod::Recursive:
         return "r:";
     }
-    abort();
+    assert(false);
 }
 
 std::string makeFixedOutputCA(FileIngestionMethod method, const Hash & hash)
@@ -167,7 +167,7 @@ std::string renderStorePathDescriptor(StorePathDescriptor ca)
         },
         [&](FixedOutputInfo fsh) {
             result += "fixed:";
-            dumpRefs(fsh.references.references, fsh.references.hasSelfReference);
+            dumpRefs(fsh.references.others, fsh.references.self);
             result += makeFileIngestionPrefix(fsh.method);
             result += fsh.hash.to_string(Base32, true);
         },
@@ -193,10 +193,10 @@ StorePathDescriptor parseStorePathDescriptor(std::string_view rawCa)
         name = *optName;
     }
 
-    auto parseRefs = [&]() -> PathReferences<StorePath> {
+    auto parseRefs = [&]() -> StoreReferences {
         if (!splitPrefix(rest, "refs:"))
             throw Error("Invalid CA \"%s\", \"%s\" should begin with \"refs:\"", rawCa, rest);
-        PathReferences<StorePath> ret;
+        StoreReferences ret;
         size_t numReferences = 0;
         {
             auto countRaw = splitPrefixTo(rest, ':');
@@ -208,10 +208,10 @@ StorePathDescriptor parseStorePathDescriptor(std::string_view rawCa)
             auto s = splitPrefixTo(rest, ':');
             if (!s)
                 throw UsageError("Missing reference no. %d", i);
-            ret.references.insert(StorePath(*s));
+            ret.others.insert(StorePath(*s));
         }
         if (splitPrefix(rest, "self:"))
-            ret.hasSelfReference = true;
+            ret.self = true;
         return ret;
     };
 
@@ -221,7 +221,7 @@ StorePathDescriptor parseStorePathDescriptor(std::string_view rawCa)
     // Switch on tag
     if (tag == "text") {
         auto refs = parseRefs();
-        if (refs.hasSelfReference)
+        if (refs.self)
             throw UsageError("Text content addresses cannot have self references");
         auto hashType = parseHashType_(rest);
         if (hashType != htSHA256)
@@ -231,7 +231,7 @@ StorePathDescriptor parseStorePathDescriptor(std::string_view rawCa)
             {
                 .hash = Hash::parseNonSRIUnprefixed(rest, std::move(hashType)),
             },
-            refs.references,
+            refs.others,
         };
     } else if (tag == "fixed") {
         auto refs = parseRefs();

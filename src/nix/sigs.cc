@@ -63,8 +63,7 @@ struct CmdCopySigs : StorePathsCommand
                        binary. */
                     if (info->narHash != info2->narHash ||
                         info->narSize != info2->narSize ||
-                        info->references != info2->references ||
-                        info->hasSelfReference != info2->hasSelfReference)
+                        info->references != info2->references)
                         continue;
 
                     for (auto & sig : info2->sigs)

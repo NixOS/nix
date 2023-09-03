@@ -136,7 +136,7 @@ struct CmdWhyDepends : SourceExprCommand
         for (auto & path : closure)
             graph.emplace(path, Node {
                 .path = path,
-                .refs = store->queryPathInfo(path)->references,
+                .refs = store->queryPathInfo(path)->references.others,
                 .dist = path == dependencyPath ? 0 : inf
             });
 
