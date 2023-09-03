@@ -523,18 +523,22 @@ bool NixRepl::processLine(std::string line)
     }
 
     else if (state->debugRepl && (command == ":bt" || command == ":backtrace")) {
-        for (const auto & [idx, i] : enumerate(state->debugTraces)) {
+        unsigned int idx = 0;
+        for (auto i = state->debugTraces.rbegin(); i != state->debugTraces.rend(); ++i) {
             std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
-            showDebugTrace(std::cout, state->positions, i);
+            showDebugTrace(std::cout, state->positions, *i);
+            ++idx;
         }
     }
 
     else if (state->debugRepl && (command == ":env")) {
-        for (const auto & [idx, i] : enumerate(state->debugTraces)) {
+        unsigned int idx = 0;
+        for (auto i = state->debugTraces.rbegin(); i != state->debugTraces.rend(); ++i) {
             if (idx == debugTraceIndex) {
-                printEnvBindings(*state, i.expr, i.env);
+                printEnvBindings(*state, i->expr, i->env);
                 break;
             }
+            ++idx;
         }
     }
 
@@ -544,15 +548,17 @@ bool NixRepl::processLine(std::string line)
             debugTraceIndex = stoi(arg);
         } catch (...) { }
 
-        for (const auto & [idx, i] : enumerate(state->debugTraces)) {
+        unsigned int idx = 0;
+        for (auto i = state->debugTraces.rbegin(); i != state->debugTraces.rend(); ++i) {
              if (idx == debugTraceIndex) {
                  std::cout << "\n" << ANSI_BLUE << idx << ANSI_NORMAL << ": ";
-                 showDebugTrace(std::cout, state->positions, i);
+                 showDebugTrace(std::cout, state->positions, *i);
                  std::cout << std::endl;
-                 printEnvBindings(*state, i.expr, i.env);
-                 loadDebugTraceEnv(i);
+                 printEnvBindings(*state, i->expr, i->env);
+                 loadDebugTraceEnv(*i);
                  break;
              }
+             ++idx;
         }
     }
 
