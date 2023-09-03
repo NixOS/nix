@@ -12,7 +12,6 @@ echo "nix version: $(nix --version)"
 
 nixArgs=("$@")
 na="${nixArgs[@]}"
-# na="--extra-experimental-features nix-command"
 
 testRepl () {
     fname=$1
@@ -31,7 +30,6 @@ testRepl () {
     fi
 }
 
-# Simple test, try building a drv
 testRepl "debugger-attr-bad"
 testRepl "debugger-bool-expected"
 testRepl "debugger-attr-deep"
