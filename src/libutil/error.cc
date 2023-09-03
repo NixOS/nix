@@ -156,6 +156,15 @@ static std::string indent(std::string_view indentFirst, std::string_view indentR
 }
 
 /**
+ * A development aid for finding missing positions, to improve error messages. Example use:
+ *
+ *     NIX_DEVELOPER_SHOW_UNKNOWN_LOCATIONS=1 _NIX_TEST_ACCEPT=1 make tests/lang.sh.test
+ *     git diff -U20 tests
+ *
+ */
+static bool printUnknownLocations = getEnv("_NIX_DEVELOPER_SHOW_UNKNOWN_LOCATIONS").has_value();
+
+/**
  * Print a position, if it is known.
  *
  * @return true if a position was printed.
@@ -170,6 +179,8 @@ static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std
             printCodeLines(oss, "", *pos, *loc);
             oss << "\n";
         }
+    } else if (printUnknownLocations) {
+        oss << "\n" << indent << ANSI_BLUE << "at " ANSI_RED << "UNKNOWN LOCATION" << ANSI_NORMAL << "\n";
     }
     return hasPos;
 }
