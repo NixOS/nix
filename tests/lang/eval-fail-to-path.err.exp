@@ -9,6 +9,4 @@ error:
 
        … while evaluating the first argument passed to builtins.toPath
 
-         at «none»:0: (source not available)
-
        error: string 'foo/bar' doesn't represent an absolute path

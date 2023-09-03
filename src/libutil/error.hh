@@ -71,6 +71,13 @@ struct AbstractPos
     uint32_t column = 0;
 
     /**
+     * An AbstractPos may be a "null object", representing an unknown position.
+     *
+     * Return true if this position is known.
+     */
+    inline operator bool() const { return line != 0; };
+
+    /**
      * Return the contents of the source file.
      */
     virtual std::optional<std::string> getSource() const

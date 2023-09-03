@@ -203,8 +203,6 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
     std::ostringstream oss;
 
-    auto noSource = ANSI_ITALIC " (source not available)" ANSI_NORMAL "\n";
-
     /*
      * Traces
      * ------
@@ -320,7 +318,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
             oss << "\n" << "… " << trace.hint.str() << "\n";
 
-            if (trace.pos) {
+            if (trace.pos && *trace.pos) {
                 count++;
 
                 oss << "\n" << ellipsisIndent << ANSI_BLUE << "at " ANSI_WARNING << *trace.pos << ANSI_NORMAL << ":";
@@ -329,8 +327,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
                     oss << "\n";
                     printCodeLines(oss, "", *trace.pos, *loc);
                     oss << "\n";
-                } else
-                    oss << noSource;
+                }
             }
         }
         oss << "\n" << prefix;
@@ -338,15 +335,14 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
     oss << einfo.msg << "\n";
 
-    if (einfo.errPos) {
+    if (einfo.errPos && *einfo.errPos) {
         oss << "\n" << ANSI_BLUE << "at " ANSI_WARNING << *einfo.errPos << ANSI_NORMAL << ":";
 
         if (auto loc = einfo.errPos->getCodeLines()) {
             oss << "\n";
             printCodeLines(oss, "", *einfo.errPos, *loc);
             oss << "\n";
-        } else
-            oss << noSource;
+        }
     }
 
     auto suggestions = einfo.suggestions.trim();
