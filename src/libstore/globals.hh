@@ -46,6 +46,14 @@ struct PluginFilesSetting : public BaseSetting<Paths>
     void set(const std::string & str, bool append = false) override;
 };
 
+const uint32_t maxIdsPerBuild =
+    #if __linux__
+    1 << 16
+    #else
+    1
+    #endif
+    ;
+
 class Settings : public Config {
 
     unsigned int getDefaultCores();
@@ -78,9 +86,6 @@ public:
 
     /* A list of user configuration files to load. */
     std::vector<Path> nixUserConfFiles;
-
-    /* The directory where internal helper programs are stored. */
-    Path nixLibexecDir;
 
     /* The directory where the main programs are stored. */
     Path nixBinDir;
@@ -195,7 +200,7 @@ public:
         )",
         {"build-timeout"}};
 
-    PathSetting buildHook{this, true, nixLibexecDir + "/nix/build-remote", "build-hook",
+    PathSetting buildHook{this, true, "", "build-hook",
         "The path of the helper program that executes builds to remote machines."};
 
     Setting<std::string> builders{
@@ -276,7 +281,68 @@ public:
           `NIX_REMOTE` is empty, the uid under which the Nix daemon runs if
           `NIX_REMOTE` is `daemon`). Obviously, this should not be used in
           multi-user settings with untrusted users.
+
+          Defaults to `nixbld` when running as root, *empty* otherwise.
+        )",
+        {}, false};
+
+    Setting<bool> autoAllocateUids{this, false, "auto-allocate-uids",
+        R"(
+          Whether to select UIDs for builds automatically, instead of using the
+          users in `build-users-group`.
+
+          UIDs are allocated starting at 872415232 (0x34000000) on Linux and 56930 on macOS.
+
+          > **Warning**
+          > This is an experimental feature.
+
+          To enable it, add the following to [`nix.conf`](#):
+
+          ```
+          extra-experimental-features = auto-allocate-uids
+          auto-allocate-uids = true
+          ```
         )"};
+
+    Setting<uint32_t> startId{this,
+        #if __linux__
+        0x34000000,
+        #else
+        56930,
+        #endif
+        "start-id",
+        "The first UID and GID to use for dynamic ID allocation."};
+
+    Setting<uint32_t> uidCount{this,
+        #if __linux__
+        maxIdsPerBuild * 128,
+        #else
+        128,
+        #endif
+        "id-count",
+        "The number of UIDs/GIDs to use for dynamic ID allocation."};
+
+    #if __linux__
+    Setting<bool> useCgroups{
+        this, false, "use-cgroups",
+        R"(
+          Whether to execute builds inside cgroups.
+          This is only supported on Linux.
+
+          Cgroups are required and enabled automatically for derivations
+          that require the `uid-range` system feature.
+
+          > **Warning**
+          > This is an experimental feature.
+
+          To enable it, add the following to [`nix.conf`](#):
+
+          ```
+          extra-experimental-features = cgroups
+          use-cgroups = true
+          ```
+        )"};
+    #endif
 
     Setting<bool> impersonateLinux26{this, false, "impersonate-linux-26",
         "Whether to impersonate a Linux 2.6 machine on newer kernels.",
@@ -309,11 +375,6 @@ public:
           killed. A value of `0` (the default) means that there is no limit.
         )",
         {"build-max-log-size"}};
-
-    /* When buildRepeat > 0 and verboseBuild == true, whether to print
-       repeated builds (i.e. builds other than the first one) to
-       stderr. Hack to prevent Hydra logs from being polluted. */
-    bool printRepeatedBuilds = true;
 
     Setting<unsigned int> pollInterval{this, 5, "build-poll-interval",
         "How often (in seconds) to poll for locks."};
@@ -430,6 +491,9 @@ public:
           for example, `/dev/nvidiactl?` specifies that `/dev/nvidiactl` will
           only be mounted in the sandbox if it exists in the host filesystem.
 
+          If the source is in the Nix store, then its closure will be added to
+          the sandbox as well.
+
           Depending on how Nix was built, the default value for this option
           may be empty or provide `/bin/sh` as a bind-mount of `bash`.
         )",
@@ -437,19 +501,6 @@ public:
 
     Setting<bool> sandboxFallback{this, true, "sandbox-fallback",
         "Whether to disable sandboxing when the kernel doesn't allow it."};
-
-    Setting<size_t> buildRepeat{
-        this, 0, "repeat",
-        R"(
-          How many times to repeat builds to check whether they are
-          deterministic. The default value is 0. If the value is non-zero,
-          every build is repeated the specified number of times. If the
-          contents of any of the runs differs from the previous ones and
-          `enforce-determinism` is true, the build is rejected and the
-          resulting store paths are not registered as “valid” in Nix’s
-          database.
-        )",
-        {"build-repeat"}};
 
 #if __linux__
     Setting<std::string> sandboxShmSize{
@@ -514,10 +565,6 @@ public:
           configuration file, and cannot be passed at the command line.
         )"};
 
-    Setting<bool> enforceDeterminism{
-        this, true, "enforce-determinism",
-        "Whether to fail if repeated builds produce different output. See `repeat`."};
-
     Setting<Strings> trustedPublicKeys{
         this,
         {"cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="},
@@ -563,9 +610,15 @@ public:
         R"(
           If set to `true` (the default), any non-content-addressed path added
           or copied to the Nix store (e.g. when substituting from a binary
-          cache) must have a valid signature, that is, be signed using one of
-          the keys listed in `trusted-public-keys` or `secret-key-files`. Set
-          to `false` to disable signature checking.
+          cache) must have a signature by a trusted key. A trusted key is one
+          listed in `trusted-public-keys`, or a public key counterpart to a
+          private key stored in a file listed in `secret-key-files`.
+
+          Set to `false` to disable signature checking and trust all
+          non-content-addressed paths unconditionally.
+
+          (Content-addressed paths are inherently trustworthy and thus
+          unaffected by this configuration option.)
         )"};
 
     Setting<StringSet> extraPlatforms{
@@ -616,6 +669,14 @@ public:
           are tried based on their Priority value, which each substituter can set
           independently. Lower value means higher priority.
           The default is `https://cache.nixos.org`, with a Priority of 40.
+
+          Nix will copy a store path from a remote store only if one
+          of the following is true:
+
+          - the store object is signed by one of the [`trusted-public-keys`](#conf-trusted-public-keys)
+          - the substituter is in the [`trusted-substituters`](#conf-trusted-substituters) list
+          - the [`require-sigs`](#conf-require-sigs) option has been set to `false`
+          - the store object is [output-addressed](glossary.md#gloss-output-addressed-store-object)
         )",
         {"binary-caches"}};
 
@@ -749,6 +810,13 @@ public:
               /nix/store/xfghy8ixrhz3kyy6p724iv3cxji088dx-bash-4.4-p23`.
         )"};
 
+    Setting<unsigned int> downloadSpeed {
+        this, 0, "download-speed",
+        R"(
+          Specify the maximum transfer rate in kilobytes per second you want
+          Nix to use for downloads.
+        )"};
+
     Setting<std::string> netrcFile{
         this, fmt("%s/%s", nixConfDir, "netrc"), "netrc-file",
         R"(
@@ -802,7 +870,7 @@ public:
         )"};
 
     Setting<StringSet> ignoredAcls{
-        this, {"security.selinux", "system.nfs4_acl"}, "ignored-acls",
+        this, {"security.selinux", "system.nfs4_acl", "security.csm"}, "ignored-acls",
         R"(
           A list of ACLs that should be ignored, normally Nix attempts to
           remove all ACLs from files and directories in the Nix store, but
@@ -918,5 +986,13 @@ void loadConfFile();
 std::vector<Path> getUserConfigFiles();
 
 extern const std::string nixVersion;
+
+/* NB: This is not sufficient. You need to call initNix() */
+void initLibStore();
+
+/* It's important to initialize before doing _anything_, which is why we
+   call upon the programmer to handle this correctly. However, we only add
+   this in a key locations, so as not to litter the code. */
+void assertLibStoreInitialized();
 
 }

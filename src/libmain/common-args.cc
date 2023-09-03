@@ -32,6 +32,7 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
     addFlag({
         .longName = "option",
         .description = "Set the Nix configuration setting *name* to *value* (overriding `nix.conf`).",
+        .category = miscCategory,
         .labels = {"name", "value"},
         .handler = {[](std::string name, std::string value) {
             try {

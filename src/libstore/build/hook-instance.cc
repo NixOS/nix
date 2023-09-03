@@ -7,6 +7,22 @@ HookInstance::HookInstance()
 {
     debug("starting build hook '%s'", settings.buildHook);
 
+    auto buildHookArgs = tokenizeString<std::list<std::string>>(settings.buildHook.get());
+
+    if (buildHookArgs.empty())
+        throw Error("'build-hook' setting is empty");
+
+    auto buildHook = buildHookArgs.front();
+    buildHookArgs.pop_front();
+
+    Strings args;
+    args.push_back(std::string(baseNameOf(buildHook)));
+
+    for (auto & arg : buildHookArgs)
+        args.push_back(arg);
+
+    args.push_back(std::to_string(verbosity));
+
     /* Create a pipe to get the output of the child. */
     fromHook.create();
 
@@ -36,14 +52,9 @@ HookInstance::HookInstance()
         if (dup2(builderOut.readSide.get(), 5) == -1)
             throw SysError("dupping builder's stdout/stderr");
 
-        Strings args = {
-            std::string(baseNameOf(settings.buildHook.get())),
-            std::to_string(verbosity),
-        };
+        execv(buildHook.c_str(), stringsToCharPtrs(args).data());
 
-        execv(settings.buildHook.get().c_str(), stringsToCharPtrs(args).data());
-
-        throw SysError("executing '%s'", settings.buildHook);
+        throw SysError("executing '%s'", buildHook);
     });
 
     pid.setSeparatePG(true);

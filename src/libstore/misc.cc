@@ -262,6 +262,7 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
         }});
 }
 
+
 std::map<DrvOutput, StorePath> drvOutputReferences(
     const std::set<Realisation> & inputRealisations,
     const StorePathSet & pathReferences)
@@ -285,11 +286,16 @@ std::map<DrvOutput, StorePath> drvOutputReferences(
     std::set<Realisation> inputRealisations;
 
     for (const auto & [inputDrv, outputNames] : drv.inputDrvs) {
-        auto outputHashes =
+        const auto outputHashes =
             staticOutputHashes(store, store.readDerivation(inputDrv));
         for (const auto & outputName : outputNames) {
+            auto outputHash = get(outputHashes, outputName);
+            if (!outputHash)
+                throw Error(
+                    "output '%s' of derivation '%s' isn't realised", outputName,
+                    store.printStorePath(inputDrv));
             auto thisRealisation = store.queryRealisation(
-                DrvOutput{outputHashes.at(outputName), outputName});
+                DrvOutput{*outputHash, outputName});
             if (!thisRealisation)
                 throw Error(
                     "output '%s' of derivation '%s' isn't built", outputName,

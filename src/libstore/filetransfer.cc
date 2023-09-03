@@ -33,14 +33,6 @@ FileTransferSettings fileTransferSettings;
 
 static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
 
-std::string resolveUri(std::string_view uri)
-{
-    if (uri.compare(0, 8, "channel:") == 0)
-        return "https://nixos.org/channels/" + std::string(uri.substr(8)) + "/nixexprs.tar.xz";
-    else
-        return std::string(uri);
-}
-
 struct curlFileTransfer : public FileTransfer
 {
     CURLM * curlm = 0;
@@ -142,9 +134,9 @@ struct curlFileTransfer : public FileTransfer
         }
 
         template<class T>
-        void fail(const T & e)
+        void fail(T && e)
         {
-            failEx(std::make_exception_ptr(e));
+            failEx(std::make_exception_ptr(std::move(e)));
         }
 
         LambdaSink finalSink;
@@ -308,6 +300,9 @@ struct curlFileTransfer : public FileTransfer
 
             curl_easy_setopt(req, CURLOPT_HTTPHEADER, requestHeaders);
 
+            if (settings.downloadSpeed.get() > 0)
+                curl_easy_setopt(req, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t) (settings.downloadSpeed.get() * 1024));
+
             if (request.head)
                 curl_easy_setopt(req, CURLOPT_NOBODY, 1);
 
@@ -319,7 +314,6 @@ struct curlFileTransfer : public FileTransfer
             }
 
             if (request.verifyTLS) {
-                debug("verify TLS: Nix CA file = '%s'", settings.caFile);
                 if (settings.caFile != "")
                     curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.c_str());
             } else {
@@ -443,14 +437,13 @@ struct curlFileTransfer : public FileTransfer
                     : httpStatus != 0
                     ? FileTransferError(err,
                         std::move(response),
-                        fmt("unable to %s '%s': HTTP error %d ('%s')",
-                            request.verb(), request.uri, httpStatus, statusMsg)
-                        + (code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
-                        )
+                        "unable to %s '%s': HTTP error %d%s",
+                        request.verb(), request.uri, httpStatus,
+                        code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
                     : FileTransferError(err,
                         std::move(response),
-                        fmt("unable to %s '%s': %s (%d)",
-                            request.verb(), request.uri, curl_easy_strerror(code), code));
+                        "unable to %s '%s': %s (%d)",
+                        request.verb(), request.uri, curl_easy_strerror(code), code);
 
                 /* If this is a transient error, then maybe retry the
                    download after a while. If we're writing to a
@@ -471,7 +464,7 @@ struct curlFileTransfer : public FileTransfer
                     fileTransfer.enqueueItem(shared_from_this());
                 }
                 else
-                    fail(exc);
+                    fail(std::move(exc));
             }
         }
     };
@@ -693,10 +686,10 @@ struct curlFileTransfer : public FileTransfer
 #if ENABLE_S3
                 auto [bucketName, key, params] = parseS3Uri(request.uri);
 
-                std::string profile = get(params, "profile").value_or("");
-                std::string region = get(params, "region").value_or(Aws::Region::US_EAST_1);
-                std::string scheme = get(params, "scheme").value_or("");
-                std::string endpoint = get(params, "endpoint").value_or("");
+                std::string profile = getOr(params, "profile", "");
+                std::string region = getOr(params, "region", Aws::Region::US_EAST_1);
+                std::string scheme = getOr(params, "scheme", "");
+                std::string endpoint = getOr(params, "endpoint", "");
 
                 S3Helper s3Helper(profile, region, scheme, endpoint);
 
@@ -704,7 +697,7 @@ struct curlFileTransfer : public FileTransfer
                 auto s3Res = s3Helper.getObject(bucketName, key);
                 FileTransferResult res;
                 if (!s3Res.data)
-                    throw FileTransferError(NotFound, {}, "S3 object '%s' does not exist", request.uri);
+                    throw FileTransferError(NotFound, "S3 object '%s' does not exist", request.uri);
                 res.data = std::move(*s3Res.data);
                 callback(std::move(res));
 #else
@@ -871,15 +864,5 @@ FileTransferError::FileTransferError(FileTransfer::Error error, std::optional<st
     else
         err.msg = hf;
 }
-
-bool isUri(std::string_view s)
-{
-    if (s.compare(0, 8, "channel:") == 0) return true;
-    size_t pos = s.find("://");
-    if (pos == std::string::npos) return false;
-    std::string scheme(s, 0, pos);
-    return scheme == "http" || scheme == "https" || scheme == "file" || scheme == "channel" || scheme == "git" || scheme == "s3" || scheme == "ssh";
-}
-
 
 }

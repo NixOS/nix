@@ -284,7 +284,7 @@ std::optional<time_t> Input::getLastModified() const
     return {};
 }
 
-ParsedURL InputScheme::toURL(const Input & input)
+ParsedURL InputScheme::toURL(const Input & input) const
 {
     throw Error("don't know how to convert input '%s' to a URL", attrsToJSON(input.attrs));
 }
@@ -292,7 +292,7 @@ ParsedURL InputScheme::toURL(const Input & input)
 Input InputScheme::applyOverrides(
     const Input & input,
     std::optional<std::string> ref,
-    std::optional<Hash> rev)
+    std::optional<Hash> rev) const
 {
     if (ref)
         throw Error("don't know how to set branch/tag name of input '%s' to '%s'", input.to_string(), *ref);
@@ -311,7 +311,7 @@ void InputScheme::markChangedFile(const Input & input, std::string_view file, st
     assert(false);
 }
 
-void InputScheme::clone(const Input & input, const Path & destDir)
+void InputScheme::clone(const Input & input, const Path & destDir) const
 {
     throw Error("do not know how to clone input '%s'", input.to_string());
 }

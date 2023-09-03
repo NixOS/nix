@@ -13,14 +13,10 @@ ifdef HOST_LINUX
  libstore_LDFLAGS += -ldl
 endif
 
-ifdef HOST_DARWIN
-libstore_FILES = sandbox-defaults.sb sandbox-minimal.sb sandbox-network.sb
-endif
-
 $(foreach file,$(libstore_FILES),$(eval $(call install-data-in,$(d)/$(file),$(datadir)/nix/sandbox)))
 
 ifeq ($(ENABLE_S3), 1)
-	libstore_LDFLAGS += -laws-cpp-sdk-transfer -laws-cpp-sdk-s3 -laws-cpp-sdk-core
+	libstore_LDFLAGS += -laws-cpp-sdk-transfer -laws-cpp-sdk-s3 -laws-cpp-sdk-core -laws-crt-cpp
 endif
 
 ifdef HOST_SOLARIS
@@ -39,13 +35,22 @@ libstore_CXXFLAGS += \
  -DNIX_STATE_DIR=\"$(localstatedir)/nix\" \
  -DNIX_LOG_DIR=\"$(localstatedir)/log/nix\" \
  -DNIX_CONF_DIR=\"$(sysconfdir)/nix\" \
- -DNIX_LIBEXEC_DIR=\"$(libexecdir)\" \
  -DNIX_BIN_DIR=\"$(bindir)\" \
  -DNIX_MAN_DIR=\"$(mandir)\" \
  -DLSOF=\"$(lsof)\"
 
+ifeq ($(embedded_sandbox_shell),yes)
+libstore_CXXFLAGS += -DSANDBOX_SHELL=\"__embedded_sandbox_shell__\"
+
+$(d)/build/local-derivation-goal.cc: $(d)/embedded-sandbox-shell.gen.hh
+
+$(d)/embedded-sandbox-shell.gen.hh: $(sandbox_shell)
+	$(trace-gen) hexdump -v -e '1/1 "0x%x," "\n"' < $< > $@.tmp
+	@mv $@.tmp $@
+else
 ifneq ($(sandbox_shell),)
 libstore_CXXFLAGS += -DSANDBOX_SHELL="\"$(sandbox_shell)\""
+endif
 endif
 
 $(d)/local-store.cc: $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh

@@ -9,3 +9,6 @@ nix-instantiate --eval -E '<by-relative-path/simple.nix>' --restrict-eval
 
 # Should ideally also test this, but there’s no pure way to do it, so just trust me that it works
 # nix-instantiate --eval -E '<nixpkgs>' -I nixpkgs=channel:nixos-unstable --restrict-eval
+
+[[ $(nix-instantiate --find-file by-absolute-path/simple.nix) = $PWD/simple.nix ]]
+[[ $(nix-instantiate --find-file by-relative-path/simple.nix) = $PWD/simple.nix ]]

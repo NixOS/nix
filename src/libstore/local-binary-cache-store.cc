@@ -57,8 +57,7 @@ protected:
         AutoDelete del(tmp, false);
         StreamToSourceAdapter source(istream);
         writeFile(tmp, source);
-        if (rename(tmp.c_str(), path2.c_str()))
-            throw SysError("renaming '%1%' to '%2%'", tmp, path2);
+        renameFile(tmp, path2);
         del.cancel();
     }
 
@@ -69,6 +68,7 @@ protected:
         } catch (SysError & e) {
             if (e.errNo == ENOENT)
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache", path);
+            throw;
         }
     }
 
@@ -107,7 +107,7 @@ bool LocalBinaryCacheStore::fileExists(const std::string & path)
 
 std::set<std::string> LocalBinaryCacheStore::uriSchemes()
 {
-    if (getEnv("_NIX_FORCE_HTTP_BINARY_CACHE_STORE") == "1")
+    if (getEnv("_NIX_FORCE_HTTP") == "1")
         return {};
     else
         return {"file"};

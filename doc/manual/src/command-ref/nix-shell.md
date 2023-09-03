@@ -15,6 +15,12 @@
   [`--keep` *name*]
   {{`--packages` | `-p`} {*packages* | *expressions*} … | [*path*]}
 
+# Disambiguation
+
+This man page describes the command `nix-shell`, which is distinct from `nix
+shell`. For documentation on the latter, run `nix shell --help` or see `man
+nix3-shell`.
+
 # Description
 
 The command `nix-shell` will build the dependencies of the specified

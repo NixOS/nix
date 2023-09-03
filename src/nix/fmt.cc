@@ -26,7 +26,8 @@ struct CmdFmt : SourceExprCommand {
 
     Strings getDefaultFlakeAttrPathPrefixes() override { return Strings{}; }
 
-    void run(ref<Store> store) {
+    void run(ref<Store> store) override
+    {
         auto evalState = getEvalState();
         auto evalStore = getEvalStore();
 

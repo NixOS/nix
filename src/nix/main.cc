@@ -53,7 +53,6 @@ static bool haveInternet()
 }
 
 std::string programPath;
-char * * savedArgv;
 
 struct HelpRequested { };
 
@@ -74,6 +73,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         addFlag({
             .longName = "help",
             .description = "Show usage information.",
+            .category = miscCategory,
             .handler = {[&]() { throw HelpRequested(); }},
         });
 
@@ -82,12 +82,13 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .shortName = 'L',
             .description = "Print full build logs on standard error.",
             .category = loggingCategory,
-            .handler = {[&]() {setLogFormat(LogFormat::barWithLogs); }},
+            .handler = {[&]() { logger->setPrintBuildLogs(true); }},
         });
 
         addFlag({
             .longName = "version",
             .description = "Show version information.",
+            .category = miscCategory,
             .handler = {[&]() { showVersion = true; }},
         });
 
@@ -95,12 +96,14 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
             .longName = "offline",
             .aliases = {"no-net"}, // FIXME: remove
             .description = "Disable substituters and consider all previously downloaded files up-to-date.",
+            .category = miscCategory,
             .handler = {[&]() { useNet = false; }},
         });
 
         addFlag({
             .longName = "refresh",
             .description = "Consider all previously downloaded files out-of-date.",
+            .category = miscCategory,
             .handler = {[&]() { refresh = true; }},
         });
     }
@@ -187,7 +190,7 @@ static void showHelp(std::vector<std::string> subcommand, MultiCommand & topleve
         *vUtils);
 
     auto attrs = state.buildBindings(16);
-    attrs.alloc("command").mkString(toplevel.toJSON().dump());
+    attrs.alloc("toplevel").mkString(toplevel.toJSON().dump());
 
     auto vRes = state.allocValue();
     state.callFunction(*vGenerateManpage, state.allocValue()->mkAttrs(attrs), *vRes, noPos);
@@ -196,7 +199,7 @@ static void showHelp(std::vector<std::string> subcommand, MultiCommand & topleve
     if (!attr)
         throw UsageError("Nix has no subcommand '%s'", concatStringsSep("", subcommand));
 
-    auto markdown = state.forceString(*attr->value);
+    auto markdown = state.forceString(*attr->value, noPos, "while evaluating the lowdown help text");
 
     RunPager pager;
     std::cout << renderMarkdownToTerminal(markdown) << "\n";
@@ -261,8 +264,15 @@ void mainWrapped(int argc, char * * argv)
     }
     #endif
 
+    Finally f([] { logger->stop(); });
+
     programPath = argv[0];
     auto programName = std::string(baseNameOf(programPath));
+
+    if (argc > 1 && std::string_view(argv[1]) == "__build-remote") {
+        programName = "build-remote";
+        argv++; argc--;
+    }
 
     {
         auto legacy = (*RegisterLegacyCommand::commands)[programName];
@@ -278,8 +288,6 @@ void mainWrapped(int argc, char * * argv)
     } else {
         verbosity = lvlInfo;
     }
-
-    Finally f([] { logger->stop(); });
 
     NixArgs args;
 
@@ -302,7 +310,7 @@ void mainWrapped(int argc, char * * argv)
             b["arity"] = primOp->arity;
             b["args"] = primOp->args;
             b["doc"] = trim(stripIndentation(primOp->doc));
-            res[(std::string) builtin.name] = std::move(b);
+            res[state.symbols[builtin.name]] = std::move(b);
         }
         std::cout << res.dump() << "\n";
         return;
@@ -320,7 +328,7 @@ void mainWrapped(int argc, char * * argv)
                 std::cout << "attrs\n"; break;
             }
             for (auto & s : *completions)
-                std::cout << s.completion << "\t" << s.description << "\n";
+                std::cout << s.completion << "\t" << trim(s.description) << "\n";
         }
     });
 
@@ -342,7 +350,10 @@ void mainWrapped(int argc, char * * argv)
         if (!completions) throw;
     }
 
-    if (completions) return;
+    if (completions) {
+        args.completionHook();
+        return;
+    }
 
     if (args.showVersion) {
         printVersion(programName);
@@ -380,6 +391,9 @@ void mainWrapped(int argc, char * * argv)
         settings.ttlPositiveNarInfoCache = 0;
     }
 
+    if (args.command->second->forceImpureByDefault() && !evalSettings.pureEval.overridden) {
+        evalSettings.pureEval = false;
+    }
     args.command->second->prepare();
     args.command->second->run();
 }

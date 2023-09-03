@@ -40,12 +40,12 @@ case "$(uname -s).$(uname -m)" in
         path=@tarballPath_aarch64-linux@
         system=aarch64-linux
         ;;
-    Linux.armv6l_linux)
+    Linux.armv6l)
         hash=@tarballHash_armv6l-linux@
         path=@tarballPath_armv6l-linux@
         system=armv6l-linux
         ;;
-    Linux.armv7l_linux)
+    Linux.armv7l)
         hash=@tarballHash_armv7l-linux@
         path=@tarballPath_armv7l-linux@
         system=armv7l-linux

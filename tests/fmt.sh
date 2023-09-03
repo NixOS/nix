@@ -18,7 +18,12 @@ cat << EOF > flake.nix
       with import ./config.nix;
       mkDerivation {
         name = "formatter";
-        buildCommand = "mkdir -p \$out/bin; cp \${./fmt.simple.sh} \$out/bin/formatter";
+        buildCommand = ''
+          mkdir -p \$out/bin
+          echo "#! ${shell}" > \$out/bin/formatter
+          cat \${./fmt.simple.sh} >> \$out/bin/formatter
+          chmod +x \$out/bin/formatter
+        '';
       };
   };
 }

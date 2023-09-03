@@ -66,6 +66,12 @@ R""(
   `nixpkgs#glibc` in `~/my-glibc` and want to compile another package
   against it.
 
+* Run a series of script commands:
+
+  ```console
+  # nix develop --command bash -c "mkdir build && cmake .. && make"
+  ```
+
 # Description
 
 `nix develop` starts a `bash` shell that provides an interactive build
@@ -80,8 +86,8 @@ initialised by `stdenv` and exits. This build environment can be
 recorded into a profile using `--profile`.
 
 The prompt used by the `bash` shell can be customised by setting the
-`bash-prompt` and `bash-prompt-suffix` settings in `nix.conf` or in
-the flake's `nixConfig` attribute.
+`bash-prompt`, `bash-prompt-prefix`, and `bash-prompt-suffix` settings in
+`nix.conf` or in the flake's `nixConfig` attribute.
 
 # Flake output attributes
 

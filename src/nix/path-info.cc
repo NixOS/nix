@@ -1,11 +1,12 @@
 #include "command.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "json.hh"
 #include "common-args.hh"
 
 #include <algorithm>
 #include <array>
+
+#include <nlohmann/json.hpp>
 
 using namespace nix;
 
@@ -86,11 +87,10 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             pathLen = std::max(pathLen, store->printStorePath(storePath).size());
 
         if (json) {
-            JSONPlaceholder jsonRoot(std::cout);
-            store->pathInfoToJSON(jsonRoot,
+            std::cout << store->pathInfoToJSON(
                 // FIXME: preserve order?
                 StorePathSet(storePaths.begin(), storePaths.end()),
-                true, showClosureSize, SRI, AllowInvalid);
+                true, showClosureSize, SRI, AllowInvalid).dump();
         }
 
         else {

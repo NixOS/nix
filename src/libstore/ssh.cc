@@ -67,7 +67,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(const std::string
         if (fakeSSH) {
             args = { "bash", "-c" };
         } else {
-            args = { "ssh", host.c_str(), "-x", "-a" };
+            args = { "ssh", host.c_str(), "-x" };
             addCommonSSHOpts(args);
             if (socketPath != "")
                 args.insert(args.end(), {"-S", socketPath});

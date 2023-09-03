@@ -60,6 +60,7 @@ struct ParseSink
     virtual void createDirectory(const Path & path) { };
 
     virtual void createRegularFile(const Path & path) { };
+    virtual void closeRegularFile() { };
     virtual void isExecutable() { };
     virtual void preallocateContents(uint64_t size) { };
     virtual void receiveContents(std::string_view data) { };
@@ -102,7 +103,9 @@ void copyNAR(Source & source, Sink & sink);
 void copyPath(const Path & from, const Path & to);
 
 
-extern const std::string narVersionMagic1;
+inline constexpr std::string_view narVersionMagic1 = "nix-archive-1";
+
+inline constexpr std::string_view caseHackSuffix = "~nix~case~hack~";
 
 
 }

@@ -21,7 +21,7 @@ struct LockedNode;
    type LockedNode. */
 struct Node : std::enable_shared_from_this<Node>
 {
-    typedef std::variant<std::shared_ptr<LockedNode>, InputPath> Edge;
+    typedef std::variant<ref<LockedNode>, InputPath> Edge;
 
     std::map<FlakeId, Edge> inputs;
 
@@ -48,10 +48,12 @@ struct LockedNode : Node
 
 struct LockFile
 {
-    std::shared_ptr<Node> root = std::make_shared<Node>();
+    ref<Node> root = make_ref<Node>();
 
     LockFile() {};
     LockFile(const nlohmann::json & json, const Path & path);
+
+    typedef std::map<ref<const Node>, std::string> KeyMap;
 
     nlohmann::json toJSON() const;
 
@@ -61,7 +63,8 @@ struct LockFile
 
     void write(const Path & path) const;
 
-    bool isImmutable() const;
+    /* Check whether this lock file has any unlocked inputs. */
+    std::optional<FlakeRef> isUnlocked() const;
 
     bool operator ==(const LockFile & other) const;
 
