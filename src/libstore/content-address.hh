@@ -38,7 +38,7 @@ std::string makeFileIngestionPrefix(FileIngestionMethod m);
 typedef std::variant<
     TextHashMethod,
     FixedOutputHashMethod
-  > ContentAddressMethod;
+> ContentAddressMethod;
 
 ContentAddressMethod parseContentAddressMethod(std::string_view rawCaMethod);
 
