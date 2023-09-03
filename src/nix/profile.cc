@@ -22,7 +22,7 @@ struct ProfileElementSource
     // FIXME: record original attrpath.
     FlakeRef resolvedRef;
     std::string attrPath;
-    OutputsSpec outputs;
+    ExtendedOutputsSpec outputs;
 
     bool operator < (const ProfileElementSource & other) const
     {
@@ -32,17 +32,19 @@ struct ProfileElementSource
     }
 };
 
+const int defaultPriority = 5;
+
 struct ProfileElement
 {
     StorePathSet storePaths;
     std::optional<ProfileElementSource> source;
     bool active = true;
-    int priority = 5;
+    int priority = defaultPriority;
 
     std::string describe() const
     {
         if (source)
-            return fmt("%s#%s%s", source->originalRef, source->attrPath, printOutputsSpec(source->outputs));
+            return fmt("%s#%s%s", source->originalRef, source->attrPath, source->outputs.to_string());
         StringSet names;
         for (auto & path : storePaths)
             names.insert(DrvName(path.name()).name);
@@ -124,7 +126,7 @@ struct ProfileManifest
                         parseFlakeRef(e[sOriginalUrl]),
                         parseFlakeRef(e[sUrl]),
                         e["attrPath"],
-                        e["outputs"].get<OutputsSpec>()
+                        e["outputs"].get<ExtendedOutputsSpec>()
                     };
                 }
                 elements.emplace_back(std::move(element));
@@ -262,13 +264,20 @@ struct ProfileManifest
     }
 };
 
-static std::map<Installable *, BuiltPaths>
+static std::map<Installable *, std::pair<BuiltPaths, ExtraPathInfo>>
 builtPathsPerInstallable(
     const std::vector<std::pair<std::shared_ptr<Installable>, BuiltPathWithResult>> & builtPaths)
 {
-    std::map<Installable *, BuiltPaths> res;
-    for (auto & [installable, builtPath] : builtPaths)
-        res[installable.get()].push_back(builtPath.path);
+    std::map<Installable *, std::pair<BuiltPaths, ExtraPathInfo>> res;
+    for (auto & [installable, builtPath] : builtPaths) {
+        auto & r = res[installable.get()];
+        /* Note that there could be conflicting info
+           (e.g. meta.priority fields) if the installable returned
+           multiple derivations. So pick one arbitrarily. FIXME:
+           print a warning? */
+        r.first.push_back(builtPath.path);
+        r.second = builtPath.info;
+    }
     return res;
 }
 
@@ -308,28 +317,25 @@ struct CmdProfileInstall : InstallablesCommand, MixDefaultProfile
         for (auto & installable : installables) {
             ProfileElement element;
 
+            auto & [res, info] = builtPaths[installable.get()];
 
-
-            if (auto installable2 = std::dynamic_pointer_cast<InstallableFlake>(installable)) {
-                // FIXME: make build() return this?
-                auto [attrPath, resolvedRef, drv] = installable2->toDerivation();
+            if (info.originalRef && info.resolvedRef && info.attrPath && info.extendedOutputsSpec) {
                 element.source = ProfileElementSource {
-                    installable2->flakeRef,
-                    resolvedRef,
-                    attrPath,
-                    installable2->outputsSpec
+                    .originalRef = *info.originalRef,
+                    .resolvedRef = *info.resolvedRef,
+                    .attrPath = *info.attrPath,
+                    .outputs = *info.extendedOutputsSpec,
                 };
-
-                if(drv.priority) {
-                    element.priority = *drv.priority;
-                }
             }
 
-            if(priority) { // if --priority was specified we want to override the priority of the installable
-                element.priority = *priority;
-            };
+            // If --priority was specified we want to override the
+            // priority of the installable.
+            element.priority =
+                priority
+                ? *priority
+                : info.priority.value_or(defaultPriority);
 
-            element.updateStorePaths(getEvalStore(), store, builtPaths[installable.get()]);
+            element.updateStorePaths(getEvalStore(), store, res);
 
             manifest.elements.push_back(std::move(element));
         }
@@ -487,18 +493,22 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
                     Strings{},
                     lockFlags);
 
-                auto [attrPath, resolvedRef, drv] = installable->toDerivation();
+                auto derivedPaths = installable->toDerivedPaths();
+                if (derivedPaths.empty()) continue;
+                auto & info = derivedPaths[0].info;
 
-                if (element.source->resolvedRef == resolvedRef) continue;
+                assert(info.resolvedRef && info.attrPath);
+
+                if (element.source->resolvedRef == info.resolvedRef) continue;
 
                 printInfo("upgrading '%s' from flake '%s' to '%s'",
-                    element.source->attrPath, element.source->resolvedRef, resolvedRef);
+                    element.source->attrPath, element.source->resolvedRef, *info.resolvedRef);
 
                 element.source = ProfileElementSource {
-                    installable->flakeRef,
-                    resolvedRef,
-                    attrPath,
-                    installable->outputsSpec
+                    .originalRef = installable->flakeRef,
+                    .resolvedRef = *info.resolvedRef,
+                    .attrPath = *info.attrPath,
+                    .outputs = installable->extendedOutputsSpec,
                 };
 
                 installables.push_back(installable);
@@ -526,7 +536,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
         for (size_t i = 0; i < installables.size(); ++i) {
             auto & installable = installables.at(i);
             auto & element = manifest.elements[indices.at(i)];
-            element.updateStorePaths(getEvalStore(), store, builtPaths[installable.get()]);
+            element.updateStorePaths(getEvalStore(), store, builtPaths[installable.get()].first);
         }
 
         updateProfile(manifest.build(store));
@@ -554,8 +564,8 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
         for (size_t i = 0; i < manifest.elements.size(); ++i) {
             auto & element(manifest.elements[i]);
             logger->cout("%d %s %s %s", i,
-                element.source ? element.source->originalRef.to_string() + "#" + element.source->attrPath + printOutputsSpec(element.source->outputs) : "-",
-                element.source ? element.source->resolvedRef.to_string() + "#" + element.source->attrPath + printOutputsSpec(element.source->outputs) : "-",
+                element.source ? element.source->originalRef.to_string() + "#" + element.source->attrPath + element.source->outputs.to_string() : "-",
+                element.source ? element.source->resolvedRef.to_string() + "#" + element.source->attrPath + element.source->outputs.to_string() : "-",
                 concatStringsSep(" ", store->printStorePathSet(element.storePaths)));
         }
     }

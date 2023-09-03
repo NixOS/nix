@@ -3,7 +3,7 @@
 #include "common-args.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "path-with-outputs.hh"
+#include "outputs-spec.hh"
 #include "derivations.hh"
 #include "progress-bar.hh"
 #include "run.hh"
@@ -232,7 +232,12 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     auto shellDrvPath = writeDerivation(*evalStore, drv);
 
     /* Build the derivation. */
-    store->buildPaths({DerivedPath::Built{shellDrvPath}}, bmNormal, evalStore);
+    store->buildPaths(
+        { DerivedPath::Built {
+            .drvPath = shellDrvPath,
+            .outputs = OutputsSpec::All { },
+        }},
+        bmNormal, evalStore);
 
     for (auto & [_0, optPath] : evalStore->queryPartialDerivationOutputMap(shellDrvPath)) {
         assert(optPath);

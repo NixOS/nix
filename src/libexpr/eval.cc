@@ -2068,27 +2068,6 @@ std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string
 }
 
 
-/* Decode a context string ‘!<name>!<path>’ into a pair <path,
-   name>. */
-NixStringContextElem decodeContext(const Store & store, std::string_view s)
-{
-    if (s.at(0) == '!') {
-        size_t index = s.find("!", 1);
-        return {
-            store.parseStorePath(s.substr(index + 1)),
-            std::string(s.substr(1, index - 1)),
-        };
-    } else
-        return {
-            store.parseStorePath(
-                s.at(0) == '/'
-                ? s
-                : s.substr(1)),
-            "",
-        };
-}
-
-
 void copyContext(const Value & v, PathSet & context)
 {
     if (v.string.context)
@@ -2103,7 +2082,7 @@ NixStringContext Value::getContext(const Store & store)
     assert(internalType == tString);
     if (string.context)
         for (const char * * p = string.context; *p; ++p)
-            res.push_back(decodeContext(store, *p));
+            res.push_back(NixStringContextElem::parse(store, *p));
     return res;
 }
 
@@ -2166,7 +2145,7 @@ BackedStringView EvalState::coerceToString(const PosIdx pos, Value & v, PathSet 
         if (canonicalizePath)
             path = canonPath(*path);
         if (copyToStore)
-            path = copyPathToStore(context, std::move(path).toOwned());
+            path = store->printStorePath(copyPathToStore(context, std::move(path).toOwned()));
         return path;
     }
 
@@ -2215,26 +2194,26 @@ BackedStringView EvalState::coerceToString(const PosIdx pos, Value & v, PathSet 
 }
 
 
-std::string EvalState::copyPathToStore(PathSet & context, const Path & path)
+StorePath EvalState::copyPathToStore(PathSet & context, const Path & path)
 {
     if (nix::isDerivation(path))
         error("file names are not allowed to end in '%1%'", drvExtension).debugThrow<EvalError>();
 
-    Path dstPath;
-    auto i = srcToStore.find(path);
-    if (i != srcToStore.end())
-        dstPath = store->printStorePath(i->second);
-    else {
-        auto p = settings.readOnlyMode
+    auto dstPath = [&]() -> StorePath
+    {
+        auto i = srcToStore.find(path);
+        if (i != srcToStore.end()) return i->second;
+
+        auto dstPath = settings.readOnlyMode
             ? store->computeStorePathForPath(std::string(baseNameOf(path)), checkSourcePath(path)).first
             : store->addToStore(std::string(baseNameOf(path)), checkSourcePath(path), FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, repair);
-        dstPath = store->printStorePath(p);
-        allowPath(p);
-        srcToStore.insert_or_assign(path, std::move(p));
-        printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, dstPath);
-    }
+        allowPath(dstPath);
+        srcToStore.insert_or_assign(path, dstPath);
+        printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
+        return dstPath;
+    }();
 
-    context.insert(dstPath);
+    context.insert(store->printStorePath(dstPath));
     return dstPath;
 }
 

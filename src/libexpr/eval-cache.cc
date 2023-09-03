@@ -300,7 +300,7 @@ struct AttrDb
                 NixStringContext context;
                 if (!queryAttribute.isNull(3))
                     for (auto & s : tokenizeString<std::vector<std::string>>(queryAttribute.getStr(3), ";"))
-                        context.push_back(decodeContext(cfg, s));
+                        context.push_back(NixStringContextElem::parse(cfg, s));
                 return {{rowId, string_t{queryAttribute.getStr(2), context}}};
             }
             case AttrType::Bool:
@@ -592,7 +592,18 @@ string_t AttrCursor::getStringWithContext()
             if (auto s = std::get_if<string_t>(&cachedValue->second)) {
                 bool valid = true;
                 for (auto & c : s->second) {
-                    if (!root->state.store->isValidPath(c.first)) {
+                    const StorePath & path = std::visit(overloaded {
+                        [&](const NixStringContextElem::DrvDeep & d) -> const StorePath & {
+                            return d.drvPath;
+                        },
+                        [&](const NixStringContextElem::Built & b) -> const StorePath & {
+                            return b.drvPath;
+                        },
+                        [&](const NixStringContextElem::Opaque & o) -> const StorePath & {
+                            return o.path;
+                        },
+                    }, c.raw());
+                    if (!root->state.store->isValidPath(path)) {
                         valid = false;
                         break;
                     }

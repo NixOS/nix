@@ -379,7 +379,7 @@ public:
         bool canonicalizePath = true,
         std::string_view errorCtx = "");
 
-    std::string copyPathToStore(PathSet & context, const Path & path);
+    StorePath copyPathToStore(PathSet & context, const Path & path);
 
     /* Path coercion.  Converts strings, paths and derivations to a
        path.  The result is guaranteed to be a canonicalised, absolute
@@ -550,10 +550,6 @@ struct DebugTraceStacker {
 /* Return a string representing the type of the value `v'. */
 std::string_view showType(ValueType type);
 std::string showType(const Value & v);
-
-/* Decode a context string ‘!<name>!<path>’ into a pair <path,
-   name>. */
-NixStringContextElem decodeContext(const Store & store, std::string_view s);
 
 /* If `path' refers to a directory, then append "/default.nix". */
 Path resolveExprPath(Path path);

@@ -33,13 +33,7 @@ struct CmdCopyLog : virtual CopyCommand, virtual InstallablesCommand
         auto dstStore = getDstStore();
         auto & dstLogStore = require<LogStore>(*dstStore);
 
-        StorePathSet drvPaths;
-
-        for (auto & i : installables)
-            for (auto & drvPath : i->toDrvPaths(getEvalStore()))
-                drvPaths.insert(drvPath);
-
-        for (auto & drvPath : drvPaths) {
+        for (auto & drvPath : Installable::toDerivations(getEvalStore(), installables, true)) {
             if (auto log = srcLogStore.getBuildLog(drvPath))
                 dstLogStore.addBuildLog(drvPath, *log);
             else
