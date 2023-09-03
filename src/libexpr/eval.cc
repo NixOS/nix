@@ -778,17 +778,21 @@ void printWithBindings(const SymbolTable & st, const Env & env)
     }
 }
 
-void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, int lvl)
+int printEnvBindings_helper(const SymbolTable & st, const StaticEnv & se, const Env & env)
 {
-    std::cout << "Env level " << lvl << std::endl;
-
     if (se.up && env.up) {
+        // first print parent bindings
+        int lvl = printEnvBindings_helper(st, *se.up, *env.up);
+        // then bindings for this level.
+        ++lvl;
+        std::cout << "Env level " << lvl << std::endl;
         std::cout << "static: ";
         printStaticEnvBindings(st, se);
         printWithBindings(st, env);
         std::cout << std::endl;
-        printEnvBindings(st, *se.up, *env.up, ++lvl);
+        return lvl;
     } else {
+        std::cout << "Env level " << 0 << std::endl;
         std::cout << ANSI_MAGENTA;
         // for the top level, don't print the double underscore ones;
         // they are in builtins.
@@ -800,15 +804,16 @@ void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & 
         printWithBindings(st, env);  // probably nothing there for the top level.
         std::cout << std::endl;
 
+        return 0;
     }
 }
 
 void printEnvBindings(const EvalState &es, const Expr & expr, const Env & env)
 {
     // just print the names for now
-    auto se = es.getStaticEnv(expr);
+    auto se = es.getStaticEnv(expr); // is this broken?
     if (se)
-        printEnvBindings(es.symbols, *se, env, 0);
+        printEnvBindings_helper(es.symbols, *se, env);
 }
 
 void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, ValMap & vm)

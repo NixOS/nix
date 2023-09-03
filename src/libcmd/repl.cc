@@ -108,7 +108,7 @@ std::string removeWhitespace(std::string s)
 NixRepl::NixRepl(const SearchPath & searchPath, nix::ref<Store> store, ref<EvalState> state,
             std::function<NixRepl::AnnotatedValues()> getValues)
     : AbstractNixRepl(state)
-    , debugTraceIndex(0)
+    , debugTraceIndex(state->debugTraces.size() - 1)
     , getValues(getValues)
     , staticEnv(new StaticEnv(false, state->staticBaseEnv.get()))
     , historyFile(getDataDir() + "/nix/repl-history")
