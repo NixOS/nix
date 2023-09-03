@@ -5,6 +5,7 @@ cd "$TEST_ROOT"
 
 replCmds="
 :bt
+:q
 "
 
 # replFailingCmds="
@@ -17,114 +18,41 @@ replCmds="
 # import $testDir/undefined-variable.nix
 # "
 
+echo "nix version: $(nix --version)"
+
+nixArgs=("$@")
+na="${nixArgs[@]}"
+# na="--extra-experimental-features nix-command"
+
 testRepl () {
-    local nixArgs=("$@")
-    rm -rf debugger-result-out || true # cleanup from other runs backed by a foreign nix store
-    local replOutput="$(nix eval "${nixArgs[@]}" --debugger -f $testDir/debugger-break.nix <<< "$replCmds")"
-    echo "$replOutput"
-    # local outPath=$(echo "$replOutput" |&
-    #     grep -o -E "$NIX_STORE_DIR/\w*-simple")
-    # nix path-info "${nixArgs[@]}" "$outPath"
-    # [ "$(realpath ./repl-result-out)" == "$outPath" ] || fail "nix repl :bl doesn't make a symlink"
-    # # run it again without checking the output to ensure the previously created symlink gets overwritten
-    # nix repl "${nixArgs[@]}" <<< "$replCmds" || fail "nix repl does not work twice with the same inputs"
+    fname=$1
+    local replOutput=$(nix eval ${na} --debugger -f $testDir/${fname}.nix <<< "$replCmds")
+    # local replOutput=$((nix eval ${na} --debugger -f $testDir/${fname}.nix <<< "$replCmds") 2>&1)
+    # echo -e "$replOutput" | grep "^.\[34\;1m[0-9]" > "/home/bburdette/testout/${fname}.txt"
+    # local replFiltered=$(echo -e "$replOutput" | { grep "^.\[34\;1m[0-9]" || echo "" ; } | grep -v "file")
+    local replFiltered=$(echo -e "$replOutput" | { grep "^.\[34\;1m[0-9]" || echo "" ; } )
 
-    # # simple.nix prints a PATH during build
-    # echo "$replOutput" | grepQuiet -s 'PATH=' || fail "nix repl :log doesn't output logs"
-    # local replOutput="$(nix repl "${nixArgs[@]}" <<< "$replFailingCmds" 2>&1)"
-    # echo "$replOutput"
-    # echo "$replOutput" | grepQuiet -s 'This should fail' \
-    #   || fail "nix repl :log doesn't output logs for a failed derivation"
-    # local replOutput="$(nix repl --show-trace "${nixArgs[@]}" <<< "$replUndefinedVariable" 2>&1)"
-    # echo "$replOutput"
-    # echo "$replOutput" | grepQuiet -s "while evaluating the file" \
-    #   || fail "nix repl --show-trace doesn't show the trace"
+    echo -e "$replFiltered" > "/home/bburdette/testout/${fname}.txt"
 
-    # nix repl "${nixArgs[@]}" --option pure-eval true 2>&1 <<< "builtins.currentSystem" \
-    #   | grep "attribute 'currentSystem' missing"
-    # nix repl "${nixArgs[@]}" 2>&1 <<< "builtins.currentSystem" \
-    #   | grep "$(nix-instantiate --eval -E 'builtins.currentSystem')"
+    local expected="$(cat $testDir/${fname}.expected)"
+
+    ex2=${expected}
+    ro2=${replFiltered}
+
+    if [ "${ex2}" != "${ro2}" ]; then
+        fail "ex2 output doesn't match for file: $fname"
+    fi
+    # if [ "${expected}" != "${replOutput}" ]; then
+    #     echo "expected: ${expected}"
+    #     echo "replOutput: ${replOutput}"
+
+    #     fail "expected output doesn't match"
+    # fi
 }
 
 # Simple test, try building a drv
-testRepl
-# Same thing (kind-of), but with a remote store.
-testRepl --store "$TEST_ROOT/store?real=$NIX_STORE_DIR"
-
-testReplResponse () {
-    local commands="$1"; shift
-    local expectedResponse="$1"; shift
-    local response="$(nix repl "$@" <<< "$commands")"
-    echo "$response" | grepQuiet -s "$expectedResponse" \
-      || fail "repl command set:
-
-$commands
-
-does not respond with:
-
-$expectedResponse
-
-but with:
-
-$response"
-}
-
-# :a uses the newest version of a symbol
-testReplResponse '
-:a { a = "1"; }
-:a { a = "2"; }
-"result: ${a}"
-' "result: 2"
-
-# check dollar escaping https://github.com/NixOS/nix/issues/4909
-# note the escaped \,
-#    \\
-# because the second argument is a regex
-testReplResponse '
-"$" + "{hi}"
-' '"\\${hi}"'
-
-testReplResponse '
-drvPath
-' '".*-simple.drv"' \
-$testDir/simple.nix
-
-testReplResponse '
-drvPath
-' '".*-simple.drv"' \
---file $testDir/simple.nix --experimental-features 'ca-derivations'
-
-testReplResponse '
-drvPath
-' '".*-simple.drv"' \
---file $testDir/simple.nix --extra-experimental-features 'repl-flake ca-derivations'
-
-mkdir -p flake && cat <<EOF > flake/flake.nix
-{
-    outputs = { self }: {
-        foo = 1;
-        bar.baz = 2;
-
-        changingThing = "beforeChange";
-    };
-}
-EOF
-testReplResponse '
-foo + baz
-' "3" \
-    ./flake ./flake\#bar --experimental-features 'flakes repl-flake'
-
-# Test the `:reload` mechansim with flakes:
-# - Eval `./flake#changingThing`
-# - Modify the flake
-# - Re-eval it
-# - Check that the result has changed
-replResult=$( (
-echo "changingThing"
-sleep 1 # Leave the repl the time to eval 'foo'
-sed -i 's/beforeChange/afterChange/' flake/flake.nix
-echo ":reload"
-echo "changingThing"
-) | nix repl ./flake --experimental-features 'flakes repl-flake')
-echo "$replResult" | grepQuiet -s beforeChange
-echo "$replResult" | grepQuiet -s afterChange
+testRepl "debugger-attr-bad"
+testRepl "debugger-bool-expected"
+testRepl "debugger-attr-deep"
+testRepl "debugger-break"
+testRepl "debugger-attr-missing"
