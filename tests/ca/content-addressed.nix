@@ -61,6 +61,24 @@ rec {
       echo ${rootCA}/non-ca-hello > $out/dep
     '';
   };
+  dependentForBuildCA = mkCADerivation {
+    name = "dependent-for-build-ca";
+    buildCommand = ''
+      echo "Depends on rootCA for building only"
+      mkdir -p $out
+      echo ${rootCA}
+      touch $out
+    '';
+  };
+  dependentForBuildNonCA = mkDerivation {
+    name = "dependent-for-build-non-ca";
+    buildCommand = ''
+      echo "Depends on rootCA for building only"
+      mkdir -p $out
+      echo ${rootCA}
+      touch $out
+    '';
+  };
   dependentFixedOutput = mkDerivation {
     name = "dependent-fixed-output";
     outputHashMode = "recursive";

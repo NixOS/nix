@@ -14,6 +14,11 @@ void BaseError::addTrace(std::shared_ptr<AbstractPos> && e, hintformat hint, boo
     err.traces.push_front(Trace { .pos = std::move(e), .hint = hint, .frame = frame });
 }
 
+void throwExceptionSelfCheck(){
+    // This is meant to be caught in initLibUtil()
+    throw SysError("C++ exception handling is broken. This would appear to be a problem with the way Nix was compiled and/or linked and/or loaded.");
+}
+
 // c++ std::exception descendants must have a 'const char* what()' function.
 // This stringifies the error and caches it for use by what(), or similarly by msg().
 const std::string & BaseError::calcWhat() const
@@ -302,13 +307,13 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     if (!einfo.traces.empty()) {
         size_t count = 0;
         for (const auto & trace : einfo.traces) {
+            if (trace.hint.str().empty()) continue;
+            if (frameOnly && !trace.frame) continue;
+
             if (!showTrace && count > 3) {
                 oss << "\n" << ANSI_WARNING "(stack trace truncated; use '--show-trace' to show the full trace)" ANSI_NORMAL << "\n";
                 break;
             }
-
-            if (trace.hint.str().empty()) continue;
-            if (frameOnly && !trace.frame) continue;
 
             count++;
             frameOnly = trace.frame;

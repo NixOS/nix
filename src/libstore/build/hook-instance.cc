@@ -5,14 +5,14 @@ namespace nix {
 
 HookInstance::HookInstance()
 {
-    debug("starting build hook '%s'", settings.buildHook);
+    debug("starting build hook '%s'", concatStringsSep(" ", settings.buildHook.get()));
 
-    auto buildHookArgs = tokenizeString<std::list<std::string>>(settings.buildHook.get());
+    auto buildHookArgs = settings.buildHook.get();
 
     if (buildHookArgs.empty())
         throw Error("'build-hook' setting is empty");
 
-    auto buildHook = buildHookArgs.front();
+    auto buildHook = canonPath(buildHookArgs.front());
     buildHookArgs.pop_front();
 
     Strings args;
@@ -35,7 +35,10 @@ HookInstance::HookInstance()
     /* Fork the hook. */
     pid = startProcess([&]() {
 
-        commonChildInit(fromHook);
+        if (dup2(fromHook.writeSide.get(), STDERR_FILENO) == -1)
+            throw SysError("cannot pipe standard error into log file");
+
+        commonChildInit();
 
         if (chdir("/") == -1) throw SysError("changing into /");
 

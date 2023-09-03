@@ -1,9 +1,6 @@
 source common.sh
 
-if [[ -z $(type -p hg) ]]; then
-    echo "Mercurial not installed; skipping Mercurial tests"
-    exit 99
-fi
+[[ $(type -p hq) ]] || skipTest "Mercurial not installed"
 
 clearStore
 

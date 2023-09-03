@@ -44,12 +44,10 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         ValidPathInfo info {
             *store,
             StorePathDescriptor {
-                .name = *namePart,
+                .name = std::move(*namePart),
                 .info = FixedOutputInfo {
-                    {
-                        .method = std::move(ingestionMethod),
-                        .hash = std::move(hash),
-                    },
+                    .method = std::move(ingestionMethod),
+                    .hash = std::move(hash),
                     .references = {},
                 },
             },

@@ -1,5 +1,7 @@
 #include "path-info.hh"
 #include "worker-protocol.hh"
+#include "worker-protocol-impl.hh"
+#include "store-api.hh"
 
 namespace nix {
 
@@ -29,20 +31,21 @@ std::optional<StorePathDescriptor> ValidPathInfo::fullStorePathDescriptorOpt() c
     return StorePathDescriptor {
         .name = std::string { path.name() },
         .info = std::visit(overloaded {
-            [&](const TextHash & th) -> ContentAddressWithReferences {
+            [&](const TextIngestionMethod &) -> ContentAddressWithReferences {
                 assert(!references.self);
                 return TextInfo {
-                    th,
+                    .hash = ca->hash,
                     .references = references.others,
                 };
             },
-            [&](const FixedOutputHash & foh) -> ContentAddressWithReferences {
+            [&](const FileIngestionMethod & m2) -> ContentAddressWithReferences {
                 return FixedOutputInfo {
-                    foh,
+                    .method = m2,
+                    .hash = ca->hash,
                     .references = references,
                 };
             },
-        }, *ca),
+        }, ca->method.raw),
     };
 }
 
@@ -104,13 +107,19 @@ ValidPathInfo::ValidPathInfo(
                 .others = std::move(ti.references),
                 .self = false,
             };
-            this->ca = std::move((TextHash &&) ti);
+            this->ca = ContentAddress {
+                .method = TextIngestionMethod {},
+                .hash = std::move(ti.hash),
+            };
         },
         [this](FixedOutputInfo && foi) {
             this->references = std::move(foi.references);
-            this->ca = std::move((FixedOutputHash &&) foi);
+            this->ca = ContentAddress {
+                .method = std::move(foi.method),
+                .hash = std::move(foi.hash),
+            };
         },
-    }, std::move(info.info));
+    }, std::move(info.info).raw);
 }
 
 
@@ -141,12 +150,13 @@ ValidPathInfo ValidPathInfo::read(Source & source, const Store & store, unsigned
     auto narHash = Hash::parseAny(readString(source), htSHA256);
     ValidPathInfo info(path, narHash);
     if (deriver != "") info.deriver = store.parseStorePath(deriver);
-    info.setReferencesPossiblyToSelf(worker_proto::read(store, source, Phantom<StorePathSet> {}));
+    info.setReferencesPossiblyToSelf(WorkerProto::Serialise<StorePathSet>::read(store,
+        WorkerProto::ReadConn { .from = source }));
     source >> info.registrationTime >> info.narSize;
     if (format >= 16) {
         source >> info.ultimate;
         info.sigs = readStrings<StringSet>(source);
-        info.ca = parseContentAddressOpt(readString(source));
+        info.ca = ContentAddress::parseOpt(readString(source));
     }
     return info;
 }
@@ -162,7 +172,9 @@ void ValidPathInfo::write(
         sink << store.printStorePath(path);
     sink << (deriver ? store.printStorePath(*deriver) : "")
          << narHash.to_string(Base16, false);
-    worker_proto::write(store, sink, referencesPossiblyToSelf());
+    WorkerProto::write(store,
+        WorkerProto::WriteConn { .to = sink },
+        referencesPossiblyToSelf());
     sink << registrationTime << narSize;
     if (format >= 16) {
         sink << ultimate

@@ -54,7 +54,7 @@ output attribute). They are also allowed in the `inputs` attribute
 of a flake, e.g.
 
 ```nix
-inputs.nixpkgs.url = github:NixOS/nixpkgs;
+inputs.nixpkgs.url = "github:NixOS/nixpkgs";
 ```
 
 is equivalent to
@@ -71,8 +71,6 @@ inputs.nixpkgs = {
 
 Here are some examples of flake references in their URL-like representation:
 
-* `.`: The flake in the current directory.
-* `/home/alice/src/patchelf`: A flake in some other directory.
 * `nixpkgs`: The `nixpkgs` entry in the flake registry.
 * `nixpkgs/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293`: The `nixpkgs`
   entry in the flake registry, with its Git revision overridden to a
@@ -92,6 +90,23 @@ Here are some examples of flake references in their URL-like representation:
   A specific branch *and* revision of a Git repository.
 * `https://github.com/NixOS/patchelf/archive/master.tar.gz`: A tarball
   flake.
+
+## Path-like syntax
+
+Flakes corresponding to a local path can also be referred to by a direct path reference, either `/absolute/path/to/the/flake` or `./relative/path/to/the/flake` (note that the leading `./` is mandatory for relative paths to avoid any ambiguity).
+
+The semantic of such a path is as follows:
+
+* If the directory is part of a Git repository, then the input will be treated as a `git+file:` URL, otherwise it will be treated as a `path:` url;
+* If the directory doesn't contain a `flake.nix` file, then Nix will search for such a file upwards in the file system hierarchy until it finds any of:
+    1. The Git repository root, or
+    2. The filesystem root (/), or
+    3. A folder on a different mount point.
+
+### Examples
+
+* `.`: The flake to which the current directory belongs to.
+* `/home/alice/src/patchelf`: A flake in some other directory.
 
 ## Flake reference attributes
 
@@ -221,11 +236,46 @@ Currently the `type` attribute can be one of the following:
   commit hash (`rev`). Note that unlike Git, GitHub allows fetching by
   commit hash without specifying a branch or tag.
 
+  You can also specify `host` as a parameter, to point to a custom GitHub
+  Enterprise server.
+
   Some examples:
 
   * `github:edolstra/dwarffs`
   * `github:edolstra/dwarffs/unstable`
   * `github:edolstra/dwarffs/d3f2baba8f425779026c6ec04021b2e927f61e31`
+  * `github:internal/project?host=company-github.example.org`
+
+* `gitlab`: Similar to `github`, is a more efficient way to fetch
+  GitLab repositories. The following attributes are required:
+
+  * `owner`: The owner of the repository.
+
+  * `repo`: The name of the repository.
+
+  Like `github`, these are downloaded as tarball archives.
+
+  The URL syntax for `gitlab` flakes is:
+
+  `gitlab:<owner>/<repo>(/<rev-or-ref>)?(\?<params>)?`
+
+  `<rev-or-ref>` works the same as `github`. Either a branch or tag name
+  (`ref`), or a commit hash (`rev`) can be specified.
+
+  Since GitLab allows for self-hosting, you can specify `host` as
+  a parameter, to point to any instances other than `gitlab.com`.
+
+  Some examples:
+
+  * `gitlab:veloren/veloren`
+  * `gitlab:veloren/veloren/master`
+  * `gitlab:veloren/veloren/80a4d7f13492d916e47d6195be23acae8001985a`
+  * `gitlab:openldap/openldap?host=git.openldap.org`
+
+  When accessing a project in a (nested) subgroup, make sure to URL-encode any
+  slashes, i.e. replace `/` with `%2F`:
+
+  * `gitlab:veloren%2Fdev/rfcs`
 
 * `sourcehut`: Similar to `github`, is a more efficient way to fetch
   SourceHut repositories. The following attributes are required:
@@ -275,14 +325,14 @@ Currently the `type` attribute can be one of the following:
 # Flake format
 
 As an example, here is a simple `flake.nix` that depends on the
-Nixpkgs flake and provides a single package (i.e. an installable
-derivation):
+Nixpkgs flake and provides a single package (i.e. an
+[installable](./nix.md#installables) derivation):
 
 ```nix
 {
   description = "A flake for building Hello World";
 
-  inputs.nixpkgs.url = github:NixOS/nixpkgs/nixos-20.03;
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-20.03";
 
   outputs = { self, nixpkgs }: {
 
@@ -317,6 +367,8 @@ The following attributes are supported in `flake.nix`:
   also contains some metadata about the inputs. These are:
 
   * `outPath`: The path in the Nix store of the flake's source tree.
+     This way, the attribute set can be passed to `import` as if it was a path,
+     as in the example above (`import nixpkgs`).
 
   * `rev`: The commit hash of the flake's repository, if applicable.
 
@@ -344,10 +396,12 @@ The following attributes are supported in `flake.nix`:
 
 * `nixConfig`: a set of `nix.conf` options to be set when evaluating any
   part of a flake. In the interests of security, only a small set of
-  whitelisted options (currently `bash-prompt`, `bash-prompt-prefix`,
-  `bash-prompt-suffix`, and `flake-registry`) are allowed to be set without
-  confirmation so long as `accept-flake-config` is not set in the global
-  configuration.
+  set of options is allowed to be set without confirmation so long as [`accept-flake-config`](@docroot@/command-ref/conf-file.md#conf-accept-flake-config) is not enabled in the global configuration:
+   - [`bash-prompt`](@docroot@/command-ref/conf-file.md#conf-bash-prompt)
+   - [`bash-prompt-prefix`](@docroot@/command-ref/conf-file.md#conf-bash-prompt-prefix)
+   - [`bash-prompt-suffix`](@docroot@/command-ref/conf-file.md#conf-bash-prompt-suffix)
+   - [`flake-registry`](@docroot@/command-ref/conf-file.md#conf-flake-registry)
+   - [`commit-lockfile-summary`](@docroot@/command-ref/conf-file.md#conf-commit-lockfile-summary)
 
 ## Flake inputs
 
@@ -374,7 +428,7 @@ inputs.nixpkgs = {
 Alternatively, you can use the URL-like syntax:
 
 ```nix
-inputs.import-cargo.url = github:edolstra/import-cargo;
+inputs.import-cargo.url = "github:edolstra/import-cargo";
 inputs.nixpkgs.url = "nixpkgs";
 ```
 

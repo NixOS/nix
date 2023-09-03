@@ -13,8 +13,10 @@
 namespace nix {
 
 
-/* Parse a generation name of the format
-   `<profilename>-<number>-link'. */
+/**
+ * Parse a generation name of the format
+ * `<profilename>-<number>-link'.
+ */
 static std::optional<GenerationNumber> parseName(const std::string & profileName, const std::string & name)
 {
     if (name.substr(0, profileName.size() + 1) != profileName + "-") return {};
@@ -26,7 +28,6 @@ static std::optional<GenerationNumber> parseName(const std::string & profileName
     else
         return {};
 }
-
 
 
 std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path profile)
@@ -61,15 +62,16 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path pro
 }
 
 
-static void makeName(const Path & profile, GenerationNumber num,
-    Path & outLink)
+/**
+ * Create a generation name that can be parsed by `parseName()`.
+ */
+static Path makeName(const Path & profile, GenerationNumber num)
 {
-    Path prefix = (format("%1%-%2%") % profile % num).str();
-    outLink = prefix + "-link";
+    return fmt("%s-%s-link", profile, num);
 }
 
 
-Path createGeneration(ref<LocalFSStore> store, Path profile, StorePath outPath)
+Path createGeneration(LocalFSStore & store, Path profile, StorePath outPath)
 {
     /* The new generation number should be higher than old the
        previous ones. */
@@ -79,7 +81,7 @@ Path createGeneration(ref<LocalFSStore> store, Path profile, StorePath outPath)
     if (gens.size() > 0) {
         Generation last = gens.back();
 
-        if (readLink(last.path) == store->printStorePath(outPath)) {
+        if (readLink(last.path) == store.printStorePath(outPath)) {
             /* We only create a new generation symlink if it differs
                from the last one.
 
@@ -89,7 +91,7 @@ Path createGeneration(ref<LocalFSStore> store, Path profile, StorePath outPath)
             return last.path;
         }
 
-        num = gens.back().number;
+        num = last.number;
     } else {
         num = 0;
     }
@@ -100,9 +102,8 @@ Path createGeneration(ref<LocalFSStore> store, Path profile, StorePath outPath)
        to the permanent roots (of which the GC would have a stale
        view).  If we didn't do it this way, the GC might remove the
        user environment etc. we've just built. */
-    Path generation;
-    makeName(profile, num + 1, generation);
-    store->addPermRoot(outPath, generation);
+    Path generation = makeName(profile, num + 1);
+    store.addPermRoot(outPath, generation);
 
     return generation;
 }
@@ -117,12 +118,19 @@ static void removeFile(const Path & path)
 
 void deleteGeneration(const Path & profile, GenerationNumber gen)
 {
-    Path generation;
-    makeName(profile, gen, generation);
+    Path generation = makeName(profile, gen);
     removeFile(generation);
 }
 
-
+/**
+ * Delete a generation with dry-run mode.
+ *
+ * Like `deleteGeneration()` but:
+ *
+ *  - We log what we are going to do.
+ *
+ *  - We only actually delete if `dryRun` is false.
+ */
 static void deleteGeneration2(const Path & profile, GenerationNumber gen, bool dryRun)
 {
     if (dryRun)
@@ -150,27 +158,36 @@ void deleteGenerations(const Path & profile, const std::set<GenerationNumber> & 
     }
 }
 
+/**
+ * Advanced the iterator until the given predicate `cond` returns `true`.
+ */
+static inline void iterDropUntil(Generations & gens, auto && i, auto && cond)
+{
+    for (; i != gens.rend() && !cond(*i); ++i);
+}
+
 void deleteGenerationsGreaterThan(const Path & profile, GenerationNumber max, bool dryRun)
 {
+    if (max == 0)
+        throw Error("Must keep at least one generation, otherwise the current one would be deleted");
+
     PathLocks lock;
     lockProfile(lock, profile);
 
-    bool fromCurGen = false;
-    auto [gens, curGen] = findGenerations(profile);
-    for (auto i = gens.rbegin(); i != gens.rend(); ++i) {
-        if (i->number == curGen) {
-            fromCurGen = true;
-            max--;
-            continue;
-        }
-        if (fromCurGen) {
-            if (max) {
-                max--;
-                continue;
-            }
-            deleteGeneration2(profile, i->number, dryRun);
-        }
-    }
+    auto [gens, _curGen] = findGenerations(profile);
+    auto curGen = _curGen;
+
+    auto i = gens.rbegin();
+
+    // Find the current generation
+    iterDropUntil(gens, i, [&](auto & g) { return g.number == curGen; });
+
+    // Skip over `max` generations, preserving them
+    for (auto keep = 0; i != gens.rend() && keep < max; ++i, ++keep);
+
+    // Delete the rest
+    for (; i != gens.rend(); ++i)
+        deleteGeneration2(profile, i->number, dryRun);
 }
 
 void deleteOldGenerations(const Path & profile, bool dryRun)
@@ -193,23 +210,33 @@ void deleteGenerationsOlderThan(const Path & profile, time_t t, bool dryRun)
 
     auto [gens, curGen] = findGenerations(profile);
 
-    bool canDelete = false;
-    for (auto i = gens.rbegin(); i != gens.rend(); ++i)
-        if (canDelete) {
-            assert(i->creationTime < t);
-            if (i->number != curGen)
-                deleteGeneration2(profile, i->number, dryRun);
-        } else if (i->creationTime < t) {
-            /* We may now start deleting generations, but we don't
-               delete this generation yet, because this generation was
-               still the one that was active at the requested point in
-               time. */
-            canDelete = true;
-        }
+    auto i = gens.rbegin();
+
+    // Predicate that the generation is older than the given time.
+    auto older = [&](auto & g) { return g.creationTime < t; };
+
+    // Find the first older generation, if one exists
+    iterDropUntil(gens, i, older);
+
+    /* Take the previous generation
+
+       We don't want delete this one yet because it
+       existed at the requested point in time, and
+       we want to be able to roll back to it. */
+    if (i != gens.rend()) ++i;
+
+    // Delete all previous generations (unless current).
+    for (; i != gens.rend(); ++i) {
+        /* Creating date and generations should be monotonic, so lower
+           numbered derivations should also be older. */
+        assert(older(*i));
+        if (i->number != curGen)
+            deleteGeneration2(profile, i->number, dryRun);
+    }
 }
 
 
-void deleteGenerationsOlderThan(const Path & profile, std::string_view timeSpec, bool dryRun)
+time_t parseOlderThanTimeSpec(std::string_view timeSpec)
 {
     if (timeSpec.empty() || timeSpec[timeSpec.size() - 1] != 'd')
         throw UsageError("invalid number of days specifier '%1%', expected something like '14d'", timeSpec);
@@ -221,9 +248,7 @@ void deleteGenerationsOlderThan(const Path & profile, std::string_view timeSpec,
     if (!days || *days < 1)
         throw UsageError("invalid number of days specifier '%1%'", timeSpec);
 
-    time_t oldTime = curTime - *days * 24 * 3600;
-
-    deleteGenerationsOlderThan(profile, oldTime, dryRun);
+    return curTime - *days * 24 * 3600;
 }
 
 
@@ -269,7 +294,7 @@ void switchGeneration(
 
 void lockProfile(PathLocks & lock, const Path & profile)
 {
-    lock.lockPaths({profile}, (format("waiting for lock on profile '%1%'") % profile).str());
+    lock.lockPaths({profile}, fmt("waiting for lock on profile '%1%'", profile));
     lock.setDeletion(true);
 }
 
@@ -280,16 +305,35 @@ std::string optimisticLockProfile(const Path & profile)
 }
 
 
+Path profilesDir()
+{
+    auto profileRoot =
+        (getuid() == 0)
+        ? rootProfilesDir()
+        : createNixStateDir() + "/profiles";
+    createDirs(profileRoot);
+    return profileRoot;
+}
+
+Path rootProfilesDir()
+{
+    return settings.nixStateDir + "/profiles/per-user/root";
+}
+
+
 Path getDefaultProfile()
 {
-    Path profileLink = getHome() + "/.nix-profile";
+    Path profileLink = settings.useXDGBaseDirectories ? createNixStateDir() + "/profile" : getHome() + "/.nix-profile";
     try {
+        auto profile = profilesDir() + "/profile";
         if (!pathExists(profileLink)) {
-            replaceSymlink(
-                getuid() == 0
-                ? settings.nixStateDir + "/profiles/default"
-                : fmt("%s/profiles/per-user/%s/profile", settings.nixStateDir, getUserName()),
-                profileLink);
+            replaceSymlink(profile, profileLink);
+        }
+        // Backwards compatibiliy measure: Make root's profile available as
+        // `.../default` as it's what NixOS and most of the init scripts expect
+        Path globalProfileLink = settings.nixStateDir + "/profiles/default";
+        if (getuid() == 0 && !pathExists(globalProfileLink)) {
+            replaceSymlink(profile, globalProfileLink);
         }
         return absPath(readLink(profileLink), dirOf(profileLink));
     } catch (Error &) {
@@ -297,5 +341,14 @@ Path getDefaultProfile()
     }
 }
 
+Path defaultChannelsDir()
+{
+    return profilesDir() + "/channels";
+}
+
+Path rootChannelsDir()
+{
+    return rootProfilesDir() + "/channels";
+}
 
 }

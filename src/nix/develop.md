@@ -69,14 +69,14 @@ R""(
 * Run a series of script commands:
 
   ```console
-  # nix develop --command bash -c "mkdir build && cmake .. && make"
+  # nix develop --command bash --command "mkdir build && cmake .. && make"
   ```
 
 # Description
 
 `nix develop` starts a `bash` shell that provides an interactive build
 environment nearly identical to what Nix would use to build
-*installable*. Inside this shell, environment variables and shell
+[*installable*](./nix.md#installables). Inside this shell, environment variables and shell
 functions are set up so that you can interactively and incrementally
 build your package.
 

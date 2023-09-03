@@ -22,7 +22,7 @@ static int main_nix_copy_closure(int argc, char ** argv)
                 printVersion("nix-copy-closure");
             else if (*arg == "--gzip" || *arg == "--bzip2" || *arg == "--xz") {
                 if (*arg != "--gzip")
-                    printMsg(lvlError, format("Warning: '%1%' is not implemented, falling back to gzip") % *arg);
+                    warn("'%1%' is not implemented, falling back to gzip", *arg);
                 gzip = true;
             } else if (*arg == "--from")
                 toMode = false;

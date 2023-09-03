@@ -38,7 +38,7 @@ directory containing at least a file named `default.nix`.
 `nix-build` is essentially a wrapper around
 [`nix-instantiate`](nix-instantiate.md) (to translate a high-level Nix
 expression to a low-level [store derivation]) and [`nix-store
---realise`](nix-store.md#operation---realise) (to build the store
+--realise`](@docroot@/command-ref/nix-store/realise.md) (to build the store
 derivation).
 
 [store derivation]: ../glossary.md#gloss-store-derivation
@@ -51,9 +51,9 @@ derivation).
 
 # Options
 
-All options not listed here are passed to `nix-store
---realise`, except for `--arg` and `--attr` / `-A` which are passed to
-`nix-instantiate`.
+All options not listed here are passed to
+[`nix-store --realise`](nix-store/realise.md),
+except for `--arg` and `--attr` / `-A` which are passed to [`nix-instantiate`](nix-instantiate.md).
 
   - <span id="opt-no-out-link">[`--no-out-link`](#opt-no-out-link)<span>
 
@@ -70,12 +70,16 @@ All options not listed here are passed to `nix-store
     Change the name of the symlink to the output path created from
     `result` to *outlink*.
 
-The following common options are supported:
+{{#include ./status-build-failure.md}}
+
+{{#include ./opt-common.md}}
+
+{{#include ./env-common.md}}
 
 # Examples
 
 ```console
-$ nix-build '<nixpkgs>' -A firefox
+$ nix-build '<nixpkgs>' --attr firefox
 store derivation is /nix/store/qybprl8sz2lc...-firefox-1.5.0.7.drv
 /nix/store/d18hyl92g30l...-firefox-1.5.0.7
 
@@ -90,7 +94,7 @@ If a derivation has multiple outputs, `nix-build` will build the default
 (first) output. You can also build all outputs:
 
 ```console
-$ nix-build '<nixpkgs>' -A openssl.all
+$ nix-build '<nixpkgs>' --attr openssl.all
 ```
 
 This will create a symlink for each output named `result-outputname`.
@@ -100,7 +104,7 @@ outputs `out`, `bin` and `man`, `nix-build` will create symlinks
 specific output:
 
 ```console
-$ nix-build '<nixpkgs>' -A openssl.man
+$ nix-build '<nixpkgs>' --attr openssl.man
 ```
 
 This will create a symlink `result-man`.
@@ -108,7 +112,7 @@ This will create a symlink `result-man`.
 Build a Nix expression given on the command line:
 
 ```console
-$ nix-build -E 'with import <nixpkgs> { }; runCommand "foo" { } "echo bar > $out"'
+$ nix-build --expr 'with import <nixpkgs> { }; runCommand "foo" { } "echo bar > $out"'
 $ cat ./result
 bar
 ```
@@ -117,5 +121,5 @@ Build the GNU Hello package from the latest revision of the master
 branch of Nixpkgs:
 
 ```console
-$ nix-build https://github.com/NixOS/nixpkgs/archive/master.tar.gz -A hello
+$ nix-build https://github.com/NixOS/nixpkgs/archive/master.tar.gz --attr hello
 ```

@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "lock.hh"
 #include "store-api.hh"
@@ -10,35 +11,54 @@ class Worker;
 
 struct PathSubstitutionGoal : public Goal
 {
-    /* The store path that should be realised through a substitute. */
-    // FIXME OwnedStorePathOrDesc storePath
+    /**
+     * The store path that should be realised through a substitute.
+     *
+     * @todo should be `OwnedStorePathOrDesc`.
+     */
     StorePath storePath;
 
-    /* The remaining substituters. */
+    /**
+     * The remaining substituters.
+     */
     std::list<ref<Store>> subs;
 
-    /* The current substituter. */
+    /**
+     * The current substituter.
+     */
     std::shared_ptr<Store> sub;
 
-    /* Whether a substituter failed. */
+    /**
+     * Whether a substituter failed.
+     */
     bool substituterFailed = false;
 
-    /* Path info returned by the substituter's query info operation. */
+    /**
+     * Path info returned by the substituter's query info operation.
+     */
     std::shared_ptr<const ValidPathInfo> info;
 
-    /* Pipe for the substituter's standard output. */
+    /**
+     * Pipe for the substituter's standard output.
+     */
     Pipe outPipe;
 
-    /* The substituter thread. */
+    /**
+     * The substituter thread.
+     */
     std::thread thr;
 
     std::promise<void> promise;
 
-    /* Whether to try to repair a valid path. */
+    /**
+     * Whether to try to repair a valid path.
+     */
     RepairFlag repair;
 
-    /* Location where we're downloading the substitute.  Differs from
-       storePath when doing a repair. */
+    /**
+     * Location where we're downloading the substitute.  Differs from
+     * storePath when doing a repair.
+     */
     Path destPath;
 
     std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions,
@@ -47,8 +67,11 @@ struct PathSubstitutionGoal : public Goal
     typedef void (PathSubstitutionGoal::*GoalState)();
     GoalState state;
 
-    /* Content address for recomputing store path */
-    // TODO delete once `storePath` is variant.
+    /**
+     * Content address for recomputing store path
+     *
+     * @todo delete once `storePath` is a `std::variant`.
+     */
     std::optional<StorePathDescriptor> ca;
 
     void done(
@@ -62,16 +85,20 @@ public:
 
     void timedOut(Error && ex) override { abort(); };
 
+    /**
+     * We prepend "a$" to the key name to ensure substitution goals
+     * happen before derivation goals.
+     */
     std::string key() override
     {
-        /* "a$" ensures substitution goals happen before derivation
-           goals. */
         return "a$" + std::string(storePath.name()) + "$" + worker.store.printStorePath(storePath);
     }
 
     void work() override;
 
-    /* The states. */
+    /**
+     * The states.
+     */
     void init();
     void tryNext();
     void gotInfo();
@@ -79,11 +106,18 @@ public:
     void tryToRun();
     void finished();
 
-    /* Callback used by the worker to write to the log. */
+    /**
+     * Callback used by the worker to write to the log.
+     */
     void handleChildOutput(int fd, std::string_view data) override;
     void handleEOF(int fd) override;
 
-    void cleanup() override;
+    /* Called by destructor, can't be overridden */
+    void cleanup() override final;
+
+    JobCategory jobCategory() const override {
+        return JobCategory::Substitution;
+    };
 };
 
 }

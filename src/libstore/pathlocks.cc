@@ -96,7 +96,7 @@ bool PathLocks::lockPaths(const PathSet & paths,
         checkInterrupt();
         Path lockPath = path + ".lock";
 
-        debug(format("locking path '%1%'") % path);
+        debug("locking path '%1%'", path);
 
         AutoCloseFD fd;
 
@@ -118,7 +118,7 @@ bool PathLocks::lockPaths(const PathSet & paths,
                 }
             }
 
-            debug(format("lock acquired on '%1%'") % lockPath);
+            debug("lock acquired on '%1%'", lockPath);
 
             /* Check that the lock file hasn't become stale (i.e.,
                hasn't been unlinked). */
@@ -130,7 +130,7 @@ bool PathLocks::lockPaths(const PathSet & paths,
                    a lock on a deleted file.  This means that other
                    processes may create and acquire a lock on
                    `lockPath', and proceed.  So we must retry. */
-                debug(format("open lock file '%1%' has become stale") % lockPath);
+                debug("open lock file '%1%' has become stale", lockPath);
             else
                 break;
         }
@@ -163,7 +163,7 @@ void PathLocks::unlock()
                 "error (ignored): cannot close lock file on '%1%'",
                 i.second);
 
-        debug(format("lock released on '%1%'") % i.second);
+        debug("lock released on '%1%'", i.second);
     }
 
     fds.clear();

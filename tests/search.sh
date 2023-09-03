@@ -20,9 +20,9 @@ clearCache
 ## Search expressions
 
 # Check that empty search string matches all
-nix search -f search.nix '' |grep -q foo
-nix search -f search.nix '' |grep -q bar
-nix search -f search.nix '' |grep -q hello
+nix search -f search.nix '' |grepQuiet foo
+nix search -f search.nix '' |grepQuiet bar
+nix search -f search.nix '' |grepQuiet hello
 
 ## Tests for multiple regex/match highlighting
 

@@ -43,7 +43,7 @@ void processExpr(EvalState & state, const Strings & attrPaths,
         Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot).first);
         state.forceValue(v, [&]() { return v.determinePos(noPos); });
 
-        PathSet context;
+        NixStringContext context;
         if (evalOnly) {
             Value vRes;
             if (autoArgs.empty())
@@ -102,7 +102,6 @@ static int main_nix_instantiate(int argc, char * * argv)
         bool strict = false;
         Strings attrPaths;
         bool wantsReadWrite = false;
-        RepairFlag repair = NoRepair;
 
         struct MyArgs : LegacyArgs, MixEvalArgs
         {
@@ -140,8 +139,6 @@ static int main_nix_instantiate(int argc, char * * argv)
                 xmlOutputSourceLocation = false;
             else if (*arg == "--strict")
                 strict = true;
-            else if (*arg == "--repair")
-                repair = Repair;
             else if (*arg == "--dry-run")
                 settings.readOnlyMode = true;
             else if (*arg != "" && arg->at(0) == '-')
@@ -160,7 +157,7 @@ static int main_nix_instantiate(int argc, char * * argv)
         auto evalStore = myArgs.evalStoreUrl ? openStore(*myArgs.evalStoreUrl) : store;
 
         auto state = std::make_unique<EvalState>(myArgs.searchPath, evalStore, store);
-        state->repair = repair;
+        state->repair = myArgs.repair;
 
         Bindings & autoArgs = *myArgs.getAutoArgs(*state);
 
@@ -168,9 +165,11 @@ static int main_nix_instantiate(int argc, char * * argv)
 
         if (findFile) {
             for (auto & i : files) {
-                Path p = state->findFile(i);
-                if (p == "") throw Error("unable to find '%1%'", i);
-                std::cout << p << std::endl;
+                auto p = state->findFile(i);
+                if (auto fn = p.getPhysicalPath())
+                    std::cout << fn->abs() << std::endl;
+                else
+                    throw Error("'%s' has no physical path", p);
             }
             return 0;
         }
@@ -184,7 +183,7 @@ static int main_nix_instantiate(int argc, char * * argv)
 
         for (auto & i : files) {
             Expr * e = fromArgs
-                ? state->parseExprFromString(i, absPath("."))
+                ? state->parseExprFromString(i, state->rootPath(CanonPath::fromCwd()))
                 : state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state, i))));
             processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);

@@ -4,22 +4,22 @@ This chapter is for impatient people who don't like reading
 documentation.  For more in-depth information you are kindly referred
 to subsequent chapters.
 
-1. Install single-user Nix by running the following:
+1. Install Nix by running the following:
 
    ```console
-   $ bash <(curl -L https://nixos.org/nix/install)
+   $ curl -L https://nixos.org/nix/install | sh
    ```
 
-   This will install Nix in `/nix`. The install script will create
-   `/nix` using `sudo`, so make sure you have sufficient rights.  (For
-   other installation methods, see
-   [here](installation/installation.md).)
+   The install script will use `sudo`, so make sure you have sufficient rights.
+   On Linux, `--daemon` can be omitted for a single-user install.
+
+   For other installation methods, see [here](installation/installation.md).
 
 1. See what installable packages are currently available in the
    channel:
 
    ```console
-   $ nix-env -qaP
+   $ nix-env --query --available --attr-path
    nixpkgs.docbook_xml_dtd_43                    docbook-xml-4.3
    nixpkgs.docbook_xml_dtd_45                    docbook-xml-4.5
    nixpkgs.firefox                               firefox-33.0.2
@@ -31,7 +31,7 @@ to subsequent chapters.
 1. Install some packages from the channel:
 
    ```console
-   $ nix-env -iA nixpkgs.hello
+   $ nix-env --install --attr nixpkgs.hello
    ```
 
    This should download pre-built packages; it should not build them
@@ -49,13 +49,13 @@ to subsequent chapters.
 1. Uninstall a package:
 
    ```console
-   $ nix-env -e hello
+   $ nix-env --uninstall hello
    ```
 
 1. You can also test a package without installing it:
 
    ```console
-   $ nix-shell -p hello
+   $ nix-shell --packages hello
    ```
 
    This builds or downloads GNU Hello and its dependencies, then drops
@@ -76,7 +76,7 @@ to subsequent chapters.
 
    ```console
    $ nix-channel --update nixpkgs
-   $ nix-env -u '*'
+   $ nix-env --upgrade '*'
    ```
 
    The latter command will upgrade each installed package for which
@@ -95,5 +95,5 @@ to subsequent chapters.
    them:
 
    ```console
-   $ nix-collect-garbage -d
+   $ nix-collect-garbage --delete-old
    ```

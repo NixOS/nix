@@ -2,8 +2,11 @@
 
 ## Recursive sets
 
-Recursive sets are just normal sets, but the attributes can refer to
-each other. For example,
+Recursive sets are like normal [attribute sets](./values.md#attribute-set), but the attributes can refer to each other.
+
+> *rec-attrset* = `rec {` [ *name* `=` *expr* `;` `]`... `}`
+
+Example:
 
 ```nix
 rec {
@@ -12,7 +15,9 @@ rec {
 }.x
 ```
 
-evaluates to `123`. Note that without `rec` the binding `x = y;` would
+This evaluates to `123`.
+
+Note that without `rec` the binding `x = y;` would
 refer to the variable `y` in the surrounding scope, if one exists, and
 would be invalid if no such variable exists. That is, in a normal
 (non-recursive) set, attributes are not added to the lexical scope; in a
@@ -33,7 +38,10 @@ will crash with an `infinite recursion encountered` error message.
 ## Let-expressions
 
 A let-expression allows you to define local variables for an expression.
-For instance,
+
+> *let-in* = `let` [ *identifier* = *expr* ]... `in` *expr*
+
+Example:
 
 ```nix
 let
@@ -42,18 +50,19 @@ let
 in x + y
 ```
 
-evaluates to `"foobar"`.
+This evaluates to `"foobar"`.
 
 ## Inheriting attributes
 
-When defining a set or in a let-expression it is often convenient to
-copy variables from the surrounding lexical scope (e.g., when you want
-to propagate attributes). This can be shortened using the `inherit`
-keyword. For instance,
+When defining an [attribute set](./values.md#attribute-set) or in a [let-expression](#let-expressions) it is often convenient to copy variables from the surrounding lexical scope (e.g., when you want to propagate attributes).
+This can be shortened using the `inherit` keyword.
+
+Example:
 
 ```nix
 let x = 123; in
-{ inherit x;
+{
+  inherit x;
   y = 456;
 }
 ```
@@ -62,23 +71,31 @@ is equivalent to
 
 ```nix
 let x = 123; in
-{ x = x;
+{
+  x = x;
   y = 456;
 }
 ```
 
-and both evaluate to `{ x = 123; y = 456; }`. (Note that this works
-because `x` is added to the lexical scope by the `let` construct.) It is
-also possible to inherit attributes from another set. For instance, in
-this fragment from `all-packages.nix`,
+and both evaluate to `{ x = 123; y = 456; }`.
+
+> **Note**
+>
+> This works because `x` is added to the lexical scope by the `let` construct.
+
+It is also possible to inherit attributes from another attribute set.
+
+Example:
+
+In this fragment from `all-packages.nix`,
 
 ```nix
 graphviz = (import ../tools/graphics/graphviz) {
   inherit fetchurl stdenv libpng libjpeg expat x11 yacc;
-  inherit (xlibs) libXaw;
+  inherit (xorg) libXaw;
 };
 
-xlibs = {
+xorg = {
   libX11 = ...;
   libXaw = ...;
   ...
@@ -92,7 +109,7 @@ libjpg = ...;
 the set used in the function call to the function defined in
 `../tools/graphics/graphviz` inherits a number of variables from the
 surrounding scope (`fetchurl` ... `yacc`), but also inherits `libXaw`
-(the X Athena Widgets) from the `xlibs` (X11 client-side libraries) set.
+(the X Athena Widgets) from the `xorg` set.
 
 Summarizing the fragment
 
@@ -191,30 +208,41 @@ three kinds of patterns:
     ```nix
     { x, y, z, ... } @ args: z + y + x + args.a
     ```
-    
-    Here `args` is bound to the entire argument, which is further
-    matched against the pattern `{ x, y, z,
-            ... }`. `@`-pattern makes mainly sense with an ellipsis(`...`) as
+
+    Here `args` is bound to the argument *as passed*, which is further
+    matched against the pattern `{ x, y, z, ... }`.
+    The `@`-pattern makes mainly sense with an ellipsis(`...`) as
     you can access attribute names as `a`, using `args.a`, which was
     given as an additional attribute to the function.
-    
+
     > **Warning**
-    > 
-    > The `args@` expression is bound to the argument passed to the
-    > function which means that attributes with defaults that aren't
-    > explicitly specified in the function call won't cause an
-    > evaluation error, but won't exist in `args`.
-    > 
+    >
+    > `args@` binds the name `args` to the attribute set that is passed to the function.
+    > In particular, `args` does *not* include any default values specified with `?` in the function's set pattern.
+    >
     > For instance
-    > 
+    >
     > ```nix
     > let
-    >   function = args@{ a ? 23, ... }: args;
+    >   f = args@{ a ? 23, ... }: [ a args ];
     > in
-    >   function {}
-    > ````
-    > 
-    > will evaluate to an empty attribute set.
+    >   f {}
+    > ```
+    >
+    > is equivalent to
+    >
+    > ```nix
+    > let
+    >   f = args @ { ... }: [ (args.a or 23) args ];
+    > in
+    >   f {}
+    > ```
+    >
+    > and both expressions will evaluate to:
+    >
+    > ```nix
+    > [ 23 {} ]
+    > ```
 
 Note that functions do not have names. If you want to give them a name,
 you can bind them to an attribute, e.g.,

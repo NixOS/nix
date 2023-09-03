@@ -2,13 +2,6 @@ source ../common.sh
 
 registry=$TEST_ROOT/registry.json
 
-requireGit() {
-    if [[ -z $(type -p git) ]]; then
-        echo "Git not installed; skipping flake tests"
-        exit 99
-    fi
-}
-
 writeSimpleFlake() {
     local flakeDir="$1"
     cat > $flakeDir/flake.nix <<EOF
@@ -20,9 +13,13 @@ writeSimpleFlake() {
       foo = import ./simple.nix;
       default = foo;
     };
+    packages.someOtherSystem = rec {
+      foo = import ./simple.nix;
+      default = foo;
+    };
 
     # To test "nix flake init".
-    legacyPackages.x86_64-linux.hello = import ./simple.nix;
+    legacyPackages.$system.hello = import ./simple.nix;
   };
 }
 EOF
@@ -62,7 +59,7 @@ EOF
 
 createGitRepo() {
     local repo="$1"
-    local extraArgs="$2"
+    local extraArgs="${2-}"
 
     rm -rf $repo $repo.tmp
     mkdir -p $repo

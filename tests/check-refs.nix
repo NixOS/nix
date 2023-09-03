@@ -2,7 +2,7 @@ with import ./config.nix;
 
 rec {
 
-  dep = import ./dependencies.nix;
+  dep = import ./dependencies.nix {};
 
   makeTest = nr: args: mkDerivation ({
     name = "check-refs-" + toString nr;
@@ -65,6 +65,13 @@ rec {
     builder = builtins.toFile "builder.sh" "mkdir $out; echo $test5; ln -s $dep $out/link";
     inherit dep test5;
     disallowedReferences = [test5];
+  };
+
+  test11 = makeTest 11 {
+    __structuredAttrs = true;
+    unsafeDiscardReferences.out = true;
+    outputChecks.out.allowedReferences = [];
+    buildCommand = ''echo ${dep} > "''${outputs[out]}"'';
   };
 
 }

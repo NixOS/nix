@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <map>
 #include <vector>
@@ -21,7 +22,9 @@ MakeError(UndefinedVarError, Error);
 MakeError(MissingArgumentError, EvalError);
 MakeError(RestrictedPathError, Error);
 
-/* Position objects. */
+/**
+ * Position objects.
+ */
 struct Pos
 {
     uint32_t line;
@@ -31,7 +34,7 @@ struct Pos
     struct Stdin { ref<std::string> source; };
     struct String { ref<std::string> source; };
 
-    typedef std::variant<none_tag, Stdin, String, Path> Origin;
+    typedef std::variant<none_tag, Stdin, String, SourcePath> Origin;
 
     Origin origin;
 
@@ -132,7 +135,9 @@ class EvalState;
 struct StaticEnv;
 
 
-/* An attribute path is a sequence of attribute names. */
+/**
+ * An attribute path is a sequence of attribute names.
+ */
 struct AttrName
 {
     Symbol symbol;
@@ -186,7 +191,7 @@ struct ExprString : Expr
 {
     std::string s;
     Value v;
-    ExprString(std::string s) : s(std::move(s)) { v.mkString(this->s.data()); };
+    ExprString(std::string &&s) : s(std::move(s)) { v.mkString(this->s.data()); };
     Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };
@@ -212,11 +217,11 @@ struct ExprVar : Expr
        or function argument) or from a "with". */
     bool fromWith;
 
-    /* In the former case, the value is obtained by going `level'
+    /* In the former case, the value is obtained by going `level`
        levels up from the current environment and getting the
-       `displ'th value in that environment.  In the latter case, the
-       value is obtained by getting the attribute named `name' from
-       the set stored in the environment that is `level' levels up
+       `displ`th value in that environment.  In the latter case, the
+       value is obtained by getting the attribute named `name` from
+       the set stored in the environment that is `level` levels up
        from the current one.*/
     Level level;
     Displacement displ;
@@ -233,7 +238,7 @@ struct ExprSelect : Expr
     PosIdx pos;
     Expr * e, * def;
     AttrPath attrPath;
-    ExprSelect(const PosIdx & pos, Expr * e, const AttrPath & attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(attrPath) { };
+    ExprSelect(const PosIdx & pos, Expr * e, const AttrPath && attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(std::move(attrPath)) { };
     ExprSelect(const PosIdx & pos, Expr * e, Symbol name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
@@ -243,7 +248,7 @@ struct ExprOpHasAttr : Expr
 {
     Expr * e;
     AttrPath attrPath;
-    ExprOpHasAttr(Expr * e, const AttrPath & attrPath) : e(e), attrPath(attrPath) { };
+    ExprOpHasAttr(Expr * e, const AttrPath && attrPath) : e(e), attrPath(std::move(attrPath)) { };
     PosIdx getPos() const override { return e->getPos(); }
     COMMON_METHODS
 };

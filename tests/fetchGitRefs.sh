@@ -1,9 +1,6 @@
 source common.sh
 
-if [[ -z $(type -p git) ]]; then
-    echo "Git not installed; skipping Git tests"
-    exit 99
-fi
+requireGit
 
 clearStore
 
@@ -56,7 +53,7 @@ invalid_ref() {
     else
         (! git check-ref-format --branch "$1" >/dev/null 2>&1)
     fi
-    nix --debug eval --raw --impure --expr "(builtins.fetchGit { url = $repo; ref = ''$1''; }).outPath" 2>&1 | grep 'invalid Git branch/tag name' >/dev/null
+    expect 1 nix --debug eval --raw --impure --expr "(builtins.fetchGit { url = $repo; ref = ''$1''; }).outPath" 2>&1 | grep 'invalid Git branch/tag name' >/dev/null
 }
 
 

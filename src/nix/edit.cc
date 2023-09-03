@@ -1,14 +1,15 @@
-#include "command.hh"
+#include "command-installable-value.hh"
 #include "shared.hh"
 #include "eval.hh"
 #include "attr-path.hh"
 #include "progress-bar.hh"
+#include "editor-for.hh"
 
 #include <unistd.h>
 
 using namespace nix;
 
-struct CmdEdit : InstallableCommand
+struct CmdEdit : InstallableValueCommand
 {
     std::string description() override
     {
@@ -24,7 +25,7 @@ struct CmdEdit : InstallableCommand
 
     Category category() override { return catSecondary; }
 
-    void run(ref<Store> store) override
+    void run(ref<Store> store, ref<InstallableValue> installable) override
     {
         auto state = getEvalState();
 

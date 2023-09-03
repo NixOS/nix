@@ -136,6 +136,19 @@ size_t Realisation::checkSignatures(const PublicKeys & publicKeys) const
     return good;
 }
 
+
+SingleDrvOutputs filterDrvOutputs(const OutputsSpec& wanted, SingleDrvOutputs&& outputs)
+{
+    SingleDrvOutputs ret = std::move(outputs);
+    for (auto it = ret.begin(); it != ret.end(); ) {
+        if (!wanted.contains(it->first))
+            it = ret.erase(it);
+        else
+            ++it;
+    }
+    return ret;
+}
+
 StorePath RealisedPath::path() const {
     return std::visit([](auto && arg) { return arg.getPath(); }, raw);
 }

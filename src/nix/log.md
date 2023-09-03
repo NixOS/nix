@@ -22,8 +22,7 @@ R""(
 
 # Description
 
-This command prints the log of a previous build of the derivation
-*installable* on standard output.
+This command prints the log of a previous build of the [*installable*](./nix.md#installables) on standard output.
 
 Nix looks for build logs in two places:
 

@@ -1,9 +1,6 @@
 source common.sh
 
-if [[ -z $(type -p git) ]]; then
-    echo "Git not installed; skipping Git tests"
-    exit 99
-fi
+requireGit
 
 clearStore
 
@@ -108,6 +105,8 @@ path2=$(nix eval --impure --raw --expr "(builtins.fetchGit $repo).outPath")
 [[ $(cat $path2/dir1/foo) = foo ]]
 
 [[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).rev") = 0000000000000000000000000000000000000000 ]]
+[[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).dirtyRev") = "${rev2}-dirty" ]]
+[[ $(nix eval --impure --raw --expr "(builtins.fetchGit $repo).dirtyShortRev") = "${rev2:0:7}-dirty" ]]
 
 # ... unless we're using an explicit ref or rev.
 path3=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; ref = \"master\"; }).outPath")
@@ -121,6 +120,10 @@ git -C $repo commit -m 'Bla3' -a
 
 path4=$(nix eval --impure --refresh --raw --expr "(builtins.fetchGit file://$repo).outPath")
 [[ $path2 = $path4 ]]
+
+[[ $(nix eval --impure --expr "builtins.hasAttr \"rev\" (builtins.fetchGit $repo)") == "true" ]]
+[[ $(nix eval --impure --expr "builtins.hasAttr \"dirtyRev\" (builtins.fetchGit $repo)") == "false" ]]
+[[ $(nix eval --impure --expr "builtins.hasAttr \"dirtyShortRev\" (builtins.fetchGit $repo)") == "false" ]]
 
 status=0
 nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; rev = \"$rev2\"; narHash = \"sha256-B5yIPHhEm0eysJKEsO7nqxprh9vcblFxpJG11gXJus1=\"; }).outPath" || status=$?
@@ -237,3 +240,17 @@ rm -rf $repo/.git
 # should succeed for a repo without commits
 git init $repo
 path10=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
+
+# should succeed for a path with a space
+# regression test for #7707
+repo="$TEST_ROOT/a b"
+git init "$repo"
+git -C "$repo" config user.email "foobar@example.com"
+git -C "$repo" config user.name "Foobar"
+
+echo utrecht > "$repo/hello"
+touch "$repo/.gitignore"
+git -C "$repo" add hello .gitignore
+git -C "$repo" commit -m 'Bla1'
+cd "$repo"
+path11=$(nix eval --impure --raw --expr "(builtins.fetchGit ./.).outPath")

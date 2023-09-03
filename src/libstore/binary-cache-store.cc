@@ -310,12 +310,11 @@ StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, std::string_view n
             {
                 .name = std::string { name },
                 .info = FixedOutputInfo {
-                    {
-                        .method = method,
-                        .hash = nar.first,
-                    },
+                    .method = method,
+                    .hash = nar.first,
                     .references = {
                         .others = references,
+                    // caller is not capable of creating a self-reference, because this is content-addressed without modulus
                         .self = false,
                     },
                 },
@@ -383,7 +382,7 @@ void BinaryCacheStore::queryPathInfoUncached(StorePathOrDesc storePath,
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
     getFile(narInfoFile,
-        {[=](std::future<std::optional<std::string>> fut) {
+        {[=,this](std::future<std::optional<std::string>> fut) {
             try {
                 auto data = fut.get();
 
@@ -431,12 +430,11 @@ StorePath BinaryCacheStore::addToStore(
             {
                 .name = std::string { name },
                 .info = FixedOutputInfo {
-                    {
-                        .method = method,
-                        .hash = h,
-                    },
+                    .method = method,
+                    .hash = h,
                     .references = {
                         .others = references,
+                        // caller is not capable of creating a self-reference, because this is content-addressed without modulus
                         .self = false,
                     },
                 },
@@ -455,7 +453,7 @@ StorePath BinaryCacheStore::addTextToStore(
     RepairFlag repair)
 {
     auto textHash = hashString(htSHA256, s);
-    auto path = makeTextPath(name, TextInfo { textHash, references });
+    auto path = makeTextPath(name, TextInfo { { textHash }, references });
 
     if (!repair && isValidPath(path))
         return path;
@@ -469,8 +467,8 @@ StorePath BinaryCacheStore::addTextToStore(
             {
                 .name = std::string { name },
                 .info = TextInfo {
-                    { .hash = textHash },
-                    references,
+                    .hash = textHash,
+                    .references = references,
                 },
             },
             nar.first,

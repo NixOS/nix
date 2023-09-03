@@ -18,6 +18,6 @@ R""(
 # Description
 
 This command generates a NAR file containing the serialisation of the
-store path *installable*. The NAR is written to standard output.
+store path [*installable*](./nix.md#installables). The NAR is written to standard output.
 
 )""
