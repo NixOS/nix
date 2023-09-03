@@ -5,8 +5,6 @@ namespace nix {
 
 struct EvalSettings : Config
 {
-    EvalSettings();
-
     static Strings getDefaultNixPath();
 
     static bool isPseudoUrl(std::string_view s);
