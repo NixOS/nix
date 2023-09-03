@@ -29,6 +29,24 @@ EOF
 }
 test_subdir_self_path
 
+test_extraAttributes_outPath_fail_safe() {
+    baseDir=$TEST_ROOT/$RANDOM
+    flakeDir=$baseDir
+    mkdir -p $flakeDir
+    writeSimpleFlake $baseDir
+
+    cat > $flakeDir/flake.nix <<"EOF"
+{
+  outputs = inputs:
+    throw "can't evaluate self, because outputs fails to return any attribute names, but I know I can be identified as ${toString inputs.meta.extraAttributes.outPath}/flake.nix}";
+}
+EOF
+    (
+        expectStderr 1 nix build $flakeDir?dir=b-low --no-link | grep -E "can't evaluate self, because outputs fails to return any attribute names, but I know I can be identified as .*/flake.nix"
+    )
+}
+test_extraAttributes_outPath_fail_safe
+
 
 test_git_subdir_self_path() {
     repoDir=$TEST_ROOT/repo-$RANDOM
@@ -47,6 +65,11 @@ test_git_subdir_self_path() {
         assert builtins.readFile ./message == "all good\n";
         assert builtins.readFile (inputs.self + "/message") == "all good\n";
         assert inputs.self.outPath == inputs.self.sourceInfo.outPath + "/b-low";
+        assert inputs.meta.extraArguments.self == inputs.self;
+        assert inputs.meta.extraAttributes.outPath == inputs.self.outPath;
+        assert inputs.meta.sourceInfo.outPath + "/b-low" == inputs.self.outPath;
+        assert inputs.meta.sourceInfo.outPath == inputs.self.sourceInfo.outPath;
+        assert inputs.meta.subdir == "b-low";
         import ./simple.nix;
     };
   };
@@ -97,6 +120,11 @@ test_git_root_self_path() {
         assert builtins.readFile ./message == "all good\n";
         assert builtins.readFile (inputs.self + "/message") == "all good\n";
         assert inputs.self.outPath == inputs.self.sourceInfo.outPath;
+        assert inputs.meta.extraArguments.self == inputs.self;
+        assert inputs.meta.extraAttributes.outPath == inputs.self.outPath;
+        assert inputs.meta.sourceInfo.outPath == inputs.self.outPath;
+        assert inputs.meta.sourceInfo.outPath == inputs.self.sourceInfo.outPath;
+        assert inputs.meta.subdir == "";
         import ./simple.nix;
     };
   };

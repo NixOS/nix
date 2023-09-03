@@ -43,7 +43,37 @@ let
                 (resolveInput lockFile.nodes.${nodeName}.inputs.${builtins.head path})
                 (builtins.tail path);
 
-          outputs = flake.outputs (inputs // { self = result; });
+          # Attributes that are added to the final representation of the flake.
+          # NB: `attrNames extraAttributes` must be lazy in `outputs` (tested). Values may depend on `outputs`.
+          extraAttributes =
+            sourceInfo
+            // {
+              # This shadows the sourceInfo.outPath
+              inherit outPath;
+
+              inherit inputs; inherit outputs; inherit sourceInfo; _type = "flake";
+            };
+
+          meta = {
+            # The source root, which may not correspond to the flake directory.
+            inherit sourceInfo;
+            # The base directory of the flake
+            inherit subdir;
+            # Extra attributes in the final representation of the flake, added to result of the output function
+            inherit extraAttributes;
+            # Extra inputs to the output function
+            inherit extraArguments;
+          };
+
+          # NB: `attrNames arguments` must be lazy in `outputs` (tested).
+          arguments = inputs // extraArguments;
+
+          extraArguments = {
+            self = result;
+            inherit meta;
+          };
+
+          outputs = flake.outputs arguments;
 
           result =
             outputs
@@ -52,13 +82,7 @@ let
             # sourceInfo does not necessarily match the outPath of the flake,
             # as the flake may be in a subdirectory of a source.
             # This is shadowed in the next //
-            // sourceInfo
-            // {
-              # This shadows the sourceInfo.outPath
-              inherit outPath;
-
-              inherit inputs; inherit outputs; inherit sourceInfo; _type = "flake";
-            };
+            // extraAttributes;
 
         in
           if node.flake or true then
