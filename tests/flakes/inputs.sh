@@ -70,7 +70,9 @@ EOF
   };
 
   outputs = inputs: rec {
-    packages = inputs.inp.packages;
+    packages =
+      assert inputs.inp.outPath == inputs.inp.sourceInfo.outPath + "/b-low";
+      inputs.inp.packages;
   };
 }
 EOF
@@ -78,3 +80,52 @@ EOF
 
 }
 test_git_subdir_self_path
+
+
+test_git_root_self_path() {
+    repoDir=$TEST_ROOT/repo-$RANDOM
+    createGitRepo $repoDir
+    writeSimpleFlake $repoDir
+    flakeDir=$repoDir
+
+    echo all good > $flakeDir/message
+    cat > $flakeDir/flake.nix <<EOF
+{
+  outputs = inputs: rec {
+    packages.$system = rec {
+      default =
+        assert builtins.readFile ./message == "all good\n";
+        assert builtins.readFile (inputs.self + "/message") == "all good\n";
+        assert inputs.self.outPath == inputs.self.sourceInfo.outPath;
+        import ./simple.nix;
+    };
+  };
+}
+EOF
+    (
+        cd $flakeDir
+        git add .
+        git commit -m init
+        # nix build
+    )
+
+    clientDir=$TEST_ROOT/client-$RANDOM
+    mkdir -p $clientDir
+    cat > $clientDir/flake.nix <<EOF
+{
+  inputs.inp = {
+    type = "git";
+    url = "file://$repoDir";
+  };
+
+  outputs = inputs: rec {
+    packages =
+      assert inputs.inp.outPath == inputs.inp.sourceInfo.outPath;
+      inputs.inp.packages;
+  };
+}
+EOF
+    nix build $clientDir --no-link
+
+}
+test_git_root_self_path
