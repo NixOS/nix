@@ -141,6 +141,11 @@ struct DebugTrace {
     std::optional<Verbosity> verbosity;
 };
 
+struct WithFrame {
+    const Expr & expr;
+    const Env & env;
+};
+
 class ErrorBuilder
 {
     private:
@@ -231,6 +236,7 @@ public:
     bool debugStop;
     bool debugQuit;
     int trylevel;
+    std::optional<WithFrame> frame;
     std::list<DebugTrace> debugTraces;
     std::map<const Expr*, const std::shared_ptr<const StaticEnv>> exprEnvs;
     const std::shared_ptr<const StaticEnv> getStaticEnv(const Expr & expr) const
@@ -248,6 +254,7 @@ public:
     [[gnu::noinline, gnu::noreturn]]
     void debugThrowLastTrace(E && error)
     {
+        // 'nullptr' args mean use env,expr from last debugTrace or 'withFrame'.
         debugThrow(error, nullptr, nullptr);
     }
 
@@ -255,13 +262,19 @@ public:
     [[gnu::noinline, gnu::noreturn]]
     void debugThrow(E && error, const Env * env, const Expr * expr)
     {
-        if (debugRepl && ((env && expr) || !debugTraces.empty())) {
-            if (!env || !expr) {
+        if (debugRepl) {
+            if (env && expr)
+                runDebugRepl(&error, *env, *expr);
+            else if (!debugTraces.empty()) {
                 const DebugTrace & last = debugTraces.front();
-                env = &last.env;
-                expr = &last.expr;
+                runDebugRepl(&error, last.env, last.expr);
             }
-            runDebugRepl(&error, *env, *expr);
+        }
+        else if (frame.has_value())
+        {
+            // Looks like we're modifying our argument pointers?
+            env = &(frame->env);
+            expr = &(frame->expr);
         }
 
         throw std::move(error);

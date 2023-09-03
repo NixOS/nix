@@ -447,15 +447,12 @@ ErrorBuilder & ErrorBuilder::withSuggestions(Suggestions & s)
 
 ErrorBuilder & ErrorBuilder::withFrame(const Env & env, const Expr & expr)
 {
-    // NOTE: This is abusing side-effects.
-    // TODO: check compatibility with nested debugger calls.
-    state.debugTraces.push_front(DebugTrace {
-        .pos = nullptr,
+    // TODO: did this break the PR 6204 stuff?
+    state.frame.emplace(WithFrame {
         .expr = expr,
-        .env = env,
-        .hint = hintformat("Fake frame for debugging purposes"),
-        .verbosity = std::nullopt
-    });
+        .env = env
+        });
+
     return *this;
 }
 
@@ -846,10 +843,6 @@ std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const Stati
 
 void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & expr)
 {
-    // double check we've got the debugRepl function pointer.
-    if (!debugRepl)
-        return;
-
     auto dts =
         error && expr.getPos()
         ? std::make_unique<DebugTraceStacker>(
