@@ -50,7 +50,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
                         .method = std::move(ingestionMethod),
                         .hash = std::move(hash),
                     },
-                    {},
+                    .references = {},
                 },
             },
             narHash,

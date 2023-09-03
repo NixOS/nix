@@ -313,7 +313,7 @@ StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, std::string_view n
                         .method = method,
                         .hash = nar.first,
                     },
-                    {
+                    .references = {
                         .references = references,
                         .hasSelfReference = false,
                     },
@@ -434,7 +434,7 @@ StorePath BinaryCacheStore::addToStore(
                         .method = method,
                         .hash = h,
                     },
-                    {
+                    .references = {
                         .references = references,
                         .hasSelfReference = false,
                     },

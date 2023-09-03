@@ -1432,7 +1432,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
                 .method = method,
                 .hash = hash,
             },
-            {
+            .references = {
                 .references = references,
                 .hasSelfReference = false,
             },

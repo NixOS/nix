@@ -55,7 +55,7 @@ std::map<StorePath, StorePath> makeContentAddressed(
                         .method = FileIngestionMethod::Recursive,
                         .hash = narModuloHash,
                     },
-                    std::move(refs),
+                    .references = std::move(refs),
                 },
             },
             Hash::dummy,

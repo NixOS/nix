@@ -238,7 +238,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
                     .method = method,
                     .hash = *expectedHash,
                 },
-                {}
+                .references = {}
             });
 
         if (state.store->isValidPath(expectedPath)) {
