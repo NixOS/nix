@@ -66,12 +66,12 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
                 for (const auto & [_i, buildable] : enumerate(buildables)) {
                     auto i = _i;
                     std::visit(overloaded {
-                        [&](BuiltPath::Opaque bo) {
+                        [&](const BuiltPath::Opaque & bo) {
                             std::string symlink = outLink;
                             if (i) symlink += fmt("-%d", i);
                             store2->addPermRoot(bo.path, absPath(symlink));
                         },
-                        [&](BuiltPath::Built bfd) {
+                        [&](const BuiltPath::Built & bfd) {
                             for (auto & output : bfd.outputs) {
                                 std::string symlink = outLink;
                                 if (i) symlink += fmt("-%d", i);

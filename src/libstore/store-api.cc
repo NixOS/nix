@@ -239,10 +239,10 @@ StorePath Store::makeFixedOutputPathFromCA(const StorePathDescriptor & desc) con
 {
     // New template
     return std::visit(overloaded {
-        [&](TextInfo ti) {
+        [&](const TextInfo & ti) {
             return makeTextPath(desc.name, ti);
         },
-        [&](FixedOutputInfo foi) {
+        [&](const FixedOutputInfo & foi) {
             return makeFixedOutputPath(desc.name, foi);
         }
     }, desc.info);
@@ -1275,13 +1275,13 @@ std::optional<StorePathDescriptor> ValidPathInfo::fullStorePathDescriptorOpt() c
     return StorePathDescriptor {
         .name = std::string { path.name() },
         .info = std::visit(overloaded {
-            [&](TextHash th) {
+            [&](const TextHash & th) {
                 TextInfo info { th };
                 assert(!hasSelfReference);
                 info.references = references;
                 return ContentAddressWithReferences { info };
             },
-            [&](FixedOutputHash foh) {
+            [&](const FixedOutputHash & foh) {
                 FixedOutputInfo info { foh };
                 info.references = static_cast<PathReferences<StorePath>>(*this);
                 return ContentAddressWithReferences { info };
@@ -1343,11 +1343,11 @@ ValidPathInfo::ValidPathInfo(
       , narHash(narHash)
 {
     std::visit(overloaded {
-        [this](TextInfo ti) {
+        [this](const TextInfo & ti) {
             this->references = ti.references;
             this->ca = TextHash { std::move(ti) };
         },
-        [this](FixedOutputInfo foi) {
+        [this](const FixedOutputInfo & foi) {
             *(static_cast<PathReferences<StorePath> *>(this)) = foi.references;
             this->ca = FixedOutputHash { (FixedOutputHash) std::move(foi) };
         },

@@ -204,10 +204,10 @@ void MixProfile::updateProfile(const BuiltPaths & buildables)
 
     for (auto & buildable : buildables) {
         std::visit(overloaded {
-            [&](BuiltPath::Opaque bo) {
+            [&](const BuiltPath::Opaque & bo) {
                 result.push_back(bo.path);
             },
-            [&](BuiltPath::Built bfd) {
+            [&](const BuiltPath::Built & bfd) {
                 for (auto & output : bfd.outputs) {
                     result.push_back(output.second);
                 }

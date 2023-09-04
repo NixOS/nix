@@ -808,6 +808,9 @@ static void opServe(Strings opFlags, Strings opArgs)
             settings.enforceDeterminism = readInt(in);
             settings.runDiffHook = true;
         }
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 7) {
+            settings.keepFailed = (bool) readInt(in);
+        }
         settings.printRepeatedBuilds = false;
     };
 

@@ -24,8 +24,8 @@ StorePathSet BuiltPath::outPaths() const
 {
     return std::visit(
         overloaded{
-            [](BuiltPath::Opaque p) { return StorePathSet{p.path}; },
-            [](BuiltPath::Built b) {
+            [](const BuiltPath::Opaque & p) { return StorePathSet{p.path}; },
+            [](const BuiltPath::Built & b) {
                 StorePathSet res;
                 for (auto & [_, path] : b.outputs)
                     res.insert(path);
@@ -94,8 +94,8 @@ RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
     RealisedPath::Set res;
     std::visit(
         overloaded{
-            [&](BuiltPath::Opaque p) { res.insert(p.path); },
-            [&](BuiltPath::Built p) {
+            [&](const BuiltPath::Opaque & p) { res.insert(p.path); },
+            [&](const BuiltPath::Built & p) {
                 auto drvHashes =
                     staticOutputHashes(store, store.readDerivation(p.drvPath));
                 for (auto& [outputName, outputPath] : p.outputs) {

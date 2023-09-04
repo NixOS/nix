@@ -249,6 +249,10 @@ private:
             conn.to
                 << settings.buildRepeat
                 << settings.enforceDeterminism;
+
+        if (GET_PROTOCOL_MINOR(conn.remoteVersion) >= 7) {
+            conn.to << ((int) settings.keepFailed);
+        }
     }
 
 public:
@@ -291,10 +295,10 @@ public:
         for (auto & p : drvPaths) {
             auto sOrDrvPath = StorePathWithOutputs::tryFromDerivedPath(p);
             std::visit(overloaded {
-                [&](StorePathWithOutputs s) {
+                [&](const StorePathWithOutputs & s) {
                     ss.push_back(s.to_string(*this));
                 },
-                [&](StorePath drvPath) {
+                [&](const StorePath & drvPath) {
                     throw Error("wanted to fetch '%s' but the legacy ssh protocol doesn't support merely substituting drv files via the build paths command. It would build them instead. Try using ssh-ng://", printStorePath(drvPath));
                 },
             }, sOrDrvPath);

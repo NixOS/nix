@@ -35,10 +35,10 @@ struct CmdLog : InstallableCommand
         RunPager pager;
         for (auto & sub : subs) {
             auto log = std::visit(overloaded {
-                [&](DerivedPath::Opaque bo) {
+                [&](const DerivedPath::Opaque & bo) {
                     return sub->getBuildLog(bo.path);
                 },
-                [&](DerivedPath::Built bfd) {
+                [&](const DerivedPath::Built & bfd) {
                     return sub->getBuildLog(bfd.drvPath);
                 },
             }, b.raw());
