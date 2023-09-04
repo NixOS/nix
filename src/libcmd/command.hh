@@ -216,7 +216,7 @@ static RegisterCommand registerCommand2(std::vector<std::string> && name)
     return RegisterCommand(std::move(name), [](){ return make_ref<T>(); });
 }
 
-Buildables build(ref<Store> store, Realise mode,
+DerivedPathsWithHints build(ref<Store> store, Realise mode,
     std::vector<std::shared_ptr<Installable>> installables, BuildMode bMode = bmNormal);
 
 std::set<StorePath> toStorePaths(ref<Store> store,
@@ -252,7 +252,7 @@ struct MixProfile : virtual StoreCommand
 
     /* If 'profile' is set, make it point at the store path produced
        by 'buildables'. */
-    void updateProfile(const Buildables & buildables);
+    void updateProfile(const DerivedPathsWithHints & buildables);
 };
 
 struct MixDefaultProfile : MixProfile

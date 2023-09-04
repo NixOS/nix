@@ -43,7 +43,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
     debug(format("building user environment dependencies"));
     state.store->buildPaths(
-        toBuildableReqs(drvsToBuild),
+        toDerivedPaths(drvsToBuild),
         state.repair ? bmRepair : bmNormal);
 
     /* Construct the whole top level derivation. */
@@ -141,7 +141,7 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     std::vector<StorePathWithOutputs> topLevelDrvs;
     topLevelDrvs.push_back({topLevelDrv});
     state.store->buildPaths(
-        toBuildableReqs(topLevelDrvs),
+        toDerivedPaths(topLevelDrvs),
         state.repair ? bmRepair : bmNormal);
 
     /* Switch the current user environment to the output path. */

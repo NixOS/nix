@@ -11,34 +11,34 @@ std::string StorePathWithOutputs::to_string(const Store & store) const
 }
 
 
-BuildableReq StorePathWithOutputs::toBuildableReq() const
+DerivedPath StorePathWithOutputs::toDerivedPath() const
 {
     if (!outputs.empty() || path.isDerivation())
-        return BuildableReqFromDrv { path, outputs };
+        return DerivedPath::Built { path, outputs };
     else
-        return BuildableOpaque { path };
+        return DerivedPath::Opaque { path };
 }
 
 
-std::vector<BuildableReq> toBuildableReqs(const std::vector<StorePathWithOutputs> ss)
+std::vector<DerivedPath> toDerivedPaths(const std::vector<StorePathWithOutputs> ss)
 {
-	std::vector<BuildableReq> reqs;
-	for (auto & s : ss) reqs.push_back(s.toBuildableReq());
+	std::vector<DerivedPath> reqs;
+	for (auto & s : ss) reqs.push_back(s.toDerivedPath());
 	return reqs;
 }
 
 
-std::variant<StorePathWithOutputs, StorePath> StorePathWithOutputs::tryFromBuildableReq(const BuildableReq & p)
+std::variant<StorePathWithOutputs, StorePath> StorePathWithOutputs::tryFromDerivedPath(const DerivedPath & p)
 {
     return std::visit(overloaded {
-        [&](BuildableOpaque bo) -> std::variant<StorePathWithOutputs, StorePath> {
+        [&](DerivedPath::Opaque bo) -> std::variant<StorePathWithOutputs, StorePath> {
             if (bo.path.isDerivation()) {
                 // drv path gets interpreted as "build", not "get drv file itself"
                 return bo.path;
             }
             return StorePathWithOutputs { bo.path };
         },
-        [&](BuildableReqFromDrv bfd) -> std::variant<StorePathWithOutputs, StorePath> {
+        [&](DerivedPath::Built bfd) -> std::variant<StorePathWithOutputs, StorePath> {
             return StorePathWithOutputs { bfd.drvPath, bfd.outputs };
         },
     }, p.raw());

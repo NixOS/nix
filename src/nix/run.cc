@@ -182,7 +182,7 @@ struct CmdRun : InstallableCommand, RunCommon
 
         auto app = installable->toApp(*state);
 
-        state->store->buildPaths(toBuildableReqs(app.context));
+        state->store->buildPaths(toDerivedPaths(app.context));
 
         Strings allArgs{app.program};
         for (auto & i : args) allArgs.push_back(i);

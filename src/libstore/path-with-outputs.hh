@@ -3,7 +3,7 @@
 #include <variant>
 
 #include "path.hh"
-#include "buildable.hh"
+#include "derived-path.hh"
 
 namespace nix {
 
@@ -14,12 +14,12 @@ struct StorePathWithOutputs
 
     std::string to_string(const Store & store) const;
 
-    BuildableReq toBuildableReq() const;
+    DerivedPath toDerivedPath() const;
 
-    static std::variant<StorePathWithOutputs, StorePath> tryFromBuildableReq(const BuildableReq &);
+    static std::variant<StorePathWithOutputs, StorePath> tryFromDerivedPath(const DerivedPath &);
 };
 
-std::vector<BuildableReq> toBuildableReqs(const std::vector<StorePathWithOutputs>);
+std::vector<DerivedPath> toDerivedPaths(const std::vector<StorePathWithOutputs>);
 
 std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s);
 

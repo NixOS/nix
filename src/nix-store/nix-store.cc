@@ -63,7 +63,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
     auto store2 = std::dynamic_pointer_cast<LocalFSStore>(store);
 
     if (path.path.isDerivation()) {
-        if (build) store->buildPaths({path.toBuildableReq()});
+        if (build) store->buildPaths({path.toDerivedPath()});
         auto outputPaths = store->queryDerivationOutputMap(path.path);
         Derivation drv = store->derivationFromPath(path.path);
         rootNr++;
@@ -134,7 +134,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     uint64_t downloadSize, narSize;
     StorePathSet willBuild, willSubstitute, unknown;
     store->queryMissing(
-        toBuildableReqs(paths),
+        toDerivedPaths(paths),
         willBuild, willSubstitute, unknown, downloadSize, narSize);
 
     if (ignoreUnknown) {
@@ -151,7 +151,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     if (dryRun) return;
 
     /* Build all paths at the same time to exploit parallelism. */
-    store->buildPaths(toBuildableReqs(paths), buildMode);
+    store->buildPaths(toDerivedPaths(paths), buildMode);
 
     if (!ignoreUnknown)
         for (auto & i : paths) {
@@ -891,7 +891,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 try {
                     MonitorFdHup monitor(in.fd);
-                    store->buildPaths(toBuildableReqs(paths));
+                    store->buildPaths(toDerivedPaths(paths));
                     out << 0;
                 } catch (Error & e) {
                     assert(e.status);

@@ -120,7 +120,7 @@ std::optional<StorePathDescriptor> getDerivationCA(const BasicDerivation & drv)
     return std::nullopt;
 }
 
-void Store::queryMissing(const std::vector<BuildableReq> & targets,
+void Store::queryMissing(const std::vector<DerivedPath> & targets,
     StorePathSet & willBuild_, StorePathSet & willSubstitute_, StorePathSet & unknown_,
     uint64_t & downloadSize_, uint64_t & narSize_)
 {
@@ -148,7 +148,7 @@ void Store::queryMissing(const std::vector<BuildableReq> & targets,
 
     Sync<State> state_(State{{}, unknown_, willSubstitute_, willBuild_, downloadSize_, narSize_});
 
-    std::function<void(BuildableReq)> doPath;
+    std::function<void(DerivedPath)> doPath;
 
     auto mustBuildDrv = [&](const StorePath & drvPath, const Derivation & drv) {
         {
@@ -157,7 +157,7 @@ void Store::queryMissing(const std::vector<BuildableReq> & targets,
         }
 
         for (auto & i : drv.inputDrvs)
-            pool.enqueue(std::bind(doPath, BuildableReqFromDrv { i.first, i.second }));
+            pool.enqueue(std::bind(doPath, DerivedPath::Built { i.first, i.second }));
     };
 
     auto checkOutput = [&](
@@ -184,13 +184,13 @@ void Store::queryMissing(const std::vector<BuildableReq> & targets,
                 drvState->outPaths.insert(outPath);
                 if (!drvState->left) {
                     for (auto & path : drvState->outPaths)
-                        pool.enqueue(std::bind(doPath, BuildableOpaque { path } ));
+                        pool.enqueue(std::bind(doPath, DerivedPath::Opaque { path } ));
                 }
             }
         }
     };
 
-    doPath = [&](const BuildableReq & req) {
+    doPath = [&](const DerivedPath & req) {
 
         {
             auto state(state_.lock());
@@ -198,7 +198,7 @@ void Store::queryMissing(const std::vector<BuildableReq> & targets,
         }
 
         std::visit(overloaded {
-          [&](BuildableReqFromDrv bfd) {
+          [&](DerivedPath::Built bfd) {
             if (!isValidPath(bfd.drvPath)) {
                 // FIXME: we could try to substitute the derivation.
                 auto state(state_.lock());
@@ -231,7 +231,7 @@ void Store::queryMissing(const std::vector<BuildableReq> & targets,
                 mustBuildDrv(bfd.drvPath, *drv);
 
           },
-          [&](BuildableOpaque bo) {
+          [&](DerivedPath::Opaque bo) {
 
             if (isValidPath(bo.path)) return;
 
@@ -255,7 +255,7 @@ void Store::queryMissing(const std::vector<BuildableReq> & targets,
             }
 
             for (auto & ref : info->second.references)
-                pool.enqueue(std::bind(doPath, BuildableOpaque { ref }));
+                pool.enqueue(std::bind(doPath, DerivedPath::Opaque { ref }));
           },
         }, req.raw());
     };

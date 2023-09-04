@@ -87,7 +87,7 @@ MAKE_WORKER_PROTO(, std::string);
 MAKE_WORKER_PROTO(, StorePath);
 MAKE_WORKER_PROTO(, ContentAddress);
 MAKE_WORKER_PROTO(, StorePathDescriptor);
-MAKE_WORKER_PROTO(, BuildableReq);
+MAKE_WORKER_PROTO(, DerivedPath);
 MAKE_WORKER_PROTO(, Realisation);
 MAKE_WORKER_PROTO(, DrvOutput);
 

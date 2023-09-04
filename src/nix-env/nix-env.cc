@@ -419,13 +419,13 @@ static void queryInstSources(EvalState & state,
 
 static void printMissing(EvalState & state, DrvInfos & elems)
 {
-    std::vector<BuildableReq> targets;
+    std::vector<DerivedPath> targets;
     for (auto & i : elems) {
         Path drvPath = i.queryDrvPath();
         if (drvPath != "")
-            targets.push_back(BuildableReqFromDrv{state.store->parseStorePath(drvPath)});
+            targets.push_back(DerivedPath::Built{state.store->parseStorePath(drvPath)});
         else
-            targets.push_back(BuildableOpaque{state.store->parseStorePath(i.queryOutPath())});
+            targets.push_back(DerivedPath::Opaque{state.store->parseStorePath(i.queryOutPath())});
     }
 
     printMissing(state.store, targets);
@@ -694,12 +694,12 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     if (globals.forceName != "")
         drv.setName(globals.forceName);
 
-    std::vector<BuildableReq> paths {
+    std::vector<DerivedPath> paths {
         (drv.queryDrvPath() != "")
-        ? (BuildableReq) (BuildableReqFromDrv {
+        ? (DerivedPath) (DerivedPath::Built {
                 globals.state->store->parseStorePath(drv.queryDrvPath())
             })
-        : (BuildableReq) (BuildableOpaque {
+        : (DerivedPath) (DerivedPath::Opaque {
                 globals.state->store->parseStorePath(drv.queryOutPath())
             }),
     };
