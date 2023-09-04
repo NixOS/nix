@@ -11,7 +11,7 @@ R""(
 # Description
 
 This command runs the Nix daemon, which is a required component in
-multi-user Nix installations. It performs build actions and other
+multi-user Nix installations. It runs build tasks and other
 operations on the Nix store on behalf of non-root users. Usually you
 don't run the daemon directly; instead it's managed by a service
 management framework such as `systemd`.

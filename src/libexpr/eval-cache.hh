@@ -44,12 +44,15 @@ enum AttrType {
     Misc = 4,
     Failed = 5,
     Bool = 6,
+    ListOfStrings = 7,
+    Int = 8,
 };
 
 struct placeholder_t {};
 struct missing_t {};
 struct misc_t {};
 struct failed_t {};
+struct int_t { NixInt x; };
 typedef uint64_t AttrId;
 typedef std::pair<AttrId, Symbol> AttrKey;
 typedef std::pair<std::string, NixStringContext> string_t;
@@ -61,7 +64,9 @@ typedef std::variant<
     missing_t,
     misc_t,
     failed_t,
-    bool
+    bool,
+    int_t,
+    std::vector<std::string>
     > AttrValue;
 
 class AttrCursor : public std::enable_shared_from_this<AttrCursor>
@@ -113,6 +118,10 @@ public:
     string_t getStringWithContext();
 
     bool getBool();
+
+    NixInt getInt();
+
+    std::vector<std::string> getListOfStrings();
 
     std::vector<Symbol> getAttrs();
 

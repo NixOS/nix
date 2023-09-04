@@ -18,9 +18,6 @@ nix-build --no-out-link dependencies.nix --dry-run 2>&1 | grep "will be built"
 # Now new command:
 nix build -f dependencies.nix --dry-run 2>&1 | grep "will be built"
 
-# TODO: XXX: FIXME: #1793
-# Disable this part of the test until the problem is resolved:
-if [ -n "$ISSUE_1795_IS_FIXED" ]; then
 clearStore
 clearCache
 
@@ -28,7 +25,6 @@ clearCache
 nix build -f dependencies.nix --dry-run 2>&1 | grep "will be built"
 # Now old command:
 nix-build --no-out-link dependencies.nix --dry-run 2>&1 | grep "will be built"
-fi
 
 ###################################################
 # Check --dry-run doesn't create links with --dry-run

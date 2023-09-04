@@ -1,0 +1,15 @@
+# Pull requests concerning the listed files will automatically invite the respective maintainers as reviewers.
+# This file is not used for denoting any kind of ownership, but is merely a tool for handling notifications.
+#
+# Merge permissions are required for maintaining an entry in this file.
+# For documentation on this mechanism, see https://help.github.com/articles/about-codeowners/
+
+# Default reviewers if nothing else matches
+* @edolstra @thufschmitt
+
+# This file
+.github/CODEOWNERS @edolstra
+
+# Public documentation
+/doc @fricklerhandwerk
+*.md @fricklerhandwerk

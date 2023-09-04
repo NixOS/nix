@@ -2,7 +2,7 @@ source common.sh
 
 file=build-hook-ca-floating.nix
 
-enableFeatures "ca-derivations ca-references"
+enableFeatures "ca-derivations"
 
 CONTENT_ADDRESSED=true
 

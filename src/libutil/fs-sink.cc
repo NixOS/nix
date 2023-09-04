@@ -24,18 +24,17 @@ void RestoreSink::createDirectory(const Path & path)
         throw SysError("creating directory '%1%'", p);
 };
 
-void RestoreSink::createRegularFile(const Path & path)
+void RestoreSink::createRegularFile(const Path & path, bool executable)
 {
     Path p = dstPath + path;
-    fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
+    fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, executable ? 0777 : 0666);
     if (!fd) throw SysError("creating file '%1%'", p);
 }
 
-void RestoreSink::createExecutableFile(const Path & path)
+void RestoreSink::closeRegularFile()
 {
-    Path p = dstPath + path;
-    fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0777);
-    if (!fd) throw SysError("creating file '%1%'", p);
+    /* Call close explicitly to make sure the error is checked */
+    fd.close();
 }
 
 void RestoreSink::isExecutable()
@@ -92,10 +91,7 @@ void RestoreSink::copyDirectory(const Path & source, const Path & destination)
         if (lstat(entry.c_str(), &st))
             throw SysError("getting attributes of path '%1%'", entry);
         if (S_ISREG(st.st_mode)) {
-            if (st.st_mode & S_IXUSR)
-                createExecutableFile(destination + "/" + i.name);
-            else
-                createRegularFile(destination + "/" + i.name);
+            createRegularFile(destination + "/" + i.name, st.st_mode & S_IXUSR);
             copyFile(entry);
         } else if (S_ISDIR(st.st_mode))
             copyDirectory(entry, destination + "/" + i.name);

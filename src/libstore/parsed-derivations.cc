@@ -2,7 +2,6 @@
 
 #include <nlohmann/json.hpp>
 #include <regex>
-#include "json.hh"
 
 namespace nix {
 
@@ -90,6 +89,7 @@ std::optional<Strings> ParsedDerivation::getStringsAttr(const std::string & name
 
 StringSet ParsedDerivation::getRequiredSystemFeatures() const
 {
+    // FIXME: cache this?
     StringSet res;
     for (auto & i : getStringsAttr("requiredSystemFeatures").value_or(Strings()))
         res.insert(i);
@@ -125,6 +125,11 @@ bool ParsedDerivation::substitutesAllowed() const
     return getBoolAttr("allowSubstitutes", true);
 }
 
+bool ParsedDerivation::useUidRange() const
+{
+    return getRequiredSystemFeatures().count("uid-range");
+}
+
 static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
 
 std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & store, const StorePathSet & inputPaths)
@@ -144,16 +149,11 @@ std::optional<nlohmann::json> ParsedDerivation::prepareStructuredAttrs(Store & s
     auto e = json.find("exportReferencesGraph");
     if (e != json.end() && e->is_object()) {
         for (auto i = e->begin(); i != e->end(); ++i) {
-            std::ostringstream str;
-            {
-                JSONPlaceholder jsonRoot(str, true);
-                StorePathSet storePaths;
-                for (auto & p : *i)
-                    storePaths.insert(store.parseStorePath(p.get<std::string>()));
-                store.pathInfoToJSON(jsonRoot,
-                    store.exportReferences(storePaths, inputPaths), false, true);
-            }
-            json[i.key()] = nlohmann::json::parse(str.str()); // urgh
+            StorePathSet storePaths;
+            for (auto & p : *i)
+                storePaths.insert(store.parseStorePath(p.get<std::string>()));
+            json[i.key()] = store.pathInfoToJSON(
+                store.exportReferences(storePaths, inputPaths), false, true);
         }
     }
 

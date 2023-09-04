@@ -548,7 +548,7 @@ namespace nix {
 
     TEST(get, emptyContainer) {
         StringMap s = { };
-        auto expected = std::nullopt;
+        auto expected = nullptr;
 
         ASSERT_EQ(get(s, "one"), expected);
     }
@@ -559,7 +559,23 @@ namespace nix {
         s["two"] = "er";
         auto expected = "yi";
 
-        ASSERT_EQ(get(s, "one"), expected);
+        ASSERT_EQ(*get(s, "one"), expected);
+    }
+
+    TEST(getOr, emptyContainer) {
+        StringMap s = { };
+        auto expected = "yi";
+
+        ASSERT_EQ(getOr(s, "one", "yi"), expected);
+    }
+
+    TEST(getOr, getFromContainer) {
+        StringMap s;
+        s["one"] = "yi";
+        s["two"] = "er";
+        auto expected = "yi";
+
+        ASSERT_EQ(getOr(s, "one", "nope"), expected);
     }
 
     /* ----------------------------------------------------------------------------

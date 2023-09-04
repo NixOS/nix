@@ -186,12 +186,12 @@ static int main_build_remote(int argc, char * * argv)
                         // build the hint template.
                         std::string errorText =
                             "Failed to find a machine for remote build!\n"
-                            "derivation: %s\nrequired (system, features): (%s, %s)";
+                            "derivation: %s\nrequired (system, features): (%s, [%s])";
                         errorText += "\n%s available machines:";
                         errorText += "\n(systems, maxjobs, supportedFeatures, mandatoryFeatures)";
 
                         for (unsigned int i = 0; i < machines.size(); ++i)
-                            errorText += "\n(%s, %s, %s, %s)";
+                            errorText += "\n([%s], %s, [%s], [%s])";
 
                         // add the template values.
                         std::string drvstr;

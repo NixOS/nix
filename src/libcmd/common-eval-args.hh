@@ -10,6 +10,8 @@ class Bindings;
 
 struct MixEvalArgs : virtual Args
 {
+    static constexpr auto category = "Common evaluation options";
+
     MixEvalArgs();
 
     Bindings * getAutoArgs(EvalState & state);

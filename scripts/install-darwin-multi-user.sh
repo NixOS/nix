@@ -167,7 +167,7 @@ poly_user_shell_get() {
 }
 
 poly_user_shell_set() {
-    _sudo "in order to give $1 a safe home directory" \
+    _sudo "in order to give $1 a safe shell" \
           /usr/bin/dscl . -create "/Users/$1" "UserShell" "$2"
 }
 

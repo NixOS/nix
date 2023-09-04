@@ -1,0 +1,42 @@
+emulate -L zsh
+
+# run-help is a zsh widget that can be bound to a key. It mainly looks up the
+# man page for the currently typed in command.
+#
+# Although run-help works for any command without requiring special support,
+# it can only deduce the right man page based solely on the name of the
+# command. Programs like Nix provide better integration with run-help by
+# helping zsh identify Nix subcommands and their corresponding man pages. This
+# is what this function does.
+#
+# To actually use run-help on zsh, place the following lines in your .zshrc:
+#
+#     (( $+aliases[run-help] )) && unalias run-help
+#     autoload -Uz run-help run-help-nix
+#
+# Then also assign run-help to any key of choice:
+#
+#     bindkey '^[h' run-help
+
+while [[ "$#" != 0 && "$1" == -* ]]; do
+  shift
+done
+
+local -a subcommands; subcommands=( nix3 )
+
+local arg
+for arg in "$@"; do
+  if man -w "${(j:-:)subcommands}-$arg" >/dev/null 2>&1; then
+    subcommands+="$arg"
+  else
+    break
+  fi
+done
+
+if (( $#subcommands > 1 )); then
+  man "${(j:-:)subcommands}"
+else
+  man nix
+fi
+
+return $?

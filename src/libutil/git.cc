@@ -3,6 +3,8 @@
 #include <vector>
 #include <map>
 
+#include <regex>
+
 #include <strings.h> // for strcasecmp
 
 #include <sys/types.h>
@@ -124,10 +126,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
                 if (perm == 40000)
                     throw SysError("file is a file but expected to be a directory '%1%'", entry);
 
-                if (perm == 100755 || perm == 755)
-                    sink.createExecutableFile(path + "/" + name);
-                else
-                    sink.createRegularFile(path + "/" + name);
+                sink.createRegularFile(path + "/" + name, perm == 100755 || perm == 755);
 
                 sink.copyFile(entry);
             } else if (S_ISDIR(st.st_mode)) {
@@ -232,6 +231,26 @@ Hash dumpGitHash(HashType ht, const Path & path, PathFilter & filter)
 void dumpGit(HashType ht, const Path & path, Sink & sink, PathFilter & filter)
 {
     dumpGitInternal(ht, path, sink, filter);
+}
+
+namespace git {
+
+std::optional<LsRemoteRefLine> parseLsRemoteLine(std::string_view line)
+{
+    const static std::regex line_regex("^(ref: *)?([^\\s]+)(?:\\t+(.*))?$");
+    std::match_results<std::string_view::const_iterator> match;
+    if (!std::regex_match(line.cbegin(), line.cend(), match, line_regex))
+        return std::nullopt;
+
+    return LsRemoteRefLine {
+        .kind = match[1].length() == 0
+            ? LsRemoteRefLine::Kind::Object
+            : LsRemoteRefLine::Kind::Symbolic,
+        .target = match[2],
+        .reference = match[3].length() == 0 ? std::nullopt : std::optional<std::string>{ match[3] }
+    };
+}
+
 }
 
 }

@@ -5,9 +5,9 @@
 
 namespace nix {
 
-static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Value & val)
+static void prim_fromTOML(EvalState & state, const PosIdx pos, Value * * args, Value & val)
 {
-    auto toml = state.forceStringNoCtx(*args[0], pos);
+    auto toml = state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.fromTOML");
 
     std::istringstream tomlStream(std::string{toml});
 
@@ -73,7 +73,7 @@ static void prim_fromTOML(EvalState & state, const Pos & pos, Value * * args, Va
     } catch (std::exception & e) { // TODO: toml::syntax_error
         throw EvalError({
             .msg = hintfmt("while parsing a TOML string: %s", e.what()),
-            .errPos = pos
+            .errPos = state.positions[pos]
         });
     }
 }

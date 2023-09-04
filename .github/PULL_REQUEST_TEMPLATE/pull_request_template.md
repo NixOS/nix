@@ -5,3 +5,7 @@ Please include relevant [release notes](https://github.com/NixOS/nix/blob/master
 **Testing**
 
 If this issue is a regression or something that should block release, please consider including a test either in the [testsuite](https://github.com/NixOS/nix/tree/master/tests) or as a [hydraJob]( https://github.com/NixOS/nix/blob/master/flake.nix#L396) so that it can be part of the [automatic checks](https://hydra.nixos.org/jobset/nix/master).
+
+**Priorities**
+
+Add :+1: to [pull requests you find important](https://github.com/NixOS/nix/pulls?q=is%3Aopen+sort%3Areactions-%2B1-desc).

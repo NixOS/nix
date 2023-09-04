@@ -85,7 +85,6 @@ static void main_nix_build(int argc, char * * argv)
     Strings attrPaths;
     Strings left;
     RepairFlag repair = NoRepair;
-    Path gcRoot;
     BuildMode buildMode = bmNormal;
     bool readStdin = false;
 
@@ -166,9 +165,6 @@ static void main_nix_build(int argc, char * * argv)
 
         else if (*arg == "--out-link" || *arg == "-o")
             outLink = getArg(*arg, arg, end);
-
-        else if (*arg == "--add-root")
-            gcRoot = getArg(*arg, arg, end);
 
         else if (*arg == "--dry-run")
             dryRun = true;
@@ -257,11 +253,12 @@ static void main_nix_build(int argc, char * * argv)
 
     auto autoArgs = myArgs.getAutoArgs(*state);
 
+    auto autoArgsWithInNixShell = autoArgs;
     if (runEnv) {
-        auto newArgs = state->buildBindings(autoArgs->size() + 1);
+        auto newArgs = state->buildBindings(autoArgsWithInNixShell->size() + 1);
         newArgs.alloc("inNixShell").mkBool(true);
         for (auto & i : *autoArgs) newArgs.insert(i);
-        autoArgs = newArgs.finish();
+        autoArgsWithInNixShell = newArgs.finish();
     }
 
     if (packages) {
@@ -316,10 +313,39 @@ static void main_nix_build(int argc, char * * argv)
         Value vRoot;
         state->eval(e, vRoot);
 
+        std::function<bool(const Value & v)> takesNixShellAttr;
+        takesNixShellAttr = [&](const Value & v) {
+            if (!runEnv) {
+                return false;
+            }
+            bool add = false;
+            if (v.type() == nFunction && v.lambda.fun->hasFormals()) {
+                for (auto & i : v.lambda.fun->formals->formals) {
+                    if (state->symbols[i.name] == "inNixShell") {
+                        add = true;
+                        break;
+                    }
+                }
+            }
+            return add;
+        };
+
         for (auto & i : attrPaths) {
-            Value & v(*findAlongAttrPath(*state, i, *autoArgs, vRoot).first);
+            Value & v(*findAlongAttrPath(
+                *state,
+                i,
+                takesNixShellAttr(vRoot) ? *autoArgsWithInNixShell : *autoArgs,
+                vRoot
+            ).first);
             state->forceValue(v, [&]() { return v.determinePos(noPos); });
-            getDerivations(*state, v, "", *autoArgs, drvs, false);
+            getDerivations(
+                *state,
+                v,
+                "",
+                takesNixShellAttr(v) ? *autoArgsWithInNixShell : *autoArgs,
+                drvs,
+                false
+            );
         }
     }
 
@@ -371,7 +397,7 @@ static void main_nix_build(int argc, char * * argv)
                 auto bashDrv = drv->requireDrvPath();
                 pathsToBuild.push_back(DerivedPath::Built {
                     .drvPath = bashDrv,
-                    .outputs = {},
+                    .outputs = {"out"},
                 });
                 pathsToCopy.insert(bashDrv);
                 shellDrv = bashDrv;
@@ -440,7 +466,7 @@ static void main_nix_build(int argc, char * * argv)
         env["NIX_STORE"] = store->storeDir;
         env["NIX_BUILD_CORES"] = std::to_string(settings.buildCores);
 
-        auto passAsFile = tokenizeString<StringSet>(get(drv.env, "passAsFile").value_or(""));
+        auto passAsFile = tokenizeString<StringSet>(getOr(drv.env, "passAsFile", ""));
 
         bool keepTmp = false;
         int fileNr = 0;

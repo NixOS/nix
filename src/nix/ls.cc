@@ -3,7 +3,7 @@
 #include "fs-accessor.hh"
 #include "nar-accessor.hh"
 #include "common-args.hh"
-#include "json.hh"
+#include <nlohmann/json.hpp>
 
 using namespace nix;
 
@@ -91,10 +91,9 @@ struct MixLs : virtual Args, MixJSON
         if (path == "/") path = "";
 
         if (json) {
-            JSONPlaceholder jsonRoot(std::cout);
             if (showDirectory)
                 throw UsageError("'--directory' is useless with '--json'");
-            listNar(jsonRoot, accessor, path, recursive);
+            std::cout << listNar(accessor, path, recursive);
         } else
             listText(accessor);
     }

@@ -29,7 +29,7 @@ highest precedence:
   can be specified using the NixOS option `nix.registry`.
 
 * The user registry `~/.config/nix/registry.json`. This registry can
-  be modified by commands such as `nix flake pin`.
+  be modified by commands such as `nix registry pin`.
 
 * Overrides specified on the command line using the option
   `--override-flake`.

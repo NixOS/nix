@@ -115,12 +115,11 @@ the Nix store. Here are the recognised types of installables:
 
 * **Store derivations**: `/nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv`
 
-  Store derivations are store paths with extension `.drv` and are a
-  low-level representation of a build-time dependency graph used
-  internally by Nix. By default, if you pass a store derivation to a
-  `nix` subcommand, it will operate on the *output paths* of the
-  derivation. For example, `nix path-info` prints information about
-  the output paths:
+  By default, if you pass a [store derivation] path to a `nix` subcommand, the command will operate on the [output path]s of the derivation.
+
+  [output path]: ../../glossary.md#gloss-output-path
+
+  For example, `nix path-info` prints information about the output paths:
 
   ```console
   # nix path-info --json /nix/store/p7gp6lxdg32h4ka1q398wd9r2zkbbz2v-hello-2.10.drv
@@ -145,6 +144,69 @@ the Nix store. Here are the recognised types of installables:
 For most commands, if no installable is specified, the default is `.`,
 i.e. Nix will operate on the default flake output attribute of the
 flake in the current directory.
+
+## Derivation output selection
+
+Derivations can have multiple outputs, each corresponding to a
+different store path. For instance, a package can have a `bin` output
+that contains programs, and a `dev` output that provides development
+artifacts like C/C++ header files. The outputs on which `nix` commands
+operate are determined as follows:
+
+* You can explicitly specify the desired outputs using the syntax
+  *installable*`^`*output1*`,`*...*`,`*outputN*. For example, you can
+  obtain the `dev` and `static` outputs of the `glibc` package:
+
+  ```console
+  # nix build 'nixpkgs#glibc^dev,static'
+  # ls ./result-dev/include/ ./result-static/lib/
+  …
+  ```
+
+  and likewise, using a store path to a "drv" file to specify the derivation:
+
+  ```console
+  # nix build '/nix/store/gzaflydcr6sb3567hap9q6srzx8ggdgg-glibc-2.33-78.drv^dev,static'
+  …
+  ```
+
+* You can also specify that *all* outputs should be used using the
+  syntax *installable*`^*`. For example, the following shows the size
+  of all outputs of the `glibc` package in the binary cache:
+
+  ```console
+  # nix path-info -S --eval-store auto --store https://cache.nixos.org 'nixpkgs#glibc^*'
+  /nix/store/g02b1lpbddhymmcjb923kf0l7s9nww58-glibc-2.33-123                 33208200
+  /nix/store/851dp95qqiisjifi639r0zzg5l465ny4-glibc-2.33-123-bin             36142896
+  /nix/store/kdgs3q6r7xdff1p7a9hnjr43xw2404z7-glibc-2.33-123-debug          155787312
+  /nix/store/n4xa8h6pbmqmwnq0mmsz08l38abb06zc-glibc-2.33-123-static          42488328
+  /nix/store/q6580lr01jpcsqs4r5arlh4ki2c1m9rv-glibc-2.33-123-dev             44200560
+  ```
+
+  and likewise, using a store path to a "drv" file to specify the derivation:
+
+  ```console
+  # nix path-info -S '/nix/store/gzaflydcr6sb3567hap9q6srzx8ggdgg-glibc-2.33-78.drv^*'
+  …
+  ```
+* If you didn't specify the desired outputs, but the derivation has an
+  attribute `meta.outputsToInstall`, Nix will use those outputs. For
+  example, since the package `nixpkgs#libxml2` has this attribute:
+
+  ```console
+  # nix eval 'nixpkgs#libxml2.meta.outputsToInstall'
+  [ "bin" "man" ]
+  ```
+
+  a command like `nix shell nixpkgs#libxml2` will provide only those
+  two outputs by default.
+
+  Note that a [store derivation] (given by its `.drv` file store path) doesn't have
+  any attributes like `meta`, and thus this case doesn't apply to it.
+
+  [store derivation]: ../../glossary.md#gloss-store-derivation
+
+* Otherwise, Nix will use all outputs of the derivation.
 
 # Nix stores
 

@@ -28,7 +28,7 @@
     <key>SoftResourceLimits</key>
     <dict>
       <key>NumberOfFiles</key>
-      <integer>4096</integer>
+      <integer>1048576</integer>
     </dict>
   </dict>
 </plist>

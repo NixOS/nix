@@ -7,6 +7,7 @@
 #if HAVE_BOEHMGC
 #include <gc/gc_allocator.h>
 #endif
+#include <nlohmann/json_fwd.hpp>
 
 namespace nix {
 
@@ -56,12 +57,12 @@ struct Expr;
 struct ExprLambda;
 struct PrimOp;
 class Symbol;
+class PosIdx;
 struct Pos;
 class StorePath;
 class Store;
 class EvalState;
 class XMLWriter;
-class JSONPlaceholder;
 
 
 typedef int64_t NixInt;
@@ -89,7 +90,7 @@ class ExternalValueBase
     /* Coerce the value to a string. Defaults to uncoercable, i.e. throws an
      * error.
      */
-    virtual std::string coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore) const;
+    virtual std::string coerceToString(const Pos & pos, PathSet & context, bool copyMore, bool copyToStore, std::string_view errorCtx) const;
 
     /* Compare to another value of the same type. Defaults to uncomparable,
      * i.e. always false.
@@ -97,13 +98,13 @@ class ExternalValueBase
     virtual bool operator ==(const ExternalValueBase & b) const;
 
     /* Print the value as JSON. Defaults to unconvertable, i.e. throws an error */
-    virtual void printValueAsJSON(EvalState & state, bool strict,
-        JSONPlaceholder & out, PathSet & context) const;
+    virtual nlohmann::json printValueAsJSON(EvalState & state, bool strict,
+        PathSet & context, bool copyToStore = true) const;
 
     /* Print the value as XML. Defaults to unevaluated */
     virtual void printValueAsXML(EvalState & state, bool strict, bool location,
         XMLWriter & doc, PathSet & context, PathSet & drvsSeen,
-        const Pos & pos) const;
+        const PosIdx pos) const;
 
     virtual ~ExternalValueBase()
     {
@@ -120,11 +121,11 @@ private:
 
     friend std::string showType(const Value & v);
 
-    void print(std::ostream & str, std::set<const void *> * seen) const;
+    void print(const SymbolTable & symbols, std::ostream & str, std::set<const void *> * seen) const;
 
 public:
 
-    void print(std::ostream & str, bool showRepeated = false) const;
+    void print(const SymbolTable & symbols, std::ostream & str, bool showRepeated = false) const;
 
     // Functions needed to distinguish the type
     // These should be removed eventually, by putting the functionality that's
@@ -250,11 +251,6 @@ public:
 
     void mkStringMove(const char * s, const PathSet & context);
 
-    inline void mkString(const Symbol & s)
-    {
-        mkString(((const std::string &) s).c_str());
-    }
-
     inline void mkPath(const char * s)
     {
         clearValue();
@@ -368,7 +364,7 @@ public:
         return internalType == tList1 ? 1 : internalType == tList2 ? 2 : bigList.size;
     }
 
-    Pos determinePos(const Pos & pos) const;
+    PosIdx determinePos(const PosIdx pos) const;
 
     /* Check whether forcing this value requires a trivial amount of
        computation. In particular, function applications are
@@ -408,9 +404,9 @@ public:
 
 
 #if HAVE_BOEHMGC
-typedef std::vector<Value *, traceable_allocator<Value *> > ValueVector;
-typedef std::map<Symbol, Value *, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, Value *> > > ValueMap;
-typedef std::map<Symbol, ValueVector, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, ValueVector> > > ValueVectorMap;
+typedef std::vector<Value *, traceable_allocator<Value *>> ValueVector;
+typedef std::map<Symbol, Value *, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, Value *>>> ValueMap;
+typedef std::map<Symbol, ValueVector, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, ValueVector>>> ValueVectorMap;
 #else
 typedef std::vector<Value *> ValueVector;
 typedef std::map<Symbol, Value *> ValueMap;

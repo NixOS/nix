@@ -35,10 +35,6 @@ static ArchiveSettings archiveSettings;
 
 static GlobalConfig::Register rArchiveSettings(&archiveSettings);
 
-const std::string narVersionMagic1 = "nix-archive-1";
-
-static std::string caseHackSuffix = "~nix~case~hack~";
-
 PathFilter defaultPathFilter = [](const Path &) { return true; };
 
 
@@ -234,6 +230,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path)
 
         else if (s == "contents" && type == tpRegular) {
             parseContents(sink, source, path);
+            sink.closeRegularFile();
         }
 
         else if (s == "executable" && type == tpRegular) {

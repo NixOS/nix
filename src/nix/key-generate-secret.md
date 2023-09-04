@@ -30,7 +30,7 @@ convert-secret-to-public` to get the corresponding public key for
 verifying signed store paths.
 
 The mandatory argument `--key-name` specifies a key name (such as
-`cache.example.org-1). It is used to look up keys on the client when
+`cache.example.org-1`). It is used to look up keys on the client when
 it verifies signatures. It can be anything, but it’s suggested to use
 the host name of your cache (e.g.  `cache.example.org`) with a suffix
 denoting the number of the key (to be incremented every time you need

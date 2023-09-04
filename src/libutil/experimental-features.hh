@@ -23,6 +23,9 @@ enum struct ExperimentalFeature
     RecursiveNix,
     NoUrlLiterals,
     FetchClosure,
+    ReplFlake,
+    AutoAllocateUids,
+    Cgroups,
 };
 
 /**
@@ -51,5 +54,12 @@ public:
 
     MissingExperimentalFeature(ExperimentalFeature);
 };
+
+/**
+ * Semi-magic conversion to and from json.
+ * See the nlohmann/json readme for more details.
+ */
+void to_json(nlohmann::json &, const ExperimentalFeature &);
+void from_json(const nlohmann::json &, ExperimentalFeature &);
 
 }

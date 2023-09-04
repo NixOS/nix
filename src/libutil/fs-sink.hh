@@ -10,8 +10,8 @@ struct ParseSink
 {
     virtual void createDirectory(const Path & path) { };
 
-    virtual void createRegularFile(const Path & path) { };
-    virtual void createExecutableFile(const Path & path) { };
+    virtual void createRegularFile(const Path & path, bool executable = false) { };
+    virtual void closeRegularFile() { };
     virtual void isExecutable() { };
     virtual void preallocateContents(uint64_t size) { };
     virtual void receiveContents(std::string_view data) { };
@@ -30,8 +30,8 @@ struct RestoreSink : ParseSink
 
     void createDirectory(const Path & path) override;
 
-    void createRegularFile(const Path & path) override;
-    void createExecutableFile(const Path & path) override;
+    void createRegularFile(const Path & path, bool executable = false) override;
+    void closeRegularFile() override;
     void isExecutable() override;
     void preallocateContents(uint64_t size) override;
     void receiveContents(std::string_view data) override;
