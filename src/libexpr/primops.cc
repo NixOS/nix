@@ -35,7 +35,7 @@ InvalidPathError::InvalidPathError(const Path & path) :
 
 void EvalState::realiseContext(const PathSet & context)
 {
-    std::vector<StorePathWithOutputs> drvs;
+    std::vector<BuildableReqFromDrv> drvs;
 
     for (auto & i : context) {
         auto [ctxS, outputName] = decodeContext(i);
@@ -43,7 +43,7 @@ void EvalState::realiseContext(const PathSet & context)
         if (!store->isValidPath(ctx))
             throw InvalidPathError(store->printStorePath(ctx));
         if (!outputName.empty() && ctx.isDerivation()) {
-            drvs.push_back(StorePathWithOutputs{ctx, {outputName}});
+            drvs.push_back({ctx, {outputName}});
         }
     }
 
@@ -51,14 +51,16 @@ void EvalState::realiseContext(const PathSet & context)
 
     if (!evalSettings.enableImportFromDerivation)
         throw EvalError("attempted to realize '%1%' during evaluation but 'allow-import-from-derivation' is false",
-            store->printStorePath(drvs.begin()->path));
+            store->printStorePath(drvs.begin()->drvPath));
 
     /* For performance, prefetch all substitute info. */
     StorePathSet willBuild, willSubstitute, unknown;
     uint64_t downloadSize, narSize;
-    store->queryMissing(drvs, willBuild, willSubstitute, unknown, downloadSize, narSize);
+    std::vector<BuildableReq> buildReqs;
+    for (auto & d : drvs) buildReqs.emplace_back(BuildableReq { d });
+    store->queryMissing(buildReqs, willBuild, willSubstitute, unknown, downloadSize, narSize);
 
-    store->buildPaths(drvs);
+    store->buildPaths(buildReqs);
 
     /* Add the output of this derivations to the allowed
        paths. */

@@ -590,14 +590,6 @@ std::map<std::string, Hash> staticOutputHashes(Store& store, const Derivation& d
 }
 
 
-std::string StorePathWithOutputs::to_string(const Store & store) const
-{
-    return outputs.empty()
-        ? store.printStorePath(path)
-        : store.printStorePath(path) + "!" + concatStringsSep(",", outputs);
-}
-
-
 bool wantOutput(const string & output, const std::set<string> & wanted)
 {
     return wanted.empty() || wanted.find(output) != wanted.end();

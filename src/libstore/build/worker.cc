@@ -232,14 +232,14 @@ void Worker::waitForAWhile(GoalPtr goal)
 
 void Worker::run(const Goals & _topGoals)
 {
-    std::vector<nix::StorePathWithOutputs> topPaths;
+    std::vector<nix::BuildableReq> topPaths;
 
     for (auto & i : _topGoals) {
         topGoals.insert(i);
         if (auto goal = dynamic_cast<DerivationGoal *>(i.get())) {
-            topPaths.push_back({goal->drvPath, goal->wantedOutputs});
+            topPaths.push_back(BuildableReqFromDrv{goal->drvPath, goal->wantedOutputs});
         } else if (auto goal = dynamic_cast<PathSubstitutionGoal *>(i.get())) {
-            topPaths.push_back({goal->storePath});
+            topPaths.push_back(BuildableOpaque{goal->storePath});
         }
     }
 

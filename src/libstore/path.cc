@@ -82,19 +82,4 @@ PathSet Store::printStorePathSet(const StorePathSet & paths) const
     return res;
 }
 
-std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s)
-{
-    size_t n = s.find("!");
-    return n == s.npos
-        ? std::make_pair(s, std::set<string>())
-        : std::make_pair(((std::string_view) s).substr(0, n),
-            tokenizeString<std::set<string>>(((std::string_view) s).substr(n + 1), ","));
-}
-
-StorePathWithOutputs Store::parsePathWithOutputs(const std::string & s)
-{
-    auto [path, outputs] = nix::parsePathWithOutputs(s);
-    return {parseStorePath(path), std::move(outputs)};
-}
-
 }

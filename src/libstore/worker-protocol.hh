@@ -87,9 +87,11 @@ MAKE_WORKER_PROTO(, std::string);
 MAKE_WORKER_PROTO(, StorePath);
 MAKE_WORKER_PROTO(, ContentAddress);
 MAKE_WORKER_PROTO(, StorePathDescriptor);
+MAKE_WORKER_PROTO(, BuildableReq);
 MAKE_WORKER_PROTO(, Realisation);
 MAKE_WORKER_PROTO(, DrvOutput);
 
+MAKE_WORKER_PROTO(template<typename T>, std::vector<T>);
 MAKE_WORKER_PROTO(template<typename T>, std::set<T>);
 
 #define X_ template<typename K, typename V>
@@ -113,6 +115,26 @@ MAKE_WORKER_PROTO(X_, Y_);
  */
 MAKE_WORKER_PROTO(, std::optional<StorePath>);
 MAKE_WORKER_PROTO(, std::optional<ContentAddress>);
+
+template<typename T>
+std::vector<T> read(const Store & store, Source & from, Phantom<std::vector<T>> _)
+{
+    std::vector<T> resSet;
+    auto size = readNum<size_t>(from);
+    while (size--) {
+        resSet.push_back(read(store, from, Phantom<T> {}));
+    }
+    return resSet;
+}
+
+template<typename T>
+void write(const Store & store, Sink & out, const std::vector<T> & resSet)
+{
+    out << resSet.size();
+    for (auto & key : resSet) {
+        write(store, out, key);
+    }
+}
 
 template<typename T>
 std::set<T> read(const Store & store, Source & from, Phantom<std::set<T>> _)

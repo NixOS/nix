@@ -2,6 +2,7 @@
 #include "util.hh"
 #include "derivations.hh"
 #include "store-api.hh"
+#include "path-with-outputs.hh"
 #include "local-fs-store.hh"
 #include "globals.hh"
 #include "shared.hh"
@@ -41,7 +42,9 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
             drvsToBuild.push_back({state.store->parseStorePath(i.queryDrvPath())});
 
     debug(format("building user environment dependencies"));
-    state.store->buildPaths(drvsToBuild, state.repair ? bmRepair : bmNormal);
+    state.store->buildPaths(
+        toBuildableReqs(drvsToBuild),
+        state.repair ? bmRepair : bmNormal);
 
     /* Construct the whole top level derivation. */
     StorePathSet references;
@@ -137,7 +140,9 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
     debug("building user environment");
     std::vector<StorePathWithOutputs> topLevelDrvs;
     topLevelDrvs.push_back({topLevelDrv});
-    state.store->buildPaths(topLevelDrvs, state.repair ? bmRepair : bmNormal);
+    state.store->buildPaths(
+        toBuildableReqs(topLevelDrvs),
+        state.repair ? bmRepair : bmNormal);
 
     /* Switch the current user environment to the output path. */
     auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();

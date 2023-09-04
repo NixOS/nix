@@ -2,6 +2,7 @@
 
 #include "realisation.hh"
 #include "path.hh"
+#include "buildable.hh"
 #include "hash.hh"
 #include "content-address.hh"
 #include "serialise.hh"
@@ -271,11 +272,6 @@ public:
 
     PathSet printStorePathSet(const StorePathSet & path) const;
 
-    /* Split a string specifying a derivation and a set of outputs
-       (/nix/store/hash-foo!out1,out2,...) into the derivation path
-       and the outputs. */
-    StorePathWithOutputs parsePathWithOutputs(const string & s);
-
     /* Display a set of paths in human-readable form (i.e., between quotes
        and separated by commas). */
     std::string showPaths(const StorePathSet & paths);
@@ -298,8 +294,6 @@ public:
     /* Same as followLinksToStore(), but apply toStorePath() to the
        result. */
     StorePath followLinksToStorePath(std::string_view path) const;
-
-    StorePathWithOutputs followLinksToStorePathWithOutputs(std::string_view path) const;
 
     /* Constructs a unique store path name. */
     StorePath makeStorePath(std::string_view type,
@@ -510,7 +504,7 @@ public:
        recursively building any sub-derivations. For inputs that are
        not derivations, substitute them. */
     virtual void buildPaths(
-        const std::vector<StorePathWithOutputs> & paths,
+        const std::vector<BuildableReq> & paths,
         BuildMode buildMode = bmNormal);
 
     /* Build a single non-materialized derivation (i.e. not from an
@@ -672,7 +666,7 @@ public:
     /* Given a set of paths that are to be built, return the set of
        derivations that will be built, and the set of output paths
        that will be substituted. */
-    virtual void queryMissing(const std::vector<StorePathWithOutputs> & targets,
+    virtual void queryMissing(const std::vector<BuildableReq> & targets,
         StorePathSet & willBuild, StorePathSet & willSubstitute, StorePathSet & unknown,
         uint64_t & downloadSize, uint64_t & narSize);
 

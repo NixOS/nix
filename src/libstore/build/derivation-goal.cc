@@ -73,7 +73,7 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath,
     state = &DerivationGoal::getDerivation;
     name = fmt(
         "building of '%s' from .drv file",
-        StorePathWithOutputs { drvPath, wantedOutputs }.to_string(worker.store));
+        BuildableReqFromDrv { drvPath, wantedOutputs }.to_string(worker.store));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
@@ -94,7 +94,7 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath, const BasicDerivation 
     state = &DerivationGoal::haveDerivation;
     name = fmt(
         "building of '%s' from in-memory derivation",
-        StorePathWithOutputs { drvPath, drv.outputNames() }.to_string(worker.store));
+        BuildableReqFromDrv { drvPath, drv.outputNames() }.to_string(worker.store));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);

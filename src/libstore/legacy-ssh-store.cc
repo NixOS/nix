@@ -3,6 +3,7 @@
 #include "remote-store.hh"
 #include "serve-protocol.hh"
 #include "store-api.hh"
+#include "path-with-outputs.hh"
 #include "worker-protocol.hh"
 #include "ssh.hh"
 #include "derivations.hh"
@@ -267,14 +268,23 @@ public:
         return status;
     }
 
-    void buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode) override
+    void buildPaths(const std::vector<BuildableReq> & drvPaths, BuildMode buildMode) override
     {
         auto conn(connections->get());
 
         conn->to << cmdBuildPaths;
         Strings ss;
-        for (auto & p : drvPaths)
-            ss.push_back(p.to_string(*this));
+        for (auto & p : drvPaths) {
+            auto sOrDrvPath = StorePathWithOutputs::tryFromBuildableReq(p);
+            std::visit(overloaded {
+                [&](StorePathWithOutputs s) {
+                    ss.push_back(s.to_string(*this));
+                },
+                [&](StorePath drvPath) {
+                    throw Error("wanted to fetch '%s' but the legacy ssh protocol doesn't support merely substituting drv files via the build paths command. It would build them instead. Try using ssh-ng://", printStorePath(drvPath));
+                },
+            }, sOrDrvPath);
+        }
         conn->to << ss;
 
         putBuildSettings(*conn);

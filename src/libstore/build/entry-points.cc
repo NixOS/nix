@@ -6,16 +6,20 @@
 
 namespace nix {
 
-void Store::buildPaths(const std::vector<StorePathWithOutputs> & drvPaths, BuildMode buildMode)
+void Store::buildPaths(const std::vector<BuildableReq> & reqs, BuildMode buildMode)
 {
     Worker worker(*this);
 
     Goals goals;
-    for (auto & path : drvPaths) {
-        if (path.path.isDerivation())
-            goals.insert(worker.makeDerivationGoal(path.path, path.outputs, buildMode));
-        else
-            goals.insert(worker.makePathSubstitutionGoal(path.path, buildMode == bmRepair ? Repair : NoRepair));
+    for (auto & br : reqs) {
+        std::visit(overloaded {
+            [&](BuildableReqFromDrv bfd) {
+                goals.insert(worker.makeDerivationGoal(bfd.drvPath, bfd.outputs, buildMode));
+            },
+            [&](BuildableOpaque bo) {
+                goals.insert(worker.makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair));
+            },
+        }, br.raw());
     }
 
     worker.run(goals);

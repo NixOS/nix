@@ -120,7 +120,7 @@ std::optional<StorePathDescriptor> getDerivationCA(const BasicDerivation & drv)
     return std::nullopt;
 }
 
-void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
+void Store::queryMissing(const std::vector<BuildableReq> & targets,
     StorePathSet & willBuild_, StorePathSet & willSubstitute_, StorePathSet & unknown_,
     uint64_t & downloadSize_, uint64_t & narSize_)
 {
@@ -148,7 +148,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
 
     Sync<State> state_(State{{}, unknown_, willSubstitute_, willBuild_, downloadSize_, narSize_});
 
-    std::function<void(StorePathWithOutputs)> doPath;
+    std::function<void(BuildableReq)> doPath;
 
     auto mustBuildDrv = [&](const StorePath & drvPath, const Derivation & drv) {
         {
@@ -157,7 +157,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
         }
 
         for (auto & i : drv.inputDrvs)
-            pool.enqueue(std::bind(doPath, StorePathWithOutputs { i.first, i.second }));
+            pool.enqueue(std::bind(doPath, BuildableReqFromDrv { i.first, i.second }));
     };
 
     auto checkOutput = [&](
@@ -184,24 +184,25 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
                 drvState->outPaths.insert(outPath);
                 if (!drvState->left) {
                     for (auto & path : drvState->outPaths)
-                        pool.enqueue(std::bind(doPath, StorePathWithOutputs { path } ));
+                        pool.enqueue(std::bind(doPath, BuildableOpaque { path } ));
                 }
             }
         }
     };
 
-    doPath = [&](const StorePathWithOutputs & path) {
+    doPath = [&](const BuildableReq & req) {
 
         {
             auto state(state_.lock());
-            if (!state->done.insert(path.to_string(*this)).second) return;
+            if (!state->done.insert(req.to_string(*this)).second) return;
         }
 
-        if (path.path.isDerivation()) {
-            if (!isValidPath(path.path)) {
+        std::visit(overloaded {
+          [&](BuildableReqFromDrv bfd) {
+            if (!isValidPath(bfd.drvPath)) {
                 // FIXME: we could try to substitute the derivation.
                 auto state(state_.lock());
-                state->unknown.insert(path.path);
+                state->unknown.insert(bfd.drvPath);
                 return;
             }
 
@@ -209,52 +210,54 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
             /* true for regular derivations, and CA derivations for which we
                have a trust mapping for all wanted outputs. */
             auto knownOutputPaths = true;
-            for (auto & [outputName, pathOpt] : queryPartialDerivationOutputMap(path.path)) {
+            for (auto & [outputName, pathOpt] : queryPartialDerivationOutputMap(bfd.drvPath)) {
                 if (!pathOpt) {
                     knownOutputPaths = false;
                     break;
                 }
-                if (wantOutput(outputName, path.outputs) && !isValidPath(*pathOpt))
+                if (wantOutput(outputName, bfd.outputs) && !isValidPath(*pathOpt))
                     invalid.insert(*pathOpt);
             }
             if (knownOutputPaths && invalid.empty()) return;
 
-            auto drv = make_ref<Derivation>(derivationFromPath(path.path));
-            ParsedDerivation parsedDrv(StorePath(path.path), *drv);
+            auto drv = make_ref<Derivation>(derivationFromPath(bfd.drvPath));
+            ParsedDerivation parsedDrv(StorePath(bfd.drvPath), *drv);
 
             if (knownOutputPaths && settings.useSubstitutes && parsedDrv.substitutesAllowed()) {
                 auto drvState = make_ref<Sync<DrvState>>(DrvState(invalid.size()));
                 for (auto & output : invalid)
-                    pool.enqueue(std::bind(checkOutput, path.path, drv, output, drvState));
+                    pool.enqueue(std::bind(checkOutput, bfd.drvPath, drv, output, drvState));
             } else
-                mustBuildDrv(path.path, *drv);
+                mustBuildDrv(bfd.drvPath, *drv);
 
-        } else {
+          },
+          [&](BuildableOpaque bo) {
 
-            if (isValidPath(path.path)) return;
+            if (isValidPath(bo.path)) return;
 
             SubstitutablePathInfos infos;
-            querySubstitutablePathInfos({path.path}, {}, infos);
+            querySubstitutablePathInfos({bo.path}, {}, infos);
 
             if (infos.empty()) {
                 auto state(state_.lock());
-                state->unknown.insert(path.path);
+                state->unknown.insert(bo.path);
                 return;
             }
 
-            auto info = infos.find(path.path);
+            auto info = infos.find(bo.path);
             assert(info != infos.end());
 
             {
                 auto state(state_.lock());
-                state->willSubstitute.insert(path.path);
+                state->willSubstitute.insert(bo.path);
                 state->downloadSize += info->second.downloadSize;
                 state->narSize += info->second.narSize;
             }
 
             for (auto & ref : info->second.references)
-                pool.enqueue(std::bind(doPath, StorePathWithOutputs { ref }));
-        }
+                pool.enqueue(std::bind(doPath, BuildableOpaque { ref }));
+          },
+        }, req.raw());
     };
 
     for (auto & path : targets)
