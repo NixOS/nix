@@ -264,8 +264,10 @@ std::optional<Hash> Input::getRev() const
 
 std::optional<Hash> Input::getTreeHash() const
 {
-    if (auto s = maybeGetStrAttr(attrs, "treeHash"))
+    if (auto s = maybeGetStrAttr(attrs, "treeHash")) {
+        settings.requireExperimentalFeature("git-hashing");
         return Hash::parseAny(*s, htSHA1);
+    }
     return {};
 }
 
