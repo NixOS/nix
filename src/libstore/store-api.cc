@@ -274,7 +274,7 @@ std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
             .method = method,
             .hash = h,
         },
-        {},
+        .references = {},
     };
     return std::make_pair(makeFixedOutputPath(name, caInfo), h);
 }
@@ -504,7 +504,7 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
                     .method = method,
                     .hash = hash,
                 },
-                {},
+                .references = {},
             },
         },
         narHash,
@@ -1429,16 +1429,18 @@ std::optional<StorePathDescriptor> ValidPathInfo::fullStorePathDescriptorOpt() c
     return StorePathDescriptor {
         .name = std::string { path.name() },
         .info = std::visit(overloaded {
-            [&](const TextHash & th) {
-                TextInfo info { th };
+            [&](const TextHash & th) -> ContentAddressWithReferences {
                 assert(!hasSelfReference);
-                info.references = references;
-                return ContentAddressWithReferences { info };
+                return TextInfo {
+                    th,
+                    .references = references,
+                };
             },
-            [&](const FixedOutputHash & foh) {
-                FixedOutputInfo info { foh };
-                info.references = static_cast<PathReferences<StorePath>>(*this);
-                return ContentAddressWithReferences { info };
+            [&](const FixedOutputHash & foh) -> ContentAddressWithReferences {
+                return FixedOutputInfo {
+                    foh,
+                    .references = static_cast<PathReferences<StorePath>>(*this),
+                };
             },
         }, *ca),
     };

@@ -2494,7 +2494,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                             .method = outputHash.method,
                             .hash = got,
                         },
-                        rewriteRefs(),
+                        .references = rewriteRefs(),
                     },
                 },
                 Hash::dummy,

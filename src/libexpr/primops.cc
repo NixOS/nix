@@ -1249,7 +1249,7 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value * *
                 .method = method,
                 .hash = h,
             },
-            {},
+            .references = {},
         });
         drv.env["out"] = state.store->printStorePath(outPath);
         drv.outputs.insert_or_assign("out",

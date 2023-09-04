@@ -226,7 +226,7 @@ StorePathDescriptor Input::computeStorePath(Store & store) const
                     .method = FileIngestionMethod::Git,
                     .hash = *treeHash,
                 },
-                {},
+                .references = {},
             },
         };
     if (auto narHash = getNarHash())
@@ -237,7 +237,7 @@ StorePathDescriptor Input::computeStorePath(Store & store) const
                     .method = FileIngestionMethod::Recursive,
                     .hash = *narHash,
                 },
-                {},
+                .references = {},
             },
         };
     throw Error("cannot compute store path for unlocked input '%s'", to_string());

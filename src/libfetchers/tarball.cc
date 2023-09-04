@@ -77,7 +77,7 @@ DownloadFileResult downloadFile(
                     .method = FileIngestionMethod::Flat,
                     .hash = hash,
                 },
-                {},
+                .references = {},
             },
         };
         ValidPathInfo info {

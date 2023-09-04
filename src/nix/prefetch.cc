@@ -72,7 +72,7 @@ std::tuple<StorePath, Hash> prefetchFile(
                 .method = ingestionMethod,
                 .hash = *expectedHash,
             },
-            {},
+            .references = {},
         });
         if (store->isValidPath(*storePath))
             hash = expectedHash;
