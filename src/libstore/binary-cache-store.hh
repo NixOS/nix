@@ -2,6 +2,7 @@
 
 #include "crypto.hh"
 #include "store-api.hh"
+#include "log-store.hh"
 
 #include "pool.hh"
 
@@ -28,7 +29,9 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
         "other than -1 which we reserve to indicate Nix defaults should be used"};
 };
 
-class BinaryCacheStore : public virtual BinaryCacheStoreConfig, public virtual Store
+class BinaryCacheStore : public virtual BinaryCacheStoreConfig,
+    public virtual Store,
+    public virtual LogStore
 {
 
 private:

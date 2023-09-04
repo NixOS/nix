@@ -117,7 +117,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         {"hash-path", {"hash", "path"}},
         {"ls-nar", {"nar", "ls"}},
         {"ls-store", {"store", "ls"}},
-        {"make-content-addressable", {"store", "make-content-addressable"}},
+        {"make-content-addressable", {"store", "make-content-addressed"}},
         {"optimise-store", {"store", "optimise"}},
         {"ping-store", {"store", "ping"}},
         {"sign-paths", {"store", "sign"}},
@@ -289,6 +289,7 @@ void mainWrapped(int argc, char * * argv)
     }
 
     if (argc == 2 && std::string(argv[1]) == "__dump-builtins") {
+        settings.experimentalFeatures = {Xp::Flakes, Xp::FetchClosure};
         evalSettings.pureEval = false;
         EvalState state({}, openStore("dummy://"));
         auto res = nlohmann::json::object();

@@ -93,7 +93,7 @@ StringSet ParsedDerivation::getRequiredSystemFeatures() const
     StringSet res;
     for (auto & i : getStringsAttr("requiredSystemFeatures").value_or(Strings()))
         res.insert(i);
-    if (!derivationHasKnownOutputPaths(drv.type()))
+    if (!drv.type().hasKnownOutputPaths())
         res.insert("ca-derivations");
     return res;
 }

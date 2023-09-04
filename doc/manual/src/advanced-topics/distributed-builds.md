@@ -110,7 +110,7 @@ default, set it to `-`.
 7.  A comma-separated list of *mandatory features*. A machine will only
     be used to build a derivation if all of the machine’s mandatory
     features appear in the derivation’s `requiredSystemFeatures`
-    attribute..
+    attribute.
 
 8.  The (base64-encoded) public host key of the remote machine. If omitted, SSH
     will use its regular known-hosts file. Specifically, the field is calculated

@@ -3,7 +3,9 @@
 #include "dotgraph.hh"
 #include "globals.hh"
 #include "build-result.hh"
+#include "store-cast.hh"
 #include "gc-store.hh"
+#include "log-store.hh"
 #include "local-store.hh"
 #include "monitor-fd.hh"
 #include "serve-protocol.hh"
@@ -436,7 +438,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             store->computeFSClosure(
                 args, referrers, true, settings.gcKeepOutputs, settings.gcKeepDerivations);
 
-            auto & gcStore = requireGcStore(*store);
+            auto & gcStore = require<GcStore>(*store);
             Roots roots = gcStore.findRoots(false);
             for (auto & [target, links] : roots)
                 if (referrers.find(target) != referrers.end())
@@ -481,13 +483,15 @@ static void opReadLog(Strings opFlags, Strings opArgs)
 {
     if (!opFlags.empty()) throw UsageError("unknown flag");
 
+    auto & logStore = require<LogStore>(*store);
+
     RunPager pager;
 
     for (auto & i : opArgs) {
-        auto path = store->followLinksToStorePath(i);
-        auto log = store->getBuildLog(path);
+        auto path = logStore.followLinksToStorePath(i);
+        auto log = logStore.getBuildLog(path);
         if (!log)
-            throw Error("build log of derivation '%s' is not available", store->printStorePath(path));
+            throw Error("build log of derivation '%s' is not available", logStore.printStorePath(path));
         std::cout << *log;
     }
 }
@@ -597,7 +601,7 @@ static void opGC(Strings opFlags, Strings opArgs)
 
     if (!opArgs.empty()) throw UsageError("no arguments expected");
 
-    auto & gcStore = requireGcStore(*store);
+    auto & gcStore = require<GcStore>(*store);
 
     if (printRoots) {
         Roots roots = gcStore.findRoots(false);
@@ -636,7 +640,7 @@ static void opDelete(Strings opFlags, Strings opArgs)
     for (auto & i : opArgs)
         options.pathsToDelete.insert(store->followLinksToStorePath(i));
 
-    auto & gcStore = requireGcStore(*store);
+    auto & gcStore = require<GcStore>(*store);
 
     GCResults results;
     PrintFreed freed(true, results);

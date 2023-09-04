@@ -61,8 +61,12 @@ struct DerivationGoal : public Goal
     bool needRestart = false;
 
     /* Whether to retry substituting the outputs after building the
-       inputs. */
-    bool retrySubstitution;
+       inputs. This is done in case of an incomplete closure. */
+    bool retrySubstitution = false;
+
+    /* Whether we've retried substitution, in which case we won't try
+       again. */
+    bool retriedSubstitution = false;
 
     /* The derivation stored at drvPath. */
     std::unique_ptr<Derivation> drv;

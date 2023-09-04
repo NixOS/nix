@@ -50,3 +50,22 @@ nix build -f dependencies.nix -o $RESULT --dry-run
 nix build -f dependencies.nix -o $RESULT
 
 [[ -h $RESULT ]]
+
+###################################################
+# Check the JSON output
+clearStore
+clearCache
+
+RES=$(nix build -f dependencies.nix --dry-run --json)
+
+if [[ -z "$NIX_TESTS_CA_BY_DEFAULT" ]]; then
+    echo "$RES" | jq '.[0] | [
+        (.drvPath | test("'$NIX_STORE_DIR'.*\\.drv")),
+        (.outputs.out | test("'$NIX_STORE_DIR'"))
+    ] | all'
+else
+    echo "$RES" | jq '.[0] | [
+        (.drvPath | test("'$NIX_STORE_DIR'.*\\.drv")),
+        .outputs.out == null
+    ] | all'
+fi

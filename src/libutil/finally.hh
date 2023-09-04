@@ -1,14 +1,13 @@
 #pragma once
 
-#include <functional>
-
 /* A trivial class to run a function at the end of a scope. */
+template<typename Fn>
 class Finally
 {
 private:
-    std::function<void()> fun;
+    Fn fun;
 
 public:
-    Finally(std::function<void()> fun) : fun(fun) { }
+    Finally(Fn fun) : fun(std::move(fun)) { }
     ~Finally() { fun(); }
 };

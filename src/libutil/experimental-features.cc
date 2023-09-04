@@ -9,9 +9,10 @@ std::map<ExperimentalFeature, std::string> stringifiedXpFeatures = {
     { Xp::CaDerivations, "ca-derivations" },
     { Xp::Flakes, "flakes" },
     { Xp::NixCommand, "nix-command" },
+    { Xp::GitHashing, "git-hashing" },
     { Xp::RecursiveNix, "recursive-nix" },
     { Xp::NoUrlLiterals, "no-url-literals" },
-    { Xp::GitHashing, "git-hashing" },
+    { Xp::FetchClosure, "fetch-closure" },
 };
 
 const std::optional<ExperimentalFeature> parseExperimentalFeature(const std::string_view & name)

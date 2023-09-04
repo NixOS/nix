@@ -54,6 +54,7 @@ typedef enum {
     lvlVomit
 } Verbosity;
 
+/* adjust Pos::origin bit width when adding stuff here */
 typedef enum {
     foFile,
     foStdin,

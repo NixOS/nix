@@ -18,9 +18,10 @@ enum struct ExperimentalFeature
     CaDerivations,
     Flakes,
     NixCommand,
+    GitHashing,
     RecursiveNix,
     NoUrlLiterals,
-    GitHashing,
+    FetchClosure,
 };
 
 /**

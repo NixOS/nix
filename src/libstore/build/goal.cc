@@ -28,7 +28,7 @@ void Goal::addWaitee(GoalPtr waitee)
 
 void Goal::waiteeDone(GoalPtr waitee, ExitCode result)
 {
-    assert(waitees.find(waitee) != waitees.end());
+    assert(waitees.count(waitee));
     waitees.erase(waitee);
 
     trace(fmt("waitee '%s' done; %d left", waitee->name, waitees.size()));

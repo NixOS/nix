@@ -1,5 +1,6 @@
 [Unit]
 Description=Nix Daemon
+Documentation=man:nix-daemon https://nixos.org/manual
 RequiresMountsFor=@storedir@
 RequiresMountsFor=@localstatedir@
 ConditionPathIsReadWrite=@localstatedir@/nix/daemon-socket

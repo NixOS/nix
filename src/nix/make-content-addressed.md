@@ -5,7 +5,7 @@ R""(
 * Create a content-addressed representation of the closure of GNU Hello:
 
   ```console
-  # nix store make-content-addressable -r nixpkgs#hello
+  # nix store make-content-addressed nixpkgs#hello
   …
   rewrote '/nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10' to '/nix/store/5skmmcb9svys5lj3kbsrjg7vf2irid63-hello-2.10'
   ```
@@ -29,7 +29,7 @@ R""(
   system closure:
 
   ```console
-  # nix store make-content-addressable -r /run/current-system
+  # nix store make-content-addressed /run/current-system
   ```
 
 # Description

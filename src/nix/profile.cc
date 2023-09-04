@@ -107,8 +107,9 @@ struct ProfileManifest
                     element.storePaths.insert(state.store->parseStorePath((std::string) p));
                 element.active = e["active"];
                 if (e.value("uri", "") != "") {
+                    auto originalUrl = e.value("originalUrl", e["originalUri"]);
                     element.source = ProfileElementSource{
-                        parseFlakeRef(e["originalUri"]),
+                        parseFlakeRef(originalUrl),
                         parseFlakeRef(e["uri"]),
                         e["attrPath"]
                     };
@@ -143,7 +144,7 @@ struct ProfileManifest
             obj["storePaths"] = paths;
             obj["active"] = element.active;
             if (element.source) {
-                obj["originalUri"] = element.source->originalRef.to_string();
+                obj["originalUrl"] = element.source->originalRef.to_string();
                 obj["uri"] = element.source->resolvedRef.to_string();
                 obj["attrPath"] = element.source->attrPath;
             }

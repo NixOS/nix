@@ -40,21 +40,21 @@ struct Goal : public std::enable_shared_from_this<Goal>
     WeakGoals waiters;
 
     /* Number of goals we are/were waiting for that have failed. */
-    unsigned int nrFailed;
+    size_t nrFailed = 0;
 
     /* Number of substitution goals we are/were waiting for that
        failed because there are no substituters. */
-    unsigned int nrNoSubstituters;
+    size_t nrNoSubstituters = 0;
 
     /* Number of substitution goals we are/were waiting for that
        failed because they had unsubstitutable references. */
-    unsigned int nrIncompleteClosure;
+    size_t nrIncompleteClosure = 0;
 
     /* Name of this goal for debugging purposes. */
     std::string name;
 
     /* Whether the goal is finished. */
-    ExitCode exitCode;
+    ExitCode exitCode = ecBusy;
 
     /* Build result. */
     BuildResult buildResult;
@@ -65,10 +65,7 @@ struct Goal : public std::enable_shared_from_this<Goal>
     Goal(Worker & worker, DerivedPath path)
         : worker(worker)
         , buildResult { .path = std::move(path) }
-    {
-        nrFailed = nrNoSubstituters = nrIncompleteClosure = 0;
-        exitCode = ecBusy;
-    }
+    { }
 
     virtual ~Goal()
     {

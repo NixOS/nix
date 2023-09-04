@@ -61,6 +61,8 @@ struct GCResults
 
 struct GcStore : public virtual Store
 {
+    inline static std::string operationName = "Garbage collection";
+
     /* Add an indirect root, which is merely a symlink to `path' from
        /nix/var/nix/gcroots/auto/<hash of `path'>.  `path' is supposed
        to be a symlink to a store path.  The garbage collector will
@@ -78,7 +80,5 @@ struct GcStore : public virtual Store
     /* Perform a garbage collection. */
     virtual void collectGarbage(const GCOptions & options, GCResults & results) = 0;
 };
-
-GcStore & requireGcStore(Store & store);
 
 }

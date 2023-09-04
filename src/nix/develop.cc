@@ -196,21 +196,22 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     drv.inputSrcs.insert(std::move(getEnvShPath));
     if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
         for (auto & output : drv.outputs) {
-            output.second = {
-                .output = DerivationOutputDeferred{},
-            };
+            output.second = DerivationOutput::Deferred {},
             drv.env[output.first] = hashPlaceholder(output.first);
         }
     } else {
         for (auto & output : drv.outputs) {
-            output.second = { .output = DerivationOutputInputAddressed { .path = StorePath::dummy } };
+            output.second = DerivationOutput::Deferred { };
             drv.env[output.first] = "";
         }
-        Hash h = std::get<0>(hashDerivationModulo(*evalStore, drv, true));
+        auto h0 = hashDerivationModulo(*evalStore, drv, true);
+        const Hash & h = h0.requireNoFixedNonDeferred();
 
         for (auto & output : drv.outputs) {
             auto outPath = store->makeOutputPath(output.first, h, drv.name);
-            output.second = { .output = DerivationOutputInputAddressed { .path = outPath } };
+            output.second = DerivationOutput::InputAddressed {
+                .path = outPath,
+            };
             drv.env[output.first] = store->printStorePath(outPath);
         }
     }

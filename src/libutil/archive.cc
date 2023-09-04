@@ -64,11 +64,12 @@ static void dumpContents(const Path & path, off_t size,
 }
 
 
-static void dump(const Path & path, Sink & sink, PathFilter & filter)
+static time_t dump(const Path & path, Sink & sink, PathFilter & filter)
 {
     checkInterrupt();
 
     auto st = lstat(path);
+    time_t result = st.st_mtime;
 
     sink << "(";
 
@@ -103,7 +104,10 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
         for (auto & i : unhacked)
             if (filter(path + "/" + i.first)) {
                 sink << "entry" << "(" << "name" << i.first << "node";
-                dump(path + "/" + i.second, sink, filter);
+                auto tmp_mtime = dump(path + "/" + i.second, sink, filter);
+                if (tmp_mtime > result) {
+                    result = tmp_mtime;
+                }
                 sink << ")";
             }
     }
@@ -114,13 +118,20 @@ static void dump(const Path & path, Sink & sink, PathFilter & filter)
     else throw Error("file '%1%' has an unsupported type", path);
 
     sink << ")";
+
+    return result;
 }
 
 
-void dumpPath(const Path & path, Sink & sink, PathFilter & filter)
+time_t dumpPathAndGetMtime(const Path & path, Sink & sink, PathFilter & filter)
 {
     sink << narVersionMagic1;
-    dump(path, sink, filter);
+    return dump(path, sink, filter);
+}
+
+void dumpPath(const Path & path, Sink & sink, PathFilter & filter)
+{
+    dumpPathAndGetMtime(path, sink, filter);
 }
 
 

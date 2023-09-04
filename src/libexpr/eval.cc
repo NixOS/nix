@@ -96,20 +96,20 @@ RootValue allocRootValue(Value * v)
 }
 
 
-void printValue(std::ostream & str, std::set<const void *> & seen, const Value & v)
+void Value::print(std::ostream & str, std::set<const void *> * seen) const
 {
     checkInterrupt();
 
-    switch (v.internalType) {
+    switch (internalType) {
     case tInt:
-        str << v.integer;
+        str << integer;
         break;
     case tBool:
-        str << (v.boolean ? "true" : "false");
+        str << (boolean ? "true" : "false");
         break;
     case tString:
         str << "\"";
-        for (const char * i = v.string.s; *i; i++)
+        for (const char * i = string.s; *i; i++)
             if (*i == '\"' || *i == '\\') str << "\\" << *i;
             else if (*i == '\n') str << "\\n";
             else if (*i == '\r') str << "\\r";
@@ -119,19 +119,19 @@ void printValue(std::ostream & str, std::set<const void *> & seen, const Value &
         str << "\"";
         break;
     case tPath:
-        str << v.path; // !!! escaping?
+        str << path; // !!! escaping?
         break;
     case tNull:
         str << "null";
         break;
     case tAttrs: {
-        if (!v.attrs->empty() && !seen.insert(v.attrs).second)
-            str << "<REPEAT>";
+        if (seen && !attrs->empty() && !seen->insert(attrs).second)
+            str << "«repeated»";
         else {
             str << "{ ";
-            for (auto & i : v.attrs->lexicographicOrder()) {
+            for (auto & i : attrs->lexicographicOrder()) {
                 str << i->name << " = ";
-                printValue(str, seen, *i->value);
+                i->value->print(str, seen);
                 str << "; ";
             }
             str << "}";
@@ -141,12 +141,12 @@ void printValue(std::ostream & str, std::set<const void *> & seen, const Value &
     case tList1:
     case tList2:
     case tListN:
-        if (v.listSize() && !seen.insert(v.listElems()).second)
-            str << "<REPEAT>";
+        if (seen && listSize() && !seen->insert(listElems()).second)
+            str << "«repeated»";
         else {
             str << "[ ";
-            for (auto v2 : v.listItems()) {
-                printValue(str, seen, *v2);
+            for (auto v2 : listItems()) {
+                v2->print(str, seen);
                 str << " ";
             }
             str << "]";
@@ -166,10 +166,10 @@ void printValue(std::ostream & str, std::set<const void *> & seen, const Value &
         str << "<PRIMOP-APP>";
         break;
     case tExternal:
-        str << *v.external;
+        str << *external;
         break;
     case tFloat:
-        str << v.fpoint;
+        str << fpoint;
         break;
     default:
         abort();
@@ -177,10 +177,16 @@ void printValue(std::ostream & str, std::set<const void *> & seen, const Value &
 }
 
 
-std::ostream & operator << (std::ostream & str, const Value & v)
+void Value::print(std::ostream & str, bool showRepeated) const
 {
     std::set<const void *> seen;
-    printValue(str, seen, v);
+    print(str, showRepeated ? nullptr : &seen);
+}
+
+
+std::ostream & operator << (std::ostream & str, const Value & v)
+{
+    v.print(str, false);
     return str;
 }
 
@@ -449,8 +455,10 @@ EvalState::EvalState(
     , regexCache(makeRegexCache())
 #if HAVE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
+    , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
 #else
     , valueAllocCache(std::make_shared<void *>(nullptr))
+    , env1AllocCache(std::make_shared<void *>(nullptr))
 #endif
     , baseEnv(allocEnv(128))
     , staticBaseEnv(false, 0)
@@ -498,23 +506,6 @@ EvalState::~EvalState()
 {
 }
 
-
-void EvalState::requireExperimentalFeatureOnEvaluation(
-    const ExperimentalFeature & feature,
-    const std::string_view fName,
-    const Pos & pos)
-{
-    if (!settings.isExperimentalFeatureEnabled(feature)) {
-        throw EvalError({
-            .msg = hintfmt(
-                "Cannot call '%2%' because experimental Nix feature '%1%' is disabled. You can enable it via '--extra-experimental-features %1%'.",
-                feature,
-                fName
-            ),
-            .errPos = pos
-        });
-    }
-}
 
 void EvalState::allowPath(const Path & path)
 {
@@ -727,9 +718,18 @@ LocalNoInlineNoReturn(void throwEvalError(const char * s, const std::string & s2
     throw EvalError(s, s2);
 }
 
+LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const Suggestions & suggestions, const char * s, const std::string & s2))
+{
+    throw EvalError(ErrorInfo {
+        .msg = hintfmt(s, s2),
+        .errPos = pos,
+        .suggestions = suggestions,
+    });
+}
+
 LocalNoInlineNoReturn(void throwEvalError(const Pos & pos, const char * s, const std::string & s2))
 {
-    throw EvalError({
+    throw EvalError(ErrorInfo {
         .msg = hintfmt(s, s2),
         .errPos = pos
     });
@@ -772,6 +772,16 @@ LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const char * s, const
         .errPos = pos
     });
 }
+
+LocalNoInlineNoReturn(void throwTypeError(const Pos & pos, const Suggestions & suggestions, const char * s, const ExprLambda & fun, const Symbol & s2))
+{
+    throw TypeError(ErrorInfo {
+        .msg = hintfmt(s, fun.showNamePos(), s2),
+        .errPos = pos,
+        .suggestions = suggestions,
+    });
+}
+
 
 LocalNoInlineNoReturn(void throwTypeError(const char * s, const Value & v))
 {
@@ -873,42 +883,6 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
             throwUndefinedVarError(var.pos, "undefined variable '%1%'", var.name);
         for (size_t l = env->prevWith; l; --l, env = env->up) ;
     }
-}
-
-
-Value * EvalState::allocValue()
-{
-    /* We use the boehm batch allocator to speed up allocations of Values (of which there are many).
-       GC_malloc_many returns a linked list of objects of the given size, where the first word
-       of each object is also the pointer to the next object in the list. This also means that we
-       have to explicitly clear the first word of every object we take. */
-    if (!*valueAllocCache) {
-        *valueAllocCache = GC_malloc_many(sizeof(Value));
-        if (!*valueAllocCache) throw std::bad_alloc();
-    }
-
-    /* GC_NEXT is a convenience macro for accessing the first word of an object.
-       Take the first list item, advance the list to the next item, and clear the next pointer. */
-    void * p = *valueAllocCache;
-    GC_PTR_STORE_AND_DIRTY(&*valueAllocCache, GC_NEXT(p));
-    GC_NEXT(p) = nullptr;
-
-    nrValues++;
-    auto v = (Value *) p;
-    return v;
-}
-
-
-Env & EvalState::allocEnv(size_t size)
-{
-    nrEnvs++;
-    nrValuesInEnvs += size;
-    Env * env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
-    env->type = Env::Plain;
-
-    /* We assume that env->values has been cleared by the allocator; maybeThunk() and lookupVar fromWith expect this. */
-
-    return *env;
 }
 
 
@@ -1281,8 +1255,15 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                 }
             } else {
                 state.forceAttrs(*vAttrs, pos);
-                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end())
-                    throwEvalError(pos, "attribute '%1%' missing", name);
+                if ((j = vAttrs->attrs->find(name)) == vAttrs->attrs->end()) {
+                    std::set<std::string> allAttrNames;
+                    for (auto & attr : *vAttrs->attrs)
+                        allAttrNames.insert(attr.name);
+                    throwEvalError(
+                        pos,
+                        Suggestions::bestMatches(allAttrNames, name),
+                        "attribute '%1%' missing", name);
+                }
             }
             vAttrs = j->value;
             pos2 = j->pos;
@@ -1398,8 +1379,17 @@ void EvalState::callFunction(Value & fun, size_t nrArgs, Value * * args, Value &
                     /* Nope, so show the first unexpected argument to the
                        user. */
                     for (auto & i : *args[0]->attrs)
-                        if (!lambda.formals->has(i.name))
-                            throwTypeError(pos, "%1% called with unexpected argument '%2%'", lambda, i.name);
+                        if (!lambda.formals->has(i.name)) {
+                            std::set<std::string> formalNames;
+                            for (auto & formal : lambda.formals->formals)
+                                formalNames.insert(formal.name);
+                            throwTypeError(
+                                pos,
+                                Suggestions::bestMatches(formalNames, i.name),
+                                "%1% called with unexpected argument '%2%'",
+                                lambda,
+                                i.name);
+                        }
                     abort(); // can't happen
                 }
             }
@@ -1902,13 +1892,22 @@ std::string_view EvalState::forceString(Value & v, const Pos & pos)
 
 /* Decode a context string ‘!<name>!<path>’ into a pair <path,
    name>. */
-std::pair<std::string, std::string> decodeContext(std::string_view s)
+NixStringContextElem decodeContext(const Store & store, std::string_view s)
 {
     if (s.at(0) == '!') {
         size_t index = s.find("!", 1);
-        return {std::string(s.substr(index + 1)), std::string(s.substr(1, index - 1))};
+        return {
+            store.parseStorePath(s.substr(index + 1)),
+            std::string(s.substr(1, index - 1)),
+        };
     } else
-        return {s.at(0) == '/' ? std::string(s) : std::string(s.substr(1)), ""};
+        return {
+            store.parseStorePath(
+                s.at(0) == '/'
+                ? s
+                : s.substr(1)),
+            "",
+        };
 }
 
 
@@ -1920,13 +1919,13 @@ void copyContext(const Value & v, PathSet & context)
 }
 
 
-std::vector<std::pair<Path, std::string>> Value::getContext()
+NixStringContext Value::getContext(const Store & store)
 {
-    std::vector<std::pair<Path, std::string>> res;
+    NixStringContext res;
     assert(internalType == tString);
     if (string.context)
         for (const char * * p = string.context; *p; ++p)
-            res.push_back(decodeContext(*p));
+            res.push_back(decodeContext(store, *p));
     return res;
 }
 
