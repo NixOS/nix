@@ -5,6 +5,7 @@
 #include "globals.hh"
 #include "tarfile.hh"
 #include "store-api.hh"
+#include "git.hh"
 #include "url-parts.hh"
 #include "pathlocks.hh"
 #include "processes.hh"
@@ -178,7 +179,7 @@ struct GitInputScheme : InputScheme
         attrs.emplace("type", "git");
 
         for (auto & [name, value] : url.query) {
-            if (name == "rev" || name == "ref" || name == "keytype" || name == "publicKey" || name == "publicKeys")
+            if (name == "rev" || name == "ref" || name == "treeHash" || name == "keytype" || name == "publicKey" || name == "publicKeys")
                 attrs.emplace(name, value);
             else if (name == "shallow" || name == "submodules" || name == "exportIgnore" || name == "allRefs" || name == "verifyCommit")
                 attrs.emplace(name, Explicit<bool> { value == "1" });
@@ -253,6 +254,7 @@ struct GitInputScheme : InputScheme
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         if (url.scheme != "git") url.scheme = "git+" + url.scheme;
         if (auto rev = input.getRev()) url.query.insert_or_assign("rev", rev->gitRev());
+        if (auto treeHash = input.getTreeHash()) url.query.insert_or_assign("treeHash", treeHash->gitRev());
         if (auto ref = input.getRef()) url.query.insert_or_assign("ref", *ref);
         if (getShallowAttr(input))
             url.query.insert_or_assign("shallow", "1");
@@ -403,6 +405,9 @@ struct GitInputScheme : InputScheme
         if (auto rev = input.getRev())
             checkHashAlgorithm(rev);
 
+        if (auto treeHash = input.getTreeHash())
+            checkHashAlgorithm(treeHash);
+
         RepoInfo repoInfo;
 
         // file:// URIs are normally not cloned (but otherwise treated the
@@ -415,9 +420,9 @@ struct GitInputScheme : InputScheme
         repoInfo.isLocal = url.scheme == "file" && !forceHttp && !isBareRepository;
         repoInfo.url = repoInfo.isLocal ? url.path : url.base;
 
-        // If this is a local directory and no ref or revision is
+        // If this is a local directory and no ref or revision or tree hash is
         // given, then allow the use of an unclean working tree.
-        if (!input.getRef() && !input.getRev() && repoInfo.isLocal)
+        if (!input.getRef() && !input.getRev() && !input.getTreeHash() && repoInfo.isLocal)
             repoInfo.workdirInfo = GitRepo::openRepo(repoInfo.url)->getWorkdirInfo();
 
         return repoInfo;
@@ -512,7 +517,7 @@ struct GitInputScheme : InputScheme
 
         if (repoInfo.isLocal) {
             repoDir = repoInfo.url;
-            if (!input.getRev())
+            if (!input.getRev() && !input.getTreeHash())
                 input.attrs.insert_or_assign("rev", GitRepo::openRepo(repoDir)->resolveRef(ref).gitRev());
         } else {
             Path cacheDir = getCachePath(repoInfo.url, getShallowAttr(input));
@@ -532,10 +537,14 @@ struct GitInputScheme : InputScheme
             bool doFetch;
             time_t now = time(0);
 
-            /* If a rev was specified, we need to fetch if it's not in the
-               repo. */
-            if (auto rev = input.getRev()) {
-                doFetch = !repo->hasObject(*rev);
+            /* If a rev / tree hash was specified, we need to fetch if
+               it's not in the repo. */
+
+            auto obj = input.getRev();
+            if (!obj) obj = input.getTreeHash();
+
+            if (obj) {
+                doFetch = !repo->hasObject(*obj);
             } else {
                 if (getAllRefsAttr(input)) {
                     doFetch = true;
@@ -574,14 +583,16 @@ struct GitInputScheme : InputScheme
                     warn("could not update cached head '%s' for '%s'", ref, repoInfo.url);
             }
 
-            if (auto rev = input.getRev()) {
-                if (!repo->hasObject(*rev))
+            if (obj) {
+                if (!repo->hasObject(*obj))
                     throw Error(
-                        "Cannot find Git revision '%s' in ref '%s' of repository '%s'! "
-                        "Please make sure that the " ANSI_BOLD "rev" ANSI_NORMAL " exists on the "
+                        "Cannot find Git revision or tree hash '%s' in ref '%s' of repository '%s'! "
+                        "Please make sure that the "
+                        ANSI_BOLD "rev" ANSI_NORMAL " or "
+                        ANSI_BOLD "treeHash" ANSI_NORMAL " exists on the "
                         ANSI_BOLD "ref" ANSI_NORMAL " you've specified or add " ANSI_BOLD
                         "allRefs = true;" ANSI_NORMAL " to " ANSI_BOLD "fetchGit" ANSI_NORMAL ".",
-                        rev->gitRev(),
+                        obj->gitRev(),
                         ref,
                         repoInfo.url
                         );
@@ -598,27 +609,46 @@ struct GitInputScheme : InputScheme
         if (isShallow && !getShallowAttr(input))
             throw Error("'%s' is a shallow Git repository, but shallow repositories are only allowed when `shallow = true;` is specified", repoInfo.url);
 
-        // FIXME: check whether rev is an ancestor of ref?
+        // FIXME: check whether rev (or some rev with treeHash) is an
+        // ancestor of ref?
 
-        auto rev = *input.getRev();
+        Attrs infoAttrs;
 
-        auto gotTreeHash = repo->getPlainAccessor(rev)->getTreeHash();
+        auto [fetchHash, fetchHashType] = input.getTreeHash()
+            ? (std::pair { input.getTreeHash().value(), true })
+            : (std::pair { input.getRev().value(), false });
 
-        Attrs infoAttrs({
-            {"rev", rev.gitRev()},
-            {"lastModified", getLastModified(repoInfo, repoDir, rev)},
-        });
+        auto gotTreeHash = repo->getPlainAccessor(fetchHash)->getTreeHash();
 
-        if (!getShallowAttr(input))
-            infoAttrs.insert_or_assign("revCount",
-                getRevCount(repoInfo, repoDir, rev));
+        if (auto optH = input.getTreeHash()) {
+            auto h = *std::move(optH);
+            infoAttrs.insert_or_assign("treeHash", h.gitRev());
+            /* if a tree hash was specified, ensure that it matches.
+               Assert because it shouldn't be possible for this to fail.
+             */
+            assert(h == gotTreeHash);
+        }
 
-        printTalkative("using revision %s of repo '%s'", rev.gitRev(), repoInfo.url);
+        if (auto optH = input.getRev()) {
+            auto rev = *std::move(optH);
+            infoAttrs.insert_or_assign("rev", rev.gitRev());
+            infoAttrs.insert_or_assign("lastModified",
+                getLastModified(repoInfo, repoDir, rev));
+            if (!getShallowAttr(input))
+                infoAttrs.insert_or_assign("revCount",
+                    getRevCount(repoInfo, repoDir, rev));
+        }
+
+        printTalkative(
+            "using %s %s of repo '%s'",
+            fetchHashType ? "tree hash" : "revision",
+            fetchHash.gitRev(),
+            repoInfo.url);
 
         verifyCommit(input, repo);
 
         bool exportIgnore = getExportIgnoreAttr(input);
-        auto accessor = repo->getAccessor(rev, exportIgnore);
+        auto accessor = repo->getAccessor(fetchHash, exportIgnore);
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 
@@ -628,7 +658,7 @@ struct GitInputScheme : InputScheme
         if (getSubmodulesAttr(input)) {
             std::map<CanonPath, nix::ref<InputAccessor>> mounts;
 
-            for (auto & [submodule, submoduleRev] : repo->getSubmodules(rev, exportIgnore)) {
+            for (auto & [submodule, submoduleRev] : repo->getSubmodules(fetchHash, exportIgnore)) {
                 auto resolved = repo->resolveSubmoduleUrl(submodule.url, repoInfo.url);
                 debug("Git submodule %s: %s %s %s -> %s",
                     submodule.path, submodule.url, submodule.branch, submoduleRev.gitRev(), resolved);
@@ -656,10 +686,12 @@ struct GitInputScheme : InputScheme
                 input.attrs.insert_or_assign("treeHash", gotTreeHash.gitRev());
         }
 
-        assert(!origRev || origRev == rev);
-        if (!getShallowAttr(input))
+
+        assert(!origRev || origRev == fetchHash);
+        if (!getShallowAttr(input) && input.getRev())
             input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
-        input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
+        if (input.getRev())
+            input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
 
         return {accessor, std::move(input)};
     }
@@ -765,7 +797,7 @@ struct GitInputScheme : InputScheme
         }
 
         auto [accessor, final] =
-            input.getRef() || input.getRev() || !repoInfo.isLocal
+            input.getRef() || input.getRev() || input.getTreeHash() || !repoInfo.isLocal
             ? getAccessorFromCommit(store, repoInfo, std::move(input))
             : getAccessorFromWorkdir(store, repoInfo, std::move(input));
 
@@ -774,15 +806,22 @@ struct GitInputScheme : InputScheme
 
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
     {
+        auto rest = [&]() {
+            return std::string { getSubmodulesAttr(input) ? ";s" : "" }
+                + (getExportIgnoreAttr(input) ? ";e" : "");
+        };
+
         if (auto rev = input.getRev())
-            return rev->gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "");
+            return rev->gitRev() + rest();
+        else if (auto rev = input.getTreeHash())
+            return rev->gitRev() + ";t" + rest();
         else
             return std::nullopt;
     }
 
     bool isLocked(const Input & input) const override
     {
-        return (bool) input.getRev();
+        return (bool) input.getRev() || (bool) input.getTreeHash();
     }
 };
 

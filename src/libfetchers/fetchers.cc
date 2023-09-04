@@ -301,14 +301,19 @@ std::string Input::getName() const
 
 StorePath Input::computeStorePath(Store & store) const
 {
-    auto narHash = getNarHash();
-    if (!narHash)
-        throw Error("cannot compute store path for unlocked input '%s'", to_string());
-    return store.makeFixedOutputPath(getName(), FixedOutputInfo {
-        .method = FileIngestionMethod::Recursive,
-        .hash = *narHash,
-        .references = {},
-    });
+    if (auto treeHash = getTreeHash())
+        return store.makeFixedOutputPath(getName(), FixedOutputInfo {
+            .method = FileIngestionMethod::Git,
+            .hash = *treeHash,
+            .references = {},
+        });
+    if (auto narHash = getNarHash())
+        return store.makeFixedOutputPath(getName(), FixedOutputInfo {
+            .method = FileIngestionMethod::Recursive,
+            .hash = *narHash,
+            .references = {},
+        });
+    throw Error("cannot compute store path for unlocked input '%s'", to_string());
 }
 
 std::string Input::getType() const
@@ -349,6 +354,15 @@ std::optional<Hash> Input::getRev() const
     }
 
     return hash;
+}
+
+std::optional<Hash> Input::getTreeHash() const
+{
+    if (auto s = maybeGetStrAttr(attrs, "treeHash")) {
+        experimentalFeatureSettings.require(Xp::GitHashing);
+        return Hash::parseAny(*s, HashAlgorithm::SHA1);
+    }
+    return {};
 }
 
 std::optional<uint64_t> Input::getRevCount() const

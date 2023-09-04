@@ -1,5 +1,6 @@
 git-hashing-tests := \
-  $(d)/simple.sh
+  $(d)/simple.sh \
+  $(d)/fetching.sh
 
 install-tests-groups += git-hashing
 
