@@ -91,9 +91,9 @@ rec {
 
   e = mkDerivation {
     name = "multiple-outputs-e";
-    outputs = [ "a" "b" "c" ];
-    meta.outputsToInstall = [ "a" "b" ];
-    buildCommand = "mkdir $a $b $c";
+    outputs = [ "a_a" "b" "c" ];
+    meta.outputsToInstall = [ "a_a" "b" ];
+    buildCommand = "mkdir $a_a $b $c";
   };
 
   independent = mkDerivation {
@@ -115,6 +115,16 @@ rec {
       ''
         cat $first/file $second/file >$out
       '';
+  };
+
+  invalid-output-name-1 = mkDerivation {
+    name = "invalid-output-name-1";
+    outputs = [ "out/"];
+  };
+
+  invalid-output-name-2 = mkDerivation {
+    name = "invalid-output-name-2";
+    outputs = [ "x" "foo$"];
   };
 
 }

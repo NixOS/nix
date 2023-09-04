@@ -1,8 +1,10 @@
-#include "util.hh"
-#include "outputs-spec.hh"
-#include "nlohmann/json.hpp"
-
 #include <regex>
+#include <nlohmann/json.hpp>
+
+#include "util.hh"
+#include "regex-combinators.hh"
+#include "outputs-spec.hh"
+#include "path-regex.hh"
 
 namespace nix {
 
@@ -18,10 +20,14 @@ bool OutputsSpec::contains(const std::string & outputName) const
     }, raw());
 }
 
+static std::string outputSpecRegexStr =
+    regex::either(
+        regex::group(R"(\*)"),
+        regex::group(regex::list(nameRegexStr)));
 
 std::optional<OutputsSpec> OutputsSpec::parseOpt(std::string_view s)
 {
-    static std::regex regex(R"((\*)|([a-z]+(,[a-z]+)*))");
+    static std::regex regex(std::string { outputSpecRegexStr });
 
     std::smatch match;
     std::string s2 { s }; // until some improves std::regex
@@ -42,7 +48,7 @@ OutputsSpec OutputsSpec::parse(std::string_view s)
 {
     std::optional spec = parseOpt(s);
     if (!spec)
-        throw Error("Invalid outputs specifier: '%s'", s);
+        throw Error("invalid outputs specifier '%s'", s);
     return *spec;
 }
 
@@ -65,7 +71,7 @@ std::pair<std::string_view, ExtendedOutputsSpec> ExtendedOutputsSpec::parse(std:
 {
     std::optional spec = parseOpt(s);
     if (!spec)
-        throw Error("Invalid extended outputs specifier: '%s'", s);
+        throw Error("invalid extended outputs specifier '%s'", s);
     return *spec;
 }
 
@@ -163,7 +169,7 @@ void adl_serializer<OutputsSpec>::to_json(json & json, OutputsSpec t) {
         [&](const OutputsSpec::Names & names) {
             json = names;
         },
-    }, t);
+    }, t.raw());
 }
 
 
@@ -183,7 +189,7 @@ void adl_serializer<ExtendedOutputsSpec>::to_json(json & json, ExtendedOutputsSp
         [&](const ExtendedOutputsSpec::Explicit & e) {
             adl_serializer<OutputsSpec>::to_json(json, e);
         },
-    }, t);
+    }, t.raw());
 }
 
 }

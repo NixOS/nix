@@ -10,6 +10,8 @@
 
 namespace nix {
 
+class Store;
+
 struct DrvOutput {
     // The hash modulo of the derivation
     Hash drvHash;
