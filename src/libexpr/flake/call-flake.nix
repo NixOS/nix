@@ -12,13 +12,15 @@ let
     builtins.mapAttrs
       (key: node:
         let
+          # Flakes should be interchangeable regardless of whether they're at the root, so use with care.
+          isRoot = key == lockFile.root;
 
           sourceInfo =
-            if key == lockFile.root
+            if isRoot
             then rootSrc
             else fetchTree (node.info or {} // removeAttrs node.locked ["dir"]);
 
-          subdir = if key == lockFile.root then rootSubdir else node.locked.dir or "";
+          subdir = if isRoot then rootSubdir else node.locked.dir or "";
 
           outPath = sourceInfo + ((if subdir == "" then "" else "/") + subdir);
 
