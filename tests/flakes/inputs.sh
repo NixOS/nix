@@ -13,11 +13,11 @@ test_subdir_self_path() {
     echo all good > $flakeDir/message
     cat > $flakeDir/flake.nix <<EOF
 {
-  outputs = inputs: rec {
+  outputs = args: rec {
     packages.$system = rec {
       default =
         assert builtins.readFile ./message == "all good\n";
-        assert builtins.readFile (inputs.self + "/message") == "all good\n";
+        assert builtins.readFile (args.self + "/message") == "all good\n";
         import ./simple.nix;
     };
   };
@@ -37,8 +37,8 @@ test_extraAttributes_outPath_fail_safe() {
 
     cat > $flakeDir/flake.nix <<"EOF"
 {
-  outputs = inputs:
-    throw "can't evaluate self, because outputs fails to return any attribute names, but I know I can be identified as ${toString inputs.meta.extraAttributes.outPath}/flake.nix}";
+  outputs = args:
+    throw "can't evaluate self, because outputs fails to return any attribute names, but I know I can be identified as ${toString args.meta.extraAttributes.outPath}/flake.nix}";
 }
 EOF
     (
@@ -59,17 +59,17 @@ test_git_subdir_self_path() {
     echo all good > $flakeDir/message
     cat > $flakeDir/flake.nix <<EOF
 {
-  outputs = inputs: rec {
+  outputs = args: rec {
     packages.$system = rec {
       default =
         assert builtins.readFile ./message == "all good\n";
-        assert builtins.readFile (inputs.self + "/message") == "all good\n";
-        assert inputs.self.outPath == inputs.self.sourceInfo.outPath + "/b-low";
-        assert inputs.meta.extraArguments.self == inputs.self;
-        assert inputs.meta.extraAttributes.outPath == inputs.self.outPath;
-        assert inputs.meta.sourceInfo.outPath + "/b-low" == inputs.self.outPath;
-        assert inputs.meta.sourceInfo.outPath == inputs.self.sourceInfo.outPath;
-        assert inputs.meta.subdir == "b-low";
+        assert builtins.readFile (args.self + "/message") == "all good\n";
+        assert args.self.outPath == args.self.sourceInfo.outPath + "/b-low";
+        assert args.meta.extraArguments.self == args.self;
+        assert args.meta.extraAttributes.outPath == args.self.outPath;
+        assert args.meta.sourceInfo.outPath + "/b-low" == args.self.outPath;
+        assert args.meta.sourceInfo.outPath == args.self.sourceInfo.outPath;
+        assert args.meta.subdir == "b-low";
         import ./simple.nix;
     };
   };
@@ -92,10 +92,10 @@ EOF
     dir = "b-low";
   };
 
-  outputs = inputs: rec {
+  outputs = args: rec {
     packages =
-      assert inputs.inp.outPath == inputs.inp.sourceInfo.outPath + "/b-low";
-      inputs.inp.packages;
+      assert args.inp.outPath == args.inp.sourceInfo.outPath + "/b-low";
+      args.inp.packages;
   };
 }
 EOF
@@ -114,17 +114,17 @@ test_git_root_self_path() {
     echo all good > $flakeDir/message
     cat > $flakeDir/flake.nix <<EOF
 {
-  outputs = inputs: rec {
+  outputs = args: rec {
     packages.$system = rec {
       default =
         assert builtins.readFile ./message == "all good\n";
-        assert builtins.readFile (inputs.self + "/message") == "all good\n";
-        assert inputs.self.outPath == inputs.self.sourceInfo.outPath;
-        assert inputs.meta.extraArguments.self == inputs.self;
-        assert inputs.meta.extraAttributes.outPath == inputs.self.outPath;
-        assert inputs.meta.sourceInfo.outPath == inputs.self.outPath;
-        assert inputs.meta.sourceInfo.outPath == inputs.self.sourceInfo.outPath;
-        assert inputs.meta.subdir == "";
+        assert builtins.readFile (args.self + "/message") == "all good\n";
+        assert args.self.outPath == args.self.sourceInfo.outPath;
+        assert args.meta.extraArguments.self == args.self;
+        assert args.meta.extraAttributes.outPath == args.self.outPath;
+        assert args.meta.sourceInfo.outPath == args.self.outPath;
+        assert args.meta.sourceInfo.outPath == args.self.sourceInfo.outPath;
+        assert args.meta.subdir == "";
         import ./simple.nix;
     };
   };
@@ -146,10 +146,10 @@ EOF
     url = "file://$repoDir";
   };
 
-  outputs = inputs: rec {
+  outputs = args: rec {
     packages =
-      assert inputs.inp.outPath == inputs.inp.sourceInfo.outPath;
-      inputs.inp.packages;
+      assert args.inp.outPath == args.inp.sourceInfo.outPath;
+      args.inp.packages;
   };
 }
 EOF

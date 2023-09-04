@@ -246,20 +246,20 @@ cat > $flake3Dir/flake.nix <<EOF
 
   description = "Fnord";
 
-  outputs = inputs: rec {
-    packages.$system.xyzzy = inputs.flake2.packages.$system.bar;
-    packages.$system.sth = inputs.flake1.packages.$system.foo;
+  outputs = args: rec {
+    packages.$system.xyzzy = args.flake2.packages.$system.bar;
+    packages.$system.sth = args.flake1.packages.$system.foo;
     packages.$system.fnord =
       with import ./config.nix;
       mkDerivation {
         inherit system;
         name = "fnord";
         dummy = builtins.readFile (builtins.path { name = "source"; path = ./.; filter = path: type: baseNameOf path == "config.nix"; } + "/config.nix");
-        dummy2 = builtins.readFile (builtins.path { name = "source"; path = inputs.flake1; filter = path: type: baseNameOf path == "simple.nix"; } + "/simple.nix");
+        dummy2 = builtins.readFile (builtins.path { name = "source"; path = args.flake1; filter = path: type: baseNameOf path == "simple.nix"; } + "/simple.nix");
         buildCommand = ''
-          cat \${inputs.nonFlake}/README.md > \$out
-          [[ \$(cat \${inputs.nonFlake}/README.md) = \$(cat \${inputs.nonFlakeFile}) ]]
-          [[ \${inputs.nonFlakeFile} = \${inputs.nonFlakeFile2} ]]
+          cat \${args.nonFlake}/README.md > \$out
+          [[ \$(cat \${args.nonFlake}/README.md) = \$(cat \${args.nonFlakeFile}) ]]
+          [[ \${args.nonFlakeFile} = \${args.nonFlakeFile2} ]]
         '';
       };
   };

@@ -8,7 +8,7 @@ writeSimpleFlake() {
 {
   description = "Bla bla";
 
-  outputs = inputs: rec {
+  outputs = args: rec {
     packages.$system = rec {
       foo = import ./simple.nix;
       default = foo;
