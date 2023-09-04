@@ -45,6 +45,15 @@ struct PluginFilesSetting : public BaseSetting<Paths>
     void set(const std::string & str, bool append = false) override;
 };
 
+class MissingExperimentalFeature: public Error
+{
+public:
+    std::string missingFeature;
+
+    MissingExperimentalFeature(std::string feature);
+    virtual const char* sname() const override { return "MissingExperimentalFeature"; }
+};
+
 class Settings : public Config {
 
     unsigned int getDefaultCores();
@@ -632,7 +641,7 @@ public:
           is `root`.
 
           > **Warning**
-          > 
+          >
           > Adding a user to `trusted-users` is essentially equivalent to
           > giving that user root access to the system. For example, the user
           > can set `sandbox-paths` and thereby obtain read access to
@@ -722,13 +731,13 @@ public:
           The program executes with no arguments. The program's environment
           contains the following environment variables:
 
-            - `DRV_PATH`  
+            - `DRV_PATH`
               The derivation for the built paths.
 
               Example:
               `/nix/store/5nihn1a7pa8b25l9zafqaqibznlvvp3f-bash-4.4-p23.drv`
 
-            - `OUT_PATHS`  
+            - `OUT_PATHS`
               Output paths of the built derivation, separated by a space
               character.
 
@@ -759,7 +768,7 @@ public:
           documentation](https://ec.haxx.se/usingcurl-netrc.html).
 
           > **Note**
-          > 
+          >
           > This must be an absolute path, and `~` is not resolved. For
           > example, `~/.netrc` won't resolve to your home directory's
           > `.netrc`.

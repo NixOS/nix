@@ -914,6 +914,10 @@ static void opServe(Strings opFlags, Strings opArgs)
 
                 if (GET_PROTOCOL_MINOR(clientVersion) >= 3)
                     out << status.timesBuilt << status.isNonDeterministic << status.startTime << status.stopTime;
+                if (GET_PROTOCOL_MINOR(clientVersion >= 5)) {
+                    worker_proto::write(*store, out, status.builtOutputs);
+                }
+
 
                 break;
             }

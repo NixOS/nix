@@ -946,7 +946,7 @@ void killUser(uid_t uid)
 #else
             if (kill(-1, SIGKILL) == 0) break;
 #endif
-            if (errno == ESRCH) break; /* no more processes */
+            if (errno == ESRCH || errno == EPERM) break; /* no more processes */
             if (errno != EINTR)
                 throw SysError("cannot kill processes for uid '%1%'", uid);
         }

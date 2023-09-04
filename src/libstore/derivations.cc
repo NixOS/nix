@@ -57,6 +57,17 @@ bool derivationIsFixed(DerivationType dt) {
     assert(false);
 }
 
+bool derivationHasKnownOutputPaths(DerivationType dt) {
+    switch (dt) {
+    case DerivationType::InputAddressed: return true;
+    case DerivationType::CAFixed: return true;
+    case DerivationType::CAFloating: return false;
+    case DerivationType::DeferredInputAddressed: return false;
+    };
+    assert(false);
+}
+
+
 bool derivationIsImpure(DerivationType dt) {
     switch (dt) {
     case DerivationType::InputAddressed: return false;

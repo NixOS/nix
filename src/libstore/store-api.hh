@@ -162,6 +162,8 @@ struct BuildResult
        non-determinism.) */
     bool isNonDeterministic = false;
 
+    DrvOutputs builtOutputs;
+
     /* The start/stop times of the build (or one of the rounds, if it
        was repeated). */
     time_t startTime = 0, stopTime = 0;
@@ -762,19 +764,16 @@ void copyStorePath(ref<Store> srcStore, ref<Store> dstStore,
    of store paths is not automatically closed; use copyClosure() for
    that. */
 void copyPaths(ref<Store> srcStore, ref<Store> dstStore,
+    const RealisedPath::Set &,
+    RepairFlag repair = NoRepair,
+    CheckSigsFlag checkSigs = CheckSigs,
+    SubstituteFlag substitute = NoSubstitute);
+void copyPaths(ref<Store> srcStore, ref<Store> dstStore,
     const std::set<OwnedStorePathOrDesc> & storePaths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
 void copyPaths(ref<Store> srcStore, ref<Store> dstStore,
-    const StorePathSet & storePaths,
-    RepairFlag repair = NoRepair,
-    CheckSigsFlag checkSigs = CheckSigs,
-    SubstituteFlag substitute = NoSubstitute);
-
-
-/* Copy the closure of the specified paths from one store to another. */
-void copyClosure(ref<Store> srcStore, ref<Store> dstStore,
     const StorePathSet & storePaths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,

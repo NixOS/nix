@@ -36,6 +36,8 @@ struct Realisation {
     GENERATE_CMP(Realisation, me->id, me->outPath);
 };
 
+typedef std::map<DrvOutput, Realisation> DrvOutputs;
+
 struct OpaquePath {
     StorePath path;
 

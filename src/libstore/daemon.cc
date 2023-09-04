@@ -581,6 +581,9 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto res = store->buildDerivation(drvPath, drv, buildMode);
         logger->stopWork();
         to << res.status << res.errorMsg;
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 0xc) {
+            worker_proto::write(*store, to, res.builtOutputs);
+        }
         break;
     }
 
