@@ -184,7 +184,7 @@ protected:
 
     friend struct ConnectionHandle;
 
-    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override;
+    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override;
 
     virtual void narFromPath(const StorePath & path, Sink & sink) override;
 

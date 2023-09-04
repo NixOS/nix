@@ -147,7 +147,7 @@ public:
 
     void narFromPath(const StorePath & path, Sink & sink) override;
 
-    ref<SourceAccessor> getFSAccessor(bool requireValidPath) override;
+    ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override;
 
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 

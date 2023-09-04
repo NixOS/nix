@@ -13,6 +13,7 @@
 #include "archive.hh"
 #include "derivations.hh"
 #include "args.hh"
+#include "git.hh"
 
 namespace nix::daemon {
 
@@ -443,13 +444,17 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                     TeeSource savedNARSource(from, saved);
                     NullFileSystemObjectSink sink; /* just parse the NAR */
                     parseDump(sink, savedNARSource);
-                } else {
+                } else if (method == FileIngestionMethod::Flat) {
                     /* Incrementally parse the NAR file, stripping the
                        metadata, and streaming the sole file we expect into
                        `saved`. */
                     RegularFileSink savedRegular { saved };
                     parseDump(savedRegular, from);
                     if (!savedRegular.regular) throw Error("regular file expected");
+                } else {
+                    /* Should have validated above that no other file ingestion
+                       method was used. */
+                    assert(false);
                 }
             });
             logger->startWork();

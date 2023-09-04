@@ -1138,7 +1138,10 @@ drvName, Bindings * attrs, Value & v)
         auto handleHashMode = [&](const std::string_view s) {
             if (s == "recursive") ingestionMethod = FileIngestionMethod::Recursive;
             else if (s == "flat") ingestionMethod = FileIngestionMethod::Flat;
-            else if (s == "text") {
+            else if (s == "git") {
+                experimentalFeatureSettings.require(Xp::GitHashing);
+                ingestionMethod = FileIngestionMethod::Git;
+            } else if (s == "text") {
                 experimentalFeatureSettings.require(Xp::DynamicDerivations);
                 ingestionMethod = TextIngestionMethod {};
             } else

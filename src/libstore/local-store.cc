@@ -1,5 +1,6 @@
 #include "local-store.hh"
 #include "globals.hh"
+#include "git.hh"
 #include "archive.hh"
 #include "pathlocks.hh"
 #include "worker-protocol.hh"
@@ -1097,19 +1098,29 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
             if (info.ca) {
                 auto & specified = *info.ca;
                 auto actualHash = ({
-                    HashModuloSink caSink {
-                        specified.hash.algo,
-                        std::string { info.path.hashPart() },
-                    };
-                    PosixSourceAccessor accessor;
-                    dumpPath(
-                        *getFSAccessor(false),
-                        CanonPath { printStorePath(info.path) },
-                        caSink,
-                        specified.method.getFileIngestionMethod());
+                    auto accessor = getFSAccessor(false);
+                    CanonPath path { printStorePath(info.path) };
+                    Hash h { HashAlgorithm::SHA256 }; // throwaway def to appease C++
+                    auto fim = specified.method.getFileIngestionMethod();
+                    switch (fim) {
+                    case FileIngestionMethod::Flat:
+                    case FileIngestionMethod::Recursive:
+                    {
+                        HashModuloSink caSink {
+                            specified.hash.algo,
+                            std::string { info.path.hashPart() },
+                        };
+                        dumpPath(*accessor, path, caSink, (FileSerialisationMethod) fim);
+                        h = caSink.finish().first;
+                        break;
+                    }
+                    case FileIngestionMethod::Git:
+                        h = git::dumpHash(specified.hash.algo, *accessor, path).hash;
+                        break;
+                    }
                     ContentAddress {
                         .method = specified.method,
-                        .hash = caSink.finish().first,
+                        .hash = std::move(h),
                     };
                 });
                 if (specified.hash != actualHash.hash) {
@@ -1199,7 +1210,30 @@ StorePath LocalStore::addToStoreFromDump(
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir + "/x";
 
-        restorePath(tempPath, bothSource, method.getFileIngestionMethod());
+        auto fim = method.getFileIngestionMethod();
+        switch (fim) {
+        case FileIngestionMethod::Flat:
+        case FileIngestionMethod::Recursive:
+            restorePath(tempPath, bothSource, (FileSerialisationMethod) fim);
+            break;
+        case FileIngestionMethod::Git: {
+            RestoreSink sink;
+            sink.dstPath = tempPath;
+            auto accessor = getFSAccessor();
+            git::restore(sink, bothSource, [&](Hash childHash) {
+                return std::pair<SourceAccessor *, CanonPath> {
+                    &*accessor,
+                    CanonPath {
+                        printStorePath(this->makeFixedOutputPath("git", FixedOutputInfo {
+                            .method = FileIngestionMethod::Git,
+                            .hash = childHash,
+                        }))
+                    },
+                };
+            });
+            break;
+        }
+        }
 
         dumpBuffer.reset();
         dump = {};
@@ -1238,7 +1272,30 @@ StorePath LocalStore::addToStoreFromDump(
             if (inMemory) {
                 StringSource dumpSource { dump };
                 /* Restore from the buffer in memory. */
-                restorePath(realPath, dumpSource, method.getFileIngestionMethod());
+                auto fim = method.getFileIngestionMethod();
+                switch (fim) {
+                case FileIngestionMethod::Flat:
+                case FileIngestionMethod::Recursive:
+                    restorePath(realPath, dumpSource, (FileSerialisationMethod) fim);
+                    break;
+                case FileIngestionMethod::Git: {
+                    RestoreSink sink;
+                    sink.dstPath = realPath;
+                    auto accessor = getFSAccessor();
+                    git::restore(sink, dumpSource, [&](Hash childHash) {
+                        return std::pair<SourceAccessor *, CanonPath> {
+                            &*accessor,
+                            CanonPath {
+                                printStorePath(this->makeFixedOutputPath("git", FixedOutputInfo {
+                                    .method = FileIngestionMethod::Git,
+                                    .hash = childHash,
+                                }))
+                            },
+                        };
+                    });
+                    break;
+                }
+                }
             } else {
                 /* Move the temporary path we restored above. */
                 moveFile(tempPath, realPath);
@@ -1367,7 +1424,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
             PosixSourceAccessor accessor;
             std::string hash = hashPath(
                 accessor, CanonPath { linkPath },
-                FileIngestionMethod::Recursive, HashAlgorithm::SHA256).first.to_string(HashFormat::Nix32, false);
+                FileIngestionMethod::Recursive, HashAlgorithm::SHA256).to_string(HashFormat::Nix32, false);
             if (hash != link.name) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
                     linkPath, link.name, hash);

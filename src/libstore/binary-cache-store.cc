@@ -324,11 +324,16 @@ StorePath BinaryCacheStore::addToStoreFromDump(
             nar = dump2.s;
             break;
         case FileIngestionMethod::Flat:
+        {
             // The dump is Flat, so we need to convert it to NAR with a
             // single file.
             StringSink s;
             dumpString(dump2.s, s);
             nar = std::move(s.s);
+            break;
+        }
+        case FileIngestionMethod::Git:
+            unsupported("addToStoreFromDump");
             break;
         }
     } else {
@@ -450,7 +455,7 @@ StorePath BinaryCacheStore::addToStore(
        non-recursive+sha256 so we can just use the default
        implementation of this method in terms of addToStoreFromDump. */
 
-    auto h = hashPath(accessor, path, method.getFileIngestionMethod(), hashAlgo, filter).first;
+    auto h = hashPath(accessor, path, method.getFileIngestionMethod(), hashAlgo, filter);
 
     auto source = sinkToSource([&](Sink & sink) {
         accessor.dumpPath(path, sink, filter);

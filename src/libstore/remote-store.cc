@@ -13,6 +13,7 @@
 #include "derivations.hh"
 #include "pool.hh"
 #include "finally.hh"
+#include "git.hh"
 #include "logging.hh"
 #include "callback.hh"
 #include "filetransfer.hh"

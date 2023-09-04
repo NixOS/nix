@@ -11,6 +11,9 @@ std::string_view makeFileIngestionPrefix(FileIngestionMethod m)
         return "";
     case FileIngestionMethod::Recursive:
         return "r:";
+    case FileIngestionMethod::Git:
+        experimentalFeatureSettings.require(Xp::GitHashing);
+        return "git:";
     default:
         throw Error("impossible, caught both cases");
     }
@@ -50,6 +53,10 @@ ContentAddressMethod ContentAddressMethod::parsePrefix(std::string_view & m)
 {
     if (splitPrefix(m, "r:")) {
         return FileIngestionMethod::Recursive;
+    }
+    else if (splitPrefix(m, "git:")) {
+        experimentalFeatureSettings.require(Xp::GitHashing);
+        return FileIngestionMethod::Git;
     }
     else if (splitPrefix(m, "text:")) {
         return TextIngestionMethod {};
@@ -131,6 +138,10 @@ static std::pair<ContentAddressMethod, HashAlgorithm> parseContentAddressMethodP
         auto method = FileIngestionMethod::Flat;
         if (splitPrefix(rest, "r:"))
             method = FileIngestionMethod::Recursive;
+        else if (splitPrefix(rest, "git:")) {
+            experimentalFeatureSettings.require(Xp::GitHashing);
+            method = FileIngestionMethod::Git;
+        }
         HashAlgorithm hashAlgo = parseHashAlgorithm_();
         return {
             std::move(method),

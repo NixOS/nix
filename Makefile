@@ -42,6 +42,7 @@ ifeq ($(ENABLE_FUNCTIONAL_TESTS), yes)
 makefiles += \
   tests/functional/local.mk \
   tests/functional/ca/local.mk \
+  tests/functional/git-hashing/local.mk \
   tests/functional/dyn-drv/local.mk \
   tests/functional/test-libstoreconsumer/local.mk \
   tests/functional/plugins/local.mk
