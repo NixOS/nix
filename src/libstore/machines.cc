@@ -16,13 +16,18 @@ Machine::Machine(decltype(storeUri) storeUri,
     decltype(mandatoryFeatures) mandatoryFeatures,
     decltype(sshPublicHostKey) sshPublicHostKey) :
     storeUri(
-        // Backwards compatibility: if the URI is a hostname,
-        // prepend ssh://.
+        // Backwards compatibility: if the URI is schemeless, is not a path,
+        // and is not one of the special store connection words, prepend
+        // ssh://.
         storeUri.find("://") != std::string::npos
-        || hasPrefix(storeUri, "local")
-        || hasPrefix(storeUri, "remote")
-        || hasPrefix(storeUri, "auto")
-        || hasPrefix(storeUri, "/")
+        || storeUri.find("/") != std::string::npos
+        || storeUri == "auto"
+        || storeUri == "daemon"
+        || storeUri == "local"
+        || hasPrefix(storeUri, "auto?")
+        || hasPrefix(storeUri, "daemon?")
+        || hasPrefix(storeUri, "local?")
+        || hasPrefix(storeUri, "?")
         ? storeUri
         : "ssh://" + storeUri),
     systemTypes(systemTypes),

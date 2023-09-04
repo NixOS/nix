@@ -76,6 +76,8 @@ struct PathSubstitutionGoal : public Goal
     /* Callback used by the worker to write to the log. */
     void handleChildOutput(int fd, const string & data) override;
     void handleEOF(int fd) override;
+
+    void cleanup() override;
 };
 
 }

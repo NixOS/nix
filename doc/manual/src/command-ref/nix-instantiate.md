@@ -29,26 +29,26 @@ standard input.
 
 # Options
 
-  - `--add-root` *path*  
+  - `--add-root` *path*\
     See the [corresponding option](nix-store.md) in `nix-store`.
 
-  - `--parse`  
+  - `--parse`\
     Just parse the input files, and print their abstract syntax trees on
     standard output in ATerm format.
 
-  - `--eval`  
+  - `--eval`\
     Just parse and evaluate the input files, and print the resulting
     values on standard output. No instantiation of store derivations
     takes place.
 
-  - `--find-file`  
+  - `--find-file`\
     Look up the given files in Nix’s search path (as specified by the
     `NIX_PATH` environment variable). If found, print the corresponding
     absolute paths on standard output. For instance, if `NIX_PATH` is
     `nixpkgs=/home/alice/nixpkgs`, then `nix-instantiate --find-file
     nixpkgs/default.nix` will print `/home/alice/nixpkgs/default.nix`.
 
-  - `--strict`  
+  - `--strict`\
     When used with `--eval`, recursively evaluate list elements and
     attributes. Normally, such sub-expressions are left unevaluated
     (since the Nix expression language is lazy).
@@ -58,17 +58,17 @@ standard input.
     > This option can cause non-termination, because lazy data
     > structures can be infinitely large.
 
-  - `--json`  
+  - `--json`\
     When used with `--eval`, print the resulting value as an JSON
     representation of the abstract syntax tree rather than as an ATerm.
 
-  - `--xml`  
+  - `--xml`\
     When used with `--eval`, print the resulting value as an XML
     representation of the abstract syntax tree rather than as an ATerm.
     The schema is the same as that used by the [`toXML`
     built-in](../expressions/builtins.md).
 
-  - `--read-write-mode`  
+  - `--read-write-mode`\
     When used with `--eval`, perform evaluation in read/write mode so
     nix language features that require it will still work (at the cost
     of needing to do instantiation of every evaluated derivation). If

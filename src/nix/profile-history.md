@@ -6,10 +6,10 @@ R""(
 
   ```console
   # nix profile history
-  Version 508 -> 509:
+  Version 508 (2020-04-10):
     flake:nixpkgs#legacyPackages.x86_64-linux.awscli: ∅ -> 1.17.13
 
-  Version 509 -> 510:
+  Version 509 (2020-05-16) <- 508:
     flake:nixpkgs#legacyPackages.x86_64-linux.awscli: 1.17.13 -> 1.18.211
   ```
 

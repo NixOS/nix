@@ -7,17 +7,17 @@ cache mechanism that Nix usually uses to fetch prebuilt binaries from
 
 The following options can be specified as URL parameters to the S3 URL:
 
-  - `profile`  
+  - `profile`\
     The name of the AWS configuration profile to use. By default Nix
     will use the `default` profile.
 
-  - `region`  
+  - `region`\
     The region of the S3 bucket. `us–east-1` by default.
     
     If your bucket is not in `us–east-1`, you should always explicitly
     specify the region parameter.
 
-  - `endpoint`  
+  - `endpoint`\
     The URL to your S3-compatible service, for when not using Amazon S3.
     Do not specify this value if you're using Amazon S3.
     
@@ -26,7 +26,7 @@ The following options can be specified as URL parameters to the S3 URL:
     > This endpoint must support HTTPS and will use path-based
     > addressing instead of virtual host based addressing.
 
-  - `scheme`  
+  - `scheme`\
     The scheme used for S3 requests, `https` (default) or `http`. This
     option allows you to disable HTTPS for binary caches which don't
     support it.

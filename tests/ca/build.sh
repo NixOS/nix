@@ -59,9 +59,17 @@ testNixCommand () {
     nix build --experimental-features 'nix-command ca-derivations' --file ./content-addressed.nix --no-link
 }
 
+# Regression test for https://github.com/NixOS/nix/issues/4775
+testNormalization () {
+    clearStore
+    outPath=$(buildAttr rootCA 1)
+    test "$(stat -c %Y $outPath)" -eq 1
+}
+
 # Disabled until we have it properly working
 # testRemoteCache
 clearStore
+testNormalization
 testDeterministicCA
 clearStore
 testCutoff

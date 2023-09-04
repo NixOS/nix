@@ -28,7 +28,8 @@ build nix from source with nix-build or how to get a development environment.
 - [Nix manual](https://nixos.org/nix/manual)
 - [Nix jobsets on hydra.nixos.org](https://hydra.nixos.org/project/nix)
 - [NixOS Discourse](https://discourse.nixos.org/)
-- [IRC - #nixos on freenode.net](irc://irc.freenode.net/#nixos)
+- [Matrix - #nix:nixos.org](https://matrix.to/#/#nix:nixos.org)
+- [IRC - #nixos on libera.chat](irc://irc.libera.chat/#nixos)
 
 ## License
 

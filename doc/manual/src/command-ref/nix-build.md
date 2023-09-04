@@ -47,16 +47,16 @@ All options not listed here are passed to `nix-store
 --realise`, except for `--arg` and `--attr` / `-A` which are passed to
 `nix-instantiate`.
 
-  - `--no-out-link`  
+  - `--no-out-link`\
     Do not create a symlink to the output path. Note that as a result
     the output does not become a root of the garbage collector, and so
     might be deleted by `nix-store
                     --gc`.
 
-  - `--dry-run`  
+  - `--dry-run`\
     Show what store paths would be built or downloaded.
 
-  - `--out-link` / `-o` *outlink*  
+  - `--out-link` / `-o` *outlink*\
     Change the name of the symlink to the output path created from
     `result` to *outlink*.
 

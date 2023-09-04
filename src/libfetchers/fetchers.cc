@@ -205,11 +205,16 @@ void Input::markChangedFile(
     return scheme->markChangedFile(*this, file, commitMsg);
 }
 
+std::string Input::getName() const
+{
+    return maybeGetStrAttr(attrs, "name").value_or("source");
+}
+
 StorePathDescriptor Input::computeStorePath(Store & store) const
 {
     if (auto treeHash = getTreeHash())
         return StorePathDescriptor {
-            "source",
+            getName(),
             FixedOutputInfo {
                 {
                     .method = FileIngestionMethod::Git,

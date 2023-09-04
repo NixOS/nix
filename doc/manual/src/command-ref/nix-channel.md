@@ -17,26 +17,26 @@ To see the list of official NixOS channels, visit
 
 This command has the following operations:
 
-  - `--add` *url* \[*name*\]  
+  - `--add` *url* \[*name*\]\
     Adds a channel named *name* with URL *url* to the list of subscribed
     channels. If *name* is omitted, it defaults to the last component of
     *url*, with the suffixes `-stable` or `-unstable` removed.
 
-  - `--remove` *name*  
+  - `--remove` *name*\
     Removes the channel named *name* from the list of subscribed
     channels.
 
-  - `--list`  
+  - `--list`\
     Prints the names and URLs of all subscribed channels on standard
     output.
 
-  - `--update` \[*names*…\]  
+  - `--update` \[*names*…\]\
     Downloads the Nix expressions of all subscribed channels (or only
     those included in *names* if specified) and makes them the default
     for `nix-env` operations (by symlinking them from the directory
     `~/.nix-defexpr`).
 
-  - `--rollback` \[*generation*\]  
+  - `--rollback` \[*generation*\]\
     Reverts the previous call to `nix-channel
                     --update`. Optionally, you can specify a specific channel generation
     number to restore.
@@ -70,14 +70,14 @@ $ nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
 
 # Files
 
-  - `/nix/var/nix/profiles/per-user/username/channels`  
+  - `/nix/var/nix/profiles/per-user/username/channels`\
     `nix-channel` uses a `nix-env` profile to keep track of previous
     versions of the subscribed channels. Every time you run `nix-channel
     --update`, a new channel generation (that is, a symlink to the
     channel Nix expressions in the Nix store) is created. This enables
     `nix-channel --rollback` to revert to previous versions.
 
-  - `~/.nix-defexpr/channels`  
+  - `~/.nix-defexpr/channels`\
     This is a symlink to
     `/nix/var/nix/profiles/per-user/username/channels`. It ensures that
     `nix-env` can find your channels. In a multi-user installation, you
@@ -89,7 +89,7 @@ $ nix-instantiate --eval -E '(import <nixpkgs> {}).lib.version'
 A channel URL should point to a directory containing the following
 files:
 
-  - `nixexprs.tar.xz`  
+  - `nixexprs.tar.xz`\
     A tarball containing Nix expressions and files referenced by them
     (such as build scripts and patches). At the top level, the tarball
     should contain a single directory. That directory must contain a

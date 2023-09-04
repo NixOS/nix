@@ -54,7 +54,7 @@ All options not listed here are passed to `nix-store
 --realise`, except for `--arg` and `--attr` / `-A` which are passed to
 `nix-instantiate`.
 
-  - `--command` *cmd*  
+  - `--command` *cmd*\
     In the environment of the derivation, run the shell command *cmd*.
     This command is executed in an interactive shell. (Use `--run` to
     use a non-interactive shell instead.) However, a call to `exit` is
@@ -64,36 +64,34 @@ All options not listed here are passed to `nix-store
     drop you into the interactive shell. This can be useful for doing
     any additional initialisation.
 
-  - `--run` *cmd*  
+  - `--run` *cmd*\
     Like `--command`, but executes the command in a non-interactive
     shell. This means (among other things) that if you hit Ctrl-C while
     the command is running, the shell exits.
 
-  - `--exclude` *regexp*  
+  - `--exclude` *regexp*\
     Do not build any dependencies whose store path matches the regular
     expression *regexp*. This option may be specified multiple times.
 
-  - `--pure`  
+  - `--pure`\
     If this flag is specified, the environment is almost entirely
     cleared before the interactive shell is started, so you get an
     environment that more closely corresponds to the “real” Nix build. A
     few variables, in particular `HOME`, `USER` and `DISPLAY`, are
-    retained. Note that (depending on your Bash
-    installation) `/etc/bashrc` is still sourced, so any variables set
-    there will affect the interactive shell.
+    retained.
 
-  - `--packages` / `-p` *packages*…  
+  - `--packages` / `-p` *packages*…\
     Set up an environment in which the specified packages are present.
     The command line arguments are interpreted as attribute names inside
     the Nix Packages collection. Thus, `nix-shell -p libjpeg openjdk`
     will start a shell in which the packages denoted by the attribute
     names `libjpeg` and `openjdk` are present.
 
-  - `-i` *interpreter*  
+  - `-i` *interpreter*\
     The chained script interpreter to be invoked by `nix-shell`. Only
     applicable in `#!`-scripts (described below).
 
-  - `--keep` *name*  
+  - `--keep` *name*\
     When a `--pure` shell is started, keep the listed environment
     variables.
 
@@ -101,7 +99,7 @@ The following common options are supported:
 
 # Environment variables
 
-  - `NIX_BUILD_SHELL`  
+  - `NIX_BUILD_SHELL`\
     Shell used to start the interactive environment. Defaults to the
     `bash` found in `PATH`.
 

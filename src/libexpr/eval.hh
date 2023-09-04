@@ -94,8 +94,14 @@ public:
 
     Value vEmptySet;
 
+    /* Store used to materialise .drv files. */
     const ref<Store> store;
 
+    /* Store used to build stuff. */
+    const ref<Store> buildStore;
+
+    RootValue vCallFlake = nullptr;
+    RootValue vImportedDrvToDerivation = nullptr;
 
 private:
     SrcToStore srcToStore;
@@ -128,8 +134,17 @@ private:
 
 public:
 
-    EvalState(const Strings & _searchPath, ref<Store> store);
+    EvalState(
+        const Strings & _searchPath,
+        ref<Store> store,
+        std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
+
+    void requireExperimentalFeatureOnEvaluation(
+        const std::string & feature,
+        const std::string_view fName,
+        const Pos & pos
+    );
 
     void addToSearchPath(const string & s);
 
@@ -162,6 +177,14 @@ public:
        form. Optionally enforce that the top-level expression is
        trivial (i.e. doesn't require arbitrary computation). */
     void evalFile(const Path & path, Value & v, bool mustBeTrivial = false);
+
+    /* Like `cacheFile`, but with an already parsed expression. */
+    void cacheFile(
+        const Path & path,
+        const Path & resolvedPath,
+        Expr * e,
+        Value & v,
+        bool mustBeTrivial = false);
 
     void resetFileCache();
 
@@ -217,7 +240,8 @@ public:
        booleans and lists to a string.  If `copyToStore' is set,
        referenced paths are copied to the Nix store as a side effect. */
     string coerceToString(const Pos & pos, Value & v, PathSet & context,
-        bool coerceMore = false, bool copyToStore = true);
+        bool coerceMore = false, bool copyToStore = true,
+        bool canonicalizePath = true);
 
     string copyPathToStore(PathSet & context, const Path & path);
 
@@ -301,7 +325,7 @@ public:
     void mkList(Value & v, size_t length);
     void mkAttrs(Value & v, size_t capacity);
     void mkThunk_(Value & v, Expr * expr);
-    void mkPos(Value & v, Pos * pos);
+    void mkPos(Value & v, ptr<Pos> pos);
 
     void concatLists(Value & v, size_t nrLists, Value * * lists, const Pos & pos);
 
@@ -316,8 +340,10 @@ private:
     unsigned long nrValuesInEnvs = 0;
     unsigned long nrValues = 0;
     unsigned long nrListElems = 0;
+    unsigned long nrLookups = 0;
     unsigned long nrAttrsets = 0;
     unsigned long nrAttrsInAttrsets = 0;
+    unsigned long nrAvoided = 0;
     unsigned long nrOpUpdates = 0;
     unsigned long nrOpUpdateValuesCopied = 0;
     unsigned long nrListConcats = 0;
@@ -339,6 +365,11 @@ private:
 
     friend struct ExprOpUpdate;
     friend struct ExprOpConcatLists;
+    friend struct ExprVar;
+    friend struct ExprString;
+    friend struct ExprInt;
+    friend struct ExprFloat;
+    friend struct ExprPath;
     friend struct ExprSelect;
     friend void prim_getAttr(EvalState & state, const Pos & pos, Value * * args, Value & v);
     friend void prim_match(EvalState & state, const Pos & pos, Value * * args, Value & v);

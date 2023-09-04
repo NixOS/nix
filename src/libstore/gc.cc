@@ -775,7 +775,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         try {
 
-            AutoCloseDir dir(opendir(realStoreDir.c_str()));
+            AutoCloseDir dir(opendir(realStoreDir.get().c_str()));
             if (!dir) throw SysError("opening directory '%1%'", realStoreDir);
 
             /* Read the store and immediately delete all paths that
@@ -856,7 +856,7 @@ void LocalStore::autoGC(bool sync)
             return std::stoll(readFile(*fakeFreeSpaceFile));
 
         struct statvfs st;
-        if (statvfs(realStoreDir.c_str(), &st))
+        if (statvfs(realStoreDir.get().c_str(), &st))
             throw SysError("getting filesystem info about '%s'", realStoreDir);
 
         return (uint64_t) st.f_bavail * st.f_frsize;

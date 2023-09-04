@@ -17,6 +17,24 @@ namespace nix {
         ASSERT_EQ(*o, "this-is-a-test");
     }
 
+    TEST(decompress, decompressNoneCompressed) {
+        auto method = "none";
+        auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
+        ref<std::string> o = decompress(method, str);
+
+        ASSERT_EQ(*o, str);
+    }
+
+    TEST(decompress, decompressEmptyCompressed) {
+        // Empty-method decompression used e.g. by S3 store
+        // (Content-Encoding == "").
+        auto method = "";
+        auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
+        ref<std::string> o = decompress(method, str);
+
+        ASSERT_EQ(*o, str);
+    }
+
     TEST(decompress, decompressXzCompressed) {
         auto method = "xz";
         auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";

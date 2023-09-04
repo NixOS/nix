@@ -41,10 +41,8 @@ handle_network_proxy() {
     fi
 }
 
-poly_validate_assumptions() {
-    if [ "$(uname -s)" != "Linux" ]; then
-        failure "This script is for use with Linux!"
-    fi
+poly_cure_artifacts() {
+    :
 }
 
 poly_service_installed_check() {
@@ -72,7 +70,7 @@ poly_service_setup_note() {
 EOF
 }
 
-poly_extra_try_me_commands(){
+poly_extra_try_me_commands() {
     if [ -e /run/systemd/system ]; then
         :
     else
@@ -81,19 +79,10 @@ poly_extra_try_me_commands(){
 EOF
     fi
 }
-poly_extra_setup_instructions(){
-    if [ -e /run/systemd/system ]; then
-        :
-    else
-        cat <<EOF
-Additionally, you may want to add nix-daemon to your init-system.
-
-EOF
-    fi
-}
 
 poly_configure_nix_daemon_service() {
     if [ -e /run/systemd/system ]; then
+        task "Setting up the nix-daemon systemd service"
         _sudo "to set up the nix-daemon service" \
               systemctl link "/nix/var/nix/profiles/default$SERVICE_SRC"
 
@@ -110,6 +99,8 @@ poly_configure_nix_daemon_service() {
 
         _sudo "to start the nix-daemon.service" \
               systemctl restart nix-daemon.service
+    else
+        reminder "I don't support your init system yet; you may want to add nix-daemon manually."
     fi
 }
 
@@ -206,4 +197,8 @@ poly_create_build_user() {
           --uid "$uid" \
           --password "!" \
           "$username"
+}
+
+poly_prepare_to_install() {
+    :
 }

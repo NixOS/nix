@@ -185,15 +185,15 @@ void printAtPos(const ErrPos & pos, std::ostream & out)
     if (pos) {
         switch (pos.origin) {
             case foFile: {
-                out << fmt(ANSI_BLUE "at " ANSI_YELLOW "%s:%s" ANSI_NORMAL ":", pos.file, showErrPos(pos));
+                out << fmt(ANSI_BLUE "at " ANSI_WARNING "%s:%s" ANSI_NORMAL ":", pos.file, showErrPos(pos));
                 break;
             }
             case foString: {
-                out << fmt(ANSI_BLUE "at " ANSI_YELLOW "«string»:%s" ANSI_NORMAL ":", showErrPos(pos));
+                out << fmt(ANSI_BLUE "at " ANSI_WARNING "«string»:%s" ANSI_NORMAL ":", showErrPos(pos));
                 break;
             }
             case foStdin: {
-                out << fmt(ANSI_BLUE "at " ANSI_YELLOW "«stdin»:%s" ANSI_NORMAL ":", showErrPos(pos));
+                out << fmt(ANSI_BLUE "at " ANSI_WARNING "«stdin»:%s" ANSI_NORMAL ":", showErrPos(pos));
                 break;
             }
             default:
@@ -232,7 +232,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
             break;
         }
         case Verbosity::lvlWarn: {
-            prefix = ANSI_YELLOW "warning";
+            prefix = ANSI_WARNING "warning";
             break;
         }
         case Verbosity::lvlInfo: {
@@ -252,7 +252,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
             break;
         }
         case Verbosity::lvlDebug: {
-            prefix = ANSI_YELLOW "debug";
+            prefix = ANSI_WARNING "debug";
             break;
         }
         default:

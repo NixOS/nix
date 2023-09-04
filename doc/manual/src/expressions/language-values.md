@@ -139,6 +139,13 @@ Nix has the following basic data types:
     environment variable `NIX_PATH` will be searched for the given file
     or directory name.
 
+    Antiquotation is supported in any paths except those in angle brackets.
+    `./${foo}-${bar}.nix` is a more convenient way of writing 
+    `./. + "/" + foo + "-" + bar + ".nix"` or `./. + "/${foo}-${bar}.nix"`. At
+    least one slash must appear *before* any antiquotations for this to be
+    recognized as a path. `a.${foo}/b.${bar}` is a syntactically valid division
+    operation. `./a.${foo}/b.${bar}` is a path.
+
   - *Booleans* with values `true` and `false`.
 
   - The null value, denoted as `null`.

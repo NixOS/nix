@@ -18,6 +18,9 @@ struct LocalFSStoreConfig : virtual StoreConfig
     const PathSetting logDir{(StoreConfig*) this, false,
         rootDir != "" ? rootDir + "/nix/var/log/nix" : settings.nixLogDir,
         "log", "directory where Nix will store state"};
+    const PathSetting realStoreDir{(StoreConfig*) this, false,
+        rootDir != "" ? rootDir + "/nix/store" : storeDir, "real",
+        "physical path to the Nix store"};
 };
 
 class LocalFSStore : public virtual LocalFSStoreConfig, public virtual Store
@@ -34,7 +37,7 @@ public:
     /* Register a permanent GC root. */
     Path addPermRoot(const StorePath & storePath, const Path & gcRoot);
 
-    virtual Path getRealStoreDir() { return storeDir; }
+    virtual Path getRealStoreDir() { return realStoreDir; }
 
     Path toRealPath(const Path & storePath) override
     {

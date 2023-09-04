@@ -15,7 +15,6 @@ struct RegisterPrimOp
         std::vector<std::string> args;
         size_t arity = 0;
         const char * doc;
-        std::optional<std::string> requiredFeature;
         PrimOpFun fun;
     };
 
@@ -28,8 +27,7 @@ struct RegisterPrimOp
     RegisterPrimOp(
         std::string name,
         size_t arity,
-        PrimOpFun fun,
-        std::optional<std::string> requiredFeature = {});
+        PrimOpFun fun);
 
     RegisterPrimOp(Info && info);
 };

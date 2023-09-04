@@ -1,7 +1,5 @@
 ifeq ($(doc_generate),yes)
 
-MANUAL_SRCS := $(call rwildcard, $(d)/src, *.md)
-
 # Generate man pages.
 man-pages := $(foreach n, \
   nix-env.1 nix-build.1 nix-shell.1 nix-store.1 nix-instantiate.1 \
@@ -25,19 +23,19 @@ nix-eval = $(dummy-env) $(bindir)/nix eval --experimental-features nix-command -
 $(d)/%.1: $(d)/src/command-ref/%.md
 	@printf "Title: %s\n\n" "$$(basename $@ .1)" > $^.tmp
 	@cat $^ >> $^.tmp
-	$(trace-gen) lowdown -sT man $^.tmp -o $@
+	$(trace-gen) lowdown -sT man -M section=1 $^.tmp -o $@
 	@rm $^.tmp
 
 $(d)/%.8: $(d)/src/command-ref/%.md
 	@printf "Title: %s\n\n" "$$(basename $@ .8)" > $^.tmp
 	@cat $^ >> $^.tmp
-	$(trace-gen) lowdown -sT man $^.tmp -o $@
+	$(trace-gen) lowdown -sT man -M section=8 $^.tmp -o $@
 	@rm $^.tmp
 
 $(d)/nix.conf.5: $(d)/src/command-ref/conf-file.md
 	@printf "Title: %s\n\n" "$$(basename $@ .5)" > $^.tmp
 	@cat $^ >> $^.tmp
-	$(trace-gen) lowdown -sT man $^.tmp -o $@
+	$(trace-gen) lowdown -sT man -M section=5 $^.tmp -o $@
 	@rm $^.tmp
 
 $(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli
@@ -46,7 +44,7 @@ $(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli
 
 $(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/generate-manpage.nix $(bindir)/nix
 	@rm -rf $@
-	$(trace-gen) $(nix-eval) --write-to $@ --expr 'import doc/manual/generate-manpage.nix (builtins.fromJSON (builtins.readFile $<))'
+	$(trace-gen) $(nix-eval) --write-to $@ --expr 'import doc/manual/generate-manpage.nix (builtins.readFile $<)'
 
 $(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/generate-options.nix $(d)/src/command-ref/conf-file-prefix.md $(bindir)/nix
 	@cat doc/manual/src/command-ref/conf-file-prefix.md > $@.tmp
@@ -64,6 +62,7 @@ $(d)/conf-file.json: $(bindir)/nix
 $(d)/src/expressions/builtins.md: $(d)/builtins.json $(d)/generate-builtins.nix $(d)/src/expressions/builtins-prefix.md $(bindir)/nix
 	@cat doc/manual/src/expressions/builtins-prefix.md > $@.tmp
 	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-builtins.nix (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp
+	@cat doc/manual/src/expressions/builtins-suffix.md >> $@.tmp
 	@mv $@.tmp $@
 
 $(d)/builtins.json: $(bindir)/nix
@@ -74,17 +73,28 @@ $(d)/builtins.json: $(bindir)/nix
 install: $(docdir)/manual/index.html
 
 # Generate 'nix' manpages.
-install: $(d)/src/command-ref/new-cli
+install: $(mandir)/man1/nix3-manpages
+man: doc/manual/generated/man1/nix3-manpages
+all: doc/manual/generated/man1/nix3-manpages
+
+$(mandir)/man1/nix3-manpages: doc/manual/generated/man1/nix3-manpages
+	@mkdir -p $(DESTDIR)$$(dirname $@)
+	$(trace-install) install -m 0644 $$(dirname $<)/* $(DESTDIR)$$(dirname $@)
+
+doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
+	@mkdir -p $(DESTDIR)$$(dirname $@)
 	$(trace-gen) for i in doc/manual/src/command-ref/new-cli/*.md; do \
 	  name=$$(basename $$i .md); \
+	  tmpFile=$$(mktemp); \
 	  if [[ $$name = SUMMARY ]]; then continue; fi; \
-	  printf "Title: %s\n\n" "$$name" > $$i.tmp; \
-	  cat $$i >> $$i.tmp; \
-	  lowdown -sT man $$i.tmp -o $(mandir)/man1/$$name.1; \
+	  printf "Title: %s\n\n" "$$name" > $$tmpFile; \
+	  cat $$i >> $$tmpFile; \
+	  lowdown -sT man -M section=1 $$tmpFile -o $(DESTDIR)$$(dirname $@)/$$name.1; \
+	  rm $$tmpFile; \
 	done
+	@touch $@
 
-$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md
-	$(trace-gen) RUST_LOG=warn mdbook build doc/manual -d $(docdir)/manual
-	@cp doc/manual/highlight.pack.js $(docdir)/manual/highlight.js
+$(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/command-ref/conf-file.md $(d)/src/expressions/builtins.md $(call rwildcard, $(d)/src, *.md)
+	$(trace-gen) RUST_LOG=warn mdbook build doc/manual -d $(DESTDIR)$(docdir)/manual
 
 endif

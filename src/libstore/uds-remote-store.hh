@@ -40,6 +40,12 @@ public:
 
 private:
 
+    struct Connection : RemoteStore::Connection
+    {
+        AutoCloseFD fd;
+        void closeWrite() override;
+    };
+
     ref<RemoteStore::Connection> openConnection() override;
     std::optional<std::string> path;
 };

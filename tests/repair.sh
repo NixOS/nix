@@ -1,5 +1,7 @@
 source common.sh
 
+needLocalStore "--repair needs a local store"
+
 clearStore
 
 path=$(nix-build dependencies.nix -o $TEST_ROOT/result)

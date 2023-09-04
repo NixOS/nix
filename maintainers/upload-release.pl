@@ -83,12 +83,12 @@ sub downloadFile {
 
     if (!-e $tmpFile) {
         print STDERR "downloading $srcFile to $tmpFile...\n";
-        system("NIX_REMOTE=https://cache.nixos.org/ nix cat-store '$srcFile' > '$tmpFile'") == 0
+        system("NIX_REMOTE=https://cache.nixos.org/ nix store cat '$srcFile' > '$tmpFile'") == 0
             or die "unable to fetch $srcFile\n";
     }
 
     my $sha256_expected = $buildInfo->{buildproducts}->{$productNr}->{sha256hash} or die;
-    my $sha256_actual = `nix hash-file --base16 --type sha256 '$tmpFile'`;
+    my $sha256_actual = `nix hash file --base16 --type sha256 '$tmpFile'`;
     chomp $sha256_actual;
     if ($sha256_expected ne $sha256_actual) {
         print STDERR "file $tmpFile is corrupt, got $sha256_actual, expected $sha256_expected\n";
@@ -110,6 +110,9 @@ downloadFile("binaryTarball.i686-linux", "1");
 downloadFile("binaryTarball.x86_64-linux", "1");
 downloadFile("binaryTarball.aarch64-linux", "1");
 downloadFile("binaryTarball.x86_64-darwin", "1");
+downloadFile("binaryTarball.aarch64-darwin", "1");
+downloadFile("binaryTarballCross.x86_64-linux.armv6l-linux", "1");
+downloadFile("binaryTarballCross.x86_64-linux.armv7l-linux", "1");
 downloadFile("installerScript", "1");
 
 for my $fn (glob "$tmpDir/*") {
@@ -133,20 +136,8 @@ for my $fn (glob "$tmpDir/*") {
 
 exit if $version =~ /pre/;
 
-# Update Nixpkgs in a very hacky way.
+# Update nix-fallback-paths.nix.
 system("cd $nixpkgsDir && git pull") == 0 or die;
-my $oldName = `nix-instantiate --eval $nixpkgsDir -A nix.name`; chomp $oldName;
-my $oldHash = `nix-instantiate --eval $nixpkgsDir -A nix.src.outputHash`; chomp $oldHash;
-print STDERR "old stable version in Nixpkgs = $oldName / $oldHash\n";
-
-my $fn = "$nixpkgsDir/pkgs/tools/package-management/nix/default.nix";
-my $oldFile = read_file($fn);
-$oldFile =~ s/$oldName/"$releaseName"/g;
-$oldFile =~ s/$oldHash/"$tarballHash"/g;
-write_file($fn, $oldFile);
-
-$oldName =~ s/nix-//g;
-$oldName =~ s/"//g;
 
 sub getStorePath {
     my ($jobName) = @_;
@@ -165,9 +156,10 @@ write_file("$nixpkgsDir/nixos/modules/installer/tools/nix-fallback-paths.nix",
            "  i686-linux = \"" . getStorePath("build.i686-linux") . "\";\n" .
            "  aarch64-linux = \"" . getStorePath("build.aarch64-linux") . "\";\n" .
            "  x86_64-darwin = \"" . getStorePath("build.x86_64-darwin") . "\";\n" .
+           "  aarch64-darwin = \"" . getStorePath("build.aarch64-darwin") . "\";\n" .
            "}\n");
 
-system("cd $nixpkgsDir && git commit -a -m 'nix: $oldName -> $version'") == 0 or die;
+system("cd $nixpkgsDir && git commit -a -m 'nix-fallback-paths.nix: Update to $version'") == 0 or die;
 
 # Update the "latest" symlink.
 $channelsBucket->add_key(

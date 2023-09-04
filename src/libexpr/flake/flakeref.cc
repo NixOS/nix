@@ -172,8 +172,12 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         auto parsedURL = parseURL(url);
         std::string fragment;
         std::swap(fragment, parsedURL.fragment);
+
+        auto input = Input::fromURL(parsedURL);
+        input.parent = baseDir;
+
         return std::make_pair(
-            FlakeRef(Input::fromURL(parsedURL), get(parsedURL.query, "dir").value_or("")),
+            FlakeRef(std::move(input), get(parsedURL.query, "dir").value_or("")),
             fragment);
     }
 }

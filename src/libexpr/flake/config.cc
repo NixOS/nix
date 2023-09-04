@@ -22,12 +22,14 @@ static TrustedList readTrustedList()
 
 static void writeTrustedList(const TrustedList & trustedList)
 {
-    writeFile(trustedListPath(), nlohmann::json(trustedList).dump());
+    auto path = trustedListPath();
+    createDirs(dirOf(path));
+    writeFile(path, nlohmann::json(trustedList).dump());
 }
 
 void ConfigFile::apply()
 {
-    std::set<std::string> whitelist{"bash-prompt", "bash-prompt-suffix"};
+    std::set<std::string> whitelist{"bash-prompt", "bash-prompt-suffix", "flake-registry"};
 
     for (auto & [name, value] : settings) {
 

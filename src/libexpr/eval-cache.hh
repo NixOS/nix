@@ -102,7 +102,7 @@ public:
 
     std::shared_ptr<AttrCursor> getAttr(std::string_view name);
 
-    std::shared_ptr<AttrCursor> findAlongAttrPath(const std::vector<Symbol> & attrPath);
+    std::shared_ptr<AttrCursor> findAlongAttrPath(const std::vector<Symbol> & attrPath, bool force = false);
 
     std::string getString();
 

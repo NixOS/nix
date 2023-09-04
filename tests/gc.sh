@@ -12,7 +12,7 @@ ln -sf $outPath "$NIX_STATE_DIR"/gcroots/foo
 nix-store --gc --print-roots | grep $outPath
 nix-store --gc --print-live | grep $outPath
 nix-store --gc --print-dead | grep $drvPath
-if nix-store --gc --print-dead | grep $outPath; then false; fi
+if nix-store --gc --print-dead | grep -E $outPath$; then false; fi
 
 nix-store --gc --print-dead
 

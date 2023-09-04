@@ -8,12 +8,12 @@ libstore_SOURCES := $(wildcard $(d)/*.cc $(d)/builtins/*.cc $(d)/build/*.cc)
 
 libstore_LIBS = libutil
 
-libstore_LDFLAGS = $(SQLITE3_LIBS) -lbz2 $(LIBCURL_LIBS) $(SODIUM_LIBS) -pthread
-ifneq ($(OS), FreeBSD)
+libstore_LDFLAGS += $(SQLITE3_LIBS) $(LIBCURL_LIBS) $(SODIUM_LIBS) -pthread
+ifdef HOST_LINUX
  libstore_LDFLAGS += -ldl
 endif
 
-ifeq ($(OS), Darwin)
+ifdef HOST_DARWIN
 libstore_FILES = sandbox-defaults.sb sandbox-minimal.sb sandbox-network.sb
 endif
 
@@ -23,7 +23,7 @@ ifeq ($(ENABLE_S3), 1)
 	libstore_LDFLAGS += -laws-cpp-sdk-transfer -laws-cpp-sdk-s3 -laws-cpp-sdk-core
 endif
 
-ifeq ($(OS), SunOS)
+ifdef HOST_SOLARIS
 	libstore_LDFLAGS += -lsocket
 endif
 
@@ -60,7 +60,7 @@ $(d)/build.cc:
 
 clean-files += $(d)/schema.sql.gen.hh $(d)/ca-specific-schema.sql.gen.hh
 
-$(eval $(call install-file-in, $(d)/nix-store.pc, $(prefix)/lib/pkgconfig, 0644))
+$(eval $(call install-file-in, $(d)/nix-store.pc, $(libdir)/pkgconfig, 0644))
 
 $(foreach i, $(wildcard src/libstore/builtins/*.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix/builtins, 0644)))

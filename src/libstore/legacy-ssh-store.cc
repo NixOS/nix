@@ -82,9 +82,20 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             conn->to << SERVE_MAGIC_1 << SERVE_PROTOCOL_VERSION;
             conn->to.flush();
 
-            unsigned int magic = readInt(conn->from);
-            if (magic != SERVE_MAGIC_2)
-                throw Error("protocol mismatch with 'nix-store --serve' on '%s'", host);
+            StringSink saved;
+            try {
+                TeeSource tee(conn->from, saved);
+                unsigned int magic = readInt(tee);
+                if (magic != SERVE_MAGIC_2)
+                    throw Error("'nix-store --serve' protocol mismatch from '%s'", host);
+            } catch (SerialisationError & e) {
+                /* In case the other side is waiting for our input,
+                   close it. */
+                conn->sshConn->in.close();
+                auto msg = conn->from.drain();
+                throw Error("'nix-store --serve' protocol mismatch from '%s', got '%s'",
+                    host, chomp(*saved.s + msg));
+            }
             conn->remoteVersion = readInt(conn->from);
             if (GET_PROTOCOL_MAJOR(conn->remoteVersion) != 0x200)
                 throw Error("unsupported 'nix-store --serve' protocol version on '%s'", host);
@@ -268,8 +279,11 @@ public:
         return status;
     }
 
-    void buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode) override
+    void buildPaths(const std::vector<DerivedPath> & drvPaths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override
     {
+        if (evalStore && evalStore.get() != this)
+            throw Error("building on an SSH store is incompatible with '--eval-store'");
+
         auto conn(connections->get());
 
         conn->to << cmdBuildPaths;

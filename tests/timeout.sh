@@ -2,6 +2,8 @@
 
 source common.sh
 
+# XXX: This shouldn’t be, but #4813 cause this test to fail
+needLocalStore "see #4813"
 
 set +e
 messages=$(nix-build -Q timeout.nix -A infiniteLoop --timeout 2 2>&1)

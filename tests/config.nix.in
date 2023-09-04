@@ -1,3 +1,12 @@
+let
+  contentAddressedByDefault = builtins.getEnv "NIX_TESTS_CA_BY_DEFAULT" == "1";
+  caArgs = if contentAddressedByDefault then {
+    __contentAddressed = true;
+    outputHashMode = "recursive";
+    outputHashAlgo = "sha256";
+  } else {};
+in
+
 rec {
   shell = "@bash@";
 
@@ -13,6 +22,6 @@ rec {
       builder = shell;
       args = ["-e" args.builder or (builtins.toFile "builder-${args.name}.sh" "if [ -e .attrs.sh ]; then source .attrs.sh; fi; eval \"$buildCommand\"")];
       PATH = path;
-    } // removeAttrs args ["builder" "meta"])
+    } // caArgs // removeAttrs args ["builder" "meta"])
     // { meta = args.meta or {}; };
 }

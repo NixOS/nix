@@ -82,7 +82,7 @@ struct yellowtxt
 template <class T>
 std::ostream & operator<<(std::ostream & out, const yellowtxt<T> & y)
 {
-    return out << ANSI_YELLOW << y.value << ANSI_NORMAL;
+    return out << ANSI_WARNING << y.value << ANSI_NORMAL;
 }
 
 template <class T>

@@ -42,7 +42,7 @@ static void showAttrs(EvalState & state, bool strict, bool location,
 
         XMLAttrs xmlAttrs;
         xmlAttrs["name"] = i;
-        if (location && a.pos != &noPos) posToXML(xmlAttrs, *a.pos);
+        if (location && a.pos != ptr(&noPos)) posToXML(xmlAttrs, *a.pos);
 
         XMLOpenElement _(doc, "attr", xmlAttrs);
         printValueAsXML(state, strict, location,

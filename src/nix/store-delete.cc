@@ -30,7 +30,7 @@ struct CmdStoreDelete : StorePathsCommand
           ;
     }
 
-    void run(ref<Store> store, std::vector<StorePath> storePaths) override
+    void run(ref<Store> store, std::vector<StorePath> && storePaths) override
     {
         for (auto & path : storePaths)
             options.pathsToDelete.insert(path);

@@ -31,7 +31,7 @@ struct CmdEdit : InstallableCommand
         auto [v, pos] = installable->toValue(*state);
 
         try {
-            pos = findDerivationFilename(*state, *v, installable->what());
+            pos = findPackageFilename(*state, *v, installable->what());
         } catch (NoPositionInfo &) {
         }
 
@@ -42,7 +42,8 @@ struct CmdEdit : InstallableCommand
 
         auto args = editorFor(pos);
 
-        restoreSignals();
+        restoreProcessContext();
+
         execvp(args.front().c_str(), stringsToCharPtrs(args).data());
 
         std::string command;

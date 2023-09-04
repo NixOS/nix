@@ -16,8 +16,9 @@ struct MixEvalArgs : virtual Args
 
     Strings searchPath;
 
-private:
+    std::optional<std::string> evalStoreUrl;
 
+private:
     std::map<std::string, std::string> autoArgs;
 };
 

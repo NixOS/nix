@@ -15,6 +15,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 #include <openssl/crypto.h>
 
@@ -110,6 +113,31 @@ static void opensslLockCallback(int mode, int type, const char * file, int line)
 }
 #endif
 
+static std::once_flag dns_resolve_flag;
+
+static void preloadNSS() {
+    /* builtin:fetchurl can trigger a DNS lookup, which with glibc can trigger a dynamic library load of
+       one of the glibc NSS libraries in a sandboxed child, which will fail unless the library's already
+       been loaded in the parent. So we force a lookup of an invalid domain to force the NSS machinery to
+       load its lookup libraries in the parent before any child gets a chance to. */
+    std::call_once(dns_resolve_flag, []() {
+        struct addrinfo *res = NULL;
+
+        /* nss will only force the "local" (not through nscd) dns resolution if its on the LOCALDOMAIN.
+           We need the resolution to be done locally, as nscd socket will not be accessible in the
+           sandbox. */
+        char * previous_env = getenv("LOCALDOMAIN");
+        setenv("LOCALDOMAIN", "invalid", 1);
+        if (getaddrinfo("this.pre-initializes.the.dns.resolvers.invalid.", "http", NULL, &res) == 0) {
+            if (res) freeaddrinfo(res);
+        }
+        if (previous_env) {
+             setenv("LOCALDOMAIN", previous_env, 1);
+        } else {
+             unsetenv("LOCALDOMAIN");
+        }
+    });
+}
 
 static void sigHandler(int signo) { }
 
@@ -176,6 +204,8 @@ void initNix()
     if (hasPrefix(getEnv("TMPDIR").value_or("/tmp"), "/var/folders/"))
         unsetenv("TMPDIR");
 #endif
+
+    preloadNSS();
 }
 
 
@@ -238,7 +268,7 @@ LegacyArgs::LegacyArgs(const std::string & programName,
     addFlag({
         .longName = "no-gc-warning",
         .description = "Disable warnings about not using `--add-root`.",
-        .handler = {&gcWarning, true},
+        .handler = {&gcWarning, false},
     });
 
     addFlag({
@@ -310,7 +340,7 @@ void printVersion(const string & programName)
 
 void showManPage(const string & name)
 {
-    restoreSignals();
+    restoreProcessContext();
     setenv("MANPATH", settings.nixManDir.c_str(), 1);
     execlp("man", "man", name.c_str(), nullptr);
     throw SysError("command 'man %1%' failed", name.c_str());
@@ -373,7 +403,7 @@ RunPager::RunPager()
             throw SysError("dupping stdin");
         if (!getenv("LESS"))
             setenv("LESS", "FRSXMK", 1);
-        restoreSignals();
+        restoreProcessContext();
         if (pager)
             execl("/bin/sh", "sh", "-c", pager, nullptr);
         execlp("pager", "pager", nullptr);

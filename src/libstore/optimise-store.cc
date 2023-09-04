@@ -198,7 +198,7 @@ void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
     /* Make the containing directory writable, but only if it's not
        the store itself (we don't want or need to mess with its
        permissions). */
-    bool mustToggle = dirOf(path) != realStoreDir;
+    bool mustToggle = dirOf(path) != realStoreDir.get();
     if (mustToggle) makeWritable(dirOf(path));
 
     /* When we're done, make the directory read-only again and reset

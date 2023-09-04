@@ -27,7 +27,7 @@ Logger * logger = makeSimpleLogger(true);
 
 void Logger::warn(const std::string & msg)
 {
-    log(lvlWarn, ANSI_YELLOW "warning:" ANSI_NORMAL " " + msg);
+    log(lvlWarn, ANSI_WARNING "warning:" ANSI_NORMAL " " + msg);
 }
 
 void Logger::writeToStdout(std::string_view s)
@@ -46,7 +46,7 @@ public:
         : printBuildLogs(printBuildLogs)
     {
         systemd = getEnv("IN_SYSTEMD") == "1";
-        tty = isatty(STDERR_FILENO);
+        tty = shouldANSI();
     }
 
     bool isVerbose() override {
@@ -163,7 +163,7 @@ struct JSONLogger : Logger {
 
     void write(const nlohmann::json & json)
     {
-        prevLogger.log(lvlError, "@nix " + json.dump());
+        prevLogger.log(lvlError, "@nix " + json.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace));
     }
 
     void log(Verbosity lvl, const FormatOrString & fs) override

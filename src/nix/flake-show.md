@@ -35,4 +35,7 @@ specified by flake reference *flake-url*. These are the top-level
 attributes in the `outputs` of the flake, as well as lower-level
 attributes for some standard outputs (e.g. `packages` or `checks`).
 
+With `--json`, the output is in a JSON representation suitable for automatic
+processing by other tools.
+
 )""
