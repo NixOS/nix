@@ -13,10 +13,13 @@ R""(
   │   │   └───build: derivation 'patchelf-0.12.20201207.f34751b'
   │   └───x86_64-linux
   │       └───build: derivation 'patchelf-0.12.20201207.f34751b'
-  ├───defaultPackage
-  │   ├───aarch64-linux: package 'patchelf-0.12.20201207.f34751b'
-  │   ├───i686-linux: package 'patchelf-0.12.20201207.f34751b'
-  │   └───x86_64-linux: package 'patchelf-0.12.20201207.f34751b'
+  ├───packages
+  │   ├───aarch64-linux
+  │   │   └───default: package 'patchelf-0.12.20201207.f34751b'
+  │   ├───i686-linux
+  │   │   └───default: package 'patchelf-0.12.20201207.f34751b'
+  │   └───x86_64-linux
+  │       └───default: package 'patchelf-0.12.20201207.f34751b'
   ├───hydraJobs
   │   ├───build
   │   │   ├───aarch64-linux: derivation 'patchelf-0.12.20201207.f34751b'

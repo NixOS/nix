@@ -7,16 +7,38 @@ namespace nix {
 
 void toJSON(std::ostream & str, const char * start, const char * end)
 {
-    str << '"';
-    for (auto i = start; i != end; i++)
-        if (*i == '\"' || *i == '\\') str << '\\' << *i;
-        else if (*i == '\n') str << "\\n";
-        else if (*i == '\r') str << "\\r";
-        else if (*i == '\t') str << "\\t";
-        else if (*i >= 0 && *i < 32)
-            str << "\\u" << std::setfill('0') << std::setw(4) << std::hex << (uint16_t) *i << std::dec;
-        else str << *i;
-    str << '"';
+    constexpr size_t BUF_SIZE = 4096;
+    char buf[BUF_SIZE + 7]; // BUF_SIZE + largest single sequence of puts
+    size_t bufPos = 0;
+
+    const auto flush = [&] {
+        str.write(buf, bufPos);
+        bufPos = 0;
+    };
+    const auto put = [&] (char c) {
+        buf[bufPos++] = c;
+    };
+
+    put('"');
+    for (auto i = start; i != end; i++) {
+        if (bufPos >= BUF_SIZE) flush();
+        if (*i == '\"' || *i == '\\') { put('\\'); put(*i); }
+        else if (*i == '\n') { put('\\'); put('n'); }
+        else if (*i == '\r') { put('\\'); put('r'); }
+        else if (*i == '\t') { put('\\'); put('t'); }
+        else if (*i >= 0 && *i < 32) {
+            const char hex[17] = "0123456789abcdef";
+            put('\\');
+            put('u');
+            put(hex[(uint16_t(*i) >> 12) & 0xf]);
+            put(hex[(uint16_t(*i) >>  8) & 0xf]);
+            put(hex[(uint16_t(*i) >>  4) & 0xf]);
+            put(hex[(uint16_t(*i) >>  0) & 0xf]);
+        }
+        else put(*i);
+    }
+    put('"');
+    flush();
 }
 
 void toJSON(std::ostream & str, const char * s)

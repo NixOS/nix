@@ -52,14 +52,14 @@ struct CacheImpl : Cache
         const Attrs & inAttrs,
         const Attrs & infoAttrs,
         const StorePathDescriptor & storePathDesc,
-        bool immutable) override
+        bool locked) override
     {
         _state.lock()->add.use()
             (attrsToJSON(inAttrs).dump())
             (attrsToJSON(infoAttrs).dump())
             // FIXME should use JSON for store path descriptor
             (renderStorePathDescriptor(storePathDesc))
-            (immutable)
+            (locked)
             (time(0)).exec();
     }
 
@@ -92,7 +92,7 @@ struct CacheImpl : Cache
 
         auto infoJSON = stmt.getStr(0);
         auto storePathDesc = parseStorePathDescriptor(stmt.getStr(1));
-        auto immutable = stmt.getInt(2) != 0;
+        auto locked = stmt.getInt(2) != 0;
         auto timestamp = stmt.getInt(3);
         auto storePath = store->makeFixedOutputPathFromCA(storePathDesc);
 
@@ -107,7 +107,7 @@ struct CacheImpl : Cache
             inAttrsJSON, infoJSON, store->printStorePath(storePath));
 
         return Result {
-            .expired = !immutable && (settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0)),
+            .expired = !locked && (settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0)),
             .infoAttrs = jsonToAttrs(nlohmann::json::parse(infoJSON)),
             .storePath = std::move(storePathDesc)
         };

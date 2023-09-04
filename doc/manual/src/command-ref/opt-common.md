@@ -162,11 +162,11 @@ Most Nix commands accept the following command-line options:
     }: ...
     ```
 
-    So if you call this Nix expression (e.g., when you do `nix-env -i
+    So if you call this Nix expression (e.g., when you do `nix-env -iA
     pkgname`), the function will be called automatically using the
     value [`builtins.currentSystem`](../expressions/builtins.md) for
     the `system` argument. You can override this using `--arg`, e.g.,
-    `nix-env -i pkgname --arg system \"i686-freebsd\"`. (Note that
+    `nix-env -iA pkgname --arg system \"i686-freebsd\"`. (Note that
     since the argument is a Nix string literal, you have to escape the
     quotes.)
 

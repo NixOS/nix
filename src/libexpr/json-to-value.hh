@@ -8,6 +8,6 @@ namespace nix {
 
 MakeError(JSONParseError, EvalError);
 
-void parseJSON(EvalState & state, const string & s, Value & v);
+void parseJSON(EvalState & state, const std::string_view & s, Value & v);
 
 }

@@ -5,7 +5,6 @@
 #include "store-api.hh"
 #include "path-with-outputs.hh"
 #include "derivations.hh"
-#include "affinity.hh"
 #include "progress-bar.hh"
 #include "run.hh"
 
@@ -195,7 +194,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
        'buildDerivation', but that's privileged. */
     drv.name += "-env";
     drv.inputSrcs.insert(std::move(getEnvShPath));
-    if (settings.isExperimentalFeatureEnabled("ca-derivations")) {
+    if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)) {
         for (auto & output : drv.outputs) {
             output.second = {
                 .output = DerivationOutputDeferred{},
@@ -308,7 +307,7 @@ struct Common : InstallableCommand, MixProfile
         for (auto & [installable_, dir_] : redirects) {
             auto dir = absPath(dir_);
             auto installable = parseInstallable(store, installable_);
-            auto builtPaths = toStorePaths(
+            auto builtPaths = Installable::toStorePaths(
                 getEvalStore(), store, Realise::Nothing, OperateOn::Output, {installable});
             for (auto & path: builtPaths) {
                 auto from = store->printStorePath(path);
@@ -326,8 +325,15 @@ struct Common : InstallableCommand, MixProfile
 
     Strings getDefaultFlakeAttrPaths() override
     {
-        return {"devShell." + settings.thisSystem.get(), "defaultPackage." + settings.thisSystem.get()};
+        Strings paths{
+            "devShells." + settings.thisSystem.get() + ".default",
+            "devShell." + settings.thisSystem.get(),
+        };
+        for (auto & p : SourceExprCommand::getDefaultFlakeAttrPaths())
+            paths.push_back(p);
+        return paths;
     }
+
     Strings getDefaultFlakeAttrPathPrefixes() override
     {
         auto res = SourceExprCommand::getDefaultFlakeAttrPathPrefixes();
@@ -341,7 +347,7 @@ struct Common : InstallableCommand, MixProfile
         if (path && hasSuffix(path->to_string(), "-env"))
             return *path;
         else {
-            auto drvs = toDerivations(store, {installable});
+            auto drvs = Installable::toDerivations(store, {installable});
 
             if (drvs.size() != 1)
                 throw Error("'%s' needs to evaluate to a single derivation, but it evaluated to %d derivations",
@@ -390,6 +396,12 @@ struct CmdDevelop : Common, MixEnvironment
             .description = "The stdenv phase to run (e.g. `build` or `configure`).",
             .labels = {"phase-name"},
             .handler = {&phase},
+        });
+
+        addFlag({
+            .longName = "unpack",
+            .description = "Run the `unpack` phase.",
+            .handler = {&phase, {"unpack"}},
         });
 
         addFlag({
@@ -467,9 +479,11 @@ struct CmdDevelop : Common, MixEnvironment
         else {
             script = "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;\n" + script;
             if (developSettings.bashPrompt != "")
-                script += fmt("[ -n \"$PS1\" ] && PS1=%s;\n", shellEscape(developSettings.bashPrompt));
+                script += fmt("[ -n \"$PS1\" ] && PS1=%s;\n",
+                    shellEscape(developSettings.bashPrompt.get()));
             if (developSettings.bashPromptSuffix != "")
-                script += fmt("[ -n \"$PS1\" ] && PS1+=%s;\n", shellEscape(developSettings.bashPromptSuffix));
+                script += fmt("[ -n \"$PS1\" ] && PS1+=%s;\n",
+                    shellEscape(developSettings.bashPromptSuffix.get()));
         }
 
         writeFull(rcFileFd.get(), script);
@@ -491,12 +505,14 @@ struct CmdDevelop : Common, MixEnvironment
                 this,
                 state,
                 installable->nixpkgsFlakeRef(),
-                Strings{"bashInteractive"},
+                "bashInteractive",
+                Strings{},
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
                 nixpkgsLockFlags);
 
             shell = store->printStorePath(
-                toStorePath(getEvalStore(), store, Realise::Outputs, OperateOn::Output, bashInstallable)) + "/bin/bash";
+                Installable::toStorePath(getEvalStore(), store, Realise::Outputs, OperateOn::Output, bashInstallable))
+                + "/bin/bash";
         } catch (Error &) {
             ignoreException();
         }

@@ -38,7 +38,7 @@ fi
 
 # Determine if we could use the multi-user installer or not
 if [ "$(uname -s)" = "Linux" ]; then
-    echo "Note: a multi-user installation is possible. See https://nixos.org/nix/manual/#sect-multi-user-installation" >&2
+    echo "Note: a multi-user installation is possible. See https://nixos.org/manual/nix/stable/installation/installing-binary.html#multi-user-installation" >&2
 fi
 
 case "$(uname -s)" in
@@ -98,7 +98,7 @@ while [ $# -gt 0 ]; do
                 echo "              providing multi-user support and better isolation for local builds."
                 echo "              Both for security and reproducibility, this method is recommended if"
                 echo "              supported on your platform."
-                echo "              See https://nixos.org/nix/manual/#sect-multi-user-installation"
+                echo "              See https://nixos.org/manual/nix/stable/installation/installing-binary.html#multi-user-installation"
                 echo ""
                 echo " --no-daemon: Simple, single-user installation that does not require root and is"
                 echo "              trivial to uninstall."
@@ -134,7 +134,7 @@ fi
 
 echo "performing a single-user installation of Nix..." >&2
 
-if ! [ -e $dest ]; then
+if ! [ -e "$dest" ]; then
     cmd="mkdir -m 0755 $dest && chown $USER $dest"
     echo "directory $dest does not exist; creating it by running '$cmd' using sudo" >&2
     if ! sudo sh -c "$cmd"; then
@@ -143,12 +143,12 @@ if ! [ -e $dest ]; then
     fi
 fi
 
-if ! [ -w $dest ]; then
-    echo "$0: directory $dest exists, but is not writable by you. This could indicate that another user has already performed a single-user installation of Nix on this system. If you wish to enable multi-user support see https://nixos.org/nix/manual/#ssec-multi-user. If you wish to continue with a single-user install for $USER please run 'chown -R $USER $dest' as root." >&2
+if ! [ -w "$dest" ]; then
+    echo "$0: directory $dest exists, but is not writable by you. This could indicate that another user has already performed a single-user installation of Nix on this system. If you wish to enable multi-user support see https://nixos.org/manual/nix/stable/installation/multi-user.html. If you wish to continue with a single-user install for $USER please run 'chown -R $USER $dest' as root." >&2
     exit 1
 fi
 
-mkdir -p $dest/store
+mkdir -p "$dest/store"
 
 printf "copying Nix to %s..." "${dest}/store" >&2
 # Insert a newline if no progress is shown.
@@ -189,17 +189,17 @@ fi
 
 # Install an SSL certificate bundle.
 if [ -z "$NIX_SSL_CERT_FILE" ] || ! [ -f "$NIX_SSL_CERT_FILE" ]; then
-    $nix/bin/nix-env -i "$cacert"
+    "$nix/bin/nix-env" -i "$cacert"
     export NIX_SSL_CERT_FILE="$HOME/.nix-profile/etc/ssl/certs/ca-bundle.crt"
 fi
 
 # Subscribe the user to the Nixpkgs channel and fetch it.
 if [ -z "$NIX_INSTALLER_NO_CHANNEL_ADD" ]; then
-    if ! $nix/bin/nix-channel --list | grep -q "^nixpkgs "; then
-        $nix/bin/nix-channel --add https://nixos.org/channels/nixpkgs-unstable
+    if ! "$nix/bin/nix-channel" --list | grep -q "^nixpkgs "; then
+        "$nix/bin/nix-channel" --add https://nixos.org/channels/nixpkgs-unstable
     fi
     if [ -z "$_NIX_INSTALLER_TEST" ]; then
-        if ! $nix/bin/nix-channel --update nixpkgs; then
+        if ! "$nix/bin/nix-channel" --update nixpkgs; then
             echo "Fetching the nixpkgs channel failed. (Are you offline?)"
             echo "To try again later, run \"nix-channel --update nixpkgs\"."
         fi
@@ -215,7 +215,7 @@ if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
         if [ -w "$fn" ]; then
             if ! grep -q "$p" "$fn"; then
                 echo "modifying $fn..." >&2
-                echo -e "\nif [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
+                printf '\nif [ -e %s ]; then . %s; fi # added by Nix installer\n' "$p" "$p" >> "$fn"
             fi
             added=1
             break
@@ -226,7 +226,7 @@ if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
         if [ -w "$fn" ]; then
             if ! grep -q "$p" "$fn"; then
                 echo "modifying $fn..." >&2
-                echo -e "\nif [ -e $p ]; then . $p; fi # added by Nix installer" >> "$fn"
+                printf '\nif [ -e %s ]; then . %s; fi # added by Nix installer\n' "$p" "$p" >> "$fn"
             fi
             added=1
             break

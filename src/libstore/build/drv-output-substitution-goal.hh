@@ -3,6 +3,8 @@
 #include "store-api.hh"
 #include "goal.hh"
 #include "realisation.hh"
+#include <thread>
+#include <future>
 
 namespace nix {
 
@@ -20,10 +22,17 @@ private:
 
     // The realisation corresponding to the given output id.
     // Will be filled once we can get it.
-    std::optional<Realisation> outputInfo;
+    std::shared_ptr<const Realisation> outputInfo;
 
     /* The remaining substituters. */
     std::list<ref<Store>> subs;
+
+    /* The current substituter. */
+    std::shared_ptr<Store> sub;
+
+    Pipe outPipe;
+    std::thread thr;
+    std::promise<std::shared_ptr<const Realisation>> promise;
 
     /* Whether a substituter failed. */
     bool substituterFailed = false;
@@ -36,15 +45,16 @@ public:
 
     void init();
     void tryNext();
+    void realisationFetched();
     void outPathValid();
     void finished();
 
     void timedOut(Error && ex) override { abort(); };
 
-    string key() override;
+    std::string key() override;
 
     void work() override;
-
+    void handleEOF(int fd) override;
 };
 
 }

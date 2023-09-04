@@ -37,7 +37,7 @@ testCutoffFor () {
 }
 
 testCutoff () {
-    # Don't directly build depenentCA, that way we'll make sure we dodn't rely on
+    # Don't directly build dependentCA, that way we'll make sure we don't rely on
     # dependent derivations always being already built.
     #testDerivation dependentCA
     testCutoffFor transitivelyDependentCA

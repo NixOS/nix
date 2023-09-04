@@ -9,7 +9,8 @@ assert foo == "foo";
 let
 
   makeDrv = name: progName: (mkDerivation {
-    inherit name progName system;
+    name = assert progName != "fail"; name;
+    inherit progName system;
     builder = ./user-envs.builder.sh;
   } // {
     meta = {
@@ -26,4 +27,5 @@ in
     (makeDrv "foo-2.0" "foo")
     (makeDrv "bar-0.1.1" "bar")
     (makeDrv "foo-0.1" "foo" // { meta.priority = 10; })
+    (makeDrv "fail-0.1" "fail")
   ]

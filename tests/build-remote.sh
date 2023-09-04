@@ -54,6 +54,14 @@ nix path-info --store $TEST_ROOT/machine3 --all \
   | grep -v builder-build-remote-input-2.sh \
   | grep builder-build-remote-input-3.sh
 
+
+# Temporarily disabled because of https://github.com/NixOS/nix/issues/6209
+if [[ -z "$CONTENT_ADDRESSED" ]]; then
+  for i in input1 input3; do
+    nix log --store $TEST_ROOT/machine0 --file "$file" --arg busybox $busybox passthru."$i" | grep hi-$i
+  done
+fi
+
 # Behavior of keep-failed
 out="$(nix-build 2>&1 failing.nix \
   --builders "$(join_by '; ' "${builders[@]}")"  \

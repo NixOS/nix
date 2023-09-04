@@ -70,7 +70,7 @@ void RestoreSink::receiveContents(std::string_view data)
     writeFull(fd.get(), data);
 }
 
-void RestoreSink::createSymlink(const Path & path, const string & target)
+void RestoreSink::createSymlink(const Path & path, const std::string & target)
 {
     Path p = dstPath + path;
     nix::createSymlink(target, p);

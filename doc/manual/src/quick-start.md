@@ -19,19 +19,19 @@ to subsequent chapters.
    channel:
 
    ```console
-   $ nix-env -qa
-   docbook-xml-4.3
-   docbook-xml-4.5
-   firefox-33.0.2
-   hello-2.9
-   libxslt-1.1.28
+   $ nix-env -qaP
+   nixpkgs.docbook_xml_dtd_43                    docbook-xml-4.3
+   nixpkgs.docbook_xml_dtd_45                    docbook-xml-4.5
+   nixpkgs.firefox                               firefox-33.0.2
+   nixpkgs.hello                                 hello-2.9
+   nixpkgs.libxslt                               libxslt-1.1.28
    …
    ```
 
 1. Install some packages from the channel:
 
    ```console
-   $ nix-env -i hello
+   $ nix-env -iA nixpkgs.hello
    ```
 
    This should download pre-built packages; it should not build them

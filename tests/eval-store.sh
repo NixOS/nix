@@ -1,6 +1,8 @@
 source common.sh
 
-requireDaemonNewerThan "2.4pre20210727"
+# Using `--eval-store` with the daemon will eventually copy everything
+# to the build store, invalidating most of the tests here
+needLocalStore
 
 eval_store=$TEST_ROOT/eval-store
 

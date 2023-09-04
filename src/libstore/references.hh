@@ -1,13 +1,31 @@
 #pragma once
 
-#include "types.hh"
 #include "hash.hh"
+#include "path.hh"
 
 namespace nix {
 
-std::pair<PathSet, HashResult> scanForReferences(const Path & path, const PathSet & refs);
+std::pair<StorePathSet, HashResult> scanForReferences(const Path & path, const StorePathSet & refs);
 
-PathSet scanForReferences(Sink & toTee, const Path & path, const PathSet & refs);
+StorePathSet scanForReferences(Sink & toTee, const Path & path, const StorePathSet & refs);
+
+class RefScanSink : public Sink
+{
+    StringSet hashes;
+    StringSet seen;
+
+    std::string tail;
+
+public:
+
+    RefScanSink(StringSet && hashes) : hashes(hashes)
+    { }
+
+    StringSet & getResult()
+    { return seen; }
+
+    void operator () (std::string_view data) override;
+};
 
 struct RewritingSink : Sink
 {

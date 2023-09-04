@@ -3,7 +3,7 @@
 ## Goals
 
 Purpose of this document is to provide a clear direction to **help design
-delightful command line** experience. This document contain guidelines to
+delightful command line** experience. This document contains guidelines to
 follow to ensure a consistent and approachable user experience.
 
 ## Overview
@@ -103,7 +103,7 @@ impacted the most by bad user experience.
 # Help is essential
 
 Help should be built into your command line so that new users can gradually
-discover new features when they need them. 
+discover new features when they need them.
 
 ## Looking for help
 
@@ -115,7 +115,7 @@ The rules are:
 
 - Help is shown by using `--help` or `help` command (eg `nix` `--``help` or
   `nix help`).
-- For non-COMMANDs (eg. `nix` `--``help`  and `nix store` `--``help`) we **show
+- For non-COMMANDs (eg. `nix` `--``help` and `nix store` `--``help`) we **show
   a summary** of most common use cases. Summary is presented on the STDOUT
   without any use of PAGER.
 - For COMMANDs (eg. `nix init` `--``help` or `nix help init`) we display the
@@ -176,7 +176,7 @@ $ nix init --template=template#pyton
 ------------------------------------------------------------------------
 Initializing Nix project at `/path/to/here`.
       Select a template for you new project:
-          |> template#pyton
+          |> template#python
              template#python-pip
              template#python-poetry
 ```
@@ -230,17 +230,17 @@ Now **Learn** part of the output is where you educate users. You should only
 show it when you know that a build will take some time and not annoy users of
 the builds that take only few seconds.
 
-Every feature like this should go though a intensive review and testing to
-collect as much a feedback as possible and to fine tune every little detail. If
+Every feature like this should go through an intensive review and testing to
+collect as much feedback as possible and to fine tune every little detail. If
 done right this can be an awesome features beginners and advance users will
 love, but if not done perfectly it will annoy users and leave bad impression.
 
 # Input
 
-Input to a command is provided via `ARGUMENTS` and `OPTIONS`. 
+Input to a command is provided via `ARGUMENTS` and `OPTIONS`.
 
 `ARGUMENTS` represent a required input for a function. When choosing to use
-`ARGUMENT` over function please be aware of the downsides that come with it:
+`ARGUMENTS` over `OPTIONS` please be aware of the downsides that come with it:
 
 - User will need to remember the order of `ARGUMENTS`. This is not a problem if
   there is only one `ARGUMENT`.
@@ -253,7 +253,7 @@ developer consider the downsides and choose wisely.
 
 ## Naming the `OPTIONS`
 
-Then only naming convention - apart from the ones mentioned in Naming the
+The only naming convention - apart from the ones mentioned in Naming the
 `COMMANDS` section is how flags are named.
 
 Flags are a type of `OPTION` that represent an option that can be turned ON of
@@ -271,12 +271,12 @@ to improve the discoverability of possible input. A new user will most likely
 not know which `ARGUMENTS` and `OPTIONS` are required or which values are
 possible for those options.
 
-In cases, the user might not provide the input or they provide wrong input,
-rather then show the error, prompt a user with an option to find and select
+In case the user does not provide the input or they provide wrong input,
+rather than show the error, prompt a user with an option to find and select
 correct input (see examples).
 
 Prompting is of course not required when TTY is not attached to STDIN. This
-would mean that scripts wont need to handle prompt, but rather handle errors.
+would mean that scripts won't need to handle prompt, but rather handle errors.
 
 A place to use prompt and provide user with interactive select
 
@@ -300,9 +300,9 @@ going to happen.
 ```shell
 $ nix build --option substitutors https://cache.example.org
 ------------------------------------------------------------------------
-  Warning! A security related question need to be answered.
+  Warning! A security related question needs to be answered.
 ------------------------------------------------------------------------
-  The following substitutors will be used to in `my-project`: 
+  The following substitutors will be used to in `my-project`:
     - https://cache.example.org
 
   Do you allow `my-project` to use above mentioned substitutors?
@@ -311,14 +311,14 @@ $ nix build --option substitutors https://cache.example.org
 
 # Output
 
-Terminal output can be quite limiting in many ways. Which should forces us to
+Terminal output can be quite limiting in many ways. Which should force us to
 think about the experience even more. As with every design the output is a
 compromise between being terse and being verbose, between showing help to
 beginners and annoying advance users. For this it is important that we know
 what are the priorities.
 
 Nix command line should be first and foremost written with beginners in mind.
-But users wont stay beginners for long and what was once useful might quickly
+But users won't stay beginners for long and what was once useful might quickly
 become annoying. There is no golden rule that we can give in this guideline
 that would make it easier how to draw a line and find best compromise.
 
@@ -342,7 +342,7 @@ also allowing them to redirect content to a file. For example:
 ```shell
 $ nix build > build.txt
 ------------------------------------------------------------------------
-  Error! Atrribute `bin` missing at (1:94) from string.
+  Error! Attribute `bin` missing at (1:94) from string.
 ------------------------------------------------------------------------
 
   1| with import <nixpkgs> { }; (pkgs.runCommandCC or pkgs.runCommand) "shell" { buildInputs = [ (surge.bin) ]; } ""
@@ -408,7 +408,7 @@ Above command clearly states that command successfully completed. And in case
 of `nix build`, which is a command that might take some time to complete, it is
 equally important to also show that a command started.
 
-## Text alignment 
+## Text alignment
 
 Text alignment is the number one design element that will present all of the
 Nix commands as a family and not as separate tools glued together.
@@ -419,7 +419,7 @@ The format we should follow is:
 $ nix COMMAND
    VERB_1 NOUN and other words
   VERB__1 NOUN and other words
-       |> Some details 
+       |> Some details
 ```
 
 Few rules that we can extract from above example:
@@ -444,13 +444,13 @@ is not even notable, therefore relying on it wouldn’t make much sense.
 
 **The bright text is much better supported** across terminals and color
 schemes. Most of the time the difference is perceived as if the bright text
-would be bold. 
+would be bold.
 
 ## Colors
 
 Humans are already conditioned by society to attach certain meaning to certain
 colors. While the meaning is not universal, a simple collection of colors is
-used to represent basic emotions. 
+used to represent basic emotions.
 
 Colors that can be used in output
 
@@ -508,7 +508,7 @@ can, with a few key strokes, be changed into and advance introspection tool.
 
 ### Progress
 
-For longer running commands we should provide and overview of the progress.
+For longer running commands we should provide and overview the progress.
 This is shown best in `nix build` example:
 
 ```shell
@@ -553,9 +553,9 @@ going to happen.
 ```shell
 $ nix build --option substitutors https://cache.example.org
 ------------------------------------------------------------------------
-  Warning! A security related question need to be answered.
+  Warning! A security related question needs to be answered.
 ------------------------------------------------------------------------
-  The following substitutors will be used to in `my-project`: 
+  The following substitutors will be used to in `my-project`:
     - https://cache.example.org
 
   Do you allow `my-project` to use above mentioned substitutors?
@@ -566,7 +566,7 @@ $ nix build --option substitutors https://cache.example.org
 
 There are many ways that you can control verbosity.
 
-Verbosity levels are: 
+Verbosity levels are:
 
 - `ERROR` (level 0)
 - `WARN` (level 1)
@@ -586,4 +586,4 @@ There are also two shortcuts, `--debug` to run in `DEBUG` verbosity level and
 
 # Appendix 1: Commands naming exceptions
 
-`nix init` and `nix repl` are well established 
+`nix init` and `nix repl` are well established

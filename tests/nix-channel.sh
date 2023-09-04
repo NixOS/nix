@@ -35,16 +35,14 @@ grep -q 'item.*attrPath="foo".*name="dependencies-top"' $TEST_ROOT/meta.xml
 nix-env -i dependencies-top
 [ -e $TEST_HOME/.nix-profile/foobar ]
 
-clearProfiles
-rm -f $TEST_HOME/.nix-channels
-
 # Test updating from a tarball
-nix-channel --add file://$TEST_ROOT/foo/nixexprs.tar.bz2 foo
+nix-channel --add file://$TEST_ROOT/foo/nixexprs.tar.bz2 bar
 nix-channel --update
 
 # Do a query.
 nix-env -qa \* --meta --xml --out-path > $TEST_ROOT/meta.xml
 grep -q 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
+grep -q 'item.*attrPath="bar".*name="dependencies-top"' $TEST_ROOT/meta.xml
 grep -q 'item.*attrPath="foo".*name="dependencies-top"' $TEST_ROOT/meta.xml
 
 # Do an install.

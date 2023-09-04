@@ -36,9 +36,9 @@ void parseGit(ParseSink & sink, Source & source, const Path & realStoreDir, cons
     parse(sink, source, "", realStoreDir, storeDir);
 }
 
-static string getStringUntil(Source & source, char byte)
+static std::string getStringUntil(Source & source, char byte)
 {
-    string s;
+    std::string s;
     char n[1];
     source(std::string_view { n, 1 });
     while (*n != byte) {
@@ -48,7 +48,7 @@ static string getStringUntil(Source & source, char byte)
     return s;
 }
 
-static string getString(Source & source, int n)
+static std::string getString(Source & source, int n)
 {
     std::string v;
     v.resize(n);
@@ -57,7 +57,7 @@ static string getString(Source & source, int n)
 }
 
 // Unfortunately, no access to libstore headers here.
-static string getStoreEntry(const Path & storeDir, Hash hash, string name)
+static std::string getStoreEntry(const Path & storeDir, Hash hash, std::string name)
 {
     Hash hash1 = hashString(htSHA256, "fixed:out:git:" + hash.to_string(Base::Base16, true) + ":");
     Hash hash2 = hashString(htSHA256, "output:out:" + hash1.to_string(Base::Base16, true) + ":" + storeDir + ":" + name);
@@ -95,7 +95,7 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
         sink.createDirectory(path);
 
         while (left) {
-            string perms = getStringUntil(source, ' ');
+            std::string perms = getStringUntil(source, ' ');
             left -= perms.size();
             left -= 1;
 
@@ -103,17 +103,17 @@ static void parse(ParseSink & sink, Source & source, const Path & path, const Pa
             if (perm != 100644 && perm != 100755 && perm != 644 && perm != 755 && perm != 40000)
               throw Error("Unknown Git permission: %d", perm);
 
-            string name = getStringUntil(source, 0);
+            std::string name = getStringUntil(source, 0);
             left -= name.size();
             left -= 1;
 
-            string hashs = getString(source, 20);
+            std::string hashs = getString(source, 20);
             left -= 20;
 
             Hash hash(htSHA1);
             std::copy(hashs.begin(), hashs.end(), hash.hash);
 
-            string entryName = getStoreEntry(storeDir, hash, "git");
+            std::string entryName = getStoreEntry(storeDir, hash, "git");
             Path entry = absPath(realStoreDir + "/" + entryName);
 
             struct stat st;
@@ -155,7 +155,7 @@ GitMode dumpGitBlob(const Path & path, const struct stat st, Sink & sink)
 
 GitMode dumpGitTree(const GitTree & entries, Sink & sink)
 {
-    vector<uint8_t> v1;
+    std::vector<uint8_t> v1;
 
     for (auto & i : entries) {
         unsigned int mode;

@@ -16,6 +16,8 @@
 #ifndef BISON_HEADER
 #define BISON_HEADER
 
+#include <variant>
+
 #include "util.hh"
 
 #include "nixexpr.hh"
@@ -33,15 +35,27 @@ namespace nix {
         Symbol file;
         FileOrigin origin;
         std::optional<ErrorInfo> error;
-        Symbol sLetBody;
         ParseData(EvalState & state)
             : state(state)
             , symbols(state.symbols)
-            , sLetBody(symbols.create("<let-body>"))
             { };
     };
 
+    struct ParserFormals {
+        std::vector<Formal> formals;
+        bool ellipsis = false;
+    };
+
 }
+
+// using C a struct allows us to avoid having to define the special
+// members that using string_view here would implicitly delete.
+struct StringToken {
+  const char * p;
+  size_t l;
+  bool hasIndentation;
+  operator std::string_view() const { return {p, l}; }
+};
 
 #define YY_DECL int yylex \
     (YYSTYPE * yylval_param, YYLTYPE * yylloc_param, yyscan_t yyscanner, nix::ParseData * data)
@@ -126,14 +140,14 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
                     auto j2 = jAttrs->attrs.find(ad.first);
                     if (j2 != jAttrs->attrs.end()) // Attr already defined in iAttrs, error.
                         dupAttr(ad.first, j2->second.pos, ad.second.pos);
-                    jAttrs->attrs[ad.first] = ad.second;
+                    jAttrs->attrs.emplace(ad.first, ad.second);
                 }
             } else {
                 dupAttr(attrPath, pos, j->second.pos);
             }
         } else {
             // This attr path is not defined. Let's create it.
-            attrs->attrs[i->symbol] = ExprAttrs::AttrDef(e, pos);
+            attrs->attrs.emplace(i->symbol, ExprAttrs::AttrDef(e, pos));
             e->setName(i->symbol);
         }
     } else {
@@ -142,21 +156,46 @@ static void addAttr(ExprAttrs * attrs, AttrPath & attrPath,
 }
 
 
-static void addFormal(const Pos & pos, Formals * formals, const Formal & formal)
+static Formals * toFormals(ParseData & data, ParserFormals * formals,
+    Pos pos = noPos, Symbol arg = {})
 {
-    if (!formals->argNames.insert(formal.name).second)
+    std::sort(formals->formals.begin(), formals->formals.end(),
+        [] (const auto & a, const auto & b) {
+            return std::tie(a.name, a.pos) < std::tie(b.name, b.pos);
+        });
+
+    std::optional<std::pair<Symbol, Pos>> duplicate;
+    for (size_t i = 0; i + 1 < formals->formals.size(); i++) {
+        if (formals->formals[i].name != formals->formals[i + 1].name)
+            continue;
+        std::pair thisDup{formals->formals[i].name, formals->formals[i + 1].pos};
+        duplicate = std::min(thisDup, duplicate.value_or(thisDup));
+    }
+    if (duplicate)
         throw ParseError({
-            .msg = hintfmt("duplicate formal function argument '%1%'",
-                formal.name),
+            .msg = hintfmt("duplicate formal function argument '%1%'", duplicate->first),
+            .errPos = duplicate->second
+        });
+
+    Formals result;
+    result.ellipsis = formals->ellipsis;
+    result.formals = std::move(formals->formals);
+
+    if (arg.set() && result.has(arg))
+        throw ParseError({
+            .msg = hintfmt("duplicate formal function argument '%1%'", arg),
             .errPos = pos
         });
-    formals->formals.push_front(formal);
+
+    delete formals;
+    return new Formals(std::move(result));
 }
 
 
-static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Expr *> & es)
+static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols,
+    std::vector<std::pair<Pos, std::variant<Expr *, StringToken> > > & es)
 {
-    if (es.empty()) return new ExprString(symbols.create(""));
+    if (es.empty()) return new ExprString("");
 
     /* Figure out the minimum indentation.  Note that by design
        whitespace-only final lines are not taken into account.  (So
@@ -164,21 +203,21 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
     bool atStartOfLine = true; /* = seen only whitespace in the current line */
     size_t minIndent = 1000000;
     size_t curIndent = 0;
-    for (auto & i : es) {
-        ExprIndStr * e = dynamic_cast<ExprIndStr *>(i);
-        if (!e) {
-            /* Anti-quotations end the current start-of-line whitespace. */
+    for (auto & [i_pos, i] : es) {
+        auto * str = std::get_if<StringToken>(&i);
+        if (!str || !str->hasIndentation) {
+            /* Anti-quotations and escaped characters end the current start-of-line whitespace. */
             if (atStartOfLine) {
                 atStartOfLine = false;
                 if (curIndent < minIndent) minIndent = curIndent;
             }
             continue;
         }
-        for (size_t j = 0; j < e->s.size(); ++j) {
+        for (size_t j = 0; j < str->l; ++j) {
             if (atStartOfLine) {
-                if (e->s[j] == ' ')
+                if (str->p[j] == ' ')
                     curIndent++;
-                else if (e->s[j] == '\n') {
+                else if (str->p[j] == '\n') {
                     /* Empty line, doesn't influence minimum
                        indentation. */
                     curIndent = 0;
@@ -186,7 +225,7 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
                     atStartOfLine = false;
                     if (curIndent < minIndent) minIndent = curIndent;
                 }
-            } else if (e->s[j] == '\n') {
+            } else if (str->p[j] == '\n') {
                 atStartOfLine = true;
                 curIndent = 0;
             }
@@ -194,53 +233,54 @@ static Expr * stripIndentation(const Pos & pos, SymbolTable & symbols, vector<Ex
     }
 
     /* Strip spaces from each line. */
-    vector<Expr *> * es2 = new vector<Expr *>;
+    std::vector<std::pair<Pos, Expr *> > * es2 = new std::vector<std::pair<Pos, Expr *> >;
     atStartOfLine = true;
     size_t curDropped = 0;
     size_t n = es.size();
-    for (vector<Expr *>::iterator i = es.begin(); i != es.end(); ++i, --n) {
-        ExprIndStr * e = dynamic_cast<ExprIndStr *>(*i);
-        if (!e) {
-            atStartOfLine = false;
-            curDropped = 0;
-            es2->push_back(*i);
-            continue;
-        }
-
-        string s2;
-        for (size_t j = 0; j < e->s.size(); ++j) {
+    auto i = es.begin();
+    const auto trimExpr = [&] (Expr * e) {
+        atStartOfLine = false;
+        curDropped = 0;
+        es2->emplace_back(i->first, e);
+    };
+    const auto trimString = [&] (const StringToken & t) {
+        std::string s2;
+        for (size_t j = 0; j < t.l; ++j) {
             if (atStartOfLine) {
-                if (e->s[j] == ' ') {
+                if (t.p[j] == ' ') {
                     if (curDropped++ >= minIndent)
-                        s2 += e->s[j];
+                        s2 += t.p[j];
                 }
-                else if (e->s[j] == '\n') {
+                else if (t.p[j] == '\n') {
                     curDropped = 0;
-                    s2 += e->s[j];
+                    s2 += t.p[j];
                 } else {
                     atStartOfLine = false;
                     curDropped = 0;
-                    s2 += e->s[j];
+                    s2 += t.p[j];
                 }
             } else {
-                s2 += e->s[j];
-                if (e->s[j] == '\n') atStartOfLine = true;
+                s2 += t.p[j];
+                if (t.p[j] == '\n') atStartOfLine = true;
             }
         }
 
         /* Remove the last line if it is empty and consists only of
            spaces. */
         if (n == 1) {
-            string::size_type p = s2.find_last_of('\n');
-            if (p != string::npos && s2.find_first_not_of(' ', p + 1) == string::npos)
-                s2 = string(s2, 0, p + 1);
+            std::string::size_type p = s2.find_last_of('\n');
+            if (p != std::string::npos && s2.find_first_not_of(' ', p + 1) == std::string::npos)
+                s2 = std::string(s2, 0, p + 1);
         }
 
-        es2->push_back(new ExprString(symbols.create(s2)));
+        es2->emplace_back(i->first, new ExprString(s2));
+    };
+    for (; i != es.end(); ++i, --n) {
+        std::visit(overloaded { trimExpr, trimString }, i->second);
     }
 
     /* If this is a single string, then don't do a concatenation. */
-    return es2->size() == 1 && dynamic_cast<ExprString *>((*es2)[0]) ? (*es2)[0] : new ExprConcatStrings(pos, true, es2);
+    return es2->size() == 1 && dynamic_cast<ExprString *>((*es2)[0].second) ? (*es2)[0].second : new ExprConcatStrings(pos, true, es2);
 }
 
 
@@ -271,29 +311,32 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
   nix::Expr * e;
   nix::ExprList * list;
   nix::ExprAttrs * attrs;
-  nix::Formals * formals;
+  nix::ParserFormals * formals;
   nix::Formal * formal;
   nix::NixInt n;
   nix::NixFloat nf;
-  const char * id; // !!! -> Symbol
-  char * path;
-  char * uri;
+  StringToken id; // !!! -> Symbol
+  StringToken path;
+  StringToken uri;
+  StringToken str;
   std::vector<nix::AttrName> * attrNames;
-  std::vector<nix::Expr *> * string_parts;
+  std::vector<std::pair<nix::Pos, nix::Expr *> > * string_parts;
+  std::vector<std::pair<nix::Pos, std::variant<nix::Expr *, StringToken> > > * ind_string_parts;
 }
 
 %type <e> start expr expr_function expr_if expr_op
-%type <e> expr_app expr_select expr_simple
+%type <e> expr_select expr_simple expr_app
 %type <list> expr_list
 %type <attrs> binds
 %type <formals> formals
 %type <formal> formal
 %type <attrNames> attrs attrpath
-%type <string_parts> string_parts_interpolated ind_string_parts
+%type <string_parts> string_parts_interpolated
+%type <ind_string_parts> ind_string_parts
 %type <e> path_start string_parts string_attr
 %type <id> attr
 %token <id> ID ATTRPATH
-%token <e> STR IND_STR
+%token <str> STR IND_STR
 %token <n> INT
 %token <nf> FLOAT
 %token <path> PATH HPATH SPATH PATH_END
@@ -324,13 +367,19 @@ expr: expr_function;
 
 expr_function
   : ID ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), false, 0, $3); }
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), 0, $3); }
   | '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create(""), true, $2, $5); }
+    { $$ = new ExprLambda(CUR_POS, data->symbols.create(""), toFormals(*data, $2), $5); }
   | '{' formals '}' '@' ID ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create($5), true, $2, $7); }
+    {
+      Symbol arg = data->symbols.create($5);
+      $$ = new ExprLambda(CUR_POS, arg, toFormals(*data, $2, CUR_POS, arg), $7);
+    }
   | ID '@' '{' formals '}' ':' expr_function
-    { $$ = new ExprLambda(CUR_POS, data->symbols.create($1), true, $4, $7); }
+    {
+      Symbol arg = data->symbols.create($1);
+      $$ = new ExprLambda(CUR_POS, arg, toFormals(*data, $4, CUR_POS, arg), $7);
+    }
   | ASSERT expr ';' expr_function
     { $$ = new ExprAssert(CUR_POS, $2, $4); }
   | WITH expr ';' expr_function
@@ -353,31 +402,36 @@ expr_if
 
 expr_op
   : '!' expr_op %prec NOT { $$ = new ExprOpNot($2); }
-  | '-' expr_op %prec NEGATE { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__sub")), new ExprInt(0)), $2); }
+  | '-' expr_op %prec NEGATE { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__sub")), {new ExprInt(0), $2}); }
   | expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
   | expr_op NEQ expr_op { $$ = new ExprOpNEq($1, $3); }
-  | expr_op '<' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $1), $3); }
-  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $3), $1)); }
-  | expr_op '>' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $3), $1); }
-  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__lessThan")), $1), $3)); }
+  | expr_op '<' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$1, $3}); }
+  | expr_op LEQ expr_op { $$ = new ExprOpNot(new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$3, $1})); }
+  | expr_op '>' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$3, $1}); }
+  | expr_op GEQ expr_op { $$ = new ExprOpNot(new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__lessThan")), {$1, $3})); }
   | expr_op AND expr_op { $$ = new ExprOpAnd(CUR_POS, $1, $3); }
   | expr_op OR expr_op { $$ = new ExprOpOr(CUR_POS, $1, $3); }
   | expr_op IMPL expr_op { $$ = new ExprOpImpl(CUR_POS, $1, $3); }
   | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(CUR_POS, $1, $3); }
   | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, *$3); }
   | expr_op '+' expr_op
-    { $$ = new ExprConcatStrings(CUR_POS, false, new vector<Expr *>({$1, $3})); }
-  | expr_op '-' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__sub")), $1), $3); }
-  | expr_op '*' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__mul")), $1), $3); }
-  | expr_op '/' expr_op { $$ = new ExprApp(CUR_POS, new ExprApp(new ExprVar(data->symbols.create("__div")), $1), $3); }
+    { $$ = new ExprConcatStrings(CUR_POS, false, new std::vector<std::pair<Pos, Expr *> >({{makeCurPos(@1, data), $1}, {makeCurPos(@3, data), $3}})); }
+  | expr_op '-' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__sub")), {$1, $3}); }
+  | expr_op '*' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__mul")), {$1, $3}); }
+  | expr_op '/' expr_op { $$ = new ExprCall(CUR_POS, new ExprVar(data->symbols.create("__div")), {$1, $3}); }
   | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(CUR_POS, $1, $3); }
   | expr_app
   ;
 
 expr_app
-  : expr_app expr_select
-    { $$ = new ExprApp(CUR_POS, $1, $2); }
-  | expr_select { $$ = $1; }
+  : expr_app expr_select {
+      if (auto e2 = dynamic_cast<ExprCall *>($1)) {
+          e2->args.push_back($2);
+          $$ = $1;
+      } else
+          $$ = new ExprCall(CUR_POS, $1, {$2});
+  }
+  | expr_select
   ;
 
 expr_select
@@ -388,13 +442,14 @@ expr_select
   | /* Backwards compatibility: because Nixpkgs has a rarely used
        function named ‘or’, allow stuff like ‘map or [...]’. */
     expr_simple OR_KW
-    { $$ = new ExprApp(CUR_POS, $1, new ExprVar(CUR_POS, data->symbols.create("or"))); }
+    { $$ = new ExprCall(CUR_POS, $1, {new ExprVar(CUR_POS, data->symbols.create("or"))}); }
   | expr_simple { $$ = $1; }
   ;
 
 expr_simple
   : ID {
-      if (strcmp($1, "__curPos") == 0)
+      std::string_view s = "__curPos";
+      if ($1.l == s.size() && strncmp($1.p, s.data(), s.size()) == 0)
           $$ = new ExprPos(CUR_POS);
       else
           $$ = new ExprVar(CUR_POS, data->symbols.create($1));
@@ -407,24 +462,24 @@ expr_simple
   }
   | path_start PATH_END { $$ = $1; }
   | path_start string_parts_interpolated PATH_END {
-      $2->insert($2->begin(), $1);
+      $2->insert($2->begin(), {makeCurPos(@1, data), $1});
       $$ = new ExprConcatStrings(CUR_POS, false, $2);
   }
   | SPATH {
-      string path($1 + 1, strlen($1) - 2);
-      $$ = new ExprApp(CUR_POS,
-          new ExprApp(new ExprVar(data->symbols.create("__findFile")),
-              new ExprVar(data->symbols.create("__nixPath"))),
-          new ExprString(data->symbols.create(path)));
+      std::string path($1.p + 1, $1.l - 2);
+      $$ = new ExprCall(CUR_POS,
+          new ExprVar(data->symbols.create("__findFile")),
+          {new ExprVar(data->symbols.create("__nixPath")),
+           new ExprString(path)});
   }
   | URI {
-      static bool noURLLiterals = settings.isExperimentalFeatureEnabled("no-url-literals");
+      static bool noURLLiterals = settings.isExperimentalFeatureEnabled(Xp::NoUrlLiterals);
       if (noURLLiterals)
           throw ParseError({
               .msg = hintfmt("URL literals are disabled"),
               .errPos = CUR_POS
           });
-      $$ = new ExprString(data->symbols.create($1));
+      $$ = new ExprString(std::string($1));
   }
   | '(' expr ')' { $$ = $2; }
   /* Let expressions `let {..., body = ...}' are just desugared
@@ -439,40 +494,41 @@ expr_simple
   ;
 
 string_parts
-  : STR
+  : STR { $$ = new ExprString(std::string($1)); }
   | string_parts_interpolated { $$ = new ExprConcatStrings(CUR_POS, true, $1); }
-  | { $$ = new ExprString(data->symbols.create("")); }
+  | { $$ = new ExprString(""); }
   ;
 
 string_parts_interpolated
-  : string_parts_interpolated STR { $$ = $1; $1->push_back($2); }
-  | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->push_back($3); }
-  | DOLLAR_CURLY expr '}' { $$ = new vector<Expr *>; $$->push_back($2); }
+  : string_parts_interpolated STR
+  { $$ = $1; $1->emplace_back(makeCurPos(@2, data), new ExprString(std::string($2))); }
+  | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $3); }
+  | DOLLAR_CURLY expr '}' { $$ = new std::vector<std::pair<Pos, Expr *> >; $$->emplace_back(makeCurPos(@1, data), $2); }
   | STR DOLLAR_CURLY expr '}' {
-      $$ = new vector<Expr *>;
-      $$->push_back($1);
-      $$->push_back($3);
+      $$ = new std::vector<std::pair<Pos, Expr *> >;
+      $$->emplace_back(makeCurPos(@1, data), new ExprString(std::string($1)));
+      $$->emplace_back(makeCurPos(@2, data), $3);
     }
   ;
 
 path_start
   : PATH {
-    Path path(absPath($1, data->basePath));
+    Path path(absPath({$1.p, $1.l}, data->basePath));
     /* add back in the trailing '/' to the first segment */
-    if ($1[strlen($1)-1] == '/' && strlen($1) > 1)
+    if ($1.p[$1.l-1] == '/' && $1.l > 1)
       path += "/";
     $$ = new ExprPath(path);
   }
   | HPATH {
-    Path path(getHome() + string($1 + 1));
+    Path path(getHome() + std::string($1.p + 1, $1.l - 1));
     $$ = new ExprPath(path);
   }
   ;
 
 ind_string_parts
-  : ind_string_parts IND_STR { $$ = $1; $1->push_back($2); }
-  | ind_string_parts DOLLAR_CURLY expr '}' { $$ = $1; $1->push_back($3); }
-  | { $$ = new vector<Expr *>; }
+  : ind_string_parts IND_STR { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $2); }
+  | ind_string_parts DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(makeCurPos(@2, data), $3); }
+  | { $$ = new std::vector<std::pair<Pos, std::variant<Expr *, StringToken> > >; }
   ;
 
 binds
@@ -483,7 +539,7 @@ binds
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
               dupAttr(i.symbol, makeCurPos(@3, data), $$->attrs[i.symbol].pos);
           Pos pos = makeCurPos(@3, data);
-          $$->attrs[i.symbol] = ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, true);
+          $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprVar(CUR_POS, i.symbol), pos, true));
       }
     }
   | binds INHERIT '(' expr ')' attrs ';'
@@ -492,7 +548,7 @@ binds
       for (auto & i : *$6) {
           if ($$->attrs.find(i.symbol) != $$->attrs.end())
               dupAttr(i.symbol, makeCurPos(@6, data), $$->attrs[i.symbol].pos);
-          $$->attrs[i.symbol] = ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), makeCurPos(@6, data));
+          $$->attrs.emplace(i.symbol, ExprAttrs::AttrDef(new ExprSelect(CUR_POS, $4, i.symbol), makeCurPos(@6, data)));
       }
     }
   | { $$ = new ExprAttrs(makeCurPos(@0, data)); }
@@ -504,7 +560,7 @@ attrs
     { $$ = $1;
       ExprString * str = dynamic_cast<ExprString *>($2);
       if (str) {
-          $$->push_back(AttrName(str->s));
+          $$->push_back(AttrName(data->symbols.create(str->s)));
           delete str;
       } else
           throw ParseError({
@@ -521,17 +577,17 @@ attrpath
     { $$ = $1;
       ExprString * str = dynamic_cast<ExprString *>($3);
       if (str) {
-          $$->push_back(AttrName(str->s));
+          $$->push_back(AttrName(data->symbols.create(str->s)));
           delete str;
       } else
           $$->push_back(AttrName($3));
     }
-  | attr { $$ = new vector<AttrName>; $$->push_back(AttrName(data->symbols.create($1))); }
+  | attr { $$ = new std::vector<AttrName>; $$->push_back(AttrName(data->symbols.create($1))); }
   | string_attr
-    { $$ = new vector<AttrName>;
+    { $$ = new std::vector<AttrName>;
       ExprString *str = dynamic_cast<ExprString *>($1);
       if (str) {
-          $$->push_back(AttrName(str->s));
+          $$->push_back(AttrName(data->symbols.create(str->s)));
           delete str;
       } else
           $$->push_back(AttrName($1));
@@ -540,7 +596,7 @@ attrpath
 
 attr
   : ID { $$ = $1; }
-  | OR_KW { $$ = "or"; }
+  | OR_KW { $$ = {"or", 2}; }
   ;
 
 string_attr
@@ -555,13 +611,13 @@ expr_list
 
 formals
   : formal ',' formals
-    { $$ = $3; addFormal(CUR_POS, $$, *$1); }
+    { $$ = $3; $$->formals.push_back(*$1); }
   | formal
-    { $$ = new Formals; addFormal(CUR_POS, $$, *$1); $$->ellipsis = false; }
+    { $$ = new ParserFormals; $$->formals.push_back(*$1); $$->ellipsis = false; }
   |
-    { $$ = new Formals; $$->ellipsis = false; }
+    { $$ = new ParserFormals; $$->ellipsis = false; }
   | ELLIPSIS
-    { $$ = new Formals; $$->ellipsis = true; }
+    { $$ = new ParserFormals; $$->ellipsis = true; }
   ;
 
 formal
@@ -586,8 +642,8 @@ formal
 namespace nix {
 
 
-Expr * EvalState::parse(const char * text, FileOrigin origin,
-    const Path & path, const Path & basePath, StaticEnv & staticEnv)
+Expr * EvalState::parse(char * text, size_t length, FileOrigin origin,
+    const PathView path, const PathView basePath, StaticEnv & staticEnv)
 {
     yyscan_t scanner;
     ParseData data(*this);
@@ -606,7 +662,7 @@ Expr * EvalState::parse(const char * text, FileOrigin origin,
     data.basePath = basePath;
 
     yylex_init(&scanner);
-    yy_scan_string(text, scanner);
+    yy_scan_buffer(text, length, scanner);
     int res = yyparse(scanner, &data);
     yylex_destroy(scanner);
 
@@ -652,63 +708,70 @@ Expr * EvalState::parseExprFromFile(const Path & path)
 
 Expr * EvalState::parseExprFromFile(const Path & path, StaticEnv & staticEnv)
 {
-    return parse(readFile(path).c_str(), foFile, path, dirOf(path), staticEnv);
+    auto buffer = readFile(path);
+    // readFile should have left some extra space for terminators
+    buffer.append("\0\0", 2);
+    return parse(buffer.data(), buffer.size(), foFile, path, dirOf(path), staticEnv);
 }
 
 
-Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath, StaticEnv & staticEnv)
+Expr * EvalState::parseExprFromString(std::string s, const Path & basePath, StaticEnv & staticEnv)
 {
-    return parse(s.data(), foString, "", basePath, staticEnv);
+    s.append("\0\0", 2);
+    return parse(s.data(), s.size(), foString, "", basePath, staticEnv);
 }
 
 
-Expr * EvalState::parseExprFromString(std::string_view s, const Path & basePath)
+Expr * EvalState::parseExprFromString(std::string s, const Path & basePath)
 {
-    return parseExprFromString(s, basePath, staticBaseEnv);
+    return parseExprFromString(std::move(s), basePath, staticBaseEnv);
 }
 
 
 Expr * EvalState::parseStdin()
 {
     //Activity act(*logger, lvlTalkative, format("parsing standard input"));
-    return parse(drainFD(0).data(), foStdin, "", absPath("."), staticBaseEnv);
+    auto buffer = drainFD(0);
+    // drainFD should have left some extra space for terminators
+    buffer.append("\0\0", 2);
+    return parse(buffer.data(), buffer.size(), foStdin, "", absPath("."), staticBaseEnv);
 }
 
 
-void EvalState::addToSearchPath(const string & s)
+void EvalState::addToSearchPath(const std::string & s)
 {
     size_t pos = s.find('=');
-    string prefix;
+    std::string prefix;
     Path path;
-    if (pos == string::npos) {
+    if (pos == std::string::npos) {
         path = s;
     } else {
-        prefix = string(s, 0, pos);
-        path = string(s, pos + 1);
+        prefix = std::string(s, 0, pos);
+        path = std::string(s, pos + 1);
     }
 
     searchPath.emplace_back(prefix, path);
 }
 
 
-Path EvalState::findFile(const string & path)
+Path EvalState::findFile(const std::string_view path)
 {
     return findFile(searchPath, path);
 }
 
 
-Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos & pos)
+Path EvalState::findFile(SearchPath & searchPath, const std::string_view path, const Pos & pos)
 {
     for (auto & i : searchPath) {
         std::string suffix;
         if (i.first.empty())
-            suffix = "/" + path;
+            suffix = concatStrings("/", path);
         else {
             auto s = i.first.size();
             if (path.compare(0, s, i.first) != 0 ||
                 (path.size() > s && path[s] != '/'))
                 continue;
-            suffix = path.size() == s ? "" : "/" + string(path, s);
+            suffix = path.size() == s ? "" : concatStrings("/", path.substr(s));
         }
         auto r = resolveSearchPathElem(i);
         if (!r.first) continue;
@@ -717,7 +780,7 @@ Path EvalState::findFile(SearchPath & searchPath, const string & path, const Pos
     }
 
     if (hasPrefix(path, "nix/"))
-        return corepkgsPrefix + path.substr(4);
+        return concatStrings(corepkgsPrefix, path.substr(4));
 
     throw ThrownError({
         .msg = hintfmt(evalSettings.pureEval
@@ -759,7 +822,7 @@ std::pair<bool, std::string> EvalState::resolveSearchPathElem(const SearchPathEl
             res = { true, path };
         else {
             logWarning({
-                .msg = hintfmt("warning: Nix search path entry '%1%' does not exist, ignoring", elem.second)
+                .msg = hintfmt("Nix search path entry '%1%' does not exist, ignoring", elem.second)
             });
             res = { false, "" };
         }

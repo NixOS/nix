@@ -100,7 +100,7 @@ std::vector<Path> getUserConfigFiles()
     // Use the paths specified in NIX_USER_CONF_FILES if it has been defined
     auto nixConfFiles = getEnv("NIX_USER_CONF_FILES");
     if (nixConfFiles.has_value()) {
-        return tokenizeString<std::vector<string>>(nixConfFiles.value(), ":");
+        return tokenizeString<std::vector<std::string>>(nixConfFiles.value(), ":");
     }
 
     // Use the paths specified by the XDG spec
@@ -122,7 +122,7 @@ StringSet Settings::getDefaultSystemFeatures()
     /* For backwards compatibility, accept some "features" that are
        used in Nixpkgs to route builds to certain machines but don't
        actually require anything special on the machines. */
-    StringSet features{"nixos-test", "benchmark", "big-parallel", "recursive-nix"};
+    StringSet features{"nixos-test", "benchmark", "big-parallel"};
 
     #if __linux__
     if (access("/dev/kvm", R_OK | W_OK) == 0)
@@ -148,7 +148,8 @@ StringSet Settings::getDefaultExtraPlatforms()
     // machines. Note that we can’t force processes from executing
     // x86_64 in aarch64 environments or vice versa since they can
     // always exec with their own binary preferences.
-    if (pathExists("/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist")) {
+    if (pathExists("/Library/Apple/System/Library/LaunchDaemons/com.apple.oahd.plist") ||
+        pathExists("/System/Library/LaunchDaemons/com.apple.oahd.plist")) {
         if (std::string{SYSTEM} == "x86_64-darwin")
             extraPlatforms.insert("aarch64-darwin");
         else if (std::string{SYSTEM} == "aarch64-darwin")
@@ -159,21 +160,16 @@ StringSet Settings::getDefaultExtraPlatforms()
     return extraPlatforms;
 }
 
-bool Settings::isExperimentalFeatureEnabled(const std::string & name)
+bool Settings::isExperimentalFeatureEnabled(const ExperimentalFeature & feature)
 {
     auto & f = experimentalFeatures.get();
-    return std::find(f.begin(), f.end(), name) != f.end();
+    return std::find(f.begin(), f.end(), feature) != f.end();
 }
 
-MissingExperimentalFeature::MissingExperimentalFeature(std::string feature)
-    : Error("experimental Nix feature '%1%' is disabled; use '--extra-experimental-features %1%' to override", feature)
-    , missingFeature(feature)
-    {}
-
-void Settings::requireExperimentalFeature(const std::string & name)
+void Settings::requireExperimentalFeature(const ExperimentalFeature & feature)
 {
-    if (!isExperimentalFeatureEnabled(name))
-        throw MissingExperimentalFeature(name);
+    if (!isExperimentalFeatureEnabled(feature))
+        throw MissingExperimentalFeature(feature);
 }
 
 bool Settings::isWSL1()
@@ -185,7 +181,7 @@ bool Settings::isWSL1()
     return hasSuffix(utsbuf.release, "-Microsoft");
 }
 
-const string nixVersion = PACKAGE_VERSION;
+const std::string nixVersion = PACKAGE_VERSION;
 
 NLOHMANN_JSON_SERIALIZE_ENUM(SandboxMode, {
     {SandboxMode::smEnabled, true},

@@ -158,7 +158,7 @@ public:
     }
 
     /* Expect a string argument. */
-    void expectArg(const std::string & label, string * dest, bool optional = false)
+    void expectArg(const std::string & label, std::string * dest, bool optional = false)
     {
         expectArgs({
             .label = label,
@@ -237,7 +237,13 @@ public:
     void add(std::string completion, std::string description = "");
 };
 extern std::shared_ptr<Completions> completions;
-extern bool pathCompletions;
+
+enum CompletionType {
+    ctNormal,
+    ctFilenames,
+    ctAttrs
+};
+extern CompletionType completionType;
 
 std::optional<std::string> needsCompletion(std::string_view s);
 

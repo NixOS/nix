@@ -167,7 +167,7 @@ unsigned Worker::getNrLocalBuilds()
 }
 
 
-void Worker::childStarted(GoalPtr goal, const set<int> & fds,
+void Worker::childStarted(GoalPtr goal, const std::set<int> & fds,
     bool inBuildSlot, bool respectTimeouts)
 {
     Child child;
@@ -245,7 +245,7 @@ void Worker::run(const Goals & _topGoals)
         }
     }
 
-    /* Call queryMissing() efficiently query substitutes. */
+    /* Call queryMissing() to efficiently query substitutes. */
     StorePathSet willBuild, willSubstitute, unknown;
     uint64_t downloadSize, narSize;
     store.queryMissing(topPaths, willBuild, willSubstitute, unknown, downloadSize, narSize);
@@ -287,11 +287,11 @@ void Worker::run(const Goals & _topGoals)
                 if (getMachines().empty())
                    throw Error("unable to start any build; either increase '--max-jobs' "
                             "or enable remote builds."
-                            "\nhttps://nixos.org/nix/manual/#chap-distributed-builds");
+                            "\nhttps://nixos.org/manual/nix/stable/advanced-topics/distributed-builds.html");
                 else
                    throw Error("unable to start any build; remote machines may not have "
                             "all required system features."
-                            "\nhttps://nixos.org/nix/manual/#chap-distributed-builds");
+                            "\nhttps://nixos.org/manual/nix/stable/advanced-topics/distributed-builds.html");
 
             }
             assert(!awake.empty());
@@ -383,7 +383,7 @@ void Worker::waitForInput()
         GoalPtr goal = j->goal.lock();
         assert(goal);
 
-        set<int> fds2(j->fds);
+        std::set<int> fds2(j->fds);
         std::vector<unsigned char> buffer(4096);
         for (auto & k : fds2) {
             if (pollStatus.at(fdToPollStatus.at(k)).revents) {
@@ -400,7 +400,7 @@ void Worker::waitForInput()
                 } else {
                     printMsg(lvlVomit, "%1%: read %2% bytes",
                         goal->getName(), rd);
-                    string data((char *) buffer.data(), rd);
+                    std::string data((char *) buffer.data(), rd);
                     j->lastOutput = after;
                     goal->handleChildOutput(k, data);
                 }

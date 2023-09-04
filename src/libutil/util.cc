@@ -1,5 +1,4 @@
 #include "util.hh"
-#include "affinity.hh"
 #include "sync.hh"
 #include "finally.hh"
 #include "serialise.hh"
@@ -82,7 +81,7 @@ void replaceEnv(std::map<std::string, std::string> newEnv)
 }
 
 
-Path absPath(Path path, std::optional<Path> dir, bool resolveSymlinks)
+Path absPath(Path path, std::optional<PathView> dir, bool resolveSymlinks)
 {
     if (path[0] != '/') {
         if (!dir) {
@@ -96,28 +95,28 @@ Path absPath(Path path, std::optional<Path> dir, bool resolveSymlinks)
             if (!getcwd(buf, sizeof(buf)))
 #endif
                 throw SysError("cannot get cwd");
-            dir = buf;
+            path = concatStrings(buf, "/", path);
 #ifdef __GNU__
             free(buf);
 #endif
-        }
-        path = *dir + "/" + path;
+        } else
+            path = concatStrings(*dir, "/", path);
     }
     return canonPath(path, resolveSymlinks);
 }
 
 
-Path canonPath(const Path & path, bool resolveSymlinks)
+Path canonPath(PathView path, bool resolveSymlinks)
 {
     assert(path != "");
 
-    string s;
+    std::string s;
+    s.reserve(256);
 
     if (path[0] != '/')
         throw Error("not an absolute path: '%1%'", path);
 
-    string::const_iterator i = path.begin(), end = path.end();
-    string temp;
+    std::string temp;
 
     /* Count the number of times we follow a symlink and stop at some
        arbitrary (but high) limit to prevent infinite loops. */
@@ -126,33 +125,37 @@ Path canonPath(const Path & path, bool resolveSymlinks)
     while (1) {
 
         /* Skip slashes. */
-        while (i != end && *i == '/') i++;
-        if (i == end) break;
+        while (!path.empty() && path[0] == '/') path.remove_prefix(1);
+        if (path.empty()) break;
 
         /* Ignore `.'. */
-        if (*i == '.' && (i + 1 == end || i[1] == '/'))
-            i++;
+        if (path == "." || path.substr(0, 2) == "./")
+            path.remove_prefix(1);
 
         /* If `..', delete the last component. */
-        else if (*i == '.' && i + 1 < end && i[1] == '.' &&
-            (i + 2 == end || i[2] == '/'))
+        else if (path == ".." || path.substr(0, 3) == "../")
         {
             if (!s.empty()) s.erase(s.rfind('/'));
-            i += 2;
+            path.remove_prefix(2);
         }
 
         /* Normal component; copy it. */
         else {
             s += '/';
-            while (i != end && *i != '/') s += *i++;
+            if (const auto slash = path.find('/'); slash == std::string::npos) {
+                s += path;
+                path = {};
+            } else {
+                s += path.substr(0, slash);
+                path = path.substr(slash);
+            }
 
             /* If s points to a symlink, resolve it and continue from there */
             if (resolveSymlinks && isLink(s)) {
                 if (++followCount >= maxFollow)
                     throw Error("infinite symlink recursion in path '%1%'", path);
-                temp = readLink(s) + string(i, end);
-                i = temp.begin();
-                end = temp.end();
+                temp = concatStrings(readLink(s), path);
+                path = temp;
                 if (!temp.empty() && temp[0] == '/') {
                     s.clear();  /* restart for symlinks pointing to absolute path */
                 } else {
@@ -165,14 +168,14 @@ Path canonPath(const Path & path, bool resolveSymlinks)
         }
     }
 
-    return s.empty() ? "/" : s;
+    return s.empty() ? "/" : std::move(s);
 }
 
 
-Path dirOf(const Path & path)
+Path dirOf(const PathView path)
 {
     Path::size_type pos = path.rfind('/');
-    if (pos == string::npos)
+    if (pos == std::string::npos)
         return ".";
     return pos == 0 ? "/" : Path(path, 0, pos);
 }
@@ -188,7 +191,7 @@ std::string_view baseNameOf(std::string_view path)
         last -= 1;
 
     auto pos = path.rfind('/', last);
-    if (pos == string::npos)
+    if (pos == std::string::npos)
         pos = 0;
     else
         pos += 1;
@@ -197,16 +200,16 @@ std::string_view baseNameOf(std::string_view path)
 }
 
 
-bool isInDir(const Path & path, const Path & dir)
+bool isInDir(std::string_view path, std::string_view dir)
 {
-    return path[0] == '/'
-        && string(path, 0, dir.size()) == dir
+    return path.substr(0, 1) == "/"
+        && path.substr(0, dir.size()) == dir
         && path.size() >= dir.size() + 2
         && path[dir.size()] == '/';
 }
 
 
-bool isDirOrInDir(const Path & path, const Path & dir)
+bool isDirOrInDir(std::string_view path, std::string_view dir)
 {
     return path == dir || isInDir(path, dir);
 }
@@ -246,7 +249,7 @@ Path readLink(const Path & path)
             else
                 throw SysError("reading symbolic link '%1%'", path);
         else if (rlSize < bufSize)
-            return string(buf.data(), rlSize);
+            return std::string(buf.data(), rlSize);
     }
 }
 
@@ -266,7 +269,7 @@ DirEntries readDirectory(DIR *dir, const Path & path)
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir)) { /* sic */
         checkInterrupt();
-        string name = dirent->d_name;
+        std::string name = dirent->d_name;
         if (name == "." || name == "..") continue;
         entries.emplace_back(name, dirent->d_ino,
 #ifdef HAVE_STRUCT_DIRENT_D_TYPE
@@ -300,7 +303,7 @@ unsigned char getFileType(const Path & path)
 }
 
 
-string readFile(int fd)
+std::string readFile(int fd)
 {
     struct stat st;
     if (fstat(fd, &st) == -1)
@@ -310,7 +313,7 @@ string readFile(int fd)
 }
 
 
-string readFile(const Path & path)
+std::string readFile(const Path & path)
 {
     AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
     if (!fd)
@@ -363,9 +366,9 @@ void writeFile(const Path & path, Source & source, mode_t mode)
     }
 }
 
-string readLine(int fd)
+std::string readLine(int fd)
 {
-    string s;
+    std::string s;
     while (1) {
         checkInterrupt();
         char ch;
@@ -384,7 +387,7 @@ string readLine(int fd)
 }
 
 
-void writeLine(int fd, string s)
+void writeLine(int fd, std::string s)
 {
     s += '\n';
     writeFull(fd, s);
@@ -395,7 +398,7 @@ static void _deletePath(int parentfd, const Path & path, uint64_t & bytesFreed)
 {
     checkInterrupt();
 
-    string name(baseNameOf(path));
+    std::string name(baseNameOf(path));
 
     struct stat st;
     if (fstatat(parentfd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) == -1) {
@@ -512,6 +515,7 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
     AutoCloseFD fd(mkstemp((char *) tmpl.c_str()));
     if (!fd)
         throw SysError("creating temporary file '%s'", tmpl);
+    closeOnExec(fd.get());
     return {std::move(fd), tmpl};
 }
 
@@ -562,8 +566,8 @@ Path getConfigDir()
 std::vector<Path> getConfigDirs()
 {
     Path configHome = getConfigDir();
-    string configDirs = getEnv("XDG_CONFIG_DIRS").value_or("");
-    std::vector<Path> result = tokenizeString<std::vector<string>>(configDirs, ":");
+    auto configDirs = getEnv("XDG_CONFIG_DIRS").value_or("/etc/xdg");
+    std::vector<Path> result = tokenizeString<std::vector<std::string>>(configDirs, ":");
     result.insert(result.begin(), configHome);
     return result;
 }
@@ -666,11 +670,13 @@ void writeFull(int fd, std::string_view s, bool allowInterrupts)
 }
 
 
-string drainFD(int fd, bool block, const size_t reserveSize)
+std::string drainFD(int fd, bool block, const size_t reserveSize)
 {
-    StringSink sink(reserveSize);
+    // the parser needs two extra bytes to append terminating characters, other users will
+    // not care very much about the extra memory.
+    StringSink sink(reserveSize + 2);
     drainFD(fd, sink, block);
-    return std::move(*sink.s);
+    return std::move(sink.s);
 }
 
 
@@ -713,7 +719,7 @@ void drainFD(int fd, Sink & sink, bool block)
 
 AutoDelete::AutoDelete() : del{false} {}
 
-AutoDelete::AutoDelete(const string & p, bool recursive) : path(p)
+AutoDelete::AutoDelete(const std::string & p, bool recursive) : path(p)
 {
     del = true;
     this->recursive = recursive;
@@ -903,7 +909,7 @@ int Pid::wait()
             return status;
         }
         if (errno != EINTR)
-            throw SysError("cannot get child exit status");
+            throw SysError("cannot get exit status of PID %d", pid);
         checkInterrupt();
     }
 }
@@ -939,9 +945,6 @@ void killUser(uid_t uid)
        users to which the current process can send signals.  So we
        fork a process, switch to uid, and send a mass kill. */
 
-    ProcessOptions options;
-    options.allowVfork = false;
-
     Pid pid = startProcess([&]() {
 
         if (setuid(uid) == -1)
@@ -964,7 +967,7 @@ void killUser(uid_t uid)
         }
 
         _exit(0);
-    }, options);
+    });
 
     int status = pid.wait();
     if (status != 0)
@@ -1006,7 +1009,6 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
             if (options.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
                 throw SysError("setting death signal");
 #endif
-            restoreAffinity();
             fun();
         } catch (std::exception & e) {
             try {
@@ -1034,7 +1036,7 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
     return res;
 }
 
-string runProgram(Path program, bool searchPath, const Strings & args,
+std::string runProgram(Path program, bool searchPath, const Strings & args,
     const std::optional<std::string> & input)
 {
     auto res = runProgram(RunOptions {.program = program, .searchPath = searchPath, .args = args, .input = input});
@@ -1059,7 +1061,7 @@ std::pair<int, std::string> runProgram(RunOptions && options)
         status = e.status;
     }
 
-    return {status, std::move(*sink.s)};
+    return {status, std::move(sink.s)};
 }
 
 void runProgram2(const RunOptions & options)
@@ -1085,8 +1087,7 @@ void runProgram2(const RunOptions & options)
     // vfork implies that the environment of the main process and the fork will
     // be shared (technically this is undefined, but in practice that's the
     // case), so we can't use it if we alter the environment
-    if (options.environment)
-        processOptions.allowVfork = false;
+    processOptions.allowVfork = !options.environment;
 
     /* Fork. */
     Pid pid = startProcess([&]() {
@@ -1173,7 +1174,7 @@ void runProgram2(const RunOptions & options)
 }
 
 
-void closeMostFDs(const set<int> & exceptions)
+void closeMostFDs(const std::set<int> & exceptions)
 {
 #if __linux__
     try {
@@ -1209,7 +1210,7 @@ void closeOnExec(int fd)
 //////////////////////////////////////////////////////////////////////
 
 
-bool _isInterrupted = false;
+std::atomic<bool> _isInterrupted = false;
 
 static thread_local bool interruptThrown = false;
 thread_local std::function<bool()> interruptCheck;
@@ -1234,45 +1235,45 @@ void _interrupted()
 //////////////////////////////////////////////////////////////////////
 
 
-template<class C> C tokenizeString(std::string_view s, const string & separators)
+template<class C> C tokenizeString(std::string_view s, std::string_view separators)
 {
     C result;
-    string::size_type pos = s.find_first_not_of(separators, 0);
-    while (pos != string::npos) {
-        string::size_type end = s.find_first_of(separators, pos + 1);
-        if (end == string::npos) end = s.size();
-        string token(s, pos, end - pos);
-        result.insert(result.end(), token);
+    auto pos = s.find_first_not_of(separators, 0);
+    while (pos != std::string::npos) {
+        auto end = s.find_first_of(separators, pos + 1);
+        if (end == std::string::npos) end = s.size();
+        result.insert(result.end(), std::string(s, pos, end - pos));
         pos = s.find_first_not_of(separators, end);
     }
     return result;
 }
 
-template Strings tokenizeString(std::string_view s, const string & separators);
-template StringSet tokenizeString(std::string_view s, const string & separators);
-template vector<string> tokenizeString(std::string_view s, const string & separators);
+template Strings tokenizeString(std::string_view s, std::string_view separators);
+template StringSet tokenizeString(std::string_view s, std::string_view separators);
+template std::vector<std::string> tokenizeString(std::string_view s, std::string_view separators);
 
 
-string chomp(std::string_view s)
+std::string chomp(std::string_view s)
 {
     size_t i = s.find_last_not_of(" \n\r\t");
-    return i == string::npos ? "" : string(s, 0, i + 1);
+    return i == std::string_view::npos ? "" : std::string(s, 0, i + 1);
 }
 
 
-string trim(const string & s, const string & whitespace)
+std::string trim(std::string_view s, std::string_view whitespace)
 {
     auto i = s.find_first_not_of(whitespace);
-    if (i == string::npos) return "";
+    if (i == s.npos) return "";
     auto j = s.find_last_not_of(whitespace);
-    return string(s, i, j == string::npos ? j : j - i + 1);
+    return std::string(s, i, j == s.npos ? j : j - i + 1);
 }
 
 
-string replaceStrings(std::string_view s,
-    const std::string & from, const std::string & to)
+std::string replaceStrings(
+    std::string res,
+    std::string_view from,
+    std::string_view to)
 {
-    string res(s);
     if (from.empty()) return res;
     size_t pos = 0;
     while ((pos = res.find(from, pos)) != std::string::npos) {
@@ -1283,20 +1284,19 @@ string replaceStrings(std::string_view s,
 }
 
 
-std::string rewriteStrings(const std::string & _s, const StringMap & rewrites)
+std::string rewriteStrings(std::string s, const StringMap & rewrites)
 {
-    auto s = _s;
     for (auto & i : rewrites) {
         if (i.first == i.second) continue;
         size_t j = 0;
-        while ((j = s.find(i.first, j)) != string::npos)
+        while ((j = s.find(i.first, j)) != std::string::npos)
             s.replace(j, i.first.size(), i.second);
     }
     return s;
 }
 
 
-string statusToString(int status)
+std::string statusToString(int status)
 {
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
         if (WIFEXITED(status))
@@ -1344,9 +1344,11 @@ std::string toLower(const std::string & s)
 }
 
 
-std::string shellEscape(const std::string & s)
+std::string shellEscape(const std::string_view s)
 {
-    std::string r = "'";
+    std::string r;
+    r.reserve(s.size() + 2);
+    r += "'";
     for (auto & i : s)
         if (i == '\'') r += "'\\''"; else r += i;
     r += '\'';
@@ -1356,11 +1358,15 @@ std::string shellEscape(const std::string & s)
 
 void ignoreException()
 {
+    /* Make sure no exceptions leave this function.
+       printError() also throws when remote is closed. */
     try {
-        throw;
-    } catch (std::exception & e) {
-        printError("error (ignored): %1%", e.what());
-    }
+        try {
+            throw;
+        } catch (std::exception & e) {
+            printError("error (ignored): %1%", e.what());
+        }
+    } catch (...) { }
 }
 
 bool shouldANSI()
@@ -1406,7 +1412,7 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
             }
         }
 
-        else if (*i == '\r')
+        else if (*i == '\r' || *i == '\a')
             // do nothing for now
             i++;
 
@@ -1440,12 +1446,11 @@ std::string filterANSIEscapes(const std::string & s, bool filterAll, unsigned in
 }
 
 
-static char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-static std::array<char, 256> base64DecodeChars;
+constexpr char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-string base64Encode(std::string_view s)
+std::string base64Encode(std::string_view s)
 {
-    string res;
+    std::string res;
     int data = 0, nbits = 0;
 
     for (char c : s) {
@@ -1464,16 +1469,19 @@ string base64Encode(std::string_view s)
 }
 
 
-string base64Decode(std::string_view s)
+std::string base64Decode(std::string_view s)
 {
-    static std::once_flag flag;
-    std::call_once(flag, [](){
-        base64DecodeChars = { (char)-1 };
+    constexpr char npos = -1;
+    constexpr std::array<char, 256> base64DecodeChars = [&]() {
+        std::array<char, 256>  result{};
+        for (auto& c : result)
+            c = npos;
         for (int i = 0; i < 64; i++)
-            base64DecodeChars[(int) base64Chars[i]] = i;
-    });
+            result[base64Chars[i]] = i;
+        return result;
+    }();
 
-    string res;
+    std::string res;
     unsigned int d = 0, bits = 0;
 
     for (char c : s) {
@@ -1481,7 +1489,7 @@ string base64Decode(std::string_view s)
         if (c == '\n') continue;
 
         char digit = base64DecodeChars[(unsigned char) c];
-        if (digit == -1)
+        if (digit == npos)
             throw Error("invalid character in Base64 string: '%c'", c);
 
         bits += 6;
@@ -1557,7 +1565,22 @@ std::pair<unsigned short, unsigned short> getWindowSize()
 }
 
 
-static Sync<std::list<std::function<void()>>> _interruptCallbacks;
+/* We keep track of interrupt callbacks using integer tokens, so we can iterate
+   safely without having to lock the data structure while executing arbitrary
+   functions.
+ */
+struct InterruptCallbacks {
+    typedef int64_t Token;
+
+    /* We use unique tokens so that we can't accidentally delete the wrong
+       handler because of an erroneous double delete. */
+    Token nextToken = 0;
+
+    /* Used as a list, see InterruptCallbacks comment. */
+    std::map<Token, std::function<void()>> callbacks;
+};
+
+static Sync<InterruptCallbacks> _interruptCallbacks;
 
 static void signalHandlerThread(sigset_t set)
 {
@@ -1579,8 +1602,19 @@ void triggerInterrupt()
     _isInterrupted = true;
 
     {
-        auto interruptCallbacks(_interruptCallbacks.lock());
-        for (auto & callback : *interruptCallbacks) {
+        InterruptCallbacks::Token i = 0;
+        while (true) {
+            std::function<void()> callback;
+            {
+                auto interruptCallbacks(_interruptCallbacks.lock());
+                auto lb = interruptCallbacks->callbacks.lower_bound(i);
+                if (lb == interruptCallbacks->callbacks.end())
+                    break;
+
+                callback = lb->second;
+                i = lb->first + 1;
+            }
+
             try {
                 callback();
             } catch (...) {
@@ -1634,11 +1668,47 @@ void setStackSize(size_t stackSize)
     #endif
 }
 
-void restoreProcessContext()
+static AutoCloseFD fdSavedMountNamespace;
+
+void saveMountNamespace()
+{
+#if __linux__
+    static std::once_flag done;
+    std::call_once(done, []() {
+        AutoCloseFD fd = open("/proc/self/ns/mnt", O_RDONLY);
+        if (!fd)
+            throw SysError("saving parent mount namespace");
+        fdSavedMountNamespace = std::move(fd);
+    });
+#endif
+}
+
+void restoreMountNamespace()
+{
+#if __linux__
+    try {
+        if (fdSavedMountNamespace && setns(fdSavedMountNamespace.get(), CLONE_NEWNS) == -1)
+            throw SysError("restoring parent mount namespace");
+    } catch (Error & e) {
+        debug(e.msg());
+    }
+#endif
+}
+
+void unshareFilesystem()
+{
+#ifdef __linux__
+    if (unshare(CLONE_FS) != 0 && errno != EPERM)
+        throw SysError("unsharing filesystem state in download thread");
+#endif
+}
+
+void restoreProcessContext(bool restoreMounts)
 {
     restoreSignals();
-
-    restoreAffinity();
+    if (restoreMounts) {
+        restoreMountNamespace();
+    }
 
     #if __linux__
     if (savedStackSize) {
@@ -1654,27 +1724,28 @@ void restoreProcessContext()
 /* RAII helper to automatically deregister a callback. */
 struct InterruptCallbackImpl : InterruptCallback
 {
-    std::list<std::function<void()>>::iterator it;
+    InterruptCallbacks::Token token;
     ~InterruptCallbackImpl() override
     {
-        _interruptCallbacks.lock()->erase(it);
+        auto interruptCallbacks(_interruptCallbacks.lock());
+        interruptCallbacks->callbacks.erase(token);
     }
 };
 
 std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()> callback)
 {
     auto interruptCallbacks(_interruptCallbacks.lock());
-    interruptCallbacks->push_back(callback);
+    auto token = interruptCallbacks->nextToken++;
+    interruptCallbacks->callbacks.emplace(token, callback);
 
     auto res = std::make_unique<InterruptCallbackImpl>();
-    res->it = interruptCallbacks->end();
-    res->it--;
+    res->token = token;
 
     return std::unique_ptr<InterruptCallback>(res.release());
 }
 
 
-AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
+AutoCloseFD createUnixDomainSocket()
 {
     AutoCloseFD fdSocket = socket(PF_UNIX, SOCK_STREAM
         #ifdef SOCK_CLOEXEC
@@ -1683,19 +1754,16 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
         , 0);
     if (!fdSocket)
         throw SysError("cannot create Unix domain socket");
-
     closeOnExec(fdSocket.get());
+    return fdSocket;
+}
 
-    struct sockaddr_un addr;
-    addr.sun_family = AF_UNIX;
-    if (path.size() + 1 >= sizeof(addr.sun_path))
-        throw Error("socket path '%1%' is too long", path);
-    strcpy(addr.sun_path, path.c_str());
 
-    unlink(path.c_str());
+AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
+{
+    auto fdSocket = nix::createUnixDomainSocket();
 
-    if (bind(fdSocket.get(), (struct sockaddr *) &addr, sizeof(addr)) == -1)
-        throw SysError("cannot bind to socket '%1%'", path);
+    bind(fdSocket.get(), path);
 
     if (chmod(path.c_str(), mode) == -1)
         throw SysError("changing permissions on '%1%'", path);
@@ -1707,7 +1775,67 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
 }
 
 
-string showBytes(uint64_t bytes)
+void bind(int fd, const std::string & path)
+{
+    unlink(path.c_str());
+
+    struct sockaddr_un addr;
+    addr.sun_family = AF_UNIX;
+
+    if (path.size() + 1 >= sizeof(addr.sun_path)) {
+        Pid pid = startProcess([&]() {
+            Path dir = dirOf(path);
+            if (chdir(dir.c_str()) == -1)
+                throw SysError("chdir to '%s' failed", dir);
+            std::string base(baseNameOf(path));
+            if (base.size() + 1 >= sizeof(addr.sun_path))
+                throw Error("socket path '%s' is too long", base);
+            memcpy(addr.sun_path, base.c_str(), base.size() + 1);
+            if (bind(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+                throw SysError("cannot bind to socket '%s'", path);
+            _exit(0);
+        });
+        int status = pid.wait();
+        if (status != 0)
+            throw Error("cannot bind to socket '%s'", path);
+    } else {
+        memcpy(addr.sun_path, path.c_str(), path.size() + 1);
+        if (bind(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+            throw SysError("cannot bind to socket '%s'", path);
+    }
+}
+
+
+void connect(int fd, const std::string & path)
+{
+    struct sockaddr_un addr;
+    addr.sun_family = AF_UNIX;
+
+    if (path.size() + 1 >= sizeof(addr.sun_path)) {
+        Pid pid = startProcess([&]() {
+            Path dir = dirOf(path);
+            if (chdir(dir.c_str()) == -1)
+                throw SysError("chdir to '%s' failed", dir);
+            std::string base(baseNameOf(path));
+            if (base.size() + 1 >= sizeof(addr.sun_path))
+                throw Error("socket path '%s' is too long", base);
+            memcpy(addr.sun_path, base.c_str(), base.size() + 1);
+            if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+                throw SysError("cannot connect to socket at '%s'", path);
+            _exit(0);
+        });
+        int status = pid.wait();
+        if (status != 0)
+            throw Error("cannot connect to socket at '%s'", path);
+    } else {
+        memcpy(addr.sun_path, path.c_str(), path.size() + 1);
+        if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1)
+            throw SysError("cannot connect to socket at '%s'", path);
+    }
+}
+
+
+std::string showBytes(uint64_t bytes)
 {
     return fmt("%.2f MiB", bytes / (1024.0 * 1024.0));
 }
@@ -1718,8 +1846,8 @@ void commonChildInit(Pipe & logPipe)
 {
     logger = makeSimpleLogger();
 
-    const static string pathNullDevice = "/dev/null";
-    restoreProcessContext();
+    const static std::string pathNullDevice = "/dev/null";
+    restoreProcessContext(false);
 
     /* Put the child in a separate session (and thus a separate
        process group) so that it has no controlling terminal (meaning

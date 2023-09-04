@@ -42,7 +42,7 @@ DrvName::~DrvName()
 { }
 
 
-bool DrvName::matches(DrvName & n)
+bool DrvName::matches(const DrvName & n)
 {
     if (name != "*") {
         if (!regex) {
@@ -56,8 +56,8 @@ bool DrvName::matches(DrvName & n)
 }
 
 
-string nextComponent(string::const_iterator & p,
-    const string::const_iterator end)
+std::string_view nextComponent(std::string_view::const_iterator & p,
+    const std::string_view::const_iterator end)
 {
     /* Skip any dots and dashes (component separators). */
     while (p != end && (*p == '.' || *p == '-')) ++p;
@@ -67,18 +67,18 @@ string nextComponent(string::const_iterator & p,
     /* If the first character is a digit, consume the longest sequence
        of digits.  Otherwise, consume the longest sequence of
        non-digit, non-separator characters. */
-    string s;
+    auto s = p;
     if (isdigit(*p))
-        while (p != end && isdigit(*p)) s += *p++;
+        while (p != end && isdigit(*p)) p++;
     else
         while (p != end && (!isdigit(*p) && *p != '.' && *p != '-'))
-            s += *p++;
+            p++;
 
-    return s;
+    return {s, size_t(p - s)};
 }
 
 
-static bool componentsLT(const string & c1, const string & c2)
+static bool componentsLT(const std::string_view c1, const std::string_view c2)
 {
     auto n1 = string2Int<int>(c1);
     auto n2 = string2Int<int>(c2);
@@ -94,14 +94,14 @@ static bool componentsLT(const string & c1, const string & c2)
 }
 
 
-int compareVersions(const string & v1, const string & v2)
+int compareVersions(const std::string_view v1, const std::string_view v2)
 {
-    string::const_iterator p1 = v1.begin();
-    string::const_iterator p2 = v2.begin();
+    auto p1 = v1.begin();
+    auto p2 = v2.begin();
 
     while (p1 != v1.end() || p2 != v2.end()) {
-        string c1 = nextComponent(p1, v1.end());
-        string c2 = nextComponent(p2, v2.end());
+        auto c1 = nextComponent(p1, v1.end());
+        auto c2 = nextComponent(p2, v2.end());
         if (componentsLT(c1, c2)) return -1;
         else if (componentsLT(c2, c1)) return 1;
     }

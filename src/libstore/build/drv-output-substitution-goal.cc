@@ -1,11 +1,17 @@
 #include "drv-output-substitution-goal.hh"
+#include "finally.hh"
 #include "worker.hh"
 #include "substitution-goal.hh"
+#include "callback.hh"
 
 namespace nix {
 
-DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(const DrvOutput& id, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
-    : Goal(worker)
+DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(
+    const DrvOutput & id,
+    Worker & worker,
+    RepairFlag repair,
+    std::optional<ContentAddress> ca)
+    : Goal(worker, DerivedPath::Opaque { StorePath::dummy })
     , id(id)
 {
     state = &DrvOutputSubstitutionGoal::init;
@@ -30,7 +36,7 @@ void DrvOutputSubstitutionGoal::init()
 
 void DrvOutputSubstitutionGoal::tryNext()
 {
-    trace("Trying next substituter");
+    trace("trying next substituter");
 
     if (subs.size() == 0) {
         /* None left.  Terminate this goal and let someone else deal
@@ -50,14 +56,42 @@ void DrvOutputSubstitutionGoal::tryNext()
         return;
     }
 
-    auto sub = subs.front();
+    sub = subs.front();
     subs.pop_front();
 
     // FIXME: Make async
-    outputInfo = sub->queryRealisation(id);
+    // outputInfo = sub->queryRealisation(id);
+    outPipe.create();
+    promise = decltype(promise)();
+
+    sub->queryRealisation(
+        id, { [&](std::future<std::shared_ptr<const Realisation>> res) {
+            try {
+                Finally updateStats([this]() { outPipe.writeSide.close(); });
+                promise.set_value(res.get());
+            } catch (...) {
+                promise.set_exception(std::current_exception());
+            }
+        } });
+
+    worker.childStarted(shared_from_this(), {outPipe.readSide.get()}, true, false);
+
+    state = &DrvOutputSubstitutionGoal::realisationFetched;
+}
+
+void DrvOutputSubstitutionGoal::realisationFetched()
+{
+    worker.childTerminated(this);
+
+    try {
+        outputInfo = promise.get_future().get();
+    } catch (std::exception & e) {
+        printError(e.what());
+        substituterFailed = true;
+    }
+
     if (!outputInfo) {
-        tryNext();
-        return;
+        return tryNext();
     }
 
     for (const auto & [depId, depPath] : outputInfo->dependentRealisations) {
@@ -89,7 +123,7 @@ void DrvOutputSubstitutionGoal::tryNext()
 void DrvOutputSubstitutionGoal::outPathValid()
 {
     assert(outputInfo);
-    trace("Output path substituted");
+    trace("output path substituted");
 
     if (nrFailed > 0) {
         debug("The output path of the derivation output '%s' could not be substituted", id.to_string());
@@ -107,7 +141,7 @@ void DrvOutputSubstitutionGoal::finished()
     amDone(ecSuccess);
 }
 
-string DrvOutputSubstitutionGoal::key()
+std::string DrvOutputSubstitutionGoal::key()
 {
     /* "a$" ensures substitution goals happen before derivation
        goals. */
@@ -118,5 +152,11 @@ void DrvOutputSubstitutionGoal::work()
 {
     (this->*state)();
 }
+
+void DrvOutputSubstitutionGoal::handleEOF(int fd)
+{
+    if (fd == outPipe.readSide.get()) worker.wakeUp(shared_from_this());
+}
+
 
 }

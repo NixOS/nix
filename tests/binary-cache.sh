@@ -14,6 +14,17 @@ outPath=$(nix-build dependencies.nix --no-out-link)
 
 nix copy --to file://$cacheDir $outPath
 
+# Test copying build logs to the binary cache.
+nix log --store file://$cacheDir $outPath 2>&1 | grep 'is not available'
+nix store copy-log --to file://$cacheDir $outPath
+nix log --store file://$cacheDir $outPath | grep FOO
+rm -rf $TEST_ROOT/var/log/nix
+nix log $outPath 2>&1 | grep 'is not available'
+nix log --substituters file://$cacheDir $outPath | grep FOO
+
+# Test copying build logs from the binary cache.
+nix store copy-log --from file://$cacheDir $(nix-store -qd $outPath)
+nix log $outPath | grep FOO
 
 basicDownloadTests() {
     # No uploading tests bcause upload with force HTTP doesn't work.

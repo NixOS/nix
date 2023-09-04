@@ -232,16 +232,19 @@ protected:
 
     T value;
     const T defaultValue;
+    const bool documentDefault;
 
 public:
 
     BaseSetting(const T & def,
+        const bool documentDefault,
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {})
         : AbstractSetting(name, description, aliases)
         , value(def)
         , defaultValue(def)
+        , documentDefault(documentDefault)
     { }
 
     operator const T &() const { return value; }
@@ -288,8 +291,9 @@ public:
         const T & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : BaseSetting<T>(def, name, description, aliases)
+        const std::set<std::string> & aliases = {},
+        const bool documentDefault = true)
+        : BaseSetting<T>(def, documentDefault, name, description, aliases)
     {
         options->addSetting(this);
     }
@@ -311,7 +315,7 @@ public:
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {})
-        : BaseSetting<Path>(def, name, description, aliases)
+        : BaseSetting<Path>(def, true, name, description, aliases)
         , allowEmpty(allowEmpty)
     {
         options->addSetting(this);

@@ -16,9 +16,9 @@ static GlobalConfig::Register rs(&mySettings);
 static void prim_anotherNull (EvalState & state, const Pos & pos, Value ** args, Value & v)
 {
     if (mySettings.settingSet)
-        mkNull(v);
+        v.mkNull();
     else
-        mkBool(v, false);
+        v.mkBool(false);
 }
 
 static RegisterPrimOp rp("anotherNull", 0, prim_anotherNull);

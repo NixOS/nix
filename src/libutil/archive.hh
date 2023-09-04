@@ -48,7 +48,7 @@ namespace nix {
 void dumpPath(const Path & path, Sink & sink,
     PathFilter & filter = defaultPathFilter);
 
-void dumpString(const std::string & s, Sink & sink);
+void dumpString(std::string_view s, Sink & sink);
 
 /* If the NAR archive contains a single file at top-level, then save
    the contents of the file to `s'.  Otherwise barf. */
@@ -69,7 +69,7 @@ struct RetrieveRegularNARSink : ParseSink
         sink(data);
     }
 
-    void createSymlink(const Path & path, const string & target) override
+    void createSymlink(const Path & path, const std::string & target) override
     {
         regular = false;
     }

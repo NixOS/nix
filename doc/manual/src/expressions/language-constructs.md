@@ -284,6 +284,10 @@ The points of interest are:
     function is called with the `localServer` argument set to `true` but
     the `db4` argument set to `null`, then the evaluation fails.
 
+    Note that `->` is the [logical
+    implication](https://en.wikipedia.org/wiki/Truth_table#Logical_implication)
+    Boolean operation.
+
 2.  This is a more subtle condition: if Subversion is built with Apache
     (`httpServer`) support, then the Expat library (an XML library) used
     by Subversion should be same as the one used by Apache. This is

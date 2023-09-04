@@ -75,20 +75,20 @@ StorePaths Store::importPaths(Source & source, CheckSigsFlag checkSigs)
 
         auto references = worker_proto::read(*this, source, Phantom<StorePathSet> {});
         auto deriver = readString(source);
-        auto narHash = hashString(htSHA256, *saved.s);
+        auto narHash = hashString(htSHA256, saved.s);
 
         ValidPathInfo info { path, narHash };
         if (deriver != "")
             info.deriver = parseStorePath(deriver);
         info.setReferencesPossiblyToSelf(std::move(references));
-        info.narSize = saved.s->size();
+        info.narSize = saved.s.size();
 
         // Ignore optional legacy signature.
         if (readInt(source) == 1)
             readString(source);
 
         // Can't use underlying source, which would have been exhausted
-        auto source = StringSource { *saved.s };
+        auto source = StringSource(saved.s);
         addToStore(info, source, NoRepair, checkSigs);
 
         res.push_back(info.path);

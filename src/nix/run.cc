@@ -8,7 +8,6 @@
 #include "finally.hh"
 #include "fs-accessor.hh"
 #include "progress-bar.hh"
-#include "affinity.hh"
 #include "eval.hh"
 
 #if __linux__
@@ -92,7 +91,7 @@ struct CmdShell : InstallablesCommand, MixEnvironment
 
     void run(ref<Store> store) override
     {
-        auto outPaths = toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, installables);
+        auto outPaths = Installable::toStorePaths(getEvalStore(), store, Realise::Outputs, OperateOn::Output, installables);
 
         auto accessor = store->getFSAccessor();
 
@@ -159,7 +158,10 @@ struct CmdRun : InstallableCommand
 
     Strings getDefaultFlakeAttrPaths() override
     {
-        Strings res{"defaultApp." + settings.thisSystem.get()};
+        Strings res{
+            "apps." + settings.thisSystem.get() + ".default",
+            "defaultApp." + settings.thisSystem.get(),
+        };
         for (auto & s : SourceExprCommand::getDefaultFlakeAttrPaths())
             res.push_back(s);
         return res;

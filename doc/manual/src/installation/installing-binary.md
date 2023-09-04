@@ -119,6 +119,30 @@ this to run the installer, but it may help if you run into trouble:
 - update `/etc/synthetic.conf` to direct macOS to create a "synthetic"
   empty root directory to mount your volume
 - specify mount options for the volume in `/etc/fstab`
+  - `rw`: read-write
+  - `noauto`: prevent the system from auto-mounting the volume (so the
+    LaunchDaemon mentioned below can control mounting it, and to avoid
+    masking problems with that mounting service).
+  - `nobrowse`: prevent the Nix Store volume from showing up on your
+    desktop; also keeps Spotlight from spending resources to index
+    this volume
+  <!-- TODO:
+  - `suid`: honor setuid? surely not? ...
+  - `owners`: honor file ownership on the volume
+
+    For now I'll avoid pretending to understand suid/owners more
+    than I do. There've been some vague reports of file-ownership
+    and permission issues, particularly in cloud/VM/headless setups.
+    My pet theory is that this has something to do with these setups
+    not having a token that gets delegated to initial/admin accounts
+    on macOS. See scripts/create-darwin-volume.sh for a little more.
+
+    In any case, by Dec 4 2021, it _seems_ like some combination of
+    suid, owners, and calling diskutil enableOwnership have stopped
+    new reports from coming in. But I hesitate to celebrate because we
+    haven't really named and catalogued the behavior, understood what
+    we're fixing, and validated that all 3 components are essential.
+  -->
 - if you have FileVault enabled
     - generate an encryption password
     - put it in your system Keychain

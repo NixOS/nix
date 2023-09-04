@@ -33,7 +33,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         StringSink sink;
         dumpPath(path, sink);
 
-        auto narHash = hashString(htSHA256, *sink.s);
+        auto narHash = hashString(htSHA256, sink.s);
 
         Hash hash { htSHA256 }; // throwaway def to appease C++
         switch (ingestionMethod) {
@@ -67,10 +67,10 @@ struct CmdAddToStore : MixDryRun, StoreCommand
             },
             narHash,
         };
-        info.narSize = sink.s->size();
+        info.narSize = sink.s.size();
 
         if (!dryRun) {
-            auto source = StringSource { *sink.s };
+            auto source = StringSource(sink.s);
             store->addToStore(info, source);
         }
 

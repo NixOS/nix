@@ -86,36 +86,34 @@ void LocalFSStore::narFromPath(const StorePathOrDesc pathOrDesc, Sink & sink)
     dumpPath(getRealStoreDir() + std::string(printStorePath(p), storeDir.size()), sink);
 }
 
-const string LocalFSStore::drvsLogDir = "drvs";
+const std::string LocalFSStore::drvsLogDir = "drvs";
 
-
-
-std::shared_ptr<std::string> LocalFSStore::getBuildLog(const StorePath & path_)
+std::optional<std::string> LocalFSStore::getBuildLog(const StorePath & path_)
 {
     auto path = path_;
 
     if (!path.isDerivation()) {
         try {
             auto info = queryPathInfo(path);
-            if (!info->deriver) return nullptr;
+            if (!info->deriver) return std::nullopt;
             path = *info->deriver;
         } catch (InvalidPath &) {
-            return nullptr;
+            return std::nullopt;
         }
     }
 
-    auto baseName = std::string(baseNameOf(printStorePath(path)));
+    auto baseName = path.to_string();
 
     for (int j = 0; j < 2; j++) {
 
         Path logPath =
             j == 0
-            ? fmt("%s/%s/%s/%s", logDir, drvsLogDir, string(baseName, 0, 2), string(baseName, 2))
+            ? fmt("%s/%s/%s/%s", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2))
             : fmt("%s/%s/%s", logDir, drvsLogDir, baseName);
         Path logBz2Path = logPath + ".bz2";
 
         if (pathExists(logPath))
-            return std::make_shared<std::string>(readFile(logPath));
+            return readFile(logPath);
 
         else if (pathExists(logBz2Path)) {
             try {
@@ -125,7 +123,7 @@ std::shared_ptr<std::string> LocalFSStore::getBuildLog(const StorePath & path_)
 
     }
 
-    return nullptr;
+    return std::nullopt;
 }
 
 }

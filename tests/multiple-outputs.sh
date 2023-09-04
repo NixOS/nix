@@ -76,7 +76,10 @@ if nix-build multiple-outputs.nix -A cyclic --no-out-link; then
     exit 1
 fi
 
+# Do a GC. This should leave an empty store.
 echo "collecting garbage..."
 rm $TEST_ROOT/result*
 nix-store --gc --keep-derivations --keep-outputs
 nix-store --gc --print-roots
+rm -rf $NIX_STORE_DIR/.links
+rmdir $NIX_STORE_DIR

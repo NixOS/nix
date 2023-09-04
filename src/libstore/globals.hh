@@ -3,6 +3,7 @@
 #include "types.hh"
 #include "config.hh"
 #include "util.hh"
+#include "experimental-features.hh"
 
 #include <map>
 #include <limits>
@@ -20,7 +21,7 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {})
-        : BaseSetting<unsigned int>(def, name, description, aliases)
+        : BaseSetting<unsigned int>(def, true, name, description, aliases)
     {
         options->addSetting(this);
     }
@@ -37,21 +38,12 @@ struct PluginFilesSetting : public BaseSetting<Paths>
         const std::string & name,
         const std::string & description,
         const std::set<std::string> & aliases = {})
-        : BaseSetting<Paths>(def, name, description, aliases)
+        : BaseSetting<Paths>(def, true, name, description, aliases)
     {
         options->addSetting(this);
     }
 
     void set(const std::string & str, bool append = false) override;
-};
-
-class MissingExperimentalFeature: public Error
-{
-public:
-    std::string missingFeature;
-
-    MissingExperimentalFeature(std::string feature);
-    virtual const char* sname() const override { return "MissingExperimentalFeature"; }
 };
 
 class Settings : public Config {
@@ -121,7 +113,7 @@ public:
     bool verboseBuild = true;
 
     Setting<size_t> logLines{this, 10, "log-lines",
-        "If `verbose-build` is false, the number of lines of the tail of "
+        "The number of lines of the tail of "
         "the log to show if a build fails."};
 
     MaxBuildJobsSetting maxBuildJobs{
@@ -138,7 +130,9 @@ public:
         {"build-max-jobs"}};
 
     Setting<unsigned int> buildCores{
-        this, getDefaultCores(), "cores",
+        this,
+        getDefaultCores(),
+        "cores",
         R"(
           Sets the value of the `NIX_BUILD_CORES` environment variable in the
           invocation of builders. Builders can use this variable at their
@@ -149,7 +143,7 @@ public:
           command line switch and defaults to `1`. The value `0` means that
           the builder should use all available CPU cores in the system.
         )",
-        {"build-cores"}};
+        {"build-cores"}, false};
 
     /* Read-only mode.  Don't copy stuff to the store, don't change
        the database. */
@@ -591,10 +585,11 @@ public:
           platform and generate incompatible code, so you may wish to
           cross-check the results of using this option against proper
           natively-built versions of your derivations.
-        )"};
+        )", {}, false};
 
     Setting<StringSet> systemFeatures{
-        this, getDefaultSystemFeatures(),
+        this,
+        getDefaultSystemFeatures(),
         "system-features",
         R"(
           A set of system “features” supported by this machine, e.g. `kvm`.
@@ -610,7 +605,7 @@ public:
           This setting by default includes `kvm` if `/dev/kvm` is accessible,
           and the pseudo-features `nixos-test`, `benchmark` and `big-parallel`
           that are used in Nixpkgs to route builds to specific machines.
-        )"};
+        )", {}, false};
 
     Setting<Strings> substituters{
         this,
@@ -805,6 +800,15 @@ public:
           may be useful in certain scenarios (e.g. to spin up containers or
           set up userspace network interfaces in tests).
         )"};
+
+    Setting<StringSet> ignoredAcls{
+        this, {"security.selinux", "system.nfs4_acl"}, "ignored-acls",
+        R"(
+          A list of ACLs that should be ignored, normally Nix attempts to
+          remove all ACLs from files and directories in the Nix store, but
+          some ACLs like `security.selinux` or `system.nfs4_acl` can't be
+          removed even by root. Therefore it's best to just ignore them.
+        )"};
 #endif
 
     Setting<Strings> hashedMirrors{
@@ -876,73 +880,15 @@ public:
           are loaded as plugins (non-recursively).
         )"};
 
-    Setting<StringMap> accessTokens{this, {}, "access-tokens",
-        R"(
-          Access tokens used to access protected GitHub, GitLab, or
-          other locations requiring token-based authentication.
-
-          Access tokens are specified as a string made up of
-          space-separated `host=token` values.  The specific token
-          used is selected by matching the `host` portion against the
-          "host" specification of the input. The actual use of the
-          `token` value is determined by the type of resource being
-          accessed:
-
-          * Github: the token value is the OAUTH-TOKEN string obtained
-            as the Personal Access Token from the Github server (see
-            https://docs.github.com/en/developers/apps/authorizing-oath-apps).
-
-          * Gitlab: the token value is either the OAuth2 token or the
-            Personal Access Token (these are different types tokens
-            for gitlab, see
-            https://docs.gitlab.com/12.10/ee/api/README.html#authentication).
-            The `token` value should be `type:tokenstring` where
-            `type` is either `OAuth2` or `PAT` to indicate which type
-            of token is being specified.
-
-          Example `~/.config/nix/nix.conf`:
-
-          ```
-          access-tokens = github.com=23ac...b289 gitlab.mycompany.com=PAT:A123Bp_Cd..EfG gitlab.com=OAuth2:1jklw3jk
-          ```
-
-          Example `~/code/flake.nix`:
-
-          ```nix
-          input.foo = {
-            type = "gitlab";
-            host = "gitlab.mycompany.com";
-            owner = "mycompany";
-            repo = "pro";
-          };
-          ```
-
-          This example specifies three tokens, one each for accessing
-          github.com, gitlab.mycompany.com, and sourceforge.net.
-
-          The `input.foo` uses the "gitlab" fetcher, which might
-          requires specifying the token type along with the token
-          value.
-          )"};
-
-    Setting<Strings> experimentalFeatures{this, {}, "experimental-features",
+    Setting<std::set<ExperimentalFeature>> experimentalFeatures{this, {}, "experimental-features",
         "Experimental Nix features to enable."};
 
-    bool isExperimentalFeatureEnabled(const std::string & name);
+    bool isExperimentalFeatureEnabled(const ExperimentalFeature &);
 
-    void requireExperimentalFeature(const std::string & name);
-
-    Setting<bool> allowDirty{this, true, "allow-dirty",
-        "Whether to allow dirty Git/Mercurial trees."};
-
-    Setting<bool> warnDirty{this, true, "warn-dirty",
-        "Whether to warn about dirty Git/Mercurial trees."};
+    void requireExperimentalFeature(const ExperimentalFeature &);
 
     Setting<size_t> narBufferSize{this, 32 * 1024 * 1024, "nar-buffer-size",
         "Maximum size of NARs before spilling them to disk."};
-
-    Setting<std::string> flakeRegistry{this, "https://github.com/NixOS/flake-registry/raw/master/flake-registry.json", "flake-registry",
-        "Path or URI of the global flake registry."};
 
     Setting<bool> allowSymlinkedStore{
         this, false, "allow-symlinked-store",
@@ -956,9 +902,6 @@ public:
           resolves to a different location from that of the build machine. You
           can enable this setting if you are sure you're not going to do that.
         )"};
-
-    Setting<bool> useRegistries{this, true, "use-registries",
-        "Whether to use flake registries to resolve flake references."};
 };
 
 
@@ -974,6 +917,6 @@ void loadConfFile();
 // Used by the Settings constructor
 std::vector<Path> getUserConfigFiles();
 
-extern const string nixVersion;
+extern const std::string nixVersion;
 
 }

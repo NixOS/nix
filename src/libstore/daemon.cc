@@ -1,10 +1,11 @@
 #include "daemon.hh"
 #include "monitor-fd.hh"
 #include "worker-protocol.hh"
+#include "build-result.hh"
 #include "store-api.hh"
+#include "gc-store.hh"
 #include "path-with-outputs.hh"
 #include "finally.hh"
-#include "affinity.hh"
 #include "archive.hh"
 #include "derivations.hh"
 #include "args.hh"
@@ -71,7 +72,7 @@ struct TunnelLogger : public Logger
 
         StringSink buf;
         buf << STDERR_NEXT << (fs.s + "\n");
-        enqueueMsg(*buf.s);
+        enqueueMsg(buf.s);
     }
 
     void logEI(const ErrorInfo & ei) override
@@ -83,7 +84,7 @@ struct TunnelLogger : public Logger
 
         StringSink buf;
         buf << STDERR_NEXT << oss.str();
-        enqueueMsg(*buf.s);
+        enqueueMsg(buf.s);
     }
 
     /* startWork() means that we're starting an operation for which we
@@ -131,7 +132,7 @@ struct TunnelLogger : public Logger
 
         StringSink buf;
         buf << STDERR_START_ACTIVITY << act << lvl << type << s << fields << parent;
-        enqueueMsg(*buf.s);
+        enqueueMsg(buf.s);
     }
 
     void stopActivity(ActivityId act) override
@@ -139,7 +140,7 @@ struct TunnelLogger : public Logger
         if (GET_PROTOCOL_MINOR(clientVersion) < 20) return;
         StringSink buf;
         buf << STDERR_STOP_ACTIVITY << act;
-        enqueueMsg(*buf.s);
+        enqueueMsg(buf.s);
     }
 
     void result(ActivityId act, ResultType type, const Fields & fields) override
@@ -147,7 +148,7 @@ struct TunnelLogger : public Logger
         if (GET_PROTOCOL_MINOR(clientVersion) < 20) return;
         StringSink buf;
         buf << STDERR_RESULT << act << type << fields;
-        enqueueMsg(*buf.s);
+        enqueueMsg(buf.s);
     }
 };
 
@@ -231,11 +232,12 @@ struct ClientSettings
                 else if (name == settings.experimentalFeatures.name) {
                     // We don’t want to forward the experimental features to
                     // the daemon, as that could cause some pretty weird stuff
-                    if (tokenizeString<Strings>(value) != settings.experimentalFeatures.get())
+                    if (parseFeatures(tokenizeString<StringSet>(value)) != settings.experimentalFeatures.get())
                         debug("Ignoring the client-specified experimental features");
                 }
                 else if (trusted
                     || name == settings.buildTimeout.name
+                    || name == settings.buildRepeat.name
                     || name == "connect-timeout"
                     || (name == "builders" && value == ""))
                     settings.set(name, value);
@@ -403,9 +405,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                         return store->queryPathInfo(path);
                     },
                     [&](FixedOutputHashMethod & fohm) {
-                        if (!refs.empty())
-                            throw UnimplementedError("cannot yet have refs with flat or nar-hashed data");
-                        auto path = store->addToStoreFromDump(source, name, fohm.fileIngestionMethod, fohm.hashType, repair);
+                        auto path = store->addToStoreFromDump(source, name, fohm.fileIngestionMethod, fohm.hashType, repair, refs);
                         return store->queryPathInfo(path);
                     },
                 }, contentAddressMethod);
@@ -433,30 +433,34 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
                 hashAlgo = parseHashType(hashAlgoRaw);
             }
 
-            StringSink saved;
-            TeeSource savedNARSource(from, saved);
-            RetrieveRegularNARSink savedRegular { saved };
-
-            if (method == FileIngestionMethod::Recursive) {
-                /* Get the entire NAR dump from the client and save it to
-                  a string so that we can pass it to
-                  addToStoreFromDump(). */
-                ParseSink sink; /* null sink; just parse the NAR */
-                parseDump(sink, savedNARSource);
-            } else if (method == FileIngestionMethod::Flat) {
-                parseDump(savedRegular, from);
-            } else {
-                /* Should have validated above that no other file ingestion
-                   method was used. */
-                assert(false);
-            }
-
+            auto dumpSource = sinkToSource([&](Sink & saved) {
+                if (method == FileIngestionMethod::Recursive) {
+                    /* We parse the NAR dump through into `saved` unmodified,
+                       so why all this extra work? We still parse the NAR so
+                       that we aren't sending arbitrary data to `saved`
+                       unwittingly`, and we know when the NAR ends so we don't
+                       consume the rest of `from` and can't parse another
+                       command. (We don't trust `addToStoreFromDump` to not
+                       eagerly consume the entire stream it's given, past the
+                       length of the Nar. */
+                    TeeSource savedNARSource(from, saved);
+                    ParseSink sink; /* null sink; just parse the NAR */
+                    parseDump(sink, savedNARSource);
+                } else if (method == FileIngestionMethod::Flat) {
+                    /* Incrementally parse the NAR file, stripping the
+                       metadata, and streaming the sole file we expect into
+                       `saved`. */
+                    RetrieveRegularNARSink savedRegular { saved };
+                    parseDump(savedRegular, from);
+                    if (!savedRegular.regular) throw Error("regular file expected");
+                } else {
+                    /* Should have validated above that no other file ingestion
+                       method was used. */
+                    assert(false);
+                }
+            });
             logger->startWork();
-            if (!savedRegular.regular) throw Error("regular file expected");
-
-            // FIXME: try to stream directly from `from`.
-            StringSource dumpSource { *saved.s };
-            auto path = store->addToStoreFromDump(dumpSource, baseName, method, hashAlgo);
+            auto path = store->addToStoreFromDump(*dumpSource, baseName, method, hashAlgo);
             logger->stopWork();
 
             to << store->printStorePath(path);
@@ -471,17 +475,19 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             dontCheckSigs = false;
 
         logger->startWork();
-        FramedSource source(from);
-        store->addMultipleToStore(source,
-            RepairFlag{repair},
-            dontCheckSigs ? NoCheckSigs : CheckSigs);
+        {
+            FramedSource source(from);
+            store->addMultipleToStore(source,
+                RepairFlag{repair},
+                dontCheckSigs ? NoCheckSigs : CheckSigs);
+        }
         logger->stopWork();
         break;
     }
 
     case wopAddTextToStore: {
-        string suffix = readString(from);
-        string s = readString(from);
+        std::string suffix = readString(from);
+        std::string s = readString(from);
         auto refs = worker_proto::read(*store, from, Phantom<StorePathSet> {});
         logger->startWork();
         auto path = store->addTextToStore(suffix, s, refs, NoRepair);
@@ -528,6 +534,25 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         store->buildPaths(drvs, mode);
         logger->stopWork();
         to << 1;
+        break;
+    }
+
+    case wopBuildPathsWithResults: {
+        auto drvs = readDerivedPaths(*store, clientVersion, from);
+        BuildMode mode = bmNormal;
+        mode = (BuildMode) readInt(from);
+
+        /* Repairing is not atomic, so disallowed for "untrusted"
+           clients.  */
+        if (mode == bmRepair && !trusted)
+            throw Error("repairing is not allowed because you are not in 'trusted-users'");
+
+        logger->startWork();
+        auto results = store->buildPathsWithResults(drvs, mode);
+        logger->stopWork();
+
+        worker_proto::write(*store, to, results);
+
         break;
     }
 
@@ -623,16 +648,19 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopAddIndirectRoot: {
         Path path = absPath(readString(from));
+
         logger->startWork();
-        store->addIndirectRoot(path);
+        auto & gcStore = requireGcStore(*store);
+        gcStore.addIndirectRoot(path);
         logger->stopWork();
+
         to << 1;
         break;
     }
 
+    // Obsolete.
     case wopSyncWithGC: {
         logger->startWork();
-        store->syncWithGC();
         logger->stopWork();
         to << 1;
         break;
@@ -640,7 +668,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case wopFindRoots: {
         logger->startWork();
-        Roots roots = store->findRoots(!trusted);
+        auto & gcStore = requireGcStore(*store);
+        Roots roots = gcStore.findRoots(!trusted);
         logger->stopWork();
 
         size_t size = 0;
@@ -671,7 +700,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         if (options.ignoreLiveness)
             throw Error("you are not allowed to ignore liveness");
-        store->collectGarbage(options, results);
+        auto & gcStore = requireGcStore(*store);
+        gcStore.collectGarbage(options, results);
         logger->stopWork();
 
         to << results.paths << results.bytesFreed << 0 /* obsolete */;
@@ -699,8 +729,8 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (GET_PROTOCOL_MINOR(clientVersion) >= 12) {
             unsigned int n = readInt(from);
             for (unsigned int i = 0; i < n; i++) {
-                string name = readString(from);
-                string value = readString(from);
+                auto name = readString(from);
+                auto value = readString(from);
                 clientSettings.overrides.emplace(name, value);
             }
         }
@@ -852,14 +882,14 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
         else {
             std::unique_ptr<Source> source;
+            StringSink saved;
             if (GET_PROTOCOL_MINOR(clientVersion) >= 21)
                 source = std::make_unique<TunnelSource>(from, to);
             else {
-                StringSink saved;
                 TeeSource tee { from, saved };
                 ParseSink ether;
                 parseDump(ether, tee);
-                source = std::make_unique<StringSource>(std::move(*saved.s));
+                source = std::make_unique<StringSource>(saved.s);
             }
 
             logger->startWork();
@@ -920,6 +950,22 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         break;
     }
 
+    case wopAddBuildLog: {
+        StorePath path{readString(from)};
+        logger->startWork();
+        if (!trusted)
+            throw Error("you are not privileged to add logs");
+        {
+            FramedSource source(from);
+            StringSink sink;
+            source.drainInto(sink);
+            store->addBuildLog(path, sink.s);
+        }
+        logger->stopWork();
+        to << 1;
+        break;
+    }
+
     default:
         throw Error("invalid operation %1%", op);
     }
@@ -955,15 +1001,19 @@ void processConnection(
 
     Finally finally([&]() {
         _isInterrupted = false;
-        prevLogger->log(lvlDebug, fmt("%d operations", opCount));
+        printMsgUsing(prevLogger, lvlDebug, "%d operations", opCount);
     });
 
     if (GET_PROTOCOL_MINOR(clientVersion) >= 14 && readInt(from)) {
-        auto affinity = readInt(from);
-        setAffinityTo(affinity);
+        // Obsolete CPU affinity.
+        readInt(from);
     }
 
-    readInt(from); // obsolete reserveSpace
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 11)
+        readInt(from); // obsolete reserveSpace
+
+    if (GET_PROTOCOL_MINOR(clientVersion) >= 33)
+        to << nixVersion;
 
     /* Send startup error messages to the client. */
     tunnelLogger->startWork();
@@ -987,6 +1037,8 @@ void processConnection(
             } catch (EndOfFile & e) {
                 break;
             }
+
+            printMsgUsing(prevLogger, lvlDebug, "received daemon op %d", op);
 
             opCount++;
 

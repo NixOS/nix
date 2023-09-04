@@ -7,6 +7,8 @@
 #include "url-parts.hh"
 #include "pathlocks.hh"
 
+#include "fetch-settings.hh"
+
 #include <sys/time.h>
 #include <sys/wait.h>
 
@@ -52,7 +54,7 @@ struct GitInputScheme : InputScheme
         for (auto &[name, value] : url.query) {
             if (name == "rev" || name == "ref" || name == "treeHash" || name == "gitIngestion")
                 attrs.emplace(name, value);
-            else if (name == "shallow")
+            else if (name == "shallow" || name == "submodules")
                 attrs.emplace(name, Explicit<bool> { value == "1" });
             else
                 url2.query.emplace(name, value);
@@ -183,7 +185,7 @@ struct GitInputScheme : InputScheme
         return {isLocal, isLocal ? url.path : url.base};
     }
 
-    std::pair<Tree, Input> fetch(ref<Store> store, const Input & _input) override
+    std::pair<StorePathDescriptor, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
 
@@ -203,7 +205,7 @@ struct GitInputScheme : InputScheme
             ? FileIngestionMethod::Git
             : FileIngestionMethod::Recursive;
 
-        auto getImmutableAttrs = [&]()
+        auto getLockedAttrs = [&]()
         {
             Attrs attrs({
                 {"type", cacheType},
@@ -219,7 +221,7 @@ struct GitInputScheme : InputScheme
         };
 
         auto makeResult = [&](const Attrs & infoAttrs, StorePathDescriptor && storePathDesc)
-            -> std::pair<Tree, Input>
+            -> std::pair<StorePathDescriptor, Input>
         {
             assert(input.getRev() || input.getTreeHash());
             /* If was originally set, that original value must be preserved. */
@@ -228,17 +230,11 @@ struct GitInputScheme : InputScheme
             if (!shallow)
                 input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
             input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
-            return {
-                Tree {
-                    store->toRealPath(store->makeFixedOutputPathFromCA(storePathDesc)),
-                    std::move(storePathDesc),
-                },
-                input
-            };
+            return {std::move(storePathDesc), input};
         };
 
         if (input.getRev()) {
-            if (auto res = getCache()->lookup(store, getImmutableAttrs()))
+            if (auto res = getCache()->lookup(store, getLockedAttrs()))
                 return makeResult(res->first, std::move(res->second));
         }
 
@@ -276,10 +272,10 @@ struct GitInputScheme : InputScheme
 
                 /* This is an unclean working tree. So copy all tracked files. */
 
-                if (!settings.allowDirty)
+                if (!fetchSettings.allowDirty)
                     throw Error("Git tree '%s' is dirty", actualUrl);
 
-                if (settings.warnDirty)
+                if (fetchSettings.warnDirty)
                     warn("Git tree '%s' is dirty", actualUrl);
 
                 auto gitOpts = Strings({ "-C", actualUrl, "ls-files", "-z" });
@@ -315,26 +311,20 @@ struct GitInputScheme : InputScheme
                     "lastModified",
                     haveCommits ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
-                return {
-                    Tree {
-                        store->toRealPath(storePath),
-                        std::move(storePathDesc),
-                    },
-                    input
-                };
+                return {std::move(storePathDesc), input};
             }
         }
 
         if (!input.getRef()) input.attrs.insert_or_assign("ref", isLocal ? readHead(actualUrl) : "master");
 
-        Attrs mutableAttrs({
+        Attrs unlockedAttrs({
             {"type", cacheType},
             {"name", name},
             {"url", actualUrl},
             {"ref", *input.getRef()},
         });
         if (ingestionMethod == FileIngestionMethod::Git)
-            mutableAttrs.insert_or_assign("gitIngestion", true);
+            unlockedAttrs.insert_or_assign("gitIngestion", true);
 
         Path repoDir;
 
@@ -345,7 +335,7 @@ struct GitInputScheme : InputScheme
                     return Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "rev-parse", rev })), htSHA1).gitRev();
                 };
                 input.attrs.insert_or_assign("rev", getHash(*input.getRef()));
-                if (settings.isExperimentalFeatureEnabled("git-hashing"))
+                if (settings.isExperimentalFeatureEnabled(Xp::GitHashing))
                     input.attrs.insert_or_assign("treeHash", getHash(*input.getRef() + ":"));
             }
 
@@ -353,7 +343,7 @@ struct GitInputScheme : InputScheme
 
         } else {
 
-            if (auto res = getCache()->lookup(store, mutableAttrs)) {
+            if (auto res = getCache()->lookup(store, unlockedAttrs)) {
                 bool found = false;
 
                 if (std::optional revS = maybeGetStrAttr(res->first, "rev")) {
@@ -364,7 +354,7 @@ struct GitInputScheme : InputScheme
                     }
                 }
 
-                if (settings.isExperimentalFeatureEnabled("git-hashing")) {
+                if (settings.isExperimentalFeatureEnabled(Xp::GitHashing)) {
                     if (std::optional treeHashS = maybeGetStrAttr(res->first, "treeHash")) {
                         auto treeHash2 = Hash::parseNonSRIUnprefixed(*treeHashS, htSHA1);
                         if (!input.getTreeHash() || input.getTreeHash() == treeHash2) {
@@ -386,16 +376,12 @@ struct GitInputScheme : InputScheme
             Path cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, actualUrl).to_string(Base32, false);
             repoDir = cacheDir;
 
-            Path cacheDirLock = cacheDir + ".lock";
             createDirs(dirOf(cacheDir));
-            AutoCloseFD lock = openLockFile(cacheDirLock, true);
-            lockFile(lock.get(), ltWrite, true);
+            PathLocks cacheDirLock({cacheDir + ".lock"});
 
             if (!pathExists(cacheDir)) {
                 runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", "--bare", repoDir });
             }
-
-            deleteLockFile(cacheDirLock, lock.get());
 
             Path localRefFile =
                 input.getRef()->compare(0, 5, "refs/") == 0
@@ -463,10 +449,12 @@ struct GitInputScheme : InputScheme
             if (!input.getRev() && !input.getTreeHash()) {
                 auto rev = Hash::parseAny(chomp(readFile(localRefFile)), htSHA1).gitRev();
                 input.attrs.insert_or_assign("rev", rev);
-                if (settings.isExperimentalFeatureEnabled("git-hashing"))
+                if (settings.isExperimentalFeatureEnabled(Xp::GitHashing))
                     input.attrs.insert_or_assign("treeHash",
                         Hash::parseAny(chomp(runProgram("git", true, { "-C", repoDir, "rev-parse", rev + ":" })), htSHA1).gitRev());
             }
+
+            // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
         }
 
         if (input.getTreeHash()) {
@@ -489,7 +477,7 @@ struct GitInputScheme : InputScheme
 
         /* Now that we know the ref, check again whether we have it in
            the store. */
-        if (auto res = getCache()->lookup(store, getImmutableAttrs()))
+        if (auto res = getCache()->lookup(store, getLockedAttrs()))
             return makeResult(res->first, std::move(res->second));
 
         Path tmpDir = createTempDir();
@@ -582,7 +570,7 @@ struct GitInputScheme : InputScheme
         } else
             infoAttrs.insert_or_assign("lastModified", (uint64_t) 0);
 
-        if (settings.isExperimentalFeatureEnabled("git-hashing"))
+        if (settings.isExperimentalFeatureEnabled(Xp::GitHashing))
             if (auto treeHash = input.getTreeHash())
                 infoAttrs.insert_or_assign("treeHash", treeHash->gitRev());
 
@@ -597,14 +585,14 @@ struct GitInputScheme : InputScheme
         if (!_input.getRev() && !_input.getTreeHash())
             getCache()->add(
                 store,
-                mutableAttrs,
+                unlockedAttrs,
                 infoAttrs,
                 storePathDesc,
                 false);
 
         getCache()->add(
             store,
-            getImmutableAttrs(),
+            getLockedAttrs(),
             infoAttrs,
             storePathDesc,
             true);

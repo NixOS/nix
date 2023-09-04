@@ -24,7 +24,7 @@ collection; you could write your own Nix expressions based on Nixpkgs,
 or completely new ones.)
 
 You can manually download the latest version of Nixpkgs from
-<http://nixos.org/nixpkgs/download.html>. However, it’s much more
+<https://github.com/NixOS/nixpkgs>. However, it’s much more
 convenient to use the Nixpkgs [*channel*](channels.md), since it makes
 it easy to stay up to date with new versions of Nixpkgs. Nixpkgs is
 automatically added to your list of “subscribed” channels when you
@@ -40,48 +40,52 @@ $ nix-channel --update
 > 
 > On NixOS, you’re automatically subscribed to a NixOS channel
 > corresponding to your NixOS major release (e.g.
-> <http://nixos.org/channels/nixos-14.12>). A NixOS channel is identical
+> <http://nixos.org/channels/nixos-21.11>). A NixOS channel is identical
 > to the Nixpkgs channel, except that it contains only Linux binaries
 > and is updated only if a set of regression tests succeed.
 
 You can view the set of available packages in Nixpkgs:
 
 ```console
-$ nix-env -qa
-aterm-2.2
-bash-3.0
-binutils-2.15
-bison-1.875d
-blackdown-1.4.2
-bzip2-1.0.2
+$ nix-env -qaP
+nixpkgs.aterm                       aterm-2.2
+nixpkgs.bash                        bash-3.0
+nixpkgs.binutils                    binutils-2.15
+nixpkgs.bison                       bison-1.875d
+nixpkgs.blackdown                   blackdown-1.4.2
+nixpkgs.bzip2                       bzip2-1.0.2
 …
 ```
 
-The flag `-q` specifies a query operation, and `-a` means that you want
+The flag `-q` specifies a query operation, `-a` means that you want
 to show the “available” (i.e., installable) packages, as opposed to the
-installed packages. If you downloaded Nixpkgs yourself, or if you
-checked it out from GitHub, then you need to pass the path to your
-Nixpkgs tree using the `-f` flag:
+installed packages, and `-P` prints the attribute paths that can be used
+to unambiguously select a package for installation (listed in the first column).
+If you downloaded Nixpkgs yourself, or if you checked it out from GitHub,
+then you need to pass the path to your Nixpkgs tree using the `-f` flag:
 
 ```console
-$ nix-env -qaf /path/to/nixpkgs
+$ nix-env -qaPf /path/to/nixpkgs
+aterm                               aterm-2.2
+bash                                bash-3.0
+…
 ```
 
 where */path/to/nixpkgs* is where you’ve unpacked or checked out
 Nixpkgs.
 
-You can select specific packages by name:
+You can filter the packages by name:
 
 ```console
-$ nix-env -qa firefox
-firefox-34.0.5
-firefox-with-plugins-34.0.5
+$ nix-env -qaP firefox
+nixpkgs.firefox-esr                 firefox-91.3.0esr
+nixpkgs.firefox                     firefox-94.0.1
 ```
 
 and using regular expressions:
 
 ```console
-$ nix-env -qa 'firefox.*'
+$ nix-env -qaP 'firefox.*'
 ```
 
 It is also possible to see the *status* of available packages, i.e.,
@@ -89,11 +93,11 @@ whether they are installed into the user environment and/or present in
 the system:
 
 ```console
-$ nix-env -qas
+$ nix-env -qaPs
 …
--PS bash-3.0
---S binutils-2.15
-IPS bison-1.875d
+-PS  nixpkgs.bash                bash-3.0
+--S  nixpkgs.binutils            binutils-2.15
+IPS  nixpkgs.bison               bison-1.875d
 …
 ```
 
@@ -106,13 +110,13 @@ which is Nix’s mechanism for doing binary deployment. It just means that
 Nix knows that it can fetch a pre-built package from somewhere
 (typically a network server) instead of building it locally.
 
-You can install a package using `nix-env -i`. For instance,
+You can install a package using `nix-env -iA`. For instance,
 
 ```console
-$ nix-env -i subversion
+$ nix-env -iA nixpkgs.subversion
 ```
 
-will install the package called `subversion` (which is, of course, the
+will install the package called `subversion` from `nixpkgs` channel (which is, of course, the
 [Subversion version management system](http://subversion.tigris.org/)).
 
 > **Note**
@@ -122,7 +126,7 @@ will install the package called `subversion` (which is, of course, the
 > binary cache <https://cache.nixos.org>; it contains binaries for most
 > packages in Nixpkgs. Only if no binary is available in the binary
 > cache, Nix will build the package from source. So if `nix-env
-> -i subversion` results in Nix building stuff from source, then either
+> -iA nixpkgs.subversion` results in Nix building stuff from source, then either
 > the package is not built for your platform by the Nixpkgs build
 > servers, or your version of Nixpkgs is too old or too new. For
 > instance, if you have a very recent checkout of Nixpkgs, then the
@@ -133,7 +137,10 @@ will install the package called `subversion` (which is, of course, the
 > using a Git checkout of the Nixpkgs tree), you will get binaries for
 > most packages.
 
-Naturally, packages can also be uninstalled:
+Naturally, packages can also be uninstalled. Unlike when installing, you will
+need to use the derivation name (though the version part can be omitted),
+instead of the attribute path, as `nix-env` does not record which attribute
+was used for installing:
 
 ```console
 $ nix-env -e subversion
@@ -143,7 +150,7 @@ Upgrading to a new version is just as easy. If you have a new release of
 Nix Packages, you can do:
 
 ```console
-$ nix-env -u subversion
+$ nix-env -uA nixpkgs.subversion
 ```
 
 This will *only* upgrade Subversion if there is a “newer” version in the

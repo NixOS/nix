@@ -40,7 +40,7 @@ export NIX_SSL_CERT_FILE=/etc/ssl/my-certificate-bundle.crt
 > **Note**
 > 
 > You must not add the export and then do the install, as the Nix
-> installer will detect the presense of Nix configuration, and abort.
+> installer will detect the presence of Nix configuration, and abort.
 
 ## `NIX_SSL_CERT_FILE` with macOS and the Nix daemon
 

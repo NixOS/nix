@@ -18,19 +18,53 @@ R""(
   nix (Nix) 2.4pre20201215_e3ddffb
   ```
 
+* Bundle a Hello using a specific bundler:
+
+  ```console
+  # nix bundle --bundler github:NixOS/bundlers#toDockerImage nixpkgs#hello
+  # docker load < hello-2.10.tar.gz
+  # docker run hello-2.10:latest hello
+  Hello, world!
+  ```
+
 # Description
 
-`nix bundle` packs the closure of the [Nix app](./nix3-run.md)
-*installable* into a single self-extracting executable. See the
-[`nix-bundle` homepage](https://github.com/matthewbauer/nix-bundle)
-for more details.
+`nix bundle`, by default, packs the closure of the *installable* into a single
+self-extracting executable. See the [`bundlers`
+homepage](https://github.com/NixOS/bundlers) for more details.
 
 > **Note**
 >
 > This command only works on Linux.
 
-# Bundler definitions
+# Flake output attributes
 
-TODO
+If no flake output attribute is given, `nix bundle` tries the following
+flake output attributes:
+
+* `bundlers.<system>.default`
+
+If an attribute *name* is given, `nix run` tries the following flake
+output attributes:
+
+* `bundlers.<system>.<name>`
+
+# Bundlers
+
+A bundler is specified by a flake output attribute named
+`bundlers.<system>.<name>`. It looks like this:
+
+```nix
+bundlers.x86_64-linux = rec {
+  identity = drv: drv;
+
+  blender_2_79 = drv: self.packages.x86_64-linux.blender_2_79;
+
+  default = identity;
+};
+```
+
+A bundler must be a function that accepts an arbitrary value (typically a
+derivation or app definition) and returns a derivation.
 
 )""

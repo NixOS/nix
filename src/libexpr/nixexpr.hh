@@ -4,8 +4,6 @@
 #include "symbol-table.hh"
 #include "error.hh"
 
-#include <map>
-
 
 namespace nix {
 
@@ -28,18 +26,21 @@ struct Pos
     FileOrigin origin;
     Symbol file;
     unsigned int line, column;
-    Pos() : origin(foString), line(0), column(0) { };
+
+    Pos() : origin(foString), line(0), column(0) { }
     Pos(FileOrigin origin, const Symbol & file, unsigned int line, unsigned int column)
-        : origin(origin), file(file), line(line), column(column) { };
+        : origin(origin), file(file), line(line), column(column) { }
+
     operator bool() const
     {
         return line != 0;
     }
+
     bool operator < (const Pos & p2) const
     {
         if (!line) return p2.line;
         if (!p2.line) return false;
-        int d = ((string) file).compare((string) p2.file);
+        int d = ((const std::string &) file).compare((const std::string &) p2.file);
         if (d < 0) return true;
         if (d > 0) return false;
         if (line < p2.line) return true;
@@ -70,7 +71,7 @@ struct AttrName
 
 typedef std::vector<AttrName> AttrPath;
 
-string showAttrPath(const AttrPath & attrPath);
+std::string showAttrPath(const AttrPath & attrPath);
 
 
 /* Abstract syntax of Nix expressions. */
@@ -96,7 +97,7 @@ struct ExprInt : Expr
 {
     NixInt n;
     Value v;
-    ExprInt(NixInt n) : n(n) { mkInt(v, n); };
+    ExprInt(NixInt n) : n(n) { v.mkInt(n); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
@@ -105,35 +106,31 @@ struct ExprFloat : Expr
 {
     NixFloat nf;
     Value v;
-    ExprFloat(NixFloat nf) : nf(nf) { mkFloat(v, nf); };
+    ExprFloat(NixFloat nf) : nf(nf) { v.mkFloat(nf); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
 
 struct ExprString : Expr
 {
-    Symbol s;
+    std::string s;
     Value v;
-    ExprString(const Symbol & s) : s(s) { mkString(v, s); };
+    ExprString(std::string s) : s(std::move(s)) { v.mkString(this->s.data()); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
-};
-
-/* Temporary class used during parsing of indented strings. */
-struct ExprIndStr : Expr
-{
-    string s;
-    ExprIndStr(const string & s) : s(s) { };
 };
 
 struct ExprPath : Expr
 {
-    string s;
+    std::string s;
     Value v;
-    ExprPath(const string & s) : s(s) { v.mkPath(this->s.c_str()); };
+    ExprPath(std::string s) : s(std::move(s)) { v.mkPath(this->s.c_str()); };
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env);
 };
+
+typedef uint32_t Level;
+typedef uint32_t Displacement;
 
 struct ExprVar : Expr
 {
@@ -150,8 +147,8 @@ struct ExprVar : Expr
        value is obtained by getting the attribute named `name' from
        the set stored in the environment that is `level' levels up
        from the current one.*/
-    unsigned int level;
-    unsigned int displ;
+    Level level;
+    Displacement displ;
 
     ExprVar(const Symbol & name) : name(name) { };
     ExprVar(const Pos & pos, const Symbol & name) : pos(pos), name(name) { };
@@ -185,7 +182,7 @@ struct ExprAttrs : Expr
         bool inherited;
         Expr * e;
         Pos pos;
-        unsigned int displ; // displacement
+        Displacement displ; // displacement
         AttrDef(Expr * e, const Pos & pos, bool inherited=false)
             : inherited(inherited), e(e), pos(pos) { };
         AttrDef() { };
@@ -222,10 +219,25 @@ struct Formal
 
 struct Formals
 {
-    typedef std::list<Formal> Formals_;
+    typedef std::vector<Formal> Formals_;
     Formals_ formals;
-    std::set<Symbol> argNames; // used during parsing
     bool ellipsis;
+
+    bool has(Symbol arg) const {
+        auto it = std::lower_bound(formals.begin(), formals.end(), arg,
+            [] (const Formal & f, const Symbol & sym) { return f.name < sym; });
+        return it != formals.end() && it->name == arg;
+    }
+
+    std::vector<Formal> lexicographicOrder() const
+    {
+        std::vector<Formal> result(formals.begin(), formals.end());
+        std::sort(result.begin(), result.end(),
+            [] (const Formal & a, const Formal & b) {
+                return std::string_view(a.name) < std::string_view(b.name);
+            });
+        return result;
+    }
 };
 
 struct ExprLambda : Expr
@@ -233,20 +245,26 @@ struct ExprLambda : Expr
     Pos pos;
     Symbol name;
     Symbol arg;
-    bool matchAttrs;
     Formals * formals;
     Expr * body;
-    ExprLambda(const Pos & pos, const Symbol & arg, bool matchAttrs, Formals * formals, Expr * body)
-        : pos(pos), arg(arg), matchAttrs(matchAttrs), formals(formals), body(body)
+    ExprLambda(const Pos & pos, const Symbol & arg, Formals * formals, Expr * body)
+        : pos(pos), arg(arg), formals(formals), body(body)
     {
-        if (!arg.empty() && formals && formals->argNames.find(arg) != formals->argNames.end())
-            throw ParseError({
-                .msg = hintfmt("duplicate formal function argument '%1%'", arg),
-                .errPos = pos
-            });
     };
     void setName(Symbol & name);
-    string showNamePos() const;
+    std::string showNamePos() const;
+    inline bool hasFormals() const { return formals != nullptr; }
+    COMMON_METHODS
+};
+
+struct ExprCall : Expr
+{
+    Expr * fun;
+    std::vector<Expr *> args;
+    Pos pos;
+    ExprCall(const Pos & pos, Expr * fun, std::vector<Expr *> && args)
+        : fun(fun), args(args), pos(pos)
+    { }
     COMMON_METHODS
 };
 
@@ -308,7 +326,6 @@ struct ExprOpNot : Expr
         void eval(EvalState & state, Env & env, Value & v); \
     };
 
-MakeBinOp(ExprApp, "")
 MakeBinOp(ExprOpEq, "==")
 MakeBinOp(ExprOpNEq, "!=")
 MakeBinOp(ExprOpAnd, "&&")
@@ -321,8 +338,8 @@ struct ExprConcatStrings : Expr
 {
     Pos pos;
     bool forceString;
-    vector<Expr *> * es;
-    ExprConcatStrings(const Pos & pos, bool forceString, vector<Expr *> * es)
+    std::vector<std::pair<Pos, Expr *> > * es;
+    ExprConcatStrings(const Pos & pos, bool forceString, std::vector<std::pair<Pos, Expr *> > * es)
         : pos(pos), forceString(forceString), es(es) { };
     COMMON_METHODS
 };
@@ -342,9 +359,39 @@ struct StaticEnv
 {
     bool isWith;
     const StaticEnv * up;
-    typedef std::map<Symbol, unsigned int> Vars;
+
+    // Note: these must be in sorted order.
+    typedef std::vector<std::pair<Symbol, Displacement>> Vars;
     Vars vars;
-    StaticEnv(bool isWith, const StaticEnv * up) : isWith(isWith), up(up) { };
+
+    StaticEnv(bool isWith, const StaticEnv * up, size_t expectedSize = 0) : isWith(isWith), up(up) {
+        vars.reserve(expectedSize);
+    };
+
+    void sort()
+    {
+        std::stable_sort(vars.begin(), vars.end(),
+            [](const Vars::value_type & a, const Vars::value_type & b) { return a.first < b.first; });
+    }
+
+    void deduplicate()
+    {
+        auto it = vars.begin(), jt = it, end = vars.end();
+        while (jt != end) {
+            *it = *jt++;
+            while (jt != end && it->first == jt->first) *it = *jt++;
+            it++;
+        }
+        vars.erase(it, end);
+    }
+
+    Vars::const_iterator find(const Symbol & name) const
+    {
+        Vars::value_type key(name, 0);
+        auto i = std::lower_bound(vars.begin(), vars.end(), key);
+        if (i != vars.end() && i->first == name) return i;
+        return vars.end();
+    }
 };
 
 

@@ -29,7 +29,7 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
     if (!sshPublicHostKey.empty()) {
         Path fileName = (Path) *state->tmpDir + "/host-key";
         auto p = host.rfind("@");
-        string thost = p != string::npos ? string(host, p + 1) : host;
+        std::string thost = p != std::string::npos ? std::string(host, p + 1) : host;
         writeFile(fileName, thost + " " + base64Decode(sshPublicHostKey) + "\n");
         args.insert(args.end(), {"-oUserKnownHostsFile=" + fileName});
     }

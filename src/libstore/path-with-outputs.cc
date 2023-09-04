@@ -22,9 +22,9 @@ DerivedPath StorePathWithOutputs::toDerivedPath() const
 
 std::vector<DerivedPath> toDerivedPaths(const std::vector<StorePathWithOutputs> ss)
 {
-	std::vector<DerivedPath> reqs;
-	for (auto & s : ss) reqs.push_back(s.toDerivedPath());
-	return reqs;
+    std::vector<DerivedPath> reqs;
+    for (auto & s : ss) reqs.push_back(s.toDerivedPath());
+    return reqs;
 }
 
 
@@ -49,9 +49,9 @@ std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s)
 {
     size_t n = s.find("!");
     return n == s.npos
-        ? std::make_pair(s, std::set<string>())
+        ? std::make_pair(s, std::set<std::string>())
         : std::make_pair(((std::string_view) s).substr(0, n),
-            tokenizeString<std::set<string>>(((std::string_view) s).substr(n + 1), ","));
+            tokenizeString<std::set<std::string>>(((std::string_view) s).substr(n + 1), ","));
 }
 
 

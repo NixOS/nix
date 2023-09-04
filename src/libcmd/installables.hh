@@ -5,6 +5,7 @@
 #include "path-with-outputs.hh"
 #include "derived-path.hh"
 #include "eval.hh"
+#include "store-api.hh"
 #include "flake/flake.hh"
 
 #include <optional>
@@ -29,13 +30,39 @@ struct UnresolvedApp
     App resolve(ref<Store> evalStore, ref<Store> store);
 };
 
+enum class Realise {
+    /* Build the derivation. Postcondition: the
+       derivation outputs exist. */
+    Outputs,
+    /* Don't build the derivation. Postcondition: the store derivation
+       exists. */
+    Derivation,
+    /* Evaluate in dry-run mode. Postcondition: nothing. */
+    // FIXME: currently unused, but could be revived if we can
+    // evaluate derivations in-memory.
+    Nothing
+};
+
+/* How to handle derivations in commands that operate on store paths. */
+enum class OperateOn {
+    /* Operate on the output path. */
+    Output,
+    /* Operate on the .drv path. */
+    Derivation
+};
+
 struct Installable
 {
     virtual ~Installable() { }
 
-    virtual std::string what() = 0;
+    virtual std::string what() const = 0;
 
     virtual DerivedPaths toDerivedPaths() = 0;
+
+    virtual StorePathSet toDrvPaths(ref<Store> store)
+    {
+        throw Error("'%s' cannot be converted to a derivation path", what());
+    }
 
     DerivedPath toDerivedPath();
 
@@ -63,6 +90,39 @@ struct Installable
     {
         return FlakeRef::fromAttrs({{"type","indirect"}, {"id", "nixpkgs"}});
     }
+
+    static BuiltPaths build(
+        ref<Store> evalStore,
+        ref<Store> store,
+        Realise mode,
+        const std::vector<std::shared_ptr<Installable>> & installables,
+        BuildMode bMode = bmNormal);
+
+    static std::set<StorePath> toStorePaths(
+        ref<Store> evalStore,
+        ref<Store> store,
+        Realise mode,
+        OperateOn operateOn,
+        const std::vector<std::shared_ptr<Installable>> & installables);
+
+    static StorePath toStorePath(
+        ref<Store> evalStore,
+        ref<Store> store,
+        Realise mode,
+        OperateOn operateOn,
+        std::shared_ptr<Installable> installable);
+
+    static std::set<StorePath> toDerivations(
+        ref<Store> store,
+        const std::vector<std::shared_ptr<Installable>> & installables,
+        bool useDeriver = false);
+
+    static BuiltPaths toBuiltPaths(
+        ref<Store> evalStore,
+        ref<Store> store,
+        Realise mode,
+        OperateOn operateOn,
+        const std::vector<std::shared_ptr<Installable>> & installables);
 };
 
 struct InstallableValue : Installable
@@ -74,13 +134,14 @@ struct InstallableValue : Installable
     struct DerivationInfo
     {
         StorePath drvPath;
-        std::optional<StorePath> outPath;
         std::string outputName;
     };
 
     virtual std::vector<DerivationInfo> toDerivations() = 0;
 
     DerivedPaths toDerivedPaths() override;
+
+    StorePathSet toDrvPaths(ref<Store> store) override;
 };
 
 struct InstallableFlake : InstallableValue
@@ -95,11 +156,12 @@ struct InstallableFlake : InstallableValue
         SourceExprCommand * cmd,
         ref<EvalState> state,
         FlakeRef && flakeRef,
-        Strings && attrPaths,
-        Strings && prefixes,
+        std::string_view fragment,
+        Strings attrPaths,
+        Strings prefixes,
         const flake::LockFlags & lockFlags);
 
-    std::string what() override { return flakeRef.to_string() + "#" + *attrPaths.begin(); }
+    std::string what() const override { return flakeRef.to_string() + "#" + *attrPaths.begin(); }
 
     std::vector<std::string> getActualAttrPaths();
 
@@ -122,5 +184,10 @@ struct InstallableFlake : InstallableValue
 ref<eval_cache::EvalCache> openEvalCache(
     EvalState & state,
     std::shared_ptr<flake::LockedFlake> lockedFlake);
+
+BuiltPaths getBuiltPaths(
+    ref<Store> evalStore,
+    ref<Store> store,
+    const DerivedPaths & hopefullyBuiltPaths);
 
 }

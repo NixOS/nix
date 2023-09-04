@@ -26,8 +26,6 @@ perl/Makefile.config
 
 # /scripts/
 /scripts/nix-profile.sh
-/scripts/nix-reduce-build
-/scripts/nix-http-export.cgi
 /scripts/nix-profile-daemon.sh
 
 # /src/libexpr/
@@ -40,6 +38,7 @@ perl/Makefile.config
 
 # /src/libstore/
 *.gen.*
+/src/libstore/tests/libstore-tests
 
 # /src/libutil/
 /src/libutil/tests/libutil-tests
@@ -121,3 +120,7 @@ GTAGS
 compile_commands.json
 
 nix-rust/target
+
+result
+
+.vscode/

@@ -74,7 +74,7 @@ PathLocks::PathLocks()
 }
 
 
-PathLocks::PathLocks(const PathSet & paths, const string & waitMsg)
+PathLocks::PathLocks(const PathSet & paths, const std::string & waitMsg)
     : deletePaths(false)
 {
     lockPaths(paths, waitMsg);
@@ -82,7 +82,7 @@ PathLocks::PathLocks(const PathSet & paths, const string & waitMsg)
 
 
 bool PathLocks::lockPaths(const PathSet & paths,
-    const string & waitMsg, bool wait)
+    const std::string & waitMsg, bool wait)
 {
     assert(fds.empty());
 
@@ -173,6 +173,19 @@ void PathLocks::unlock()
 void PathLocks::setDeletion(bool deletePaths)
 {
     this->deletePaths = deletePaths;
+}
+
+
+FdLock::FdLock(int fd, LockType lockType, bool wait, std::string_view waitMsg)
+    : fd(fd)
+{
+    if (wait) {
+        if (!lockFile(fd, lockType, false)) {
+            printInfo("%s", waitMsg);
+            acquired = lockFile(fd, lockType, true);
+        }
+    } else
+        acquired = lockFile(fd, lockType, false);
 }
 
 

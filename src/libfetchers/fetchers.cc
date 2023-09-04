@@ -25,13 +25,13 @@ static void fixupInput(Input & input)
     input.getType();
     input.getRef();
     if (input.getRev())
-        input.immutable = true;
+        input.locked = true;
     if (input.getTreeHash())
-        input.immutable = true;
+        input.locked = true;
     input.getRevCount();
     input.getLastModified();
     if (input.getNarHash())
-        input.immutable = true;
+        input.locked = true;
 }
 
 Input Input::fromURL(const ParsedURL & url)
@@ -129,15 +129,19 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
             debug("using substituted/cached input '%s' in '%s'",
                 to_string(), store->printStorePath(storePath));
 
-            auto actualPath = store->toRealPath(storePath);
-
-            return {fetchers::Tree(std::move(actualPath), std::move(storePathDesc)), *this};
+            return {
+                Tree {
+                    .actualPath = store->toRealPath(storePath),
+                    .storePath = std::move(storePathDesc),
+                },
+                *this,
+            };
         } catch (Error & e) {
             debug("substitution of input '%s' failed: %s", to_string(), e.what());
         }
     }
 
-    auto [tree, input] = [&]() -> std::pair<Tree, Input> {
+    auto [storePath, input] = [&]() -> std::pair<StorePathDescriptor, Input> {
         try {
             return scheme->fetch(store, *this);
         } catch (Error & e) {
@@ -146,8 +150,10 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
         }
     }();
 
-    if (tree.actualPath == "")
-        tree.actualPath = store->toRealPath(store->makeFixedOutputPathFromCA(tree.storePath));
+    Tree tree {
+        .actualPath = store->toRealPath(store->makeFixedOutputPathFromCA(storePath)),
+        .storePath = storePath,
+    };
 
     auto narHash = store->queryPathInfo(tree.storePath)->narHash;
     input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
@@ -170,7 +176,7 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
                 input.to_string(), *prevRevCount);
     }
 
-    input.immutable = true;
+    input.locked = true;
 
     assert(input.hasAllInfo());
 
@@ -234,7 +240,7 @@ StorePathDescriptor Input::computeStorePath(Store & store) const
                 {},
             },
         };
-    throw Error("cannot compute store path for mutable input '%s'", to_string());
+    throw Error("cannot compute store path for unlocked input '%s'", to_string());
 }
 
 std::string Input::getType() const
@@ -270,7 +276,7 @@ std::optional<Hash> Input::getRev() const
 std::optional<Hash> Input::getTreeHash() const
 {
     if (auto s = maybeGetStrAttr(attrs, "treeHash")) {
-        settings.requireExperimentalFeature("git-hashing");
+        settings.requireExperimentalFeature(Xp::GitHashing);
         return Hash::parseAny(*s, htSHA1);
     }
     return {};

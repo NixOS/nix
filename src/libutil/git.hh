@@ -19,7 +19,7 @@ void parseGit(ParseSink & sink, Source & source, const Path & realStoreDir, cons
 // Dumps a single file to a sink
 GitMode dumpGitBlob(const Path & path, const struct stat st, Sink & sink);
 
-typedef std::map<string, std::pair<GitMode, Hash>> GitTree;
+typedef std::map<std::string, std::pair<GitMode, Hash>> GitTree;
 
 // Dumps a representation of a git tree to a sink
 GitMode dumpGitTree(const GitTree & entries, Sink & sink);

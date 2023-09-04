@@ -26,7 +26,7 @@ elements (referenced from the figure by number):
     called with three arguments: `stdenv`, `fetchurl`, and `perl`. They
     are needed to build Hello, but we don't know how to build them here;
     that's why they are function arguments. `stdenv` is a package that
-    is used by almost all Nix Packages packages; it provides a
+    is used by almost all Nix Packages; it provides a
     “standard” environment consisting of the things you would expect
     in a basic Unix environment: a C/C++ compiler (GCC, to be precise),
     the Bash shell, fundamental Unix tools such as `cp`, `grep`, `tar`,

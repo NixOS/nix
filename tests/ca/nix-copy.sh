@@ -2,9 +2,6 @@
 
 source common.sh
 
-# Globally enable the ca derivations experimental flag
-sed -i 's/experimental-features = .*/& ca-derivations ca-references/' "$NIX_CONF_DIR/nix.conf"
-
 export REMOTE_STORE_DIR="$TEST_ROOT/remote_store"
 export REMOTE_STORE="file://$REMOTE_STORE_DIR"
 

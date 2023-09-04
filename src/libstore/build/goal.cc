@@ -5,8 +5,8 @@ namespace nix {
 
 
 bool CompareGoalPtrs::operator() (const GoalPtr & a, const GoalPtr & b) const {
-    string s1 = a->key();
-    string s2 = b->key();
+    std::string s1 = a->key();
+    std::string s2 = b->key();
     return s1 < s2;
 }
 

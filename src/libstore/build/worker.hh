@@ -38,7 +38,7 @@ struct Child
 {
     WeakGoalPtr goal;
     Goal * goal2; // ugly hackery
-    set<int> fds;
+    std::set<int> fds;
     bool respectTimeouts;
     bool inBuildSlot;
     steady_time_point lastOutput; /* time we last got output on stdout/stderr */
@@ -167,7 +167,7 @@ public:
 
     /* Registers a running child process.  `inBuildSlot' means that
        the process counts towards the jobs limit. */
-    void childStarted(GoalPtr goal, const set<int> & fds,
+    void childStarted(GoalPtr goal, const std::set<int> & fds,
         bool inBuildSlot, bool respectTimeouts);
 
     /* Unregisters a running child process.  `wakeSleepers' should be

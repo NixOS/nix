@@ -94,7 +94,7 @@ struct IndirectInputScheme : InputScheme
         return input;
     }
 
-    std::pair<Tree, Input> fetch(ref<Store> store, const Input & input) override
+    std::pair<StorePathDescriptor, Input> fetch(ref<Store> store, const Input & input) override
     {
         throw Error("indirect input '%s' cannot be fetched directly", input.to_string());
     }

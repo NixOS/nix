@@ -188,17 +188,24 @@ PKG_CHECK_MODULES([EDITLINE], [libeditline], [CXXFLAGS="$EDITLINE_CFLAGS $CXXFLA
     [AC_MSG_ERROR([Nix requires libeditline; it was not found via pkg-config, but via its header, but required functions do not work. Maybe it is too old? >= 1.14 is required.])])
 ])
 
-# Look for libsodium, an optional dependency.
+# Look for libsodium.
 PKG_CHECK_MODULES([SODIUM], [libsodium], [CXXFLAGS="$SODIUM_CFLAGS $CXXFLAGS"])
 
 # Look for libbrotli{enc,dec}.
 PKG_CHECK_MODULES([LIBBROTLI], [libbrotlienc libbrotlidec], [CXXFLAGS="$LIBBROTLI_CFLAGS $CXXFLAGS"])
 
 # Look for libcpuid.
+have_libcpuid=
 if test "$machine_name" = "x86_64"; then
-  PKG_CHECK_MODULES([LIBCPUID], [libcpuid], [CXXFLAGS="$LIBCPUID_CFLAGS $CXXFLAGS"])
-  have_libcpuid=1
-  AC_DEFINE([HAVE_LIBCPUID], [1], [Use libcpuid])
+    AC_ARG_ENABLE([cpuid],
+                  AS_HELP_STRING([--disable-cpuid], [Do not determine microarchitecture levels with libcpuid (relevant to x86_64 only)]))
+    if test "x$enable_cpuid" != "xno"; then
+      PKG_CHECK_MODULES([LIBCPUID], [libcpuid],
+        [CXXFLAGS="$LIBCPUID_CFLAGS $CXXFLAGS"
+         have_libcpuid=1
+         AC_DEFINE([HAVE_LIBCPUID], [1], [Use libcpuid])]
+      )
+    fi
 fi
 AC_SUBST(HAVE_LIBCPUID, [$have_libcpuid])
 
@@ -255,13 +262,17 @@ fi
 PKG_CHECK_MODULES([GTEST], [gtest_main])
 
 
+# Look for nlohmann/json.
+PKG_CHECK_MODULES([NLOHMANN_JSON], [nlohmann_json >= 3.9])
+
+
 # documentation generation switch
 AC_ARG_ENABLE(doc-gen, AS_HELP_STRING([--disable-doc-gen],[disable documentation generation]),
   doc_generate=$enableval, doc_generate=yes)
 AC_SUBST(doc_generate)
 
 # Look for lowdown library.
-PKG_CHECK_MODULES([LOWDOWN], [lowdown >= 0.8.0], [CXXFLAGS="$LOWDOWN_CFLAGS $CXXFLAGS"])
+PKG_CHECK_MODULES([LOWDOWN], [lowdown >= 0.9.0], [CXXFLAGS="$LOWDOWN_CFLAGS $CXXFLAGS"])
 
 # Setuid installations.
 AC_CHECK_FUNCS([setresuid setreuid lchown])

@@ -16,7 +16,7 @@ struct ParseSink
     virtual void preallocateContents(uint64_t size) { };
     virtual void receiveContents(std::string_view data) { };
 
-    virtual void createSymlink(const Path & path, const string & target) { };
+    virtual void createSymlink(const Path & path, const std::string & target) { };
 
     virtual void copyFile(const Path & source) { };
     virtual void copyDirectory(const Path & source, const Path & destination) { };
@@ -36,7 +36,7 @@ struct RestoreSink : ParseSink
     void preallocateContents(uint64_t size) override;
     void receiveContents(std::string_view data) override;
 
-    void createSymlink(const Path & path, const string & target) override;
+    void createSymlink(const Path & path, const std::string & target) override;
 
     void copyFile(const Path & source) override;
     void copyDirectory(const Path & source, const Path & destination) override;
