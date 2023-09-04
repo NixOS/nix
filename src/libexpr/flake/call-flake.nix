@@ -84,7 +84,7 @@ let
               canRemove = isClosed && (builtins.functionBindsAllAttrs flake.outputs == false);
 
               removals = if acceptsMeta then [] else [ "meta" ];
-              checked = if !acceptsMeta && !canRemove then warning else x: x;
+              checked = if isRoot && !acceptsMeta && !canRemove then warning else x: x;
               warning = warn
                 "in flake ${toString outPath}: The flake's ${emphasize "outputs"} function does not accept the ${emphasize "meta"} argument.\nThis will become an error.\nPlease add ellipsis (${emphasize "..."}) to the function header for it to be compatible with both dated and upcoming versions of Flakes. Example use of ellipsis: ${emphasize "outputs = { self, ... }: "}.";
             in

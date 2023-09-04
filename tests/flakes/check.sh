@@ -2,7 +2,8 @@ source common.sh
 
 flakeDir=$TEST_ROOT/flake3
 depDir=$TEST_ROOT/flakedep
-mkdir -p $flakeDir $depDir
+depDirB=$TEST_ROOT/flakedep2
+mkdir -p $flakeDir $depDir $depDirB
 
 cat > $depDir/flake.nix <<EOF
 {
@@ -135,20 +136,39 @@ EOF
 
 expectStderr 1 nix flake check $flakeDir | grep -F "flake input name 'meta' is reserved"
 
-
-cat > $flakeDir/flake.nix <<EOF
+echo cat \> $depDirB/flake.nix
+cat > $depDirB/flake.nix <<EOF
 {
   inputs = {
   };
   outputs = args@{ self }:
-    # args won't have meta, as required by function semantics, but it is rather unfortunate, so Nix should warn about it.
+    # args won't have meta, as required by function semantics, but it is rather unfortunate,
+    # so Nix should warn about it, when this is the root flake.
     assert !args?meta; # implied by function semantics
+    {
+      packages.$system = { };
+    };
+}
+EOF
+
+nix flake check $depDirB 2>&1 | grep -F "Please add ellipsis"
+
+cat $depDirB/flake.nix
+
+# However it should not warn when the flake is used as a dependency, because in that case the user may not own the flake and can't change it. If they do own it, they only need to know about it when working on the flake itself.
+cat > $flakeDir/flake.nix <<EOF
+{
+  inputs = {
+    dep.url = "$depDirB";
+  };
+  outputs = { self, dep }:
+    builtins.seq dep.packages
     {
     };
 }
 EOF
 
-nix flake check $flakeDir 2>&1 | grep -F "Please add ellipsis"
+nix flake check $flakeDir 2>&1 | grepQuietInverse "Please add ellipsis"
 
 
 cat > $flakeDir/flake.nix <<EOF
@@ -163,4 +183,4 @@ cat > $flakeDir/flake.nix <<EOF
 }
 EOF
 
-nix flake check $flakeDir 2>&1 | grep -v "Please add ellipsis"
+nix flake check $flakeDir 2>&1 | grepQuietInverse "Please add ellipsis"
