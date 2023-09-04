@@ -36,16 +36,44 @@ Issues on the board progress through the following states:
 
 - No Status
 
-  Team members can add pull requests or issues to discuss or review together.
-
   During the discussion meeting, the team triages new items.
+  To be considered, issues and pull requests must have a high-level description to provide the whole team with the necessary context at a glance.
+
+  On every meeting, at least one item from each of the following categories is inspected:
+
+  1. [critical](https://github.com/NixOS/nix/labels/critical)
+  2. [security](https://github.com/NixOS/nix/labels/security)
+  3. [regression](https://github.com/NixOS/nix/labels/regression)
+  4. [bug](https://github.com/NixOS/nix/issues?q=is%3Aopen+label%3Abug+sort%3Areactions-%2B1-desc)
+
+  - [oldest pull requests](https://github.com/NixOS/nix/pulls?q=is%3Apr+is%3Aopen+sort%3Acreated-asc)
+  - [most popular pull requests](https://github.com/NixOS/nix/pulls?q=is%3Apr+is%3Aopen+sort%3Areactions-%2B1-desc)
+  - [oldest issues](https://github.com/NixOS/nix/issues?q=is%3Aissue+is%3Aopen+sort%3Acreated-asc)
+  - [most popular issues](https://github.com/NixOS/nix/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc)
+
+  Team members can also add pull requests or issues they would like the whole team to consider.
+
   If there is disagreement on the general idea behind an issue or pull request, it is moved to _To discuss_, otherwise to _In review_.
 
 - To discuss
 
-  Pull requests and issues that are important and controversial are discussed by the team during discussion meetings.
+  Pull requests and issues that are deemed important and controversial are discussed by the team during discussion meetings.
 
   This may be where the merit of the change itself or the implementation strategy is contested by a team member.
+
+  As a general guideline, the order of items is determined as follows:
+
+  - Prioritise pull requests over issues
+
+    Contributors who took the time to implement concrete change proposals should not wait indefinitely.
+
+  - Prioritise fixing bugs over documentation, improvements or new features
+
+    The team values stability and accessibility higher than raw functionality.
+
+  - Interleave issues and PRs
+
+    This way issues without attempts at a solution get a chance to get addressed.
 
 - In review
 

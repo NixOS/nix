@@ -50,7 +50,7 @@ public:
         return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);
     }
 
-    std::optional<std::string> getBuildLog(const StorePath & path) override;
+    std::optional<std::string> getBuildLogExact(const StorePath & path) override;
 
 };
 

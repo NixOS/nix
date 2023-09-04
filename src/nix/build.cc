@@ -94,13 +94,15 @@ struct CmdBuild : InstallablesCommand, MixDryRun, MixJSON, MixProfile
         if (dryRun) {
             std::vector<DerivedPath> pathsToBuild;
 
-            for (auto & i : installables) {
-                auto b = i->toDerivedPaths();
-                pathsToBuild.insert(pathsToBuild.end(), b.begin(), b.end());
-            }
+            for (auto & i : installables)
+                for (auto & b : i->toDerivedPaths())
+                    pathsToBuild.push_back(b.path);
+
             printMissing(store, pathsToBuild, lvlError);
+
             if (json)
                 logger->cout("%s", derivedPathsToJSON(pathsToBuild, store).dump());
+
             return;
         }
 

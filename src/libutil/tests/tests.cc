@@ -312,6 +312,42 @@ namespace nix {
     }
 
     /* ----------------------------------------------------------------------------
+     * getLine
+     * --------------------------------------------------------------------------*/
+
+    TEST(getLine, all) {
+        {
+            auto [line, rest] = getLine("foo\nbar\nxyzzy");
+            ASSERT_EQ(line, "foo");
+            ASSERT_EQ(rest, "bar\nxyzzy");
+        }
+
+        {
+            auto [line, rest] = getLine("foo\r\nbar\r\nxyzzy");
+            ASSERT_EQ(line, "foo");
+            ASSERT_EQ(rest, "bar\r\nxyzzy");
+        }
+
+        {
+            auto [line, rest] = getLine("foo\n");
+            ASSERT_EQ(line, "foo");
+            ASSERT_EQ(rest, "");
+        }
+
+        {
+            auto [line, rest] = getLine("foo");
+            ASSERT_EQ(line, "foo");
+            ASSERT_EQ(rest, "");
+        }
+
+        {
+            auto [line, rest] = getLine("");
+            ASSERT_EQ(line, "");
+            ASSERT_EQ(rest, "");
+        }
+    }
+
+    /* ----------------------------------------------------------------------------
      * toLower
      * --------------------------------------------------------------------------*/
 

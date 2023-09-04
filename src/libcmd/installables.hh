@@ -2,7 +2,7 @@
 
 #include "util.hh"
 #include "path.hh"
-#include "path-with-outputs.hh"
+#include "outputs-spec.hh"
 #include "derived-path.hh"
 #include "eval.hh"
 #include "store-api.hh"
@@ -20,7 +20,7 @@ namespace eval_cache { class EvalCache; class AttrCursor; }
 
 struct App
 {
-    std::vector<StorePathWithOutputs> context;
+    std::vector<DerivedPath> context;
     Path program;
     // FIXME: add args, sandbox settings, metadata, ...
 };
@@ -52,11 +52,32 @@ enum class OperateOn {
     Derivation
 };
 
+struct ExtraPathInfo
+{
+    std::optional<NixInt> priority;
+    std::optional<FlakeRef> originalRef;
+    std::optional<FlakeRef> resolvedRef;
+    std::optional<std::string> attrPath;
+    // FIXME: merge with DerivedPath's 'outputs' field?
+    std::optional<ExtendedOutputsSpec> extendedOutputsSpec;
+};
+
+/* A derived path with any additional info that commands might
+   need from the derivation. */
+struct DerivedPathWithInfo
+{
+    DerivedPath path;
+    ExtraPathInfo info;
+};
+
 struct BuiltPathWithResult
 {
     BuiltPath path;
+    ExtraPathInfo info;
     std::optional<BuildResult> result;
 };
+
+typedef std::vector<DerivedPathWithInfo> DerivedPathsWithInfo;
 
 struct Installable
 {
@@ -64,14 +85,9 @@ struct Installable
 
     virtual std::string what() const = 0;
 
-    virtual DerivedPaths toDerivedPaths() = 0;
+    virtual DerivedPathsWithInfo toDerivedPaths() = 0;
 
-    virtual StorePathSet toDrvPaths(ref<Store> store)
-    {
-        throw Error("'%s' cannot be converted to a derivation path", what());
-    }
-
-    DerivedPath toDerivedPath();
+    DerivedPathWithInfo toDerivedPath();
 
     UnresolvedApp toApp(EvalState & state);
 
@@ -146,19 +162,6 @@ struct InstallableValue : Installable
     ref<EvalState> state;
 
     InstallableValue(ref<EvalState> state) : state(state) {}
-
-    struct DerivationInfo
-    {
-        StorePath drvPath;
-        std::set<std::string> outputsToInstall;
-        std::optional<NixInt> priority;
-    };
-
-    virtual std::vector<DerivationInfo> toDerivations() = 0;
-
-    DerivedPaths toDerivedPaths() override;
-
-    StorePathSet toDrvPaths(ref<Store> store) override;
 };
 
 struct InstallableFlake : InstallableValue
@@ -166,7 +169,7 @@ struct InstallableFlake : InstallableValue
     FlakeRef flakeRef;
     Strings attrPaths;
     Strings prefixes;
-    OutputsSpec outputsSpec;
+    ExtendedOutputsSpec extendedOutputsSpec;
     const flake::LockFlags & lockFlags;
     mutable std::shared_ptr<flake::LockedFlake> _lockedFlake;
 
@@ -175,7 +178,7 @@ struct InstallableFlake : InstallableValue
         ref<EvalState> state,
         FlakeRef && flakeRef,
         std::string_view fragment,
-        OutputsSpec outputsSpec,
+        ExtendedOutputsSpec extendedOutputsSpec,
         Strings attrPaths,
         Strings prefixes,
         const flake::LockFlags & lockFlags);
@@ -186,9 +189,7 @@ struct InstallableFlake : InstallableValue
 
     Value * getFlakeOutputs(EvalState & state, const flake::LockedFlake & lockedFlake);
 
-    std::tuple<std::string, FlakeRef, DerivationInfo> toDerivation();
-
-    std::vector<DerivationInfo> toDerivations() override;
+    DerivedPathsWithInfo toDerivedPaths() override;
 
     std::pair<Value *, PosIdx> toValue(EvalState & state) override;
 

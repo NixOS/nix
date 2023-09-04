@@ -49,7 +49,7 @@ authentication, you can avoid typing the passphrase with `ssh-agent`.
   - `--include-outputs`\
     Also copy the outputs of [store derivation]s included in the closure.
 
-    [store derivation]: ../../glossary.md#gloss-store-derivation
+    [store derivation]: ../glossary.md#gloss-store-derivation
 
   - `--use-substitutes` / `-s`\
     Attempt to download missing paths on the target machine using Nix’s
