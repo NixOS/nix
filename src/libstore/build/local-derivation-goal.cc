@@ -1,22 +1,22 @@
 #include "local-derivation-goal.hh"
-#include "gc-store.hh"
+#include "indirect-root-store.hh"
 #include "hook-instance.hh"
 #include "worker.hh"
 #include "builtins.hh"
 #include "builtins/buildenv.hh"
-#include "references.hh"
+#include "path-references.hh"
 #include "finally.hh"
 #include "util.hh"
 #include "archive.hh"
 #include "git.hh"
 #include "compression.hh"
 #include "daemon.hh"
-#include "worker-protocol.hh"
 #include "topo-sort.hh"
 #include "callback.hh"
 #include "json-utils.hh"
 #include "cgroup.hh"
 #include "personality.hh"
+#include "namespaces.hh"
 
 #include <regex>
 #include <queue>
@@ -65,8 +65,9 @@ void handleDiffHook(
     const Path & tryA, const Path & tryB,
     const Path & drvPath, const Path & tmpDir)
 {
-    auto diffHook = settings.diffHook;
-    if (diffHook != "" && settings.runDiffHook) {
+    auto & diffHookOpt = settings.diffHook.get();
+    if (diffHookOpt && settings.runDiffHook) {
+        auto & diffHook = *diffHookOpt;
         try {
             auto diffRes = runProgram(RunOptions {
                 .program = diffHook,
@@ -168,7 +169,8 @@ void LocalDerivationGoal::killSandbox(bool getStats)
 }
 
 
-void LocalDerivationGoal::tryLocalBuild() {
+void LocalDerivationGoal::tryLocalBuild()
+{
     unsigned int curBuilds = worker.getNrLocalBuilds();
     if (curBuilds >= settings.maxBuildJobs) {
         state = &DerivationGoal::tryToBuild;
@@ -176,6 +178,8 @@ void LocalDerivationGoal::tryLocalBuild() {
         outputLocks.unlock();
         return;
     }
+
+    assert(derivationType);
 
     /* Are we doing a chroot build? */
     {
@@ -194,7 +198,7 @@ void LocalDerivationGoal::tryLocalBuild() {
         else if (settings.sandboxMode == smDisabled)
             useChroot = false;
         else if (settings.sandboxMode == smRelaxed)
-            useChroot = derivationType.isSandboxed() && !noChroot;
+            useChroot = derivationType->isSandboxed() && !noChroot;
     }
 
     auto & localStore = getLocalStore();
@@ -205,6 +209,17 @@ void LocalDerivationGoal::tryLocalBuild() {
             throw Error("building using a diverted store is not supported on this platform");
         #endif
     }
+
+    #if __linux__
+    if (useChroot) {
+        if (!mountAndPidNamespacesSupported()) {
+            if (!settings.sandboxFallback)
+                throw Error("this system does not support the kernel namespaces that are required for sandboxing; use '--no-sandbox' to disable sandboxing");
+            debug("auto-disabling sandboxing because the prerequisite namespaces are not available");
+            useChroot = false;
+        }
+    }
+    #endif
 
     if (useBuildUsers()) {
         if (!buildUser)
@@ -280,7 +295,7 @@ void LocalDerivationGoal::closeReadPipes()
     if (hook) {
         DerivationGoal::closeReadPipes();
     } else
-        builderOut.readSide = -1;
+        builderOut.close();
 }
 
 
@@ -345,7 +360,7 @@ bool LocalDerivationGoal::cleanupDecideWhetherDiskFull()
         for (auto & [_, status] : initialOutputs) {
             if (!status.known) continue;
             if (buildMode != bmCheck && status.known->isValid()) continue;
-            auto p = worker.store.printStorePath(status.known->path);
+            auto p = worker.store.toRealPath(status.known->path);
             if (pathExists(chrootRootDir + p))
                 renameFile((chrootRootDir + p), p);
         }
@@ -373,12 +388,6 @@ void LocalDerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
 }
 
 
-int childEntry(void * arg)
-{
-    ((LocalDerivationGoal *) arg)->runChild();
-    return 1;
-}
-
 #if __linux__
 static void linkOrCopy(const Path & from, const Path & to)
 {
@@ -389,8 +398,9 @@ static void linkOrCopy(const Path & from, const Path & to)
            bind-mount in this case?
 
            It can also fail with EPERM in BeegFS v7 and earlier versions
+           or fail with EXDEV in OpenAFS
            which don't allow hard-links to other directories */
-        if (errno != EMLINK && errno != EPERM)
+        if (errno != EMLINK && errno != EPERM && errno != EXDEV)
             throw SysError("linking '%s' to '%s'", to, from);
         copyPath(from, to);
     }
@@ -407,7 +417,7 @@ void LocalDerivationGoal::startBuilder()
         )
     {
         #if __linux__
-        settings.requireExperimentalFeature(Xp::Cgroups);
+        experimentalFeatureSettings.require(Xp::Cgroups);
 
         auto cgroupFS = getCgroupFS();
         if (!cgroupFS)
@@ -587,6 +597,10 @@ void LocalDerivationGoal::startBuilder()
             else
                 dirsInChroot[i.substr(0, p)] = {i.substr(p + 1), optional};
         }
+        if (hasPrefix(worker.store.storeDir, tmpDirInSandbox))
+        {
+            throw Error("`sandbox-build-dir` must not contain the storeDir");
+        }
         dirsInChroot[tmpDirInSandbox] = tmpDir;
 
         /* Add the closure of store paths to the chroot. */
@@ -644,7 +658,7 @@ void LocalDerivationGoal::startBuilder()
         /* Clean up the chroot directory automatically. */
         autoDelChroot = std::make_shared<AutoDelete>(chrootRootDir);
 
-        printMsg(lvlChatty, format("setting up chroot environment in '%1%'") % chrootRootDir);
+        printMsg(lvlChatty, "setting up chroot environment in '%1%'", chrootRootDir);
 
         // FIXME: make this 0700
         if (mkdir(chrootRootDir.c_str(), buildUser && buildUser->getUIDCount() != 1 ? 0755 : 0750) == -1)
@@ -664,7 +678,8 @@ void LocalDerivationGoal::startBuilder()
            nobody account.  The latter is kind of a hack to support
            Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
-        chownToBuilder(chrootRootDir + "/etc");
+        if (parsedDrv->useUidRange())
+            chownToBuilder(chrootRootDir + "/etc");
 
         if (parsedDrv->useUidRange() && (!buildUser || buildUser->getUIDCount() < 65536))
             throw Error("feature 'uid-range' requires the setting '%s' to be enabled", settings.autoAllocateUids.name);
@@ -677,7 +692,7 @@ void LocalDerivationGoal::startBuilder()
                 "nogroup:x:65534:\n", sandboxGid()));
 
         /* Create /etc/hosts with localhost entry. */
-        if (derivationType.isSandboxed())
+        if (derivationType->isSandboxed())
             writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n::1 localhost\n");
 
         /* Make the closure of the inputs available in the chroot,
@@ -746,8 +761,7 @@ void LocalDerivationGoal::startBuilder()
         throw Error("home directory '%1%' exists; please remove it to assure purity of builds without sandboxing", homeDir);
 
     if (useChroot && settings.preBuildHook != "" && dynamic_cast<Derivation *>(drv.get())) {
-        printMsg(lvlChatty, format("executing pre-build hook '%1%'")
-            % settings.preBuildHook);
+        printMsg(lvlChatty, "executing pre-build hook '%1%'", settings.preBuildHook);
         auto args = useChroot ? Strings({worker.store.printStorePath(drvPath), chrootRootDir}) :
             Strings({ worker.store.printStorePath(drvPath) });
         enum BuildHookState {
@@ -796,15 +810,13 @@ void LocalDerivationGoal::startBuilder()
     /* Create the log file. */
     Path logFile = openLogFile();
 
-    /* Create a pipe to get the output of the builder. */
-    //builderOut.create();
-
-    builderOut.readSide = posix_openpt(O_RDWR | O_NOCTTY);
-    if (!builderOut.readSide)
+    /* Create a pseudoterminal to get the output of the builder. */
+    builderOut = posix_openpt(O_RDWR | O_NOCTTY);
+    if (!builderOut)
         throw SysError("opening pseudoterminal master");
 
     // FIXME: not thread-safe, use ptsname_r
-    std::string slaveName(ptsname(builderOut.readSide.get()));
+    std::string slaveName = ptsname(builderOut.get());
 
     if (buildUser) {
         if (chmod(slaveName.c_str(), 0600))
@@ -815,34 +827,34 @@ void LocalDerivationGoal::startBuilder()
     }
 #if __APPLE__
     else {
-        if (grantpt(builderOut.readSide.get()))
+        if (grantpt(builderOut.get()))
             throw SysError("granting access to pseudoterminal slave");
     }
 #endif
 
-    #if 0
-    // Mount the pt in the sandbox so that the "tty" command works.
-    // FIXME: this doesn't work with the new devpts in the sandbox.
-    if (useChroot)
-        dirsInChroot[slaveName] = {slaveName, false};
-    #endif
-
-    if (unlockpt(builderOut.readSide.get()))
+    if (unlockpt(builderOut.get()))
         throw SysError("unlocking pseudoterminal");
 
-    builderOut.writeSide = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
-    if (!builderOut.writeSide)
-        throw SysError("opening pseudoterminal slave");
+    /* Open the slave side of the pseudoterminal and use it as stderr. */
+    auto openSlave = [&]()
+    {
+        AutoCloseFD builderOut = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
+        if (!builderOut)
+            throw SysError("opening pseudoterminal slave");
 
-    // Put the pt into raw mode to prevent \n -> \r\n translation.
-    struct termios term;
-    if (tcgetattr(builderOut.writeSide.get(), &term))
-        throw SysError("getting pseudoterminal attributes");
+        // Put the pt into raw mode to prevent \n -> \r\n translation.
+        struct termios term;
+        if (tcgetattr(builderOut.get(), &term))
+            throw SysError("getting pseudoterminal attributes");
 
-    cfmakeraw(&term);
+        cfmakeraw(&term);
 
-    if (tcsetattr(builderOut.writeSide.get(), TCSANOW, &term))
-        throw SysError("putting pseudoterminal into raw mode");
+        if (tcsetattr(builderOut.get(), TCSANOW, &term))
+            throw SysError("putting pseudoterminal into raw mode");
+
+        if (dup2(builderOut.get(), STDERR_FILENO) == -1)
+            throw SysError("cannot pipe standard error into log file");
+    };
 
     buildResult.startTime = time(0);
 
@@ -884,101 +896,49 @@ void LocalDerivationGoal::startBuilder()
            us.
         */
 
-        if (derivationType.isSandboxed())
+        if (derivationType->isSandboxed())
             privateNetwork = true;
 
         userNamespaceSync.create();
 
-        Path maxUserNamespaces = "/proc/sys/user/max_user_namespaces";
-        static bool userNamespacesEnabled =
-            pathExists(maxUserNamespaces)
-            && trim(readFile(maxUserNamespaces)) != "0";
+        usingUserNamespace = userNamespacesSupported();
 
-        usingUserNamespace = userNamespacesEnabled;
+        Pipe sendPid;
+        sendPid.create();
 
         Pid helper = startProcess([&]() {
+            sendPid.readSide.close();
+
+            /* We need to open the slave early, before
+               CLONE_NEWUSER. Otherwise we get EPERM when running as
+               root. */
+            openSlave();
 
             /* Drop additional groups here because we can't do it
-               after we've created the new user namespace.  FIXME:
-               this means that if we're not root in the parent
-               namespace, we can't drop additional groups; they will
-               be mapped to nogroup in the child namespace. There does
-               not seem to be a workaround for this. (But who can tell
-               from reading user_namespaces(7)?)
-               See also https://lwn.net/Articles/621612/. */
-            if (getuid() == 0 && setgroups(0, 0) == -1)
-                throw SysError("setgroups failed");
+               after we've created the new user namespace. */
+            if (setgroups(0, 0) == -1) {
+                if (errno != EPERM)
+                    throw SysError("setgroups failed");
+                if (settings.requireDropSupplementaryGroups)
+                    throw Error("setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
+            }
 
-            size_t stackSize = 1 * 1024 * 1024;
-            char * stack = (char *) mmap(0, stackSize,
-                PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
-            if (stack == MAP_FAILED) throw SysError("allocating stack");
-
-            int flags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
+            ProcessOptions options;
+            options.cloneFlags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
             if (privateNetwork)
-                flags |= CLONE_NEWNET;
+                options.cloneFlags |= CLONE_NEWNET;
             if (usingUserNamespace)
-                flags |= CLONE_NEWUSER;
+                options.cloneFlags |= CLONE_NEWUSER;
 
-            pid_t child = clone(childEntry, stack + stackSize, flags, this);
-            if (child == -1 && errno == EINVAL) {
-                /* Fallback for Linux < 2.13 where CLONE_NEWPID and
-                   CLONE_PARENT are not allowed together. */
-                flags &= ~CLONE_NEWPID;
-                child = clone(childEntry, stack + stackSize, flags, this);
-            }
-            if (usingUserNamespace && child == -1 && (errno == EPERM || errno == EINVAL)) {
-                /* Some distros patch Linux to not allow unprivileged
-                 * user namespaces. If we get EPERM or EINVAL, try
-                 * without CLONE_NEWUSER and see if that works.
-                 * Details: https://salsa.debian.org/kernel-team/linux/-/commit/d98e00eda6bea437e39b9e80444eee84a32438a6
-                 */
-                usingUserNamespace = false;
-                flags &= ~CLONE_NEWUSER;
-                child = clone(childEntry, stack + stackSize, flags, this);
-            }
-            if (child == -1) {
-                switch(errno) {
-                    case EPERM:
-                    case EINVAL: {
-                        int errno_ = errno;
-                        if (!userNamespacesEnabled && errno==EPERM)
-                            notice("user namespaces appear to be disabled; they are required for sandboxing; check /proc/sys/user/max_user_namespaces");
-                        if (userNamespacesEnabled) {
-                            Path procSysKernelUnprivilegedUsernsClone = "/proc/sys/kernel/unprivileged_userns_clone";
-                            if (pathExists(procSysKernelUnprivilegedUsernsClone)
-                                && trim(readFile(procSysKernelUnprivilegedUsernsClone)) == "0") {
-                                notice("user namespaces appear to be disabled; they are required for sandboxing; check /proc/sys/kernel/unprivileged_userns_clone");
-                            }
-                        }
-                        Path procSelfNsUser = "/proc/self/ns/user";
-                        if (!pathExists(procSelfNsUser))
-                            notice("/proc/self/ns/user does not exist; your kernel was likely built without CONFIG_USER_NS=y, which is required for sandboxing");
-                        /* Otherwise exit with EPERM so we can handle this in the
-                           parent. This is only done when sandbox-fallback is set
-                           to true (the default). */
-                        if (settings.sandboxFallback)
-                            _exit(1);
-                        /* Mention sandbox-fallback in the error message so the user
-                           knows that having it disabled contributed to the
-                           unrecoverability of this failure */
-                        throw SysError(errno_, "creating sandboxed builder process using clone(), without sandbox-fallback");
-                    }
-                    default:
-                        throw SysError("creating sandboxed builder process using clone()");
-                }
-            }
-            writeFull(builderOut.writeSide.get(),
-                fmt("%d %d\n", usingUserNamespace, child));
+            pid_t child = startProcess([&]() { runChild(); }, options);
+
+            writeFull(sendPid.writeSide.get(), fmt("%d\n", child));
             _exit(0);
         });
 
-        int res = helper.wait();
-        if (res != 0 && settings.sandboxFallback) {
-            useChroot = false;
-            initTmpDir();
-            goto fallback;
-        } else if (res != 0)
+        sendPid.writeSide.close();
+
+        if (helper.wait() != 0)
             throw Error("unable to start build process");
 
         userNamespaceSync.readSide = -1;
@@ -989,10 +949,9 @@ void LocalDerivationGoal::startBuilder()
             userNamespaceSync.writeSide = -1;
         });
 
-        auto ss = tokenizeString<std::vector<std::string>>(readLine(builderOut.readSide.get()));
-        assert(ss.size() == 2);
-        usingUserNamespace = ss[0] == "1";
-        pid = string2Int<pid_t>(ss[1]).value();
+        auto ss = tokenizeString<std::vector<std::string>>(readLine(sendPid.readSide.get()));
+        assert(ss.size() == 1);
+        pid = string2Int<pid_t>(ss[0]).value();
 
         if (usingUserNamespace) {
             /* Set the UID/GID mapping of the builder's user namespace
@@ -1046,25 +1005,22 @@ void LocalDerivationGoal::startBuilder()
     } else
 #endif
     {
-#if __linux__
-    fallback:
-#endif
         pid = startProcess([&]() {
+            openSlave();
             runChild();
         });
     }
 
     /* parent */
     pid.setSeparatePG(true);
-    builderOut.writeSide = -1;
-    worker.childStarted(shared_from_this(), {builderOut.readSide.get()}, true, true);
+    worker.childStarted(shared_from_this(), {builderOut.get()}, true, true);
 
     /* Check if setting up the build environment failed. */
     std::vector<std::string> msgs;
     while (true) {
         std::string msg = [&]() {
             try {
-                return readLine(builderOut.readSide.get());
+                return readLine(builderOut.get());
             } catch (Error & e) {
                 auto status = pid.wait();
                 e.addTrace({}, "while waiting for the build environment for '%s' to initialize (%s, previous messages: %s)",
@@ -1076,7 +1032,7 @@ void LocalDerivationGoal::startBuilder()
         }();
         if (msg.substr(0, 1) == "\2") break;
         if (msg.substr(0, 1) == "\1") {
-            FdSource source(builderOut.readSide.get());
+            FdSource source(builderOut.get());
             auto ex = readError(source);
             ex.addTrace({}, "while setting up the build environment");
             throw ex;
@@ -1160,7 +1116,7 @@ void LocalDerivationGoal::initEnv()
     env["NIX_STORE"] = worker.store.storeDir;
 
     /* The maximum number of cores to utilize for parallel building. */
-    env["NIX_BUILD_CORES"] = (format("%d") % settings.buildCores).str();
+    env["NIX_BUILD_CORES"] = fmt("%d", settings.buildCores);
 
     initTmpDir();
 
@@ -1168,7 +1124,7 @@ void LocalDerivationGoal::initEnv()
        derivation, tell the builder, so that for instance `fetchurl'
        can skip checking the output.  On older Nixes, this environment
        variable won't be set, so `fetchurl' will do the check. */
-    if (derivationType.isFixed()) env["NIX_OUTPUT_CHECKED"] = "1";
+    if (derivationType->isFixed()) env["NIX_OUTPUT_CHECKED"] = "1";
 
     /* *Only* if this is a fixed-output derivation, propagate the
        values of the environment variables specified in the
@@ -1179,7 +1135,7 @@ void LocalDerivationGoal::initEnv()
        to the builder is generally impure, but the output of
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
-    if (!derivationType.isSandboxed()) {
+    if (!derivationType->isSandboxed()) {
         for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings()))
             env[i] = getEnv(i).value_or("");
     }
@@ -1211,11 +1167,24 @@ void LocalDerivationGoal::writeStructuredAttrs()
 
         writeFile(tmpDir + "/.attrs.sh", rewriteStrings(jsonSh, inputRewrites));
         chownToBuilder(tmpDir + "/.attrs.sh");
-        env["NIX_ATTRS_SH_FILE"] = tmpDir + "/.attrs.sh";
+        env["NIX_ATTRS_SH_FILE"] = tmpDirInSandbox + "/.attrs.sh";
         writeFile(tmpDir + "/.attrs.json", rewriteStrings(json.dump(), inputRewrites));
         chownToBuilder(tmpDir + "/.attrs.json");
-        env["NIX_ATTRS_JSON_FILE"] = tmpDir + "/.attrs.json";
+        env["NIX_ATTRS_JSON_FILE"] = tmpDirInSandbox + "/.attrs.json";
     }
+}
+
+
+static StorePath pathPartOfReq(const SingleDerivedPath & req)
+{
+    return std::visit(overloaded {
+        [&](const SingleDerivedPath::Opaque & bo) {
+            return bo.path;
+        },
+        [&](const SingleDerivedPath::Built & bfd)  {
+            return pathPartOfReq(*bfd.drvPath);
+        },
+    }, req.raw());
 }
 
 
@@ -1226,7 +1195,7 @@ static StorePath pathPartOfReq(const DerivedPath & req)
             return bo.path;
         },
         [&](const DerivedPath::Built & bfd)  {
-            return bfd.drvPath;
+            return pathPartOfReq(*bfd.drvPath);
         },
     }, req.raw());
 }
@@ -1247,7 +1216,7 @@ struct RestrictedStoreConfig : virtual LocalFSStoreConfig
 /* A wrapper around LocalStore that only allows building/querying of
    paths that are in the input closures of the build or were added via
    recursive Nix calls. */
-struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual LocalFSStore, public virtual GcStore
+struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual IndirectRootStore, public virtual GcStore
 {
     ref<LocalStore> next;
 
@@ -1298,11 +1267,13 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override
     { }
 
-    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(const StorePath & path) override
+    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(
+        const StorePath & path,
+        Store * evalStore = nullptr) override
     {
         if (!goal.isAllowed(path))
             throw InvalidPath("cannot query output map for unknown path '%s' in recursive Nix", printStorePath(path));
-        return next->queryPartialDerivationOutputMap(path);
+        return next->queryPartialDerivationOutputMap(path, evalStore);
     }
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
@@ -1387,7 +1358,7 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
                 result.rethrow();
     }
 
-    std::vector<BuildResult> buildPathsWithResults(
+    std::vector<KeyedBuildResult> buildPathsWithResults(
         const std::vector<DerivedPath> & paths,
         BuildMode buildMode = bmNormal,
         std::shared_ptr<Store> evalStore = nullptr) override
@@ -1467,17 +1438,21 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual Lo
 
     virtual void addBuildLog(const StorePath & path, std::string_view log) override
     { unsupported("addBuildLog"); }
+
+    std::optional<TrustedFlag> isTrustedClient() override
+    { return NotTrusted; }
 };
 
 
 void LocalDerivationGoal::startDaemon()
 {
-    settings.requireExperimentalFeature(Xp::RecursiveNix);
+    experimentalFeatureSettings.require(Xp::RecursiveNix);
 
     Store::Params params;
     params["path-info-cache-size"] = "0";
     params["store"] = worker.store.storeDir;
-    params["root"] = getLocalStore().rootDir;
+    if (auto & optRoot = getLocalStore().rootDir.get())
+        params["root"] = *optRoot;
     params["state"] = "/no-such-path";
     params["log"] = "/no-such-path";
     auto store = make_ref<RestrictedStore>(params,
@@ -1506,7 +1481,7 @@ void LocalDerivationGoal::startDaemon()
                 (struct sockaddr *) &remoteAddr, &remoteAddrLen);
             if (!remote) {
                 if (errno == EINTR || errno == EAGAIN) continue;
-                if (errno == EINVAL) break;
+                if (errno == EINVAL || errno == ECONNABORTED) break;
                 throw SysError("accepting connection");
             }
 
@@ -1519,8 +1494,7 @@ void LocalDerivationGoal::startDaemon()
                 FdSink to(remote.get());
                 try {
                     daemon::processConnection(store, from, to,
-                        daemon::NotTrusted, daemon::Recursive,
-                        [&](Store & store) { store.createUser("nobody", 65535); });
+                        NotTrusted, daemon::Recursive);
                     debug("terminated daemon connection");
                 } catch (SysError &) {
                     ignoreException();
@@ -1537,8 +1511,22 @@ void LocalDerivationGoal::startDaemon()
 
 void LocalDerivationGoal::stopDaemon()
 {
-    if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1)
-        throw SysError("shutting down daemon socket");
+    if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1) {
+        // According to the POSIX standard, the 'shutdown' function should
+        // return an ENOTCONN error when attempting to shut down a socket that
+        // hasn't been connected yet. This situation occurs when the 'accept'
+        // function is called on a socket without any accepted connections,
+        // leaving the socket unconnected. While Linux doesn't seem to produce
+        // an error for sockets that have only been accepted, more
+        // POSIX-compliant operating systems like OpenBSD, macOS, and others do
+        // return the ENOTCONN error. Therefore, we handle this error here to
+        // avoid raising an exception for compliant behaviour.
+        if (errno == ENOTCONN) {
+            daemonSocket.close();
+        } else {
+            throw SysError("shutting down daemon socket");
+        }
+    }
 
     if (daemonThread.joinable())
         daemonThread.join();
@@ -1549,7 +1537,8 @@ void LocalDerivationGoal::stopDaemon()
         thread.join();
     daemonWorkerThreads.clear();
 
-    daemonSocket = -1;
+    // release the socket.
+    daemonSocket.close();
 }
 
 
@@ -1709,7 +1698,7 @@ void LocalDerivationGoal::runChild()
 
     try { /* child */
 
-        commonChildInit(builderOut);
+        commonChildInit();
 
         try {
             setupSeccomp();
@@ -1813,7 +1802,7 @@ void LocalDerivationGoal::runChild()
             /* Fixed-output derivations typically need to access the
                network, so give them access to /etc/resolv.conf and so
                on. */
-            if (!derivationType.isSandboxed()) {
+            if (!derivationType->isSandboxed()) {
                 // Only use nss functions to resolve hosts and
                 // services. Don’t use it for anything else that may
                 // be configured for this system. This limits the
@@ -1826,6 +1815,9 @@ void LocalDerivationGoal::runChild()
                 for (auto & path : { "/etc/resolv.conf", "/etc/services", "/etc/hosts" })
                     if (pathExists(path))
                         ss.push_back(path);
+
+                if (settings.caFile != "")
+                    dirsInChroot.try_emplace("/etc/ssl/certs/ca-certificates.crt", settings.caFile, true);
             }
 
             for (auto & i : ss) dirsInChroot.emplace(i, i);
@@ -1909,6 +1901,10 @@ void LocalDerivationGoal::runChild()
                     doBind("/dev/ptmx", chrootRootDir + "/dev/ptmx");
                 }
             }
+
+            /* Make /etc unwritable */
+            if (!parsedDrv->useUidRange())
+                chmod_(chrootRootDir + "/etc", 0555);
 
             /* Unshare this mount namespace. This is necessary because
                pivot_root() below changes the root of the mount
@@ -2057,7 +2053,7 @@ void LocalDerivationGoal::runChild()
                     #include "sandbox-defaults.sb"
                     ;
 
-                if (!derivationType.isSandboxed())
+                if (!derivationType->isSandboxed())
                     sandboxProfile +=
                         #include "sandbox-network.sb"
                         ;
@@ -2118,7 +2114,7 @@ void LocalDerivationGoal::runChild()
 
             /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different mechanisms
                to find temporary directories, so we want to open up a broader place for them to dump their files, if needed. */
-            Path globalTmpDir = canonPath(getEnv("TMPDIR").value_or("/tmp"), true);
+            Path globalTmpDir = canonPath(getEnvNonEmpty("TMPDIR").value_or("/tmp"), true);
 
             /* They don't like trailing slashes on subpath directives */
             if (globalTmpDir.back() == '/') globalTmpDir.pop_back();
@@ -2220,7 +2216,7 @@ void LocalDerivationGoal::runChild()
 }
 
 
-DrvOutputs LocalDerivationGoal::registerOutputs()
+SingleDrvOutputs LocalDerivationGoal::registerOutputs()
 {
     /* When using a build hook, the build hook can register the output
        as valid (by doing `nix-store --import').  If so we don't have
@@ -2326,11 +2322,27 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             buildUser ? std::optional(buildUser->getUIDRange()) : std::nullopt,
             inodesSeen);
 
-        debug("scanning for references for output '%s' in temp location '%s'", outputName, actualPath);
+        bool discardReferences = false;
+        if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
+            if (auto udr = get(*structuredAttrs, "unsafeDiscardReferences")) {
+                if (auto output = get(*udr, outputName)) {
+                    if (!output->is_boolean())
+                        throw Error("attribute 'unsafeDiscardReferences.\"%s\"' of derivation '%s' must be a Boolean", outputName, drvPath.to_string());
+                    discardReferences = output->get<bool>();
+                }
+            }
+        }
 
-        /* Pass blank Sink as we are not ready to hash data at this stage. */
-        NullSink blank;
-        auto references = scanForReferences(blank, actualPath, referenceablePaths);
+        StorePathSet references;
+        if (discardReferences)
+            debug("discarding references of output '%s'", outputName);
+        else {
+            debug("scanning for references for output '%s' in temp location '%s'", outputName, actualPath);
+
+            /* Pass blank Sink as we are not ready to hash data at this stage. */
+            NullSink blank;
+            references = scanForReferences(blank, actualPath, referenceablePaths);
+        }
 
         outputReferencesIfUnregistered.insert_or_assign(
             outputName,
@@ -2405,18 +2417,21 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             continue;
         auto references = *referencesOpt;
 
-        auto rewriteOutput = [&]() {
+        auto rewriteOutput = [&](const StringMap & rewrites) {
             /* Apply hash rewriting if necessary. */
-            if (!outputRewrites.empty()) {
+            if (!rewrites.empty()) {
                 debug("rewriting hashes in '%1%'; cross fingers", actualPath);
 
-                /* FIXME: this is in-memory. */
-                StringSink sink;
-                dumpPath(actualPath, sink);
+                /* FIXME: Is this actually streaming? */
+                auto source = sinkToSource([&](Sink & nextSink) {
+                    RewritingSink rsink(rewrites, nextSink);
+                    dumpPath(actualPath, rsink);
+                    rsink.flush();
+                });
+                Path tmpPath = actualPath + ".tmp";
+                restorePath(tmpPath, *source);
                 deletePath(actualPath);
-                sink.s = rewriteStrings(sink.s, outputRewrites);
-                StringSource source(sink.s);
-                restorePath(actualPath, source);
+                movePath(tmpPath, actualPath);
 
                 /* FIXME: set proper permissions in restorePath() so
                    we don't have to do another traversal. */
@@ -2455,61 +2470,75 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 throw BuildError(
                     "output path %1% without valid stats info",
                     actualPath);
-            if (outputHash.method == FileIngestionMethod::Flat) {
+            if (outputHash.method == ContentAddressMethod { FileIngestionMethod::Flat } ||
+                outputHash.method == ContentAddressMethod { TextIngestionMethod {} })
+            {
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st->st_mode) || (st->st_mode & S_IXUSR) != 0)
                     throw BuildError(
                         "output path '%1%' should be a non-executable regular file "
-                        "since recursive hashing is not enabled (outputHashMode=flat)",
+                        "since recursive hashing is not enabled (one of outputHashMode={flat,text} is true)",
                         actualPath);
             }
-            rewriteOutput();
+            rewriteOutput(outputRewrites);
             /* FIXME optimize and deduplicate with addToStore */
             std::string oldHashPart { scratchPath->hashPart() };
             Hash got { outputHash.hashType }; // Dummy value
-            switch (outputHash.method) {
-            case FileIngestionMethod::Recursive: {
-                HashModuloSink caSink { outputHash.hashType, oldHashPart };
-                dumpPath(actualPath, caSink);
-                got = caSink.finish().first;
-                break;
-            }
-            case FileIngestionMethod::Flat: {
-                HashModuloSink caSink { outputHash.hashType, oldHashPart };
-                readFile(actualPath, caSink);
-                got = caSink.finish().first;
-                break;
-            }
-            case FileIngestionMethod::Git: {
-                got = dumpGitHash(outputHash.hashType, (Path) tmpDir + "/tmp");
-                break;
-            }
+            std::visit(overloaded {
+                [&](const TextIngestionMethod &) {
+                    HashModuloSink caSink { outputHash.hashType, oldHashPart };
+                    readFile(actualPath, caSink);
+                    got = caSink.finish().first;
+                },
+                [&](const FileIngestionMethod & m2) {
+                    switch (m2) {
+                    case FileIngestionMethod::Recursive: {
+                        HashModuloSink caSink { outputHash.hashType, oldHashPart };
+                        dumpPath(actualPath, caSink);
+                        got = caSink.finish().first;
+                        break;
+                    }
+                    case FileIngestionMethod::Flat: {
+                        HashModuloSink caSink { outputHash.hashType, oldHashPart };
+                        readFile(actualPath, caSink);
+                        got = caSink.finish().first;
+                        break;
+                    }
+                    case FileIngestionMethod::Git: {
+                        got = dumpGitHash(outputHash.hashType, (Path) tmpDir + "/tmp");
+                        break;
+                    }
+                    }
+                },
+            }, outputHash.method.raw);
+
+            auto optCA = ContentAddressWithReferences::fromPartsOpt(
+                outputHash.method,
+                std::move(got),
+                rewriteRefs());
+            if (!optCA) {
+                // TODO track distinct failure modes separately (at the time of
+                // writing there is just one but `nullopt` is unclear) so this
+                // message can't get out of sync.
+                throw BuildError("output path '%s' has illegal content address, probably a spurious self-reference with text hashing");
             }
             ValidPathInfo newInfo0 {
                 worker.store,
                 {
                     .name = outputPathName(drv->name, outputName),
-                    .info = FixedOutputInfo {
-                        {
-                            .method = outputHash.method,
-                            .hash = got,
-                        },
-                        .references = rewriteRefs(),
-                    },
+                    .info = *std::move(optCA),
                 },
                 Hash::dummy,
             };
             if (*scratchPath != newInfo0.path) {
-                // Also rewrite the output path
-                auto source = sinkToSource([&](Sink & nextSink) {
-                    RewritingSink rsink2(oldHashPart, std::string(newInfo0.path.hashPart()), nextSink);
-                    dumpPath(actualPath, rsink2);
-                    rsink2.flush();
-                });
-                Path tmpPath = actualPath + ".tmp";
-                restorePath(tmpPath, *source);
-                deletePath(actualPath);
-                movePath(tmpPath, actualPath);
+                // If the path has some self-references, we need to rewrite
+                // them.
+                // (note that this doesn't invalidate the ca hash we calculated
+                // above because it's computed *modulo the self-references*, so
+                // it already takes this rewrite into account).
+                rewriteOutput(
+                    StringMap{{oldHashPart,
+                               std::string(newInfo0.path.hashPart())}});
             }
 
             HashResult narHashAndSize = hashPath(htSHA256, actualPath);
@@ -2531,7 +2560,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                     outputRewrites.insert_or_assign(
                         std::string { scratchPath->hashPart() },
                         std::string { requiredFinalPath.hashPart() });
-                rewriteOutput();
+                rewriteOutput(outputRewrites);
                 auto narHashAndSize = hashPath(htSHA256, actualPath);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
@@ -2540,15 +2569,16 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             },
 
             [&](const DerivationOutput::CAFixed & dof) {
+                auto & wanted = dof.ca.hash;
+
                 auto newInfo0 = newInfoFromCA(DerivationOutput::CAFloating {
-                    .method = dof.hash.method,
-                    .hashType = dof.hash.hash.type,
+                    .method = dof.ca.method,
+                    .hashType = wanted.type,
                 });
 
                 /* Check wanted hash */
-                const Hash & wanted = dof.hash.hash;
                 assert(newInfo0.ca);
-                auto got = getContentAddressHash(*newInfo0.ca);
+                auto & got = newInfo0.ca->hash;
                 if (wanted != got) {
                     /* Throw an error after registering the path as
                        valid. */
@@ -2559,6 +2589,11 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                             wanted.to_string(SRI, true),
                             got.to_string(SRI, true)));
                 }
+                if (!newInfo0.references.empty())
+                    delayedException = std::make_exception_ptr(
+                        BuildError("illegal path references in fixed-output derivation '%s'",
+                            worker.store.printStorePath(drvPath)));
+
                 return newInfo0;
             },
 
@@ -2579,7 +2614,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
                 });
             },
 
-        }, output->raw());
+        }, output->raw);
 
         /* FIXME: set proper permissions in restorePath() so
             we don't have to do another traversal. */
@@ -2720,7 +2755,7 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
        means it's safe to link the derivation to the output hash. We must do
        that for floating CA derivations, which otherwise couldn't be cached,
        but it's fine to do in all cases. */
-    DrvOutputs builtOutputs;
+    SingleDrvOutputs builtOutputs;
 
     for (auto & [outputName, newInfo] : infos) {
         auto oldinfo = get(initialOutputs, outputName);
@@ -2732,14 +2767,13 @@ DrvOutputs LocalDerivationGoal::registerOutputs()
             },
             .outPath = newInfo.path
         };
-        if (settings.isExperimentalFeatureEnabled(Xp::CaDerivations)
+        if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)
             && drv->type().isPure())
         {
             signRealisation(thisRealisation);
             worker.store.registerDrvOutput(thisRealisation);
         }
-        if (wantedOutputs.contains(outputName))
-            builtOutputs.emplace(thisRealisation.id, thisRealisation);
+        builtOutputs.emplace(outputName, thisRealisation);
     }
 
     return builtOutputs;
@@ -2930,11 +2964,11 @@ void LocalDerivationGoal::deleteTmpDir(bool force)
 bool LocalDerivationGoal::isReadDesc(int fd)
 {
     return (hook && DerivationGoal::isReadDesc(fd)) ||
-        (!hook && fd == builderOut.readSide.get());
+        (!hook && fd == builderOut.get());
 }
 
 
-StorePath LocalDerivationGoal::makeFallbackPath(std::string_view outputName)
+StorePath LocalDerivationGoal::makeFallbackPath(OutputNameView outputName)
 {
     return worker.store.makeStorePath(
         "rewrite:" + std::string(drvPath.to_string()) + ":name:" + std::string(outputName),

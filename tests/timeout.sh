@@ -5,17 +5,14 @@ source common.sh
 # XXX: This shouldn’t be, but #4813 cause this test to fail
 needLocalStore "see #4813"
 
-set +e
-messages=$(nix-build -Q timeout.nix -A infiniteLoop --timeout 2 2>&1)
-status=$?
-set -e
+messages=$(nix-build -Q timeout.nix -A infiniteLoop --timeout 2 2>&1) && status=0 || status=$?
 
 if [ $status -ne 101 ]; then
     echo "error: 'nix-store' exited with '$status'; should have exited 101"
     exit 1
 fi
 
-if ! echo "$messages" | grep -q "timed out"; then
+if echo "$messages" | grepQuietInvert "timed out"; then
     echo "error: build may have failed for reasons other than timeout; output:"
     echo "$messages" >&2
     exit 1

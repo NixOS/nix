@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <list>
 #include <map>
@@ -9,15 +10,11 @@
 
 namespace nix {
 
-/* Symbol table used by the parser and evaluator to represent and look
-   up identifiers and attributes efficiently.  SymbolTable::create()
-   converts a string into a symbol.  Symbols have the property that
-   they can be compared efficiently (using an equality test),
-   because the symbol table stores only one copy of each string. */
-
-/* This class mainly exists to give us an operator<< for ostreams. We could also
-   return plain strings from SymbolTable, but then we'd have to wrap every
-   instance of a symbol that is fmt()ed, which is inconvenient and error-prone. */
+/**
+ * This class mainly exists to give us an operator<< for ostreams. We could also
+ * return plain strings from SymbolTable, but then we'd have to wrap every
+ * instance of a symbol that is fmt()ed, which is inconvenient and error-prone.
+ */
 class SymbolStr
 {
     friend class SymbolTable;
@@ -46,6 +43,11 @@ public:
     friend std::ostream & operator <<(std::ostream & os, const SymbolStr & symbol);
 };
 
+/**
+ * Symbols have the property that they can be compared efficiently
+ * (using an equality test), because the symbol table stores only one
+ * copy of each string.
+ */
 class Symbol
 {
     friend class SymbolTable;
@@ -65,6 +67,10 @@ public:
     bool operator!=(const Symbol other) const { return id != other.id; }
 };
 
+/**
+ * Symbol table used by the parser and evaluator to represent and look
+ * up identifiers and attributes efficiently.
+ */
 class SymbolTable
 {
 private:
@@ -73,6 +79,9 @@ private:
 
 public:
 
+    /**
+     * converts a string into a symbol.
+     */
     Symbol create(std::string_view s)
     {
         // Most symbols are looked up more than once, so we trade off insertion performance

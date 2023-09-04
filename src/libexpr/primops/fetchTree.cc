@@ -1,9 +1,11 @@
 #include "primops.hh"
 #include "eval-inline.hh"
+#include "eval-settings.hh"
 #include "store-api.hh"
 #include "fetchers.hh"
 #include "filetransfer.hh"
 #include "registry.hh"
+#include "url.hh"
 
 #include <ctime>
 #include <iomanip>
@@ -23,10 +25,9 @@ void emitTreeAttrs(
 
     auto attrs = state.buildBindings(10);
 
-    auto storePath = state.store->printStorePath(
-        state.store->makeFixedOutputPathFromCA(tree.storePath));
+    auto storePath = state.store->makeFixedOutputPathFromCA(tree.storePath);
 
-    attrs.alloc(state.sOutPath).mkString(storePath, {storePath});
+    state.mkStorePathString(storePath, attrs.alloc(state.sOutPath));
 
     // FIXME: support arbitrary input attributes.
 
@@ -66,6 +67,11 @@ void emitTreeAttrs(
 
     }
 
+    if (auto dirtyRev = fetchers::maybeGetStrAttr(input.attrs, "dirtyRev")) {
+        attrs.alloc("dirtyRev").mkString(*dirtyRev);
+        attrs.alloc("dirtyShortRev").mkString(*fetchers::maybeGetStrAttr(input.attrs, "dirtyShortRev"));
+    }
+
     if (auto lastModified = input.getLastModified()) {
         attrs.alloc("lastModified").mkInt(*lastModified);
         attrs.alloc("lastModifiedDate").mkString(
@@ -78,7 +84,16 @@ void emitTreeAttrs(
 std::string fixURI(std::string uri, EvalState & state, const std::string & defaultScheme = "file")
 {
     state.checkURI(uri);
-    return uri.find("://") != std::string::npos ? uri : defaultScheme + "://" + uri;
+    if (uri.find("://") == std::string::npos) {
+        const auto p = ParsedURL {
+            .scheme = defaultScheme,
+            .authority = "",
+            .path = uri
+        };
+        return p.to_string();
+    } else {
+        return uri;
+    }
 }
 
 std::string fixURIForGit(std::string uri, EvalState & state)
@@ -107,7 +122,7 @@ static void fetchTree(
     const FetchTreeParams & params = FetchTreeParams{}
 ) {
     fetchers::Input input;
-    PathSet context;
+    NixStringContext context;
 
     state.forceValue(*args[0], pos);
 
@@ -190,12 +205,16 @@ static void fetchTree(
 
 static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    settings.requireExperimentalFeature(Xp::Flakes);
+    experimentalFeatureSettings.require(Xp::Flakes);
     fetchTree(state, pos, args, v, std::nullopt, FetchTreeParams { .allowNameArgument = false });
 }
 
 // FIXME: document
-static RegisterPrimOp primop_fetchTree("fetchTree", 1, prim_fetchTree);
+static RegisterPrimOp primop_fetchTree({
+    .name = "fetchTree",
+    .arity = 1,
+    .fun = prim_fetchTree
+});
 
 static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v,
     const std::string & who, bool unpack, std::string name)
@@ -248,10 +267,8 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
         auto expectedPath = state.store->makeFixedOutputPath(
             name,
             FixedOutputInfo {
-                {
-                    .method = method,
-                    .hash = *expectedHash,
-                },
+                .method = method,
+                .hash = *expectedHash,
                 .references = {}
             });
 
@@ -274,7 +291,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
     //       https://github.com/NixOS/nix/issues/4313
     auto storePath =
         unpack
-        ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).first.storePath
+        ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).tree.storePath
         : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
     auto actualStorePath = state.store->makeFixedOutputPathFromCA(storePath);
@@ -300,9 +317,9 @@ static RegisterPrimOp primop_fetchurl({
     .name = "__fetchurl",
     .args = {"url"},
     .doc = R"(
-      Download the specified URL and return the path of the downloaded
-      file. This function is not available if [restricted evaluation
-      mode](../command-ref/conf-file.md) is enabled.
+      Download the specified URL and return the path of the downloaded file.
+
+      Not available in [restricted evaluation mode](@docroot@/command-ref/conf-file.md#conf-restrict-eval).
     )",
     .fun = prim_fetchurl,
 });
@@ -352,8 +369,7 @@ static RegisterPrimOp primop_fetchTarball({
       stdenv.mkDerivation { … }
       ```
 
-      This function is not available if [restricted evaluation
-      mode](../command-ref/conf-file.md) is enabled.
+      Not available in [restricted evaluation mode](@docroot@/command-ref/conf-file.md#conf-restrict-eval).
     )",
     .fun = prim_fetchTarball,
 });
@@ -371,36 +387,44 @@ static RegisterPrimOp primop_fetchGit({
       of the repo at that URL is fetched. Otherwise, it can be an
       attribute with the following attributes (all except `url` optional):
 
-        - url\
-          The URL of the repo.
+      - `url`
 
-        - name\
-          The name of the directory the repo should be exported to in the
-          store. Defaults to the basename of the URL.
+        The URL of the repo.
 
-        - rev\
-          The git revision to fetch. Defaults to the tip of `ref`.
+      - `name` (default: *basename of the URL*)
 
-        - ref\
-          The git ref to look for the requested revision under. This is
-          often a branch or tag name. Defaults to `HEAD`.
+        The name of the directory the repo should be exported to in the store.
 
-          By default, the `ref` value is prefixed with `refs/heads/`. As
-          of Nix 2.3.0 Nix will not prefix `refs/heads/` if `ref` starts
-          with `refs/`.
+      - `rev` (default: *the tip of `ref`*)
 
-        - submodules\
-          A Boolean parameter that specifies whether submodules should be
-          checked out. Defaults to `false`.
+        The [Git revision] to fetch.
+        This is typically a commit hash.
 
-        - shallow\
-          A Boolean parameter that specifies whether fetching a shallow clone
-          is allowed. Defaults to `false`.
+        [Git revision]: https://git-scm.com/docs/git-rev-parse#_specifying_revisions
 
-        - allRefs\
-          Whether to fetch all refs of the repository. With this argument being
-          true, it's possible to load a `rev` from *any* `ref` (by default only
-          `rev`s from the specified `ref` are supported).
+      - `ref` (default: `HEAD`)
+
+        The [Git reference] under which to look for the requested revision.
+        This is often a branch or tag name.
+
+        [Git reference]: https://git-scm.com/book/en/v2/Git-Internals-Git-References
+
+        By default, the `ref` value is prefixed with `refs/heads/`.
+        As of 2.3.0, Nix will not prefix `refs/heads/` if `ref` starts with `refs/`.
+
+      - `submodules` (default: `false`)
+
+        A Boolean parameter that specifies whether submodules should be checked out.
+
+      - `shallow` (default: `false`)
+
+        A Boolean parameter that specifies whether fetching a shallow clone is allowed.
+
+      - `allRefs`
+
+        Whether to fetch all references of the repository.
+        With this argument being true, it's possible to load a `rev` from *any* `ref`
+        (by default only `rev`s from the specified `ref` are supported).
 
       Here are some examples of how to use `fetchGit`.
 
@@ -476,14 +500,20 @@ static RegisterPrimOp primop_fetchGit({
           }
           ```
 
-          > **Note**
-          >
-          > Nix will refetch the branch in accordance with
-          > the option `tarball-ttl`.
+          Nix will refetch the branch according to the [`tarball-ttl`](@docroot@/command-ref/conf-file.md#conf-tarball-ttl) setting.
 
-          > **Note**
-          >
-          > This behavior is disabled in *Pure evaluation mode*.
+          This behavior is disabled in [pure evaluation mode](@docroot@/command-ref/conf-file.md#conf-pure-eval).
+
+        - To fetch the content of a checked-out work directory:
+
+          ```nix
+          builtins.fetchGit ./work-dir
+          ```
+
+      If the URL points to a local directory, and no `ref` or `rev` is
+      given, `fetchGit` will use the current content of the checked-out
+      files, even if they are not committed or added to Git's index. It will
+      only consider files added to the Git repository, as listed by `git ls-files`.
     )",
     .fun = prim_fetchGit,
 });

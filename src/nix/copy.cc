@@ -10,8 +10,6 @@ struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand
 
     SubstituteFlag substitute = NoSubstitute;
 
-    using BuiltPathsCommand::run;
-
     CmdCopy()
         : BuiltPathsCommand(true)
     {

@@ -1,9 +1,6 @@
 source ./common.sh
 
-if [[ -z $(type -p hg) ]]; then
-    echo "Mercurial not installed; skipping"
-    exit 99
-fi
+[[ $(type -p hq) ]] || skipTest "Mercurial not installed"
 
 flake1Dir=$TEST_ROOT/flake-hg1
 mkdir -p $flake1Dir

@@ -63,6 +63,7 @@ std::optional<std::string> readHead(const Path & path)
         .program = "git",
         // FIXME: use 'HEAD' to avoid returning all refs
         .args = {"ls-remote", "--symref", path},
+        .isInteractive = true,
     });
     if (status != 0) return std::nullopt;
 
@@ -246,13 +247,20 @@ std::pair<StorePathDescriptor, Input> fetchFromWorkdir(ref<Store> store, Input &
         "lastModified",
         workdirInfo.hasHead ? std::stoull(runProgram("git", true, { "-C", actualPath, "--git-dir", gitDir, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
+    if (workdirInfo.hasHead) {
+        input.attrs.insert_or_assign("dirtyRev", chomp(
+            runProgram("git", true, { "-C", actualPath, "--git-dir", gitDir, "rev-parse", "--verify", "HEAD" })) + "-dirty");
+        input.attrs.insert_or_assign("dirtyShortRev", chomp(
+            runProgram("git", true, { "-C", actualPath, "--git-dir", gitDir, "rev-parse", "--verify", "--short", "HEAD" })) + "-dirty");
+    }
+
     return {std::move(storePathDesc), input};
 }
 }  // end namespace
 
 struct GitInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url) const override
+    std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
     {
         if (url.scheme != "git" &&
             url.scheme != "git+http" &&
@@ -270,7 +278,7 @@ struct GitInputScheme : InputScheme
         for (auto & [name, value] : url.query) {
             if (name == "rev" || name == "ref" || name == "treeHash" || name == "gitIngestion")
                 attrs.emplace(name, value);
-            else if (name == "shallow" || name == "submodules")
+            else if (name == "shallow" || name == "submodules" || name == "allRefs")
                 attrs.emplace(name, Explicit<bool> { value == "1" });
             else
                 url2.query.emplace(name, value);
@@ -286,7 +294,7 @@ struct GitInputScheme : InputScheme
         if (maybeGetStrAttr(attrs, "type") != "git") return {};
 
         for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "gitIngestion" && name != "treeHash" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name")
+            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "gitIngestion" && name != "treeHash"  && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name" && name != "dirtyRev" && name != "dirtyShortRev")
                 throw Error("unsupported Git input attribute '%s'", name);
 
         parseURL(getStrAttr(attrs, "url"));
@@ -364,7 +372,7 @@ struct GitInputScheme : InputScheme
 
         args.push_back(destDir);
 
-        runProgram("git", true, args);
+        runProgram("git", true, args, {}, true);
     }
 
     std::optional<Path> getSourcePath(const Input & input) override
@@ -506,7 +514,7 @@ struct GitInputScheme : InputScheme
                     return Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "--git-dir", gitDir, "rev-parse", rev })), htSHA1).gitRev();
                 };
                 input.attrs.insert_or_assign("rev", getHash(*input.getRef()));
-                if (settings.isExperimentalFeatureEnabled(Xp::GitHashing))
+                if (experimentalFeatureSettings.isEnabled(Xp::GitHashing))
                     input.attrs.insert_or_assign("treeHash", getHash(*input.getRef() + ":"));
             }
 
@@ -538,7 +546,7 @@ struct GitInputScheme : InputScheme
                     }
                 }
 
-                if (settings.isExperimentalFeatureEnabled(Xp::GitHashing)) {
+                if (experimentalFeatureSettings.isEnabled(Xp::GitHashing)) {
                     if (std::optional treeHashS = maybeGetStrAttr(res->first, "treeHash")) {
                         auto treeHash2 = Hash::parseNonSRIUnprefixed(*treeHashS, htSHA1);
                         if (!input.getTreeHash() || input.getTreeHash() == treeHash2) {
@@ -616,7 +624,7 @@ struct GitInputScheme : InputScheme
                             : ref == "HEAD"
                                 ? *ref
                                 : "refs/heads/" + *ref;
-                    runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", fetchRef, fetchRef) });
+                    runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "fetch", "--quiet", "--force", "--", actualUrl, fmt("%s:%s", fetchRef, fetchRef) }, {}, true);
                 } catch (Error & e) {
                     if (!pathExists(localRefFile)) throw;
                     warn("could not update local clone of Git repository '%s'; continuing with the most recent version", actualUrl);
@@ -631,7 +639,7 @@ struct GitInputScheme : InputScheme
             if (!input.getRev() && !input.getTreeHash()) {
                 auto rev = Hash::parseAny(chomp(readFile(localRefFile)), htSHA1).gitRev();
                 input.attrs.insert_or_assign("rev", rev);
-                if (settings.isExperimentalFeatureEnabled(Xp::GitHashing))
+                if (experimentalFeatureSettings.isEnabled(Xp::GitHashing))
                     input.attrs.insert_or_assign("treeHash",
                         Hash::parseAny(chomp(runProgram("git", true, { "-C", repoDir, "rev-parse", rev + ":" })), htSHA1).gitRev());
             }
@@ -705,24 +713,52 @@ struct GitInputScheme : InputScheme
             AutoDelete delTmpGitDir(tmpGitDir, true);
 
             runProgram("git", true, { "-c", "init.defaultBranch=" + gitInitialBranch, "init", tmpDir, "--separate-git-dir", tmpGitDir });
-            // TODO: repoDir might lack the ref (it only checks if rev
-            // exists, see FIXME above) so use a big hammer and fetch
-            // everything to ensure we get the rev.
-            runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
-                                      "--update-head-ok", "--", repoDir, "refs/*:refs/*" });
+
+            {
+                // TODO: repoDir might lack the ref (it only checks if rev
+                // exists, see FIXME above) so use a big hammer and fetch
+                // everything to ensure we get the rev.
+                Activity act(*logger, lvlTalkative, actUnknown, fmt("making temporary clone of '%s'", repoDir));
+                runProgram("git", true, { "-C", tmpDir, "fetch", "--quiet", "--force",
+                        "--update-head-ok", "--", repoDir, "refs/*:refs/*" }, {}, true);
+            }
 
             runProgram("git", true, { "-C", tmpDir, "checkout", "--quiet", input.getTreeHash() ? input.getTreeHash()->gitRev() : input.getRev()->gitRev() });
-            runProgram("git", true, { "-C", tmpDir, "remote", "add", "origin", actualUrl });
-            runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" });
+
+            /* Ensure that we use the correct origin for fetching
+               submodules. This matters for submodules with relative
+               URLs. */
+            if (isLocal) {
+                writeFile(tmpGitDir + "/config", readFile(repoDir + "/" + gitDir + "/config"));
+
+                /* Restore the config.bare setting we may have just
+                   copied erroneously from the user's repo. */
+                runProgram("git", true, { "-C", tmpDir, "config", "core.bare", "false" });
+            } else
+                runProgram("git", true, { "-C", tmpDir, "config", "remote.origin.url", actualUrl });
+
+            /* As an optimisation, copy the modules directory of the
+               source repo if it exists. */
+            auto modulesPath = repoDir + "/" + gitDir + "/modules";
+            if (pathExists(modulesPath)) {
+                Activity act(*logger, lvlTalkative, actUnknown, fmt("copying submodules of '%s'", actualUrl));
+                runProgram("cp", true, { "-R", "--", modulesPath, tmpGitDir + "/modules" });
+            }
+
+            {
+                Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching submodules of '%s'", actualUrl));
+                runProgram("git", true, { "-C", tmpDir, "submodule", "--quiet", "update", "--init", "--recursive" }, {}, true);
+            }
 
             filter = isNotDotGitDirectory;
         } else {
+            auto & fetchHash_ = fetchHash; // Work-around clang restriction.
             // FIXME: should pipe this, or find some better way to extract a
             // revision.
             auto source = sinkToSource([&](Sink & sink) {
                 runProgram2({
                     .program = "git",
-                    .args = { "-C", repoDir, "--git-dir", gitDir, "archive", fetchHash.gitRev() },
+                    .args = { "-C", repoDir, "--git-dir", gitDir, "archive", fetchHash_.gitRev() },
                     .standardOut = &sink
                 });
             });
@@ -753,7 +789,7 @@ struct GitInputScheme : InputScheme
         } else
             infoAttrs.insert_or_assign("lastModified", (uint64_t) 0);
 
-        if (settings.isExperimentalFeatureEnabled(Xp::GitHashing))
+        if (experimentalFeatureSettings.isEnabled(Xp::GitHashing))
             if (auto treeHash = input.getTreeHash())
                 infoAttrs.insert_or_assign("treeHash", treeHash->gitRev());
 

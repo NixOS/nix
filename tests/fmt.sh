@@ -1,7 +1,5 @@
 source common.sh
 
-set -o pipefail
-
 clearStore
 rm -rf $TEST_HOME/.cache $TEST_HOME/.config $TEST_HOME/.local
 

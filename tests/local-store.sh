@@ -17,3 +17,6 @@ PATH2=$(nix path-info --store "$PWD/x" $CORRECT_PATH)
 
 PATH3=$(nix path-info --store "local?root=$PWD/x" $CORRECT_PATH)
 [ $CORRECT_PATH == $PATH3 ]
+
+# Ensure store ping trusted works with local store
+nix --store ./x store ping --json | jq -e '.trusted'

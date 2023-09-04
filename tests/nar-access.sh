@@ -46,8 +46,8 @@ diff -u \
     <(echo '{"type":"regular","size":0}' | jq -S)
 
 # Test missing files.
-nix store ls --json -R $storePath/xyzzy 2>&1 | grep 'does not exist in NAR'
-nix store ls $storePath/xyzzy 2>&1 | grep 'does not exist'
+expect 1 nix store ls --json -R $storePath/xyzzy 2>&1 | grep 'does not exist in NAR'
+expect 1 nix store ls $storePath/xyzzy 2>&1 | grep 'does not exist'
 
 # Test failure to dump.
 if nix-store --dump $storePath >/dev/full ; then

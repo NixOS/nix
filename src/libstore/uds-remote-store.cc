@@ -1,4 +1,5 @@
 #include "uds-remote-store.hh"
+#include "worker-protocol.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -13,6 +14,14 @@
 
 namespace nix {
 
+std::string UDSRemoteStoreConfig::doc()
+{
+    return
+        #include "uds-remote-store.md"
+        ;
+}
+
+
 UDSRemoteStore::UDSRemoteStore(const Params & params)
     : StoreConfig(params)
     , LocalFSStoreConfig(params)
@@ -26,9 +35,9 @@ UDSRemoteStore::UDSRemoteStore(const Params & params)
 
 
 UDSRemoteStore::UDSRemoteStore(
-        const std::string scheme,
-        std::string socket_path,
-        const Params & params)
+    const std::string scheme,
+    std::string socket_path,
+    const Params & params)
     : UDSRemoteStore(params)
 {
     path.emplace(socket_path);
@@ -66,6 +75,15 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     conn->startTime = std::chrono::steady_clock::now();
 
     return conn;
+}
+
+
+void UDSRemoteStore::addIndirectRoot(const Path & path)
+{
+    auto conn(getConnection());
+    conn->to << WorkerProto::Op::AddIndirectRoot << path;
+    conn.processStderr();
+    readInt(conn->from);
 }
 
 

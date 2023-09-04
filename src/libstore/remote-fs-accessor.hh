@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "fs-accessor.hh"
 #include "ref.hh"

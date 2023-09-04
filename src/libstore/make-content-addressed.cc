@@ -51,10 +51,8 @@ std::map<StorePath, StorePath> makeContentAddressed(
             StorePathDescriptor {
                 .name = std::string { path.name() },
                 .info = FixedOutputInfo {
-                    {
-                        .method = FileIngestionMethod::Recursive,
-                        .hash = narModuloHash,
-                    },
+                    .method = FileIngestionMethod::Recursive,
+                    .hash = narModuloHash,
                     .references = std::move(refs),
                 },
             },
@@ -78,6 +76,17 @@ std::map<StorePath, StorePath> makeContentAddressed(
     }
 
     return remappings;
+}
+
+StorePath makeContentAddressed(
+    Store & srcStore,
+    Store & dstStore,
+    const StorePath & fromPath)
+{
+    auto remappings = makeContentAddressed(srcStore, dstStore, StorePathSet { fromPath });
+    auto i = remappings.find(fromPath);
+    assert(i != remappings.end());
+    return i->second;
 }
 
 }

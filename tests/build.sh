@@ -2,8 +2,6 @@ source common.sh
 
 clearStore
 
-set -o pipefail
-
 # Make sure that 'nix build' returns all outputs by default.
 nix build -f multiple-outputs.nix --json a b --no-link | jq --exit-status '
   (.[0] |
@@ -59,6 +57,30 @@ nix build -f multiple-outputs.nix --json 'e^*' --no-link | jq --exit-status '
     (.outputs | keys == ["a_a", "b", "c"]))
 '
 
+# test buidling from non-drv attr path
+
+nix build -f multiple-outputs.nix --json 'e.a_a.outPath' --no-link | jq --exit-status '
+  (.[0] |
+    (.drvPath | match(".*multiple-outputs-e.drv")) and
+    (.outputs | keys == ["a_a"]))
+'
+
+# Illegal type of string context
+expectStderr 1 nix build -f multiple-outputs.nix 'e.a_a.drvPath' \
+  | grepQuiet "has a context which refers to a complete source and binary closure."
+
+# No string context
+expectStderr 1 nix build --expr '""' --no-link \
+  | grepQuiet "has 0 entries in its context. It should only have exactly one entry"
+
+# Too much string context
+expectStderr 1 nix build --impure --expr 'with (import ./multiple-outputs.nix).e.a_a; "${drvPath}${outPath}"' --no-link \
+  | grepQuiet "has 2 entries in its context. It should only have exactly one entry"
+
+nix build --impure --json --expr 'builtins.unsafeDiscardOutputDependency (import ./multiple-outputs.nix).e.a_a.drvPath' --no-link | jq --exit-status '
+  (.[0] | match(".*multiple-outputs-e.drv"))
+'
+
 # Test building from raw store path to drv not expression.
 
 drv=$(nix eval -f multiple-outputs.nix --raw a.drvPath)
@@ -108,61 +130,6 @@ nix build --impure -f multiple-outputs.nix --json e --no-link | jq --exit-status
     (.outputs | keys == ["a_a", "b"]))
 '
 
-testNormalization () {
-    clearStore
-    outPath=$(nix-build ./simple.nix --no-out-link)
-    test "$(stat -c %Y $outPath)" -eq 1
-}
-
-testNormalization
-
-# https://github.com/NixOS/nix/issues/6572
-issue_6572_independent_outputs() {
-    nix build -f multiple-outputs.nix --json independent --no-link > $TEST_ROOT/independent.json
-
-    # Make sure that 'nix build' can build a derivation that depends on both outputs of another derivation.
-    p=$(nix build -f multiple-outputs.nix use-independent --no-link --print-out-paths)
-    nix-store --delete "$p" # Clean up for next test
-
-    # Make sure that 'nix build' tracks input-outputs correctly when a single output is already present.
-    nix-store --delete "$(jq -r <$TEST_ROOT/independent.json .[0].outputs.first)"
-    p=$(nix build -f multiple-outputs.nix use-independent --no-link --print-out-paths)
-    cmp $p <<EOF
-first
-second
-EOF
-    nix-store --delete "$p" # Clean up for next test
-
-    # Make sure that 'nix build' tracks input-outputs correctly when a single output is already present.
-    nix-store --delete "$(jq -r <$TEST_ROOT/independent.json .[0].outputs.second)"
-    p=$(nix build -f multiple-outputs.nix use-independent --no-link --print-out-paths)
-    cmp $p <<EOF
-first
-second
-EOF
-    nix-store --delete "$p" # Clean up for next test
-}
-issue_6572_independent_outputs
-
-
-# https://github.com/NixOS/nix/issues/6572
-issue_6572_dependent_outputs() {
-
-    nix build -f multiple-outputs.nix --json a --no-link > $TEST_ROOT/a.json
-
-    # # Make sure that 'nix build' can build a derivation that depends on both outputs of another derivation.
-    p=$(nix build -f multiple-outputs.nix use-a --no-link --print-out-paths)
-    nix-store --delete "$p" # Clean up for next test
-
-    # Make sure that 'nix build' tracks input-outputs correctly when a single output is already present.
-    nix-store --delete "$(jq -r <$TEST_ROOT/a.json .[0].outputs.second)"
-    p=$(nix build -f multiple-outputs.nix use-a --no-link --print-out-paths)
-    cmp $p <<EOF
-first
-second
-EOF
-    nix-store --delete "$p" # Clean up for next test
-}
-if isDaemonNewer "2.12pre0"; then
-    issue_6572_dependent_outputs
-fi
+# Make sure that `--stdin` works and does not apply any defaults
+printf "" | nix build --no-link --stdin --json | jq --exit-status '. == []'
+printf "%s\n" "$drv^*" | nix build --no-link --stdin --json | jq --exit-status '.[0]|has("drvPath")'

@@ -31,15 +31,18 @@ store already contains a file with the same hash and base name.
 Otherwise, the file is downloaded, and an error is signaled if the
 actual hash of the file does not match the specified hash.
 
-This command prints the hash on standard output. Additionally, if the
-option `--print-path` is used, the path of the downloaded file in the
-Nix store is also printed.
+This command prints the hash on standard output.
+The hash is printed using base-32 unless `--type md5` is specified,
+in which case it's printed using base-16.
+Additionally, if the option `--print-path` is used,
+the path of the downloaded file in the Nix store is also printed.
 
 # Options
 
   - `--type` *hashAlgo*\
-    Use the specified cryptographic hash algorithm, which can be one of
-    `md5`, `sha1`, `sha256`, and `sha512`.
+    Use the specified cryptographic hash algorithm,
+    which can be one of `md5`, `sha1`, `sha256`, and `sha512`.
+    The default is `sha256`.
 
   - `--print-path`\
     Print the store path of the downloaded file on standard output.

@@ -105,7 +105,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         };
 
         return std::make_pair(
-            FlakeRef(Input::fromURL(parsedURL), ""),
+            FlakeRef(Input::fromURL(parsedURL, isFlake), ""),
             percentDecode(match.str(6)));
     }
 
@@ -176,7 +176,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
                             parsedURL.query.insert_or_assign("shallow", "1");
 
                         return std::make_pair(
-                            FlakeRef(Input::fromURL(parsedURL), getOr(parsedURL.query, "dir", "")),
+                            FlakeRef(Input::fromURL(parsedURL, isFlake), getOr(parsedURL.query, "dir", "")),
                             fragment);
                     }
 
@@ -204,7 +204,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         std::string fragment;
         std::swap(fragment, parsedURL.fragment);
 
-        auto input = Input::fromURL(parsedURL);
+        auto input = Input::fromURL(parsedURL, isFlake);
         input.parent = baseDir;
 
         return std::make_pair(
@@ -246,7 +246,7 @@ std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragment
 {
     auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse(url);
     auto [flakeRef, fragment] = parseFlakeRefWithFragment(std::string { prefix }, baseDir, allowMissing, isFlake);
-    return {std::move(flakeRef), fragment, extendedOutputsSpec};
+    return {std::move(flakeRef), fragment, std::move(extendedOutputsSpec)};
 }
 
 }

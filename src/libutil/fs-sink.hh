@@ -5,7 +5,9 @@
 
 namespace nix {
 
-/* FIXME: fix this API, it sucks. */
+/**
+ * \todo Fix this API, it sucks.
+ */
 struct ParseSink
 {
     virtual void createDirectory(const Path & path) { };

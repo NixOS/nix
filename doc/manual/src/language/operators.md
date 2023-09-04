@@ -24,7 +24,7 @@
 | [Equality]                             | *expr* `==` *expr*                         | none          | 11         |
 | Inequality                             | *expr* `!=` *expr*                         | none          | 11         |
 | Logical conjunction (`AND`)            | *bool* `&&` *bool*                         | left          | 12         |
-| Logical disjunction (`OR`)             | *bool* `\|\|` *bool*                       | left          | 13         |
+| Logical disjunction (`OR`)             | *bool* <code>\|\|</code> *bool*            | left          | 13         |
 | [Logical implication]                  | *bool* `->` *bool*                         | none          | 14         |
 
 [string]: ./values.md#type-string
@@ -35,17 +35,14 @@
 
 ## Attribute selection
 
+> *attrset* `.` *attrpath* \[ `or` *expr* \]
+
 Select the attribute denoted by attribute path *attrpath* from [attribute set] *attrset*.
-If the attribute doesn’t exist, return *value* if provided, otherwise abort evaluation.
+If the attribute doesn’t exist, return the *expr* after `or` if provided, otherwise abort evaluation.
 
-<!-- FIXME: the following should to into its own language syntax section, but that needs more work to fit in well -->
-
-An attribute path is a dot-separated list of attribute names.
-An attribute name can be an identifier or a string.
+An attribute path is a dot-separated list of [attribute names](./values.md#attribute-set).
 
 > *attrpath* = *name* [ `.` *name* ]...
-> *name* = *identifier* | *string*
-> *identifier* ~ `[a-zA-Z_][a-zA-Z0-9_'-]*`
 
 [Attribute selection]: #attribute-selection
 
@@ -116,7 +113,7 @@ The result is a string.
 [store path]: ../glossary.md#gloss-store-path
 [store]: ../glossary.md#gloss-store
 
-[Path and string concatenation]: #path-and-string-concatenation
+[String and path concatenation]: #string-and-path-concatenation
 
 ## Update
 
@@ -133,7 +130,7 @@ If an attribute name is present in both, the attribute value from the latter is 
 
 Comparison is
 
-- [arithmetic] for [number]s 
+- [arithmetic] for [number]s
 - lexicographic for [string]s and [path]s
 - item-wise lexicographic for [list]s:
   elements at the same index in both lists are compared according to their type and skipped if they are equal.

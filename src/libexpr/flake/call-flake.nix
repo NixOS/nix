@@ -16,7 +16,9 @@ let
 
           subdir = if key == lockFile.root then rootSubdir else node.locked.dir or "";
 
-          flake = import (sourceInfo + (if subdir != "" then "/" else "") + subdir + "/flake.nix");
+          outPath = sourceInfo + ((if subdir == "" then "" else "/") + subdir);
+
+          flake = import (outPath + "/flake.nix");
 
           inputs = builtins.mapAttrs
             (inputName: inputSpec: allNodes.${resolveInput inputSpec})
@@ -43,7 +45,21 @@ let
 
           outputs = flake.outputs (inputs // { self = result; });
 
-          result = outputs // sourceInfo // { inherit inputs; inherit outputs; inherit sourceInfo; _type = "flake"; };
+          result =
+            outputs
+            # We add the sourceInfo attribute for its metadata, as they are
+            # relevant metadata for the flake. However, the outPath of the
+            # sourceInfo does not necessarily match the outPath of the flake,
+            # as the flake may be in a subdirectory of a source.
+            # This is shadowed in the next //
+            // sourceInfo
+            // {
+              # This shadows the sourceInfo.outPath
+              inherit outPath;
+
+              inherit inputs; inherit outputs; inherit sourceInfo; _type = "flake";
+            };
+
         in
           if node.flake or true then
             assert builtins.isFunction flake.outputs;

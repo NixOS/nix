@@ -28,6 +28,12 @@ nix realisation info --file ./content-addressed.nix transitivelyDependentCA
 nix realisation info --file ./content-addressed.nix dependentCA
 # nix realisation info --file ./content-addressed.nix rootCA --outputs out
 
+if isDaemonNewer "2.13"; then
+    pushToStore="../push-to-store.sh"
+else
+    pushToStore="../push-to-store-old.sh"
+fi
+
 # Same thing, but
 # 1. With non-ca derivations
 # 2. Erasing the realisations on the remote store
@@ -37,7 +43,7 @@ nix realisation info --file ./content-addressed.nix dependentCA
 #
 # Regression test for #4725
 clearStore
-nix build --file ../simple.nix -L --no-link --post-build-hook ../push-to-store.sh
+nix build --file ../simple.nix -L --no-link --post-build-hook "$pushToStore"
 clearStore
 rm -r "$REMOTE_STORE_DIR/realisations"
 nix build --file ../simple.nix -L --no-link --substitute --substituters "$REMOTE_STORE" --no-require-sigs -j0
@@ -52,7 +58,7 @@ if [[ -z "$(ls "$REMOTE_STORE_DIR/realisations")" ]]; then
 fi
 
 # Test the local realisation disk cache
-buildDrvs --post-build-hook ../push-to-store.sh
+buildDrvs --post-build-hook "$pushToStore"
 clearStore
 # Add the realisations of rootCA to the cachecache
 clearCacheCache

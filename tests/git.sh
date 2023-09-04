@@ -3,7 +3,7 @@ source common.sh
 clearStore
 clearCache
 
-export NIX_CONFIG+=$'\nextra-experimental-features = git-hashing'
+enableFeatures "git-hashing"
 
 try () {
     hash=$(nix hash git --base16 --type sha1 $TEST_ROOT/hash-path)

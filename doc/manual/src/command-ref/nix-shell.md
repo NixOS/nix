@@ -89,7 +89,7 @@ All options not listed here are passed to `nix-store
   - `--packages` / `-p` *packages*…\
     Set up an environment in which the specified packages are present.
     The command line arguments are interpreted as attribute names inside
-    the Nix Packages collection. Thus, `nix-shell -p libjpeg openjdk`
+    the Nix Packages collection. Thus, `nix-shell --packages libjpeg openjdk`
     will start a shell in which the packages denoted by the attribute
     names `libjpeg` and `openjdk` are present.
 
@@ -101,7 +101,7 @@ All options not listed here are passed to `nix-store
     When a `--pure` shell is started, keep the listed environment
     variables.
 
-The following common options are supported:
+{{#include ./opt-common.md}}
 
 # Environment variables
 
@@ -110,15 +110,18 @@ The following common options are supported:
     `bash` found in `<nixpkgs>`, falling back to the `bash` found in
     `PATH` if not found.
 
+{{#include ./env-common.md}}
+
 # Examples
 
 To build the dependencies of the package Pan, and start an interactive
 shell in which to build it:
 
 ```console
-$ nix-shell '<nixpkgs>' -A pan
+$ nix-shell '<nixpkgs>' --attr pan
 [nix-shell]$ eval ${unpackPhase:-unpackPhase}
-[nix-shell]$ cd pan-*
+[nix-shell]$ cd $sourceRoot
+[nix-shell]$ eval ${patchPhase:-patchPhase}
 [nix-shell]$ eval ${configurePhase:-configurePhase}
 [nix-shell]$ eval ${buildPhase:-buildPhase}
 [nix-shell]$ ./pan/gui/pan
@@ -134,7 +137,7 @@ To clear the environment first, and do some additional automatic
 initialisation of the interactive shell:
 
 ```console
-$ nix-shell '<nixpkgs>' -A pan --pure \
+$ nix-shell '<nixpkgs>' --attr pan --pure \
     --command 'export NIX_DEBUG=1; export NIX_CORES=8; return'
 ```
 
@@ -143,13 +146,13 @@ Nix expressions can also be given on the command line using the `-E` and
 packages `sqlite` and `libX11`:
 
 ```console
-$ nix-shell -E 'with import <nixpkgs> { }; runCommand "dummy" { buildInputs = [ sqlite xorg.libX11 ]; } ""'
+$ nix-shell --expr 'with import <nixpkgs> { }; runCommand "dummy" { buildInputs = [ sqlite xorg.libX11 ]; } ""'
 ```
 
 A shorter way to do the same is:
 
 ```console
-$ nix-shell -p sqlite xorg.libX11
+$ nix-shell --packages sqlite xorg.libX11
 [nix-shell]$ echo $NIX_LDFLAGS
 … -L/nix/store/j1zg5v…-sqlite-3.8.0.2/lib -L/nix/store/0gmcz9…-libX11-1.6.1/lib …
 ```
@@ -159,7 +162,7 @@ the `buildInputs = [ ... ]` shown above, not only package names. So the
 following is also legal:
 
 ```console
-$ nix-shell -p sqlite 'git.override { withManual = false; }'
+$ nix-shell --packages sqlite 'git.override { withManual = false; }'
 ```
 
 The `-p` flag looks up Nixpkgs in the Nix search path. You can override
@@ -168,7 +171,7 @@ gives you a shell containing the Pan package from a specific revision of
 Nixpkgs:
 
 ```console
-$ nix-shell -p pan -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
+$ nix-shell --packages pan -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/8a3eea054838b55aca962c3fbde9c83c102b8bf2.tar.gz
 
 [nix-shell:~]$ pan --version
 Pan 0.139
@@ -182,7 +185,7 @@ done by starting the script with the following lines:
 
 ```bash
 #! /usr/bin/env nix-shell
-#! nix-shell -i real-interpreter -p packages
+#! nix-shell -i real-interpreter --packages packages
 ```
 
 where *real-interpreter* is the “real” script interpreter that will be
@@ -199,7 +202,7 @@ For example, here is a Python script that depends on Python and the
 
 ```python
 #! /usr/bin/env nix-shell
-#! nix-shell -i python -p python pythonPackages.prettytable
+#! nix-shell -i python --packages python pythonPackages.prettytable
 
 import prettytable
 
@@ -214,7 +217,7 @@ requires Perl and the `HTML::TokeParser::Simple` and `LWP` packages:
 
 ```perl
 #! /usr/bin/env nix-shell
-#! nix-shell -i perl -p perl perlPackages.HTMLTokeParserSimple perlPackages.LWP
+#! nix-shell -i perl --packages perl perlPackages.HTMLTokeParserSimple perlPackages.LWP
 
 use HTML::TokeParser::Simple;
 
@@ -232,7 +235,7 @@ package like Terraform:
 
 ```bash
 #! /usr/bin/env nix-shell
-#! nix-shell -i bash -p "terraform.withPlugins (plugins: [ plugins.openstack ])"
+#! nix-shell -i bash --packages "terraform.withPlugins (plugins: [ plugins.openstack ])"
 
 terraform apply
 ```
@@ -248,7 +251,7 @@ branch):
 
 ```haskell
 #! /usr/bin/env nix-shell
-#! nix-shell -i runghc -p "haskellPackages.ghcWithPackages (ps: [ps.download-curl ps.tagsoup])"
+#! nix-shell -i runghc --packages "haskellPackages.ghcWithPackages (ps: [ps.download-curl ps.tagsoup])"
 #! nix-shell -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/nixos-20.03.tar.gz
 
 import Network.Curl.Download

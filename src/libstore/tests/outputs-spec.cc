@@ -2,6 +2,7 @@
 
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
+#include <rapidcheck/gtest.h>
 
 namespace nix {
 
@@ -197,5 +198,38 @@ TEST_JSON(ExtendedOutputsSpec, name, R"(["a"])", ExtendedOutputsSpec::Explicit {
 TEST_JSON(ExtendedOutputsSpec, names, R"(["a","b"])", (ExtendedOutputsSpec::Explicit { OutputsSpec::Names { "a", "b" } }))
 
 #undef TEST_JSON
+
+}
+
+namespace rc {
+using namespace nix;
+
+Gen<OutputsSpec> Arbitrary<OutputsSpec>::arbitrary()
+{
+    switch (*gen::inRange<uint8_t>(0, std::variant_size_v<OutputsSpec::Raw>)) {
+    case 0:
+        return gen::just((OutputsSpec) OutputsSpec::All { });
+    case 1:
+        return gen::just((OutputsSpec) OutputsSpec::Names {
+            *gen::nonEmpty(gen::container<StringSet>(gen::map(
+                gen::arbitrary<StorePathName>(),
+                [](StorePathName n) { return n.name; }))),
+        });
+    default:
+        assert(false);
+    }
+}
+
+}
+
+namespace nix {
+
+RC_GTEST_PROP(
+    OutputsSpec,
+    prop_round_rip,
+    (const OutputsSpec & o))
+{
+    RC_ASSERT(o == OutputsSpec::parse(o.to_string()));
+}
 
 }

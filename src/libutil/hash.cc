@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstring>
 
+#include <openssl/crypto.h>
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 
@@ -16,7 +17,6 @@
 #include <fcntl.h>
 
 namespace nix {
-
 
 static size_t regularHashSize(HashType type) {
     switch (type) {
@@ -72,12 +72,13 @@ const std::string base16Chars = "0123456789abcdef";
 
 static std::string printHash16(const Hash & hash)
 {
-    char buf[hash.hashSize * 2];
+    std::string buf;
+    buf.reserve(hash.hashSize * 2);
     for (unsigned int i = 0; i < hash.hashSize; i++) {
-        buf[i * 2] = base16Chars[hash.hash[i] >> 4];
-        buf[i * 2 + 1] = base16Chars[hash.hash[i] & 0x0f];
+        buf.push_back(base16Chars[hash.hash[i] >> 4]);
+        buf.push_back(base16Chars[hash.hash[i] & 0x0f]);
     }
-    return std::string(buf, hash.hashSize * 2);
+    return buf;
 }
 
 
@@ -131,7 +132,7 @@ std::string Hash::to_string(Base base, bool includeType) const
         break;
     case Base64:
     case SRI:
-        s += base64Encode(std::string((const char *) hash, hashSize));
+        s += base64Encode(std::string_view((const char *) hash, hashSize));
         break;
     }
     return s;
@@ -343,7 +344,7 @@ HashSink::~HashSink()
     delete ctx;
 }
 
-void HashSink::write(std::string_view data)
+void HashSink::writeUnbuffered(std::string_view data)
 {
     bytes += data.size();
     update(ht, *ctx, data);
@@ -411,7 +412,7 @@ HashType parseHashType(std::string_view s)
         throw UsageError("unknown hash algorithm '%1%'", s);
 }
 
-std::string printHashType(HashType ht)
+std::string_view printHashType(HashType ht)
 {
     switch (ht) {
     case htMD5: return "md5";

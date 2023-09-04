@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "types.hh"
 
@@ -12,14 +13,18 @@ struct UserLock
 {
     virtual ~UserLock() { }
 
-    /* Get the first and last UID. */
+    /**
+     * Get the first and last UID.
+     */
     std::pair<uid_t, uid_t> getUIDRange()
     {
         auto first = getUID();
         return {first, first + getUIDCount() - 1};
     }
 
-    /* Get the first UID. */
+    /**
+     * Get the first UID.
+     */
     virtual uid_t getUID() = 0;
 
     virtual uid_t getUIDCount() = 0;
@@ -29,8 +34,10 @@ struct UserLock
     virtual std::vector<gid_t> getSupplementaryGIDs() = 0;
 };
 
-/* Acquire a user lock for a UID range of size `nrIds`. Note that this
-   may return nullptr if no user is available. */
+/**
+ * Acquire a user lock for a UID range of size `nrIds`. Note that this
+ * may return nullptr if no user is available.
+ */
 std::unique_ptr<UserLock> acquireUserLock(uid_t nrIds, bool useUserNamespace);
 
 bool useBuildUsers();

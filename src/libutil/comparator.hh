@@ -1,6 +1,24 @@
 #pragma once
+///@file
 
-/* Awfull hacky generation of the comparison operators by doing a lexicographic
+/**
+ * Declare comparison methods without defining them.
+ */
+#define DECLARE_ONE_CMP(COMPARATOR, MY_TYPE) \
+    bool operator COMPARATOR(const MY_TYPE & other) const;
+#define DECLARE_EQUAL(my_type) \
+    DECLARE_ONE_CMP(==, my_type)
+#define DECLARE_LEQ(my_type) \
+    DECLARE_ONE_CMP(<, my_type)
+#define DECLARE_NEQ(my_type) \
+    DECLARE_ONE_CMP(!=, my_type)
+#define DECLARE_CMP(my_type) \
+    DECLARE_EQUAL(my_type) \
+    DECLARE_LEQ(my_type) \
+    DECLARE_NEQ(my_type)
+
+/**
+ * Awful hacky generation of the comparison operators by doing a lexicographic
  * comparison between the choosen fields.
  *
  * ```
@@ -15,12 +33,12 @@
  * }
  * ```
  */
-#define GENERATE_ONE_CMP(COMPARATOR, MY_TYPE, FIELDS...) \
+#define GENERATE_ONE_CMP(COMPARATOR, MY_TYPE, ...) \
     bool operator COMPARATOR(const MY_TYPE& other) const { \
-      const MY_TYPE* me = this; \
-      auto fields1 = std::make_tuple( FIELDS ); \
-      me = &other; \
-      auto fields2 = std::make_tuple( FIELDS ); \
+      __VA_OPT__(const MY_TYPE* me = this;) \
+      auto fields1 = std::make_tuple( __VA_ARGS__ ); \
+      __VA_OPT__(me = &other;) \
+      auto fields2 = std::make_tuple( __VA_ARGS__ ); \
       return fields1 COMPARATOR fields2; \
     }
 #define GENERATE_EQUAL(args...) GENERATE_ONE_CMP(==, args)
