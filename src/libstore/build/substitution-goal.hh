@@ -8,7 +8,7 @@ namespace nix {
 
 class Worker;
 
-struct SubstitutionGoal : public Goal
+struct PathSubstitutionGoal : public Goal
 {
     /* The store path that should be realised through a substitute. */
     // FIXME OwnedStorePathOrDesc storePath
@@ -44,15 +44,15 @@ struct SubstitutionGoal : public Goal
     std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions,
         maintainRunningSubstitutions, maintainExpectedNar, maintainExpectedDownload;
 
-    typedef void (SubstitutionGoal::*GoalState)();
+    typedef void (PathSubstitutionGoal::*GoalState)();
     GoalState state;
 
     /* Content address for recomputing store path */
     // TODO delete once `storePath` is variant.
     std::optional<StorePathDescriptor> ca;
 
-    SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<StorePathDescriptor> ca = std::nullopt);
-    ~SubstitutionGoal();
+    PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<StorePathDescriptor> ca = std::nullopt);
+    ~PathSubstitutionGoal();
 
     void timedOut(Error && ex) override { abort(); };
 

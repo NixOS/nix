@@ -114,7 +114,7 @@ static std::shared_ptr<Registry> getSystemRegistry()
 
 Path getUserRegistryPath()
 {
-    return getHome() + "/.config/nix/registry.json";
+    return getConfigDir() + "/nix/registry.json";
 }
 
 std::shared_ptr<Registry> getUserRegistry()

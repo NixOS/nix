@@ -5,19 +5,24 @@ R""(
 * Show what `nixpkgs` resolves to:
 
   ```console
-  # nix flake info nixpkgs
-  Resolved URL:  github:NixOS/nixpkgs
-  Locked URL:    github:NixOS/nixpkgs/b67ba0bfcc714453cdeb8d713e35751eb8b4c8f4
-  Description:   A collection of packages for the Nix package manager
-  Path:          /nix/store/23qapccs6cfmwwrlq8kr41vz5vdmns3r-source
-  Revision:      b67ba0bfcc714453cdeb8d713e35751eb8b4c8f4
-  Last modified: 2020-12-23 12:36:12
+  # nix flake metadata nixpkgs
+  Resolved URL:  github:edolstra/dwarffs
+  Locked URL:    github:edolstra/dwarffs/f691e2c991e75edb22836f1dbe632c40324215c5
+  Description:   A filesystem that fetches DWARF debug info from the Internet on demand
+  Path:          /nix/store/769s05vjydmc2lcf6b02az28wsa9ixh1-source
+  Revision:      f691e2c991e75edb22836f1dbe632c40324215c5
+  Last modified: 2021-01-21 15:41:26
+  Inputs:
+  ├───nix: github:NixOS/nix/6254b1f5d298ff73127d7b0f0da48f142bdc753c
+  │   ├───lowdown-src: github:kristapsdz/lowdown/1705b4a26fbf065d9574dce47a94e8c7c79e052f
+  │   └───nixpkgs: github:NixOS/nixpkgs/ad0d20345219790533ebe06571f82ed6b034db31
+  └───nixpkgs follows input 'nix/nixpkgs'
   ```
 
 * Show information about `dwarffs` in JSON format:
 
   ```console
-  # nix flake info dwarffs --json | jq .
+  # nix flake metadata dwarffs --json | jq .
   {
     "description": "A filesystem that fetches DWARF debug info from the Internet on demand",
     "lastModified": 1597153508,
@@ -29,6 +34,7 @@ R""(
       "rev": "d181d714fd36eb06f4992a1997cd5601e26db8f5",
       "type": "github"
     },
+    "locks": { ... },
     "original": {
       "id": "dwarffs",
       "type": "indirect"
@@ -75,6 +81,9 @@ data. This includes:
   time of the commit of the locked flake; for tarball flakes, it's the
   most recent timestamp of any file inside the tarball.
 
+* `Inputs`: The flake inputs with their corresponding lock file
+  entries.
+
 With `--json`, the output is a JSON object with the following fields:
 
 * `original` and `originalUrl`: The flake reference specified by the
@@ -95,5 +104,7 @@ With `--json`, the output is a JSON object with the following fields:
 * `revCount`: See `Revisions` above.
 
 * `lastModified`: See `Last modified` above.
+
+* `locks`: The contents of `flake.lock`.
 
 )""

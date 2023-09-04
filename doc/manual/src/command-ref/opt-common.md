@@ -134,15 +134,6 @@ Most Nix commands accept the following command-line options:
     failure in obtaining the substitutes to lead to a full build from
     source (with the related consumption of resources).
 
-  - `--no-build-hook`  
-    Disables the build hook mechanism. This allows to ignore remote
-    builders if they are setup on the machine.
-    
-    It's useful in cases where the bandwidth between the client and the
-    remote builder is too low. In that case it can take more time to
-    upload the sources to the remote builder and fetch back the result
-    than to do the computation locally.
-
   - `--readonly-mode`  
     When this option is used, no attempt is made to open the Nix
     database. Most Nix operations do need database access, so those

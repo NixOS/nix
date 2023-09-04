@@ -81,7 +81,7 @@ path installables are substituted.
 
 Unless `--no-link` is specified, after a successful build, it creates
 symlinks to the store paths of the installables. These symlinks have
-the prefix `./result` by default; this can be overriden using the
+the prefix `./result` by default; this can be overridden using the
 `--out-link` option. Each symlink has a suffix `-<N>-<outname>`, where
 *N* is the index of the installable (with the left-most installable
 having index 0), and *outname* is the symbolic derivation output name

@@ -2,6 +2,8 @@
 #include "globals.hh"
 #include "nar-info-disk-cache.hh"
 
+#include <atomic>
+
 namespace nix {
 
 struct LocalBinaryCacheStoreConfig : virtual BinaryCacheStoreConfig
@@ -50,7 +52,8 @@ protected:
         const std::string & mimeType) override
     {
         auto path2 = binaryCacheDir + "/" + path;
-        Path tmp = path2 + ".tmp." + std::to_string(getpid());
+        static std::atomic<int> counter{0};
+        Path tmp = fmt("%s.tmp.%d.%d", path2, getpid(), ++counter);
         AutoDelete del(tmp, false);
         StreamToSourceAdapter source(istream);
         writeFile(tmp, source);

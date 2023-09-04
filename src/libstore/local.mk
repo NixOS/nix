@@ -28,7 +28,7 @@ ifeq ($(OS), SunOS)
 endif
 
 ifeq ($(HAVE_SECCOMP), 1)
-	libstore_LDFLAGS += -lseccomp
+	libstore_LDFLAGS += $(LIBSECCOMP_LIBS)
 endif
 
 libstore_CXXFLAGS += \

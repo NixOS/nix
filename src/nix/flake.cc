@@ -43,12 +43,6 @@ public:
         return parseFlakeRef(flakeUrl, absPath(".")); //FIXME
     }
 
-    Flake getFlake()
-    {
-        auto evalState = getEvalState();
-        return flake::getFlake(*evalState, getFlakeRef(), lockFlags.useRegistries);
-    }
-
     LockedFlake lockFlake()
     {
         return flake::lockFlake(*getEvalState(), getFlakeRef(), lockFlags);
@@ -59,45 +53,6 @@ public:
         return getFlakeRef();
     }
 };
-
-static void printFlakeInfo(const Store & store, const Flake & flake)
-{
-    logger->cout("Resolved URL:  %s", flake.resolvedRef.to_string());
-    logger->cout("Locked URL:    %s", flake.lockedRef.to_string());
-    if (flake.description)
-        logger->cout("Description:   %s", *flake.description);
-    logger->cout("Path:          %s", store.printStorePath(
-        store.makeFixedOutputPathFromCA(flake.sourceInfo->storePath)));
-    if (auto rev = flake.lockedRef.input.getRev())
-        logger->cout("Revision:      %s", rev->to_string(Base16, false));
-    if (auto revCount = flake.lockedRef.input.getRevCount())
-        logger->cout("Revisions:     %s", *revCount);
-    if (auto lastModified = flake.lockedRef.input.getLastModified())
-        logger->cout("Last modified: %s",
-            std::put_time(std::localtime(&*lastModified), "%F %T"));
-}
-
-static nlohmann::json flakeToJSON(const Store & store, const Flake & flake)
-{
-    nlohmann::json j;
-    if (flake.description)
-        j["description"] = *flake.description;
-    j["originalUrl"] = flake.originalRef.to_string();
-    j["original"] = fetchers::attrsToJSON(flake.originalRef.toAttrs());
-    j["resolvedUrl"] = flake.resolvedRef.to_string();
-    j["resolved"] = fetchers::attrsToJSON(flake.resolvedRef.toAttrs());
-    j["url"] = flake.lockedRef.to_string(); // FIXME: rename to lockedUrl
-    j["locked"] = fetchers::attrsToJSON(flake.lockedRef.toAttrs());
-    if (auto rev = flake.lockedRef.input.getRev())
-        j["revision"] = rev->to_string(Base16, false);
-    if (auto revCount = flake.lockedRef.input.getRevCount())
-        j["revCount"] = *revCount;
-    if (auto lastModified = flake.lockedRef.input.getLastModified())
-        j["lastModified"] = *lastModified;
-    j["path"] = store.printStorePath(
-        store.makeFixedOutputPathFromCA(flake.sourceInfo->storePath));
-    return j;
-}
 
 struct CmdFlakeUpdate : FlakeCommand
 {
@@ -112,6 +67,7 @@ struct CmdFlakeUpdate : FlakeCommand
         removeFlag("recreate-lock-file");
         removeFlag("update-input");
         removeFlag("no-update-lock-file");
+        removeFlag("no-write-lock-file");
     }
 
     std::string doc() override
@@ -126,6 +82,7 @@ struct CmdFlakeUpdate : FlakeCommand
         settings.tarballTtl = 0;
 
         lockFlags.recreateLockFile = true;
+        lockFlags.writeLockFile = true;
 
         lockFlake();
     }
@@ -138,6 +95,12 @@ struct CmdFlakeLock : FlakeCommand
         return "create missing lock file entries";
     }
 
+    CmdFlakeLock()
+    {
+        /* Remove flags that don't make sense. */
+        removeFlag("no-write-lock-file");
+    }
+
     std::string doc() override
     {
         return
@@ -148,6 +111,8 @@ struct CmdFlakeLock : FlakeCommand
     void run(nix::ref<nix::Store> store) override
     {
         settings.tarballTtl = 0;
+
+        lockFlags.writeLockFile = true;
 
         lockFlake();
     }
@@ -167,54 +132,74 @@ static void enumerateOutputs(EvalState & state, Value & vFlake,
         callback(attr.name, *attr.value, *attr.pos);
 }
 
-struct CmdFlakeInfo : FlakeCommand, MixJSON
+struct CmdFlakeMetadata : FlakeCommand, MixJSON
 {
     std::string description() override
     {
-        return "list info about a given flake";
+        return "show flake metadata";
     }
 
     std::string doc() override
     {
         return
-          #include "flake-info.md"
+          #include "flake-metadata.md"
           ;
     }
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto flake = getFlake();
+        auto lockedFlake = lockFlake();
+        auto & flake = lockedFlake.flake;
 
         if (json) {
-            auto json = flakeToJSON(*store, flake);
-            logger->cout("%s", json.dump());
-        } else
-            printFlakeInfo(*store, flake);
-    }
-};
+            nlohmann::json j;
+            if (flake.description)
+                j["description"] = *flake.description;
+            j["originalUrl"] = flake.originalRef.to_string();
+            j["original"] = fetchers::attrsToJSON(flake.originalRef.toAttrs());
+            j["resolvedUrl"] = flake.resolvedRef.to_string();
+            j["resolved"] = fetchers::attrsToJSON(flake.resolvedRef.toAttrs());
+            j["url"] = flake.lockedRef.to_string(); // FIXME: rename to lockedUrl
+            j["locked"] = fetchers::attrsToJSON(flake.lockedRef.toAttrs());
+            if (auto rev = flake.lockedRef.input.getRev())
+                j["revision"] = rev->to_string(Base16, false);
+            if (auto revCount = flake.lockedRef.input.getRevCount())
+                j["revCount"] = *revCount;
+            if (auto lastModified = flake.lockedRef.input.getLastModified())
+                j["lastModified"] = *lastModified;
+            j["path"] = store->printStorePath(
+                store->makeFixedOutputPathFromCA(flake.sourceInfo->storePath));
+            j["locks"] = lockedFlake.lockFile.toJSON();
+            logger->cout("%s", j.dump());
+        } else {
+            logger->cout(
+                ANSI_BOLD "Resolved URL:" ANSI_NORMAL "  %s",
+                flake.resolvedRef.to_string());
+            logger->cout(
+                ANSI_BOLD "Locked URL:" ANSI_NORMAL "    %s",
+                flake.lockedRef.to_string());
+            if (flake.description)
+                logger->cout(
+                    ANSI_BOLD "Description:" ANSI_NORMAL "   %s",
+                    *flake.description);
+            logger->cout(
+                ANSI_BOLD "Path:" ANSI_NORMAL "          %s",
+                store->printStorePath(
+                    store->makeFixedOutputPathFromCA(flake.sourceInfo->storePath)));
+            if (auto rev = flake.lockedRef.input.getRev())
+                logger->cout(
+                    ANSI_BOLD "Revision:" ANSI_NORMAL "      %s",
+                    rev->to_string(Base16, false));
+            if (auto revCount = flake.lockedRef.input.getRevCount())
+                logger->cout(
+                    ANSI_BOLD "Revisions:" ANSI_NORMAL "     %s",
+                    *revCount);
+            if (auto lastModified = flake.lockedRef.input.getLastModified())
+                logger->cout(
+                    ANSI_BOLD "Last modified:" ANSI_NORMAL " %s",
+                    std::put_time(std::localtime(&*lastModified), "%F %T"));
 
-struct CmdFlakeListInputs : FlakeCommand, MixJSON
-{
-    std::string description() override
-    {
-        return "list flake inputs";
-    }
-
-    std::string doc() override
-    {
-        return
-          #include "flake-list-inputs.md"
-          ;
-    }
-
-    void run(nix::ref<nix::Store> store) override
-    {
-        auto flake = lockFlake();
-
-        if (json)
-            logger->cout("%s", flake.lockFile.toJSON());
-        else {
-            logger->cout("%s", flake.flake.lockedRef);
+            logger->cout(ANSI_BOLD "Inputs:" ANSI_NORMAL);
 
             std::unordered_set<std::shared_ptr<Node>> visited;
 
@@ -228,7 +213,7 @@ struct CmdFlakeListInputs : FlakeCommand, MixJSON
                     if (auto lockedNode = std::get_if<0>(&input.second)) {
                         logger->cout("%s" ANSI_BOLD "%s" ANSI_NORMAL ": %s",
                             prefix + (last ? treeLast : treeConn), input.first,
-                            *lockedNode ? (*lockedNode)->lockedRef : flake.flake.lockedRef);
+                            *lockedNode ? (*lockedNode)->lockedRef : flake.lockedRef);
 
                         bool firstVisit = visited.insert(*lockedNode).second;
 
@@ -241,9 +226,18 @@ struct CmdFlakeListInputs : FlakeCommand, MixJSON
                 }
             };
 
-            visited.insert(flake.lockFile.root);
-            recurse(*flake.lockFile.root, "");
+            visited.insert(lockedFlake.lockFile.root);
+            recurse(*lockedFlake.lockFile.root, "");
         }
+    }
+};
+
+struct CmdFlakeInfo : CmdFlakeMetadata
+{
+    void run(nix::ref<nix::Store> store) override
+    {
+        warn("'nix flake info' is a deprecated alias for 'nix flake metadata'");
+        CmdFlakeMetadata::run(store);
     }
 };
 
@@ -1044,8 +1038,8 @@ struct CmdFlake : NixMultiCommand
         : MultiCommand({
                 {"update", []() { return make_ref<CmdFlakeUpdate>(); }},
                 {"lock", []() { return make_ref<CmdFlakeLock>(); }},
+                {"metadata", []() { return make_ref<CmdFlakeMetadata>(); }},
                 {"info", []() { return make_ref<CmdFlakeInfo>(); }},
-                {"list-inputs", []() { return make_ref<CmdFlakeListInputs>(); }},
                 {"check", []() { return make_ref<CmdFlakeCheck>(); }},
                 {"init", []() { return make_ref<CmdFlakeInit>(); }},
                 {"new", []() { return make_ref<CmdFlakeNew>(); }},

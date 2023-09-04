@@ -11,7 +11,7 @@ export NIX_LOCALSTATE_DIR=$TEST_ROOT/var
 export NIX_LOG_DIR=$TEST_ROOT/var/log/nix
 export NIX_STATE_DIR=$TEST_ROOT/var/nix
 export NIX_CONF_DIR=$TEST_ROOT/etc
-export NIX_DAEMON_SOCKET_PATH=$TEST_ROOT/daemon-socket
+export NIX_DAEMON_SOCKET_PATH=$TEST_ROOT/dSocket
 unset NIX_USER_CONF_FILES
 export _NIX_TEST_SHARED=$TEST_ROOT/shared
 if [[ -n $NIX_STORE ]]; then
@@ -29,6 +29,12 @@ unset XDG_CACHE_HOME
 mkdir -p $TEST_HOME
 
 export PATH=@bindir@:$PATH
+if [[ -n "${NIX_CLIENT_PACKAGE:-}" ]]; then
+  export PATH="$NIX_CLIENT_PACKAGE/bin":$PATH
+fi
+if [[ -n "${NIX_DAEMON_PACKAGE:-}" ]]; then
+  export NIX_DAEMON_COMMAND="$NIX_DAEMON_PACKAGE/bin/nix-daemon"
+fi
 coreutils=@coreutils@
 
 export dot=@dot@
@@ -57,7 +63,6 @@ clearStore() {
     mkdir "$NIX_STORE_DIR"
     rm -rf "$NIX_STATE_DIR"
     mkdir "$NIX_STATE_DIR"
-    nix-store --init
     clearProfiles
 }
 
@@ -73,7 +78,7 @@ startDaemon() {
     # Start the daemon, wait for the socket to appear.  !!!
     # ‘nix-daemon’ should have an option to fork into the background.
     rm -f $NIX_STATE_DIR/daemon-socket/socket
-    nix daemon &
+    ${NIX_DAEMON_COMMAND:-nix daemon} &
     for ((i = 0; i < 30; i++)); do
         if [ -e $NIX_DAEMON_SOCKET_PATH ]; then break; fi
         sleep 1

@@ -22,26 +22,23 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
 
     Sync<State> state_(State{0, paths_, 0});
 
-    std::function<void(const Path &)> enqueue;
+    std::function<void(const StorePath &)> enqueue;
 
     std::condition_variable done;
 
-    enqueue = [&](const Path & path) -> void {
+    enqueue = [&](const StorePath & path) -> void {
         {
             auto state(state_.lock());
             if (state->exc) return;
-            if (!state->paths.insert(parseStorePath(path)).second) return;
+            if (!state->paths.insert(path).second) return;
             state->pending++;
         }
 
-        auto p = parseStorePath(path);
-        queryPathInfo(p, {[&, pathS(path)](std::future<ref<const ValidPathInfo>> fut) {
+        queryPathInfo(path, {[&](std::future<ref<const ValidPathInfo>> fut) {
             // FIXME: calls to isValidPath() should be async
 
             try {
                 auto info = fut.get();
-
-                auto path = parseStorePath(pathS);
 
                 if (flipDirection) {
 
@@ -49,28 +46,28 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
                     queryReferrers(path, referrers);
                     for (auto & ref : referrers)
                         if (ref != path)
-                            enqueue(printStorePath(ref));
+                            enqueue(ref);
 
                     if (includeOutputs)
                         for (auto & i : queryValidDerivers(path))
-                            enqueue(printStorePath(i));
+                            enqueue(i);
 
                     if (includeDerivers && path.isDerivation())
                         for (auto & i : queryDerivationOutputs(path))
                             if (isValidPath(i) && queryPathInfo(i)->deriver == path)
-                                enqueue(printStorePath(i));
+                                enqueue(i);
 
                 } else {
 
                     for (auto & ref : info->references)
-                        enqueue(printStorePath(ref));
+                        enqueue(ref);
 
                     if (includeOutputs && path.isDerivation())
                         for (auto & i : queryDerivationOutputs(path))
-                            if (isValidPath(i)) enqueue(printStorePath(i));
+                            if (isValidPath(i)) enqueue(i);
 
                     if (includeDerivers && info->deriver && isValidPath(*info->deriver))
-                        enqueue(printStorePath(*info->deriver));
+                        enqueue(*info->deriver);
 
                 }
 
@@ -90,7 +87,7 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
     };
 
     for (auto & startPath : startPaths)
-        enqueue(printStorePath(startPath));
+        enqueue(startPath);
 
     {
         auto state(state_.lock());
@@ -164,12 +161,9 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
     };
 
     auto checkOutput = [&](
-        const Path & drvPathS, ref<Derivation> drv, const Path & outPathS, ref<Sync<DrvState>> drvState_)
+        const StorePath & drvPath, ref<Derivation> drv, const StorePath & outPath, ref<Sync<DrvState>> drvState_)
     {
         if (drvState_->lock()->done) return;
-
-        auto drvPath = parseStorePath(drvPathS);
-        auto outPath = parseStorePath(outPathS);
 
         SubstitutablePathInfos infos;
         auto caOpt = getDerivationCA(*drv);
@@ -211,7 +205,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
                 return;
             }
 
-            PathSet invalid;
+            StorePathSet invalid;
             /* true for regular derivations, and CA derivations for which we
                have a trust mapping for all wanted outputs. */
             auto knownOutputPaths = true;
@@ -221,7 +215,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
                     break;
                 }
                 if (wantOutput(outputName, path.outputs) && !isValidPath(*pathOpt))
-                    invalid.insert(printStorePath(*pathOpt));
+                    invalid.insert(*pathOpt);
             }
             if (knownOutputPaths && invalid.empty()) return;
 
@@ -231,7 +225,7 @@ void Store::queryMissing(const std::vector<StorePathWithOutputs> & targets,
             if (knownOutputPaths && settings.useSubstitutes && parsedDrv.substitutesAllowed()) {
                 auto drvState = make_ref<Sync<DrvState>>(DrvState(invalid.size()));
                 for (auto & output : invalid)
-                    pool.enqueue(std::bind(checkOutput, printStorePath(path.path), drv, output, drvState));
+                    pool.enqueue(std::bind(checkOutput, path.path, drv, output, drvState));
             } else
                 mustBuildDrv(path.path, *drv);
 

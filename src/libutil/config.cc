@@ -20,7 +20,7 @@ bool Config::set(const std::string & name, const std::string & value)
             return false;
     }
     i->second.setting->set(value, append);
-    i->second.setting->overriden = true;
+    i->second.setting->overridden = true;
     return true;
 }
 
@@ -35,7 +35,7 @@ void Config::addSetting(AbstractSetting * setting)
     auto i = unknownSettings.find(setting->name);
     if (i != unknownSettings.end()) {
         setting->set(i->second);
-        setting->overriden = true;
+        setting->overridden = true;
         unknownSettings.erase(i);
         set = true;
     }
@@ -48,7 +48,7 @@ void Config::addSetting(AbstractSetting * setting)
                     alias, setting->name);
             else {
                 setting->set(i->second);
-                setting->overriden = true;
+                setting->overridden = true;
                 unknownSettings.erase(i);
                 set = true;
             }
@@ -69,10 +69,10 @@ void AbstractConfig::reapplyUnknownSettings()
         set(s.first, s.second);
 }
 
-void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly)
+void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly)
 {
     for (auto & opt : _settings)
-        if (!opt.second.isAlias && (!overridenOnly || opt.second.setting->overriden))
+        if (!opt.second.isAlias && (!overriddenOnly || opt.second.setting->overridden))
             res.emplace(opt.first, SettingInfo{opt.second.setting->to_string(), opt.second.setting->description});
 }
 
@@ -136,10 +136,10 @@ void AbstractConfig::applyConfigFile(const Path & path)
     } catch (SysError &) { }
 }
 
-void Config::resetOverriden()
+void Config::resetOverridden()
 {
     for (auto & s : _settings)
-        s.second.setting->overriden = false;
+        s.second.setting->overridden = false;
 }
 
 nlohmann::json Config::toJSON()
@@ -169,7 +169,7 @@ AbstractSetting::AbstractSetting(
 
 void AbstractSetting::setDefault(const std::string & str)
 {
-    if (!overriden) set(str);
+    if (!overridden) set(str);
 }
 
 nlohmann::json AbstractSetting::toJSON()
@@ -203,7 +203,7 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
         .description = fmt("Set the `%s` setting.", name),
         .category = category,
         .labels = {"value"},
-        .handler = {[=](std::string s) { overriden = true; set(s); }},
+        .handler = {[=](std::string s) { overridden = true; set(s); }},
     });
 
     if (isAppendable())
@@ -212,7 +212,7 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
             .description = fmt("Append to the `%s` setting.", name),
             .category = category,
             .labels = {"value"},
-            .handler = {[=](std::string s) { overriden = true; set(s, true); }},
+            .handler = {[=](std::string s) { overridden = true; set(s, true); }},
         });
 }
 
@@ -365,16 +365,16 @@ bool GlobalConfig::set(const std::string & name, const std::string & value)
     return false;
 }
 
-void GlobalConfig::getSettings(std::map<std::string, SettingInfo> & res, bool overridenOnly)
+void GlobalConfig::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly)
 {
     for (auto & config : *configRegistrations)
-        config->getSettings(res, overridenOnly);
+        config->getSettings(res, overriddenOnly);
 }
 
-void GlobalConfig::resetOverriden()
+void GlobalConfig::resetOverridden()
 {
     for (auto & config : *configRegistrations)
-        config->resetOverriden();
+        config->resetOverridden();
 }
 
 nlohmann::json GlobalConfig::toJSON()

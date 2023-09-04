@@ -24,7 +24,7 @@ R""(
 
 This command creates a flake in the current directory by copying the
 files of a template. It will not overwrite existing files. The default
-template is `templates#defaultTemplate`, but this can be overriden
+template is `templates#defaultTemplate`, but this can be overridden
 using `-t`.
 
 # Template definitions

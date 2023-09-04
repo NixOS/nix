@@ -111,10 +111,11 @@ MixFlakeOptions::MixFlakeOptions()
 
     addFlag({
         .longName = "override-input",
-        .description = "Override a specific flake input (e.g. `dwarffs/nixpkgs`).",
+        .description = "Override a specific flake input (e.g. `dwarffs/nixpkgs`). This implies `--no-write-lock-file`.",
         .category = category,
         .labels = {"input-path", "flake-url"},
         .handler = {[&](std::string inputPath, std::string flakeRef) {
+            lockFlags.writeLockFile = false;
             lockFlags.inputOverrides.insert_or_assign(
                 flake::parseInputPath(inputPath),
                 parseFlakeRef(flakeRef, absPath(".")));
@@ -278,6 +279,12 @@ ref<EvalState> EvalCommand::getEvalState()
     if (!evalState)
         evalState = std::make_shared<EvalState>(searchPath, getStore());
     return ref<EvalState>(evalState);
+}
+
+EvalCommand::~EvalCommand()
+{
+    if (evalState)
+        evalState->printStats();
 }
 
 void completeFlakeRef(ref<Store> store, std::string_view prefix)

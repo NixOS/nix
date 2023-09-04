@@ -5,20 +5,20 @@
 
 namespace nix {
 
-SubstitutionGoal::SubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<StorePathDescriptor> ca)
+PathSubstitutionGoal::PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<StorePathDescriptor> ca)
     : Goal(worker)
     , storePath(storePath)
     , repair(repair)
     , ca(ca)
 {
-    state = &SubstitutionGoal::init;
+    state = &PathSubstitutionGoal::init;
     name = fmt("substitution of '%s'", worker.store.printStorePath(this->storePath));
     trace("created");
     maintainExpectedSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.expectedSubstitutions);
 }
 
 
-SubstitutionGoal::~SubstitutionGoal()
+PathSubstitutionGoal::~PathSubstitutionGoal()
 {
     try {
         if (thr.joinable()) {
@@ -32,13 +32,13 @@ SubstitutionGoal::~SubstitutionGoal()
 }
 
 
-void SubstitutionGoal::work()
+void PathSubstitutionGoal::work()
 {
     (this->*state)();
 }
 
 
-void SubstitutionGoal::init()
+void PathSubstitutionGoal::init()
 {
     trace("init");
 
@@ -59,7 +59,7 @@ void SubstitutionGoal::init()
 }
 
 
-void SubstitutionGoal::tryNext()
+void PathSubstitutionGoal::tryNext()
 {
     trace("trying next substituter");
 
@@ -143,7 +143,7 @@ void SubstitutionGoal::tryNext()
     /* Bail out early if this substituter lacks a valid
        signature. LocalStore::addToStore() also checks for this, but
        only after we've downloaded the path. */
-    if (!sub->isTrusted && worker.store.pathInfoIsTrusted(*info))
+    if (!sub->isTrusted && worker.store.pathInfoIsUntrusted(*info))
     {
         warn("substituter '%s' does not have a valid signature for path '%s'",
             sub->getUri(), worker.store.printStorePath(storePath));
@@ -154,16 +154,16 @@ void SubstitutionGoal::tryNext()
     /* To maintain the closure invariant, we first have to realise the
        paths referenced by this one. */
     for (auto & i : info->references)
-        addWaitee(worker.makeSubstitutionGoal(i));
+        addWaitee(worker.makePathSubstitutionGoal(i));
 
     if (waitees.empty()) /* to prevent hang (no wake-up event) */
         referencesValid();
     else
-        state = &SubstitutionGoal::referencesValid;
+        state = &PathSubstitutionGoal::referencesValid;
 }
 
 
-void SubstitutionGoal::referencesValid()
+void PathSubstitutionGoal::referencesValid()
 {
     trace("all references realised");
 
@@ -176,12 +176,12 @@ void SubstitutionGoal::referencesValid()
     for (auto & i : info->references)
         assert(worker.store.isValidPath(i));
 
-    state = &SubstitutionGoal::tryToRun;
+    state = &PathSubstitutionGoal::tryToRun;
     worker.wakeUp(shared_from_this());
 }
 
 
-void SubstitutionGoal::tryToRun()
+void PathSubstitutionGoal::tryToRun()
 {
     trace("trying to run");
 
@@ -222,11 +222,11 @@ void SubstitutionGoal::tryToRun()
 
     worker.childStarted(shared_from_this(), {outPipe.readSide.get()}, true, false);
 
-    state = &SubstitutionGoal::finished;
+    state = &PathSubstitutionGoal::finished;
 }
 
 
-void SubstitutionGoal::finished()
+void PathSubstitutionGoal::finished()
 {
     trace("substitute finished");
 
@@ -250,7 +250,7 @@ void SubstitutionGoal::finished()
         }
 
         /* Try the next substitute. */
-        state = &SubstitutionGoal::tryNext;
+        state = &PathSubstitutionGoal::tryNext;
         worker.wakeUp(shared_from_this());
         return;
     }
@@ -279,12 +279,12 @@ void SubstitutionGoal::finished()
 }
 
 
-void SubstitutionGoal::handleChildOutput(int fd, const string & data)
+void PathSubstitutionGoal::handleChildOutput(int fd, const string & data)
 {
 }
 
 
-void SubstitutionGoal::handleEOF(int fd)
+void PathSubstitutionGoal::handleEOF(int fd)
 {
     if (fd == outPipe.readSide.get()) worker.wakeUp(shared_from_this());
 }

@@ -61,7 +61,9 @@ testNixCommand () {
 
 # Disabled until we have it properly working
 # testRemoteCache
+clearStore
 testDeterministicCA
+clearStore
 testCutoff
 testGC
 testNixCommand

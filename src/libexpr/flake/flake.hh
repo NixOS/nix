@@ -113,7 +113,7 @@ struct LockFlags
     /* Whether to commit changes to flake.lock. */
     bool commitLockFile = false;
 
-    /* Flake inputs to be overriden. */
+    /* Flake inputs to be overridden. */
     std::map<InputPath, FlakeRef> inputOverrides;
 
     /* Flake inputs to be updated. This means that any existing lock
