@@ -1,7 +1,15 @@
 source common.sh
 
 flakeDir=$TEST_ROOT/flake3
-mkdir -p $flakeDir
+depDir=$TEST_ROOT/flakedep
+mkdir -p $flakeDir $depDir
+
+cat > $depDir/flake.nix <<EOF
+{
+  outputs = { ... }: {
+  };
+}
+EOF
 
 cat > $flakeDir/flake.nix <<EOF
 {
@@ -89,3 +97,40 @@ nix flake check $flakeDir
 checkRes=$(nix flake check --all-systems --keep-going $flakeDir 2>&1 && fail "nix flake check --all-systems should have failed" || true)
 echo "$checkRes" | grepQuiet "packages.system-1.default"
 echo "$checkRes" | grepQuiet "packages.system-2.default"
+
+cat > $flakeDir/flake.nix <<EOF
+{
+  inputs = {
+    dep.url = "$depDir";
+  };
+  outputs = { self, dep }: {
+  };
+}
+EOF
+
+nix flake check $flakeDir
+
+cat > $flakeDir/flake.nix <<EOF
+{
+  inputs = {
+    self.url = "$depDir";
+  };
+  outputs = { self }: {
+  };
+}
+EOF
+
+expectStderr 1 nix flake check $flakeDir | grep -F "flake input name 'self' is reserved"
+
+
+cat > $flakeDir/flake.nix <<EOF
+{
+  inputs = {
+    meta.url = "$depDir";
+  };
+  outputs = args@{ self, ... }: {
+  };
+}
+EOF
+
+expectStderr 1 nix flake check $flakeDir | grep -F "flake input name 'meta' is reserved"
