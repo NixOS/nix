@@ -32,6 +32,10 @@
 - Introduce a new [`outputOf`](@docroot@/language/builtins.md#builtins-outputOf) builtin.
   It is part of the [`dynamic-derivations`](@docroot@/contributing/experimental-features.md#xp-feature-dynamic-derivations) experimental feature.
 
+- The flake output function now accepts a parameter `meta`, which gives access to `sourceInfo` and such parameters in a robust manner, even when `self` can not be evaluated. This helps frameworks report error messages with locations, as trying to access the location previously resulted in an unhelpful infinite recursion when the error condition caused `self` to fail.
+
+  If an `outputs` function has a binding for all attributes (using `@`), you will be asked to add an ellipsis to avoid later confusion as to why `meta` is missing - which is necessary because of a limitation of Nix function semantics. This warning may occur in a dependency.
+
 - Flake follow paths at depths greater than 2 are now handled correctly, preventing "follows a non-existent input" errors.
 
 - [`nix-store --query`](@docroot@/command-ref/nix-store/query.md) gained a new type of query: `--valid-derivers`. It returns all `.drv` files in the local store that *can be* used to build the output passed in argument.

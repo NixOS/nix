@@ -134,3 +134,33 @@ cat > $flakeDir/flake.nix <<EOF
 EOF
 
 expectStderr 1 nix flake check $flakeDir | grep -F "flake input name 'meta' is reserved"
+
+
+cat > $flakeDir/flake.nix <<EOF
+{
+  inputs = {
+  };
+  outputs = args@{ self }:
+    # args won't have meta, as required by function semantics, but it is rather unfortunate, so Nix should warn about it.
+    assert !args?meta; # implied by function semantics
+    {
+    };
+}
+EOF
+
+nix flake check $flakeDir 2>&1 | grep -F "Please add ellipsis"
+
+
+cat > $flakeDir/flake.nix <<EOF
+{
+  inputs = {
+  };
+  outputs = args:
+    assert args?meta;
+    assert args?self;
+    {
+    };
+}
+EOF
+
+nix flake check $flakeDir 2>&1 | grep -v "Please add ellipsis"

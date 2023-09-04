@@ -2,6 +2,10 @@ lockFileStr: rootSrc: rootSubdir:
 
 let
 
+  warn = msg: builtins.trace "${emphasize "warning"}: ${msg}";
+  emphasize = x: "[1;35m${x}[0m";
+  optional = cond: thing: if cond then [ thing ] else [];
+
   lockFile = builtins.fromJSON lockFileStr;
 
   allNodes =
@@ -66,7 +70,24 @@ let
           };
 
           # NB: `attrNames arguments` must be lazy in `outputs` (tested).
-          arguments = inputs // extraArguments;
+          arguments = inputs // extraArgumentsCompat;
+
+          # Find out if we have a conflict between a missing meta argument and the need for `meta` attr to be added to the @ binding.
+          # If possible, fix it up without complaining.
+          extraArgumentsCompat = builtins.removeAttrs extraArguments (
+            let
+              # NB: some of these builtins can return null, hence the ==
+              isClosed = builtins.functionOpen flake.outputs == false;
+              acceptsMeta = !isClosed || (builtins.functionArgs flake.outputs)?meta;
+              canRemove = isClosed && (builtins.functionBindsAllAttrs flake.outputs == false);
+
+              removals = if acceptsMeta then [] else [ "meta" ];
+              checked = if !acceptsMeta && !canRemove then warning else x: x;
+              warning = warn
+                "in flake ${toString outPath}: The flake's ${emphasize "outputs"} function does not accept the ${emphasize "meta"} argument.\nThis will become an error.\nPlease add ellipsis (${emphasize "..."}) to the function header for it to be compatible with both dated and upcoming versions of Flakes. Example use of ellipsis: ${emphasize "outputs = { self, ... }: "}.";
+            in
+              checked removals
+          );
 
           extraArguments = {
             self = result;
