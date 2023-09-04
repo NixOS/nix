@@ -93,13 +93,11 @@ public:
 
     std::string gitRev() const
     {
-        assert(type == htSHA1);
         return to_string(Base16, false);
     }
 
     std::string gitShortRev() const
     {
-        assert(type == htSHA1);
         return std::string(to_string(Base16, false), 0, 7);
     }
 

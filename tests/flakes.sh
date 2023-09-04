@@ -376,6 +376,9 @@ cat > $templatesDir/flake.nix <<EOF
       trivial = {
         path = ./trivial;
         description = "A trivial flake";
+        welcomeText = ''
+            Welcome to my trivial flake
+        '';
       };
       default = trivial;
     };

@@ -90,6 +90,7 @@ perl/Makefile.config
 
 /misc/systemd/nix-daemon.service
 /misc/systemd/nix-daemon.socket
+/misc/systemd/nix-daemon.conf
 /misc/upstart/nix-daemon.conf
 
 /src/resolve-system-dependencies/resolve-system-dependencies

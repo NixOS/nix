@@ -423,6 +423,18 @@ EOF
         fi
     done
 
+    if [ "$(uname -s)" = "Linux" ] && [ ! -e /run/systemd/system ]; then
+        warning <<EOF
+We did not detect systemd on your system. With a multi-user install
+without systemd you will have to manually configure your init system to
+launch the Nix daemon after installation.
+EOF
+        if ! ui_confirm "Do you want to proceed with a multi-user installation?"; then
+            failure <<EOF
+You have aborted the installation.
+EOF
+        fi
+    fi
 }
 
 setup_report() {

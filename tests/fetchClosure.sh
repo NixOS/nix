@@ -56,3 +56,15 @@ nix copy --to file://$cacheDir $caPath
     fromPath = $caPath;
   }
 ") = $caPath ]]
+
+# Check that URL query parameters aren't allowed.
+clearStore
+narCache=$TEST_ROOT/nar-cache
+rm -rf $narCache
+(! nix eval -v --raw --expr "
+  builtins.fetchClosure {
+    fromStore = \"file://$cacheDir?local-nar-cache=$narCache\";
+    fromPath = $caPath;
+  }
+")
+(! [ -e $narCache ])

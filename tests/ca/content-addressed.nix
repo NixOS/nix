@@ -64,8 +64,7 @@ rec {
   dependentFixedOutput = mkDerivation {
     name = "dependent-fixed-output";
     outputHashMode = "recursive";
-    outputHashAlgo = "sha256";
-    outputHash = "sha256-QvtAMbUl/uvi+LCObmqOhvNOapHdA2raiI4xG5zI5pA=";
+    outputHash = "sha512-7aJcmSuEuYP5tGKcmGY8bRr/lrCjJlOxP2mIUjO/vMQeg6gx/65IbzRWES8EKiPDOs9z+wF30lEfcwxM/cT4pw==";
     buildCommand = ''
       cat ${dependentCA}/dep
       echo foo > $out

@@ -1,4 +1,4 @@
-# Release X.Y (2022-03-07)
+# Release 2.7 (2022-03-07)
 
 * Nix will now make some helpful suggestions when you mistype
   something on the command line. For instance, if you type `nix build

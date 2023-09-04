@@ -29,9 +29,7 @@ static std::string readHead(const Path & path)
 
 static bool isNotDotGitDirectory(const Path & path)
 {
-    static const std::regex gitDirRegex("^(?:.*/)?\\.git$");
-
-    return not std::regex_match(path, gitDirRegex);
+    return baseNameOf(path) != ".git";
 }
 
 struct GitInputScheme : InputScheme
@@ -205,16 +203,28 @@ struct GitInputScheme : InputScheme
             ? FileIngestionMethod::Git
             : FileIngestionMethod::Recursive;
 
+        auto checkHashType = [&](const std::optional<Hash> & hash)
+        {
+            if (hash.has_value() && !(hash->type == htSHA1 || hash->type == htSHA256))
+                throw Error("Hash '%s' is not supported by Git. Supported types are sha1 and sha256.", hash->to_string(Base16, true));
+        };
+
         auto getLockedAttrs = [&]()
         {
             Attrs attrs({
                 {"type", cacheType},
                 {"name", name},
             });
-            if (input.getTreeHash())
-                attrs.insert_or_assign("treeHash", input.getTreeHash()->gitRev());
-            if (input.getRev())
-                attrs.insert_or_assign("rev", input.getRev()->gitRev());
+            if (auto optH = input.getTreeHash()) {
+                auto h = *std::move(optH);
+                checkHashType(h);
+                attrs.insert_or_assign("treeHash", h.gitRev());
+            }
+            if (auto optH = input.getRev()) {
+                auto h = *std::move(optH);
+                checkHashType(h);
+                attrs.insert_or_assign("rev", h.gitRev());
+            }
             if (maybeGetBoolAttr(input.attrs, "gitIngestion").value_or((bool) input.getTreeHash()))
                 attrs.insert_or_assign("gitIngestion", true);
             return attrs;
@@ -309,9 +319,11 @@ struct GitInputScheme : InputScheme
                 auto files = tokenizeString<std::set<std::string>>(
                     runProgram("git", true, gitOpts), "\0"s);
 
+                Path actualPath(absPath(actualUrl));
+
                 PathFilter filter = [&](const Path & p) -> bool {
-                    assert(hasPrefix(p, actualUrl));
-                    std::string file(p, actualUrl.size() + 1);
+                    assert(hasPrefix(p, actualPath));
+                    std::string file(p, actualPath.size() + 1);
 
                     auto st = lstat(p);
 
@@ -324,7 +336,7 @@ struct GitInputScheme : InputScheme
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore(input.getName(), actualUrl, ingestionMethod, htSHA256, filter);
+                auto storePath = store->addToStore(input.getName(), actualPath, ingestionMethod, htSHA256, filter);
                 // FIXME: just have Store::addToStore return a StorePathDescriptor, as
                 // it has the underlying information.
                 auto storePathDesc = store->queryPathInfo(storePath)->fullStorePathDescriptorOpt().value();
@@ -333,7 +345,7 @@ struct GitInputScheme : InputScheme
                 // modified dirty file?
                 input.attrs.insert_or_assign(
                     "lastModified",
-                    hasHead ? std::stoull(runProgram("git", true, { "-C", actualUrl, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
+                    hasHead ? std::stoull(runProgram("git", true, { "-C", actualPath, "log", "-1", "--format=%ct", "--no-show-signature", "HEAD" })) : 0);
 
                 return {std::move(storePathDesc), input};
             }

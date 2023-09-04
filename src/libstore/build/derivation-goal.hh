@@ -57,6 +57,11 @@ struct DerivationGoal : public Goal
        them. */
     StringSet wantedOutputs;
 
+    /* Mapping from input derivations + output names to actual store
+       paths. This is filled in by waiteeDone() as each dependency
+       finishes, before inputsRealised() is reached, */
+    std::map<std::pair<StorePath, std::string>, StorePath> inputDrvOutputs;
+
     /* Whether additional wanted outputs have been added. */
     bool needRestart = false;
 
@@ -223,6 +228,8 @@ struct DerivationGoal : public Goal
         BuildResult::Status status,
         DrvOutputs builtOutputs = {},
         std::optional<Error> ex = {});
+
+    void waiteeDone(GoalPtr waitee, ExitCode result) override;
 
     StorePathSet exportReferences(const StorePathSet & storePaths);
 };

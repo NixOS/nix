@@ -178,7 +178,7 @@ namespace nix {
     }
 
     TEST(parseURL, parseFileURLWithQueryAndFragment) {
-        auto s = "file:///none/of/your/business";
+        auto s = "file:///none/of//your/business";
         auto parsed = parseURL(s);
 
         ParsedURL expected {
@@ -186,7 +186,7 @@ namespace nix {
             .base = "",
             .scheme = "file",
             .authority = "",
-            .path = "/none/of/your/business",
+            .path = "/none/of//your/business",
             .query = (StringMap) { },
             .fragment = "",
         };

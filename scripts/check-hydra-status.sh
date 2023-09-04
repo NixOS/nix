@@ -14,7 +14,7 @@ curl -sS -H 'Accept: application/json' https://hydra.nixos.org/jobset/nix/master
 someBuildFailed=0
 
 for buildId in $BUILDS_FOR_LATEST_EVAL; do
-  buildInfo=$(curl -sS -H 'Accept: application/json' "https://hydra.nixos.org/build/$buildId")
+  buildInfo=$(curl --fail -sS -H 'Accept: application/json' "https://hydra.nixos.org/build/$buildId")
 
   finished=$(echo "$buildInfo" | jq -r '.finished')
 

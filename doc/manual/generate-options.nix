@@ -6,7 +6,8 @@ options:
 concatStrings (map
   (name:
     let option = options.${name}; in
-    "  - `${name}`  \n\n"
+    "  - [`${name}`](#conf-${name})"
+    + "<p id=\"conf-${name}\"></p>\n\n"
     + concatStrings (map (s: "    ${s}\n") (splitLines option.description)) + "\n\n"
     + (if option.documentDefault
        then "    **Default:** " + (

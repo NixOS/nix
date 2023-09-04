@@ -24,9 +24,16 @@ PathSubstitutionGoal::~PathSubstitutionGoal()
 }
 
 
-void PathSubstitutionGoal::done(ExitCode result, BuildResult::Status status)
+void PathSubstitutionGoal::done(
+    ExitCode result,
+    BuildResult::Status status,
+    std::optional<std::string> errorMsg)
 {
     buildResult.status = status;
+    if (errorMsg) {
+        debug(*errorMsg);
+        buildResult.errorMsg = *errorMsg;
+    }
     amDone(result);
 }
 
@@ -67,12 +74,14 @@ void PathSubstitutionGoal::tryNext()
     if (subs.size() == 0) {
         /* None left.  Terminate this goal and let someone else deal
            with it. */
-        debug("path '%s' is required, but there is no substituter that can build it", worker.store.printStorePath(storePath));
 
         /* Hack: don't indicate failure if there were no substituters.
            In that case the calling derivation should just do a
            build. */
-        done(substituterFailed ? ecFailed : ecNoSubstituters, BuildResult::NoSubstituters);
+        done(
+            substituterFailed ? ecFailed : ecNoSubstituters,
+            BuildResult::NoSubstituters,
+            fmt("path '%s' is required, but there is no substituter that can build it", worker.store.printStorePath(storePath)));
 
         if (substituterFailed) {
             worker.failedSubstitutions++;
@@ -169,10 +178,10 @@ void PathSubstitutionGoal::referencesValid()
     trace("all references realised");
 
     if (nrFailed > 0) {
-        debug("some references of path '%s' could not be realised", worker.store.printStorePath(storePath));
         done(
             nrNoSubstituters > 0 || nrIncompleteClosure > 0 ? ecIncompleteClosure : ecFailed,
-            BuildResult::DependencyFailed);
+            BuildResult::DependencyFailed,
+            fmt("some references of path '%s' could not be realised", worker.store.printStorePath(storePath)));
         return;
     }
 

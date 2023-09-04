@@ -38,9 +38,12 @@ void runProgramInStore(ref<Store> store,
        unshare(CLONE_NEWUSER) doesn't work in a multithreaded program
        (which "nix" is), so we exec() a single-threaded helper program
        (chrootHelper() below) to do the work. */
-    auto store2 = store.dynamic_pointer_cast<LocalStore>();
+    auto store2 = store.dynamic_pointer_cast<LocalFSStore>();
 
-    if (store2 && store->storeDir != store2->getRealStoreDir()) {
+    if (!store2)
+        throw Error("store '%s' is not a local store so it does not support command execution", store->getUri());
+
+    if (store->storeDir != store2->getRealStoreDir()) {
         Strings helperArgs = { chrootHelperName, store->storeDir, store2->getRealStoreDir(), program };
         for (auto & arg : args) helperArgs.push_back(arg);
 
@@ -179,6 +182,7 @@ struct CmdRun : InstallableCommand
     {
         auto state = getEvalState();
 
+        lockFlags.applyNixConfig = true;
         auto app = installable->toApp(*state).resolve(getEvalStore(), store);
 
         Strings allArgs{app.program};

@@ -24,12 +24,12 @@ std::string formatProtocol(unsigned int proto)
 }
 
 bool checkPass(const std::string & msg) {
-    logger->log(ANSI_GREEN "[PASS] " ANSI_NORMAL + msg);
+    notice(ANSI_GREEN "[PASS] " ANSI_NORMAL + msg);
     return true;
 }
 
 bool checkFail(const std::string & msg) {
-    logger->log(ANSI_RED "[FAIL] " ANSI_NORMAL + msg);
+    notice(ANSI_RED "[FAIL] " ANSI_NORMAL + msg);
     return false;
 }
 

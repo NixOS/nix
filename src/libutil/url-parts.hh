@@ -18,7 +18,7 @@ const static std::string userRegex = "(?:(?:" + unreservedRegex + "|" + pctEncod
 const static std::string authorityRegex = "(?:" + userRegex + "@)?" + hostRegex + "(?::[0-9]+)?";
 const static std::string pcharRegex = "(?:" + unreservedRegex + "|" + pctEncoded + "|" + subdelimsRegex + "|[:@])";
 const static std::string queryRegex = "(?:" + pcharRegex + "|[/? \"])*";
-const static std::string segmentRegex = "(?:" + pcharRegex + "+)";
+const static std::string segmentRegex = "(?:" + pcharRegex + "*)";
 const static std::string absPathRegex = "(?:(?:/" + segmentRegex + ")*/?)";
 const static std::string pathRegex = "(?:" + segmentRegex + "(?:/" + segmentRegex + ")*/?)";
 

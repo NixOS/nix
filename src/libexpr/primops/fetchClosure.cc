@@ -61,6 +61,12 @@ static void prim_fetchClosure(EvalState & state, const Pos & pos, Value * * args
             .errPos = pos
         });
 
+    if (!parsedURL.query.empty())
+        throw Error({
+            .msg = hintfmt("'fetchClosure' does not support URL query parameters (in '%s')", *fromStoreUrl),
+            .errPos = pos
+        });
+
     auto fromStore = openStore(parsedURL.to_string());
 
     if (toCA) {
@@ -87,7 +93,8 @@ static void prim_fetchClosure(EvalState & state, const Pos & pos, Value * * args
                 });
         }
     } else {
-        copyClosure(*fromStore, *state.store, RealisedPath::Set { *fromPath });
+        if (!state.store->isValidPath(*fromPath))
+            copyClosure(*fromStore, *state.store, RealisedPath::Set { *fromPath });
         toPath = fromPath;
     }
 

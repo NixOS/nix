@@ -3,6 +3,7 @@ Description=Nix Daemon
 Documentation=man:nix-daemon https://nixos.org/manual
 RequiresMountsFor=@storedir@
 RequiresMountsFor=@localstatedir@
+RequiresMountsFor=@localstatedir@/nix/db
 ConditionPathIsReadWrite=@localstatedir@/nix/daemon-socket
 
 [Service]

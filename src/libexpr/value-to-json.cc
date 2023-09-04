@@ -84,7 +84,8 @@ void printValueAsJSON(EvalState & state, bool strict,
                 .msg = hintfmt("cannot convert %1% to JSON", showType(v)),
                 .errPos = v.determinePos(pos)
             });
-            throw e.addTrace(pos, hintfmt("message for the trace"));
+            e.addTrace(pos, hintfmt("message for the trace"));
+            throw e;
     }
 }
 

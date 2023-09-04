@@ -306,9 +306,9 @@ Value * EvalCache::getRootValue()
     return *value;
 }
 
-std::shared_ptr<AttrCursor> EvalCache::getRoot()
+ref<AttrCursor> EvalCache::getRoot()
 {
-    return std::make_shared<AttrCursor>(ref(shared_from_this()), std::nullopt);
+    return make_ref<AttrCursor>(ref(shared_from_this()), std::nullopt);
 }
 
 AttrCursor::AttrCursor(

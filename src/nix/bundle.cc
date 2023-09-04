@@ -9,7 +9,7 @@ using namespace nix;
 
 struct CmdBundle : InstallableCommand
 {
-    std::string bundler = "github:matthewbauer/nix-bundle";
+    std::string bundler = "github:NixOS/bundlers";
     std::optional<Path> outLink;
 
     CmdBundle()

@@ -9,10 +9,9 @@ namespace nix {
 
 const std::string nativeSystem = SYSTEM;
 
-BaseError & BaseError::addTrace(std::optional<ErrPos> e, hintformat hint)
+void BaseError::addTrace(std::optional<ErrPos> e, hintformat hint)
 {
     err.traces.push_front(Trace { .pos = e, .hint = hint });
-    return *this;
 }
 
 // c++ std::exception descendants must have a 'const char* what()' function.
@@ -22,12 +21,9 @@ const std::string & BaseError::calcWhat() const
     if (what_.has_value())
         return *what_;
     else {
-        err.name = sname();
-
         std::ostringstream oss;
         showErrorInfo(oss, err, loggerSettings.showTrace);
         what_ = oss.str();
-
         return *what_;
     }
 }

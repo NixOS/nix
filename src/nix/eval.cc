@@ -16,7 +16,7 @@ struct CmdEval : MixJSON, InstallableCommand
     std::optional<std::string> apply;
     std::optional<Path> writeTo;
 
-    CmdEval()
+    CmdEval() : InstallableCommand(true /* supportReadOnlyMode */)
     {
         addFlag({
             .longName = "raw",
