@@ -1,10 +1,10 @@
 # Release X.Y (202?-??-??)
 
-- Two new builtin functions,
+- A pair of builtin functions,
   [`builtins.parseFlakeRef`](@docroot@/language/builtins.md#builtins-parseFlakeRef)
   and
   [`builtins.flakeRefToString`](@docroot@/language/builtins.md#builtins-flakeRefToString),
-  have been added.
+  has been added.
   These functions are useful for converting between flake references encoded as attribute sets and URLs.
 
 - Function introspection in the language has been extended to allow more compatibility logic to be written.
