@@ -100,6 +100,7 @@
   - [File System Object](architecture/file-system-object.md)
 - [Protocols](protocols/protocols.md)
   - [Serving Tarball Flakes](protocols/tarball-fetcher.md)
+  - [Derivation on-disk "ATerm" format](protocols/derivation-aterm.md)
 - [Glossary](glossary.md)
 - [Contributing](contributing/contributing.md)
   - [Hacking](contributing/hacking.md)
