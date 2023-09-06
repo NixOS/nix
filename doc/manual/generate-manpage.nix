@@ -79,6 +79,10 @@ let
         # Options
 
         ${showOptions details.flags toplevel.flags}
+
+        > **Note**
+        >
+        > See [`man nix.conf`](@docroot@/command-ref/conf-file.md#command-line-flags) for overriding configuration settings with command line flags.
       '';
 
       showOptions = options: commonOptions:
