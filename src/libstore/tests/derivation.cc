@@ -143,26 +143,76 @@ TEST_JSON(ImpureDerivationTest, impure,
 
 #undef TEST_JSON
 
-#define TEST_JSON(NAME, STR, VAL, DRV_NAME)                     \
-    TEST_F(DerivationTest, Derivation_ ## NAME ## _to_json) {   \
-        using nlohmann::literals::operator "" _json;            \
-        ASSERT_EQ(                                              \
-            STR ## _json,                                       \
-            (Derivation { VAL }).toJSON(*store));               \
-    }                                                           \
-                                                                \
-    TEST_F(DerivationTest, Derivation_ ## NAME ## _from_json) { \
-        using nlohmann::literals::operator "" _json;            \
-        ASSERT_EQ(                                              \
-            Derivation { VAL },                                 \
-            Derivation::fromJSON(                               \
-                *store,                                         \
-                STR ## _json));                                 \
+#define TEST_JSON(NAME, STR, VAL)                                \
+    TEST_F(DerivationTest, Derivation_ ## NAME ## _to_json) {    \
+        using nlohmann::literals::operator "" _json;             \
+        ASSERT_EQ(                                               \
+            STR ## _json,                                        \
+            (VAL).toJSON(*store));                               \
+    }                                                            \
+                                                                 \
+    TEST_F(DerivationTest, Derivation_ ## NAME ## _from_json) {  \
+        using nlohmann::literals::operator "" _json;             \
+        ASSERT_EQ(                                               \
+            (VAL),                                               \
+            Derivation::fromJSON(                                \
+                *store,                                          \
+                STR ## _json));                                  \
     }
+
+#define TEST_ATERM(NAME, STR, VAL, DRV_NAME)                     \
+    TEST_F(DerivationTest, Derivation_ ## NAME ## _to_aterm) {   \
+        ASSERT_EQ(                                               \
+            STR,                                                 \
+            (VAL).unparse(*store, false));                       \
+    }                                                            \
+                                                                 \
+    TEST_F(DerivationTest, Derivation_ ## NAME ## _from_aterm) { \
+        auto parsed = parseDerivation(                           \
+             *store,                                             \
+             STR,                                                \
+             DRV_NAME);                                          \
+        ASSERT_EQ(                                               \
+            (VAL).toJSON(*store),                                \
+            parsed.toJSON(*store));                              \
+        ASSERT_EQ(                                               \
+            (VAL),                                               \
+            parsed);                                             \
+    }
+
+Derivation makeSimpleDrv(const Store & store) {
+    Derivation drv;
+    drv.name = "simple-derivation";
+    drv.inputSrcs = {
+        store.parseStorePath("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"),
+    };
+    drv.inputDrvs = {
+        {
+            store.parseStorePath("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"),
+            {
+                "cat",
+                "dog",
+            },
+        },
+    };
+    drv.platform = "wasm-sel4";
+    drv.builder = "foo";
+    drv.args = {
+        "bar",
+        "baz",
+    };
+    drv.env = {
+        {
+            "BIG_BAD",
+            "WOLF",
+        },
+    };
+    return drv;
+}
 
 TEST_JSON(simple,
     R"({
-      "name": "my-derivation",
+      "name": "simple-derivation",
       "inputSrcs": [
         "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"
       ],
@@ -183,37 +233,14 @@ TEST_JSON(simple,
       },
       "outputs": {}
     })",
-    ({
-        Derivation drv;
-        drv.name = "my-derivation";
-        drv.inputSrcs = {
-            store->parseStorePath("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"),
-        };
-        drv.inputDrvs = {
-            {
-                store->parseStorePath("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"),
-                {
-                    "cat",
-                    "dog",
-                },
-            }
-        };
-        drv.platform = "wasm-sel4";
-        drv.builder = "foo";
-        drv.args = {
-            "bar",
-            "baz",
-        };
-        drv.env = {
-            {
-                "BIG_BAD",
-                "WOLF",
-            },
-        };
-        drv;
-    }),
-    "drv-name")
+    makeSimpleDrv(*store))
+
+TEST_ATERM(simple,
+    R"(Derive([],[("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv",["cat","dog"])],["/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"],"wasm-sel4","foo",["bar","baz"],[("BIG_BAD","WOLF")]))",
+    makeSimpleDrv(*store),
+    "simple-derivation")
 
 #undef TEST_JSON
+#undef TEST_ATERM
 
 }
