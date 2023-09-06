@@ -70,6 +70,7 @@ let
         * [`${command} ${name}`](./${appendName filename name}.md) - ${subcmd.description}
       '';
 
+      # TODO: move this confusing special case out of here when implementing #8496
       maybeDocumentation = optionalString
         (details ? doc)
         (replaceStrings ["@stores@"] [storeDocs] details.doc);
