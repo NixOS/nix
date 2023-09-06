@@ -98,7 +98,7 @@ let
                 (option ? labels)
                 (concatStringsSep " " (map (s: "*${s}*") option.labels));
             in trim ''
-              - `--${name}` ${shortName} ${labels}
+              - <span id="opt-${name}">[`--${name}`](#opt-${name})</span> ${shortName} ${labels}
 
                 ${option.description}
             '';
