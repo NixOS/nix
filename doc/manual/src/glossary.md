@@ -197,9 +197,15 @@
 
   [closure]: #gloss-closure
 
+- [output]{#gloss-output}
+
+  A [store object] produced by a [derivation].
+
+  [output]: #gloss-output
+
 - [output path]{#gloss-output-path}
 
-  A [store path] produced by a [derivation].
+  The [store path] to the [output] of a [derivation].
 
   [output path]: #gloss-output-path
 
