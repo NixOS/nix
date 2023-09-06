@@ -96,14 +96,14 @@ $(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli $(d)/sr
 	@cp $< $@
 	@$(call process-includes,$@,$@)
 
-$(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/utils.nix $(d)/generate-manpage.nix $(bindir)/nix
+$(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/utils.nix $(d)/generate-manpage.nix $(d)/generate-settings.nix $(d)/generate-store-info.nix $(bindir)/nix
 	@rm -rf $@ $@.tmp
 	$(trace-gen) $(nix-eval) --write-to $@.tmp --expr 'import doc/manual/generate-manpage.nix (builtins.readFile $<)'
 	@mv $@.tmp $@
 
-$(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/utils.nix $(d)/src/command-ref/conf-file-prefix.md $(d)/src/command-ref/experimental-features-shortlist.md $(bindir)/nix
+$(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/utils.nix $(d)/generate-settings.nix $(d)/src/command-ref/conf-file-prefix.md $(d)/src/command-ref/experimental-features-shortlist.md $(bindir)/nix
 	@cat doc/manual/src/command-ref/conf-file-prefix.md > $@.tmp
-	$(trace-gen) $(nix-eval) --expr '(import doc/manual/utils.nix).showSettings { useAnchors = true; } (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp;
+	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-settings.nix "opt-" (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp;
 	@mv $@.tmp $@
 
 $(d)/nix.json: $(bindir)/nix
