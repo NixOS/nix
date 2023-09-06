@@ -148,7 +148,7 @@ let
             To use this store, you need to make sure the corresponding experimental feature,
             [`${experimentalFeature}`](@docroot@/contributing/experimental-features.md#xp-feature-${experimentalFeature}),
             is enabled.
-            For example, include the following in [`nix.conf`](#):
+            For example, include the following in [`nix.conf`](@docroot@/command-ref/conf-file.md):
 
             ```
             extra-experimental-features = ${experimentalFeature}
