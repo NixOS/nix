@@ -154,8 +154,9 @@ static void expect(std::istream & str, std::string_view s)
 {
     char s2[s.size()];
     str.read(s2, s.size());
-    if (std::string(s2, s.size()) != s)
-        throw FormatError("expected string '%1%'", s);
+    std::string_view s2View { s2, s.size() };
+    if (s2View != s)
+        throw FormatError("expected string '%s', got '%s'", s, s2View);
 }
 
 
@@ -223,7 +224,8 @@ static DerivationOutput parseDerivationOutput(const Store & store,
         const auto hashType = parseHashType(hashAlgo);
         if (hashS == "impure") {
             experimentalFeatureSettings.require(Xp::ImpureDerivations);
-            assert(pathS == "");
+            if (pathS != "")
+                throw FormatError("impure derivation output should not specify output path");
             return DerivationOutput::Impure {
                 .method = std::move(method),
                 .hashType = std::move(hashType),
@@ -239,7 +241,8 @@ static DerivationOutput parseDerivationOutput(const Store & store,
             };
         } else {
             experimentalFeatureSettings.require(Xp::CaDerivations);
-            assert(pathS == "");
+            if (pathS != "")
+                throw FormatError("content-addressed derivation output should not specify output path");
             return DerivationOutput::CAFloating {
                 .method = std::move(method),
                 .hashType = std::move(hashType),
