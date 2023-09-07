@@ -6,4 +6,6 @@ out1=$(nix-build ./text-hashed-output.nix -A hello --no-out-link)
 
 clearStore
 
-expectStderr 1 nix-build ./text-hashed-output.nix -A wrapper --no-out-link | grepQuiet "Dependencies on the outputs of dynamic derivations are not yet supported"
+out2=$(nix-build ./text-hashed-output.nix -A wrapper --no-out-link)
+
+diff -r $out1 $out2

@@ -594,11 +594,14 @@ GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal)
     return subGoal;
 }
 
-const DerivationGoal * tryGetConcreteDrvGoal(GoalPtr waitee)
+std::optional<std::pair<std::reference_wrapper<const DerivationGoal>, std::reference_wrapper<const SingleDerivedPath>>> tryGetConcreteDrvGoal(GoalPtr waitee)
 {
     auto * odg = dynamic_cast<CreateDerivationAndRealiseGoal *>(&*waitee);
-    if (!odg) return nullptr;
-    return &*odg->concreteDrvGoal;
+    if (!odg) return std::nullopt;
+    return {{
+        std::cref(*odg->concreteDrvGoal),
+        std::cref(*odg->drvReq),
+    }};
 }
 
 }

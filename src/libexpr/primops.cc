@@ -1252,15 +1252,13 @@ drvName, Bindings * attrs, Value & v)
                 state.store->computeFSClosure(d.drvPath, refs);
                 for (auto & j : refs) {
                     drv.inputSrcs.insert(j);
-                    if (j.isDerivation())
-                        drv.inputDrvs[j] = state.store->readDerivation(j).outputNames();
+                    if (j.isDerivation()) {
+                        drv.inputDrvs.map[j].value = state.store->readDerivation(j).outputNames();
+                    }
                 }
             },
             [&](const NixStringContextElem::Built & b) {
-                if (auto * p = std::get_if<DerivedPath::Opaque>(&*b.drvPath))
-                    drv.inputDrvs[p->path].insert(b.output);
-                else
-                    throw UnimplementedError("Dependencies on the outputs of dynamic derivations are not yet supported");
+                drv.inputDrvs.ensureSlot(*b.drvPath).value.insert(b.output);
             },
             [&](const NixStringContextElem::Opaque & o) {
                 drv.inputSrcs.insert(o.path);

@@ -42,6 +42,26 @@ class ImpureDerivationTest : public DerivationTest
     }
 };
 
+TEST_F(DerivationTest, BadATerm_version) {
+    ASSERT_THROW(
+        parseDerivation(
+            *store,
+            R"(DrvWithVersion("invalid-version",[],[("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv",["cat","dog"])],["/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"],"wasm-sel4","foo",["bar","baz"],[("BIG_BAD","WOLF")]))",
+            "whatever",
+            mockXpSettings),
+        FormatError);
+}
+
+TEST_F(DynDerivationTest, BadATerm_oldVersionDynDeps) {
+    ASSERT_THROW(
+        parseDerivation(
+            *store,
+            R"(Derive([],[("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv",(["cat","dog"],[("cat",["kitten"]),("goose",["gosling"])]))],["/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"],"wasm-sel4","foo",["bar","baz"],[("BIG_BAD","WOLF")]))",
+            "dyn-dep-derivation",
+            mockXpSettings),
+        FormatError);
+}
+
 #define TEST_JSON(FIXTURE, NAME, STR, VAL, DRV_NAME, OUTPUT_NAME) \
     TEST_F(FIXTURE, DerivationOutput_ ## NAME ## _to_json) {    \
         using nlohmann::literals::operator "" _json;           \
@@ -143,35 +163,37 @@ TEST_JSON(ImpureDerivationTest, impure,
 
 #undef TEST_JSON
 
-#define TEST_JSON(NAME, STR, VAL)                                \
-    TEST_F(DerivationTest, Derivation_ ## NAME ## _to_json) {    \
+#define TEST_JSON(FIXTURE, NAME, STR, VAL)                       \
+    TEST_F(FIXTURE, Derivation_ ## NAME ## _to_json) {           \
         using nlohmann::literals::operator "" _json;             \
         ASSERT_EQ(                                               \
             STR ## _json,                                        \
             (VAL).toJSON(*store));                               \
     }                                                            \
                                                                  \
-    TEST_F(DerivationTest, Derivation_ ## NAME ## _from_json) {  \
+    TEST_F(FIXTURE, Derivation_ ## NAME ## _from_json) {         \
         using nlohmann::literals::operator "" _json;             \
         ASSERT_EQ(                                               \
             (VAL),                                               \
             Derivation::fromJSON(                                \
                 *store,                                          \
-                STR ## _json));                                  \
+                STR ## _json,                                    \
+                mockXpSettings));                                \
     }
 
-#define TEST_ATERM(NAME, STR, VAL, DRV_NAME)                     \
-    TEST_F(DerivationTest, Derivation_ ## NAME ## _to_aterm) {   \
+#define TEST_ATERM(FIXTURE, NAME, STR, VAL, DRV_NAME)            \
+    TEST_F(FIXTURE, Derivation_ ## NAME ## _to_aterm) {          \
         ASSERT_EQ(                                               \
             STR,                                                 \
             (VAL).unparse(*store, false));                       \
     }                                                            \
                                                                  \
-    TEST_F(DerivationTest, Derivation_ ## NAME ## _from_aterm) { \
+    TEST_F(FIXTURE, Derivation_ ## NAME ## _from_aterm) {        \
         auto parsed = parseDerivation(                           \
-             *store,                                             \
-             STR,                                                \
-             DRV_NAME);                                          \
+            *store,                                              \
+            STR,                                                 \
+            DRV_NAME,                                            \
+            mockXpSettings);                                     \
         ASSERT_EQ(                                               \
             (VAL).toJSON(*store),                                \
             parsed.toJSON(*store));                              \
@@ -187,11 +209,15 @@ Derivation makeSimpleDrv(const Store & store) {
         store.parseStorePath("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"),
     };
     drv.inputDrvs = {
-        {
-            store.parseStorePath("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"),
+        .map = {
             {
-                "cat",
-                "dog",
+                store.parseStorePath("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"),
+                {
+                    .value = {
+                        "cat",
+                        "dog",
+                    },
+                },
             },
         },
     };
@@ -210,17 +236,20 @@ Derivation makeSimpleDrv(const Store & store) {
     return drv;
 }
 
-TEST_JSON(simple,
+TEST_JSON(DerivationTest, simple,
     R"({
       "name": "simple-derivation",
       "inputSrcs": [
         "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"
       ],
       "inputDrvs": {
-        "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv": [
-          "cat",
-          "dog"
-        ]
+        "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv": {
+          "dynamicOutputs": {},
+          "outputs": [
+            "cat",
+            "dog"
+          ]
+        }
       },
       "system": "wasm-sel4",
       "builder": "foo",
@@ -235,10 +264,104 @@ TEST_JSON(simple,
     })",
     makeSimpleDrv(*store))
 
-TEST_ATERM(simple,
+TEST_ATERM(DerivationTest, simple,
     R"(Derive([],[("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv",["cat","dog"])],["/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"],"wasm-sel4","foo",["bar","baz"],[("BIG_BAD","WOLF")]))",
     makeSimpleDrv(*store),
     "simple-derivation")
+
+Derivation makeDynDepDerivation(const Store & store) {
+    Derivation drv;
+    drv.name = "dyn-dep-derivation";
+    drv.inputSrcs = {
+        store.parseStorePath("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"),
+    };
+    drv.inputDrvs = {
+        .map = {
+            {
+                store.parseStorePath("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"),
+                DerivedPathMap<StringSet>::ChildNode {
+                    .value = {
+                        "cat",
+                        "dog",
+                    },
+                    .childMap = {
+                        {
+                            "cat",
+                            DerivedPathMap<StringSet>::ChildNode {
+                                .value = {
+                                    "kitten",
+                                },
+                            },
+                        },
+                        {
+                            "goose",
+                            DerivedPathMap<StringSet>::ChildNode {
+                                .value = {
+                                    "gosling",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+    drv.platform = "wasm-sel4";
+    drv.builder = "foo";
+    drv.args = {
+        "bar",
+        "baz",
+    };
+    drv.env = {
+        {
+            "BIG_BAD",
+            "WOLF",
+        },
+    };
+    return drv;
+}
+
+TEST_JSON(DynDerivationTest, dynDerivationDeps,
+    R"({
+      "name": "dyn-dep-derivation",
+      "inputSrcs": [
+        "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"
+      ],
+      "inputDrvs": {
+        "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv": {
+          "dynamicOutputs": {
+            "cat": {
+              "dynamicOutputs": {},
+              "outputs": ["kitten"]
+            },
+            "goose": {
+              "dynamicOutputs": {},
+              "outputs": ["gosling"]
+            }
+          },
+          "outputs": [
+            "cat",
+            "dog"
+          ]
+        }
+      },
+      "system": "wasm-sel4",
+      "builder": "foo",
+      "args": [
+        "bar",
+        "baz"
+      ],
+      "env": {
+        "BIG_BAD": "WOLF"
+      },
+      "outputs": {}
+    })",
+    makeDynDepDerivation(*store))
+
+TEST_ATERM(DynDerivationTest, dynDerivationDeps,
+    R"(DrvWithVersion("xp-dyn-drv",[],[("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv",(["cat","dog"],[("cat",["kitten"]),("goose",["gosling"])]))],["/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"],"wasm-sel4","foo",["bar","baz"],[("BIG_BAD","WOLF")]))",
+    makeDynDepDerivation(*store),
+    "dyn-dep-derivation")
 
 #undef TEST_JSON
 #undef TEST_ATERM
