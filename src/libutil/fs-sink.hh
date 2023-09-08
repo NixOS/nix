@@ -22,4 +22,21 @@ struct ParseSink
     virtual void createSymlink(const Path & path, const std::string & target) { };
 };
 
+struct RestoreSink : ParseSink
+{
+    Path dstPath;
+    AutoCloseFD fd;
+
+
+    void createDirectory(const Path & path) override;
+
+    void createRegularFile(const Path & path) override;
+    void closeRegularFile() override;
+    void isExecutable() override;
+    void preallocateContents(uint64_t size) override;
+    void receiveContents(std::string_view data) override;
+
+    void createSymlink(const Path & path, const std::string & target) override;
+};
+
 }
