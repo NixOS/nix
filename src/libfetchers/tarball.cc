@@ -15,7 +15,8 @@ DownloadFileResult downloadFile(
     const std::string & url,
     const std::string & name,
     bool locked,
-    const Headers & headers)
+    const Headers & headers,
+    bool useShortTtl)
 {
     // FIXME: check store
 
@@ -25,7 +26,7 @@ DownloadFileResult downloadFile(
         {"name", name},
     });
 
-    auto cached = getCache()->lookupExpired(store, inAttrs);
+    auto cached = getCache()->lookupExpired(store, inAttrs, useShortTtl);
 
     auto useCached = [&]() -> DownloadFileResult
     {

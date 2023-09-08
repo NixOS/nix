@@ -166,7 +166,8 @@ DownloadFileResult downloadFile(
     const std::string & url,
     const std::string & name,
     bool locked,
-    const Headers & headers = {});
+    const Headers & headers = {},
+    bool useShortTtl = false);
 
 struct DownloadTarballResult
 {

@@ -18,7 +18,8 @@ struct Cache
 
     virtual std::optional<std::pair<Attrs, StorePath>> lookup(
         ref<Store> store,
-        const Attrs & inAttrs) = 0;
+        const Attrs & inAttrs,
+        bool useShortTtl = false) = 0;
 
     struct Result
     {
@@ -29,7 +30,8 @@ struct Cache
 
     virtual std::optional<Result> lookupExpired(
         ref<Store> store,
-        const Attrs & inAttrs) = 0;
+        const Attrs & inAttrs,
+        bool useShortTtl = false) = 0;
 };
 
 ref<Cache> getCache();

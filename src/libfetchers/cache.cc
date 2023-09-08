@@ -64,7 +64,8 @@ struct CacheImpl : Cache
 
     std::optional<std::pair<Attrs, StorePath>> lookup(
         ref<Store> store,
-        const Attrs & inAttrs) override
+        const Attrs & inAttrs,
+        bool useShortTtl = false) override
     {
         if (auto res = lookupExpired(store, inAttrs)) {
             if (!res->expired)
@@ -77,7 +78,8 @@ struct CacheImpl : Cache
 
     std::optional<Result> lookupExpired(
         ref<Store> store,
-        const Attrs & inAttrs) override
+        const Attrs & inAttrs,
+        bool useShortTtl = false) override
     {
         auto state(_state.lock());
 
@@ -104,8 +106,11 @@ struct CacheImpl : Cache
         debug("using cache entry '%s' -> '%s', '%s'",
             inAttrsJSON, infoJSON, store->printStorePath(storePath));
 
+        bool expired = !locked && (useShortTtl ?
+            settings.shortTtl.get() == 0 || timestamp + settings.shortTtl < time(0) :
+            settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0));
         return Result {
-            .expired = !locked && (settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0)),
+            .expired = expired,
             .infoAttrs = jsonToAttrs(nlohmann::json::parse(infoJSON)),
             .storePath = std::move(storePath)
         };

@@ -496,14 +496,14 @@ struct GitInputScheme : InputScheme
                     unlockedAttrs.insert_or_assign("ref", input.getRef().value());
                 }
             }
-
             if (auto res = getCache()->lookup(store, unlockedAttrs)) {
                 auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
-                if (!input.getRev() || input.getRev() == rev2) {
-                    input.attrs.insert_or_assign("rev", rev2.gitRev());
+                if (input.getRev() == rev2) {
                     return makeResult(res->first, std::move(res->second));
                 }
             }
+
+            // XXX TODO: Do a lightweight fetch to find out what the head and head commit is.
 
             Path cacheDir = getCachePath(actualUrl);
             repoDir = cacheDir;

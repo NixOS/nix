@@ -641,19 +641,41 @@ public:
     Setting<unsigned int> tarballTtl{
         this, 60 * 60, "tarball-ttl",
         R"(
-          The number of seconds a downloaded tarball is considered fresh. If
-          the cached tarball is stale, Nix will check whether it is still up
+          The number of seconds a downloaded file is considered fresh. If
+          the cached file is stale, Nix will check whether it is still up
           to date using the ETag header. Nix will download a new version if
           the ETag header is unsupported, or the cached ETag doesn't match.
 
-          Setting the TTL to `0` forces Nix to always check if the tarball is
+          Setting the TTL to `0` forces Nix to always check if the file is
           up to date.
 
-          Nix caches tarballs in `$XDG_CACHE_HOME/nix/tarballs`.
+          Nix caches files in `$XDG_CACHE_HOME/nix`.
 
           Files fetched via `NIX_PATH`, `fetchGit`, `fetchMercurial`,
           `fetchTarball`, and `fetchurl` respect this TTL.
         )"};
+
+    Setting<unsigned int> shortTtl{
+        this, 5, "short-ttl",
+        R"(
+          The number of seconds a downloaded file is considered fresh. If
+          the cached file is stale, Nix will check whether it is still up
+          to date using the ETag header. Nix will download a new version if
+          the ETag header is unsupported, or the cached ETag doesn't match.
+
+          The short TTL is used for files that are expected to change often,
+          such as API calls.
+
+          Setting the TTL to `0` forces Nix to always check if the file is
+          up to date.
+
+          Nix caches files in `$XDG_CACHE_HOME/nix`.
+
+          Currently, only calls that fetch git repository information as part
+          of the implementation of fetchers such as `fetchGit`, `fetchTree`
+          respect this TTL.
+        )"};
+
 
     Setting<bool> requireSigs{
         this, true, "require-sigs",
