@@ -16,6 +16,7 @@
 #include <nlohmann/json.hpp>
 #include <regex>
 #include <iomanip>
+#include <charconv>
 
 #include "strings.hh"
 
@@ -186,6 +187,16 @@ struct ProfileManifest
             for (auto & packageInfo : packageInfos) {
                 ProfileElement element;
                 element.storePaths = {packageInfo.queryOutPath()};
+                Value * priorityV = drvInfo.queryMeta("priority");
+                if (priorityV && priorityV->type() == nString) {
+                    auto result = std::from_chars(
+                        priorityV->str().data(),
+                        priorityV->str().data() + priorityV->str().size(),
+                        element.priority);
+                    if (result.ec != std::errc()) {
+                        throw Error("profile manifest '%s' has invalid priority '%s'", manifestPath, priorityV->str());
+                    }
+                }
                 addElement(std::move(element));
             }
         }
