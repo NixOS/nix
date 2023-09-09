@@ -100,7 +100,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         parsedURL.query.erase("dir");
         std::string fragment;
         std::swap(fragment, parsedURL.fragment);
-        return std::make_pair(FlakeRef(Input::fromURL(parsedURL), dir), fragment);
+        return std::make_pair(FlakeRef(Input::fromURL(parsedURL, isFlake), dir), fragment);
     };
 
     /* Check if 'url' is a flake ID. This is an abbreviated syntax for
@@ -116,7 +116,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
         };
 
         return std::make_pair(
-            FlakeRef(Input::fromURL(parsedURL), ""),
+            FlakeRef(Input::fromURL(parsedURL, isFlake), ""),
             percentDecode(match.str(6)));
     }
 

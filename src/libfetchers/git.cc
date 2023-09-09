@@ -143,7 +143,7 @@ bool isNotDotGitDirectory(const Path & path)
 
 struct GitInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url) const override
+    std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
     {
         if (url.scheme != "git" &&
             url.scheme != "git+http" &&

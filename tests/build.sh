@@ -78,7 +78,7 @@ expectStderr 1 nix build --impure --expr 'with (import ./multiple-outputs.nix).e
   | grepQuiet "has 2 entries in its context. It should only have exactly one entry"
 
 nix build --impure --json --expr 'builtins.unsafeDiscardOutputDependency (import ./multiple-outputs.nix).e.a_a.drvPath' --no-link | jq --exit-status '
-  (.[0] | .path | match(".*multiple-outputs-e.drv"))
+  (.[0] | match(".*multiple-outputs-e.drv"))
 '
 
 # Test building from raw store path to drv not expression.

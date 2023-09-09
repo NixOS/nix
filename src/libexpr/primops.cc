@@ -57,7 +57,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
                     .drvPath = b.drvPath,
                     .outputs = OutputsSpec::Names { b.output },
                 });
-                ensureValid(b.drvPath);
+                ensureValid(b.drvPath->getBaseStorePath());
             },
             [&](const NixStringContextElem::Opaque & o) {
                 auto ctxS = store->printStorePath(o.path);
@@ -78,29 +78,32 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
     if (!evalSettings.enableImportFromDerivation)
         debugThrowLastTrace(Error(
             "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
-            store->printStorePath(drvs.begin()->drvPath)));
+            drvs.begin()->to_string(*store)));
 
     /* Build/substitute the context. */
     std::vector<DerivedPath> buildReqs;
     for (auto & d : drvs) buildReqs.emplace_back(DerivedPath { d });
     store->buildPaths(buildReqs);
 
-    /* Get all the output paths corresponding to the placeholders we had */
     for (auto & drv : drvs) {
         auto outputs = resolveDerivedPath(*store, drv);
         for (auto & [outputName, outputPath] : outputs) {
-            res.insert_or_assign(
-                DownstreamPlaceholder::unknownCaOutput(drv.drvPath, outputName).render(),
-                store->printStorePath(outputPath)
-            );
-        }
-    }
-
-    /* Add the output of this derivations to the allowed
-       paths. */
-    if (rootFS->hasAccessControl()) {
-        for (auto & [_placeholder, outputPath] : res) {
-            allowPath(store->toRealPath(outputPath));
+            /* Add the output of this derivations to the allowed
+               paths. */
+            if (rootFS->hasAccessControl()) {
+                allowPath(store->toRealPath(outputPath));
+            }
+            /* Get all the output paths corresponding to the placeholders we had */
+            if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
+                res.insert_or_assign(
+                    DownstreamPlaceholder::fromSingleDerivedPathBuilt(
+                        SingleDerivedPath::Built {
+                            .drvPath = drv.drvPath,
+                            .output = outputName,
+                        }).render(),
+                    store->printStorePath(outputPath)
+                );
+            }
         }
     }
 
@@ -154,8 +157,10 @@ static void mkOutputString(
 {
     state.mkOutputString(
         attrs.alloc(o.first),
-        drvPath,
-        o.first,
+        SingleDerivedPath::Built {
+            .drvPath = makeConstantStorePathRef(drvPath),
+            .output = o.first,
+        },
         o.second.path(*state.store, Derivation::nameFromPath(drvPath), o.first));
 }
 
@@ -1254,7 +1259,10 @@ drvName, Bindings * attrs, Value & v)
                 }
             },
             [&](const NixStringContextElem::Built & b) {
-                drv.inputDrvs[b.drvPath].insert(b.output);
+                if (auto * p = std::get_if<DerivedPath::Opaque>(&*b.drvPath))
+                    drv.inputDrvs[p->path].insert(b.output);
+                else
+                    throw UnimplementedError("Dependencies on the outputs of dynamic derivations are not yet supported");
             },
             [&](const NixStringContextElem::Opaque & o) {
                 drv.inputSrcs.insert(o.path);
@@ -1836,6 +1844,45 @@ static RegisterPrimOp primop_readDir({
     .fun = prim_readDir,
 });
 
+/* Extend single element string context with another output. */
+static void prim_outputOf(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    SingleDerivedPath drvPath = state.coerceToSingleDerivedPath(pos, *args[0], "while evaluating the first argument to builtins.outputOf");
+
+    std::string_view outputName = state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument to builtins.outputOf");
+
+    state.mkSingleDerivedPathString(
+        SingleDerivedPath::Built {
+            .drvPath = make_ref<SingleDerivedPath>(drvPath),
+            .output = std::string { outputName },
+        },
+        v);
+}
+
+static RegisterPrimOp primop_outputOf({
+    .name = "__outputOf",
+    .args = {"derivation-reference", "output-name"},
+    .doc = R"(
+      Return the output path of a derivation, literally or using a placeholder if needed.
+
+      If the derivation has a statically-known output path (i.e. the derivation output is input-addressed, or fixed content-addresed), the output path will just be returned.
+      But if the derivation is content-addressed or if the derivation is itself not-statically produced (i.e. is the output of another derivation), a placeholder will be returned instead.
+
+      *`derivation reference`* must be a string that may contain a regular store path to a derivation, or may be a placeholder reference. If the derivation is produced by a derivation, you must explicitly select `drv.outPath`.
+      This primop can be chained arbitrarily deeply.
+      For instance,
+      ```nix
+      builtins.outputOf
+        (builtins.outputOf myDrv "out)
+        "out"
+      ```
+      will return a placeholder for the output of the output of `myDrv`.
+
+      This primop corresponds to the `^` sigil for derivable paths, e.g. as part of installable syntax on the command line.
+    )",
+    .fun = prim_outputOf,
+    .experimentalFeature = Xp::DynamicDerivations,
+});
 
 /*************************************************************
  * Creating files

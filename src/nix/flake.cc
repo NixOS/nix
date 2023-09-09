@@ -540,9 +540,9 @@ struct CmdFlakeCheck : FlakeCommand
                                             *attr2.value, attr2.pos);
                                         if (drvPath && attr_name == settings.thisSystem.get()) {
                                             drvPaths.push_back(DerivedPath::Built {
-                                                    .drvPath = *drvPath,
-                                                        .outputs = OutputsSpec::All { },
-                                                        });
+                                                .drvPath = makeConstantStorePathRef(*drvPath),
+                                                .outputs = OutputsSpec::All { },
+                                            });
                                         }
                                     }
                                 }

@@ -1172,6 +1172,19 @@ void LocalDerivationGoal::writeStructuredAttrs()
 }
 
 
+static StorePath pathPartOfReq(const SingleDerivedPath & req)
+{
+    return std::visit(overloaded {
+        [&](const SingleDerivedPath::Opaque & bo) {
+            return bo.path;
+        },
+        [&](const SingleDerivedPath::Built & bfd)  {
+            return pathPartOfReq(*bfd.drvPath);
+        },
+    }, req.raw());
+}
+
+
 static StorePath pathPartOfReq(const DerivedPath & req)
 {
     return std::visit(overloaded {
@@ -1179,7 +1192,7 @@ static StorePath pathPartOfReq(const DerivedPath & req)
             return bo.path;
         },
         [&](const DerivedPath::Built & bfd)  {
-            return bfd.drvPath;
+            return pathPartOfReq(*bfd.drvPath);
         },
     }, req.raw());
 }
@@ -2307,7 +2320,6 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
         bool discardReferences = false;
         if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
             if (auto udr = get(*structuredAttrs, "unsafeDiscardReferences")) {
-                experimentalFeatureSettings.require(Xp::DiscardReferences);
                 if (auto output = get(*udr, outputName)) {
                     if (!output->is_boolean())
                         throw Error("attribute 'unsafeDiscardReferences.\"%s\"' of derivation '%s' must be a Boolean", outputName, drvPath.to_string());

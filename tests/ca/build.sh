@@ -2,7 +2,7 @@
 
 source common.sh
 
-drv=$(nix-instantiate ./content-addressed.nix -A rootCA --arg seed 1)
+drv=$(nix-instantiate ./content-addressed.nix -A rootCA --arg seed 1)^out
 nix derivation show "$drv" --arg seed 1
 
 buildAttr () {
@@ -12,14 +12,6 @@ buildAttr () {
     local args=("./content-addressed.nix" "-A" "$derivationPath" --arg seed "$seedValue" "--no-out-link")
     args+=("$@")
     nix-build "${args[@]}"
-}
-
-testRemoteCache () {
-    clearCache
-    local outPath=$(buildAttr dependentNonCA 1)
-    nix copy --to file://$cacheDir $outPath
-    clearStore
-    buildAttr dependentNonCA 1 --option substituters file://$cacheDir --no-require-sigs |& grepQuietInverse "building dependent-non-ca"
 }
 
 testDeterministicCA () {
@@ -66,8 +58,6 @@ testNormalization () {
     test "$(stat -c %Y $outPath)" -eq 1
 }
 
-# Disabled until we have it properly working
-# testRemoteCache
 clearStore
 testNormalization
 testDeterministicCA

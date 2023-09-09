@@ -27,7 +27,6 @@ enum struct ExperimentalFeature
     ReplFlake,
     AutoAllocateUids,
     Cgroups,
-    DiscardReferences,
     DaemonTrustOverride,
     DynamicDerivations,
     ParseTomlTimestamps,

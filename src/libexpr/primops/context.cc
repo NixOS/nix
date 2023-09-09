@@ -106,7 +106,10 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value * * args,
                 contextInfos[std::move(d.drvPath)].allOutputs = true;
             },
             [&](NixStringContextElem::Built && b) {
-                contextInfos[std::move(b.drvPath)].outputs.emplace_back(std::move(b.output));
+                // FIXME should eventually show string context as is, no
+                // resolving here.
+                auto drvPath = resolveDerivedPath(*state.store, *b.drvPath);
+                contextInfos[std::move(drvPath)].outputs.emplace_back(std::move(b.output));
             },
             [&](NixStringContextElem::Opaque && o) {
                 contextInfos[std::move(o.path)].path = true;
@@ -222,7 +225,7 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
             for (auto elem : iter->value->listItems()) {
                 auto outputName = state.forceStringNoCtx(*elem, iter->pos, "while evaluating an output name within a string context");
                 context.emplace(NixStringContextElem::Built {
-                    .drvPath = namePath,
+                    .drvPath = makeConstantStorePathRef(namePath),
                     .output = std::string { outputName },
                 });
             }

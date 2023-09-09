@@ -12,7 +12,7 @@ struct ExperimentalFeatureDetails
     std::string_view description;
 };
 
-constexpr std::array<ExperimentalFeatureDetails, 15> xpFeatureDetails = {{
+constexpr std::array<ExperimentalFeatureDetails, 14> xpFeatureDetails = {{
     {
         .tag = Xp::CaDerivations,
         .name = "ca-derivations",
@@ -180,15 +180,6 @@ constexpr std::array<ExperimentalFeatureDetails, 15> xpFeatureDetails = {{
         .description = R"(
             Allows Nix to execute builds inside cgroups. See
             the [`use-cgroups`](#conf-use-cgroups) setting for details.
-        )",
-    },
-    {
-        .tag = Xp::DiscardReferences,
-        .name = "discard-references",
-        .description = R"(
-            Allow the use of the [`unsafeDiscardReferences`](@docroot@/language/advanced-attributes.html#adv-attr-unsafeDiscardReferences) attribute in derivations
-            that use [structured attributes](@docroot@/language/advanced-attributes.html#adv-attr-structuredAttrs). This disables scanning of outputs for
-            runtime dependencies.
         )",
     },
     {

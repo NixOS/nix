@@ -15,6 +15,7 @@
 #include "value-to-json.hh"
 #include "xml-writer.hh"
 #include "legacy.hh"
+#include "eval-settings.hh" // for defexpr
 
 #include <cerrno>
 #include <ctime>
@@ -481,7 +482,7 @@ static void printMissing(EvalState & state, DrvInfos & elems)
     for (auto & i : elems)
         if (auto drvPath = i.queryDrvPath())
             targets.push_back(DerivedPath::Built{
-                .drvPath = *drvPath,
+                .drvPath = makeConstantStorePathRef(*drvPath),
                 .outputs = OutputsSpec::All { },
             });
         else
@@ -759,7 +760,7 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     std::vector<DerivedPath> paths {
         drvPath
         ? (DerivedPath) (DerivedPath::Built {
-            .drvPath = *drvPath,
+            .drvPath = makeConstantStorePathRef(*drvPath),
             .outputs = OutputsSpec::All { },
         })
         : (DerivedPath) (DerivedPath::Opaque {
@@ -1399,7 +1400,7 @@ static int main_nix_env(int argc, char * * argv)
         globals.instSource.type = srcUnknown;
         globals.instSource.systemFilter = "*";
 
-        Path nixExprPath = settings.useXDGBaseDirectories ? createNixStateDir() + "/defexpr" : getHome() + "/.nix-defexpr";
+        Path nixExprPath = getNixDefExpr();
 
         if (!pathExists(nixExprPath)) {
             try {

@@ -14,9 +14,9 @@ void registerInputScheme(std::shared_ptr<InputScheme> && inputScheme)
     inputSchemes->push_back(std::move(inputScheme));
 }
 
-Input Input::fromURL(const std::string & url)
+Input Input::fromURL(const std::string & url, bool requireTree)
 {
-    return fromURL(parseURL(url));
+    return fromURL(parseURL(url), requireTree);
 }
 
 static void fixupInput(Input & input)
@@ -28,10 +28,10 @@ static void fixupInput(Input & input)
     input.getLastModified();
 }
 
-Input Input::fromURL(const ParsedURL & url)
+Input Input::fromURL(const ParsedURL & url, bool requireTree)
 {
     for (auto & inputScheme : *inputSchemes) {
-        auto res = inputScheme->inputFromURL(url);
+        auto res = inputScheme->inputFromURL(url, requireTree);
         if (res) {
             res->scheme = inputScheme;
             fixupInput(*res);

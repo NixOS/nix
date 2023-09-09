@@ -22,11 +22,13 @@ StringPairs resolveRewrites(
     StringPairs res;
     for (auto & dep : dependencies)
         if (auto drvDep = std::get_if<BuiltPathBuilt>(&dep.path))
-            for (auto & [ outputName, outputPath ] : drvDep->outputs)
-                res.emplace(
-                    DownstreamPlaceholder::unknownCaOutput(drvDep->drvPath, outputName).render(),
-                    store.printStorePath(outputPath)
-                );
+            if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
+                for (auto & [ outputName, outputPath ] : drvDep->outputs)
+                    res.emplace(
+                        DownstreamPlaceholder::unknownCaOutput(
+                            drvDep->drvPath->outPath(), outputName).render(),
+                        store.printStorePath(outputPath)
+                    );
     return res;
 }
 
@@ -64,7 +66,7 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
                 [&](const NixStringContextElem::DrvDeep & d) -> DerivedPath {
                     /* We want all outputs of the drv */
                     return DerivedPath::Built {
-                        .drvPath = d.drvPath,
+                        .drvPath = makeConstantStorePathRef(d.drvPath),
                         .outputs = OutputsSpec::All {},
                     };
                 },
@@ -105,7 +107,7 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
         auto program = outPath + "/bin/" + mainProgram;
         return UnresolvedApp { App {
             .context = { DerivedPath::Built {
-                .drvPath = drvPath,
+                .drvPath = makeConstantStorePathRef(drvPath),
                 .outputs = OutputsSpec::Names { outputName },
             } },
             .program = program,

@@ -43,7 +43,7 @@ static std::string runHg(const Strings & args, const std::optional<std::string> 
 
 struct MercurialInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url) const override
+    std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
     {
         if (url.scheme != "hg+http" &&
             url.scheme != "hg+https" &&

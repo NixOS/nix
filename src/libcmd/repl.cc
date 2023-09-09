@@ -648,7 +648,7 @@ bool NixRepl::processLine(std::string line)
         if (command == ":b" || command == ":bl") {
             state->store->buildPaths({
                 DerivedPath::Built {
-                    .drvPath = drvPath,
+                    .drvPath = makeConstantStorePathRef(drvPath),
                     .outputs = OutputsSpec::All { },
                 },
             });

@@ -358,6 +358,9 @@ public:
                 [&](const StorePath & drvPath) {
                     throw Error("wanted to fetch '%s' but the legacy ssh protocol doesn't support merely substituting drv files via the build paths command. It would build them instead. Try using ssh-ng://", printStorePath(drvPath));
                 },
+                [&](std::monostate) {
+                    throw Error("wanted build derivation that is itself a build product, but the legacy ssh protocol doesn't support that. Try using ssh-ng://");
+                },
             }, sOrDrvPath);
         }
         conn->to << ss;

@@ -180,8 +180,10 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         for (auto & implem : *Implementations::registered) {
             auto storeConfig = implem.getConfig();
             auto storeName = storeConfig->name();
-            stores[storeName]["doc"] = storeConfig->doc();
-            stores[storeName]["settings"] = storeConfig->toJSON();
+            auto & j = stores[storeName];
+            j["doc"] = storeConfig->doc();
+            j["settings"] = storeConfig->toJSON();
+            j["experimentalFeature"] = storeConfig->experimentalFeature();
         }
         res["stores"] = std::move(stores);
 
@@ -354,6 +356,7 @@ void mainWrapped(int argc, char * * argv)
         experimentalFeatureSettings.experimentalFeatures = {
             Xp::Flakes,
             Xp::FetchClosure,
+            Xp::DynamicDerivations,
         };
         evalSettings.pureEval = false;
         EvalState state({}, openStore("dummy://"));

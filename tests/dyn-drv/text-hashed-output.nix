@@ -12,9 +12,6 @@ rec {
       mkdir -p $out
       echo "Hello World" > $out/hello
     '';
-    __contentAddressed = true;
-    outputHashMode = "recursive";
-    outputHashAlgo = "sha256";
   };
   producingDrv = mkDerivation {
     name = "hello.drv";
@@ -25,5 +22,12 @@ rec {
     __contentAddressed = true;
     outputHashMode = "text";
     outputHashAlgo = "sha256";
+  };
+  wrapper = mkDerivation {
+    name = "use-dynamic-drv-in-non-dynamic-drv";
+    buildCommand = ''
+      echo "Copying the output of the dynamic derivation"
+      cp -r ${builtins.outputOf producingDrv.outPath "out"} $out
+    '';
   };
 }
