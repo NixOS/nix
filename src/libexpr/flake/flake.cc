@@ -520,11 +520,6 @@ LockedFlake lockFlake(
                             }
                         }
 
-                        auto localPath(parentPath);
-                        // If this input is a path, recurse it down.
-                        // This allows us to resolve path inputs relative to the current flake.
-                        if ((*input.ref).input.getType() == "path")
-                            localPath = absPath(*input.ref->input.getSourcePath(), parentPath);
                         computeLocks(
                             mustRefetch
                             ? getFlake(state, oldLock->lockedRef, false, flakeCache, inputPath).inputs
