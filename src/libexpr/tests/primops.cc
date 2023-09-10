@@ -232,6 +232,55 @@ namespace nix {
         ASSERT_THAT(*y->value, IsTrue());
     }
 
+    TEST_F(PrimOpTest, functionInfoWithEllipsisAndArg) {
+        auto v = eval("builtins.functionInfo ({ x, y ? 123, ...}@inputs: 1)");
+        ASSERT_THAT(v, IsAttrsOfSize(3));
+
+        auto arg = v.attrs->find(createSymbol("arg"));
+        ASSERT_NE(arg, nullptr);
+        ASSERT_THAT(*arg->value, IsStringEq("inputs"));
+
+        auto ellipsis = v.attrs->find(createSymbol("ellipsis"));
+        ASSERT_NE(ellipsis, nullptr);
+        ASSERT_THAT(*ellipsis->value, IsTrue());
+
+        auto formals = v.attrs->find(createSymbol("formals"));
+        ASSERT_NE(formals, nullptr);
+        ASSERT_THAT(*formals->value, IsAttrsOfSize(2));
+
+        auto x = formals->value->attrs->find(createSymbol("x"));
+        ASSERT_NE(x, nullptr);
+        ASSERT_THAT(*x->value, IsFalse());
+
+        auto y = formals->value->attrs->find(createSymbol("y"));
+        ASSERT_NE(y, nullptr);
+        ASSERT_THAT(*y->value, IsTrue());
+    }
+
+    TEST_F(PrimOpTest, functionInfoNoEllipsisNoArg) {
+        auto v = eval("builtins.functionInfo ({ x, y ? 123}: 1)");
+        ASSERT_THAT(v, IsAttrsOfSize(2));
+
+        auto arg = v.attrs->find(createSymbol("arg"));
+        ASSERT_EQ(arg, v.attrs->end());
+
+        auto ellipsis = v.attrs->find(createSymbol("ellipsis"));
+        ASSERT_NE(ellipsis, nullptr);
+        ASSERT_THAT(*ellipsis->value, IsFalse());
+
+        auto formals = v.attrs->find(createSymbol("formals"));
+        ASSERT_NE(formals, nullptr);
+        ASSERT_THAT(*formals->value, IsAttrsOfSize(2));
+
+        auto x = formals->value->attrs->find(createSymbol("x"));
+        ASSERT_NE(x, nullptr);
+        ASSERT_THAT(*x->value, IsFalse());
+
+        auto y = formals->value->attrs->find(createSymbol("y"));
+        ASSERT_NE(y, nullptr);
+        ASSERT_THAT(*y->value, IsTrue());
+    }
+
     TEST_F(PrimOpTest, mapAttrs) {
         auto v = eval("builtins.mapAttrs (name: value: value * 10) { a = 1; b = 2; }");
         ASSERT_THAT(v, IsAttrsOfSize(2));
