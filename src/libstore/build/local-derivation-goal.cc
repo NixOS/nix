@@ -651,7 +651,10 @@ void LocalDerivationGoal::startBuilder()
            environment using bind-mounts.  We put it in the Nix store
            to ensure that we can create hard-links to non-directory
            inputs in the fake Nix store in the chroot (see below). */
-        chrootRootDir = worker.store.Store::toRealPath(drvPath) + ".chroot";
+        chrootRootDirBase = worker.store.storeDir;
+        createDirs(chrootRootDirBase);
+
+        chrootRootDir = chrootRootDirBase + "/" + drvPath.to_string() + ".chroot";
         deletePath(chrootRootDir);
 
         /* Clean up the chroot directory automatically. */

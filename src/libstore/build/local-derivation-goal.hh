@@ -64,6 +64,7 @@ struct LocalDerivationGoal : public DerivationGoal
      */
     bool useChroot = false;
 
+    Path chrootRootDirBase;
     Path chrootRootDir;
 
     /**
