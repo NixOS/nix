@@ -164,16 +164,7 @@ struct ProfileManifest
             for (auto & drvInfo : drvInfos) {
                 ProfileElement element;
                 element.storePaths = {drvInfo.queryOutPath()};
-                Value * priorityV = drvInfo.queryMeta("priority");
-                if (priorityV && priorityV->type() == nString) {
-                    auto result = std::from_chars(
-                        priorityV->str().data(),
-                        priorityV->str().data() + priorityV->str().size(),
-                        element.priority);
-                    if (result.ec != std::errc()) {
-                        throw Error("profile manifest '%s' has invalid priority '%s'", manifestPath, priorityV->str());
-                    }
-                }
+                element.priority = drvInfo.queryMetaInt("priority", defaultPriority);
                 elements.emplace_back(std::move(element));
             }
         }
