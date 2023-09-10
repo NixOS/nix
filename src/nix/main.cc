@@ -358,7 +358,6 @@ void mainWrapped(int argc, char * * argv)
     if (argc == 2 && std::string(argv[1]) == "__dump-language") {
         experimentalFeatureSettings.experimentalFeatures = {
             Xp::Flakes,
-            Xp::FetchClosure,
             Xp::DynamicDerivations,
         };
         evalSettings.pureEval = false;
