@@ -60,8 +60,7 @@ std::optional<std::string> readHead(const Path & path)
 {
     auto [status, output] = runProgram(RunOptions {
         .program = "git",
-        // FIXME: use 'HEAD' to avoid returning all refs
-        .args = {"ls-remote", "--symref", path},
+        .args = {"ls-remote", "--symref", path, "HEAD"},
         .isInteractive = true,
     });
     if (status != 0) return std::nullopt;
@@ -76,6 +75,31 @@ std::optional<std::string> readHead(const Path & path)
             case git::LsRemoteRefLine::Kind::Object:
                 debug("resolved HEAD rev '%s' for repo '%s'", parseResult->target, path);
                 break;
+        }
+        return parseResult->target;
+    }
+    return std::nullopt;
+}
+
+// Returns the latest revision
+std::optional<std::string> readRevision(const Path & path, const std::string & reference)
+{
+    auto [status, output] = runProgram(RunOptions {
+        .program = "git",
+        .args = {"ls-remote", path, reference},
+        .isInteractive = true,
+    });
+    if (status != 0) return std::nullopt;
+
+    std::string_view line = output;
+    line = line.substr(0, line.find("\n"));
+    if (const auto parseResult = git::parseLsRemoteLine(line)) {
+        switch (parseResult->kind) {
+            case git::LsRemoteRefLine::Kind::Object:
+                debug("resolved revision '%s' from reference '%s' on '%s'", parseResult->target, path, reference);
+                break;
+            case git::LsRemoteRefLine::Kind::Symbolic:
+                throw Error("Should git should never resolve a symbolic revision without  '--symref'");
         }
         return parseResult->target;
     }
@@ -131,6 +155,48 @@ std::optional<std::string> readHeadCached(const std::string & actualUrl)
 
     return std::nullopt;
 }
+
+
+std::optional<std::string> readRevisionCached(const std::string & actualUrl, const std::string & reference)
+{
+    Path cacheDir = getCachePath(actualUrl);
+    Path localRefFile =
+                reference.compare(0, 5, "refs/") == 0
+                ? cacheDir + "/" + reference
+                : cacheDir + "/refs/heads/" + reference;
+    struct stat st;
+    auto existsInCache = (stat(localRefFile.c_str(), &st) == 0);
+
+
+    std::optional<std::string> cachedRevision;
+    if (existsInCache) {
+        time_t now = time(0);
+        auto cacheIsFresh = isCacheFileWithinTtl(now, st);
+
+        if (cacheIsFresh) {
+            // Returning a cached revision if available and fresh
+            debug("using fresh cached revision '%s' for repo '%s'", *cachedRevision, actualUrl);
+            auto cachedRevision = readRevision(cacheDir, reference);
+            assert(cachedRevision.has_value());
+            return cachedRevision;
+        }
+
+        auto revision = readRevision(actualUrl, reference);
+        if (revision) {
+            // Returning a fresh revision if the cache exists but is expired
+            return revision;
+        }
+
+        warn("could not get a fresh revision for reference '%s' in repo '%s'; using expired cached revision '%s'", reference, actualUrl, *cachedRevision);
+        auto cachedRevision = readRevision(cacheDir, reference);
+        assert(cachedRevision.has_value());
+        return cachedRevision;
+    }
+
+    // Return a fresh revision if there is none in the cache
+    return readRevision(actualUrl, reference);
+}
+
 
 bool isNotDotGitDirectory(const Path & path)
 {
@@ -473,37 +539,63 @@ struct GitInputScheme : InputScheme
                     head = "master";
                 }
                 input.attrs.insert_or_assign("ref", *head);
-                unlockedAttrs.insert_or_assign("ref", *head);
             }
 
             if (!input.getRev())
-                input.attrs.insert_or_assign("rev",
-                    Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "--git-dir", gitDir, "rev-parse", *input.getRef() })), htSHA1).gitRev());
+            {
+                auto rev = Hash::parseAny(chomp(runProgram("git", true, { "-C", actualUrl, "--git-dir", gitDir, "rev-parse", *input.getRef() })), htSHA1).gitRev();
+                input.attrs.insert_or_assign("rev", rev);
+                unlockedAttrs.insert_or_assign("rev", rev);
+            }
 
             repoDir = actualUrl;
         } else {
             const bool useHeadRef = !input.getRef();
-            if (useHeadRef) {
+            // Set ref to the head if it is unset
+            if (!input.getRef()) {
                 auto head = readHeadCached(actualUrl);
                 if (!head) {
                     warn("could not read HEAD ref from repo at '%s', using 'master'", actualUrl);
                     head = "master";
                 }
                 input.attrs.insert_or_assign("ref", *head);
-                unlockedAttrs.insert_or_assign("ref", *head);
-            } else {
-                if (!input.getRev()) {
-                    unlockedAttrs.insert_or_assign("ref", input.getRef().value());
-                }
             }
+
+            // At this point we should always have a reference
+            assert(input.getRef());
+
+
+
+            // Find the latest revision for a reference
+            // This should always succeed when the repo is reachable
+            // If we are offline
+            if (!input.getRev()) {
+                auto reference = input.getRef();
+                if (!reference) {
+                    // Should never happen. If there is no reference, the code above should set it to HEAD
+                    throw Error("No reference nor revision specified for repository '%s'", actualUrl);
+                }
+                auto remoteRev = readRevisionCached(actualUrl, *reference);
+                if (!remoteRev){
+                    throw Error("Could not find revision for reference '%s' in repository '%s'. Also cacheDirExists '%s'", *reference, actualUrl);
+                }
+                input.attrs.insert_or_assign("rev", *remoteRev);
+            }
+
+            // At this point we should always have a revision
+            assert(input.getRev());
+
+            unlockedAttrs.insert_or_assign("rev", input.getRev()->gitRev());
+
+            // Lockup in the cache
             if (auto res = getCache()->lookup(store, unlockedAttrs)) {
+                // If we have a rev, check that it matches the rev in the cache.
                 auto rev2 = Hash::parseAny(getStrAttr(res->first, "rev"), htSHA1);
                 if (input.getRev() == rev2) {
+                    // If it does we are done
                     return makeResult(res->first, std::move(res->second));
                 }
             }
-
-            // XXX TODO: Do a lightweight fetch to find out what the head and head commit is.
 
             Path cacheDir = getCachePath(actualUrl);
             repoDir = cacheDir;
@@ -526,26 +618,14 @@ struct GitInputScheme : InputScheme
 
             /* If a rev was specified, we need to fetch if it's not in the
                repo. */
-            if (input.getRev()) {
-                try {
-                    runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "cat-file", "-e", input.getRev()->gitRev() });
-                    doFetch = false;
-                } catch (ExecError & e) {
-                    if (WIFEXITED(e.status)) {
-                        doFetch = true;
-                    } else {
-                        throw;
-                    }
-                }
-            } else {
-                if (allRefs) {
+            try {
+                runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "cat-file", "-e", input.getRev()->gitRev() });
+                doFetch = false;
+            } catch (ExecError & e) {
+                if (WIFEXITED(e.status)) {
                     doFetch = true;
                 } else {
-                    /* If the local ref is older than ‘tarball-ttl’ seconds, do a
-                       git fetch to update the local ref to the remote ref. */
-                    struct stat st;
-                    doFetch = stat(localRefFile.c_str(), &st) != 0 ||
-                        !isCacheFileWithinTtl(now, st);
+                    throw;
                 }
             }
 
@@ -574,9 +654,6 @@ struct GitInputScheme : InputScheme
                 if (useHeadRef && !storeCachedHead(actualUrl, *input.getRef()))
                     warn("could not update cached head '%s' for '%s'", *input.getRef(), actualUrl);
             }
-
-            if (!input.getRev())
-                input.attrs.insert_or_assign("rev", Hash::parseAny(chomp(readFile(localRefFile)), htSHA1).gitRev());
 
             // cache dir lock is removed at scope end; we will only use read-only operations on specific revisions in the remainder
         }
