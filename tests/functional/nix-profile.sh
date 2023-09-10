@@ -50,8 +50,9 @@ printf false > $flake1Dir/ca.nix
 cp "${config_nix}" $flake1Dir/
 
 # Test upgrading from nix-env.
-nix-env -f ./user-envs.nix -i foo-1.0
+nix-env -f ./user-envs.nix -i foo-1.0 foo-0.1
 nix profile list | grep -A2 'Name:.*foo' | grep 'Store paths:.*foo-1.0'
+nix profile list | grep -A2 'Name:.*foo' | grep 'Store paths:.*foo-0.1'
 nix profile install $flake1Dir -L
 nix profile list | grep -A4 'Name:.*flake1' | grep 'Locked flake URL:.*narHash'
 grep '"priority":10' $TEST_HOME/.nix-profile/manifest.json
@@ -64,7 +65,7 @@ nix profile diff-closures | grep 'env-manifest.nix: ε → ∅'
 
 # Test XDG Base Directories support
 export NIX_CONFIG="use-xdg-base-directories = true"
-nix profile remove flake1 2>&1 | grep 'removed 1 packages'
+nix profile remove foo-0.1 flake1 foo 2>&1 | grep 'removed 1 packages'
 nix profile install $flake1Dir
 [[ $($TEST_HOME/.local/state/nix/profile/bin/hello) = "Hello World" ]]
 unset NIX_CONFIG

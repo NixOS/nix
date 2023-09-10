@@ -31,7 +31,6 @@ let
       // {
         meta = {
           description = "A silly test package with some \${escaped anti-quotation} in it";
-          priority = 10;
           inherit platforms;
         };
       }
