@@ -451,6 +451,7 @@
             passthru.perl-bindings = with final; perl.pkgs.toPerlModule (currentStdenv.mkDerivation {
               name = "nix-perl-${version}";
 
+              sourceRoot = "source/subprojects/nix-perl";
               src = self;
 
               nativeBuildInputs =
@@ -477,7 +478,6 @@
 
               enableParallelBuilding = true;
 
-              postUnpack = "sourceRoot=$sourceRoot/perl";
             });
 
             meta.platforms = lib.platforms.unix;
