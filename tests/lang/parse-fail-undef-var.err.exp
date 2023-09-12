@@ -1,0 +1,7 @@
+error: undefined variable 'y'
+
+       at «stdin»:1:4:
+
+            1| x: y
+             |    ^
+            2|

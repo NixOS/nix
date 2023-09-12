@@ -1,27 +1,29 @@
 #pragma once
+///@file
 
+#include <cstdlib>
 #include <mutex>
 #include <condition_variable>
 #include <cassert>
 
 namespace nix {
 
-/* This template class ensures synchronized access to a value of type
-   T. It is used as follows:
-
-     struct Data { int x; ... };
-
-     Sync<Data> data;
-
-     {
-       auto data_(data.lock());
-       data_->x = 123;
-     }
-
-   Here, "data" is automatically unlocked when "data_" goes out of
-   scope.
-*/
-
+/**
+ * This template class ensures synchronized access to a value of type
+ * T. It is used as follows:
+ *
+ *   struct Data { int x; ... };
+ *
+ *   Sync<Data> data;
+ *
+ *   {
+ *     auto data_(data.lock());
+ *     data_->x = 123;
+ *   }
+ *
+ * Here, "data" is automatically unlocked when "data_" goes out of
+ * scope.
+ */
 template<class T, class M = std::mutex>
 class Sync
 {
@@ -33,6 +35,7 @@ public:
 
     Sync() { }
     Sync(const T & data) : data(data) { }
+    Sync(T && data) noexcept : data(std::move(data)) { }
 
     class Lock
     {
@@ -55,11 +58,11 @@ public:
         }
 
         template<class Rep, class Period>
-        void wait_for(std::condition_variable & cv,
+        std::cv_status wait_for(std::condition_variable & cv,
             const std::chrono::duration<Rep, Period> & duration)
         {
             assert(s);
-            cv.wait_for(lk, duration);
+            return cv.wait_for(lk, duration);
         }
 
         template<class Rep, class Period, class Predicate>

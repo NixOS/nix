@@ -1,94 +1,125 @@
 #include "value-to-json.hh"
-#include "json.hh"
 #include "eval-inline.hh"
 #include "util.hh"
+#include "store-api.hh"
 
 #include <cstdlib>
 #include <iomanip>
+#include <nlohmann/json.hpp>
 
 
 namespace nix {
-
-void printValueAsJSON(EvalState & state, bool strict,
-    Value & v, JSONPlaceholder & out, PathSet & context)
+using json = nlohmann::json;
+json printValueAsJSON(EvalState & state, bool strict,
+    Value & v, const PosIdx pos, NixStringContext & context, bool copyToStore)
 {
     checkInterrupt();
 
-    if (strict) state.forceValue(v);
+    if (strict) state.forceValue(v, pos);
 
-    switch (v.type) {
+    json out;
 
-        case tInt:
-            out.write(v.integer);
+    switch (v.type()) {
+
+        case nInt:
+            out = v.integer;
             break;
 
-        case tBool:
-            out.write(v.boolean);
+        case nBool:
+            out = v.boolean;
             break;
 
-        case tString:
+        case nString:
             copyContext(v, context);
-            out.write(v.string.s);
+            out = v.string.s;
             break;
 
-        case tPath:
-            out.write(state.copyPathToStore(context, v.path));
+        case nPath:
+            if (copyToStore)
+                out = state.store->printStorePath(
+                    state.copyPathToStore(context, v.path()));
+            else
+                out = v.path().path.abs();
             break;
 
-        case tNull:
-            out.write(nullptr);
+        case nNull:
+            // already initialized as null
             break;
 
-        case tAttrs: {
-            Bindings::iterator i = v.attrs->find(state.sOutPath);
+        case nAttrs: {
+            auto maybeString = state.tryAttrsToString(pos, v, context, false, false);
+            if (maybeString) {
+                out = *maybeString;
+                break;
+            }
+            auto i = v.attrs->find(state.sOutPath);
             if (i == v.attrs->end()) {
-                auto obj(out.object());
+                out = json::object();
                 StringSet names;
                 for (auto & j : *v.attrs)
-                    names.insert(j.name);
+                    names.emplace(state.symbols[j.name]);
                 for (auto & j : names) {
                     Attr & a(*v.attrs->find(state.symbols.create(j)));
-                    auto placeholder(obj.placeholder(j));
-                    printValueAsJSON(state, strict, *a.value, placeholder, context);
+                    try {
+                        out[j] = printValueAsJSON(state, strict, *a.value, a.pos, context, copyToStore);
+                    } catch (Error & e) {
+                        e.addTrace(state.positions[a.pos],
+                            hintfmt("while evaluating attribute '%1%'", j));
+                        throw;
+                    }
                 }
             } else
-                printValueAsJSON(state, strict, *i->value, out, context);
+                return printValueAsJSON(state, strict, *i->value, i->pos, context, copyToStore);
             break;
         }
 
-        case tList1: case tList2: case tListN: {
-            auto list(out.list());
-            for (unsigned int n = 0; n < v.listSize(); ++n) {
-                auto placeholder(list.placeholder());
-                printValueAsJSON(state, strict, *v.listElems()[n], placeholder, context);
+        case nList: {
+            out = json::array();
+            int i = 0;
+            for (auto elem : v.listItems()) {
+                try {
+                    out.push_back(printValueAsJSON(state, strict, *elem, pos, context, copyToStore));
+                } catch (Error & e) {
+                    e.addTrace({},
+                        hintfmt("while evaluating list element at index %1%", i));
+                    throw;
+                }
+                i++;
             }
             break;
         }
 
-        case tExternal:
-            v.external->printValueAsJSON(state, strict, out, context);
+        case nExternal:
+            return v.external->printValueAsJSON(state, strict, context, copyToStore);
             break;
 
-        case tFloat:
-            out.write(v.fpoint);
+        case nFloat:
+            out = v.fpoint;
             break;
 
-        default:
-            throw TypeError(format("cannot convert %1% to JSON") % showType(v));
+        case nThunk:
+        case nFunction:
+            auto e = TypeError({
+                .msg = hintfmt("cannot convert %1% to JSON", showType(v)),
+                .errPos = state.positions[v.determinePos(pos)]
+            });
+            e.addTrace(state.positions[pos], hintfmt("message for the trace"));
+            state.debugThrowLastTrace(e);
+            throw e;
     }
+    return out;
 }
 
 void printValueAsJSON(EvalState & state, bool strict,
-    Value & v, std::ostream & str, PathSet & context)
+    Value & v, const PosIdx pos, std::ostream & str, NixStringContext & context, bool copyToStore)
 {
-    JSONPlaceholder out(str);
-    printValueAsJSON(state, strict, v, out, context);
+    str << printValueAsJSON(state, strict, v, pos, context, copyToStore);
 }
 
-void ExternalValueBase::printValueAsJSON(EvalState & state, bool strict,
-    JSONPlaceholder & out, PathSet & context) const
+json ExternalValueBase::printValueAsJSON(EvalState & state, bool strict,
+    NixStringContext & context, bool copyToStore) const
 {
-    throw TypeError(format("cannot convert %1% to JSON") % showType());
+    state.debugThrowLastTrace(TypeError("cannot convert %1% to JSON", showType()));
 }
 
 

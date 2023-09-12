@@ -1,144 +1,174 @@
-#include "config.h"
 #include "json-to-value.hh"
 
-#include <cstring>
+#include <variant>
+#include <nlohmann/json.hpp>
+
+using json = nlohmann::json;
 
 namespace nix {
 
-
-static void skipWhitespace(const char * & s)
-{
-    while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
-}
-
-
-static string parseJSONString(const char * & s)
-{
-    string res;
-    if (*s++ != '"') throw JSONParseError("expected JSON string");
-    while (*s != '"') {
-        if (!*s) throw JSONParseError("got end-of-string in JSON string");
-        if (*s == '\\') {
-            s++;
-            if (*s == '"') res += '"';
-            else if (*s == '\\') res += '\\';
-            else if (*s == '/') res += '/';
-            else if (*s == '/') res += '/';
-            else if (*s == 'b') res += '\b';
-            else if (*s == 'f') res += '\f';
-            else if (*s == 'n') res += '\n';
-            else if (*s == 'r') res += '\r';
-            else if (*s == 't') res += '\t';
-            else if (*s == 'u') throw JSONParseError("\\u characters in JSON strings are currently not supported");
-            else throw JSONParseError("invalid escaped character in JSON string");
-            s++;
-        } else
-            res += *s++;
-    }
-    s++;
-    return res;
-}
-
-
-static void parseJSON(EvalState & state, const char * & s, Value & v)
-{
-    skipWhitespace(s);
-
-    if (!*s) throw JSONParseError("expected JSON value");
-
-    if (*s == '[') {
-        s++;
-        ValueVector values;
-        values.reserve(128);
-        skipWhitespace(s);
-        while (1) {
-            if (values.empty() && *s == ']') break;
-            Value * v2 = state.allocValue();
-            parseJSON(state, s, *v2);
-            values.push_back(v2);
-            skipWhitespace(s);
-            if (*s == ']') break;
-            if (*s != ',') throw JSONParseError("expected ‘,’ or ‘]’ after JSON array element");
-            s++;
+// for more information, refer to
+// https://github.com/nlohmann/json/blob/master/include/nlohmann/detail/input/json_sax.hpp
+class JSONSax : nlohmann::json_sax<json> {
+    class JSONState {
+    protected:
+        std::unique_ptr<JSONState> parent;
+        RootValue v;
+    public:
+        virtual std::unique_ptr<JSONState> resolve(EvalState &)
+        {
+            throw std::logic_error("tried to close toplevel json parser state");
         }
-        s++;
-        state.mkList(v, values.size());
-        for (size_t n = 0; n < values.size(); ++n)
-            v.listElems()[n] = values[n];
-    }
+        explicit JSONState(std::unique_ptr<JSONState> && p) : parent(std::move(p)) {}
+        explicit JSONState(Value * v) : v(allocRootValue(v)) {}
+        JSONState(JSONState & p) = delete;
+        Value & value(EvalState & state)
+        {
+            if (!v)
+                v = allocRootValue(state.allocValue());
+            return **v;
+        }
+        virtual ~JSONState() {}
+        virtual void add() {}
+    };
 
-    else if (*s == '{') {
-        s++;
+    class JSONObjectState : public JSONState {
+        using JSONState::JSONState;
         ValueMap attrs;
-        while (1) {
-            skipWhitespace(s);
-            if (attrs.empty() && *s == '}') break;
-            string name = parseJSONString(s);
-            skipWhitespace(s);
-            if (*s != ':') throw JSONParseError("expected ‘:’ in JSON object");
-            s++;
-            Value * v2 = state.allocValue();
-            parseJSON(state, s, *v2);
-            attrs[state.symbols.create(name)] = v2;
-            skipWhitespace(s);
-            if (*s == '}') break;
-            if (*s != ',') throw JSONParseError("expected ‘,’ or ‘}’ after JSON member");
-            s++;
+        std::unique_ptr<JSONState> resolve(EvalState & state) override
+        {
+            auto attrs2 = state.buildBindings(attrs.size());
+            for (auto & i : attrs)
+                attrs2.insert(i.first, i.second);
+            parent->value(state).mkAttrs(attrs2.alreadySorted());
+            return std::move(parent);
         }
-        state.mkAttrs(v, attrs.size());
-        for (auto & i : attrs)
-            v.attrs->push_back(Attr(i.first, i.second));
-        v.attrs->sort();
-        s++;
-    }
-
-    else if (*s == '"') {
-        mkString(v, parseJSONString(s));
-    }
-
-    else if (isdigit(*s) || *s == '-' || *s == '.' ) {
-        // Buffer into a string first, then use built-in C++ conversions
-        std::string tmp_number;
-        ValueType number_type = tInt;
-
-        while (isdigit(*s) || *s == '-' || *s == '.' || *s == 'e' || *s == 'E') {
-            if (*s == '.' || *s == 'e' || *s == 'E')
-                number_type = tFloat;
-            tmp_number += *s++;
+        void add() override { v = nullptr; }
+    public:
+        void key(string_t & name, EvalState & state)
+        {
+            attrs.insert_or_assign(state.symbols.create(name), &value(state));
         }
+    };
 
-        if (number_type == tFloat)
-            mkFloat(v, stod(tmp_number));
-        else
-            mkInt(v, stoi(tmp_number));
+    class JSONListState : public JSONState {
+        ValueVector values;
+        std::unique_ptr<JSONState> resolve(EvalState & state) override
+        {
+            Value & v = parent->value(state);
+            state.mkList(v, values.size());
+            for (size_t n = 0; n < values.size(); ++n) {
+                v.listElems()[n] = values[n];
+            }
+            return std::move(parent);
+        }
+        void add() override {
+            values.push_back(*v);
+            v = nullptr;
+        }
+    public:
+        JSONListState(std::unique_ptr<JSONState> && p, std::size_t reserve) : JSONState(std::move(p))
+        {
+            values.reserve(reserve);
+        }
+    };
+
+    EvalState & state;
+    std::unique_ptr<JSONState> rs;
+
+public:
+    JSONSax(EvalState & state, Value & v) : state(state), rs(new JSONState(&v)) {};
+
+    bool null()
+    {
+        rs->value(state).mkNull();
+        rs->add();
+        return true;
     }
 
-    else if (strncmp(s, "true", 4) == 0) {
-        s += 4;
-        mkBool(v, true);
+    bool boolean(bool val)
+    {
+        rs->value(state).mkBool(val);
+        rs->add();
+        return true;
     }
 
-    else if (strncmp(s, "false", 5) == 0) {
-        s += 5;
-        mkBool(v, false);
+    bool number_integer(number_integer_t val)
+    {
+        rs->value(state).mkInt(val);
+        rs->add();
+        return true;
     }
 
-    else if (strncmp(s, "null", 4) == 0) {
-        s += 4;
-        mkNull(v);
+    bool number_unsigned(number_unsigned_t val)
+    {
+        rs->value(state).mkInt(val);
+        rs->add();
+        return true;
     }
 
-    else throw JSONParseError("unrecognised JSON value");
-}
+    bool number_float(number_float_t val, const string_t & s)
+    {
+        rs->value(state).mkFloat(val);
+        rs->add();
+        return true;
+    }
 
+    bool string(string_t & val)
+    {
+        rs->value(state).mkString(val);
+        rs->add();
+        return true;
+    }
 
-void parseJSON(EvalState & state, const string & s_, Value & v)
+#if NLOHMANN_JSON_VERSION_MAJOR >= 3 && NLOHMANN_JSON_VERSION_MINOR >= 8
+    bool binary(binary_t&)
+    {
+        // This function ought to be unreachable
+        assert(false);
+        return true;
+    }
+#endif
+
+    bool start_object(std::size_t len)
+    {
+        rs = std::make_unique<JSONObjectState>(std::move(rs));
+        return true;
+    }
+
+    bool key(string_t & name)
+    {
+        dynamic_cast<JSONObjectState*>(rs.get())->key(name, state);
+        return true;
+    }
+
+    bool end_object() {
+        rs = rs->resolve(state);
+        rs->add();
+        return true;
+    }
+
+    bool end_array() {
+        return end_object();
+    }
+
+    bool start_array(size_t len) {
+        rs = std::make_unique<JSONListState>(std::move(rs),
+            len != std::numeric_limits<size_t>::max() ? len : 128);
+        return true;
+    }
+
+    bool parse_error(std::size_t, const std::string&, const nlohmann::detail::exception& ex) {
+        throw JSONParseError(ex.what());
+    }
+};
+
+void parseJSON(EvalState & state, const std::string_view & s_, Value & v)
 {
-    const char * s = s_.c_str();
-    parseJSON(state, s, v);
-    skipWhitespace(s);
-    if (*s) throw JSONParseError(format("expected end-of-string while parsing JSON value: %1%") % s);
+    JSONSax parser(state, v);
+    bool res = json::sax_parse(s_, &parser);
+    if (!res)
+        throw JSONParseError("Invalid JSON Value");
 }
-
 
 }

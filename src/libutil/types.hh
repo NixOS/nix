@@ -1,153 +1,119 @@
 #pragma once
-
-#include "config.h"
+///@file
 
 #include "ref.hh"
 
-#include <string>
 #include <list>
 #include <set>
-#include <memory>
-
-#include <boost/format.hpp>
-
-/* Before 4.7, gcc's std::exception uses empty throw() specifiers for
- * its (virtual) destructor and what() in c++11 mode, in violation of spec
- */
-#ifdef __GNUC__
-#if __GNUC__ < 4 || (__GNUC__ == 4 && __GNUC_MINOR__ < 7)
-#define EXCEPTION_NEEDS_THROW_SPEC
-#endif
-#endif
-
+#include <string>
+#include <limits>
+#include <map>
+#include <variant>
+#include <vector>
 
 namespace nix {
 
+typedef std::list<std::string> Strings;
+typedef std::set<std::string> StringSet;
+typedef std::map<std::string, std::string> StringMap;
+typedef std::map<std::string, std::string> StringPairs;
 
-/* Inherit some names from other namespaces for convenience. */
-using std::string;
-using std::list;
-using std::set;
-using std::vector;
-using boost::format;
+/**
+ * Paths are just strings.
+ */
+typedef std::string Path;
+typedef std::string_view PathView;
+typedef std::list<Path> Paths;
+typedef std::set<Path> PathSet;
 
+typedef std::vector<std::pair<std::string, std::string>> Headers;
 
-struct FormatOrString
+/**
+ * Helper class to run code at startup.
+ */
+template<typename T>
+struct OnStartup
 {
-    string s;
-    FormatOrString(const string & s) : s(s) { };
-    FormatOrString(const format & f) : s(f.str()) { };
-    FormatOrString(const char * s) : s(s) { };
+    OnStartup(T && t) { t(); }
+};
+
+/**
+ * Wrap bools to prevent string literals (i.e. 'char *') from being
+ * cast to a bool in Attr.
+ */
+template<typename T>
+struct Explicit {
+    T t;
+
+    bool operator ==(const Explicit<T> & other) const
+    {
+        return t == other.t;
+    }
 };
 
 
-/* A helper for formatting strings. ‘fmt(format, a_0, ..., a_n)’ is
-   equivalent to ‘boost::format(format) % a_0 % ... %
-   ... a_n’. However, ‘fmt(s)’ is equivalent to ‘s’ (so no %-expansion
-   takes place). */
+/**
+ * This wants to be a little bit like rust's Cow type.
+ * Some parts of the evaluator benefit greatly from being able to reuse
+ * existing allocations for strings, but have to be able to also use
+ * newly allocated storage for values.
+ *
+ * We do not define implicit conversions, even with ref qualifiers,
+ * since those can easily become ambiguous to the reader and can degrade
+ * into copying behaviour we want to avoid.
+ */
+class BackedStringView {
+private:
+    std::variant<std::string, std::string_view> data;
 
-inline void formatHelper(boost::format & f)
-{
-}
-
-template<typename T, typename... Args>
-inline void formatHelper(boost::format & f, T x, Args... args)
-{
-    formatHelper(f % x, args...);
-}
-
-inline std::string fmt(const std::string & s)
-{
-    return s;
-}
-
-inline std::string fmt(const char * s)
-{
-    return s;
-}
-
-inline std::string fmt(const FormatOrString & fs)
-{
-    return fs.s;
-}
-
-template<typename... Args>
-inline std::string fmt(const std::string & fs, Args... args)
-{
-    boost::format f(fs);
-    formatHelper(f, args...);
-    return f.str();
-}
-
-
-/* BaseError should generally not be caught, as it has Interrupted as
-   a subclass. Catch Error instead. */
-class BaseError : public std::exception
-{
-protected:
-    string prefix_; // used for location traces etc.
-    string err;
-public:
-    unsigned int status = 1; // exit status
-
-    template<typename... Args>
-    BaseError(unsigned int status, Args... args)
-        : err(fmt(args...))
-        , status(status)
-    {
-    }
-
-    template<typename... Args>
-    BaseError(Args... args)
-        : err(fmt(args...))
-    {
-    }
-
-#ifdef EXCEPTION_NEEDS_THROW_SPEC
-    ~BaseError() throw () { };
-    const char * what() const throw () { return err.c_str(); }
-#else
-    const char * what() const noexcept { return err.c_str(); }
-#endif
-
-    const string & msg() const { return err; }
-    const string & prefix() const { return prefix_; }
-    BaseError & addPrefix(const FormatOrString & fs);
-};
-
-#define MakeError(newClass, superClass) \
-    class newClass : public superClass                  \
-    {                                                   \
-    public:                                             \
-        using superClass::superClass;                   \
+    /**
+     * Needed to introduce a temporary since operator-> must return
+     * a pointer. Without this we'd need to store the view object
+     * even when we already own a string.
+     */
+    class Ptr {
+    private:
+        std::string_view view;
+    public:
+        Ptr(std::string_view view): view(view) {}
+        const std::string_view * operator->() const { return &view; }
     };
 
-MakeError(Error, BaseError)
-
-class SysError : public Error
-{
 public:
-    int errNo;
+    BackedStringView(std::string && s): data(std::move(s)) {}
+    BackedStringView(std::string_view sv): data(sv) {}
+    template<size_t N>
+    BackedStringView(const char (& lit)[N]): data(std::string_view(lit)) {}
 
-    template<typename... Args>
-    SysError(Args... args)
-        : Error(addErrno(fmt(args...)))
-    { }
+    BackedStringView(const BackedStringView &) = delete;
+    BackedStringView & operator=(const BackedStringView &) = delete;
 
-private:
+    /**
+     * We only want move operations defined since the sole purpose of
+     * this type is to avoid copies.
+     */
+    BackedStringView(BackedStringView && other) = default;
+    BackedStringView & operator=(BackedStringView && other) = default;
 
-    std::string addErrno(const std::string & s);
+    bool isOwned() const
+    {
+        return std::holds_alternative<std::string>(data);
+    }
+
+    std::string toOwned() &&
+    {
+        return isOwned()
+            ? std::move(std::get<std::string>(data))
+            : std::string(std::get<std::string_view>(data));
+    }
+
+    std::string_view operator*() const
+    {
+        return isOwned()
+            ? std::get<std::string>(data)
+            : std::get<std::string_view>(data);
+    }
+    Ptr operator->() const { return Ptr(**this); }
 };
-
-
-typedef list<string> Strings;
-typedef set<string> StringSet;
-
-
-/* Paths are just strings. */
-typedef string Path;
-typedef list<Path> Paths;
-typedef set<Path> PathSet;
-
 
 }

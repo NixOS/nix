@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include <functional>
 #include <limits>
@@ -11,33 +12,37 @@
 
 namespace nix {
 
-/* This template class implements a simple pool manager of resources
-   of some type R, such as database connections. It is used as
-   follows:
-
-     class Connection { ... };
-
-     Pool<Connection> pool;
-
-     {
-       auto conn(pool.get());
-       conn->exec("select ...");
-     }
-
-   Here, the Connection object referenced by ‘conn’ is automatically
-   returned to the pool when ‘conn’ goes out of scope.
-*/
-
+/**
+ * This template class implements a simple pool manager of resources
+ * of some type R, such as database connections. It is used as
+ * follows:
+ *
+ *   class Connection { ... };
+ *
+ *   Pool<Connection> pool;
+ *
+ *   {
+ *     auto conn(pool.get());
+ *     conn->exec("select ...");
+ *   }
+ *
+ * Here, the Connection object referenced by ‘conn’ is automatically
+ * returned to the pool when ‘conn’ goes out of scope.
+ */
 template <class R>
 class Pool
 {
 public:
 
-    /* A function that produces new instances of R on demand. */
+    /**
+     * A function that produces new instances of R on demand.
+     */
     typedef std::function<ref<R>()> Factory;
 
-    /* A function that checks whether an instance of R is still
-       usable. Unusable instances are removed from the pool. */
+    /**
+     * A function that checks whether an instance of R is still
+     * usable. Unusable instances are removed from the pool.
+     */
     typedef std::function<bool(const ref<R> &)> Validator;
 
 private:
@@ -68,6 +73,22 @@ public:
         state_->max = max;
     }
 
+    void incCapacity()
+    {
+        auto state_(state.lock());
+        state_->max++;
+        /* we could wakeup here, but this is only used when we're
+         * about to nest Pool usages, and we want to save the slot for
+         * the nested use if we can
+         */
+    }
+
+    void decCapacity()
+    {
+        auto state_(state.lock());
+        state_->max--;
+    }
+
     ~Pool()
     {
         auto state_(state.lock());
@@ -81,6 +102,7 @@ public:
     private:
         Pool & pool;
         std::shared_ptr<R> r;
+        bool bad = false;
 
         friend Pool;
 
@@ -96,7 +118,8 @@ public:
             if (!r) return;
             {
                 auto state_(pool.state.lock());
-                state_->idle.push_back(ref<R>(r));
+                if (!bad)
+                    state_->idle.push_back(ref<R>(r));
                 assert(state_->inUse);
                 state_->inUse--;
             }
@@ -105,6 +128,8 @@ public:
 
         R * operator -> () { return &*r; }
         R & operator * () { return *r; }
+
+        void markBad() { bad = true; }
     };
 
     Handle get()
@@ -137,14 +162,30 @@ public:
         } catch (...) {
             auto state_(state.lock());
             state_->inUse--;
+            wakeup.notify_one();
             throw;
         }
     }
 
-    unsigned int count()
+    size_t count()
     {
         auto state_(state.lock());
         return state_->idle.size() + state_->inUse;
+    }
+
+    size_t capacity()
+    {
+        return state.lock()->max;
+    }
+
+    void flushBad()
+    {
+        auto state_(state.lock());
+        std::vector<ref<R>> left;
+        for (auto & p : state_->idle)
+            if (validator(p))
+                left.push_back(p);
+        std::swap(state_->idle, left);
     }
 };
 

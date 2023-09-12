@@ -60,10 +60,10 @@ sub readManifest_ {
     # Decompress the manifest if necessary.
     if ($manifest =~ /\.bz2$/) {
         open MANIFEST, "$Nix::Config::bzip2 -d < $manifest |"
-            or die "cannot decompress ‘$manifest’: $!";
+            or die "cannot decompress '$manifest': $!";
     } else {
         open MANIFEST, "<$manifest"
-            or die "cannot open ‘$manifest’: $!";
+            or die "cannot open '$manifest': $!";
     }
 
     my $inside = 0;
@@ -287,7 +287,7 @@ sub parseNARInfo {
         # FIXME: might be useful to support multiple signatures per .narinfo.
 
         if (!defined $sig) {
-            warn "NAR info file ‘$location’ lacks a signature; ignoring\n";
+            warn "NAR info file '$location' lacks a signature; ignoring\n";
             return undef;
         }
         my ($keyName, $sig64) = split ":", $sig;
@@ -295,7 +295,7 @@ sub parseNARInfo {
 
         my $publicKey = $Nix::Config::binaryCachePublicKeys{$keyName};
         if (!defined $publicKey) {
-            warn "NAR info file ‘$location’ is signed by unknown key ‘$keyName’; ignoring\n";
+            warn "NAR info file '$location' is signed by unknown key '$keyName'; ignoring\n";
             return undef;
         }
 
@@ -306,12 +306,12 @@ sub parseNARInfo {
                 [ map { "$Nix::Config::storeDir/$_" } @refs ]);
         };
         if ($@) {
-            warn "cannot compute fingerprint of ‘$location’; ignoring\n";
+            warn "cannot compute fingerprint of '$location'; ignoring\n";
             return undef;
         }
 
         if (!checkSignature($publicKey, decode_base64($sig64), $fingerprint)) {
-            warn "NAR info file ‘$location’ has an incorrect signature; ignoring\n";
+            warn "NAR info file '$location' has an incorrect signature; ignoring\n";
             return undef;
         }
 

@@ -2,6 +2,21 @@ with import ./config.nix;
 
 rec {
 
+  # Want to ensure that "out" doesn't get a suffix on it's path.
+  nameCheck = mkDerivation {
+    name = "multiple-outputs-a";
+    outputs = [ "out" "dev" ];
+    builder = builtins.toFile "builder.sh"
+      ''
+        mkdir $first $second
+        test -z $all
+        echo "first" > $first/file
+        echo "second" > $second/file
+        ln -s $first $second/link
+      '';
+    helloString = "Hello, world!";
+  };
+
   a = mkDerivation {
     name = "multiple-outputs-a";
     outputs = [ "first" "second" ];
@@ -14,6 +29,15 @@ rec {
         ln -s $first $second/link
       '';
     helloString = "Hello, world!";
+  };
+
+  use-a = mkDerivation {
+    name = "use-a";
+    inherit (a) first second;
+    builder = builtins.toFile "builder.sh"
+      ''
+        cat $first/file $second/file >$out
+      '';
   };
 
   b = mkDerivation {
@@ -64,5 +88,43 @@ rec {
         echo $c > $a/baz
       '';
   }).a;
+
+  e = mkDerivation {
+    name = "multiple-outputs-e";
+    outputs = [ "a_a" "b" "c" ];
+    meta.outputsToInstall = [ "a_a" "b" ];
+    buildCommand = "mkdir $a_a $b $c";
+  };
+
+  independent = mkDerivation {
+    name = "multiple-outputs-independent";
+    outputs = [ "first" "second" ];
+    builder = builtins.toFile "builder.sh"
+      ''
+        mkdir $first $second
+        test -z $all
+        echo "first" > $first/file
+        echo "second" > $second/file
+      '';
+  };
+
+  use-independent = mkDerivation {
+    name = "use-independent";
+    inherit (a) first second;
+    builder = builtins.toFile "builder.sh"
+      ''
+        cat $first/file $second/file >$out
+      '';
+  };
+
+  invalid-output-name-1 = mkDerivation {
+    name = "invalid-output-name-1";
+    outputs = [ "out/"];
+  };
+
+  invalid-output-name-2 = mkDerivation {
+    name = "invalid-output-name-2";
+    outputs = [ "x" "foo$"];
+  };
 
 }

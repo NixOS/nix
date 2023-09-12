@@ -2,17 +2,17 @@ source common.sh
 
 clearStore
 
-outPath1=$(echo 'with import ./config.nix; mkDerivation { name = "foo1"; builder = builtins.toFile "builder" "mkdir $out; echo hello > $out/foo"; }' | nix-build - --no-out-link --option auto-optimise-store true)
-outPath2=$(echo 'with import ./config.nix; mkDerivation { name = "foo2"; builder = builtins.toFile "builder" "mkdir $out; echo hello > $out/foo"; }' | nix-build - --no-out-link --option auto-optimise-store true)
+outPath1=$(echo 'with import ./config.nix; mkDerivation { name = "foo1"; builder = builtins.toFile "builder" "mkdir $out; echo hello > $out/foo"; }' | nix-build - --no-out-link --auto-optimise-store)
+outPath2=$(echo 'with import ./config.nix; mkDerivation { name = "foo2"; builder = builtins.toFile "builder" "mkdir $out; echo hello > $out/foo"; }' | nix-build - --no-out-link --auto-optimise-store)
 
-inode1="$(perl -e "print ((lstat('$outPath1/foo'))[1])")"
-inode2="$(perl -e "print ((lstat('$outPath2/foo'))[1])")"
+inode1="$(stat --format=%i $outPath1/foo)"
+inode2="$(stat --format=%i $outPath2/foo)"
 if [ "$inode1" != "$inode2" ]; then
     echo "inodes do not match"
     exit 1
 fi
 
-nlink="$(perl -e "print ((lstat('$outPath1/foo'))[3])")"
+nlink="$(stat --format=%h $outPath1/foo)"
 if [ "$nlink" != 3 ]; then
     echo "link count incorrect"
     exit 1
@@ -20,16 +20,17 @@ fi
 
 outPath3=$(echo 'with import ./config.nix; mkDerivation { name = "foo3"; builder = builtins.toFile "builder" "mkdir $out; echo hello > $out/foo"; }' | nix-build - --no-out-link)
 
-inode3="$(perl -e "print ((lstat('$outPath3/foo'))[1])")"
+inode3="$(stat --format=%i $outPath3/foo)"
 if [ "$inode1" = "$inode3" ]; then
     echo "inodes match unexpectedly"
     exit 1
 fi
 
-nix-store --optimise
+# XXX: This should work through the daemon too
+NIX_REMOTE="" nix-store --optimise
 
-inode1="$(perl -e "print ((lstat('$outPath1/foo'))[1])")"
-inode3="$(perl -e "print ((lstat('$outPath3/foo'))[1])")"
+inode1="$(stat --format=%i $outPath1/foo)"
+inode3="$(stat --format=%i $outPath3/foo)"
 if [ "$inode1" != "$inode3" ]; then
     echo "inodes do not match"
     exit 1

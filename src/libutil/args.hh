@@ -1,163 +1,298 @@
 #pragma once
+///@file
 
 #include <iostream>
 #include <map>
 #include <memory>
 
+#include <nlohmann/json_fwd.hpp>
+
 #include "util.hh"
 
 namespace nix {
 
-MakeError(UsageError, Error);
-
 enum HashType : char;
+
+class MultiCommand;
 
 class Args
 {
 public:
 
-    /* Parse the command line, throwing a UsageError if something goes
-       wrong. */
+    /**
+     * Parse the command line, throwing a UsageError if something goes
+     * wrong.
+     */
     void parseCmdline(const Strings & cmdline);
 
-    virtual void printHelp(const string & programName, std::ostream & out);
-
+    /**
+     * Return a short one-line description of the command.
+     */
     virtual std::string description() { return ""; }
+
+    virtual bool forceImpureByDefault() { return false; }
+
+    /**
+     * Return documentation about this command, in Markdown format.
+     */
+    virtual std::string doc() { return ""; }
 
 protected:
 
-    /* Flags. */
-    struct Flag
+    static const size_t ArityAny = std::numeric_limits<size_t>::max();
+
+    struct Handler
     {
-        char shortName;
-        std::string description;
-        Strings labels;
+        std::function<void(std::vector<std::string>)> fun;
         size_t arity;
-        std::function<void(Strings)> handler;
+
+        Handler() {}
+
+        Handler(std::function<void(std::vector<std::string>)> && fun)
+            : fun(std::move(fun))
+            , arity(ArityAny)
+        { }
+
+        Handler(std::function<void()> && handler)
+            : fun([handler{std::move(handler)}](std::vector<std::string>) { handler(); })
+            , arity(0)
+        { }
+
+        Handler(std::function<void(std::string)> && handler)
+            : fun([handler{std::move(handler)}](std::vector<std::string> ss) {
+                handler(std::move(ss[0]));
+              })
+            , arity(1)
+        { }
+
+        Handler(std::function<void(std::string, std::string)> && handler)
+            : fun([handler{std::move(handler)}](std::vector<std::string> ss) {
+                handler(std::move(ss[0]), std::move(ss[1]));
+              })
+            , arity(2)
+        { }
+
+        Handler(std::vector<std::string> * dest)
+            : fun([=](std::vector<std::string> ss) { *dest = ss; })
+            , arity(ArityAny)
+        { }
+
+        Handler(std::string * dest)
+            : fun([=](std::vector<std::string> ss) { *dest = ss[0]; })
+            , arity(1)
+        { }
+
+        Handler(std::optional<std::string> * dest)
+            : fun([=](std::vector<std::string> ss) { *dest = ss[0]; })
+            , arity(1)
+        { }
+
+        template<class T>
+        Handler(T * dest, const T & val)
+            : fun([=](std::vector<std::string> ss) { *dest = val; })
+            , arity(0)
+        { }
+
+        template<class I>
+        Handler(I * dest)
+            : fun([=](std::vector<std::string> ss) {
+                *dest = string2IntWithUnitPrefix<I>(ss[0]);
+              })
+            , arity(1)
+        { }
+
+        template<class I>
+        Handler(std::optional<I> * dest)
+            : fun([=](std::vector<std::string> ss) {
+                *dest = string2IntWithUnitPrefix<I>(ss[0]);
+            })
+            , arity(1)
+        { }
     };
 
-    std::map<std::string, Flag> longFlags;
-    std::map<char, Flag> shortFlags;
+    /* Options. */
+    struct Flag
+    {
+        typedef std::shared_ptr<Flag> ptr;
+
+        std::string longName;
+        std::set<std::string> aliases;
+        char shortName = 0;
+        std::string description;
+        std::string category;
+        Strings labels;
+        Handler handler;
+        std::function<void(size_t, std::string_view)> completer;
+
+        std::optional<ExperimentalFeature> experimentalFeature;
+
+        static Flag mkHashTypeFlag(std::string && longName, HashType * ht);
+        static Flag mkHashTypeOptFlag(std::string && longName, std::optional<HashType> * oht);
+    };
+
+    std::map<std::string, Flag::ptr> longFlags;
+    std::map<char, Flag::ptr> shortFlags;
 
     virtual bool processFlag(Strings::iterator & pos, Strings::iterator end);
-
-    void printFlags(std::ostream & out);
 
     /* Positional arguments. */
     struct ExpectedArg
     {
         std::string label;
-        size_t arity; // 0 = any
-        std::function<void(Strings)> handler;
+        bool optional = false;
+        Handler handler;
+        std::function<void(size_t, std::string_view)> completer;
     };
 
     std::list<ExpectedArg> expectedArgs;
 
     virtual bool processArgs(const Strings & args, bool finish);
 
+    virtual Strings::iterator rewriteArgs(Strings & args, Strings::iterator pos)
+    { return pos; }
+
+    std::set<std::string> hiddenCategories;
+
+    /**
+     * Called after all command line flags before the first non-flag
+     * argument (if any) have been processed.
+     */
+    virtual void initialFlagsProcessed() {}
+
+    /**
+     * Called after the command line has been processed if we need to generate
+     * completions. Useful for commands that need to know the whole command line
+     * in order to know what completions to generate.
+     */
+    virtual void completionHook() { }
+
 public:
 
-    /* Helper functions for constructing flags / positional
-       arguments. */
+    void addFlag(Flag && flag);
 
-    void mkFlag(char shortName, const std::string & longName,
-        const Strings & labels, const std::string & description,
-        size_t arity, std::function<void(Strings)> handler)
+    void removeFlag(const std::string & longName);
+
+    void expectArgs(ExpectedArg && arg)
     {
-        auto flag = Flag{shortName, description, labels, arity, handler};
-        if (shortName) shortFlags[shortName] = flag;
-        longFlags[longName] = flag;
+        expectedArgs.emplace_back(std::move(arg));
     }
 
-    void mkFlag(char shortName, const std::string & longName,
-        const std::string & description, std::function<void()> fun)
+    /**
+     * Expect a string argument.
+     */
+    void expectArg(const std::string & label, std::string * dest, bool optional = false)
     {
-        mkFlag(shortName, longName, {}, description, 0, std::bind(fun));
-    }
-
-    void mkFlag1(char shortName, const std::string & longName,
-        const std::string & label, const std::string & description,
-        std::function<void(std::string)> fun)
-    {
-        mkFlag(shortName, longName, {label}, description, 1, [=](Strings ss) {
-            fun(ss.front());
+        expectArgs({
+            .label = label,
+            .optional = optional,
+            .handler = {dest}
         });
     }
 
-    void mkFlag(char shortName, const std::string & name,
-        const std::string & description, bool * dest)
+    /**
+     * Expect 0 or more arguments.
+     */
+    void expectArgs(const std::string & label, std::vector<std::string> * dest)
     {
-        mkFlag(shortName, name, description, dest, true);
-    }
-
-    void mkFlag(char shortName, const std::string & longName,
-        const std::string & label, const std::string & description,
-        string * dest)
-    {
-        mkFlag1(shortName, longName, label, description, [=](std::string s) {
-            *dest = s;
+        expectArgs({
+            .label = label,
+            .handler = {dest}
         });
     }
 
-    void mkHashTypeFlag(const std::string & name, HashType * ht);
-
-    template<class T>
-    void mkFlag(char shortName, const std::string & longName, const std::string & description,
-        T * dest, const T & value)
-    {
-        mkFlag(shortName, longName, {}, description, 0, [=](Strings ss) {
-            *dest = value;
-        });
-    }
-
-    template<class I>
-    void mkIntFlag(char shortName, const std::string & longName,
-        const std::string & description, I * dest)
-    {
-        mkFlag<I>(shortName, longName, description, [=](I n) {
-            *dest = n;
-        });
-    }
-
-    template<class I>
-    void mkFlag(char shortName, const std::string & longName,
-        const std::string & description, std::function<void(I)> fun)
-    {
-        mkFlag(shortName, longName, {"N"}, description, 1, [=](Strings ss) {
-            I n;
-            if (!string2Int(ss.front(), n))
-                throw UsageError(format("flag ‘--%1%’ requires a integer argument") % longName);
-            fun(n);
-        });
-    }
-
-    /* Expect a string argument. */
-    void expectArg(const std::string & label, string * dest)
-    {
-        expectedArgs.push_back(ExpectedArg{label, 1, [=](Strings ss) {
-            *dest = ss.front();
-        }});
-    }
-
-    /* Expect 0 or more arguments. */
-    void expectArgs(const std::string & label, Strings * dest)
-    {
-        expectedArgs.push_back(ExpectedArg{label, 0, [=](Strings ss) {
-            *dest = ss;
-        }});
-    }
+    virtual nlohmann::json toJSON();
 
     friend class MultiCommand;
+
+    MultiCommand * parent = nullptr;
+
+private:
+
+    /**
+     * Experimental features needed when parsing args. These are checked
+     * after flag parsing is completed in order to support enabling
+     * experimental features coming after the flag that needs the
+     * experimental feature.
+     */
+    std::set<ExperimentalFeature> flagExperimentalFeatures;
+};
+
+/**
+ * A command is an argument parser that can be executed by calling its
+ * run() method.
+ */
+struct Command : virtual public Args
+{
+    friend class MultiCommand;
+
+    virtual ~Command() { }
+
+    /**
+     * Entry point to the command
+     */
+    virtual void run() = 0;
+
+    typedef int Category;
+
+    static constexpr Category catDefault = 0;
+
+    virtual std::optional<ExperimentalFeature> experimentalFeature ();
+
+    virtual Category category() { return catDefault; }
+};
+
+typedef std::map<std::string, std::function<ref<Command>()>> Commands;
+
+/**
+ * An argument parser that supports multiple subcommands,
+ * i.e. ‘<command> <subcommand>’.
+ */
+class MultiCommand : virtual public Args
+{
+public:
+    Commands commands;
+
+    std::map<Command::Category, std::string> categories;
+
+    /**
+     * Selected command, if any.
+     */
+    std::optional<std::pair<std::string, ref<Command>>> command;
+
+    MultiCommand(const Commands & commands);
+
+    bool processFlag(Strings::iterator & pos, Strings::iterator end) override;
+
+    bool processArgs(const Strings & args, bool finish) override;
+
+    void completionHook() override;
+
+    nlohmann::json toJSON() override;
 };
 
 Strings argvToStrings(int argc, char * * argv);
 
-/* Helper function for rendering argument labels. */
-std::string renderLabels(const Strings & labels);
+struct Completion {
+    std::string completion;
+    std::string description;
 
-/* Helper function for printing 2-column tables. */
-typedef std::vector<std::pair<std::string, std::string>> Table2;
+    bool operator<(const Completion & other) const;
+};
+class Completions : public std::set<Completion> {
+public:
+    void add(std::string completion, std::string description = "");
+};
+extern std::shared_ptr<Completions> completions;
 
-void printTable(std::ostream & out, const Table2 & table);
+enum CompletionType {
+    ctNormal,
+    ctFilenames,
+    ctAttrs
+};
+extern CompletionType completionType;
+
+void completePath(size_t, std::string_view prefix);
+
+void completeDir(size_t, std::string_view prefix);
 
 }

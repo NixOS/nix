@@ -1,5 +1,3 @@
-#include "config.h"
-
 #include "util.hh"
 #include "local-store.hh"
 #include "globals.hh"
@@ -11,6 +9,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdio.h>
+#include <regex>
 
 
 namespace nix {
@@ -18,18 +17,16 @@ namespace nix {
 
 static void makeWritable(const Path & path)
 {
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path ‘%1%’") % path);
+    auto st = lstat(path);
     if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
-        throw SysError(format("changing writability of ‘%1%’") % path);
+        throw SysError("changing writability of '%1%'", path);
 }
 
 
 struct MakeReadOnly
 {
     Path path;
-    MakeReadOnly(const Path & path) : path(path) { }
+    MakeReadOnly(const PathView path) : path(path) { }
     ~MakeReadOnly()
     {
         try {
@@ -47,18 +44,18 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
     debug("loading hash inodes in memory");
     InodeHash inodeHash;
 
-    AutoCloseDir dir = opendir(linksDir.c_str());
-    if (!dir) throw SysError(format("opening directory ‘%1%’") % linksDir);
+    AutoCloseDir dir(opendir(linksDir.c_str()));
+    if (!dir) throw SysError("opening directory '%1%'", linksDir);
 
     struct dirent * dirent;
-    while (errno = 0, dirent = readdir(dir)) { /* sic */
+    while (errno = 0, dirent = readdir(dir.get())) { /* sic */
         checkInterrupt();
         // We don't care if we hit non-hash files, anything goes
         inodeHash.insert(dirent->d_ino);
     }
-    if (errno) throw SysError(format("reading directory ‘%1%’") % linksDir);
+    if (errno) throw SysError("reading directory '%1%'", linksDir);
 
-    printMsg(lvlTalkative, format("loaded %1% hash inodes") % inodeHash.size());
+    printMsg(lvlTalkative, "loaded %1% hash inodes", inodeHash.size());
 
     return inodeHash;
 }
@@ -68,40 +65,52 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
 {
     Strings names;
 
-    AutoCloseDir dir = opendir(path.c_str());
-    if (!dir) throw SysError(format("opening directory ‘%1%’") % path);
+    AutoCloseDir dir(opendir(path.c_str()));
+    if (!dir) throw SysError("opening directory '%1%'", path);
 
     struct dirent * dirent;
-    while (errno = 0, dirent = readdir(dir)) { /* sic */
+    while (errno = 0, dirent = readdir(dir.get())) { /* sic */
         checkInterrupt();
 
         if (inodeHash.count(dirent->d_ino)) {
-            debug(format("‘%1%’ is already linked") % dirent->d_name);
+            debug("'%1%' is already linked", dirent->d_name);
             continue;
         }
 
-        string name = dirent->d_name;
+        std::string name = dirent->d_name;
         if (name == "." || name == "..") continue;
         names.push_back(name);
     }
-    if (errno) throw SysError(format("reading directory ‘%1%’") % path);
+    if (errno) throw SysError("reading directory '%1%'", path);
 
     return names;
 }
 
 
-void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHash & inodeHash)
+void LocalStore::optimisePath_(Activity * act, OptimiseStats & stats,
+    const Path & path, InodeHash & inodeHash, RepairFlag repair)
 {
     checkInterrupt();
 
-    struct stat st;
-    if (lstat(path.c_str(), &st))
-        throw SysError(format("getting attributes of path ‘%1%’") % path);
+    auto st = lstat(path);
+
+#if __APPLE__
+    /* HFS/macOS has some undocumented security feature disabling hardlinking for
+       special files within .app dirs. *.app/Contents/PkgInfo and
+       *.app/Contents/Resources/\*.lproj seem to be the only paths affected. See
+       https://github.com/NixOS/nix/issues/1443 for more discussion. */
+
+    if (std::regex_search(path, std::regex("\\.app/Contents/.+$")))
+    {
+        debug("'%1%' is not allowed to be linked in macOS", path);
+        return;
+    }
+#endif
 
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectoryIgnoringInodes(path, inodeHash);
         for (auto & i : names)
-            optimisePath_(stats, path + "/" + i, inodeHash);
+            optimisePath_(act, stats, path + "/" + i, inodeHash, repair);
         return;
     }
 
@@ -117,13 +126,13 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
        NixOS (example: $fontconfig/var/cache being modified).  Skip
        those files.  FIXME: check the modification time. */
     if (S_ISREG(st.st_mode) && (st.st_mode & S_IWUSR)) {
-        printError(format("skipping suspicious writable file ‘%1%’") % path);
+        warn("skipping suspicious writable file '%1%'", path);
         return;
     }
 
     /* This can still happen on top-level files. */
     if (st.st_nlink > 1 && inodeHash.count(st.st_ino)) {
-        debug(format("‘%1%’ is already linked, with %2% other file(s)") % path % (st.st_nlink - 2));
+        debug("'%s' is already linked, with %d other file(s)", path, st.st_nlink - 2);
         return;
     }
 
@@ -137,12 +146,25 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
        contents of the symlink (i.e. the result of readlink()), not
        the contents of the target (which may not even exist). */
     Hash hash = hashPath(htSHA256, path).first;
-    debug(format("‘%1%’ has hash ‘%2%’") % path % printHash(hash));
+    debug("'%1%' has hash '%2%'", path, hash.to_string(Base32, true));
 
     /* Check if this is a known hash. */
-    Path linkPath = linksDir + "/" + printHash32(hash);
+    Path linkPath = linksDir + "/" + hash.to_string(Base32, false);
 
- retry:
+    /* Maybe delete the link, if it has been corrupted. */
+    if (pathExists(linkPath)) {
+        auto stLink = lstat(linkPath);
+        if (st.st_size != stLink.st_size
+            || (repair && hash != hashPath(htSHA256, linkPath).first))
+        {
+            // XXX: Consider overwriting linkPath with our valid version.
+            warn("removing corrupted link '%s'", linkPath);
+            warn("There may be more corrupted paths."
+                 "\nYou should run `nix-store --verify --check-contents --repair` to fix them all");
+            unlink(linkPath.c_str());
+        }
+    }
+
     if (!pathExists(linkPath)) {
         /* Nope, create a hard link in the links directory. */
         if (link(path.c_str(), linkPath.c_str()) == 0) {
@@ -161,45 +183,37 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
                full.  When that happens, it's fine to ignore it: we
                just effectively disable deduplication of this
                file.  */
-            printInfo("cannot link ‘%s’ to ‘%s’: %s", linkPath, path, strerror(errno));
+            printInfo("cannot link '%s' to '%s': %s", linkPath, path, strerror(errno));
             return;
 
         default:
-            throw SysError("cannot link ‘%1%’ to ‘%2%’", linkPath, path);
+            throw SysError("cannot link '%1%' to '%2%'", linkPath, path);
         }
     }
 
     /* Yes!  We've seen a file with the same contents.  Replace the
        current file with a hard link to that file. */
-    struct stat stLink;
-    if (lstat(linkPath.c_str(), &stLink))
-        throw SysError(format("getting attributes of path ‘%1%’") % linkPath);
+    auto stLink = lstat(linkPath);
 
     if (st.st_ino == stLink.st_ino) {
-        debug(format("‘%1%’ is already linked to ‘%2%’") % path % linkPath);
+        debug("'%1%' is already linked to '%2%'", path, linkPath);
         return;
     }
 
-    if (st.st_size != stLink.st_size) {
-        printError(format("removing corrupted link ‘%1%’") % linkPath);
-        unlink(linkPath.c_str());
-        goto retry;
-    }
-
-    printMsg(lvlTalkative, format("linking ‘%1%’ to ‘%2%’") % path % linkPath);
+    printMsg(lvlTalkative, "linking '%1%' to '%2%'", path, linkPath);
 
     /* Make the containing directory writable, but only if it's not
        the store itself (we don't want or need to mess with its
        permissions). */
-    bool mustToggle = dirOf(path) != realStoreDir;
-    if (mustToggle) makeWritable(dirOf(path));
+    const Path dirOfPath(dirOf(path));
+    bool mustToggle = dirOfPath != realStoreDir.get();
+    if (mustToggle) makeWritable(dirOfPath);
 
     /* When we're done, make the directory read-only again and reset
        its timestamp back to 0. */
-    MakeReadOnly makeReadOnly(mustToggle ? dirOf(path) : "");
+    MakeReadOnly makeReadOnly(mustToggle ? dirOfPath : "");
 
-    Path tempLink = (format("%1%/.tmp-link-%2%-%3%")
-        % realStoreDir % getpid() % rand()).str();
+    Path tempLink = fmt("%1%/.tmp-link-%2%-%3%", realStoreDir, getpid(), random());
 
     if (link(linkPath.c_str(), tempLink.c_str()) == -1) {
         if (errno == EMLINK) {
@@ -207,50 +221,59 @@ void LocalStore::optimisePath_(OptimiseStats & stats, const Path & path, InodeHa
                systems).  This is likely to happen with empty files.
                Just shrug and ignore. */
             if (st.st_size)
-                printInfo(format("‘%1%’ has maximum number of links") % linkPath);
+                printInfo("'%1%' has maximum number of links", linkPath);
             return;
         }
-        throw SysError("cannot link ‘%1%’ to ‘%2%’", tempLink, linkPath);
+        throw SysError("cannot link '%1%' to '%2%'", tempLink, linkPath);
     }
 
     /* Atomically replace the old file with the new hard link. */
-    if (rename(tempLink.c_str(), path.c_str()) == -1) {
+    try {
+        renameFile(tempLink, path);
+    } catch (SysError & e) {
         if (unlink(tempLink.c_str()) == -1)
-            printError(format("unable to unlink ‘%1%’") % tempLink);
+            printError("unable to unlink '%1%'", tempLink);
         if (errno == EMLINK) {
             /* Some filesystems generate too many links on the rename,
                rather than on the original link.  (Probably it
                temporarily increases the st_nlink field before
                decreasing it again.) */
-            if (st.st_size)
-                printInfo(format("‘%1%’ has maximum number of links") % linkPath);
+            debug("'%s' has reached maximum number of links", linkPath);
             return;
         }
-        throw SysError(format("cannot rename ‘%1%’ to ‘%2%’") % tempLink % path);
+        throw;
     }
 
     stats.filesLinked++;
     stats.bytesFreed += st.st_size;
     stats.blocksFreed += st.st_blocks;
+
+    if (act)
+        act->result(resFileLinked, st.st_size, st.st_blocks);
 }
 
 
 void LocalStore::optimiseStore(OptimiseStats & stats)
 {
-    PathSet paths = queryAllValidPaths();
+    Activity act(*logger, actOptimiseStore);
+
+    auto paths = queryAllValidPaths();
     InodeHash inodeHash = loadInodeHash();
+
+    act.progress(0, paths.size());
+
+    uint64_t done = 0;
 
     for (auto & i : paths) {
         addTempRoot(i);
         if (!isValidPath(i)) continue; /* path was GC'ed, probably */
-        Activity act(*logger, lvlChatty, format("hashing files in ‘%1%’") % i);
-        optimisePath_(stats, realStoreDir + "/" + baseNameOf(i), inodeHash);
+        {
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
+            optimisePath_(&act, stats, realStoreDir + "/" + std::string(i.to_string()), inodeHash, NoRepair);
+        }
+        done++;
+        act.progress(done, paths.size());
     }
-}
-
-static string showBytes(unsigned long long bytes)
-{
-    return (format("%.2f MiB") % (bytes / (1024.0 * 1024.0))).str();
 }
 
 void LocalStore::optimiseStore()
@@ -259,18 +282,17 @@ void LocalStore::optimiseStore()
 
     optimiseStore(stats);
 
-    printError(
-        format("%1% freed by hard-linking %2% files")
-        % showBytes(stats.bytesFreed)
-        % stats.filesLinked);
+    printInfo("%s freed by hard-linking %d files",
+        showBytes(stats.bytesFreed),
+        stats.filesLinked);
 }
 
-void LocalStore::optimisePath(const Path & path)
+void LocalStore::optimisePath(const Path & path, RepairFlag repair)
 {
     OptimiseStats stats;
     InodeHash inodeHash;
 
-    if (settings.autoOptimiseStore) optimisePath_(stats, path, inodeHash);
+    if (settings.autoOptimiseStore) optimisePath_(nullptr, stats, path, inodeHash, repair);
 }
 
 

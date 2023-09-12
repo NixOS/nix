@@ -1,51 +1,25 @@
 package Nix::Config;
 
 use MIME::Base64;
+use Nix::Store;
 
 $version = "@PACKAGE_VERSION@";
 
-$binDir = $ENV{"NIX_BIN_DIR"} || "@bindir@";
-$libexecDir = $ENV{"NIX_LIBEXEC_DIR"} || "@libexecdir@";
-$stateDir = $ENV{"NIX_STATE_DIR"} || "@localstatedir@/nix";
-$logDir = $ENV{"NIX_LOG_DIR"} || "@localstatedir@/log/nix";
-$confDir = $ENV{"NIX_CONF_DIR"} || "@sysconfdir@/nix";
-$storeDir = $ENV{"NIX_STORE_DIR"} || "@storedir@";
-
-$bzip2 = "@bzip2@";
-$xz = "@xz@";
-$curl = "@curl@";
-
-$useBindings = "@perlbindings@" eq "yes";
+$binDir = Nix::Store::getBinDir;
+$storeDir = Nix::Store::getStoreDir;
 
 %config = ();
 
-%binaryCachePublicKeys = ();
-
-$defaultPublicKeys = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
-
 sub readConfig {
-    if (defined $ENV{'_NIX_OPTIONS'}) {
-        foreach my $s (split '\n', $ENV{'_NIX_OPTIONS'}) {
-            my ($n, $v) = split '=', $s, 2;
-            $config{$n} = $v;
-        }
-    } else {
-        my $config = "$confDir/nix.conf";
-        return unless -f $config;
+    my $config = "$confDir/nix.conf";
+    return unless -f $config;
 
-        open CONFIG, "<$config" or die "cannot open ‘$config’";
-        while (<CONFIG>) {
-            /^\s*([\w\-\.]+)\s*=\s*(.*)$/ or next;
-            $config{$1} = $2;
-        }
-        close CONFIG;
+    open CONFIG, "<$config" or die "cannot open '$config'";
+    while (<CONFIG>) {
+        /^\s*([\w\-\.]+)\s*=\s*(.*)$/ or next;
+        $config{$1} = $2;
     }
-
-    foreach my $s (split(/ /, $config{"binary-cache-public-keys"} // $defaultPublicKeys)) {
-        my ($keyName, $publicKey) = split ":", $s;
-        next unless defined $keyName && defined $publicKey;
-        $binaryCachePublicKeys{$keyName} = decode_base64($publicKey);
-    }
+    close CONFIG;
 }
 
 return 1;

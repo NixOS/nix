@@ -3,6 +3,9 @@ programs-list :=
 # Build a program with symbolic name $(1).  The program is defined by
 # various variables prefixed by ‘$(1)_’:
 #
+# - $(1)_NAME: the name of the program (e.g. ‘foo’); defaults to
+#   $(1).
+#
 # - $(1)_DIR: the directory where the (non-installed) program will be
 #   placed.
 #
@@ -23,36 +26,41 @@ programs-list :=
 # - $(1)_INSTALL_DIR: the directory where the program will be
 #   installed; defaults to $(bindir).
 define build-program
+  $(1)_NAME ?= $(1)
   _d := $(buildprefix)$$($(1)_DIR)
   _srcs := $$(sort $$(foreach src, $$($(1)_SOURCES), $$(src)))
   $(1)_OBJS := $$(addprefix $(buildprefix), $$(addsuffix .o, $$(basename $$(_srcs))))
-  _libs := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_PATH))
-  $(1)_PATH := $$(_d)/$(1)
+  _libs := $$(foreach lib, $$($(1)_LIBS), $$(foreach lib2, $$($$(lib)_LIB_CLOSURE), $$($$(lib2)_PATH)))
+  $(1)_PATH := $$(_d)/$$($(1)_NAME)
 
   $$(eval $$(call create-dir, $$(_d)))
 
   $$($(1)_PATH): $$($(1)_OBJS) $$(_libs) | $$(_d)/
-	$$(trace-ld) $(CXX) -o $$@ $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
+	+$$(trace-ld) $(CXX) -o $$@ $$(LDFLAGS) $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE))
 
   $(1)_INSTALL_DIR ?= $$(bindir)
-  $(1)_INSTALL_PATH := $$($(1)_INSTALL_DIR)/$(1)
 
-  $$(eval $$(call create-dir, $$($(1)_INSTALL_DIR)))
+  ifdef $(1)_INSTALL_DIR
 
-  install: $(DESTDIR)$$($(1)_INSTALL_PATH)
+    $(1)_INSTALL_PATH := $$($(1)_INSTALL_DIR)/$$($(1)_NAME)
 
-  ifeq ($(BUILD_SHARED_LIBS), 1)
+    $$(eval $$(call create-dir, $$($(1)_INSTALL_DIR)))
 
-    _libs_final := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_INSTALL_PATH))
+    install: $(DESTDIR)$$($(1)_INSTALL_PATH)
 
-    $(DESTDIR)$$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final) | $(DESTDIR)$$($(1)_INSTALL_DIR)/
-	$$(trace-ld) $(CXX) -o $$@ $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
+    ifeq ($(BUILD_SHARED_LIBS), 1)
 
-  else
+      _libs_final := $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_INSTALL_PATH))
 
-    $(DESTDIR)$$($(1)_INSTALL_PATH): $$($(1)_PATH) | $(DESTDIR)$$($(1)_INSTALL_DIR)/
-	install -t $$($(1)_INSTALL_DIR) $$<
+      $(DESTDIR)$$($(1)_INSTALL_PATH): $$($(1)_OBJS) $$(_libs_final) | $(DESTDIR)$$($(1)_INSTALL_DIR)/
+	+$$(trace-ld) $(CXX) -o $$@ $$(LDFLAGS) $$(GLOBAL_LDFLAGS) $$($(1)_OBJS) $$($(1)_LDFLAGS) $$(foreach lib, $$($(1)_LIBS), $$($$(lib)_LDFLAGS_USE_INSTALLED))
 
+    else
+
+      $(DESTDIR)$$($(1)_INSTALL_PATH): $$($(1)_PATH) | $(DESTDIR)$$($(1)_INSTALL_DIR)/
+	+$$(trace-install) install -t $(DESTDIR)$$($(1)_INSTALL_DIR) $$<
+
+    endif
   endif
 
   # Propagate CFLAGS and CXXFLAGS to the individual object files.
@@ -75,5 +83,10 @@ define build-program
 
   programs-list += $$($(1)_PATH)
   clean-files += $$($(1)_PATH) $$(_d)/*.o $$(_d)/.*.dep $$($(1)_DEPS) $$($(1)_OBJS)
-  dist-files += $$(_srcs)
+
+  # Phony target to run this program (typically as a dependency of 'check').
+  .PHONY: $(1)_RUN
+  $(1)_RUN: $$($(1)_PATH)
+	$(trace-test) $$($(1)_PATH)
+
 endef

@@ -2,6 +2,8 @@
 #include "util.hh"
 #include "derivations.hh"
 #include "store-api.hh"
+#include "path-with-outputs.hh"
+#include "local-fs-store.hh"
 #include "globals.hh"
 #include "shared.hh"
 #include "eval.hh"
@@ -15,10 +17,12 @@ namespace nix {
 DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
 {
     DrvInfos elems;
-    Path manifestFile = userEnv + "/manifest.nix";
+    if (pathExists(userEnv + "/manifest.json"))
+        throw Error("profile '%s' is incompatible with 'nix-env'; please use 'nix profile' instead", userEnv);
+    auto manifestFile = userEnv + "/manifest.nix";
     if (pathExists(manifestFile)) {
         Value v;
-        state.evalFile(manifestFile, v);
+        state.evalFile(state.rootPath(CanonPath(manifestFile)), v);
         Bindings & bindings(*state.allocBindings(0));
         getDerivations(state, v, "", bindings, elems, false);
     }
@@ -28,107 +32,117 @@ DrvInfos queryInstalled(EvalState & state, const Path & userEnv)
 
 bool createUserEnv(EvalState & state, DrvInfos & elems,
     const Path & profile, bool keepDerivations,
-    const string & lockToken)
+    const std::string & lockToken)
 {
     /* Build the components in the user environment, if they don't
        exist already. */
-    PathSet drvsToBuild;
+    std::vector<StorePathWithOutputs> drvsToBuild;
     for (auto & i : elems)
-        if (i.queryDrvPath() != "")
-            drvsToBuild.insert(i.queryDrvPath());
+        if (auto drvPath = i.queryDrvPath())
+            drvsToBuild.push_back({*drvPath});
 
-    debug(format("building user environment dependencies"));
-    state.store->buildPaths(drvsToBuild, state.repair ? bmRepair : bmNormal);
+    debug("building user environment dependencies");
+    state.store->buildPaths(
+        toDerivedPaths(drvsToBuild),
+        state.repair ? bmRepair : bmNormal);
 
     /* Construct the whole top level derivation. */
-    PathSet references;
+    StorePathSet references;
     Value manifest;
     state.mkList(manifest, elems.size());
-    unsigned int n = 0;
+    size_t n = 0;
     for (auto & i : elems) {
         /* Create a pseudo-derivation containing the name, system,
            output paths, and optionally the derivation path, as well
            as the meta attributes. */
-        Path drvPath = keepDerivations ? i.queryDrvPath() : "";
+        std::optional<StorePath> drvPath = keepDerivations ? i.queryDrvPath() : std::nullopt;
+        DrvInfo::Outputs outputs = i.queryOutputs(true, true);
+        StringSet metaNames = i.queryMetaNames();
 
-        Value & v(*state.allocValue());
-        manifest.listElems()[n++] = &v;
-        state.mkAttrs(v, 16);
+        auto attrs = state.buildBindings(7 + outputs.size());
 
-        mkString(*state.allocAttr(v, state.sType), "derivation");
-        mkString(*state.allocAttr(v, state.sName), i.name);
-        if (!i.system.empty())
-            mkString(*state.allocAttr(v, state.sSystem), i.system);
-        mkString(*state.allocAttr(v, state.sOutPath), i.queryOutPath());
-        if (drvPath != "")
-            mkString(*state.allocAttr(v, state.sDrvPath), i.queryDrvPath());
+        attrs.alloc(state.sType).mkString("derivation");
+        attrs.alloc(state.sName).mkString(i.queryName());
+        auto system = i.querySystem();
+        if (!system.empty())
+            attrs.alloc(state.sSystem).mkString(system);
+        attrs.alloc(state.sOutPath).mkString(state.store->printStorePath(i.queryOutPath()));
+        if (drvPath)
+            attrs.alloc(state.sDrvPath).mkString(state.store->printStorePath(*drvPath));
 
         // Copy each output meant for installation.
-        DrvInfo::Outputs outputs = i.queryOutputs(true);
-        Value & vOutputs = *state.allocAttr(v, state.sOutputs);
+        auto & vOutputs = attrs.alloc(state.sOutputs);
         state.mkList(vOutputs, outputs.size());
-        unsigned int m = 0;
-        for (auto & j : outputs) {
-            mkString(*(vOutputs.listElems()[m++] = state.allocValue()), j.first);
-            Value & vOutputs = *state.allocAttr(v, state.symbols.create(j.first));
-            state.mkAttrs(vOutputs, 2);
-            mkString(*state.allocAttr(vOutputs, state.sOutPath), j.second);
+        for (const auto & [m, j] : enumerate(outputs)) {
+            (vOutputs.listElems()[m] = state.allocValue())->mkString(j.first);
+            auto outputAttrs = state.buildBindings(2);
+            outputAttrs.alloc(state.sOutPath).mkString(state.store->printStorePath(*j.second));
+            attrs.alloc(j.first).mkAttrs(outputAttrs);
 
             /* This is only necessary when installing store paths, e.g.,
                `nix-env -i /nix/store/abcd...-foo'. */
-            state.store->addTempRoot(j.second);
-            state.store->ensurePath(j.second);
+            state.store->addTempRoot(*j.second);
+            state.store->ensurePath(*j.second);
 
-            references.insert(j.second);
+            references.insert(*j.second);
         }
 
         // Copy the meta attributes.
-        Value & vMeta = *state.allocAttr(v, state.sMeta);
-        state.mkAttrs(vMeta, 16);
-        StringSet metaNames = i.queryMetaNames();
+        auto meta = state.buildBindings(metaNames.size());
         for (auto & j : metaNames) {
             Value * v = i.queryMeta(j);
             if (!v) continue;
-            vMeta.attrs->push_back(Attr(state.symbols.create(j), v));
+            meta.insert(state.symbols.create(j), v);
         }
-        vMeta.attrs->sort();
-        v.attrs->sort();
 
-        if (drvPath != "") references.insert(drvPath);
+        attrs.alloc(state.sMeta).mkAttrs(meta);
+
+        (manifest.listElems()[n++] = state.allocValue())->mkAttrs(attrs);
+
+        if (drvPath) references.insert(*drvPath);
     }
 
     /* Also write a copy of the list of user environment elements to
        the store; we need it for future modifications of the
        environment. */
-    Path manifestFile = state.store->addTextToStore("env-manifest.nix",
-        (format("%1%") % manifest).str(), references);
+    std::ostringstream str;
+    manifest.print(state.symbols, str, true);
+    auto manifestFile = state.store->addTextToStore("env-manifest.nix",
+        str.str(), references);
 
     /* Get the environment builder expression. */
     Value envBuilder;
-    state.evalFile(state.findFile("nix/buildenv.nix"), envBuilder);
+    state.eval(state.parseExprFromString(
+        #include "buildenv.nix.gen.hh"
+            , state.rootPath(CanonPath::root)), envBuilder);
 
     /* Construct a Nix expression that calls the user environment
        builder with the manifest as argument. */
-    Value args, topLevel;
-    state.mkAttrs(args, 3);
-    mkString(*state.allocAttr(args, state.symbols.create("manifest")),
-        manifestFile, {manifestFile});
-    args.attrs->push_back(Attr(state.symbols.create("derivations"), &manifest));
-    args.attrs->sort();
-    mkApp(topLevel, envBuilder, args);
+    auto attrs = state.buildBindings(3);
+    state.mkStorePathString(manifestFile, attrs.alloc("manifest"));
+    attrs.insert(state.symbols.create("derivations"), &manifest);
+    Value args;
+    args.mkAttrs(attrs);
+
+    Value topLevel;
+    topLevel.mkApp(&envBuilder, &args);
 
     /* Evaluate it. */
     debug("evaluating user environment builder");
-    state.forceValue(topLevel);
-    PathSet context;
+    state.forceValue(topLevel, [&]() { return topLevel.determinePos(noPos); });
+    NixStringContext context;
     Attr & aDrvPath(*topLevel.attrs->find(state.sDrvPath));
-    Path topLevelDrv = state.coerceToPath(aDrvPath.pos ? *(aDrvPath.pos) : noPos, *(aDrvPath.value), context);
+    auto topLevelDrv = state.coerceToStorePath(aDrvPath.pos, *aDrvPath.value, context, "");
     Attr & aOutPath(*topLevel.attrs->find(state.sOutPath));
-    Path topLevelOut = state.coerceToPath(aOutPath.pos ? *(aOutPath.pos) : noPos, *(aOutPath.value), context);
+    auto topLevelOut = state.coerceToStorePath(aOutPath.pos, *aOutPath.value, context, "");
 
     /* Realise the resulting store expression. */
     debug("building user environment");
-    state.store->buildPaths({topLevelDrv}, state.repair ? bmRepair : bmNormal);
+    std::vector<StorePathWithOutputs> topLevelDrvs;
+    topLevelDrvs.push_back({topLevelDrv});
+    state.store->buildPaths(
+        toDerivedPaths(topLevelDrvs),
+        state.repair ? bmRepair : bmNormal);
 
     /* Switch the current user environment to the output path. */
     auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();
@@ -139,12 +153,12 @@ bool createUserEnv(EvalState & state, DrvInfos & elems,
 
         Path lockTokenCur = optimisticLockProfile(profile);
         if (lockToken != lockTokenCur) {
-            printError(format("profile ‘%1%’ changed while we were busy; restarting") % profile);
+            printInfo("profile '%1%' changed while we were busy; restarting", profile);
             return false;
         }
 
-        debug(format("switching to new user environment"));
-        Path generation = createGeneration(ref<LocalFSStore>(store2), profile, topLevelOut);
+        debug("switching to new user environment");
+        Path generation = createGeneration(*store2, profile, topLevelOut);
         switchLink(profile, generation);
     }
 

@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "ref.hh"
 #include "types.hh"
@@ -8,17 +9,23 @@
 
 namespace nix {
 
-ref<std::string> compress(const std::string & method, const std::string & in);
-
-ref<std::string> decompress(const std::string & method, const std::string & in);
-
-struct CompressionSink : BufferedSink
+struct CompressionSink : BufferedSink, FinishSink
 {
-    virtual void finish() = 0;
+    using BufferedSink::operator ();
+    using BufferedSink::writeUnbuffered;
+    using FinishSink::finish;
 };
 
-ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink);
+std::string decompress(const std::string & method, std::string_view in);
+
+std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Sink & nextSink);
+
+std::string compress(const std::string & method, std::string_view in, const bool parallel = false, int level = -1);
+
+ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel = false, int level = -1);
 
 MakeError(UnknownCompressionMethod, Error);
+
+MakeError(CompressionError, Error);
 
 }

@@ -1,16 +1,12 @@
-ifeq ($(MAKECMDGOALS), dist)
-  # Make sure we are in repo root with `--git-dir`
-  dist-files += $(shell git --git-dir=.git ls-files || find * -type f)
-endif
-
-dist-files += configure config.h.in nix.spec
-
 clean-files += Makefile.config
 
-GLOBAL_CXXFLAGS += -I . -I src -I src/libutil -I src/libstore -I src/libmain -I src/libexpr \
-  -Wno-unneeded-internal-declaration
+GLOBAL_CXXFLAGS += -Wno-deprecated-declarations -Werror=switch
+# Allow switch-enum to be overridden for files that do not support it, usually because of dependency headers.
+ERROR_SWITCH_ENUM = -Werror=switch-enum
 
-$(foreach i, config.h $(call rwildcard, src/lib*, *.hh) src/nix-store/serve-protocol.hh, \
+$(foreach i, config.h $(wildcard src/lib*/*.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix, 0644)))
 
-$(foreach i, $(call rwildcard, src/boost, *.hpp), $(eval $(call install-file-in, $(i), $(includedir)/nix/$(patsubst src/%/,%,$(dir $(i))), 0644)))
+$(GCH): src/libutil/util.hh config.h
+
+GCH_CXXFLAGS = -I src/libutil

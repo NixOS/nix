@@ -1,7 +1,9 @@
 #pragma once
+///@file
 
 #include "crypto.hh"
 #include "store-api.hh"
+#include "log-store.hh"
 
 #include "pool.hh"
 
@@ -11,138 +13,151 @@ namespace nix {
 
 struct NarInfo;
 
-class BinaryCacheStore : public Store
+struct BinaryCacheStoreConfig : virtual StoreConfig
 {
+    using StoreConfig::StoreConfig;
+
+    const Setting<std::string> compression{(StoreConfig*) this, "xz", "compression",
+        "NAR compression method (`xz`, `bzip2`, `gzip`, `zstd`, or `none`)."};
+
+    const Setting<bool> writeNARListing{(StoreConfig*) this, false, "write-nar-listing",
+        "Whether to write a JSON file that lists the files in each NAR."};
+
+    const Setting<bool> writeDebugInfo{(StoreConfig*) this, false, "index-debug-info",
+        R"(
+          Whether to index DWARF debug info files by build ID. This allows [`dwarffs`](https://github.com/edolstra/dwarffs) to
+          fetch debug info on demand
+        )"};
+
+    const Setting<Path> secretKeyFile{(StoreConfig*) this, "", "secret-key",
+        "Path to the secret key used to sign the binary cache."};
+
+    const Setting<Path> localNarCache{(StoreConfig*) this, "", "local-nar-cache",
+        "Path to a local cache of NARs fetched from this binary cache, used by commands such as `nix store cat`."};
+
+    const Setting<bool> parallelCompression{(StoreConfig*) this, false, "parallel-compression",
+        "Enable multi-threaded compression of NARs. This is currently only available for `xz` and `zstd`."};
+
+    const Setting<int> compressionLevel{(StoreConfig*) this, -1, "compression-level",
+        R"(
+          The *preset level* to be used when compressing NARs.
+          The meaning and accepted values depend on the compression method selected.
+          `-1` specifies that the default compression level should be used.
+        )"};
+};
+
+
+/**
+ * @note subclasses must implement at least one of the two
+ * virtual getFile() methods.
+ */
+class BinaryCacheStore : public virtual BinaryCacheStoreConfig,
+    public virtual Store,
+    public virtual LogStore
+{
+
 private:
 
     std::unique_ptr<SecretKey> secretKey;
 
-    std::string compression;
-
-    bool writeNARListing;
-
 protected:
 
-    BinaryCacheStore(const Params & params);
+    // The prefix under which realisation infos will be stored
+    const std::string realisationsPrefix = "realisations";
 
-    [[noreturn]] void notImpl();
+    BinaryCacheStore(const Params & params);
 
 public:
 
     virtual bool fileExists(const std::string & path) = 0;
 
-    virtual void upsertFile(const std::string & path, const std::string & data) = 0;
+    virtual void upsertFile(const std::string & path,
+        std::shared_ptr<std::basic_iostream<char>> istream,
+        const std::string & mimeType) = 0;
 
-    /* Return the contents of the specified file, or null if it
-       doesn't exist. */
-    virtual void getFile(const std::string & path,
-        std::function<void(std::shared_ptr<std::string>)> success,
-        std::function<void(std::exception_ptr exc)> failure) = 0;
+    void upsertFile(const std::string & path,
+        // FIXME: use std::string_view
+        std::string && data,
+        const std::string & mimeType);
 
-    std::shared_ptr<std::string> getFile(const std::string & path);
+    /**
+     * Dump the contents of the specified file to a sink.
+     */
+    virtual void getFile(const std::string & path, Sink & sink);
 
-protected:
+    /**
+     * Fetch the specified file and call the specified callback with
+     * the result. A subclass may implement this asynchronously.
+     */
+    virtual void getFile(
+        const std::string & path,
+        Callback<std::optional<std::string>> callback) noexcept;
 
-    bool wantMassQuery_ = false;
-    int priority = 50;
+    std::optional<std::string> getFile(const std::string & path);
 
 public:
 
-    virtual void init();
+    virtual void init() override;
 
 private:
 
     std::string narMagic;
 
-    std::string narInfoFileFor(const Path & storePath);
+    std::string narInfoFileFor(const StorePath & storePath);
+
+    void writeNarInfo(ref<NarInfo> narInfo);
+
+    ref<const ValidPathInfo> addToStoreCommon(
+        Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs,
+        std::function<ValidPathInfo(HashResult)> mkInfo);
 
 public:
 
-    bool isValidPathUncached(const Path & path) override;
+    bool isValidPathUncached(const StorePath & path) override;
 
-    PathSet queryAllValidPaths() override
-    { notImpl(); }
+    void queryPathInfoUncached(const StorePath & path,
+        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
-    void queryPathInfoUncached(const Path & path,
-        std::function<void(std::shared_ptr<ValidPathInfo>)> success,
-        std::function<void(std::exception_ptr exc)> failure) override;
+    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
-    void queryReferrers(const Path & path,
-        PathSet & referrers) override
-    { notImpl(); }
+    void addToStore(const ValidPathInfo & info, Source & narSource,
+        RepairFlag repair, CheckSigsFlag checkSigs) override;
 
-    PathSet queryValidDerivers(const Path & path) override
-    { return {}; }
+    StorePath addToStoreFromDump(Source & dump, std::string_view name,
+        FileIngestionMethod method, HashType hashAlgo, RepairFlag repair, const StorePathSet & references) override;
 
-    PathSet queryDerivationOutputs(const Path & path) override
-    { notImpl(); }
+    StorePath addToStore(
+        std::string_view name,
+        const Path & srcPath,
+        FileIngestionMethod method,
+        HashType hashAlgo,
+        PathFilter & filter,
+        RepairFlag repair,
+        const StorePathSet & references) override;
 
-    StringSet queryDerivationOutputNames(const Path & path) override
-    { notImpl(); }
+    StorePath addTextToStore(
+        std::string_view name,
+        std::string_view s,
+        const StorePathSet & references,
+        RepairFlag repair) override;
 
-    Path queryPathFromHashPart(const string & hashPart) override
-    { notImpl(); }
+    void registerDrvOutput(const Realisation & info) override;
 
-    PathSet querySubstitutablePaths(const PathSet & paths) override
-    { return {}; }
+    void queryRealisationUncached(const DrvOutput &,
+        Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
-    void querySubstitutablePathInfos(const PathSet & paths,
-        SubstitutablePathInfos & infos) override
-    { }
-
-    bool wantMassQuery() override { return wantMassQuery_; }
-
-    void addToStore(const ValidPathInfo & info, const ref<std::string> & nar,
-        bool repair, bool dontCheckSigs,
-        std::shared_ptr<FSAccessor> accessor) override;
-
-    Path addToStore(const string & name, const Path & srcPath,
-        bool recursive, HashType hashAlgo,
-        PathFilter & filter, bool repair) override;
-
-    Path addTextToStore(const string & name, const string & s,
-        const PathSet & references, bool repair) override;
-
-    void narFromPath(const Path & path, Sink & sink) override;
-
-    void buildPaths(const PathSet & paths, BuildMode buildMode) override
-    { notImpl(); }
-
-    BuildResult buildDerivation(const Path & drvPath, const BasicDerivation & drv,
-        BuildMode buildMode) override
-    { notImpl(); }
-
-    void ensurePath(const Path & path) override
-    { notImpl(); }
-
-    void addTempRoot(const Path & path) override
-    { notImpl(); }
-
-    void addIndirectRoot(const Path & path) override
-    { notImpl(); }
-
-    void syncWithGC() override
-    { }
-
-    Roots findRoots() override
-    { notImpl(); }
-
-    void collectGarbage(const GCOptions & options, GCResults & results) override
-    { notImpl(); }
-
-    void optimiseStore() override
-    { }
-
-    bool verifyStore(bool checkContents, bool repair) override
-    { return true; }
+    void narFromPath(const StorePath & path, Sink & sink) override;
 
     ref<FSAccessor> getFSAccessor() override;
 
-public:
+    void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 
-    void addSignatures(const Path & storePath, const StringSet & sigs) override
-    { notImpl(); }
+    std::optional<std::string> getBuildLogExact(const StorePath & path) override;
+
+    void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
 };
+
+MakeError(NoSuchBinaryCacheFile, Error);
 
 }

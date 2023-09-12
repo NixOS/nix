@@ -13,24 +13,24 @@ struct CmdCopySigs : StorePathsCommand
 
     CmdCopySigs()
     {
-        mkFlag('s', "substituter", {"store-uri"}, "use signatures from specified store", 1,
-            [&](Strings ss) { substituterUris.push_back(ss.front()); });
-    }
-
-    std::string name() override
-    {
-        return "copy-sigs";
+        addFlag({
+            .longName = "substituter",
+            .shortName = 's',
+            .description = "Copy signatures from the specified store.",
+            .labels = {"store-uri"},
+            .handler = {[&](std::string s) { substituterUris.push_back(s); }},
+        });
     }
 
     std::string description() override
     {
-        return "copy path signatures from substituters (like binary caches)";
+        return "copy store path signatures from substituters";
     }
 
-    void run(ref<Store> store, Paths storePaths) override
+    void run(ref<Store> store, StorePaths && storePaths) override
     {
         if (substituterUris.empty())
-            throw UsageError("you must specify at least one substituter using ‘-s’");
+            throw UsageError("you must specify at least one substituter using '-s'");
 
         // FIXME: factor out commonality with MixVerify.
         std::vector<ref<Store>> substituters;
@@ -42,12 +42,14 @@ struct CmdCopySigs : StorePathsCommand
         std::string doneLabel = "done";
         std::atomic<size_t> added{0};
 
-        logger->setExpected(doneLabel, storePaths.size());
+        //logger->setExpected(doneLabel, storePaths.size());
 
-        auto doPath = [&](const Path & storePath) {
-            Activity act(*logger, lvlInfo, format("getting signatures for ‘%s’") % storePath);
+        auto doPath = [&](const Path & storePathS) {
+            //Activity act(*logger, lvlInfo, "getting signatures for '%s'", storePath);
 
             checkInterrupt();
+
+            auto storePath = store->parseStorePath(storePathS);
 
             auto info = store->queryPathInfo(storePath);
 
@@ -55,7 +57,7 @@ struct CmdCopySigs : StorePathsCommand
 
             for (auto & store2 : substituters) {
                 try {
-                    auto info2 = store2->queryPathInfo(storePath);
+                    auto info2 = store2->queryPathInfo(info->path);
 
                     /* Don't import signatures that don't match this
                        binary. */
@@ -76,43 +78,45 @@ struct CmdCopySigs : StorePathsCommand
                 added += newSigs.size();
             }
 
-            logger->incProgress(doneLabel);
+            //logger->incProgress(doneLabel);
         };
 
         for (auto & storePath : storePaths)
-            pool.enqueue(std::bind(doPath, storePath));
+            pool.enqueue(std::bind(doPath, store->printStorePath(storePath)));
 
         pool.process();
 
-        printInfo(format("imported %d signatures") % added);
+        printInfo("imported %d signatures", added);
     }
 };
 
-static RegisterCommand r1(make_ref<CmdCopySigs>());
+static auto rCmdCopySigs = registerCommand2<CmdCopySigs>({"store", "copy-sigs"});
 
-struct CmdSignPaths : StorePathsCommand
+struct CmdSign : StorePathsCommand
 {
     Path secretKeyFile;
 
-    CmdSignPaths()
+    CmdSign()
     {
-        mkFlag('k', "key-file", {"file"}, "file containing the secret signing key", &secretKeyFile);
-    }
-
-    std::string name() override
-    {
-        return "sign-paths";
+        addFlag({
+            .longName = "key-file",
+            .shortName = 'k',
+            .description = "File containing the secret signing key.",
+            .labels = {"file"},
+            .handler = {&secretKeyFile},
+            .completer = completePath
+        });
     }
 
     std::string description() override
     {
-        return "sign the specified paths";
+        return "sign store paths";
     }
 
-    void run(ref<Store> store, Paths storePaths) override
+    void run(ref<Store> store, StorePaths && storePaths) override
     {
         if (secretKeyFile.empty())
-            throw UsageError("you must specify a secret key file using ‘-k’");
+            throw UsageError("you must specify a secret key file using '-k'");
 
         SecretKey secretKey(readFile(secretKeyFile));
 
@@ -123,7 +127,7 @@ struct CmdSignPaths : StorePathsCommand
 
             auto info2(*info);
             info2.sigs.clear();
-            info2.sign(secretKey);
+            info2.sign(*store, secretKey);
             assert(!info2.sigs.empty());
 
             if (!info->sigs.count(*info2.sigs.begin())) {
@@ -132,8 +136,91 @@ struct CmdSignPaths : StorePathsCommand
             }
         }
 
-        printInfo(format("added %d signatures") % added);
+        printInfo("added %d signatures", added);
     }
 };
 
-static RegisterCommand r3(make_ref<CmdSignPaths>());
+static auto rCmdSign = registerCommand2<CmdSign>({"store", "sign"});
+
+struct CmdKeyGenerateSecret : Command
+{
+    std::optional<std::string> keyName;
+
+    CmdKeyGenerateSecret()
+    {
+        addFlag({
+            .longName = "key-name",
+            .description = "Identifier of the key (e.g. `cache.example.org-1`).",
+            .labels = {"name"},
+            .handler = {&keyName},
+        });
+    }
+
+    std::string description() override
+    {
+        return "generate a secret key for signing store paths";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "key-generate-secret.md"
+          ;
+    }
+
+    void run() override
+    {
+        if (!keyName)
+            throw UsageError("required argument '--key-name' is missing");
+
+        writeFull(STDOUT_FILENO, SecretKey::generate(*keyName).to_string());
+    }
+};
+
+struct CmdKeyConvertSecretToPublic : Command
+{
+    std::string description() override
+    {
+        return "generate a public key for verifying store paths from a secret key read from standard input";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "key-convert-secret-to-public.md"
+          ;
+    }
+
+    void run() override
+    {
+        SecretKey secretKey(drainFD(STDIN_FILENO));
+        writeFull(STDOUT_FILENO, secretKey.toPublicKey().to_string());
+    }
+};
+
+struct CmdKey : NixMultiCommand
+{
+    CmdKey()
+        : MultiCommand({
+                {"generate-secret", []() { return make_ref<CmdKeyGenerateSecret>(); }},
+                {"convert-secret-to-public", []() { return make_ref<CmdKeyConvertSecretToPublic>(); }},
+            })
+    {
+    }
+
+    std::string description() override
+    {
+        return "generate and convert Nix signing keys";
+    }
+
+    Category category() override { return catUtility; }
+
+    void run() override
+    {
+        if (!command)
+            throw UsageError("'nix key' requires a sub-command.");
+        command->second->run();
+    }
+};
+
+static auto rCmdKey = registerCommand<CmdKey>("key");

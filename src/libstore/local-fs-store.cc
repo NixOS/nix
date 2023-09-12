@@ -1,15 +1,15 @@
 #include "archive.hh"
 #include "fs-accessor.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "globals.hh"
+#include "compression.hh"
+#include "derivations.hh"
 
 namespace nix {
 
 LocalFSStore::LocalFSStore(const Params & params)
     : Store(params)
-    , rootDir(get(params, "root"))
-    , stateDir(canonPath(get(params, "state", rootDir != "" ? rootDir + "/nix/var/nix" : settings.nixStateDir)))
-    , logDir(canonPath(get(params, "log", rootDir != "" ? rootDir + "/nix/var/log/nix" : settings.nixLogDir)))
 {
 }
 
@@ -19,11 +19,11 @@ struct LocalStoreAccessor : public FSAccessor
 
     LocalStoreAccessor(ref<LocalFSStore> store) : store(store) { }
 
-    Path toRealPath(const Path & path)
+    Path toRealPath(const Path & path, bool requireValidPath = true)
     {
-        Path storePath = store->toStorePath(path);
-        if (!store->isValidPath(storePath))
-            throw InvalidPath(format("path ‘%1%’ is not a valid store path") % storePath);
+        auto storePath = store->toStorePath(path).first;
+        if (requireValidPath && !store->isValidPath(storePath))
+            throw InvalidPath("path '%1%' is not a valid store path", store->printStorePath(storePath));
         return store->getRealStoreDir() + std::string(path, store->storeDir.size());
     }
 
@@ -32,13 +32,13 @@ struct LocalStoreAccessor : public FSAccessor
         auto realPath = toRealPath(path);
 
         struct stat st;
-        if (lstat(path.c_str(), &st)) {
+        if (lstat(realPath.c_str(), &st)) {
             if (errno == ENOENT || errno == ENOTDIR) return {Type::tMissing, 0, false};
-            throw SysError(format("getting status of ‘%1%’") % path);
+            throw SysError("getting status of '%1%'", path);
         }
 
         if (!S_ISREG(st.st_mode) && !S_ISDIR(st.st_mode) && !S_ISLNK(st.st_mode))
-            throw Error(format("file ‘%1%’ has unsupported type") % path);
+            throw Error("file '%1%' has unsupported type", path);
 
         return {
             S_ISREG(st.st_mode) ? Type::tRegular :
@@ -52,7 +52,7 @@ struct LocalStoreAccessor : public FSAccessor
     {
         auto realPath = toRealPath(path);
 
-        auto entries = nix::readDirectory(path);
+        auto entries = nix::readDirectory(realPath);
 
         StringSet res;
         for (auto & entry : entries)
@@ -61,9 +61,9 @@ struct LocalStoreAccessor : public FSAccessor
         return res;
     }
 
-    std::string readFile(const Path & path) override
+    std::string readFile(const Path & path, bool requireValidPath = true) override
     {
-        return nix::readFile(toRealPath(path));
+        return nix::readFile(toRealPath(path, requireValidPath));
     }
 
     std::string readLink(const Path & path) override
@@ -74,14 +74,43 @@ struct LocalStoreAccessor : public FSAccessor
 
 ref<FSAccessor> LocalFSStore::getFSAccessor()
 {
-    return make_ref<LocalStoreAccessor>(ref<LocalFSStore>(std::dynamic_pointer_cast<LocalFSStore>(shared_from_this())));
+    return make_ref<LocalStoreAccessor>(ref<LocalFSStore>(
+            std::dynamic_pointer_cast<LocalFSStore>(shared_from_this())));
 }
 
-void LocalFSStore::narFromPath(const Path & path, Sink & sink)
+void LocalFSStore::narFromPath(const StorePath & path, Sink & sink)
 {
     if (!isValidPath(path))
-        throw Error(format("path ‘%s’ is not valid") % path);
-    dumpPath(getRealStoreDir() + std::string(path, storeDir.size()), sink);
+        throw Error("path '%s' is not valid", printStorePath(path));
+    dumpPath(getRealStoreDir() + std::string(printStorePath(path), storeDir.size()), sink);
+}
+
+const std::string LocalFSStore::drvsLogDir = "drvs";
+
+std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path)
+{
+    auto baseName = path.to_string();
+
+    for (int j = 0; j < 2; j++) {
+
+        Path logPath =
+            j == 0
+            ? fmt("%s/%s/%s/%s", logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2))
+            : fmt("%s/%s/%s", logDir, drvsLogDir, baseName);
+        Path logBz2Path = logPath + ".bz2";
+
+        if (pathExists(logPath))
+            return readFile(logPath);
+
+        else if (pathExists(logBz2Path)) {
+            try {
+                return decompress("bzip2", readFile(logBz2Path));
+            } catch (Error &) { }
+        }
+
+    }
+
+    return std::nullopt;
 }
 
 }

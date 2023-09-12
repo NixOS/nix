@@ -1,7 +1,10 @@
 #include "store-api.hh"
+#include "store-cast.hh"
+#include "gc-store.hh"
 #include "profiles.hh"
 #include "shared.hh"
 #include "globals.hh"
+#include "legacy.hh"
 
 #include <iostream>
 #include <cerrno>
@@ -34,12 +37,14 @@ void removeOldGenerations(std::string dir)
                 link = readLink(path);
             } catch (SysError & e) {
                 if (e.errNo == ENOENT) continue;
+                throw;
             }
-            if (link.find("link") != string::npos) {
-                printInfo(format("removing old generations of profile %1%") % path);
-                if (deleteOlderThan != "")
-                    deleteGenerationsOlderThan(path, deleteOlderThan, dryRun);
-                else
+            if (link.find("link") != std::string::npos) {
+                printInfo("removing old generations of profile %s", path);
+                if (deleteOlderThan != "") {
+                    auto t = parseOlderThanTimeSpec(deleteOlderThan);
+                    deleteGenerationsOlderThan(path, t, dryRun);
+                } else
                     deleteOldGenerations(path, dryRun);
             }
         } else if (type == DT_DIR) {
@@ -48,12 +53,10 @@ void removeOldGenerations(std::string dir)
     }
 }
 
-int main(int argc, char * * argv)
+static int main_nix_collect_garbage(int argc, char * * argv)
 {
-    bool removeOld = false;
-
-    return handleExceptions(argv[0], [&]() {
-        initNix();
+    {
+        bool removeOld = false;
 
         GCOptions options;
 
@@ -68,25 +71,32 @@ int main(int argc, char * * argv)
                 deleteOlderThan = getArg(*arg, arg, end);
             }
             else if (*arg == "--dry-run") dryRun = true;
-            else if (*arg == "--max-freed") {
-                long long maxFreed = getIntArg<long long>(*arg, arg, end, true);
-                options.maxFreed = maxFreed >= 0 ? maxFreed : 0;
-            }
+            else if (*arg == "--max-freed")
+                options.maxFreed = std::max(getIntArg<int64_t>(*arg, arg, end, true), (int64_t) 0);
             else
                 return false;
             return true;
         });
 
-        auto profilesDir = settings.nixStateDir + "/profiles";
-        if (removeOld) removeOldGenerations(profilesDir);
+        if (removeOld) {
+            std::set<Path> dirsToClean = {
+                profilesDir(), settings.nixStateDir + "/profiles", dirOf(getDefaultProfile())};
+            for (auto & dir : dirsToClean)
+                removeOldGenerations(dir);
+        }
 
         // Run the actual garbage collector.
         if (!dryRun) {
             auto store = openStore();
+            auto & gcStore = require<GcStore>(*store);
             options.action = GCOptions::gcDeleteDead;
             GCResults results;
             PrintFreed freed(true, results);
-            store->collectGarbage(options, results);
+            gcStore.collectGarbage(options, results);
         }
-    });
+
+        return 0;
+    }
 }
+
+static RegisterLegacyCommand r_nix_collect_garbage("nix-collect-garbage", main_nix_collect_garbage);

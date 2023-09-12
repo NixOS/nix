@@ -1,85 +1,175 @@
 #include "get-drvs.hh"
 #include "util.hh"
 #include "eval-inline.hh"
+#include "derivations.hh"
+#include "store-api.hh"
+#include "path-with-outputs.hh"
 
 #include <cstring>
+#include <regex>
 
 
 namespace nix {
 
 
-string DrvInfo::queryDrvPath()
+DrvInfo::DrvInfo(EvalState & state, std::string attrPath, Bindings * attrs)
+    : state(&state), attrs(attrs), attrPath(std::move(attrPath))
 {
-    if (drvPath == "" && attrs) {
+}
+
+
+DrvInfo::DrvInfo(EvalState & state, ref<Store> store, const std::string & drvPathWithOutputs)
+    : state(&state), attrs(nullptr), attrPath("")
+{
+    auto [drvPath, selectedOutputs] = parsePathWithOutputs(*store, drvPathWithOutputs);
+
+    this->drvPath = drvPath;
+
+    auto drv = store->derivationFromPath(drvPath);
+
+    name = drvPath.name();
+
+    if (selectedOutputs.size() > 1)
+        throw Error("building more than one derivation output is not supported, in '%s'", drvPathWithOutputs);
+
+    outputName =
+        selectedOutputs.empty()
+        ? getOr(drv.env, "outputName", "out")
+        : *selectedOutputs.begin();
+
+    auto i = drv.outputs.find(outputName);
+    if (i == drv.outputs.end())
+        throw Error("derivation '%s' does not have output '%s'", store->printStorePath(drvPath), outputName);
+    auto & [outputName, output] = *i;
+
+    outPath = {output.path(*store, drv.name, outputName)};
+}
+
+
+std::string DrvInfo::queryName() const
+{
+    if (name == "" && attrs) {
+        auto i = attrs->find(state->sName);
+        if (i == attrs->end()) throw TypeError("derivation name missing");
+        name = state->forceStringNoCtx(*i->value, noPos, "while evaluating the 'name' attribute of a derivation");
+    }
+    return name;
+}
+
+
+std::string DrvInfo::querySystem() const
+{
+    if (system == "" && attrs) {
+        auto i = attrs->find(state->sSystem);
+        system = i == attrs->end() ? "unknown" : state->forceStringNoCtx(*i->value, i->pos, "while evaluating the 'system' attribute of a derivation");
+    }
+    return system;
+}
+
+
+std::optional<StorePath> DrvInfo::queryDrvPath() const
+{
+    if (!drvPath && attrs) {
         Bindings::iterator i = attrs->find(state->sDrvPath);
-        PathSet context;
-        drvPath = i != attrs->end() ? state->coerceToPath(*i->pos, *i->value, context) : "";
+        NixStringContext context;
+        if (i == attrs->end())
+            drvPath = {std::nullopt};
+        else
+            drvPath = {state->coerceToStorePath(i->pos, *i->value, context, "while evaluating the 'drvPath' attribute of a derivation")};
     }
-    return drvPath;
+    return drvPath.value_or(std::nullopt);
 }
 
 
-string DrvInfo::queryOutPath()
+StorePath DrvInfo::requireDrvPath() const
 {
-    if (outPath == "" && attrs) {
-        Bindings::iterator i = attrs->find(state->sOutPath);
-        PathSet context;
-        outPath = i != attrs->end() ? state->coerceToPath(*i->pos, *i->value, context) : "";
-    }
-    return outPath;
+    if (auto drvPath = queryDrvPath())
+        return *drvPath;
+    throw Error("derivation does not contain a 'drvPath' attribute");
 }
 
 
-DrvInfo::Outputs DrvInfo::queryOutputs(bool onlyOutputsToInstall)
+StorePath DrvInfo::queryOutPath() const
+{
+    if (!outPath && attrs) {
+        Bindings::iterator i = attrs->find(state->sOutPath);
+        NixStringContext context;
+        if (i != attrs->end())
+            outPath = state->coerceToStorePath(i->pos, *i->value, context, "while evaluating the output path of a derivation");
+    }
+    if (!outPath)
+        throw UnimplementedError("CA derivations are not yet supported");
+    return *outPath;
+}
+
+
+DrvInfo::Outputs DrvInfo::queryOutputs(bool withPaths, bool onlyOutputsToInstall)
 {
     if (outputs.empty()) {
         /* Get the ‘outputs’ list. */
         Bindings::iterator i;
         if (attrs && (i = attrs->find(state->sOutputs)) != attrs->end()) {
-            state->forceList(*i->value, *i->pos);
+            state->forceList(*i->value, i->pos, "while evaluating the 'outputs' attribute of a derivation");
 
             /* For each output... */
-            for (unsigned int j = 0; j < i->value->listSize(); ++j) {
-                /* Evaluate the corresponding set. */
-                string name = state->forceStringNoCtx(*i->value->listElems()[j], *i->pos);
-                Bindings::iterator out = attrs->find(state->symbols.create(name));
-                if (out == attrs->end()) continue; // FIXME: throw error?
-                state->forceAttrs(*out->value);
+            for (auto elem : i->value->listItems()) {
+                std::string output(state->forceStringNoCtx(*elem, i->pos, "while evaluating the name of an output of a derivation"));
 
-                /* And evaluate its ‘outPath’ attribute. */
-                Bindings::iterator outPath = out->value->attrs->find(state->sOutPath);
-                if (outPath == out->value->attrs->end()) continue; // FIXME: throw error?
-                PathSet context;
-                outputs[name] = state->coerceToPath(*outPath->pos, *outPath->value, context);
+                if (withPaths) {
+                    /* Evaluate the corresponding set. */
+                    Bindings::iterator out = attrs->find(state->symbols.create(output));
+                    if (out == attrs->end()) continue; // FIXME: throw error?
+                    state->forceAttrs(*out->value, i->pos, "while evaluating an output of a derivation");
+
+                    /* And evaluate its ‘outPath’ attribute. */
+                    Bindings::iterator outPath = out->value->attrs->find(state->sOutPath);
+                    if (outPath == out->value->attrs->end()) continue; // FIXME: throw error?
+                    NixStringContext context;
+                    outputs.emplace(output, state->coerceToStorePath(outPath->pos, *outPath->value, context, "while evaluating an output path of a derivation"));
+                } else
+                    outputs.emplace(output, std::nullopt);
             }
         } else
-            outputs["out"] = queryOutPath();
+            outputs.emplace("out", withPaths ? std::optional{queryOutPath()} : std::nullopt);
     }
+
     if (!onlyOutputsToInstall || !attrs)
         return outputs;
 
-    /* Check for `meta.outputsToInstall` and return `outputs` reduced to that. */
-    const Value * outTI = queryMeta("outputsToInstall");
-    if (!outTI) return outputs;
-    const auto errMsg = Error("this derivation has bad ‘meta.outputsToInstall’");
-        /* ^ this shows during `nix-env -i` right under the bad derivation */
-    if (!outTI->isList()) throw errMsg;
-    Outputs result;
-    for (auto i = outTI->listElems(); i != outTI->listElems() + outTI->listSize(); ++i) {
-        if ((*i)->type != tString) throw errMsg;
-        auto out = outputs.find((*i)->string.s);
-        if (out == outputs.end()) throw errMsg;
+    Bindings::iterator i;
+    if (attrs && (i = attrs->find(state->sOutputSpecified)) != attrs->end() && state->forceBool(*i->value, i->pos, "while evaluating the 'outputSpecified' attribute of a derivation")) {
+        Outputs result;
+        auto out = outputs.find(queryOutputName());
+        if (out == outputs.end())
+            throw Error("derivation does not have output '%s'", queryOutputName());
         result.insert(*out);
+        return result;
     }
-    return result;
+
+    else {
+        /* Check for `meta.outputsToInstall` and return `outputs` reduced to that. */
+        const Value * outTI = queryMeta("outputsToInstall");
+        if (!outTI) return outputs;
+        auto errMsg = Error("this derivation has bad 'meta.outputsToInstall'");
+            /* ^ this shows during `nix-env -i` right under the bad derivation */
+        if (!outTI->isList()) throw errMsg;
+        Outputs result;
+        for (auto elem : outTI->listItems()) {
+            if (elem->type() != nString) throw errMsg;
+            auto out = outputs.find(elem->string.s);
+            if (out == outputs.end()) throw errMsg;
+            result.insert(*out);
+        }
+        return result;
+    }
 }
 
 
-string DrvInfo::queryOutputName()
+std::string DrvInfo::queryOutputName() const
 {
     if (outputName == "" && attrs) {
         Bindings::iterator i = attrs->find(state->sOutputName);
-        outputName = i != attrs->end() ? state->forceStringNoCtx(*i->value) : "";
+        outputName = i != attrs->end() ? state->forceStringNoCtx(*i->value, noPos, "while evaluating the output name of a derivation") : "";
     }
     return outputName;
 }
@@ -91,7 +181,7 @@ Bindings * DrvInfo::getMeta()
     if (!attrs) return 0;
     Bindings::iterator a = attrs->find(state->sMeta);
     if (a == attrs->end()) return 0;
-    state->forceAttrs(*a->value, *a->pos);
+    state->forceAttrs(*a->value, a->pos, "while evaluating the 'meta' attribute of a derivation");
     meta = a->value->attrs;
     return meta;
 }
@@ -102,32 +192,32 @@ StringSet DrvInfo::queryMetaNames()
     StringSet res;
     if (!getMeta()) return res;
     for (auto & i : *meta)
-        res.insert(i.name);
+        res.emplace(state->symbols[i.name]);
     return res;
 }
 
 
 bool DrvInfo::checkMeta(Value & v)
 {
-    state->forceValue(v);
-    if (v.isList()) {
-        for (unsigned int n = 0; n < v.listSize(); ++n)
-            if (!checkMeta(*v.listElems()[n])) return false;
+    state->forceValue(v, [&]() { return v.determinePos(noPos); });
+    if (v.type() == nList) {
+        for (auto elem : v.listItems())
+            if (!checkMeta(*elem)) return false;
         return true;
     }
-    else if (v.type == tAttrs) {
+    else if (v.type() == nAttrs) {
         Bindings::iterator i = v.attrs->find(state->sOutPath);
         if (i != v.attrs->end()) return false;
         for (auto & i : *v.attrs)
             if (!checkMeta(*i.value)) return false;
         return true;
     }
-    else return v.type == tInt || v.type == tBool || v.type == tString ||
-                v.type == tFloat;
+    else return v.type() == nInt || v.type() == nBool || v.type() == nString ||
+                v.type() == nFloat;
 }
 
 
-Value * DrvInfo::queryMeta(const string & name)
+Value * DrvInfo::queryMeta(const std::string & name)
 {
     if (!getMeta()) return 0;
     Bindings::iterator a = meta->find(state->symbols.create(name));
@@ -136,49 +226,49 @@ Value * DrvInfo::queryMeta(const string & name)
 }
 
 
-string DrvInfo::queryMetaString(const string & name)
+std::string DrvInfo::queryMetaString(const std::string & name)
 {
     Value * v = queryMeta(name);
-    if (!v || v->type != tString) return "";
+    if (!v || v->type() != nString) return "";
     return v->string.s;
 }
 
 
-NixInt DrvInfo::queryMetaInt(const string & name, NixInt def)
+NixInt DrvInfo::queryMetaInt(const std::string & name, NixInt def)
 {
     Value * v = queryMeta(name);
     if (!v) return def;
-    if (v->type == tInt) return v->integer;
-    if (v->type == tString) {
+    if (v->type() == nInt) return v->integer;
+    if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            integer meta fields. */
-        NixInt n;
-        if (string2Int(v->string.s, n)) return n;
+        if (auto n = string2Int<NixInt>(v->string.s))
+            return *n;
     }
     return def;
 }
 
-NixFloat DrvInfo::queryMetaFloat(const string & name, NixFloat def)
+NixFloat DrvInfo::queryMetaFloat(const std::string & name, NixFloat def)
 {
     Value * v = queryMeta(name);
     if (!v) return def;
-    if (v->type == tFloat) return v->fpoint;
-    if (v->type == tString) {
+    if (v->type() == nFloat) return v->fpoint;
+    if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            float meta fields. */
-        NixFloat n;
-        if (string2Float(v->string.s, n)) return n;
+        if (auto n = string2Float<NixFloat>(v->string.s))
+            return *n;
     }
     return def;
 }
 
 
-bool DrvInfo::queryMetaBool(const string & name, bool def)
+bool DrvInfo::queryMetaBool(const std::string & name, bool def)
 {
     Value * v = queryMeta(name);
     if (!v) return def;
-    if (v->type == tBool) return v->boolean;
-    if (v->type == tString) {
+    if (v->type() == nBool) return v->boolean;
+    if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            Boolean meta fields. */
         if (strcmp(v->string.s, "true") == 0) return true;
@@ -188,23 +278,22 @@ bool DrvInfo::queryMetaBool(const string & name, bool def)
 }
 
 
-void DrvInfo::setMeta(const string & name, Value * v)
+void DrvInfo::setMeta(const std::string & name, Value * v)
 {
     getMeta();
-    Bindings * old = meta;
-    meta = state->allocBindings(1 + (old ? old->size() : 0));
-    Symbol sym = state->symbols.create(name);
-    if (old)
-        for (auto i : *old)
+    auto attrs = state->buildBindings(1 + (meta ? meta->size() : 0));
+    auto sym = state->symbols.create(name);
+    if (meta)
+        for (auto i : *meta)
             if (i.name != sym)
-                meta->push_back(i);
-    if (v) meta->push_back(Attr(sym, v));
-    meta->sort();
+                attrs.insert(i);
+    if (v) attrs.insert(sym, v);
+    meta = attrs.finish();
 }
 
 
 /* Cache for already considered attrsets. */
-typedef set<Bindings *> Done;
+typedef std::set<Bindings *> Done;
 
 
 /* Evaluate value `v'.  If it evaluates to a set of type `derivation',
@@ -212,29 +301,23 @@ typedef set<Bindings *> Done;
    The result boolean indicates whether it makes sense
    for the caller to recursively search for derivations in `v'. */
 static bool getDerivation(EvalState & state, Value & v,
-    const string & attrPath, DrvInfos & drvs, Done & done,
+    const std::string & attrPath, DrvInfos & drvs, Done & done,
     bool ignoreAssertionFailures)
 {
     try {
-        state.forceValue(v);
+        state.forceValue(v, [&]() { return v.determinePos(noPos); });
         if (!state.isDerivation(v)) return true;
 
         /* Remove spurious duplicates (e.g., a set like `rec { x =
            derivation {...}; y = x;}'. */
-        if (done.find(v.attrs) != done.end()) return false;
-        done.insert(v.attrs);
+        if (!done.insert(v.attrs).second) return false;
 
-        Bindings::iterator i = v.attrs->find(state.sName);
-        /* !!! We really would like to have a decent back trace here. */
-        if (i == v.attrs->end()) throw TypeError("derivation name missing");
+        DrvInfo drv(state, attrPath, v.attrs);
 
-        Bindings::iterator i2 = v.attrs->find(state.sSystem);
-
-        DrvInfo drv(state, state.forceStringNoCtx(*i->value), attrPath,
-            i2 == v.attrs->end() ? "unknown" : state.forceStringNoCtx(*i2->value, *i2->pos),
-            v.attrs);
+        drv.queryName();
 
         drvs.push_back(drv);
+
         return false;
 
     } catch (AssertionError & e) {
@@ -244,26 +327,28 @@ static bool getDerivation(EvalState & state, Value & v,
 }
 
 
-bool getDerivation(EvalState & state, Value & v, DrvInfo & drv,
+std::optional<DrvInfo> getDerivation(EvalState & state, Value & v,
     bool ignoreAssertionFailures)
 {
     Done done;
     DrvInfos drvs;
     getDerivation(state, v, "", drvs, done, ignoreAssertionFailures);
-    if (drvs.size() != 1) return false;
-    drv = drvs.front();
-    return true;
+    if (drvs.size() != 1) return {};
+    return std::move(drvs.front());
 }
 
 
-static string addToPath(const string & s1, const string & s2)
+static std::string addToPath(const std::string & s1, const std::string & s2)
 {
     return s1.empty() ? s2 : s1 + "." + s2;
 }
 
 
+static std::regex attrRegex("[A-Za-z_][A-Za-z0-9-_+]*");
+
+
 static void getDerivations(EvalState & state, Value & vIn,
-    const string & pathPrefix, Bindings & autoArgs,
+    const std::string & pathPrefix, Bindings & autoArgs,
     DrvInfos & drvs, Done & done,
     bool ignoreAssertionFailures)
 {
@@ -273,7 +358,7 @@ static void getDerivations(EvalState & state, Value & vIn,
     /* Process the expression. */
     if (!getDerivation(state, v, pathPrefix, drvs, done, ignoreAssertionFailures)) ;
 
-    else if (v.type == tAttrs) {
+    else if (v.type() == nAttrs) {
 
         /* !!! undocumented hackery to support combining channels in
            nix-env.cc. */
@@ -284,36 +369,31 @@ static void getDerivations(EvalState & state, Value & vIn,
            there are names clashes between derivations, the derivation
            bound to the attribute with the "lower" name should take
            precedence). */
-        typedef std::map<string, Symbol> SortedSymbols;
-        SortedSymbols attrs;
-        for (auto & i : *v.attrs)
-            attrs.insert(std::pair<string, Symbol>(i.name, i.name));
-
-        for (auto & i : attrs) {
-            Activity act(*logger, lvlDebug, format("evaluating attribute ‘%1%’") % i.first);
-            string pathPrefix2 = addToPath(pathPrefix, i.first);
-            Value & v2(*v.attrs->find(i.second)->value);
+        for (auto & i : v.attrs->lexicographicOrder(state.symbols)) {
+            debug("evaluating attribute '%1%'", state.symbols[i->name]);
+            if (!std::regex_match(std::string(state.symbols[i->name]), attrRegex))
+                continue;
+            std::string pathPrefix2 = addToPath(pathPrefix, state.symbols[i->name]);
             if (combineChannels)
-                getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
-            else if (getDerivation(state, v2, pathPrefix2, drvs, done, ignoreAssertionFailures)) {
+                getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+            else if (getDerivation(state, *i->value, pathPrefix2, drvs, done, ignoreAssertionFailures)) {
                 /* If the value of this attribute is itself a set,
                    should we recurse into it?  => Only if it has a
                    `recurseForDerivations = true' attribute. */
-                if (v2.type == tAttrs) {
-                    Bindings::iterator j = v2.attrs->find(state.symbols.create("recurseForDerivations"));
-                    if (j != v2.attrs->end() && state.forceBool(*j->value, *j->pos))
-                        getDerivations(state, v2, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+                if (i->value->type() == nAttrs) {
+                    Bindings::iterator j = i->value->attrs->find(state.sRecurseForDerivations);
+                    if (j != i->value->attrs->end() && state.forceBool(*j->value, j->pos, "while evaluating the attribute `recurseForDerivations`"))
+                        getDerivations(state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
                 }
             }
         }
     }
 
-    else if (v.isList()) {
-        for (unsigned int n = 0; n < v.listSize(); ++n) {
-            Activity act(*logger, lvlDebug, "evaluating list element");
-            string pathPrefix2 = addToPath(pathPrefix, (format("%1%") % n).str());
-            if (getDerivation(state, *v.listElems()[n], pathPrefix2, drvs, done, ignoreAssertionFailures))
-                getDerivations(state, *v.listElems()[n], pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
+    else if (v.type() == nList) {
+        for (auto [n, elem] : enumerate(v.listItems())) {
+            std::string pathPrefix2 = addToPath(pathPrefix, fmt("%d", n));
+            if (getDerivation(state, *elem, pathPrefix2, drvs, done, ignoreAssertionFailures))
+                getDerivations(state, *elem, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
         }
     }
 
@@ -321,7 +401,7 @@ static void getDerivations(EvalState & state, Value & vIn,
 }
 
 
-void getDerivations(EvalState & state, Value & v, const string & pathPrefix,
+void getDerivations(EvalState & state, Value & v, const std::string & pathPrefix,
     Bindings & autoArgs, DrvInfos & drvs, bool ignoreAssertionFailures)
 {
     Done done;

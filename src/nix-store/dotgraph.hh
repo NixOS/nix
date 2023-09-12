@@ -1,11 +1,10 @@
 #pragma once
+///@file
 
-#include "types.hh"
+#include "store-api.hh"
 
 namespace nix {
 
-class Store;
-
-void printDotGraph(ref<Store> store, const PathSet & roots);
+void printDotGraph(ref<Store> store, StorePathSet && roots);
 
 }

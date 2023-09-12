@@ -1,6 +1,5 @@
-#include "config.h"
-
-#include "types.hh"
+#include "error.hh"
+#include "shared.hh"
 
 #include <cstring>
 #include <cstddef>
@@ -20,9 +19,9 @@ static void sigsegvHandler(int signo, siginfo_t * info, void * ctx)
     bool haveSP = true;
     char * sp = 0;
 #if defined(__x86_64__) && defined(REG_RSP)
-    sp = (char *) ((ucontext *) ctx)->uc_mcontext.gregs[REG_RSP];
+    sp = (char *) ((ucontext_t *) ctx)->uc_mcontext.gregs[REG_RSP];
 #elif defined(REG_ESP)
-    sp = (char *) ((ucontext *) ctx)->uc_mcontext.gregs[REG_ESP];
+    sp = (char *) ((ucontext_t *) ctx)->uc_mcontext.gregs[REG_ESP];
 #else
     haveSP = false;
 #endif
@@ -31,9 +30,7 @@ static void sigsegvHandler(int signo, siginfo_t * info, void * ctx)
         ptrdiff_t diff = (char *) info->si_addr - sp;
         if (diff < 0) diff = -diff;
         if (diff < 4096) {
-            char msg[] = "error: stack overflow (possible infinite recursion)\n";
-            [[gnu::unused]] int res = write(2, msg, strlen(msg));
-            _exit(1); // maybe abort instead?
+            nix::stackOverflowHandler(info, ctx);
         }
     }
 
@@ -54,7 +51,8 @@ void detectStackOverflow()
        delivered when we're out of stack space. */
     stack_t stack;
     stack.ss_size = 4096 * 4 + MINSIGSTKSZ;
-    stack.ss_sp = new char[stack.ss_size];
+    static auto stackBuf = std::make_unique<std::vector<char>>(stack.ss_size);
+    stack.ss_sp = stackBuf->data();
     if (!stack.ss_sp) throw Error("cannot allocate alternative stack");
     stack.ss_flags = 0;
     if (sigaltstack(&stack, 0) == -1) throw SysError("cannot set alternative stack");
@@ -64,9 +62,16 @@ void detectStackOverflow()
     act.sa_sigaction = sigsegvHandler;
     act.sa_flags = SA_SIGINFO | SA_ONSTACK;
     if (sigaction(SIGSEGV, &act, 0))
-        throw SysError("resetting SIGCHLD");
+        throw SysError("resetting SIGSEGV");
 #endif
 }
 
+std::function<void(siginfo_t * info, void * ctx)> stackOverflowHandler(defaultStackOverflowHandler);
+
+void defaultStackOverflowHandler(siginfo_t * info, void * ctx) {
+    char msg[] = "error: stack overflow (possible infinite recursion)\n";
+    [[gnu::unused]] auto res = write(2, msg, strlen(msg));
+    _exit(1); // maybe abort instead?
+}
 
 }

@@ -1,4 +1,5 @@
 #pragma once
+///@file
 
 #include "eval.hh"
 
@@ -6,8 +7,8 @@
 
 namespace nix {
 
-MakeError(JSONParseError, EvalError)
+MakeError(JSONParseError, EvalError);
 
-void parseJSON(EvalState & state, const string & s, Value & v);
+void parseJSON(EvalState & state, const std::string_view & s, Value & v);
 
 }

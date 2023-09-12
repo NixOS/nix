@@ -2,6 +2,14 @@ source common.sh
 
 clearStore
 
+rm -f $TEST_ROOT/result*
+
+# Test whether the output names match our expectations
+outPath=$(nix-instantiate multiple-outputs.nix --eval -A nameCheck.out.outPath)
+[ "$(echo "$outPath" | sed -E 's_^".*/[^-/]*-([^/]*)"$_\1_')" = "multiple-outputs-a" ]
+outPath=$(nix-instantiate multiple-outputs.nix --eval -A nameCheck.dev.outPath)
+[ "$(echo "$outPath" | sed -E 's_^".*/[^-/]*-([^/]*)"$_\1_')" = "multiple-outputs-a-dev" ]
+
 # Test whether read-only evaluation works when referring to the
 # ‘drvPath’ attribute.
 echo "evaluating c..."
@@ -11,8 +19,8 @@ echo "evaluating c..."
 # outputs.
 drvPath=$(nix-instantiate multiple-outputs.nix -A c)
 #[ "$drvPath" = "$drvPath2" ]
-grep -q 'multiple-outputs-a.drv",\["first","second"\]' $drvPath
-grep -q 'multiple-outputs-b.drv",\["out"\]' $drvPath
+grepQuiet 'multiple-outputs-a.drv",\["first","second"\]' $drvPath
+grepQuiet 'multiple-outputs-b.drv",\["out"\]' $drvPath
 
 # While we're at it, test the ‘unsafeDiscardOutputDependency’ primop.
 outPath=$(nix-build multiple-outputs.nix -A d --no-out-link)
@@ -28,7 +36,7 @@ echo "output path is $outPath"
 [ "$(cat "$outPath"/file)" = "success" ]
 
 # Test nix-build on a derivation with multiple outputs.
-nix-build multiple-outputs.nix -A a -o $TEST_ROOT/result
+outPath1=$(nix-build multiple-outputs.nix -A a -o $TEST_ROOT/result)
 [ -e $TEST_ROOT/result-first ]
 (! [ -e $TEST_ROOT/result-second ])
 nix-build multiple-outputs.nix -A a.all -o $TEST_ROOT/result
@@ -37,9 +45,20 @@ nix-build multiple-outputs.nix -A a.all -o $TEST_ROOT/result
 [ "$(cat $TEST_ROOT/result-second/link/file)" = "first" ]
 hash1=$(nix-store -q --hash $TEST_ROOT/result-second)
 
+outPath2=$(nix-build $(nix-instantiate multiple-outputs.nix -A a) --no-out-link)
+[[ $outPath1 = $outPath2 ]]
+
+outPath2=$(nix-build $(nix-instantiate multiple-outputs.nix -A a.first) --no-out-link)
+[[ $outPath1 = $outPath2 ]]
+
+outPath2=$(nix-build $(nix-instantiate multiple-outputs.nix -A a.second) --no-out-link)
+[[ $(cat $outPath2/file) = second ]]
+
+[[ $(nix-build $(nix-instantiate multiple-outputs.nix -A a.all) --no-out-link | wc -l) -eq 2 ]]
+
 # Delete one of the outputs and rebuild it.  This will cause a hash
 # rewrite.
-nix-store --delete $TEST_ROOT/result-second --ignore-liveness
+env -u NIX_REMOTE nix store delete $TEST_ROOT/result-second --ignore-liveness
 nix-build multiple-outputs.nix -A a.all -o $TEST_ROOT/result
 [ "$(cat $TEST_ROOT/result-second/file)" = "second" ]
 [ "$(cat $TEST_ROOT/result-second/link/file)" = "first" ]
@@ -57,7 +76,13 @@ if nix-build multiple-outputs.nix -A cyclic --no-out-link; then
     exit 1
 fi
 
+# Do a GC. This should leave an empty store.
 echo "collecting garbage..."
 rm $TEST_ROOT/result*
-nix-store --gc --option gc-keep-derivations true --option gc-keep-outputs true
+nix-store --gc --keep-derivations --keep-outputs
 nix-store --gc --print-roots
+rm -rf $NIX_STORE_DIR/.links
+rmdir $NIX_STORE_DIR
+
+expect 1 nix build -f multiple-outputs.nix invalid-output-name-1 2>&1 | grep 'contains illegal character'
+expect 1 nix build -f multiple-outputs.nix invalid-output-name-2 2>&1 | grep 'contains illegal character'

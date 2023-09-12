@@ -1,10 +1,10 @@
-#include <assert.h>
+#include <cassert>
 
 #include "xml-writer.hh"
 
 
 namespace nix {
-    
+
 
 XMLWriter::XMLWriter(bool indent, std::ostream & output)
     : output(output), indent(indent)
@@ -28,14 +28,15 @@ void XMLWriter::close()
 }
 
 
-void XMLWriter::indent_(unsigned int depth)
+void XMLWriter::indent_(size_t depth)
 {
     if (!indent) return;
-    output << string(depth * 2, ' ');
+    output << std::string(depth * 2, ' ');
 }
 
 
-void XMLWriter::openElement(const string & name,
+void XMLWriter::openElement(
+    std::string_view name,
     const XMLAttrs & attrs)
 {
     assert(!closed);
@@ -44,7 +45,7 @@ void XMLWriter::openElement(const string & name,
     writeAttrs(attrs);
     output << ">";
     if (indent) output << std::endl;
-    pendingElems.push_back(name);
+    pendingElems.push_back(std::string(name));
 }
 
 
@@ -59,7 +60,8 @@ void XMLWriter::closeElement()
 }
 
 
-void XMLWriter::writeEmptyElement(const string & name,
+void XMLWriter::writeEmptyElement(
+    std::string_view name,
     const XMLAttrs & attrs)
 {
     assert(!closed);
@@ -75,7 +77,7 @@ void XMLWriter::writeAttrs(const XMLAttrs & attrs)
 {
     for (auto & i : attrs) {
         output << " " << i.first << "=\"";
-        for (unsigned int j = 0; j < i.second.size(); ++j) {
+        for (size_t j = 0; j < i.second.size(); ++j) {
             char c = i.second[j];
             if (c == '"') output << "&quot;";
             else if (c == '<') output << "&lt;";

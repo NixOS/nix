@@ -97,7 +97,7 @@ sub connectToRemoteNix {
         syswrite($to, pack("L<x4L<x4", $SERVE_MAGIC_1, $clientVersion)) or die;
         $magic = readInt($from);
     };
-    die "unable to connect to ‘$sshHost’\n" if $@;
+    die "unable to connect to '$sshHost'\n" if $@;
     die "did not get valid handshake from remote host\n" if $magic  != 0x5452eecb;
 
     my $serverVersion = readInt($from);

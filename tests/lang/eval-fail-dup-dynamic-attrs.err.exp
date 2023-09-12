@@ -1,0 +1,8 @@
+error: dynamic attribute 'b' already defined at /pwd/lang/eval-fail-dup-dynamic-attrs.nix:2:11
+
+       at /pwd/lang/eval-fail-dup-dynamic-attrs.nix:3:11:
+
+            2|   set = { "${"" + "b"}" = 1; };
+            3|   set = { "${"b" + ""}" = 2; };
+             |           ^
+            4| }

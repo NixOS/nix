@@ -3,17 +3,30 @@ source common.sh
 # Tests miscellaneous commands.
 
 # Do all commands have help?
-#nix-env --help | grep -q install
-#nix-store --help | grep -q realise
-#nix-instantiate --help | grep -q eval
-#nix-hash --help | grep -q base32
+#nix-env --help | grepQuiet install
+#nix-store --help | grepQuiet realise
+#nix-instantiate --help | grepQuiet eval
+#nix-hash --help | grepQuiet base32
 
 # Can we ask for the version number?
 nix-env --version | grep "$version"
 
 # Usage errors.
-nix-env --foo 2>&1 | grep "no operation"
-nix-env -q --foo 2>&1 | grep "unknown flag"
+expect 1 nix-env --foo 2>&1 | grep "no operation"
+expect 1 nix-env -q --foo 2>&1 | grep "unknown flag"
 
 # Eval Errors.
-nix-instantiate --eval -E 'let a = {} // a; in a.foo' 2>&1 | grep "infinite recursion encountered, at (string):1:15$"
+eval_arg_res=$(nix-instantiate --eval -E 'let a = {} // a; in a.foo' 2>&1 || true)
+echo $eval_arg_res | grep "at «string»:1:15:"
+echo $eval_arg_res | grep "infinite recursion encountered"
+
+eval_stdin_res=$(echo 'let a = {} // a; in a.foo' | nix-instantiate --eval -E - 2>&1 || true)
+echo $eval_stdin_res | grep "at «stdin»:1:15:"
+echo $eval_stdin_res | grep "infinite recursion encountered"
+
+# Attribute path errors
+expectStderr 1 nix-instantiate --eval -E '{}' -A '"x' | grepQuiet "missing closing quote in selection path"
+expectStderr 1 nix-instantiate --eval -E '[]' -A 'x' | grepQuiet "should be a set"
+expectStderr 1 nix-instantiate --eval -E '{}' -A '1' | grepQuiet "should be a list"
+expectStderr 1 nix-instantiate --eval -E '{}' -A '.' | grepQuiet "empty attribute name"
+expectStderr 1 nix-instantiate --eval -E '[]' -A '1' | grepQuiet "out of range"

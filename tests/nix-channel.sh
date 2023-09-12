@@ -6,16 +6,30 @@ rm -f $TEST_HOME/.nix-channels $TEST_HOME/.nix-profile
 
 # Test add/list/remove.
 nix-channel --add http://foo/bar xyzzy
-nix-channel --list | grep -q http://foo/bar
+nix-channel --list | grepQuiet http://foo/bar
 nix-channel --remove xyzzy
+[[ $(nix-channel --list-generations | wc -l) == 1 ]]
 
 [ -e $TEST_HOME/.nix-channels ]
 [ "$(cat $TEST_HOME/.nix-channels)" = '' ]
 
+# Test the XDG Base Directories support
+
+export NIX_CONFIG="use-xdg-base-directories = true"
+
+nix-channel --add http://foo/bar xyzzy
+nix-channel --list | grepQuiet http://foo/bar
+nix-channel --remove xyzzy
+
+unset NIX_CONFIG
+
+[ -e $TEST_HOME/.local/state/nix/channels ]
+[ "$(cat $TEST_HOME/.local/state/nix/channels)" = '' ]
+
 # Create a channel.
 rm -rf $TEST_ROOT/foo
 mkdir -p $TEST_ROOT/foo
-nix copy --recursive --to file://$TEST_ROOT/foo?compression="bzip2" $(nix-store -r $(nix-instantiate dependencies.nix))
+nix copy --to file://$TEST_ROOT/foo?compression="bzip2" $(nix-store -r $(nix-instantiate dependencies.nix))
 rm -rf $TEST_ROOT/nixexprs
 mkdir -p $TEST_ROOT/nixexprs
 cp config.nix dependencies.nix dependencies.builder*.sh $TEST_ROOT/nixexprs/
@@ -25,35 +39,28 @@ ln -s dependencies.nix $TEST_ROOT/nixexprs/default.nix
 # Test the update action.
 nix-channel --add file://$TEST_ROOT/foo
 nix-channel --update
+[[ $(nix-channel --list-generations | wc -l) == 2 ]]
 
 # Do a query.
 nix-env -qa \* --meta --xml --out-path > $TEST_ROOT/meta.xml
-if [ "$xmllint" != false ]; then
-    $xmllint --noout $TEST_ROOT/meta.xml || fail "malformed XML"
-fi
-grep -q 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
-grep -q 'item.*attrPath="foo".*name="dependencies"' $TEST_ROOT/meta.xml
+grepQuiet 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
+grepQuiet 'item.*attrPath="foo".*name="dependencies-top"' $TEST_ROOT/meta.xml
 
 # Do an install.
-nix-env -i dependencies
-[ -e $TEST_ROOT/var/nix/profiles/default/foobar ]
-
-clearProfiles
-rm -f $TEST_HOME/.nix-channels
+nix-env -i dependencies-top
+[ -e $TEST_HOME/.nix-profile/foobar ]
 
 # Test updating from a tarball
-nix-channel --add file://$TEST_ROOT/foo/nixexprs.tar.bz2 foo
+nix-channel --add file://$TEST_ROOT/foo/nixexprs.tar.bz2 bar
 nix-channel --update
 
 # Do a query.
 nix-env -qa \* --meta --xml --out-path > $TEST_ROOT/meta.xml
-if [ "$xmllint" != false ]; then
-    $xmllint --noout $TEST_ROOT/meta.xml || fail "malformed XML"
-fi
-grep -q 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
-grep -q 'item.*attrPath="foo".*name="dependencies"' $TEST_ROOT/meta.xml
+grepQuiet 'meta.*description.*Random test package' $TEST_ROOT/meta.xml
+grepQuiet 'item.*attrPath="bar".*name="dependencies-top"' $TEST_ROOT/meta.xml
+grepQuiet 'item.*attrPath="foo".*name="dependencies-top"' $TEST_ROOT/meta.xml
 
 # Do an install.
-nix-env -i dependencies
-[ -e $TEST_ROOT/var/nix/profiles/default/foobar ]
+nix-env -i dependencies-top
+[ -e $TEST_HOME/.nix-profile/foobar ]
 

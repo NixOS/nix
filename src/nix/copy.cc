@@ -1,26 +1,32 @@
 #include "command.hh"
 #include "shared.hh"
 #include "store-api.hh"
-#include "sync.hh"
-#include "thread-pool.hh"
-
-#include <atomic>
 
 using namespace nix;
 
-struct CmdCopy : StorePathsCommand
+struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand
 {
-    std::string srcUri, dstUri;
+    CheckSigsFlag checkSigs = CheckSigs;
+
+    SubstituteFlag substitute = NoSubstitute;
 
     CmdCopy()
+        : BuiltPathsCommand(true)
     {
-        mkFlag(0, "from", "store-uri", "URI of the source Nix store", &srcUri);
-        mkFlag(0, "to", "store-uri", "URI of the destination Nix store", &dstUri);
-    }
+        addFlag({
+            .longName = "no-check-sigs",
+            .description = "Do not require that paths are signed by trusted keys.",
+            .handler = {&checkSigs, NoCheckSigs},
+        });
 
-    std::string name() override
-    {
-        return "copy";
+        addFlag({
+            .longName = "substitute-on-destination",
+            .shortName = 's',
+            .description = "Whether to try substitutes on the destination store (only supported by SSH stores).",
+            .handler = {&substitute, Substitute},
+        });
+
+        realiseMode = Realise::Outputs;
     }
 
     std::string description() override
@@ -28,52 +34,29 @@ struct CmdCopy : StorePathsCommand
         return "copy paths between Nix stores";
     }
 
-    Examples examples() override
+    std::string doc() override
     {
-        return {
-            Example{
-                "To copy Firefox to the local store to a binary cache in file:///tmp/cache:",
-                "nix copy --to file:///tmp/cache -r $(type -p firefox)"
-            },
-        };
+        return
+          #include "copy.md"
+          ;
     }
 
-    void run(ref<Store> store, Paths storePaths) override
+    Category category() override { return catSecondary; }
+
+    void run(ref<Store> srcStore, BuiltPaths && paths) override
     {
-        if (srcUri.empty() && dstUri.empty())
-            throw UsageError("you must pass ‘--from’ and/or ‘--to’");
+        auto dstStore = getDstStore();
 
-        ref<Store> srcStore = srcUri.empty() ? store : openStore(srcUri);
-        ref<Store> dstStore = dstUri.empty() ? store : openStore(dstUri);
+        RealisedPath::Set stuffToCopy;
 
-        std::string copiedLabel = "copied";
+        for (auto & builtPath : paths) {
+            auto theseRealisations = builtPath.toRealisedPaths(*srcStore);
+            stuffToCopy.insert(theseRealisations.begin(), theseRealisations.end());
+        }
 
-        logger->setExpected(copiedLabel, storePaths.size());
-
-        ThreadPool pool;
-
-        processGraph<Path>(pool,
-            PathSet(storePaths.begin(), storePaths.end()),
-
-            [&](const Path & storePath) {
-                return srcStore->queryPathInfo(storePath)->references;
-            },
-
-            [&](const Path & storePath) {
-                checkInterrupt();
-
-                if (!dstStore->isValidPath(storePath)) {
-                    Activity act(*logger, lvlInfo, format("copying ‘%s’...") % storePath);
-
-                    copyStorePath(srcStore, dstStore, storePath);
-
-                    logger->incProgress(copiedLabel);
-                } else
-                    logger->incExpected(copiedLabel, -1);
-            });
-
-        pool.process();
+        copyPaths(
+            *srcStore, *dstStore, stuffToCopy, NoRepair, checkSigs, substitute);
     }
 };
 
-static RegisterCommand r1(make_ref<CmdCopy>());
+static auto rCmdCopy = registerCommand<CmdCopy>("copy");

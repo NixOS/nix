@@ -4,6 +4,7 @@ let
   name2 = "hello";
   name3 = "915resolution-0.5.2";
   name4 = "xf86-video-i810-1.7.4";
+  name5 = "name-that-ends-with-dash--1.0";
 
   eq = 0;
   lt = builtins.sub 0 1;
@@ -23,6 +24,8 @@ let
     ((builtins.parseDrvName name3).version == "0.5.2")
     ((builtins.parseDrvName name4).name == "xf86-video-i810")
     ((builtins.parseDrvName name4).version == "1.7.4")
+    ((builtins.parseDrvName name5).name == "name-that-ends-with-dash")
+    ((builtins.parseDrvName name5).version == "-1.0")
     (versionTest "1.0" "2.3" lt)
     (versionTest "2.1" "2.3" lt)
     (versionTest "2.3" "2.3" eq)

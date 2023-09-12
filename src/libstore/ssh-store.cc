@@ -1,130 +1,110 @@
+#include "ssh-store-config.hh"
 #include "store-api.hh"
+#include "local-fs-store.hh"
 #include "remote-store.hh"
+#include "remote-store-connection.hh"
 #include "remote-fs-accessor.hh"
 #include "archive.hh"
 #include "worker-protocol.hh"
 #include "pool.hh"
+#include "ssh.hh"
 
 namespace nix {
 
-class SSHStore : public RemoteStore
+struct SSHStoreConfig : virtual RemoteStoreConfig, virtual CommonSSHStoreConfig
+{
+    using RemoteStoreConfig::RemoteStoreConfig;
+    using CommonSSHStoreConfig::CommonSSHStoreConfig;
+
+    const Setting<Path> remoteProgram{(StoreConfig*) this, "nix-daemon", "remote-program",
+        "Path to the `nix-daemon` executable on the remote machine."};
+
+    const std::string name() override { return "Experimental SSH Store"; }
+
+    std::string doc() override
+    {
+        return
+          #include "ssh-store.md"
+          ;
+    }
+};
+
+class SSHStore : public virtual SSHStoreConfig, public virtual RemoteStore
 {
 public:
 
-    SSHStore(string uri, const Params & params, size_t maxConnections = std::numeric_limits<size_t>::max());
+    SSHStore(const std::string & scheme, const std::string & host, const Params & params)
+        : StoreConfig(params)
+        , RemoteStoreConfig(params)
+        , CommonSSHStoreConfig(params)
+        , SSHStoreConfig(params)
+        , Store(params)
+        , RemoteStore(params)
+        , host(host)
+        , master(
+            host,
+            sshKey,
+            sshPublicHostKey,
+            // Use SSH master only if using more than 1 connection.
+            connections->capacity() > 1,
+            compress)
+    {
+    }
 
-    std::string getUri() override;
+    static std::set<std::string> uriSchemes() { return {"ssh-ng"}; }
 
-    void narFromPath(const Path & path, Sink & sink) override;
+    std::string getUri() override
+    {
+        return *uriSchemes().begin() + "://" + host;
+    }
 
-    ref<FSAccessor> getFSAccessor() override;
+    // FIXME extend daemon protocol, move implementation to RemoteStore
+    std::optional<std::string> getBuildLogExact(const StorePath & path) override
+    { unsupported("getBuildLogExact"); }
 
-private:
+protected:
 
     struct Connection : RemoteStore::Connection
     {
-        Pid sshPid;
-        AutoCloseFD out;
-        AutoCloseFD in;
+        std::unique_ptr<SSHMaster::Connection> sshConn;
+
+        void closeWrite() override
+        {
+            sshConn->in.close();
+        }
     };
 
     ref<RemoteStore::Connection> openConnection() override;
 
-    AutoDelete tmpDir;
+    std::string host;
 
-    Path socketPath;
+    SSHMaster master;
 
-    Pid sshMaster;
-
-    string uri;
-
-    Path key;
-};
-
-SSHStore::SSHStore(string uri, const Params & params, size_t maxConnections)
-    : Store(params)
-    , RemoteStore(params, maxConnections)
-    , tmpDir(createTempDir("", "nix", true, true, 0700))
-    , socketPath((Path) tmpDir + "/ssh.sock")
-    , uri(std::move(uri))
-    , key(get(params, "ssh-key", ""))
-{
-}
-
-string SSHStore::getUri()
-{
-    return "ssh://" + uri;
-}
-
-class ForwardSource : public Source
-{
-    Source & readSource;
-    Sink & writeSink;
-public:
-    ForwardSource(Source & readSource, Sink & writeSink) : readSource(readSource), writeSink(writeSink) {}
-    size_t read(unsigned char * data, size_t len) override
+    void setOptions(RemoteStore::Connection & conn) override
     {
-        auto res = readSource.read(data, len);
-        writeSink(data, len);
-        return res;
-    }
+        /* TODO Add a way to explicitly ask for some options to be
+           forwarded. One option: A way to query the daemon for its
+           settings, and then a series of params to SSHStore like
+           forward-cores or forward-overridden-cores that only
+           override the requested settings.
+        */
+    };
 };
-
-void SSHStore::narFromPath(const Path & path, Sink & sink)
-{
-    auto conn(connections->get());
-    conn->to << wopNarFromPath << path;
-    conn->processStderr();
-    ParseSink ps;
-    auto fwd = ForwardSource(conn->from, sink);
-    parseDump(ps, fwd);
-}
-
-ref<FSAccessor> SSHStore::getFSAccessor()
-{
-    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()));
-}
 
 ref<RemoteStore::Connection> SSHStore::openConnection()
 {
-    if ((pid_t) sshMaster == -1) {
-        sshMaster = startProcess([&]() {
-            if (key.empty())
-                execlp("ssh", "ssh", "-N", "-M", "-S", socketPath.c_str(), uri.c_str(), NULL);
-            else
-                execlp("ssh", "ssh", "-N", "-M", "-S", socketPath.c_str(), "-i", key.c_str(), uri.c_str(), NULL);
-            throw SysError("starting ssh master");
-        });
-    }
-
     auto conn = make_ref<Connection>();
-    Pipe in, out;
-    in.create();
-    out.create();
-    conn->sshPid = startProcess([&]() {
-        if (dup2(in.readSide.get(), STDIN_FILENO) == -1)
-            throw SysError("duping over STDIN");
-        if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
-            throw SysError("duping over STDOUT");
-        execlp("ssh", "ssh", "-S", socketPath.c_str(), uri.c_str(), "nix-daemon", "--stdio", NULL);
-        throw SysError("executing nix-daemon --stdio over ssh");
-    });
-    in.readSide = -1;
-    out.writeSide = -1;
-    conn->out = std::move(out.readSide);
-    conn->in = std::move(in.writeSide);
-    conn->to = FdSink(conn->in.get());
-    conn->from = FdSource(conn->out.get());
-    initConnection(*conn);
+
+    std::string command = remoteProgram + " --stdio";
+    if (remoteStore.get() != "")
+        command += " --store " + shellEscape(remoteStore.get());
+
+    conn->sshConn = master.startCommand(command);
+    conn->to = FdSink(conn->sshConn->in.get());
+    conn->from = FdSource(conn->sshConn->out.get());
     return conn;
 }
 
-static RegisterStoreImplementation regStore([](
-    const std::string & uri, const Store::Params & params)
-    -> std::shared_ptr<Store>
-{
-    if (std::string(uri, 0, 6) != "ssh://") return 0;
-    return std::make_shared<SSHStore>(uri.substr(6), params);
-});
+static RegisterStoreImplementation<SSHStore, SSHStoreConfig> regSSHStore;
 
 }

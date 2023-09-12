@@ -1,0 +1,14 @@
+error:
+       … while calling the 'toPath' builtin
+
+         at /pwd/lang/eval-fail-to-path.nix:1:1:
+
+            1| builtins.toPath "foo/bar"
+             | ^
+            2|
+
+       … while evaluating the first argument passed to builtins.toPath
+
+         at «none»:0: (source not available)
+
+       error: string 'foo/bar' doesn't represent an absolute path

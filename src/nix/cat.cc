@@ -13,11 +13,11 @@ struct MixCat : virtual Args
     {
         auto st = accessor->stat(path);
         if (st.type == FSAccessor::Type::tMissing)
-            throw Error(format("path ‘%1%’ does not exist") % path);
+            throw Error("path '%1%' does not exist", path);
         if (st.type != FSAccessor::Type::tRegular)
-            throw Error(format("path ‘%1%’ is not a regular file") % path);
+            throw Error("path '%1%' is not a regular file", path);
 
-        std::cout << accessor->readFile(path);
+        writeFull(STDOUT_FILENO, accessor->readFile(path));
     }
 };
 
@@ -25,17 +25,23 @@ struct CmdCatStore : StoreCommand, MixCat
 {
     CmdCatStore()
     {
-        expectArg("path", &path);
-    }
-
-    std::string name() override
-    {
-        return "cat-store";
+        expectArgs({
+            .label = "path",
+            .handler = {&path},
+            .completer = completePath
+        });
     }
 
     std::string description() override
     {
-        return "print the contents of a store file on stdout";
+        return "print the contents of a file in the Nix store on stdout";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "store-cat.md"
+          ;
     }
 
     void run(ref<Store> store) override
@@ -50,25 +56,31 @@ struct CmdCatNar : StoreCommand, MixCat
 
     CmdCatNar()
     {
-        expectArg("nar", &narPath);
+        expectArgs({
+            .label = "nar",
+            .handler = {&narPath},
+            .completer = completePath
+        });
         expectArg("path", &path);
-    }
-
-    std::string name() override
-    {
-        return "cat-nar";
     }
 
     std::string description() override
     {
-        return "print the contents of a file inside a NAR file";
+        return "print the contents of a file inside a NAR file on stdout";
+    }
+
+    std::string doc() override
+    {
+        return
+          #include "nar-cat.md"
+          ;
     }
 
     void run(ref<Store> store) override
     {
-        cat(makeNarAccessor(make_ref<std::string>(readFile(narPath))));
+        cat(makeNarAccessor(readFile(narPath)));
     }
 };
 
-static RegisterCommand r1(make_ref<CmdCatStore>());
-static RegisterCommand r2(make_ref<CmdCatNar>());
+static auto rCmdCatStore = registerCommand2<CmdCatStore>({"store", "cat"});
+static auto rCmdCatNar = registerCommand2<CmdCatNar>({"nar", "cat"});

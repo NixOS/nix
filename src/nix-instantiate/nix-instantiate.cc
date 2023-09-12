@@ -8,7 +8,9 @@
 #include "value-to-json.hh"
 #include "util.hh"
 #include "store-api.hh"
-#include "common-opts.hh"
+#include "local-fs-store.hh"
+#include "common-eval-args.hh"
+#include "legacy.hh"
 
 #include <map>
 #include <iostream>
@@ -17,16 +19,8 @@
 using namespace nix;
 
 
-static Expr * parseStdin(EvalState & state)
-{
-    Activity act(*logger, lvlTalkative, format("parsing standard input"));
-    return state.parseExprFromString(drainFD(0), absPath("."));
-}
-
-
 static Path gcRoot;
 static int rootNr = 0;
-static bool indirectRoot = false;
 
 
 enum OutputKind { okPlain, okXML, okJSON };
@@ -37,7 +31,8 @@ void processExpr(EvalState & state, const Strings & attrPaths,
     bool evalOnly, OutputKind output, bool location, Expr * e)
 {
     if (parseOnly) {
-        std::cout << format("%1%\n") % *e;
+        e->show(state.symbols, std::cout);
+        std::cout << "\n";
         return;
     }
 
@@ -45,10 +40,10 @@ void processExpr(EvalState & state, const Strings & attrPaths,
     state.eval(e, vRoot);
 
     for (auto & i : attrPaths) {
-        Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot));
-        state.forceValue(v);
+        Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot).first);
+        state.forceValue(v, [&]() { return v.determinePos(noPos); });
 
-        PathSet context;
+        NixStringContext context;
         if (evalOnly) {
             Value vRes;
             if (autoArgs.empty())
@@ -56,47 +51,47 @@ void processExpr(EvalState & state, const Strings & attrPaths,
             else
                 state.autoCallFunction(autoArgs, v, vRes);
             if (output == okXML)
-                printValueAsXML(state, strict, location, vRes, std::cout, context);
-            else if (output == okJSON)
-                printValueAsJSON(state, strict, vRes, std::cout, context);
-            else {
+                printValueAsXML(state, strict, location, vRes, std::cout, context, noPos);
+            else if (output == okJSON) {
+                printValueAsJSON(state, strict, vRes, v.determinePos(noPos), std::cout, context);
+                std::cout << std::endl;
+            } else {
                 if (strict) state.forceValueDeep(vRes);
-                std::cout << vRes << std::endl;
+                vRes.print(state.symbols, std::cout);
+                std::cout << std::endl;
             }
         } else {
             DrvInfos drvs;
             getDerivations(state, v, "", autoArgs, drvs, false);
             for (auto & i : drvs) {
-                Path drvPath = i.queryDrvPath();
+                auto drvPath = i.requireDrvPath();
+                auto drvPathS = state.store->printStorePath(drvPath);
 
                 /* What output do we want? */
-                string outputName = i.queryOutputName();
+                std::string outputName = i.queryOutputName();
                 if (outputName == "")
-                    throw Error(format("derivation ‘%1%’ lacks an ‘outputName’ attribute ") % drvPath);
+                    throw Error("derivation '%1%' lacks an 'outputName' attribute", drvPathS);
 
                 if (gcRoot == "")
                     printGCWarning();
                 else {
-                    Path rootName = gcRoot;
+                    Path rootName = absPath(gcRoot);
                     if (++rootNr > 1) rootName += "-" + std::to_string(rootNr);
                     auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();
                     if (store2)
-                        drvPath = store2->addPermRoot(drvPath, rootName, indirectRoot);
+                        drvPathS = store2->addPermRoot(drvPath, rootName);
                 }
-                std::cout << format("%1%%2%\n") % drvPath % (outputName != "out" ? "!" + outputName : "");
+                std::cout << fmt("%s%s\n", drvPathS, (outputName != "out" ? "!" + outputName : ""));
             }
         }
     }
 }
 
 
-int main(int argc, char * * argv)
+static int main_nix_instantiate(int argc, char * * argv)
 {
-    return handleExceptions(argv[0], [&]() {
-        initNix();
-        initGC();
-
-        Strings files, searchPath;
+    {
+        Strings files;
         bool readStdin = false;
         bool fromArgs = false;
         bool findFile = false;
@@ -107,10 +102,13 @@ int main(int argc, char * * argv)
         bool strict = false;
         Strings attrPaths;
         bool wantsReadWrite = false;
-        std::map<string, string> autoArgs_;
-        bool repair = false;
 
-        parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
+        struct MyArgs : LegacyArgs, MixEvalArgs
+        {
+            using LegacyArgs::LegacyArgs;
+        };
+
+        MyArgs myArgs(std::string(baseNameOf(argv[0])), [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help")
                 showManPage("nix-instantiate");
             else if (*arg == "--version")
@@ -129,14 +127,10 @@ int main(int argc, char * * argv)
                 findFile = true;
             else if (*arg == "--attr" || *arg == "-A")
                 attrPaths.push_back(getArg(*arg, arg, end));
-            else if (parseAutoArgs(arg, end, autoArgs_))
-                ;
-            else if (parseSearchPathArg(arg, end, searchPath))
-                ;
             else if (*arg == "--add-root")
                 gcRoot = getArg(*arg, arg, end);
             else if (*arg == "--indirect")
-                indirectRoot = true;
+                ;
             else if (*arg == "--xml")
                 outputKind = okXML;
             else if (*arg == "--json")
@@ -145,8 +139,6 @@ int main(int argc, char * * argv)
                 xmlOutputSourceLocation = false;
             else if (*arg == "--strict")
                 strict = true;
-            else if (*arg == "--repair")
-                repair = true;
             else if (*arg == "--dry-run")
                 settings.readOnlyMode = true;
             else if (*arg != "" && arg->at(0) == '-')
@@ -156,42 +148,51 @@ int main(int argc, char * * argv)
             return true;
         });
 
+        myArgs.parseCmdline(argvToStrings(argc, argv));
+
         if (evalOnly && !wantsReadWrite)
             settings.readOnlyMode = true;
 
         auto store = openStore();
+        auto evalStore = myArgs.evalStoreUrl ? openStore(*myArgs.evalStoreUrl) : store;
 
-        EvalState state(searchPath, store);
-        state.repair = repair;
+        auto state = std::make_unique<EvalState>(myArgs.searchPath, evalStore, store);
+        state->repair = myArgs.repair;
 
-        Bindings & autoArgs(*evalAutoArgs(state, autoArgs_));
+        Bindings & autoArgs = *myArgs.getAutoArgs(*state);
 
-        if (attrPaths.empty()) attrPaths.push_back("");
+        if (attrPaths.empty()) attrPaths = {""};
 
         if (findFile) {
             for (auto & i : files) {
-                Path p = state.findFile(i);
-                if (p == "") throw Error(format("unable to find ‘%1%’") % i);
-                std::cout << p << std::endl;
+                auto p = state->findFile(i);
+                if (auto fn = p.getPhysicalPath())
+                    std::cout << fn->abs() << std::endl;
+                else
+                    throw Error("'%s' has no physical path", p);
             }
-            return;
+            return 0;
         }
 
         if (readStdin) {
-            Expr * e = parseStdin(state);
-            processExpr(state, attrPaths, parseOnly, strict, autoArgs,
+            Expr * e = state->parseStdin();
+            processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         } else if (files.empty() && !fromArgs)
             files.push_back("./default.nix");
 
         for (auto & i : files) {
             Expr * e = fromArgs
-                ? state.parseExprFromString(i, absPath("."))
-                : state.parseExprFromFile(resolveExprPath(lookupFileArg(state, i)));
-            processExpr(state, attrPaths, parseOnly, strict, autoArgs,
+                ? state->parseExprFromString(i, state->rootPath(CanonPath::fromCwd()))
+                : state->parseExprFromFile(resolveExprPath(state->checkSourcePath(lookupFileArg(*state, i))));
+            processExpr(*state, attrPaths, parseOnly, strict, autoArgs,
                 evalOnly, outputKind, xmlOutputSourceLocation, e);
         }
 
-        state.printStats();
-    });
+        state->printStats();
+
+        return 0;
+    }
 }
+
+static RegisterLegacyCommand r_nix_instantiate("nix-instantiate", main_nix_instantiate);
