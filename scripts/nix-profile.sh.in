@@ -1,4 +1,4 @@
-if [ -n "$HOME" ] && [ -n "$USER" ]; then
+if [ -n "$HOME" ] && [ -n "$USER" ] && ! USER=$(id -u -n); then
     __savedpath="$PATH"
     export PATH=@coreutils@
 
