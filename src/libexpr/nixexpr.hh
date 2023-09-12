@@ -175,18 +175,16 @@ struct Expr
 
 struct ExprInt : Expr
 {
-    NixInt n;
     Value v;
-    ExprInt(NixInt n) : n(n) { v.mkInt(n); };
+    ExprInt(NixInt n) { v.mkInt(n); };
     Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };
 
 struct ExprFloat : Expr
 {
-    NixFloat nf;
     Value v;
-    ExprFloat(NixFloat nf) : nf(nf) { v.mkFloat(nf); };
+    ExprFloat(NixFloat nf) { v.mkFloat(nf); };
     Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };
