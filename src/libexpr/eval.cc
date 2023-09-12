@@ -2506,6 +2506,7 @@ void EvalState::printStats()
             {"elements", nrValuesInEnvs},
             {"bytes", bEnvs},
         };
+        topObj["nrExprs"] = Expr::nrExprs;
         topObj["list"] = {
             {"elements", nrListElems},
             {"bytes", bLists},
