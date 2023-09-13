@@ -580,10 +580,10 @@ LockedFlake lockFlake(
                                     inputFlake.sourceInfo->actualPath
                                      + "/"
                                      + inputFlake.lockedRef.subdir
-                                     + "/flake.lock").root.get_ptr(),
+                                     + "/flake.lock").root.get_ptr();
                             computeLocks(
                                 inputFlake.inputs, childNode, inputPath,
-                                upstreamLock inputPath, localPath, false);
+                                upstreamLock, inputPath, localPath, false);
                         }
 
                         else {
