@@ -29,7 +29,7 @@ struct CmdPingStore : StoreCommand, MixJSON
             if (auto version = store->getVersion())
                 notice("Version: %s", *version);
             if (auto trusted = store->isTrustedClient())
-                notice("Trusted: %s", *trusted);
+                notice("Trusted: %s", *trusted ? "true" : "false");
         } else {
             nlohmann::json res;
             Finally printRes([&]() {
@@ -41,7 +41,7 @@ struct CmdPingStore : StoreCommand, MixJSON
             if (auto version = store->getVersion())
                 res["version"] = *version;
             if (auto trusted = store->isTrustedClient())
-                res["trusted"] = *trusted;
+                res["trusted"] = *trusted ? true : false;
         }
     }
 };
