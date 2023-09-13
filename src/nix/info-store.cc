@@ -17,7 +17,7 @@ struct CmdPingStore : StoreCommand, MixJSON
     std::string doc() override
     {
         return
-          #include "ping-store.md"
+          #include "info-store.md"
           ;
     }
 
@@ -46,4 +46,4 @@ struct CmdPingStore : StoreCommand, MixJSON
     }
 };
 
-static auto rCmdPingStore = registerCommand2<CmdPingStore>({"store", "ping"});
+static auto rCmdPingStore = registerCommand2<CmdPingStore>({"store", "info"});

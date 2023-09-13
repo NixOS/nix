@@ -126,7 +126,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         {"ls-store", {"store", "ls"}},
         {"make-content-addressable", {"store", "make-content-addressed"}},
         {"optimise-store", {"store", "optimise"}},
-        {"ping-store", {"store", "ping"}},
+        {"info-store", {"store", "info"}},
         {"sign-paths", {"store", "sign"}},
         {"show-derivation", {"derivation", "show"}},
         {"to-base16", {"hash", "to-base16"}},
