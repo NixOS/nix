@@ -570,19 +570,20 @@ LockedFlake lockFlake(
                             parents.push_back(*input.ref);
                             Finally cleanup([&]() { parents.pop_back(); });
 
-                            /* Recursively process the inputs of this
-                               flake. Also, unless we already have this flake
-                               in the top-level lock file, use this flake's
-                               own lock file. */
+                            /* Recursively process the inputs of this flake.
+                               Use this flake's own lock file; we don't want
+                               to leave the transitive inputs at the version
+                               associated with what this dependency used to be
+                               used to be */
+                            auto upstreamLock =
+                                LockFile::read(
+                                    inputFlake.sourceInfo->actualPath
+                                     + "/"
+                                     + inputFlake.lockedRef.subdir
+                                     + "/flake.lock").root.get_ptr(),
                             computeLocks(
                                 inputFlake.inputs, childNode, inputPath,
-                                oldLock
-                                ? std::dynamic_pointer_cast<const Node>(oldLock)
-                                : LockFile::read(
-                                    inputFlake.sourceInfo->actualPath + "/" + inputFlake.lockedRef.subdir + "/flake.lock").root.get_ptr(),
-                                oldLock ? lockRootPath : inputPath,
-                                localPath,
-                                false);
+                                upstreamLock inputPath, localPath, false);
                         }
 
                         else {
