@@ -17,8 +17,7 @@ struct CmdPingStore : StoreCommand, MixJSON
     std::string doc() override
     {
         return
-          #include "info-store.md"
-          ;
+          #include "info-store.md";
     }
 
     void run(ref<Store> store) override
