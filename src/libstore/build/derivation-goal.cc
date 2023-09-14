@@ -928,7 +928,7 @@ void DerivationGoal::buildDone()
     closeReadPipes();
 
     /* Close the log file. */
-    closeLogFile();
+    Finally logFileCloser([&](){ closeLogFile(); });
 
     cleanupPostChildKill();
 

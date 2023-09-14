@@ -6,6 +6,7 @@ path=$(nix-store -q $(nix-instantiate fixed.nix -A good.0))
 
 echo 'testing bad...'
 nix-build fixed.nix -A bad --no-out-link && fail "should fail"
+nix-store --read-log $(nix-instantiate fixed.nix -A bad) |& grep -q "hash mismatch"
 
 # Building with the bad hash should produce the "good" output path as
 # a side-effect.
