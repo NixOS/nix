@@ -13,7 +13,7 @@ On Linux and macOS the easiest way to install Nix is to run the following shell 
 (as a user other than root):
 
 ```console
-$ curl -L https://nixos.org/nix/install | sh
+curl -L https://nixos.org/nix/install | sh
 ```
 
 Information on additional installation methods is available on the [Nix download page](https://nixos.org/download.html).
