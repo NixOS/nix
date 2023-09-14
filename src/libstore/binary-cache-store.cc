@@ -171,6 +171,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
            compression == "lzip" ? ".lzip" :
            compression == "lz4" ? ".lz4" :
            compression == "br" ? ".br" :
+           compression == "gzip" ? ".gz" :
            "");
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();

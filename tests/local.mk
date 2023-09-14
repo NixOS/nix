@@ -87,6 +87,7 @@ nix_tests = \
   structured-attrs.sh \
   shell.sh \
   brotli.sh \
+  gz.sh \
   zstd.sh \
   compression-levels.sh \
   nix-copy-ssh.sh \
