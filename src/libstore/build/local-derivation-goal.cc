@@ -387,26 +387,6 @@ void LocalDerivationGoal::cleanupPostOutputsRegisteredModeNonCheck()
 }
 
 
-#if __linux__
-static void linkOrCopy(const Path & from, const Path & to)
-{
-    if (link(from.c_str(), to.c_str()) == -1) {
-        /* Hard-linking fails if we exceed the maximum link count on a
-           file (e.g. 32000 of ext3), which is quite possible after a
-           'nix-store --optimise'. FIXME: actually, why don't we just
-           bind-mount in this case?
-
-           It can also fail with EPERM in BeegFS v7 and earlier versions
-           or fail with EXDEV in OpenAFS
-           which don't allow hard-links to other directories */
-        if (errno != EMLINK && errno != EPERM && errno != EXDEV)
-            throw SysError("linking '%s' to '%s'", to, from);
-        copyPath(from, to);
-    }
-}
-#endif
-
-
 void LocalDerivationGoal::startBuilder()
 {
     if ((buildUser && buildUser->getUIDCount() != 1)
@@ -1559,34 +1539,34 @@ void LocalDerivationGoal::addDependency(const StorePath & path)
 
             auto st = lstat(source);
 
-            if (S_ISDIR(st.st_mode)) {
+            /* Bind-mount the path into the sandbox. This requires
+               entering its mount namespace, which is not possible
+               in multithreaded programs. So we do this in a
+               child process.*/
+            Pid child(startProcess([&]() {
 
-                /* Bind-mount the path into the sandbox. This requires
-                   entering its mount namespace, which is not possible
-                   in multithreaded programs. So we do this in a
-                   child process.*/
-                Pid child(startProcess([&]() {
+                if (usingUserNamespace && (setns(sandboxUserNamespace.get(), 0) == -1))
+                    throw SysError("entering sandbox user namespace");
 
-                    if (usingUserNamespace && (setns(sandboxUserNamespace.get(), 0) == -1))
-                        throw SysError("entering sandbox user namespace");
+                if (setns(sandboxMountNamespace.get(), 0) == -1)
+                    throw SysError("entering sandbox mount namespace");
 
-                    if (setns(sandboxMountNamespace.get(), 0) == -1)
-                        throw SysError("entering sandbox mount namespace");
-
+                if (S_ISDIR(st.st_mode))
                     createDirs(target);
+                else {
+                    createDirs(dirOf(target));
+                    writeFile(target, "");
+                }
 
-                    if (mount(source.c_str(), target.c_str(), "", MS_BIND, 0) == -1)
-                        throw SysError("bind mount from '%s' to '%s' failed", source, target);
+                if (mount(source.c_str(), target.c_str(), "", MS_BIND, 0) == -1)
+                    throw SysError("bind mount from '%s' to '%s' failed", source, target);
 
-                    _exit(0);
-                }));
+                _exit(0);
+            }));
 
-                int status = child.wait();
-                if (status != 0)
-                    throw Error("could not add path '%s' to sandbox", worker.store.printStorePath(path));
-
-            } else
-                linkOrCopy(source, target);
+            int status = child.wait();
+            if (status != 0)
+                throw Error("could not add path '%s' to sandbox", worker.store.printStorePath(path));
 
         #else
             throw Error("don't know how to make path '%s' (produced by a recursive Nix call) appear in the sandbox",
