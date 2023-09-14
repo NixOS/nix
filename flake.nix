@@ -58,36 +58,55 @@
 
       nixSrc = fileset.toSource {
         root = ./.;
-        fileset = fileset.intersect baseFiles (
-          fileset.difference
-            (fileset.unions [
-              ./.version
-              ./boehmgc-coroutine-sp-fallback.diff
-              ./bootstrap.sh
-              ./configure.ac
-              ./doc
-              ./local.mk
-              ./m4
-              ./Makefile
-              ./Makefile.config.in
-              ./misc
-              ./mk
-              ./precompiled-headers.h
-              ./src
-              ./tests
-              ./COPYING
-              ./scripts/local.mk
-              (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
-              # TODO: do we really need README.md? It doesn't seem used in the build.
-              ./README.md
-            ])
-            (fileset.unions [
-              # Removed file sets
-              ./tests/nixos
-              ./tests/installer
-            ])
+        fileset = nixFileset;
+      };
+
+      nixSrcNoTest = fileset.toSource {
+        root = ./.;
+        fileset = fileset.difference nixFileset (
+          fileset.unions [
+            ./tests
+            ./src/libexpr/tests
+            ./src/libstore/tests
+            ./src/libutil/tests
+          ]
         );
       };
+
+      nixSrcForPkg = finalAttrs:
+        if finalAttrs.doCheck or false || finalAttrs.doInstallCheck or false
+        then nixSrc
+        else nixSrcNoTest;
+
+      nixFileset = fileset.intersect baseFiles (
+        fileset.difference
+          (fileset.unions [
+            ./.version
+            ./boehmgc-coroutine-sp-fallback.diff
+            ./bootstrap.sh
+            ./configure.ac
+            ./doc
+            ./local.mk
+            ./m4
+            ./Makefile
+            ./Makefile.config.in
+            ./misc
+            ./mk
+            ./precompiled-headers.h
+            ./src
+            ./tests
+            ./COPYING
+            ./scripts/local.mk
+            (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
+            # TODO: do we really need README.md? It doesn't seem used in the build.
+            ./README.md
+          ])
+          (fileset.unions [
+            # Removed file sets
+            ./tests/nixos
+            ./tests/installer
+          ])
+      );
 
       # Memoize nixpkgs for different platforms for efficiency.
       nixpkgsFor = forAllSystems
@@ -372,7 +391,7 @@
             name = "nix-${version}";
             inherit version;
 
-            src = nixSrc;
+            src = nixSrcForPkg finalAttrs;
             VERSION_SUFFIX = versionSuffix;
 
             outputs = [ "out" "dev" "doc" ];
@@ -505,12 +524,34 @@
 
       # https://nixos.org/manual/nixos/unstable/index.html#sec-calling-nixos-tests
       runNixOSTestFor = system: test: nixos-lib.runTest {
-        imports = [ test ];
+        imports = [
+          test
+          # For fast cycle when you don't need the regular tests:
+          # (useNixWithoutRegularTests system)
+        ];
         hostPkgs = nixpkgsFor.${system}.native;
         defaults = {
           nixpkgs.pkgs = nixpkgsFor.${system}.native;
         };
         _module.args.nixpkgs = nixpkgs;
+      };
+
+      # A module that makes a NixOS VM test use a Nix package without tests.
+      useNixWithoutRegularTests = system: {
+        defaults = {
+          # TODO: `.extend` is slightly inefficient.
+          #       Make NixOS use `nix.package` consistently instead, and set that instead of doing `.extend`.
+          #       `system` parameter can then be removed.
+          nixpkgs.pkgs = lib.mkForce (
+            nixpkgsFor.${system}.native.extend (self: super: {
+              nix = super.nix.overrideAttrs(old: { doCheck = false; });
+            })
+          );
+          system.systemBuilderArgs.disallowedRequisites = [
+            # Avoid building `pkgs.nix`, which is the regular build with tests which we want to avoid.
+            (builtins.unsafeDiscardStringContext (lib.getBin nixpkgsFor.${system}.native.nix))
+          ];
+        };
       };
 
     in {
