@@ -33,7 +33,7 @@ struct CmdPingStore : StoreCommand, MixJSON
         } else {
             nlohmann::json res;
             Finally printRes([&]() {
-                logger->cout("%s", res);
+                logger->cout("%s", res.dump(2));
             });
 
             res["url"] = store->getUri();
