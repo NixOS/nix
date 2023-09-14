@@ -131,7 +131,8 @@ let
     with nixpkgsFor.${image.system}.native;
     runCommand
       "installer-test-${imageName}-${testName}"
-      { buildInputs = [ qemu_kvm openssh ];
+      {
+        buildInputs = [ qemu_kvm openssh ];
         image = image.image;
         postBoot = image.postBoot or "";
         installScript = installScripts.${testName}.script;
@@ -230,15 +231,40 @@ let
           [[ \$(nix-instantiate --eval --expr 'builtins.readFile <myChannel/someFile>') = '"someContent"' ]]
         EOF
 
+        echo "Running installer again to test for idempotency..."
+        $ssh "set -eux; $installScript"
+
+        echo "Testing Nix installation..."
+        $ssh <<EOF
+          set -ex
+
+          # FIXME: get rid of this; ideally ssh should just work.
+          source ~/.bash_profile || true
+          source ~/.bash_login || true
+          source ~/.profile || true
+          source /etc/bashrc || true
+
+          nix-env --version
+          nix --extra-experimental-features nix-command store ping
+
+          out=\$(nix-build --no-substitute -E 'derivation { name = "foo"; system = "x86_64-linux"; builder = "/bin/sh"; args = ["-c" "echo foobar > \$out"]; }')
+          [[ \$(cat \$out) = foobar ]]
+        EOF
+
         echo "Done!"
         touch $out
       '';
 
 in
 
-builtins.mapAttrs (imageName: image:
-  { ${image.system} = builtins.mapAttrs (testName: test:
-      makeTest imageName testName
-    ) installScripts;
-  }
-) images
+builtins.mapAttrs
+  (imageName: image:
+    {
+      ${image.system} = builtins.mapAttrs
+        (testName: test:
+          makeTest imageName testName
+        )
+        installScripts;
+    }
+  )
+  images

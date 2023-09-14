@@ -441,19 +441,31 @@ $(uninstall_directions)
 EOF
     fi
 
-    # TODO: I think it would be good for this step to accumulate more
-    #       knowledge of older obsolete artifacts, if there are any.
-    #       We could issue a "reminder" here that the user might want
-    #       to clean them up?
-
+    problematic_profile_targets=()
     for profile_target in "${PROFILE_TARGETS[@]}"; do
-        # TODO: I think it would be good to accumulate a list of all
-        #       of the copies so that people don't hit this 2 or 3x in
-        #       a row for different files.
-        if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
-            # this backup process first released in Nix 2.1
-            failure <<EOF
+        # this backup process first released in Nix 2.1
+        if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ] && ! contains_source_lines "$profile_target"; then
+            # Identical backup and original happens especially on macOS as it overwrites /etc/zshrc on every update
+            if cmp -s "$profile_target" "$profile_target$PROFILE_BACKUP_SUFFIX"; then
+                rm "$profile_target$PROFILE_BACKUP_SUFFIX"
+            else
+                problematic_profile_targets+=("$profile_target")
+            fi
+        fi
+    done
+
+    if [ "${PROFILE_TARGETS[@]}" ]; then
+        resolution_explanation=$(cat <<EOF
 I back up shell profile/rc scripts before I add Nix to them.
+However, at least one of them was already backed up.
+Clean them up manually to continue.
+EOF
+)
+
+        for profile_target in "${problematic_profile_targets[@]}"; do
+            resolution_explanation+=$(cat <<EOF
+
+
 I need to back up $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX,
 but the latter already exists.
 
@@ -470,8 +482,11 @@ Here's how to clean up the old backup file:
    $profile_target$PROFILE_BACKUP_SUFFIX doesn't mention Nix, run:
    mv $profile_target$PROFILE_BACKUP_SUFFIX $profile_target
 EOF
-        fi
-    done
+)
+        done
+
+        failure "$resolution_explanation"
+    fi
 
     if is_os_linux && [ ! -e /run/systemd/system ]; then
         warning <<EOF
@@ -816,7 +831,7 @@ install_from_extracted_nix() {
         cd "$EXTRACTED_NIX_PATH"
 
         _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
-              cp -RPp ./store/* "$NIX_ROOT/store/"
+              cp -RPnp ./store/* "$NIX_ROOT/store/"
 
         _sudo "to make the new store non-writable at $NIX_ROOT/store" \
               chmod -R ugo-w "$NIX_ROOT/store/"
@@ -862,6 +877,11 @@ end
 EOF
 }
 
+contains_source_lines() {
+    # This works for both POSIX shells and fish
+    grep -q "# Nix" "$1" && grep -q "# End Nix" "$1"
+}
+
 configure_shell_profile() {
     task "Setting up shell profiles: ${PROFILE_TARGETS[*]}"
     for profile_target in "${PROFILE_TARGETS[@]}"; do
@@ -877,7 +897,7 @@ configure_shell_profile() {
             fi
         fi
 
-        if [ -e "$profile_target" ]; then
+        if [ -e "$profile_target" ] && ! contains_source_lines "$profile_target"; then
             shell_source_lines \
                 | _sudo "extend your $profile_target with nix-daemon settings" \
                         tee -a "$profile_target"
