@@ -1,4 +1,4 @@
-default: all
+default: src/libutil/libnixutil.so all
 
 
 # Get rid of default suffixes. FIXME: is this a good idea?
