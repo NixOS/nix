@@ -66,7 +66,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
             auto refs = tokenizeString<Strings>(value, " ");
             if (!references.empty()) throw corrupt("extra References");
             for (auto & r : refs)
-                references.insert(StorePath(r));
+                insertReferencePossiblyToSelf(StorePath(r));
         }
         else if (name == "Deriver") {
             if (value != "unknown-deriver")

@@ -81,7 +81,7 @@ struct PathInputScheme : InputScheme
         // nothing to do
     }
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
+    std::pair<StorePathDescriptor, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
         std::string absPath;
@@ -123,7 +123,11 @@ struct PathInputScheme : InputScheme
         }
         input.attrs.insert_or_assign("lastModified", uint64_t(mtime));
 
-        return {std::move(*storePath), input};
+        // FIXME: just have Store::addToStore return a StorePathDescriptor, as
+        // it has the underlying information.
+        auto storePathDesc = store->queryPathInfo(*storePath)->fullStorePathDescriptorOpt().value();
+
+        return {std::move(storePathDesc), input};
     }
 };
 

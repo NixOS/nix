@@ -79,6 +79,17 @@ void WorkerProto::Serialise<ContentAddress>::write(const Store & store, WorkerPr
 }
 
 
+StorePathDescriptor WorkerProto::Serialise<StorePathDescriptor>::read(const Store & store, WorkerProto::ReadConn conn)
+{
+    return parseStorePathDescriptor(readString(conn.from));
+}
+
+void WorkerProto::Serialise<StorePathDescriptor>::write(const Store & store, WorkerProto::WriteConn conn, const StorePathDescriptor & ca)
+{
+    conn.to << renderStorePathDescriptor(ca);
+}
+
+
 DerivedPath WorkerProto::Serialise<DerivedPath>::read(const Store & store, WorkerProto::ReadConn conn)
 {
     auto s = readString(conn.from);

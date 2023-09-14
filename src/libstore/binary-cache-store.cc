@@ -180,11 +180,11 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
         duration);
 
     /* Verify that all references are valid. This may do some .narinfo
-       reads, but typically they'll already be cached. */
-    for (auto & ref : info.references)
+       reads, but typically they'll already be cached. Note that
+       self-references are always valid. */
+    for (auto & ref : info.references.others)
         try {
-            if (ref != info.path)
-                queryPathInfo(ref);
+            queryPathInfo(ref);
         } catch (InvalidPath &) {
             throw Error("cannot add '%s' to the binary cache because the reference '%s' is not valid",
                 printStorePath(info.path), printStorePath(ref));
@@ -307,14 +307,16 @@ StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, std::string_view n
     return addToStoreCommon(dump, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
             *this,
-            name,
-            FixedOutputInfo {
-                .method = method,
-                .hash = nar.first,
-                .references = {
-                    .others = references,
+            {
+                .name = std::string { name },
+                .info = FixedOutputInfo {
+                    .method = method,
+                    .hash = nar.first,
+                    .references = {
+                        .others = references,
                     // caller is not capable of creating a self-reference, because this is content-addressed without modulus
-                    .self = false,
+                        .self = false,
+                    },
                 },
             },
             nar.first,
@@ -324,12 +326,12 @@ StorePath BinaryCacheStore::addToStoreFromDump(Source & dump, std::string_view n
     })->path;
 }
 
-bool BinaryCacheStore::isValidPathUncached(const StorePath & storePath)
+bool BinaryCacheStore::isValidPathUncached(StorePathOrDesc storePath)
 {
     // FIXME: this only checks whether a .narinfo with a matching hash
     // part exists. So ‘f4kb...-foo’ matches ‘f4kb...-bar’, even
     // though they shouldn't. Not easily fixed.
-    return fileExists(narInfoFileFor(storePath));
+    return fileExists(narInfoFileFor(bakeCaIfNeeded(storePath)));
 }
 
 std::optional<StorePath> BinaryCacheStore::queryPathFromHashPart(const std::string & hashPart)
@@ -343,7 +345,7 @@ std::optional<StorePath> BinaryCacheStore::queryPathFromHashPart(const std::stri
     }
 }
 
-void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
+void BinaryCacheStore::narFromPath(StorePathOrDesc storePath, Sink & sink)
 {
     auto info = queryPathInfo(storePath).cast<const NarInfo>();
 
@@ -365,16 +367,17 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
     stats.narReadBytes += narSize.length;
 }
 
-void BinaryCacheStore::queryPathInfoUncached(const StorePath & storePath,
+void BinaryCacheStore::queryPathInfoUncached(StorePathOrDesc storePath,
     Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     auto uri = getUri();
-    auto storePathS = printStorePath(storePath);
+    auto actualStorePath = bakeCaIfNeeded(storePath);
+    auto storePathS = printStorePath(actualStorePath);
     auto act = std::make_shared<Activity>(*logger, lvlTalkative, actQueryPathInfo,
         fmt("querying info about '%s' on '%s'", storePathS, uri), Logger::Fields{storePathS, uri});
     PushActivity pact(act->id);
 
-    auto narInfoFile = narInfoFileFor(storePath);
+    auto narInfoFile = narInfoFileFor(actualStorePath);
 
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
@@ -424,14 +427,16 @@ StorePath BinaryCacheStore::addToStore(
     return addToStoreCommon(*source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
             *this,
-            name,
-            FixedOutputInfo {
-                .method = method,
-                .hash = h,
-                .references = {
-                    .others = references,
-                    // caller is not capable of creating a self-reference, because this is content-addressed without modulus
-                    .self = false,
+            {
+                .name = std::string { name },
+                .info = FixedOutputInfo {
+                    .method = method,
+                    .hash = h,
+                    .references = {
+                        .others = references,
+                        // caller is not capable of creating a self-reference, because this is content-addressed without modulus
+                        .self = false,
+                    },
                 },
             },
             nar.first,
@@ -459,10 +464,12 @@ StorePath BinaryCacheStore::addTextToStore(
     return addToStoreCommon(source, repair, CheckSigs, [&](HashResult nar) {
         ValidPathInfo info {
             *this,
-            std::string { name },
-            TextInfo {
-                .hash = textHash,
-                .references = references,
+            {
+                .name = std::string { name },
+                .info = TextInfo {
+                    .hash = textHash,
+                    .references = references,
+                },
             },
             nar.first,
         };

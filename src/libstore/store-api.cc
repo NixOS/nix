@@ -181,6 +181,31 @@ static std::string makeType(
     return std::move(type);
 }
 
+StorePath Store::bakeCaIfNeeded(const OwnedStorePathOrDesc & path) const
+{
+    return bakeCaIfNeeded(borrowStorePathOrDesc(path));
+}
+
+StorePath Store::bakeCaIfNeeded(StorePathOrDesc path) const
+{
+    return std::visit(overloaded {
+        [this](std::reference_wrapper<const StorePath> storePath) {
+            return StorePath {storePath};
+        },
+        [this](std::reference_wrapper<const StorePathDescriptor> ca) {
+            return makeFixedOutputPathFromCA(ca);
+        },
+    }, path);
+}
+
+StorePathOrDesc borrowStorePathOrDesc(const OwnedStorePathOrDesc & storePathOrDesc) {
+    // Can't use std::visit as it would copy :(
+    if (auto p = std::get_if<StorePath>(&storePathOrDesc))
+        return *p;
+    if (auto p = std::get_if<StorePathDescriptor>(&storePathOrDesc))
+        return *p;
+    abort();
+}
 
 StorePath Store::makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const
 {
@@ -202,26 +227,23 @@ StorePath Store::makeTextPath(std::string_view name, const TextInfo & info) cons
 {
     assert(info.hash.type == htSHA256);
     return makeStorePath(
-        makeType(*this, "text", StoreReferences {
-            .others = info.references,
-            .self = false,
-        }),
+        makeType(*this, "text", StoreReferences { info.references }),
         info.hash,
         name);
 }
 
 
-StorePath Store::makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const
+StorePath Store::makeFixedOutputPathFromCA(const StorePathDescriptor & desc) const
 {
     // New template
     return std::visit(overloaded {
         [&](const TextInfo & ti) {
-            return makeTextPath(name, ti);
+            return makeTextPath(desc.name, ti);
         },
         [&](const FixedOutputInfo & foi) {
-            return makeFixedOutputPath(name, foi);
+            return makeFixedOutputPath(desc.name, foi);
         }
-    }, ca.raw);
+    }, desc.info.raw);
 }
 
 
@@ -313,7 +335,7 @@ void Store::addMultipleToStore(
             bytesExpected += info.narSize;
             act.setExpected(actCopyPath, bytesExpected);
 
-            return info.references;
+            return info.references.others;
         },
 
         [&](const StorePath & path) {
@@ -437,11 +459,13 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
 
     ValidPathInfo info {
         *this,
-        name,
-        FixedOutputInfo {
-            .method = method,
-            .hash = hash,
-            .references = {},
+        StorePathDescriptor {
+            std::string { name },
+            FixedOutputInfo {
+                .method = method,
+                .hash = hash,
+                .references = {},
+            },
         },
         narHash,
     };
@@ -552,58 +576,66 @@ StorePathSet Store::queryDerivationOutputs(const StorePath & path)
 }
 
 
-void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, SubstitutablePathInfos & infos)
+void Store::querySubstitutablePathInfos(const StorePathSet & paths, const std::set<StorePathDescriptor> & caPaths, SubstitutablePathInfos & infos)
 {
     if (!settings.useSubstitutes) return;
+
+    auto query = [&](auto & sub, const StorePath & localPath, const StorePath & subPath) {
+        if (infos.count(subPath))
+            // Choose first succeeding substituter.
+            return;
+
+        debug("checking substituter '%s' for path '%s'", sub->getUri(), sub->printStorePath(subPath));
+
+        try {
+            auto info = sub->queryPathInfo(subPath);
+
+            if (sub->storeDir != storeDir && !(info->isContentAddressed(*sub) && info->references.empty()))
+                return;
+
+            auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
+                std::shared_ptr<const ValidPathInfo>(info));
+            infos.insert_or_assign(localPath, SubstitutablePathInfo {
+                info->deriver,
+                info->references,
+                narInfo ? narInfo->fileSize : 0,
+                info->narSize,
+            });
+        } catch (InvalidPath &) {
+        } catch (SubstituterDisabled &) {
+        } catch (Error & e) {
+            if (settings.tryFallback)
+                logError(e.info());
+            else
+                throw;
+        }
+    };
+
     for (auto & sub : getDefaultSubstituters()) {
         for (auto & path : paths) {
-            if (infos.count(path.first))
-                // Choose first succeeding substituter.
-                continue;
-
-            auto subPath(path.first);
-
-            // Recompute store path so that we can use a different store root.
-            if (path.second) {
-                subPath = makeFixedOutputPathFromCA(
-                    path.first.name(),
-                    ContentAddressWithReferences::withoutRefs(*path.second));
-                if (sub->storeDir == storeDir)
-                    assert(subPath == path.first);
-                if (subPath != path.first)
-                    debug("replaced path '%s' with '%s' for substituter '%s'", printStorePath(path.first), sub->printStorePath(subPath), sub->getUri());
-            } else if (sub->storeDir != storeDir) continue;
-
-            debug("checking substituter '%s' for path '%s'", sub->getUri(), sub->printStorePath(subPath));
-            try {
-                auto info = sub->queryPathInfo(subPath);
-
-                if (sub->storeDir != storeDir && !(info->isContentAddressed(*sub) && info->references.empty()))
-                    continue;
-
-                auto narInfo = std::dynamic_pointer_cast<const NarInfo>(
-                    std::shared_ptr<const ValidPathInfo>(info));
-                infos.insert_or_assign(path.first, SubstitutablePathInfo{
-                    .deriver = info->deriver,
-                    .references = info->references,
-                    .downloadSize = narInfo ? narInfo->fileSize : 0,
-                    .narSize = info->narSize,
-                });
-            } catch (InvalidPath &) {
-            } catch (SubstituterDisabled &) {
-            } catch (Error & e) {
-                if (settings.tryFallback)
-                    logError(e.info());
-                else
-                    throw;
-            }
+            if (sub->storeDir != storeDir) continue;
+            query(sub, path, path);
+        }
+        for (auto & ca : caPaths) {
+            // TODO Deal with references: either disallow, or require the
+            // store path lengths be the same and rewrite strings.
+            auto localPath = makeFixedOutputPathFromCA(ca);
+            auto subPath = sub->makeFixedOutputPathFromCA(ca);
+            if (sub->storeDir == storeDir)
+                assert(localPath == subPath);
+            if (localPath != subPath)
+                // TODO print CA too
+                debug("replaced path '%s' with '%s' for substituter '%s'", printStorePath(localPath), sub->printStorePath(subPath), sub->getUri());
+            query(sub, localPath, subPath);
         }
     }
 }
 
 
-bool Store::isValidPath(const StorePath & storePath)
+bool Store::isValidPath(StorePathOrDesc storePathOrDesc)
 {
+    auto storePath = bakeCaIfNeeded(storePathOrDesc);
+
     {
         auto state_(state.lock());
         auto res = state_->pathInfoCache.get(std::string(storePath.to_string()));
@@ -636,7 +668,7 @@ bool Store::isValidPath(const StorePath & storePath)
 
 /* Default implementation for stores that only implement
    queryPathInfoUncached(). */
-bool Store::isValidPathUncached(const StorePath & path)
+bool Store::isValidPathUncached(StorePathOrDesc path)
 {
     try {
         queryPathInfo(path);
@@ -647,7 +679,7 @@ bool Store::isValidPathUncached(const StorePath & path)
 }
 
 
-ref<const ValidPathInfo> Store::queryPathInfo(const StorePath & storePath)
+ref<const ValidPathInfo> Store::queryPathInfo(StorePathOrDesc storePath)
 {
     std::promise<ref<const ValidPathInfo>> promise;
 
@@ -672,9 +704,11 @@ static bool goodStorePath(const StorePath & expected, const StorePath & actual)
 }
 
 
-void Store::queryPathInfo(const StorePath & storePath,
+void Store::queryPathInfo(StorePathOrDesc pathOrCa,
     Callback<ref<const ValidPathInfo>> callback) noexcept
 {
+    auto storePath = bakeCaIfNeeded(pathOrCa);
+
     auto hashPart = std::string(storePath.hashPart());
 
     try {
@@ -708,7 +742,7 @@ void Store::queryPathInfo(const StorePath & storePath,
 
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
-    queryPathInfoUncached(storePath,
+    queryPathInfoUncached(pathOrCa,
         {[this, storePath, hashPart, callbackPtr](std::future<std::shared_ptr<const ValidPathInfo>> fut) {
 
             try {
@@ -825,21 +859,37 @@ void Store::substitutePaths(const StorePathSet & paths)
 
 StorePathSet Store::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute)
 {
+    std::set<OwnedStorePathOrDesc> paths2;
+    for (auto & p : paths)
+        paths2.insert(p);
+    auto res = queryValidPaths(paths2, maybeSubstitute);
+    StorePathSet res2;
+    for (auto & r : res) {
+        auto p = std::get_if<StorePath>(&r);
+        assert(p);
+        res2.insert(*p);
+    }
+    return res2;
+}
+
+std::set<OwnedStorePathOrDesc> Store::queryValidPaths(const std::set<OwnedStorePathOrDesc> & paths, SubstituteFlag maybeSubstitute)
+{
     struct State
     {
         size_t left;
-        StorePathSet valid;
+        std::set<OwnedStorePathOrDesc> valid;
         std::exception_ptr exc;
     };
 
-    Sync<State> state_(State{paths.size(), StorePathSet()});
+    Sync<State> state_(State{paths.size(), {}});
 
     std::condition_variable wakeup;
     ThreadPool pool;
 
-    auto doQuery = [&](const StorePath & path) {
+    auto doQuery = [&](const OwnedStorePathOrDesc & path) {
         checkInterrupt();
-        queryPathInfo(path, {[path, &state_, &wakeup](std::future<ref<const ValidPathInfo>> fut) {
+        auto path2 = borrowStorePathOrDesc(path);
+        queryPathInfo(path2, {[path, &state_, &wakeup](std::future<ref<const ValidPathInfo>> fut) {
             auto state(state_.lock());
             try {
                 auto info = fut.get();
@@ -893,7 +943,7 @@ std::string Store::makeValidityRegistration(const StorePathSet & paths,
 
         s += fmt("%1%\n", info->references.size());
 
-        for (auto & j : info->references)
+        for (auto & j : info->referencesPossiblyToSelf())
             s += printStorePath(j) + "\n";
     }
 
@@ -956,7 +1006,7 @@ json Store::pathInfoToJSON(const StorePathSet & storePaths,
 
             {
                 auto& jsonRefs = (jsonPath["references"] = json::array());
-                for (auto & ref : info->references)
+                for (auto & ref : info->referencesPossiblyToSelf())
                     jsonRefs.emplace_back(printStorePath(ref));
             }
 
@@ -1042,6 +1092,7 @@ static std::string makeCopyPathMessage(
     std::string_view dstUri,
     std::string_view storePath)
 {
+    // FIXME Use CA when we have it in messages below
     return srcUri == "local" || srcUri == "daemon"
         ? fmt("copying path '%s' to '%s'", storePath, dstUri)
         : dstUri == "local" || dstUri == "daemon"
@@ -1049,17 +1100,19 @@ static std::string makeCopyPathMessage(
         : fmt("copying path '%s' from '%s' to '%s'", storePath, srcUri, dstUri);
 }
 
-
 void copyStorePath(
     Store & srcStore,
     Store & dstStore,
-    const StorePath & storePath,
+    StorePathOrDesc storePath,
     RepairFlag repair,
     CheckSigsFlag checkSigs)
 {
+
+    auto actualStorePath = srcStore.bakeCaIfNeeded(storePath);
+
     auto srcUri = srcStore.getUri();
     auto dstUri = dstStore.getUri();
-    auto storePathS = srcStore.printStorePath(storePath);
+    auto storePathS = srcStore.printStorePath(actualStorePath);
     Activity act(*logger, lvlInfo, actCopyPath,
         makeCopyPathMessage(srcUri, dstUri, storePathS),
         {storePathS, srcUri, dstUri});
@@ -1070,14 +1123,21 @@ void copyStorePath(
     uint64_t total = 0;
 
     // recompute store path on the chance dstStore does it differently
-    if (info->ca && info->references.empty()) {
-        auto info2 = make_ref<ValidPathInfo>(*info);
-        info2->path = dstStore.makeFixedOutputPathFromCA(
-            info->path.name(),
-            info->contentAddressWithReferences().value());
-        if (dstStore.storeDir == srcStore.storeDir)
-            assert(info->path == info2->path);
-        info = info2;
+    if (auto p = std::get_if<std::reference_wrapper<const StorePathDescriptor>>(&storePath)) {
+        auto ca = static_cast<const StorePathDescriptor &>(*p);
+        // {
+        //     ValidPathInfo srcInfoCA { *srcStore, StorePathDescriptor { ca } };
+        //     assert((StoreReferences &)(*info) == (StoreReferences &)srcInfoCA);
+        // }
+        if (info->references.empty()) {
+            auto info2 = make_ref<ValidPathInfo>(*info);
+            ValidPathInfo dstInfoCA { dstStore, StorePathDescriptor { ca }, info->narHash };
+            if (dstStore.storeDir == srcStore.storeDir)
+                assert(info2->path == info2->path);
+            info2->path = std::move(dstInfoCA.path);
+            info2->ca = std::move(dstInfoCA.ca);
+            info = info2;
+        }
     }
 
     if (info->ultimate) {
@@ -1094,14 +1154,14 @@ void copyStorePath(
         TeeSink tee { sink, progressSink };
         srcStore.narFromPath(storePath, tee);
     }, [&]() {
-           throw EndOfFile("NAR for '%s' fetched from '%s' is incomplete", srcStore.printStorePath(storePath), srcStore.getUri());
+           throw EndOfFile("NAR for '%s' fetched from '%s' is incomplete", srcStore.printStorePath(actualStorePath), srcStore.getUri());
     });
 
     dstStore.addToStore(*info, *source, repair, checkSigs);
 }
 
 
-std::map<StorePath, StorePath> copyPaths(
+void copyPaths(
     Store & srcStore,
     Store & dstStore,
     const RealisedPath::Set & paths,
@@ -1118,7 +1178,7 @@ std::map<StorePath, StorePath> copyPaths(
             toplevelRealisations.insert(*realisation);
         }
     }
-    auto pathsMap = copyPaths(srcStore, dstStore, storePaths, repair, checkSigs, substitute);
+    copyPaths(srcStore, dstStore, storePaths, repair, checkSigs, substitute);
 
     ThreadPool pool;
 
@@ -1151,11 +1211,10 @@ std::map<StorePath, StorePath> copyPaths(
         else
             throw;
     }
-
-    return pathsMap;
 }
 
-std::map<StorePath, StorePath> copyPaths(
+
+void copyPaths(
     Store & srcStore,
     Store & dstStore,
     const StorePathSet & storePaths,
@@ -1171,57 +1230,24 @@ std::map<StorePath, StorePath> copyPaths(
 
     Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
 
-    // In the general case, `addMultipleToStore` requires a sorted list of
-    // store paths to add, so sort them right now
-    auto sortedMissing = srcStore.topoSortPaths(missing);
-    std::reverse(sortedMissing.begin(), sortedMissing.end());
+    uint64_t total = 0;
 
-    std::map<StorePath, StorePath> pathsMap;
-    for (auto & path : storePaths)
-        pathsMap.insert_or_assign(path, path);
+    auto sorted = srcStore.topoSortPaths(missing);
+    std::reverse(sorted.begin(), sorted.end());
 
-    Store::PathsSource pathsToCopy;
-
-    auto computeStorePathForDst = [&](const ValidPathInfo & currentPathInfo) -> StorePath {
-        auto storePathForSrc = currentPathInfo.path;
-        auto storePathForDst = storePathForSrc;
-        if (currentPathInfo.ca && currentPathInfo.references.empty()) {
-            storePathForDst = dstStore.makeFixedOutputPathFromCA(
-                currentPathInfo.path.name(),
-                currentPathInfo.contentAddressWithReferences().value());
-            if (dstStore.storeDir == srcStore.storeDir)
-                assert(storePathForDst == storePathForSrc);
-            if (storePathForDst != storePathForSrc)
-                debug("replaced path '%s' to '%s' for substituter '%s'",
-                        srcStore.printStorePath(storePathForSrc),
-                        dstStore.printStorePath(storePathForDst),
-                        dstStore.getUri());
-        }
-        return storePathForDst;
-    };
-
-    // total is accessed by each copy, which are each handled in separate threads
-    std::atomic<uint64_t> total = 0;
-
-    for (auto & missingPath : sortedMissing) {
-        auto info = srcStore.queryPathInfo(missingPath);
-
-        auto storePathForDst = computeStorePathForDst(*info);
-        pathsMap.insert_or_assign(missingPath, storePathForDst);
-
-        ValidPathInfo infoForDst = *info;
-        infoForDst.path = storePathForDst;
-
-        auto source = sinkToSource([&](Sink & sink) {
-            // We can reasonably assume that the copy will happen whenever we
-            // read the path, so log something about that at that point
+    auto source = sinkToSource([&](Sink & sink) {
+        sink << sorted.size();
+        for (auto & storePath : sorted) {
             auto srcUri = srcStore.getUri();
             auto dstUri = dstStore.getUri();
-            auto storePathS = srcStore.printStorePath(missingPath);
+            auto storePathS = srcStore.printStorePath(storePath);
             Activity act(*logger, lvlInfo, actCopyPath,
                 makeCopyPathMessage(srcUri, dstUri, storePathS),
                 {storePathS, srcUri, dstUri});
             PushActivity pact(act.id);
+
+            auto info = srcStore.queryPathInfo(storePath);
+            info->write(sink, srcStore, 16);
 
             LambdaSink progressSink([&](std::string_view data) {
                 total += data.size();
@@ -1229,15 +1255,123 @@ std::map<StorePath, StorePath> copyPaths(
             });
             TeeSink tee { sink, progressSink };
 
-            srcStore.narFromPath(missingPath, tee);
-        });
-        pathsToCopy.push_back(std::pair{infoForDst, std::move(source)});
+            srcStore.narFromPath(storePath, tee);
+        }
+    });
+
+    dstStore.addMultipleToStore(*source, repair, checkSigs);
+}
+
+
+void copyPaths(
+    Store & srcStore,
+    Store & dstStore,
+    const std::set<OwnedStorePathOrDesc> & storePaths,
+    RepairFlag repair,
+    CheckSigsFlag checkSigs,
+    SubstituteFlag substitute)
+{
+    auto valid = dstStore.queryValidPaths(storePaths, substitute);
+
+    std::set<OwnedStorePathOrDesc> missing;
+
+    // Filter to just the ones which are missing.
+
+    // While doing so, if we can "upgrade" the store path into a store
+    // path descriptor because it is content-addressed, do that.
+    for (auto & path : storePaths) {
+        if (valid.count(path)) continue;
+
+        auto pathDescOpt = [&]() -> std::optional<std::pair<StorePath, StorePathDescriptor>> {
+            auto storePathP = std::get_if<StorePath>(&path);
+            // Already store path descriptor
+            if (!storePathP) return std::nullopt;
+            auto & storePath = *storePathP;
+
+            auto info = srcStore.queryPathInfo(borrowStorePathOrDesc(path));
+
+            auto descOpt = info->fullStorePathDescriptorOpt();
+            if (!descOpt) return std::nullopt;
+
+            return { { storePath, *std::move(descOpt) } };
+        }();
+
+        if (pathDescOpt) {
+            auto [storePath, desc] = *std::move(pathDescOpt);
+
+            debug("found CA description '%s' for path '%s'",
+                renderStorePathDescriptor(desc),
+                srcStore.printStorePath(storePath));
+
+            missing.insert(std::move(desc));
+        } else {
+            missing.insert(path);
+        }
     }
 
-    dstStore.addMultipleToStore(pathsToCopy, act, repair, checkSigs);
+    Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
 
-    return pathsMap;
+    uint64_t total = 0;
+
+    // In the general case, `addMultipleToStore` requires a sorted list of
+    // store paths to add, so sort them right now
+
+    // Only paths, no descriptors
+    StorePathSet missingPaths;
+    // Map from paths back to original
+    std::map<StorePath, const OwnedStorePathOrDesc *> rich;
+
+    // Build
+    for (auto & pathOrDesc : missing) {
+        auto path = srcStore.bakeCaIfNeeded(pathOrDesc);
+        rich.insert_or_assign(path, &pathOrDesc);
+    }
+
+    // Sort paths
+    auto sortedMissingPaths = srcStore.topoSortPaths(missingPaths);
+    std::reverse(sortedMissingPaths.begin(), sortedMissingPaths.end());
+
+    // Sorted originals
+    std::vector<const OwnedStorePathOrDesc *> sortedMissing;
+    for (auto & path : sortedMissingPaths)
+        sortedMissing.push_back(rich.at(path));
+
+    auto source = sinkToSource([&](Sink & sink) {
+        sink << sortedMissing.size();
+        for (auto * missingPathP : sortedMissing) {
+            auto & missingPath = *missingPathP;
+
+            // For destination store
+            auto info = *srcStore.queryPathInfo(borrowStorePathOrDesc(missingPath));
+
+            if (auto * pDesc = std::get_if<StorePathDescriptor>(&missingPath))
+                info.path = dstStore.makeFixedOutputPathFromCA(*pDesc);
+
+            // We can reasonably assume that the copy will happen whenever we
+            // read the path, so log something about that at that point
+            auto srcUri = srcStore.getUri();
+            auto dstUri = dstStore.getUri();
+            auto storePathS = srcStore.printStorePath(info.path);
+            Activity act(*logger, lvlInfo, actCopyPath,
+                makeCopyPathMessage(srcUri, dstUri, storePathS),
+                {storePathS, srcUri, dstUri});
+            PushActivity pact(act.id);
+
+            info.write(sink, srcStore, 16);
+
+            LambdaSink progressSink([&](std::string_view data) {
+                total += data.size();
+                act.progress(total, info.narSize);
+            });
+            TeeSink tee { sink, progressSink };
+
+            srcStore.narFromPath(borrowStorePathOrDesc(missingPath), tee);
+        }
+    });
+
+    dstStore.addMultipleToStore(*source, repair, checkSigs);
 }
+
 
 void copyClosure(
     Store & srcStore,
@@ -1295,7 +1429,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(const Store & store, std::istre
     if (!n) throw Error("number expected");
     while ((*n)--) {
         getline(str, s);
-        info.references.insert(store.parseStorePath(s));
+        info.insertReferencePossiblyToSelf(store.parseStorePath(s));
     }
     if (!str || str.eof()) throw Error("missing input");
     return std::optional<ValidPathInfo>(std::move(info));
@@ -1317,7 +1451,6 @@ std::string showPaths(const PathSet & paths)
 {
     return concatStringsSep(", ", quoteStrings(paths));
 }
-
 
 Derivation Store::derivationFromPath(const StorePath & drvPath)
 {

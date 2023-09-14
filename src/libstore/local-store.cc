@@ -868,9 +868,10 @@ uint64_t LocalStore::addValidPath(State & state,
 }
 
 
-void LocalStore::queryPathInfoUncached(const StorePath & path,
+void LocalStore::queryPathInfoUncached(StorePathOrDesc pathOrDesc,
     Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
+    auto path = bakeCaIfNeeded(pathOrDesc);
     try {
         callback(retrySQLite<std::shared_ptr<const ValidPathInfo>>([&]() {
             auto state(_state.lock());
@@ -922,7 +923,8 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
     auto useQueryReferences(state.stmts->QueryReferences.use()(info->id));
 
     while (useQueryReferences.next())
-        info->references.insert(parseStorePath(useQueryReferences.getStr(0)));
+        info->insertReferencePossiblyToSelf(
+            parseStorePath(useQueryReferences.getStr(0)));
 
     return info;
 }
@@ -957,8 +959,9 @@ bool LocalStore::isValidPath_(State & state, const StorePath & path)
 }
 
 
-bool LocalStore::isValidPathUncached(const StorePath & path)
+bool LocalStore::isValidPathUncached(StorePathOrDesc pathOrDesc)
 {
+    auto path = bakeCaIfNeeded(pathOrDesc);
     return retrySQLite<bool>([&]() {
         auto state(_state.lock());
         return isValidPath_(*state, path);
@@ -966,11 +969,11 @@ bool LocalStore::isValidPathUncached(const StorePath & path)
 }
 
 
-StorePathSet LocalStore::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute)
+std::set<OwnedStorePathOrDesc> LocalStore::queryValidPaths(const std::set<OwnedStorePathOrDesc> & paths, SubstituteFlag maybeSubstitute)
 {
-    StorePathSet res;
+    std::set<OwnedStorePathOrDesc> res;
     for (auto & i : paths)
-        if (isValidPath(i)) res.insert(i);
+        if (isValidPath(borrowStorePathOrDesc(i))) res.insert(i);
     return res;
 }
 
@@ -1121,7 +1124,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
 
         for (auto & [_, i] : infos) {
             auto referrer = queryValidPathId(*state, i.path);
-            for (auto & j : i.references)
+            for (auto & j : i.referencesPossiblyToSelf())
                 state->stmts->AddReference.use()(referrer)(queryValidPathId(*state, j)).exec();
         }
 
@@ -1141,7 +1144,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         topoSort(paths,
             {[&](const StorePath & path) {
                 auto i = infos.find(path);
-                return i == infos.end() ? StorePathSet() : i->second.references;
+                return i == infos.end() ? StorePathSet() : i->second.references.others;
             }},
             {[&](const StorePath & path, const StorePath & parent) {
                 return BuildError(
@@ -1332,21 +1335,24 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
 
     auto [hash, size] = hashSink->finish();
 
-    ContentAddressWithReferences desc = FixedOutputInfo {
-        .method = method,
-        .hash = hash,
-        .references = {
-            .others = references,
-            // caller is not capable of creating a self-reference, because this is content-addressed without modulus
-            .self = false,
+    auto desc = StorePathDescriptor {
+        std::string { name },
+        FixedOutputInfo {
+            .method = method,
+            .hash = hash,
+            .references = {
+                .others = references,
+                // caller is not capable of creating a self-reference, because this is content-addressed without modulus
+                .self = false,
+            },
         },
     };
 
-    auto dstPath = makeFixedOutputPathFromCA(name, desc);
+    auto dstPath = makeFixedOutputPathFromCA(desc);
 
     addTempRoot(dstPath);
 
-    if (repair || !isValidPath(dstPath)) {
+    if (repair || !isValidPath(desc)) {
 
         /* The first check above is an optimisation to prevent
            unnecessary lock acquisition. */
@@ -1355,7 +1361,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
 
         PathLocks outputLock({realPath});
 
-        if (repair || !isValidPath(dstPath)) {
+        if (repair || !isValidPath(desc)) {
 
             deletePath(realPath);
 
@@ -1386,12 +1392,7 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
 
             optimisePath(realPath, repair);
 
-            ValidPathInfo info {
-                *this,
-                name,
-                std::move(desc),
-                narHash.first
-            };
+            ValidPathInfo info { *this, std::move(desc), narHash.first };
             info.narSize = narHash.second;
             registerValidPath(info);
         }
@@ -1440,7 +1441,8 @@ StorePath LocalStore::addTextToStore(
 
             ValidPathInfo info { dstPath, narHash };
             info.narSize = sink.s.size();
-            info.references = references;
+            // No self reference allowed with text-hashing
+            info.references.others = references;
             info.ca = {
                 .method = TextIngestionMethod {},
                 .hash = hash,

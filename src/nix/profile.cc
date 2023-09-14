@@ -220,14 +220,16 @@ struct ProfileManifest
 
         ValidPathInfo info {
             *store,
-            "profile",
-            FixedOutputInfo {
-                .method = FileIngestionMethod::Recursive,
-                .hash = narHash,
-                .references = {
-                    .others = std::move(references),
-                    // profiles never refer to themselves
-                    .self = false,
+            StorePathDescriptor {
+                "profile",
+                FixedOutputInfo {
+                    .method = FileIngestionMethod::Recursive,
+                    .hash = narHash,
+                    .references = {
+                        .others = std::move(references),
+                        // profiles never refer to themselves
+                        .self = false,
+                    },
                 },
             },
             narHash,

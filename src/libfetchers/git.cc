@@ -200,7 +200,7 @@ WorkdirInfo getWorkdirInfo(const Input & input, const Path & workdir)
     return WorkdirInfo { .clean = clean, .hasHead = hasHead };
 }
 
-std::pair<StorePath, Input> fetchFromWorkdir(ref<Store> store, Input & input, const Path & workdir, const WorkdirInfo & workdirInfo)
+std::pair<StorePathDescriptor, Input> fetchFromWorkdir(ref<Store> store, Input & input, const Path & workdir, const WorkdirInfo & workdirInfo)
 {
     const bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
     auto gitDir = ".git";
@@ -236,6 +236,9 @@ std::pair<StorePath, Input> fetchFromWorkdir(ref<Store> store, Input & input, co
     };
 
     auto storePath = store->addToStore(input.getName(), actualPath, FileIngestionMethod::Recursive, htSHA256, filter);
+    // FIXME: just have Store::addToStore return a StorePathDescriptor, as
+    // it has the underlying information.
+    auto storePathDesc = store->queryPathInfo(storePath)->fullStorePathDescriptorOpt().value();
 
     // FIXME: maybe we should use the timestamp of the last
     // modified dirty file?
@@ -250,7 +253,7 @@ std::pair<StorePath, Input> fetchFromWorkdir(ref<Store> store, Input & input, co
             runProgram("git", true, { "-C", actualPath, "--git-dir", gitDir, "rev-parse", "--verify", "--short", "HEAD" })) + "-dirty");
     }
 
-    return {std::move(storePath), input};
+    return {std::move(storePathDesc), input};
 }
 }  // end namespace
 
@@ -396,7 +399,7 @@ struct GitInputScheme : InputScheme
         return {isLocal, isLocal ? url.path : url.base};
     }
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
+    std::pair<StorePathDescriptor, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
         auto gitDir = ".git";
@@ -429,15 +432,15 @@ struct GitInputScheme : InputScheme
             });
         };
 
-        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
-            -> std::pair<StorePath, Input>
+        auto makeResult = [&](const Attrs & infoAttrs, StorePathDescriptor && storePathDesc)
+            -> std::pair<StorePathDescriptor, Input>
         {
             assert(input.getRev());
             assert(!_input.getRev() || _input.getRev() == input.getRev());
             if (!shallow)
                 input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
             input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
-            return {std::move(storePath), input};
+            return {std::move(storePathDesc), input};
         };
 
         if (input.getRev()) {
@@ -676,6 +679,9 @@ struct GitInputScheme : InputScheme
         }
 
         auto storePath = store->addToStore(name, tmpDir, FileIngestionMethod::Recursive, htSHA256, filter);
+        // FIXME: just have Store::addToStore return a StorePathDescriptor, as
+        // it has the underlying information.
+        auto storePathDesc = store->queryPathInfo(storePath)->fullStorePathDescriptorOpt().value();
 
         auto lastModified = std::stoull(runProgram("git", true, { "-C", repoDir, "--git-dir", gitDir, "log", "-1", "--format=%ct", "--no-show-signature", input.getRev()->gitRev() }));
 
@@ -693,17 +699,17 @@ struct GitInputScheme : InputScheme
                 store,
                 unlockedAttrs,
                 infoAttrs,
-                storePath,
+                storePathDesc,
                 false);
 
         getCache()->add(
             store,
             getLockedAttrs(),
             infoAttrs,
-            storePath,
+            storePathDesc,
             true);
 
-        return makeResult(infoAttrs, std::move(storePath));
+        return makeResult(infoAttrs, std::move(storePathDesc));
     }
 };
 

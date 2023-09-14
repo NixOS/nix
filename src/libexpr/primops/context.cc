@@ -187,8 +187,9 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value * * ar
                 .errPos = state.positions[i.pos]
             });
         auto namePath = state.store->parseStorePath(name);
-        if (!settings.readOnlyMode)
+        if (!settings.readOnlyMode) {
             state.store->ensurePath(namePath);
+        }
         state.forceAttrs(*i.value, i.pos, "while evaluating the value of a string context");
         auto iter = i.value->attrs->find(sPath);
         if (iter != i.value->attrs->end()) {

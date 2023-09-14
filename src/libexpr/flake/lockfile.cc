@@ -40,7 +40,7 @@ LockedNode::LockedNode(const nlohmann::json & json)
             fetchers::attrsToJSON(lockedRef.input.toAttrs()));
 }
 
-StorePath LockedNode::computeStorePath(Store & store) const
+StorePathDescriptor LockedNode::computeStorePath(Store & store) const
 {
     return lockedRef.input.computeStorePath(store);
 }

@@ -13,10 +13,10 @@ struct Cache
         ref<Store> store,
         const Attrs & inAttrs,
         const Attrs & infoAttrs,
-        const StorePath & storePath,
+        const StorePathDescriptor & storePath,
         bool locked) = 0;
 
-    virtual std::optional<std::pair<Attrs, StorePath>> lookup(
+    virtual std::optional<std::pair<Attrs, StorePathDescriptor>> lookup(
         ref<Store> store,
         const Attrs & inAttrs) = 0;
 
@@ -24,7 +24,7 @@ struct Cache
     {
         bool expired = false;
         Attrs infoAttrs;
-        StorePath storePath;
+        StorePathDescriptor storePath;
     };
 
     virtual std::optional<Result> lookupExpired(

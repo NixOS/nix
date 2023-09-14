@@ -346,7 +346,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         StorePathSet paths;
         if (op == WorkerProto::Op::QueryReferences)
-            for (auto & i : store->queryPathInfo(path)->references)
+            for (auto & i : store->queryPathInfo(path)->referencesPossiblyToSelf())
                 paths.insert(i);
         else if (op == WorkerProto::Op::QueryReferrers)
             store->queryReferrers(path, paths);
@@ -776,7 +776,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         auto path = store->parseStorePath(readString(from));
         logger->startWork();
         SubstitutablePathInfos infos;
-        store->querySubstitutablePathInfos({{path, std::nullopt}}, infos);
+        store->querySubstitutablePathInfos({path}, {}, infos);
         logger->stopWork();
         auto i = infos.find(path);
         if (i == infos.end())
@@ -784,7 +784,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         else {
             to << 1
                << (i->second.deriver ? store->printStorePath(*i->second.deriver) : "");
-            WorkerProto::write(*store, wconn, i->second.references);
+            WorkerProto::write(*store, wconn, i->second.references.possiblyToSelf(path));
             to << i->second.downloadSize
                << i->second.narSize;
         }
@@ -793,21 +793,34 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
     case WorkerProto::Op::QuerySubstitutablePathInfos: {
         SubstitutablePathInfos infos;
-        StorePathCAMap pathsMap = {};
-        if (GET_PROTOCOL_MINOR(clientVersion) < 22) {
-            auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
-            for (auto & path : paths)
-                pathsMap.emplace(path, std::nullopt);
-        } else
-            pathsMap = WorkerProto::Serialise<StorePathCAMap>::read(*store, rconn);
+        StorePathSet paths;
+        std::set<StorePathDescriptor> caPaths;
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 36) {
+            paths = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
+            caPaths = WorkerProto::Serialise<std::set<StorePathDescriptor>>::read(*store, rconn);
+        } else if (GET_PROTOCOL_MINOR(clientVersion) >= 22) {
+            auto pathsMap = WorkerProto::Serialise<WorkerProto::StorePathCAMap>::read(*store, rconn);
+            for (auto & [storePath, optCA] : pathsMap) {
+                if (!optCA) {
+                    paths.insert(storePath);
+                } else {
+                    caPaths.insert(StorePathDescriptor {
+                        .name = std::string { storePath.name() },
+                        .info = ContentAddressWithReferences::withoutRefs(*optCA),
+                    });
+                }
+            }
+        } else {
+            paths = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
+        }
         logger->startWork();
-        store->querySubstitutablePathInfos(pathsMap, infos);
+        store->querySubstitutablePathInfos(paths, caPaths, infos);
         logger->stopWork();
         to << infos.size();
         for (auto & i : infos) {
             to << store->printStorePath(i.first)
                << (i.second.deriver ? store->printStorePath(*i.second.deriver) : "");
-            WorkerProto::write(*store, wconn, i.second.references);
+            WorkerProto::write(*store, wconn, i.second.references.possiblyToSelf(i.first));
             to << i.second.downloadSize << i.second.narSize;
         }
         break;
@@ -887,7 +900,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         ValidPathInfo info { path, narHash };
         if (deriver != "")
             info.deriver = store->parseStorePath(deriver);
-        info.references = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
+        info.setReferencesPossiblyToSelf(WorkerProto::Serialise<StorePathSet>::read(*store, rconn));
         from >> info.registrationTime >> info.narSize >> info.ultimate;
         info.sigs = readStrings<StringSet>(from);
         info.ca = ContentAddress::parseOpt(readString(from));

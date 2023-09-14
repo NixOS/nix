@@ -152,14 +152,14 @@ public:
 
     std::string getUri() override;
 
-    bool isValidPathUncached(const StorePath & path) override;
+    bool isValidPathUncached(StorePathOrDesc path) override;
 
-    StorePathSet queryValidPaths(const StorePathSet & paths,
+    std::set<OwnedStorePathOrDesc> queryValidPaths(const std::set<OwnedStorePathOrDesc> & paths,
         SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
     StorePathSet queryAllValidPaths() override;
 
-    void queryPathInfoUncached(const StorePath & path,
+    void queryPathInfoUncached(StorePathOrDesc,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override;

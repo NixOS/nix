@@ -183,7 +183,7 @@ struct GitArchiveInputScheme : InputScheme
 
     virtual DownloadUrl getDownloadUrl(const Input & input) const = 0;
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
+    std::pair<StorePathDescriptor, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
 
@@ -267,9 +267,8 @@ struct GitHubInputScheme : GitArchiveInputScheme
         Headers headers = makeHeadersWithAuthTokens(host);
 
         auto json = nlohmann::json::parse(
-            readFile(
-                store->toRealPath(
-                    downloadFile(store, url, "source", false, headers).storePath)));
+            readFile(store->toRealPath(store->makeFixedOutputPathFromCA(
+                downloadFile(store, url, "source", false, headers).storePath))));
         auto rev = Hash::parseAny(std::string { json["sha"] }, htSHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
@@ -338,10 +337,9 @@ struct GitLabInputScheme : GitArchiveInputScheme
 
         Headers headers = makeHeadersWithAuthTokens(host);
 
-        auto json = nlohmann::json::parse(
-            readFile(
-                store->toRealPath(
-                    downloadFile(store, url, "source", false, headers).storePath)));
+        auto json = nlohmann::json::parse(readFile(
+            store->toRealPath(store->makeFixedOutputPathFromCA(
+                downloadFile(store, url, "source", false, headers).storePath))));
         auto rev = Hash::parseAny(std::string(json[0]["id"]), htSHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
@@ -403,8 +401,8 @@ struct SourceHutInputScheme : GitArchiveInputScheme
 
         std::string refUri;
         if (ref == "HEAD") {
-            auto file = store->toRealPath(
-                downloadFile(store, fmt("%s/HEAD", base_url), "source", false, headers).storePath);
+            auto file = store->toRealPath(store->makeFixedOutputPathFromCA(
+                downloadFile(store, fmt("%s/HEAD", base_url), "source", false, headers).storePath));
             std::ifstream is(file);
             std::string line;
             getline(is, line);
@@ -419,8 +417,8 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         }
         std::regex refRegex(refUri);
 
-        auto file = store->toRealPath(
-            downloadFile(store, fmt("%s/info/refs", base_url), "source", false, headers).storePath);
+        auto file = store->toRealPath(store->makeFixedOutputPathFromCA(
+            downloadFile(store, fmt("%s/info/refs", base_url), "source", false, headers).storePath));
         std::ifstream is(file);
 
         std::string line;

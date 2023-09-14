@@ -258,11 +258,12 @@ void DerivationGoal::haveDerivation()
                     )
                 );
             else {
-                auto * cap = getDerivationCA(*drv);
+                auto optCA = getDerivationCA(*drv);
+                auto storePathOrCA =
+                    optCA ? StorePathOrDesc { *optCA } : status.known->path;
                 addWaitee(upcast_goal(worker.makePathSubstitutionGoal(
-                    status.known->path,
-                    buildMode == bmRepair ? Repair : NoRepair,
-                    cap ? std::optional { *cap } : std::nullopt)));
+                    storePathOrCA,
+                    buildMode == bmRepair ? Repair : NoRepair)));
             }
         }
 

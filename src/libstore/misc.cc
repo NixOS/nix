@@ -40,9 +40,8 @@ void Store::computeFSClosure(const StorePathSet & startPaths,
                         std::future<ref<const ValidPathInfo>> & fut) {
             StorePathSet res;
             auto info = fut.get();
-            for (auto& ref : info->references)
-                if (ref != path)
-                    res.insert(ref);
+            for (auto & ref : info->references.others)
+                res.insert(ref);
 
             if (includeOutputs && path.isDerivation())
                 for (auto& [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
@@ -83,15 +82,18 @@ void Store::computeFSClosure(const StorePath & startPath,
 }
 
 
-const ContentAddress * getDerivationCA(const BasicDerivation & drv)
+std::optional<StorePathDescriptor> getDerivationCA(const BasicDerivation & drv)
 {
     auto out = drv.outputs.find("out");
     if (out == drv.outputs.end())
-        return nullptr;
+        return std::nullopt;
     if (auto dof = std::get_if<DerivationOutput::CAFixed>(&out->second.raw)) {
-        return &dof->ca;
+        return StorePathDescriptor {
+            .name =  drv.name,
+            .info = ContentAddressWithReferences::withoutRefs(dof->ca),
+        };
     }
-    return nullptr;
+    return std::nullopt;
 }
 
 void Store::queryMissing(const std::vector<DerivedPath> & targets,
@@ -153,13 +155,11 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
         if (drvState_->lock()->done) return;
 
         SubstitutablePathInfos infos;
-        auto * cap = getDerivationCA(*drv);
-        querySubstitutablePathInfos({
-            {
-                outPath,
-                cap ? std::optional { *cap } : std::nullopt,
-            },
-        }, infos);
+        auto caOpt = getDerivationCA(*drv);
+        if (caOpt)
+            querySubstitutablePathInfos({}, { *std::move(caOpt) }, infos);
+        else
+            querySubstitutablePathInfos({outPath}, {}, infos);
 
         if (infos.empty()) {
             drvState_->lock()->done = true;
@@ -263,7 +263,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
             if (isValidPath(bo.path)) return;
 
             SubstitutablePathInfos infos;
-            querySubstitutablePathInfos({{bo.path, std::nullopt}}, infos);
+            querySubstitutablePathInfos({bo.path}, {}, infos);
 
             if (infos.empty()) {
                 auto state(state_.lock());
@@ -281,7 +281,7 @@ void Store::queryMissing(const std::vector<DerivedPath> & targets,
                 state->narSize += info->second.narSize;
             }
 
-            for (auto & ref : info->second.references)
+            for (auto & ref : info->second.references.others)
                 pool.enqueue(std::bind(doPath, DerivedPath::Opaque { ref }));
           },
         }, req.raw());
@@ -299,7 +299,7 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
     return topoSort(paths,
         {[&](const StorePath & path) {
             try {
-                return queryPathInfo(path)->references;
+                return queryPathInfo(path)->references.others;
             } catch (InvalidPath &) {
                 return StorePathSet();
             }
@@ -311,6 +311,7 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
                 printStorePath(parent));
         }});
 }
+
 
 std::map<DrvOutput, StorePath> drvOutputReferences(
     const std::set<Realisation> & inputRealisations,
@@ -372,7 +373,7 @@ std::map<DrvOutput, StorePath> drvOutputReferences(
 
     auto info = store.queryPathInfo(outputPath);
 
-    return drvOutputReferences(Realisation::closure(store, inputRealisations), info->references);
+    return drvOutputReferences(Realisation::closure(store, inputRealisations), info->referencesPossiblyToSelf());
 }
 
 OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd, Store * evalStore_)

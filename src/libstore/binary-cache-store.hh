@@ -113,9 +113,9 @@ private:
 
 public:
 
-    bool isValidPathUncached(const StorePath & path) override;
+    bool isValidPathUncached(StorePathOrDesc path) override;
 
-    void queryPathInfoUncached(const StorePath & path,
+    void queryPathInfoUncached(StorePathOrDesc path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
@@ -146,7 +146,7 @@ public:
     void queryRealisationUncached(const DrvOutput &,
         Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
-    void narFromPath(const StorePath & path, Sink & sink) override;
+    void narFromPath(StorePathOrDesc path, Sink & sink) override;
 
     ref<FSAccessor> getFSAccessor() override;
 

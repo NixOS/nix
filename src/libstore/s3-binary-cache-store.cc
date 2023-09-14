@@ -309,8 +309,9 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
        fetches the .narinfo file, rather than first checking for its
        existence via a HEAD request. Since .narinfos are small, doing
        a GET is unlikely to be slower than HEAD. */
-    bool isValidPathUncached(const StorePath & storePath) override
+    bool isValidPathUncached(StorePathOrDesc storePathOrDesc) override
     {
+        auto storePath = bakeCaIfNeeded(storePathOrDesc);
         try {
             queryPathInfo(storePath);
             return true;

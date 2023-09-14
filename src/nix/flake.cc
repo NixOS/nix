@@ -186,7 +186,8 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 j["revCount"] = *revCount;
             if (auto lastModified = flake.lockedRef.input.getLastModified())
                 j["lastModified"] = *lastModified;
-            j["path"] = store->printStorePath(flake.sourceInfo->storePath);
+            j["path"] = store->printStorePath(
+                store->makeFixedOutputPathFromCA(flake.sourceInfo->storePath));
             j["locks"] = lockedFlake.lockFile.toJSON();
             logger->cout("%s", j.dump());
         } else {
@@ -202,7 +203,8 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                     *flake.description);
             logger->cout(
                 ANSI_BOLD "Path:" ANSI_NORMAL "          %s",
-                store->printStorePath(flake.sourceInfo->storePath));
+                store->printStorePath(
+                    store->makeFixedOutputPathFromCA(flake.sourceInfo->storePath)));
             if (auto rev = flake.lockedRef.input.getRev())
                 logger->cout(
                     ANSI_BOLD "Revision:" ANSI_NORMAL "      %s",
@@ -972,7 +974,8 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
         StorePathSet sources;
 
-        sources.insert(flake.flake.sourceInfo->storePath);
+        sources.insert(
+            store->makeFixedOutputPathFromCA(flake.flake.sourceInfo->storePath));
 
         // FIXME: use graph output, handle cycles.
         std::function<nlohmann::json(const Node & node)> traverse;
@@ -981,10 +984,11 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
             nlohmann::json jsonObj2 = json ? json::object() : nlohmann::json(nullptr);
             for (auto & [inputName, input] : node.inputs) {
                 if (auto inputNode = std::get_if<0>(&input)) {
-                    auto storePath =
+                    auto storePathDesc =
                         dryRun
                         ? (*inputNode)->lockedRef.input.computeStorePath(*store)
                         : (*inputNode)->lockedRef.input.fetch(store).first.storePath;
+                    auto storePath = store->makeFixedOutputPathFromCA(storePathDesc);
                     if (json) {
                         auto& jsonObj3 = jsonObj2[inputName];
                         jsonObj3["path"] = store->printStorePath(storePath);
@@ -1001,8 +1005,16 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
 
         if (json) {
             nlohmann::json jsonRoot = {
-                {"path", store->printStorePath(flake.flake.sourceInfo->storePath)},
-                {"inputs", traverse(*flake.lockFile.root)},
+                {
+                    "path",
+                    store->printStorePath(
+                        store->makeFixedOutputPathFromCA(
+                            flake.flake.sourceInfo->storePath)),
+                },
+                {
+                    "inputs",
+                    traverse(*flake.lockFile.root),
+                },
             };
             logger->cout("%s", jsonRoot);
         } else {
@@ -1338,15 +1350,16 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
         auto [tree, lockedRef] = resolvedRef.fetchTree(store);
         auto hash = store->queryPathInfo(tree.storePath)->narHash;
 
+        auto actualStorePath = store->bakeCaIfNeeded((const OwnedStorePathOrDesc &)tree.storePath);
         if (json) {
             auto res = nlohmann::json::object();
-            res["storePath"] = store->printStorePath(tree.storePath);
+            res["storePath"] = store->printStorePath(actualStorePath);
             res["hash"] = hash.to_string(SRI, true);
             logger->cout(res.dump());
         } else {
             notice("Downloaded '%s' to '%s' (hash '%s').",
                 lockedRef.to_string(),
-                store->printStorePath(tree.storePath),
+                store->printStorePath(actualStorePath),
                 hash.to_string(SRI, true));
         }
     }

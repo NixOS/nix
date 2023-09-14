@@ -204,8 +204,9 @@ void RemoteStore::setOptions()
     setOptions(*(getConnection().handle));
 }
 
-bool RemoteStore::isValidPathUncached(const StorePath & path)
+bool RemoteStore::isValidPathUncached(StorePathOrDesc pathOrDesc)
 {
+    auto path = bakeCaIfNeeded(pathOrDesc);
     auto conn(getConnection());
     conn->to << WorkerProto::Op::IsValidPath << printStorePath(path);
     conn.processStderr();
@@ -213,22 +214,31 @@ bool RemoteStore::isValidPathUncached(const StorePath & path)
 }
 
 
-StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute)
+std::set<OwnedStorePathOrDesc> RemoteStore::queryValidPaths(const std::set<OwnedStorePathOrDesc> & paths, SubstituteFlag maybeSubstitute)
 {
     auto conn(getConnection());
     if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
-        StorePathSet res;
+        std::set<OwnedStorePathOrDesc> res;
         for (auto & i : paths)
-            if (isValidPath(i)) res.insert(i);
+            if (isValidPath(borrowStorePathOrDesc(i)))
+                res.insert(i);
         return res;
     } else {
         conn->to << WorkerProto::Op::QueryValidPaths;
-        WorkerProto::write(*this, *conn, paths);
+        StorePathSet paths2;
+        for (auto & pathOrDesc : paths)
+            paths2.insert(bakeCaIfNeeded(pathOrDesc));
+        // FIXME make new version to take advantage of desc case
+        WorkerProto::write(*this, *conn, paths2);
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) >= 27) {
             conn->to << (settings.buildersUseSubstitutes ? 1 : 0);
         }
         conn.processStderr();
-        return WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
+        auto res = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
+        std::set<OwnedStorePathOrDesc> res2;
+        for (auto & r : res)
+            res2.insert(r);
+        return res2;
     }
 }
 
@@ -262,58 +272,76 @@ StorePathSet RemoteStore::querySubstitutablePaths(const StorePathSet & paths)
 }
 
 
-void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, SubstitutablePathInfos & infos)
+void RemoteStore::querySubstitutablePathInfos(const StorePathSet & paths, const std::set<StorePathDescriptor> & caPaths, SubstitutablePathInfos & infos)
 {
-    if (pathsMap.empty()) return;
+    if (paths.empty() && caPaths.empty()) return;
 
     auto conn(getConnection());
 
-    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
+    auto combineSet = [&]() {
+        std::set<StorePath> combined { paths };
+        for (auto & ca : caPaths)
+            combined.insert(makeFixedOutputPathFromCA(ca));
+        return combined;
+    };
 
-        for (auto & i : pathsMap) {
+    if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 12) {
+        for (auto & path : combineSet()) {
             SubstitutablePathInfo info;
-            conn->to << WorkerProto::Op::QuerySubstitutablePathInfo << printStorePath(i.first);
+            conn->to << WorkerProto::Op::QuerySubstitutablePathInfo << printStorePath(path);
             conn.processStderr();
             unsigned int reply = readInt(conn->from);
             if (reply == 0) continue;
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info.deriver = parseStorePath(deriver);
-            info.references = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
+            info.references.setPossiblyToSelf(path, WorkerProto::Serialise<StorePathSet>::read(*this, *conn));
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
-            infos.insert_or_assign(i.first, std::move(info));
+            infos.insert_or_assign(path, std::move(info));
         }
 
     } else {
 
         conn->to << WorkerProto::Op::QuerySubstitutablePathInfos;
         if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 22) {
-            StorePathSet paths;
-            for (auto & path : pathsMap)
-                paths.insert(path.first);
+            WorkerProto::write(*this, *conn, combineSet());
+        } else if (GET_PROTOCOL_MINOR(conn->daemonVersion) < 36) {
+            WorkerProto::StorePathCAMap pathMap;
+            for (auto & path : paths)
+                pathMap[path];
+            for (auto & desc : caPaths) {
+                auto path = makeFixedOutputPathFromCA(desc);
+                pathMap[path] = {
+                    .method = desc.info.getMethod(),
+                    .hash = desc.info.getHash(),
+                };
+            }
+            WorkerProto::write(*this, *conn, pathMap);
+        } else {
             WorkerProto::write(*this, *conn, paths);
-        } else
-            WorkerProto::write(*this, *conn, pathsMap);
+            WorkerProto::write(*this, *conn, caPaths);
+        }
         conn.processStderr();
         size_t count = readNum<size_t>(conn->from);
         for (size_t n = 0; n < count; n++) {
-            SubstitutablePathInfo & info(infos[parseStorePath(readString(conn->from))]);
+            auto path = parseStorePath(readString(conn->from));
+            SubstitutablePathInfo & info { infos[path] };
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info.deriver = parseStorePath(deriver);
-            info.references = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
+            info.references.setPossiblyToSelf(path, WorkerProto::Serialise<StorePathSet>::read(*this, *conn));
             info.downloadSize = readLongLong(conn->from);
             info.narSize = readLongLong(conn->from);
         }
-
     }
 }
 
 
-void RemoteStore::queryPathInfoUncached(const StorePath & path,
+void RemoteStore::queryPathInfoUncached(StorePathOrDesc pathOrDesc,
     Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
+    auto path = bakeCaIfNeeded(pathOrDesc);
     try {
         std::shared_ptr<const ValidPathInfo> info;
         {
@@ -523,7 +551,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
             sink
                 << exportMagic
                 << printStorePath(info.path);
-            WorkerProto::write(*this, *conn, info.references);
+            WorkerProto::write(*this, *conn, info.referencesPossiblyToSelf());
             sink
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << 0 // == no legacy signature
@@ -542,7 +570,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
                  << printStorePath(info.path)
                  << (info.deriver ? printStorePath(*info.deriver) : "")
                  << info.narHash.to_string(Base16, false);
-        WorkerProto::write(*this, *conn, info.references);
+        WorkerProto::write(*this, *conn, info.referencesPossiblyToSelf());
         conn->to << info.registrationTime << info.narSize
                  << info.ultimate << info.sigs << renderContentAddress(info.ca)
                  << repair << !checkSigs;
@@ -832,8 +860,9 @@ BuildResult RemoteStore::buildDerivation(const StorePath & drvPath, const BasicD
 }
 
 
-void RemoteStore::ensurePath(const StorePath & path)
+void RemoteStore::ensurePath(StorePathOrDesc pathOrDesc)
 {
+    auto path = bakeCaIfNeeded(pathOrDesc);
     auto conn(getConnection());
     conn->to << WorkerProto::Op::EnsurePath << printStorePath(path);
     conn.processStderr();
@@ -996,8 +1025,9 @@ RemoteStore::Connection::~Connection()
     }
 }
 
-void RemoteStore::narFromPath(const StorePath & path, Sink & sink)
+void RemoteStore::narFromPath(StorePathOrDesc pathOrDesc, Sink & sink)
 {
+    auto path = bakeCaIfNeeded(pathOrDesc);
     auto conn(connections->get());
     conn->to << WorkerProto::Op::NarFromPath << printStorePath(path);
     conn->processStderr();

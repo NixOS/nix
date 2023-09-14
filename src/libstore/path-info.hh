@@ -18,7 +18,7 @@ class Store;
 struct SubstitutablePathInfo
 {
     std::optional<StorePath> deriver;
-    StorePathSet references;
+    StoreReferences references;
     /**
      * 0 = unknown or inapplicable
      */
@@ -31,7 +31,6 @@ struct SubstitutablePathInfo
 
 typedef std::map<StorePath, SubstitutablePathInfo> SubstitutablePathInfos;
 
-
 struct ValidPathInfo
 {
     StorePath path;
@@ -40,7 +39,7 @@ struct ValidPathInfo
      * \todo document this
      */
     Hash narHash;
-    StorePathSet references;
+    StoreReferences references;
     time_t registrationTime = 0;
     uint64_t narSize = 0; // 0 = unknown
     uint64_t id; // internal use only
@@ -93,16 +92,22 @@ struct ValidPathInfo
     void sign(const Store & store, const SecretKey & secretKey);
 
 	/**
-	 * @return The `ContentAddressWithReferences` that determines the
+	 * @return The `StorePathDescriptor` that determines the
 	 * store path for a content-addressed store object, `std::nullopt`
 	 * for an input-addressed store object.
 	 */
-    std::optional<ContentAddressWithReferences> contentAddressWithReferences() const;
+    std::optional<StorePathDescriptor> fullStorePathDescriptorOpt() const;
 
     /**
      * @return true iff the path is verifiably content-addressed.
      */
     bool isContentAddressed(const Store & store) const;
+
+    /* Functions to view references + hasSelfReference as one set, mainly for
+       compatibility's sake. */
+    StorePathSet referencesPossiblyToSelf() const;
+    void insertReferencePossiblyToSelf(StorePath && ref);
+    void setReferencesPossiblyToSelf(StorePathSet && refs);
 
     static const size_t maxSigs = std::numeric_limits<size_t>::max();
 
@@ -126,7 +131,7 @@ struct ValidPathInfo
     ValidPathInfo(const StorePath & path, Hash narHash) : path(path), narHash(narHash) { };
 
     ValidPathInfo(const Store & store,
-        std::string_view name, ContentAddressWithReferences && ca, Hash narHash);
+        StorePathDescriptor && ca, Hash narHash);
 
     virtual ~ValidPathInfo() { }
 

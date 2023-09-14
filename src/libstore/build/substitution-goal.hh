@@ -13,14 +13,10 @@ struct PathSubstitutionGoal : public Goal
 {
     /**
      * The store path that should be realised through a substitute.
+     *
+     * @todo should be `OwnedStorePathOrDesc`.
      */
     StorePath storePath;
-
-    /**
-     * The path the substituter refers to the path as. This will be
-     * different when the stores have different names.
-     */
-    std::optional<StorePath> subPath;
 
     /**
      * The remaining substituters.
@@ -73,8 +69,10 @@ struct PathSubstitutionGoal : public Goal
 
     /**
      * Content address for recomputing store path
+     *
+     * @todo delete once `storePath` is a `std::variant`.
      */
-    std::optional<ContentAddress> ca;
+    std::optional<StorePathDescriptor> ca;
 
     void done(
         ExitCode result,
@@ -82,7 +80,7 @@ struct PathSubstitutionGoal : public Goal
         std::optional<std::string> errorMsg = {});
 
 public:
-    PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    PathSubstitutionGoal(const StorePath & storePath, Worker & worker, RepairFlag repair = NoRepair, std::optional<StorePathDescriptor> ca = std::nullopt);
     ~PathSubstitutionGoal();
 
     void timedOut(Error && ex) override { abort(); };

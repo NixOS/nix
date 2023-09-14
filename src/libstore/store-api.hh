@@ -95,7 +95,15 @@ struct BuildResult;
 struct KeyedBuildResult;
 
 
-typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
+/* Useful for many store functions which can take advantage of content
+   addresses or work with regular store paths */
+typedef std::variant<StorePath, StorePathDescriptor> OwnedStorePathOrDesc;
+typedef std::variant<
+    std::reference_wrapper<const StorePath>,
+    std::reference_wrapper<const StorePathDescriptor>
+> StorePathOrDesc;
+
+StorePathOrDesc borrowStorePathOrDesc(const OwnedStorePathOrDesc &);
 
 struct StoreConfig : public Config
 {
@@ -286,7 +294,10 @@ public:
 
     StorePath makeTextPath(std::string_view name, const TextInfo & info) const;
 
-    StorePath makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const;
+    StorePath makeFixedOutputPathFromCA(const StorePathDescriptor & info) const;
+
+    StorePath bakeCaIfNeeded(StorePathOrDesc path) const;
+    StorePath bakeCaIfNeeded(const OwnedStorePathOrDesc & path) const;
 
     /**
      * Preparatory part of addToStore().
@@ -322,11 +333,11 @@ public:
     /**
      * Check whether a path is valid.
      */
-    bool isValidPath(const StorePath & path);
+    bool isValidPath(StorePathOrDesc desc);
 
 protected:
 
-    virtual bool isValidPathUncached(const StorePath & path);
+    virtual bool isValidPathUncached(StorePathOrDesc desc);
 
 public:
 
@@ -341,6 +352,8 @@ public:
      * Query which of the given paths is valid. Optionally, try to
      * substitute missing paths.
      */
+    virtual std::set<OwnedStorePathOrDesc> queryValidPaths(const std::set<OwnedStorePathOrDesc> & paths,
+        SubstituteFlag maybeSubstitute = NoSubstitute);
     virtual StorePathSet queryValidPaths(const StorePathSet & paths,
         SubstituteFlag maybeSubstitute = NoSubstitute);
 
@@ -361,12 +374,12 @@ public:
      * Query information about a valid path. It is permitted to omit
      * the name part of the store path.
      */
-    ref<const ValidPathInfo> queryPathInfo(const StorePath & path);
+    ref<const ValidPathInfo> queryPathInfo(StorePathOrDesc path);
 
     /**
      * Asynchronous version of queryPathInfo().
      */
-    void queryPathInfo(const StorePath & path,
+    void queryPathInfo(StorePathOrDesc path,
         Callback<ref<const ValidPathInfo>> callback) noexcept;
 
     /**
@@ -404,7 +417,7 @@ public:
 
 protected:
 
-    virtual void queryPathInfoUncached(const StorePath & path,
+    virtual void queryPathInfoUncached(StorePathOrDesc path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept = 0;
     virtual void queryRealisationUncached(const DrvOutput &,
         Callback<std::shared_ptr<const Realisation>> callback) noexcept = 0;
@@ -477,7 +490,8 @@ public:
      * If a path does not have substitute info, it's omitted from the
      * resulting ‘infos’ map.
      */
-    virtual void querySubstitutablePathInfos(const StorePathCAMap & paths,
+    virtual void querySubstitutablePathInfos(const StorePathSet & paths,
+        const std::set<StorePathDescriptor> & caPaths,
         SubstitutablePathInfos & infos);
 
     /**
@@ -573,7 +587,7 @@ public:
     /**
      * Write a NAR dump of a store path.
      */
-    virtual void narFromPath(const StorePath & path, Sink & sink) = 0;
+    virtual void narFromPath(StorePathOrDesc desc, Sink & sink) = 0;
 
     /**
      * For each path, if it's a derivation, build it.  Building a
@@ -644,7 +658,7 @@ public:
      * may be made valid by running a substitute (if defined for the
      * path).
      */
-    virtual void ensurePath(const StorePath & path);
+    virtual void ensurePath(StorePathOrDesc desc);
 
     /**
      * Add a store path as a temporary root of the garbage collector.
@@ -889,7 +903,7 @@ protected:
 void copyStorePath(
     Store & srcStore,
     Store & dstStore,
-    const StorePath & storePath,
+    StorePathOrDesc storePath,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs);
 
@@ -899,19 +913,24 @@ void copyStorePath(
  * in parallel. They are copied in a topologically sorted order (i.e. if
  * A is a reference of B, then A is copied before B), but the set of
  * store paths is not automatically closed; use copyClosure() for that.
- *
- * @return a map of what each path was copied to the dstStore as.
  */
-std::map<StorePath, StorePath> copyPaths(
+void copyPaths(
     Store & srcStore, Store & dstStore,
     const RealisedPath::Set &,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
 
-std::map<StorePath, StorePath> copyPaths(
+void copyPaths(
     Store & srcStore, Store & dstStore,
-    const StorePathSet & paths,
+    const std::set<OwnedStorePathOrDesc> & storePaths,
+    RepairFlag repair = NoRepair,
+    CheckSigsFlag checkSigs = CheckSigs,
+    SubstituteFlag substitute = NoSubstitute);
+
+void copyPaths(
+    Store & srcStore, Store & dstStore,
+    const StorePathSet & storePaths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
@@ -1048,7 +1067,7 @@ std::optional<ValidPathInfo> decodeValidPathInfo(
  */
 std::pair<std::string, Store::Params> splitUriAndParams(const std::string & uri);
 
-const ContentAddress * getDerivationCA(const BasicDerivation & drv);
+std::optional<StorePathDescriptor> getDerivationCA(const BasicDerivation & drv);
 
 std::map<DrvOutput, StorePath> drvOutputReferences(
     Store & store,

@@ -33,7 +33,7 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
         return *uriSchemes().begin();
     }
 
-    void queryPathInfoUncached(const StorePath & path,
+    void queryPathInfoUncached(StorePathOrDesc path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
     {
         callback(nullptr);
@@ -65,7 +65,7 @@ struct DummyStore : public virtual DummyStoreConfig, public virtual Store
         RepairFlag repair) override
     { unsupported("addTextToStore"); }
 
-    void narFromPath(const StorePath & path, Sink & sink) override
+    void narFromPath(StorePathOrDesc path, Sink & sink) override
     { unsupported("narFromPath"); }
 
     void queryRealisationUncached(const DrvOutput &,

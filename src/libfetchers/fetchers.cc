@@ -1,5 +1,6 @@
 #include "fetchers.hh"
 #include "store-api.hh"
+#include "archive.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -117,20 +118,28 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
        original source). So check that. */
     if (hasAllInfo()) {
         try {
-            auto storePath = computeStorePath(*store);
+            auto storePathDesc = computeStorePath(*store);
 
-            store->ensurePath(storePath);
+            store->ensurePath(std::cref(storePathDesc));
+
+            auto storePath = store->makeFixedOutputPathFromCA(storePathDesc);
 
             debug("using substituted/cached input '%s' in '%s'",
                 to_string(), store->printStorePath(storePath));
 
-            return {Tree { .actualPath = store->toRealPath(storePath), .storePath = std::move(storePath) }, *this};
+            return {
+                Tree {
+                    .actualPath = store->toRealPath(storePath),
+                    .storePath = std::move(storePathDesc),
+                },
+                *this,
+            };
         } catch (Error & e) {
             debug("substitution of input '%s' failed: %s", to_string(), e.what());
         }
     }
 
-    auto [storePath, input] = [&]() -> std::pair<StorePath, Input> {
+    auto [storePath, input] = [&]() -> std::pair<StorePathDescriptor, Input> {
         try {
             return scheme->fetch(store, *this);
         } catch (Error & e) {
@@ -140,7 +149,7 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
     }();
 
     Tree tree {
-        .actualPath = store->toRealPath(storePath),
+        .actualPath = store->toRealPath(store->makeFixedOutputPathFromCA(storePath)),
         .storePath = storePath,
     };
 
@@ -211,16 +220,19 @@ std::string Input::getName() const
     return maybeGetStrAttr(attrs, "name").value_or("source");
 }
 
-StorePath Input::computeStorePath(Store & store) const
+StorePathDescriptor Input::computeStorePath(Store & store) const
 {
     auto narHash = getNarHash();
     if (!narHash)
         throw Error("cannot compute store path for unlocked input '%s'", to_string());
-    return store.makeFixedOutputPath(getName(), FixedOutputInfo {
-        .method = FileIngestionMethod::Recursive,
-        .hash = *narHash,
-        .references = {},
-    });
+    return StorePathDescriptor {
+        getName(),
+        FixedOutputInfo {
+            .method = FileIngestionMethod::Recursive,
+            .hash = *narHash,
+            .references = {},
+        },
+    };
 }
 
 std::string Input::getType() const
@@ -306,6 +318,32 @@ void InputScheme::markChangedFile(const Input & input, std::string_view file, st
 void InputScheme::clone(const Input & input, const Path & destDir) const
 {
     throw Error("do not know how to clone input '%s'", input.to_string());
+}
+
+std::optional<StorePath> trySubstitute(ref<Store> store, FileIngestionMethod ingestionMethod,
+    Hash hash, std::string_view name)
+{
+    auto ca = StorePathDescriptor {
+        .name = std::string { name },
+        .info = FixedOutputInfo {
+            ingestionMethod,
+            hash,
+            {}
+        },
+    };
+    auto substitutablePath = store->makeFixedOutputPathFromCA(ca);
+
+    try {
+        store->ensurePath(ca);
+
+        debug("using substituted path '%s'", store->printStorePath(substitutablePath));
+
+        return substitutablePath;
+    } catch (Error & e) {
+        debug("substitution of path '%s' failed: %s", store->printStorePath(substitutablePath), e.what());
+    }
+
+    return std::nullopt;
 }
 
 }

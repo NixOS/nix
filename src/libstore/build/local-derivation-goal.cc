@@ -1244,10 +1244,10 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
         return paths;
     }
 
-    void queryPathInfoUncached(const StorePath & path,
+    void queryPathInfoUncached(StorePathOrDesc path,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
     {
-        if (goal.isAllowed(path)) {
+        if (goal.isAllowed(bakeCaIfNeeded(path))) {
             try {
                 /* Censor impure information. */
                 auto info = std::make_shared<ValidPathInfo>(*next->queryPathInfo(path));
@@ -1319,15 +1319,17 @@ struct RestrictedStore : public virtual RestrictedStoreConfig, public virtual In
         return path;
     }
 
-    void narFromPath(const StorePath & path, Sink & sink) override
+    void narFromPath(StorePathOrDesc pathOrDesc, Sink & sink) override
     {
+        auto path = bakeCaIfNeeded(pathOrDesc);
         if (!goal.isAllowed(path))
             throw InvalidPath("cannot dump unknown path '%s' in recursive Nix", printStorePath(path));
-        LocalFSStore::narFromPath(path, sink);
+        LocalFSStore::narFromPath(pathOrDesc, sink);
     }
 
-    void ensurePath(const StorePath & path) override
+    void ensurePath(StorePathOrDesc pathOrDesc) override
     {
+        auto path = bakeCaIfNeeded(pathOrDesc);
         if (!goal.isAllowed(path))
             throw InvalidPath("cannot substitute unknown path '%s' in recursive Nix", printStorePath(path));
         /* Nothing to be done; 'path' must already be valid. */
@@ -2510,8 +2512,10 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             }
             ValidPathInfo newInfo0 {
                 worker.store,
-                outputPathName(drv->name, outputName),
-                *std::move(optCA),
+                {
+                    .name = outputPathName(drv->name, outputName),
+                    .info = *std::move(optCA),
+                },
                 Hash::dummy,
             };
             if (*scratchPath != newInfo0.path) {
@@ -2548,10 +2552,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 auto narHashAndSize = hashPath(htSHA256, actualPath);
                 ValidPathInfo newInfo0 { requiredFinalPath, narHashAndSize.first };
                 newInfo0.narSize = narHashAndSize.second;
-                auto refs = rewriteRefs();
-                newInfo0.references = std::move(refs.others);
-                if (refs.self)
-                    newInfo0.references.insert(newInfo0.path);
+                newInfo0.references = rewriteRefs();
                 return newInfo0;
             },
 
@@ -2807,12 +2808,12 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
                 auto i = outputsByPath.find(worker.store.printStorePath(path));
                 if (i != outputsByPath.end()) {
                     closureSize += i->second.narSize;
-                    for (auto & ref : i->second.references)
+                    for (auto & ref : i->second.referencesPossiblyToSelf())
                         pathsLeft.push(ref);
                 } else {
                     auto info = worker.store.queryPathInfo(path);
                     closureSize += info->narSize;
-                    for (auto & ref : info->references)
+                    for (auto & ref : info->referencesPossiblyToSelf())
                         pathsLeft.push(ref);
                 }
             }
@@ -2852,7 +2853,7 @@ void LocalDerivationGoal::checkOutputs(const std::map<std::string, ValidPathInfo
 
                 auto used = recursive
                     ? getClosure(info.path).first
-                    : info.references;
+                    : info.referencesPossiblyToSelf();
 
                 if (recursive && checks.ignoreSelfRefs)
                     used.erase(info.path);

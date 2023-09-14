@@ -38,7 +38,7 @@ public:
     ref<FSAccessor> getFSAccessor() override
     { return LocalFSStore::getFSAccessor(); }
 
-    void narFromPath(const StorePath & path, Sink & sink) override
+    void narFromPath(StorePathOrDesc path, Sink & sink) override
     { LocalFSStore::narFromPath(path, sink); }
 
     /**

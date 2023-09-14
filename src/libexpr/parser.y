@@ -781,8 +781,12 @@ std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Pa
 
     if (EvalSettings::isPseudoUrl(value)) {
         try {
-            auto storePath = fetchers::downloadTarball(
-                store, EvalSettings::resolvePseudoUrl(value), "source", false).tree.storePath;
+            auto storePath = store->makeFixedOutputPathFromCA(
+                fetchers::downloadTarball(
+                    store,
+                    EvalSettings::resolvePseudoUrl(value),
+                    "source",
+                    false).tree.storePath);
             res = { store->toRealPath(storePath) };
         } catch (FileTransferError & e) {
             logWarning({
@@ -796,7 +800,8 @@ std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Pa
         experimentalFeatureSettings.require(Xp::Flakes);
         auto flakeRef = parseFlakeRef(value.substr(6), {}, true, false);
         debug("fetching flake search path element '%s''", value);
-        auto storePath = flakeRef.resolve(store).fetchTree(store).first.storePath;
+        auto storePath = store->makeFixedOutputPathFromCA(
+    		flakeRef.resolve(store).fetchTree(store).first.storePath);
         res = { store->toRealPath(storePath) };
     }
 

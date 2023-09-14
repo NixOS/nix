@@ -5,6 +5,7 @@
 #include "hash.hh"
 #include "path.hh"
 #include "comparator.hh"
+#include "reference-set.hh"
 #include "variant-wrapper.hh"
 
 namespace nix {
@@ -163,38 +164,7 @@ std::string renderContentAddress(std::optional<ContentAddress> ca);
  * See the schema for store paths in store-api.cc
  */
 
-/**
- * A set of references to other store objects.
- *
- * References to other store objects are tracked with store paths, self
- * references however are tracked with a boolean.
- */
-struct StoreReferences
-{
-    /**
-     * References to other store objects
-     */
-    StorePathSet others;
-
-    /**
-     * Reference to this store object
-     */
-    bool self = false;
-
-    /**
-     * @return true iff no references, i.e. others is empty and self is
-     * false.
-     */
-    bool empty() const;
-
-    /**
-     * Returns the numbers of references, i.e. the size of others + 1
-     * iff self is true.
-     */
-    size_t size() const;
-
-    GENERATE_CMP(StoreReferences, me->self, me->others);
-};
+using StoreReferences = References<StorePath>;
 
 // This matches the additional info that we need for makeTextPath
 struct TextInfo
@@ -276,5 +246,16 @@ struct ContentAddressWithReferences
 
     Hash getHash() const;
 };
+
+struct StorePathDescriptor {
+    std::string name;
+    ContentAddressWithReferences info;
+
+    GENERATE_CMP(StorePathDescriptor, me->name, me->info);
+};
+
+std::string renderStorePathDescriptor(StorePathDescriptor ca);
+
+StorePathDescriptor parseStorePathDescriptor(std::string_view rawCa);
 
 }

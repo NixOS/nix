@@ -113,7 +113,8 @@ static void update(const StringSet & channelNames)
             // got redirected in the process, so that we can grab the various parts of a nix channel
             // definition from a consistent location if the redirect changes mid-download.
             auto result = fetchers::downloadFile(store, url, std::string(baseNameOf(url)), false);
-            auto filename = store->toRealPath(result.storePath);
+            auto filename = store->toRealPath(
+                store->makeFixedOutputPathFromCA(result.storePath));
             url = result.effectiveUrl;
 
             bool unpacked = false;
@@ -124,12 +125,21 @@ static void update(const StringSet & channelNames)
             }
 
             if (!unpacked) {
+                StorePathDescriptor storePathDesc {
+                    .name = "t e m p",
+                    .info = FixedOutputInfo {
+                        .method = FileIngestionMethod::Flat,
+                        .hash = Hash(htSHA256),
+                        .references = {},
+                    },
+                };
                 // Download the channel tarball.
                 try {
-                    filename = store->toRealPath(fetchers::downloadFile(store, url + "/nixexprs.tar.xz", "nixexprs.tar.xz", false).storePath);
+                    storePathDesc = fetchers::downloadFile(store, url + "/nixexprs.tar.xz", "nixexprs.tar.xz", false).storePath;
                 } catch (FileTransferError & e) {
-                    filename = store->toRealPath(fetchers::downloadFile(store, url + "/nixexprs.tar.bz2", "nixexprs.tar.bz2", false).storePath);
+                    storePathDesc = fetchers::downloadFile(store, url + "/nixexprs.tar.bz2", "nixexprs.tar.bz2", false).storePath;
                 }
+                filename = store->toRealPath(store->makeFixedOutputPathFromCA(storePathDesc));
             }
             // Regardless of where it came from, add the expression representing this channel to accumulated expression
             exprs.push_back("f: f { name = \"" + cname + "\"; channelName = \"" + name + "\"; src = builtins.storePath \"" + filename + "\"; " + extraAttrs + " }");

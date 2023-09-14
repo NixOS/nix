@@ -14,7 +14,7 @@ std::string ValidPathInfo::fingerprint(const Store & store) const
         "1;" + store.printStorePath(path) + ";"
         + narHash.to_string(Base32, true) + ";"
         + std::to_string(narSize) + ";"
-        + concatStringsSep(",", store.printStorePathSet(references));
+        + concatStringsSep(",", store.printStorePathSet(referencesPossiblyToSelf()));
 }
 
 
@@ -23,46 +23,40 @@ void ValidPathInfo::sign(const Store & store, const SecretKey & secretKey)
     sigs.insert(secretKey.signDetached(fingerprint(store)));
 }
 
-std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithReferences() const
+std::optional<StorePathDescriptor> ValidPathInfo::fullStorePathDescriptorOpt() const
 {
     if (! ca)
         return std::nullopt;
 
-    return std::visit(overloaded {
-        [&](const TextIngestionMethod &) -> ContentAddressWithReferences {
-            assert(references.count(path) == 0);
-            return TextInfo {
-                .hash = ca->hash,
-                .references = references,
-            };
-        },
-        [&](const FileIngestionMethod & m2) -> ContentAddressWithReferences {
-            auto refs = references;
-            bool hasSelfReference = false;
-            if (refs.count(path)) {
-                hasSelfReference = true;
-                refs.erase(path);
-            }
-            return FixedOutputInfo {
-                .method = m2,
-                .hash = ca->hash,
-                .references = {
-                    .others = std::move(refs),
-                    .self = hasSelfReference,
-                },
-            };
-        },
-    }, ca->method.raw);
+    return StorePathDescriptor {
+        .name = std::string { path.name() },
+        .info = std::visit(overloaded {
+            [&](const TextIngestionMethod &) -> ContentAddressWithReferences {
+                assert(!references.self);
+                return TextInfo {
+                    .hash = ca->hash,
+                    .references = references.others,
+                };
+            },
+            [&](const FileIngestionMethod & m2) -> ContentAddressWithReferences {
+                return FixedOutputInfo {
+                    .method = m2,
+                    .hash = ca->hash,
+                    .references = references,
+                };
+            },
+        }, ca->method.raw),
+    };
 }
 
 bool ValidPathInfo::isContentAddressed(const Store & store) const
 {
-    auto fullCaOpt = contentAddressWithReferences();
+    auto fullCaOpt = fullStorePathDescriptorOpt();
 
     if (! fullCaOpt)
         return false;
 
-    auto caPath = store.makeFixedOutputPathFromCA(path.name(), *fullCaOpt);
+    auto caPath = store.makeFixedOutputPathFromCA(*fullCaOpt);
 
     bool res = caPath == path;
 
@@ -94,7 +88,7 @@ bool ValidPathInfo::checkSignature(const Store & store, const PublicKeys & publi
 Strings ValidPathInfo::shortRefs() const
 {
     Strings refs;
-    for (auto & r : references)
+    for (auto & r : referencesPossiblyToSelf())
         refs.push_back(std::string(r.to_string()));
     return refs;
 }
@@ -102,30 +96,46 @@ Strings ValidPathInfo::shortRefs() const
 
 ValidPathInfo::ValidPathInfo(
     const Store & store,
-    std::string_view name,
-    ContentAddressWithReferences && ca,
+    StorePathDescriptor && info,
     Hash narHash)
-      : path(store.makeFixedOutputPathFromCA(name, ca))
+      : path(store.makeFixedOutputPathFromCA(info))
       , narHash(narHash)
 {
     std::visit(overloaded {
         [this](TextInfo && ti) {
-            this->references = std::move(ti.references);
+            this->references = {
+                .others = std::move(ti.references),
+                .self = false,
+            };
             this->ca = ContentAddress {
                 .method = TextIngestionMethod {},
                 .hash = std::move(ti.hash),
             };
         },
         [this](FixedOutputInfo && foi) {
-            this->references = std::move(foi.references.others);
-            if (foi.references.self)
-                this->references.insert(path);
+            this->references = std::move(foi.references);
             this->ca = ContentAddress {
                 .method = std::move(foi.method),
                 .hash = std::move(foi.hash),
             };
         },
-    }, std::move(ca).raw);
+    }, std::move(info.info).raw);
+}
+
+
+StorePathSet ValidPathInfo::referencesPossiblyToSelf() const
+{
+    return references.possiblyToSelf(path);
+}
+
+void ValidPathInfo::insertReferencePossiblyToSelf(StorePath && ref)
+{
+    return references.insertPossiblyToSelf(path, std::move(ref));
+}
+
+void ValidPathInfo::setReferencesPossiblyToSelf(StorePathSet && refs)
+{
+    return references.setPossiblyToSelf(path, std::move(refs));
 }
 
 
@@ -140,8 +150,8 @@ ValidPathInfo ValidPathInfo::read(Source & source, const Store & store, unsigned
     auto narHash = Hash::parseAny(readString(source), htSHA256);
     ValidPathInfo info(path, narHash);
     if (deriver != "") info.deriver = store.parseStorePath(deriver);
-    info.references = WorkerProto::Serialise<StorePathSet>::read(store,
-        WorkerProto::ReadConn { .from = source });
+    info.setReferencesPossiblyToSelf(WorkerProto::Serialise<StorePathSet>::read(store,
+        WorkerProto::ReadConn { .from = source }));
     source >> info.registrationTime >> info.narSize;
     if (format >= 16) {
         source >> info.ultimate;
@@ -164,7 +174,7 @@ void ValidPathInfo::write(
          << narHash.to_string(Base16, false);
     WorkerProto::write(store,
         WorkerProto::WriteConn { .to = sink },
-        references);
+        referencesPossiblyToSelf());
     sink << registrationTime << narSize;
     if (format >= 16) {
         sink << ultimate

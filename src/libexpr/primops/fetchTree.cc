@@ -25,8 +25,9 @@ void emitTreeAttrs(
 
     auto attrs = state.buildBindings(10);
 
+    auto storePath = state.store->makeFixedOutputPathFromCA(tree.storePath);
 
-    state.mkStorePathString(tree.storePath, attrs.alloc(state.sOutPath));
+    state.mkStorePathString(storePath, attrs.alloc(state.sOutPath));
 
     // FIXME: support arbitrary input attributes.
 
@@ -188,7 +189,7 @@ static void fetchTree(
 
     auto [tree, input2] = input.fetch(state.store);
 
-    state.allowPath(tree.storePath);
+    state.allowPath(state.store->makeFixedOutputPathFromCA(tree.storePath));
 
     emitTreeAttrs(state, tree, input2, v, params.emptyRevFallback, false);
 }
@@ -250,18 +251,29 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
     if (evalSettings.pureEval && !expectedHash)
         state.debugThrowLastTrace(EvalError("in pure evaluation mode, '%s' requires a 'sha256' argument", who));
 
-    // early exit if pinned and already in the store
-    if (expectedHash && expectedHash->type == htSHA256) {
+    // early exit if pinned and already in the store, or substituted successfully
+    if (expectedHash) {
+        auto method = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat;
+
         auto expectedPath = state.store->makeFixedOutputPath(
             name,
             FixedOutputInfo {
-                .method = unpack ? FileIngestionMethod::Recursive : FileIngestionMethod::Flat,
+                .method = method,
                 .hash = *expectedHash,
                 .references = {}
             });
 
         if (state.store->isValidPath(expectedPath)) {
             state.allowAndSetStorePathString(expectedPath, v);
+            return;
+        }
+
+        // try to substitute if we can
+
+        auto substitutableStorePath = fetchers::trySubstitute(state.store, method, *expectedHash, name);
+
+        if (substitutableStorePath) {
+            state.allowAndSetStorePathString(*substitutableStorePath, v);
             return;
         }
     }
@@ -273,16 +285,18 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
         ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).tree.storePath
         : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
+    auto actualStorePath = state.store->makeFixedOutputPathFromCA(storePath);
+
     if (expectedHash) {
         auto hash = unpack
             ? state.store->queryPathInfo(storePath)->narHash
-            : hashFile(htSHA256, state.store->toRealPath(storePath));
+            : hashFile(htSHA256, state.store->toRealPath(actualStorePath));
         if (hash != *expectedHash)
             state.debugThrowLastTrace(EvalError((unsigned int) 102, "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
                 *url, expectedHash->to_string(Base32, true), hash.to_string(Base32, true)));
     }
 
-    state.allowAndSetStorePathString(storePath, v);
+    state.allowAndSetStorePathString(actualStorePath, v);
 }
 
 static void prim_fetchurl(EvalState & state, const PosIdx pos, Value * * args, Value & v)

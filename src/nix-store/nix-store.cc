@@ -265,7 +265,7 @@ static void printTree(const StorePath & path,
        closure(B).  That is, if derivation A is an (possibly indirect)
        input of B, then A is printed first.  This has the effect of
        flattening the tree, preventing deeply nested structures.  */
-    auto sorted = store->topoSortPaths(info->references);
+    auto sorted = store->topoSortPaths(info->referencesPossiblyToSelf());
     reverse(sorted.begin(), sorted.end());
 
     for (const auto &[n, i] : enumerate(sorted)) {
@@ -347,7 +347,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 for (auto & j : ps) {
                     if (query == qRequisites) store->computeFSClosure(j, paths, false, includeOutputs);
                     else if (query == qReferences) {
-                        for (auto & p : store->queryPathInfo(j)->references)
+                        for (auto & p : store->queryPathInfo(j)->referencesPossiblyToSelf())
                             paths.insert(p);
                     }
                     else if (query == qReferrers) {
@@ -368,7 +368,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
         case qDeriver:
             for (auto & i : opArgs) {
-                auto info = store->queryPathInfo(store->followLinksToStorePath(i));
+                auto path = store->followLinksToStorePath(i);
+                auto info = store->queryPathInfo(path);
                 cout << fmt("%s\n", info->deriver ? store->printStorePath(*info->deriver) : "unknown-deriver");
             }
             break;
@@ -888,7 +889,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                         auto info = store->queryPathInfo(i);
                         out << store->printStorePath(info->path)
                             << (info->deriver ? store->printStorePath(*info->deriver) : "");
-                        WorkerProto::write(*store, wconn, info->references);
+                        WorkerProto::write(*store, wconn, info->referencesPossiblyToSelf());
                         // !!! Maybe we want compression?
                         out << info->narSize // downloadSize
                             << info->narSize;
@@ -903,9 +904,11 @@ static void opServe(Strings opFlags, Strings opArgs)
                 break;
             }
 
-            case ServeProto::Command::DumpStorePath:
-                store->narFromPath(store->parseStorePath(readString(in)), out);
+            case ServeProto::Command::DumpStorePath: {
+                auto path = store->parseStorePath(readString(in));
+                store->narFromPath(path, out);
                 break;
+            }
 
             case ServeProto::Command::ImportPaths: {
                 if (!writeAllowed) throw Error("importing paths is not allowed");
@@ -988,7 +991,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 };
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.references = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
+                info.setReferencesPossiblyToSelf(WorkerProto::Serialise<StorePathSet>::read(*store, rconn));
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
                 info.ca = ContentAddress::parseOpt(readString(in));

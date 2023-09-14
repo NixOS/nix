@@ -100,25 +100,30 @@ std::shared_ptr<DerivationGoal> Worker::makeBasicDerivationGoal(const StorePath 
 }
 
 
-std::shared_ptr<PathSubstitutionGoal> Worker::makePathSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
+std::shared_ptr<PathSubstitutionGoal> Worker::makePathSubstitutionGoal(StorePathOrDesc path, RepairFlag repair)
 {
-    std::weak_ptr<PathSubstitutionGoal> & goal_weak = substitutionGoals[path];
-    auto goal = goal_weak.lock(); // FIXME
+    auto p = store.bakeCaIfNeeded(path);
+    std::weak_ptr<PathSubstitutionGoal> & goal_weak = substitutionGoals[p];
+    std::shared_ptr<PathSubstitutionGoal> goal = goal_weak.lock(); // FIXME
     if (!goal) {
-        goal = std::make_shared<PathSubstitutionGoal>(path, *this, repair, ca);
+        auto optCA = std::get_if<1>(&path);
+        goal = std::make_shared<PathSubstitutionGoal>(
+            p,
+            *this,
+            repair,
+            optCA ? std::optional { *optCA } : std::nullopt);
         goal_weak = goal;
         wakeUp(goal);
     }
     return goal;
 }
 
-
-std::shared_ptr<DrvOutputSubstitutionGoal> Worker::makeDrvOutputSubstitutionGoal(const DrvOutput& id, RepairFlag repair, std::optional<ContentAddress> ca)
+std::shared_ptr<DrvOutputSubstitutionGoal> Worker::makeDrvOutputSubstitutionGoal(const DrvOutput& id, RepairFlag repair)
 {
     std::weak_ptr<DrvOutputSubstitutionGoal> & goal_weak = drvOutputSubstitutionGoals[id];
     auto goal = goal_weak.lock(); // FIXME
     if (!goal) {
-        goal = std::make_shared<DrvOutputSubstitutionGoal>(id, *this, repair, ca);
+        goal = std::make_shared<DrvOutputSubstitutionGoal>(id, *this, repair);
         goal_weak = goal;
         wakeUp(goal);
     }

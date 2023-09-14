@@ -46,14 +46,14 @@ public:
 
     /* Implementations of abstract store API methods. */
 
-    bool isValidPathUncached(const StorePath & path) override;
+    bool isValidPathUncached(StorePathOrDesc path) override;
 
-    StorePathSet queryValidPaths(const StorePathSet & paths,
+    std::set<OwnedStorePathOrDesc> queryValidPaths(const std::set<OwnedStorePathOrDesc> & paths,
         SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
     StorePathSet queryAllValidPaths() override;
 
-    void queryPathInfoUncached(const StorePath & path,
+    void queryPathInfoUncached(StorePathOrDesc,
         Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override;
@@ -67,7 +67,8 @@ public:
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
 
-    void querySubstitutablePathInfos(const StorePathCAMap & paths,
+    void querySubstitutablePathInfos(const StorePathSet & paths,
+        const std::set<StorePathDescriptor> & caPaths,
         SubstitutablePathInfos & infos) override;
 
     /**
@@ -122,7 +123,7 @@ public:
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
         BuildMode buildMode) override;
 
-    void ensurePath(const StorePath & path) override;
+    void ensurePath(StorePathOrDesc path) override;
 
     void addTempRoot(const StorePath & path) override;
 
@@ -187,7 +188,7 @@ protected:
 
     virtual ref<FSAccessor> getFSAccessor() override;
 
-    virtual void narFromPath(const StorePath & path, Sink & sink) override;
+    virtual void narFromPath(StorePathOrDesc pathOrDesc, Sink & sink) override;
 
 private:
 

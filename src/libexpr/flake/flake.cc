@@ -63,10 +63,12 @@ static std::tuple<fetchers::Tree, FlakeRef, FlakeRef> fetchOrSubstituteTree(
 
     auto [tree, lockedRef] = *fetched;
 
-    debug("got tree '%s' from '%s'",
-        state.store->printStorePath(tree.storePath), lockedRef);
+    auto storePath = state.store->makeFixedOutputPathFromCA(tree.storePath);
 
-    state.allowPath(tree.storePath);
+    debug("got tree '%s' from '%s'",
+        state.store->printStorePath(storePath), lockedRef);
+
+    state.allowPath(storePath);
 
     assert(!originalRef.input.getNarHash() || tree.storePath == originalRef.input.computeStorePath(*state.store));
 
@@ -210,7 +212,8 @@ static Flake getFlake(
     auto flakeFile = canonPath(flakeDir + "/flake.nix", true);
     if (!isInDir(flakeFile, sourceInfo.actualPath))
         throw Error("'flake.nix' file of flake '%s' escapes from '%s'",
-            lockedRef, state.store->printStorePath(sourceInfo.storePath));
+            lockedRef,
+            state.store->printStorePath(state.store->makeFixedOutputPathFromCA(sourceInfo.storePath)));
 
     Flake flake {
         .originalRef = originalRef,
@@ -886,14 +889,14 @@ static RegisterPrimOp r4({
 
 }
 
-Fingerprint LockedFlake::getFingerprint() const
+Fingerprint LockedFlake::getFingerprint(const Store & store) const
 {
     // FIXME: as an optimization, if the flake contains a lock file
     // and we haven't changed it, then it's sufficient to use
     // flake.sourceInfo.storePath for the fingerprint.
     return hashString(htSHA256,
         fmt("%s;%s;%d;%d;%s",
-            flake.sourceInfo->storePath.to_string(),
+            store.makeFixedOutputPathFromCA(flake.sourceInfo->storePath).to_string(),
             flake.lockedRef.subdir,
             flake.lockedRef.input.getRevCount().value_or(0),
             flake.lockedRef.input.getLastModified().value_or(0),

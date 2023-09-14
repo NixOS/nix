@@ -1616,8 +1616,9 @@ static void prim_readFile(EvalState & state, const PosIdx pos, Value * * args, V
         state.debugThrowLastTrace(Error("the contents of the file '%1%' cannot be represented as a Nix string", path));
     StorePathSet refs;
     if (state.store->isInStore(path.path.abs())) {
+        auto p = state.store->toStorePath(path.path.abs()).first;
         try {
-            refs = state.store->queryPathInfo(state.store->toStorePath(path.path.abs()).first)->references;
+            refs = state.store->queryPathInfo(p)->referencesPossiblyToSelf();
         } catch (Error &) { // FIXME: should be InvalidPathError
         }
         // Re-scan references to filter down to just the ones that actually occur in the file.
@@ -2186,7 +2187,7 @@ static void addPath(
             try {
                 auto [storePath, subPath] = state.store->toStorePath(path);
                 // FIXME: we should scanForReferences on the path before adding it
-                refs = state.store->queryPathInfo(storePath)->references;
+                refs = state.store->queryPathInfo(storePath)->referencesPossiblyToSelf();
                 path = state.store->toRealPath(storePath) + subPath;
             } catch (Error &) { // FIXME: should be InvalidPathError
             }

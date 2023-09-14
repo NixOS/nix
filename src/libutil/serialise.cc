@@ -74,6 +74,10 @@ void Source::operator () (char * data, size_t len)
     }
 }
 
+void Source::operator () (std::string_view data)
+{
+    (*this)((char *)data.data(), data.size());
+}
 
 void Source::drainInto(Sink & sink)
 {

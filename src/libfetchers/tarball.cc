@@ -64,7 +64,7 @@ DownloadFileResult downloadFile(
     if (res.immutableUrl)
         infoAttrs.emplace("immutableUrl", *res.immutableUrl);
 
-    std::optional<StorePath> storePath;
+    std::optional<StorePathDescriptor> storePath;
 
     if (res.cached) {
         assert(cached);
@@ -73,20 +73,22 @@ DownloadFileResult downloadFile(
         StringSink sink;
         dumpString(res.data, sink);
         auto hash = hashString(htSHA256, res.data);
-        ValidPathInfo info {
-            *store,
-            name,
-            FixedOutputInfo {
+        storePath = {
+            .name = name,
+            .info = FixedOutputInfo {
                 .method = FileIngestionMethod::Flat,
                 .hash = hash,
                 .references = {},
             },
+        };
+        ValidPathInfo info {
+            *store,
+            StorePathDescriptor { *storePath },
             hashString(htSHA256, sink.s),
         };
         info.narSize = sink.s.size();
         auto source = StringSource { sink.s };
         store->addToStore(info, source, NoRepair, NoCheckSigs);
-        storePath = std::move(info.path);
     }
 
     getCache()->add(
@@ -133,14 +135,17 @@ DownloadTarballResult downloadTarball(
 
     if (cached && !cached->expired)
         return {
-            .tree = Tree { .actualPath = store->toRealPath(cached->storePath), .storePath = std::move(cached->storePath) },
+            .tree = Tree {
+                .actualPath = store->toRealPath(store->makeFixedOutputPathFromCA(cached->storePath)),
+                .storePath = std::move(cached->storePath),
+            },
             .lastModified = (time_t) getIntAttr(cached->infoAttrs, "lastModified"),
             .immutableUrl = maybeGetStrAttr(cached->infoAttrs, "immutableUrl"),
         };
 
     auto res = downloadFile(store, url, name, locked, headers);
 
-    std::optional<StorePath> unpackedStorePath;
+    std::optional<StorePathDescriptor> unpackedStorePath;
     time_t lastModified;
 
     if (cached && res.etag != "" && getStrAttr(cached->infoAttrs, "etag") == res.etag) {
@@ -149,13 +154,18 @@ DownloadTarballResult downloadTarball(
     } else {
         Path tmpDir = createTempDir();
         AutoDelete autoDelete(tmpDir, true);
-        unpackTarfile(store->toRealPath(res.storePath), tmpDir);
+        unpackTarfile(
+            store->toRealPath(store->makeFixedOutputPathFromCA(res.storePath)),
+            tmpDir);
         auto members = readDirectory(tmpDir);
         if (members.size() != 1)
             throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
         auto topDir = tmpDir + "/" + members.begin()->name;
         lastModified = lstat(topDir).st_mtime;
-        unpackedStorePath = store->addToStore(name, topDir, FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, NoRepair);
+        auto temp = store->addToStore(name, topDir, FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, NoRepair);
+        // FIXME: just have Store::addToStore return a StorePathDescriptor, as
+        // it has the underlying information.
+        unpackedStorePath = store->queryPathInfo(temp)->fullStorePathDescriptorOpt().value();
     }
 
     Attrs infoAttrs({
@@ -174,7 +184,10 @@ DownloadTarballResult downloadTarball(
         locked);
 
     return {
-        .tree = Tree { .actualPath = store->toRealPath(*unpackedStorePath), .storePath = std::move(*unpackedStorePath) },
+        .tree = Tree {
+            .actualPath = store->toRealPath(store->makeFixedOutputPathFromCA(*unpackedStorePath)),
+            .storePath = std::move(*unpackedStorePath)
+        },
         .lastModified = lastModified,
         .immutableUrl = res.immutableUrl,
     };
@@ -274,7 +287,7 @@ struct FileInputScheme : CurlInputScheme
                 : (!requireTree && !hasTarballExtension(url.path)));
     }
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
+    std::pair<StorePathDescriptor, Input> fetch(ref<Store> store, const Input & input) override
     {
         auto file = downloadFile(store, getStrAttr(input.attrs, "url"), input.getName(), false);
         return {std::move(file.storePath), input};
@@ -295,7 +308,7 @@ struct TarballInputScheme : CurlInputScheme
                 : (requireTree || hasTarballExtension(url.path)));
     }
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
+    std::pair<StorePathDescriptor, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
         auto url = getStrAttr(input.attrs, "url");

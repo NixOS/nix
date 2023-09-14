@@ -72,6 +72,7 @@ struct Source
      * an error if it is not going to be available.
      */
     void operator () (char * data, size_t len);
+    void operator () (std::string_view data);
 
     /**
      * Store up to ‘len’ in the buffer pointed to by ‘data’, and
@@ -231,6 +232,7 @@ struct TeeSource : Source
         return n;
     }
 };
+
 
 /**
  * A reader that consumes the original Source until 'size'.

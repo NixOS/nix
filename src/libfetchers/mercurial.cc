@@ -145,7 +145,7 @@ struct MercurialInputScheme : InputScheme
         return {isLocal, isLocal ? url.path : url.base};
     }
 
-    std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
+    std::pair<StorePathDescriptor, Input> fetch(ref<Store> store, const Input & _input) override
     {
         Input input(_input);
 
@@ -196,8 +196,11 @@ struct MercurialInputScheme : InputScheme
                 };
 
                 auto storePath = store->addToStore(input.getName(), actualPath, FileIngestionMethod::Recursive, htSHA256, filter);
+                // FIXME: just have Store::addToStore return a StorePathDescriptor, as
+                // it has the underlying information.
+                auto storePathDesc = store->queryPathInfo(storePath)->fullStorePathDescriptorOpt().value();
 
-                return {std::move(storePath), input};
+                return {std::move(storePathDesc), input};
             }
         }
 
@@ -221,8 +224,8 @@ struct MercurialInputScheme : InputScheme
             });
         };
 
-        auto makeResult = [&](const Attrs & infoAttrs, StorePath && storePath)
-            -> std::pair<StorePath, Input>
+        auto makeResult = [&](const Attrs & infoAttrs, StorePathDescriptor && storePath)
+            -> std::pair<StorePathDescriptor, Input>
         {
             assert(input.getRev());
             assert(!_input.getRev() || _input.getRev() == input.getRev());
@@ -301,6 +304,9 @@ struct MercurialInputScheme : InputScheme
         deletePath(tmpDir + "/.hg_archival.txt");
 
         auto storePath = store->addToStore(name, tmpDir);
+        // FIXME: just have Store::addToStore return a StorePathDescriptor, as
+        // it has the underlying information.
+        auto storePathDesc = store->queryPathInfo(storePath)->fullStorePathDescriptorOpt().value();
 
         Attrs infoAttrs({
             {"rev", input.getRev()->gitRev()},
@@ -312,17 +318,17 @@ struct MercurialInputScheme : InputScheme
                 store,
                 unlockedAttrs,
                 infoAttrs,
-                storePath,
+                storePathDesc,
                 false);
 
         getCache()->add(
             store,
             getLockedAttrs(),
             infoAttrs,
-            storePath,
+            storePathDesc,
             true);
 
-        return makeResult(infoAttrs, std::move(storePath));
+        return makeResult(infoAttrs, std::move(storePathDesc));
     }
 };
 

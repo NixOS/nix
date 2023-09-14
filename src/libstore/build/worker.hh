@@ -226,8 +226,8 @@ public:
     /**
      * @ref SubstitutionGoal "substitution goal"
      */
-    std::shared_ptr<PathSubstitutionGoal> makePathSubstitutionGoal(const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
-    std::shared_ptr<DrvOutputSubstitutionGoal> makeDrvOutputSubstitutionGoal(const DrvOutput & id, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    std::shared_ptr<PathSubstitutionGoal> makePathSubstitutionGoal(StorePathOrDesc storePath, RepairFlag repair = NoRepair);
+    std::shared_ptr<DrvOutputSubstitutionGoal> makeDrvOutputSubstitutionGoal(const DrvOutput & id, RepairFlag repair = NoRepair);
 
     /**
      * Make a goal corresponding to the `DerivedPath`.
