@@ -2748,6 +2748,109 @@ static RegisterPrimOp primop_catAttrs({
     .fun = prim_catAttrs,
 });
 
+static void prim_functionStrict(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    state.forceValue(*args[0], pos);
+    if (args[0]->isPrimOpApp() || args[0]->isPrimOp()) {
+        v.mkNull();
+        return;
+    }
+
+    state.forceFunction(*args[0], pos, "while evaluating the argument passed to builtins.functionStrict");
+    const auto fun = args[0]->lambda.fun;
+
+    if (args[0]->isLambda() && fun->hasFormals()) {
+        v.mkBool(true);
+    } else {
+        v.mkNull();
+    }
+}
+
+static RegisterPrimOp primop_functionStrict({
+    .name = "__functionStrict",
+    .args = {"f"},
+    .doc = R"(
+      Return `true` if *f* is a function that is defined using strict function
+      syntax, which is to say, using an argument attribute set declaration such
+      as `{ a }:` or `{ ... }:`.
+
+      Proper strictness analysis is undecidable, so for all other functions the
+      return value is `null`. `false` is not returned.
+    )",
+    .fun = prim_functionStrict,
+});
+
+static void prim_functionOpen(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    state.forceValue(*args[0], pos);
+    if (args[0]->isPrimOpApp() || args[0]->isPrimOp()) {
+        v.mkNull();
+        return;
+    }
+
+    state.forceFunction(*args[0], pos, "while evaluating the argument passed to builtins.functionOpen");
+    const auto fun = args[0]->lambda.fun;
+
+    if (args[0]->isLambda()) {
+        v.mkNull();
+    }
+
+    if (fun->hasFormals()) {
+        v.mkBool(fun->formals->ellipsis);
+    } else {
+        v.mkNull();
+    }
+}
+
+static RegisterPrimOp primop_functionOpen({
+    .name = "__functionOpen",
+    .args = {"f"},
+    .doc = R"(
+      Return `true` if *f* is a function that is defined using the ellipsis syntax, such as `{ ... }:` or `{ foo, ... }:`.
+
+      Return `false` for functions defined with an attribute list but no ellipsis, such as `{ foo, bar }:`.
+
+      Return `null` for functions defined using plain lambdas, such as `x: ...`, as well as for built-in functions.
+    )",
+    .fun = prim_functionOpen,
+});
+
+static void prim_functionBindsAllAttrs(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    state.forceValue(*args[0], pos);
+    if (args[0]->isPrimOpApp() || args[0]->isPrimOp()) {
+        v.mkNull();
+        return;
+    }
+
+    state.forceFunction(*args[0], pos, "while evaluating the argument passed to builtins.functionBindsAllAttrs");
+    const auto fun = args[0]->lambda.fun;
+
+    if (!args[0]->isLambda()) {
+        v.mkNull();
+        return;
+    }
+
+    if (fun->hasFormals()) {
+        v.mkBool(fun->arg != Symbol {});
+    } else {
+        v.mkNull();
+    }
+}
+
+static RegisterPrimOp primop_functionBindsAllAttrs({
+    .name = "__functionBindsAllAttrs",
+    .args = {"f"},
+    .doc = R"(
+      If the function is not defined with an argument list, return `null`.
+
+      Return `true` if *f* is a function that is defined using the `@` syntax, which binds an identifier to the original attribute set.
+
+      Return `false` for a function that does not use the `@` syntax.
+    )",
+    .fun = prim_functionBindsAllAttrs,
+});
+
 static void prim_functionArgs(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
     state.forceValue(*args[0], pos);

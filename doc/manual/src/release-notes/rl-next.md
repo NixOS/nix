@@ -1,11 +1,20 @@
 # Release X.Y (202?-??-??)
 
-- Two new builtin functions,
+- A pair of builtin functions,
   [`builtins.parseFlakeRef`](@docroot@/language/builtins.md#builtins-parseFlakeRef)
   and
   [`builtins.flakeRefToString`](@docroot@/language/builtins.md#builtins-flakeRefToString),
-  have been added.
+  has been added.
   These functions are useful for converting between flake references encoded as attribute sets and URLs.
+
+- Function introspection in the language has been extended to allow more compatibility logic to be written.
+
+  - [`builtins.functionOpen`](@docroot@/language/builtins.md#builtins-functionOpen): whether arbitrary attributes can be passed to the function; a boolean, or `null` for plain lambdas like `x: x`.
+  - [`builtins.functionBindsAllAttrs`](@docroot@/language/builtins.md#builtins-functionBindsAllAttrs): whether the function puts the whole attrset into a variable with `@`.
+
+  The combination of being closed, but binding all attributes is not forward compatible and can now be reported as part of migrations that add an attribute to a function call.
+
+- [`builtins.functionStrict`](@docroot@/language/builtins.md#builtins-functionStrict): whether the function is written using strict syntax, such as `{ ... }: foo`. The fact that this function is strict in its argument is often forgotten, so this allows library or DSL authors to detect and report it in places where it might be common to encounter this.
 
 - [`builtins.toJSON`](@docroot@/language/builtins.md#builtins-parseFlakeRef) now prints [--show-trace](@docroot@/command-ref/conf-file.html#conf-show-trace) items for the path in which it finds an evaluation error.
 
@@ -22,6 +31,10 @@
 
 - Introduce a new [`outputOf`](@docroot@/language/builtins.md#builtins-outputOf) builtin.
   It is part of the [`dynamic-derivations`](@docroot@/contributing/experimental-features.md#xp-feature-dynamic-derivations) experimental feature.
+
+- The flake output function now accepts a parameter `meta`, which gives access to `sourceInfo` and such parameters in a robust manner, even when `self` can not be evaluated. This helps frameworks report error messages with locations, as trying to access the location previously resulted in an unhelpful infinite recursion when the error condition caused `self` to fail.
+
+  If an `outputs` function has a binding for all attributes (using `@`), you will be asked to add an ellipsis to avoid later confusion as to why `meta` is missing - which is necessary because of a limitation of Nix function semantics.
 
 - Flake follow paths at depths greater than 2 are now handled correctly, preventing "follows a non-existent input" errors.
 

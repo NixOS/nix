@@ -43,7 +43,7 @@ cat >flake.nix <<EOF
 {
   description = "Bla bla";
 
-  outputs = inputs: rec {
+  outputs = args: rec {
     apps.$system = { };
     checks.$system = { };
     devShells.$system = { };
@@ -69,7 +69,7 @@ true
 # nixpkgs.legacyPackages is a particularly prominent instance of this.
 cat >flake.nix <<EOF
 {
-  outputs = inputs: {
+  outputs = args: {
     legacyPackages.$system = {
       AAAAAASomeThingsFailToEvaluate = throw "nooo";
       simple = import ./simple.nix;

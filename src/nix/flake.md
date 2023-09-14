@@ -517,6 +517,19 @@ way. Most flakes provide their functionality through Nixpkgs overlays
 or NixOS modules, which are composed into the top-level flake's
 `nixpkgs` input; so their own `nixpkgs` input is usually irrelevant.
 
+# Other arguments
+
+As discussed, `self` is an example of an `outputs` argument that is not derived from `inputs`.
+
+The following are the extra attributes that are always passed to `outputs`:
+
+* `meta`: An attribute set relating to the flake. It contains the attributes:
+  * `sourceInfo`: Equal to `self.sourceInfo`, but accessible even when `self` is broken due to an evaluation error.
+  * `subdir`: The subdirectory within `sourceInfo`, where `flake.nix` resides. This is `""` when `flake.nix` is at `${sourceInfo.outPath}/flake.nix`.
+  * `extraAttributes`: Attributes that are added to the flake outputs by `getFlake` or the internal `inputs` logic.
+  * `extraArguments`: A reference to the attributes documented here - essentially the `outputs` arguments that aren't `inputs`.
+* `self`: This flake, including the attributes returned by `outputs` and `meta.extraAttributes`. It has the same shape as the result of `getFlake` or the inputs that are flakes.
+
 # Lock files
 
 Inputs specified in `flake.nix` are typically "unlocked" in the sense

@@ -183,6 +183,10 @@ static std::map<FlakeId, FlakeInput> parseFlakeInputs(
     expectType(state, nAttrs, *value, pos);
 
     for (nix::Attr & inputAttr : *(*value).attrs) {
+
+        if (inputAttr.name == state.sSelf || inputAttr.name == state.sMeta)
+            throw Error("flake input name '%s' is reserved", state.symbols[inputAttr.name]);
+
         inputs.emplace(state.symbols[inputAttr.name],
             parseFlakeInput(state,
                 state.symbols[inputAttr.name],
@@ -244,7 +248,7 @@ static Flake getFlake(
 
         if (outputs->value->isLambda() && outputs->value->lambda.fun->hasFormals()) {
             for (auto & formal : outputs->value->lambda.fun->formals->formals) {
-                if (formal.name != state.sSelf)
+                if (!(formal.name == state.sSelf || formal.name == state.sMeta))
                     flake.inputs.emplace(state.symbols[formal.name], FlakeInput {
                         .ref = parseFlakeRef(state.symbols[formal.name])
                     });
