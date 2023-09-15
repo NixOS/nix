@@ -592,10 +592,7 @@ void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, Substituta
             } catch (InvalidPath &) {
             } catch (SubstituterDisabled &) {
             } catch (Error & e) {
-                if (settings.tryFallback)
-                    logError(e.info());
-                else
-                    throw;
+                logError(e.info());
             }
         }
     }

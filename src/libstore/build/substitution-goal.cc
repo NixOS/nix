@@ -74,6 +74,9 @@ void PathSubstitutionGoal::tryNext()
     if (subs.size() == 0) {
         /* None left.  Terminate this goal and let someone else deal
            with it. */
+        if (subError.has_value()) {
+            throw std::move(*subError);
+        }
 
         /* Hack: don't indicate failure if there were no substituters.
            In that case the calling derivation should just do a
@@ -111,19 +114,12 @@ void PathSubstitutionGoal::tryNext()
     } catch (InvalidPath &) {
         tryNext();
         return;
-    } catch (SubstituterDisabled &) {
-        if (settings.tryFallback) {
-            tryNext();
-            return;
-        }
-        throw;
     } catch (Error & e) {
-        if (settings.tryFallback) {
-            logError(e.info());
-            tryNext();
-            return;
+        if (!subError.has_value()) {
+            subError = std::move(e);
         }
-        throw;
+        tryNext();
+        return;
     }
 
     if (info->path != storePath) {
