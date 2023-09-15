@@ -765,19 +765,6 @@ void printStaticEnvBindings(const SymbolTable & st, const StaticEnv & se)
 // just for the current level of Env, not the whole chain.
 void printWithBindings(const SymbolTable & st, const Env & env)
 {
-    std::cout << "printWithBindings" << std::endl;
-    switch (env.type) {
-        case Env::Plain:
-            std::cout << "env type: Plain" << std::endl;
-            break;
-        case Env::HasWithAttrs:
-            std::cout << "env type: HasWithAttrs" << std::endl;
-            break;
-        case Env::HasWithExpr:
-            std::cout << "env type: HasWithExpr" << std::endl;
-            break;
-    }
-
     if (env.type == Env::HasWithAttrs) {
         std::cout << "with: ";
         std::cout << ANSI_MAGENTA;
@@ -788,8 +775,6 @@ void printWithBindings(const SymbolTable & st, const Env & env)
         }
         std::cout << ANSI_NORMAL;
         std::cout << std::endl;
-    } else if (env.type == Env::HasWithExpr){
-        std::cout << "haswithexpr" << std::endl;
     }
 }
 
@@ -825,7 +810,7 @@ int printEnvBindings_helper(const SymbolTable & st, const StaticEnv & se, const 
 void printEnvBindings(const EvalState &es, const Expr & expr, const Env & env)
 {
     // just print the names for now
-    auto se = es.getStaticEnv(expr); // is this broken?
+    auto se = es.getStaticEnv(expr);
     if (se)
         printEnvBindings_helper(es.symbols, *se, env);
 }
@@ -1820,15 +1805,11 @@ https://nixos.org/manual/nix/stable/language/constructs.html#functions.)", symbo
 
 void ExprWith::eval(EvalState & state, Env & env, Value & v)
 {
-    // std::cout << "ExprWith::eval" << showType(v) << std::endl;
-    std::cout << "ExprWith::eval" << std::endl;
     Env & env2(state.allocEnv(1));
     env2.up = &env;
     env2.prevWith = prevWith;
     env2.type = Env::HasWithExpr;
     env2.values[0] = (Value *) attrs;
-
-    printEnvBindings(state, *body, env2);
 
     body->eval(state, env2, v);
 }

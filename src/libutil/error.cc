@@ -150,7 +150,7 @@ static std::string indent(std::string_view indentFirst, std::string_view indentR
     return res;
 }
 
-// return verbosity to a string of the appropriate colorl; doesn't revert to ANSI_NORMAL.
+// return verbosity in a string of the appropriate color; doesn't revert to ANSI_NORMAL.
 std::string showVerbosity(Verbosity v)
 {
     switch (v) {

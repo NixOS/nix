@@ -40,7 +40,8 @@ testRepl () {
     local replFiltered=$(echo -e "$replOutput" | { grep "^.\[34\;1m[0-9]" | sed 's/while evaluating the file.*/while evaluating the file/' || echo "" ; }  )
 
     # write the output to a file for debug
-    # echo -e "$replFiltered" > "/home/bburdette/testout/${fname}.txt"
+    # local fpath="~/testout/${fname}.txt"
+    # echo -e "$replFiltered" > $(realpath fpath)
 
     local expected="$(cat $testDir/${fname}.expected)"
 
