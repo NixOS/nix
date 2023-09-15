@@ -765,6 +765,19 @@ void printStaticEnvBindings(const SymbolTable & st, const StaticEnv & se)
 // just for the current level of Env, not the whole chain.
 void printWithBindings(const SymbolTable & st, const Env & env)
 {
+    std::cout << "printWithBindings" << std::endl;
+    switch (env.type) {
+        case Env::Plain:
+            std::cout << "env type: Plain" << std::endl;
+            break;
+        case Env::HasWithAttrs:
+            std::cout << "env type: HasWithAttrs" << std::endl;
+            break;
+        case Env::HasWithExpr:
+            std::cout << "env type: HasWithExpr" << std::endl;
+            break;
+    }
+
     if (env.type == Env::HasWithAttrs) {
         std::cout << "with: ";
         std::cout << ANSI_MAGENTA;
@@ -775,6 +788,8 @@ void printWithBindings(const SymbolTable & st, const Env & env)
         }
         std::cout << ANSI_NORMAL;
         std::cout << std::endl;
+    } else if (env.type == Env::HasWithExpr){
+        std::cout << "haswithexpr" << std::endl;
     }
 }
 
@@ -803,7 +818,6 @@ int printEnvBindings_helper(const SymbolTable & st, const StaticEnv & se, const 
         std::cout << std::endl;
         printWithBindings(st, env);  // probably nothing there for the top level.
         std::cout << std::endl;
-
         return 0;
     }
 }
@@ -1806,11 +1820,15 @@ https://nixos.org/manual/nix/stable/language/constructs.html#functions.)", symbo
 
 void ExprWith::eval(EvalState & state, Env & env, Value & v)
 {
+    // std::cout << "ExprWith::eval" << showType(v) << std::endl;
+    std::cout << "ExprWith::eval" << std::endl;
     Env & env2(state.allocEnv(1));
     env2.up = &env;
     env2.prevWith = prevWith;
     env2.type = Env::HasWithExpr;
     env2.values[0] = (Value *) attrs;
+
+    printEnvBindings(state, *body, env2);
 
     body->eval(state, env2, v);
 }
@@ -2064,12 +2082,12 @@ void EvalState::forceValueDeep(Value & v)
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
                     auto dts = debugRepl && i.value->isThunk()
                         ? makeDebugTraceStacker(*this, *i.value->thunk.expr, *i.value->thunk.env, positions[i.pos],
-                            "while fully evaluating the attribute '%1%'", symbols[i.name])
+                            "while deep evaluating the attribute '%1%'", symbols[i.name])
                         : nullptr;
 
                     recurse(*i.value);
                 } catch (Error & e) {
-                    addErrorTrace(e, i.pos, "while fully evaluating the attribute '%1%'", symbols[i.name]);
+                    addErrorTrace(e, i.pos, "while deep evaluating the attribute '%1%'", symbols[i.name]);
                     throw;
                 }
         }
