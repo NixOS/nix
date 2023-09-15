@@ -3,6 +3,7 @@ nix_tests = \
   init.sh \
   flakes/flakes.sh \
   flakes/run.sh \
+  flakes/commands-create-profile.sh \
   flakes/mercurial.sh \
   flakes/circular.sh \
   flakes/init.sh \

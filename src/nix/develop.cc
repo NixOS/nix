@@ -252,7 +252,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     throw Error("get-env.sh failed to produce an environment");
 }
 
-struct Common : InstallableCommand, MixProfile
+struct Common : InstallableCommand, MixDefaultProfile
 {
     std::set<std::string> ignoreVars{
         "BASHOPTS",

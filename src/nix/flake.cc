@@ -743,7 +743,7 @@ struct CmdFlakeCheck : FlakeCommand
 static Strings defaultTemplateAttrPathsPrefixes{"templates."};
 static Strings defaultTemplateAttrPaths = {"templates.default", "defaultTemplate"};
 
-struct CmdFlakeInitCommon : virtual Args, EvalCommand
+struct CmdFlakeInitCommon : virtual Args, EvalCommand, MixDefaultProfile
 {
     std::string templateUrl = "templates";
     Path destDir;

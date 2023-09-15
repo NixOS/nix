@@ -64,7 +64,7 @@ void runProgramInStore(ref<Store> store,
 
 }
 
-struct CmdShell : InstallablesCommand, MixEnvironment
+struct CmdShell : InstallablesCommand, MixEnvironment, MixDefaultProfile
 {
 
     using InstallablesCommand::run;
@@ -137,7 +137,7 @@ struct CmdShell : InstallablesCommand, MixEnvironment
 
 static auto rCmdShell = registerCommand<CmdShell>("shell");
 
-struct CmdRun : InstallableValueCommand
+struct CmdRun : InstallableValueCommand, MixDefaultProfile
 {
     using InstallableCommand::run;
 
