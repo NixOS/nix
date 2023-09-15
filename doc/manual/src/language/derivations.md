@@ -19,6 +19,7 @@ It outputs an attribute set, and produces a [store derivation](@docroot@/glossar
 
   Example: `name = "hello";`
 
+  The store derivation's path will be `/nix/store/<hash>-hello.drv`, and the output paths will be of the form `/nix/store/<hash>-hello[-<output>]`
 - [`system`]{#attr-system} ([String](@docroot@/language/values.md#type-string))
 
   The system type on which the [`builder`](#attr-builder) executable is meant to be run.
