@@ -14,14 +14,14 @@ It outputs an attribute set, and produces a [store derivation](@docroot@/glossar
 
 - [`name`]{#attr-name} ([String](@docroot@/language/values.md#type-string))
 
-  Symbolic name for the derivation.
-  It is appended to the [store paths](@docroot@/glossary.md#gloss-store-path) of the resulting store derivation and its [output paths][output path].
+  A symbolic name for the derivation.
+  It is added to the [store derivation]'s [path](@docroot@/glossary.md#gloss-store-path) and its [output paths][output path].
 
   Example: `name = "hello";`
 
 - [`system`]{#attr-system} ([String](@docroot@/language/values.md#type-string))
 
-  The system type on which the [`builder`](#attr-builder) executable can be run.
+  The system type on which the [`builder`](#attr-builder) executable is meant to be run.
 
   Nix will only build derivations where the `system` attribute matches the current [`system` configuration option].
   It can automatically [build on other platforms](../advanced-topics/distributed-builds.md) by forwarding build requests to other machines.
