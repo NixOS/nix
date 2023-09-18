@@ -351,6 +351,10 @@ std::optional<ExperimentalFeature> Command::experimentalFeature ()
 MultiCommand::MultiCommand(const Commands & commands_)
     : commands(commands_)
 {
+    std::map<std::string, std::string> aliases = {
+        {"ping", "info"}
+    };
+
     expectArgs({
         .label = "subcommand",
         .optional = true,
@@ -358,14 +362,23 @@ MultiCommand::MultiCommand(const Commands & commands_)
             assert(!command);
             auto i = commands.find(s);
             if (i == commands.end()) {
-                std::set<std::string> commandNames;
-                for (auto & [name, _] : commands)
-                    commandNames.insert(name);
-                auto suggestions = Suggestions::bestMatches(commandNames, s);
-                throw UsageError(suggestions, "'%s' is not a recognised command", s);
+                auto alias = aliases.find(s);
+                std::string alias_name = alias->second;
+                auto alias_command = commands.find(alias_name);
+
+                if(alias == aliases.end() || alias_command == commands.end()) {
+                    std::set<std::string> commandNames;
+                    for (auto & [name, _] : commands)
+                        commandNames.insert(name);
+                    auto suggestions = Suggestions::bestMatches(commandNames, s);
+                    throw UsageError(suggestions, "'%s' is not a recognised command", s);
+                }
+                command = {alias_name, alias_command->second()};
+                command->second->parent = this;
+            } else {
+                command = {s, i->second()};
+                command->second->parent = this;
             }
-            command = {s, i->second()};
-            command->second->parent = this;
         }},
         .completer = {[&](size_t, std::string_view prefix) {
             for (auto & [name, command] : commands)
