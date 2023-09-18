@@ -20,6 +20,7 @@ nix eval --expr 'assert 1 + 2 == 3; true'
 [[ $(nix eval attr --json -f "./eval.nix") == '{"foo":"bar"}' ]]
 [[ $(nix eval int -f - < "./eval.nix") == 123 ]]
 [[ "$(nix eval --expr '{"assert"=1;bar=2;}')" == '{ "assert" = 1; bar = 2; }' ]]
+[[ "$(nix eval func -f "./eval.nix" --argstr arg foo)" == '"foobar"' ]]
 
 # Check if toFile can be utilized during restricted eval
 [[ $(nix eval --restrict-eval --expr 'import (builtins.toFile "source" "42")') == 42 ]]
