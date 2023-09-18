@@ -1342,6 +1342,8 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
             auto res = nlohmann::json::object();
             res["storePath"] = store->printStorePath(tree.storePath);
             res["hash"] = hash.to_string(SRI, true);
+            res["original"] = fetchers::attrsToJSON(resolvedRef.toAttrs());
+            res["locked"] = fetchers::attrsToJSON(lockedRef.toAttrs());
             logger->cout(res.dump());
         } else {
             notice("Downloaded '%s' to '%s' (hash '%s').",
