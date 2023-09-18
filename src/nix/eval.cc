@@ -72,6 +72,11 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
             v = vRes;
         }
 
+        auto autoArgs = getAutoArgs(*state);
+        auto valPost = state->allocValue();
+        state->autoCallFunction(*autoArgs, *v, *valPost);
+        v = valPost;
+
         if (writeTo) {
             stopProgressBar();
 
