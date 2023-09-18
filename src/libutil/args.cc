@@ -351,6 +351,7 @@ std::optional<ExperimentalFeature> Command::experimentalFeature ()
 MultiCommand::MultiCommand(const Commands & commands_)
     : commands(commands_)
 {
+    // Subcommand aliases
     std::map<std::string, std::string> aliases = {
         {"ping", "info"}
     };
@@ -362,6 +363,9 @@ MultiCommand::MultiCommand(const Commands & commands_)
             assert(!command);
             auto i = commands.find(s);
             if (i == commands.end()) {
+                // If no command under commands matches the subcommand s,
+                // then check if any alias exist for it.  If so, then run the
+                // command with alias
                 auto alias = aliases.find(s);
                 std::string alias_name = alias->second;
                 auto alias_command = commands.find(alias_name);
