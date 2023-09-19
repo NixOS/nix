@@ -34,16 +34,16 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1693494129,
-        "narHash": "sha256-YrHlSbniFmhcz0ORe8MMFttifKR4hTRzyX2OQUO9VxA=",
-        "owner": "NixOS",
+        "lastModified": 1695124524,
+        "narHash": "sha256-trXDytVCqf3KryQQQrHOZKUabu1/lB8/ndOAuZKQrOE=",
+        "owner": "edolstra",
         "repo": "nixpkgs",
-        "rev": "22a584b861ab31a2dca52121999079832f0e0f73",
+        "rev": "a3d30b525535e3158221abc1a957ce798ab159fe",
         "type": "github"
       },
       "original": {
-        "owner": "NixOS",
-        "ref": "nixos-23.05-small",
+        "owner": "edolstra",
+        "ref": "fix-aws-sdk-cpp",
         "repo": "nixpkgs",
         "type": "github"
       }
