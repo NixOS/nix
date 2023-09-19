@@ -588,6 +588,8 @@
             lcovFilter = [ "*/boost/*" "*-tab.*" ];
 
             hardeningDisable = ["fortify"];
+
+            NIX_CFLAGS_COMPILE = "-DCOVERAGE=1";
           };
 
         # API docs for Nix's unstable internal C++ interfaces.

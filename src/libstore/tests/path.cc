@@ -134,6 +134,8 @@ Gen<StorePath> Arbitrary<StorePath>::arbitrary()
 
 namespace nix {
 
+#ifndef COVERAGE
+
 RC_GTEST_FIXTURE_PROP(
     StorePathTest,
     prop_regex_accept,
@@ -149,5 +151,7 @@ RC_GTEST_FIXTURE_PROP(
 {
     RC_ASSERT(p == store->parseStorePath(store->printStorePath(p)));
 }
+
+#endif
 
 }

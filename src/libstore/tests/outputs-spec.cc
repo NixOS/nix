@@ -224,6 +224,8 @@ Gen<OutputsSpec> Arbitrary<OutputsSpec>::arbitrary()
 
 namespace nix {
 
+#ifndef COVERAGE
+
 RC_GTEST_PROP(
     OutputsSpec,
     prop_round_rip,
@@ -231,5 +233,7 @@ RC_GTEST_PROP(
 {
     RC_ASSERT(o == OutputsSpec::parse(o.to_string()));
 }
+
+#endif
 
 }
