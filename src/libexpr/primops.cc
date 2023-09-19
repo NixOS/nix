@@ -1252,15 +1252,13 @@ drvName, Bindings * attrs, Value & v)
                 state.store->computeFSClosure(d.drvPath, refs);
                 for (auto & j : refs) {
                     drv.inputSrcs.insert(j);
-                    if (j.isDerivation())
-                        drv.inputDrvs[j] = state.store->readDerivation(j).outputNames();
+                    if (j.isDerivation()) {
+                        drv.inputDrvs.map[j].value = state.store->readDerivation(j).outputNames();
+                    }
                 }
             },
             [&](const NixStringContextElem::Built & b) {
-                if (auto * p = std::get_if<DerivedPath::Opaque>(&*b.drvPath))
-                    drv.inputDrvs[p->path].insert(b.output);
-                else
-                    throw UnimplementedError("Dependencies on the outputs of dynamic derivations are not yet supported");
+                drv.inputDrvs.ensureSlot(*b.drvPath).value.insert(b.output);
             },
             [&](const NixStringContextElem::Opaque & o) {
                 drv.inputSrcs.insert(o.path);
@@ -1520,15 +1518,25 @@ static RegisterPrimOp primop_storePath({
 
 static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    auto & arg = *args[0];
+
     /* We don’t check the path right now, because we don’t want to
        throw if the path isn’t allowed, but just return false (and we
        can’t just catch the exception here because we still want to
-       throw if something in the evaluation of `*args[0]` tries to
+       throw if something in the evaluation of `arg` tries to
        access an unauthorized path). */
-    auto path = realisePath(state, pos, *args[0], { .checkForPureEval = false });
+    auto path = realisePath(state, pos, arg, { .checkForPureEval = false });
+
+    /* SourcePath doesn't know about trailing slash. */
+    auto mustBeDir = arg.type() == nString && arg.str().ends_with("/");
 
     try {
-        v.mkBool(state.checkSourcePath(path).pathExists());
+        auto checked = state.checkSourcePath(path);
+        auto exists = checked.pathExists();
+        if (exists && mustBeDir) {
+            exists = checked.lstat().type == InputAccessor::tDirectory;
+        }
+        v.mkBool(exists);
     } catch (SysError & e) {
         /* Don't give away info from errors while canonicalising
            ‘path’ in restricted mode. */

@@ -406,8 +406,22 @@ static void main_nix_build(int argc, char * * argv)
             }
         }
 
+        std::function<void(ref<SingleDerivedPath>, const DerivedPathMap<StringSet>::ChildNode &)> accumDerivedPath;
+
+        accumDerivedPath = [&](ref<SingleDerivedPath> inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
+            if (!inputNode.value.empty())
+                pathsToBuild.push_back(DerivedPath::Built {
+                    .drvPath = inputDrv,
+                    .outputs = OutputsSpec::Names { inputNode.value },
+                });
+            for (const auto & [outputName, childNode] : inputNode.childMap)
+                accumDerivedPath(
+                    make_ref<SingleDerivedPath>(SingleDerivedPath::Built { inputDrv, outputName }),
+                    childNode);
+        };
+
         // Build or fetch all dependencies of the derivation.
-        for (const auto & [inputDrv0, inputOutputs] : drv.inputDrvs) {
+        for (const auto & [inputDrv0, inputNode] : drv.inputDrvs.map) {
             // To get around lambda capturing restrictions in the
             // standard.
             const auto & inputDrv = inputDrv0;
@@ -416,10 +430,7 @@ static void main_nix_build(int argc, char * * argv)
                         return !std::regex_search(store->printStorePath(inputDrv), std::regex(exclude));
                     }))
             {
-                pathsToBuild.push_back(DerivedPath::Built {
-                    .drvPath = makeConstantStorePathRef(inputDrv),
-                    .outputs = OutputsSpec::Names { inputOutputs },
-                });
+                accumDerivedPath(makeConstantStorePathRef(inputDrv), inputNode);
                 pathsToCopy.insert(inputDrv);
             }
         }
@@ -482,13 +493,21 @@ static void main_nix_build(int argc, char * * argv)
 
         if (env.count("__json")) {
             StorePathSet inputs;
-            for (auto & [depDrvPath, wantedDepOutputs] : drv.inputDrvs) {
-                auto outputs = evalStore->queryPartialDerivationOutputMap(depDrvPath);
-                for (auto & i : wantedDepOutputs) {
+
+            std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumInputClosure;
+
+            accumInputClosure = [&](const StorePath & inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
+                auto outputs = evalStore->queryPartialDerivationOutputMap(inputDrv);
+                for (auto & i : inputNode.value) {
                     auto o = outputs.at(i);
                     store->computeFSClosure(*o, inputs);
                 }
-            }
+                for (const auto & [outputName, childNode] : inputNode.childMap)
+                    accumInputClosure(*outputs.at(outputName), childNode);
+            };
+
+            for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
+                accumInputClosure(inputDrv, inputNode);
 
             ParsedDerivation parsedDrv(drvInfo.requireDrvPath(), drv);
 

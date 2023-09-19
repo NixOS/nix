@@ -9,6 +9,8 @@ struct SingleBuiltPathBuilt {
     ref<SingleBuiltPath> drvPath;
     std::pair<std::string, StorePath> output;
 
+    SingleDerivedPathBuilt discardOutputPath() const;
+
     std::string to_string(const Store & store) const;
     static SingleBuiltPathBuilt parse(const Store & store, std::string_view, std::string_view);
     nlohmann::json toJSON(const Store & store) const;
@@ -33,6 +35,8 @@ struct SingleBuiltPath : _SingleBuiltPathRaw {
     }
 
     StorePath outPath() const;
+
+    SingleDerivedPath discardOutputPath() const;
 
     static SingleBuiltPath parse(const Store & store, std::string_view);
     nlohmann::json toJSON(const Store & store) const;

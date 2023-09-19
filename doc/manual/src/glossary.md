@@ -33,7 +33,7 @@
 
   Ensure a [store path] is [valid][validity].
 
-  This means either running the `builder` executable as specified in the corresponding [derivation] or fetching a pre-built [store object] from a [substituter].
+  This means either running the [`builder`](@docroot@/language/derivations.md#attr-builder) executable as specified in the corresponding [derivation], or fetching a pre-built [store object] from a [substituter], or delegating to a [remote builder](@docroot@/advanced-topics/distributed-builds.html) and retrieving the outputs. <!-- TODO: link [running] to build process page, #8888 -->
 
   See [`nix-build`](./command-ref/nix-build.md) and [`nix-store --realise`](@docroot@/command-ref/nix-store/realise.md).
 
@@ -197,9 +197,15 @@
 
   [closure]: #gloss-closure
 
+- [output]{#gloss-output}
+
+  A [store object] produced by a [derivation].
+
+  [output]: #gloss-output
+
 - [output path]{#gloss-output-path}
 
-  A [store path] produced by a [derivation].
+  The [store path] to the [output] of a [derivation].
 
   [output path]: #gloss-output-path
 

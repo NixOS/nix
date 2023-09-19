@@ -30,7 +30,7 @@ a number of possible ways:
     derivation with the highest *priority* is used. A derivation can
     define a priority by declaring the `meta.priority` attribute. This
     attribute should be a number, with a higher value denoting a lower
-    priority. The default priority is `0`.
+    priority. The default priority is `5`.
 
     If there are multiple matching derivations with the same priority,
     then the derivation with the highest version will be installed.
