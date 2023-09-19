@@ -390,82 +390,14 @@ std::pair<Path, std::string> getLocalRepoContainingRevision(const std::string gi
 	return {absPath(repoDir), treeHash};
 }
 
-struct RepoFile {
-	std::string content;
-	std::string pathInRepo;
-	bool executable;
-	bool symLink;
-};
-
-/// Get a list of all files in a git repo at a specific revision.
-///
-/// @param repoDir A path to a git repo. If dirty is unset it can also be a bar git repo
-/// @param revision A git revision. Usually a commit hash.
-/// @return A list of all files in the repo at the revision with content and metadata.
-std::vector<RepoFile> getRepoFiles(const Path &gitDir, const std::string &revision) {
-	std::vector<RepoFile> result = {};
-
-	auto output = runProgram(
-		"git", true,
-		Strings{"-C", gitDir, "ls-tree", "-r", "-z", "--full-tree", "--format", "%(objectmode)\x09%(objecttype)\x09%(objectname)\x09%(path)", revision},
-		std::nullopt, true);
-	auto lines = tokenizeString<std::set<std::string>>(output, "\0"s);
-
-	for (auto line : lines) {
-		auto words = tokenizeString<std::vector<std::string>>(line, "\x09"s);
-		if (words.size() != 4) {
-			throw Error("failed to parse git ls-tree output. The following line does not consist of four entries: %s", line);
-		}
-		auto mode = words[0];
-		auto type = words[1];
-		auto blobHash = words[2];
-		auto path = words[3];
-
-		if (type != "blob") {
-			// There should be only blobs except for submodules which are commits or trees.
-			// We are not interested in submodules here.
-			continue;
-		}
-
-		auto executable = mode == "100755";
-		auto regular = mode == "100644";
-		auto symlink = mode == "120000";
-		if (!executable && !regular && !symlink) {
-			throw Error("failed to parse git ls-tree output. Git only supports three modes ('100755', '100644' and '120000'), but we got '%s'", mode);
-		}
-
-		auto content = runProgram("git", true, {"-C", gitDir, "cat-file", "blob", std::string(blobHash)});
-		result.emplace_back(RepoFile{content, std::string(path), executable, symlink});
-	}
-
-	return result;
-}
-
 /// Copy all files from at a specific revision in a git repo to a target directory
 ///
 /// @param gitDir A path to a git working tree
 /// @param targetDir The tree will be placed here
 /// @param revision The revision that will get copied
 void copyAllFilesFromRevision(const Path &gitDir, const Path &targetDir, const std::string &revision) {
-	auto allFiles = getRepoFiles(gitDir, revision);
-
-	// Copy all files to the targetDir
-	// FIXME: There is probably a more efficient way to do this
-	for (auto file : allFiles) {
-		auto target = targetDir + "/" + file.pathInRepo;
-		createDirs(dirOf(target));
-		if (file.symLink) {
-			std::filesystem::create_symlink(file.content, target);
-			continue;
-		}
-		writeFile(target, file.content);
-		auto regularPermissions =
-			std::filesystem::perms::owner_read | std::filesystem::perms::owner_write | std::filesystem::perms::group_read | std::filesystem::perms::others_read;
-		auto executablePermissions =
-			regularPermissions | std::filesystem::perms::owner_exec | std::filesystem::perms::group_exec | std::filesystem::perms::others_exec;
-		auto permissions = file.executable ? executablePermissions : regularPermissions;
-		std::filesystem::permissions(target, permissions);
-	}
+    auto source = sinkToSource([&](Sink &sink) { runProgram2({.program = "git", .args = {"-C", gitDir, "archive", revision}, .standardOut = &sink}); });
+	unpackTarfile(*source, targetDir);
 }
 
 /// Place the tree of a git repo at a given revision at a given path
