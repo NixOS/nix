@@ -25,6 +25,16 @@ using namespace std::string_literals;
 // BUG:
 //   fetchGit { url = "local"; ref = "abbreviated tag"} works but
 //   fetchGit { url = "remote"; ref = "abbreviated tag"} does not work
+//
+// Checklist:
+// - Caching between commits works (when fetching a commit with already fetched ancestors only the missing commits are fetched).
+// - Compared performance to previous implementation
+// - Dirty local, local and remote repos behave the same way.
+// - All three layers of caching respect the correct expiration.
+// - shallow works
+// - submodules works
+// - Documentation is updated
+// - Debug prints are removed
 
 namespace nix::fetchers {
 
@@ -345,8 +355,11 @@ Path fetchRevisionIntoCache(const std::string gitUrl, const std::string revision
 	PathLocks cacheDirLock({repoDir + ".lock"});
 	try {
 		// Fetch the revision into the local repo
-		runProgram("git", true, {"-C", repoDir, "fetch", "--no-tags", "--quiet", "--", gitUrl, revision}, {}, true);
-	} catch (Error &e) {
+        // When using `git fetch` git tries to detect which revisions we already have and only fetch the ones we dont have. However git only considers revisions that are the ancestor of a reference. We want that git considers every revision we already have. By creating a reference for every revision when we fetch it we can be sure that every revision we have locally is a ancestor of a reference.
+        // This is not optimal as we do not remove a reference if we later get a reference to their children. This could lead to a lot of unnecessary references but that is probably not a real problem.
+        std::string const referencesForRevisionsPrefix = "refs/__nix_refs_for_revs/" ;
+		runProgram("git", true, {"-C", repoDir, "-c", "fetch.negotiationAlgorithm=consecutive", "fetch", "--no-tags", "--recurse-submodules=no","--quiet", "--no-write-fetch-head", "--", gitUrl, revision + ":" + referencesForRevisionsPrefix + revision}, {}, true);
+    } catch (Error &e) {
 		// Failing the fetch is always fatal. We do not want to continue with a partial repo.
 		throw Error("failed to fetch revision '%s' from '%s'", revision, gitUrl);
 	}
@@ -632,7 +645,6 @@ struct GitInputScheme : InputScheme
 		auto cacheType = std::string("git") + (shallow ? "-shallow" : "") + (submodules ? "-submodules" : "");
 		if (!allowDirty) {
 			if (auto res = getCache()->lookup(store, Attrs({{"name", name}, {"type", cacheType}, {"url", actualUrl}, {"rev", revision}}))) {
-				warn("CACHED RESULT");
 				return makeResult(input, std::move(res->second), res->first, revision, shallow, false);
 			}
 		}
