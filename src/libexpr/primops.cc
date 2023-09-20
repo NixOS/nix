@@ -70,7 +70,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
                 res.insert_or_assign(ctxS, ctxS);
                 ensureValid(d.drvPath);
             },
-        }, c.raw());
+        }, c.raw);
     }
 
     if (drvs.empty()) return {};
@@ -1254,20 +1254,18 @@ drvName, Bindings * attrs, Value & v)
                 state.store->computeFSClosure(d.drvPath, refs);
                 for (auto & j : refs) {
                     drv.inputSrcs.insert(j);
-                    if (j.isDerivation())
-                        drv.inputDrvs[j] = state.store->readDerivation(j).outputNames();
+                    if (j.isDerivation()) {
+                        drv.inputDrvs.map[j].value = state.store->readDerivation(j).outputNames();
+                    }
                 }
             },
             [&](const NixStringContextElem::Built & b) {
-                if (auto * p = std::get_if<DerivedPath::Opaque>(&*b.drvPath))
-                    drv.inputDrvs[p->path].insert(b.output);
-                else
-                    throw UnimplementedError("Dependencies on the outputs of dynamic derivations are not yet supported");
+                drv.inputDrvs.ensureSlot(*b.drvPath).value.insert(b.output);
             },
             [&](const NixStringContextElem::Opaque & o) {
                 drv.inputSrcs.insert(o.path);
             },
-        }, c.raw());
+        }, c.raw);
     }
 
     /* Do we have all required attributes? */
@@ -1336,13 +1334,13 @@ drvName, Bindings * attrs, Value & v)
             if (isImpure)
                 drv.outputs.insert_or_assign(i,
                     DerivationOutput::Impure {
-                        .method = method.raw,
+                        .method = method,
                         .hashType = ht,
                     });
             else
                 drv.outputs.insert_or_assign(i,
                     DerivationOutput::CAFloating {
-                        .method = method.raw,
+                        .method = method,
                         .hashType = ht,
                     });
         }
@@ -1375,7 +1373,7 @@ drvName, Bindings * attrs, Value & v)
                 drv.env[i] = state.store->printStorePath(outPath);
                 drv.outputs.insert_or_assign(
                     i,
-                    DerivationOutputInputAddressed {
+                    DerivationOutput::InputAddressed {
                         .path = std::move(outPath),
                     });
             }
@@ -1383,7 +1381,7 @@ drvName, Bindings * attrs, Value & v)
             ;
         case DrvHash::Kind::Deferred:
             for (auto & i : outputs) {
-                drv.outputs.insert_or_assign(i, DerivationOutputDeferred {});
+                drv.outputs.insert_or_assign(i, DerivationOutput::Deferred {});
             }
         }
     }
@@ -1524,15 +1522,24 @@ static RegisterPrimOp primop_storePath({
 
 static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    auto & arg = *args[0];
+
     /* We don’t check the path right now, because we don’t want to
        throw if the path isn’t allowed, but just return false (and we
        can’t just catch the exception here because we still want to
-       throw if something in the evaluation of `*args[0]` tries to
+       throw if something in the evaluation of `arg` tries to
        access an unauthorized path). */
-    auto path = realisePath(state, pos, *args[0], { .checkForPureEval = false });
+    auto path = realisePath(state, pos, arg, { .checkForPureEval = false });
+
+    /* SourcePath doesn't know about trailing slash. */
+    auto mustBeDir = arg.type() == nString && arg.str().ends_with("/");
 
     try {
-        v.mkBool(path.pathExists());
+        auto exists = path.pathExists();
+        if (exists && mustBeDir) {
+            exists = path.lstat().type == InputAccessor::tDirectory;
+        }
+        v.mkBool(exists);
     } catch (SysError & e) {
         /* Don't give away info from errors while canonicalising
            ‘path’ in restricted mode. */
@@ -1849,7 +1856,7 @@ static void prim_outputOf(EvalState & state, const PosIdx pos, Value * * args, V
 {
     SingleDerivedPath drvPath = state.coerceToSingleDerivedPath(pos, *args[0], "while evaluating the first argument to builtins.outputOf");
 
-    std::string_view outputName = state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument to builtins.outputOf");
+    OutputNameView outputName = state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument to builtins.outputOf");
 
     state.mkSingleDerivedPathString(
         SingleDerivedPath::Built {
@@ -2060,7 +2067,7 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Val
     StorePathSet refs;
 
     for (auto c : context) {
-        if (auto p = std::get_if<NixStringContextElem::Opaque>(&c))
+        if (auto p = std::get_if<NixStringContextElem::Opaque>(&c.raw))
             refs.insert(p->path);
         else
             state.debugThrowLastTrace(EvalError({

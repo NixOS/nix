@@ -17,7 +17,7 @@ the attributes of which specify the inputs of the build.
     string. This is used as a symbolic name for the package by
     `nix-env`, and it is appended to the output paths of the derivation.
 
-  - There must be an attribute named `builder` that identifies the
+  - There must be an attribute named [`builder`]{#attr-builder} that identifies the
     program that is executed to perform the build. It can be either a
     derivation or a source (a local file reference, e.g.,
     `./builder.sh`).

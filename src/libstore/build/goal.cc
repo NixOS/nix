@@ -11,7 +11,7 @@ bool CompareGoalPtrs::operator() (const GoalPtr & a, const GoalPtr & b) const {
 }
 
 
-BuildResult Goal::getBuildResult(const DerivedPath & req) {
+BuildResult Goal::getBuildResult(const DerivedPath & req) const {
     BuildResult res { buildResult };
 
     if (auto pbp = std::get_if<DerivedPath::Built>(&req)) {

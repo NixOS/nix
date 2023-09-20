@@ -1,7 +1,8 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.11-small";
+  #inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05-small";
+  inputs.nixpkgs.url = "github:edolstra/nixpkgs/fix-aws-sdk-cpp";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
@@ -19,10 +20,12 @@
         then ""
         else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
 
+      linux32BitSystems = [ "i686-linux" ];
       linux64BitSystems = [ "x86_64-linux" "aarch64-linux" ];
-      linuxSystems = linux64BitSystems ++ [ "i686-linux" ];
-      systems = linuxSystems ++ [ "x86_64-darwin" "aarch64-darwin" ];
-
+      linuxSystems = linux32BitSystems ++ linux64BitSystems;
+      darwinSystems = [ "x86_64-darwin" "aarch64-darwin" ];
+      systems = linuxSystems ++ darwinSystems;
+      
       crossSystems = [ "armv6l-linux" "armv7l-linux" ];
 
       stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" "ccacheStdenv" ];
@@ -40,6 +43,52 @@
             })
             stdenvs);
 
+      # Experimental fileset library: https://github.com/NixOS/nixpkgs/pull/222981
+      # Not an "idiomatic" flake input because:
+      #  - Propagation to dependent locks: https://github.com/NixOS/nix/issues/7730
+      #  - Subflake would download redundant and huge parent flake
+      #  - No git tree hash support: https://github.com/NixOS/nix/issues/6044
+      inherit (import (builtins.fetchTarball { url = "https://github.com/NixOS/nix/archive/1bdcd7fc8a6a40b2e805bad759b36e64e911036b.tar.gz"; sha256 = "sha256:14ljlpdsp4x7h1fkhbmc4bd3vsqnx8zdql4h3037wh09ad6a0893"; }))
+        fileset;
+
+      baseFiles =
+        # .gitignore has already been processed, so any changes in it are irrelevant
+        # at this point. It is not represented verbatim for test purposes because
+        # that would interfere with repo semantics.
+        fileset.fileFilter (f: f.name != ".gitignore") ./.;
+
+      nixSrc = fileset.toSource {
+        root = ./.;
+        fileset = fileset.intersect baseFiles (
+          fileset.difference
+            (fileset.unions [
+              ./.version
+              ./boehmgc-coroutine-sp-fallback.diff
+              ./bootstrap.sh
+              ./configure.ac
+              ./doc
+              ./local.mk
+              ./m4
+              ./Makefile
+              ./Makefile.config.in
+              ./misc
+              ./mk
+              ./precompiled-headers.h
+              ./src
+              ./tests
+              ./COPYING
+              ./scripts/local.mk
+              (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
+              # TODO: do we really need README.md? It doesn't seem used in the build.
+              ./README.md
+            ])
+            (fileset.unions [
+              # Removed file sets
+              ./tests/nixos
+              ./tests/installer
+            ])
+        );
+      };
 
       # Memoize nixpkgs for different platforms for efficiency.
       nixpkgsFor = forAllSystems
@@ -210,7 +259,7 @@
             "-${client.version}-against-${daemon.version}";
         inherit version;
 
-        src = self;
+        src = nixSrc;
 
         VERSION_SUFFIX = versionSuffix;
 
@@ -321,18 +370,11 @@
           };
           let
             canRunInstalled = currentStdenv.buildPlatform.canExecute currentStdenv.hostPlatform;
-
-            sourceByRegexInverted = rxs: origSrc: final.lib.cleanSourceWith {
-              filter = (path: type:
-                let relPath = final.lib.removePrefix (toString origSrc + "/") (toString path);
-                in ! lib.any (re: builtins.match re relPath != null) rxs);
-              src = origSrc;
-            };
           in currentStdenv.mkDerivation (finalAttrs: {
             name = "nix-${version}";
             inherit version;
 
-            src = sourceByRegexInverted [ "tests/nixos/.*" "tests/installer/.*" ] self;
+            src = nixSrc;
             VERSION_SUFFIX = versionSuffix;
 
             outputs = [ "out" "dev" "doc" ];
@@ -530,7 +572,7 @@
           releaseTools.coverageAnalysis {
             name = "nix-coverage-${version}";
 
-            src = self;
+            src = nixSrc;
 
             configureFlags = testConfigureFlags;
 
@@ -547,6 +589,8 @@
             lcovFilter = [ "*/boost/*" "*-tab.*" ];
 
             hardeningDisable = ["fortify"];
+
+            NIX_CFLAGS_COMPILE = "-DCOVERAGE=1";
           };
 
         # API docs for Nix's unstable internal C++ interfaces.
@@ -558,7 +602,7 @@
             pname = "nix-internal-api-docs";
             inherit version;
 
-            src = self;
+            src = nixSrc;
 
             configureFlags = testConfigureFlags ++ internalApiDocsConfigureFlags;
 
@@ -616,7 +660,9 @@
         tests.nixpkgsLibTests =
           forAllSystems (system:
             import (nixpkgs + "/lib/tests/release.nix")
-              { pkgs = nixpkgsFor.${system}.native; }
+              { pkgs = nixpkgsFor.${system}.native;
+                nixVersions = [ self.packages.${system}.nix ];
+              }
           );
 
         metrics.nixpkgs = import "${nixpkgs-regression}/pkgs/top-level/metrics.nix" {

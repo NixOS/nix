@@ -13,14 +13,14 @@ nix --experimental-features 'nix-command' eval --impure  --expr \
 # the future so it does work, but there are some design questions to
 # resolve first. Adding a test so we don't liberalise it by accident.
 expectStderr 1 nix --experimental-features 'nix-command dynamic-derivations' eval --impure --expr \
-    'builtins.outputOf (import ../dependencies.nix) "out"' \
+    'builtins.outputOf (import ../dependencies.nix {}) "out"' \
     | grepQuiet "value is a set while a string was expected"
 
 # Test that "DrvDeep" string contexts are not supported at this time
 #
 # Like the above, this is a restriction we could relax later.
 expectStderr 1 nix --experimental-features 'nix-command dynamic-derivations' eval --impure --expr \
-    'builtins.outputOf (import ../dependencies.nix).drvPath "out"' \
+    'builtins.outputOf (import ../dependencies.nix {}).drvPath "out"' \
     | grepQuiet "has a context which refers to a complete source and binary closure. This is not supported at this time"
 
 # Test using `builtins.outputOf` with static derivations

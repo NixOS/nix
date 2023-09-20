@@ -547,7 +547,7 @@ struct CmdDevelop : Common, MixEnvironment
                 state,
                 std::move(nixpkgs),
                 "bashInteractive",
-                DefaultOutputs(),
+                ExtendedOutputsSpec::Default(),
                 Strings{},
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
                 nixpkgsLockFlags);

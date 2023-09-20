@@ -20,15 +20,22 @@ StringPairs resolveRewrites(
     const std::vector<BuiltPathWithResult> & dependencies)
 {
     StringPairs res;
-    for (auto & dep : dependencies)
-        if (auto drvDep = std::get_if<BuiltPathBuilt>(&dep.path))
-            if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
-                for (auto & [ outputName, outputPath ] : drvDep->outputs)
+    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
+        for (auto & dep : dependencies) {
+            if (auto drvDep = std::get_if<BuiltPathBuilt>(&dep.path)) {
+                for (auto & [ outputName, outputPath ] : drvDep->outputs) {
                     res.emplace(
-                        DownstreamPlaceholder::unknownCaOutput(
-                            drvDep->drvPath->outPath(), outputName).render(),
+                        DownstreamPlaceholder::fromSingleDerivedPathBuilt(
+                            SingleDerivedPath::Built {
+                                .drvPath = make_ref<SingleDerivedPath>(drvDep->drvPath->discardOutputPath()),
+                                .output = outputName,
+                            }).render(),
                         store.printStorePath(outputPath)
                     );
+                }
+            }
+        }
+    }
     return res;
 }
 
@@ -81,7 +88,7 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
                         .path = o.path,
                     };
                 },
-            }, c.raw()));
+            }, c.raw));
         }
 
         return UnresolvedApp{App {

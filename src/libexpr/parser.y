@@ -751,12 +751,6 @@ Expr * EvalState::parseStdin()
 }
 
 
-void EvalState::addToSearchPath(SearchPath::Elem && elem)
-{
-    searchPath.elements.emplace_back(std::move(elem));
-}
-
-
 SourcePath EvalState::findFile(const std::string_view path)
 {
     return findFile(searchPath, path);

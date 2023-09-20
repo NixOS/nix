@@ -461,7 +461,7 @@ Installables SourceExprCommand::parseInstallables(
             result.push_back(
                 make_ref<InstallableAttrPath>(
                     InstallableAttrPath::parse(
-                        state, *this, vFile, prefix, extendedOutputsSpec)));
+                        state, *this, vFile, std::move(prefix), std::move(extendedOutputsSpec))));
         }
 
     } else {
@@ -477,7 +477,7 @@ Installables SourceExprCommand::parseInstallables(
             if (prefix.find('/') != std::string::npos) {
                 try {
                     result.push_back(make_ref<InstallableDerivedPath>(
-                        InstallableDerivedPath::parse(store, prefix, extendedOutputsSpec)));
+                        InstallableDerivedPath::parse(store, prefix, extendedOutputsSpec.raw)));
                     continue;
                 } catch (BadStorePath &) {
                 } catch (...) {
@@ -493,7 +493,7 @@ Installables SourceExprCommand::parseInstallables(
                         getEvalState(),
                         std::move(flakeRef),
                         fragment,
-                        extendedOutputsSpec,
+                        std::move(extendedOutputsSpec),
                         getDefaultFlakeAttrPaths(),
                         getDefaultFlakeAttrPathPrefixes(),
                         lockFlags));
