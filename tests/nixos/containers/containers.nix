@@ -56,8 +56,8 @@
     host.fail("nix build -v --auto-allocate-uids --no-sandbox -L --offline --impure --file ${./id-test.nix} --argstr name id-test-6 --arg uidRange true")
 
     # Run systemd-nspawn in a Nix build.
-    #host.succeed("nix build -v --auto-allocate-uids --sandbox -L --offline --impure --file ${./systemd-nspawn.nix} --argstr nixpkgs ${nixpkgs}")
-    #host.succeed("[[ $(cat ./result/msg) = 'Hello World' ]]")
+    host.succeed("nix build -v --auto-allocate-uids --sandbox -L --offline --impure --file ${./systemd-nspawn.nix} --argstr nixpkgs ${nixpkgs}")
+    host.succeed("[[ $(cat ./result/msg) = 'Hello World' ]]")
   '';
 
 }
