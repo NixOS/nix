@@ -23,6 +23,10 @@ Information on additional installation methods is available on the [Nix download
 See our [Hacking guide](https://nixos.org/manual/nix/unstable/contributing/hacking.html) in our manual for instruction on how to
 to set up a development environment and build Nix from source.
 
+## Contributing
+
+Check the [contributing guide](./CONTRIBUTING.md) if you want to get involved with developing Nix.
+
 ## Additional Resources
 
 - [Nix manual](https://nixos.org/nix/manual)
