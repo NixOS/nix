@@ -381,27 +381,38 @@ static RegisterPrimOp primop_fetchGit({
 
       - `ref` (default: `HEAD`)
 
-        The [Git reference] under which to look for the requested revision.
-        This is often a branch or tag name.
+        The [Git reference] to fetch. Has no effect if `rev` is specified.
 
         [Git reference]: https://git-scm.com/book/en/v2/Git-Internals-Git-References
 
-        By default, the `ref` value is prefixed with `refs/heads/`.
-        As of 2.3.0, Nix will not prefix `refs/heads/` if `ref` starts with `refs/`.
+        The `ref` value is prefixed with `refs/heads/` except when it already start with `refs/` or is `HEAD`.
 
       - `submodules` (default: `false`)
 
-        A Boolean parameter that specifies whether submodules should be checked out.
+        A Boolean parameter that specifies whether [submodules] should be checked out.
+
+        [submodules]: https://git-scm.com/docs/gitsubmodules
 
       - `shallow` (default: `false`)
 
-        A Boolean parameter that specifies whether fetching a shallow clone is allowed.
+        A Boolean parameter that specifies whether to fetch as a [shallow commit].
+        This can significantly speed up the checkout of large repositories. If set
+        the output will not contain the `revCount` attribute.
 
-      - `allRefs`
+        [shallow commit]: https://git-scm.com/docs/shallow
 
-        Whether to fetch all references of the repository.
-        With this argument being true, it's possible to load a `rev` from *any* `ref`
-        (by default only `rev`s from the specified `ref` are supported).
+        Required if the source is a shallow repository.
+
+          > **Note**
+          >
+          > Setting this is almost always a good idea, as it significantly reduces
+          > the amount of data to fetch. The only two cases when you should not set
+          > this are when you fetch a lot of revisions in reverse order or when you
+          > need the `revCount` attribute on the output.
+
+      If the URL points to a local directory and no `ref` or `rev` is
+      given `fetchGit` will use the current state of the directory, which
+      will include modified tracked files and staged changes.
 
       Here are some examples of how to use `fetchGit`.
 
@@ -410,7 +421,6 @@ static RegisterPrimOp primop_fetchGit({
           ```nix
           builtins.fetchGit {
             url = "git@github.com:my-secret/repository.git";
-            ref = "master";
             rev = "adab8b916a45068c044658c4158d81878f9ed1c3";
           }
           ```
@@ -424,33 +434,7 @@ static RegisterPrimOp primop_fetchGit({
           }
           ```
 
-        - If the revision you're looking for is in the default branch of
-          the git repository you don't strictly need to specify the branch
-          name in the `ref` attribute.
-
-          However, if the revision you're looking for is in a future
-          branch for the non-default branch you will need to specify the
-          the `ref` attribute as well.
-
-          ```nix
-          builtins.fetchGit {
-            url = "https://github.com/nixos/nix.git";
-            rev = "841fcbd04755c7a2865c51c1e2d3b045976b7452";
-            ref = "1.11-maintenance";
-          }
-          ```
-
-          > **Note**
-          >
-          > It is nice to always specify the branch which a revision
-          > belongs to. Without the branch being specified, the fetcher
-          > might fail if the default branch changes. Additionally, it can
-          > be confusing to try a commit from a non-default branch and see
-          > the fetch fail. If the branch is specified the fault is much
-          > more obvious.
-
-        - If the revision you're looking for is in the default branch of
-          the git repository you may omit the `ref` attribute.
+        - To fetch a revision/commit:
 
           ```nix
           builtins.fetchGit {
@@ -486,11 +470,6 @@ static RegisterPrimOp primop_fetchGit({
           ```nix
           builtins.fetchGit ./work-dir
           ```
-
-      If the URL points to a local directory, and no `ref` or `rev` is
-      given, `fetchGit` will use the current content of the checked-out
-      files, even if they are not committed or added to Git's index. It will
-      only consider files added to the Git repository, as listed by `git ls-files`.
     )",
     .fun = prim_fetchGit,
 });

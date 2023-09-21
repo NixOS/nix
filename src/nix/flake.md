@@ -86,10 +86,16 @@ Here are some examples of flake references in their URL-like representation:
 * `git+https://github.com/NixOS/patchelf`: A Git repository.
 * `git+https://github.com/NixOS/patchelf?ref=master`: A specific
   branch of a Git repository.
-* `git+https://github.com/NixOS/patchelf?ref=master&rev=f34751b88bd07d7f44f5cd3200fb4122bf916c7e`:
-  A specific branch *and* revision of a Git repository.
+* `git+https://github.com/NixOS/patchelf?ref=refs/tags/0.18.0`:
+  A specific tag of a Git repository.
+* `git+https://github.com/NixOS/patchelf?rev=f34751b88bd07d7f44f5cd3200fb4122bf916c7e`:
+  A specific revision/commit of a Git repository.
 * `https://github.com/NixOS/patchelf/archive/master.tar.gz`: A tarball
   flake.
+* `git+file:///path/to/local/flake`:
+  A local Git repository at the current working tree
+* `git+file:///path/to/local/flake?ref=main`:
+  A local Git repository at a specific reference
 
 ## Path-like syntax
 
@@ -170,28 +176,24 @@ Currently the `type` attribute can be one of the following:
   They have the URL form
 
   ```
-  git(+http|+https|+ssh|+git|+file|):(//<server>)?<path>(\?<params>)?
+  git(+http|+https|+ssh|+file|):(//<server>)?<path>(\?<params>)?
   ```
 
   The `ref` attribute defaults to resolving the `HEAD` reference.
+  Has no effect if `rev` is specified.
 
-  The `rev` attribute must denote a commit that exists in the branch
-  or tag specified by the `ref` attribute, since Nix doesn't do a full
-  clone of the remote repository by default (and the Git protocol
-  doesn't allow fetching a `rev` without a known `ref`). The default
+  The `rev` attribute denotes a commit/revision. The default
   is the commit currently pointed to by `ref`.
 
-  When `git+file` is used without specifying `ref` or `rev`, files are
-  fetched directly from the local `path` as long as they have been added
-  to the Git repository. If there are uncommitted changes, the reference
-  is treated as dirty and a warning is printed.
+  When `git+file` is used without specifying `ref` and `rev` and the repository includes modified tracked files or
+  staged changes, the dirty state of the repository including will be used and a warning will be printed.
 
   For example, the following are valid Git flake references:
 
   * `git+https://example.org/my/repo`
   * `git+https://example.org/my/repo?dir=flake1`
   * `git+ssh://git@github.com/NixOS/nix?ref=v1.2.3`
-  * `git://github.com/edolstra/dwarffs?ref=unstable&rev=e486d8d40e626a20e06d792db8cc5ac5aba9a5b4`
+  * `git://github.com/edolstra/dwarffs&rev=e486d8d40e626a20e06d792db8cc5ac5aba9a5b4`
   * `git+file:///home/my-user/some-repo/some-repo`
 
 * `mercurial`: Mercurial repositories. The URL form is similar to the
