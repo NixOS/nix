@@ -105,6 +105,7 @@
 - [Contributing](contributing/contributing.md)
   - [Hacking](contributing/hacking.md)
   - [Testing](contributing/testing.md)
+  - [Documentation](contributing/documentation.md)
   - [Experimental Features](contributing/experimental-features.md)
   - [CLI guideline](contributing/cli-guideline.md)
   - [C++ style guide](contributing/cxx.md)

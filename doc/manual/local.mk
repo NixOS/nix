@@ -173,6 +173,10 @@ doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
 	done
 	@touch $@
 
+# the `! -name 'contributing.md'` filter excludes the one place where
+# `@docroot@` is to be preserved for documenting the mechanism
+# FIXME: maybe contributing guides should live right next to the code
+# instead of in the manual
 $(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md $(d)/src/command-ref/conf-file.md $(d)/src/language/builtins.md $(d)/src/language/builtin-constants.md
 	$(trace-gen) \
 		tmp="$$(mktemp -d)"; \
@@ -180,7 +184,7 @@ $(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/
 		find "$$tmp" -name '*.md' | while read -r file; do \
 			$(call process-includes,$$file,$$file); \
 		done; \
-		find "$$tmp" -name '*.md' | while read -r file; do \
+		find "$$tmp" -name '*.md' ! -name 'documentation.md' | while read -r file; do \
 			docroot="$$(realpath --relative-to="$$(dirname "$$file")" $$tmp/manual/src)"; \
 			sed -i "s,@docroot@,$$docroot,g" "$$file"; \
 		done; \
