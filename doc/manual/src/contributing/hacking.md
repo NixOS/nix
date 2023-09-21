@@ -271,17 +271,3 @@ or inside a `nix develop` shell by running:
 # make internal-api-html
 # xdg-open ./outputs/doc/share/doc/nix/internal-api/html/index.html
 ```
-
-## Coverage analysis
-
-A coverage analysis report is [available
-online](https://hydra.nixos.org/job/nix/master/coverage/latest/download-by-type/report/coverage). You
-can build it yourself:
-
-```
-# nix build .#hydraJobs.coverage
-# xdg-open ./result/coverage/index.html
-```
-
-Metrics about the change in line/function coverage over time are also
-[available](https://hydra.nixos.org/job/nix/master/coverage#tabs-charts).

@@ -1,5 +1,19 @@
 # Running tests
 
+## Coverage analysis
+
+A [coverage analysis report] is available online
+You can build it yourself:
+
+[coverage analysis report]: https://hydra.nixos.org/job/nix/master/coverage/latest/download-by-type/report/coverage
+
+```
+# nix build .#hydraJobs.coverage
+# xdg-open ./result/coverage/index.html
+```
+
+[Extensive records of build metrics](https://hydra.nixos.org/job/nix/master/coverage#tabs-charts), such as test coverage over time, are also available online.
+
 ## Unit-tests
 
 The unit-tests for each Nix library (`libexpr`, `libstore`, etc..) are defined
