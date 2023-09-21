@@ -43,6 +43,13 @@ using namespace std::string_literals;
 //   config files that var can be specified multiple times for multiple helpers, I am not sure how it behaves
 //   as a flag. Also not sure if this would make it harder to switch to gitoxide or libgit2 at some point.
 // - fixes: 7209: Adjusts documentation with correct default value for name.
+// - 7195: Trouble with inconsistencies between dirty local, submodule and remote repos. Apparently `git archive`
+//   behaves slightly different to `git clone` because it does not contain things with export-ignore in gitattributes.
+//   Previously clone-like behaviour was used for submodules and dirty local repos and archive-like behavior for
+//   everything else. This PR unifies everything to archive like behavior.
+// - 5863: Wants a spinner for cloning
+// - 5313: Related to 7195 I think. Maybe some transformations are applied in git archive and not in git clone
+//   or vice-versa
 //
 // BUG:
 //   fetchGit { url = "local"; ref = "abbreviated tag"} works but
@@ -58,6 +65,7 @@ using namespace std::string_literals;
 // - [ ] Documentation is updated
 // - [ ] Debug prints are removed
 // - [ ] Caching behaviour is documented
+// - [ ] Remove this comment and open a PR
 //
 // Ideas:
 // - We could significantly speed up the cloning of large repos by only using sparse checkouts. I only see two problems with that:
