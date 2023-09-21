@@ -171,7 +171,7 @@ constexpr std::array<ExperimentalFeatureDetails, 14> xpFeatureDetails = {{
         .name = "auto-allocate-uids",
         .description = R"(
             Allows Nix to automatically pick UIDs for builds, rather than creating
-            `nixbld*` user accounts. See the [`auto-allocate-uids`](#conf-auto-allocate-uids) setting for details.
+            `nixbld*` user accounts. See the [`auto-allocate-uids`](@docroot@/command-ref/conf-file.md#conf-auto-allocate-uids) setting for details.
         )",
     },
     {
@@ -179,7 +179,7 @@ constexpr std::array<ExperimentalFeatureDetails, 14> xpFeatureDetails = {{
         .name = "cgroups",
         .description = R"(
             Allows Nix to execute builds inside cgroups. See
-            the [`use-cgroups`](#conf-use-cgroups) setting for details.
+            the [`use-cgroups`](@docroot@/command-ref/conf-file.md#conf-use-cgroups) setting for details.
         )",
     },
     {
