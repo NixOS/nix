@@ -22,19 +22,27 @@ using namespace std::string_literals;
 // A bit slower for local repositories
 // A lot faster for remote repositories
 //
+// fixes: 8134 by fixing support for shallow fetches
+//
 // BUG:
 //   fetchGit { url = "local"; ref = "abbreviated tag"} works but
 //   fetchGit { url = "remote"; ref = "abbreviated tag"} does not work
 //
 // Checklist:
-// - Caching between commits works (when fetching a commit with already fetched ancestors only the missing commits are fetched).
-// - Compared performance to previous implementation
-// - Dirty local, local and remote repos behave the same way.
-// - All three layers of caching respect the correct expiration.
-// - shallow works
-// - submodules works
-// - Documentation is updated
-// - Debug prints are removed
+// - [x] Caching between commits works (when fetching a commit with already fetched ancestors only the missing commits are fetched).
+// - [ ] Compared performance to previous implementation
+// - [x] Dirty local, local and remote repos behave the same way.
+// - [ ] All three layers of caching respect the correct expiration.
+// - [x] shallow repos works
+// - [x] submodules works
+// - [ ] Documentation is updated
+// - [ ] Debug prints are removed
+//
+// Ideas:
+// - We could significantly speed up the cloning of large repos by only using sparse checkouts. I only see two problems with that:
+//   1. Getting revCount
+//   2. Significantly more disk usage when fetching revisions in reverse order
+//   I currently think that the best way to do this is by having 2 local cache, one with only shallow commits, and one with only commits, but no content (--filter=tree:0). The second repo is only for calculating revCount.
 
 namespace nix::fetchers {
 
@@ -62,10 +70,13 @@ bool isCacheFileWithinTtl(const struct stat &st) {
 
 /// Get a path to a bare git repo in the nix git cache
 ///
-/// @param key A key that identifies the repo. Usually the URL.
+/// The shallow and the normal versions can not share
+///
+/// @param url The git url used as cache key.
+/// @param shallow The shallow versio
 /// @return The cache path. You should lock it before writing to it.
-Path getCachePath(std::string_view key) {
-	auto cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, key).to_string(Base32, false);
+Path getGitCachePath(std::string_view url, bool shallow = false) {
+	auto cacheDir = getCacheDir() + "/nix/gitv3/" + hashString(htSHA256, url).to_string(Base32, false) + (shallow ? "_shallow" : "");
 	// Create the repo if it does not exist
 	if (!pathExists(cacheDir)) {
 		createDirs(dirOf(cacheDir));
@@ -139,7 +150,7 @@ std::optional<std::string> resolveRevision(const Path &gitUrl, const std::string
 /// @param isLocal Skip the cache and look up directly in the local repository.
 /// @return The resolved revision and full reference. nullopt if the reference could not be resolved.
 std::string readRevisionCached(const std::string &gitUrl, const std::optional<std::string> &reference, bool isLocal) {
-	Path cacheDir = getCachePath(gitUrl);
+	Path cacheDir = getGitCachePath(gitUrl);
 
 	// TODO: Currently every input reference is treated as a /ref/heads reference if it is no full ref.
 	// This means that tag references need to be prefixed with 'refs/tags/' otherwise they would not work.
@@ -343,9 +354,10 @@ std::optional<std::string> getWorkdirDiff(const Path &workDir, const std::string
 ///
 /// @param gitUrl A [git url](https://git-scm.com/docs/git-fetch#_git_urls) to the repository.
 /// @param revision A git revision. Usually a commit hash.
+/// @param shallow Fetch only the single commit. Less data transfer but does not benefit from already fetched commits.
 /// @return A path to a bare git repo containing the specified revision. The path is to be treated as read-only.
-Path fetchRevisionIntoCache(const std::string gitUrl, const std::string revision) {
-	Path repoDir = getCachePath(gitUrl);
+Path fetchRevisionIntoCache(const std::string gitUrl, const std::string revision, bool shallow) {
+	Path repoDir = getGitCachePath(gitUrl, shallow);
 
 	if (revisionIsInRepo(repoDir, revision)) {
 		return repoDir;
@@ -355,10 +367,18 @@ Path fetchRevisionIntoCache(const std::string gitUrl, const std::string revision
 	PathLocks cacheDirLock({repoDir + ".lock"});
 	try {
 		// Fetch the revision into the local repo
+        //
         // When using `git fetch` git tries to detect which revisions we already have and only fetch the ones we dont have. However git only considers revisions that are the ancestor of a reference. We want that git considers every revision we already have. By creating a reference for every revision when we fetch it we can be sure that every revision we have locally is a ancestor of a reference.
         // This is not optimal as we do not remove a reference if we later get a reference to their children. This could lead to a lot of unnecessary references but that is probably not a real problem.
         std::string const referencesForRevisionsPrefix = "refs/__nix_refs_for_revs/" ;
-		runProgram("git", true, {"-C", repoDir, "-c", "fetch.negotiationAlgorithm=consecutive", "fetch", "--no-tags", "--recurse-submodules=no","--quiet", "--no-write-fetch-head", "--", gitUrl, revision + ":" + referencesForRevisionsPrefix + revision}, {}, true);
+		auto options = Strings{"-C", repoDir, "-c", "fetch.negotiationAlgorithm=consecutive", "fetch", "--no-tags", "--recurse-submodules=no","--quiet", "--no-write-fetch-head"};
+        if (shallow) {
+            options.push_back("--depth=1");
+        }
+        options.push_back("--");
+        options.push_back(gitUrl);
+        options.push_back(revision + ":" + referencesForRevisionsPrefix + revision);
+        runProgram("git", true, options, {}, true);
     } catch (Error &e) {
 		// Failing the fetch is always fatal. We do not want to continue with a partial repo.
 		throw Error("failed to fetch revision '%s' from '%s'", revision, gitUrl);
@@ -378,9 +398,9 @@ Path fetchRevisionIntoCache(const std::string gitUrl, const std::string revision
 /// @param revision A git revision. Usually a commit hash.
 /// @return A path to a bare git repo containing the specified revision. The path is to be treated as read-only.
 std::pair<Path, std::string> getLocalRepoContainingRevision(const std::string gitUrl, const std::string revision, bool local, bool allowDirty,
-															bool submodules) {
+															bool submodules, bool shallow) {
 	if (!local) {
-		Path repoDir = fetchRevisionIntoCache(gitUrl, revision);
+		Path repoDir = fetchRevisionIntoCache(gitUrl, revision, shallow);
 		return {absPath(repoDir), revision};
 	}
 
@@ -394,7 +414,7 @@ std::pair<Path, std::string> getLocalRepoContainingRevision(const std::string gi
 		return {absPath(gitUrl), revision};
 	}
 
-	Path repoDir = fetchRevisionIntoCache(gitUrl, revision);
+	Path repoDir = fetchRevisionIntoCache(gitUrl, revision, shallow);
 	PathLocks cacheDirLock({repoDir + ".lock"});
 	runProgram("git", true, {"-C", repoDir, "read-tree", revision});
 	runProgram("git", true, Strings{"-C", repoDir, "apply", "--cached", "--binary", "-"}, dirtyDiff);
@@ -428,7 +448,7 @@ std::pair<Path, bool> placeRevisionTreeAtPath(const std::string &url, const Path
 											  const bool shallow, const bool isLocal = false, const bool allowDirty = false) {
 	printTalkative("using revision %s of repo '%s'", inputRevision, url);
 
-	auto [gitDir, revision] = getLocalRepoContainingRevision(url, inputRevision, isLocal, allowDirty, submodules);
+	auto [gitDir, revision] = getLocalRepoContainingRevision(url, inputRevision, isLocal, allowDirty, submodules, shallow);
 	auto isLocalAndDirty = isLocal && allowDirty && revision != inputRevision;
 
 	bool isShallow = chomp(runProgram("git", true, {"-C", gitDir, "rev-parse", "--is-shallow-repository"})) == "true";
@@ -497,7 +517,7 @@ struct GitInputScheme : InputScheme
         for (auto & [name, value] : url.query) {
             if (name == "rev" || name == "ref")
                 attrs.emplace(name, value);
-            else if (name == "shallow" || name == "submodules" || name == "allRefs")
+            else if (name == "shallow" || name == "submodules")
                 attrs.emplace(name, Explicit<bool> { value == "1" });
             else
                 url2.query.emplace(name, value);
@@ -519,7 +539,6 @@ struct GitInputScheme : InputScheme
         parseURL(getStrAttr(attrs, "url"));
         maybeGetBoolAttr(attrs, "shallow");
         maybeGetBoolAttr(attrs, "submodules");
-        maybeGetBoolAttr(attrs, "allRefs");
 
         if (auto ref = maybeGetStrAttr(attrs, "ref")) {
             if (std::regex_search(*ref, badGitRefRegex))

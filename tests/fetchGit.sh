@@ -51,7 +51,7 @@ git -C $repo checkout master
 devrev=$(git -C $repo rev-parse devtest)
 out=$(nix eval --impure --raw --expr "builtins.fetchGit { url = file://$repo; rev = \"$devrev\"; }" 2>&1)
 
-[[ $(nix eval --raw --expr "builtins.readFile (builtins.fetchGit { url = file://$repo; rev = \"$devrev\"; allRefs = true; } + \"/differentbranch\")") = 'different file' ]]
+[[ $(nix eval --raw --expr "builtins.readFile (builtins.fetchGit { url = file://$repo; rev = \"$devrev\"; } + \"/differentbranch\")") = 'different file' ]]
 
 # In pure eval mode, fetchGit without a revision should fail.
 [[ $(nix eval --impure --raw --expr "builtins.readFile (fetchGit file://$repo + \"/hello\")") = world ]]
