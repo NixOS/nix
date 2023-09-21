@@ -36,8 +36,8 @@ namespace nix {
  *
  *   std::map<std::string, Config::SettingInfo> settings;
  *   config.getSettings(settings);
- *   config["system"].description == "the current system"
- *   config["system"].value == "x86_64-linux"
+ *   settings["system"].description == "the current system"
+ *   settings["system"].value == "x86_64-linux"
  *
  *
  * The above retrieves all currently known settings from the `Config` object
