@@ -314,7 +314,6 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             // Create builders for the new directories.
             for (auto n = prefixLen; n < names.size(); ++n)
                 pushBuilder(names[n]);
-
         };
 
         pushBuilder("");

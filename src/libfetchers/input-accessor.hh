@@ -121,8 +121,6 @@ struct MemoryInputAccessor : InputAccessor
 
 ref<MemoryInputAccessor> makeMemoryInputAccessor();
 
-ref<InputAccessor> makeZipInputAccessor(const CanonPath & path);
-
 ref<InputAccessor> makePatchingInputAccessor(
     ref<InputAccessor> next,
     const std::vector<std::string> & patches);
