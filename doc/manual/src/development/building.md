@@ -1,21 +1,64 @@
-# Hacking
+# Building Nix
 
-This section provides some notes on how to hack on Nix. To get the
-latest version of Nix from GitHub:
+This section provides some notes on how to start hacking on Nix.
+To get the latest version of Nix from GitHub:
 
 ```console
 $ git clone https://github.com/NixOS/nix.git
 $ cd nix
 ```
 
-The following instructions assume you already have some version of Nix installed locally, so that you can use it to set up the development environment. If you don't have it installed, follow the [installation instructions].
+> **Note**
+>
+> The following instructions assume you already have some version of Nix installed locally, so that you can use it to set up the development environment.
+> If you don't have it installed, follow the [installation instructions](../installation/installation.md).
 
-[installation instructions]: ../installation/index.md
+
+To build all dependencies and start a shell in which all environment variables are set up so that those dependencies can be found:
+
+```console
+$ nix-shell
+```
+
+To get a shell with one of the other [supported compilation environments](#compilation-environments):
+
+```console
+$ nix-shell --attr devShells.x86_64-linux.native-clangStdenvPackages
+```
+
+> **Note**
+>
+> You can use `native-ccacheStdenvPackages` to drastically improve rebuild time.
+> By default, [ccache](https://ccache.dev) keeps artifacts in `~/.cache/ccache/`.
+
+To build Nix itself in this shell:
+
+```console
+[nix-shell]$ autoreconfPhase
+[nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
+[nix-shell]$ make -j $NIX_BUILD_CORES
+```
+
+To install it in `$(pwd)/outputs` and test it:
+
+```console
+[nix-shell]$ make install
+[nix-shell]$ make installcheck -j $NIX_BUILD_CORES
+[nix-shell]$ ./outputs/out/bin/nix --version
+nix (Nix) 2.12
+```
+
+To build a release version of Nix for the current operating system and CPU architecture:
+
+```console
+$ nix-build
+```
+
+You can also build Nix for one of the [supported platforms](#platforms).
 
 ## Building Nix with flakes
 
 This section assumes you are using Nix with the [`flakes`] and [`nix-command`] experimental features enabled.
-See the [Building Nix](#building-nix) section for equivalent instructions using stable Nix interfaces.
 
 [`flakes`]: @docroot@/contributing/experimental-features.md#xp-feature-flakes
 [`nix-command`]: @docroot@/contributing/experimental-features.md#xp-nix-command
@@ -63,50 +106,6 @@ To build a release version of Nix for the current operating system and CPU archi
 
 ```console
 $ nix build
-```
-
-You can also build Nix for one of the [supported platforms](#platforms).
-
-## Building Nix
-
-To build all dependencies and start a shell in which all environment variables are set up so that those dependencies can be found:
-
-```console
-$ nix-shell
-```
-
-To get a shell with one of the other [supported compilation environments](#compilation-environments):
-
-```console
-$ nix-shell --attr devShells.x86_64-linux.native-clangStdenvPackages
-```
-
-> **Note**
->
-> You can use `native-ccacheStdenvPackages` to drastically improve rebuild time.
-> By default, [ccache](https://ccache.dev) keeps artifacts in `~/.cache/ccache/`.
-
-To build Nix itself in this shell:
-
-```console
-[nix-shell]$ autoreconfPhase
-[nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
-[nix-shell]$ make -j $NIX_BUILD_CORES
-```
-
-To install it in `$(pwd)/outputs` and test it:
-
-```console
-[nix-shell]$ make install
-[nix-shell]$ make installcheck -j $NIX_BUILD_CORES
-[nix-shell]$ ./outputs/out/bin/nix --version
-nix (Nix) 2.12
-```
-
-To build a release version of Nix for the current operating system and CPU architecture:
-
-```console
-$ nix-build
 ```
 
 You can also build Nix for one of the [supported platforms](#platforms).

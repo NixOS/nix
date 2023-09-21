@@ -20,7 +20,15 @@
 
 /command-ref/command-ref /command-ref 301!
 
-/contributing/contributing /contributing 301!
+/contributing/contributing /development 301!
+/contributing /development 301!
+/contributing/hacking /development/building 301!
+/contributing/testing /development/testing 301!
+/contributing/documentation /development/documentation 301!
+/contributing/experimental-features /development/experimental-features 301!
+/contributing/cli-guideline /development/cli-guideline 301!
+/contributing/json-guideline /development/json-guideline 301!
+/contributing/cxx /development/cxx 301!
 
 /expressions/expression-language /language/ 301!
 /expressions/language-constructs /language/constructs 301!
