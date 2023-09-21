@@ -29,7 +29,6 @@ to set up a development environment and build Nix from source.
 - [Nix jobsets on hydra.nixos.org](https://hydra.nixos.org/project/nix)
 - [NixOS Discourse](https://discourse.nixos.org/)
 - [Matrix - #nix:nixos.org](https://matrix.to/#/#nix:nixos.org)
-- [IRC - #nixos on libera.chat](irc://irc.libera.chat/#nixos)
 
 ## License
 
