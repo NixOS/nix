@@ -8,6 +8,15 @@ error:
              | ^
             3|   (_: f: f null)
 
+       … from call site
+
+         at /pwd/lang/eval-fail-foldlStrict-strict-op-application.nix:2:1:
+
+            1| # Tests that the result of applying op is forced even if the value is never used
+            2| builtins.foldl'
+             | ^
+            3|   (_: f: f null)
+
        … while calling anonymous lambda
 
          at /pwd/lang/eval-fail-foldlStrict-strict-op-application.nix:3:7:

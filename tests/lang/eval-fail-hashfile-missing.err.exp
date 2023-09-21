@@ -10,7 +10,12 @@ error:
 
        … while evaluating the first argument passed to builtins.toString
 
-         at «none»:0: (source not available)
+         at /pwd/lang/eval-fail-hashfile-missing.nix:4:3:
+
+            3| in
+            4|   toString (builtins.concatLists (map (hash: map (builtins.hashFile hash) paths) ["md5" "sha1" "sha256" "sha512"]))
+             |   ^
+            5|
 
        … while calling the 'hashFile' builtin
 
