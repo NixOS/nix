@@ -22,7 +22,27 @@ using namespace std::string_literals;
 // A bit slower for local repositories
 // A lot faster for remote repositories
 //
-// fixes: 8134 by fixing support for shallow fetches
+// Related issues and PRs in no particular order
+// - fixes: 8134 by fixing support for shallow fetches
+//   TODO: Leave comment on the issue to try out PR
+// - 2944: among other things wants support for getting only subdirectories.
+//   afaik this should be possible with sparse checkouts. (fetch --filter=tree:0)
+// - 5811: sparse checkouts.
+// - 4173: Use system ssl certs, probably not related to this
+// - #4313 #https://github.com/NixOS/nix/pull/8246 5407: binary substitutors
+// - 4623: LFS support
+// - 5291: abbreviated references apparently worked for tags at some point and people are mad that it changed.
+//   It is probably ok to reintroduce the old behaviour, because refs are impure anyway. We should just keep
+//   in mind that that can lead to weird caching issues, when there are refs with the same name as tags.
+//   For repos with a lot of refs and without rev, the current implementation is slower, as we do two calls
+//   To the remote repository( ls-remote and fetch)
+// - 6496: Support for sha256
+// - 6929: why do we even have revCount
+// - 7908: git is not available everywhere
+// - 7453: support for netrc file can be added by passing -c credential.helper="netrc -f FILE" to git. In
+//   config files that var can be specified multiple times for multiple helpers, I am not sure how it behaves
+//   as a flag. Also not sure if this would make it harder to switch to gitoxide or libgit2 at some point.
+// - fixes: 7209: Adjusts documentation with correct default value for name.
 //
 // BUG:
 //   fetchGit { url = "local"; ref = "abbreviated tag"} works but
@@ -37,6 +57,7 @@ using namespace std::string_literals;
 // - [x] submodules works
 // - [ ] Documentation is updated
 // - [ ] Debug prints are removed
+// - [ ] Caching behaviour is documented
 //
 // Ideas:
 // - We could significantly speed up the cloning of large repos by only using sparse checkouts. I only see two problems with that:
