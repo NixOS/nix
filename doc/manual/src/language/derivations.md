@@ -114,7 +114,11 @@ It outputs an attribute set, and produces a [store derivation](@docroot@/glossar
 - Every other attribute is passed as an environment variable to the builder.
   Attribute values are translated to environment variables as follows:
 
-    - Strings and numbers are just passed verbatim.
+    - Strings are passed unchanged.
+    
+    - Integral numbers are converted to decimal notation.
+    
+    - Floating point numbers are converted to simple decimal or scientific notation with a preset precision.
 
     - A *path* (e.g., `../foo/sources.tar`) causes the referenced file
       to be copied to the store; its location in the store is put in
