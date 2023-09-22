@@ -98,6 +98,10 @@ perl/Makefile.config
 /tests/lang/*.err
 /tests/lang/*.ast
 
+# /tests/debugger
+/tests/debugger/*.err
+
+
 /perl/lib/Nix/Config.pm
 /perl/lib/Nix/Store.cc
 
