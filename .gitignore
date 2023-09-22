@@ -99,7 +99,7 @@ perl/Makefile.config
 /tests/lang/*.ast
 
 # /tests/debugger
-/tests/debugger/*.err
+/tests/debugger/*.out
 
 
 /perl/lib/Nix/Config.pm
