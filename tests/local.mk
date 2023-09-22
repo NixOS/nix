@@ -71,6 +71,7 @@ nix_tests = \
   pure-eval.sh \
   eval.sh \
   repl.sh \
+  debugger-backtrace.sh \
   binary-cache-build-remote.sh \
   search.sh \
   logging.sh \

@@ -1,4 +1,4 @@
-[34;1m0[0m: while deep evaluating the attribute '[35;1mb[0m'
+[34;1m0[0m: while evaluating the attribute '[35;1mb[0m'
 [34;1m1[0m: while calling [35;1m'wat'[0m
 [34;1m2[0m: while evaluating the attribute '[35;1mb[0m'
 [34;1m3[0m: [31;1merror: [0minfinite recursion encountered
