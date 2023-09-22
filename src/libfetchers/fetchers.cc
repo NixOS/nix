@@ -135,9 +135,14 @@ std::pair<StorePath, Input> Input::fetchToStore(ref<Store> store) const
 void InputScheme::checkLocks(const Input & specified, const Input & final) const
 {
     if (auto prevNarHash = specified.getNarHash()) {
-        if (final.getNarHash() != prevNarHash)
-            throw Error((unsigned int) 102, "NAR hash mismatch in input '%s', expected '%s'",
-                specified.to_string(), prevNarHash->to_string(SRI, true));
+        if (final.getNarHash() != prevNarHash) {
+            if (final.getNarHash())
+                throw Error((unsigned int) 102, "NAR hash mismatch in input '%s', expected '%s' but got '%s'",
+                    specified.to_string(), prevNarHash->to_string(SRI, true), final.getNarHash()->to_string(SRI, true));
+            else
+                throw Error((unsigned int) 102, "NAR hash mismatch in input '%s', expected '%s' but got none",
+                    specified.to_string(), prevNarHash->to_string(SRI, true));
+        }
     }
 
     if (auto prevLastModified = specified.getLastModified()) {
