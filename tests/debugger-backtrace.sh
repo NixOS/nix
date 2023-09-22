@@ -34,21 +34,18 @@ na="${nixArgs[@]}"
 
 testRepl () {
     fname=$1
-    local replOutput=$(nix eval ${na} --debugger -f $testDir/${fname}.nix <<< "$replCmds")
+    local replOutput=$(nix eval ${na} --debugger -f $testDir/debugger/${fname}.nix <<< "$replCmds")
     # grep: only include backtrace sequence lines, not hex position or code location.
     # sed: remove file path as that will vary.
     local replFiltered=$(echo -e "$replOutput" | { grep "^.\[34\;1m[0-9]" | sed 's/while evaluating the file.*/while evaluating the file/' || echo "" ; }  )
 
     # write the output to a file for debug
-    # local fpath="~/testout/${fname}.txt"
-    # echo -e "$replFiltered" > $(realpath fpath)
+    local fpath="$testDir/debugger/${fname}.err"
+    echo -e "$replFiltered" > "${fpath}"
 
-    local expected="$(cat $testDir/${fname}.expected)"
+    local expected="$(cat $testDir/debugger/${fname}.exp)"
 
-    ex2=${expected}
-    ro2=${replFiltered}
-
-    if [ "${ex2}" != "${ro2}" ]; then
+    if [ "${expected}" != "${replFiltered}" ]; then
         fail "backtrace output doesn't match for file: $fname"
     fi
 }
