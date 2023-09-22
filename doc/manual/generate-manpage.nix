@@ -70,6 +70,7 @@ let
         * [`${command} ${name}`](./${appendName filename name}.md) - ${subcmd.description}
       '';
 
+      # TODO: move this confusing special case out of here when implementing #8496
       maybeDocumentation = optionalString
         (details ? doc)
         (replaceStrings ["@stores@"] [storeDocs] details.doc);
@@ -78,6 +79,10 @@ let
         # Options
 
         ${showOptions details.flags toplevel.flags}
+
+        > **Note**
+        >
+        > See [`man nix.conf`](@docroot@/command-ref/conf-file.md#command-line-flags) for overriding configuration settings with command line flags.
       '';
 
       showOptions = options: commonOptions:
@@ -147,7 +152,7 @@ let
             To use this store, you need to make sure the corresponding experimental feature,
             [`${experimentalFeature}`](@docroot@/contributing/experimental-features.md#xp-feature-${experimentalFeature}),
             is enabled.
-            For example, include the following in [`nix.conf`](#):
+            For example, include the following in [`nix.conf`](@docroot@/command-ref/conf-file.md):
 
             ```
             extra-experimental-features = ${experimentalFeature}
