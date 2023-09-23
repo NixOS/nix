@@ -1,8 +1,8 @@
 let
   inherit (builtins)
-    attrNames attrValues fromJSON listToAttrs mapAttrs
+    attrNames attrValues fromJSON listToAttrs mapAttrs groupBy
     concatStringsSep concatMap length lessThan replaceStrings sort;
-  inherit (import ./utils.nix) concatStrings optionalString filterAttrs trim squash unique showSettings;
+  inherit (import ./utils.nix) attrsToList concatStrings optionalString filterAttrs trim squash unique showSettings;
 in
 
 commandDump:
@@ -87,12 +87,11 @@ let
 
       showOptions = allOptions:
         let
-          showCategory = cat: ''
+          showCategory = cat: opts: ''
             ${optionalString (cat != "") "**${cat}:**"}
 
-            ${listOptions (filterAttrs (n: v: v.category == cat) allOptions)}
+            ${concatStringsSep "\n" (attrValues (mapAttrs showOption opts))}
             '';
-          listOptions = opts: concatStringsSep "\n" (attrValues (mapAttrs showOption opts));
           showOption = name: option:
             let
               shortName = optionalString
@@ -106,8 +105,12 @@ let
 
                 ${option.description}
             '';
-          categories = sort lessThan (unique (map (cmd: cmd.category) (attrValues allOptions)));
-        in concatStrings (map showCategory categories);
+          categories = mapAttrs
+            (_: listToAttrs)
+            (groupBy
+              (cmd: cmd.value.category)
+              (attrsToList allOptions));
+        in concatStrings (attrValues (mapAttrs showCategory categories));
     in squash result;
 
   appendName = filename: name: (if filename == "nix" then "nix3" else filename) + "-" + name;
