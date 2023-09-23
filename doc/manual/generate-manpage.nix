@@ -75,10 +75,14 @@ let
         (details ? doc)
         (replaceStrings ["@stores@"] [storeDocs] details.doc);
 
-      maybeOptions = optionalString (details.flags != {}) ''
+      maybeOptions = let
+        allVisibleOptions = filterAttrs
+          (_: o: ! o.hiddenCategory)
+          (details.flags // toplevel.flags);
+      in optionalString (allVisibleOptions != {}) ''
         # Options
 
-        ${showOptions (details.flags // toplevel.flags)}
+        ${showOptions allVisibleOptions}
 
         > **Note**
         >
