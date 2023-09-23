@@ -78,16 +78,15 @@ let
       maybeOptions = optionalString (details.flags != {}) ''
         # Options
 
-        ${showOptions details.flags toplevel.flags}
+        ${showOptions (details.flags // toplevel.flags)}
 
         > **Note**
         >
         > See [`man nix.conf`](@docroot@/command-ref/conf-file.md#command-line-flags) for overriding configuration settings with command line flags.
       '';
 
-      showOptions = options: commonOptions:
+      showOptions = allOptions:
         let
-          allOptions = options // commonOptions;
           showCategory = cat: ''
             ${optionalString (cat != "") "**${cat}:**"}
 
