@@ -93,6 +93,12 @@ echo foo | nix develop -f "$shellDotNix" shellDrv -c cat | grepQuiet foo
 # Ensure `nix develop -c` actually executes the command if stdout isn't a terminal
 nix develop -f "$shellDotNix" shellDrv -c echo foo |& grepQuiet foo
 
+# Ensure `nix develop -c` can execute shell functions and builtins
+nix develop -f "$shellDotNix" shellDrv -c fun | grepQuiet blabla
+
+# Ensure `nix develop -c` returns exit code when calling shell function
+(nix develop -f "$shellDotNix" shellDrv -c funFail && false) || [[ $? -eq 42 ]]
+
 # Test 'nix print-dev-env'.
 
 nix print-dev-env -f "$shellDotNix" shellDrv > $TEST_ROOT/dev-env.sh

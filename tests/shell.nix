@@ -34,6 +34,9 @@ let pkgs = rec {
     fun() {
       echo blabla
     }
+    funFail() {
+      exit 42
+    }
   '';
 
   stdenv = mkDerivation {
