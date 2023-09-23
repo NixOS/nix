@@ -92,7 +92,7 @@ let
       showOptions = allOptions:
         let
           showCategory = cat: opts: ''
-            ${optionalString (cat != "") "**${cat}:**"}
+            ${optionalString (cat != "") "## ${cat}"}
 
             ${concatStringsSep "\n" (attrValues (mapAttrs showOption opts))}
             '';
