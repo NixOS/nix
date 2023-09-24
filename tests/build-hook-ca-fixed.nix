@@ -8,7 +8,10 @@ let
     derivation ({
       inherit system;
       builder = busybox;
-      args = ["sh" "-e" args.builder or (builtins.toFile "builder-${args.name}.sh" "if [ -e .attrs.sh ]; then source .attrs.sh; fi; eval \"$buildCommand\"")];
+      args = ["sh" "-e" args.builder or (builtins.toFile "builder-${args.name}.sh" ''
+        if [ -e "$NIX_ATTRS_SH_FILE" ]; then source $NIX_ATTRS_SH_FILE; fi;
+        eval "$buildCommand"
+      '')];
       outputHashMode = "recursive";
       outputHashAlgo = "sha256";
     } // removeAttrs args ["builder" "meta" "passthru"])
