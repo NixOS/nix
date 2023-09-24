@@ -228,7 +228,7 @@ This happens late in the process, so `nix build` is not suitable for iterating.
 To build the manual incrementally, run:
 
 ```console
-make html -j $NIX_BUILD_CORES
+make manual-html -j $NIX_BUILD_CORES
 ```
 
 In order to reflect changes to the [Makefile], clear all generated files before re-building:
