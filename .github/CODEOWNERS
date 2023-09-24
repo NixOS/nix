@@ -16,3 +16,13 @@
 
 # Libstore layer
 /src/libstore @thufschmitt
+
+# Libexpr, nix language
+/src/libexpr/parser.y @edolstra @inclyc
+/src/libexpr/lexer.l @edolstra @inclyc
+/src/libexpr/nixexpr.hh @edolstra @inclyc
+/src/libexpr/nixexpr.cc @edolstra @inclyc
+/src/libexpr/symbol-table.hh @edolstra @inclyc
+/src/libexpr/eval.cc @edolstra @inclyc
+/src/libexpr/eval.hh @edolstra @inclyc
+/src/libexpr/eval-inline.hh @edolstra @inclyc
