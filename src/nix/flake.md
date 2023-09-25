@@ -68,11 +68,9 @@ inputs.nixpkgs = {
 ```
 
 Following [RFC 3986](https://datatracker.ietf.org/doc/html/rfc3986#section-2.1),
-characters outside of the allowed range (i.e. are neither [reserved
-character](https://datatracker.ietf.org/doc/html/rfc3986#section-2.2) or
-[unreserved
-characters](https://datatracker.ietf.org/doc/html/rfc3986#section-2.3)) must be
-percent-encoded.
+characters outside of the allowed range (i.e. neither [reserved characters](https://datatracker.ietf.org/doc/html/rfc3986#section-2.2)
+nor [unreserved characters](https://datatracker.ietf.org/doc/html/rfc3986#section-2.3))
+must be percent-encoded.
 
 ### Examples
 
@@ -110,8 +108,7 @@ The semantic of such a path is as follows:
     2. The filesystem root (/), or
     3. A folder on a different mount point.
 
-Contrary to URL-like reference, path-like flake references can contain
-arbitrary unicode characters (except `#` and `?`).
+Contrary to URL-like references, path-like flake references can contain arbitrary unicode characters (except `#` and `?`).
 
 ### Examples
 
