@@ -110,6 +110,7 @@ let
                 ${option.description}
             '';
           categories = mapAttrs
+            # Convert each group from a list of key-value pairs back to an attrset
             (_: listToAttrs)
             (groupBy
               (cmd: cmd.value.category)
