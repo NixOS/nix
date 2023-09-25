@@ -156,7 +156,7 @@ std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
 struct Expr
 {
     static unsigned long nrExprs;
-    inline Expr() {
+    Expr() {
         nrExprs++;
     }
     virtual ~Expr() { };
