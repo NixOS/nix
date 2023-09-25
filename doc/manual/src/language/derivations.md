@@ -1,9 +1,9 @@
 # Derivations
 
 The most important built-in function is `derivation`, which is used to describe a single derivation:
-a build task to run a process on precisely defined input files and repeatably produce output files at uniquely determined file system paths.
+a specification for running an executable on precisely defined input files to repeatably produce output files at uniquely determined file system paths.
 
-It takes as input an attribute set, the attributes of which specify the inputs to the build.
+It takes as input an attribute set, the attributes of which specify the inputs to the process.
 It outputs an attribute set, and produces a [store derivation](@docroot@/glossary.md#gloss-store-derivation) as a side effect of evaluation.
 
 <!-- FIXME: add a section on output attributes -->
