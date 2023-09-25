@@ -2991,7 +2991,7 @@ static RegisterPrimOp primop_tail({
     .name = "__tail",
     .args = {"list"},
     .doc = R"(
-      Return the second to last elements of a list; abort evaluation if
+      Return the list without its first item; abort evaluation if
       the argument isn’t a list or is an empty list.
 
       > **Warning**
