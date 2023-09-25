@@ -653,6 +653,7 @@ formal
 
 namespace nix {
 
+unsigned long Expr::nrExprs = 0;
 
 Expr * EvalState::parse(
     char * text,

@@ -155,6 +155,10 @@ std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
 
 struct Expr
 {
+    static unsigned long nrExprs;
+    Expr() {
+        nrExprs++;
+    }
     virtual ~Expr() { };
     virtual void show(const SymbolTable & symbols, std::ostream & str) const;
     virtual void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
@@ -171,18 +175,16 @@ struct Expr
 
 struct ExprInt : Expr
 {
-    NixInt n;
     Value v;
-    ExprInt(NixInt n) : n(n) { v.mkInt(n); };
+    ExprInt(NixInt n) { v.mkInt(n); };
     Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };
 
 struct ExprFloat : Expr
 {
-    NixFloat nf;
     Value v;
-    ExprFloat(NixFloat nf) : nf(nf) { v.mkFloat(nf); };
+    ExprFloat(NixFloat nf) { v.mkFloat(nf); };
     Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };
