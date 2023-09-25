@@ -385,7 +385,16 @@ static RegisterPrimOp primop_fetchGit({
 
         [Git reference]: https://git-scm.com/book/en/v2/Git-Internals-Git-References
 
-        The `ref` value is prefixed with `refs/heads/` except when it already start with `refs/` or is `HEAD`.
+        The `ref` value can be an abbreviated ref (e.g. `master` or `v0.1.2`), a full
+        ref (e.g. `refs/heads/master` or `refs/tags/v0.1.2`), or the special reference
+        `HEAD`.
+
+        Abbreviated refs are resolved by using `git ls-remote url ABBREVIATED_REF`.
+        If the abbreviated ref is ambiguous, the first result is used.
+
+        When the cache contains a unexpired ref that matches the abbreviated ref,
+        the remote is not queried. This may lead to unexpected results if there are
+        tags named like branches. To avoid this, use a full ref for tags.
 
       - `submodules` (default: `false`)
 
@@ -413,6 +422,11 @@ static RegisterPrimOp primop_fetchGit({
       If the URL points to a local directory and no `ref` or `rev` is
       given `fetchGit` will use the current state of the directory, which
       will include modified tracked files and staged changes.
+
+      Fetched references, objects and revisions are cached. The cache is located at
+      `~/.cache/nix/gitv3/`. Commits and git objects stay cached indefinitely,
+      refs are expire according to the [`tarball-ttl`](@docroot@/command-ref/conf-file.md#conf-tarball-ttl)
+      setting. There is a separate cache for every combination of `url` and `shallow`.
 
       Here are some examples of how to use `fetchGit`.
 

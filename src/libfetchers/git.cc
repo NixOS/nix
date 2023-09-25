@@ -10,68 +10,13 @@
 
 #include "fetch-settings.hh"
 
+#include <algorithm>
 #include <regex>
 #include <string.h>
 #include <sys/time.h>
 #include <sys/wait.h>
 
 using namespace std::string_literals;
-
-// CHANGES:
-// allRefs is no longer needed
-// A bit slower for local repositories
-// A lot faster for remote repositories
-//
-// Related issues and PRs in no particular order
-// - fixes: 8134 by fixing support for shallow fetches
-//   TODO: Leave comment on the issue to try out PR
-// - 2944: among other things wants support for getting only subdirectories.
-//   afaik this should be possible with sparse checkouts. (fetch --filter=tree:0)
-// - 5811: sparse checkouts.
-// - 4173: Use system ssl certs, probably not related to this
-// - #4313 #https://github.com/NixOS/nix/pull/8246 5407: binary substitutors
-// - 4623: LFS support
-// - 5291: abbreviated references apparently worked for tags at some point and people are mad that it changed.
-//   It is probably ok to reintroduce the old behaviour, because refs are impure anyway. We should just keep
-//   in mind that that can lead to weird caching issues, when there are refs with the same name as tags.
-//   For repos with a lot of refs and without rev, the current implementation is slower, as we do two calls
-//   To the remote repository( ls-remote and fetch)
-// - 6496: Support for sha256
-// - 6929: why do we even have revCount
-// - 7908: git is not available everywhere
-// - 7453: support for netrc file can be added by passing -c credential.helper="netrc -f FILE" to git. In
-//   config files that var can be specified multiple times for multiple helpers, I am not sure how it behaves
-//   as a flag. Also not sure if this would make it harder to switch to gitoxide or libgit2 at some point.
-// - fixes: 7209: Adjusts documentation with correct default value for name.
-// - 7195: Trouble with inconsistencies between dirty local, submodule and remote repos. Apparently `git archive`
-//   behaves slightly different to `git clone` because it does not contain things with export-ignore in gitattributes.
-//   Previously clone-like behaviour was used for submodules and dirty local repos and archive-like behavior for
-//   everything else. This PR unifies everything to archive like behavior.
-// - 5863: Wants a spinner for cloning
-// - 5313: Related to 7195 I think. Maybe some transformations are applied in git archive and not in git clone
-//   or vice-versa
-//
-// BUG:
-//   fetchGit { url = "local"; ref = "abbreviated tag"} works but
-//   fetchGit { url = "remote"; ref = "abbreviated tag"} does not work
-//
-// Checklist:
-// - [x] Caching between commits works (when fetching a commit with already fetched ancestors only the missing commits are fetched).
-// - [ ] Compared performance to previous implementation
-// - [x] Dirty local, local and remote repos behave the same way.
-// - [ ] All three layers of caching respect the correct expiration.
-// - [x] shallow repos works
-// - [x] submodules works
-// - [ ] Documentation is updated
-// - [ ] Debug prints are removed
-// - [ ] Caching behaviour is documented
-// - [ ] Remove this comment and open a PR
-//
-// Ideas:
-// - We could significantly speed up the cloning of large repos by only using sparse checkouts. I only see two problems with that:
-//   1. Getting revCount
-//   2. Significantly more disk usage when fetching revisions in reverse order
-//   I currently think that the best way to do this is by having 2 local cache, one with only shallow commits, and one with only commits, but no content (--filter=tree:0). The second repo is only for calculating revCount.
 
 namespace nix::fetchers {
 
@@ -82,6 +27,12 @@ namespace {
 /// It is set with `-c init.defaultBranch=` instead of `--initial-branch=` to stay compatible with
 /// old version of git, which will ignore unrecognized `-c` options.
 const std::string gitInitialBranch = "__nix_dummy_branch";
+/// For caching reasons a reference is created for every revision we fetch.
+/// These references are stored like `refs/__nix_refs_for_revs/COMMIT_HASH`.
+std::string const referencesForRevisionsPrefix = "refs/__nix_refs_for_revs/";
+/// For various reasons we can not use HEAD in the cache.
+/// The following reference is used instead.
+const std::string cachedHeadReference = "refs/heads/__nix_cache_HEAD";
 
 /// Get the git hash of an empty tree
 ///
@@ -115,6 +66,78 @@ Path getGitCachePath(std::string_view url, bool shallow = false) {
 	return cacheDir;
 }
 
+struct RevisionInCacheResult {
+	std::string revision;
+	std::string fullReference;
+	bool fresh;
+};
+
+/// Resolves the revision and full reference for a given reference in a git repo
+///
+/// If a abbreviated reference is passed (e.g. 'master') it is also expanded to a full reference (e.g. 'refs/heads/master')
+///
+/// Cached references expire according to the `isCacheFileWithinTtl` function.
+///
+/// If a fresh reference exists, the first fresh reference is returned. Otherwise the first expired reference of nullopt is returned.
+///
+/// @param repoDir The path of a local cached git directory obtained with `getGitCachePath`.
+/// @param reference A git reference.
+/// @param uncachedRepository Set to true if repoDir is not a cached repo. If set the first expired cache entry is returned. If set the function also works with
+/// packed references.
+/// @return The resolved revision, full reference and information about its freshness.
+std::optional<RevisionInCacheResult> resolveReference(const Path &repoDir, const std::string &reference, bool uncachedRepository = false) {
+	// Run ls-remote to find a revision for the reference
+	auto [status, output] = runProgram(RunOptions{
+		.program = "git",
+		.args = {"ls-remote", repoDir, reference},
+		.isInteractive = true,
+	});
+	if (status != 0)
+		return std::nullopt;
+
+	std::optional<RevisionInCacheResult> firstExpiredCacheResult = std::nullopt;
+
+	auto lines = tokenizeString<std::vector<std::string>>(output, "\n");
+	for (auto line : lines) {
+		if (const auto parseResult = git::parseLsRemoteLine(line)) {
+			if (parseResult->kind == git::LsRemoteRefLine::Kind::Symbolic) {
+				throw Error("git should never resolve a symbolic revision without  '--symref'");
+			}
+
+			// parseResult->reference is always defined if parseResult->kind is not git::LsRemoteRefLine::Kind::Symbolic
+			// which we asserted above
+			auto const fullReference = parseResult->reference.value();
+			auto const revision = parseResult->target;
+
+			if (!firstExpiredCacheResult.has_value()) {
+				firstExpiredCacheResult = RevisionInCacheResult{
+					.revision = revision,
+					.fullReference = fullReference,
+					.fresh = false,
+				};
+				if (uncachedRepository)
+					return firstExpiredCacheResult;
+			}
+
+			auto referenceFile = repoDir + "/" + fullReference;
+			struct stat st;
+			stat(referenceFile.c_str(), &st);
+			auto cacheIsFresh = isCacheFileWithinTtl(st);
+
+			if (cacheIsFresh) {
+				debug("resolved reference '%s' in repo '%s' to revision '%s' and full reference '%s'", reference, repoDir, revision, fullReference);
+				return RevisionInCacheResult{
+					.revision = revision,
+					.fullReference = fullReference,
+					.fresh = true,
+				};
+			}
+		}
+	}
+
+	return firstExpiredCacheResult;
+}
+
 /// Check if a revision is present in a git repository
 ///
 /// @param gitDir A path to a bare git repository or .git directory
@@ -132,53 +155,175 @@ bool revisionIsInRepo(const Path gitDir, const std::string revision) {
 	}
 }
 
-/// Resolves the revision and full reference for a given reference in a git repo
+/// Get a path to a bare git repo containing the specified revision
 ///
-/// If a abbreviated reference is passed (e.g. 'master') it is also resolved to a full reference (e.g. 'refs/heads/master')
+/// If the cached repo already contains the revision it just returns the path to the repo.
+/// Otherwise it fetches the revision into the repo and returns the path to the repo.
 ///
-/// @param gitUrl A git url that will be used with `git ls-remote` to resolve the revision.
-/// @param reference A git reference or HEAD.
-/// @return The resolved revision and full reference. nullopt if the reference could not be resolved.
-std::optional<std::string> resolveRevision(const Path &gitUrl, const std::string &reference) {
-	// Run ls-remote to find a revision for the reference
-	auto [status, output] = runProgram(RunOptions{
-		.program = "git",
-		.args = {"ls-remote", gitUrl, reference},
-		.isInteractive = true,
-	});
-	if (status != 0)
-		return std::nullopt;
+/// The returned path is a cache dir path without a look. That is fine as long as there are only read-only operations on the fetched revision.
+///
+/// @param gitUrl A [git url](https://git-scm.com/docs/git-fetch#_git_urls) to the repository.
+/// @param revision A git revision. Usually a commit hash.
+/// @param shallow Fetch only the single commit. Less data transfer but does not benefit from already fetched commits.
+/// @return A path to a bare git repo containing the specified revision. The path is to be treated as read-only.
+Path fetchRevisionIntoCache(const std::string &gitUrl, const std::string &revision, bool shallow) {
+	Path repoDir = getGitCachePath(gitUrl, shallow);
 
-	std::string_view line = output;
-	line = line.substr(0, line.find("\n"));
-	if (const auto parseResult = git::parseLsRemoteLine(line)) {
-		if (parseResult->kind == git::LsRemoteRefLine::Kind::Symbolic) {
-			throw Error("Should git should never resolve a symbolic revision without  '--symref'");
-		}
-
-		// parseResult->reference is always defined if parseResult->kind is not git::LsRemoteRefLine::Kind::Symbolic
-		// which we asserted above
-		auto const fullReference = parseResult->reference.value();
-		auto const revision = parseResult->target;
-
-		debug("resolved reference '%s' in repo '%s' to revision '%s' and full reference '%s'", reference, gitUrl, revision, fullReference);
-		return revision;
+	if (revisionIsInRepo(repoDir, revision)) {
+		return repoDir;
 	}
-	return std::nullopt;
+
+	Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", gitUrl));
+	PathLocks cacheDirLock({repoDir + ".lock"});
+	try {
+		// Fetch the revision into the local repo
+		//
+		// When using `git fetch` git tries to detect which revisions we already have and only fetch the ones we dont have. However git only considers revisions
+		// that are the ancestor of a reference. We want that git considers every revision we already have. By creating a reference for every revision when we
+		// fetch it we can be sure that every revision we have locally is a ancestor of a reference. This is not optimal as we do not remove a reference if we
+		// later get a reference to their children. This could lead to a lot of unnecessary references but that is probably not a real problem.
+		auto options = Strings{"-C",
+							   repoDir,
+							   "-c",
+							   "fetch.negotiationAlgorithm=consecutive",
+							   "fetch",
+							   "--no-tags",
+							   "--recurse-submodules=no",
+							   "--quiet",
+							   "--force",
+							   "--no-write-fetch-head",
+							   "--refmap="};
+		if (shallow) {
+			options.push_back("--depth=1");
+		}
+		options.push_back("--");
+		options.push_back(gitUrl);
+		options.push_back(revision + ":" + referencesForRevisionsPrefix + revision);
+		runProgram("git", true, options, {}, true);
+	} catch (Error &e) {
+		// Failing the fetch is always fatal. We do not want to continue with a partial repo.
+		throw Error("failed to fetch revision '%s' from '%s'", revision, gitUrl);
+	}
+
+	return repoDir;
 }
 
-/// Resolves the revision and full reference for a given reference in a git repo.
+/// Fetch a specific reference into the git cache for a given git url.
+///
+/// This function uses `git fetch` to fetch and resolve the reference in one go.
+///
+/// If the reference is already in the cache and the cache entry is not expired (See `isCacheFileWithinTtl`) it is not fetched again.
+/// If the cached reference is expired and the reference can not be fetched the expired revision is used and a warning is printed.
+///
+/// @param gitUrl A git url that will be used with `git fetch` to resolve the revision.
+/// @param reference A abbreviated git reference or the special reference HEAD.
+/// @param shallow Fetch only the single commit.
+/// @return The revision of the reference
+std::string fetchAndResolveReferenceIntoCache(const std::string &gitUrl, const std::string &reference, bool shallow) {
+	Path repoDir = getGitCachePath(gitUrl, shallow);
+
+	auto cachedRef = reference == "HEAD" ? cachedHeadReference : reference;
+	auto resolvedCachedRevision = resolveReference(repoDir, cachedRef);
+	auto freshCacheEntry = resolvedCachedRevision.has_value() && resolvedCachedRevision.value().fresh ? resolvedCachedRevision : std::nullopt;
+	auto expiredCacheEntry = resolvedCachedRevision.has_value() && !resolvedCachedRevision.value().fresh ? resolvedCachedRevision : std::nullopt;
+
+	if (freshCacheEntry.has_value()) {
+		return freshCacheEntry.value().revision;
+	}
+
+	Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", gitUrl));
+	PathLocks cacheDirLock({repoDir + ".lock"});
+	// Fetch the revision into the local repo
+	auto options = Strings{"-C",
+						   repoDir,
+						   "-c",
+						   "fetch.negotiationAlgorithm=consecutive",
+						   "fetch",
+						   "--no-tags",
+						   "--recurse-submodules=no",
+						   "--quiet",
+						   "--force",
+						   "--write-fetch-head",
+						   "--refmap=",
+						   "--verbose"};
+	if (shallow) {
+		options.push_back("--depth=1");
+	}
+	options.push_back("--");
+	options.push_back(gitUrl);
+	auto refspec = reference == "HEAD" ? ("HEAD:" + cachedHeadReference)
+									   : ((reference.substr(0, 5) == "refs/") ? (reference + ":" + reference) : ("*/" + reference + ":" + "*/" + reference));
+	options.push_back(refspec);
+
+	// Will be set to the correct revision
+	std::string newRevision;
+	// Will be set to the full reference
+	std::string fullReference;
+	try {
+		runProgram("git", true, options, {}, true);
+		auto fetchHead = readFile(repoDir + "/FETCH_HEAD");
+		auto lines = tokenizeString<std::vector<std::string>>(fetchHead, "\n");
+
+		for (auto line : lines) {
+			if (line.empty())
+				continue;
+
+			auto revision = line.substr(0, line.find('\t'));
+			auto remainder = line.substr(line.find_last_of('\t') + 1);
+			auto firstQuote = remainder.find_first_of('\'');
+			auto secondQuote = remainder.find_first_of('\'', firstQuote + 1);
+			auto fullRef = remainder.substr(firstQuote + 1, secondQuote - firstQuote - 1);
+			if (remainder.substr(0, 7) == "branch ") {
+				fullRef = "refs/heads/" + fullRef;
+			}
+			if (remainder.substr(0, 4) == "tag ") {
+				fullRef = "refs/tags/" + fullRef;
+			}
+
+			// Write the reference manually to ensure it is not a packed reference and that its timestamp is updated
+			Path cachedReferenceFile = repoDir + "/" + fullRef;
+			createDirs(dirOf(cachedReferenceFile));
+			writeFile(cachedReferenceFile, revision);
+
+			// Write a reference file for the fetched revision
+			Path referenceFileForRevision = repoDir + "/" + referencesForRevisionsPrefix + revision;
+			createDirs(dirOf(referenceFileForRevision));
+			writeFile(referenceFileForRevision, revision);
+
+			if (newRevision.empty()) {
+				newRevision = revision;
+				fullReference = fullRef;
+			}
+		}
+	} catch (Error &e) {
+		// If the fetch failed, newRevision will still be empty. We handle that below.
+	}
+
+	if (!newRevision.size()) {
+		// No revision was fetched, so we use the expired cache entry if we have one
+		if (expiredCacheEntry.has_value()) {
+			auto expiredRevision = expiredCacheEntry.value().revision;
+			auto expiredFullReference = expiredCacheEntry.value().fullReference;
+			warn("failed to resolve revision for reference '%s' in repository '%s'; using expired cached revision '%s'", reference, gitUrl, expiredRevision);
+			return expiredRevision;
+		}
+		throw Error("failed to read revision for reference '%s' from '%s'", reference, gitUrl);
+	}
+	return newRevision;
+}
+
+/// Resolves the revision for a given reference in a git repo.
 ///
 /// Tries a lookup in the local git cache first. If the revision is not in the cache it is resolved using the repository at gitUrl.
 ///
-/// If a abbreviated reference is passed (e.g. 'something') it is treated as a heads reference (e.g. 'refs/heads/something').
+/// Abbreviated reference (e.g. 'something') are looked up using `git ls-remote something` or `git fetch gitUrl '*/something'`.
 /// The only supported special reference is 'HEAD'.
 ///
 /// @param gitUrl The url of the git repo. Can be any [git url](https://git-scm.com/docs/git-fetch#_git_urls).
-/// @param reference A full git reference or and abbreviated branch (ref/heads) reference.
+/// @param reference A git reference.
 /// @param isLocal Skip the cache and look up directly in the local repository.
 /// @return The resolved revision and full reference. nullopt if the reference could not be resolved.
-std::string readRevisionCached(const std::string &gitUrl, const std::optional<std::string> &reference, bool isLocal) {
+std::string resolveReferenceAndPrepareCache(const std::string &gitUrl, const std::optional<std::string> &reference, bool isLocal, bool shallow) {
 	Path cacheDir = getGitCachePath(gitUrl);
 
 	// TODO: Currently every input reference is treated as a /ref/heads reference if it is no full ref.
@@ -186,60 +331,22 @@ std::string readRevisionCached(const std::string &gitUrl, const std::optional<st
 	// We theoretically fully support abbreviated references, but that may break compatibility with older versions
 	// On the other hand reference resolution is always impure so it probably can be changed without breaking anything.
 	std::string referenceOrHead = reference.value_or("HEAD");
-	Path fullRef = referenceOrHead.compare(0, 5, "refs/") == 0 ? referenceOrHead : referenceOrHead == "HEAD" ? "HEAD" : "refs/heads/" + referenceOrHead;
+	// Path fullRef = referenceOrHead.compare(0, 5, "refs/") == 0 ? referenceOrHead : referenceOrHead == "HEAD" ? "HEAD" : "refs/heads/" + referenceOrHead;
 
 	if (isLocal) {
-		auto const localRevision = resolveRevision(gitUrl, fullRef);
+		auto const localRevision = resolveReference(gitUrl, referenceOrHead, true);
 		if (localRevision) {
-			return localRevision.value();
+			return localRevision->revision;
 		}
-		if (fullRef == "HEAD") {
+		if (referenceOrHead == "HEAD") {
 			// If HEAD can not be found the repository has probably no commits.
 			return getEmptyTreeHash(gitUrl);
 		}
-		throw Error("failed resolve revision for reference '%s' in local repository '%s'", fullRef, gitUrl);
+		throw Error("failed resolve revision for reference '%s' in local repository '%s'", referenceOrHead, gitUrl);
 	}
 
-	auto cachedFullRef = fullRef == "HEAD" ? "refs/heads/__nix_cache_HEAD" : fullRef;
-	Path cachedReferenceFile = cacheDir + "/" + cachedFullRef;
+	auto revision = fetchAndResolveReferenceIntoCache(gitUrl, referenceOrHead, shallow);
 
-	struct stat st;
-	auto existsInCache = (stat(cachedReferenceFile.c_str(), &st) == 0);
-	if (existsInCache) {
-		auto cacheIsFresh = isCacheFileWithinTtl(st);
-
-		if (cacheIsFresh) {
-			// Returning a cached revision if available and fresh
-			std::string cachedRevision = trim(readFile(cachedReferenceFile));
-			debug("using cached revision '%s' for reference '%s' in repository '%s'", cachedRevision, fullRef, gitUrl);
-			return cachedRevision;
-		}
-
-		auto freshRevision = resolveRevision(gitUrl, fullRef);
-		if (freshRevision) {
-			// Returning a fresh revision if the cache exists but is expired
-			PathLocks cacheDirLock({cacheDir + ".lock"});
-			createDirs(dirOf(cachedReferenceFile));
-			auto const revision = freshRevision.value();
-			writeFile(cachedReferenceFile, revision);
-			return revision;
-		}
-
-		auto cachedRevision = trim(readFile(cachedReferenceFile));
-		warn("failed to resolve revision for reference '%s' in repository '%s'; using expired cached revision '%s'", fullRef, gitUrl, cachedRevision);
-		return cachedRevision;
-	}
-
-	// Return a fresh revision if there is none in the cache
-	auto const freshRevision = resolveRevision(gitUrl, fullRef);
-	if (!freshRevision) {
-		throw Error("failed to resolve revision for reference '%s' in repository '%s'", fullRef, gitUrl);
-	}
-
-	PathLocks cacheDirLock({cacheDir + ".lock"});
-	createDirs(dirOf(cachedReferenceFile));
-	auto const revision = freshRevision.value();
-	writeFile(cachedReferenceFile, revision);
 	return revision;
 }
 
@@ -383,51 +490,9 @@ std::optional<std::string> getWorkdirDiff(const Path &workDir, const std::string
 ///
 /// @param gitUrl A [git url](https://git-scm.com/docs/git-fetch#_git_urls) to the repository.
 /// @param revision A git revision. Usually a commit hash.
-/// @param shallow Fetch only the single commit. Less data transfer but does not benefit from already fetched commits.
 /// @return A path to a bare git repo containing the specified revision. The path is to be treated as read-only.
-Path fetchRevisionIntoCache(const std::string gitUrl, const std::string revision, bool shallow) {
-	Path repoDir = getGitCachePath(gitUrl, shallow);
-
-	if (revisionIsInRepo(repoDir, revision)) {
-		return repoDir;
-	}
-
-	Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Git repository '%s'", gitUrl));
-	PathLocks cacheDirLock({repoDir + ".lock"});
-	try {
-		// Fetch the revision into the local repo
-        //
-        // When using `git fetch` git tries to detect which revisions we already have and only fetch the ones we dont have. However git only considers revisions that are the ancestor of a reference. We want that git considers every revision we already have. By creating a reference for every revision when we fetch it we can be sure that every revision we have locally is a ancestor of a reference.
-        // This is not optimal as we do not remove a reference if we later get a reference to their children. This could lead to a lot of unnecessary references but that is probably not a real problem.
-        std::string const referencesForRevisionsPrefix = "refs/__nix_refs_for_revs/" ;
-		auto options = Strings{"-C", repoDir, "-c", "fetch.negotiationAlgorithm=consecutive", "fetch", "--no-tags", "--recurse-submodules=no","--quiet", "--no-write-fetch-head"};
-        if (shallow) {
-            options.push_back("--depth=1");
-        }
-        options.push_back("--");
-        options.push_back(gitUrl);
-        options.push_back(revision + ":" + referencesForRevisionsPrefix + revision);
-        runProgram("git", true, options, {}, true);
-    } catch (Error &e) {
-		// Failing the fetch is always fatal. We do not want to continue with a partial repo.
-		throw Error("failed to fetch revision '%s' from '%s'", revision, gitUrl);
-	}
-
-	return repoDir;
-}
-
-/// Get a path to a bare git repo containing the specified revision
-///
-/// If the cached repo already contains the revision it just returns the path to the repo.
-/// Otherwise it fetches the revision into the repo and returns the path to the repo.
-///
-/// The returned path is a cache dir path without a look. That is fine as long as there are only read-only operations on the fetched revision.
-///
-/// @param gitUrl A [git url](https://git-scm.com/docs/git-fetch#_git_urls) to the repository.
-/// @param revision A git revision. Usually a commit hash.
-/// @return A path to a bare git repo containing the specified revision. The path is to be treated as read-only.
-std::pair<Path, std::string> getLocalRepoContainingRevision(const std::string gitUrl, const std::string revision, bool local, bool allowDirty,
-															bool submodules, bool shallow) {
+std::pair<Path, std::string> getLocalRepoContainingRevision(const std::string gitUrl, const std::string revision, bool local, bool allowDirty, bool submodules,
+															bool shallow) {
 	if (!local) {
 		Path repoDir = fetchRevisionIntoCache(gitUrl, revision, shallow);
 		return {absPath(repoDir), revision};
@@ -458,7 +523,7 @@ std::pair<Path, std::string> getLocalRepoContainingRevision(const std::string gi
 /// @param targetDir The tree will be placed here
 /// @param revision The revision that will get copied
 void copyAllFilesFromRevision(const Path &gitDir, const Path &targetDir, const std::string &revision) {
-    auto source = sinkToSource([&](Sink &sink) { runProgram2({.program = "git", .args = {"-C", gitDir, "archive", revision}, .standardOut = &sink}); });
+	auto source = sinkToSource([&](Sink &sink) { runProgram2({.program = "git", .args = {"-C", gitDir, "archive", revision}, .standardOut = &sink}); });
 	unpackTarfile(*source, targetDir);
 }
 
@@ -526,134 +591,124 @@ std::pair<StorePath, Input> makeResult(const Input &input, StorePath &&storePath
 }
 } // end namespace
 
-struct GitInputScheme : InputScheme
-{
-    std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
-    {
-        if (url.scheme != "git" &&
-            url.scheme != "git+http" &&
-            url.scheme != "git+https" &&
-            url.scheme != "git+ssh" &&
-            url.scheme != "git+file") return {};
+struct GitInputScheme : InputScheme {
+	std::optional<Input> inputFromURL(const ParsedURL &url, bool requireTree) const override {
+		if (url.scheme != "git" && url.scheme != "git+http" && url.scheme != "git+https" && url.scheme != "git+ssh" && url.scheme != "git+file")
+			return {};
 
-        auto url2(url);
-        if (hasPrefix(url2.scheme, "git+")) url2.scheme = std::string(url2.scheme, 4);
-        url2.query.clear();
+		auto url2(url);
+		if (hasPrefix(url2.scheme, "git+"))
+			url2.scheme = std::string(url2.scheme, 4);
+		url2.query.clear();
 
-        Attrs attrs;
-        attrs.emplace("type", "git");
+		Attrs attrs;
+		attrs.emplace("type", "git");
 
-        for (auto & [name, value] : url.query) {
-            if (name == "rev" || name == "ref")
-                attrs.emplace(name, value);
-            else if (name == "shallow" || name == "submodules")
-                attrs.emplace(name, Explicit<bool> { value == "1" });
-            else
-                url2.query.emplace(name, value);
-        }
+		for (auto &[name, value] : url.query) {
+			if (name == "rev" || name == "ref")
+				attrs.emplace(name, value);
+			else if (name == "shallow" || name == "submodules")
+				attrs.emplace(name, Explicit<bool>{value == "1"});
+			else
+				url2.query.emplace(name, value);
+		}
 
-        attrs.emplace("url", url2.to_string());
+		attrs.emplace("url", url2.to_string());
 
-        return inputFromAttrs(attrs);
-    }
+		return inputFromAttrs(attrs);
+	}
 
-    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
-    {
-        if (maybeGetStrAttr(attrs, "type") != "git") return {};
+	std::optional<Input> inputFromAttrs(const Attrs &attrs) const override {
+		if (maybeGetStrAttr(attrs, "type") != "git")
+			return {};
 
-        for (auto & [name, value] : attrs)
-            if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name" && name != "dirtyRev" && name != "dirtyShortRev")
-                throw Error("unsupported Git input attribute '%s'", name);
+		for (auto &[name, value] : attrs)
+			if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" &&
+				name != "revCount" && name != "narHash" && name != "allRefs" && name != "name" && name != "dirtyRev" && name != "dirtyShortRev")
+				throw Error("unsupported Git input attribute '%s'", name);
 
-        parseURL(getStrAttr(attrs, "url"));
-        maybeGetBoolAttr(attrs, "shallow");
-        maybeGetBoolAttr(attrs, "submodules");
+		parseURL(getStrAttr(attrs, "url"));
+		maybeGetBoolAttr(attrs, "shallow");
+		maybeGetBoolAttr(attrs, "submodules");
 
-        if (auto ref = maybeGetStrAttr(attrs, "ref")) {
-            if (std::regex_search(*ref, badGitRefRegex))
-                throw BadURL("invalid Git branch/tag name '%s'", *ref);
-        }
+		if (auto ref = maybeGetStrAttr(attrs, "ref")) {
+			if (std::regex_search(*ref, badGitRefRegex))
+				throw BadURL("invalid Git branch/tag name '%s'", *ref);
+		}
 
-        Input input;
-        input.attrs = attrs;
-        return input;
-    }
+		Input input;
+		input.attrs = attrs;
+		return input;
+	}
 
-    ParsedURL toURL(const Input & input) const override
-    {
-        auto url = parseURL(getStrAttr(input.attrs, "url"));
-        if (url.scheme != "git") url.scheme = "git+" + url.scheme;
-        if (auto rev = input.getRev()) url.query.insert_or_assign("rev", rev->gitRev());
-        if (auto ref = input.getRef()) url.query.insert_or_assign("ref", *ref);
-        if (maybeGetBoolAttr(input.attrs, "shallow").value_or(false))
-            url.query.insert_or_assign("shallow", "1");
-        return url;
-    }
+	ParsedURL toURL(const Input &input) const override {
+		auto url = parseURL(getStrAttr(input.attrs, "url"));
+		if (url.scheme != "git")
+			url.scheme = "git+" + url.scheme;
+		if (auto rev = input.getRev())
+			url.query.insert_or_assign("rev", rev->gitRev());
+		if (auto ref = input.getRef())
+			url.query.insert_or_assign("ref", *ref);
+		if (maybeGetBoolAttr(input.attrs, "shallow").value_or(false))
+			url.query.insert_or_assign("shallow", "1");
+		return url;
+	}
 
-    bool hasAllInfo(const Input & input) const override
-    {
-        bool maybeDirty = !input.getRef();
-        bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
-        return
-            maybeGetIntAttr(input.attrs, "lastModified")
-            && (shallow || maybeDirty || maybeGetIntAttr(input.attrs, "revCount"));
-    }
+	bool hasAllInfo(const Input &input) const override {
+		bool maybeDirty = !input.getRef();
+		bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
+		return maybeGetIntAttr(input.attrs, "lastModified") && (shallow || maybeDirty || maybeGetIntAttr(input.attrs, "revCount"));
+	}
 
-    Input applyOverrides(
-        const Input & input,
-        std::optional<std::string> ref,
-        std::optional<Hash> rev) const override
-    {
-        auto res(input);
-        if (rev) res.attrs.insert_or_assign("rev", rev->gitRev());
-        if (ref) res.attrs.insert_or_assign("ref", *ref);
-        // TODO: I do not understand why this check is required
-        if (!res.getRef() && res.getRev())
-            throw Error("Git input '%s' has a commit hash but no branch/tag name", res.to_string());
-        return res;
-    }
+	Input applyOverrides(const Input &input, std::optional<std::string> ref, std::optional<Hash> rev) const override {
+		auto res(input);
+		if (rev)
+			res.attrs.insert_or_assign("rev", rev->gitRev());
+		if (ref)
+			res.attrs.insert_or_assign("ref", *ref);
+		// TODO: I do not understand why this check is required
+		if (!res.getRef() && res.getRev())
+			throw Error("Git input '%s' has a commit hash but no branch/tag name", res.to_string());
+		return res;
+	}
 
-    void clone(const Input & input, const Path & destDir) const override
-    {
-        auto [isLocal, actualUrl] = getActualUrl(getStrAttr(input.attrs, "url"));
+	void clone(const Input &input, const Path &destDir) const override {
+		auto [isLocal, actualUrl] = getActualUrl(getStrAttr(input.attrs, "url"));
 
-        Strings args = {"clone"};
+		Strings args = {"clone"};
 
-        args.push_back(actualUrl);
+		args.push_back(actualUrl);
 
-        if (auto ref = input.getRef()) {
-            args.push_back("--branch");
-            args.push_back(*ref);
-        }
+		if (auto ref = input.getRef()) {
+			args.push_back("--branch");
+			args.push_back(*ref);
+		}
 
-        if (input.getRev()) throw UnimplementedError("cloning a specific revision is not implemented");
+		if (input.getRev())
+			throw UnimplementedError("cloning a specific revision is not implemented");
 
-        args.push_back(destDir);
+		args.push_back(destDir);
 
-        runProgram("git", true, args, {}, true);
-    }
+		runProgram("git", true, args, {}, true);
+	}
 
-    std::optional<Path> getSourcePath(const Input & input) override
-    {
-        auto url = parseURL(getStrAttr(input.attrs, "url"));
-        if (url.scheme == "file" && !input.getRef() && !input.getRev())
-            return url.path;
-        return {};
-    }
+	std::optional<Path> getSourcePath(const Input &input) override {
+		auto url = parseURL(getStrAttr(input.attrs, "url"));
+		if (url.scheme == "file" && !input.getRef() && !input.getRev())
+			return url.path;
+		return {};
+	}
 
-    void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg) override
-    {
-        auto sourcePath = getSourcePath(input);
-        assert(sourcePath);
-        auto gitDir = ".git";
+	void markChangedFile(const Input &input, std::string_view file, std::optional<std::string> commitMsg) override {
+		auto sourcePath = getSourcePath(input);
+		assert(sourcePath);
+		auto gitDir = ".git";
 
-        runProgram("git", true,
-            { "-C", *sourcePath, "--git-dir", gitDir, "add", "--intent-to-add", "--", std::string(file) });
+		runProgram("git", true, {"-C", *sourcePath, "--git-dir", gitDir, "add", "--intent-to-add", "--", std::string(file)});
 
-        if (commitMsg)
-            runProgram("git", true,
-                { "-C", *sourcePath, "--git-dir", gitDir, "commit", std::string(file), "-m", *commitMsg });
-    }
+		if (commitMsg)
+			runProgram("git", true, {"-C", *sourcePath, "--git-dir", gitDir, "commit", std::string(file), "-m", *commitMsg});
+	}
 
 	std::pair<bool, std::string> getActualUrl(const std::string &url) const {
 		// file:// URIs are normally not cloned (but otherwise treated the
@@ -677,6 +732,8 @@ struct GitInputScheme : InputScheme
 		std::string name = input.getName();
 		std::optional<std::string> reference = input.getRef();
 		std::optional<std::string> inputRevision = input.getRev() ? std::optional(input.getRev()->gitRev()) : std::nullopt;
+		bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
+		bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
 
 		// Resolve the actual url
 		auto [isLocal, actualUrl] = getActualUrl(getStrAttr(input.attrs, "url"));
@@ -685,11 +742,9 @@ struct GitInputScheme : InputScheme
 		auto allowDirty = !reference && !inputRevision && isLocal;
 
 		// Resolve reference to revision if necessary
-		std::string revision = inputRevision.has_value() ? inputRevision.value() : readRevisionCached(actualUrl, reference, isLocal);
+		std::string revision = inputRevision.has_value() ? inputRevision.value() : resolveReferenceAndPrepareCache(actualUrl, reference, isLocal, shallow);
 
 		// Lookup revision in cache and return if it is there
-		bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
-		bool submodules = maybeGetBoolAttr(input.attrs, "submodules").value_or(false);
 		auto cacheType = std::string("git") + (shallow ? "-shallow" : "") + (submodules ? "-submodules" : "");
 		if (!allowDirty) {
 			if (auto res = getCache()->lookup(store, Attrs({{"name", name}, {"type", cacheType}, {"url", actualUrl}, {"rev", revision}}))) {

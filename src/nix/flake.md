@@ -94,8 +94,8 @@ Here are some examples of flake references in their URL-like representation:
   flake.
 * `git+file:///path/to/local/flake`:
   A local Git repository at the current working tree
-* `git+file:///path/to/local/flake?ref=main`:
-  A local Git repository at a specific reference
+* `git+file:///path/to/local/flake?rev=f34751b88bd07d7f44f5cd3200fb4122bf916c7e`:
+  A local Git repository at a specific revision/commit
 
 ## Path-like syntax
 
