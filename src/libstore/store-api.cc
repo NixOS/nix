@@ -1457,26 +1457,25 @@ std::shared_ptr<Store> openFromNonUri(const std::string & uri, const Store::Para
 //
 // This function now ensures that a usable connection string is available:
 // * If the store to be opened is not an SSH store, nothing will be done.
-// * If the URL looks like `root@[::1]` (which is allowed by the URL parser and probably
+// * If the URL host looks like `[::1]` (which is allowed by the URL parser and probably
 //   needed to pass further flags), it
-//   will be transformed into `root@::1` for SSH (same for `[::1]` -> `::1`).
-// * If the URL looks like `root@::1` it will be left as-is.
+//   will be transformed into `::1` for SSH (same for `[::1]` -> `::1`).
+// * If the URL host looks like `::1` it will be left as-is.
 // * In any other case, the string will be left as-is.
-static std::string extractConnStr(const std::string &proto, const std::string &connStr)
+static std::string extractConnStr(
+    const std::string & proto,
+    const std::string & host)
 {
     if (proto.rfind("ssh") != std::string::npos) {
         std::smatch result;
-        std::regex v6AddrRegex("^((.*)@)?\\[(.*)\\]$");
+        std::regex v6AddrRegex("^\\[(.*)\\]$");
 
-        if (std::regex_match(connStr, result, v6AddrRegex)) {
-            if (result[1].matched) {
-                return result.str(1) + result.str(3);
-            }
-            return result.str(3);
+        if (std::regex_match(host, result, v6AddrRegex)) {
+            return result.str(1);
         }
     }
 
-    return connStr;
+    return host;
 }
 
 ref<Store> openStore(const std::string & uri_,
@@ -1487,14 +1486,13 @@ ref<Store> openStore(const std::string & uri_,
         auto parsedUri = parseURL(uri_);
         params.insert(parsedUri.query.begin(), parsedUri.query.end());
 
-        auto baseURI = extractConnStr(
-            parsedUri.scheme,
-            parsedUri.authority.value_or("") + parsedUri.path
-        );
+        auto authHack = parsedUri.authority.value_or(ParsedURLAuthority {});
+        authHack.host = extractConnStr(parsedUri.scheme, authHack.host);
+        authHack.host += parsedUri.path;
 
         for (auto implem : *Implementations::registered) {
             if (implem.uriSchemes.count(parsedUri.scheme)) {
-                auto store = implem.create(parsedUri.scheme, baseURI, params);
+                auto store = implem.create(parsedUri.scheme, authHack.host, authHack.port, params);
                 if (store) {
                     experimentalFeatureSettings.require(store->experimentalFeature());
                     store->init();

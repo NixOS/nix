@@ -77,7 +77,7 @@ std::string fixURI(std::string uri, EvalState & state, const std::string & defau
     if (uri.find("://") == std::string::npos) {
         const auto p = ParsedURL {
             .scheme = defaultScheme,
-            .authority = "",
+            .authority = {{}},
             .path = uri
         };
         return p.to_string();

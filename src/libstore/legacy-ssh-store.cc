@@ -94,7 +94,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
 
     static std::set<std::string> uriSchemes() { return {"ssh"}; }
 
-    LegacySSHStore(const std::string & scheme, const std::string & host, const Params & params)
+    LegacySSHStore(const std::string & scheme, const std::string & host, std::optional<uint16_t> port, const Params & params)
         : StoreConfig(params)
         , CommonSSHStoreConfig(params)
         , LegacySSHStoreConfig(params)
@@ -107,6 +107,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             ))
         , master(
             host,
+            port,
             sshKey,
             sshPublicHostKey,
             // Use SSH master only if using more than 1 connection.

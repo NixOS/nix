@@ -3,9 +3,10 @@
 
 namespace nix {
 
-SSHMaster::SSHMaster(const std::string & host, const std::string & keyFile, const std::string & sshPublicHostKey, bool useMaster, bool compress, int logFD)
+SSHMaster::SSHMaster(const std::string & host, std::optional<uint16_t> port, const std::string & keyFile, const std::string & sshPublicHostKey, bool useMaster, bool compress, int logFD)
     : host(host)
-    , fakeSSH(host == "localhost")
+    , port(port)
+    , fakeSSH(host == "localhost" && !port)
     , keyFile(keyFile)
     , sshPublicHostKey(sshPublicHostKey)
     , useMaster(useMaster && !fakeSSH)
@@ -36,6 +37,8 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
     }
     if (compress)
         args.push_back("-C");
+    if (port)
+        args.insert(args.end(), {"-p", std::to_string(*port)});
 
     args.push_back("-oPermitLocalCommand=yes");
     args.push_back("-oLocalCommand=echo started");

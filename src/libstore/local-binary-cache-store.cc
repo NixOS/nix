@@ -31,6 +31,7 @@ public:
     LocalBinaryCacheStore(
         const std::string scheme,
         const Path & binaryCacheDir,
+        std::optional<uint16_t> port,
         const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
@@ -39,6 +40,8 @@ public:
         , BinaryCacheStore(params)
         , binaryCacheDir(binaryCacheDir)
     {
+        if (port)
+            throw Error("file:// store does not accept a port number");
     }
 
     void init() override;

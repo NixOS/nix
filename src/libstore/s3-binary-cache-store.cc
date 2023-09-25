@@ -271,6 +271,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
     S3BinaryCacheStoreImpl(
         const std::string & uriScheme,
         const std::string & bucketName,
+        std::optional<uint16_t> port,
         const Params & params)
         : StoreConfig(params)
         , BinaryCacheStoreConfig(params)
@@ -281,6 +282,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStoreConfig, public virtual
         , bucketName(bucketName)
         , s3Helper(profile, region, scheme, endpoint)
     {
+        if (port)
+            throw Error("s3:// store does not accept a port number");
         diskCache = getNarInfoDiskCache();
     }
 

@@ -37,9 +37,12 @@ UDSRemoteStore::UDSRemoteStore(const Params & params)
 UDSRemoteStore::UDSRemoteStore(
     const std::string scheme,
     std::string socket_path,
+    std::optional<uint16_t> port,
     const Params & params)
     : UDSRemoteStore(params)
 {
+    if (port)
+        throw Error("unix:// store does not accept a port number");
     path.emplace(socket_path);
 }
 

@@ -440,7 +440,7 @@ LocalStore::LocalStore(const Params & params)
 }
 
 
-LocalStore::LocalStore(std::string scheme, std::string path, const Params & params)
+LocalStore::LocalStore(std::string scheme, std::string path, std::optional<uint16_t> port, const Params & params)
     : LocalStore(params)
 {
     throw UnimplementedError("LocalStore");

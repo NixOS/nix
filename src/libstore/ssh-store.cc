@@ -33,7 +33,7 @@ class SSHStore : public virtual SSHStoreConfig, public virtual RemoteStore
 {
 public:
 
-    SSHStore(const std::string & scheme, const std::string & host, const Params & params)
+    SSHStore(const std::string & scheme, const std::string & host, std::optional<uint16_t> port, const Params & params)
         : StoreConfig(params)
         , RemoteStoreConfig(params)
         , CommonSSHStoreConfig(params)
@@ -43,6 +43,7 @@ public:
         , host(host)
         , master(
             host,
+            port,
             sshKey,
             sshPublicHostKey,
             // Use SSH master only if using more than 1 connection.

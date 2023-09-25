@@ -994,7 +994,7 @@ std::list<ref<Store>> getDefaultSubstituters();
 struct StoreFactory
 {
     std::set<std::string> uriSchemes;
-    std::function<std::shared_ptr<Store> (const std::string & scheme, const std::string & uri, const Store::Params & params)> create;
+    std::function<std::shared_ptr<Store> (const std::string & scheme, const std::string & host, std::optional<uint16_t> optPort, const Store::Params & params)> create;
     std::function<std::shared_ptr<StoreConfig> ()> getConfig;
 };
 
@@ -1009,9 +1009,9 @@ struct Implementations
         StoreFactory factory{
             .uriSchemes = T::uriSchemes(),
             .create =
-                ([](const std::string & scheme, const std::string & uri, const Store::Params & params)
+                ([](const std::string & scheme, const std::string & host, std::optional<uint16_t> optPort, const Store::Params & params)
                  -> std::shared_ptr<Store>
-                 { return std::make_shared<T>(scheme, uri, params); }),
+                 { return std::make_shared<T>(scheme, host, optPort, params); }),
             .getConfig =
                 ([]()
                  -> std::shared_ptr<StoreConfig>
