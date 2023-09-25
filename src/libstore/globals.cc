@@ -114,11 +114,6 @@ void loadConfFile()
        ~/.nix/nix.conf or the command line. */
     globalConfig.resetOverridden();
 
-    /* Alway consider this option as overridden so environment
-       variables inherited from current environment can be sent to
-       daemon. */
-    settings.environment.overridden = true;
-
     auto files = settings.nixUserConfFiles;
     for (auto file = files.rbegin(); file != files.rend(); file++) {
         globalConfig.applyConfigFile(*file);
@@ -286,25 +281,6 @@ Paths PluginFilesSetting::parse(const std::string & str) const
     if (pluginsLoaded)
         throw UsageError("plugin-files set after plugins were loaded, you may need to move the flag before the subcommand");
     return BaseSetting<Paths>::parse(str);
-}
-
-
-StringMap EnvironmentSetting::parse(const std::string & str) const
-{
-    StringMap res;
-    for (auto & elem : tokenizeString<Strings>(str)) {
-        auto eq = elem.find_first_of('=');
-        if (std::string::npos != eq) {
-            res.emplace(std::string(elem, 0, eq), std::string(elem, eq + 1));
-        }
-        else {
-            auto envValue = getEnv(elem.c_str());
-            if (envValue.has_value()) {
-                res.emplace(elem, envValue.value());
-            }
-        }
-    }
-    return res;
 }
 
 

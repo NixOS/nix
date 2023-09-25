@@ -1135,10 +1135,10 @@ void LocalDerivationGoal::initEnv()
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
     if (!derivationType->isSandboxed()) {
-        auto & environment = settings.environment.get();
+        auto & impureEnvVarOverrides = settings.impureEnvVarOverrides.get();
         for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings())) {
-            auto envVar = environment.find(i);
-            if (envVar != environment.end()) {
+            auto envVar = impureEnvVarOverrides.find(i);
+            if (envVar != impureEnvVarOverrides.end()) {
                 env[i] = envVar->second;
             } else {
                 env[i] = getEnv(i).value_or("");

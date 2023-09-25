@@ -46,21 +46,6 @@ struct PluginFilesSetting : public BaseSetting<Paths>
     Paths parse(const std::string & str) const override;
 };
 
-struct EnvironmentSetting : public BaseSetting<StringMap>
-{
-    EnvironmentSetting(Config * options,
-        const StringMap & def,
-        const std::string & name,
-        const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : BaseSetting<StringMap>(def, true, name, description, aliases)
-    {
-        options->addSetting(this);
-    }
-
-    StringMap parse(const std::string & str) const override;
-};
-
 const uint32_t maxIdsPerBuild =
     #if __linux__
     1 << 16
@@ -1068,18 +1053,15 @@ public:
         )"
     };
 
-    EnvironmentSetting environment{this, {}, "environment",
+    Setting<StringMap> impureEnvVarOverrides {this, {}, "impure-env-var-overrides",
         R"(
-          Extra environments variables to use. A list of items, each in the
-          format of:
+          A list of items, each in the format of:
 
           - `name=value`: Set environment variable `name` to `value`.
-          - `name`: Inherit environment variable `name` from current
-            environment.
 
           If the user is trusted (see `trusted-users` option), when building
           a fixed-output derivation, environment variables set in this option
-          will be passed to the builder if they are listed in `impureEnvVars`.
+          will be passed to the builder if they are listed in [`impureEnvVars`](@docroot@/language/advanced-attributes.md##adv-attr-impureEnvVars).
 
           This option is useful for, e.g., setting `https_proxy` for
           fixed-output derivations and in a multi-user Nix installation, or
