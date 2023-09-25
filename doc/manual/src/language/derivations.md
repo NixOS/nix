@@ -71,11 +71,15 @@ It outputs an attribute set, and produces a [store derivation](@docroot@/glossar
   Examples:
 
   Imagine a library package that provides a dynamic library, header files, and documentation.
-  A program that links against the library doesn’t need the header files and documentation at runtime, and it doesn’t need the documentation at build time.
+  A program that links against such a library doesn’t need the header files and documentation at runtime, and it doesn’t need the documentation at build time.
   Thus, the library package could specify:
 
   ```nix
-  outputs = [ "lib" "dev" "doc" ];
+  derivation {
+    # ...
+    outputs = [ "lib" "dev" "doc" ];
+    # ...
+  }
   ```
 
   This will cause Nix to pass environment variables `lib`, `dev`, and `doc` to the builder containing the intended store paths of each output.
@@ -90,22 +94,12 @@ It outputs an attribute set, and produces a [store derivation](@docroot@/glossar
 
   for an Autoconf-style package.
 
-  You can refer to each output of a
-  derivation by selecting it as an attribute, e.g.
-
-  ```nix
-  buildInputs = [ pkg.lib pkg.dev ];
-  ```
-  <!-- FIXME: move this to the output attributes section when we have one -->
+  You can refer to each output of a derivation by selecting it as an attribute, e.g. `myPackage.lib` or `myPackage.doc`.
 
   The first element of `outputs` determines the *default output*.
-  Thus, you could also write
+  Therefore, in the given example, `myPackage` is equivalent to `myPackage.lib`.
 
-  ```nix
-  buildInputs = [ pkg pkg.dev ];
-  ```
-
-  since `pkg` is equivalent to `pkg.lib`.
+  <!-- FIXME: refer to the output attributes when we have one -->
 
 - See [Advanced Attributes](./advanced-attributes.md) for more, infrequently used, optional attributes.
 
@@ -115,9 +109,9 @@ It outputs an attribute set, and produces a [store derivation](@docroot@/glossar
   Attribute values are translated to environment variables as follows:
 
     - Strings are passed unchanged.
-    
+
     - Integral numbers are converted to decimal notation.
-    
+
     - Floating point numbers are converted to simple decimal or scientific notation with a preset precision.
 
     - A *path* (e.g., `../foo/sources.tar`) causes the referenced file
