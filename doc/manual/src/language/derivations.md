@@ -75,16 +75,16 @@ It outputs an attribute set, and produces a [store derivation](@docroot@/glossar
   Thus, the library package could specify:
 
   ```nix
-  outputs = [ "lib" "headers" "doc" ];
+  outputs = [ "lib" "dev" "doc" ];
   ```
 
-  This will cause Nix to pass environment variables `lib`, `headers`, and `doc` to the builder containing the intended store paths of each output.
+  This will cause Nix to pass environment variables `lib`, `dev`, and `doc` to the builder containing the intended store paths of each output.
   The builder would typically do something like
 
   ```bash
   ./configure \
     --libdir=$lib/lib \
-    --includedir=$headers/include \
+    --includedir=$dev/include \
     --docdir=$doc/share/doc
   ```
 
@@ -94,7 +94,7 @@ It outputs an attribute set, and produces a [store derivation](@docroot@/glossar
   derivation by selecting it as an attribute, e.g.
 
   ```nix
-  buildInputs = [ pkg.lib pkg.headers ];
+  buildInputs = [ pkg.lib pkg.dev ];
   ```
   <!-- FIXME: move this to the output attributes section when we have one -->
 
@@ -102,7 +102,7 @@ It outputs an attribute set, and produces a [store derivation](@docroot@/glossar
   Thus, you could also write
 
   ```nix
-  buildInputs = [ pkg pkg.headers ];
+  buildInputs = [ pkg pkg.dev ];
   ```
 
   since `pkg` is equivalent to `pkg.lib`.
