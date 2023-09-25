@@ -213,7 +213,6 @@ static RegisterPrimOp primop_fetchTree({
           ```
     )",
     .fun = prim_fetchTree,
-    .experimentalFeature = Xp::Flakes,
 });
 
 static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v,
