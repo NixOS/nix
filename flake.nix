@@ -24,8 +24,11 @@
       linuxSystems = linux32BitSystems ++ linux64BitSystems;
       darwinSystems = [ "x86_64-darwin" "aarch64-darwin" ];
       systems = linuxSystems ++ darwinSystems;
-      
-      crossSystems = [ "armv6l-linux" "armv7l-linux" ];
+
+      crossSystems = [
+        "armv6l-linux" "armv7l-linux"
+        "x86_64-freebsd13" "x86_64-netbsd"
+      ];
 
       stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" "ccacheStdenv" ];
 
@@ -93,7 +96,14 @@
       nixpkgsFor = forAllSystems
         (system: let
           make-pkgs = crossSystem: stdenv: import nixpkgs {
-            inherit system crossSystem;
+            localSystem = {
+              inherit system;
+            };
+            crossSystem = if crossSystem == null then null else {
+              system = crossSystem;
+            } // lib.optionalAttrs (crossSystem == "x86_64-freebsd13") {
+              useLLVM = true;
+            };
             overlays = [
               (overlayFor (p: p.${stdenv}))
             ];
@@ -179,9 +189,9 @@
             libarchive
             boost
             lowdown-nix
+            libsodium
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
-          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
           ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 
         checkDeps = [
@@ -732,6 +742,9 @@
 
       devShells = let
         makeShell = pkgs: stdenv:
+          let
+            canRunInstalled = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
+          in
           with commonDeps { inherit pkgs; };
           stdenv.mkDerivation {
             name = "nix";
@@ -739,13 +752,18 @@
             outputs = [ "out" "dev" "doc" ];
 
             nativeBuildInputs = nativeBuildDeps
-                                ++ (lib.optionals stdenv.cc.isClang [ pkgs.bear pkgs.clang-tools ]);
+              ++ lib.optional stdenv.cc.isClang pkgs.buildPackages.bear
+              ++ lib.optional
+                (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform)
+                pkgs.buildPackages.clang-tools
+              ;
 
             buildInputs = buildDeps ++ propagatedDeps
               ++ awsDeps ++ checkDeps ++ internalApiDocsDeps;
 
             configureFlags = configureFlags
-              ++ testConfigureFlags ++ internalApiDocsConfigureFlags;
+              ++ testConfigureFlags ++ internalApiDocsConfigureFlags
+              ++ lib.optional (!canRunInstalled) "--disable-doc-gen";
 
             enableParallelBuilding = true;
 
