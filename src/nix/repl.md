@@ -36,7 +36,7 @@ R""(
   Loading Installable ''...
   Added 1 variables.
 
-  # nix repl --extra-experimental-features 'flakes repl-flake' nixpkgs
+  # nix repl --extra-experimental-features 'flakes' nixpkgs
   Loading Installable 'flake:nixpkgs#'...
   Added 5 variables.
 

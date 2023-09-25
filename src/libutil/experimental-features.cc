@@ -163,6 +163,8 @@ constexpr std::array<ExperimentalFeatureDetails, 14> xpFeatureDetails = {{
         .tag = Xp::ReplFlake,
         .name = "repl-flake",
         .description = R"(
+            *Enabled with [`flakes`](#xp-feature-flakes) since 2.19*
+
             Allow passing [installables](@docroot@/command-ref/new-cli/nix.md#installables) to `nix repl`, making its interface consistent with the other experimental commands.
         )",
     },
