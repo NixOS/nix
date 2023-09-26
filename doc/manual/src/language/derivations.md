@@ -4,7 +4,9 @@ The most important built-in function is `derivation`, which is used to describe 
 a specification for running an executable on precisely defined input files to repeatably produce output files at uniquely determined file system paths.
 
 It takes as input an attribute set, the attributes of which specify the inputs to the process.
-It outputs an attribute set, and produces a [store derivation](@docroot@/glossary.md#gloss-store-derivation) as a side effect of evaluation.
+It outputs an attribute set, and produces a [store derivation] as a side effect of evaluation.
+
+[store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
 <!-- FIXME: add a section on output attributes -->
 
