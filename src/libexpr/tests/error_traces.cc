@@ -102,6 +102,7 @@ namespace nix {
             , type                                                          \
         )
 
+
     TEST_F(ErrorTraceTest, genericClosure) {
         ASSERT_TRACE2("genericClosure 1",
                       TypeError,
@@ -169,12 +170,12 @@ namespace nix {
         ASSERT_TRACE2("replaceStrings [ 1 ] [ \"new\" ] {}",
                       TypeError,
                       hintfmt("value is %s while a string was expected", "an integer"),
-                      hintfmt("while evaluating one of the strings to replace passed to builtins.replaceStrings"));
+                      hintfmt("while evaluating the element at index %d of the strings to replace passed to builtins.replaceStrings", 0));
 
-        ASSERT_TRACE2("replaceStrings [ \"oo\" ] [ true ] \"foo\"",
+        ASSERT_TRACE2("replaceStrings [ \"a\" \"oo\" ] [ \"b\" true ] \"foo\"",
                       TypeError,
                       hintfmt("value is %s while a string was expected", "a Boolean"),
-                      hintfmt("while evaluating one of the replacement strings passed to builtins.replaceStrings"));
+                      hintfmt("while evaluating the element at index %d of the replacement strings passed to builtins.replaceStrings", 1));
 
         ASSERT_TRACE2("replaceStrings [ \"old\" ] [ \"new\" ] {}",
                       TypeError,
@@ -484,6 +485,10 @@ namespace nix {
                       hintfmt("value is %s while a set was expected", "a string"),
                       hintfmt("while evaluating the first argument passed to builtins.removeAttrs"));
 
+        ASSERT_TRACE2("removeAttrs { foo = 1; } [ \"bar\" \"baz\" 1 ]",
+                      TypeError,
+                      hintfmt("value is %s while a string was expected", "an integer"),
+                      hintfmt("while evaluating the element at index %d of the list of attribute names to remove passed as the second argument to builtins.removeAttrs", 2));
     }
 
 
@@ -496,7 +501,7 @@ namespace nix {
         ASSERT_TRACE2("listToAttrs [ 1 ]",
                       TypeError,
                       hintfmt("value is %s while a set was expected", "an integer"),
-                      hintfmt("while evaluating an element of the list passed to builtins.listToAttrs"));
+                      hintfmt("while evaluating the element at index %d of the list passed to builtins.listToAttrs", 0));
 
         ASSERT_TRACE2("listToAttrs [ {} ]",
                       TypeError,
@@ -544,12 +549,12 @@ namespace nix {
         ASSERT_TRACE2("catAttrs \"foo\" [ 1 ]",
                       TypeError,
                       hintfmt("value is %s while a set was expected", "an integer"),
-                      hintfmt("while evaluating an element in the list passed as second argument to builtins.catAttrs"));
+                      hintfmt("while evaluating the element at index %d of the list of attribute sets passed as the second argument to builtins.catAttrs", 0));
 
-        ASSERT_TRACE2("catAttrs \"foo\" [ { foo = 1; } 1 { bar = 5;} ]",
+        ASSERT_TRACE2("catAttrs \"foo\" [ { foo = 1; } { baz = 4; } 1 { bar = 5;} ]",
                       TypeError,
                       hintfmt("value is %s while a set was expected", "an integer"),
-                      hintfmt("while evaluating an element in the list passed as second argument to builtins.catAttrs"));
+                      hintfmt("while evaluating the element at index %d of the list of attribute sets passed as the second argument to builtins.catAttrs", 2));
 
     }
 
@@ -596,7 +601,13 @@ namespace nix {
         ASSERT_TRACE2("zipAttrsWith (_: 1) [ 1 ]",
                       TypeError,
                       hintfmt("value is %s while a set was expected", "an integer"),
-                      hintfmt("while evaluating a value of the list passed as second argument to builtins.zipAttrsWith"));
+                      hintfmt("while evaluating the element at index %d of the list of attribute sets passed as the second argument to builtins.zipAttrsWith", 0));
+
+        ASSERT_TRACE2("zipAttrsWith (_: builtins.abort \"unreachable\") [ { a = \"foo\"; } 1 ]",
+                      TypeError,
+                      hintfmt("value is %s while a set was expected", "an integer"),
+                      hintfmt("while evaluating the element at index %d of the list of attribute sets passed as the second argument to builtins.zipAttrsWith", 1));
+
 
         // XXX: How to properly tell that the fucntion takes two arguments ?
         // The same question also applies to sort, and maybe others.
@@ -713,12 +724,12 @@ namespace nix {
         ASSERT_TRACE2("concatLists [ 1 ]",
                       TypeError,
                       hintfmt("value is %s while a list was expected", "an integer"),
-                      hintfmt("while evaluating a value of the list passed to builtins.concatLists"));
+                      hintfmt("while evaluating the element at index %d of the list to concatenate", 0));
 
         ASSERT_TRACE2("concatLists [ [1] \"foo\" ]",
                       TypeError,
                       hintfmt("value is %s while a list was expected", "a string"),
-                      hintfmt("while evaluating a value of the list passed to builtins.concatLists"));
+                      hintfmt("while evaluating the element at index %d of the list to concatenate", 1));
 
     }
 

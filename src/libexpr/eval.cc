@@ -427,18 +427,6 @@ ErrorBuilder & ErrorBuilder::atPos(PosIdx pos)
     return *this;
 }
 
-ErrorBuilder & ErrorBuilder::withTrace(PosIdx pos, const std::string_view text)
-{
-    info.traces.push_front(Trace{ .pos = state.positions[pos], .hint = hintformat(std::string(text)), .frame = false });
-    return *this;
-}
-
-ErrorBuilder & ErrorBuilder::withFrameTrace(PosIdx pos, const std::string_view text)
-{
-    info.traces.push_front(Trace{ .pos = state.positions[pos], .hint = hintformat(std::string(text)), .frame = true });
-    return *this;
-}
-
 ErrorBuilder & ErrorBuilder::withSuggestions(Suggestions & s)
 {
     info.suggestions = s;
@@ -1217,34 +1205,6 @@ void EvalState::eval(Expr * e, Value & v)
 }
 
 
-inline bool EvalState::evalBool(Env & env, Expr * e, const PosIdx pos, std::string_view errorCtx)
-{
-    try {
-        Value v;
-        e->eval(*this, env, v);
-        if (v.type() != nBool)
-            error("value is %1% while a Boolean was expected", showType(v)).withFrame(env, *e).debugThrow<TypeError>();
-        return v.boolean;
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
-    }
-}
-
-
-inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx)
-{
-    try {
-        e->eval(*this, env, v);
-        if (v.type() != nAttrs)
-            error("value is %1% while a set was expected", showType(v)).withFrame(env, *e).debugThrow<TypeError>();
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
-    }
-}
-
-
 void Expr::eval(EvalState & state, Env & env, Value & v)
 {
     abort();
@@ -1916,21 +1876,34 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
 {
-    Value v1; e1->eval(state, env, v1);
-    Value v2; e2->eval(state, env, v2);
-    Value * lists[2] = { &v1, &v2 };
-    state.concatLists(v, 2, lists, pos, "while evaluating one of the elements to concatenate");
+    Value v1, v2;
+    state.evalList(env, e1, v1, pos, "in the left operand of the concat (++) operator");
+    state.evalList(env, e2, v2, pos, "in the right operand of the concat (++) operator");
+
+    state.nrListConcats++;
+
+    auto l1 = v1.listSize();
+    auto l2 = v2.listSize();
+
+    if (l1 == 0) { v = v2; return; }
+    if (l2 == 0) { v = v1; return; }
+
+    state.mkList(v, l1 + l2);
+
+    auto out = v.listElems();
+    memcpy(out, v1.listElems(), l1 * sizeof(Value *));
+    memcpy(out + l1, v2.listElems(), l2 * sizeof(Value *));
 }
 
 
-void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos, std::string_view errorCtx)
+void EvalState::concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos)
 {
     nrListConcats++;
 
     Value * nonEmpty = 0;
     size_t len = 0;
     for (size_t n = 0; n < nrLists; ++n) {
-        forceList(*lists[n], pos, errorCtx);
+        forceList(*lists[n], pos, "while evaluating the element at index %d of the list to concatenate", n);
         auto l = lists[n]->listSize();
         len += l;
         if (l) nonEmpty = lists[n];
@@ -2086,80 +2059,9 @@ void EvalState::forceValueDeep(Value & v)
 }
 
 
-NixInt EvalState::forceInt(Value & v, const PosIdx pos, std::string_view errorCtx)
-{
-    try {
-        forceValue(v, pos);
-        if (v.type() != nInt)
-            error("value is %1% while an integer was expected", showType(v)).debugThrow<TypeError>();
-        return v.integer;
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
-    }
-}
-
-
-NixFloat EvalState::forceFloat(Value & v, const PosIdx pos, std::string_view errorCtx)
-{
-    try {
-        forceValue(v, pos);
-        if (v.type() == nInt)
-            return v.integer;
-        else if (v.type() != nFloat)
-            error("value is %1% while a float was expected", showType(v)).debugThrow<TypeError>();
-        return v.fpoint;
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
-    }
-}
-
-
-bool EvalState::forceBool(Value & v, const PosIdx pos, std::string_view errorCtx)
-{
-    try {
-        forceValue(v, pos);
-        if (v.type() != nBool)
-            error("value is %1% while a Boolean was expected", showType(v)).debugThrow<TypeError>();
-        return v.boolean;
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
-    }
-}
-
-
 bool EvalState::isFunctor(Value & fun)
 {
     return fun.type() == nAttrs && fun.attrs->find(sFunctor) != fun.attrs->end();
-}
-
-
-void EvalState::forceFunction(Value & v, const PosIdx pos, std::string_view errorCtx)
-{
-    try {
-        forceValue(v, pos);
-        if (v.type() != nFunction && !isFunctor(v))
-            error("value is %1% while a function was expected", showType(v)).debugThrow<TypeError>();
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
-    }
-}
-
-
-std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string_view errorCtx)
-{
-    try {
-        forceValue(v, pos);
-        if (v.type() != nString)
-            error("value is %1% while a string was expected", showType(v)).debugThrow<TypeError>();
-        return v.string.s;
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
-    }
 }
 
 
@@ -2168,24 +2070,6 @@ void copyContext(const Value & v, NixStringContext & context)
     if (v.string.context)
         for (const char * * p = v.string.context; *p; ++p)
             context.insert(NixStringContextElem::parse(*p));
-}
-
-
-std::string_view EvalState::forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx)
-{
-    auto s = forceString(v, pos, errorCtx);
-    copyContext(v, context);
-    return s;
-}
-
-
-std::string_view EvalState::forceStringNoCtx(Value & v, const PosIdx pos, std::string_view errorCtx)
-{
-    auto s = forceString(v, pos, errorCtx);
-    if (v.string.context) {
-        error("the string '%1%' is not allowed to refer to a store path (such as '%2%')", v.string.s, v.string.context[0]).withTrace(pos, errorCtx).debugThrow<EvalError>();
-    }
-    return s;
 }
 
 
@@ -2214,6 +2098,7 @@ std::optional<std::string> EvalState::tryAttrsToString(const PosIdx pos, Value &
 
     return {};
 }
+
 
 BackedStringView EvalState::coerceToString(
     const PosIdx pos,
