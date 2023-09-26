@@ -343,7 +343,7 @@ public:
           users in `build-users-group`.
 
           UIDs are allocated starting at 872415232 (0x34000000) on Linux and 56930 on macOS.
-        )"};
+        )", {}, true, Xp::AutoAllocateUids};
 
     Setting<uint32_t> startId{this,
         #if __linux__
@@ -697,19 +697,40 @@ public:
         getDefaultSystemFeatures(),
         "system-features",
         R"(
-          A set of system “features” supported by this machine, e.g. `kvm`.
-          Derivations can express a dependency on such features through the
-          derivation attribute `requiredSystemFeatures`. For example, the
-          attribute
+          A set of system “features” supported by this machine.
 
-              requiredSystemFeatures = [ "kvm" ];
+          This complements the [`system`](#conf-system) and [`extra-platforms`](#conf-extra-platforms) configuration options and the corresponding [`system`](@docroot@/language/derivations.md#attr-system) attribute on derivations.
 
-          ensures that the derivation can only be built on a machine with the
-          `kvm` feature.
+          A derivation can require system features in the [`requiredSystemFeatures` attribute](@docroot@/language/advanced-attributes.md#adv-attr-requiredSystemFeatures), and the machine to build the derivation must have them.
 
-          This setting by default includes `kvm` if `/dev/kvm` is accessible,
-          and the pseudo-features `nixos-test`, `benchmark` and `big-parallel`
-          that are used in Nixpkgs to route builds to specific machines.
+          System features are user-defined, but Nix sets the following defaults:
+
+          - `kvm`
+
+            Included by default if `/dev/kvm` is accessible.
+
+          - `nixos-test`, `benchmark`, `big-parallel`
+
+            These historical pseudo-features are always enabled for backwards compatibility, as they are used in Nixpkgs to route Hydra builds to specific machines.
+
+          - `ca-derivations`
+
+            Included by default if the [`ca-derivations` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-ca-derivations) is enabled.
+
+            This system feature is implicitly required by derivations with the [`__contentAddressed` attribute](@docroot@/language/advanced-attributes.md#adv-attr-__contentAddressed).
+
+          - `recursive-nix`
+
+            Included by default if the [`recursive-nix` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-recursive-nix) is enabled.
+
+          - `uid-range`
+
+            On Linux, Nix can run builds in a user namespace where they run as root (UID 0) and have 65,536 UIDs available.
+            This is primarily useful for running containers such as `systemd-nspawn` inside a Nix build. For an example, see [`tests/systemd-nspawn/nix`][nspawn].
+
+            [nspawn]: https://github.com/NixOS/nix/blob/67bcb99700a0da1395fa063d7c6586740b304598/tests/systemd-nspawn.nix.
+
+            Included by default on Linux if the [`auto-allocate-uids`](#conf-auto-allocate-uids) setting is enabled.
         )", {}, false};
 
     Setting<Strings> substituters{
