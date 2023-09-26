@@ -28,6 +28,8 @@ class Store;
 struct Source;
 
 // items being serialised
+class StorePath;
+struct ContentAddress;
 struct DerivedPath;
 struct DrvOutput;
 struct Realisation;
@@ -220,6 +222,8 @@ template<typename T>
 MAKE_WORKER_PROTO(std::vector<T>);
 template<typename T>
 MAKE_WORKER_PROTO(std::set<T>);
+template<typename... Ts>
+MAKE_WORKER_PROTO(std::tuple<Ts...>);
 
 template<typename K, typename V>
 #define X_ std::map<K, V>

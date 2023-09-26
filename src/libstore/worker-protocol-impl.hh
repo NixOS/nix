@@ -75,4 +75,20 @@ void WorkerProto::Serialise<std::map<K, V>>::write(const Store & store, WorkerPr
     }
 }
 
+template<typename... Ts>
+std::tuple<Ts...> WorkerProto::Serialise<std::tuple<Ts...>>::read(const Store & store, WorkerProto::ReadConn conn)
+{
+    return std::tuple<Ts...> {
+        WorkerProto::Serialise<Ts>::read(store, conn)...,
+    };
+}
+
+template<typename... Ts>
+void WorkerProto::Serialise<std::tuple<Ts...>>::write(const Store & store, WorkerProto::WriteConn conn, const std::tuple<Ts...> & res)
+{
+    std::apply([&]<typename... Us>(const Us &... args) {
+        (WorkerProto::Serialise<Us>::write(store, conn, args), ...);
+    }, res);
+}
+
 }
