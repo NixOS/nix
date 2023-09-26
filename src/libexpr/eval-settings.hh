@@ -47,11 +47,12 @@ struct EvalSettings : Config
     Setting<bool> enableImportFromDerivation{
         this, true, "allow-import-from-derivation",
         R"(
-          By default, Nix allows you to `import` from a derivation, allowing
-          building at evaluation time. With this option set to false, Nix will
-          throw an error when evaluating an expression that uses this feature,
-          allowing users to ensure their evaluation will not require any
-          builds to take place.
+          By default, Nix allows [Import from Derivation](@docroot@/language/import-from-derivation.md).
+
+          With this option set to `false`, Nix will throw an error when evaluating an expression that uses this feature,
+          even when the required store object is readily available.
+          This ensures that evaluation will not require any builds to take place,
+          regardless of the state of the store.
         )"};
 
     Setting<Strings> allowedUris{this, {}, "allowed-uris",
