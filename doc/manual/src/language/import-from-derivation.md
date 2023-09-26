@@ -8,8 +8,11 @@ In this case, when that store object is needed, evaluation will be paused, the s
 [realised]: @docroot@/glossary.md#gloss-realise
 
 This has performance implications:
-Since evaluation is sequential, each required store object that is not already in the store will also be realised sequentially.
-Usually, if store objects are not already present, realisation is orders of magnitude slower than evaluation.
+Evaluation can only finish when all required store objects are realised.
+Since the Nix language evaluator is sequential, it only finds [store paths] to read from one at a time.
+While realisation is always parallel, in this case it cannot be done for all required store paths at once, and is therefore much slower than otherwise.
+
+[store paths]: @docroot@/glossary.md#gloss-store-path
 
 Passing an expression `expr` that evaluates to a [store path](@docroot@/glossary.md#gloss-store-path) to any built-in function which reads from the filesystem constitutes Import From Derivation:
 
