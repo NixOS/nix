@@ -54,7 +54,7 @@ building '/nix/store/348q1cal6sdgfxs8zqi9v8llrsn4kqkq-hello.drv'...
 "hello world"
 ```
 
-The contents of the derivation's [output path](@docroot@/glossary.md#gloss-output-path) have to be [realised] before they can be read with [`readFile`](./builtins.md#builtins-readFile).
+The contents of the derivation's output have to be [realised] before they can be read with [`readFile`](./builtins.md#builtins-readFile).
 Only then evaluation can continue to produce the final result.
 
 ## Illustration
