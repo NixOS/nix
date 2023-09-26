@@ -8,8 +8,6 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 
 [store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
-<!-- FIXME: add a section on output attributes -->
-
 ## Input attributes
 
 ### Required
@@ -17,11 +15,22 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 - [`name`]{#attr-name} ([String](@docroot@/language/values.md#type-string))
 
   A symbolic name for the derivation.
-  It is added to the [store derivation]'s [path](@docroot@/glossary.md#gloss-store-path) and its [output paths][output path].
+  It is added to the [store path] of the corresponding [store derivation] as well as to its [output paths](@docroot@/glossary.md#gloss-output-path).
 
-  Example: `name = "hello";`
+  [store path]: @docroot@/glossary.md#gloss-store-path
 
-  The store derivation's path will be `/nix/store/<hash>-hello.drv`, and the output paths will be of the form `/nix/store/<hash>-hello[-<output>]`
+  > **Example**
+  >
+  > ```nix
+  > derivation {
+  >   name = "hello";
+  >   # ...
+  > }
+  > ```
+  >
+  > The store derivation's path will be `/nix/store/<hash>-hello.drv`.
+  > The [output](#attr-outputs) paths will be of the form `/nix/store/<hash>-hello[-<output>]`
+
 - [`system`]{#attr-system} ([String](@docroot@/language/values.md#type-string))
 
   The system type on which the [`builder`](#attr-builder) executable is meant to be run.
@@ -29,77 +38,174 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
   A necessary condition for Nix to build derivations locally is that the `system` attribute matches the current [`system` configuration option].
   It can automatically [build on other platforms](../advanced-topics/distributed-builds.md) by forwarding build requests to other machines.
 
-  Examples:
-
-  `system = "x86_64-linux";`
-
-  `system = builtins.currentSystem;`
-
-  [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem) has the value of the [`system` configuration option], and defaults to the system type of the current Nix installation.
-
   [`system` configuration option]: @docroot@/command-ref/conf-file.md#conf-system
+
+  > **Example**
+  >
+  > Declare a derivation to be built on a specific system type:
+  >
+  > ```nix
+  > derivation {
+  >   # ...
+  >   system = "x86_64-linux";
+  >   # ...
+  > }
+  > ```
+
+  > **Example**
+  >
+  > Declare a derivation to be built on the system type that evaluates the expression:
+  >
+  > ```nix
+  > derivation {
+  >   # ...
+  >   system = builtins.currentSystem;
+  >   # ...
+  > }
+  > ```
+  >
+  > [`builtins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem) has the value of the [`system` configuration option], and defaults to the system type of the current Nix installation.
 
 - [`builder`]{#attr-builder} ([Path](@docroot@/language/values.md#type-path) | [String](@docroot@/language/values.md#type-string))
 
   Path to an executable that will perform the build.
 
-  Examples:
+  > **Example**
+  >
+  > Use the file located at `/bin/bash` as the builder executable:
+  >
+  > ```nix
+  > derivation {
+  >   # ...
+  >   builder = "/bin/bash";
+  >   # ...
+  > };
+  > ```
 
-  `builder = "/bin/bash";`
+  <!-- -->
 
-  `builder = ./builder.sh;`
+  > **Example**
+  >
+  > Copy a local file to the Nix store for use as the builder executable:
+  >
+  > ```nix
+  > derivation {
+  >   # ...
+  >   builder = ./builder.sh;
+  >   # ...
+  > };
+  > ```
 
-  `builder = "${pkgs.python}/bin/python";`
+  <!-- -->
+
+  > **Example**
+  >
+  > Use a file from another derivation as the builder executable:
+  >
+  > ```nix
+  > let pkgs = import <nixpkgs> {}; in
+  > derivation {
+  >   # ...
+  >   builder = "${pkgs.python}/bin/python";
+  >   # ...
+  > };
+  > ```
 
 ### Optional
 
-- [`args`]{#attr-args} ([List](@docroot@/language/values.md#list) of [String](@docroot@/language/values.md#type-string)) Default: `[ ]`
+- [`args`]{#attr-args} ([List](@docroot@/language/values.md#list) of [String](@docroot@/language/values.md#type-string))
+
+  Default: `[ ]`
 
   Command-line arguments to be passed to the [`builder`](#attr-builder) executable.
 
-  Example: `args = [ "-c" "echo hello world > $out" ];`
+  > **Example**
+  >
+  > Pass arguments to Bash to interpret a shell command:
+  >
+  > ```nix
+  > derivation {
+  >   # ...
+  >   builder = "/bin/bash";
+  >   args = [ "-c" "echo hello world > $out" ];
+  >   # ...
+  > };
+  > ```
 
-- [`outputs`]{#attr-outputs} ([List](@docroot@/language/values.md#list) of [String](@docroot@/language/values.md#type-string)) Default: `[ "out" ]`
+- [`outputs`]{#attr-outputs} ([List](@docroot@/language/values.md#list) of [String](@docroot@/language/values.md#type-string))
+
+  Default: `[ "out" ]`
 
   Symbolic outputs of the derivation.
-  Each output name is passed to the [`builder`](#attr-builder) executable as an environment variable with its value set to the corresponding [output path].
+  Each output name is passed to the [`builder`](#attr-builder) executable as an environment variable with its value set to the corresponding [store path].
 
-  [output path]: @docroot@/glossary.md#gloss-output-path
-
-  By default, a derivation produces a single output path called `out`.
-  However, derivations can produce multiple output paths.
+  By default, a derivation produces a single output called `out`.
+  However, derivations can produce multiple outputs.
   This allows the associated [store objects](@docroot@/glossary.md#gloss-store-object) and their [closures](@docroot@/glossary.md#gloss-closure) to be copied or garbage-collected separately.
 
-  Examples:
+  > **Example**
+  >
+  > Imagine a library package that provides a dynamic library, header files, and documentation.
+  > A program that links against such a library doesn’t need the header files and documentation at runtime, and it doesn’t need the documentation at build time.
+  > Thus, the library package could specify:
+  >
+  > ```nix
+  > derivation {
+  >   # ...
+  >   outputs = [ "lib" "dev" "doc" ];
+  >   # ...
+  > }
+  > ```
+  >
+  > This will cause Nix to pass environment variables `lib`, `dev`, and `doc` to the builder containing the intended store paths of each output.
+  > The builder would typically do something like
+  >
+  > ```bash
+  > ./configure \
+  >   --libdir=$lib/lib \
+  >   --includedir=$dev/include \
+  >   --docdir=$doc/share/doc
+  > ```
+  >
+  > for an Autoconf-style package.
 
-  Imagine a library package that provides a dynamic library, header files, and documentation.
-  A program that links against such a library doesn’t need the header files and documentation at runtime, and it doesn’t need the documentation at build time.
-  Thus, the library package could specify:
+  The symbolic name is appended to an output's store path, unless it is `out`.
 
-  ```nix
-  derivation {
-    # ...
-    outputs = [ "lib" "dev" "doc" ];
-    # ...
-  }
-  ```
+  > **Example**
+  >
+  >
+  > ```nix
+  > derivation {
+  >   name = "example";
+  >   outputs = [ "lib" "dev" "doc" ];
+  >   # ...
+  > }
+  > ```
+  >
+  > The store derivation path will be `/nix/store/<hash>-example.drv`.
+  > The output paths will be
+  > - `/nix/store/<hash>-example-lib`
+  > - `/nix/store/<hash>-example-dev`
+  > - `/nix/store/<hash>-example-doc`
 
-  This will cause Nix to pass environment variables `lib`, `dev`, and `doc` to the builder containing the intended store paths of each output.
-  The builder would typically do something like
+  You can refer to each output of a derivation by selecting it as an attribute.
+  The first element of `outputs` determines the *default output* and ends up at the top-level.
 
-  ```bash
-  ./configure \
-    --libdir=$lib/lib \
-    --includedir=$dev/include \
-    --docdir=$doc/share/doc
-  ```
-
-  for an Autoconf-style package.
-
-  You can refer to each output of a derivation by selecting it as an attribute, e.g. `myPackage.lib` or `myPackage.doc`.
-
-  The first element of `outputs` determines the *default output*.
-  Therefore, in the given example, `myPackage` is equivalent to `myPackage.lib`.
+  > **Example**
+  >
+  > Select an output by attribute name:
+  >
+  > ```nix
+  > let
+  >   myPackage = derivation {
+  >     name = "example";
+  >     outputs = [ "lib" "dev" "doc" ];
+  >     # ...
+  >   };
+  > in myPackage.dev
+  > ```
+  >
+  > SInce `lib` is the first output, `myPackage` is equivalent to `myPackage.lib`.
 
   <!-- FIXME: refer to the output attributes when we have one -->
 
@@ -123,14 +229,15 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
       reside in the Nix store.
 
     - A *derivation* causes that derivation to be built prior to the
-      present derivation; its default output path is put in the
-      environment variable.
+      present derivation. The environment variable is set to the [store path] of the derivation's default [output](#attr-outputs).
 
     - Lists of the previous types are also allowed. They are simply
       concatenated, separated by spaces.
 
     - `true` is passed as the string `1`, `false` and `null` are
       passed as an empty string.
+
+<!-- FIXME: add a section on output attributes -->
 
 ## Builder execution
 
