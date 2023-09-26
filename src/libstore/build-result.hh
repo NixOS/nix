@@ -3,6 +3,7 @@
 
 #include "realisation.hh"
 #include "derived-path.hh"
+#include "comparator.hh"
 
 #include <string>
 #include <chrono>
@@ -99,6 +100,8 @@ struct BuildResult
      * User and system CPU time the build took.
      */
     std::optional<std::chrono::microseconds> cpuUser, cpuSystem;
+
+    DECLARE_CMP(BuildResult);
 
     bool success()
     {
