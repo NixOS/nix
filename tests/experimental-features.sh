@@ -80,7 +80,7 @@ nix --experimental-features '' upgrade-nix --help 1>/dev/null
 # all care). To deal with fixing later, we simply make them require the
 # nix-command experimental features --- it so happens that the commands we wish
 # stabilizing to do not need them anyways.
-for arg in '--print-build-logs' '--offline' '--refresh'; do
+for arg in '--offline' '--refresh'; do
     nix --experimental-features 'nix-command' "$arg" --help 1>/dev/null
     expect 1 nix --experimental-features '' "$arg" --help 1>/dev/null
 done

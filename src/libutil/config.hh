@@ -192,6 +192,10 @@ public:
     const std::string description;
     const std::set<std::string> aliases;
 
+    /* Short name for the CLI argument corresponding to this
+       setting. */
+    char shortName = 0;
+
     int created = 123;
 
     bool overridden = false;
