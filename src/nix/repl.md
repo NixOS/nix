@@ -43,9 +43,6 @@ R""(
   nix-repl> legacyPackages.x86_64-linux.emacs.name
   "emacs-27.1"
 
-  nix-repl> legacyPackages.x86_64-linux.emacs.name
-  "emacs-27.1"
-
   nix-repl> :q
 
   # nix repl --expr 'import <nixpkgs>{}'
