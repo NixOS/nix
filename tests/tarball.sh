@@ -16,9 +16,15 @@ hash=$(nix hash path $tarroot)
 test_tarball() {
     local ext="$1"
     local compressor="$2"
+    local noroot="${3:-false}"
 
     tarball=$TEST_ROOT/tarball.tar$ext
-    (cd $TEST_ROOT && tar cf - tarball) | $compressor > $tarball
+    if [ "$noroot" = true ]; then
+        local tarargs="-C tarball ."
+    else
+        local tarargs="tarball"
+    fi
+    (cd $TEST_ROOT && tar cf - $tarargs) | $compressor > $tarball
 
     nix-env -f file://$tarball -qa --out-path | grepQuiet dependencies
 
@@ -55,6 +61,7 @@ test_tarball() {
 }
 
 test_tarball '' cat
+test_tarball '' cat true
 test_tarball .xz xz
 test_tarball .gz gzip
 
