@@ -16,10 +16,12 @@
 #ifndef BISON_HEADER
 #define BISON_HEADER
 
+#include <map>
 #include <variant>
 
 #include "util.hh"
 
+#include "comment.hh"
 #include "nixexpr.hh"
 #include "eval.hh"
 #include "eval-settings.hh"
@@ -35,6 +37,8 @@ namespace nix {
         SourcePath basePath;
         PosTable::Origin origin;
         std::optional<ErrorInfo> error;
+        std::vector<Comment> comments;
+        std::map<nix::Expr *, Comment> attachedComments;
     };
 
     struct ParserFormals {
@@ -283,6 +287,25 @@ static Expr * stripIndentation(const PosIdx pos, SymbolTable & symbols,
         return result;
     }
     return new ExprConcatStrings(pos, true, es2);
+}
+
+static void actOnDocumentableDeclaration(ParseData &data, nix::Expr *decl) {
+    // TODO: we should have a switch that turn of this act by default
+    // because for evaluation we does not want to introduce any overhead
+    // if (no need this action)
+    //   return;
+
+    if (data.comments.empty())
+        return;
+
+    // TODO: check if there are only whitespaces between decl & the comment
+    // TODO: deal with aliases & partial lambdas
+    if (!dynamic_cast<nix::ExprLambda *>(decl))
+        return;
+
+    // TODO: maybe parse the comment and strip '*' prefixes
+    data.attachedComments.insert({decl, std::move(data.comments.back())});
+    data.comments.clear();
 }
 
 
@@ -541,7 +564,12 @@ ind_string_parts
   ;
 
 binds
-  : binds attrpath '=' expr ';' { $$ = $1; addAttr($$, std::move(*$2), $4, makeCurPos(@2, data), data->state); delete $2; }
+  : binds attrpath '=' expr ';' {
+    $$ = $1;
+    addAttr($$, std::move(*$2), $4, makeCurPos(@2, data), data->state);
+    actOnDocumentableDeclaration(*data, $4);
+    delete $2;
+  }
   | binds INHERIT attrs ';'
     { $$ = $1;
       for (auto & i : *$3) {
@@ -677,6 +705,7 @@ Expr * EvalState::parse(
     if (res) throw ParseError(data.error.value());
 
     data.result->bindVars(*this, staticEnv);
+    attachedComments.insert(data.attachedComments.begin(), data.attachedComments.end());
 
     return data.result;
 }

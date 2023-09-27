@@ -751,6 +751,17 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
                 .doc = doc,
             };
     }
+    if (v.isLambda()) {
+        ExprLambda * lambda = v.lambda.fun;
+        Expr * e = lambda;
+        if (attachedComments.contains(e)) {
+            return Doc{
+                .pos = positions[lambda->getPos()],
+                .name = "", /* TODO: nix::Symbol */
+                .args = {},
+                .doc = attachedComments[e].content.c_str()};
+        }
+    }
     return {};
 }
 

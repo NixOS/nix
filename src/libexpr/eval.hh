@@ -2,6 +2,7 @@
 ///@file
 
 #include "attr-set.hh"
+#include "comment.hh"
 #include "types.hh"
 #include "value.hh"
 #include "nixexpr.hh"
@@ -185,6 +186,8 @@ class EvalState : public std::enable_shared_from_this<EvalState>
 public:
     SymbolTable symbols;
     PosTable positions;
+
+    std::map<Expr *, Comment> attachedComments;
 
     const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
         sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
