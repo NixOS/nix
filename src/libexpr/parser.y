@@ -339,7 +339,7 @@ void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * err
 %type <id> attr
 %token <id> ID
 %token <str> STR IND_STR
-%token <n> INT
+%token <n> INT BIN OCT HEX
 %token <nf> FLOAT
 %token <path> PATH HPATH SPATH PATH_END
 %token <uri> URI
@@ -456,6 +456,9 @@ expr_simple
       else
           $$ = new ExprVar(CUR_POS, data->symbols.create($1));
   }
+  | BIN { $$ = new ExprInt($1); }
+  | OCT { $$ = new ExprInt($1); }
+  | HEX { $$ = new ExprInt($1); }
   | INT { $$ = new ExprInt($1); }
   | FLOAT { $$ = new ExprFloat($1); }
   | '"' string_parts '"' { $$ = $2; }
