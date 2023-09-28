@@ -28,10 +28,10 @@ libexpr_LDFLAGS_PROPAGATED = $(BDW_GC_LIBS)
 
 libexpr_ORDER_AFTER := $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexer-tab.hh
 
-$(d)/parser-tab.cc $(d)/parser-tab.hh: $(d)/parser.y
+$(d)/parser-tab.cc $(d)/parser-tab.hh: $(d)/parser/parser.y $(d)/parser/prologue.inc $(d)/parser/epilogue.inc
 	$(trace-gen) bison -v -o $(libexpr_DIR)/parser-tab.cc $< -d
 
-$(d)/lexer-tab.cc $(d)/lexer-tab.hh: $(d)/lexer.l
+$(d)/lexer-tab.cc $(d)/lexer-tab.hh: $(d)/lexer/lexer.l $(d)/lexer/prologue.inc
 	$(trace-gen) flex --outfile $(libexpr_DIR)/lexer-tab.cc --header-file=$(libexpr_DIR)/lexer-tab.hh $<
 
 clean-files += $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexer-tab.hh
