@@ -177,7 +177,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
   > ```nix
   > derivation {
   >   name = "example";
-  >   outputs = [ "lib" "dev" "doc" ];
+  >   outputs = [ "lib" "dev" "doc" "out" ];
   >   # ...
   > }
   > ```
@@ -187,6 +187,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
   > - `/nix/store/<hash>-example-lib`
   > - `/nix/store/<hash>-example-dev`
   > - `/nix/store/<hash>-example-doc`
+  > - `/nix/store/<hash>-example`
 
   You can refer to each output of a derivation by selecting it as an attribute.
   The first element of `outputs` determines the *default output* and ends up at the top-level.
@@ -199,7 +200,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
   > let
   >   myPackage = derivation {
   >     name = "example";
-  >     outputs = [ "lib" "dev" "doc" ];
+  >     outputs = [ "lib" "dev" "doc" "out" ];
   >     # ...
   >   };
   > in myPackage.dev
