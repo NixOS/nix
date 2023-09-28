@@ -156,7 +156,7 @@ DrvInfo::Outputs DrvInfo::queryOutputs(bool withPaths, bool onlyOutputsToInstall
         Outputs result;
         for (auto elem : outTI->listItems()) {
             if (elem->type() != nString) throw errMsg;
-            auto out = outputs.find(elem->string.s);
+            auto out = outputs.find(elem->c_str());
             if (out == outputs.end()) throw errMsg;
             result.insert(*out);
         }
@@ -230,7 +230,7 @@ std::string DrvInfo::queryMetaString(const std::string & name)
 {
     Value * v = queryMeta(name);
     if (!v || v->type() != nString) return "";
-    return v->string.s;
+    return v->c_str();
 }
 
 
@@ -242,7 +242,7 @@ NixInt DrvInfo::queryMetaInt(const std::string & name, NixInt def)
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            integer meta fields. */
-        if (auto n = string2Int<NixInt>(v->string.s))
+        if (auto n = string2Int<NixInt>(v->c_str()))
             return *n;
     }
     return def;
@@ -256,7 +256,7 @@ NixFloat DrvInfo::queryMetaFloat(const std::string & name, NixFloat def)
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            float meta fields. */
-        if (auto n = string2Float<NixFloat>(v->string.s))
+        if (auto n = string2Float<NixFloat>(v->c_str()))
             return *n;
     }
     return def;
@@ -271,8 +271,8 @@ bool DrvInfo::queryMetaBool(const std::string & name, bool def)
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            Boolean meta fields. */
-        if (strcmp(v->string.s, "true") == 0) return true;
-        if (strcmp(v->string.s, "false") == 0) return false;
+        if (v->string_view() == "true") return true;
+        if (v->string_view() == "false") return false;
     }
     return def;
 }

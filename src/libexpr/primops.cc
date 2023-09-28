@@ -590,7 +590,7 @@ struct CompareValues
                 case nFloat:
                     return v1->fpoint < v2->fpoint;
                 case nString:
-                    return strcmp(v1->string.s, v2->string.s) < 0;
+                    return v1->string_view().compare(v2->string_view()) < 0;
                 case nPath:
                     return strcmp(v1->_path, v2->_path) < 0;
                 case nList:
@@ -982,7 +982,7 @@ static void prim_trace(EvalState & state, const PosIdx pos, Value * * args, Valu
 {
     state.forceValue(*args[0], pos);
     if (args[0]->type() == nString)
-        printError("trace: %1%", args[0]->string.s);
+        printError("trace: %1%", args[0]->string_view());
     else
         printError("trace: %1%", printValue(state, *args[0]));
     state.forceValue(*args[1], pos);
@@ -1528,7 +1528,7 @@ static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args,
     auto path = realisePath(state, pos, arg, { .checkForPureEval = false });
 
     /* SourcePath doesn't know about trailing slash. */
-    auto mustBeDir = arg.type() == nString && arg.str().ends_with("/");
+    auto mustBeDir = arg.type() == nString && arg.string_view().ends_with("/");
 
     try {
         auto checked = state.checkSourcePath(path);
@@ -2400,7 +2400,7 @@ static void prim_attrNames(EvalState & state, const PosIdx pos, Value * * args, 
         (v.listElems()[n++] = state.allocValue())->mkString(state.symbols[i.name]);
 
     std::sort(v.listElems(), v.listElems() + n,
-              [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
+              [](Value * v1, Value * v2) { return v1->string_view().compare(v2->string_view()) < 0; });
 }
 
 static RegisterPrimOp primop_attrNames({
@@ -2541,7 +2541,7 @@ static void prim_removeAttrs(EvalState & state, const PosIdx pos, Value * * args
     names.reserve(args[1]->listSize());
     for (auto elem : args[1]->listItems()) {
         state.forceStringNoCtx(*elem, pos, "while evaluating the values of the second argument passed to builtins.removeAttrs");
-        names.emplace_back(state.symbols.create(elem->string.s), nullptr);
+        names.emplace_back(state.symbols.create(elem->string_view()), nullptr);
     }
     std::sort(names.begin(), names.end());
 

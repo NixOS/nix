@@ -186,10 +186,9 @@ public:
          * For canonicity, the store paths should be in sorted order.
          */
         struct {
-            const char * s;
+            const char * c_str;
             const char * * context; // must be in sorted order
         } string;
-
         const char * _path;
         Bindings * attrs;
         struct {
@@ -270,7 +269,7 @@ public:
     inline void mkString(const char * s, const char * * context = 0)
     {
         internalType = tString;
-        string.s = s;
+        string.c_str = s;
         string.context = context;
     }
 
@@ -441,10 +440,21 @@ public:
         return SourcePath{CanonPath(_path)};
     }
 
-    std::string_view str() const
+    std::string_view string_view() const
     {
         assert(internalType == tString);
-        return std::string_view(string.s);
+        return std::string_view(string.c_str);
+    }
+
+    const char * const c_str() const
+    {
+        assert(internalType == tString);
+        return string.c_str;
+    }
+
+    const char * * context() const
+    {
+        return string.context;
     }
 };
 
