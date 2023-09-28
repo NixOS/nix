@@ -206,7 +206,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
   > in myPackage.dev
   > ```
   >
-  > SInce `lib` is the first output, `myPackage` is equivalent to `myPackage.lib`.
+  > Since `lib` is the first output, `myPackage` is equivalent to `myPackage.lib`.
 
   <!-- FIXME: refer to the output attributes when we have one -->
 
