@@ -61,10 +61,10 @@ createGitRepo() {
     local repo="$1"
     local extraArgs="${2-}"
 
-    rm -rf $repo $repo.tmp
-    mkdir -p $repo
+    rm -rf "$repo" "$repo".tmp
+    mkdir -p "$repo"
 
-    git -C $repo init $extraArgs
-    git -C $repo config user.email "foobar@example.com"
-    git -C $repo config user.name "Foobar"
+    git -C "$repo" init $extraArgs
+    git -C "$repo" config user.email "foobar@example.com"
+    git -C "$repo" config user.name "Foobar"
 }

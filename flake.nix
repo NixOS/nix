@@ -1,7 +1,7 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.11-small";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05-small";
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
@@ -19,11 +19,16 @@
         then ""
         else "pre${builtins.substring 0 8 (self.lastModifiedDate or self.lastModified or "19700101")}_${self.shortRev or "dirty"}";
 
+      linux32BitSystems = [ "i686-linux" ];
       linux64BitSystems = [ "x86_64-linux" "aarch64-linux" ];
-      linuxSystems = linux64BitSystems ++ [ "i686-linux" ];
-      systems = linuxSystems ++ [ "x86_64-darwin" "aarch64-darwin" ];
+      linuxSystems = linux32BitSystems ++ linux64BitSystems;
+      darwinSystems = [ "x86_64-darwin" "aarch64-darwin" ];
+      systems = linuxSystems ++ darwinSystems;
 
-      crossSystems = [ "armv6l-linux" "armv7l-linux" ];
+      crossSystems = [
+        "armv6l-linux" "armv7l-linux"
+        "x86_64-freebsd13" "x86_64-netbsd"
+      ];
 
       stdenvs = [ "gccStdenv" "clangStdenv" "clang11Stdenv" "stdenv" "libcxxStdenv" "ccacheStdenv" ];
 
@@ -73,6 +78,7 @@
               ./precompiled-headers.h
               ./src
               ./tests
+              ./unit-test-data
               ./COPYING
               ./scripts/local.mk
               (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
@@ -91,7 +97,14 @@
       nixpkgsFor = forAllSystems
         (system: let
           make-pkgs = crossSystem: stdenv: import nixpkgs {
-            inherit system crossSystem;
+            localSystem = {
+              inherit system;
+            };
+            crossSystem = if crossSystem == null then null else {
+              system = crossSystem;
+            } // lib.optionalAttrs (crossSystem == "x86_64-freebsd13") {
+              useLLVM = true;
+            };
             overlays = [
               (overlayFor (p: p.${stdenv}))
             ];
@@ -177,9 +190,9 @@
             libarchive
             boost
             lowdown-nix
+            libsodium
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
-          ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
           ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 
         checkDeps = [
@@ -585,6 +598,8 @@
             lcovFilter = [ "*/boost/*" "*-tab.*" ];
 
             hardeningDisable = ["fortify"];
+
+            NIX_CFLAGS_COMPILE = "-DCOVERAGE=1";
           };
 
         # API docs for Nix's unstable internal C++ interfaces.
@@ -654,7 +669,9 @@
         tests.nixpkgsLibTests =
           forAllSystems (system:
             import (nixpkgs + "/lib/tests/release.nix")
-              { pkgs = nixpkgsFor.${system}.native; }
+              { pkgs = nixpkgsFor.${system}.native;
+                nixVersions = [ self.packages.${system}.nix ];
+              }
           );
 
         metrics.nixpkgs = import "${nixpkgs-regression}/pkgs/top-level/metrics.nix" {
@@ -726,6 +743,9 @@
 
       devShells = let
         makeShell = pkgs: stdenv:
+          let
+            canRunInstalled = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
+          in
           with commonDeps { inherit pkgs; };
           stdenv.mkDerivation {
             name = "nix";
@@ -733,13 +753,18 @@
             outputs = [ "out" "dev" "doc" ];
 
             nativeBuildInputs = nativeBuildDeps
-                                ++ (lib.optionals stdenv.cc.isClang [ pkgs.bear pkgs.clang-tools ]);
+              ++ lib.optional stdenv.cc.isClang pkgs.buildPackages.bear
+              ++ lib.optional
+                (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform)
+                pkgs.buildPackages.clang-tools
+              ;
 
             buildInputs = buildDeps ++ propagatedDeps
               ++ awsDeps ++ checkDeps ++ internalApiDocsDeps;
 
             configureFlags = configureFlags
-              ++ testConfigureFlags ++ internalApiDocsConfigureFlags;
+              ++ testConfigureFlags ++ internalApiDocsConfigureFlags
+              ++ lib.optional (!canRunInstalled) "--disable-doc-gen";
 
             enableParallelBuilding = true;
 

@@ -343,7 +343,7 @@ const redirects = {
     "linux": "uninstall.html#linux",
     "macos": "uninstall.html#macos",
     "uninstalling": "uninstall.html",
-  }
+  },
   "contributing/hacking.html": {
     "nix-with-flakes": "#building-nix-with-flakes",
     "classic-nix": "#building-nix",

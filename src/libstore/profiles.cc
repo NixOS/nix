@@ -183,7 +183,7 @@ void deleteGenerationsGreaterThan(const Path & profile, GenerationNumber max, bo
     iterDropUntil(gens, i, [&](auto & g) { return g.number == curGen; });
 
     // Skip over `max` generations, preserving them
-    for (auto keep = 0; i != gens.rend() && keep < max; ++i, ++keep);
+    for (GenerationNumber keep = 0; i != gens.rend() && keep < max; ++i, ++keep);
 
     // Delete the rest
     for (; i != gens.rend(); ++i)

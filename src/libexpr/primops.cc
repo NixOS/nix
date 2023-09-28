@@ -590,7 +590,7 @@ struct CompareValues
                 case nFloat:
                     return v1->fpoint < v2->fpoint;
                 case nString:
-                    return strcmp(v1->string.s, v2->string.s) < 0;
+                    return v1->string_view().compare(v2->string_view()) < 0;
                 case nPath:
                     return strcmp(v1->_path, v2->_path) < 0;
                 case nList:
@@ -982,7 +982,7 @@ static void prim_trace(EvalState & state, const PosIdx pos, Value * * args, Valu
 {
     state.forceValue(*args[0], pos);
     if (args[0]->type() == nString)
-        printError("trace: %1%", args[0]->string.s);
+        printError("trace: %1%", args[0]->string_view());
     else
         printError("trace: %1%", printValue(state, *args[0]));
     state.forceValue(*args[1], pos);
@@ -1252,15 +1252,13 @@ drvName, Bindings * attrs, Value & v)
                 state.store->computeFSClosure(d.drvPath, refs);
                 for (auto & j : refs) {
                     drv.inputSrcs.insert(j);
-                    if (j.isDerivation())
-                        drv.inputDrvs[j] = state.store->readDerivation(j).outputNames();
+                    if (j.isDerivation()) {
+                        drv.inputDrvs.map[j].value = state.store->readDerivation(j).outputNames();
+                    }
                 }
             },
             [&](const NixStringContextElem::Built & b) {
-                if (auto * p = std::get_if<DerivedPath::Opaque>(&*b.drvPath))
-                    drv.inputDrvs[p->path].insert(b.output);
-                else
-                    throw UnimplementedError("Dependencies on the outputs of dynamic derivations are not yet supported");
+                drv.inputDrvs.ensureSlot(*b.drvPath).value.insert(b.output);
             },
             [&](const NixStringContextElem::Opaque & o) {
                 drv.inputSrcs.insert(o.path);
@@ -1520,15 +1518,25 @@ static RegisterPrimOp primop_storePath({
 
 static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    auto & arg = *args[0];
+
     /* We don’t check the path right now, because we don’t want to
        throw if the path isn’t allowed, but just return false (and we
        can’t just catch the exception here because we still want to
-       throw if something in the evaluation of `*args[0]` tries to
+       throw if something in the evaluation of `arg` tries to
        access an unauthorized path). */
-    auto path = realisePath(state, pos, *args[0], { .checkForPureEval = false });
+    auto path = realisePath(state, pos, arg, { .checkForPureEval = false });
+
+    /* SourcePath doesn't know about trailing slash. */
+    auto mustBeDir = arg.type() == nString && arg.string_view().ends_with("/");
 
     try {
-        v.mkBool(state.checkSourcePath(path).pathExists());
+        auto checked = state.checkSourcePath(path);
+        auto exists = checked.pathExists();
+        if (exists && mustBeDir) {
+            exists = checked.lstat().type == InputAccessor::tDirectory;
+        }
+        v.mkBool(exists);
     } catch (SysError & e) {
         /* Don't give away info from errors while canonicalising
            ‘path’ in restricted mode. */
@@ -1843,7 +1851,7 @@ static void prim_outputOf(EvalState & state, const PosIdx pos, Value * * args, V
 {
     SingleDerivedPath drvPath = state.coerceToSingleDerivedPath(pos, *args[0], "while evaluating the first argument to builtins.outputOf");
 
-    std::string_view outputName = state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument to builtins.outputOf");
+    OutputNameView outputName = state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument to builtins.outputOf");
 
     state.mkSingleDerivedPathString(
         SingleDerivedPath::Built {
@@ -2392,7 +2400,7 @@ static void prim_attrNames(EvalState & state, const PosIdx pos, Value * * args, 
         (v.listElems()[n++] = state.allocValue())->mkString(state.symbols[i.name]);
 
     std::sort(v.listElems(), v.listElems() + n,
-              [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
+              [](Value * v1, Value * v2) { return v1->string_view().compare(v2->string_view()) < 0; });
 }
 
 static RegisterPrimOp primop_attrNames({
@@ -2533,7 +2541,7 @@ static void prim_removeAttrs(EvalState & state, const PosIdx pos, Value * * args
     names.reserve(args[1]->listSize());
     for (auto elem : args[1]->listItems()) {
         state.forceStringNoCtx(*elem, pos, "while evaluating the values of the second argument passed to builtins.removeAttrs");
-        names.emplace_back(state.symbols.create(elem->string.s), nullptr);
+        names.emplace_back(state.symbols.create(elem->string_view()), nullptr);
     }
     std::sort(names.begin(), names.end());
 
@@ -2983,7 +2991,7 @@ static RegisterPrimOp primop_tail({
     .name = "__tail",
     .args = {"list"},
     .doc = R"(
-      Return the second to last elements of a list; abort evaluation if
+      Return the list without its first item; abort evaluation if
       the argument isn’t a list or is an empty list.
 
       > **Warning**

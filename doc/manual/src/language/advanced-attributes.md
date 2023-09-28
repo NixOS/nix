@@ -229,6 +229,8 @@ Derivations can declare some infrequently used optional attributes.
     [`outputHashAlgo`](#adv-attr-outputHashAlgo)
     like for *fixed-output derivations* (see above).
 
+    It also implicitly requires that the machine to build the derivation must have the `ca-derivations` [system feature](@docroot@/command-ref/conf-file.md#conf-system-features).
+
   - [`passAsFile`]{#adv-attr-passAsFile}\
     A list of names of attributes that should be passed via files rather
     than environment variables. For example, if you have
@@ -335,3 +337,15 @@ Derivations can declare some infrequently used optional attributes.
     This is useful, for example, when generating self-contained filesystem images with
     their own embedded Nix store: hashes found inside such an image refer
     to the embedded store and not to the host's Nix store.
+
+- [`requiredSystemFeatures`]{#adv-attr-requiredSystemFeatures}\
+
+  If a derivation has the `requiredSystemFeatures` attribute, then Nix will only build it on a machine that has the corresponding features set in its [`system-features` configuration](@docroot@/command-ref/conf-file.md#conf-system-features).
+
+  For example, setting
+
+  ```nix
+  requiredSystemFeatures = [ "kvm" ];
+  ```
+
+  ensures that the derivation can only be built on a machine with the `kvm` feature.

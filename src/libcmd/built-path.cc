@@ -58,6 +58,28 @@ StorePathSet BuiltPath::outPaths() const
     );
 }
 
+SingleDerivedPath::Built SingleBuiltPath::Built::discardOutputPath() const
+{
+    return SingleDerivedPath::Built {
+        .drvPath = make_ref<SingleDerivedPath>(drvPath->discardOutputPath()),
+        .output = output.first,
+    };
+}
+
+SingleDerivedPath SingleBuiltPath::discardOutputPath() const
+{
+    return std::visit(
+        overloaded{
+            [](const SingleBuiltPath::Opaque & p) -> SingleDerivedPath {
+                return p;
+            },
+            [](const SingleBuiltPath::Built & b) -> SingleDerivedPath {
+                return b.discardOutputPath();
+            },
+        }, raw()
+    );
+}
+
 nlohmann::json BuiltPath::Built::toJSON(const Store & store) const
 {
     nlohmann::json res;

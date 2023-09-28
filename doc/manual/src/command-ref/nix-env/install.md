@@ -19,18 +19,21 @@ current generation of the active profile, to which a set of store paths
 described by *args* is added. The arguments *args* map to store paths in
 a number of possible ways:
 
-  - By default, *args* is a set of derivation names denoting derivations
+
+  - By default, *args* is a set of [derivation] names denoting derivations
     in the active Nix expression. These are realised, and the resulting
     output paths are installed. Currently installed derivations with a
     name equal to the name of a derivation being added are removed
     unless the option `--preserve-installed` is specified.
+
+    [derivation]: @docroot@/language/derivations.md
 
     If there are multiple derivations matching a name in *args* that
     have the same name (e.g., `gcc-3.3.6` and `gcc-4.1.1`), then the
     derivation with the highest *priority* is used. A derivation can
     define a priority by declaring the `meta.priority` attribute. This
     attribute should be a number, with a higher value denoting a lower
-    priority. The default priority is `0`.
+    priority. The default priority is `5`.
 
     If there are multiple matching derivations with the same priority,
     then the derivation with the highest version will be installed.
@@ -66,8 +69,59 @@ a number of possible ways:
   - If *args* are store paths that are not store derivations, then these
     are [realised](@docroot@/command-ref/nix-store/realise.md) and installed.
 
-  - By default all outputs are installed for each derivation. That can
-    be reduced by setting `meta.outputsToInstall`.
+  - By default all outputs are installed for each derivation.
+    This can be overridden by adding a `meta.outputsToInstall` attribute on the derivation listing a subset of the output names.
+
+    <!-- TODO: add anchor link to `outputs` when #7320 is merged -->
+
+    Example:
+
+    The file `example.nix` defines a [derivation] with two outputs `foo` and `bar`, each containing a file.
+
+    ```nix
+    # example.nix
+    let
+      pkgs = import <nixpkgs> {};
+      command = ''
+        ${pkgs.coreutils}/bin/mkdir -p $foo $bar
+        echo foo > $foo/foo-file
+        echo bar > $bar/bar-file
+      '';
+    in
+    derivation {
+      name = "example";
+      builder = "${pkgs.bash}/bin/bash";
+      args = [ "-c" command ];
+      outputs = [ "foo" "bar" ];
+      system = builtins.currentSystem;
+    }
+    ```
+
+    Installing from this Nix expression will make files from both outputs appear in the current profile.
+
+    ```console
+    $ nix-env --install --file example.nix
+    installing 'example'
+    $ ls ~/.nix-profile
+    foo-file
+    bar-file
+    manifest.nix
+    ```
+
+    Adding `meta.outputsToInstall` to that derivation will make `nix-env` only install files from the specified outputs.
+
+    ```nix
+    # example-outputs.nix
+    import ./example.nix // { meta.outputsToInstall = [ "bar" ]; }
+    ```
+
+    ```console
+    $ nix-env --install --file example-outputs.nix
+    installing 'example'
+    $ ls ~/.nix-profile
+    bar-file
+    manifest.nix
+    ```
 
 # Flags
 

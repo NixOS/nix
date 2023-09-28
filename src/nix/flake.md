@@ -67,6 +67,11 @@ inputs.nixpkgs = {
 };
 ```
 
+Following [RFC 3986](https://datatracker.ietf.org/doc/html/rfc3986#section-2.1),
+characters outside of the allowed range (i.e. neither [reserved characters](https://datatracker.ietf.org/doc/html/rfc3986#section-2.2)
+nor [unreserved characters](https://datatracker.ietf.org/doc/html/rfc3986#section-2.3))
+must be percent-encoded.
+
 ### Examples
 
 Here are some examples of flake references in their URL-like representation:
@@ -103,10 +108,14 @@ The semantic of such a path is as follows:
     2. The filesystem root (/), or
     3. A folder on a different mount point.
 
+Contrary to URL-like references, path-like flake references can contain arbitrary unicode characters (except `#` and `?`).
+
 ### Examples
 
 * `.`: The flake to which the current directory belongs to.
 * `/home/alice/src/patchelf`: A flake in some other directory.
+* `./../sub directory/with Ûñî©ôδ€`: A flake in another relative directory that
+  has Unicode characters in its name.
 
 ## Flake reference attributes
 

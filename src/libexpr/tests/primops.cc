@@ -711,14 +711,14 @@ namespace nix {
         // FIXME: add a test that verifies the string context is as expected
         auto v = eval("builtins.replaceStrings [\"oo\" \"a\"] [\"a\" \"i\"] \"foobar\"");
         ASSERT_EQ(v.type(), nString);
-        ASSERT_EQ(v.string.s, std::string_view("fabir"));
+        ASSERT_EQ(v.string_view(), "fabir");
     }
 
     TEST_F(PrimOpTest, concatStringsSep) {
         // FIXME: add a test that verifies the string context is as expected
         auto v = eval("builtins.concatStringsSep \"%\" [\"foo\" \"bar\" \"baz\"]");
         ASSERT_EQ(v.type(), nString);
-        ASSERT_EQ(std::string_view(v.string.s), "foo%bar%baz");
+        ASSERT_EQ(v.string_view(), "foo%bar%baz");
     }
 
     TEST_F(PrimOpTest, split1) {

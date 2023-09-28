@@ -146,5 +146,87 @@ EOF
 
 git -C $flakeFollowsA add flake.nix
 
-nix flake lock $flakeFollowsA 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid'"
-nix flake lock $flakeFollowsA 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid2'"
+nix flake lock "$flakeFollowsA" 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid'"
+nix flake lock "$flakeFollowsA" 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid2'"
+
+# Now test follow path overloading
+# This tests a lockfile checking regression https://github.com/NixOS/nix/pull/8819
+#
+# We construct the following graph, where p->q means p has input q.
+# A double edge means that the edge gets overridden using `follows`.
+#
+#      A
+#     / \
+#    /   \
+#   v     v
+#   B ==> C   --- follows declared in A
+#    \\  /
+#     \\/     --- follows declared in B
+#      v
+#      D
+#
+# The message was
+#    error: input 'B/D' follows a non-existent input 'B/C/D'
+# 
+# Note that for `B` to resolve its follow for `D`, it needs `C/D`, for which it needs to resolve the follow on `C` first.
+flakeFollowsOverloadA="$TEST_ROOT/follows/overload/flakeA"
+flakeFollowsOverloadB="$TEST_ROOT/follows/overload/flakeA/flakeB"
+flakeFollowsOverloadC="$TEST_ROOT/follows/overload/flakeA/flakeB/flakeC"
+flakeFollowsOverloadD="$TEST_ROOT/follows/overload/flakeA/flakeB/flakeC/flakeD"
+
+# Test following path flakerefs.
+createGitRepo "$flakeFollowsOverloadA"
+mkdir -p "$flakeFollowsOverloadB"
+mkdir -p "$flakeFollowsOverloadC"
+mkdir -p "$flakeFollowsOverloadD"
+
+cat > "$flakeFollowsOverloadD/flake.nix" <<EOF
+{
+    description = "Flake D";
+    inputs = {};
+    outputs = { ... }: {};
+}
+EOF
+
+cat > "$flakeFollowsOverloadC/flake.nix" <<EOF
+{
+    description = "Flake C";
+    inputs.D.url = "path:./flakeD";
+    outputs = { ... }: {};
+}
+EOF
+
+cat > "$flakeFollowsOverloadB/flake.nix" <<EOF
+{
+    description = "Flake B";
+    inputs = {
+        C = {
+            url = "path:./flakeC";
+        };
+        D.follows = "C/D";
+    };
+    outputs = { ... }: {};
+}
+EOF
+
+# input B/D should be able to be found...
+cat > "$flakeFollowsOverloadA/flake.nix" <<EOF
+{
+    description = "Flake A";
+    inputs = {
+        B = {
+            url = "path:./flakeB";
+            inputs.C.follows = "C";
+        };
+        C.url = "path:./flakeB/flakeC";
+    };
+    outputs = { ... }: {};
+}
+EOF
+
+git -C "$flakeFollowsOverloadA" add flake.nix flakeB/flake.nix \
+  flakeB/flakeC/flake.nix flakeB/flakeC/flakeD/flake.nix
+
+nix flake metadata "$flakeFollowsOverloadA"
+nix flake update "$flakeFollowsOverloadA"
+nix flake lock "$flakeFollowsOverloadA"

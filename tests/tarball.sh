@@ -9,6 +9,7 @@ rm -rf $tarroot
 mkdir -p $tarroot
 cp dependencies.nix $tarroot/default.nix
 cp config.nix dependencies.builder*.sh $tarroot/
+touch -d '@1000000000' $tarroot $tarroot/*
 
 hash=$(nix hash path $tarroot)
 
@@ -35,6 +36,8 @@ test_tarball() {
     # Do not re-fetch paths already present
     nix-build  -o $TEST_ROOT/result -E "import (fetchTree { type = \"tarball\"; url = file:///does-not-exist/must-remain-unused/$tarball; narHash = \"$hash\"; })"
     expectStderr 102 nix-build  -o $TEST_ROOT/result -E "import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"sha256-xdKv2pq/IiwLSnBBJXW8hNowI4MrdZfW+SYqDQs7Tzc=\"; })" | grep 'NAR hash mismatch in input'
+
+    [[ $(nix eval --impure --expr "(fetchTree file://$tarball).lastModified") = 1000000000 ]]
 
     nix-instantiate --strict --eval -E "!((import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"$hash\"; })) ? submodules)" >&2
     nix-instantiate --strict --eval -E "!((import (fetchTree { type = \"tarball\"; url = file://$tarball; narHash = \"$hash\"; })) ? submodules)" 2>&1 | grep 'true'

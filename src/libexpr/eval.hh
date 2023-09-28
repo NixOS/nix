@@ -341,8 +341,6 @@ public:
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
 
-    void addToSearchPath(SearchPath::Elem && elem);
-
     SearchPath getSearchPath() { return searchPath; }
 
     /**

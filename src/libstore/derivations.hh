@@ -6,7 +6,7 @@
 #include "hash.hh"
 #include "content-address.hh"
 #include "repair-flag.hh"
-#include "derived-path.hh"
+#include "derived-path-map.hh"
 #include "sync.hh"
 #include "comparator.hh"
 #include "variant-wrapper.hh"
@@ -55,7 +55,7 @@ struct DerivationOutput
          * @param drvName The name of the derivation this is an output of, without the `.drv`.
          * @param outputName The name of this output.
          */
-        StorePath path(const Store & store, std::string_view drvName, std::string_view outputName) const;
+        StorePath path(const Store & store, std::string_view drvName, OutputNameView outputName) const;
 
         GENERATE_CMP(CAFixed, me->ca);
     };
@@ -132,19 +132,19 @@ struct DerivationOutput
      * the safer interface provided by
      * BasicDerivation::outputsAndOptPaths
      */
-    std::optional<StorePath> path(const Store & store, std::string_view drvName, std::string_view outputName) const;
+    std::optional<StorePath> path(const Store & store, std::string_view drvName, OutputNameView outputName) const;
 
     nlohmann::json toJSON(
         const Store & store,
         std::string_view drvName,
-        std::string_view outputName) const;
+        OutputNameView outputName) const;
     /**
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
     static DerivationOutput fromJSON(
         const Store & store,
         std::string_view drvName,
-        std::string_view outputName,
+        OutputNameView outputName,
         const nlohmann::json & json,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 };
@@ -323,13 +323,13 @@ struct Derivation : BasicDerivation
     /**
      * inputs that are sub-derivations
      */
-    DerivationInputs inputDrvs;
+    DerivedPathMap<std::set<OutputName>> inputDrvs;
 
     /**
      * Print a derivation.
      */
     std::string unparse(const Store & store, bool maskOutputs,
-        std::map<std::string, StringSet> * actualInputs = nullptr) const;
+        DerivedPathMap<StringSet>::ChildNode::Map * actualInputs = nullptr) const;
 
     /**
      * Return the underlying basic derivation but with these changes:
@@ -368,7 +368,8 @@ struct Derivation : BasicDerivation
     nlohmann::json toJSON(const Store & store) const;
     static Derivation fromJSON(
         const Store & store,
-        const nlohmann::json & json);
+        const nlohmann::json & json,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     GENERATE_CMP(Derivation,
         static_cast<const BasicDerivation &>(*me),
@@ -389,7 +390,11 @@ StorePath writeDerivation(Store & store,
 /**
  * Read a derivation from a file.
  */
-Derivation parseDerivation(const Store & store, std::string && s, std::string_view name);
+Derivation parseDerivation(
+    const Store & store,
+    std::string && s,
+    std::string_view name,
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
  * \todo Remove.
@@ -405,7 +410,7 @@ bool isDerivation(std::string_view fileName);
  * This is usually <drv-name>-<output-name>, but is just <drv-name> when
  * the output name is "out".
  */
-std::string outputPathName(std::string_view drvName, std::string_view outputName);
+std::string outputPathName(std::string_view drvName, OutputNameView outputName);
 
 
 /**
@@ -499,7 +504,7 @@ void writeDerivation(Sink & out, const Store & store, const BasicDerivation & dr
  * own outputs without needing to use the hash of a derivation in
  * itself, making the hash near-impossible to calculate.
  */
-std::string hashPlaceholder(const std::string_view outputName);
+std::string hashPlaceholder(const OutputNameView outputName);
 
 extern const Hash impureOutputHash;
 

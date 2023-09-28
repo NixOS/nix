@@ -172,7 +172,24 @@ void RemoteStore::ConnectionHandle::processStderr(Sink * sink, Source * source, 
     auto ex = handle->processStderr(sink, source, flush);
     if (ex) {
         daemonException = true;
-        std::rethrow_exception(ex);
+        try {
+            std::rethrow_exception(ex);
+        } catch (const Error & e) {
+            // Nix versions before #4628 did not have an adequate behavior for reporting that the derivation format was upgraded.
+            // To avoid having to add compatibility logic in many places, we expect to catch almost all occurrences of the
+            // old incomprehensible error here, so that we can explain to users what's going on when their daemon is
+            // older than #4628 (2023).
+            if (experimentalFeatureSettings.isEnabled(Xp::DynamicDerivations) &&
+                GET_PROTOCOL_MINOR(handle->daemonVersion) <= 35)
+            {
+                auto m = e.msg();
+                if (m.find("parsing derivation") != std::string::npos &&
+                    m.find("expected string") != std::string::npos &&
+                    m.find("Derive([") != std::string::npos)
+                    throw Error("%s, this might be because the daemon is too old to understand dependencies on dynamic derivations. Check to see if the raw dervation is in the form '%s'", std::move(m), "DrvWithVersion(..)");
+            }
+            throw;
+        }
     }
 }
 
