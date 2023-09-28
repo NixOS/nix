@@ -175,6 +175,7 @@
             buildPackages.autoconf-archive
             buildPackages.autoreconfHook
             buildPackages.pkg-config
+            buildPackages.nixVersions.nix_2_14
 
             # Tests
             buildPackages.git

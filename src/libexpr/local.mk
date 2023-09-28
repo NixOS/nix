@@ -4,6 +4,17 @@ libexpr_NAME = libnixexpr
 
 libexpr_DIR := $(d)
 
+# Workaround for
+#   error: creating directory '/nix/var': Permission denied
+# We are using nix itself to generate codes
+# but it might not be able to run inside sandboxes (see comment above)
+nixcmd = env NIX_LOCALSTATE_DIR=$(TMPDIR) \
+             NIX_STORE_DIR=$(TMPDIR) \
+             NIX_STATE_DIR=$(TMPDIR) \
+             NIX_LOG_DIR=$(TMPDIR) \
+             NIX_CONF_DIR=$(TMPDIR) nix
+
+
 libexpr_SOURCES := \
   $(wildcard $(d)/*.cc) \
   $(wildcard $(d)/value/*.cc) \
@@ -26,7 +37,18 @@ endif
 # because inline functions in libexpr's header files call libgc.
 libexpr_LDFLAGS_PROPAGATED = $(BDW_GC_LIBS)
 
-libexpr_ORDER_AFTER := $(d)/parser-tab.cc $(d)/parser-tab.hh $(d)/lexer-tab.cc $(d)/lexer-tab.hh
+libexpr_ORDER_AFTER := $(d)/parser-tab.cc \
+                       $(d)/parser-tab.hh \
+                       $(d)/lexer-tab.cc \
+                       $(d)/lexer-tab.hh \
+                       $(d)/diagnostics.inc.hh \
+                       $(d)/diagnostics-id.inc.hh
+
+$(d)/diagnostics-id.inc.hh: $(d)/diagnostics-gen.nix $(d)/diagnostics.nix
+	$(trace-gen) $(nixcmd) --experimental-features "nix-command" eval --raw --file $< idmacros  > $@
+
+$(d)/diagnostics.inc.hh: $(d)/diagnostics-gen.nix $(d)/diagnostics.nix
+	$(trace-gen) $(nixcmd) --experimental-features "nix-command" eval --raw --file $< declarations  > $@
 
 $(d)/parser-tab.cc $(d)/parser-tab.hh: $(d)/parser.y $(d)/parser-prologue.cpp $(d)/parser-epilogue.cpp
 	$(trace-gen) bison -v -o $(libexpr_DIR)/parser-tab.cc $< -d

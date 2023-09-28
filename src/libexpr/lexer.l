@@ -62,20 +62,17 @@ or          { return OR_KW; }
               try {
                   yylval->n = boost::lexical_cast<int64_t>(yytext);
               } catch (const boost::bad_lexical_cast &) {
-                  throw ParseError({
-                      .msg = hintfmt("invalid integer '%1%'", yytext),
-                      .errPos = data->state.positions[CUR_POS],
-                  });
+                  data->diags.add(std::make_unique<DiagInvalidInteger>(CUR_POS, yytext));
+                  yyterminate();
               }
               return INT;
             }
 {FLOAT}     { errno = 0;
               yylval->nf = strtod(yytext, 0);
-              if (errno != 0)
-                  throw ParseError({
-                      .msg = hintfmt("invalid float '%1%'", yytext),
-                      .errPos = data->state.positions[CUR_POS],
-                  });
+              if (errno != 0) {
+                  data->diags.add(std::make_unique<DiagInvalidFloat>(CUR_POS, yytext));
+                  yyterminate();
+              }
               return FLOAT;
             }
 
@@ -201,10 +198,8 @@ or          { return OR_KW; }
 
 <INPATH_SLASH>{ANY} |
 <INPATH_SLASH><<EOF>> {
-  throw ParseError({
-      .msg = hintfmt("path has a trailing slash"),
-      .errPos = data->state.positions[CUR_POS],
-  });
+  data->diags.add(std::make_unique<DiagPathHasTrailingSlash>(CUR_POS));
+  yyterminate();
 }
 
 {SPATH}     { yylval->path = {yytext, (size_t) yyleng}; return SPATH; }

@@ -97,11 +97,10 @@ expr_function
   | WITH expr ';' expr_function
     { $$ = new ExprWith(CUR_POS, $2, $4); }
   | LET binds IN expr_function
-    { if (!$2->dynamicAttrs.empty())
-        throw ParseError({
-            .msg = hintfmt("dynamic attributes not allowed in let"),
-            .errPos = data->state.positions[CUR_POS]
-        });
+    {
+      if (!$2->dynamicAttrs.empty()) {
+        data->diags.add(std::make_unique<DiagDynamicAttrsInLet>(CUR_POS));
+      }
       $$ = new ExprLet($2, $4);
     }
   | expr_if
@@ -187,11 +186,11 @@ expr_simple
   }
   | URI {
       static bool noURLLiterals = experimentalFeatureSettings.isEnabled(Xp::NoUrlLiterals);
-      if (noURLLiterals)
-          throw ParseError({
-              .msg = hintfmt("URL literals are disabled"),
-              .errPos = data->state.positions[CUR_POS]
-          });
+      if (noURLLiterals) {
+        data->diags.add(std::make_unique<DiagURLLiteralsDisabled>(CUR_POS));
+      } else {
+        data->diags.add(std::make_unique<DiagURLLiterals>(CUR_POS));
+      }
       $$ = new ExprString(std::string($1));
   }
   | '(' expr ')' { $$ = $2; }
@@ -234,10 +233,7 @@ path_start
   }
   | HPATH {
     if (evalSettings.pureEval) {
-        throw Error(
-            "the path '%s' can not be resolved in pure mode",
-            std::string_view($1.p, $1.l)
-        );
+        data->diags.add(std::make_unique<DiagHPathPure>(CUR_POS, std::string($1.p + 1, $1.l - 1)));
     }
     Path path(getHome() + std::string($1.p + 1, $1.l - 1));
     $$ = new ExprPath(std::move(path));
@@ -284,10 +280,7 @@ attrs
           $$->push_back(AttrName(data->symbols.create(str->s)));
           delete str;
       } else
-          throw ParseError({
-              .msg = hintfmt("dynamic attributes not allowed in inherit"),
-              .errPos = data->state.positions[makeCurPos(@2, data)]
-          });
+          data->diags.add(std::make_unique<DiagInheritDynamic>(CUR_POS));
     }
   | { $$ = new AttrPath; }
   ;
