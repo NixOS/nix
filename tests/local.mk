@@ -12,6 +12,7 @@ nix_tests = \
   flakes/check.sh \
   flakes/unlocked-override.sh \
   flakes/absolute-paths.sh \
+  flakes/absolute-attr-paths.sh \
   flakes/build-paths.sh \
   flakes/flake-in-submodule.sh \
   gc.sh \
