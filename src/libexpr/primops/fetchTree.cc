@@ -177,12 +177,12 @@ static RegisterPrimOp primop_fetchTree({
     .args = {"input"},
     .doc = R"(
       Fetch a source tree or a plain file using one of the supported backends.
-      *input* can be an attribute set representation of [flake reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references) or a URL.
-      The input should be "locked", that is, it should contain a commit hash or content hash unless impure evaluation (`--impure`) is allowed.
+      *input* must be a [flake reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references), either in attribute set representation or in the URL-like syntax.
+      The input should be "locked", that is, it should contain a commit hash or content hash unless impure evaluation (`--impure`) is enabled.
 
       Here are some examples of how to use `fetchTree`:
 
-      - Fetch a GitHub repository:
+      - Fetch a GitHub repository using the attribute set representation:
 
           ```nix
           builtins.fetchTree {
@@ -193,7 +193,7 @@ static RegisterPrimOp primop_fetchTree({
           }
           ```
 
-        This evaluates to attribute set:
+        This evaluates to the following attribute set:
 
           ```
           {
@@ -205,15 +205,12 @@ static RegisterPrimOp primop_fetchTree({
             shortRev = "ae2e6b3";
           }
           ```
-      - Fetch a single file from a URL:
 
-          ```nix
-          builtins.fetchTree "https://example.com/"
+      - Fetch the same GitHub repository using the URL-like syntax:
+
           ```
-
-      > **Note**
-      >
-      > This function requires the [`flakes` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-flakes) to be enabled.
+          builtins.fetchTree "github:NixOS/nixpkgs/ae2e6b3958682513d28f7d633734571fb18285dd"
+          ```
     )",
     .fun = prim_fetchTree,
     .experimentalFeature = Xp::Flakes,
