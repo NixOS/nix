@@ -254,7 +254,8 @@ std::optional<Hash> Input::getRev() const
         try {
             hash = Hash::parseAnyPrefixed(*s);
         } catch (BadHash &e) {
-            // Default to sha1 for backwards compatibility with existing flakes
+            // Default to sha1 for backwards compatibility with existing
+            // usages (e.g. `builtins.fetchTree` calls or flake inputs).
             hash = Hash::parseAny(*s, htSHA1);
         }
     }
