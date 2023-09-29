@@ -152,7 +152,7 @@ static void fetchTree(
         }
     }
 
-    if (!evalSettings.pureEval && !input.isDirect())
+    if (!evalSettings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
         input = lookupInRegistries(state.store, input).first;
 
     if (evalSettings.pureEval && !input.isLocked())
