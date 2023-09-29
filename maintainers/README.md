@@ -96,8 +96,10 @@ What constitutes a trivial pull request is up to maintainers' judgement.
 Pull requests and issues that are deemed important and controversial are discussed by the team during discussion meetings.
 
 This may be where the merit of the change itself or the implementation strategy is contested by a team member.
+Whenever the discussion opens up questions about the process or this team's goals, this may indicate that the change is too large in scope.
+In that case it is taken off the board to be reconsidered by the author or broken down into smaller pieces that are less far-reaching and can be reviewed independently.
 
-As a general guideline, the order of items is determined as follows:
+As a general guideline, the order of items to discuss is determined as follows:
 
 - Prioritise pull requests over issues
 
