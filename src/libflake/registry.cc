@@ -5,7 +5,7 @@
 #include "store-api.hh"
 #include "local-fs-store.hh"
 
-#include "fetch-settings.hh"
+#include "flake-settings.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -152,7 +152,7 @@ void overrideRegistry(
 static std::shared_ptr<Registry> getGlobalRegistry(ref<Store> store)
 {
     static auto reg = [&]() {
-        auto path = fetchSettings.flakeRegistry.get();
+        auto path = flakeSettings.flakeRegistry.get();
         if (path == "") {
             return std::make_shared<Registry>(Registry::Global); // empty registry
         }

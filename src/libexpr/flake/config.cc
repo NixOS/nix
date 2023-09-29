@@ -1,6 +1,6 @@
 #include "flake.hh"
 #include "globals.hh"
-#include "fetch-settings.hh"
+#include "flake-settings.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -50,7 +50,7 @@ void ConfigFile::apply()
         else
             assert(false);
 
-        if (!whitelist.count(baseName) && !nix::fetchSettings.acceptFlakeConfig) {
+        if (!whitelist.count(baseName) && !nix::flakeSettings.acceptFlakeConfig) {
             bool trusted = false;
             auto trustedList = readTrustedList();
             auto tlname = get(trustedList, name);

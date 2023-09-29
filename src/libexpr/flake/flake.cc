@@ -8,6 +8,7 @@
 #include "fetchers.hh"
 #include "finally.hh"
 #include "fetch-settings.hh"
+#include "flake-settings.hh"
 
 namespace nix {
 
@@ -329,7 +330,7 @@ LockedFlake lockFlake(
 
     FlakeCache flakeCache;
 
-    auto useRegistries = lockFlags.useRegistries.value_or(fetchSettings.useRegistries);
+    auto useRegistries = lockFlags.useRegistries.value_or(flakeSettings.useRegistries);
 
     auto flake = getFlake(state, topRef, useRegistries, flakeCache);
 
@@ -664,7 +665,7 @@ LockedFlake lockFlake(
                             }
                             std::string cm;
 
-                            cm = fetchSettings.commitLockFileSummary.get();
+                            cm = flakeSettings.commitLockFileSummary.get();
 
                             if (cm == "") {
                                 cm = fmt("%s: %s", relPath, lockFileExists ? "Update" : "Add");
@@ -761,7 +762,7 @@ static void prim_getFlake(EvalState & state, const PosIdx pos, Value * * args, V
             LockFlags {
                 .updateLockFile = false,
                 .writeLockFile = false,
-                .useRegistries = !evalSettings.pureEval && fetchSettings.useRegistries,
+                .useRegistries = !evalSettings.pureEval && flakeSettings.useRegistries,
                 .allowUnlocked = !evalSettings.pureEval,
             }),
         v);

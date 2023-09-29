@@ -4,6 +4,7 @@ makefiles = \
   src/libutil/local.mk \
   src/libstore/local.mk \
   src/libfetchers/local.mk \
+  src/libflake/local.mk \
   src/libmain/local.mk \
   src/libexpr/local.mk \
   src/libcmd/local.mk \

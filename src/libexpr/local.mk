@@ -12,9 +12,9 @@ libexpr_SOURCES := \
   $(d)/lexer-tab.cc \
   $(d)/parser-tab.cc
 
-libexpr_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libmain -I src/libexpr
+libexpr_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libflake  -I src/libexpr
 
-libexpr_LIBS = libutil libstore libfetchers
+libexpr_LIBS = libutil libstore libfetchers libflake
 
 libexpr_LDFLAGS += -lboost_context -pthread
 ifdef HOST_LINUX
