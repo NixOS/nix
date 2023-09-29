@@ -130,6 +130,15 @@ GNU gdb (GDB) 12.1
 One can debug the Nix invocation in all the usual ways.
 For example, enter `run` to start the Nix invocation.
 
+### Troubleshooting
+
+Sometimes running tests in the development shell may leave artefacts in the local repository.
+To remove any traces of that:
+
+```console
+git clean -x --force tests
+```
+
 ### Characterization testing
 
 Occasionally, Nix utilizes a technique called [Characterization Testing](https://en.wikipedia.org/wiki/Characterization_test) as part of the functional tests.
