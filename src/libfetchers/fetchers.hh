@@ -158,6 +158,11 @@ struct InputScheme
     virtual void markChangedFile(const Input & input, std::string_view file, std::optional<std::string> commitMsg);
 
     virtual std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) = 0;
+
+    /**
+     * Is this `InputScheme` part of an experimental feature?
+     */
+    virtual std::optional<ExperimentalFeature> experimentalFeature();
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
