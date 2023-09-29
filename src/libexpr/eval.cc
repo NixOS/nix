@@ -21,7 +21,6 @@
 #include "url.hh"
 #include "fetch-to-store.hh"
 #include "tarball.hh"
-#include "flake/flakeref.hh"
 #include "parser-tab.hh"
 
 #include <algorithm>

@@ -8,7 +8,6 @@ libexpr_SOURCES := \
   $(wildcard $(d)/*.cc) \
   $(wildcard $(d)/value/*.cc) \
   $(wildcard $(d)/primops/*.cc) \
-  $(wildcard $(d)/flake/*.cc) \
   $(d)/lexer-tab.cc \
   $(d)/parser-tab.cc
 # Not just for this library itself, but also for downstream libraries using this library
@@ -45,8 +44,6 @@ $(eval $(call install-file-in, $(buildprefix)$(d)/nix-expr.pc, $(libdir)/pkgconf
 
 $(foreach i, $(wildcard src/libexpr/value/*.hh), \
   $(eval $(call install-file-in, $(i), $(includedir)/nix/value, 0644)))
-$(foreach i, $(wildcard src/libexpr/flake/*.hh), \
-  $(eval $(call install-file-in, $(i), $(includedir)/nix/flake, 0644)))
 
 $(d)/primops.cc: $(d)/imported-drv-to-derivation.nix.gen.hh
 
