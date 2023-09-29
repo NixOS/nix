@@ -195,7 +195,6 @@ static void fetchTree(
 
 static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    experimentalFeatureSettings.require(Xp::Flakes);
     fetchTree(state, pos, args, v, std::nullopt, FetchTreeParams { .allowNameArgument = false });
 }
 
@@ -237,12 +236,9 @@ static RegisterPrimOp primop_fetchTree({
           ```nix
           builtins.fetchTree "https://example.com/"
           ```
-
-      > **Note**
-      >
-      > This function requires the [`flakes` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-flakes) to be enabled.
     )",
-    .fun = prim_fetchTree
+    .fun = prim_fetchTree,
+    .experimentalFeature = Xp::Flakes,
 });
 
 static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v,

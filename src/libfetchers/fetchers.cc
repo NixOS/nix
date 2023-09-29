@@ -36,6 +36,7 @@ Input Input::fromURL(const ParsedURL & url, bool requireTree)
     for (auto & inputScheme : *inputSchemes) {
         auto res = inputScheme->inputFromURL(url, requireTree);
         if (res) {
+            experimentalFeatureSettings.require(inputScheme->experimentalFeature());
             res->scheme = inputScheme;
             fixupInput(*res);
             return std::move(*res);
@@ -50,6 +51,7 @@ Input Input::fromAttrs(Attrs && attrs)
     for (auto & inputScheme : *inputSchemes) {
         auto res = inputScheme->inputFromAttrs(attrs);
         if (res) {
+            experimentalFeatureSettings.require(inputScheme->experimentalFeature());
             res->scheme = inputScheme;
             fixupInput(*res);
             return std::move(*res);
@@ -254,7 +256,8 @@ std::optional<Hash> Input::getRev() const
         try {
             hash = Hash::parseAnyPrefixed(*s);
         } catch (BadHash &e) {
-            // Default to sha1 for backwards compatibility with existing flakes
+            // Default to sha1 for backwards compatibility with existing
+            // usages (e.g. `builtins.fetchTree` calls or flake inputs).
             hash = Hash::parseAny(*s, htSHA1);
         }
     }
@@ -306,6 +309,11 @@ void InputScheme::markChangedFile(const Input & input, std::string_view file, st
 void InputScheme::clone(const Input & input, const Path & destDir) const
 {
     throw Error("do not know how to clone input '%s'", input.to_string());
+}
+
+std::optional<ExperimentalFeature> InputScheme::experimentalFeature()
+{
+    return {};
 }
 
 }

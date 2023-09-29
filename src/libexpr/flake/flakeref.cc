@@ -289,4 +289,6 @@ std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragment
     return {std::move(flakeRef), fragment, std::move(extendedOutputsSpec)};
 }
 
+std::regex flakeIdRegex(flakeIdRegexS, std::regex::ECMAScript);
+
 }

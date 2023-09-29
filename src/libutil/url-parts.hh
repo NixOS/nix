@@ -41,7 +41,4 @@ extern std::regex revRegex;
 /// A ref or revision, or a ref followed by a revision.
 const static std::string refAndOrRevRegex = "(?:(" + revRegexS + ")|(?:(" + refRegexS + ")(?:/(" + revRegexS + "))?))";
 
-const static std::string flakeIdRegexS = "[a-zA-Z][a-zA-Z0-9_-]*";
-extern std::regex flakeIdRegex;
-
 }
