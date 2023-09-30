@@ -1575,10 +1575,16 @@ void LocalStore::signRealisation(Realisation & realisation)
     // FIXME: keep secret keys in memory.
 
     auto secretKeyFiles = settings.secretKeyFiles;
+    auto remoteSigningPaths = settings.remoteSigningPaths;
 
     for (auto & secretKeyFile : secretKeyFiles.get()) {
         SecretKey secretKey(readFile(secretKeyFile));
         LocalSigner signer(std::move(secretKey));
+        realisation.sign(signer);
+    }
+
+    for (auto & remoteSigningPath : remoteSigningPaths.get()) {
+        RemoteSigner signer(remoteSigningPath);
         realisation.sign(signer);
     }
 }
@@ -1587,11 +1593,18 @@ void LocalStore::signPathInfo(ValidPathInfo & info)
 {
     // FIXME: keep secret keys in memory.
 
+    auto remoteSigningPaths = settings.remoteSigningPaths;
     auto secretKeyFiles = settings.secretKeyFiles;
 
     for (auto & secretKeyFile : secretKeyFiles.get()) {
         SecretKey secretKey(readFile(secretKeyFile));
-        info.sign(*this, secretKey);
+        LocalSigner signer(std::move(secretKey));
+        info.sign(*this, signer);
+    }
+
+    for (auto & remoteSigningPath : remoteSigningPaths.get()) {
+        RemoteSigner signer(remoteSigningPath);
+        info.sign(*this, signer);
     }
 }
 
