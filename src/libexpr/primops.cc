@@ -1528,7 +1528,9 @@ static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args,
     auto path = realisePath(state, pos, arg, { .checkForPureEval = false });
 
     /* SourcePath doesn't know about trailing slash. */
-    auto mustBeDir = arg.type() == nString && arg.string_view().ends_with("/");
+    auto mustBeDir = arg.type() == nString
+        && (arg.string_view().ends_with("/")
+            || arg.string_view().ends_with("/."));
 
     try {
         auto checked = state.checkSourcePath(path);
