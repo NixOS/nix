@@ -24,8 +24,8 @@ nix develop -f structured-attrs-shell.nix -c bash -c 'test "3" = "$(jq ".my.list
 # (which is an associative array in thsi case) being fine.
 nix develop -f structured-attrs-shell.nix -c bash -c 'test -n "$out"'
 
-nix print-dev-env -f structured-attrs-shell.nix | grep -q 'NIX_ATTRS_JSON_FILE='
-nix print-dev-env -f structured-attrs-shell.nix | grep -q 'NIX_ATTRS_SH_FILE='
+nix print-dev-env -f structured-attrs-shell.nix | grepQuiet 'NIX_ATTRS_JSON_FILE='
+nix print-dev-env -f structured-attrs-shell.nix | grepQuiet 'NIX_ATTRS_SH_FILE='
 nix print-dev-env -f shell.nix shellDrv | grepQuietInverse 'NIX_ATTRS_SH_FILE'
 
 jsonOut="$(nix print-dev-env -f structured-attrs-shell.nix --json)"
