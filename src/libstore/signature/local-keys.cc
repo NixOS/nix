@@ -1,4 +1,5 @@
-#include "crypto.hh"
+#include "signature/local-keys.hh"
+
 #include "file-system.hh"
 #include "util.hh"
 #include "globals.hh"
@@ -73,8 +74,7 @@ PublicKey::PublicKey(std::string_view s)
         throw Error("public key is not valid");
 }
 
-bool verifyDetached(const std::string & data, const std::string & sig,
-    const PublicKeys & publicKeys)
+bool verifyDetached(const std::string & data, const std::string & sig, const PublicKeys& publicKeys)
 {
     auto ss = split(sig);
 

@@ -61,8 +61,7 @@ typedef std::map<std::string, PublicKey> PublicKeys;
  * @return true iff ‘sig’ is a correct signature over ‘data’ using one
  * of the given public keys.
  */
-bool verifyDetached(const std::string & data, const std::string & sig,
-    const PublicKeys & publicKeys);
+bool verifyDetached(const std::string & data, const std::string & sig, const PublicKeys & publicKeys);
 
 PublicKeys getDefaultPublicKeys();
 
