@@ -42,4 +42,18 @@ class LocalSigner : public Signer
     private:
         SecretKey privkey;
 };
+
+// Remote signer
+// The remote signer adheres to the Nix Remote Signing API
+class RemoteSigner : public Signer
+{
+    public:
+        RemoteSigner(const std::string & remoteServerPath);
+
+        virtual std::string signDetached(std::string_view s) const;
+
+    private:
+        std::string serverPath;
+        std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> _curl_handle;
+};
 }

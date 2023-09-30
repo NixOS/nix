@@ -10,6 +10,8 @@
 
 namespace nix {
 
+const std::string nixVersion = PACKAGE_VERSION;
+
 void initLibUtil() {
     // Check that exception handling works. Exception handling has been observed
     // not to work on darwin when the linker flags aren't quite right.

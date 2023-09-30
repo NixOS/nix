@@ -17,6 +17,12 @@ namespace nix {
 void initLibUtil();
 
 /**
+ * This Nix version.
+ */
+extern const std::string nixVersion;
+
+
+/**
  * Convert a list of strings to a null-terminated vector of `char
  * *`s. The result must not be accessed beyond the lifetime of the
  * list of strings.

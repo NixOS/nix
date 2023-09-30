@@ -7,6 +7,7 @@
 #include "finally.hh"
 #include "callback.hh"
 #include "signals.hh"
+#include "network/user-agent.hh"
 
 #if ENABLE_S3
 #include <aws/core/client/ClientConfiguration.h>
@@ -295,9 +296,7 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(req, CURLOPT_MAXREDIRS, 10);
             curl_easy_setopt(req, CURLOPT_NOSIGNAL, 1);
-            curl_easy_setopt(req, CURLOPT_USERAGENT,
-                ("curl/" LIBCURL_VERSION " Nix/" + nixVersion +
-                    (fileTransferSettings.userAgentSuffix != "" ? " " + fileTransferSettings.userAgentSuffix.get() : "")).c_str());
+            set_user_agent(req, fileTransferSettings.userAgentSuffix.get());
             #if LIBCURL_VERSION_NUM >= 0x072b00
             curl_easy_setopt(req, CURLOPT_PIPEWAIT, 1);
             #endif
