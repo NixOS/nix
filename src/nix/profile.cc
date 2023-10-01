@@ -163,6 +163,7 @@ struct ProfileManifest
             for (auto & drvInfo : drvInfos) {
                 ProfileElement element;
                 element.storePaths = {drvInfo.queryOutPath()};
+                element.priority = drvInfo.queryMetaInt("priority", defaultPriority);
                 elements.emplace_back(std::move(element));
             }
         }
