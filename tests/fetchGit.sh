@@ -63,6 +63,10 @@ out=$(nix eval --impure --raw --expr "builtins.fetchGit { url = file://$repo; re
 path2=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev2\"; }).outPath")
 [[ $path = $path2 ]]
 
+# Fetch using a tag
+path2=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = file://$repo; ref = \"tag2\";}).outPath")
+[[ $path = $path2 ]]
+
 # In pure eval mode, fetchGit with a revision should succeed.
 [[ $(nix eval --raw --expr "builtins.readFile (fetchGit { url = file://$repo; rev = \"$rev2\"; } + \"/hello\")") = world ]]
 
