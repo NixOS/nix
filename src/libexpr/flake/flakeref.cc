@@ -190,7 +190,7 @@ std::optional<std::pair<FlakeRef, std::string>> parseFlakeIdRef(
 
     static std::regex flakeRegex(
         "((" + flakeIdRegexS + ")(?:/(?:" + refAndOrRevRegex + "))?)"
-        + "(?:#(" + queryRegex + "))?",
+        + "(?:#(" + fragmentRegex + "))?",
         std::regex::ECMAScript);
 
     if (std::regex_match(url, match, flakeRegex)) {

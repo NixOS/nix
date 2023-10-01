@@ -5,12 +5,13 @@
 namespace nix {
 
 static const std::string attributeNamePattern("[a-z0-9_-]+");
-static const std::regex lastAttributeRegex("(?:" + attributeNamePattern + "\\.)*(?!default)(" + attributeNamePattern +")");
+static const std::regex lastAttributeRegex("(?:" + attributeNamePattern + "\\.)*(?!default)(" + attributeNamePattern +")(\\^.*)?");
 static const std::string pathSegmentPattern("[a-zA-Z0-9_-]+");
 static const std::regex lastPathSegmentRegex(".*/(" + pathSegmentPattern +")");
 static const std::regex secondPathSegmentRegex("(?:" + pathSegmentPattern + ")/(" + pathSegmentPattern +")(?:/.*)?");
 static const std::regex gitProviderRegex("github|gitlab|sourcehut");
 static const std::regex gitSchemeRegex("git($|\\+.*)");
+static const std::regex defaultOutputRegex(".*\\.default($|\\^.*)");
 
 std::optional<std::string> getNameFromURL(ParsedURL url) {
   std::smatch match;
@@ -32,7 +33,7 @@ std::optional<std::string> getNameFromURL(ParsedURL url) {
     return match.str(1);
 
   /* If everything failed but there is a non-default fragment, use it in full */
-  if (!url.fragment.empty() && !hasSuffix(url.fragment, "default"))
+  if (!url.fragment.empty() && !std::regex_match(url.fragment, defaultOutputRegex))
     return url.fragment;
 
   /* If there is no fragment, take the last element of the path */

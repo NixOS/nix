@@ -10,6 +10,8 @@ namespace nix {
         ASSERT_EQ(getNameFromURL(parseURL("path:~/repos/nixpkgs#packages.x86_64-linux.hello")), "hello");
         ASSERT_EQ(getNameFromURL(parseURL("path:.#nonStandardAttr.mylaptop")), "nonStandardAttr.mylaptop");
         ASSERT_EQ(getNameFromURL(parseURL("path:./repos/myflake#nonStandardAttr.mylaptop")), "nonStandardAttr.mylaptop");
+        ASSERT_EQ(getNameFromURL(parseURL("path:./nixpkgs#packages.x86_64-linux.complex^bin,man")), "complex");
+        ASSERT_EQ(getNameFromURL(parseURL("path:./myproj#packages.x86_64-linux.default^*")), "myproj");
 
         ASSERT_EQ(getNameFromURL(parseURL("github:NixOS/nixpkgs#packages.x86_64-linux.hello")), "hello");
         ASSERT_EQ(getNameFromURL(parseURL("github:NixOS/nixpkgs#hello")), "hello");
@@ -60,5 +62,6 @@ namespace nix {
         ASSERT_EQ(getNameFromURL(parseURL("path:.")), std::nullopt);
         ASSERT_EQ(getNameFromURL(parseURL("file:.#")), std::nullopt);
         ASSERT_EQ(getNameFromURL(parseURL("path:.#packages.x86_64-linux.default")), std::nullopt);
+        ASSERT_EQ(getNameFromURL(parseURL("path:.#packages.x86_64-linux.default^*")), std::nullopt);
     }
 }

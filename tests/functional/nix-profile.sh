@@ -126,6 +126,7 @@ nix profile install "$flake1Dir^*"
 [ -e $TEST_HOME/.nix-profile/include ]
 
 printf Nix > $flake1Dir/who
+nix profile list
 nix profile upgrade flake1
 [[ $($TEST_HOME/.nix-profile/bin/hello) = "Hello Nix" ]]
 [ -e $TEST_HOME/.nix-profile/share/man ]
