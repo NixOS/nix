@@ -1,6 +1,5 @@
 #include "worker.hh"
 #include "substitution-goal.hh"
-#include "create-derivation-and-realise-goal.hh"
 #include "derivation-goal.hh"
 #include "local-store.hh"
 
@@ -16,7 +15,7 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
 
     worker.run(goals);
 
-    StringSet failed;
+    StorePathSet failed;
     std::optional<Error> ex;
     for (auto & i : goals) {
         if (i->ex) {
@@ -26,10 +25,10 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
                 ex = std::move(i->ex);
         }
         if (i->exitCode != Goal::ecSuccess) {
-            if (auto i2 = dynamic_cast<CreateDerivationAndRealiseGoal *>(i.get()))
-                failed.insert(i2->drvReq->to_string(*this));
+            if (auto i2 = dynamic_cast<DerivationGoal *>(i.get()))
+                failed.insert(i2->drvPath);
             else if (auto i2 = dynamic_cast<PathSubstitutionGoal *>(i.get()))
-                failed.insert(printStorePath(i2->storePath));
+                failed.insert(i2->storePath);
         }
     }
 
@@ -38,7 +37,7 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
         throw std::move(*ex);
     } else if (!failed.empty()) {
         if (ex) logError(ex->info());
-        throw Error(worker.failingExitStatus(), "build of %s failed", concatStringsSep(", ", quoteStrings(failed)));
+        throw Error(worker.failingExitStatus(), "build of %s failed", showPaths(failed));
     }
 }
 
