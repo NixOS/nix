@@ -71,7 +71,7 @@ DerivationGoal::DerivationGoal(const StorePath & drvPath,
     , wantedOutputs(wantedOutputs)
     , buildMode(buildMode)
 {
-    state = &DerivationGoal::loadDerivation;
+    state = &DerivationGoal::getDerivation;
     name = fmt(
         "building of '%s' from .drv file",
         DerivedPath::Built { makeConstantStorePathRef(drvPath), wantedOutputs }.to_string(worker.store));
@@ -161,6 +161,24 @@ void DerivationGoal::addWantedOutputs(const OutputsSpec & outputs)
         break;
     };
     wantedOutputs = newWanted;
+}
+
+
+void DerivationGoal::getDerivation()
+{
+    trace("init");
+
+    /* The first thing to do is to make sure that the derivation
+       exists.  If it doesn't, it may be created through a
+       substitute. */
+    if (buildMode == bmNormal && worker.evalStore.isValidPath(drvPath)) {
+        loadDerivation();
+        return;
+    }
+
+    addWaitee(upcast_goal(worker.makePathSubstitutionGoal(drvPath)));
+
+    state = &DerivationGoal::loadDerivation;
 }
 
 
@@ -1498,24 +1516,23 @@ void DerivationGoal::waiteeDone(GoalPtr waitee, ExitCode result)
     if (!useDerivation) return;
     auto & fullDrv = *dynamic_cast<Derivation *>(drv.get());
 
-    std::optional info = tryGetConcreteDrvGoal(waitee);
-    if (!info) return;
-    const auto & [dg, drvReq] = *info;
+    auto * dg = dynamic_cast<DerivationGoal *>(&*waitee);
+    if (!dg) return;
 
-    auto * nodeP = fullDrv.inputDrvs.findSlot(drvReq.get());
+    auto * nodeP = fullDrv.inputDrvs.findSlot(DerivedPath::Opaque { .path = dg->drvPath });
     if (!nodeP) return;
     auto & outputs = nodeP->value;
 
     for (auto & outputName : outputs) {
-        auto buildResult = dg.get().getBuildResult(DerivedPath::Built {
-            .drvPath = makeConstantStorePathRef(dg.get().drvPath),
+        auto buildResult = dg->getBuildResult(DerivedPath::Built {
+            .drvPath = makeConstantStorePathRef(dg->drvPath),
             .outputs = OutputsSpec::Names { outputName },
         });
         if (buildResult.success()) {
             auto i = buildResult.builtOutputs.find(outputName);
             if (i != buildResult.builtOutputs.end())
                 inputDrvOutputs.insert_or_assign(
-                    { dg.get().drvPath, outputName },
+                    { dg->drvPath, outputName },
                     i->second.outPath);
         }
     }
