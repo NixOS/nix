@@ -23,20 +23,20 @@ struct IndirectInputScheme : InputScheme
             else if (std::regex_match(path[1], refRegex))
                 ref = path[1];
             else
-                throw BadURL("in flake URL '%s', '%s' is not a commit hash or branch/tag name", url.url, path[1]);
+                throw BadURL("in URL '%s', '%s' is not a commit hash or branch/tag name", url.url, path[1]);
         } else if (path.size() == 3) {
             if (!std::regex_match(path[1], refRegex))
-                throw BadURL("in flake URL '%s', '%s' is not a branch/tag name", url.url, path[1]);
+                throw BadURL("in URL '%s', '%s' is not a branch/tag name", url.url, path[1]);
             ref = path[1];
             if (!std::regex_match(path[2], revRegex))
-                throw BadURL("in flake URL '%s', '%s' is not a commit hash", url.url, path[2]);
+                throw BadURL("in URL '%s', '%s' is not a commit hash", url.url, path[2]);
             rev = Hash::parseAny(path[2], htSHA1);
         } else
             throw BadURL("GitHub URL '%s' is invalid", url.url);
 
         std::string id = path[0];
         if (!std::regex_match(id, flakeRegex))
-            throw BadURL("'%s' is not a valid flake ID", id);
+            throw BadURL("'%s' is not a valid registry ID", id);
 
         // FIXME: forbid query params?
 
@@ -60,7 +60,7 @@ struct IndirectInputScheme : InputScheme
 
         auto id = getStrAttr(attrs, "id");
         if (!std::regex_match(id, flakeRegex))
-            throw BadURL("'%s' is not a valid flake ID", id);
+            throw BadURL("'%s' is not a valid registry ID", id);
 
         Input input;
         input.direct = false;
@@ -101,7 +101,7 @@ struct IndirectInputScheme : InputScheme
 
     std::optional<ExperimentalFeature> experimentalFeature() override
     {
-        return Xp::Flakes;
+        return Xp::FetcherRegistry;
     }
 };
 

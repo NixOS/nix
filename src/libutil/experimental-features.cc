@@ -55,6 +55,13 @@ constexpr std::array<ExperimentalFeatureDetails, 14> xpFeatureDetails = {{
         )",
     },
     {
+        .tag = Xp::FetcherRegistry,
+        .name = "fetcher-registry",
+        .description = R"(
+            TODO. And TODO be implied by "flakes"?
+        )",
+    },
+    {
         .tag = Xp::Flakes,
         .name = "flakes",
         .description = R"(
