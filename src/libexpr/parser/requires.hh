@@ -4,12 +4,11 @@
 
 #include <variant>
 
-#include "util.hh"
-
-#include "nixexpr.hh"
-#include "eval.hh"
 #include "eval-settings.hh"
+#include "eval.hh"
 #include "globals.hh"
+#include "nixexpr.hh"
+#include "util.hh"
 
 namespace nix {
 
@@ -29,7 +28,7 @@ struct ParserFormals
     bool ellipsis = false;
 };
 
-}
+} // namespace nix
 
 // using C a struct allows us to avoid having to define the special
 // members that using string_view here would implicitly delete.

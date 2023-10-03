@@ -1,17 +1,17 @@
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+
 #include <fcntl.h>
 #include <unistd.h>
 
 #include "parser-tab.hh"
-
 #include "lexer-tab.hh"
 
 #include "eval.hh"
-#include "filetransfer.hh"
 #include "fetchers.hh"
-#include "store-api.hh"
+#include "filetransfer.hh"
 #include "flake/flake.hh"
+#include "store-api.hh"
 
 namespace nix {
 
@@ -97,7 +97,7 @@ SourcePath EvalState::findFile(const std::string_view path)
 
 SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_view path, const PosIdx pos)
 {
-    for (auto & i : searchPath.elements) {
+    for (const auto & i : searchPath.elements) {
         auto suffixOpt = i.prefix.suffixIfPotentialMatch(path);
 
         if (!suffixOpt)
@@ -109,7 +109,7 @@ SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_
             continue;
         auto r = *rOpt;
 
-        Path res = suffix == "" ? r : concatStrings(r, "/", suffix);
+        Path res = suffix.empty() ? r : concatStrings(r, "/", suffix);
         if (pathExists(res))
             return CanonPath(canonPath(res));
     }
@@ -125,12 +125,12 @@ SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_
                      : "file '%s' was not found in the Nix search path (add it using $NIX_PATH or -I)",
                  path),
              .errPos = positions[pos]}),
-        0, 0);
+        nullptr, nullptr);
 }
 
 std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Path & value0)
 {
-    auto & value = value0.s;
+    const auto & value = value0.s;
     auto i = searchPathResolved.find(value);
     if (i != searchPathResolved.end())
         return i->second;
@@ -175,4 +175,4 @@ std::optional<std::string> EvalState::resolveSearchPathPath(const SearchPath::Pa
     return res;
 }
 
-}
+} // namespace nix

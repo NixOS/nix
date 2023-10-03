@@ -1,4 +1,3 @@
-
 #include "parser-tab.hh"
 #include "lexer-tab.hh"
 
@@ -32,22 +31,22 @@ static void addAttr(ExprAttrs * attrs, AttrPath && attrPath, Expr * e, const Pos
     // ===========================
     for (i = attrPath.begin(); i + 1 < attrPath.end(); i++) {
         if (i->symbol) {
-            ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
+            auto j = attrs->attrs.find(i->symbol);
             if (j != attrs->attrs.end()) {
                 if (!j->second.inherited) {
-                    ExprAttrs * attrs2 = dynamic_cast<ExprAttrs *>(j->second.e);
+                    auto * attrs2 = dynamic_cast<ExprAttrs *>(j->second.e);
                     if (!attrs2)
                         dupAttr(state, attrPath, pos, j->second.pos);
                     attrs = attrs2;
                 } else
                     dupAttr(state, attrPath, pos, j->second.pos);
             } else {
-                ExprAttrs * nested = new ExprAttrs;
+                auto * nested = new ExprAttrs;
                 attrs->attrs[i->symbol] = ExprAttrs::AttrDef(nested, pos);
                 attrs = nested;
             }
         } else {
-            ExprAttrs * nested = new ExprAttrs;
+            auto * nested = new ExprAttrs;
             attrs->dynamicAttrs.push_back(ExprAttrs::DynamicAttrDef(i->expr, nested, pos));
             attrs = nested;
         }
@@ -55,14 +54,14 @@ static void addAttr(ExprAttrs * attrs, AttrPath && attrPath, Expr * e, const Pos
     // Expr insertion.
     // ==========================
     if (i->symbol) {
-        ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
+        auto j = attrs->attrs.find(i->symbol);
         if (j != attrs->attrs.end()) {
             // This attr path is already defined. However, if both
             // e and the expr pointed by the attr path are two attribute sets,
             // we want to merge them.
             // Otherwise, throw an error.
-            auto ae = dynamic_cast<ExprAttrs *>(e);
-            auto jAttrs = dynamic_cast<ExprAttrs *>(j->second.e);
+            auto * ae = dynamic_cast<ExprAttrs *>(e);
+            auto * jAttrs = dynamic_cast<ExprAttrs *>(j->second.e);
             if (jAttrs && ae) {
                 for (auto & ad : ae->attrs) {
                     auto j2 = jAttrs->attrs.find(ad.first);
@@ -222,7 +221,7 @@ static inline PosIdx makeCurPos(const YYLTYPE & loc, ParseData * data)
 
 #define CUR_POS makeCurPos(*yylocp, data)
 
-}
+} // namespace nix
 
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * error)
 {

@@ -84,7 +84,7 @@ static StringToken unescapeStr(SymbolTable & symbols, char * s, size_t length)
     return {result, size_t(t - result)};
 }
 
-}
+} // namespace nix
 
 #define YY_USER_INIT initLoc(yylloc)
 #define YY_USER_ACTION adjustLoc(yylloc, yytext, yyleng);
