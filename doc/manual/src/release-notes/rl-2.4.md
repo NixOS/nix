@@ -342,6 +342,9 @@ more than 2800 commits from 195 contributors since release 2.3.
 * We no longer release source tarballs. If you want to build from
   source, please build from the tags in the Git repository.
 
+* Store path names can now start with `.`, producing paths incompatible
+  with Nix 2.3 and earlier.
+
 ## Contributors
 
 This release has contributions from
