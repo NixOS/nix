@@ -260,6 +260,7 @@
       testNixVersions = pkgs: client: daemon: with commonDeps { inherit pkgs; }; with pkgs.lib; pkgs.stdenv.mkDerivation {
         NIX_DAEMON_PACKAGE = daemon;
         NIX_CLIENT_PACKAGE = client;
+        HAVE_LOCAL_NIX_BUILD = false;
         name =
           "nix-tests"
           + optionalString
