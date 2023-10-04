@@ -230,6 +230,7 @@ let
       pkgs.releaseTools.nixBuild {
         NIX_DAEMON_PACKAGE = daemon;
         NIX_CLIENT_PACKAGE = client;
+        HAVE_LOCAL_NIX_BUILD = false;
         name = "nix-tests-${client.src.version}-against-${daemon.src.version}";
 
         src = tarball;

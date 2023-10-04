@@ -1,6 +1,10 @@
 check:
 	@echo "Warning: Nix has no 'make check'. Please install Nix and run 'make installcheck' instead."
 
+# whether to run the tests that assume that we have a local build of
+# Nix
+HAVE_LOCAL_NIX_BUILD ?= 1
+
 nix_tests = \
   init.sh hash.sh lang.sh add.sh simple.sh dependencies.sh \
   gc.sh \
@@ -27,7 +31,6 @@ nix_tests = \
   brotli.sh \
   pure-eval.sh \
   check.sh \
-  plugins.sh \
   search.sh \
   nix-copy-ssh.sh \
   post-hook.sh \
@@ -35,10 +38,16 @@ nix_tests = \
   test-infra.sh \
   # parallel.sh
 
+ifeq ($(HAVE_LOCAL_NIX_BUILD), 1)
+  nix_tests += plugins.sh
+endif
+
+tests/plugins.sh.test: tests/plugins/libplugintest.$(SO_EXT)
+
 install-tests += $(foreach x, $(nix_tests), tests/$(x))
 
 tests-environment = NIX_REMOTE= $(bash) -e
 
 clean-files += $(d)/common.sh
 
-test-deps += tests/common.sh tests/plugins/libplugintest.$(SO_EXT)
+test-deps += tests/common.sh
