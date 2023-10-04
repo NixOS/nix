@@ -208,9 +208,9 @@ MAKE_WORKER_PROTO(ContentAddress);
 template<>
 MAKE_WORKER_PROTO(DerivedPath);
 template<>
-MAKE_WORKER_PROTO(Realisation);
-template<>
 MAKE_WORKER_PROTO(DrvOutput);
+template<>
+MAKE_WORKER_PROTO(Realisation);
 template<>
 MAKE_WORKER_PROTO(BuildResult);
 template<>
