@@ -4,7 +4,7 @@ let
   showSettings = import ./generate-settings.nix;
 in
 
-storesInfo:
+inlineHTML: storesInfo:
 
 let
 
@@ -20,7 +20,7 @@ let
 
       ### Settings
 
-      ${showSettings "store-${slug}" settings}
+      ${showSettings { prefix = "store-${slug}"; inherit inlineHTML; } settings}
     '';
 
       # markdown doesn't like spaces in URLs

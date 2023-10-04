@@ -6,7 +6,7 @@ let
   showStoreDocs = import ./generate-store-info.nix;
 in
 
-commandDump:
+inlineHTML: commandDump:
 
 let
 
@@ -75,7 +75,7 @@ let
       # store parameters should not be part of command documentation to begin
       # with, but instead be rendered on separate pages.
       maybeStoreDocs = optionalString (details ? doc)
-        (replaceStrings [ "@stores@" ] [ (showStoreDocs commandInfo.stores) ] details.doc);
+        (replaceStrings [ "@stores@" ] [ (showStoreDocs inlineHTML commandInfo.stores) ] details.doc);
 
       maybeOptions = let
         allVisibleOptions = filterAttrs
@@ -84,14 +84,14 @@ let
       in optionalString (allVisibleOptions != {}) ''
         # Options
 
-        ${showOptions allVisibleOptions}
+        ${showOptions inlineHTML allVisibleOptions}
 
         > **Note**
         >
         > See [`man nix.conf`](@docroot@/command-ref/conf-file.md#command-line-flags) for overriding configuration settings with command line flags.
       '';
 
-      showOptions = allOptions:
+      showOptions = inlineHTML: allOptions:
         let
           showCategory = cat: opts: ''
             ${optionalString (cat != "") "## ${cat}"}
@@ -100,17 +100,21 @@ let
             '';
           showOption = name: option:
             let
+              result = trim ''
+                - ${item}
+
+                  ${option.description}
+              '';
+              item = if inlineHTML
+                then ''<span id="opt-${name}">[`--${name}`](#opt-${name})</span> ${shortName} ${labels}''
+                else "`--${name}` ${shortName} ${labels}";
               shortName = optionalString
                 (option ? shortName)
                 ("/ `-${option.shortName}`");
               labels = optionalString
                 (option ? labels)
                 (concatStringsSep " " (map (s: "*${s}*") option.labels));
-            in trim ''
-              - <span id="opt-${name}">[`--${name}`](#opt-${name})</span> ${shortName} ${labels}
-
-                ${option.description}
-            '';
+            in result;
           categories = mapAttrs
             # Convert each group from a list of key-value pairs back to an attrset
             (_: listToAttrs)

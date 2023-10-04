@@ -3,18 +3,21 @@ let
   inherit (import ./utils.nix) concatStrings indent optionalString squash;
 in
 
-prefix: settingsInfo:
+# `inlineHTML` is a hack to accommodate inconsistent output from `lowdown`
+{ prefix, inlineHTML ? true }: settingsInfo:
 
 let
 
   showSetting = prefix: setting: { description, documentDefault, defaultValue, aliases, value, experimentalFeature }:
     let
       result = squash ''
-          - <span id="${prefix}-${setting}">[`${setting}`](#${prefix}-${setting})</span>
+          - ${item}
 
           ${indent "  " body}
         '';
-
+      item = if inlineHTML
+        then ''<span id="${prefix}-${setting}">[`${setting}`](#${prefix}-${setting})</span>''
+        else "`${setting}`";
       # separate body to cleanly handle indentation
       body = ''
           ${description}
