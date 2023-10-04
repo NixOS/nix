@@ -50,6 +50,8 @@ cat >flake.nix <<EOF
     legacyPackages.$system = { };
     packages.$system = { };
     packages.someOtherSystem = { };
+    configurations.$system = { };
+    configurations.someOtherSystem = { };
 
     formatter = { };
     nixosConfigurations = { };
