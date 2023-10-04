@@ -280,8 +280,12 @@
         enableParallelBuilding = true;
 
         configureFlags = testConfigureFlags; # otherwise configure fails
-        dontBuild = true;
         doInstallCheck = true;
+
+        buildPhase = ''
+          # Remove the source files to make sure that we're not accidentally rebuilding Nix
+          rm src/**/*.cc
+        '';
 
         installPhase = ''
           mkdir -p $out
