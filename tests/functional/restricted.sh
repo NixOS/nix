@@ -9,10 +9,10 @@ nix-instantiate --restrict-eval ./simple.nix -I src=.
 nix-instantiate --restrict-eval ./simple.nix -I src1=simple.nix -I src2=config.nix -I src3=./simple.builder.sh
 
 (! nix-instantiate --restrict-eval --eval -E 'builtins.readFile ./simple.nix')
-nix-instantiate --restrict-eval --eval -E 'builtins.readFile ./simple.nix' -I src=..
+nix-instantiate --restrict-eval --eval -E 'builtins.readFile ./simple.nix' -I src=../..
 
-(! nix-instantiate --restrict-eval --eval -E 'builtins.readDir ../src/nix-channel')
-nix-instantiate --restrict-eval --eval -E 'builtins.readDir ../src/nix-channel' -I src=../src
+(! nix-instantiate --restrict-eval --eval -E 'builtins.readDir ../../src/nix-channel')
+nix-instantiate --restrict-eval --eval -E 'builtins.readDir ../../src/nix-channel' -I src=../../src
 
 (! nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in <foo>')
 nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in <foo>' -I src=.

@@ -134,7 +134,7 @@ else
         echo ''
         echo 'You can rerun this test with:'
         echo ''
-        echo '    _NIX_TEST_ACCEPT=1 make tests/lang.sh.test'
+        echo '    _NIX_TEST_ACCEPT=1 make tests/functional/lang.sh.test'
         echo ''
         echo 'to regenerate the files containing the expected output,'
         echo 'and then view the git diff to decide whether a change is'

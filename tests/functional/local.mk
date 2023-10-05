@@ -139,15 +139,16 @@ ifeq ($(HAVE_LOCAL_NIX_BUILD), 1)
 	endif
 endif
 
-tests/test-libstoreconsumer.sh.test: tests/test-libstoreconsumer/test-libstoreconsumer
-tests/plugins.sh: tests/plugins/libplugintest.$(SO_EXT)
+$(d)/test-libstoreconsumer.sh.test $(d)/test-libstoreconsumer.sh.test-debug: \
+  $(d)/test-libstoreconsumer/test-libstoreconsumer
+$(d)/plugins.sh.test $(d)/plugins.sh.test-debug: \
+  $(d)/plugins/libplugintest.$(SO_EXT)
 
 install-tests += $(foreach x, $(nix_tests), $(d)/$(x))
 
-clean-files += \
+test-clean-files := \
   $(d)/common/vars-and-functions.sh \
   $(d)/config.nix
 
-test-deps += \
-  tests/common/vars-and-functions.sh \
-  tests/config.nix
+clean-files += $(test-clean-files)
+test-deps += $(test-clean-files)

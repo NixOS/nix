@@ -6,7 +6,7 @@ unset NIX_STATE_DIR
 
 remoteDir=$TEST_ROOT/remote
 
-# Note: ssh{-ng}://localhost bypasses ssh. See tests/build-remote.sh for
+# Note: ssh{-ng}://localhost bypasses ssh. See tests/functional/build-remote.sh for
 # more details.
 nix-build $file -o $TEST_ROOT/result --max-jobs 0 \
   --arg busybox $busybox \

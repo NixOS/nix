@@ -61,36 +61,28 @@
 
       nixSrc = fileset.toSource {
         root = ./.;
-        fileset = fileset.intersect baseFiles (
-          fileset.difference
-            (fileset.unions [
-              ./.version
-              ./boehmgc-coroutine-sp-fallback.diff
-              ./bootstrap.sh
-              ./configure.ac
-              ./doc
-              ./local.mk
-              ./m4
-              ./Makefile
-              ./Makefile.config.in
-              ./misc
-              ./mk
-              ./precompiled-headers.h
-              ./src
-              ./tests
-              ./unit-test-data
-              ./COPYING
-              ./scripts/local.mk
-              (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
-              # TODO: do we really need README.md? It doesn't seem used in the build.
-              ./README.md
-            ])
-            (fileset.unions [
-              # Removed file sets
-              ./tests/nixos
-              ./tests/installer
-            ])
-        );
+        fileset = fileset.intersect baseFiles (fileset.unions [
+          ./.version
+          ./boehmgc-coroutine-sp-fallback.diff
+          ./bootstrap.sh
+          ./configure.ac
+          ./doc
+          ./local.mk
+          ./m4
+          ./Makefile
+          ./Makefile.config.in
+          ./misc
+          ./mk
+          ./precompiled-headers.h
+          ./src
+          ./tests/functional
+          ./unit-test-data
+          ./COPYING
+          ./scripts/local.mk
+          (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
+          # TODO: do we really need README.md? It doesn't seem used in the build.
+          ./README.md
+        ]);
       };
 
       # Memoize nixpkgs for different platforms for efficiency.
