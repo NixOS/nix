@@ -151,9 +151,7 @@ DownloadTarballResult downloadTarball(
         AutoDelete autoDelete(tmpDir, true);
         unpackTarfile(store->toRealPath(res.storePath), tmpDir);
         auto members = readDirectory(tmpDir);
-        if (members.size() != 1)
-            throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
-        auto topDir = tmpDir + "/" + members.begin()->name;
+        auto topDir = members.size() == 1 ? tmpDir + "/" + members.begin()->name : tmpDir;
         lastModified = lstat(topDir).st_mtime;
         unpackedStorePath = store->addToStore(name, topDir, FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, NoRepair);
     }
