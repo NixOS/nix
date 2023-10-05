@@ -106,6 +106,7 @@ nix_tests = \
   ssh-relay.sh \
   plugins.sh \
   build.sh \
+  keep-going.sh \
   build-delete.sh \
   output-normalization.sh \
   selfref-gc.sh \
