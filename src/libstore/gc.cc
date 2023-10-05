@@ -776,7 +776,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         }
     };
 
-    /* Synchronisation point for testing, see tests/gc-concurrent.sh. */
+    /* Synchronisation point for testing, see tests/functional/gc-concurrent.sh. */
     if (auto p = getEnv("_NIX_TEST_GC_SYNC"))
         readFile(*p);
 

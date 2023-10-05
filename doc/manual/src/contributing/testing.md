@@ -12,7 +12,7 @@ Finer-grained filtering is also possible using the [--gtest_filter](https://goog
 
 ## Functional tests
 
-The functional tests reside under the `tests` directory and are listed in `tests/local.mk`.
+The functional tests reside under the `tests/functional` directory and are listed in `tests/functional/local.mk`.
 Each test is a bash script.
 
 ### Running the whole test suite
@@ -21,8 +21,8 @@ The whole test suite can be run with:
 
 ```shell-session
 $ make install && make installcheck
-ran test tests/foo.sh... [PASS]
-ran test tests/bar.sh... [PASS]
+ran test tests/functional/foo.sh... [PASS]
+ran test tests/functional/bar.sh... [PASS]
 ...
 ```
 
@@ -30,14 +30,14 @@ ran test tests/bar.sh... [PASS]
 
 Sometimes it is useful to group related tests so they can be easily run together without running the entire test suite.
 Each test group is in a subdirectory of `tests`.
-For example, `tests/ca/local.mk` defines a `ca` test group for content-addressed derivation outputs.
+For example, `tests/functional/ca/local.mk` defines a `ca` test group for content-addressed derivation outputs.
 
 That test group can be run like this:
 
 ```shell-session
 $ make ca.test-group -j50
-ran test tests/ca/nix-run.sh... [PASS]
-ran test tests/ca/import-derivation.sh... [PASS]
+ran test tests/functional/ca/nix-run.sh... [PASS]
+ran test tests/functional/ca/import-derivation.sh... [PASS]
 ...
 ```
 
@@ -56,21 +56,21 @@ install-tests-groups += $(test-group-name)
 Individual tests can be run with `make`:
 
 ```shell-session
-$ make tests/${testName}.sh.test
-ran test tests/${testName}.sh... [PASS]
+$ make tests/functional/${testName}.sh.test
+ran test tests/functional/${testName}.sh... [PASS]
 ```
 
 or without `make`:
 
 ```shell-session
-$ ./mk/run-test.sh tests/${testName}.sh
-ran test tests/${testName}.sh... [PASS]
+$ ./mk/run-test.sh tests/functional/${testName}.sh
+ran test tests/functional/${testName}.sh... [PASS]
 ```
 
 To see the complete output, one can also run:
 
 ```shell-session
-$ ./mk/debug-test.sh tests/${testName}.sh
+$ ./mk/debug-test.sh tests/functional/${testName}.sh
 + foo
 output from foo
 + bar
@@ -105,7 +105,7 @@ edit it like so:
 Then, running the test with `./mk/debug-test.sh` will drop you into GDB once the script reaches that point:
 
 ```shell-session
-$ ./mk/debug-test.sh tests/${testName}.sh
+$ ./mk/debug-test.sh tests/functional/${testName}.sh
 ...
 + gdb blash blub
 GNU gdb (GDB) 12.1
@@ -124,9 +124,11 @@ This technique is to include the exact output/behavior of a former version of Ni
 For example, this technique is used for the language tests, to check both the printed final value if evaluation was successful, and any errors and warnings encountered.
 
 It is frequently useful to regenerate the expected output.
-To do that, rerun the failed test with `_NIX_TEST_ACCEPT=1`.
-(At least, this is the convention we've used for `tests/lang.sh`.
-If we add more characterization testing we should always strive to be consistent.)
+To do that, rerun the failed test(s) with `_NIX_TEST_ACCEPT=1`.
+For example:
+```bash
+_NIX_TEST_ACCEPT=1 make tests/functional/lang.sh.test
+```
 
 An interesting situation to document is the case when these tests are "overfitted".
 The language tests are, again, an example of this.

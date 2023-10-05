@@ -103,7 +103,6 @@ nix_tests = \
   case-hack.sh \
   placeholders.sh \
   ssh-relay.sh \
-  plugins.sh \
   build.sh \
   build-delete.sh \
   output-normalization.sh \
@@ -128,17 +127,20 @@ ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh
 endif
 
+ifeq ($(BUILD_SHARED_LIBS), 1)
+	nix_tests += plugins.sh
+endif
+
+$(d)/test-libstoreconsumer.sh.test $(d)/test-libstoreconsumer.sh.test-debug: \
+  $(d)/test-libstoreconsumer/test-libstoreconsumer
+$(d)/plugins.sh.test $(d)/plugins.sh.test-debug: \
+  $(d)/plugins/libplugintest.$(SO_EXT)
+
 install-tests += $(foreach x, $(nix_tests), $(d)/$(x))
 
-clean-files += \
+test-clean-files := \
   $(d)/common/vars-and-functions.sh \
   $(d)/config.nix
 
-test-deps += \
-  tests/common/vars-and-functions.sh \
-  tests/config.nix \
-  tests/test-libstoreconsumer/test-libstoreconsumer
-
-ifeq ($(BUILD_SHARED_LIBS), 1)
-  test-deps += tests/plugins/libplugintest.$(SO_EXT)
-endif
+clean-files += $(test-clean-files)
+test-deps += $(test-clean-files)

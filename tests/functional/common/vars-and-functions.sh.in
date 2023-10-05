@@ -6,7 +6,7 @@ COMMON_VARS_AND_FUNCTIONS_SH_SOURCED=1
 
 export PS4='+(${BASH_SOURCE[0]-$0}:$LINENO) '
 
-export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)/${TEST_NAME:-default}
+export TEST_ROOT=$(realpath ${TMPDIR:-/tmp}/nix-test)/${TEST_NAME:-default/tests\/functional//}
 export NIX_STORE_DIR
 if ! NIX_STORE_DIR=$(readlink -f $TEST_ROOT/store 2> /dev/null); then
     # Maybe the build directory is symlinked.

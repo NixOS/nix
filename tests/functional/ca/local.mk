@@ -25,4 +25,4 @@ clean-files += \
   $(d)/config.nix
 
 test-deps += \
-  tests/ca/config.nix
+  tests/functional/ca/config.nix
