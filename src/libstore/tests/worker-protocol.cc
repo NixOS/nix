@@ -187,7 +187,7 @@ CHARACTERIZATION_TEST(
     "build-result",
     ({
         using namespace std::literals::chrono_literals;
-        std::tuple<BuildResult, BuildResult/*, BuildResult*/> t {
+        std::tuple<BuildResult, BuildResult, BuildResult> t {
             BuildResult {
                 .status = BuildResult::OutputRejected,
                 .errorMsg = "no idea why",
@@ -200,9 +200,6 @@ CHARACTERIZATION_TEST(
                 .startTime = 30,
                 .stopTime = 50,
             },
-#if 0
-            // This is commented because this test would fail!
-            // FIXME uncomment this and fix the underlying bug.
             BuildResult {
                 .status = BuildResult::Built,
                 .timesBuilt = 1,
@@ -230,10 +227,14 @@ CHARACTERIZATION_TEST(
                 },
                 .startTime = 30,
                 .stopTime = 50,
+#if 0
+                // These fields are not yet serialized.
+                // FIXME Include in next version of protocol or document
+                // why they are skipped.
                 .cpuUser = std::chrono::milliseconds(500s),
                 .cpuSystem = std::chrono::milliseconds(604s),
-            },
 #endif
+            },
         };
         t;
     }))
