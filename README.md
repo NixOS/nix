@@ -7,16 +7,11 @@ Nix is a powerful package manager for Linux and other Unix systems that makes pa
 management reliable and reproducible. Please refer to the [Nix manual](https://nixos.org/nix/manual)
 for more details.
 
-## Installation
+## Installation and first steps
 
-On Linux and macOS the easiest way to install Nix is to run the following shell command
-(as a user other than root):
+Visit [nix.dev](https://nix.dev) for [installation instructions](https://nix.dev/tutorials/install-nix) and [beginner tutorials](https://nix.dev/tutorials/first-steps).
 
-```console
-$ curl -L https://nixos.org/nix/install | sh
-```
-
-Information on additional installation methods is available on the [Nix download page](https://nixos.org/download.html).
+Full reference documentation can be found in the [Nix manual](https://nixos.org/nix/manual).
 
 ## Building And Developing
 
