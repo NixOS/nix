@@ -648,6 +648,8 @@
 
         tests.containers = runNixOSTestFor "x86_64-linux" ./tests/nixos/containers/containers.nix;
 
+        tests.fetchers-substitute = runNixOSTestFor "x86_64-linux" ./tests/nixos/fetchers-substitute.nix;
+
         tests.setuid = lib.genAttrs
           ["i686-linux" "x86_64-linux"]
           (system: runNixOSTestFor system ./tests/nixos/setuid.nix);
