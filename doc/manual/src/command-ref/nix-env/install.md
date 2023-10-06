@@ -14,19 +14,21 @@
 
 # Description
 
-The install operation creates a new user environment, based on the
-current generation of the active profile, to which a set of store paths
-described by *args* is added. The arguments *args* map to store paths in
-a number of possible ways:
+The install operation creates a new user environment.
+It is based on the current generation of the active [profile](@docroot@/command-ref/files/profiles.md), to which a set of [store paths] described by *args* is added.
+
+[store paths]: @docroot@/glossary.md#gloss-store-path
+
+The arguments *args* map to store paths in a number of possible ways:
 
 
-  - By default, *args* is a set of [derivation] names denoting derivations
-    in the active Nix expression. These are realised, and the resulting
-    output paths are installed. Currently installed derivations with a
-    name equal to the name of a derivation being added are removed
-    unless the option `--preserve-installed` is specified.
+  - By default, *args* is a set of [derivation] names denoting derivations in the [default Nix expression].
+    These are [realised], and the resulting output paths are installed.
+    Currently installed derivations with a name equal to the name of a derivation being added are removed unless the option `--preserve-installed` is specified.
 
-    [derivation]: @docroot@/language/derivations.md
+    [derivation]: @docroot@/glossary.md#gloss-derivation
+    [default Nix expression]: @docroot@/command-ref/files/default-nix-expression.md
+    [realised]: @docroot@/glossary.md#gloss-realise
 
     If there are multiple derivations matching a name in *args* that
     have the same name (e.g., `gcc-3.3.6` and `gcc-4.1.1`), then the
@@ -43,40 +45,33 @@ a number of possible ways:
     gcc-3.3.6 gcc-4.1.1` will install both version of GCC (and will
     probably cause a user environment conflict\!).
 
-  - If `--attr` (`-A`) is specified, the arguments are *attribute
-    paths* that select attributes from the top-level Nix
-    expression. This is faster than using derivation names and
-    unambiguous. To find out the attribute paths of available
-    packages, use `nix-env --query --available --attr-path `.
+  - If [`--attr`](#opt-attr) / `-A` is specified, the arguments are *attribute paths* that select attributes from the [default Nix expression].
+    This is faster than using derivation names and unambiguous.
+    Show the attribute paths of available packages with [`nix-env --query`](./query.md):
+
+    ```console
+    nix-env --query --available --attr-path`
+    ```
 
   - If `--from-profile` *path* is given, *args* is a set of names
-    denoting installed store paths in the profile *path*. This is an
+    denoting installed [store paths] in the profile *path*. This is an
     easy way to copy user environment elements from one profile to
     another.
 
-  - If `--from-expression` is given, *args* are Nix
-    [functions](@docroot@/language/constructs.md#functions)
-    that are called with the active Nix expression as their single
-    argument. The derivations returned by those function calls are
-    installed. This allows derivations to be specified in an
-    unambiguous way, which is necessary if there are multiple
-    derivations with the same name.
+  - If `--from-expression` is given, *args* are [Nix language functions](@docroot@/language/constructs.md#functions) that are called with the [default Nix expression] as their single argument.
+    The derivations returned by those function calls are installed.
+    This allows derivations to be specified in an unambiguous way, which is necessary if there are multiple derivations with the same name.
 
-  - If *args* are [store derivations](@docroot@/glossary.md#gloss-store-derivation), then these are
-    [realised](@docroot@/command-ref/nix-store/realise.md), and the resulting output paths
-    are installed.
+  - If *args* are [store derivations](@docroot@/glossary.md#gloss-store-derivation), then these are [realised], and the resulting output paths are installed.
 
-  - If *args* are store paths that are not store derivations, then these
-    are [realised](@docroot@/command-ref/nix-store/realise.md) and installed.
+  - If *args* are [store paths] that are not store derivations, then these are [realised] and installed.
 
-  - By default all outputs are installed for each derivation.
+  - By default all [outputs](@docroot@/language/derivations.md#attr-outputs) are installed for each [derivation].
     This can be overridden by adding a `meta.outputsToInstall` attribute on the derivation listing a subset of the output names.
-
-    <!-- TODO: add anchor link to `outputs` when #7320 is merged -->
 
     Example:
 
-    The file `example.nix` defines a [derivation] with two outputs `foo` and `bar`, each containing a file.
+    The file `example.nix` defines a derivation with two outputs `foo` and `bar`, each containing a file.
 
     ```nix
     # example.nix
@@ -123,15 +118,17 @@ a number of possible ways:
     manifest.nix
     ```
 
-# Flags
+# Options
 
-  - `--prebuilt-only` / `-b`\
+  - `--prebuilt-only` / `-b`
+
     Use only derivations for which a substitute is registered, i.e.,
     there is a pre-built binary available that can be downloaded in lieu
     of building the derivation. Thus, no packages will be built from
     source.
 
-  - `--preserve-installed` / `-P`\
+  - `--preserve-installed` / `-P`
+
     Do not remove derivations with a name matching one of the
     derivations being installed. Usually, trying to have two versions of
     the same package installed in the same generation of a profile will
@@ -139,7 +136,8 @@ a number of possible ways:
     clashes between the two versions. However, this is not the case for
     all packages.
 
-  - `--remove-all` / `-r`\
+  - `--remove-all` / `-r`
+
     Remove all previously installed packages first. This is equivalent
     to running `nix-env --uninstall '.*'` first, except that everything happens
     in a single transaction.
