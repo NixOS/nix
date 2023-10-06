@@ -8,5 +8,3 @@ error:
             2|
 
        error: negative start position in 'substring'
-
-       at «none»:0: (source not available)
