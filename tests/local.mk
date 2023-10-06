@@ -1,3 +1,7 @@
+# whether to run the tests that assume that we have a local build of
+# Nix
+HAVE_LOCAL_NIX_BUILD ?= 1
+
 nix_tests = \
   test-infra.sh \
   init.sh \
@@ -104,7 +108,6 @@ nix_tests = \
   case-hack.sh \
   placeholders.sh \
   ssh-relay.sh \
-  plugins.sh \
   build.sh \
   build-delete.sh \
   output-normalization.sh \
@@ -120,7 +123,6 @@ nix_tests = \
   flakes/show.sh \
   impure-derivations.sh \
   path-from-hash-part.sh \
-  test-libstoreconsumer.sh \
   toString-path.sh \
   read-only-store.sh \
   nested-sandboxing.sh
@@ -128,6 +130,17 @@ nix_tests = \
 ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh
 endif
+
+ifeq ($(HAVE_LOCAL_NIX_BUILD), 1)
+	nix_tests += test-libstoreconsumer.sh
+
+	ifeq ($(BUILD_SHARED_LIBS), 1)
+		nix_tests += plugins.sh
+	endif
+endif
+
+tests/test-libstoreconsumer.sh.test: tests/test-libstoreconsumer/test-libstoreconsumer
+tests/plugins.sh: tests/plugins/libplugintest.$(SO_EXT)
 
 install-tests += $(foreach x, $(nix_tests), $(d)/$(x))
 
@@ -137,9 +150,4 @@ clean-files += \
 
 test-deps += \
   tests/common/vars-and-functions.sh \
-  tests/config.nix \
-  tests/test-libstoreconsumer/test-libstoreconsumer
-
-ifeq ($(BUILD_SHARED_LIBS), 1)
-  test-deps += tests/plugins/libplugintest.$(SO_EXT)
-endif
+  tests/config.nix
