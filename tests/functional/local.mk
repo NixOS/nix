@@ -1,7 +1,3 @@
-# whether to run the tests that assume that we have a local build of
-# Nix
-HAVE_LOCAL_NIX_BUILD ?= 1
-
 nix_tests = \
   test-infra.sh \
   init.sh \
@@ -131,7 +127,7 @@ ifeq ($(HAVE_LIBCPUID), 1)
 	nix_tests += compute-levels.sh
 endif
 
-ifeq ($(HAVE_LOCAL_NIX_BUILD), 1)
+ifeq ($(ENABLE_BUILD), yes)
 	nix_tests += test-libstoreconsumer.sh
 
 	ifeq ($(BUILD_SHARED_LIBS), 1)

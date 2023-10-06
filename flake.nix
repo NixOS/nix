@@ -59,29 +59,40 @@
         # that would interfere with repo semantics.
         fileset.fileFilter (f: f.name != ".gitignore") ./.;
 
+      configureFiles = fileset.unions [
+        ./.version
+        ./configure.ac
+        ./m4
+        # TODO: do we really need README.md? It doesn't seem used in the build.
+        ./README.md
+      ];
+
+      topLevelBuildFiles = fileset.unions [
+        ./local.mk
+        ./Makefile
+        ./Makefile.config.in
+        ./mk
+      ];
+
+      functionalTestFiles = fileset.unions [
+        ./tests/functional
+        (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
+      ];
+
       nixSrc = fileset.toSource {
         root = ./.;
         fileset = fileset.intersect baseFiles (fileset.unions [
-          ./.version
+          configureFiles
+          topLevelBuildFiles
           ./boehmgc-coroutine-sp-fallback.diff
-          ./bootstrap.sh
-          ./configure.ac
           ./doc
-          ./local.mk
-          ./m4
-          ./Makefile
-          ./Makefile.config.in
           ./misc
-          ./mk
           ./precompiled-headers.h
           ./src
-          ./tests/functional
           ./unit-test-data
           ./COPYING
           ./scripts/local.mk
-          (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
-          # TODO: do we really need README.md? It doesn't seem used in the build.
-          ./README.md
+          functionalTestFiles
         ]);
       };
 
@@ -252,7 +263,6 @@
       testNixVersions = pkgs: client: daemon: with commonDeps { inherit pkgs; }; with pkgs.lib; pkgs.stdenv.mkDerivation {
         NIX_DAEMON_PACKAGE = daemon;
         NIX_CLIENT_PACKAGE = client;
-        HAVE_LOCAL_NIX_BUILD = false;
         name =
           "nix-tests"
           + optionalString
@@ -261,7 +271,14 @@
             "-${client.version}-against-${daemon.version}";
         inherit version;
 
-        src = nixSrc;
+        src = fileset.toSource {
+          root = ./.;
+          fileset = fileset.intersect baseFiles (fileset.unions [
+            configureFiles
+            topLevelBuildFiles
+            functionalTestFiles
+          ]);
+        };
 
         VERSION_SUFFIX = versionSuffix;
 
@@ -271,19 +288,20 @@
 
         enableParallelBuilding = true;
 
-        configureFlags = testConfigureFlags; # otherwise configure fails
+        configureFlags =
+          testConfigureFlags # otherwise configure fails
+          ++ [ "--disable-build" ];
+        dontBuild = true;
         doInstallCheck = true;
-
-        buildPhase = ''
-          # Remove the source files to make sure that we're not accidentally rebuilding Nix
-          rm src/**/*.cc
-        '';
 
         installPhase = ''
           mkdir -p $out
         '';
 
-        installCheckPhase = "make installcheck -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES";
+        installCheckPhase = ''
+          mkdir -p src/nix-channel
+          make installcheck -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES
+        '';
       };
 
       binaryTarball = nix: pkgs:
