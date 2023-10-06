@@ -57,7 +57,7 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
 
    - [ ] Fixes an [idea approved](https://github.com/NixOS/nix/labels/idea%20approved) issue
    - [ ] Tests, as appropriate:
-     - Functional tests – [`tests/**.sh`](./tests)
+     - Functional tests – [`tests/functional/**.sh`](./tests/functional)
      - Unit tests – [`src/*/tests`](./src/)
      - Integration tests – [`tests/nixos/*`](./tests/nixos)
    - [ ] User documentation in the [manual](..doc/manual/src)

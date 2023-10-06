@@ -27,11 +27,11 @@ makefiles += \
   src/libutil/tests/local.mk \
   src/libstore/tests/local.mk \
   src/libexpr/tests/local.mk \
-  tests/local.mk \
-  tests/ca/local.mk \
-  tests/dyn-drv/local.mk \
-  tests/test-libstoreconsumer/local.mk \
-  tests/plugins/local.mk
+  tests/functional/local.mk \
+  tests/functional/ca/local.mk \
+  tests/functional/dyn-drv/local.mk \
+  tests/functional/test-libstoreconsumer/local.mk \
+  tests/functional/plugins/local.mk
 else
 makefiles += \
   mk/disable-tests.mk
