@@ -30,11 +30,10 @@ Expr * EvalState::parse(
 
     yylex_init(&scanner);
     yy_scan_buffer(text, length, scanner);
-    int res = yyparse(scanner, &data);
+    yyparse(scanner, &data);
     yylex_destroy(scanner);
 
-    if (res)
-        throw ParseError(data.error.value());
+    data.diags.checkRaise(data.state.positions);
 
     data.result->bindVars(*this, staticEnv);
 

@@ -4,6 +4,11 @@
 
 #include <variant>
 
+#include "diagnostic.hh"
+#include "util.hh"
+
+#include "nixexpr.hh"
+#include "eval.hh"
 #include "eval-settings.hh"
 #include "eval.hh"
 #include "globals.hh"
@@ -19,7 +24,9 @@ struct ParseData
     Expr * result;
     SourcePath basePath;
     PosTable::Origin origin;
-    std::optional<ErrorInfo> error;
+
+    /// Stores diagnostics while parsing this input
+    DiagnosticEngine diags;
 };
 
 struct ParserFormals

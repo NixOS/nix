@@ -1,3 +1,4 @@
+#include "diagnostic.hh"
 #include "parser-tab.hh"
 #include "lexer-tab.hh"
 
@@ -225,5 +226,8 @@ static inline PosIdx makeCurPos(const YYLTYPE & loc, ParseData * data)
 
 void yyerror(YYLTYPE * loc, yyscan_t scanner, ParseData * data, const char * error)
 {
-    data->error = {.msg = hintfmt(error), .errPos = data->state.positions[makeCurPos(*loc, data)]};
+    DiagBisonParse diag;
+    diag.err = error;
+    diag.loc = makeCurPos(*loc, data);
+    data->diags.add(std::make_unique<DiagBisonParse>(std::move(diag)));
 }
