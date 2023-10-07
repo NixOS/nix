@@ -1698,13 +1698,14 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
 
 static RegisterPrimOp primop_findFile(PrimOp {
     .name = "__findFile",
-    .args = {"search path", "lookup path"},
+    .args = {"search-path", "lookup-path"},
     .doc = R"(
-      Look up the given path with the given search path.
+      Find *lookup-path* in *search-path*.
 
-      A search path is represented list of [attribute sets](./values.md#attribute-set) with two attributes, `prefix`, and `path`.
-      `prefix` is a relative path.
-      `path` denotes a file system location; the exact syntax depends on the command line interface.
+      A search path is represented list of [attribute sets](./values.md#attribute-set) with two attributes:
+      - `prefix` is a relative path.
+      - `path` denotes a file system location
+      The exact syntax depends on the command line interface.
 
       Examples of search path attribute sets:
 
@@ -1722,13 +1723,12 @@ static RegisterPrimOp primop_findFile(PrimOp {
         }
         ```
 
-      The lookup algorithm checks each entry until a match is found, returning a [path value](@docroot@/language/values.html#type-path) of the match.
+      The lookup algorithm checks each entry until a match is found, returning a [path value](@docroot@/language/values.html#type-path) of the match:
 
-      This is the process for each entry:
-      If the lookup path matches `prefix`, then the remainder of the lookup path (the "suffix") is searched for within the directory denoted by `patch`.
-      Note that the `path` may need to be downloaded at this point to look inside.
-      If the suffix is found inside that directory, then the entry is a match;
-      the combined absolute path of the directory (now downloaded if need be) and the suffix is returned.
+      - If *lookup-path* matches `prefix`, then the remainder of *lookup-path* (the "suffix") is searched for within the directory denoted by `path`.
+        Note that the `path` may need to be downloaded at this point to look inside.
+      - If the suffix is found inside that directory, then the entry is a match.
+        The combined absolute path of the directory (now downloaded if need be) and the suffix is returned.
 
       [Lookup path](@docroot@/language/constructs/lookup-path.md) expressions can be [desugared](https://en.wikipedia.org/wiki/Syntactic_sugar) using this and [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath):
 
