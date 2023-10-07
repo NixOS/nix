@@ -21,11 +21,26 @@ struct EvalSettings : Config
     Setting<Strings> nixPath{
         this, getDefaultNixPath(), "nix-path",
         R"(
-          List of directories to be searched for `<...>` file references
-
-          In particular, outside of [pure evaluation mode](#conf-pure-eval), this determines the value of
+          List of search paths to use for lookup paths.
+          This setting determines the value of
           [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath).
-        )"};
+
+          The default value is
+
+          ```
+          $HOME/.nix-defexpr/channels
+          nixpkgs=$NIX_STATE_DIR/profiles/per-user/root/channels/nixpkgs
+          $NIX_STATE_DIR/profiles/per-user/root/channels
+          ```
+
+          It can be overridden with the [`NIX_PATH` environment variable](@docroot@/command-ref/env-common.md#env-NIX_PATH) or the [`-I` command line option](@docroot@/command-ref/opt-common.md#opt-I).
+
+          > **Note**
+          >
+          > If [restricted evaluation](#conf-restrict-eval) is enabled, the default value is ignored.
+          >
+          > If [pure evaluation](#conf-pure-eval) is enabled, lookup paths are not resolved at all.
+        )", {}, false};
 
     Setting<std::string> currentSystem{
         this, "", "eval-system",
