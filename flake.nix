@@ -509,18 +509,6 @@
           };
         };
 
-      nixos-lib = import (nixpkgs + "/nixos/lib") { };
-
-      # https://nixos.org/manual/nixos/unstable/index.html#sec-calling-nixos-tests
-      runNixOSTestFor = system: test: nixos-lib.runTest {
-        imports = [ test ];
-        hostPkgs = nixpkgsFor.${system}.native;
-        defaults = {
-          nixpkgs.pkgs = nixpkgsFor.${system}.native;
-        };
-        _module.args.nixpkgs = nixpkgs;
-      };
-
     in {
       # A Nixpkgs overlay that overrides the 'nix' and
       # 'nix.perl-bindings' packages.
@@ -627,49 +615,29 @@
           };
 
         # System tests.
-        tests.authorization = runNixOSTestFor "x86_64-linux" ./tests/nixos/authorization.nix;
+        tests = import ./tests/nixos { inherit lib nixpkgs nixpkgsFor; } // {
 
-        tests.remoteBuilds = runNixOSTestFor "x86_64-linux" ./tests/nixos/remote-builds.nix;
+          # Make sure that nix-env still produces the exact same result
+          # on a particular version of Nixpkgs.
+          evalNixpkgs =
+            with nixpkgsFor.x86_64-linux.native;
+            runCommand "eval-nixos" { buildInputs = [ nix ]; }
+              ''
+                type -p nix-env
+                # Note: we're filtering out nixos-install-tools because https://github.com/NixOS/nixpkgs/pull/153594#issuecomment-1020530593.
+                time nix-env --store dummy:// -f ${nixpkgs-regression} -qaP --drv-path | sort | grep -v nixos-install-tools > packages
+                [[ $(sha1sum < packages | cut -c1-40) = ff451c521e61e4fe72bdbe2d0ca5d1809affa733 ]]
+                mkdir $out
+              '';
 
-        tests.nix-copy-closure = runNixOSTestFor "x86_64-linux" ./tests/nixos/nix-copy-closure.nix;
-
-        tests.nix-copy = runNixOSTestFor "x86_64-linux" ./tests/nixos/nix-copy.nix;
-
-        tests.nssPreload = runNixOSTestFor "x86_64-linux" ./tests/nixos/nss-preload.nix;
-
-        tests.githubFlakes = runNixOSTestFor "x86_64-linux" ./tests/nixos/github-flakes.nix;
-
-        tests.sourcehutFlakes = runNixOSTestFor "x86_64-linux" ./tests/nixos/sourcehut-flakes.nix;
-
-        tests.tarballFlakes = runNixOSTestFor "x86_64-linux" ./tests/nixos/tarball-flakes.nix;
-
-        tests.containers = runNixOSTestFor "x86_64-linux" ./tests/nixos/containers/containers.nix;
-
-        tests.setuid = lib.genAttrs
-          ["i686-linux" "x86_64-linux"]
-          (system: runNixOSTestFor system ./tests/nixos/setuid.nix);
-
-
-        # Make sure that nix-env still produces the exact same result
-        # on a particular version of Nixpkgs.
-        tests.evalNixpkgs =
-          with nixpkgsFor.x86_64-linux.native;
-          runCommand "eval-nixos" { buildInputs = [ nix ]; }
-            ''
-              type -p nix-env
-              # Note: we're filtering out nixos-install-tools because https://github.com/NixOS/nixpkgs/pull/153594#issuecomment-1020530593.
-              time nix-env --store dummy:// -f ${nixpkgs-regression} -qaP --drv-path | sort | grep -v nixos-install-tools > packages
-              [[ $(sha1sum < packages | cut -c1-40) = ff451c521e61e4fe72bdbe2d0ca5d1809affa733 ]]
-              mkdir $out
-            '';
-
-        tests.nixpkgsLibTests =
-          forAllSystems (system:
-            import (nixpkgs + "/lib/tests/release.nix")
-              { pkgs = nixpkgsFor.${system}.native;
-                nixVersions = [ self.packages.${system}.nix ];
-              }
-          );
+          nixpkgsLibTests =
+            forAllSystems (system:
+              import (nixpkgs + "/lib/tests/release.nix")
+                { pkgs = nixpkgsFor.${system}.native;
+                  nixVersions = [ self.packages.${system}.nix ];
+                }
+            );
+        };
 
         metrics.nixpkgs = import "${nixpkgs-regression}/pkgs/top-level/metrics.nix" {
           pkgs = nixpkgsFor.x86_64-linux.native;
