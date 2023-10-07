@@ -63,16 +63,32 @@ you can instead write
 
 ### Attribute name
 
-Attribute names can be created dynamically with string interpolation:
+<!--
+FIXME: these examples are redundant with the main page on attribute sets.
+figure out what to do about that
+-->
 
-```nix
-let name = "foo"; in
-{
-  ${name} = "bar";
-}
-```
+Attribute names can be interpolated strings.
 
-    { foo = "bar"; }
+> **Example**
+>
+> ```nix
+> let name = "foo"; in
+> { ${name} = 123; }
+> ```
+>
+>     { foo = 123; }
+
+Attributes can be selected with interpolated strings.
+
+> **Example**
+>
+> ```nix
+> let name = "foo"; in
+> { foo = 123; }.${name}
+> ```
+>
+>     123
 
 # Interpolated expression
 
