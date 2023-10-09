@@ -122,7 +122,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     */
 
     std::map<std::string, std::vector<std::string>> aliases = {
-        {"store#info", {"store", "ping"}}
+        {"store#info#", {"store", "ping"}}
     };
 
     bool aliasUsed = false;
@@ -132,14 +132,9 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         if (aliasUsed || command || pos == args.end()) return pos;
 
         std::string argStr = "";
-        int size = args.size();
-        int ind = 0;
         for(auto arg:args) {
             argStr += arg;
-            ind++;
-            if(ind != size) {
-                argStr += '#';
-            }
+            argStr += '#';
         }
 
         for(auto it=aliases.begin(); it != aliases.end(); it++) {
