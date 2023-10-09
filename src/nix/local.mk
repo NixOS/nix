@@ -31,7 +31,7 @@ src/nix/develop.cc: src/nix/get-env.sh.gen.hh
 
 src/nix-channel/nix-channel.cc: src/nix-channel/unpack-channel.nix.gen.hh
 
-src/nix/main.cc: doc/manual/generate-manpage.nix.gen.hh doc/manual/utils.nix.gen.hh
+src/nix/main.cc: doc/manual/generate-manpage.nix.gen.hh doc/manual/utils.nix.gen.hh doc/manual/generate-settings.nix.gen.hh doc/manual/generate-store-info.nix.gen.hh
 
 src/nix/doc/files/%.md: doc/manual/src/command-ref/files/%.md
 	@mkdir -p $$(dirname $@)

@@ -214,11 +214,28 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
             , CanonPath::root),
         *vUtils);
 
+    auto vSettingsInfo = state.allocValue();
+    state.cacheFile(
+        CanonPath("/generate-settings.nix"), CanonPath("/generate-settings.nix"),
+        state.parseExprFromString(
+            #include "generate-settings.nix.gen.hh"
+            , CanonPath::root),
+        *vSettingsInfo);
+
+    auto vStoreInfo = state.allocValue();
+    state.cacheFile(
+        CanonPath("/generate-store-info.nix"), CanonPath("/generate-store-info.nix"),
+        state.parseExprFromString(
+            #include "generate-store-info.nix.gen.hh"
+            , CanonPath::root),
+        *vStoreInfo);
+
     auto vDump = state.allocValue();
     vDump->mkString(toplevel.dumpCli());
 
     auto vRes = state.allocValue();
-    state.callFunction(*vGenerateManpage, *vDump, *vRes, noPos);
+    state.callFunction(*vGenerateManpage, state.getBuiltin("false"), *vRes, noPos);
+    state.callFunction(*vRes, *vDump, *vRes, noPos);
 
     auto attr = vRes->attrs->get(state.symbols.create(mdName + ".md"));
     if (!attr)
