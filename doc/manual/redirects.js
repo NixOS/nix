@@ -336,7 +336,6 @@ const redirects = {
     "simple-values": "#primitives",
     "lists": "#list",
     "strings": "#string",
-    "lists": "#list",
     "attribute-sets": "#attribute-set",
   },
   "installation/installing-binary.html": {

@@ -107,18 +107,16 @@
   e.g. `~/foo` would be equivalent to `/home/edolstra/foo` for a user
   whose home directory is `/home/edolstra`.
 
-  When an [interpolated string][string interpolation] evaluates to a path, the path is first copied into the Nix store and the resulting string is the [store path] of the newly created [store object].
-
-  [store path]: ../glossary.md#gloss-store-path
-  [store object]: ../glossary.md#gloss-store-object
-
   For instance, evaluating `"${./foo.txt}"` will cause `foo.txt` in the current directory to be copied into the Nix store and result in the string `"/nix/store/<hash>-foo.txt"`.
 
   Note that the Nix language assumes that all input files will remain _unchanged_ while  evaluating a Nix expression.
   For example, assume you used a file path in an interpolated string during a `nix repl` session.
-  Later in the same session, after having changed the file contents, evaluating the interpolated string with the file path again might not return a new store path, since Nix might not re-read the file contents.
+  Later in the same session, after having changed the file contents, evaluating the interpolated string with the file path again might not return a new [store path], since Nix might not re-read the file contents.
 
-  Paths support [string interpolation].
+  [store path]: ../glossary.md#gloss-store-path
+
+  Paths can include [string interpolation] and can themselves be [interpolated in other expressions].
+  [interpolated in other expressions]: ./string-interpolation.md#interpolated-expressions
 
   At least one slash (`/`) must appear *before* any interpolated expression for the result to be recognized as a path.
 

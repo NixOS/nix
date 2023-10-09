@@ -59,29 +59,40 @@
         # that would interfere with repo semantics.
         fileset.fileFilter (f: f.name != ".gitignore") ./.;
 
+      configureFiles = fileset.unions [
+        ./.version
+        ./configure.ac
+        ./m4
+        # TODO: do we really need README.md? It doesn't seem used in the build.
+        ./README.md
+      ];
+
+      topLevelBuildFiles = fileset.unions [
+        ./local.mk
+        ./Makefile
+        ./Makefile.config.in
+        ./mk
+      ];
+
+      functionalTestFiles = fileset.unions [
+        ./tests/functional
+        (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
+      ];
+
       nixSrc = fileset.toSource {
         root = ./.;
         fileset = fileset.intersect baseFiles (fileset.unions [
-          ./.version
+          configureFiles
+          topLevelBuildFiles
           ./boehmgc-coroutine-sp-fallback.diff
-          ./bootstrap.sh
-          ./configure.ac
           ./doc
-          ./local.mk
-          ./m4
-          ./Makefile
-          ./Makefile.config.in
           ./misc
-          ./mk
           ./precompiled-headers.h
           ./src
-          ./tests/functional
           ./unit-test-data
           ./COPYING
           ./scripts/local.mk
-          (fileset.fileFilter (f: lib.strings.hasPrefix "nix-profile" f.name) ./scripts)
-          # TODO: do we really need README.md? It doesn't seem used in the build.
-          ./README.md
+          functionalTestFiles
         ]);
       };
 
@@ -252,7 +263,6 @@
       testNixVersions = pkgs: client: daemon: with commonDeps { inherit pkgs; }; with pkgs.lib; pkgs.stdenv.mkDerivation {
         NIX_DAEMON_PACKAGE = daemon;
         NIX_CLIENT_PACKAGE = client;
-        HAVE_LOCAL_NIX_BUILD = false;
         name =
           "nix-tests"
           + optionalString
@@ -261,7 +271,14 @@
             "-${client.version}-against-${daemon.version}";
         inherit version;
 
-        src = nixSrc;
+        src = fileset.toSource {
+          root = ./.;
+          fileset = fileset.intersect baseFiles (fileset.unions [
+            configureFiles
+            topLevelBuildFiles
+            functionalTestFiles
+          ]);
+        };
 
         VERSION_SUFFIX = versionSuffix;
 
@@ -271,19 +288,20 @@
 
         enableParallelBuilding = true;
 
-        configureFlags = testConfigureFlags; # otherwise configure fails
+        configureFlags =
+          testConfigureFlags # otherwise configure fails
+          ++ [ "--disable-build" ];
+        dontBuild = true;
         doInstallCheck = true;
-
-        buildPhase = ''
-          # Remove the source files to make sure that we're not accidentally rebuilding Nix
-          rm src/**/*.cc
-        '';
 
         installPhase = ''
           mkdir -p $out
         '';
 
-        installCheckPhase = "make installcheck -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES";
+        installCheckPhase = ''
+          mkdir -p src/nix-channel
+          make installcheck -j$NIX_BUILD_CORES -l$NIX_BUILD_CORES
+        '';
       };
 
       binaryTarball = nix: pkgs:
@@ -459,7 +477,15 @@
             passthru.perl-bindings = with final; perl.pkgs.toPerlModule (currentStdenv.mkDerivation {
               name = "nix-perl-${version}";
 
-              src = self;
+              src = fileset.toSource {
+                root = ./.;
+                fileset = fileset.intersect baseFiles (fileset.unions [
+                  ./perl
+                  ./.version
+                  ./m4
+                  ./mk
+                ]);
+              };
 
               nativeBuildInputs =
                 [ buildPackages.autoconf-archive
@@ -508,18 +534,6 @@
             '';
           };
         };
-
-      nixos-lib = import (nixpkgs + "/nixos/lib") { };
-
-      # https://nixos.org/manual/nixos/unstable/index.html#sec-calling-nixos-tests
-      runNixOSTestFor = system: test: nixos-lib.runTest {
-        imports = [ test ];
-        hostPkgs = nixpkgsFor.${system}.native;
-        defaults = {
-          nixpkgs.pkgs = nixpkgsFor.${system}.native;
-        };
-        _module.args.nixpkgs = nixpkgs;
-      };
 
     in {
       # A Nixpkgs overlay that overrides the 'nix' and
@@ -627,49 +641,29 @@
           };
 
         # System tests.
-        tests.authorization = runNixOSTestFor "x86_64-linux" ./tests/nixos/authorization.nix;
+        tests = import ./tests/nixos { inherit lib nixpkgs nixpkgsFor; } // {
 
-        tests.remoteBuilds = runNixOSTestFor "x86_64-linux" ./tests/nixos/remote-builds.nix;
+          # Make sure that nix-env still produces the exact same result
+          # on a particular version of Nixpkgs.
+          evalNixpkgs =
+            with nixpkgsFor.x86_64-linux.native;
+            runCommand "eval-nixos" { buildInputs = [ nix ]; }
+              ''
+                type -p nix-env
+                # Note: we're filtering out nixos-install-tools because https://github.com/NixOS/nixpkgs/pull/153594#issuecomment-1020530593.
+                time nix-env --store dummy:// -f ${nixpkgs-regression} -qaP --drv-path | sort | grep -v nixos-install-tools > packages
+                [[ $(sha1sum < packages | cut -c1-40) = ff451c521e61e4fe72bdbe2d0ca5d1809affa733 ]]
+                mkdir $out
+              '';
 
-        tests.nix-copy-closure = runNixOSTestFor "x86_64-linux" ./tests/nixos/nix-copy-closure.nix;
-
-        tests.nix-copy = runNixOSTestFor "x86_64-linux" ./tests/nixos/nix-copy.nix;
-
-        tests.nssPreload = runNixOSTestFor "x86_64-linux" ./tests/nixos/nss-preload.nix;
-
-        tests.githubFlakes = runNixOSTestFor "x86_64-linux" ./tests/nixos/github-flakes.nix;
-
-        tests.sourcehutFlakes = runNixOSTestFor "x86_64-linux" ./tests/nixos/sourcehut-flakes.nix;
-
-        tests.tarballFlakes = runNixOSTestFor "x86_64-linux" ./tests/nixos/tarball-flakes.nix;
-
-        tests.containers = runNixOSTestFor "x86_64-linux" ./tests/nixos/containers/containers.nix;
-
-        tests.setuid = lib.genAttrs
-          ["i686-linux" "x86_64-linux"]
-          (system: runNixOSTestFor system ./tests/nixos/setuid.nix);
-
-
-        # Make sure that nix-env still produces the exact same result
-        # on a particular version of Nixpkgs.
-        tests.evalNixpkgs =
-          with nixpkgsFor.x86_64-linux.native;
-          runCommand "eval-nixos" { buildInputs = [ nix ]; }
-            ''
-              type -p nix-env
-              # Note: we're filtering out nixos-install-tools because https://github.com/NixOS/nixpkgs/pull/153594#issuecomment-1020530593.
-              time nix-env --store dummy:// -f ${nixpkgs-regression} -qaP --drv-path | sort | grep -v nixos-install-tools > packages
-              [[ $(sha1sum < packages | cut -c1-40) = ff451c521e61e4fe72bdbe2d0ca5d1809affa733 ]]
-              mkdir $out
-            '';
-
-        tests.nixpkgsLibTests =
-          forAllSystems (system:
-            import (nixpkgs + "/lib/tests/release.nix")
-              { pkgs = nixpkgsFor.${system}.native;
-                nixVersions = [ self.packages.${system}.nix ];
-              }
-          );
+          nixpkgsLibTests =
+            forAllSystems (system:
+              import (nixpkgs + "/lib/tests/release.nix")
+                { pkgs = nixpkgsFor.${system}.native;
+                  nixVersions = [ self.packages.${system}.nix ];
+                }
+            );
+        };
 
         metrics.nixpkgs = import "${nixpkgs-regression}/pkgs/top-level/metrics.nix" {
           pkgs = nixpkgsFor.x86_64-linux.native;
