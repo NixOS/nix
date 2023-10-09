@@ -2,7 +2,7 @@
 
 > **Syntax**
 >
-> *lookup-path* = `<` *identifier* [ `/` *identifier* `]`... `>`
+> *lookup-path* = `<` *identifier* [ `/` *identifier* ]... `>`
 
 A lookup path is an identifier with an optional path suffix that resolves to a [path value](@docroot@/language/values.md#type-path) if the identifier matches a search path entry.
 
