@@ -477,7 +477,15 @@
             passthru.perl-bindings = with final; perl.pkgs.toPerlModule (currentStdenv.mkDerivation {
               name = "nix-perl-${version}";
 
-              src = self;
+              src = fileset.toSource {
+                root = ./.;
+                fileset = fileset.intersect baseFiles (fileset.unions [
+                  ./perl
+                  ./.version
+                  ./m4
+                  ./mk
+                ]);
+              };
 
               nativeBuildInputs =
                 [ buildPackages.autoconf-archive
