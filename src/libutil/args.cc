@@ -352,6 +352,7 @@ std::optional<ExperimentalFeature> Command::experimentalFeature ()
 MultiCommand::MultiCommand(const Commands & commands_)
     : commands(commands_)
 {
+
     expectArgs({
         .label = "subcommand",
         .optional = true,
