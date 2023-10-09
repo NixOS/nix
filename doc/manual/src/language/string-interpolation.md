@@ -92,7 +92,7 @@ Attributes can be selected with interpolated strings.
 
 # Interpolated expression
 
-An interpolated expression must evaluate to one of the following:
+An expression that is interpolated must evaluate to one of the following:
 
 - a [string]
 - a [path]
