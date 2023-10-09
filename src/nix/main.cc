@@ -115,7 +115,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     /**
      * In aliases map, the key should be a string of the command to alias combined with # character.
      * For Example, If alias need to be created for command:
-     * "store info", then the key should be "store#info" 
+     * "store info", then the key should be "store#info#" 
      * 
      * The reason key was configured in this way is to reduce the complexity if vector was used as a key, 
      * then we need to keep track of where a vector starting command is present in the args list 
