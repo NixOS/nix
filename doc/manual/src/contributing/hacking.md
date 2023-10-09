@@ -42,8 +42,8 @@ $ nix develop .#native-clang11StdenvPackages
 To build Nix itself in this shell:
 
 ```console
-[nix-shell]$ ./bootstrap.sh
-[nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
+[nix-shell]$ autoreconfPhase
+[nix-shell]$ configurePhase
 [nix-shell]$ make -j $NIX_BUILD_CORES
 ```
 
@@ -86,7 +86,7 @@ $ nix-shell --attr devShells.x86_64-linux.native-clang11StdenvPackages
 To build Nix itself in this shell:
 
 ```console
-[nix-shell]$ ./bootstrap.sh
+[nix-shell]$ autoreconfPhase
 [nix-shell]$ ./configure $configureFlags --prefix=$(pwd)/outputs/out
 [nix-shell]$ make -j $NIX_BUILD_CORES
 ```
