@@ -389,10 +389,10 @@ Hash compressHash(const Hash & hash, unsigned int newSize)
 std::optional<HashType> parseHashTypeOpt(std::string_view s)
 {
     if (s == "md5") return htMD5;
-    else if (s == "sha1") return htSHA1;
-    else if (s == "sha256") return htSHA256;
-    else if (s == "sha512") return htSHA512;
-    else return std::optional<HashType> {};
+    if (s == "sha1") return htSHA1;
+    if (s == "sha256") return htSHA256;
+    if (s == "sha512") return htSHA512;
+    return std::nullopt;
 }
 
 HashType parseHashType(std::string_view s)
