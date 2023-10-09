@@ -1730,7 +1730,7 @@ static RegisterPrimOp primop_findFile(PrimOp {
       If the suffix is found inside that directory, then the entry is a match;
       the combined absolute path of the directory (now downloaded if need be) and the suffix is returned.
 
-      The syntax
+      [Lookup path](@docroot@/language/constructs/lookup-path.md) expressions can be [desugared](https://en.wikipedia.org/wiki/Syntactic_sugar) using this and [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath):
 
       ```nix
       <nixpkgs>
@@ -4396,9 +4396,9 @@ void EvalState::createBaseEnv()
     addConstant("__nixPath", v, {
         .type = nList,
         .doc = R"(
-          The search path used to resolve angle bracket path lookups.
+          List of search path entries used to resolve [lookup paths](@docroot@/language/constructs/lookup-path.md).
 
-          Angle bracket expressions can be
+          Lookup path expressions can be
           [desugared](https://en.wikipedia.org/wiki/Syntactic_sugar)
           using this and
           [`builtins.findFile`](./builtins.html#builtins-findFile):

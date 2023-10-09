@@ -107,11 +107,6 @@
   e.g. `~/foo` would be equivalent to `/home/edolstra/foo` for a user
   whose home directory is `/home/edolstra`.
 
-  Paths can also be specified between angle brackets, e.g.
-  `<nixpkgs>`. This means that the directories listed in the
-  environment variable `NIX_PATH` will be searched for the given file
-  or directory name.
-
   For instance, evaluating `"${./foo.txt}"` will cause `foo.txt` in the current directory to be copied into the Nix store and result in the string `"/nix/store/<hash>-foo.txt"`.
 
   Note that the Nix language assumes that all input files will remain _unchanged_ while  evaluating a Nix expression.
@@ -120,13 +115,15 @@
 
   [store path]: ../glossary.md#gloss-store-path
 
-  Paths, except those in angle brackets (`< >`), support [string interpolation] and can be used in [interpolated expressions].
-  [interpolated expressions]: ./string-interpolation.md#interpolated-expressions
+  Paths can include [string interpolation] and can themselves be [interpolated in other expressions].
+  [interpolated in other expressions]: ./string-interpolation.md#interpolated-expressions
 
   At least one slash (`/`) must appear *before* any interpolated expression for the result to be recognized as a path.
 
   `a.${foo}/b.${bar}` is a syntactically valid division operation.
   `./a.${foo}/b.${bar}` is a path.
+
+  [Lookup paths](./constructs/lookup-path.md) such as `<nixpkgs>` resolve to path values.
 
 - <a id="type-boolean" href="#type-boolean">Boolean</a>
 
