@@ -28,11 +28,11 @@ struct CmdDumpPath : StorePathCommand
 
 static auto rDumpPath = registerCommand2<CmdDumpPath>({"store", "dump-path"});
 
-struct CmdDumpPath2 : Command
+struct CmdNarPack : Command
 {
     Path path;
 
-    CmdDumpPath2()
+    CmdNarPack()
     {
         expectArgs({
             .label = "path",
@@ -49,7 +49,7 @@ struct CmdDumpPath2 : Command
     std::string doc() override
     {
         return
-          #include "nar-dump-path.md"
+          #include "nar-pack.md"
           ;
     }
 
@@ -61,4 +61,4 @@ struct CmdDumpPath2 : Command
     }
 };
 
-static auto rDumpPath2 = registerCommand2<CmdDumpPath2>({"nar", "dump-path"});
+static auto rNarPack = registerCommand2<CmdNarPack>({"nar", "pack"});
