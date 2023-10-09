@@ -29,10 +29,12 @@ struct EvalSettings : Config
         this, false, "restrict-eval",
         R"(
           If set to `true`, the Nix evaluator will not allow access to any
-          files outside of the Nix search path (as set via the `NIX_PATH`
-          environment variable or the `-I` option), or to URIs outside of
-          [`allowed-uris`](../command-ref/conf-file.md#conf-allowed-uris).
-          The default is `false`.
+          files outside of
+          [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath),
+          or to URIs outside of
+          [`allowed-uris`](@docroot@/command-ref/conf-file.md#conf-allowed-uris).
+
+          Also the default value for [`nix-path`](#conf-nix-path) is ignored, such that only explicitly set search path entries are taken into account.
         )"};
 
     Setting<bool> pureEval{this, false, "pure-eval",
