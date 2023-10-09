@@ -2491,7 +2491,7 @@ bool EvalState::fullGC() {
 #endif
 }
 
-void EvalState::printStats()
+void EvalState::maybePrintStats()
 {
     bool showStats = getEnv("NIX_SHOW_STATS").value_or("0") != "0";
 

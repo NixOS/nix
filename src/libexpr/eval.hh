@@ -714,7 +714,7 @@ public:
      * Performs a full memory GC before printing the statistics, so that the
      * GC statistics are more accurate.
      */
-    void printStats();
+    void maybePrintStats();
 
     /**
      * Print statistics, unconditionally, cheaply, without performing a GC first.
