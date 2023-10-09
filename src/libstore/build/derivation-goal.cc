@@ -8,8 +8,8 @@
 #include "util.hh"
 #include "archive.hh"
 #include "compression.hh"
-#include "worker-protocol.hh"
-#include "worker-protocol-impl.hh"
+#include "common-protocol.hh"
+#include "common-protocol-impl.hh"
 #include "topo-sort.hh"
 #include "callback.hh"
 #include "local-store.hh" // TODO remove, along with remaining downcasts
@@ -1185,11 +1185,11 @@ HookReply DerivationGoal::tryBuildHook()
         throw;
     }
 
-    WorkerProto::WriteConn conn { hook->sink };
+    CommonProto::WriteConn conn { hook->sink };
 
     /* Tell the hook all the inputs that have to be copied to the
        remote system. */
-    WorkerProto::write(worker.store, conn, inputPaths);
+    CommonProto::write(worker.store, conn, inputPaths);
 
     /* Tell the hooks the missing outputs that have to be copied back
        from the remote system. */
@@ -1200,7 +1200,7 @@ HookReply DerivationGoal::tryBuildHook()
             if (buildMode != bmCheck && status.known && status.known->isValid()) continue;
             missingOutputs.insert(outputName);
         }
-        WorkerProto::write(worker.store, conn, missingOutputs);
+        CommonProto::write(worker.store, conn, missingOutputs);
     }
 
     hook->sink = FdSink();

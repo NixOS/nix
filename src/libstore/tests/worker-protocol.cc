@@ -7,85 +7,17 @@
 #include "worker-protocol-impl.hh"
 #include "derived-path.hh"
 #include "build-result.hh"
-#include "tests/libstore.hh"
+#include "tests/protocol.hh"
+#include "tests/characterization.hh"
 
 namespace nix {
 
-class WorkerProtoTest : public LibStoreTest
-{
-public:
-    Path unitTestData = getEnv("_NIX_TEST_UNIT_DATA").value() + "/libstore/worker-protocol";
+const char workerProtoDir[] = "worker-protocol";
 
-    bool testAccept() {
-        return getEnv("_NIX_TEST_ACCEPT") == "1";
-    }
-
-    Path goldenMaster(std::string_view testStem) {
-        return unitTestData + "/" + testStem + ".bin";
-    }
-
-    /**
-     * Golden test for `T` reading
-     */
-    template<typename T>
-    void readTest(PathView testStem, T value)
-    {
-        if (testAccept())
-        {
-            GTEST_SKIP() << "Cannot read golden master because another test is also updating it";
-        }
-        else
-        {
-            auto expected = readFile(goldenMaster(testStem));
-
-            T got = ({
-                StringSource from { expected };
-                WorkerProto::Serialise<T>::read(
-                    *store,
-                    WorkerProto::ReadConn { .from = from });
-            });
-
-            ASSERT_EQ(got, value);
-        }
-    }
-
-    /**
-     * Golden test for `T` write
-     */
-    template<typename T>
-    void writeTest(PathView testStem, const T & value)
-    {
-        auto file = goldenMaster(testStem);
-
-        StringSink to;
-        WorkerProto::write(
-            *store,
-            WorkerProto::WriteConn { .to = to },
-            value);
-
-        if (testAccept())
-        {
-            createDirs(dirOf(file));
-            writeFile(file, to.s);
-            GTEST_SKIP() << "Updating golden master";
-        }
-        else
-        {
-            auto expected = readFile(file);
-            ASSERT_EQ(to.s, expected);
-        }
-    }
-};
-
-#define CHARACTERIZATION_TEST(NAME, STEM, VALUE)  \
-    TEST_F(WorkerProtoTest, NAME ## _read) {   \
-        readTest(STEM, VALUE);                 \
-    }                                          \
-    TEST_F(WorkerProtoTest, NAME ## _write) {  \
-        writeTest(STEM, VALUE);                \
-    }
+using WorkerProtoTest = ProtoTest<WorkerProto, workerProtoDir>;
 
 CHARACTERIZATION_TEST(
+    WorkerProtoTest,
     string,
     "string",
     (std::tuple<std::string, std::string, std::string, std::string, std::string> {
@@ -97,6 +29,7 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
+    WorkerProtoTest,
     storePath,
     "store-path",
     (std::tuple<StorePath, StorePath> {
@@ -105,6 +38,7 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
+    WorkerProtoTest,
     contentAddress,
     "content-address",
     (std::tuple<ContentAddress, ContentAddress, ContentAddress> {
@@ -123,6 +57,7 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
+    WorkerProtoTest,
     derivedPath,
     "derived-path",
     (std::tuple<DerivedPath, DerivedPath> {
@@ -138,6 +73,7 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
+    WorkerProtoTest,
     drvOutput,
     "drv-output",
     (std::tuple<DrvOutput, DrvOutput> {
@@ -152,6 +88,7 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
+    WorkerProtoTest,
     realisation,
     "realisation",
     (std::tuple<Realisation, Realisation> {
@@ -183,6 +120,7 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
+    WorkerProtoTest,
     buildResult,
     "build-result",
     ({
@@ -240,6 +178,7 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
+    WorkerProtoTest,
     keyedBuildResult,
     "keyed-build-result",
     ({
@@ -275,6 +214,7 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
+    WorkerProtoTest,
     optionalTrustedFlag,
     "optional-trusted-flag",
     (std::tuple<std::optional<TrustedFlag>, std::optional<TrustedFlag>, std::optional<TrustedFlag>> {
@@ -284,6 +224,7 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
+    WorkerProtoTest,
     vector,
     "vector",
     (std::tuple<std::vector<std::string>, std::vector<std::string>, std::vector<std::string>, std::vector<std::vector<std::string>>> {
@@ -294,6 +235,7 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
+    WorkerProtoTest,
     set,
     "set",
     (std::tuple<std::set<std::string>, std::set<std::string>, std::set<std::string>, std::set<std::set<std::string>>> {
@@ -304,6 +246,7 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
+    WorkerProtoTest,
     optionalStorePath,
     "optional-store-path",
     (std::tuple<std::optional<StorePath>, std::optional<StorePath>> {
@@ -314,6 +257,7 @@ CHARACTERIZATION_TEST(
     }))
 
 CHARACTERIZATION_TEST(
+    WorkerProtoTest,
     optionalContentAddress,
     "optional-content-address",
     (std::tuple<std::optional<ContentAddress>, std::optional<ContentAddress>> {

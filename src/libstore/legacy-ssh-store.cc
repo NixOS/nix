@@ -6,8 +6,8 @@
 #include "build-result.hh"
 #include "store-api.hh"
 #include "path-with-outputs.hh"
-#include "worker-protocol.hh"
-#include "worker-protocol-impl.hh"
+#include "common-protocol.hh"
+#include "common-protocol-impl.hh"
 #include "ssh.hh"
 #include "derivations.hh"
 #include "callback.hh"
@@ -50,37 +50,37 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         bool good = true;
 
         /**
-         * Coercion to `WorkerProto::ReadConn`. This makes it easy to use the
-         * factored out worker protocol searlizers with a
+         * Coercion to `CommonProto::ReadConn`. This makes it easy to use the
+         * factored out common protocol serialisers with a
          * `LegacySSHStore::Connection`.
          *
-         * The worker protocol connection types are unidirectional, unlike
+         * The common protocol connection types are unidirectional, unlike
          * this type.
          *
-         * @todo Use server protocol serializers, not worker protocol
+         * @todo Use server protocol serializers, not common protocol
          * serializers, once we have made that distiction.
          */
-        operator WorkerProto::ReadConn ()
+        operator CommonProto::ReadConn ()
         {
-            return WorkerProto::ReadConn {
+            return CommonProto::ReadConn {
                 .from = from,
             };
         }
 
         /*
-         * Coercion to `WorkerProto::WriteConn`. This makes it easy to use the
-         * factored out worker protocol searlizers with a
+         * Coercion to `CommonProto::WriteConn`. This makes it easy to use the
+         * factored out common protocol searlizers with a
          * `LegacySSHStore::Connection`.
          *
-         * The worker protocol connection types are unidirectional, unlike
+         * The common protocol connection types are unidirectional, unlike
          * this type.
          *
-         * @todo Use server protocol serializers, not worker protocol
+         * @todo Use server protocol serializers, not common protocol
          * serializers, once we have made that distiction.
          */
-        operator WorkerProto::WriteConn ()
+        operator CommonProto::WriteConn ()
         {
-            return WorkerProto::WriteConn {
+            return CommonProto::WriteConn {
                 .to = to,
             };
         }
@@ -183,7 +183,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info->deriver = parseStorePath(deriver);
-            info->references = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
+            info->references = CommonProto::Serialise<StorePathSet>::read(*this, *conn);
             readLongLong(conn->from); // download size
             info->narSize = readLongLong(conn->from);
 
@@ -217,7 +217,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
                 << printStorePath(info.path)
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << info.narHash.to_string(Base16, false);
-            WorkerProto::write(*this, *conn, info.references);
+            CommonProto::write(*this, *conn, info.references);
             conn->to
                 << info.registrationTime
                 << info.narSize
@@ -246,7 +246,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             conn->to
                 << exportMagic
                 << printStorePath(info.path);
-            WorkerProto::write(*this, *conn, info.references);
+            CommonProto::write(*this, *conn, info.references);
             conn->to
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << 0
@@ -331,7 +331,7 @@ public:
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
             conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 6) {
-            auto builtOutputs = WorkerProto::Serialise<DrvOutputs>::read(*this, *conn);
+            auto builtOutputs = CommonProto::Serialise<DrvOutputs>::read(*this, *conn);
             for (auto && [output, realisation] : builtOutputs)
                 status.builtOutputs.insert_or_assign(
                     std::move(output.outputName),
@@ -409,10 +409,10 @@ public:
         conn->to
             << ServeProto::Command::QueryClosure
             << includeOutputs;
-        WorkerProto::write(*this, *conn, paths);
+        CommonProto::write(*this, *conn, paths);
         conn->to.flush();
 
-        for (auto & i : WorkerProto::Serialise<StorePathSet>::read(*this, *conn))
+        for (auto & i : CommonProto::Serialise<StorePathSet>::read(*this, *conn))
             out.insert(i);
     }
 
@@ -425,10 +425,10 @@ public:
             << ServeProto::Command::QueryValidPaths
             << false // lock
             << maybeSubstitute;
-        WorkerProto::write(*this, *conn, paths);
+        CommonProto::write(*this, *conn, paths);
         conn->to.flush();
 
-        return WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
+        return CommonProto::Serialise<StorePathSet>::read(*this, *conn);
     }
 
     void connect() override
