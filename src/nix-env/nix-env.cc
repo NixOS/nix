@@ -1531,7 +1531,7 @@ static int main_nix_env(int argc, char * * argv)
 
         op(globals, std::move(opFlags), std::move(opArgs));
 
-        globals.state->printStats();
+        globals.state->maybePrintStats();
 
         return 0;
     }

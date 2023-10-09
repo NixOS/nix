@@ -344,7 +344,7 @@ static void main_nix_build(int argc, char * * argv)
         }
     }
 
-    state->printStats();
+    state->maybePrintStats();
 
     auto buildPaths = [&](const std::vector<DerivedPath> & paths) {
         /* Note: we do this even when !printMissing to efficiently

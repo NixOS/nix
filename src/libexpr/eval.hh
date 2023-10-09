@@ -709,9 +709,25 @@ public:
     void concatLists(Value & v, size_t nrLists, Value * * lists, const PosIdx pos, std::string_view errorCtx);
 
     /**
-     * Print statistics.
+     * Print statistics, if enabled.
+     *
+     * Performs a full memory GC before printing the statistics, so that the
+     * GC statistics are more accurate.
      */
-    void printStats();
+    void maybePrintStats();
+
+    /**
+     * Print statistics, unconditionally, cheaply, without performing a GC first.
+     */
+    void printStatistics();
+
+    /**
+     * Perform a full memory garbage collection - not incremental.
+     *
+     * @return true if Nix was built with GC and a GC was performed, false if not.
+     *              The return value is currently not thread safe - just the return value.
+     */
+    bool fullGC();
 
     /**
      * Realise the given context, and return a mapping from the placeholders

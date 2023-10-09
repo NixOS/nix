@@ -2477,10 +2477,37 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
     }
 }
 
-void EvalState::printStats()
+bool EvalState::fullGC() {
+#if HAVE_BOEHMGC
+    GC_gcollect();
+    // Check that it ran. We might replace this with a version that uses more
+    // of the boehm API to get this reliably, at a maintenance cost.
+    // We use a 1K margin because technically this has a race condtion, but we
+    // probably won't encounter it in practice, because the CLI isn't concurrent
+    // like that.
+    return GC_get_bytes_since_gc() < 1024;
+#else
+    return false;
+#endif
+}
+
+void EvalState::maybePrintStats()
 {
     bool showStats = getEnv("NIX_SHOW_STATS").value_or("0") != "0";
 
+    if (showStats) {
+        // Make the final heap size more deterministic.
+#if HAVE_BOEHMGC
+        if (!fullGC()) {
+            warn("failed to perform a full GC before reporting stats");
+        }
+#endif
+        printStatistics();
+    }
+}
+
+void EvalState::printStatistics()
+{
     struct rusage buf;
     getrusage(RUSAGE_SELF, &buf);
     float cpuTime = buf.ru_utime.tv_sec + ((float) buf.ru_utime.tv_usec / 1000000);
@@ -2494,106 +2521,105 @@ void EvalState::printStats()
     GC_word heapSize, totalBytes;
     GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
 #endif
-    if (showStats) {
-        auto outPath = getEnv("NIX_SHOW_STATS_PATH").value_or("-");
-        std::fstream fs;
-        if (outPath != "-")
-            fs.open(outPath, std::fstream::out);
-        json topObj = json::object();
-        topObj["cpuTime"] = cpuTime;
-        topObj["envs"] = {
-            {"number", nrEnvs},
-            {"elements", nrValuesInEnvs},
-            {"bytes", bEnvs},
-        };
-        topObj["nrExprs"] = Expr::nrExprs;
-        topObj["list"] = {
-            {"elements", nrListElems},
-            {"bytes", bLists},
-            {"concats", nrListConcats},
-        };
-        topObj["values"] = {
-            {"number", nrValues},
-            {"bytes", bValues},
-        };
-        topObj["symbols"] = {
-            {"number", symbols.size()},
-            {"bytes", symbols.totalSize()},
-        };
-        topObj["sets"] = {
-            {"number", nrAttrsets},
-            {"bytes", bAttrsets},
-            {"elements", nrAttrsInAttrsets},
-        };
-        topObj["sizes"] = {
-            {"Env", sizeof(Env)},
-            {"Value", sizeof(Value)},
-            {"Bindings", sizeof(Bindings)},
-            {"Attr", sizeof(Attr)},
-        };
-        topObj["nrOpUpdates"] = nrOpUpdates;
-        topObj["nrOpUpdateValuesCopied"] = nrOpUpdateValuesCopied;
-        topObj["nrThunks"] = nrThunks;
-        topObj["nrAvoided"] = nrAvoided;
-        topObj["nrLookups"] = nrLookups;
-        topObj["nrPrimOpCalls"] = nrPrimOpCalls;
-        topObj["nrFunctionCalls"] = nrFunctionCalls;
+
+    auto outPath = getEnv("NIX_SHOW_STATS_PATH").value_or("-");
+    std::fstream fs;
+    if (outPath != "-")
+        fs.open(outPath, std::fstream::out);
+    json topObj = json::object();
+    topObj["cpuTime"] = cpuTime;
+    topObj["envs"] = {
+        {"number", nrEnvs},
+        {"elements", nrValuesInEnvs},
+        {"bytes", bEnvs},
+    };
+    topObj["nrExprs"] = Expr::nrExprs;
+    topObj["list"] = {
+        {"elements", nrListElems},
+        {"bytes", bLists},
+        {"concats", nrListConcats},
+    };
+    topObj["values"] = {
+        {"number", nrValues},
+        {"bytes", bValues},
+    };
+    topObj["symbols"] = {
+        {"number", symbols.size()},
+        {"bytes", symbols.totalSize()},
+    };
+    topObj["sets"] = {
+        {"number", nrAttrsets},
+        {"bytes", bAttrsets},
+        {"elements", nrAttrsInAttrsets},
+    };
+    topObj["sizes"] = {
+        {"Env", sizeof(Env)},
+        {"Value", sizeof(Value)},
+        {"Bindings", sizeof(Bindings)},
+        {"Attr", sizeof(Attr)},
+    };
+    topObj["nrOpUpdates"] = nrOpUpdates;
+    topObj["nrOpUpdateValuesCopied"] = nrOpUpdateValuesCopied;
+    topObj["nrThunks"] = nrThunks;
+    topObj["nrAvoided"] = nrAvoided;
+    topObj["nrLookups"] = nrLookups;
+    topObj["nrPrimOpCalls"] = nrPrimOpCalls;
+    topObj["nrFunctionCalls"] = nrFunctionCalls;
 #if HAVE_BOEHMGC
-        topObj["gc"] = {
-            {"heapSize", heapSize},
-            {"totalBytes", totalBytes},
-        };
+    topObj["gc"] = {
+        {"heapSize", heapSize},
+        {"totalBytes", totalBytes},
+    };
 #endif
 
-        if (countCalls) {
-            topObj["primops"] = primOpCalls;
-            {
-                auto& list = topObj["functions"];
-                list = json::array();
-                for (auto & [fun, count] : functionCalls) {
-                    json obj = json::object();
-                    if (fun->name)
-                        obj["name"] = (std::string_view) symbols[fun->name];
-                    else
-                        obj["name"] = nullptr;
-                    if (auto pos = positions[fun->pos]) {
-                        if (auto path = std::get_if<SourcePath>(&pos.origin))
-                            obj["file"] = path->to_string();
-                        obj["line"] = pos.line;
-                        obj["column"] = pos.column;
-                    }
-                    obj["count"] = count;
-                    list.push_back(obj);
+    if (countCalls) {
+        topObj["primops"] = primOpCalls;
+        {
+            auto& list = topObj["functions"];
+            list = json::array();
+            for (auto & [fun, count] : functionCalls) {
+                json obj = json::object();
+                if (fun->name)
+                    obj["name"] = (std::string_view) symbols[fun->name];
+                else
+                    obj["name"] = nullptr;
+                if (auto pos = positions[fun->pos]) {
+                    if (auto path = std::get_if<SourcePath>(&pos.origin))
+                        obj["file"] = path->to_string();
+                    obj["line"] = pos.line;
+                    obj["column"] = pos.column;
                 }
-            }
-            {
-                auto list = topObj["attributes"];
-                list = json::array();
-                for (auto & i : attrSelects) {
-                    json obj = json::object();
-                    if (auto pos = positions[i.first]) {
-                        if (auto path = std::get_if<SourcePath>(&pos.origin))
-                            obj["file"] = path->to_string();
-                        obj["line"] = pos.line;
-                        obj["column"] = pos.column;
-                    }
-                    obj["count"] = i.second;
-                    list.push_back(obj);
-                }
+                obj["count"] = count;
+                list.push_back(obj);
             }
         }
+        {
+            auto list = topObj["attributes"];
+            list = json::array();
+            for (auto & i : attrSelects) {
+                json obj = json::object();
+                if (auto pos = positions[i.first]) {
+                    if (auto path = std::get_if<SourcePath>(&pos.origin))
+                        obj["file"] = path->to_string();
+                    obj["line"] = pos.line;
+                    obj["column"] = pos.column;
+                }
+                obj["count"] = i.second;
+                list.push_back(obj);
+            }
+        }
+    }
 
-        if (getEnv("NIX_SHOW_SYMBOLS").value_or("0") != "0") {
-            // XXX: overrides earlier assignment
-            topObj["symbols"] = json::array();
-            auto &list = topObj["symbols"];
-            symbols.dump([&](const std::string & s) { list.emplace_back(s); });
-        }
-        if (outPath == "-") {
-            std::cerr << topObj.dump(2) << std::endl;
-        } else {
-            fs << topObj.dump(2) << std::endl;
-        }
+    if (getEnv("NIX_SHOW_SYMBOLS").value_or("0") != "0") {
+        // XXX: overrides earlier assignment
+        topObj["symbols"] = json::array();
+        auto &list = topObj["symbols"];
+        symbols.dump([&](const std::string & s) { list.emplace_back(s); });
+    }
+    if (outPath == "-") {
+        std::cerr << topObj.dump(2) << std::endl;
+    } else {
+        fs << topObj.dump(2) << std::endl;
     }
 }
 
