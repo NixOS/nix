@@ -401,7 +401,7 @@ HashType parseHashType(std::string_view s)
     if (opt_h)
         return *opt_h;
     else
-        throw UsageError("unknown hash algorithm '%1%'", s);
+        throw UsageError("unknown hash algorithm '%1%', expect 'md5', 'sha1', 'sha256', or 'sha512'", s);
 }
 
 std::string_view printHashType(HashType ht)
