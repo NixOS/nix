@@ -182,6 +182,21 @@ HashResult hashPath(HashType ht, const Path & path,
 Hash compressHash(const Hash & hash, unsigned int newSize);
 
 /**
+ * Parse a string representing a hash format.
+ */
+HashFormat parseHashFormat(std::string_view hashFormatName);
+
+/**
+ * std::optional version of parseHashFormat that doesn't throw error.
+ */
+std::optional<HashFormat> parseHashFormatOpt(std::string_view hashFormatName);
+
+/**
+ * The reverse of parseHashFormat.
+ */
+std::string_view printHashFormat(HashFormat hashFormat);
+
+/**
  * Parse a string representing a hash type.
  */
 HashType parseHashType(std::string_view s);

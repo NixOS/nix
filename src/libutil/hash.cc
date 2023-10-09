@@ -386,6 +386,41 @@ Hash compressHash(const Hash & hash, unsigned int newSize)
 }
 
 
+std::optional<HashFormat> parseHashFormatOpt(std::string_view hashFormatName)
+{
+    if (hashFormatName == "base16") return HashFormat::Base16;
+    if (hashFormatName == "base32") return HashFormat::Base32;
+    if (hashFormatName == "base64") return HashFormat::Base64;
+    if (hashFormatName == "sri") return HashFormat::SRI;
+    return std::nullopt;
+}
+
+HashFormat parseHashFormat(std::string_view hashFormatName)
+{
+    auto opt_f = parseHashFormatOpt(hashFormatName);
+    if (opt_f)
+        return *opt_f;
+    throw UsageError("unknown hash format '%1%', expect 'base16', 'base32', 'base64', or 'sri'", hashFormatName);
+}
+
+std::string_view printHashFormat(HashFormat HashFormat)
+{
+    switch (HashFormat) {
+    case HashFormat::Base64:
+        return "base64";
+    case HashFormat::Base32:
+        return "base32";
+    case HashFormat::Base16:
+        return "base16";
+    case HashFormat::SRI:
+        return "sri";
+    default:
+        // illegal hash base enum value internally, as opposed to external input
+        // which should be validated with nice error message.
+        assert(false);
+    }
+}
+
 std::optional<HashType> parseHashTypeOpt(std::string_view s)
 {
     if (s == "md5") return htMD5;

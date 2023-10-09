@@ -79,6 +79,21 @@ namespace nix {
                 "7299aeadb6889018501d289e4900f7e4331b99dec4b5433a"
                 "c7d329eeb6dd26545e96e55b874be909");
     }
+
+    /* ----------------------------------------------------------------------------
+     * parseHashFormat, parseHashFormatOpt, printHashFormat
+     * --------------------------------------------------------------------------*/
+
+    TEST(hashFormat, testRoundTripPrintParse) {
+        for (const HashFormat hashFormat: { HashFormat::Base64, HashFormat::Base32, HashFormat::Base16, HashFormat::SRI}) {
+            ASSERT_EQ(parseHashFormat(printHashFormat(hashFormat)), hashFormat);
+            ASSERT_EQ(*parseHashFormatOpt(printHashFormat(hashFormat)), hashFormat);
+        }
+    }
+
+    TEST(hashFormat, testParseHashFormatOptException) {
+        ASSERT_EQ(parseHashFormatOpt("sha0042"), std::nullopt);
+    }
 }
 
 namespace rc {
