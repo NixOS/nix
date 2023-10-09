@@ -40,7 +40,10 @@ struct EvalSettings : Config
           Pure evaluation mode ensures that the result of Nix expressions is fully determined by explicitly declared inputs, and not influenced by external state:
 
           - Restrict file system and network access to files specified by cryptographic hash
-          - Disable [`bultins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem) and [`builtins.currentTime`](@docroot@/language/builtin-constants.md#builtins-currentTime)
+          - Disable impure constants:
+            - [`bultins.currentSystem`](@docroot@/language/builtin-constants.md#builtins-currentSystem)
+            - [`builtins.currentTime`](@docroot@/language/builtin-constants.md#builtins-currentTime)
+            - [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath)
         )"
         };
 
