@@ -354,6 +354,7 @@ const redirects = {
     "installer-tests": "testing.html#installer-tests",
     "one-time-setup": "testing.html#one-time-setup",
     "using-the-ci-generated-installer-for-manual-testing": "testing.html#using-the-ci-generated-installer-for-manual-testing",
+    "characterization-testing": "#characterisation-testing-unit",
   }
 };
 

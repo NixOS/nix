@@ -62,11 +62,11 @@ The path to the `unit-test-data` directory is passed to the unit test executable
 You can run the whole testsuite with `make check`, or the tests for a specific component with `make libfoo-tests_RUN`.
 Finer-grained filtering is also possible using the [--gtest_filter](https://google.github.io/googletest/advanced.html#running-a-subset-of-the-tests) command-line option, or the `GTEST_FILTER` environment variable.
 
-### Characterization testing
+### Characterisation testing { #characaterisation-testing-unit }
 
-See [below](#characterization-testing-1) for a broader discussion of characterization testing.
+See [functional characterisation testing](#characterisation-testing-functional) for a broader discussion of characterisation testing.
 
-Like with the functional characterization, `_NIX_TEST_ACCEPT=1` is also used.
+Like with the functional characterisation, `_NIX_TEST_ACCEPT=1` is also used.
 For example:
 ```shell-session
 $ _NIX_TEST_ACCEPT=1 make libstore-tests-exe_RUN
@@ -77,8 +77,8 @@ $ _NIX_TEST_ACCEPT=1 make libstore-tests-exe_RUN
 [  SKIPPED ] WorkerProtoTest.storePath_write
 ...
 ```
-will regenerate the "golden master" expected result for the `libnixstore` characterization tests.
-The characterization tests will mark themselves "skipped" since they regenerated the expected result instead of actually testing anything.
+will regenerate the "golden master" expected result for the `libnixstore` characterisation tests.
+The characterisation tests will mark themselves "skipped" since they regenerated the expected result instead of actually testing anything.
 
 ## Functional tests
 
@@ -195,9 +195,9 @@ To remove any traces of that:
 git clean -x --force tests
 ```
 
-### Characterization testing
+### Characterisation testing { #characterisation-testing-functional }
 
-Occasionally, Nix utilizes a technique called [Characterization Testing](https://en.wikipedia.org/wiki/Characterization_test) as part of the functional tests.
+Occasionally, Nix utilizes a technique called [Characterisation Testing](https://en.wikipedia.org/wiki/Characterization_test) as part of the functional tests.
 This technique is to include the exact output/behavior of a former version of Nix in a test in order to check that Nix continues to produce the same behavior going forward.
 
 For example, this technique is used for the language tests, to check both the printed final value if evaluation was successful, and any errors and warnings encountered.
@@ -208,7 +208,7 @@ For example:
 ```bash
 _NIX_TEST_ACCEPT=1 make tests/functional/lang.sh.test
 ```
-This convention is shared with the [characterization unit tests](#characterization-testing-1) too.
+This convention is shared with the [characterisation unit tests](#characterisation-testing-unit) too.
 
 An interesting situation to document is the case when these tests are "overfitted".
 The language tests are, again, an example of this.
@@ -221,7 +221,7 @@ Diagnostic outputs are indeed not a stable interface, but they still are importa
 By recording the expected output, the test suite guards against accidental changes, and ensure the *result* (not just the code that implements it) of the diagnostic code paths are under code review.
 Regressions are caught, and improvements always show up in code review.
 
-To ensure that characterization testing doesn't make it harder to intentionally change these interfaces, there always must be an easy way to regenerate the expected output, as we do with `_NIX_TEST_ACCEPT=1`.
+To ensure that characterisation testing doesn't make it harder to intentionally change these interfaces, there always must be an easy way to regenerate the expected output, as we do with `_NIX_TEST_ACCEPT=1`.
 
 ## Integration tests
 
@@ -235,7 +235,7 @@ You can run them manually with `nix build .#hydraJobs.tests.{testName}` or `nix-
 
 After a one-time setup, the Nix repository's GitHub Actions continuous integration (CI) workflow can test the installer each time you push to a branch.
 
-Creating a Cachix cache for your installer tests and adding its authorization token to GitHub enables [two installer-specific jobs in the CI workflow](https://github.com/NixOS/nix/blob/88a45d6149c0e304f6eb2efcc2d7a4d0d569f8af/.github/workflows/ci.yml#L50-L91):
+Creating a Cachix cache for your installer tests and adding its authorisation token to GitHub enables [two installer-specific jobs in the CI workflow](https://github.com/NixOS/nix/blob/88a45d6149c0e304f6eb2efcc2d7a4d0d569f8af/.github/workflows/ci.yml#L50-L91):
 
 - The `installer` job generates installers for the platforms below and uploads them to your Cachix cache:
   - `x86_64-linux`
