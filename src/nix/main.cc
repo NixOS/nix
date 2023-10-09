@@ -112,27 +112,17 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         });
     }
 
+    /**
+     * In aliases map, the key should be a string of the command to alias combined with # character.
+     * For Example, If alias need to be created for command:
+     * "store info", then the key should be "store#info" 
+     * 
+     * The reason key was configured in this way is to reduce the complexity if vector was used as a key, 
+     * then we need to keep track of where a vector starting command is present in the args list 
+    */
+
     std::map<std::string, std::vector<std::string>> aliases = {
-        {"add-to-store", {"store", "add-path"}},
-        {"cat-nar", {"nar", "cat"}},
-        {"cat-store", {"store", "cat"}},
-        {"copy-sigs", {"store", "copy-sigs"}},
-        {"dev-shell", {"develop"}},
-        {"diff-closures", {"store", "diff-closures"}},
-        {"dump-path", {"store", "dump-path"}},
-        {"hash-file", {"hash", "file"}},
-        {"hash-path", {"hash", "path"}},
-        {"ls-nar", {"nar", "ls"}},
-        {"ls-store", {"store", "ls"}},
-        {"make-content-addressable", {"store", "make-content-addressed"}},
-        {"optimise-store", {"store", "optimise"}},
-        {"ping-store", {"store", "ping"}},
-        {"sign-paths", {"store", "sign"}},
-        {"show-derivation", {"derivation", "show"}},
-        {"to-base16", {"hash", "to-base16"}},
-        {"to-base32", {"hash", "to-base32"}},
-        {"to-base64", {"hash", "to-base64"}},
-        {"verify", {"store", "verify"}},
+        {"store#info", {"store", "ping"}}
     };
 
     bool aliasUsed = false;
@@ -140,15 +130,40 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
     Strings::iterator rewriteArgs(Strings & args, Strings::iterator pos) override
     {
         if (aliasUsed || command || pos == args.end()) return pos;
-        auto arg = *pos;
-        auto i = aliases.find(arg);
-        if (i == aliases.end()) return pos;
-        warn("'%s' is a deprecated alias for '%s'",
-            arg, concatStringsSep(" ", i->second));
-        pos = args.erase(pos);
-        for (auto j = i->second.rbegin(); j != i->second.rend(); ++j)
-            pos = args.insert(pos, *j);
-        aliasUsed = true;
+
+        std::string argStr = "";
+        int size = args.size();
+        int ind = 0;
+        for(auto arg:args) {
+            argStr += arg;
+            ind++;
+            if(ind != size) {
+                argStr += '#';
+            }
+        }
+
+        for(auto it=aliases.begin(); it != aliases.end(); it++) {
+            auto foundPos = argStr.find(it->first);
+            if(foundPos != std::string::npos) {
+                std::string substr = argStr.substr(0,foundPos);
+                int count=std::count(argStr.begin(),argStr.begin() + foundPos,'#');
+
+                Strings::iterator iter = args.begin();
+                std::advance(iter, count);
+
+                for(auto j = it->second.begin(); j != it->second.end(); ++j) {
+                    pos = args.erase(iter);
+                    pos = args.insert(pos, *j);
+                    iter = pos;
+                    advance(iter, 1);
+                }
+                Strings::iterator res_iter = args.begin();
+                std::advance(res_iter, count);
+                aliasUsed = true;
+                return res_iter;
+            }
+        }
+
         return pos;
     }
 
