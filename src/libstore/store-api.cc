@@ -938,7 +938,7 @@ StorePathSet Store::exportReferences(const StorePathSet & storePaths, const Stor
 
 json Store::pathInfoToJSON(const StorePathSet & storePaths,
     bool includeImpureInfo, bool showClosureSize,
-    Base hashBase,
+    HashFormat hashFormat,
     AllowInvalidFlag allowInvalid)
 {
     json::array_t jsonList = json::array();
@@ -951,7 +951,7 @@ json Store::pathInfoToJSON(const StorePathSet & storePaths,
 
             jsonPath["path"] = printStorePath(info->path);
             jsonPath["valid"] = true;
-            jsonPath["narHash"] = info->narHash.to_string(hashBase, true);
+            jsonPath["narHash"] = info->narHash.to_string(hashFormat, true);
             jsonPath["narSize"] = info->narSize;
 
             {
@@ -993,7 +993,7 @@ json Store::pathInfoToJSON(const StorePathSet & storePaths,
                     if (!narInfo->url.empty())
                         jsonPath["url"] = narInfo->url;
                     if (narInfo->fileHash)
-                        jsonPath["downloadHash"] = narInfo->fileHash->to_string(hashBase, true);
+                        jsonPath["downloadHash"] = narInfo->fileHash->to_string(hashFormat, true);
                     if (narInfo->fileSize)
                         jsonPath["downloadSize"] = narInfo->fileSize;
                     if (showClosureSize)

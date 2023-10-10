@@ -115,14 +115,14 @@ std::string printHash16or32(const Hash & hash)
 }
 
 
-std::string Hash::to_string(Base base, bool includeType) const
+std::string Hash::to_string(HashFormat hashFormat, bool includeType) const
 {
     std::string s;
-    if (base == SRI || includeType) {
+    if (hashFormat == SRI || includeType) {
         s += printHashType(type);
-        s += base == SRI ? '-' : ':';
+        s += hashFormat == SRI ? '-' : ':';
     }
-    switch (base) {
+    switch (hashFormat) {
     case Base16:
         s += printHash16(*this);
         break;

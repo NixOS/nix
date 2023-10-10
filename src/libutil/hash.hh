@@ -23,7 +23,7 @@ extern std::set<std::string> hashTypes;
 
 extern const std::string base32Chars;
 
-enum Base : int { Base64, Base32, Base16, SRI };
+enum HashFormat : int { Base64, Base32, Base16, SRI };
 
 
 struct Hash
@@ -114,7 +114,7 @@ public:
      * or base-64. By default, this is prefixed by the hash type
      * (e.g. "sha256:").
      */
-    std::string to_string(Base base, bool includeType) const;
+    std::string to_string(HashFormat hashFormat, bool includeType) const;
 
     std::string gitRev() const
     {
