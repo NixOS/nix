@@ -4,6 +4,7 @@
 #include "types.hh"
 #include "config.hh"
 #include "util.hh"
+#include "experimental-features.hh"
 
 #include <map>
 #include <limits>
@@ -1066,7 +1067,11 @@ public:
           This option is useful for, e.g., setting `https_proxy` for
           fixed-output derivations and in a multi-user Nix installation, or
           setting private access tokens when fetching a private repository.
-        )"};
+        )",
+        {}, // aliases
+        true, // document default
+        Xp::ConfigurableImpureEnv
+    };
 };
 
 
