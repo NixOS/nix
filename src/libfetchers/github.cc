@@ -206,6 +206,8 @@ struct GitArchiveInputScheme : InputScheme
         }
 
         auto url = getDownloadUrl(input);
+        if (fetchSettings.offline)
+            throw Error("cannot fetch Git archive '%s' while offline", url.url);
 
         auto result = downloadTarball(store, url.url, input.getName(), true, url.headers);
 

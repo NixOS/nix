@@ -7,6 +7,7 @@
 #include "tarfile.hh"
 #include "types.hh"
 #include "split.hh"
+#include "fetch-settings.hh"
 
 namespace nix::fetchers {
 
@@ -37,8 +38,15 @@ DownloadFileResult downloadFile(
         };
     };
 
-    if (cached && !cached->expired)
-        return useCached();
+    if (cached) {
+        if (!cached->expired) {
+            return useCached();
+        }
+        if (fetchSettings.offline) {
+            warn("using expired version of %s", getStrAttr(cached->infoAttrs, "url"));
+            return useCached();
+        }
+    }
 
     FileTransferRequest request(url);
     request.headers = headers;
