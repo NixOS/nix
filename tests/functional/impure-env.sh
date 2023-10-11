@@ -4,6 +4,7 @@ source common.sh
 requireDaemonNewerThan "2.18.0pre20230816"
 
 enableFeatures "configurable-impure-env"
+restartDaemon
 
 varTest() {
     local var="$1"; shift
