@@ -12,7 +12,7 @@ struct ExperimentalFeatureDetails
     std::string_view description;
 };
 
-constexpr std::array<ExperimentalFeatureDetails, 14> xpFeatureDetails = {{
+constexpr std::array<ExperimentalFeatureDetails, 15> xpFeatureDetails = {{
     {
         .tag = Xp::CaDerivations,
         .name = "ca-derivations",
@@ -221,6 +221,13 @@ constexpr std::array<ExperimentalFeatureDetails, 14> xpFeatureDetails = {{
             Allow the use of the `read-only` parameter in [local store](@docroot@/command-ref/new-cli/nix3-help-stores.md#local-store) URIs.
         )",
     },
+    {
+        .tag = Xp::ConfigurableImpureEnv,
+        .name = "configurable-impure-env",
+        .description = R"(
+            Allow the use of the [impure-env](@docroot@/command-ref/conf-file.md#conf-impure-env) setting.
+        )",
+    }
 }};
 
 static_assert(

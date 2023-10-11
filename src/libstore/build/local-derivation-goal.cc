@@ -1135,8 +1135,18 @@ void LocalDerivationGoal::initEnv()
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
     if (!derivationType->isSandboxed()) {
-        for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings()))
-            env[i] = getEnv(i).value_or("");
+        auto & impureEnv = settings.impureEnv.get();
+        if (!impureEnv.empty())
+            experimentalFeatureSettings.require(Xp::ConfigurableImpureEnv);
+
+        for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings())) {
+            auto envVar = impureEnv.find(i);
+            if (envVar != impureEnv.end()) {
+                env[i] = envVar->second;
+            } else {
+                env[i] = getEnv(i).value_or("");
+            }
+        }
     }
 
     /* Currently structured log messages piggyback on stderr, but we
