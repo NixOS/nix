@@ -10,6 +10,25 @@ struct Cache
 {
     virtual ~Cache() { }
 
+    /* A cache for arbitrary Attrs -> Attrs mappings with a timestamp
+       for expiration. */
+    virtual void add(
+        const Attrs & inAttrs,
+        const Attrs & infoAttrs) = 0;
+
+    virtual std::optional<Attrs> lookup2(
+        const Attrs & inAttrs) = 0;
+
+    struct Result2
+    {
+        bool expired = false;
+        Attrs infoAttrs;
+    };
+
+    virtual std::optional<Result2> lookupExpired2(
+        const Attrs & inAttrs) = 0;
+
+    /* Old cache for things that have a store path. */
     virtual void add(
         ref<Store> store,
         const Attrs & inAttrs,

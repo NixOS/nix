@@ -53,6 +53,12 @@ struct GitRepo
     virtual void fetch(
         const std::string & url,
         const std::string & refspec) = 0;
+
+    /*
+     * Given a Git tree hash, compute the hash of its NAR
+     * serialisation. This is memoised on-disk.
+     */
+    virtual Hash treeHashToNarHash(const Hash & treeHash) = 0;
 };
 
 ref<GitRepo> getTarballCache();

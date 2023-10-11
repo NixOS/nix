@@ -778,7 +778,10 @@ FileTransferResult FileTransfer::upload(const FileTransferRequest & request)
     return enqueueFileTransfer(request).get();
 }
 
-void FileTransfer::download(FileTransferRequest && request, Sink & sink)
+void FileTransfer::download(
+    FileTransferRequest && request,
+    Sink & sink,
+    std::function<void(FileTransferResult)> resultCallback)
 {
     /* Note: we can't call 'sink' via request.dataCallback, because
        that would cause the sink to execute on the fileTransfer
@@ -828,11 +831,13 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
     };
 
     enqueueFileTransfer(request,
-        {[_state](std::future<FileTransferResult> fut) {
+        {[_state, resultCallback{std::move(resultCallback)}](std::future<FileTransferResult> fut) {
             auto state(_state->lock());
             state->quit = true;
             try {
-                fut.get();
+                auto res = fut.get();
+                if (resultCallback)
+                    resultCallback(std::move(res));
             } catch (...) {
                 state->exc = std::current_exception();
             }

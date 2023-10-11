@@ -1,5 +1,6 @@
 #include "git-utils.hh"
 #include "input-accessor.hh"
+#include "cache.hh"
 
 #include <boost/core/span.hpp>
 
@@ -460,6 +461,22 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
               url,
               refspec
             }, {}, true);
+    }
+
+    Hash treeHashToNarHash(const Hash & treeHash) override
+    {
+        auto accessor = getAccessor(treeHash);
+
+        fetchers::Attrs cacheKey({{"_what", "treeHashToNarHash"}, {"treeHash", treeHash.gitRev()}});
+
+        if (auto res = fetchers::getCache()->lookup2(cacheKey))
+            return Hash::parseAny(fetchers::getStrAttr(*res, "narHash"), htSHA256);
+
+        auto narHash = accessor->hashPath(CanonPath::root);
+
+        fetchers::getCache()->add(cacheKey, fetchers::Attrs({{"narHash", narHash.to_string(SRI, true)}}));
+
+        return narHash;
     }
 };
 

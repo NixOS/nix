@@ -10,6 +10,7 @@
 #include "split.hh"
 #include "fs-input-accessor.hh"
 #include "store-api.hh"
+#include "git-utils.hh"
 
 namespace nix::fetchers {
 
@@ -183,6 +184,86 @@ DownloadTarballResult downloadTarball(
     };
 }
 
+struct DownloadTarballResult2
+{
+    Hash treeHash;
+    time_t lastModified;
+    std::optional<std::string> immutableUrl;
+};
+
+/* Download and import a tarball into the Git cache. The result is
+   the Git tree hash of the root directory. */
+DownloadTarballResult2 downloadTarball2(
+    ref<Store> store,
+    const std::string & url,
+    const Headers & headers)
+{
+    Attrs inAttrs({
+        {"_what", "tarballCache"},
+        {"url", url},
+    });
+
+    auto cached = getCache()->lookupExpired2(inAttrs);
+
+    auto attrsToResult = [&](const Attrs & infoAttrs)
+    {
+        return DownloadTarballResult2 {
+            .treeHash = getRev(infoAttrs, "treeHash"),
+            .lastModified = (time_t) getIntAttr(infoAttrs, "lastModified"),
+            .immutableUrl = maybeGetStrAttr(infoAttrs, "immutableUrl"),
+        };
+    };
+
+    if (cached && !getTarballCache()->hasObject(getRev(cached->infoAttrs, "treeHash")))
+        cached.reset();
+
+    if (cached && !cached->expired)
+        return attrsToResult(cached->infoAttrs);
+
+    auto _res = std::make_shared<Sync<FileTransferResult>>();
+
+    auto source = sinkToSource([&](Sink & sink) {
+        FileTransferRequest req(url);
+        req.expectedETag = cached ? getStrAttr(cached->infoAttrs, "etag") : "";
+        getFileTransfer()->download(std::move(req), sink,
+            [_res](FileTransferResult r)
+            {
+                *_res->lock() = r;
+            });
+    });
+
+    /* Note: if the download is cached, `importTarball()` will receive
+       no data, which causes it to import an empty tarball. */
+    auto tarballInfo = getTarballCache()->importTarball(*source);
+
+    auto res(_res->lock());
+
+    Attrs infoAttrs;
+
+    if (res->cached) {
+        infoAttrs = cached->infoAttrs;
+    } else {
+        infoAttrs.insert_or_assign("etag", res->etag);
+        infoAttrs.insert_or_assign("treeHash", tarballInfo.treeHash.gitRev());
+        infoAttrs.insert_or_assign("lastModified", uint64_t(tarballInfo.lastModified));
+        if (res->immutableUrl)
+            infoAttrs.insert_or_assign("immutableUrl", *res->immutableUrl);
+    }
+
+    getCache()->add(inAttrs, infoAttrs);
+
+    if (url != res->effectiveUri) {
+        Attrs inAttrs2(inAttrs);
+        inAttrs2.insert_or_assign("url", res->effectiveUri);
+        getCache()->add(inAttrs2, infoAttrs);
+    }
+
+    // FIXME: add a cache entry for immutableUrl? That could allow
+    // cache poisoning.
+
+    return attrsToResult(infoAttrs);
+}
+
 // An input scheme corresponding to a curl-downloadable resource.
 struct CurlInputScheme : InputScheme
 {
@@ -198,6 +279,8 @@ struct CurlInputScheme : InputScheme
     }
 
     virtual bool isValidURL(const ParsedURL & url, bool requireTree) const = 0;
+
+    static const std::set<std::string> specialParams;
 
     std::optional<Input> inputFromURL(const ParsedURL & _url, bool requireTree) const override
     {
@@ -221,8 +304,8 @@ struct CurlInputScheme : InputScheme
             if (auto n = string2Int<uint64_t>(*i))
                 input.attrs.insert_or_assign("revCount", *n);
 
-        url.query.erase("rev");
-        url.query.erase("revCount");
+        for (auto & param : specialParams)
+            url.query.erase(param);
 
         input.attrs.insert_or_assign("type", inputType());
         input.attrs.insert_or_assign("url", url.to_string());
@@ -235,9 +318,8 @@ struct CurlInputScheme : InputScheme
         if (type != inputType()) return {};
 
         // FIXME: some of these only apply to TarballInputScheme.
-        std::set<std::string> allowedNames = {"type", "url", "narHash", "name", "unpack", "rev", "revCount", "lastModified"};
         for (auto & [name, value] : attrs)
-            if (!allowedNames.count(name))
+            if (!specialParams.count(name))
                 throw Error("unsupported %s input attribute '%s'", *type, name);
 
         Input input;
@@ -261,6 +343,10 @@ struct CurlInputScheme : InputScheme
     {
         return (bool) input.getNarHash();
     }
+};
+
+const std::set<std::string> CurlInputScheme::specialParams{
+    "type", "url", "narHash", "name", "unpack", "rev", "revCount", "lastModified"
 };
 
 struct FileInputScheme : CurlInputScheme
@@ -308,11 +394,14 @@ struct TarballInputScheme : CurlInputScheme
     {
         auto input(_input);
 
-        auto result = downloadTarball(store, getStrAttr(input.attrs, "url"), input.getName(), false);
+        auto result = downloadTarball2(store, getStrAttr(input.attrs, "url"), {});
 
-        // FIXME: remove?
-        auto narHash = store->queryPathInfo(result.storePath)->narHash;
-        input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
+        auto accessor = getTarballCache()->getAccessor(result.treeHash);
+
+        accessor->setPathDisplay("«" + input.to_string() + "»");
+
+        if (result.lastModified && !input.attrs.contains("lastModified"))
+            input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
 
         if (result.immutableUrl) {
             auto immutableInput = Input::fromURL(*result.immutableUrl);
@@ -323,10 +412,10 @@ struct TarballInputScheme : CurlInputScheme
             input = immutableInput;
         }
 
-        if (result.lastModified && !input.attrs.contains("lastModified"))
-            input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
+        input.attrs.insert_or_assign("narHash",
+            getTarballCache()->treeHashToNarHash(result.treeHash).to_string(SRI, true));
 
-        return {makeStorePathAccessor(store, result.storePath), input};
+        return {accessor, input};
     }
 };
 

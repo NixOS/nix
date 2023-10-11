@@ -33,4 +33,6 @@ bool getBoolAttr(const Attrs & attrs, const std::string & name);
 
 std::map<std::string, std::string> attrsToQuery(const Attrs & attrs);
 
+Hash getRev(const Attrs & attrs, const std::string & name);
+
 }
