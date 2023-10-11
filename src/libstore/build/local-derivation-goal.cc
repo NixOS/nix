@@ -1136,6 +1136,9 @@ void LocalDerivationGoal::initEnv()
        already know the cryptographic hash of the output). */
     if (!derivationType->isSandboxed()) {
         auto & impureEnv = settings.impureEnv.get();
+        if (!impureEnv.empty())
+            experimentalFeatureSettings.require(Xp::ConfigurableImpureEnv);
+
         for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings())) {
             auto envVar = impureEnv.find(i);
             if (envVar != impureEnv.end()) {
