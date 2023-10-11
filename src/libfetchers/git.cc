@@ -342,38 +342,34 @@ struct GitInputScheme : InputScheme
 
     uint64_t getLastModified(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
     {
-        auto key = fmt("git-%s-last-modified", rev.gitRev());
+        Attrs key{{"_what", "gitLastModified"}, {"rev", rev.gitRev()}};
 
         auto cache = getCache();
 
-        if (auto lastModifiedS = cache->queryFact(key)) {
-            if (auto lastModified = string2Int<uint64_t>(*lastModifiedS))
-                return *lastModified;
-        }
+        if (auto res = cache->lookup(key))
+            return getIntAttr(*res, "lastModified");
 
         auto lastModified = GitRepo::openRepo(CanonPath(repoDir))->getLastModified(rev);
 
-        cache->upsertFact(key, std::to_string(lastModified));
+        cache->upsert(key, Attrs{{"lastModified", lastModified}});
 
         return lastModified;
     }
 
     uint64_t getRevCount(const RepoInfo & repoInfo, const std::string & repoDir, const Hash & rev) const
     {
-        auto key = fmt("git-%s-revcount", rev.gitRev());
+        Attrs key{{"_what", "gitRevCount"}, {"rev", rev.gitRev()}};
 
         auto cache = getCache();
 
-        if (auto revCountS = cache->queryFact(key)) {
-            if (auto revCount = string2Int<uint64_t>(*revCountS))
-                return *revCount;
-        }
+        if (auto revCountAttrs = cache->lookup(key))
+            return getIntAttr(*revCountAttrs, "revCount");
 
         Activity act(*logger, lvlChatty, actUnknown, fmt("getting Git revision count of '%s'", repoInfo.url));
 
         auto revCount = GitRepo::openRepo(CanonPath(repoDir))->getRevCount(rev);
 
-        cache->upsertFact(key, std::to_string(revCount));
+        cache->upsert(key, Attrs{{"revCount", revCount}});
 
         return revCount;
     }

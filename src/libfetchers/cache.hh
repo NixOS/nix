@@ -12,11 +12,26 @@ struct Cache
 
     /* A cache for arbitrary Attrs -> Attrs mappings with a timestamp
        for expiration. */
-    virtual void add(
+
+    /*
+     * Add a value to the cache. The cache is an arbitrary mapping of
+     * Attrs to Attrs.
+     */
+    virtual void upsert(
         const Attrs & inAttrs,
         const Attrs & infoAttrs) = 0;
 
-    virtual std::optional<Attrs> lookup2(
+    /*
+     * Look up a key with infinite TTL.
+     */
+    virtual std::optional<Attrs> lookup(
+        const Attrs & inAttrs) = 0;
+
+    /*
+     * Look up a key. Return nothing if its TTL has exceeded
+     * `settings.tarballTTL`.
+     */
+    virtual std::optional<Attrs> lookupWithTTL(
         const Attrs & inAttrs) = 0;
 
     struct Result2
@@ -25,7 +40,11 @@ struct Cache
         Attrs infoAttrs;
     };
 
-    virtual std::optional<Result2> lookupExpired2(
+    /*
+     * Look up a key. Return a bool denoting whether its TTL has
+     * exceeded `settings.tarballTTL`.
+     */
+    virtual std::optional<Result2> lookupExpired(
         const Attrs & inAttrs) = 0;
 
     /* Old cache for things that have a store path. */
@@ -50,14 +69,6 @@ struct Cache
     virtual std::optional<Result> lookupExpired(
         ref<Store> store,
         const Attrs & inAttrs) = 0;
-
-    /* A simple key/value store for immutable facts such as the
-       revcount corresponding to a rev. */
-    virtual void upsertFact(
-        std::string_view key,
-        std::string_view value) = 0;
-
-    virtual std::optional<std::string> queryFact(std::string_view key) = 0;
 };
 
 ref<Cache> getCache();

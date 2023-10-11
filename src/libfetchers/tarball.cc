@@ -194,18 +194,18 @@ DownloadTarballResult2 downloadTarball2(
         {"url", url},
     });
 
-    auto cached = getCache()->lookupExpired2(inAttrs);
+    auto cached = getCache()->lookupExpired(inAttrs);
 
     auto attrsToResult = [&](const Attrs & infoAttrs)
     {
         return DownloadTarballResult2 {
-            .treeHash = getRev(infoAttrs, "treeHash"),
+            .treeHash = getRevAttr(infoAttrs, "treeHash"),
             .lastModified = (time_t) getIntAttr(infoAttrs, "lastModified"),
             .immutableUrl = maybeGetStrAttr(infoAttrs, "immutableUrl"),
         };
     };
 
-    if (cached && !getTarballCache()->hasObject(getRev(cached->infoAttrs, "treeHash")))
+    if (cached && !getTarballCache()->hasObject(getRevAttr(cached->infoAttrs, "treeHash")))
         cached.reset();
 
     if (cached && !cached->expired)
@@ -222,6 +222,8 @@ DownloadTarballResult2 downloadTarball2(
                 *_res->lock() = r;
             });
     });
+
+    // FIXME: fall back to cached value if download fails.
 
     /* Note: if the download is cached, `importTarball()` will receive
        no data, which causes it to import an empty tarball. */
@@ -244,7 +246,7 @@ DownloadTarballResult2 downloadTarball2(
     /* Insert a cache entry for every URL in the redirect chain. */
     for (auto & url : res->urls) {
         inAttrs.insert_or_assign("url", url);
-        getCache()->add(inAttrs, infoAttrs);
+        getCache()->upsert(inAttrs, infoAttrs);
     }
 
     // FIXME: add a cache entry for immutableUrl? That could allow

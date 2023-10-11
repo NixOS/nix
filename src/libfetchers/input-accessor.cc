@@ -107,16 +107,21 @@ StorePath InputAccessor::fetchToStore(
     // FIXME: add an optimisation for the case where the accessor is
     // an FSInputAccessor pointing to a store path.
 
-    std::optional<std::string> cacheKey;
+    std::optional<fetchers::Attrs> cacheKey;
 
     if (!filter && fingerprint) {
-        cacheKey = *fingerprint + "|" + name + "|" + path.abs();
-        if (auto storePathS = fetchers::getCache()->queryFact(*cacheKey)) {
-            if (auto storePath = store->maybeParseStorePath(*storePathS)) {
-                if (store->isValidPath(*storePath)) {
-                    debug("store path cache hit for '%s'", showPath(path));
-                    return *storePath;
-                }
+        cacheKey = fetchers::Attrs{
+            {"_what", "fetchToStore"},
+            {"store", store->storeDir},
+            {"name", std::string(name)},
+            {"fingerprint", *fingerprint},
+            {"path", path.abs()}
+        };
+        if (auto res = fetchers::getCache()->lookup(*cacheKey)) {
+            StorePath storePath(fetchers::getStrAttr(*res, "storePath"));
+            if (store->isValidPath(storePath)) {
+                debug("store path cache hit for '%s'", showPath(path));
+                return storePath;
             }
         }
     } else
@@ -134,7 +139,9 @@ StorePath InputAccessor::fetchToStore(
         : store->addToStoreFromDump(*source, name, FileIngestionMethod::Recursive, htSHA256, repair);
 
     if (cacheKey)
-        fetchers::getCache()->upsertFact(*cacheKey, store->printStorePath(storePath));
+        fetchers::getCache()->upsert(
+            *cacheKey,
+            fetchers::Attrs{{"storePath", std::string(storePath.to_string())}});
 
     return storePath;
 }

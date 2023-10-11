@@ -469,12 +469,12 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
         fetchers::Attrs cacheKey({{"_what", "treeHashToNarHash"}, {"treeHash", treeHash.gitRev()}});
 
-        if (auto res = fetchers::getCache()->lookup2(cacheKey))
+        if (auto res = fetchers::getCache()->lookup(cacheKey))
             return Hash::parseAny(fetchers::getStrAttr(*res, "narHash"), htSHA256);
 
         auto narHash = accessor->hashPath(CanonPath::root);
 
-        fetchers::getCache()->add(cacheKey, fetchers::Attrs({{"narHash", narHash.to_string(SRI, true)}}));
+        fetchers::getCache()->upsert(cacheKey, fetchers::Attrs({{"narHash", narHash.to_string(SRI, true)}}));
 
         return narHash;
     }

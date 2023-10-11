@@ -17,12 +17,6 @@ create table if not exists Cache (
     timestamp integer not null,
     primary key (input)
 );
-
-create table if not exists Facts (
-    name     text not null,
-    value    text not null,
-    primary key (name)
-);
 )sql";
 
 // FIXME: we should periodically purge/nuke this cache to prevent it
@@ -54,15 +48,9 @@ struct CacheImpl : Cache
 
         state->lookup.create(state->db,
             "select info, path, immutable, timestamp from Cache where input = ?");
-
-        state->upsertFact.create(state->db,
-            "insert or replace into Facts(name, value) values (?, ?)");
-
-        state->queryFact.create(state->db,
-            "select value from Facts where name = ?");
     }
 
-    void add(
+    void upsert(
         const Attrs & inAttrs,
         const Attrs & infoAttrs) override
     {
@@ -74,9 +62,16 @@ struct CacheImpl : Cache
             (time(0)).exec();
     }
 
-    std::optional<Attrs> lookup2(const Attrs & inAttrs) override
+    std::optional<Attrs> lookup(const Attrs & inAttrs) override
     {
-        if (auto res = lookupExpired2(inAttrs)) {
+        if (auto res = lookupExpired(inAttrs))
+            return std::move(res->infoAttrs);
+        return {};
+    }
+
+    std::optional<Attrs> lookupWithTTL(const Attrs & inAttrs) override
+    {
+        if (auto res = lookupExpired(inAttrs)) {
             if (!res->expired)
                 return std::move(res->infoAttrs);
             debug("ignoring expired cache entry '%s'",
@@ -85,7 +80,7 @@ struct CacheImpl : Cache
         return {};
     }
 
-    std::optional<Result2> lookupExpired2(const Attrs & inAttrs) override
+    std::optional<Result2> lookupExpired(const Attrs & inAttrs) override
     {
         auto state(_state.lock());
 
@@ -171,26 +166,6 @@ struct CacheImpl : Cache
             .infoAttrs = jsonToAttrs(nlohmann::json::parse(infoJSON)),
             .storePath = std::move(storePath)
         };
-    }
-
-    void upsertFact(
-        std::string_view key,
-        std::string_view value) override
-    {
-        debug("upserting fact '%s' -> '%s'", key, value);
-        _state.lock()->upsertFact.use()
-            (key)
-            (value).exec();
-    }
-
-    std::optional<std::string> queryFact(std::string_view key) override
-    {
-        auto state(_state.lock());
-
-        auto stmt(state->queryFact.use()(key));
-        if (!stmt.next()) return {};
-
-        return stmt.getStr(0);
     }
 };
 

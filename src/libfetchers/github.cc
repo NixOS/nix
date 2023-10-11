@@ -228,15 +228,15 @@ struct GitArchiveInputScheme : InputScheme
 
         auto cache = getCache();
 
-        auto treeHashKey = fmt("git-rev-to-tree-hash-%s", rev->gitRev());
-        auto lastModifiedKey = fmt("git-rev-to-last-modified-%s", rev->gitRev());
+        Attrs treeHashKey{{"_what", "gitRevToTreeHash"}, {"rev", rev->gitRev()}};
+        Attrs lastModifiedKey{{"_what", "gitRevToLastModified"}, {"rev", rev->gitRev()}};
 
-        if (auto treeHashS = cache->queryFact(treeHashKey)) {
-            if (auto lastModifiedS = cache->queryFact(lastModifiedKey)) {
-                auto treeHash = Hash::parseAny(*treeHashS, htSHA1);
-                auto lastModified = string2Int<time_t>(*lastModifiedS).value();
+        if (auto treeHashAttrs = cache->lookup(treeHashKey)) {
+            if (auto lastModifiedAttrs = cache->lookup(lastModifiedKey)) {
+                auto treeHash = getRevAttr(*treeHashAttrs, "treeHash");
+                auto lastModified = getIntAttr(*lastModifiedAttrs, "lastModified");
                 if (getTarballCache()->hasObject(treeHash))
-                    return {std::move(input), GitRepo::TarballInfo { .treeHash = treeHash, .lastModified = lastModified }};
+                    return {std::move(input), GitRepo::TarballInfo { .treeHash = treeHash, .lastModified = (time_t) lastModified }};
                 else
                     debug("Git tree with hash '%s' has disappeared from the cache, refetching...", treeHash.gitRev());
             }
@@ -253,8 +253,8 @@ struct GitArchiveInputScheme : InputScheme
 
         auto tarballInfo = getTarballCache()->importTarball(*source);
 
-        cache->upsertFact(treeHashKey, tarballInfo.treeHash.gitRev());
-        cache->upsertFact(lastModifiedKey, std::to_string(tarballInfo.lastModified));
+        cache->upsert(treeHashKey, Attrs{{"treeHash", tarballInfo.treeHash.gitRev()}});
+        cache->upsert(lastModifiedKey, Attrs{{"lastModified", (uint64_t) tarballInfo.lastModified}});
 
         if (upstreamTreeHash != tarballInfo.treeHash)
             warn(
