@@ -1054,7 +1054,7 @@ public:
         )"
     };
 
-    Setting<StringMap> impureEnvVarOverrides {this, {}, "impure-env-var-overrides",
+    Setting<StringMap> impureEnvVarOverrides {this, {}, "impure-env",
         R"(
           A list of items, each in the format of:
 

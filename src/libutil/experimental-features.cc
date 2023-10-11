@@ -225,7 +225,7 @@ constexpr std::array<ExperimentalFeatureDetails, 15> xpFeatureDetails = {{
         .tag = Xp::ConfigurableImpureEnv,
         .name = "configurable-impure-env",
         .description = R"(
-            Allow the use of the [impure-env-var-overrides](#conf-auto-allocate-uids) setting.
+            Allow the use of the [impure-env](@docroot@/command-ref/conf-file.md#conf-impure-env) setting.
         )",
     }
 }};
