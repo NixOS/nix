@@ -112,6 +112,13 @@ Derivations can declare some infrequently used optional attributes.
     > environmental variables come from the environment of the
     > `nix-build`.
 
+    If the [`configurable-impure-env` experimental
+    feature](@docroot@/contributing/experimental-features.md#xp-feature-configurable-impure-env)
+    is enabled, these environment variables can also be controlled
+    through the
+    [`impure-env`](@docroot@/command-ref/conf-file.md#conf-impure-env)
+    configuration setting.
+
   - [`outputHash`]{#adv-attr-outputHash}; [`outputHashAlgo`]{#adv-attr-outputHashAlgo}; [`outputHashMode`]{#adv-attr-outputHashMode}\
     These attributes declare that the derivation is a so-called
     *fixed-output derivation*, which means that a cryptographic hash of
