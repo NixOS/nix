@@ -105,6 +105,8 @@ struct curlFileTransfer : public FileTransfer
                     this->result.data.append(data);
               })
         {
+            result.urls.push_back(request.uri);
+
             requestHeaders = curl_slist_append(requestHeaders, "Accept-Encoding: zstd, br, gzip, deflate, bzip2, xz");
             if (!request.expectedETag.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
@@ -181,6 +183,16 @@ struct curlFileTransfer : public FileTransfer
             return ((TransferItem *) userp)->writeCallback(contents, size, nmemb);
         }
 
+        void appendCurrentUrl()
+        {
+            char * effectiveUriCStr = nullptr;
+            curl_easy_getinfo(req, CURLINFO_EFFECTIVE_URL, &effectiveUriCStr);
+            if (effectiveUriCStr && *result.urls.rbegin() != effectiveUriCStr) {
+                printError("EFFECTIVE %s", effectiveUriCStr);
+                result.urls.push_back(effectiveUriCStr);
+            }
+        }
+
         size_t headerCallback(void * contents, size_t size, size_t nmemb)
         {
             size_t realSize = size * nmemb;
@@ -195,6 +207,7 @@ struct curlFileTransfer : public FileTransfer
                 statusMsg = trim(match.str(1));
                 acceptRanges = false;
                 encoding = "";
+                appendCurrentUrl();
             } else {
 
                 auto i = line.find(':');
@@ -359,13 +372,10 @@ struct curlFileTransfer : public FileTransfer
         {
             auto httpStatus = getHTTPStatus();
 
-            char * effectiveUriCStr = nullptr;
-            curl_easy_getinfo(req, CURLINFO_EFFECTIVE_URL, &effectiveUriCStr);
-            if (effectiveUriCStr)
-                result.effectiveUri = effectiveUriCStr;
-
             debug("finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes",
                 request.verb(), request.uri, code, httpStatus, result.bodySize);
+
+            appendCurrentUrl();
 
             if (decompressionSink) {
                 try {

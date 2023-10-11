@@ -62,7 +62,6 @@ DownloadFileResult downloadFile(
     // FIXME: write to temporary file.
     Attrs infoAttrs({
         {"etag", res.etag},
-        {"url", res.effectiveUri},
     });
 
     if (res.immutableUrl)
@@ -93,29 +92,21 @@ DownloadFileResult downloadFile(
         storePath = std::move(info.path);
     }
 
-    getCache()->add(
-        store,
-        inAttrs,
-        infoAttrs,
-        *storePath,
-        locked);
-
-    if (url != res.effectiveUri)
+    for (auto & url : res.urls) {
+        inAttrs.insert_or_assign("url", url);
+        infoAttrs.insert_or_assign("url", *res.urls.rbegin());
         getCache()->add(
             store,
-            {
-                {"type", "file"},
-                {"url", res.effectiveUri},
-                {"name", name},
-            },
+            inAttrs,
             infoAttrs,
             *storePath,
             locked);
+    }
 
     return {
         .storePath = std::move(*storePath),
         .etag = res.etag,
-        .effectiveUrl = res.effectiveUri,
+        .effectiveUrl = *res.urls.rbegin(),
         .immutableUrl = res.immutableUrl,
     };
 }
@@ -250,12 +241,10 @@ DownloadTarballResult2 downloadTarball2(
             infoAttrs.insert_or_assign("immutableUrl", *res->immutableUrl);
     }
 
-    getCache()->add(inAttrs, infoAttrs);
-
-    if (url != res->effectiveUri) {
-        Attrs inAttrs2(inAttrs);
-        inAttrs2.insert_or_assign("url", res->effectiveUri);
-        getCache()->add(inAttrs2, infoAttrs);
+    /* Insert a cache entry for every URL in the redirect chain. */
+    for (auto & url : res->urls) {
+        inAttrs.insert_or_assign("url", url);
+        getCache()->add(inAttrs, infoAttrs);
     }
 
     // FIXME: add a cache entry for immutableUrl? That could allow
