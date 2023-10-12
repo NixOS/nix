@@ -187,10 +187,8 @@ struct curlFileTransfer : public FileTransfer
         {
             char * effectiveUriCStr = nullptr;
             curl_easy_getinfo(req, CURLINFO_EFFECTIVE_URL, &effectiveUriCStr);
-            if (effectiveUriCStr && *result.urls.rbegin() != effectiveUriCStr) {
-                printError("EFFECTIVE %s", effectiveUriCStr);
+            if (effectiveUriCStr && *result.urls.rbegin() != effectiveUriCStr)
                 result.urls.push_back(effectiveUriCStr);
-            }
         }
 
         size_t headerCallback(void * contents, size_t size, size_t nmemb)
