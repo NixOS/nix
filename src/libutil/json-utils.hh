@@ -84,14 +84,14 @@ struct adl_serializer<std::optional<T>> {
             "null is already in use for underlying type's JSON");
         return json.is_null()
             ? std::nullopt
-            : std::optional { adl_serializer<T>::from_json(json) };
+            : std::make_optional(std::template get<T>(json));
     }
     static void to_json(json & json, std::optional<T> t) {
         static_assert(
             nix::json_avoids_null<T>::value,
             "null is already in use for underlying type's JSON");
         if (t)
-            adl_serializer<T>::to_json(json, *t);
+            json = * t;
         else
             json = nullptr;
     }
