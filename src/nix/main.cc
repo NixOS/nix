@@ -211,11 +211,22 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
         #include "utils.nix.gen.hh"
         );
 
+    state.corepkgsFS->addFile(
+        CanonPath("/generate-settings.nix"),
+        #include "generate-settings.nix.gen.hh"
+        );
+
+    state.corepkgsFS->addFile(
+        CanonPath("/generate-store-info.nix"),
+        #include "generate-store-info.nix.gen.hh"
+        );
+
     auto vDump = state.allocValue();
     vDump->mkString(toplevel.dumpCli());
 
     auto vRes = state.allocValue();
-    state.callFunction(*vGenerateManpage, *vDump, *vRes, noPos);
+    state.callFunction(*vGenerateManpage, state.getBuiltin("false"), *vRes, noPos);
+    state.callFunction(*vRes, *vDump, *vRes, noPos);
 
     auto attr = vRes->attrs->get(state.symbols.create(mdName + ".md"));
     if (!attr)

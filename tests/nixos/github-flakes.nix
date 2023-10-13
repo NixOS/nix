@@ -187,6 +187,10 @@ in
     client.succeed("nix registry pin nixpkgs")
     client.succeed("nix flake metadata nixpkgs --tarball-ttl 0 >&2")
 
+    # Test fetchTree on a github URL.
+    hash = client.succeed(f"nix eval --raw --expr '(fetchTree {info['url']}).narHash'")
+    assert hash == info['locked']['narHash']
+
     # Shut down the web server. The flake should be cached on the client.
     github.succeed("systemctl stop httpd.service")
 

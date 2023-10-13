@@ -15,8 +15,12 @@ Each of *paths* is processed as follows:
   1. If it is not [valid], substitute the store derivation file itself.
   2. Realise its [output paths]:
     - Try to fetch from [substituters] the [store objects] associated with the output paths in the store derivation's [closure].
-      - With [content-addressed derivations] (experimental): Determine the output paths to realise by querying content-addressed realisation entries in the [Nix database].
-    - For any store paths that cannot be substituted, produce the required store objects. This involves first realising all outputs of the derivation's dependencies and then running the derivation's [`builder`](@docroot@/language/derivations.md#attr-builder) executable. <!-- TODO: Link to build process page #8888 -->
+      - With [content-addressed derivations] (experimental):
+        Determine the output paths to realise by querying content-addressed realisation entries in the [Nix database].
+    - For any store paths that cannot be substituted, produce the required store objects:
+      1. Realise all outputs of the derivation's dependencies
+      2. Run the derivation's [`builder`](@docroot@/language/derivations.md#attr-builder) executable
+         <!-- TODO: Link to build process page #8888 -->
 - Otherwise, and if the path is not already valid: Try to fetch the associated [store objects] in the path's [closure] from [substituters].
 
 If no substitutes are available and no store derivation is given, realisation fails.

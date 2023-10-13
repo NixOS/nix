@@ -543,7 +543,7 @@ path_start
         );
     }
     CanonPath path(getHome() + std::string($1.p + 1, $1.l - 1));
-    $$ = {.e = new ExprPath(data->state.rootPath(path)), .appendSlash = true};
+    $$ = {.e = new ExprPath(data->state.rootPath(std::move(path))), .appendSlash = true};
   }
   ;
 
@@ -668,6 +668,7 @@ formal
 
 namespace nix {
 
+unsigned long Expr::nrExprs = 0;
 
 Expr * EvalState::parse(
     char * text,

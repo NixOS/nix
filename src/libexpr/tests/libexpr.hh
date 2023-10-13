@@ -71,7 +71,7 @@ namespace nix {
         if (arg.type() != nString) {
             return false;
         }
-        return std::string_view(arg.string.s) == s;
+        return std::string_view(arg.c_str()) == s;
     }
 
     MATCHER_P(IsIntEq, v, fmt("The string is equal to \"%1%\"", v)) {

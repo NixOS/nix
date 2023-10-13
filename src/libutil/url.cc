@@ -8,7 +8,6 @@ namespace nix {
 std::regex refRegex(refRegexS, std::regex::ECMAScript);
 std::regex badGitRefRegex(badGitRefRegexS, std::regex::ECMAScript);
 std::regex revRegex(revRegexS, std::regex::ECMAScript);
-std::regex flakeIdRegex(flakeIdRegexS, std::regex::ECMAScript);
 
 ParsedURL parseURL(const std::string & url)
 {
@@ -103,7 +102,7 @@ std::string percentEncode(std::string_view s, std::string_view keep)
             || keep.find(c) != std::string::npos)
             res += c;
         else
-            res += fmt("%%%02X", (unsigned int) c);
+            res += fmt("%%%02X", c & 0xFF);
     return res;
 }
 
@@ -157,6 +156,23 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme)
         .application = application,
         .transport = transport,
     };
+}
+
+std::string fixGitURL(const std::string & url)
+{
+    std::regex scpRegex("([^/]*)@(.*):(.*)");
+    if (!hasPrefix(url, "/") && std::regex_match(url, scpRegex))
+        return std::regex_replace(url, scpRegex, "ssh://$1@$2/$3");
+    else {
+        if (url.find("://") == std::string::npos) {
+            return (ParsedURL {
+                .scheme = "file",
+                .authority = "",
+                .path = url
+            }).to_string();
+        } else
+            return url;
+    }
 }
 
 }

@@ -1,5 +1,3 @@
-clean-files += Makefile.config
-
 GLOBAL_CXXFLAGS += -Wno-deprecated-declarations -Werror=switch
 # Allow switch-enum to be overridden for files that do not support it, usually because of dependency headers.
 ERROR_SWITCH_ENUM = -Werror=switch-enum

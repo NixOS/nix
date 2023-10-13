@@ -92,6 +92,11 @@ struct IndirectInputScheme : InputScheme
         throw Error("indirect input '%s' cannot be fetched directly", input.to_string());
     }
 
+    std::optional<ExperimentalFeature> experimentalFeature() override
+    {
+        return Xp::Flakes;
+    }
+
     bool isDirect(const Input & input) const override
     { return false; }
 };

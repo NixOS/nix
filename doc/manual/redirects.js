@@ -336,14 +336,13 @@ const redirects = {
     "simple-values": "#primitives",
     "lists": "#list",
     "strings": "#string",
-    "lists": "#list",
     "attribute-sets": "#attribute-set",
   },
   "installation/installing-binary.html": {
     "linux": "uninstall.html#linux",
     "macos": "uninstall.html#macos",
     "uninstalling": "uninstall.html",
-  }
+  },
   "contributing/hacking.html": {
     "nix-with-flakes": "#building-nix-with-flakes",
     "classic-nix": "#building-nix",
@@ -355,6 +354,7 @@ const redirects = {
     "installer-tests": "testing.html#installer-tests",
     "one-time-setup": "testing.html#one-time-setup",
     "using-the-ci-generated-installer-for-manual-testing": "testing.html#using-the-ci-generated-installer-for-manual-testing",
+    "characterization-testing": "#characterisation-testing-unit",
   }
 };
 

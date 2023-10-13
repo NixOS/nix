@@ -922,7 +922,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
     case nString:
         str << ANSI_WARNING;
-        printLiteralString(str, v.string.s);
+        printLiteralString(str, v.string_view());
         str << ANSI_NORMAL;
         break;
 

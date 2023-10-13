@@ -203,3 +203,7 @@ Most Nix commands accept the following command-line options:
   Fix corrupted or missing store paths by redownloading or rebuilding them.
   Note that this is slow because it requires computing a cryptographic hash of the contents of every path in the closure of the build.
   Also note the warning under `nix-store --repair-path`.
+
+> **Note**
+>
+> See [`man nix.conf`](@docroot@/command-ref/conf-file.md#command-line-flags) for overriding configuration settings with command line flags.

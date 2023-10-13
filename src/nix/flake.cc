@@ -1327,6 +1327,8 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
 
         if (json) {
             auto res = nlohmann::json::object();
+            res["original"] = fetchers::attrsToJSON(resolvedRef.toAttrs());
+            res["locked"] = fetchers::attrsToJSON(lockedRef.toAttrs());
             logger->cout(res.dump());
         } else {
             notice("Fetched '%s'.", lockedRef.to_string());

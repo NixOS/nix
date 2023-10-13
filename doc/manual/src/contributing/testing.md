@@ -1,18 +1,88 @@
 # Running tests
 
+## Coverage analysis
+
+A [coverage analysis report] is available online
+You can build it yourself:
+
+[coverage analysis report]: https://hydra.nixos.org/job/nix/master/coverage/latest/download-by-type/report/coverage
+
+```
+# nix build .#hydraJobs.coverage
+# xdg-open ./result/coverage/index.html
+```
+
+[Extensive records of build metrics](https://hydra.nixos.org/job/nix/master/coverage#tabs-charts), such as test coverage over time, are also available online.
+
 ## Unit-tests
 
-The unit-tests for each Nix library (`libexpr`, `libstore`, etc..) are defined
-under `src/{library_name}/tests` using the
-[googletest](https://google.github.io/googletest/) and
-[rapidcheck](https://github.com/emil-e/rapidcheck) frameworks.
+The unit tests are defined using the [googletest] and [rapidcheck] frameworks.
+
+[googletest]: https://google.github.io/googletest/
+[rapidcheck]: https://github.com/emil-e/rapidcheck
+
+### Source and header layout
+
+> An example of some files, demonstrating much of what is described below
+>
+> ```
+> src
+> ├── libexpr
+> │   ├── value/context.hh
+> │   ├── value/context.cc
+> │   │
+> │   …
+>     └── tests
+> │       ├── value/context.hh
+> │       ├── value/context.cc
+> │       │
+> │       …
+> │
+> ├── unit-test-data
+> │   ├── libstore
+> │   │   ├── worker-protocol/content-address.bin
+> │   │   …
+> │   …
+> …
+> ```
+
+The unit tests for each Nix library (`libnixexpr`, `libnixstore`, etc..) live inside a directory `src/${library_shortname}/tests` within the directory for the library (`src/${library_shortname}`).
+
+The data is in `unit-test-data`, with one subdir per library, with the same name as where the code goes.
+For example, `libnixstore` code is in `src/libstore`, and its test data is in `unit-test-data/libstore`.
+The path to the `unit-test-data` directory is passed to the unit test executable with the environment variable `_NIX_TEST_UNIT_DATA`.
+
+> **Note**
+> Due to the way googletest works, downstream unit test executables will actually include and re-run upstream library tests.
+> Therefore it is important that the same value for `_NIX_TEST_UNIT_DATA` be used with the tests for each library.
+> That is why we have the test data nested within a single `unit-test-data` directory.
+
+### Running tests
 
 You can run the whole testsuite with `make check`, or the tests for a specific component with `make libfoo-tests_RUN`.
 Finer-grained filtering is also possible using the [--gtest_filter](https://google.github.io/googletest/advanced.html#running-a-subset-of-the-tests) command-line option, or the `GTEST_FILTER` environment variable.
 
+### Characterisation testing { #characaterisation-testing-unit }
+
+See [functional characterisation testing](#characterisation-testing-functional) for a broader discussion of characterisation testing.
+
+Like with the functional characterisation, `_NIX_TEST_ACCEPT=1` is also used.
+For example:
+```shell-session
+$ _NIX_TEST_ACCEPT=1 make libstore-tests-exe_RUN
+...
+[  SKIPPED ] WorkerProtoTest.string_read
+[  SKIPPED ] WorkerProtoTest.string_write
+[  SKIPPED ] WorkerProtoTest.storePath_read
+[  SKIPPED ] WorkerProtoTest.storePath_write
+...
+```
+will regenerate the "golden master" expected result for the `libnixstore` characterisation tests.
+The characterisation tests will mark themselves "skipped" since they regenerated the expected result instead of actually testing anything.
+
 ## Functional tests
 
-The functional tests reside under the `tests` directory and are listed in `tests/local.mk`.
+The functional tests reside under the `tests/functional` directory and are listed in `tests/functional/local.mk`.
 Each test is a bash script.
 
 ### Running the whole test suite
@@ -21,8 +91,8 @@ The whole test suite can be run with:
 
 ```shell-session
 $ make install && make installcheck
-ran test tests/foo.sh... [PASS]
-ran test tests/bar.sh... [PASS]
+ran test tests/functional/foo.sh... [PASS]
+ran test tests/functional/bar.sh... [PASS]
 ...
 ```
 
@@ -30,14 +100,14 @@ ran test tests/bar.sh... [PASS]
 
 Sometimes it is useful to group related tests so they can be easily run together without running the entire test suite.
 Each test group is in a subdirectory of `tests`.
-For example, `tests/ca/local.mk` defines a `ca` test group for content-addressed derivation outputs.
+For example, `tests/functional/ca/local.mk` defines a `ca` test group for content-addressed derivation outputs.
 
 That test group can be run like this:
 
 ```shell-session
 $ make ca.test-group -j50
-ran test tests/ca/nix-run.sh... [PASS]
-ran test tests/ca/import-derivation.sh... [PASS]
+ran test tests/functional/ca/nix-run.sh... [PASS]
+ran test tests/functional/ca/import-derivation.sh... [PASS]
 ...
 ```
 
@@ -56,21 +126,21 @@ install-tests-groups += $(test-group-name)
 Individual tests can be run with `make`:
 
 ```shell-session
-$ make tests/${testName}.sh.test
-ran test tests/${testName}.sh... [PASS]
+$ make tests/functional/${testName}.sh.test
+ran test tests/functional/${testName}.sh... [PASS]
 ```
 
 or without `make`:
 
 ```shell-session
-$ ./mk/run-test.sh tests/${testName}.sh
-ran test tests/${testName}.sh... [PASS]
+$ ./mk/run-test.sh tests/functional/${testName}.sh
+ran test tests/functional/${testName}.sh... [PASS]
 ```
 
 To see the complete output, one can also run:
 
 ```shell-session
-$ ./mk/debug-test.sh tests/${testName}.sh
+$ ./mk/debug-test.sh tests/functional/${testName}.sh
 + foo
 output from foo
 + bar
@@ -105,7 +175,7 @@ edit it like so:
 Then, running the test with `./mk/debug-test.sh` will drop you into GDB once the script reaches that point:
 
 ```shell-session
-$ ./mk/debug-test.sh tests/${testName}.sh
+$ ./mk/debug-test.sh tests/functional/${testName}.sh
 ...
 + gdb blash blub
 GNU gdb (GDB) 12.1
@@ -116,17 +186,29 @@ GNU gdb (GDB) 12.1
 One can debug the Nix invocation in all the usual ways.
 For example, enter `run` to start the Nix invocation.
 
-### Characterization testing
+### Troubleshooting
 
-Occasionally, Nix utilizes a technique called [Characterization Testing](https://en.wikipedia.org/wiki/Characterization_test) as part of the functional tests.
+Sometimes running tests in the development shell may leave artefacts in the local repository.
+To remove any traces of that:
+
+```console
+git clean -x --force tests
+```
+
+### Characterisation testing { #characterisation-testing-functional }
+
+Occasionally, Nix utilizes a technique called [Characterisation Testing](https://en.wikipedia.org/wiki/Characterization_test) as part of the functional tests.
 This technique is to include the exact output/behavior of a former version of Nix in a test in order to check that Nix continues to produce the same behavior going forward.
 
 For example, this technique is used for the language tests, to check both the printed final value if evaluation was successful, and any errors and warnings encountered.
 
 It is frequently useful to regenerate the expected output.
-To do that, rerun the failed test with `_NIX_TEST_ACCEPT=1`.
-(At least, this is the convention we've used for `tests/lang.sh`.
-If we add more characterization testing we should always strive to be consistent.)
+To do that, rerun the failed test(s) with `_NIX_TEST_ACCEPT=1`.
+For example:
+```bash
+_NIX_TEST_ACCEPT=1 make tests/functional/lang.sh.test
+```
+This convention is shared with the [characterisation unit tests](#characterisation-testing-unit) too.
 
 An interesting situation to document is the case when these tests are "overfitted".
 The language tests are, again, an example of this.
@@ -139,7 +221,7 @@ Diagnostic outputs are indeed not a stable interface, but they still are importa
 By recording the expected output, the test suite guards against accidental changes, and ensure the *result* (not just the code that implements it) of the diagnostic code paths are under code review.
 Regressions are caught, and improvements always show up in code review.
 
-To ensure that characterization testing doesn't make it harder to intentionally change these interfaces, there always must be an easy way to regenerate the expected output, as we do with `_NIX_TEST_ACCEPT=1`.
+To ensure that characterisation testing doesn't make it harder to intentionally change these interfaces, there always must be an easy way to regenerate the expected output, as we do with `_NIX_TEST_ACCEPT=1`.
 
 ## Integration tests
 
@@ -153,7 +235,7 @@ You can run them manually with `nix build .#hydraJobs.tests.{testName}` or `nix-
 
 After a one-time setup, the Nix repository's GitHub Actions continuous integration (CI) workflow can test the installer each time you push to a branch.
 
-Creating a Cachix cache for your installer tests and adding its authorization token to GitHub enables [two installer-specific jobs in the CI workflow](https://github.com/NixOS/nix/blob/88a45d6149c0e304f6eb2efcc2d7a4d0d569f8af/.github/workflows/ci.yml#L50-L91):
+Creating a Cachix cache for your installer tests and adding its authorisation token to GitHub enables [two installer-specific jobs in the CI workflow](https://github.com/NixOS/nix/blob/88a45d6149c0e304f6eb2efcc2d7a4d0d569f8af/.github/workflows/ci.yml#L50-L91):
 
 - The `installer` job generates installers for the platforms below and uploads them to your Cachix cache:
   - `x86_64-linux`

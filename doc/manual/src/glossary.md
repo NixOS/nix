@@ -33,11 +33,15 @@
 
   Ensure a [store path] is [valid][validity].
 
-  This means either running the [`builder`](@docroot@/language/derivations.md#attr-builder) executable as specified in the corresponding [derivation], or fetching a pre-built [store object] from a [substituter], or delegating to a [remote builder](@docroot@/advanced-topics/distributed-builds.html) and retrieving the outputs. <!-- TODO: link [running] to build process page, #8888 -->
+  This can be achieved by:
+  - Fetching a pre-built [store object] from a [substituter]
+  - Running the [`builder`](@docroot@/language/derivations.md#attr-builder) executable as specified in the corresponding [derivation]
+  - Delegating to a [remote builder](@docroot@/advanced-topics/distributed-builds.html) and retrieving the outputs
+  <!-- TODO: link [running] to build process page, #8888 -->
 
-  See [`nix-build`](./command-ref/nix-build.md) and [`nix-store --realise`](@docroot@/command-ref/nix-store/realise.md).
+  See [`nix-store --realise`](@docroot@/command-ref/nix-store/realise.md) for a detailed description of the algorithm.
 
-  See [`nix build`](./command-ref/new-cli/nix3-build.md) (experimental).
+  See also [`nix-build`](./command-ref/nix-build.md) and [`nix build`](./command-ref/new-cli/nix3-build.md) (experimental).
 
   [realise]: #gloss-realise
 
@@ -105,11 +109,14 @@
 
 - [store object]{#gloss-store-object}
 
-
   A store object consists of a [file system object], [reference]s to other store objects, and other metadata.
   It can be referred to by a [store path].
 
   [store object]: #gloss-store-object
+
+- [IFD]{#gloss-ifd}
+
+  [Import From Derivation](./language/import-from-derivation.md)
 
 - [input-addressed store object]{#gloss-input-addressed-store-object}
 

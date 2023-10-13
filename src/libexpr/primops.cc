@@ -256,64 +256,71 @@ static RegisterPrimOp primop_import({
     .args = {"path"},
     // TODO turn "normal path values" into link below
     .doc = R"(
-      Load, parse and return the Nix expression in the file *path*.
-
-      The value *path* can be a path, a string, or an attribute set with an
-      `__toString` attribute or a `outPath` attribute (as derivations or flake
-      inputs typically have).
-
-      If *path* is a directory, the file `default.nix` in that directory
-      is loaded.
-
-      Evaluation aborts if the file doesn’t exist or contains
-      an incorrect Nix expression. `import` implements Nix’s module
-      system: you can put any Nix expression (such as a set or a
-      function) in a separate file, and use it from Nix expressions in
-      other files.
+      Load, parse, and return the Nix expression in the file *path*.
 
       > **Note**
       >
       > Unlike some languages, `import` is a regular function in Nix.
-      > Paths using the angle bracket syntax (e.g., `import` *\<foo\>*)
-      > are normal [path values](@docroot@/language/values.md#type-path).
 
-      A Nix expression loaded by `import` must not contain any *free
-      variables* (identifiers that are not defined in the Nix expression
-      itself and are not built-in). Therefore, it cannot refer to
-      variables that are in scope at the call site. For instance, if you
-      have a calling expression
+      The *path* argument must meet the same criteria as an [interpolated expression](@docroot@/language/string-interpolation.md#interpolated-expression).
 
-      ```nix
-      rec {
-        x = 123;
-        y = import ./foo.nix;
-      }
-      ```
+      If *path* is a directory, the file `default.nix` in that directory is used if it exists.
 
-      then the following `foo.nix` will give an error:
+      > **Example**
+      >
+      > ```console
+      > $ echo 123 > default.nix
+      > ```
+      >
+      > Import `default.nix` from the current directory.
+      >
+      > ```nix
+      > import ./.
+      > ```
+      >
+      >     123
 
-      ```nix
-      x + 456
-      ```
+      Evaluation aborts if the file doesn’t exist or contains an invalid Nix expression.
 
-      since `x` is not in scope in `foo.nix`. If you want `x` to be
-      available in `foo.nix`, you should pass it as a function argument:
+      A Nix expression loaded by `import` must not contain any *free variables*, that is, identifiers that are not defined in the Nix expression itself and are not built-in.
+      Therefore, it cannot refer to variables that are in scope at the call site.
 
-      ```nix
-      rec {
-        x = 123;
-        y = import ./foo.nix x;
-      }
-      ```
-
-      and
-
-      ```nix
-      x: x + 456
-      ```
-
-      (The function argument doesn’t have to be called `x` in `foo.nix`;
-      any name would work.)
+      > **Example**
+      >
+      > If you have a calling expression
+      >
+      > ```nix
+      > rec {
+      >   x = 123;
+      >   y = import ./foo.nix;
+      > }
+      > ```
+      >
+      >  then the following `foo.nix` will give an error:
+      >
+      >  ```nix
+      >  # foo.nix
+      >  x + 456
+      >  ```
+      >
+      >  since `x` is not in scope in `foo.nix`.
+      > If you want `x` to be available in `foo.nix`, pass it as a function argument:
+      >
+      >  ```nix
+      >  rec {
+      >    x = 123;
+      >    y = import ./foo.nix x;
+      >  }
+      >  ```
+      >
+      >  and
+      >
+      >  ```nix
+      >  # foo.nix
+      >  x: x + 456
+      >  ```
+      >
+      >  The function argument doesn’t have to be called `x` in `foo.nix`; any name would work.
     )",
     .fun = [](EvalState & state, const PosIdx pos, Value * * args, Value & v)
     {
@@ -592,7 +599,7 @@ struct CompareValues
                 case nFloat:
                     return v1->fpoint < v2->fpoint;
                 case nString:
-                    return strcmp(v1->string.s, v2->string.s) < 0;
+                    return v1->string_view().compare(v2->string_view()) < 0;
                 case nPath:
                     // FIXME: handle accessor?
                     return strcmp(v1->_path.path, v2->_path.path) < 0;
@@ -984,7 +991,7 @@ static void prim_trace(EvalState & state, const PosIdx pos, Value * * args, Valu
 {
     state.forceValue(*args[0], pos);
     if (args[0]->type() == nString)
-        printError("trace: %1%", state.decodePaths(args[0]->string.s));
+        printError("trace: %1%", state.decodePaths(args[0]->string_view()));
     else
         printError("trace: %1%", printValue(state, *args[0]));
     state.forceValue(*args[1], pos);
@@ -1532,7 +1539,9 @@ static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args,
     auto path = realisePath(state, pos, arg, { .checkForPureEval = false });
 
     /* SourcePath doesn't know about trailing slash. */
-    auto mustBeDir = arg.type() == nString && arg.str().ends_with("/");
+    auto mustBeDir = arg.type() == nString
+        && (arg.string_view().ends_with("/")
+            || arg.string_view().ends_with("/."));
 
     try {
         auto exists = path.pathExists();
@@ -1693,13 +1702,14 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
 
 static RegisterPrimOp primop_findFile(PrimOp {
     .name = "__findFile",
-    .args = {"search path", "lookup path"},
+    .args = {"search-path", "lookup-path"},
     .doc = R"(
-      Look up the given path with the given search path.
+      Find *lookup-path* in *search-path*.
 
-      A search path is represented list of [attribute sets](./values.md#attribute-set) with two attributes, `prefix`, and `path`.
-      `prefix` is a relative path.
-      `path` denotes a file system location; the exact syntax depends on the command line interface.
+      A search path is represented list of [attribute sets](./values.md#attribute-set) with two attributes:
+      - `prefix` is a relative path.
+      - `path` denotes a file system location
+      The exact syntax depends on the command line interface.
 
       Examples of search path attribute sets:
 
@@ -1717,15 +1727,14 @@ static RegisterPrimOp primop_findFile(PrimOp {
         }
         ```
 
-      The lookup algorithm checks each entry until a match is found, returning a [path value](@docroot@/language/values.html#type-path) of the match.
+      The lookup algorithm checks each entry until a match is found, returning a [path value](@docroot@/language/values.html#type-path) of the match:
 
-      This is the process for each entry:
-      If the lookup path matches `prefix`, then the remainder of the lookup path (the "suffix") is searched for within the directory denoted by `patch`.
-      Note that the `path` may need to be downloaded at this point to look inside.
-      If the suffix is found inside that directory, then the entry is a match;
-      the combined absolute path of the directory (now downloaded if need be) and the suffix is returned.
+      - If *lookup-path* matches `prefix`, then the remainder of *lookup-path* (the "suffix") is searched for within the directory denoted by `path`.
+        Note that the `path` may need to be downloaded at this point to look inside.
+      - If the suffix is found inside that directory, then the entry is a match.
+        The combined absolute path of the directory (now downloaded if need be) and the suffix is returned.
 
-      The syntax
+      [Lookup path](@docroot@/language/constructs/lookup-path.md) expressions can be [desugared](https://en.wikipedia.org/wiki/Syntactic_sugar) using this and [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath):
 
       ```nix
       <nixpkgs>
@@ -2425,7 +2434,7 @@ static void prim_attrNames(EvalState & state, const PosIdx pos, Value * * args, 
         (v.listElems()[n++] = state.allocValue())->mkString(state.symbols[i.name]);
 
     std::sort(v.listElems(), v.listElems() + n,
-              [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
+              [](Value * v1, Value * v2) { return v1->string_view().compare(v2->string_view()) < 0; });
 }
 
 static RegisterPrimOp primop_attrNames({
@@ -2566,7 +2575,7 @@ static void prim_removeAttrs(EvalState & state, const PosIdx pos, Value * * args
     names.reserve(args[1]->listSize());
     for (auto elem : args[1]->listItems()) {
         state.forceStringNoCtx(*elem, pos, "while evaluating the values of the second argument passed to builtins.removeAttrs");
-        names.emplace_back(state.symbols.create(elem->string.s), nullptr);
+        names.emplace_back(state.symbols.create(elem->string_view()), nullptr);
     }
     std::sort(names.begin(), names.end());
 
@@ -3016,7 +3025,7 @@ static RegisterPrimOp primop_tail({
     .name = "__tail",
     .args = {"list"},
     .doc = R"(
-      Return the second to last elements of a list; abort evaluation if
+      Return the list without its first item; abort evaluation if
       the argument isn’t a list or is an empty list.
 
       > **Warning**
@@ -4412,9 +4421,9 @@ void EvalState::createBaseEnv()
     addConstant("__nixPath", v, {
         .type = nList,
         .doc = R"(
-          The search path used to resolve angle bracket path lookups.
+          List of search path entries used to resolve [lookup paths](@docroot@/language/constructs/lookup-path.md).
 
-          Angle bracket expressions can be
+          Lookup path expressions can be
           [desugared](https://en.wikipedia.org/wiki/Syntactic_sugar)
           using this and
           [`builtins.findFile`](./builtins.html#builtins-findFile):

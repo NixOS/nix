@@ -145,13 +145,17 @@ std::string printHash16or32(const Hash & hash);
 Hash hashString(HashType ht, std::string_view s);
 
 /**
- * Compute the hash of the given file.
+ * Compute the hash of the given file, hashing its contents directly.
+ *
+ * (Metadata, such as the executable permission bit, is ignored.)
  */
 Hash hashFile(HashType ht, const Path & path);
 
 /**
- * Compute the hash of the given path.  The hash is defined as
- * (essentially) hashString(ht, dumpPath(path)).
+ * Compute the hash of the given path, serializing as a Nix Archive and
+ * then hashing that.
+ *
+ * The hash is defined as (essentially) hashString(ht, dumpPath(path)).
  */
 typedef std::pair<Hash, uint64_t> HashResult;
 HashResult hashPath(HashType ht, const Path & path,

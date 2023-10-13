@@ -76,12 +76,12 @@ void Expr::show(const SymbolTable & symbols, std::ostream & str) const
 
 void ExprInt::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    str << n;
+    str << v.integer;
 }
 
 void ExprFloat::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    str << nf;
+    str << v.fpoint;
 }
 
 void ExprString::show(const SymbolTable & symbols, std::ostream & str) const

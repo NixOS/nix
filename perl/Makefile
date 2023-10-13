@@ -1,6 +1,12 @@
 makefiles = local.mk
 
-GLOBAL_CXXFLAGS += -g -Wall -std=c++2a -I ../src
+GLOBAL_CXXFLAGS += -g -Wall -std=c++2a
+
+# A convenience for concurrent development of Nix and its Perl bindings.
+# Not needed in a standalone build of the Perl bindings.
+ifneq ("$(wildcard ../src)", "")
+  GLOBAL_CXXFLAGS += -I ../src
+endif
 
 -include Makefile.config
 
