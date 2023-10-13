@@ -295,6 +295,10 @@ struct CurlInputScheme : InputScheme
             if (auto n = string2Int<uint64_t>(*i))
                 input.attrs.insert_or_assign("revCount", *n);
 
+        if (auto i = get(url.query, "lastModified"))
+            if (auto n = string2Int<uint64_t>(*i))
+                input.attrs.insert_or_assign("lastModified", *n);
+
         for (auto & param : specialParams)
             url.query.erase(param);
 
@@ -391,9 +395,6 @@ struct TarballInputScheme : CurlInputScheme
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 
-        if (result.lastModified && !input.attrs.contains("lastModified"))
-            input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
-
         if (result.immutableUrl) {
             auto immutableInput = Input::fromURL(*result.immutableUrl);
             // FIXME: would be nice to support arbitrary flakerefs
@@ -402,6 +403,9 @@ struct TarballInputScheme : CurlInputScheme
                 throw Error("tarball 'Link' headers that redirect to non-tarball URLs are not supported");
             input = immutableInput;
         }
+
+        if (result.lastModified && !input.attrs.contains("lastModified"))
+            input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
 
         input.attrs.insert_or_assign("narHash",
             getTarballCache()->treeHashToNarHash(result.treeHash).to_string(SRI, true));
