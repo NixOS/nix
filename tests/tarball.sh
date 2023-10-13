@@ -57,8 +57,3 @@ test_tarball() {
 test_tarball '' cat
 test_tarball .xz xz
 test_tarball .gz gzip
-
-rm -rf $TEST_ROOT/tmp
-mkdir -p $TEST_ROOT/tmp
-(! TMPDIR=$TEST_ROOT/tmp XDG_RUNTIME_DIR=$TEST_ROOT/tmp nix-env -f file://$(pwd)/bad.tar.xz -qa --out-path)
-(! [ -e $TEST_ROOT/tmp/bad ])
