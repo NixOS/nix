@@ -26,7 +26,7 @@ extern const std::string base32Chars;
 /**
  * @brief Enumeration representing the hash formats.
  */
-enum HashFormat : int {
+enum struct HashFormat : int {
     /// @brief Base 64 encoding.
     /// @see [IETF RFC 4648, section 4](https://datatracker.ietf.org/doc/html/rfc4648#section-4).
     Base64,
