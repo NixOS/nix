@@ -11,7 +11,7 @@ using namespace nix;
 struct CmdHashBase : Command
 {
     FileIngestionMethod mode;
-    HashFormat hashFormat = SRI;
+    HashFormat hashFormat = HashFormat::SRI;
     bool truncate = false;
     HashType ht = htSHA256;
     std::vector<std::string> paths;
@@ -22,25 +22,25 @@ struct CmdHashBase : Command
         addFlag({
             .longName = "sri",
             .description = "Print the hash in SRI format.",
-            .handler = {&hashFormat, SRI},
+            .handler = {&hashFormat, HashFormat::SRI},
         });
 
         addFlag({
             .longName = "base64",
             .description = "Print the hash in base-64 format.",
-            .handler = {&hashFormat, Base64},
+            .handler = {&hashFormat, HashFormat::Base64},
         });
 
         addFlag({
             .longName = "base32",
             .description = "Print the hash in base-32 (Nix-specific) format.",
-            .handler = {&hashFormat, Base32},
+            .handler = {&hashFormat, HashFormat::Base32},
         });
 
         addFlag({
             .longName = "base16",
             .description = "Print the hash in base-16 format.",
-            .handler = {&hashFormat, Base16},
+            .handler = {&hashFormat, HashFormat::Base16},
         });
 
         addFlag(Flag::mkHashTypeFlag("type", &ht));
@@ -94,7 +94,7 @@ struct CmdHashBase : Command
 
             Hash h = hashSink->finish().first;
             if (truncate && h.hashSize > 20) h = compressHash(h, 20);
-            logger->cout(h.to_string(hashFormat, hashFormat == SRI));
+            logger->cout(h.to_string(hashFormat, hashFormat == HashFormat::SRI));
         }
     }
 };
@@ -114,16 +114,16 @@ struct CmdToBase : Command
     std::string description() override
     {
         return fmt("convert a hash to %s representation",
-            hashFormat == Base16 ? "base-16" :
-            hashFormat == Base32 ? "base-32" :
-            hashFormat == Base64 ? "base-64" :
+            hashFormat == HashFormat::Base16 ? "base-16" :
+            hashFormat == HashFormat::Base32 ? "base-32" :
+            hashFormat == HashFormat::Base64 ? "base-64" :
             "SRI");
     }
 
     void run() override
     {
         for (auto s : args)
-            logger->cout(Hash::parseAny(s, ht).to_string(hashFormat, hashFormat == SRI));
+            logger->cout(Hash::parseAny(s, ht).to_string(hashFormat, hashFormat == HashFormat::SRI));
     }
 };
 
@@ -133,10 +133,10 @@ struct CmdHash : NixMultiCommand
         : MultiCommand({
                 {"file", []() { return make_ref<CmdHashBase>(FileIngestionMethod::Flat);; }},
                 {"path", []() { return make_ref<CmdHashBase>(FileIngestionMethod::Recursive); }},
-                {"to-base16", []() { return make_ref<CmdToBase>(Base16); }},
-                {"to-base32", []() { return make_ref<CmdToBase>(Base32); }},
-                {"to-base64", []() { return make_ref<CmdToBase>(Base64); }},
-                {"to-sri", []() { return make_ref<CmdToBase>(SRI); }},
+                {"to-base16", []() { return make_ref<CmdToBase>(HashFormat::Base16); }},
+                {"to-base32", []() { return make_ref<CmdToBase>(HashFormat::Base32); }},
+                {"to-base64", []() { return make_ref<CmdToBase>(HashFormat::Base64); }},
+                {"to-sri", []() { return make_ref<CmdToBase>(HashFormat::SRI); }},
           })
     { }
 
@@ -162,7 +162,7 @@ static int compatNixHash(int argc, char * * argv)
 {
     std::optional<HashType> ht;
     bool flat = false;
-    HashFormat hashFormat = Base16;
+    HashFormat hashFormat = HashFormat::Base16;
     bool truncate = false;
     enum { opHash, opTo } op = opHash;
     std::vector<std::string> ss;
@@ -173,10 +173,10 @@ static int compatNixHash(int argc, char * * argv)
         else if (*arg == "--version")
             printVersion("nix-hash");
         else if (*arg == "--flat") flat = true;
-        else if (*arg == "--base16") hashFormat = Base16;
-        else if (*arg == "--base32") hashFormat = Base32;
-        else if (*arg == "--base64") hashFormat = Base64;
-        else if (*arg == "--sri") hashFormat = SRI;
+        else if (*arg == "--base16") hashFormat = HashFormat::Base16;
+        else if (*arg == "--base32") hashFormat = HashFormat::Base32;
+        else if (*arg == "--base64") hashFormat = HashFormat::Base64;
+        else if (*arg == "--sri") hashFormat = HashFormat::SRI;
         else if (*arg == "--truncate") truncate = true;
         else if (*arg == "--type") {
             std::string s = getArg(*arg, arg, end);
@@ -184,19 +184,19 @@ static int compatNixHash(int argc, char * * argv)
         }
         else if (*arg == "--to-base16") {
             op = opTo;
-            hashFormat = Base16;
+            hashFormat = HashFormat::Base16;
         }
         else if (*arg == "--to-base32") {
             op = opTo;
-            hashFormat = Base32;
+            hashFormat = HashFormat::Base32;
         }
         else if (*arg == "--to-base64") {
             op = opTo;
-            hashFormat = Base64;
+            hashFormat = HashFormat::Base64;
         }
         else if (*arg == "--to-sri") {
             op = opTo;
-            hashFormat = SRI;
+            hashFormat = HashFormat::SRI;
         }
         else if (*arg != "" && arg->at(0) == '-')
             return false;

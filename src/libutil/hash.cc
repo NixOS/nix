@@ -111,26 +111,26 @@ static std::string printHash32(const Hash & hash)
 std::string printHash16or32(const Hash & hash)
 {
     assert(hash.type);
-    return hash.to_string(hash.type == htMD5 ? Base16 : Base32, false);
+    return hash.to_string(hash.type == htMD5 ? HashFormat::Base16 : HashFormat::Base32, false);
 }
 
 
 std::string Hash::to_string(HashFormat hashFormat, bool includeType) const
 {
     std::string s;
-    if (hashFormat == SRI || includeType) {
+    if (hashFormat == HashFormat::SRI || includeType) {
         s += printHashType(type);
-        s += hashFormat == SRI ? '-' : ':';
+        s += hashFormat == HashFormat::SRI ? '-' : ':';
     }
     switch (hashFormat) {
-    case Base16:
+    case HashFormat::Base16:
         s += printHash16(*this);
         break;
-    case Base32:
+    case HashFormat::Base32:
         s += printHash32(*this);
         break;
-    case Base64:
-    case SRI:
+    case HashFormat::Base64:
+    case HashFormat::SRI:
         s += base64Encode(std::string_view((const char *) hash, hashSize));
         break;
     }
@@ -267,7 +267,7 @@ Hash newHashAllowEmpty(std::string_view hashStr, std::optional<HashType> ht)
         if (!ht)
             throw BadHash("empty hash requires explicit hash type");
         Hash h(*ht);
-        warn("found empty hash, assuming '%s'", h.to_string(SRI, true));
+        warn("found empty hash, assuming '%s'", h.to_string(HashFormat::SRI, true));
         return h;
     } else
         return Hash::parseAny(hashStr, ht);

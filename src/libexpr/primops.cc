@@ -1758,7 +1758,7 @@ static void prim_hashFile(EvalState & state, const PosIdx pos, Value * * args, V
 
     auto path = realisePath(state, pos, *args[1]);
 
-    v.mkString(hashString(*ht, path.readFile()).to_string(Base16, false));
+    v.mkString(hashString(*ht, path.readFile()).to_string(HashFormat::Base16, false));
 }
 
 static RegisterPrimOp primop_hashFile({
@@ -3760,7 +3760,7 @@ static void prim_hashString(EvalState & state, const PosIdx pos, Value * * args,
     NixStringContext context; // discarded
     auto s = state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.hashString");
 
-    v.mkString(hashString(*ht, s).to_string(Base16, false));
+    v.mkString(hashString(*ht, s).to_string(HashFormat::Base16, false));
 }
 
 static RegisterPrimOp primop_hashString({

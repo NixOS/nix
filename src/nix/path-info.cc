@@ -90,7 +90,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             std::cout << store->pathInfoToJSON(
                 // FIXME: preserve order?
                 StorePathSet(storePaths.begin(), storePaths.end()),
-                true, showClosureSize, SRI, AllowInvalid).dump();
+                true, showClosureSize, HashFormat::SRI, AllowInvalid).dump();
         }
 
         else {

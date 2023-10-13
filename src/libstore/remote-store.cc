@@ -541,7 +541,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source,
         conn->to << WorkerProto::Op::AddToStoreNar
                  << printStorePath(info.path)
                  << (info.deriver ? printStorePath(*info.deriver) : "")
-                 << info.narHash.to_string(Base16, false);
+                 << info.narHash.to_string(HashFormat::Base16, false);
         WorkerProto::write(*this, *conn, info.references);
         conn->to << info.registrationTime << info.narSize
                  << info.ultimate << info.sigs << renderContentAddress(info.ca)

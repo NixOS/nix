@@ -334,7 +334,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         logger->startWork();
         auto hash = store->queryPathInfo(path)->narHash;
         logger->stopWork();
-        to << hash.to_string(Base16, false);
+        to << hash.to_string(HashFormat::Base16, false);
         break;
     }
 

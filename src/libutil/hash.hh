@@ -132,12 +132,12 @@ public:
 
     std::string gitRev() const
     {
-        return to_string(Base16, false);
+        return to_string(HashFormat::Base16, false);
     }
 
     std::string gitShortRev() const
     {
-        return std::string(to_string(Base16, false), 0, 7);
+        return std::string(to_string(HashFormat::Base16, false), 0, 7);
     }
 
     static Hash dummy;

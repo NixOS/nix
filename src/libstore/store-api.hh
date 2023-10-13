@@ -676,7 +676,7 @@ public:
      */
     nlohmann::json pathInfoToJSON(const StorePathSet & storePaths,
         bool includeImpureInfo, bool showClosureSize,
-        HashFormat hashFormat = Base32,
+        HashFormat hashFormat = HashFormat::Base32,
         AllowInvalidFlag allowInvalid = DisallowInvalid);
 
     /**

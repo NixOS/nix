@@ -154,7 +154,7 @@ StorePath Store::makeStorePath(std::string_view type,
 StorePath Store::makeStorePath(std::string_view type,
     const Hash & hash, std::string_view name) const
 {
-    return makeStorePath(type, hash.to_string(Base16, true), name);
+    return makeStorePath(type, hash.to_string(HashFormat::Base16, true), name);
 }
 
 
@@ -192,7 +192,7 @@ StorePath Store::makeFixedOutputPath(std::string_view name, const FixedOutputInf
             hashString(htSHA256,
                 "fixed:out:"
                 + makeFileIngestionPrefix(info.method)
-                + info.hash.to_string(Base16, true) + ":"),
+                + info.hash.to_string(HashFormat::Base16, true) + ":"),
             name);
     }
 }
@@ -884,7 +884,7 @@ std::string Store::makeValidityRegistration(const StorePathSet & paths,
         auto info = queryPathInfo(i);
 
         if (showHash) {
-            s += info->narHash.to_string(Base16, false) + "\n";
+            s += info->narHash.to_string(HashFormat::Base16, false) + "\n";
             s += fmt("%1%\n", info->narSize);
         }
 
