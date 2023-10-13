@@ -111,81 +111,9 @@ DownloadFileResult downloadFile(
     };
 }
 
-DownloadTarballResult downloadTarball(
-    ref<Store> store,
-    const std::string & url,
-    const std::string & name,
-    bool locked,
-    const Headers & headers)
-{
-    Attrs inAttrs({
-        {"type", "tarball"},
-        {"url", url},
-        {"name", name},
-    });
-
-    auto cached = getCache()->lookupExpired(store, inAttrs);
-
-    if (cached && !cached->expired)
-        return {
-            .storePath = std::move(cached->storePath),
-            .lastModified = (time_t) getIntAttr(cached->infoAttrs, "lastModified"),
-            .immutableUrl = maybeGetStrAttr(cached->infoAttrs, "immutableUrl"),
-        };
-
-    auto res = downloadFile(store, url, name, locked, headers);
-
-    std::optional<StorePath> unpackedStorePath;
-    time_t lastModified;
-
-    if (cached && res.etag != "" && getStrAttr(cached->infoAttrs, "etag") == res.etag) {
-        unpackedStorePath = std::move(cached->storePath);
-        lastModified = getIntAttr(cached->infoAttrs, "lastModified");
-    } else {
-        Path tmpDir = createTempDir();
-        AutoDelete autoDelete(tmpDir, true);
-        unpackTarfile(store->toRealPath(res.storePath), tmpDir);
-        auto members = readDirectory(tmpDir);
-        if (members.size() != 1)
-            throw nix::Error("tarball '%s' contains an unexpected number of top-level files", url);
-        auto topDir = tmpDir + "/" + members.begin()->name;
-        lastModified = lstat(topDir).st_mtime;
-        unpackedStorePath = store->addToStore(name, topDir, FileIngestionMethod::Recursive, htSHA256, defaultPathFilter, NoRepair);
-    }
-
-    Attrs infoAttrs({
-        {"lastModified", uint64_t(lastModified)},
-        {"etag", res.etag},
-    });
-
-    if (res.immutableUrl)
-        infoAttrs.emplace("immutableUrl", *res.immutableUrl);
-
-    getCache()->add(
-        store,
-        inAttrs,
-        infoAttrs,
-        *unpackedStorePath,
-        locked);
-
-    return {
-        .storePath = std::move(*unpackedStorePath),
-        .lastModified = lastModified,
-        .immutableUrl = res.immutableUrl,
-    };
-}
-
-struct DownloadTarballResult2
-{
-    Hash treeHash;
-    time_t lastModified;
-    std::optional<std::string> immutableUrl;
-};
-
 /* Download and import a tarball into the Git cache. The result is
    the Git tree hash of the root directory. */
-DownloadTarballResult2 downloadTarball2(
-    ref<Store> store,
+DownloadTarballResult downloadTarball(
     const std::string & url,
     const Headers & headers)
 {
@@ -198,10 +126,12 @@ DownloadTarballResult2 downloadTarball2(
 
     auto attrsToResult = [&](const Attrs & infoAttrs)
     {
-        return DownloadTarballResult2 {
-            .treeHash = getRevAttr(infoAttrs, "treeHash"),
+        auto treeHash = getRevAttr(infoAttrs, "treeHash");
+        return DownloadTarballResult {
+            .treeHash = treeHash,
             .lastModified = (time_t) getIntAttr(infoAttrs, "lastModified"),
             .immutableUrl = maybeGetStrAttr(infoAttrs, "immutableUrl"),
+            .accessor = getTarballCache()->getAccessor(treeHash),
         };
     };
 
@@ -389,11 +319,9 @@ struct TarballInputScheme : CurlInputScheme
     {
         auto input(_input);
 
-        auto result = downloadTarball2(store, getStrAttr(input.attrs, "url"), {});
+        auto result = downloadTarball(getStrAttr(input.attrs, "url"), {});
 
-        auto accessor = getTarballCache()->getAccessor(result.treeHash);
-
-        accessor->setPathDisplay("«" + input.to_string() + "»");
+        result.accessor->setPathDisplay("«" + input.to_string() + "»");
 
         if (result.immutableUrl) {
             auto immutableInput = Input::fromURL(*result.immutableUrl);
@@ -410,7 +338,7 @@ struct TarballInputScheme : CurlInputScheme
         input.attrs.insert_or_assign("narHash",
             getTarballCache()->treeHashToNarHash(result.treeHash).to_string(SRI, true));
 
-        return {accessor, input};
+        return {result.accessor, input};
     }
 };
 

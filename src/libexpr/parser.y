@@ -796,12 +796,11 @@ std::optional<SourcePath> EvalState::resolveSearchPathPath(const SearchPath::Pat
 
     if (EvalSettings::isPseudoUrl(value)) {
         try {
-            auto storePath = fetchers::downloadTarball(
-                store, EvalSettings::resolvePseudoUrl(value), "source", false).storePath;
-            auto accessor = makeStorePathAccessor(store, storePath);
+            auto accessor = fetchers::downloadTarball(
+                EvalSettings::resolvePseudoUrl(value)).accessor;
             registerAccessor(accessor);
             res.emplace(accessor->root());
-        } catch (FileTransferError & e) {
+        } catch (Error & e) {
             logWarning({
                 .msg = hintfmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)
             });

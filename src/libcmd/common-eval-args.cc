@@ -169,9 +169,8 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
 SourcePath lookupFileArg(EvalState & state, std::string_view s)
 {
     if (EvalSettings::isPseudoUrl(s)) {
-        auto storePath = fetchers::downloadTarball(
-            state.store, EvalSettings::resolvePseudoUrl(s), "source", false).storePath;
-        auto accessor = makeStorePathAccessor(state.store, storePath);
+        auto accessor = fetchers::downloadTarball(
+            EvalSettings::resolvePseudoUrl(s)).accessor;
         state.registerAccessor(accessor);
         return accessor->root();
     }
