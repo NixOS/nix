@@ -47,3 +47,4 @@ struct CmdPingStore : StoreCommand, MixJSON
 };
 
 static auto rCmdPingStore = registerCommand2<CmdPingStore>({"store", "ping"});
+static auto rCmdInfoStore = registerCommand2<CmdPingStore>({"store", "info"});
