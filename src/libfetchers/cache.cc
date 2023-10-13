@@ -27,7 +27,7 @@ struct CacheImpl : Cache
     struct State
     {
         SQLite db;
-        SQLiteStmt add, lookup, upsertFact, queryFact;
+        SQLiteStmt add, lookup;
     };
 
     Sync<State> _state;
@@ -36,7 +36,7 @@ struct CacheImpl : Cache
     {
         auto state(_state.lock());
 
-        auto dbPath = getCacheDir() + "/nix/fetcher-cache-v2.sqlite";
+        auto dbPath = getCacheDir() + "/nix/fetcher-cache-v1.sqlite";
         createDirs(dirOf(dbPath));
 
         state->db = SQLite(dbPath);
