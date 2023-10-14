@@ -451,7 +451,7 @@ AutoCloseFD LocalStore::openGCLock()
 {
     Path fnGCLock = stateDir + "/gc.lock";
     auto fdGCLock = open(fnGCLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
-    if (!fdGCLock)
+    if (fdGCLock == -1)
         throw SysError("opening global GC lock '%1%'", fnGCLock);
     return fdGCLock;
 }
