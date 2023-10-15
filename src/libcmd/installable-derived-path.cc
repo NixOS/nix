@@ -18,14 +18,7 @@ DerivedPathsWithInfo InstallableDerivedPath::toDerivedPaths()
 
 std::optional<StorePath> InstallableDerivedPath::getStorePath()
 {
-    return std::visit(overloaded {
-        [&](const DerivedPath::Built & bfd) {
-            return bfd.drvPath;
-        },
-        [&](const DerivedPath::Opaque & bo) {
-            return bo.path;
-        },
-    }, derivedPath.raw());
+    return derivedPath.getBaseStorePath();
 }
 
 InstallableDerivedPath InstallableDerivedPath::parse(
@@ -42,7 +35,7 @@ InstallableDerivedPath InstallableDerivedPath::parse(
             // Remove this prior to stabilizing the new CLI.
             if (storePath.isDerivation()) {
                 auto oldDerivedPath = DerivedPath::Built {
-                    .drvPath = storePath,
+                    .drvPath = makeConstantStorePathRef(storePath),
                     .outputs = OutputsSpec::All { },
                 };
                 warn(
@@ -55,12 +48,14 @@ InstallableDerivedPath InstallableDerivedPath::parse(
         },
         // If the user did use ^, we just do exactly what is written.
         [&](const ExtendedOutputsSpec::Explicit & outputSpec) -> DerivedPath {
+            auto drv = make_ref<SingleDerivedPath>(SingleDerivedPath::parse(*store, prefix));
+            drvRequireExperiment(*drv);
             return DerivedPath::Built {
-                .drvPath = store->parseStorePath(prefix),
+                .drvPath = std::move(drv),
                 .outputs = outputSpec,
             };
         },
-    }, extendedOutputsSpec.raw());
+    }, extendedOutputsSpec.raw);
     return InstallableDerivedPath {
         store,
         std::move(derivedPath),

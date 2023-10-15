@@ -3,11 +3,10 @@
 #include "pool.hh"
 #include "remote-store.hh"
 #include "serve-protocol.hh"
+#include "serve-protocol-impl.hh"
 #include "build-result.hh"
 #include "store-api.hh"
 #include "path-with-outputs.hh"
-#include "worker-protocol.hh"
-#include "worker-protocol-impl.hh"
 #include "ssh.hh"
 #include "derivations.hh"
 #include "callback.hh"
@@ -50,37 +49,31 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         bool good = true;
 
         /**
-         * Coercion to `WorkerProto::ReadConn`. This makes it easy to use the
-         * factored out worker protocol searlizers with a
+         * Coercion to `ServeProto::ReadConn`. This makes it easy to use the
+         * factored out serve protocol searlizers with a
          * `LegacySSHStore::Connection`.
          *
-         * The worker protocol connection types are unidirectional, unlike
+         * The serve protocol connection types are unidirectional, unlike
          * this type.
-         *
-         * @todo Use server protocol serializers, not worker protocol
-         * serializers, once we have made that distiction.
          */
-        operator WorkerProto::ReadConn ()
+        operator ServeProto::ReadConn ()
         {
-            return WorkerProto::ReadConn {
+            return ServeProto::ReadConn {
                 .from = from,
             };
         }
 
         /*
-         * Coercion to `WorkerProto::WriteConn`. This makes it easy to use the
-         * factored out worker protocol searlizers with a
+         * Coercion to `ServeProto::WriteConn`. This makes it easy to use the
+         * factored out serve protocol searlizers with a
          * `LegacySSHStore::Connection`.
          *
-         * The worker protocol connection types are unidirectional, unlike
+         * The serve protocol connection types are unidirectional, unlike
          * this type.
-         *
-         * @todo Use server protocol serializers, not worker protocol
-         * serializers, once we have made that distiction.
          */
-        operator WorkerProto::WriteConn ()
+        operator ServeProto::WriteConn ()
         {
-            return WorkerProto::WriteConn {
+            return ServeProto::WriteConn {
                 .to = to,
             };
         }
@@ -183,7 +176,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             auto deriver = readString(conn->from);
             if (deriver != "")
                 info->deriver = parseStorePath(deriver);
-            info->references = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
+            info->references = ServeProto::Serialise<StorePathSet>::read(*this, *conn);
             readLongLong(conn->from); // download size
             info->narSize = readLongLong(conn->from);
 
@@ -217,7 +210,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
                 << printStorePath(info.path)
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << info.narHash.to_string(Base16, false);
-            WorkerProto::write(*this, *conn, info.references);
+            ServeProto::write(*this, *conn, info.references);
             conn->to
                 << info.registrationTime
                 << info.narSize
@@ -246,7 +239,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
             conn->to
                 << exportMagic
                 << printStorePath(info.path);
-            WorkerProto::write(*this, *conn, info.references);
+            ServeProto::write(*this, *conn, info.references);
             conn->to
                 << (info.deriver ? printStorePath(*info.deriver) : "")
                 << 0
@@ -331,7 +324,7 @@ public:
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 3)
             conn->from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
         if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 6) {
-            auto builtOutputs = WorkerProto::Serialise<DrvOutputs>::read(*this, *conn);
+            auto builtOutputs = ServeProto::Serialise<DrvOutputs>::read(*this, *conn);
             for (auto && [output, realisation] : builtOutputs)
                 status.builtOutputs.insert_or_assign(
                     std::move(output.outputName),
@@ -357,6 +350,9 @@ public:
                 },
                 [&](const StorePath & drvPath) {
                     throw Error("wanted to fetch '%s' but the legacy ssh protocol doesn't support merely substituting drv files via the build paths command. It would build them instead. Try using ssh-ng://", printStorePath(drvPath));
+                },
+                [&](std::monostate) {
+                    throw Error("wanted build derivation that is itself a build product, but the legacy ssh protocol doesn't support that. Try using ssh-ng://");
                 },
             }, sOrDrvPath);
         }
@@ -406,10 +402,10 @@ public:
         conn->to
             << ServeProto::Command::QueryClosure
             << includeOutputs;
-        WorkerProto::write(*this, *conn, paths);
+        ServeProto::write(*this, *conn, paths);
         conn->to.flush();
 
-        for (auto & i : WorkerProto::Serialise<StorePathSet>::read(*this, *conn))
+        for (auto & i : ServeProto::Serialise<StorePathSet>::read(*this, *conn))
             out.insert(i);
     }
 
@@ -422,10 +418,10 @@ public:
             << ServeProto::Command::QueryValidPaths
             << false // lock
             << maybeSubstitute;
-        WorkerProto::write(*this, *conn, paths);
+        ServeProto::write(*this, *conn, paths);
         conn->to.flush();
 
-        return WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
+        return ServeProto::Serialise<StorePathSet>::read(*this, *conn);
     }
 
     void connect() override

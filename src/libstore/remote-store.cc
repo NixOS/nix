@@ -172,7 +172,24 @@ void RemoteStore::ConnectionHandle::processStderr(Sink * sink, Source * source, 
     auto ex = handle->processStderr(sink, source, flush);
     if (ex) {
         daemonException = true;
-        std::rethrow_exception(ex);
+        try {
+            std::rethrow_exception(ex);
+        } catch (const Error & e) {
+            // Nix versions before #4628 did not have an adequate behavior for reporting that the derivation format was upgraded.
+            // To avoid having to add compatibility logic in many places, we expect to catch almost all occurrences of the
+            // old incomprehensible error here, so that we can explain to users what's going on when their daemon is
+            // older than #4628 (2023).
+            if (experimentalFeatureSettings.isEnabled(Xp::DynamicDerivations) &&
+                GET_PROTOCOL_MINOR(handle->daemonVersion) <= 35)
+            {
+                auto m = e.msg();
+                if (m.find("parsing derivation") != std::string::npos &&
+                    m.find("expected string") != std::string::npos &&
+                    m.find("Derive([") != std::string::npos)
+                    throw Error("%s, this might be because the daemon is too old to understand dependencies on dynamic derivations. Check to see if the raw dervation is in the form '%s'", std::move(m), "DrvWithVersion(..)");
+            }
+            throw;
+        }
     }
 }
 
@@ -656,6 +673,9 @@ static void writeDerivedPaths(RemoteStore & store, RemoteStore::Connection & con
                         GET_PROTOCOL_MAJOR(conn.daemonVersion),
                         GET_PROTOCOL_MINOR(conn.daemonVersion));
                 },
+                [&](std::monostate) {
+                    throw Error("wanted to build a derivation that is itself a build product, but the legacy 'ssh://' protocol doesn't support that. Try using 'ssh-ng://'");
+                },
             }, sOrDrvPath);
         }
         conn.to << ss;
@@ -670,9 +690,16 @@ void RemoteStore::copyDrvsFromEvalStore(
         /* The remote doesn't have a way to access evalStore, so copy
            the .drvs. */
         RealisedPath::Set drvPaths2;
-        for (auto & i : paths)
-            if (auto p = std::get_if<DerivedPath::Built>(&i))
-                drvPaths2.insert(p->drvPath);
+        for (const auto & i : paths) {
+            std::visit(overloaded {
+                [&](const DerivedPath::Opaque & bp) {
+                    // Do nothing, path is hopefully there already
+                },
+                [&](const DerivedPath::Built & bp) {
+                    drvPaths2.insert(bp.drvPath->getBaseStorePath());
+                },
+            }, i.raw());
+        }
         copyClosure(*evalStore, *this, drvPaths2);
     }
 }
@@ -742,7 +769,8 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
                         };
 
                         OutputPathMap outputs;
-                        auto drv = evalStore->readDerivation(bfd.drvPath);
+                        auto drvPath = resolveDerivedPath(*evalStore, *bfd.drvPath);
+                        auto drv = evalStore->readDerivation(drvPath);
                         const auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
                         auto built = resolveDerivedPath(*this, bfd, &*evalStore);
                         for (auto & [output, outputPath] : built) {
@@ -750,7 +778,7 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
                             if (!outputHash)
                                 throw Error(
                                     "the derivation '%s' doesn't have an output named '%s'",
-                                    printStorePath(bfd.drvPath), output);
+                                    printStorePath(drvPath), output);
                             auto outputId = DrvOutput{ *outputHash, output };
                             if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
                                 auto realisation =

@@ -155,6 +155,10 @@ std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
 
 struct Expr
 {
+    static unsigned long nrExprs;
+    Expr() {
+        nrExprs++;
+    }
     virtual ~Expr() { };
     virtual void show(const SymbolTable & symbols, std::ostream & str) const;
     virtual void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
@@ -171,18 +175,16 @@ struct Expr
 
 struct ExprInt : Expr
 {
-    NixInt n;
     Value v;
-    ExprInt(NixInt n) : n(n) { v.mkInt(n); };
+    ExprInt(NixInt n) { v.mkInt(n); };
     Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };
 
 struct ExprFloat : Expr
 {
-    NixFloat nf;
     Value v;
-    ExprFloat(NixFloat nf) : nf(nf) { v.mkFloat(nf); };
+    ExprFloat(NixFloat nf) { v.mkFloat(nf); };
     Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };
@@ -238,7 +240,7 @@ struct ExprSelect : Expr
     PosIdx pos;
     Expr * e, * def;
     AttrPath attrPath;
-    ExprSelect(const PosIdx & pos, Expr * e, const AttrPath && attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(std::move(attrPath)) { };
+    ExprSelect(const PosIdx & pos, Expr * e, AttrPath attrPath, Expr * def) : pos(pos), e(e), def(def), attrPath(std::move(attrPath)) { };
     ExprSelect(const PosIdx & pos, Expr * e, Symbol name) : pos(pos), e(e), def(0) { attrPath.push_back(AttrName(name)); };
     PosIdx getPos() const override { return pos; }
     COMMON_METHODS
@@ -248,7 +250,7 @@ struct ExprOpHasAttr : Expr
 {
     Expr * e;
     AttrPath attrPath;
-    ExprOpHasAttr(Expr * e, const AttrPath && attrPath) : e(e), attrPath(std::move(attrPath)) { };
+    ExprOpHasAttr(Expr * e, AttrPath attrPath) : e(e), attrPath(std::move(attrPath)) { };
     PosIdx getPos() const override { return e->getPos(); }
     COMMON_METHODS
 };

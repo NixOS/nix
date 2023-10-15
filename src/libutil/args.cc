@@ -236,6 +236,7 @@ nlohmann::json Args::toJSON()
 
     for (auto & [name, flag] : longFlags) {
         auto j = nlohmann::json::object();
+        j["hiddenCategory"] = hiddenCategories.count(flag->category) > 0;
         if (flag->aliases.count(name)) continue;
         if (flag->shortName)
             j["shortName"] = std::string(1, flag->shortName);
@@ -410,8 +411,8 @@ nlohmann::json MultiCommand::toJSON()
         auto cat = nlohmann::json::object();
         cat["id"] = command->category();
         cat["description"] = trim(categories[command->category()]);
-        j["category"] = std::move(cat);
         cat["experimental-feature"] = command->experimentalFeature();
+        j["category"] = std::move(cat);
         cmds[name] = std::move(j);
     }
 

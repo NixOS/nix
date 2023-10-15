@@ -7,7 +7,7 @@ std::regex flakeRegex("[a-zA-Z][a-zA-Z0-9_-]*", std::regex::ECMAScript);
 
 struct IndirectInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url) const override
+    std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
     {
         if (url.scheme != "flake") return {};
 
@@ -97,6 +97,11 @@ struct IndirectInputScheme : InputScheme
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
     {
         throw Error("indirect input '%s' cannot be fetched directly", input.to_string());
+    }
+
+    std::optional<ExperimentalFeature> experimentalFeature() override
+    {
+        return Xp::Flakes;
     }
 };
 

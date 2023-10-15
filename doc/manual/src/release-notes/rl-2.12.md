@@ -2,7 +2,6 @@
 
 * On Linux, Nix can now run builds in a user namespace where they run
   as root (UID 0) and have 65,536 UIDs available.
-  <!-- FIXME: move this to its own section about system features -->
   This is primarily useful for running containers such as `systemd-nspawn`
   inside a Nix build. For an example, see [`tests/systemd-nspawn/nix`][nspawn].
 

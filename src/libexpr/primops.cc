@@ -56,7 +56,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
                     .drvPath = b.drvPath,
                     .outputs = OutputsSpec::Names { b.output },
                 });
-                ensureValid(b.drvPath);
+                ensureValid(b.drvPath->getBaseStorePath());
             },
             [&](const NixStringContextElem::Opaque & o) {
                 auto ctxS = store->printStorePath(o.path);
@@ -69,7 +69,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
                 res.insert_or_assign(ctxS, ctxS);
                 ensureValid(d.drvPath);
             },
-        }, c.raw());
+        }, c.raw);
     }
 
     if (drvs.empty()) return {};
@@ -77,29 +77,32 @@ StringMap EvalState::realiseContext(const NixStringContext & context)
     if (!evalSettings.enableImportFromDerivation)
         debugThrowLastTrace(Error(
             "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
-            store->printStorePath(drvs.begin()->drvPath)));
+            drvs.begin()->to_string(*store)));
 
     /* Build/substitute the context. */
     std::vector<DerivedPath> buildReqs;
     for (auto & d : drvs) buildReqs.emplace_back(DerivedPath { d });
     store->buildPaths(buildReqs);
 
-    /* Get all the output paths corresponding to the placeholders we had */
     for (auto & drv : drvs) {
         auto outputs = resolveDerivedPath(*store, drv);
         for (auto & [outputName, outputPath] : outputs) {
-            res.insert_or_assign(
-                DownstreamPlaceholder::unknownCaOutput(drv.drvPath, outputName).render(),
-                store->printStorePath(outputPath)
-            );
-        }
-    }
-
-    /* Add the output of this derivations to the allowed
-       paths. */
-    if (allowedPaths) {
-        for (auto & [_placeholder, outputPath] : res) {
-            allowPath(store->toRealPath(outputPath));
+            /* Add the output of this derivations to the allowed
+               paths. */
+            if (allowedPaths) {
+                allowPath(outputPath);
+            }
+            /* Get all the output paths corresponding to the placeholders we had */
+            if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
+                res.insert_or_assign(
+                    DownstreamPlaceholder::fromSingleDerivedPathBuilt(
+                        SingleDerivedPath::Built {
+                            .drvPath = drv.drvPath,
+                            .output = outputName,
+                        }).render(),
+                    store->printStorePath(outputPath)
+                );
+            }
         }
     }
 
@@ -153,8 +156,10 @@ static void mkOutputString(
 {
     state.mkOutputString(
         attrs.alloc(o.first),
-        drvPath,
-        o.first,
+        SingleDerivedPath::Built {
+            .drvPath = makeConstantStorePathRef(drvPath),
+            .output = o.first,
+        },
         o.second.path(*state.store, Derivation::nameFromPath(drvPath), o.first));
 }
 
@@ -253,64 +258,71 @@ static RegisterPrimOp primop_import({
     .args = {"path"},
     // TODO turn "normal path values" into link below
     .doc = R"(
-      Load, parse and return the Nix expression in the file *path*.
-
-      The value *path* can be a path, a string, or an attribute set with an
-      `__toString` attribute or a `outPath` attribute (as derivations or flake
-      inputs typically have).
-
-      If *path* is a directory, the file `default.nix` in that directory
-      is loaded.
-
-      Evaluation aborts if the file doesn’t exist or contains
-      an incorrect Nix expression. `import` implements Nix’s module
-      system: you can put any Nix expression (such as a set or a
-      function) in a separate file, and use it from Nix expressions in
-      other files.
+      Load, parse, and return the Nix expression in the file *path*.
 
       > **Note**
       >
       > Unlike some languages, `import` is a regular function in Nix.
-      > Paths using the angle bracket syntax (e.g., `import` *\<foo\>*)
-      > are normal [path values](@docroot@/language/values.md#type-path).
 
-      A Nix expression loaded by `import` must not contain any *free
-      variables* (identifiers that are not defined in the Nix expression
-      itself and are not built-in). Therefore, it cannot refer to
-      variables that are in scope at the call site. For instance, if you
-      have a calling expression
+      The *path* argument must meet the same criteria as an [interpolated expression](@docroot@/language/string-interpolation.md#interpolated-expression).
 
-      ```nix
-      rec {
-        x = 123;
-        y = import ./foo.nix;
-      }
-      ```
+      If *path* is a directory, the file `default.nix` in that directory is used if it exists.
 
-      then the following `foo.nix` will give an error:
+      > **Example**
+      >
+      > ```console
+      > $ echo 123 > default.nix
+      > ```
+      >
+      > Import `default.nix` from the current directory.
+      >
+      > ```nix
+      > import ./.
+      > ```
+      >
+      >     123
 
-      ```nix
-      x + 456
-      ```
+      Evaluation aborts if the file doesn’t exist or contains an invalid Nix expression.
 
-      since `x` is not in scope in `foo.nix`. If you want `x` to be
-      available in `foo.nix`, you should pass it as a function argument:
+      A Nix expression loaded by `import` must not contain any *free variables*, that is, identifiers that are not defined in the Nix expression itself and are not built-in.
+      Therefore, it cannot refer to variables that are in scope at the call site.
 
-      ```nix
-      rec {
-        x = 123;
-        y = import ./foo.nix x;
-      }
-      ```
-
-      and
-
-      ```nix
-      x: x + 456
-      ```
-
-      (The function argument doesn’t have to be called `x` in `foo.nix`;
-      any name would work.)
+      > **Example**
+      >
+      > If you have a calling expression
+      >
+      > ```nix
+      > rec {
+      >   x = 123;
+      >   y = import ./foo.nix;
+      > }
+      > ```
+      >
+      >  then the following `foo.nix` will give an error:
+      >
+      >  ```nix
+      >  # foo.nix
+      >  x + 456
+      >  ```
+      >
+      >  since `x` is not in scope in `foo.nix`.
+      > If you want `x` to be available in `foo.nix`, pass it as a function argument:
+      >
+      >  ```nix
+      >  rec {
+      >    x = 123;
+      >    y = import ./foo.nix x;
+      >  }
+      >  ```
+      >
+      >  and
+      >
+      >  ```nix
+      >  # foo.nix
+      >  x: x + 456
+      >  ```
+      >
+      >  The function argument doesn’t have to be called `x` in `foo.nix`; any name would work.
     )",
     .fun = [](EvalState & state, const PosIdx pos, Value * * args, Value & v)
     {
@@ -585,7 +597,7 @@ struct CompareValues
                 case nFloat:
                     return v1->fpoint < v2->fpoint;
                 case nString:
-                    return strcmp(v1->string.s, v2->string.s) < 0;
+                    return v1->string_view().compare(v2->string_view()) < 0;
                 case nPath:
                     return strcmp(v1->_path, v2->_path) < 0;
                 case nList:
@@ -977,7 +989,7 @@ static void prim_trace(EvalState & state, const PosIdx pos, Value * * args, Valu
 {
     state.forceValue(*args[0], pos);
     if (args[0]->type() == nString)
-        printError("trace: %1%", args[0]->string.s);
+        printError("trace: %1%", args[0]->string_view());
     else
         printError("trace: %1%", printValue(state, *args[0]));
     state.forceValue(*args[1], pos);
@@ -1247,17 +1259,18 @@ drvName, Bindings * attrs, Value & v)
                 state.store->computeFSClosure(d.drvPath, refs);
                 for (auto & j : refs) {
                     drv.inputSrcs.insert(j);
-                    if (j.isDerivation())
-                        drv.inputDrvs[j] = state.store->readDerivation(j).outputNames();
+                    if (j.isDerivation()) {
+                        drv.inputDrvs.map[j].value = state.store->readDerivation(j).outputNames();
+                    }
                 }
             },
             [&](const NixStringContextElem::Built & b) {
-                drv.inputDrvs[b.drvPath].insert(b.output);
+                drv.inputDrvs.ensureSlot(*b.drvPath).value.insert(b.output);
             },
             [&](const NixStringContextElem::Opaque & o) {
                 drv.inputSrcs.insert(o.path);
             },
-        }, c.raw());
+        }, c.raw);
     }
 
     /* Do we have all required attributes? */
@@ -1326,13 +1339,13 @@ drvName, Bindings * attrs, Value & v)
             if (isImpure)
                 drv.outputs.insert_or_assign(i,
                     DerivationOutput::Impure {
-                        .method = method.raw,
+                        .method = method,
                         .hashType = ht,
                     });
             else
                 drv.outputs.insert_or_assign(i,
                     DerivationOutput::CAFloating {
-                        .method = method.raw,
+                        .method = method,
                         .hashType = ht,
                     });
         }
@@ -1365,7 +1378,7 @@ drvName, Bindings * attrs, Value & v)
                 drv.env[i] = state.store->printStorePath(outPath);
                 drv.outputs.insert_or_assign(
                     i,
-                    DerivationOutputInputAddressed {
+                    DerivationOutput::InputAddressed {
                         .path = std::move(outPath),
                     });
             }
@@ -1373,7 +1386,7 @@ drvName, Bindings * attrs, Value & v)
             ;
         case DrvHash::Kind::Deferred:
             for (auto & i : outputs) {
-                drv.outputs.insert_or_assign(i, DerivationOutputDeferred {});
+                drv.outputs.insert_or_assign(i, DerivationOutput::Deferred {});
             }
         }
     }
@@ -1512,15 +1525,27 @@ static RegisterPrimOp primop_storePath({
 
 static void prim_pathExists(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
+    auto & arg = *args[0];
+
     /* We don’t check the path right now, because we don’t want to
        throw if the path isn’t allowed, but just return false (and we
        can’t just catch the exception here because we still want to
-       throw if something in the evaluation of `*args[0]` tries to
+       throw if something in the evaluation of `arg` tries to
        access an unauthorized path). */
-    auto path = realisePath(state, pos, *args[0], { .checkForPureEval = false });
+    auto path = realisePath(state, pos, arg, { .checkForPureEval = false });
+
+    /* SourcePath doesn't know about trailing slash. */
+    auto mustBeDir = arg.type() == nString
+        && (arg.string_view().ends_with("/")
+            || arg.string_view().ends_with("/."));
 
     try {
-        v.mkBool(state.checkSourcePath(path).pathExists());
+        auto checked = state.checkSourcePath(path);
+        auto exists = checked.pathExists();
+        if (exists && mustBeDir) {
+            exists = checked.lstat().type == InputAccessor::tDirectory;
+        }
+        v.mkBool(exists);
     } catch (SysError & e) {
         /* Don't give away info from errors while canonicalising
            ‘path’ in restricted mode. */
@@ -1673,13 +1698,14 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value * * args, V
 
 static RegisterPrimOp primop_findFile(PrimOp {
     .name = "__findFile",
-    .args = {"search path", "lookup path"},
+    .args = {"search-path", "lookup-path"},
     .doc = R"(
-      Look up the given path with the given search path.
+      Find *lookup-path* in *search-path*.
 
-      A search path is represented list of [attribute sets](./values.md#attribute-set) with two attributes, `prefix`, and `path`.
-      `prefix` is a relative path.
-      `path` denotes a file system location; the exact syntax depends on the command line interface.
+      A search path is represented list of [attribute sets](./values.md#attribute-set) with two attributes:
+      - `prefix` is a relative path.
+      - `path` denotes a file system location
+      The exact syntax depends on the command line interface.
 
       Examples of search path attribute sets:
 
@@ -1697,15 +1723,14 @@ static RegisterPrimOp primop_findFile(PrimOp {
         }
         ```
 
-      The lookup algorithm checks each entry until a match is found, returning a [path value](@docroot@/language/values.html#type-path) of the match.
+      The lookup algorithm checks each entry until a match is found, returning a [path value](@docroot@/language/values.html#type-path) of the match:
 
-      This is the process for each entry:
-      If the lookup path matches `prefix`, then the remainder of the lookup path (the "suffix") is searched for within the directory denoted by `patch`.
-      Note that the `path` may need to be downloaded at this point to look inside.
-      If the suffix is found inside that directory, then the entry is a match;
-      the combined absolute path of the directory (now downloaded if need be) and the suffix is returned.
+      - If *lookup-path* matches `prefix`, then the remainder of *lookup-path* (the "suffix") is searched for within the directory denoted by `path`.
+        Note that the `path` may need to be downloaded at this point to look inside.
+      - If the suffix is found inside that directory, then the entry is a match.
+        The combined absolute path of the directory (now downloaded if need be) and the suffix is returned.
 
-      The syntax
+      [Lookup path](@docroot@/language/constructs/lookup-path.md) expressions can be [desugared](https://en.wikipedia.org/wiki/Syntactic_sugar) using this and [`builtins.nixPath`](@docroot@/language/builtin-constants.md#builtins-nixPath):
 
       ```nix
       <nixpkgs>
@@ -1830,6 +1855,45 @@ static RegisterPrimOp primop_readDir({
     .fun = prim_readDir,
 });
 
+/* Extend single element string context with another output. */
+static void prim_outputOf(EvalState & state, const PosIdx pos, Value * * args, Value & v)
+{
+    SingleDerivedPath drvPath = state.coerceToSingleDerivedPath(pos, *args[0], "while evaluating the first argument to builtins.outputOf");
+
+    OutputNameView outputName = state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument to builtins.outputOf");
+
+    state.mkSingleDerivedPathString(
+        SingleDerivedPath::Built {
+            .drvPath = make_ref<SingleDerivedPath>(drvPath),
+            .output = std::string { outputName },
+        },
+        v);
+}
+
+static RegisterPrimOp primop_outputOf({
+    .name = "__outputOf",
+    .args = {"derivation-reference", "output-name"},
+    .doc = R"(
+      Return the output path of a derivation, literally or using a placeholder if needed.
+
+      If the derivation has a statically-known output path (i.e. the derivation output is input-addressed, or fixed content-addresed), the output path will just be returned.
+      But if the derivation is content-addressed or if the derivation is itself not-statically produced (i.e. is the output of another derivation), a placeholder will be returned instead.
+
+      *`derivation reference`* must be a string that may contain a regular store path to a derivation, or may be a placeholder reference. If the derivation is produced by a derivation, you must explicitly select `drv.outPath`.
+      This primop can be chained arbitrarily deeply.
+      For instance,
+      ```nix
+      builtins.outputOf
+        (builtins.outputOf myDrv "out)
+        "out"
+      ```
+      will return a placeholder for the output of the output of `myDrv`.
+
+      This primop corresponds to the `^` sigil for derivable paths, e.g. as part of installable syntax on the command line.
+    )",
+    .fun = prim_outputOf,
+    .experimentalFeature = Xp::DynamicDerivations,
+});
 
 /*************************************************************
  * Creating files
@@ -2007,7 +2071,7 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value * * args, Val
     StorePathSet refs;
 
     for (auto c : context) {
-        if (auto p = std::get_if<NixStringContextElem::Opaque>(&c))
+        if (auto p = std::get_if<NixStringContextElem::Opaque>(&c.raw))
             refs.insert(p->path);
         else
             state.debugThrowLastTrace(EvalError({
@@ -2345,7 +2409,7 @@ static void prim_attrNames(EvalState & state, const PosIdx pos, Value * * args, 
         (v.listElems()[n++] = state.allocValue())->mkString(state.symbols[i.name]);
 
     std::sort(v.listElems(), v.listElems() + n,
-              [](Value * v1, Value * v2) { return strcmp(v1->string.s, v2->string.s) < 0; });
+              [](Value * v1, Value * v2) { return v1->string_view().compare(v2->string_view()) < 0; });
 }
 
 static RegisterPrimOp primop_attrNames({
@@ -2486,7 +2550,7 @@ static void prim_removeAttrs(EvalState & state, const PosIdx pos, Value * * args
     names.reserve(args[1]->listSize());
     for (auto elem : args[1]->listItems()) {
         state.forceStringNoCtx(*elem, pos, "while evaluating the values of the second argument passed to builtins.removeAttrs");
-        names.emplace_back(state.symbols.create(elem->string.s), nullptr);
+        names.emplace_back(state.symbols.create(elem->string_view()), nullptr);
     }
     std::sort(names.begin(), names.end());
 
@@ -2936,7 +3000,7 @@ static RegisterPrimOp primop_tail({
     .name = "__tail",
     .args = {"list"},
     .doc = R"(
-      Return the second to last elements of a list; abort evaluation if
+      Return the list without its first item; abort evaluation if
       the argument isn’t a list or is an empty list.
 
       > **Warning**
@@ -4332,9 +4396,9 @@ void EvalState::createBaseEnv()
     addConstant("__nixPath", v, {
         .type = nList,
         .doc = R"(
-          The search path used to resolve angle bracket path lookups.
+          List of search path entries used to resolve [lookup paths](@docroot@/language/constructs/lookup-path.md).
 
-          Angle bracket expressions can be
+          Lookup path expressions can be
           [desugared](https://en.wikipedia.org/wiki/Syntactic_sugar)
           using this and
           [`builtins.findFile`](./builtins.html#builtins-findFile):

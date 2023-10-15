@@ -544,9 +544,9 @@ struct CmdFlakeCheck : FlakeCommand
                                             *attr2.value, attr2.pos);
                                         if (drvPath && attr_name == settings.thisSystem.get()) {
                                             drvPaths.push_back(DerivedPath::Built {
-                                                    .drvPath = *drvPath,
-                                                        .outputs = OutputsSpec::All { },
-                                                        });
+                                                .drvPath = makeConstantStorePathRef(*drvPath),
+                                                .outputs = OutputsSpec::All { },
+                                            });
                                         }
                                     }
                                 }
@@ -778,7 +778,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto [templateFlakeRef, templateName] = parseFlakeRefWithFragment(templateUrl, absPath("."));
 
         auto installable = InstallableFlake(nullptr,
-            evalState, std::move(templateFlakeRef), templateName, DefaultOutputs(),
+            evalState, std::move(templateFlakeRef), templateName, ExtendedOutputsSpec::Default(),
             defaultTemplateAttrPaths,
             defaultTemplateAttrPathsPrefixes,
             lockFlags);
@@ -1342,6 +1342,8 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
             auto res = nlohmann::json::object();
             res["storePath"] = store->printStorePath(tree.storePath);
             res["hash"] = hash.to_string(SRI, true);
+            res["original"] = fetchers::attrsToJSON(resolvedRef.toAttrs());
+            res["locked"] = fetchers::attrsToJSON(lockedRef.toAttrs());
             logger->cout(res.dump());
         } else {
             notice("Downloaded '%s' to '%s' (hash '%s').",

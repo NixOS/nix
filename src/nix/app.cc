@@ -20,13 +20,22 @@ StringPairs resolveRewrites(
     const std::vector<BuiltPathWithResult> & dependencies)
 {
     StringPairs res;
-    for (auto & dep : dependencies)
-        if (auto drvDep = std::get_if<BuiltPathBuilt>(&dep.path))
-            for (auto & [ outputName, outputPath ] : drvDep->outputs)
-                res.emplace(
-                    DownstreamPlaceholder::unknownCaOutput(drvDep->drvPath, outputName).render(),
-                    store.printStorePath(outputPath)
-                );
+    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
+        for (auto & dep : dependencies) {
+            if (auto drvDep = std::get_if<BuiltPathBuilt>(&dep.path)) {
+                for (auto & [ outputName, outputPath ] : drvDep->outputs) {
+                    res.emplace(
+                        DownstreamPlaceholder::fromSingleDerivedPathBuilt(
+                            SingleDerivedPath::Built {
+                                .drvPath = make_ref<SingleDerivedPath>(drvDep->drvPath->discardOutputPath()),
+                                .output = outputName,
+                            }).render(),
+                        store.printStorePath(outputPath)
+                    );
+                }
+            }
+        }
+    }
     return res;
 }
 
@@ -64,7 +73,7 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
                 [&](const NixStringContextElem::DrvDeep & d) -> DerivedPath {
                     /* We want all outputs of the drv */
                     return DerivedPath::Built {
-                        .drvPath = d.drvPath,
+                        .drvPath = makeConstantStorePathRef(d.drvPath),
                         .outputs = OutputsSpec::All {},
                     };
                 },
@@ -79,7 +88,7 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
                         .path = o.path,
                     };
                 },
-            }, c.raw()));
+            }, c.raw));
         }
 
         return UnresolvedApp{App {
@@ -105,7 +114,7 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
         auto program = outPath + "/bin/" + mainProgram;
         return UnresolvedApp { App {
             .context = { DerivedPath::Built {
-                .drvPath = drvPath,
+                .drvPath = makeConstantStorePathRef(drvPath),
                 .outputs = OutputsSpec::Names { outputName },
             } },
             .program = program,

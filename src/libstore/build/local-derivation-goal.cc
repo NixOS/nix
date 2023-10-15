@@ -178,6 +178,8 @@ void LocalDerivationGoal::tryLocalBuild()
         return;
     }
 
+    assert(derivationType);
+
     /* Are we doing a chroot build? */
     {
         auto noChroot = parsedDrv->getBoolAttr("__noChroot");
@@ -195,7 +197,7 @@ void LocalDerivationGoal::tryLocalBuild()
         else if (settings.sandboxMode == smDisabled)
             useChroot = false;
         else if (settings.sandboxMode == smRelaxed)
-            useChroot = derivationType.isSandboxed() && !noChroot;
+            useChroot = derivationType->isSandboxed() && !noChroot;
     }
 
     auto & localStore = getLocalStore();
@@ -689,7 +691,7 @@ void LocalDerivationGoal::startBuilder()
                 "nogroup:x:65534:\n", sandboxGid()));
 
         /* Create /etc/hosts with localhost entry. */
-        if (derivationType.isSandboxed())
+        if (derivationType->isSandboxed())
             writeFile(chrootRootDir + "/etc/hosts", "127.0.0.1 localhost\n::1 localhost\n");
 
         /* Make the closure of the inputs available in the chroot,
@@ -893,7 +895,7 @@ void LocalDerivationGoal::startBuilder()
            us.
         */
 
-        if (derivationType.isSandboxed())
+        if (derivationType->isSandboxed())
             privateNetwork = true;
 
         userNamespaceSync.create();
@@ -1121,7 +1123,7 @@ void LocalDerivationGoal::initEnv()
        derivation, tell the builder, so that for instance `fetchurl'
        can skip checking the output.  On older Nixes, this environment
        variable won't be set, so `fetchurl' will do the check. */
-    if (derivationType.isFixed()) env["NIX_OUTPUT_CHECKED"] = "1";
+    if (derivationType->isFixed()) env["NIX_OUTPUT_CHECKED"] = "1";
 
     /* *Only* if this is a fixed-output derivation, propagate the
        values of the environment variables specified in the
@@ -1132,9 +1134,19 @@ void LocalDerivationGoal::initEnv()
        to the builder is generally impure, but the output of
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
-    if (!derivationType.isSandboxed()) {
-        for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings()))
-            env[i] = getEnv(i).value_or("");
+    if (!derivationType->isSandboxed()) {
+        auto & impureEnv = settings.impureEnv.get();
+        if (!impureEnv.empty())
+            experimentalFeatureSettings.require(Xp::ConfigurableImpureEnv);
+
+        for (auto & i : parsedDrv->getStringsAttr("impureEnvVars").value_or(Strings())) {
+            auto envVar = impureEnv.find(i);
+            if (envVar != impureEnv.end()) {
+                env[i] = envVar->second;
+            } else {
+                env[i] = getEnv(i).value_or("");
+            }
+        }
     }
 
     /* Currently structured log messages piggyback on stderr, but we
@@ -1172,6 +1184,19 @@ void LocalDerivationGoal::writeStructuredAttrs()
 }
 
 
+static StorePath pathPartOfReq(const SingleDerivedPath & req)
+{
+    return std::visit(overloaded {
+        [&](const SingleDerivedPath::Opaque & bo) {
+            return bo.path;
+        },
+        [&](const SingleDerivedPath::Built & bfd)  {
+            return pathPartOfReq(*bfd.drvPath);
+        },
+    }, req.raw());
+}
+
+
 static StorePath pathPartOfReq(const DerivedPath & req)
 {
     return std::visit(overloaded {
@@ -1179,7 +1204,7 @@ static StorePath pathPartOfReq(const DerivedPath & req)
             return bo.path;
         },
         [&](const DerivedPath::Built & bfd)  {
-            return bfd.drvPath;
+            return pathPartOfReq(*bfd.drvPath);
         },
     }, req.raw());
 }
@@ -1784,7 +1809,7 @@ void LocalDerivationGoal::runChild()
             /* Fixed-output derivations typically need to access the
                network, so give them access to /etc/resolv.conf and so
                on. */
-            if (!derivationType.isSandboxed()) {
+            if (!derivationType->isSandboxed()) {
                 // Only use nss functions to resolve hosts and
                 // services. Don’t use it for anything else that may
                 // be configured for this system. This limits the
@@ -2035,7 +2060,7 @@ void LocalDerivationGoal::runChild()
                     #include "sandbox-defaults.sb"
                     ;
 
-                if (!derivationType.isSandboxed())
+                if (!derivationType->isSandboxed())
                     sandboxProfile +=
                         #include "sandbox-network.sb"
                         ;
@@ -2307,7 +2332,6 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
         bool discardReferences = false;
         if (auto structuredAttrs = parsedDrv->getStructuredAttrs()) {
             if (auto udr = get(*structuredAttrs, "unsafeDiscardReferences")) {
-                experimentalFeatureSettings.require(Xp::DiscardReferences);
                 if (auto output = get(*udr, outputName)) {
                     if (!output->is_boolean())
                         throw Error("attribute 'unsafeDiscardReferences.\"%s\"' of derivation '%s' must be a Boolean", outputName, drvPath.to_string());
@@ -2587,7 +2611,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 });
             },
 
-        }, output->raw());
+        }, output->raw);
 
         /* FIXME: set proper permissions in restorePath() so
             we don't have to do another traversal. */
@@ -2941,7 +2965,7 @@ bool LocalDerivationGoal::isReadDesc(int fd)
 }
 
 
-StorePath LocalDerivationGoal::makeFallbackPath(std::string_view outputName)
+StorePath LocalDerivationGoal::makeFallbackPath(OutputNameView outputName)
 {
     return worker.store.makeStorePath(
         "rewrite:" + std::string(drvPath.to_string()) + ":name:" + std::string(outputName),

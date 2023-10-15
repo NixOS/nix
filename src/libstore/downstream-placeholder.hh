@@ -3,6 +3,7 @@
 
 #include "hash.hh"
 #include "path.hh"
+#include "derived-path.hh"
 
 namespace nix {
 
@@ -52,10 +53,13 @@ public:
      *
      * The derivation itself is known (we have a store path for it), but
      * the output doesn't yet have a known store path.
+     *
+     * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
     static DownstreamPlaceholder unknownCaOutput(
         const StorePath & drvPath,
-        std::string_view outputName);
+        OutputNameView outputName,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     /**
      * Create a placehold for the output of an unknown derivation.
@@ -68,7 +72,19 @@ public:
      */
     static DownstreamPlaceholder unknownDerivation(
         const DownstreamPlaceholder & drvPlaceholder,
-        std::string_view outputName,
+        OutputNameView outputName,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+    /**
+     * Convenience constructor that handles both cases (unknown
+     * content-addressed output and unknown derivation), delegating as
+     * needed to `unknownCaOutput` and `unknownDerivation`.
+     *
+     * Recursively builds up a placeholder from a
+     * `SingleDerivedPath::Built.drvPath` chain.
+     */
+    static DownstreamPlaceholder fromSingleDerivedPathBuilt(
+        const SingleDerivedPath::Built & built,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 };
 

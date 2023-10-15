@@ -31,7 +31,7 @@ struct GitArchiveInputScheme : InputScheme
 
     virtual std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const = 0;
 
-    std::optional<Input> inputFromURL(const ParsedURL & url) const override
+    std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
     {
         if (url.scheme != type()) return {};
 

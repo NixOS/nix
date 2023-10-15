@@ -132,6 +132,8 @@ subcommands, these are `packages.`*system*,
 attributes `packages.x86_64-linux.hello`,
 `legacyPackages.x86_64-linux.hello` and `hello`.
 
+If *attrpath* begins with `.` then no prefixes or defaults are attempted. This allows the form *flakeref*[`#.`*attrpath*], such as `github:NixOS/nixpkgs#.lib.fakeSha256` to avoid a search of `packages.*system*.lib.fakeSha256`
+
 ### Store path
 
 Example: `/nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10`

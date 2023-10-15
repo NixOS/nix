@@ -1196,6 +1196,15 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     if (checkSigs && pathInfoIsUntrusted(info))
         throw Error("cannot add path '%s' because it lacks a signature by a trusted key", printStorePath(info.path));
 
+    /* In case we are not interested in reading the NAR: discard it. */
+    bool narRead = false;
+    Finally cleanup = [&]() {
+        if (!narRead) {
+            ParseSink sink;
+            parseDump(sink, source);
+        }
+    };
+
     addTempRoot(info.path);
 
     if (repair || !isValidPath(info.path)) {
@@ -1220,6 +1229,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             TeeSource wrapperSource { source, hashSink };
 
+            narRead = true;
             restorePath(realPath, wrapperSource);
 
             auto hashResult = hashSink.finish();
@@ -1499,17 +1509,33 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
     auto fdGCLock = openGCLock();
     FdLock gcLock(fdGCLock.get(), ltRead, true, "waiting for the big garbage collector lock...");
 
-    StringSet store;
-    for (auto & i : readDirectory(realStoreDir)) store.insert(i.name);
-
-    /* Check whether all valid paths actually exist. */
-    printInfo("checking path existence...");
-
     StorePathSet validPaths;
-    StorePathSet done;
 
-    for (auto & i : queryAllValidPaths())
-        verifyPath(i, store, done, validPaths, repair, errors);
+    {
+        StorePathSet storePathsInStoreDir;
+        /* Why aren't we using `queryAllValidPaths`? Because that would
+           tell us about all the paths than the database knows about. Here we
+           want to know about all the store paths in the store directory,
+           regardless of what the database thinks.
+
+           We will end up cross-referencing these two sources of truth (the
+           database and the filesystem) in the loop below, in order to catch
+           invalid states.
+         */
+        for (auto & i : readDirectory(realStoreDir)) {
+            try {
+                storePathsInStoreDir.insert({i.name});
+            } catch (BadStorePath &) { }
+        }
+
+        /* Check whether all valid paths actually exist. */
+        printInfo("checking path existence...");
+
+        StorePathSet done;
+
+        for (auto & i : queryAllValidPaths())
+            verifyPath(i, storePathsInStoreDir, done, validPaths, repair, errors);
+    }
 
     /* Optionally, check the content hashes (slow). */
     if (checkContents) {
@@ -1595,21 +1621,21 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 }
 
 
-void LocalStore::verifyPath(const StorePath & path, const StringSet & store,
+void LocalStore::verifyPath(const StorePath & path, const StorePathSet & storePathsInStoreDir,
     StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors)
 {
     checkInterrupt();
 
     if (!done.insert(path).second) return;
 
-    if (!store.count(std::string(path.to_string()))) {
+    if (!storePathsInStoreDir.count(path)) {
         /* Check any referrers first.  If we can invalidate them
            first, then we can invalidate this path as well. */
         bool canInvalidate = true;
         StorePathSet referrers; queryReferrers(path, referrers);
         for (auto & i : referrers)
             if (i != path) {
-                verifyPath(i, store, done, validPaths, repair, errors);
+                verifyPath(i, storePathsInStoreDir, done, validPaths, repair, errors);
                 if (validPaths.count(i))
                     canInvalidate = false;
             }

@@ -114,7 +114,7 @@ void Value::print(const SymbolTable &symbols, std::ostream &str,
         printLiteralBool(str, boolean);
         break;
     case tString:
-        printLiteralString(str, string.s);
+        printLiteralString(str, string_view());
         break;
     case tPath:
         str << path().to_string(); // !!! escaping?
@@ -339,7 +339,7 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
         Value nameValue;
         name.expr->eval(state, env, nameValue);
         state.forceStringNoCtx(nameValue, noPos, "while evaluating an attribute name");
-        return state.symbols.create(nameValue.string.s);
+        return state.symbols.create(nameValue.string_view());
     }
 }
 
@@ -527,9 +527,9 @@ EvalState::EvalState(
     /* Initialise the Nix expression search path. */
     if (!evalSettings.pureEval) {
         for (auto & i : _searchPath.elements)
-            addToSearchPath(SearchPath::Elem {i});
+            searchPath.elements.emplace_back(SearchPath::Elem {i});
         for (auto & i : evalSettings.nixPath.get())
-            addToSearchPath(SearchPath::Elem::parse(i));
+            searchPath.elements.emplace_back(SearchPath::Elem::parse(i));
     }
 
     if (evalSettings.restrictEval || evalSettings.pureEval) {
@@ -1027,23 +1027,67 @@ void EvalState::mkStorePathString(const StorePath & p, Value & v)
 }
 
 
+std::string EvalState::mkOutputStringRaw(
+    const SingleDerivedPath::Built & b,
+    std::optional<StorePath> optStaticOutputPath,
+    const ExperimentalFeatureSettings & xpSettings)
+{
+    /* In practice, this is testing for the case of CA derivations, or
+       dynamic derivations. */
+    return optStaticOutputPath
+        ? store->printStorePath(*std::move(optStaticOutputPath))
+        /* Downstream we would substitute this for an actual path once
+           we build the floating CA derivation */
+        : DownstreamPlaceholder::fromSingleDerivedPathBuilt(b, xpSettings).render();
+}
+
+
 void EvalState::mkOutputString(
     Value & value,
-    const StorePath & drvPath,
-    const std::string outputName,
-    std::optional<StorePath> optOutputPath)
+    const SingleDerivedPath::Built & b,
+    std::optional<StorePath> optStaticOutputPath,
+    const ExperimentalFeatureSettings & xpSettings)
 {
     value.mkString(
-        optOutputPath
-            ? store->printStorePath(*std::move(optOutputPath))
-            /* Downstream we would substitute this for an actual path once
-               we build the floating CA derivation */
-            : DownstreamPlaceholder::unknownCaOutput(drvPath, outputName).render(),
+        mkOutputStringRaw(b, optStaticOutputPath, xpSettings),
+        NixStringContext { b });
+}
+
+
+std::string EvalState::mkSingleDerivedPathStringRaw(
+    const SingleDerivedPath & p)
+{
+    return std::visit(overloaded {
+        [&](const SingleDerivedPath::Opaque & o) {
+            return store->printStorePath(o.path);
+        },
+        [&](const SingleDerivedPath::Built & b) {
+            auto optStaticOutputPath = std::visit(overloaded {
+                [&](const SingleDerivedPath::Opaque & o) {
+                    auto drv = store->readDerivation(o.path);
+                    auto i = drv.outputs.find(b.output);
+                    if (i == drv.outputs.end())
+                        throw Error("derivation '%s' does not have output '%s'", b.drvPath->to_string(*store), b.output);
+                    return i->second.path(*store, drv.name, b.output);
+                },
+                [&](const SingleDerivedPath::Built & o) -> std::optional<StorePath> {
+                    return std::nullopt;
+                },
+            }, b.drvPath->raw());
+            return mkOutputStringRaw(b, optStaticOutputPath);
+        }
+    }, p.raw());
+}
+
+
+void EvalState::mkSingleDerivedPathString(
+    const SingleDerivedPath & p,
+    Value & v)
+{
+    v.mkString(
+        mkSingleDerivedPathStringRaw(p),
         NixStringContext {
-            NixStringContextElem::Built {
-                .drvPath = drvPath,
-                .output = outputName,
-            }
+            std::visit([](auto && v) -> NixStringContextElem { return v; }, p),
         });
 }
 
@@ -1299,7 +1343,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         if (nameVal.type() == nNull)
             continue;
         state.forceStringNoCtx(nameVal, i.pos, "while evaluating the name of a dynamic attribute");
-        auto nameSym = state.symbols.create(nameVal.string.s);
+        auto nameSym = state.symbols.create(nameVal.string_view());
         Bindings::iterator j = v.attrs->find(nameSym);
         if (j != v.attrs->end())
             state.error("dynamic attribute '%1%' already defined at %2%", state.symbols[nameSym], state.positions[j->pos]).atPos(i.pos).withFrame(env, *this).debugThrow<EvalError>();
@@ -2111,7 +2155,7 @@ std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string
         forceValue(v, pos);
         if (v.type() != nString)
             error("value is %1% while a string was expected", showType(v)).debugThrow<TypeError>();
-        return v.string.s;
+        return v.string_view();
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
         throw;
@@ -2138,8 +2182,8 @@ std::string_view EvalState::forceString(Value & v, NixStringContext & context, c
 std::string_view EvalState::forceStringNoCtx(Value & v, const PosIdx pos, std::string_view errorCtx)
 {
     auto s = forceString(v, pos, errorCtx);
-    if (v.string.context) {
-        error("the string '%1%' is not allowed to refer to a store path (such as '%2%')", v.string.s, v.string.context[0]).withTrace(pos, errorCtx).debugThrow<EvalError>();
+    if (v.context()) {
+        error("the string '%1%' is not allowed to refer to a store path (such as '%2%')", v.string_view(), v.context()[0]).withTrace(pos, errorCtx).debugThrow<EvalError>();
     }
     return s;
 }
@@ -2152,7 +2196,7 @@ bool EvalState::isDerivation(Value & v)
     if (i == v.attrs->end()) return false;
     forceValue(*i->value, i->pos);
     if (i->value->type() != nString) return false;
-    return strcmp(i->value->string.s, "derivation") == 0;
+    return i->value->string_view().compare("derivation") == 0;
 }
 
 
@@ -2184,7 +2228,7 @@ BackedStringView EvalState::coerceToString(
 
     if (v.type() == nString) {
         copyContext(v, context);
-        return std::string_view(v.string.s);
+        return v.string_view();
     }
 
     if (v.type() == nPath) {
@@ -2298,7 +2342,7 @@ StorePath EvalState::coerceToStorePath(const PosIdx pos, Value & v, NixStringCon
 }
 
 
-std::pair<DerivedPath, std::string_view> EvalState::coerceToDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx)
+std::pair<SingleDerivedPath, std::string_view> EvalState::coerceToSingleDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx)
 {
     NixStringContext context;
     auto s = forceString(v, context, pos, errorCtx);
@@ -2309,23 +2353,18 @@ std::pair<DerivedPath, std::string_view> EvalState::coerceToDerivedPathUnchecked
             s, csize)
             .withTrace(pos, errorCtx).debugThrow<EvalError>();
     auto derivedPath = std::visit(overloaded {
-        [&](NixStringContextElem::Opaque && o) -> DerivedPath {
-            return DerivedPath::Opaque {
-                .path = std::move(o.path),
-            };
+        [&](NixStringContextElem::Opaque && o) -> SingleDerivedPath {
+            return std::move(o);
         },
-        [&](NixStringContextElem::DrvDeep &&) -> DerivedPath {
+        [&](NixStringContextElem::DrvDeep &&) -> SingleDerivedPath {
             error(
                 "string '%s' has a context which refers to a complete source and binary closure. This is not supported at this time",
                 s).withTrace(pos, errorCtx).debugThrow<EvalError>();
         },
-        [&](NixStringContextElem::Built && b) -> DerivedPath {
-            return DerivedPath::Built {
-                .drvPath = std::move(b.drvPath),
-                .outputs = OutputsSpec::Names { std::move(b.output) },
-            };
+        [&](NixStringContextElem::Built && b) -> SingleDerivedPath {
+            return std::move(b);
         },
-    }, ((NixStringContextElem &&) *context.begin()).raw());
+    }, ((NixStringContextElem &&) *context.begin()).raw);
     return {
         std::move(derivedPath),
         std::move(s),
@@ -2333,41 +2372,29 @@ std::pair<DerivedPath, std::string_view> EvalState::coerceToDerivedPathUnchecked
 }
 
 
-DerivedPath EvalState::coerceToDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx)
+SingleDerivedPath EvalState::coerceToSingleDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx)
 {
-    auto [derivedPath, s_] = coerceToDerivedPathUnchecked(pos, v, errorCtx);
+    auto [derivedPath, s_] = coerceToSingleDerivedPathUnchecked(pos, v, errorCtx);
     auto s = s_;
-    std::visit(overloaded {
-        [&](const DerivedPath::Opaque & o) {
-            auto sExpected = store->printStorePath(o.path);
-            if (s != sExpected)
+    auto sExpected = mkSingleDerivedPathStringRaw(derivedPath);
+    if (s != sExpected) {
+        /* `std::visit` is used here just to provide a more precise
+           error message. */
+        std::visit(overloaded {
+            [&](const SingleDerivedPath::Opaque & o) {
                 error(
                     "path string '%s' has context with the different path '%s'",
                     s, sExpected)
                     .withTrace(pos, errorCtx).debugThrow<EvalError>();
-        },
-        [&](const DerivedPath::Built & b) {
-            // TODO need derived path with single output to make this
-            // total. Will add as part of RFC 92 work and then this is
-            // cleaned up.
-            auto output = *std::get<OutputsSpec::Names>(b.outputs).begin();
-
-            auto drv = store->readDerivation(b.drvPath);
-            auto i = drv.outputs.find(output);
-            if (i == drv.outputs.end())
-                throw Error("derivation '%s' does not have output '%s'", store->printStorePath(b.drvPath), output);
-            auto optOutputPath = i->second.path(*store, drv.name, output);
-            // This is testing for the case of CA derivations
-            auto sExpected = optOutputPath
-                ? store->printStorePath(*optOutputPath)
-                : DownstreamPlaceholder::unknownCaOutput(b.drvPath, output).render();
-            if (s != sExpected)
+            },
+            [&](const SingleDerivedPath::Built & b) {
                 error(
                     "string '%s' has context with the output '%s' from derivation '%s', but the string is not the right placeholder for this derivation output. It should be '%s'",
-                    s, output, store->printStorePath(b.drvPath), sExpected)
+                    s, b.output, b.drvPath->to_string(*store), sExpected)
                     .withTrace(pos, errorCtx).debugThrow<EvalError>();
-        }
-    }, derivedPath.raw());
+            }
+        }, derivedPath.raw());
+    }
     return derivedPath;
 }
 
@@ -2399,7 +2426,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
             return v1.boolean == v2.boolean;
 
         case nString:
-            return strcmp(v1.string.s, v2.string.s) == 0;
+            return v1.string_view().compare(v2.string_view()) == 0;
 
         case nPath:
             return strcmp(v1._path, v2._path) == 0;
@@ -2450,10 +2477,37 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
     }
 }
 
-void EvalState::printStats()
+bool EvalState::fullGC() {
+#if HAVE_BOEHMGC
+    GC_gcollect();
+    // Check that it ran. We might replace this with a version that uses more
+    // of the boehm API to get this reliably, at a maintenance cost.
+    // We use a 1K margin because technically this has a race condtion, but we
+    // probably won't encounter it in practice, because the CLI isn't concurrent
+    // like that.
+    return GC_get_bytes_since_gc() < 1024;
+#else
+    return false;
+#endif
+}
+
+void EvalState::maybePrintStats()
 {
     bool showStats = getEnv("NIX_SHOW_STATS").value_or("0") != "0";
 
+    if (showStats) {
+        // Make the final heap size more deterministic.
+#if HAVE_BOEHMGC
+        if (!fullGC()) {
+            warn("failed to perform a full GC before reporting stats");
+        }
+#endif
+        printStatistics();
+    }
+}
+
+void EvalState::printStatistics()
+{
     struct rusage buf;
     getrusage(RUSAGE_SELF, &buf);
     float cpuTime = buf.ru_utime.tv_sec + ((float) buf.ru_utime.tv_usec / 1000000);
@@ -2467,105 +2521,105 @@ void EvalState::printStats()
     GC_word heapSize, totalBytes;
     GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
 #endif
-    if (showStats) {
-        auto outPath = getEnv("NIX_SHOW_STATS_PATH").value_or("-");
-        std::fstream fs;
-        if (outPath != "-")
-            fs.open(outPath, std::fstream::out);
-        json topObj = json::object();
-        topObj["cpuTime"] = cpuTime;
-        topObj["envs"] = {
-            {"number", nrEnvs},
-            {"elements", nrValuesInEnvs},
-            {"bytes", bEnvs},
-        };
-        topObj["list"] = {
-            {"elements", nrListElems},
-            {"bytes", bLists},
-            {"concats", nrListConcats},
-        };
-        topObj["values"] = {
-            {"number", nrValues},
-            {"bytes", bValues},
-        };
-        topObj["symbols"] = {
-            {"number", symbols.size()},
-            {"bytes", symbols.totalSize()},
-        };
-        topObj["sets"] = {
-            {"number", nrAttrsets},
-            {"bytes", bAttrsets},
-            {"elements", nrAttrsInAttrsets},
-        };
-        topObj["sizes"] = {
-            {"Env", sizeof(Env)},
-            {"Value", sizeof(Value)},
-            {"Bindings", sizeof(Bindings)},
-            {"Attr", sizeof(Attr)},
-        };
-        topObj["nrOpUpdates"] = nrOpUpdates;
-        topObj["nrOpUpdateValuesCopied"] = nrOpUpdateValuesCopied;
-        topObj["nrThunks"] = nrThunks;
-        topObj["nrAvoided"] = nrAvoided;
-        topObj["nrLookups"] = nrLookups;
-        topObj["nrPrimOpCalls"] = nrPrimOpCalls;
-        topObj["nrFunctionCalls"] = nrFunctionCalls;
+
+    auto outPath = getEnv("NIX_SHOW_STATS_PATH").value_or("-");
+    std::fstream fs;
+    if (outPath != "-")
+        fs.open(outPath, std::fstream::out);
+    json topObj = json::object();
+    topObj["cpuTime"] = cpuTime;
+    topObj["envs"] = {
+        {"number", nrEnvs},
+        {"elements", nrValuesInEnvs},
+        {"bytes", bEnvs},
+    };
+    topObj["nrExprs"] = Expr::nrExprs;
+    topObj["list"] = {
+        {"elements", nrListElems},
+        {"bytes", bLists},
+        {"concats", nrListConcats},
+    };
+    topObj["values"] = {
+        {"number", nrValues},
+        {"bytes", bValues},
+    };
+    topObj["symbols"] = {
+        {"number", symbols.size()},
+        {"bytes", symbols.totalSize()},
+    };
+    topObj["sets"] = {
+        {"number", nrAttrsets},
+        {"bytes", bAttrsets},
+        {"elements", nrAttrsInAttrsets},
+    };
+    topObj["sizes"] = {
+        {"Env", sizeof(Env)},
+        {"Value", sizeof(Value)},
+        {"Bindings", sizeof(Bindings)},
+        {"Attr", sizeof(Attr)},
+    };
+    topObj["nrOpUpdates"] = nrOpUpdates;
+    topObj["nrOpUpdateValuesCopied"] = nrOpUpdateValuesCopied;
+    topObj["nrThunks"] = nrThunks;
+    topObj["nrAvoided"] = nrAvoided;
+    topObj["nrLookups"] = nrLookups;
+    topObj["nrPrimOpCalls"] = nrPrimOpCalls;
+    topObj["nrFunctionCalls"] = nrFunctionCalls;
 #if HAVE_BOEHMGC
-        topObj["gc"] = {
-            {"heapSize", heapSize},
-            {"totalBytes", totalBytes},
-        };
+    topObj["gc"] = {
+        {"heapSize", heapSize},
+        {"totalBytes", totalBytes},
+    };
 #endif
 
-        if (countCalls) {
-            topObj["primops"] = primOpCalls;
-            {
-                auto& list = topObj["functions"];
-                list = json::array();
-                for (auto & [fun, count] : functionCalls) {
-                    json obj = json::object();
-                    if (fun->name)
-                        obj["name"] = (std::string_view) symbols[fun->name];
-                    else
-                        obj["name"] = nullptr;
-                    if (auto pos = positions[fun->pos]) {
-                        if (auto path = std::get_if<SourcePath>(&pos.origin))
-                            obj["file"] = path->to_string();
-                        obj["line"] = pos.line;
-                        obj["column"] = pos.column;
-                    }
-                    obj["count"] = count;
-                    list.push_back(obj);
+    if (countCalls) {
+        topObj["primops"] = primOpCalls;
+        {
+            auto& list = topObj["functions"];
+            list = json::array();
+            for (auto & [fun, count] : functionCalls) {
+                json obj = json::object();
+                if (fun->name)
+                    obj["name"] = (std::string_view) symbols[fun->name];
+                else
+                    obj["name"] = nullptr;
+                if (auto pos = positions[fun->pos]) {
+                    if (auto path = std::get_if<SourcePath>(&pos.origin))
+                        obj["file"] = path->to_string();
+                    obj["line"] = pos.line;
+                    obj["column"] = pos.column;
                 }
-            }
-            {
-                auto list = topObj["attributes"];
-                list = json::array();
-                for (auto & i : attrSelects) {
-                    json obj = json::object();
-                    if (auto pos = positions[i.first]) {
-                        if (auto path = std::get_if<SourcePath>(&pos.origin))
-                            obj["file"] = path->to_string();
-                        obj["line"] = pos.line;
-                        obj["column"] = pos.column;
-                    }
-                    obj["count"] = i.second;
-                    list.push_back(obj);
-                }
+                obj["count"] = count;
+                list.push_back(obj);
             }
         }
+        {
+            auto list = topObj["attributes"];
+            list = json::array();
+            for (auto & i : attrSelects) {
+                json obj = json::object();
+                if (auto pos = positions[i.first]) {
+                    if (auto path = std::get_if<SourcePath>(&pos.origin))
+                        obj["file"] = path->to_string();
+                    obj["line"] = pos.line;
+                    obj["column"] = pos.column;
+                }
+                obj["count"] = i.second;
+                list.push_back(obj);
+            }
+        }
+    }
 
-        if (getEnv("NIX_SHOW_SYMBOLS").value_or("0") != "0") {
-            // XXX: overrides earlier assignment
-            topObj["symbols"] = json::array();
-            auto &list = topObj["symbols"];
-            symbols.dump([&](const std::string & s) { list.emplace_back(s); });
-        }
-        if (outPath == "-") {
-            std::cerr << topObj.dump(2) << std::endl;
-        } else {
-            fs << topObj.dump(2) << std::endl;
-        }
+    if (getEnv("NIX_SHOW_SYMBOLS").value_or("0") != "0") {
+        // XXX: overrides earlier assignment
+        topObj["symbols"] = json::array();
+        auto &list = topObj["symbols"];
+        symbols.dump([&](const std::string & s) { list.emplace_back(s); });
+    }
+    if (outPath == "-") {
+        std::cerr << topObj.dump(2) << std::endl;
+    } else {
+        fs << topObj.dump(2) << std::endl;
     }
 }
 

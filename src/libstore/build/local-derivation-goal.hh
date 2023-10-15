@@ -272,8 +272,10 @@ struct LocalDerivationGoal : public DerivationGoal
 
     /**
      * Forcibly kill the child process, if any.
+     *
+     * Called by destructor, can't be overridden
      */
-    void killChild() override;
+    void killChild() override final;
 
     /**
      * Kill any processes running under the build user UID or in the
@@ -295,7 +297,7 @@ struct LocalDerivationGoal : public DerivationGoal
      * @todo Add option to randomize, so we can audit whether our
      * rewrites caught everything
      */
-    StorePath makeFallbackPath(std::string_view outputName);
+    StorePath makeFallbackPath(OutputNameView outputName);
 };
 
 }

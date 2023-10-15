@@ -25,7 +25,6 @@ void emitTreeAttrs(
 
     auto attrs = state.buildBindings(10);
 
-
     state.mkStorePathString(tree.storePath, attrs.alloc(state.sOutPath));
 
     // FIXME: support arbitrary input attributes.
@@ -71,36 +70,10 @@ void emitTreeAttrs(
     v.mkAttrs(attrs);
 }
 
-std::string fixURI(std::string uri, EvalState & state, const std::string & defaultScheme = "file")
-{
-    state.checkURI(uri);
-    if (uri.find("://") == std::string::npos) {
-        const auto p = ParsedURL {
-            .scheme = defaultScheme,
-            .authority = "",
-            .path = uri
-        };
-        return p.to_string();
-    } else {
-        return uri;
-    }
-}
-
-std::string fixURIForGit(std::string uri, EvalState & state)
-{
-    /* Detects scp-style uris (e.g. git@github.com:NixOS/nix) and fixes
-     * them by removing the `:` and assuming a scheme of `ssh://`
-     * */
-    static std::regex scp_uri("([^/]*)@(.*):(.*)");
-    if (uri[0] != '/' && std::regex_match(uri, scp_uri))
-        return fixURI(std::regex_replace(uri, scp_uri, "$1@$2/$3"), state, "ssh");
-    else
-        return fixURI(uri, state);
-}
-
 struct FetchTreeParams {
     bool emptyRevFallback = false;
     bool allowNameArgument = false;
+    bool isFetchGit = false;
 };
 
 static void fetchTree(
@@ -108,11 +81,12 @@ static void fetchTree(
     const PosIdx pos,
     Value * * args,
     Value & v,
-    std::optional<std::string> type,
     const FetchTreeParams & params = FetchTreeParams{}
 ) {
     fetchers::Input input;
     NixStringContext context;
+    std::optional<std::string> type;
+    if (params.isFetchGit) type = "git";
 
     state.forceValue(*args[0], pos);
 
@@ -142,10 +116,8 @@ static void fetchTree(
             if (attr.value->type() == nPath || attr.value->type() == nString) {
                 auto s = state.coerceToString(attr.pos, *attr.value, context, "", false, false).toOwned();
                 attrs.emplace(state.symbols[attr.name],
-                    state.symbols[attr.name] == "url"
-                    ? type == "git"
-                      ? fixURIForGit(s, state)
-                      : fixURI(s, state)
+                    params.isFetchGit && state.symbols[attr.name] == "url"
+                    ? fixGitURL(s)
                     : s);
             }
             else if (attr.value->type() == nBool)
@@ -170,21 +142,23 @@ static void fetchTree(
                 "while evaluating the first argument passed to the fetcher",
                 false, false).toOwned();
 
-        if (type == "git") {
+        if (params.isFetchGit) {
             fetchers::Attrs attrs;
             attrs.emplace("type", "git");
-            attrs.emplace("url", fixURIForGit(url, state));
+            attrs.emplace("url", fixGitURL(url));
             input = fetchers::Input::fromAttrs(std::move(attrs));
         } else {
-            input = fetchers::Input::fromURL(fixURI(url, state));
+            input = fetchers::Input::fromURL(url);
         }
     }
 
-    if (!evalSettings.pureEval && !input.isDirect())
+    if (!evalSettings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
         input = lookupInRegistries(state.store, input).first;
 
     if (evalSettings.pureEval && !input.isLocked())
         state.debugThrowLastTrace(EvalError("in pure evaluation mode, 'fetchTree' requires a locked input, at %s", state.positions[pos]));
+
+    state.checkURI(input.toURLString());
 
     auto [tree, input2] = input.fetch(state.store);
 
@@ -195,15 +169,51 @@ static void fetchTree(
 
 static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    experimentalFeatureSettings.require(Xp::Flakes);
-    fetchTree(state, pos, args, v, std::nullopt, FetchTreeParams { .allowNameArgument = false });
+    fetchTree(state, pos, args, v, { });
 }
 
-// FIXME: document
 static RegisterPrimOp primop_fetchTree({
     .name = "fetchTree",
-    .arity = 1,
-    .fun = prim_fetchTree
+    .args = {"input"},
+    .doc = R"(
+      Fetch a source tree or a plain file using one of the supported backends.
+      *input* must be a [flake reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references), either in attribute set representation or in the URL-like syntax.
+      The input should be "locked", that is, it should contain a commit hash or content hash unless impure evaluation (`--impure`) is enabled.
+
+      Here are some examples of how to use `fetchTree`:
+
+      - Fetch a GitHub repository using the attribute set representation:
+
+          ```nix
+          builtins.fetchTree {
+            type = "github";
+            owner = "NixOS";
+            repo = "nixpkgs";
+            rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
+          }
+          ```
+
+        This evaluates to the following attribute set:
+
+          ```
+          {
+            lastModified = 1686503798;
+            lastModifiedDate = "20230611171638";
+            narHash = "sha256-rA9RqKP9OlBrgGCPvfd5HVAXDOy8k2SmPtB/ijShNXc=";
+            outPath = "/nix/store/l5m6qlvfs9sdw14ja3qbzpglcjlb6j1x-source";
+            rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
+            shortRev = "ae2e6b3";
+          }
+          ```
+
+      - Fetch the same GitHub repository using the URL-like syntax:
+
+          ```
+          builtins.fetchTree "github:NixOS/nixpkgs/ae2e6b3958682513d28f7d633734571fb18285dd"
+          ```
+    )",
+    .fun = prim_fetchTree,
+    .experimentalFeature = Xp::Flakes,
 });
 
 static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v,
@@ -353,7 +363,12 @@ static RegisterPrimOp primop_fetchTarball({
 
 static void prim_fetchGit(EvalState & state, const PosIdx pos, Value * * args, Value & v)
 {
-    fetchTree(state, pos, args, v, "git", FetchTreeParams { .emptyRevFallback = true, .allowNameArgument = true });
+    fetchTree(state, pos, args, v,
+        FetchTreeParams {
+            .emptyRevFallback = true,
+            .allowNameArgument = true,
+            .isFetchGit = true
+        });
 }
 
 static RegisterPrimOp primop_fetchGit({

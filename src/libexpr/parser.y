@@ -520,7 +520,7 @@ path_start
     /* add back in the trailing '/' to the first segment */
     if ($1.p[$1.l-1] == '/' && $1.l > 1)
       path += "/";
-    $$ = new ExprPath(path);
+    $$ = new ExprPath(std::move(path));
   }
   | HPATH {
     if (evalSettings.pureEval) {
@@ -530,7 +530,7 @@ path_start
         );
     }
     Path path(getHome() + std::string($1.p + 1, $1.l - 1));
-    $$ = new ExprPath(path);
+    $$ = new ExprPath(std::move(path));
   }
   ;
 
@@ -653,6 +653,7 @@ formal
 
 namespace nix {
 
+unsigned long Expr::nrExprs = 0;
 
 Expr * EvalState::parse(
     char * text,
@@ -733,12 +734,6 @@ Expr * EvalState::parseStdin()
     buffer.append("\0\0", 2);
     auto s = make_ref<std::string>(std::move(buffer));
     return parse(s->data(), s->size(), Pos::Stdin{.source = s}, rootPath(CanonPath::fromCwd()), staticBaseEnv);
-}
-
-
-void EvalState::addToSearchPath(SearchPath::Elem && elem)
-{
-    searchPath.elements.emplace_back(std::move(elem));
 }
 
 

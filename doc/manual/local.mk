@@ -96,14 +96,14 @@ $(d)/src/SUMMARY.md: $(d)/src/SUMMARY.md.in $(d)/src/command-ref/new-cli $(d)/sr
 	@cp $< $@
 	@$(call process-includes,$@,$@)
 
-$(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/utils.nix $(d)/generate-manpage.nix $(bindir)/nix
+$(d)/src/command-ref/new-cli: $(d)/nix.json $(d)/utils.nix $(d)/generate-manpage.nix $(d)/generate-settings.nix $(d)/generate-store-info.nix $(bindir)/nix
 	@rm -rf $@ $@.tmp
-	$(trace-gen) $(nix-eval) --write-to $@.tmp --expr 'import doc/manual/generate-manpage.nix (builtins.readFile $<)'
+	$(trace-gen) $(nix-eval) --write-to $@.tmp --expr 'import doc/manual/generate-manpage.nix true (builtins.readFile $<)'
 	@mv $@.tmp $@
 
-$(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/utils.nix $(d)/src/command-ref/conf-file-prefix.md $(d)/src/command-ref/experimental-features-shortlist.md $(bindir)/nix
+$(d)/src/command-ref/conf-file.md: $(d)/conf-file.json $(d)/utils.nix $(d)/generate-settings.nix $(d)/src/command-ref/conf-file-prefix.md $(d)/src/command-ref/experimental-features-shortlist.md $(bindir)/nix
 	@cat doc/manual/src/command-ref/conf-file-prefix.md > $@.tmp
-	$(trace-gen) $(nix-eval) --expr '(import doc/manual/utils.nix).showSettings { useAnchors = true; } (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp;
+	$(trace-gen) $(nix-eval) --expr 'import doc/manual/generate-settings.nix { prefix = "opt-"; } (builtins.fromJSON (builtins.readFile $<))' >> $@.tmp;
 	@mv $@.tmp $@
 
 $(d)/nix.json: $(bindir)/nix
@@ -173,6 +173,10 @@ doc/manual/generated/man1/nix3-manpages: $(d)/src/command-ref/new-cli
 	done
 	@touch $@
 
+# the `! -name 'contributing.md'` filter excludes the one place where
+# `@docroot@` is to be preserved for documenting the mechanism
+# FIXME: maybe contributing guides should live right next to the code
+# instead of in the manual
 $(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/custom.css $(d)/src/SUMMARY.md $(d)/src/command-ref/new-cli $(d)/src/contributing/experimental-feature-descriptions.md $(d)/src/command-ref/conf-file.md $(d)/src/language/builtins.md $(d)/src/language/builtin-constants.md
 	$(trace-gen) \
 		tmp="$$(mktemp -d)"; \
@@ -180,7 +184,7 @@ $(docdir)/manual/index.html: $(MANUAL_SRCS) $(d)/book.toml $(d)/anchors.jq $(d)/
 		find "$$tmp" -name '*.md' | while read -r file; do \
 			$(call process-includes,$$file,$$file); \
 		done; \
-		find "$$tmp" -name '*.md' | while read -r file; do \
+		find "$$tmp" -name '*.md' ! -name 'documentation.md' | while read -r file; do \
 			docroot="$$(realpath --relative-to="$$(dirname "$$file")" $$tmp/manual/src)"; \
 			sed -i "s,@docroot@,$$docroot,g" "$$file"; \
 		done; \

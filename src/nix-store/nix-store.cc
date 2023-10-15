@@ -9,10 +9,9 @@
 #include "local-store.hh"
 #include "monitor-fd.hh"
 #include "serve-protocol.hh"
+#include "serve-protocol-impl.hh"
 #include "shared.hh"
 #include "util.hh"
-#include "worker-protocol.hh"
-#include "worker-protocol-impl.hh"
 #include "graphml.hh"
 #include "legacy.hh"
 #include "path-with-outputs.hh"
@@ -283,7 +282,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
 {
     enum QueryType
         { qOutputs, qRequisites, qReferences, qReferrers
-        , qReferrersClosure, qDeriver, qBinding, qHash, qSize
+        , qReferrersClosure, qDeriver, qValidDerivers, qBinding, qHash, qSize
         , qTree, qGraph, qGraphML, qResolve, qRoots };
     std::optional<QueryType> query;
     bool useOutput = false;
@@ -299,6 +298,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (i == "--referrers" || i == "--referers") query = qReferrers;
         else if (i == "--referrers-closure" || i == "--referers-closure") query = qReferrersClosure;
         else if (i == "--deriver" || i == "-d") query = qDeriver;
+        else if (i == "--valid-derivers") query = qValidDerivers;
         else if (i == "--binding" || i == "-b") {
             if (opArgs.size() == 0)
                 throw UsageError("expected binding name");
@@ -371,6 +371,21 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 cout << fmt("%s\n", info->deriver ? store->printStorePath(*info->deriver) : "unknown-deriver");
             }
             break;
+
+        case qValidDerivers: {
+            StorePathSet result;
+            for (auto & i : opArgs) {
+                auto derivers = store->queryValidDerivers(store->followLinksToStorePath(i));
+                for (const auto &i: derivers) {
+                    result.insert(i);
+                }
+            }
+            auto sorted = store->topoSortPaths(result);
+            for (StorePaths::reverse_iterator i = sorted.rbegin();
+                 i != sorted.rend(); ++i)
+                cout << fmt("%s\n", store->printStorePath(*i));
+            break;
+        }
 
         case qBinding:
             for (auto & i : opArgs) {
@@ -805,8 +820,8 @@ static void opServe(Strings opFlags, Strings opArgs)
     out.flush();
     unsigned int clientVersion = readInt(in);
 
-    WorkerProto::ReadConn rconn { .from = in };
-    WorkerProto::WriteConn wconn { .to = out };
+    ServeProto::ReadConn rconn { .from = in };
+    ServeProto::WriteConn wconn { .to = out };
 
     auto getBuildSettings = [&]() {
         // FIXME: changing options here doesn't work if we're
@@ -851,7 +866,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             case ServeProto::Command::QueryValidPaths: {
                 bool lock = readInt(in);
                 bool substitute = readInt(in);
-                auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
+                auto paths = ServeProto::Serialise<StorePathSet>::read(*store, rconn);
                 if (lock && writeAllowed)
                     for (auto & path : paths)
                         store->addTempRoot(path);
@@ -860,19 +875,19 @@ static void opServe(Strings opFlags, Strings opArgs)
                     store->substitutePaths(paths);
                 }
 
-                WorkerProto::write(*store, wconn, store->queryValidPaths(paths));
+                ServeProto::write(*store, wconn, store->queryValidPaths(paths));
                 break;
             }
 
             case ServeProto::Command::QueryPathInfos: {
-                auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
+                auto paths = ServeProto::Serialise<StorePathSet>::read(*store, rconn);
                 // !!! Maybe we want a queryPathInfos?
                 for (auto & i : paths) {
                     try {
                         auto info = store->queryPathInfo(i);
                         out << store->printStorePath(info->path)
                             << (info->deriver ? store->printStorePath(*info->deriver) : "");
-                        WorkerProto::write(*store, wconn, info->references);
+                        ServeProto::write(*store, wconn, info->references);
                         // !!! Maybe we want compression?
                         out << info->narSize // downloadSize
                             << info->narSize;
@@ -900,7 +915,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case ServeProto::Command::ExportPaths: {
                 readInt(in); // obsolete
-                store->exportPaths(WorkerProto::Serialise<StorePathSet>::read(*store, rconn), out);
+                store->exportPaths(ServeProto::Serialise<StorePathSet>::read(*store, rconn), out);
                 break;
             }
 
@@ -946,7 +961,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                     DrvOutputs builtOutputs;
                     for (auto & [output, realisation] : status.builtOutputs)
                         builtOutputs.insert_or_assign(realisation.id, realisation);
-                    WorkerProto::write(*store, wconn, builtOutputs);
+                    ServeProto::write(*store, wconn, builtOutputs);
                 }
 
                 break;
@@ -955,9 +970,9 @@ static void opServe(Strings opFlags, Strings opArgs)
             case ServeProto::Command::QueryClosure: {
                 bool includeOutputs = readInt(in);
                 StorePathSet closure;
-                store->computeFSClosure(WorkerProto::Serialise<StorePathSet>::read(*store, rconn),
+                store->computeFSClosure(ServeProto::Serialise<StorePathSet>::read(*store, rconn),
                     closure, false, includeOutputs);
-                WorkerProto::write(*store, wconn, closure);
+                ServeProto::write(*store, wconn, closure);
                 break;
             }
 
@@ -972,7 +987,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 };
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.references = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
+                info.references = ServeProto::Serialise<StorePathSet>::read(*store, rconn);
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
                 info.ca = ContentAddress::parseOpt(readString(in));
