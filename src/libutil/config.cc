@@ -68,6 +68,7 @@ void AbstractConfig::warnUnknownSettings()
 void AbstractConfig::reapplyUnknownSettings()
 {
     auto unknownSettings2 = std::move(unknownSettings);
+    unknownSettings = {};
     for (auto & s : unknownSettings2)
         set(s.first, s.second);
 }
