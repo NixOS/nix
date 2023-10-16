@@ -6,6 +6,10 @@
     <dict>
       <key>OBJC_DISABLE_INITIALIZE_FORK_SAFETY</key>
       <string>YES</string>
+      <key>AWS_CONFIG_FILE</key>
+      <string>/etc/nix/aws/config</string>
+      <key>AWS_SHARED_CREDENTIALS_FILE</key>
+      <string>/etc/nix/aws/credentials</string>
     </dict>
     <key>Label</key>
     <string>org.nixos.nix-daemon</string>

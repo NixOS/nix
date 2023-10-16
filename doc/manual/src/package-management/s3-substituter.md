@@ -50,7 +50,11 @@ For AWS S3 the binary cache URL for example bucket will be exactly
 
 Nix will use the [default credential provider
 chain](https://docs.aws.amazon.com/sdk-for-cpp/v1/developer-guide/credentials.html)
-for authenticating requests to Amazon S3.
+for authenticating requests to Amazon S3. *On macOS:* the multi-user nix
+installer configures `nix-daemon` such that the [location of shared `config`
+and `credentials`
+files](https://docs.aws.amazon.com/sdkref/latest/guide/file-location.html) are
+`/etc/nix/aws/config` and `/etc/nix/aws/credentials`, respectively.
 
 Nix supports authenticated reads from Amazon S3 and S3 compatible binary
 caches.
@@ -69,7 +73,11 @@ buckets. The binary cache URL for our example bucket will be
 
 Nix will use the [default credential provider
 chain](https://docs.aws.amazon.com/sdk-for-cpp/v1/developer-guide/credentials.html)
-for authenticating requests to Amazon S3.
+for authenticating requests to Amazon S3. *On macOS:* the multi-user nix
+installer configures `nix-daemon` such that the [location of shared `config`
+and `credentials`
+files](https://docs.aws.amazon.com/sdkref/latest/guide/file-location.html) are
+`/etc/nix/aws/config` and `/etc/nix/aws/credentials`, respectively.
 
 Your account will need the following IAM policy to upload to the cache:
 
