@@ -83,7 +83,7 @@ static std::pair<ContentAddressMethod, HashType> parseContentAddressMethodPrefix
         if (!hashTypeRaw)
             throw UsageError("content address hash must be in form '<algo>:<hash>', but found: %s", wholeInput);
         HashType hashType = parseHashType(*hashTypeRaw);
-        return std::move(hashType);
+        return hashType;
     };
 
     // Switch on prefix

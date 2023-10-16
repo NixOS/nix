@@ -2521,7 +2521,7 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
             ValidPathInfo newInfo0 {
                 worker.store,
                 outputPathName(drv->name, outputName),
-                *std::move(optCA),
+                std::move(*optCA),
                 Hash::dummy,
             };
             if (*scratchPath != newInfo0.path) {
