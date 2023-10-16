@@ -561,7 +561,7 @@ void DerivationGoal::inputsRealised()
               attempt = fullDrv.tryResolve(worker.store);
             }
             assert(attempt);
-            Derivation drvResolved { *std::move(attempt) };
+            Derivation drvResolved { std::move(*attempt) };
 
             auto pathResolved = writeDerivation(worker.store, drvResolved);
 
