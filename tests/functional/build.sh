@@ -66,7 +66,7 @@ nix build -f multiple-outputs.nix --json 'e.a_a.outPath' --no-link | jq --exit-s
 '
 
 # Illegal type of string context
-expectStderr 1 nix build -f multiple-outputs.nix 'e.a_a.drvPath' \
+expectStderr 1 nix build --impure --expr 'builtins.addDrvOutputDependencies (import ./multiple-outputs.nix).e.a_a.drvPath' \
   | grepQuiet "has a context which refers to a complete source and binary closure."
 
 # No string context
@@ -77,7 +77,7 @@ expectStderr 1 nix build --expr '""' --no-link \
 expectStderr 1 nix build --impure --expr 'with (import ./multiple-outputs.nix).e.a_a; "${drvPath}${outPath}"' --no-link \
   | grepQuiet "has 2 entries in its context. It should only have exactly one entry"
 
-nix build --impure --json --expr 'builtins.unsafeDiscardOutputDependency (import ./multiple-outputs.nix).e.a_a.drvPath' --no-link | jq --exit-status '
+nix build --json -f multiple-outputs.nix e.a_a.drvPath --no-link | jq --exit-status '
   (.[0] | match(".*multiple-outputs-e.drv"))
 '
 

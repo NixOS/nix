@@ -16,8 +16,9 @@ rec {
 
   shared = builtins.getEnv "_NIX_TEST_SHARED";
 
-  mkDerivation = args:
-    derivation ({
+  mkDerivation = args: let
+
+    drv = derivation ({
       inherit system;
       builder = shell;
       args = ["-e" args.builder or (builtins.toFile "builder-${args.name}.sh" ''
@@ -25,6 +26,22 @@ rec {
         eval "$buildCommand"
       '')];
       PATH = path;
-    } // caArgs // removeAttrs args ["builder" "meta"])
-    // { meta = args.meta or {}; };
+    } // caArgs // removeAttrs args ["builder" "meta"]);
+
+    fixUp = value: value // outputsMap // {
+      # Not unsafe, and we will add back if we need it.
+      # Nixpkgs should do this too, when `addDrvOutputDependencies` makes it into the NixOS stable release.
+      drvPath = (builtins.unsafeDiscardOutputDependency value.drvPath);
+    };
+
+    outputsMap = builtins.listToAttrs (map
+      (name: {
+        inherit name;
+        value = fixUp drv.${name};
+      })
+      (drv.outputs or []));
+
+  in fixUp drv // {
+    meta = args.meta or {};
+  };
 }

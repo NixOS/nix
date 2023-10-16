@@ -20,7 +20,7 @@ expectStderr 1 nix --experimental-features 'nix-command dynamic-derivations' eva
 #
 # Like the above, this is a restriction we could relax later.
 expectStderr 1 nix --experimental-features 'nix-command dynamic-derivations' eval --impure --expr \
-    'builtins.outputOf (import ../dependencies.nix {}).drvPath "out"' \
+    'builtins.outputOf (builtins.addDrvOutputDependencies (import ../dependencies.nix {}).drvPath) "out"' \
     | grepQuiet "has a context which refers to a complete source and binary closure. This is not supported at this time"
 
 # Test using `builtins.outputOf` with static derivations
@@ -28,7 +28,7 @@ testStaticHello () {
     nix eval --impure --expr \
         'with (import ./text-hashed-output.nix); let
            a = hello.outPath;
-           b = builtins.outputOf (builtins.unsafeDiscardOutputDependency hello.drvPath) "out";
+           b = builtins.outputOf hello.drvPath "out";
          in builtins.trace a
            (builtins.trace b
              (assert a == b; null))'
@@ -53,7 +53,7 @@ NIX_TESTS_CA_BY_DEFAULT=1 testStaticHello
 nix eval --impure --expr \
     'with (import ./text-hashed-output.nix); let
        a = producingDrv.outPath;
-       b = builtins.outputOf (builtins.builtins.unsafeDiscardOutputDependency producingDrv.drvPath) "out";
+       b = builtins.outputOf producingDrv.drvPath "out";
      in builtins.trace a
        (builtins.trace b
          (assert a == b; null))'
@@ -67,7 +67,7 @@ testDynamicHello () {
     nix eval --impure --expr \
         'with (import ./text-hashed-output.nix); let
            a = builtins.outputOf producingDrv.outPath "out";
-           b = builtins.outputOf (builtins.outputOf (builtins.unsafeDiscardOutputDependency producingDrv.drvPath) "out") "out";
+           b = builtins.outputOf (builtins.outputOf producingDrv.drvPath "out") "out";
          in builtins.trace a
            (builtins.trace b
              (assert a == b; null))'

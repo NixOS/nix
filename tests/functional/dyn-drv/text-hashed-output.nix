@@ -17,7 +17,7 @@ rec {
     name = "hello.drv";
     buildCommand = ''
       echo "Copying the derivation"
-      cp ${builtins.unsafeDiscardOutputDependency hello.drvPath} $out
+      cp ${hello.drvPath} $out
     '';
     __contentAddressed = true;
     outputHashMode = "text";

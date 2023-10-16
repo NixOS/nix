@@ -49,9 +49,9 @@ cat > $flake1Dir/flake.nix <<EOF
       goodPath = path;
     };
 
-    a10 = builtins.unsafeDiscardOutputDependency self.drvCall.drvPath;
+    a10 = self.drvCall.drvPath;
 
-    a11 = self.drvCall.drvPath;
+    a11 = builtins.addDrvOutputDependencies self.drvCall.drvPath;
 
     a12 = self.drvCall.outPath;
 
