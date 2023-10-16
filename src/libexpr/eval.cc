@@ -2290,7 +2290,7 @@ BackedStringView EvalState::coerceToString(
                     && (!v2->isList() || v2->listSize() != 0))
                     result += " ";
             }
-            return std::move(result);
+            return result;
         }
     }
 
