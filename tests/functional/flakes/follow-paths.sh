@@ -167,7 +167,7 @@ nix flake lock "$flakeFollowsA" 2>&1 | grep "warning: input 'B' has an override 
 #
 # The message was
 #    error: input 'B/D' follows a non-existent input 'B/C/D'
-# 
+#
 # Note that for `B` to resolve its follow for `D`, it needs `C/D`, for which it needs to resolve the follow on `C` first.
 flakeFollowsOverloadA="$TEST_ROOT/follows/overload/flakeA"
 flakeFollowsOverloadB="$TEST_ROOT/follows/overload/flakeA/flakeB"
@@ -230,3 +230,33 @@ git -C "$flakeFollowsOverloadA" add flake.nix flakeB/flake.nix \
 nix flake metadata "$flakeFollowsOverloadA"
 nix flake update "$flakeFollowsOverloadA"
 nix flake lock "$flakeFollowsOverloadA"
+
+# Now test follow cycle detection
+# We construct the following follows graph:
+#
+#    foo
+#    / ^
+#   /   \
+#  v     \
+# bar -> baz
+# The message was
+#     error: follow cycle detected: [baz -> foo -> bar -> baz]
+flakeFollowCycle="$TEST_ROOT/follows/followCycle"
+
+# Test following path flakerefs.
+mkdir -p "$flakeFollowCycle"
+
+cat > $flakeFollowCycle/flake.nix <<EOF
+{
+    description = "Flake A";
+    inputs = {
+        foo.follows = "bar";
+        bar.follows = "baz";
+        baz.follows = "foo";
+    };
+    outputs = { ... }: {};
+}
+EOF
+
+checkRes=$(nix flake lock "$flakeFollowCycle" 2>&1 && fail "nix flake lock should have failed." || true)
+echo $checkRes | grep -F "error: follow cycle detected: [baz -> foo -> bar -> baz]"

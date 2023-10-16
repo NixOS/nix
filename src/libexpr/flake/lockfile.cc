@@ -45,16 +45,26 @@ StorePath LockedNode::computeStorePath(Store & store) const
     return lockedRef.input.computeStorePath(store);
 }
 
-std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
-{
+
+static std::shared_ptr<Node> doFind(const ref<Node>& root, const InputPath & path, std::vector<std::string>& visited) {
     auto pos = root;
+
+    auto pathS = printInputPath(path);
+    auto found = std::find(visited.cbegin(), visited.cend(), pathS);
+
+    if(found != visited.end()) {
+        std::vector cycle(found, visited.cend());
+        cycle.push_back(pathS);
+        throw Error("follow cycle detected: [%s]", concatStringsSep(" -> ", cycle));
+    }
+    visited.push_back(pathS);
 
     for (auto & elem : path) {
         if (auto i = get(pos->inputs, elem)) {
             if (auto node = std::get_if<0>(&*i))
                 pos = *node;
             else if (auto follows = std::get_if<1>(&*i)) {
-                if (auto p = findInput(*follows))
+                if (auto p = doFind(root, *follows, visited))
                     pos = ref(p);
                 else
                     return {};
@@ -64,6 +74,12 @@ std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
     }
 
     return pos;
+}
+
+std::shared_ptr<Node> LockFile::findInput(const InputPath & path)
+{
+    std::vector<std::string> visited;
+    return doFind(root, path, visited);
 }
 
 LockFile::LockFile(const nlohmann::json & json, const Path & path)
