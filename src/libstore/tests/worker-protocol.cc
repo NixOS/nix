@@ -72,9 +72,18 @@ VERSIONED_CHARACTERIZATION_TEST(
     derivedPath,
     "derived-path",
     defaultVersion,
-    (std::tuple<DerivedPath, DerivedPath> {
+    (std::tuple<DerivedPath, DerivedPath, DerivedPath, DerivedPath> {
         DerivedPath::Opaque {
             .path = StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo" },
+        },
+        DerivedPath::Opaque {
+            .path = StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv" },
+        },
+        DerivedPath::Built {
+            .drvPath = makeConstantStorePathRef(StorePath {
+                "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+            }),
+            .outputs = OutputsSpec::All { },
         },
         DerivedPath::Built {
             .drvPath = makeConstantStorePathRef(StorePath {
