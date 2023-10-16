@@ -120,14 +120,6 @@ struct LocalDerivationGoal : public DerivationGoal
      */
     OutputPathMap scratchOutputs;
 
-    /**
-     * Path registration info from the previous round, if we're
-     * building multiple times. Since this contains the hash, it
-     * allows us to compare whether two rounds produced the same
-     * result.
-     */
-    std::map<Path, ValidPathInfo> prevInfos;
-
     uid_t sandboxUid() { return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 1000 : 0) : buildUser->getUID(); }
     gid_t sandboxGid() { return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 100  : 0) : buildUser->getGID(); }
 
