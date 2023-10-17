@@ -148,6 +148,11 @@ static void fetchTree(
             attrs.emplace("url", fixGitURL(url));
             input = fetchers::Input::fromAttrs(std::move(attrs));
         } else {
+            if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))
+                state.debugThrowLastTrace(EvalError({
+                    .msg = hintfmt("passing a string argument to 'fetchTree' requires the 'flakes' experimental feature"),
+                    .errPos = state.positions[pos]
+                }));
             input = fetchers::Input::fromURL(url);
         }
     }
@@ -179,6 +184,10 @@ static RegisterPrimOp primop_fetchTree({
       Fetch a source tree or a plain file using one of the supported backends.
       *input* must be a [flake reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references), either in attribute set representation or in the URL-like syntax.
       The input should be "locked", that is, it should contain a commit hash or content hash unless impure evaluation (`--impure`) is enabled.
+
+      > **Note**
+      >
+      > The URL-like syntax requires the [`flakes` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-flakes) to be enabled.
 
       Here are some examples of how to use `fetchTree`:
 
