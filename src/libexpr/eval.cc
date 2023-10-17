@@ -999,7 +999,7 @@ std::string EvalState::mkOutputStringRaw(
     /* In practice, this is testing for the case of CA derivations, or
        dynamic derivations. */
     return optStaticOutputPath
-        ? store->printStorePath(*std::move(optStaticOutputPath))
+        ? store->printStorePath(std::move(*optStaticOutputPath))
         /* Downstream we would substitute this for an actual path once
            we build the floating CA derivation */
         : DownstreamPlaceholder::fromSingleDerivedPathBuilt(b, xpSettings).render();
@@ -2257,7 +2257,7 @@ BackedStringView EvalState::coerceToString(
                     && (!v2->isList() || v2->listSize() != 0))
                     result += " ";
             }
-            return std::move(result);
+            return result;
         }
     }
 

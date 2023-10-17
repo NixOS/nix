@@ -475,47 +475,13 @@
 
             hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
 
-            passthru.perl-bindings = with final; perl.pkgs.toPerlModule (currentStdenv.mkDerivation {
-              name = "nix-perl-${version}";
-
-              src = fileset.toSource {
-                root = ./.;
-                fileset = fileset.intersect baseFiles (fileset.unions [
-                  ./perl
-                  ./.version
-                  ./m4
-                  ./mk
-                ]);
-              };
-
-              nativeBuildInputs =
-                [ buildPackages.autoconf-archive
-                  buildPackages.autoreconfHook
-                  buildPackages.pkg-config
-                ];
-
-              buildInputs =
-                [ nix
-                  curl
-                  bzip2
-                  xz
-                  pkgs.perl
-                  boost
-                ]
-                ++ lib.optional (currentStdenv.isLinux || currentStdenv.isDarwin) libsodium
-                ++ lib.optional currentStdenv.isDarwin darwin.apple_sdk.frameworks.Security;
-
-              configureFlags = [
-                "--with-dbi=${perlPackages.DBI}/${pkgs.perl.libPrefix}"
-                "--with-dbd-sqlite=${perlPackages.DBDSQLite}/${pkgs.perl.libPrefix}"
-              ];
-
-              enableParallelBuilding = true;
-
-              postUnpack = "sourceRoot=$sourceRoot/perl";
-            });
+            passthru.perl-bindings = final.callPackage ./perl {
+              inherit fileset;
+              stdenv = currentStdenv;
+            };
 
             meta.platforms = lib.platforms.unix;
+            meta.mainProgram = "nix";
           });
 
           lowdown-nix = with final; currentStdenv.mkDerivation rec {
