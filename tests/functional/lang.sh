@@ -68,7 +68,7 @@ for i in lang/eval-fail-*.nix; do
     echo "evaluating $i (should fail)";
     i=$(basename "$i" .nix)
     if
-        expectStderr 1 nix-instantiate --show-trace "lang/$i.nix" \
+        expectStderr 1 nix-instantiate --eval --strict --show-trace "lang/$i.nix" \
             | sed "s!$(pwd)!/pwd!g" > "lang/$i.err"
     then
         diffAndAccept "$i" err err.exp
