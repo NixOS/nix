@@ -17,7 +17,7 @@ struct CmdPingStore : StoreCommand, MixJSON
     std::string doc() override
     {
         return
-          #include "ping-store.md"
+          #include "store-info.md"
           ;
     }
 
@@ -50,11 +50,11 @@ struct CmdInfoStore : CmdPingStore
 {
     void run(nix::ref<nix::Store> store) override
     {
-        warn("'nix store info' is a deprecated alias for 'nix store ping'");
+        warn("'nix store ping' is a deprecated alias for 'nix store info'");
         CmdPingStore::run(store);
     }
 };
 
 
-static auto rCmdPingStore = registerCommand2<CmdPingStore>({"store", "ping"});
-static auto rCmdInfoStore = registerCommand2<CmdInfoStore>({"store", "info"});  
+static auto rCmdPingStore = registerCommand2<CmdPingStore>({"store", "info"});
+static auto rCmdInfoStore = registerCommand2<CmdInfoStore>({"store", "ping"});
