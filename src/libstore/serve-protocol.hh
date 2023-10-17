@@ -31,6 +31,13 @@ struct ServeProto
     enum struct Command : uint64_t;
 
     /**
+     * Version type for the protocol.
+     *
+     * @todo Convert to struct with separate major vs minor fields.
+     */
+    using Version = unsigned int;
+
+    /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      *
