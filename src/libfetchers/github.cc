@@ -223,6 +223,11 @@ struct GitArchiveInputScheme : InputScheme
 
         return {result.tree.storePath, input};
     }
+
+    std::optional<ExperimentalFeature> experimentalFeature() override
+    {
+        return Xp::Flakes;
+    }
 };
 
 struct GitHubInputScheme : GitArchiveInputScheme

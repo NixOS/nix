@@ -125,6 +125,11 @@ struct PathInputScheme : InputScheme
 
         return {std::move(*storePath), input};
     }
+
+    std::optional<ExperimentalFeature> experimentalFeature() override
+    {
+        return Xp::Flakes;
+    }
 };
 
 static auto rPathInputScheme = OnStartup([] { registerInputScheme(std::make_unique<PathInputScheme>()); });
