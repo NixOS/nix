@@ -480,6 +480,7 @@
             };
 
             meta.platforms = lib.platforms.unix;
+            meta.mainProgram = "nix";
           });
 
           lowdown-nix = with final; currentStdenv.mkDerivation rec {
