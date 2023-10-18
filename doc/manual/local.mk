@@ -125,7 +125,7 @@ $(d)/src/command-ref/experimental-features-shortlist.md: $(d)/xp-features.json $
 	@mv $@.tmp $@
 
 $(d)/xp-features.json: $(bindir)/nix
-	$(trace-gen) $(dummy-env) NIX_PATH=nix/corepkgs=corepkgs $(bindir)/nix __dump-xp-features > $@.tmp
+	$(trace-gen) $(dummy-env) $(bindir)/nix __dump-xp-features > $@.tmp
 	@mv $@.tmp $@
 
 $(d)/src/language/builtins.md: $(d)/language.json $(d)/generate-builtins.nix $(d)/src/language/builtins-prefix.md $(bindir)/nix
@@ -141,7 +141,7 @@ $(d)/src/language/builtin-constants.md: $(d)/language.json $(d)/generate-builtin
 	@mv $@.tmp $@
 
 $(d)/language.json: $(bindir)/nix
-	$(trace-gen) $(dummy-env) NIX_PATH=nix/corepkgs=corepkgs $(bindir)/nix __dump-language > $@.tmp
+	$(trace-gen) $(dummy-env) $(bindir)/nix __dump-language > $@.tmp
 	@mv $@.tmp $@
 
 # Generate the HTML manual.
