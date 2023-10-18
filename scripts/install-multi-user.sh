@@ -33,6 +33,7 @@ NIX_BUILD_USER_NAME_TEMPLATE="nixbld%d"
 readonly NIX_ROOT="/nix"
 readonly NIX_EXTRA_CONF=${NIX_EXTRA_CONF:-}
 
+readonly NIX_INSTALLER_NO_MODIFY_PROFILE=${NIX_INSTALLER_NO_MODIFY_PROFILE:-}
 readonly PROFILE_TARGETS=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/zshrc" "/etc/bash.bashrc" "/etc/zsh/zshrc")
 readonly PROFILE_BACKUP_SUFFIX=".backup-before-nix"
 readonly PROFILE_NIX_FILE="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
@@ -117,10 +118,11 @@ uninstall_directions() {
         poly_service_uninstall_directions "$step"
     fi
 
-    for profile_target in "${PROFILE_TARGETS[@]}"; do
-        if [ -e "$profile_target" ] && [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
-            step=$((step + 1))
-            cat <<EOF
+    if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
+        for profile_target in "${PROFILE_TARGETS[@]}"; do
+            if [ -e "$profile_target" ] && [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
+                step=$((step + 1))
+                cat <<EOF
 $step. Restore $profile_target$PROFILE_BACKUP_SUFFIX back to $profile_target
 
   sudo mv $profile_target$PROFILE_BACKUP_SUFFIX $profile_target
@@ -129,8 +131,9 @@ $step. Restore $profile_target$PROFILE_BACKUP_SUFFIX back to $profile_target
 opened while it existed.)
 
 EOF
-        fi
-    done
+            fi
+        done
+    fi
 
     step=$((step + 1))
     cat <<EOF
@@ -751,14 +754,16 @@ I will:
  - set up the "default profile" by creating some Nix-related files in
    $ROOT_HOME
 EOF
-        for profile_target in "${PROFILE_TARGETS[@]}"; do
-            if [ -e "$profile_target" ]; then
-                cat <<EOF
+        if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
+            for profile_target in "${PROFILE_TARGETS[@]}"; do
+                if [ -e "$profile_target" ]; then
+                    cat <<EOF
  - back up $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX
  - update $profile_target to include some Nix configuration
 EOF
-            fi
-        done
+                fi
+            done
+        fi
         poly_service_setup_note
         if ! ui_confirm "Ready to continue?"; then
             failure <<EOF
@@ -918,6 +923,26 @@ configure_shell_profile() {
     reminder "Nix won't work in active shell sessions until you restart them."
 }
 
+describe_shell_profile() {
+    task "Describe shell profile requirements"
+    cat <<EOF
+
+You opted out of shell profile modifications, so you may want to
+make your own edits to set up your environment. For reference,
+I'll print out what I would have added to your shell init files.
+
+For bash and zsh, I would've appended the following to system init
+files such as /etc/bashrc or /etc/zshrc:
+$(shell_source_lines)
+
+For fish, I would've appended the following to system init
+files such as /etc/fish:
+$(fish_source_lines)
+EOF
+
+    reminder "You opted out of shell profile updates; nix won't be on PATH."
+}
+
 cert_in_store() {
     # in a subshell
     # - change into the cert-file dir
@@ -1005,7 +1030,12 @@ main() {
     place_channel_configuration
     install_from_extracted_nix
 
-    configure_shell_profile
+    if [ -z "$NIX_INSTALLER_NO_MODIFY_PROFILE" ]; then
+        configure_shell_profile
+    else
+        # user explicitly opted out, so just tell them what's needed
+        describe_shell_profile
+    fi
 
     set +eu
     # shellcheck disable=SC1091

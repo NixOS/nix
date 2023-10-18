@@ -79,7 +79,7 @@ while [ $# -gt 0 ]; do
             export NIX_USER_COUNT=$2
             shift;;
         --no-modify-profile)
-            NIX_INSTALLER_NO_MODIFY_PROFILE=1;;
+            export NIX_INSTALLER_NO_MODIFY_PROFILE=1;;
         --darwin-use-unencrypted-nix-store-volume)
             {
                 echo "Warning: the flag --darwin-use-unencrypted-nix-store-volume"
