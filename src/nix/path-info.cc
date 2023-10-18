@@ -16,6 +16,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
     bool showClosureSize = false;
     bool humanReadable = false;
     bool showSigs = false;
+    bool showSubStatus = false;
 
     CmdPathInfo()
     {
@@ -44,6 +45,14 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             .longName = "sigs",
             .description = "Show signatures.",
             .handler = {&showSigs, true},
+        });
+
+        addFlag({
+            .longName = "filter-substitutable",
+            .description =
+                "Query path availability in the configured substituters, printing only those that are not available. "
+                "When used with `--json`, a `substitutable` boolean is added to the output.",
+            .handler = {&showSubStatus, true},
         });
     }
 
@@ -86,14 +95,36 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
         for (auto & storePath : storePaths)
             pathLen = std::max(pathLen, store->printStorePath(storePath).size());
 
+        StorePathSet substitutablePaths;
+        if (showSubStatus)
+            substitutablePaths = store->querySubstitutablePaths(StorePathSet(storePaths.begin(), storePaths.end()));
+
         if (json) {
-            std::cout << store->pathInfoToJSON(
+            auto json = store->pathInfoToJSON(
                 // FIXME: preserve order?
                 StorePathSet(storePaths.begin(), storePaths.end()),
-                true, showClosureSize, SRI, AllowInvalid).dump();
+                true, showClosureSize, SRI, AllowInvalid);
+
+            if (showSubStatus) {
+                for (auto & v : json) {
+                    std::string const storePathS = v["path"];
+                    v["substitutable"] = (bool) substitutablePaths.count(store->parseStorePath(storePathS));
+                }
+            }
+            std::cout << json.dump();
         }
 
         else {
+            StorePaths missingPaths;
+
+            if (showSubStatus) {
+                for (auto & path : storePaths) {
+                    if (!substitutablePaths.count(path))
+                      missingPaths.emplace_back(std::move(path));
+                }
+
+                storePaths = missingPaths;
+            }
 
             for (auto & storePath : storePaths) {
                 auto info = store->queryPathInfo(storePath);
