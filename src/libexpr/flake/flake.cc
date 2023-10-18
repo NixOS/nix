@@ -428,7 +428,7 @@ LockedFlake lockFlake(
                        ancestors? */
                     auto i = overrides.find(inputPath);
                     bool hasOverride = i != overrides.end();
-                    bool hasCliOverride = explicitCliOverrides.find(inputPath) != explicitCliOverrides.end();
+                    bool hasCliOverride = explicitCliOverrides.contains(inputPath);
                     if (hasOverride) {
                         overridesUsed.insert(inputPath);
                         // Respect the “flakeness” of the input even if we
