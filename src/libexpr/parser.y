@@ -64,7 +64,6 @@ struct StringToken {
 
 #include "parser-tab.hh"
 #include "lexer-tab.hh"
-#include "fs-input-accessor.hh"
 
 YY_DECL;
 
@@ -650,6 +649,8 @@ formal
 #include "fetchers.hh"
 #include "store-api.hh"
 #include "flake/flake.hh"
+#include "fs-input-accessor.hh"
+#include "memory-input-accessor.hh"
 
 
 namespace nix {
@@ -761,7 +762,7 @@ SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_
     }
 
     if (hasPrefix(path, "nix/"))
-        return rootPath(CanonPath(concatStrings(corepkgsPrefix, path.substr(4))));
+        return {corepkgsFS, CanonPath(path.substr(3))};
 
     debugThrow(ThrownError({
         .msg = hintfmt(evalSettings.pureEval

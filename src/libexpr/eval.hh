@@ -25,6 +25,7 @@ class StorePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
 struct FSInputAccessor;
+struct MemoryInputAccessor;
 
 
 /**
@@ -212,9 +213,25 @@ public:
 
     Bindings emptyBindings;
 
+    /**
+     * The accessor for the root filesystem.
+     */
     const ref<FSInputAccessor> rootFS;
 
+    /**
+     * The in-memory filesystem for <nix/...> paths.
+     */
+    const ref<MemoryInputAccessor> corepkgsFS;
+
+    /**
+     * In-memory filesystem for internal, non-user-callable Nix
+     * expressions like call-flake.nix.
+     */
+    const ref<MemoryInputAccessor> internalFS;
+
     const SourcePath derivationInternal;
+
+    const SourcePath callFlakeInternal;
 
     /**
      * Store used to materialise .drv files.
@@ -226,7 +243,6 @@ public:
      */
     const ref<Store> buildStore;
 
-    RootValue vCallFlake = nullptr;
     RootValue vImportedDrvToDerivation = nullptr;
 
     /**
@@ -408,16 +424,6 @@ public:
      */
     void evalFile(const SourcePath & path, Value & v, bool mustBeTrivial = false);
 
-    /**
-     * Like `evalFile`, but with an already parsed expression.
-     */
-    void cacheFile(
-        const SourcePath & path,
-        const SourcePath & resolvedPath,
-        Expr * e,
-        Value & v,
-        bool mustBeTrivial = false);
-
     void resetFileCache();
 
     /**
@@ -427,7 +433,7 @@ public:
     SourcePath findFile(const SearchPath & searchPath, const std::string_view path, const PosIdx pos = noPos);
 
     /**
-     * Try to resolve a search path value (not the optinal key part)
+     * Try to resolve a search path value (not the optional key part)
      *
      * If the specified search path element is a URI, download it.
      *
@@ -831,8 +837,6 @@ struct InvalidPathError : EvalError
     ~InvalidPathError() throw () { };
 #endif
 };
-
-static const std::string corepkgsPrefix{"/__corepkgs__/"};
 
 template<class ErrorType>
 void ErrorBuilder::debugThrow()

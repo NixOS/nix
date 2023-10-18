@@ -13,6 +13,7 @@
 #include "profiles.hh"
 #include "print.hh"
 #include "fs-input-accessor.hh"
+#include "memory-input-accessor.hh"
 
 #include <algorithm>
 #include <chrono>
@@ -516,7 +517,16 @@ EvalState::EvalState(
                     : "in restricted mode";
                 throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
             }))
-    , derivationInternal(rootPath(CanonPath("/builtin/derivation.nix")))
+    , corepkgsFS(makeMemoryInputAccessor())
+    , internalFS(makeMemoryInputAccessor())
+    , derivationInternal{corepkgsFS->addFile(
+        CanonPath("derivation-internal.nix"),
+        #include "primops/derivation.nix.gen.hh"
+    )}
+    , callFlakeInternal{internalFS->addFile(
+        CanonPath("call-flake.nix"),
+        #include "flake/call-flake.nix.gen.hh"
+    )}
     , store(store)
     , buildStore(buildStore ? buildStore : store)
     , debugRepl(nullptr)
@@ -531,7 +541,8 @@ EvalState::EvalState(
     , baseEnv(allocEnv(128))
     , staticBaseEnv{std::make_shared<StaticEnv>(false, nullptr)}
 {
-    rootFS->allowPath(CanonPath::root); // FIXME
+    // For now, don't rely on FSInputAccessor for access control.
+    rootFS->allowPath(CanonPath::root);
 
     countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
@@ -570,6 +581,11 @@ EvalState::EvalState(
         }
     }
 
+    corepkgsFS->addFile(
+        CanonPath("fetchurl.nix"),
+        #include "fetchurl.nix.gen.hh"
+    );
+
     createBaseEnv();
 }
 
@@ -600,6 +616,7 @@ void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & 
 
 SourcePath EvalState::checkSourcePath(const SourcePath & path_)
 {
+    if (path_.accessor != rootFS) return path_;
     if (!allowedPaths) return path_;
 
     auto i = resolvedPaths.find(path_.path.abs());
@@ -613,8 +630,6 @@ SourcePath EvalState::checkSourcePath(const SourcePath & path_)
      * and thus leak symlink targets.
      */
     Path abspath = canonPath(path_.path.abs());
-
-    if (hasPrefix(abspath, corepkgsPrefix)) return rootPath(CanonPath(abspath));
 
     for (auto & i : *allowedPaths) {
         if (isDirOrInDir(abspath, i)) {
@@ -1180,24 +1195,6 @@ void EvalState::evalFile(const SourcePath & path_, Value & v, bool mustBeTrivial
     if (!e)
         e = parseExprFromFile(checkSourcePath(resolvedPath));
 
-    cacheFile(path, resolvedPath, e, v, mustBeTrivial);
-}
-
-
-void EvalState::resetFileCache()
-{
-    fileEvalCache.clear();
-    fileParseCache.clear();
-}
-
-
-void EvalState::cacheFile(
-    const SourcePath & path,
-    const SourcePath & resolvedPath,
-    Expr * e,
-    Value & v,
-    bool mustBeTrivial)
-{
     fileParseCache[resolvedPath] = e;
 
     try {
@@ -1223,6 +1220,13 @@ void EvalState::cacheFile(
 
     fileEvalCache[resolvedPath] = v;
     if (path != resolvedPath) fileEvalCache[path] = v;
+}
+
+
+void EvalState::resetFileCache()
+{
+    fileEvalCache.clear();
+    fileParseCache.clear();
 }
 
 
@@ -2341,10 +2345,31 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
 
 SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)
 {
-    auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
-    if (path == "" || path[0] != '/')
-        error("string '%1%' doesn't represent an absolute path", path).withTrace(pos, errorCtx).debugThrow<EvalError>();
-    return rootPath(CanonPath(path));
+    try {
+        forceValue(v, pos);
+
+        if (v.type() == nString) {
+            copyContext(v, context);
+            auto s = v.string_view();
+            if (!hasPrefix(s, "/"))
+                error("string '%s' doesn't represent an absolute path", s).atPos(pos).debugThrow<EvalError>();
+            return rootPath(CanonPath(s));
+        }
+    } catch (Error & e) {
+        e.addTrace(positions[pos], errorCtx);
+        throw;
+    }
+
+    if (v.type() == nPath)
+        return v.path();
+
+    if (v.type() == nAttrs) {
+        auto i = v.attrs->find(sOutPath);
+        if (i != v.attrs->end())
+            return coerceToPath(pos, *i->value, context, errorCtx);
+    }
+
+    error("cannot coerce %1% to a path", showType(v)).withTrace(pos, errorCtx).debugThrow<TypeError>();
 }
 
 
