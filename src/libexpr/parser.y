@@ -64,6 +64,7 @@ struct StringToken {
 
 #include "parser-tab.hh"
 #include "lexer-tab.hh"
+#include "fs-input-accessor.hh"
 
 YY_DECL;
 
@@ -520,7 +521,7 @@ path_start
     /* add back in the trailing '/' to the first segment */
     if ($1.p[$1.l-1] == '/' && $1.l > 1)
       path += "/";
-    $$ = new ExprPath(std::move(path));
+    $$ = new ExprPath(ref<InputAccessor>(data->state.rootFS), std::move(path));
   }
   | HPATH {
     if (evalSettings.pureEval) {
@@ -530,7 +531,7 @@ path_start
         );
     }
     Path path(getHome() + std::string($1.p + 1, $1.l - 1));
-    $$ = new ExprPath(std::move(path));
+    $$ = new ExprPath(ref<InputAccessor>(data->state.rootFS), std::move(path));
   }
   ;
 
@@ -756,11 +757,11 @@ SourcePath EvalState::findFile(const SearchPath & searchPath, const std::string_
         auto r = *rOpt;
 
         Path res = suffix == "" ? r : concatStrings(r, "/", suffix);
-        if (pathExists(res)) return CanonPath(canonPath(res));
+        if (pathExists(res)) return rootPath(CanonPath(canonPath(res)));
     }
 
     if (hasPrefix(path, "nix/"))
-        return CanonPath(concatStrings(corepkgsPrefix, path.substr(4)));
+        return rootPath(CanonPath(concatStrings(corepkgsPrefix, path.substr(4))));
 
     debugThrow(ThrownError({
         .msg = hintfmt(evalSettings.pureEval

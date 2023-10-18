@@ -20,7 +20,6 @@ MakeError(Abort, EvalError);
 MakeError(TypeError, EvalError);
 MakeError(UndefinedVarError, Error);
 MakeError(MissingArgumentError, EvalError);
-MakeError(RestrictedPathError, Error);
 
 /**
  * Position objects.
@@ -200,9 +199,13 @@ struct ExprString : Expr
 
 struct ExprPath : Expr
 {
+    ref<InputAccessor> accessor;
     std::string s;
     Value v;
-    ExprPath(std::string s) : s(std::move(s)) { v.mkPath(this->s.c_str()); };
+    ExprPath(ref<InputAccessor> accessor, std::string s) : accessor(accessor), s(std::move(s))
+    {
+        v.mkPath(&*accessor, this->s.c_str());
+    }
     Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
 };

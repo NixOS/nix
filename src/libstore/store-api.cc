@@ -225,12 +225,16 @@ StorePath Store::makeFixedOutputPathFromCA(std::string_view name, const ContentA
 }
 
 
-std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
-    const Path & srcPath, FileIngestionMethod method, HashType hashAlgo, PathFilter & filter) const
+std::pair<StorePath, Hash> Store::computeStorePathFromDump(
+    Source & dump,
+    std::string_view name,
+    FileIngestionMethod method,
+    HashType hashAlgo,
+    const StorePathSet & references) const
 {
-    Hash h = method == FileIngestionMethod::Recursive
-        ? hashPath(hashAlgo, srcPath, filter).first
-        : hashFile(hashAlgo, srcPath);
+    HashSink sink(hashAlgo);
+    dump.drainInto(sink);
+    auto h = sink.finish().first;
     FixedOutputInfo caInfo {
         .method = method,
         .hash = h,

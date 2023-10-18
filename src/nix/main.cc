@@ -204,30 +204,30 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
     auto vGenerateManpage = state.allocValue();
     state.eval(state.parseExprFromString(
         #include "generate-manpage.nix.gen.hh"
-        , CanonPath::root), *vGenerateManpage);
+        , state.rootPath(CanonPath::root)), *vGenerateManpage);
 
     auto vUtils = state.allocValue();
     state.cacheFile(
-        CanonPath("/utils.nix"), CanonPath("/utils.nix"),
+        state.rootPath(CanonPath("/utils.nix")), state.rootPath(CanonPath("/utils.nix")),
         state.parseExprFromString(
             #include "utils.nix.gen.hh"
-            , CanonPath::root),
+            , state.rootPath(CanonPath::root)),
         *vUtils);
 
     auto vSettingsInfo = state.allocValue();
     state.cacheFile(
-        CanonPath("/generate-settings.nix"), CanonPath("/generate-settings.nix"),
+        state.rootPath(CanonPath("/generate-settings.nix")), state.rootPath(CanonPath("/generate-settings.nix")),
         state.parseExprFromString(
             #include "generate-settings.nix.gen.hh"
-            , CanonPath::root),
+            , state.rootPath(CanonPath::root)),
         *vSettingsInfo);
 
     auto vStoreInfo = state.allocValue();
     state.cacheFile(
-        CanonPath("/generate-store-info.nix"), CanonPath("/generate-store-info.nix"),
+        state.rootPath(CanonPath("/generate-store-info.nix")), state.rootPath(CanonPath("/generate-store-info.nix")),
         state.parseExprFromString(
             #include "generate-store-info.nix.gen.hh"
-            , CanonPath::root),
+            , state.rootPath(CanonPath::root)),
         *vStoreInfo);
 
     auto vDump = state.allocValue();

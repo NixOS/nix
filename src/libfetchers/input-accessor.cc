@@ -3,10 +3,147 @@
 
 namespace nix {
 
+static std::atomic<size_t> nextNumber{0};
+
+InputAccessor::InputAccessor()
+    : number(++nextNumber)
+{
+}
+
+// FIXME: merge with archive.cc.
+void InputAccessor::dumpPath(
+    const CanonPath & path,
+    Sink & sink,
+    PathFilter & filter)
+{
+    auto dumpContents = [&](const CanonPath & path)
+    {
+        // FIXME: pipe
+        auto s = readFile(path);
+        sink << "contents" << s.size();
+        sink(s);
+        writePadding(s.size(), sink);
+    };
+
+    std::function<void(const CanonPath & path)> dump;
+
+    dump = [&](const CanonPath & path) {
+        checkInterrupt();
+
+        auto st = lstat(path);
+
+        sink << "(";
+
+        if (st.type == tRegular) {
+            sink << "type" << "regular";
+            if (st.isExecutable)
+                sink << "executable" << "";
+            dumpContents(path);
+        }
+
+        else if (st.type == tDirectory) {
+            sink << "type" << "directory";
+
+            /* If we're on a case-insensitive system like macOS, undo
+               the case hack applied by restorePath(). */
+            std::map<std::string, std::string> unhacked;
+            for (auto & i : readDirectory(path))
+                if (/* archiveSettings.useCaseHack */ false) { // FIXME
+                    std::string name(i.first);
+                    size_t pos = i.first.find(caseHackSuffix);
+                    if (pos != std::string::npos) {
+                        debug("removing case hack suffix from '%s'", path + i.first);
+                        name.erase(pos);
+                    }
+                    if (!unhacked.emplace(name, i.first).second)
+                        throw Error("file name collision in between '%s' and '%s'",
+                            (path + unhacked[name]),
+                            (path + i.first));
+                } else
+                    unhacked.emplace(i.first, i.first);
+
+            for (auto & i : unhacked)
+                if (filter((path + i.first).abs())) {
+                    sink << "entry" << "(" << "name" << i.first << "node";
+                    dump(path + i.second);
+                    sink << ")";
+                }
+        }
+
+        else if (st.type == tSymlink)
+            sink << "type" << "symlink" << "target" << readLink(path);
+
+        else throw Error("file '%s' has an unsupported type", path);
+
+        sink << ")";
+    };
+
+    sink << narVersionMagic1;
+    dump(path);
+}
+
+Hash InputAccessor::hashPath(
+    const CanonPath & path,
+    PathFilter & filter,
+    HashType ht)
+{
+    HashSink sink(ht);
+    dumpPath(path, sink, filter);
+    return sink.finish().first;
+}
+
+StorePath InputAccessor::fetchToStore(
+    ref<Store> store,
+    const CanonPath & path,
+    std::string_view name,
+    PathFilter * filter,
+    RepairFlag repair)
+{
+    Activity act(*logger, lvlChatty, actUnknown, fmt("copying '%s' to the store", showPath(path)));
+
+    auto source = sinkToSource([&](Sink & sink) {
+        dumpPath(path, sink, filter ? *filter : defaultPathFilter);
+    });
+
+    auto storePath =
+        settings.readOnlyMode
+        ? store->computeStorePathFromDump(*source, name).first
+        : store->addToStoreFromDump(*source, name, FileIngestionMethod::Recursive, htSHA256, repair);
+
+    return storePath;
+}
+
+std::optional<InputAccessor::Stat> InputAccessor::maybeLstat(const CanonPath & path)
+{
+    // FIXME: merge these into one operation.
+    if (!pathExists(path))
+        return {};
+    return lstat(path);
+}
+
+std::string InputAccessor::showPath(const CanonPath & path)
+{
+    return path.abs();
+}
+
+SourcePath InputAccessor::root()
+{
+    return {ref(shared_from_this()), CanonPath::root};
+}
+
 std::ostream & operator << (std::ostream & str, const SourcePath & path)
 {
     str << path.to_string();
     return str;
+}
+
+StorePath SourcePath::fetchToStore(
+    ref<Store> store,
+    std::string_view name,
+    PathFilter * filter,
+    RepairFlag repair) const
+{
+    return accessor->fetchToStore(store, path, name, filter, repair);
 }
 
 std::string_view SourcePath::baseName() const
@@ -18,60 +155,12 @@ SourcePath SourcePath::parent() const
 {
     auto p = path.parent();
     assert(p);
-    return std::move(*p);
-}
-
-InputAccessor::Stat SourcePath::lstat() const
-{
-    auto st = nix::lstat(path.abs());
-    return InputAccessor::Stat {
-        .type =
-            S_ISREG(st.st_mode) ? InputAccessor::tRegular :
-            S_ISDIR(st.st_mode) ? InputAccessor::tDirectory :
-            S_ISLNK(st.st_mode) ? InputAccessor::tSymlink :
-            InputAccessor::tMisc,
-        .isExecutable = S_ISREG(st.st_mode) && st.st_mode & S_IXUSR
-    };
-}
-
-std::optional<InputAccessor::Stat> SourcePath::maybeLstat() const
-{
-    // FIXME: merge these into one operation.
-    if (!pathExists())
-        return {};
-    return lstat();
-}
-
-InputAccessor::DirEntries SourcePath::readDirectory() const
-{
-    InputAccessor::DirEntries res;
-    for (auto & entry : nix::readDirectory(path.abs())) {
-        std::optional<InputAccessor::Type> type;
-        switch (entry.type) {
-        case DT_REG: type = InputAccessor::Type::tRegular; break;
-        case DT_LNK: type = InputAccessor::Type::tSymlink; break;
-        case DT_DIR: type = InputAccessor::Type::tDirectory; break;
-        }
-        res.emplace(entry.name, type);
-    }
-    return res;
-}
-
-StorePath SourcePath::fetchToStore(
-    ref<Store> store,
-    std::string_view name,
-    PathFilter * filter,
-    RepairFlag repair) const
-{
-    return
-        settings.readOnlyMode
-        ? store->computeStorePathForPath(name, path.abs(), FileIngestionMethod::Recursive, htSHA256, filter ? *filter : defaultPathFilter).first
-        : store->addToStore(name, path.abs(), FileIngestionMethod::Recursive, htSHA256, filter ? *filter : defaultPathFilter, repair);
+    return {accessor, std::move(*p)};
 }
 
 SourcePath SourcePath::resolveSymlinks() const
 {
-    SourcePath res(CanonPath::root);
+    auto res = accessor->root();
 
     int linksAllowed = 1024;
 

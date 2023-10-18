@@ -202,7 +202,7 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
             state.vImportedDrvToDerivation = allocRootValue(state.allocValue());
             state.eval(state.parseExprFromString(
                 #include "imported-drv-to-derivation.nix.gen.hh"
-                , CanonPath::root), **state.vImportedDrvToDerivation);
+                , state.rootPath(CanonPath::root)), **state.vImportedDrvToDerivation);
         }
 
         state.forceFunction(**state.vImportedDrvToDerivation, pos, "while evaluating imported-drv-to-derivation.nix.gen.hh");
@@ -213,7 +213,7 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
     else if (path2 == corepkgsPrefix + "fetchurl.nix") {
         state.eval(state.parseExprFromString(
             #include "fetchurl.nix.gen.hh"
-            , CanonPath::root), v);
+            , state.rootPath(CanonPath::root)), v);
     }
 
     else {
@@ -599,7 +599,8 @@ struct CompareValues
                 case nString:
                     return v1->string_view().compare(v2->string_view()) < 0;
                 case nPath:
-                    return strcmp(v1->_path, v2->_path) < 0;
+                    // FIXME: handle accessor?
+                    return strcmp(v1->_path.path, v2->_path.path) < 0;
                 case nList:
                     // Lexicographic comparison
                     for (size_t i = 0;; i++) {
@@ -2203,7 +2204,7 @@ static void addPath(
 
         path = evalSettings.pureEval && expectedHash
             ? path
-            : state.checkSourcePath(CanonPath(path)).path.abs();
+            : state.checkSourcePath(state.rootPath(CanonPath(path))).path.abs();
 
         PathFilter filter = filterFun ? ([&](const Path & path) {
             auto st = lstat(path);
@@ -2236,9 +2237,10 @@ static void addPath(
             });
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-            StorePath dstPath = settings.readOnlyMode
-                ? state.store->computeStorePathForPath(name, path, method, htSHA256, filter).first
-                : state.store->addToStore(name, path, method, htSHA256, filter, state.repair, refs);
+            // FIXME
+            if (method != FileIngestionMethod::Recursive)
+                throw Error("'recursive = false' is not implemented");
+            auto dstPath = state.rootPath(CanonPath(path)).fetchToStore(state.store, name, &filter, state.repair);
             if (expectedHash && expectedStorePath != dstPath)
                 state.debugThrowLastTrace(Error("store path mismatch in (possibly filtered) path added from '%s'", path));
             state.allowAndSetStorePathString(dstPath, v);
@@ -4447,7 +4449,7 @@ void EvalState::createBaseEnv()
         // the parser needs two NUL bytes as terminators; one of them
         // is implied by being a C string.
         "\0";
-    eval(parse(code, sizeof(code), derivationInternal, {CanonPath::root}, staticBaseEnv), *vDerivation);
+    eval(parse(code, sizeof(code), derivationInternal, rootPath(CanonPath::root), staticBaseEnv), *vDerivation);
 }
 
 

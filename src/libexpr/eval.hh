@@ -24,6 +24,7 @@ class EvalState;
 class StorePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
+struct FSInputAccessor;
 
 
 /**
@@ -210,6 +211,8 @@ public:
     std::optional<PathSet> allowedPaths;
 
     Bindings emptyBindings;
+
+    const ref<FSInputAccessor> rootFS;
 
     const SourcePath derivationInternal;
 

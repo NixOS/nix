@@ -5,14 +5,29 @@
 #include "archive.hh"
 #include "canon-path.hh"
 #include "repair-flag.hh"
+#include "hash.hh"
 
 namespace nix {
 
+MakeError(RestrictedPathError, Error);
+
+struct SourcePath;
 class StorePath;
 class Store;
 
-struct InputAccessor
+struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
 {
+    const size_t number;
+
+    InputAccessor();
+
+    virtual ~InputAccessor()
+    { }
+
+    virtual std::string readFile(const CanonPath & path) = 0;
+
+    virtual bool pathExists(const CanonPath & path) = 0;
+
     enum Type {
       tRegular, tSymlink, tDirectory,
       /**
@@ -32,9 +47,63 @@ struct InputAccessor
         bool isExecutable = false; // regular files only
     };
 
+    virtual Stat lstat(const CanonPath & path) = 0;
+
+    std::optional<Stat> maybeLstat(const CanonPath & path);
+
     typedef std::optional<Type> DirEntry;
 
     typedef std::map<std::string, DirEntry> DirEntries;
+
+    virtual DirEntries readDirectory(const CanonPath & path) = 0;
+
+    virtual std::string readLink(const CanonPath & path) = 0;
+
+    virtual void dumpPath(
+        const CanonPath & path,
+        Sink & sink,
+        PathFilter & filter = defaultPathFilter);
+
+    Hash hashPath(
+        const CanonPath & path,
+        PathFilter & filter = defaultPathFilter,
+        HashType ht = htSHA256);
+
+    StorePath fetchToStore(
+        ref<Store> store,
+        const CanonPath & path,
+        std::string_view name = "source",
+        PathFilter * filter = nullptr,
+        RepairFlag repair = NoRepair);
+
+    /* Return a corresponding path in the root filesystem, if
+       possible. This is only possible for inputs that are
+       materialized in the root filesystem. */
+    virtual std::optional<CanonPath> getPhysicalPath(const CanonPath & path)
+    { return std::nullopt; }
+
+    bool operator == (const InputAccessor & x) const
+    {
+        return number == x.number;
+    }
+
+    bool operator < (const InputAccessor & x) const
+    {
+        return number < x.number;
+    }
+
+    void setPathDisplay(std::string displayPrefix, std::string displaySuffix = "");
+
+    virtual std::string showPath(const CanonPath & path);
+
+    SourcePath root();
+
+    /* Return the maximum last-modified time of the files in this
+       tree, if available. */
+    virtual std::optional<time_t> getLastModified()
+    {
+        return std::nullopt;
+    }
 };
 
 /**
@@ -45,11 +114,8 @@ struct InputAccessor
  */
 struct SourcePath
 {
+    ref<InputAccessor> accessor;
     CanonPath path;
-
-    SourcePath(CanonPath path)
-        : path(std::move(path))
-    { }
 
     std::string_view baseName() const;
 
@@ -64,39 +130,42 @@ struct SourcePath
      * return its contents; otherwise throw an error.
      */
     std::string readFile() const
-    { return nix::readFile(path.abs()); }
+    { return accessor->readFile(path); }
 
     /**
      * Return whether this `SourcePath` denotes a file (of any type)
      * that exists
     */
     bool pathExists() const
-    { return nix::pathExists(path.abs()); }
+    { return accessor->pathExists(path); }
 
     /**
      * Return stats about this `SourcePath`, or throw an exception if
      * it doesn't exist.
      */
-    InputAccessor::Stat lstat() const;
+    InputAccessor::Stat lstat() const
+    { return accessor->lstat(path); }
 
     /**
      * Return stats about this `SourcePath`, or std::nullopt if it
      * doesn't exist.
      */
-    std::optional<InputAccessor::Stat> maybeLstat() const;
+    std::optional<InputAccessor::Stat> maybeLstat() const
+    { return accessor->maybeLstat(path); }
 
     /**
      * If this `SourcePath` denotes a directory (not a symlink),
      * return its directory entries; otherwise throw an error.
      */
-    InputAccessor::DirEntries readDirectory() const;
+    InputAccessor::DirEntries readDirectory() const
+    { return accessor->readDirectory(path); }
 
     /**
      * If this `SourcePath` denotes a symlink, return its target;
      * otherwise throw an error.
      */
     std::string readLink() const
-    { return nix::readLink(path.abs()); }
+    { return accessor->readLink(path); }
 
     /**
      * Dump this `SourcePath` to `sink` as a NAR archive.
@@ -104,7 +173,7 @@ struct SourcePath
     void dumpPath(
         Sink & sink,
         PathFilter & filter = defaultPathFilter) const
-    { return nix::dumpPath(path.abs(), sink, filter); }
+    { return accessor->dumpPath(path, sink, filter); }
 
     /**
      * Copy this `SourcePath` to the Nix store.
@@ -120,7 +189,7 @@ struct SourcePath
      * it has a physical location.
      */
     std::optional<CanonPath> getPhysicalPath() const
-    { return path; }
+    { return accessor->getPhysicalPath(path); }
 
     std::string to_string() const
     { return path.abs(); }
@@ -129,7 +198,7 @@ struct SourcePath
      * Append a `CanonPath` to this path.
      */
     SourcePath operator + (const CanonPath & x) const
-    { return {path + x}; }
+    { return {accessor, path + x}; }
 
     /**
      * Append a single component `c` to this path. `c` must not
@@ -137,21 +206,21 @@ struct SourcePath
      * and `c`.
      */
     SourcePath operator + (std::string_view c) const
-    {  return {path + c}; }
+    {  return {accessor, path + c}; }
 
     bool operator == (const SourcePath & x) const
     {
-        return path == x.path;
+        return std::tie(accessor, path) == std::tie(x.accessor, x.path);
     }
 
     bool operator != (const SourcePath & x) const
     {
-        return path != x.path;
+        return std::tie(accessor, path) != std::tie(x.accessor, x.path);
     }
 
     bool operator < (const SourcePath & x) const
     {
-        return path < x.path;
+        return std::tie(accessor, path) < std::tie(x.accessor, x.path);
     }
 
     /**
