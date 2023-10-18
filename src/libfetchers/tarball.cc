@@ -308,7 +308,7 @@ struct TarballInputScheme : CurlInputScheme
             input = immutableInput;
         }
 
-        if (result.lastModified && !input.attrs.contains("lastModified"))
+        if (result.lastModified && !input.attrs.count("lastModified"))
             input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
 
         return {result.tree.storePath, std::move(input)};
