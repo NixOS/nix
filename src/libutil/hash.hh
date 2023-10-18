@@ -23,7 +23,21 @@ extern std::set<std::string> hashTypes;
 
 extern const std::string base32Chars;
 
-enum HashFormat : int { Base64, Base32, Base16, SRI };
+/**
+ * @brief Enumeration representing the hash formats.
+ */
+enum HashFormat : int {
+    /// @brief Base 64 encoding.
+    /// @see [IETF RFC 4648, section 4](https://datatracker.ietf.org/doc/html/rfc4648#section-4).
+    Base64,
+    /// @brief Nix-specific base-32 encoding. @see base32Chars
+    Base32,
+    /// @brief Lowercase hexadecimal encoding. @see base16Chars
+    Base16,
+    /// @brief "<hash algo>:<Base 64 hash>", format of the SRI integrity attribute.
+    /// @see W3C recommendation [Subresource Intergrity](https://www.w3.org/TR/SRI/).
+    SRI
+};
 
 
 struct Hash
