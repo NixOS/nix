@@ -50,7 +50,9 @@ The team meets twice a week:
   1. Code review on pull requests from [In review](#in-review).
   2. Other chores and tasks.
 
-Meeting notes are collected on a [collaborative scratchpad](https://pad.lassul.us/Cv7FpYx-Ri-4VjUykQOLAw), and published on Discourse under the [Nix category](https://discourse.nixos.org/c/dev/nix/50).
+Meeting notes are collected on a [collaborative scratchpad](https://pad.lassul.us/Cv7FpYx-Ri-4VjUykQOLAw).
+Notes on issues and pull requests are posted as comments and linked from the meeting notes, so they are easy to find from both places.
+[All meeting notes](https://discourse.nixos.org/search?expanded=true&q=Nix%20team%20meeting%20minutes%20%23%20%23dev%3Anix%20in%3Atitle%20order%3Alatest_topic) are published on Discourse under the [Nix category](https://discourse.nixos.org/c/dev/nix/50).
 
 ## Project board protocol
 
