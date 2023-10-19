@@ -708,6 +708,7 @@ public:
           `kvm` feature.
 
           This setting by default includes `kvm` if `/dev/kvm` is accessible,
+          `apple-virt` if hardware virtualization is available on macOS,
           and the pseudo-features `nixos-test`, `benchmark` and `big-parallel`
           that are used in Nixpkgs to route builds to specific machines.
         )", {}, false};
