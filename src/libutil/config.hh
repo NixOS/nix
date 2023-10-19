@@ -312,8 +312,7 @@ public:
 template<typename T>
 std::ostream & operator <<(std::ostream & str, const BaseSetting<T> & opt)
 {
-    str << (const T &) opt;
-    return str;
+    return str << static_cast<const T &>(opt);
 }
 
 template<typename T>
