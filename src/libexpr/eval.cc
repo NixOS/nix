@@ -616,7 +616,9 @@ void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & 
 
 SourcePath EvalState::checkSourcePath(const SourcePath & path_)
 {
-    if (path_.accessor != rootFS) return path_;
+    // Don't check non-rootFS accessors, they're in a different namespace.
+    if (path_.accessor != ref<InputAccessor>(rootFS)) return path_;
+
     if (!allowedPaths) return path_;
 
     auto i = resolvedPaths.find(path_.path.abs());
