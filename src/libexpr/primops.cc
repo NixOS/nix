@@ -734,6 +734,17 @@ static RegisterPrimOp primop_genericClosure(PrimOp {
       ```
       [ { key = 5; } { key = 16; } { key = 8; } { key = 4; } { key = 2; } { key = 1; } ]
       ```
+
+      > **Note**
+      >
+      > `key` can be one of the following types:
+      >
+      > - [Number](@docroot@/language/values.md#type-number)
+      > - [Boolean](@docroot@/language/values.md#type-boolean)
+      > - [String](@docroot@/language/values.md#type-string)
+      > - [Path](@docroot@/language/values.md#type-path)
+      > - [List](@docroot@/language/values.md#list)
+
       )",
     .fun = prim_genericClosure,
 });
