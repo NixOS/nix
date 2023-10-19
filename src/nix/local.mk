@@ -14,9 +14,9 @@ nix_SOURCES := \
   $(wildcard src/nix-instantiate/*.cc) \
   $(wildcard src/nix-store/*.cc) \
 
-nix_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libexpr -I src/libmain -I src/libcmd -I doc/manual
+nix_CXXFLAGS += -I src/libutil -I src/libstore -I src/libfetchers -I src/libflake -I src/libexpr -I src/libmain -I src/libcmd -I doc/manual
 
-nix_LIBS = libexpr libmain libfetchers libstore libutil libcmd
+nix_LIBS = libexpr libmain libflake libfetchers libstore libutil libcmd
 
 nix_LDFLAGS = -pthread $(SODIUM_LIBS) $(EDITLINE_LIBS) $(BOOST_LDFLAGS) $(LOWDOWN_LIBS)
 
