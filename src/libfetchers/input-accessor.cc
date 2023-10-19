@@ -96,6 +96,7 @@ StorePath InputAccessor::fetchToStore(
     ref<Store> store,
     const CanonPath & path,
     std::string_view name,
+    FileIngestionMethod method,
     PathFilter * filter,
     RepairFlag repair)
 {
@@ -107,8 +108,8 @@ StorePath InputAccessor::fetchToStore(
 
     auto storePath =
         settings.readOnlyMode
-        ? store->computeStorePathFromDump(*source, name).first
-        : store->addToStoreFromDump(*source, name, FileIngestionMethod::Recursive, htSHA256, repair);
+        ? store->computeStorePathFromDump(*source, name, method, htSHA256).first
+        : store->addToStoreFromDump(*source, name, method, htSHA256, repair);
 
     return storePath;
 }
@@ -140,10 +141,11 @@ std::ostream & operator << (std::ostream & str, const SourcePath & path)
 StorePath SourcePath::fetchToStore(
     ref<Store> store,
     std::string_view name,
+    FileIngestionMethod method,
     PathFilter * filter,
     RepairFlag repair) const
 {
-    return accessor->fetchToStore(store, path, name, filter, repair);
+    return accessor->fetchToStore(store, path, name, method, filter, repair);
 }
 
 std::string_view SourcePath::baseName() const

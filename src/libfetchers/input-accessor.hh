@@ -6,6 +6,7 @@
 #include "canon-path.hh"
 #include "repair-flag.hh"
 #include "hash.hh"
+#include "content-address.hh"
 
 namespace nix {
 
@@ -73,6 +74,7 @@ struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
         ref<Store> store,
         const CanonPath & path,
         std::string_view name = "source",
+        FileIngestionMethod method = FileIngestionMethod::Recursive,
         PathFilter * filter = nullptr,
         RepairFlag repair = NoRepair);
 
@@ -181,6 +183,7 @@ struct SourcePath
     StorePath fetchToStore(
         ref<Store> store,
         std::string_view name = "source",
+        FileIngestionMethod method = FileIngestionMethod::Recursive,
         PathFilter * filter = nullptr,
         RepairFlag repair = NoRepair) const;
 

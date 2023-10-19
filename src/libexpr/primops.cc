@@ -2233,10 +2233,7 @@ static void addPath(
             });
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-            // FIXME
-            if (method != FileIngestionMethod::Recursive)
-                throw Error("'recursive = false' is not implemented");
-            auto dstPath = state.rootPath(CanonPath(path)).fetchToStore(state.store, name, &filter, state.repair);
+            auto dstPath = state.rootPath(CanonPath(path)).fetchToStore(state.store, name, method, &filter, state.repair);
             if (expectedHash && expectedStorePath != dstPath)
                 state.debugThrowLastTrace(Error("store path mismatch in (possibly filtered) path added from '%s'", path));
             state.allowAndSetStorePathString(dstPath, v);
