@@ -14,6 +14,7 @@
 #include "archive.hh"
 #include "util.hh"
 #include "config.hh"
+#include "source-accessor.hh"
 
 namespace nix {
 
@@ -36,91 +37,134 @@ static GlobalConfig::Register rArchiveSettings(&archiveSettings);
 PathFilter defaultPathFilter = [](const Path &) { return true; };
 
 
-static void dumpContents(const Path & path, off_t size,
-    Sink & sink)
+void SourceAccessor::dumpPath(
+    const CanonPath & path,
+    Sink & sink,
+    PathFilter & filter)
 {
-    sink << "contents" << size;
+    auto dumpContents = [&](const CanonPath & path)
+    {
+        /* It would be nice if this was streaming, but we need the
+           size before the contents. */
+        auto s = readFile(path);
+        sink << "contents" << s.size();
+        sink(s);
+        writePadding(s.size(), sink);
+    };
 
-    AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
-    if (!fd) throw SysError("opening file '%1%'", path);
+    std::function<void(const CanonPath & path)> dump;
 
-    std::vector<char> buf(65536);
-    size_t left = size;
+    dump = [&](const CanonPath & path) {
+        checkInterrupt();
 
-    while (left > 0) {
-        auto n = std::min(left, buf.size());
-        readFull(fd.get(), buf.data(), n);
-        left -= n;
-        sink({buf.data(), n});
-    }
+        auto st = lstat(path);
 
-    writePadding(size, sink);
+        sink << "(";
+
+        if (st.type == tRegular) {
+            sink << "type" << "regular";
+            if (st.isExecutable)
+                sink << "executable" << "";
+            dumpContents(path);
+        }
+
+        else if (st.type == tDirectory) {
+            sink << "type" << "directory";
+
+            /* If we're on a case-insensitive system like macOS, undo
+               the case hack applied by restorePath(). */
+            std::map<std::string, std::string> unhacked;
+            for (auto & i : readDirectory(path))
+                if (archiveSettings.useCaseHack) {
+                    std::string name(i.first);
+                    size_t pos = i.first.find(caseHackSuffix);
+                    if (pos != std::string::npos) {
+                        debug("removing case hack suffix from '%s'", path + i.first);
+                        name.erase(pos);
+                    }
+                    if (!unhacked.emplace(name, i.first).second)
+                        throw Error("file name collision in between '%s' and '%s'",
+                            (path + unhacked[name]),
+                            (path + i.first));
+                } else
+                    unhacked.emplace(i.first, i.first);
+
+            for (auto & i : unhacked)
+                if (filter((path + i.first).abs())) {
+                    sink << "entry" << "(" << "name" << i.first << "node";
+                    dump(path + i.second);
+                    sink << ")";
+                }
+        }
+
+        else if (st.type == tSymlink)
+            sink << "type" << "symlink" << "target" << readLink(path);
+
+        else throw Error("file '%s' has an unsupported type", path);
+
+        sink << ")";
+    };
+
+    sink << narVersionMagic1;
+    dump(path);
 }
 
 
-static time_t dump(const Path & path, Sink & sink, PathFilter & filter)
+struct FSSourceAccessor : SourceAccessor
 {
-    checkInterrupt();
+    time_t mtime = 0; // most recent mtime seen
 
-    auto st = lstat(path);
-    time_t result = st.st_mtime;
-
-    sink << "(";
-
-    if (S_ISREG(st.st_mode)) {
-        sink << "type" << "regular";
-        if (st.st_mode & S_IXUSR)
-            sink << "executable" << "";
-        dumpContents(path, st.st_size, sink);
+    std::string readFile(const CanonPath & path) override
+    {
+        return nix::readFile(path.abs());
     }
 
-    else if (S_ISDIR(st.st_mode)) {
-        sink << "type" << "directory";
+    bool pathExists(const CanonPath & path) override
+    {
+        return nix::pathExists(path.abs());
+    }
 
-        /* If we're on a case-insensitive system like macOS, undo
-           the case hack applied by restorePath(). */
-        std::map<std::string, std::string> unhacked;
-        for (auto & i : readDirectory(path))
-            if (archiveSettings.useCaseHack) {
-                std::string name(i.name);
-                size_t pos = i.name.find(caseHackSuffix);
-                if (pos != std::string::npos) {
-                    debug("removing case hack suffix from '%1%'", path + "/" + i.name);
-                    name.erase(pos);
-                }
-                if (!unhacked.emplace(name, i.name).second)
-                    throw Error("file name collision in between '%1%' and '%2%'",
-                       (path + "/" + unhacked[name]),
-                       (path + "/" + i.name));
-            } else
-                unhacked.emplace(i.name, i.name);
+    Stat lstat(const CanonPath & path) override
+    {
+        auto st = nix::lstat(path.abs());
+        mtime = std::max(mtime, st.st_mtime);
+        return Stat {
+            .type =
+                S_ISREG(st.st_mode) ? tRegular :
+                S_ISDIR(st.st_mode) ? tDirectory :
+                S_ISLNK(st.st_mode) ? tSymlink :
+                tMisc,
+            .isExecutable = S_ISREG(st.st_mode) && st.st_mode & S_IXUSR
+        };
+    }
 
-        for (auto & i : unhacked)
-            if (filter(path + "/" + i.first)) {
-                sink << "entry" << "(" << "name" << i.first << "node";
-                auto tmp_mtime = dump(path + "/" + i.second, sink, filter);
-                if (tmp_mtime > result) {
-                    result = tmp_mtime;
-                }
-                sink << ")";
+    DirEntries readDirectory(const CanonPath & path) override
+    {
+        DirEntries res;
+        for (auto & entry : nix::readDirectory(path.abs())) {
+            std::optional<Type> type;
+            switch (entry.type) {
+            case DT_REG: type = Type::tRegular; break;
+            case DT_LNK: type = Type::tSymlink; break;
+            case DT_DIR: type = Type::tDirectory; break;
             }
+            res.emplace(entry.name, type);
+        }
+        return res;
     }
 
-    else if (S_ISLNK(st.st_mode))
-        sink << "type" << "symlink" << "target" << readLink(path);
-
-    else throw Error("file '%1%' has an unsupported type", path);
-
-    sink << ")";
-
-    return result;
-}
+    std::string readLink(const CanonPath & path) override
+    {
+        return nix::readLink(path.abs());
+    }
+};
 
 
 time_t dumpPathAndGetMtime(const Path & path, Sink & sink, PathFilter & filter)
 {
-    sink << narVersionMagic1;
-    return dump(path, sink, filter);
+    FSSourceAccessor accessor;
+    accessor.dumpPath(CanonPath::fromCwd(path), sink, filter);
+    return accessor.mtime;
 }
 
 void dumpPath(const Path & path, Sink & sink, PathFilter & filter)
@@ -139,17 +183,6 @@ static SerialisationError badArchive(const std::string & s)
 {
     return SerialisationError("bad archive: " + s);
 }
-
-
-#if 0
-static void skipGeneric(Source & source)
-{
-    if (readString(source) == "(") {
-        while (readString(source) != ")")
-            skipGeneric(source);
-    }
-}
-#endif
 
 
 static void parseContents(ParseSink & sink, Source & source, const Path & path)
