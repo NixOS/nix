@@ -505,18 +505,7 @@ EvalState::EvalState(
     , sOutputSpecified(symbols.create("outputSpecified"))
     , repair(NoRepair)
     , emptyBindings(0)
-    , rootFS(
-        makeFSInputAccessor(
-            CanonPath::root,
-            evalSettings.restrictEval || evalSettings.pureEval
-            ? std::optional<std::set<CanonPath>>(std::set<CanonPath>())
-            : std::nullopt,
-            [](const CanonPath & path) -> RestrictedPathError {
-                auto modeInformation = evalSettings.pureEval
-                    ? "in pure evaluation mode (use '--impure' to override)"
-                    : "in restricted mode";
-                throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
-            }))
+    , rootFS(makeFSInputAccessor(CanonPath::root))
     , corepkgsFS(makeMemoryInputAccessor())
     , internalFS(makeMemoryInputAccessor())
     , derivationInternal{corepkgsFS->addFile(
@@ -541,9 +530,6 @@ EvalState::EvalState(
     , baseEnv(allocEnv(128))
     , staticBaseEnv{std::make_shared<StaticEnv>(false, nullptr)}
 {
-    // For now, don't rely on FSInputAccessor for access control.
-    rootFS->allowPath(CanonPath::root);
-
     countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
     assert(gcInitialised);
