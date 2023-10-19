@@ -63,6 +63,8 @@ The result is a [Boolean] value.
 
 [Has attribute]: #has-attribute
 
+Complexity is O(log₂(*n*)) for *n* attributes in the *attrset*
+
 ## Arithmetic
 
 Numbers are type-compatible:
