@@ -52,9 +52,7 @@ class AbstractConfig
 protected:
     StringMap unknownSettings;
 
-    AbstractConfig(const StringMap & initials = {})
-        : unknownSettings(initials)
-    { }
+    AbstractConfig(StringMap initials = {});
 
 public:
 
@@ -163,9 +161,7 @@ private:
 
 public:
 
-    Config(const StringMap & initials = {})
-        : AbstractConfig(initials)
-    { }
+    Config(StringMap initials = {});
 
     bool set(const std::string & name, const std::string & value) override;
 
@@ -206,12 +202,7 @@ protected:
         const std::set<std::string> & aliases,
         std::optional<ExperimentalFeature> experimentalFeature = std::nullopt);
 
-    virtual ~AbstractSetting()
-    {
-        // Check against a gcc miscompilation causing our constructor
-        // not to run (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=80431).
-        assert(created == 123);
-    }
+    virtual ~AbstractSetting();
 
     virtual void set(const std::string & value, bool append = false) = 0;
 
@@ -229,7 +220,7 @@ protected:
 
     virtual void convertToArg(Args & args, const std::string & category);
 
-    bool isOverridden() const { return overridden; }
+    bool isOverridden() const;
 };
 
 /**
@@ -365,11 +356,7 @@ public:
         const Path & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : BaseSetting<Path>(def, true, name, description, aliases)
-    {
-        options->addSetting(this);
-    }
+        const std::set<std::string> & aliases = {});
 
     Path parse(const std::string & str) const override;
 
@@ -391,15 +378,11 @@ public:
         const std::optional<Path> & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
-        : BaseSetting<std::optional<Path>>(def, true, name, description, aliases)
-    {
-        options->addSetting(this);
-    }
+        const std::set<std::string> & aliases = {});
 
     std::optional<Path> parse(const std::string & str) const override;
 
-    void operator =(const std::optional<Path> & v) { this->assign(v); }
+    void operator =(const std::optional<Path> & v);
 };
 
 struct GlobalConfig : public AbstractConfig
