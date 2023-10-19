@@ -148,9 +148,6 @@ public:
     {
         bool isAlias;
         AbstractSetting * setting;
-        SettingData(bool isAlias, AbstractSetting * setting)
-            : isAlias(isAlias), setting(setting)
-        { }
     };
 
     typedef std::map<std::string, SettingData> Settings;
