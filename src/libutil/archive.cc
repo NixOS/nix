@@ -110,59 +110,9 @@ void SourceAccessor::dumpPath(
 }
 
 
-struct FSSourceAccessor : SourceAccessor
-{
-    time_t mtime = 0; // most recent mtime seen
-
-    std::string readFile(const CanonPath & path) override
-    {
-        return nix::readFile(path.abs());
-    }
-
-    bool pathExists(const CanonPath & path) override
-    {
-        return nix::pathExists(path.abs());
-    }
-
-    Stat lstat(const CanonPath & path) override
-    {
-        auto st = nix::lstat(path.abs());
-        mtime = std::max(mtime, st.st_mtime);
-        return Stat {
-            .type =
-                S_ISREG(st.st_mode) ? tRegular :
-                S_ISDIR(st.st_mode) ? tDirectory :
-                S_ISLNK(st.st_mode) ? tSymlink :
-                tMisc,
-            .isExecutable = S_ISREG(st.st_mode) && st.st_mode & S_IXUSR
-        };
-    }
-
-    DirEntries readDirectory(const CanonPath & path) override
-    {
-        DirEntries res;
-        for (auto & entry : nix::readDirectory(path.abs())) {
-            std::optional<Type> type;
-            switch (entry.type) {
-            case DT_REG: type = Type::tRegular; break;
-            case DT_LNK: type = Type::tSymlink; break;
-            case DT_DIR: type = Type::tDirectory; break;
-            }
-            res.emplace(entry.name, type);
-        }
-        return res;
-    }
-
-    std::string readLink(const CanonPath & path) override
-    {
-        return nix::readLink(path.abs());
-    }
-};
-
-
 time_t dumpPathAndGetMtime(const Path & path, Sink & sink, PathFilter & filter)
 {
-    FSSourceAccessor accessor;
+    PosixSourceAccessor accessor;
     accessor.dumpPath(CanonPath::fromCwd(path), sink, filter);
     return accessor.mtime;
 }

@@ -93,4 +93,28 @@ struct SourceAccessor
     }
 };
 
+/**
+ * A source accessor that uses the Unix filesystem.
+ */
+struct PosixSourceAccessor : SourceAccessor
+{
+    /**
+     * The most recent mtime seen by lstat(). This is a hack to
+     * support dumpPathAndGetMtime(). Should remove this eventually.
+     */
+    time_t mtime = 0;
+
+    std::string readFile(const CanonPath & path) override;
+
+    bool pathExists(const CanonPath & path) override;
+
+    Stat lstat(const CanonPath & path) override;
+
+    DirEntries readDirectory(const CanonPath & path) override;
+
+    std::string readLink(const CanonPath & path) override;
+
+    std::optional<CanonPath> getPhysicalPath(const CanonPath & path) override;
+};
+
 }
