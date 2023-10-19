@@ -1,11 +1,9 @@
 #pragma once
 
+#include "source-accessor.hh"
 #include "ref.hh"
 #include "types.hh"
-#include "archive.hh"
-#include "canon-path.hh"
 #include "repair-flag.hh"
-#include "hash.hh"
 #include "content-address.hh"
 
 namespace nix {
@@ -16,60 +14,8 @@ struct SourcePath;
 class StorePath;
 class Store;
 
-struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
+struct InputAccessor : SourceAccessor, std::enable_shared_from_this<InputAccessor>
 {
-    const size_t number;
-
-    InputAccessor();
-
-    virtual ~InputAccessor()
-    { }
-
-    virtual std::string readFile(const CanonPath & path) = 0;
-
-    virtual bool pathExists(const CanonPath & path) = 0;
-
-    enum Type {
-      tRegular, tSymlink, tDirectory,
-      /**
-        Any other node types that may be encountered on the file system, such as device nodes, sockets, named pipe, and possibly even more exotic things.
-
-        Responsible for `"unknown"` from `builtins.readFileType "/dev/null"`.
-
-        Unlike `DT_UNKNOWN`, this must not be used for deferring the lookup of types.
-      */
-      tMisc
-    };
-
-    struct Stat
-    {
-        Type type = tMisc;
-        //uint64_t fileSize = 0; // regular files only
-        bool isExecutable = false; // regular files only
-    };
-
-    virtual Stat lstat(const CanonPath & path) = 0;
-
-    std::optional<Stat> maybeLstat(const CanonPath & path);
-
-    typedef std::optional<Type> DirEntry;
-
-    typedef std::map<std::string, DirEntry> DirEntries;
-
-    virtual DirEntries readDirectory(const CanonPath & path) = 0;
-
-    virtual std::string readLink(const CanonPath & path) = 0;
-
-    virtual void dumpPath(
-        const CanonPath & path,
-        Sink & sink,
-        PathFilter & filter = defaultPathFilter);
-
-    Hash hashPath(
-        const CanonPath & path,
-        PathFilter & filter = defaultPathFilter,
-        HashType ht = htSHA256);
-
     StorePath fetchToStore(
         ref<Store> store,
         const CanonPath & path,
@@ -78,34 +24,7 @@ struct InputAccessor : public std::enable_shared_from_this<InputAccessor>
         PathFilter * filter = nullptr,
         RepairFlag repair = NoRepair);
 
-    /* Return a corresponding path in the root filesystem, if
-       possible. This is only possible for inputs that are
-       materialized in the root filesystem. */
-    virtual std::optional<CanonPath> getPhysicalPath(const CanonPath & path)
-    { return std::nullopt; }
-
-    bool operator == (const InputAccessor & x) const
-    {
-        return number == x.number;
-    }
-
-    bool operator < (const InputAccessor & x) const
-    {
-        return number < x.number;
-    }
-
-    void setPathDisplay(std::string displayPrefix, std::string displaySuffix = "");
-
-    virtual std::string showPath(const CanonPath & path);
-
     SourcePath root();
-
-    /* Return the maximum last-modified time of the files in this
-       tree, if available. */
-    virtual std::optional<time_t> getLastModified()
-    {
-        return std::nullopt;
-    }
 };
 
 /**
