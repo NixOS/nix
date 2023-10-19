@@ -12,7 +12,7 @@ std::string ValidPathInfo::fingerprint(const Store & store) const
             store.printStorePath(path));
     return
         "1;" + store.printStorePath(path) + ";"
-        + narHash.to_string(Base32, true) + ";"
+        + narHash.to_string(HashFormat::Base32, true) + ";"
         + std::to_string(narSize) + ";"
         + concatStringsSep(",", store.printStorePathSet(references));
 }
@@ -161,7 +161,7 @@ void ValidPathInfo::write(
     if (includePath)
         sink << store.printStorePath(path);
     sink << (deriver ? store.printStorePath(*deriver) : "")
-         << narHash.to_string(Base16, false);
+         << narHash.to_string(HashFormat::Base16, false);
     WorkerProto::write(store,
         WorkerProto::WriteConn { .to = sink },
         references);

@@ -147,12 +147,12 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
     };
 
     auto narHash = store->queryPathInfo(tree.storePath)->narHash;
-    input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
+    input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
     if (auto prevNarHash = getNarHash()) {
         if (narHash != *prevNarHash)
             throw Error((unsigned int) 102, "NAR hash mismatch in input '%s' (%s), expected '%s', got '%s'",
-                to_string(), tree.actualPath, prevNarHash->to_string(SRI, true), narHash.to_string(SRI, true));
+                to_string(), tree.actualPath, prevNarHash->to_string(HashFormat::SRI, true), narHash.to_string(HashFormat::SRI, true));
     }
 
     if (auto prevLastModified = getLastModified()) {

@@ -1066,7 +1066,7 @@ void LocalDerivationGoal::initTmpDir() {
                 env[i.first] = i.second;
             } else {
                 auto hash = hashString(htSHA256, i.first);
-                std::string fn = ".attr-" + hash.to_string(Base32, false);
+                std::string fn = ".attr-" + hash.to_string(HashFormat::Base32, false);
                 Path p = tmpDir + "/" + fn;
                 writeFile(p, rewriteStrings(i.second, inputRewrites));
                 chownToBuilder(p);
@@ -2583,8 +2583,8 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                     delayedException = std::make_exception_ptr(
                         BuildError("hash mismatch in fixed-output derivation '%s':\n  specified: %s\n     got:    %s",
                             worker.store.printStorePath(drvPath),
-                            wanted.to_string(SRI, true),
-                            got.to_string(SRI, true)));
+                            wanted.to_string(HashFormat::SRI, true),
+                            got.to_string(HashFormat::SRI, true)));
                 }
                 if (!newInfo0.references.empty())
                     delayedException = std::make_exception_ptr(
