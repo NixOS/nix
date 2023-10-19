@@ -595,7 +595,9 @@ struct CompareValues
                 case nString:
                     return v1->string_view().compare(v2->string_view()) < 0;
                 case nPath:
-                    // FIXME: handle accessor?
+                    // Note: we don't take the accessor into account
+                    // since it's not obvious how to compare them in a
+                    // reproducible way.
                     return strcmp(v1->_path.path, v2->_path.path) < 0;
                 case nList:
                     // Lexicographic comparison
