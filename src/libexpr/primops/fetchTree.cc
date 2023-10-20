@@ -5,6 +5,7 @@
 #include "fetchers.hh"
 #include "filetransfer.hh"
 #include "registry.hh"
+#include "tarball.hh"
 #include "url.hh"
 
 #include <ctime>
@@ -15,7 +16,7 @@ namespace nix {
 
 void emitTreeAttrs(
     EvalState & state,
-    const fetchers::Tree & tree,
+    const StorePath & storePath,
     const fetchers::Input & input,
     Value & v,
     bool emptyRevFallback,
@@ -25,7 +26,7 @@ void emitTreeAttrs(
 
     auto attrs = state.buildBindings(10);
 
-    state.mkStorePathString(tree.storePath, attrs.alloc(state.sOutPath));
+    state.mkStorePathString(storePath, attrs.alloc(state.sOutPath));
 
     // FIXME: support arbitrary input attributes.
 
@@ -165,11 +166,11 @@ static void fetchTree(
 
     state.checkURI(input.toURLString());
 
-    auto [tree, input2] = input.fetch(state.store);
+    auto [storePath, input2] = input.fetch(state.store);
 
-    state.allowPath(tree.storePath);
+    state.allowPath(storePath);
 
-    emitTreeAttrs(state, tree, input2, v, params.emptyRevFallback, false);
+    emitTreeAttrs(state, storePath, input2, v, params.emptyRevFallback, false);
 }
 
 static void prim_fetchTree(EvalState & state, const PosIdx pos, Value * * args, Value & v)
@@ -288,7 +289,7 @@ static void fetch(EvalState & state, const PosIdx pos, Value * * args, Value & v
     //       https://github.com/NixOS/nix/issues/4313
     auto storePath =
         unpack
-        ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).tree.storePath
+        ? fetchers::downloadTarball(state.store, *url, name, (bool) expectedHash).storePath
         : fetchers::downloadFile(state.store, *url, name, (bool) expectedHash).storePath;
 
     if (expectedHash) {

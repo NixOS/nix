@@ -1,3 +1,4 @@
+#include "tarball.hh"
 #include "fetchers.hh"
 #include "cache.hh"
 #include "filetransfer.hh"
@@ -133,7 +134,7 @@ DownloadTarballResult downloadTarball(
 
     if (cached && !cached->expired)
         return {
-            .tree = Tree { .actualPath = store->toRealPath(cached->storePath), .storePath = std::move(cached->storePath) },
+            .storePath = std::move(cached->storePath),
             .lastModified = (time_t) getIntAttr(cached->infoAttrs, "lastModified"),
             .immutableUrl = maybeGetStrAttr(cached->infoAttrs, "immutableUrl"),
         };
@@ -174,7 +175,7 @@ DownloadTarballResult downloadTarball(
         locked);
 
     return {
-        .tree = Tree { .actualPath = store->toRealPath(*unpackedStorePath), .storePath = std::move(*unpackedStorePath) },
+        .storePath = std::move(*unpackedStorePath),
         .lastModified = lastModified,
         .immutableUrl = res.immutableUrl,
     };
@@ -307,7 +308,7 @@ struct TarballInputScheme : CurlInputScheme
         if (result.lastModified && !input.attrs.contains("lastModified"))
             input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
 
-        return {result.tree.storePath, std::move(input)};
+        return {result.storePath, std::move(input)};
     }
 };
 

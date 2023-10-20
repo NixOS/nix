@@ -13,12 +13,6 @@ namespace nix { class Store; }
 
 namespace nix::fetchers {
 
-struct Tree
-{
-    Path actualPath;
-    StorePath storePath;
-};
-
 struct InputScheme;
 
 /**
@@ -83,10 +77,10 @@ public:
     bool contains(const Input & other) const;
 
     /**
-     * Fetch the input into the Nix store, returning the location in
-     * the Nix store and the locked input.
+     * Fetch the entire input into the Nix store, returning the
+     * location in the Nix store and the locked input.
      */
-    std::pair<Tree, Input> fetch(ref<Store> store) const;
+    std::pair<StorePath, Input> fetch(ref<Store> store) const;
 
     Input applyOverrides(
         std::optional<std::string> ref,
@@ -157,34 +151,5 @@ struct InputScheme
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
-
-struct DownloadFileResult
-{
-    StorePath storePath;
-    std::string etag;
-    std::string effectiveUrl;
-    std::optional<std::string> immutableUrl;
-};
-
-DownloadFileResult downloadFile(
-    ref<Store> store,
-    const std::string & url,
-    const std::string & name,
-    bool locked,
-    const Headers & headers = {});
-
-struct DownloadTarballResult
-{
-    Tree tree;
-    time_t lastModified;
-    std::optional<std::string> immutableUrl;
-};
-
-DownloadTarballResult downloadTarball(
-    ref<Store> store,
-    const std::string & url,
-    const std::string & name,
-    bool locked,
-    const Headers & headers = {});
 
 }

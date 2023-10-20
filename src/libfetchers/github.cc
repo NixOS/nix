@@ -7,6 +7,7 @@
 #include "git.hh"
 #include "fetchers.hh"
 #include "fetch-settings.hh"
+#include "tarball.hh"
 
 #include <optional>
 #include <nlohmann/json.hpp>
@@ -213,10 +214,10 @@ struct GitArchiveInputScheme : InputScheme
                 {"rev", rev->gitRev()},
                 {"lastModified", uint64_t(result.lastModified)}
             },
-            result.tree.storePath,
+            result.storePath,
             true);
 
-        return {result.tree.storePath, input};
+        return {result.storePath, input};
     }
 
     std::optional<ExperimentalFeature> experimentalFeature() override
