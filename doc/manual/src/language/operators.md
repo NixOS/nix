@@ -63,6 +63,8 @@ The result is a [Boolean] value.
 
 [Has attribute]: #has-attribute
 
+After evaluating *attrset* and *attrpath*, the computational complexity is O(log(*n*)) for *n* attributes in the *attrset*
+
 ## Arithmetic
 
 Numbers are type-compatible:
