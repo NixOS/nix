@@ -714,9 +714,13 @@ public:
 
           System features are user-defined, but Nix sets the following defaults:
 
+          - `apple-virt`
+
+            Included on darwin if virtualization is available.
+
           - `kvm`
 
-            Included by default if `/dev/kvm` is accessible.
+            Included on Linux if `/dev/kvm` is accessible.
 
           - `nixos-test`, `benchmark`, `big-parallel`
 
