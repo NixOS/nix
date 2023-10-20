@@ -2461,6 +2461,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
 
         case nPath:
             return
+                // FIXME: compare accessors by their fingerprint.
                 v1._path.accessor == v2._path.accessor
                 && strcmp(v1._path.path, v2._path.path) == 0;
 
