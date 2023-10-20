@@ -109,7 +109,7 @@ bool Input::contains(const Input & other) const
     return false;
 }
 
-std::pair<Tree, Input> Input::fetch(ref<Store> store) const
+std::pair<StorePath, Input> Input::fetch(ref<Store> store) const
 {
     if (!scheme)
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
@@ -126,7 +126,7 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
             debug("using substituted/cached input '%s' in '%s'",
                 to_string(), store->printStorePath(storePath));
 
-            return {Tree { .actualPath = store->toRealPath(storePath), .storePath = std::move(storePath) }, *this};
+            return {std::move(storePath), *this};
         } catch (Error & e) {
             debug("substitution of input '%s' failed: %s", to_string(), e.what());
         }
@@ -141,18 +141,16 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
         }
     }();
 
-    Tree tree {
-        .actualPath = store->toRealPath(storePath),
-        .storePath = storePath,
-    };
-
-    auto narHash = store->queryPathInfo(tree.storePath)->narHash;
+    auto narHash = store->queryPathInfo(storePath)->narHash;
     input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
     if (auto prevNarHash = getNarHash()) {
         if (narHash != *prevNarHash)
             throw Error((unsigned int) 102, "NAR hash mismatch in input '%s' (%s), expected '%s', got '%s'",
-                to_string(), tree.actualPath, prevNarHash->to_string(HashFormat::SRI, true), narHash.to_string(HashFormat::SRI, true));
+                to_string(),
+                store->printStorePath(storePath),
+                prevNarHash->to_string(HashFormat::SRI, true),
+                narHash.to_string(HashFormat::SRI, true));
     }
 
     if (auto prevLastModified = getLastModified()) {
@@ -175,7 +173,7 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
 
     input.locked = true;
 
-    return {std::move(tree), input};
+    return {std::move(storePath), input};
 }
 
 Input Input::applyOverrides(
