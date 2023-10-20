@@ -44,12 +44,15 @@ void SourceAccessor::dumpPath(
 {
     auto dumpContents = [&](const CanonPath & path)
     {
-        /* It would be nice if this was streaming, but we need the
-           size before the contents. */
-        auto s = readFile(path);
-        sink << "contents" << s.size();
-        sink(s);
-        writePadding(s.size(), sink);
+        sink << "contents";
+        std::optional<uint64_t> size;
+        readFile(path, sink, [&](uint64_t _size)
+        {
+            size = _size;
+            sink << _size;
+        });
+        assert(size);
+        writePadding(*size, sink);
     };
 
     std::function<void(const CanonPath & path)> dump;

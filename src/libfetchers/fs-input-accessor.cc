@@ -19,11 +19,14 @@ struct FSInputAccessorImpl : FSInputAccessor, PosixSourceAccessor
     {
     }
 
-    std::string readFile(const CanonPath & path) override
+    void readFile(
+        const CanonPath & path,
+        Sink & sink,
+        std::function<void(uint64_t)> sizeCallback) override
     {
         auto absPath = makeAbsPath(path);
         checkAllowed(absPath);
-        return PosixSourceAccessor::readFile(absPath);
+        PosixSourceAccessor::readFile(absPath, sink, sizeCallback);
     }
 
     bool pathExists(const CanonPath & path) override

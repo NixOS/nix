@@ -17,7 +17,7 @@ StorePath InputAccessor::fetchToStore(
         if (method == FileIngestionMethod::Recursive)
             dumpPath(path, sink, filter ? *filter : defaultPathFilter);
         else
-            sink(readFile(path)); // FIXME: stream
+            readFile(path, sink);
     });
 
     auto storePath =

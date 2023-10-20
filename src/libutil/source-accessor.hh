@@ -5,6 +5,8 @@
 
 namespace nix {
 
+struct Sink;
+
 /**
  * A read-only filesystem abstraction. This is used by the Nix
  * evaluator and elsewhere for accessing sources in various
@@ -20,7 +22,23 @@ struct SourceAccessor
     virtual ~SourceAccessor()
     { }
 
-    virtual std::string readFile(const CanonPath & path) = 0;
+    /**
+     * Return the contents of a file as a string.
+     */
+    virtual std::string readFile(const CanonPath & path);
+
+    /**
+     * Write the contents of a file as a sink. `sizeCallback` must be
+     * called with the size of the file before any data is written to
+     * the sink.
+     *
+     * Note: subclasses of `SourceAccessor` need to implement at least
+     * one of the `readFile()` variants.
+     */
+    virtual void readFile(
+        const CanonPath & path,
+        Sink & sink,
+        std::function<void(uint64_t)> sizeCallback = [](uint64_t size){});
 
     virtual bool pathExists(const CanonPath & path) = 0;
 
@@ -97,7 +115,10 @@ struct PosixSourceAccessor : SourceAccessor
      */
     time_t mtime = 0;
 
-    std::string readFile(const CanonPath & path) override;
+    void readFile(
+        const CanonPath & path,
+        Sink & sink,
+        std::function<void(uint64_t)> sizeCallback) override;
 
     bool pathExists(const CanonPath & path) override;
 
