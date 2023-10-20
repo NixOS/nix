@@ -83,16 +83,7 @@ struct SourceAccessor
         return number < x.number;
     }
 
-    void setPathDisplay(std::string displayPrefix, std::string displaySuffix = "");
-
     virtual std::string showPath(const CanonPath & path);
-
-    /* Return the maximum last-modified time of the files in this
-       tree, if available. */
-    virtual std::optional<time_t> getLastModified()
-    {
-        return std::nullopt;
-    }
 };
 
 /**

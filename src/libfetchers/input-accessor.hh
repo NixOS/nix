@@ -16,6 +16,15 @@ class Store;
 
 struct InputAccessor : SourceAccessor, std::enable_shared_from_this<InputAccessor>
 {
+    /**
+     * Return the maximum last-modified time of the files in this
+     * tree, if available.
+     */
+    virtual std::optional<time_t> getLastModified()
+    {
+        return std::nullopt;
+    }
+
     StorePath fetchToStore(
         ref<Store> store,
         const CanonPath & path,
