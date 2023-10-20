@@ -253,12 +253,6 @@ struct CurlInputScheme : InputScheme
             url.query.insert_or_assign("narHash", narHash->to_string(HashFormat::SRI, true));
         return url;
     }
-
-    bool hasAllInfo(const Input & input) const override
-    {
-        return true;
-    }
-
 };
 
 struct FileInputScheme : CurlInputScheme

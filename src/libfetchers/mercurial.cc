@@ -98,13 +98,6 @@ struct MercurialInputScheme : InputScheme
         return url;
     }
 
-    bool hasAllInfo(const Input & input) const override
-    {
-        // FIXME: ugly, need to distinguish between dirty and clean
-        // default trees.
-        return input.getRef() == "default" || maybeGetIntAttr(input.attrs, "revCount");
-    }
-
     Input applyOverrides(
         const Input & input,
         std::optional<std::string> ref,
