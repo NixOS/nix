@@ -65,9 +65,11 @@ struct SourceAccessor
         PathFilter & filter = defaultPathFilter,
         HashType ht = htSHA256);
 
-    /* Return a corresponding path in the root filesystem, if
-       possible. This is only possible for filesystems that are
-       materialized in the root filesystem. */
+    /**
+     * Return a corresponding path in the root filesystem, if
+     * possible. This is only possible for filesystems that are
+     * materialized in the root filesystem.
+     */
     virtual std::optional<CanonPath> getPhysicalPath(const CanonPath & path)
     { return std::nullopt; }
 
