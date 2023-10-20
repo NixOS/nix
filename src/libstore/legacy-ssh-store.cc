@@ -45,7 +45,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         std::unique_ptr<SSHMaster::Connection> sshConn;
         FdSink to;
         FdSource from;
-        int remoteVersion;
+        ServeProto::Version remoteVersion;
         bool good = true;
 
         /**
@@ -60,6 +60,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         {
             return ServeProto::ReadConn {
                 .from = from,
+                .version = remoteVersion,
             };
         }
 
@@ -75,6 +76,7 @@ struct LegacySSHStore : public virtual LegacySSHStoreConfig, public virtual Stor
         {
             return ServeProto::WriteConn {
                 .to = to,
+                .version = remoteVersion,
             };
         }
     };

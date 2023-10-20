@@ -818,10 +818,16 @@ static void opServe(Strings opFlags, Strings opArgs)
     if (magic != SERVE_MAGIC_1) throw Error("protocol mismatch");
     out << SERVE_MAGIC_2 << SERVE_PROTOCOL_VERSION;
     out.flush();
-    unsigned int clientVersion = readInt(in);
+    ServeProto::Version clientVersion = readInt(in);
 
-    ServeProto::ReadConn rconn { .from = in };
-    ServeProto::WriteConn wconn { .to = out };
+    ServeProto::ReadConn rconn {
+        .from = in,
+        .version = clientVersion,
+    };
+    ServeProto::WriteConn wconn {
+        .to = out,
+        .version = clientVersion,
+    };
 
     auto getBuildSettings = [&]() {
         // FIXME: changing options here doesn't work if we're

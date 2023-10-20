@@ -11,14 +11,22 @@
 
 namespace nix {
 
-const char commonProtoDir[] = "serve-protocol";
+const char serveProtoDir[] = "serve-protocol";
 
-using ServeProtoTest = ProtoTest<ServeProto, commonProtoDir>;
+struct ServeProtoTest : VersionedProtoTest<ServeProto, serveProtoDir>
+{
+    /**
+     * For serializers that don't care about the minimum version, we
+     * used the oldest one: 1.0.
+     */
+    ServeProto::Version defaultVersion = 1 << 8 | 0;
+};
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     ServeProtoTest,
     string,
     "string",
+    defaultVersion,
     (std::tuple<std::string, std::string, std::string, std::string, std::string> {
         "",
         "hi",
@@ -27,19 +35,21 @@ CHARACTERIZATION_TEST(
         "oh no \0\0\0 what was that!",
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     ServeProtoTest,
     storePath,
     "store-path",
+    defaultVersion,
     (std::tuple<StorePath, StorePath> {
         StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo" },
         StorePath { "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo-bar" },
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     ServeProtoTest,
     contentAddress,
     "content-address",
+    defaultVersion,
     (std::tuple<ContentAddress, ContentAddress, ContentAddress> {
         ContentAddress {
             .method = TextIngestionMethod {},
@@ -55,10 +65,11 @@ CHARACTERIZATION_TEST(
         },
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     ServeProtoTest,
     drvOutput,
     "drv-output",
+    defaultVersion,
     (std::tuple<DrvOutput, DrvOutput> {
         {
             .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
@@ -70,10 +81,11 @@ CHARACTERIZATION_TEST(
         },
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     ServeProtoTest,
     realisation,
     "realisation",
+    defaultVersion,
     (std::tuple<Realisation, Realisation> {
         Realisation {
             .id = DrvOutput {
@@ -102,10 +114,11 @@ CHARACTERIZATION_TEST(
         },
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     ServeProtoTest,
     vector,
     "vector",
+    defaultVersion,
     (std::tuple<std::vector<std::string>, std::vector<std::string>, std::vector<std::string>, std::vector<std::vector<std::string>>> {
         { },
         { "" },
@@ -113,10 +126,11 @@ CHARACTERIZATION_TEST(
         { {}, { "" }, { "", "1", "2" } },
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     ServeProtoTest,
     set,
     "set",
+    defaultVersion,
     (std::tuple<std::set<std::string>, std::set<std::string>, std::set<std::string>, std::set<std::set<std::string>>> {
         { },
         { "" },
@@ -124,10 +138,11 @@ CHARACTERIZATION_TEST(
         { {}, { "" }, { "", "1", "2" } },
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     ServeProtoTest,
     optionalStorePath,
     "optional-store-path",
+    defaultVersion,
     (std::tuple<std::optional<StorePath>, std::optional<StorePath>> {
         std::nullopt,
         std::optional {
@@ -135,10 +150,11 @@ CHARACTERIZATION_TEST(
         },
     }))
 
-CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST(
     ServeProtoTest,
     optionalContentAddress,
     "optional-content-address",
+    defaultVersion,
     (std::tuple<std::optional<ContentAddress>, std::optional<ContentAddress>> {
         std::nullopt,
         std::optional {
