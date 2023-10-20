@@ -14,7 +14,10 @@ StorePath InputAccessor::fetchToStore(
     Activity act(*logger, lvlChatty, actUnknown, fmt("copying '%s' to the store", showPath(path)));
 
     auto source = sinkToSource([&](Sink & sink) {
-        dumpPath(path, sink, filter ? *filter : defaultPathFilter);
+        if (method == FileIngestionMethod::Recursive)
+            dumpPath(path, sink, filter ? *filter : defaultPathFilter);
+        else
+            sink(readFile(path)); // FIXME: stream
     });
 
     auto storePath =
