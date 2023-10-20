@@ -169,14 +169,14 @@ void doCommitVerification(const Path repoDir, const Path gitDir, const std::stri
             && k.type != "ssh-ed25519"
             && k.type != "ssh-ed25519-sk"
             && k.type != "ssh-rsa")
-            warn("Unknow keytype: %s\n"
+            warn("Unknown keytype: %s\n"
                  "Please use one of\n"
                  "- ssh-dsa\n"
-                 "- ssh-ecdsa\n"
-                 "- ssh-ecdsa-sk\n"
-                 "- ssh-ed25519\n"
-                 "- ssh-ed25519-sk\n"
-                 "- ssh-rsa", k.type);
+                 "  ssh-ecdsa\n"
+                 "  ssh-ecdsa-sk\n"
+                 "  ssh-ed25519\n"
+                 "  ssh-ed25519-sk\n"
+                 "  ssh-rsa", k.type);
         allowedSigners += "* " + k.type + " " + k.key + "\n";
     }
     writeFile(allowedSignersFile, allowedSigners);
@@ -201,7 +201,7 @@ void doCommitVerification(const Path repoDir, const Path gitDir, const std::stri
     }
     re += "]";
     if (status == 0 && std::regex_search(output, std::regex(re)))
-        printTalkative("Commit signature verification on commit %s succeeded", rev);
+        printTalkative("Signature verification on commit %s succeeded", rev);
     else
         throw Error("Commit signature verification on commit %s failed: \n%s", rev, output);
 }
