@@ -35,7 +35,6 @@ struct Input
     std::shared_ptr<InputScheme> scheme; // note: can be null
     Attrs attrs;
     bool locked = false;
-    bool direct = true;
 
     /**
      * path of the parent of this input, used for relative path resolution
@@ -71,7 +70,7 @@ public:
      * Check whether this is a "direct" input, that is, not
      * one that goes through a registry.
      */
-    bool isDirect() const { return direct; }
+    bool isDirect() const;
 
     /**
      * Check whether this is a "locked" input, that is,
@@ -152,6 +151,9 @@ struct InputScheme
      * Is this `InputScheme` part of an experimental feature?
      */
     virtual std::optional<ExperimentalFeature> experimentalFeature();
+
+    virtual bool isDirect(const Input & input) const
+    { return true; }
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);

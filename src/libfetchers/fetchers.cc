@@ -84,6 +84,11 @@ std::string Input::to_string() const
     return toURL().to_string();
 }
 
+bool Input::isDirect() const
+{
+    return !scheme || scheme->isDirect(*this);
+}
+
 Attrs Input::toAttrs() const
 {
     return attrs;
