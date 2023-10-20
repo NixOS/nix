@@ -89,11 +89,6 @@ Attrs Input::toAttrs() const
     return attrs;
 }
 
-bool Input::hasAllInfo() const
-{
-    return getNarHash() && scheme && scheme->hasAllInfo(*this);
-}
-
 bool Input::operator ==(const Input & other) const
 {
     return attrs == other.attrs;
@@ -117,7 +112,7 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
     /* The tree may already be in the Nix store, or it could be
        substituted (which is often faster than fetching from the
        original source). So check that. */
-    if (hasAllInfo()) {
+    if (getNarHash()) {
         try {
             auto storePath = computeStorePath(*store);
 
@@ -174,8 +169,6 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
     }
 
     input.locked = true;
-
-    assert(input.hasAllInfo());
 
     return {std::move(tree), input};
 }

@@ -66,11 +66,6 @@ struct PathInputScheme : InputScheme
         };
     }
 
-    bool hasAllInfo(const Input & input) const override
-    {
-        return true;
-    }
-
     std::optional<Path> getSourcePath(const Input & input) override
     {
         return getStrAttr(input.attrs, "path");

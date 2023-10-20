@@ -79,15 +79,6 @@ public:
      */
     bool isLocked() const { return locked; }
 
-    /**
-     * Check whether the input carries all necessary info required
-     * for cache insertion and substitution.
-     * These fields are used to uniquely identify cached trees
-     * within the "tarball TTL" window without necessarily
-     * indicating that the input's origin is unchanged.
-     */
-    bool hasAllInfo() const;
-
     bool operator ==(const Input & other) const;
 
     bool contains(const Input & other) const;
@@ -143,8 +134,6 @@ struct InputScheme
     virtual std::optional<Input> inputFromAttrs(const Attrs & attrs) const = 0;
 
     virtual ParsedURL toURL(const Input & input) const;
-
-    virtual bool hasAllInfo(const Input & input) const = 0;
 
     virtual Input applyOverrides(
         const Input & input,

@@ -132,11 +132,6 @@ struct GitArchiveInputScheme : InputScheme
         };
     }
 
-    bool hasAllInfo(const Input & input) const override
-    {
-        return input.getRev() && maybeGetIntAttr(input.attrs, "lastModified");
-    }
-
     Input applyOverrides(
         const Input & _input,
         std::optional<std::string> ref,
