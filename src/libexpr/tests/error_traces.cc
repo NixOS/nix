@@ -295,7 +295,7 @@ namespace nix {
     TEST_F(ErrorTraceTest, toPath) {
         ASSERT_TRACE2("toPath []",
                       TypeError,
-                      hintfmt("cannot coerce %s to a path", "a list"),
+                      hintfmt("cannot coerce %s to a string", "a list"),
                       hintfmt("while evaluating the first argument passed to builtins.toPath"));
 
         ASSERT_TRACE2("toPath \"foo\"",
@@ -309,7 +309,7 @@ namespace nix {
     TEST_F(ErrorTraceTest, storePath) {
         ASSERT_TRACE2("storePath true",
                       TypeError,
-                      hintfmt("cannot coerce %s to a path", "a Boolean"),
+                      hintfmt("cannot coerce %s to a string", "a Boolean"),
                       hintfmt("while evaluating the first argument passed to 'builtins.storePath'"));
 
     }
@@ -318,7 +318,7 @@ namespace nix {
     TEST_F(ErrorTraceTest, pathExists) {
         ASSERT_TRACE2("pathExists []",
                       TypeError,
-                      hintfmt("cannot coerce %s to a path", "a list"),
+                      hintfmt("cannot coerce %s to a string", "a list"),
                       hintfmt("while realising the context of a path"));
 
         ASSERT_TRACE2("pathExists \"zorglub\"",
@@ -377,7 +377,7 @@ namespace nix {
     TEST_F(ErrorTraceTest, filterSource) {
         ASSERT_TRACE2("filterSource [] []",
                       TypeError,
-                      hintfmt("cannot coerce %s to a path", "a list"),
+                      hintfmt("cannot coerce %s to a string", "a list"),
                       hintfmt("while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'"));
 
         ASSERT_TRACE2("filterSource [] \"foo\"",

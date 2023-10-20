@@ -2335,29 +2335,32 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext
 {
     try {
         forceValue(v, pos);
-
-        if (v.type() == nString) {
-            copyContext(v, context);
-            auto s = v.string_view();
-            if (!hasPrefix(s, "/"))
-                error("string '%s' doesn't represent an absolute path", s).atPos(pos).debugThrow<EvalError>();
-            return rootPath(CanonPath(s));
-        }
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
         throw;
     }
 
+    /* Handle path values directly, without coercing to a string. */
     if (v.type() == nPath)
         return v.path();
 
+    /* Similarly, handle __toString where the result may be a path
+       value. */
     if (v.type() == nAttrs) {
-        auto i = v.attrs->find(sOutPath);
-        if (i != v.attrs->end())
-            return coerceToPath(pos, *i->value, context, errorCtx);
+        auto i = v.attrs->find(sToString);
+        if (i != v.attrs->end()) {
+            Value v1;
+            callFunction(*i->value, v, v1, pos);
+            return coerceToPath(pos, v1, context, errorCtx);
+        }
     }
 
-    error("cannot coerce %1% to a path", showType(v)).withTrace(pos, errorCtx).debugThrow<TypeError>();
+    /* Any other value should be coercable to a string, interpreted
+       relative to the root filesystem. */
+    auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
+    if (path == "" || path[0] != '/')
+        error("string '%1%' doesn't represent an absolute path", path).withTrace(pos, errorCtx).debugThrow<EvalError>();
+    return rootPath(CanonPath(path));
 }
 
 
