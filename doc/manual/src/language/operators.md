@@ -63,7 +63,7 @@ The result is a [Boolean] value.
 
 [Has attribute]: #has-attribute
 
-Complexity is O(log₂(*n*)) for *n* attributes in the *attrset*
+After evaluating *attrset* and *attrpath*, the computational complexity is O(log(*n*)) for *n* attributes in the *attrset*
 
 ## Arithmetic
 
