@@ -720,7 +720,7 @@ public:
 
           - `kvm`
 
-            Included by default if `/dev/kvm` is accessible.
+            Included on Linux if `/dev/kvm` is accessible.
 
           - `nixos-test`, `benchmark`, `big-parallel`
 
