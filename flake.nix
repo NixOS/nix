@@ -5,7 +5,7 @@
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.lowdown-src = { url = "github:kristapsdz/lowdown"; flake = false; };
   inputs.flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
-  inputs.flake-schemas.url = github:DeterminateSystems/flake-schemas;
+  inputs.flake-schemas.url = "github:DeterminateSystems/flake-schemas";
 
   outputs = { self, nixpkgs, nixpkgs-regression, lowdown-src, flake-compat, flake-schemas }:
 
