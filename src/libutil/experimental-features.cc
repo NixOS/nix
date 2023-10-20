@@ -12,7 +12,7 @@ struct ExperimentalFeatureDetails
     std::string_view description;
 };
 
-constexpr std::array<ExperimentalFeatureDetails, 15> xpFeatureDetails = {{
+constexpr std::array<ExperimentalFeatureDetails, 16> xpFeatureDetails = {{
     {
         .tag = Xp::CaDerivations,
         .name = "ca-derivations",
@@ -227,7 +227,14 @@ constexpr std::array<ExperimentalFeatureDetails, 15> xpFeatureDetails = {{
         .description = R"(
             Allow the use of the [impure-env](@docroot@/command-ref/conf-file.md#conf-impure-env) setting.
         )",
-    }
+    },
+    {
+        .tag = Xp::VerifiedFetches,
+        .name = "verified-fetches",
+        .description = R"(
+            Enables verification of git commit signatures through the [`fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit) built-in.
+        )",
+    },
 }};
 
 static_assert(
