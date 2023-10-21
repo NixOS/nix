@@ -99,7 +99,7 @@ struct adl_serializer<std::optional<T>> {
         static_assert(
             nix::json_avoids_null<T>::value,
             "null is already in use for underlying type's JSON");
-        if (t.has_value())
+        if (t)
             json = *t;
         else
             json = nullptr;
