@@ -29,7 +29,7 @@ StringPairs resolveRewrites(
             continue;
         }
 
-        for (auto & [ outputName, outputPath ] : drvDep->outputs) {
+        for (const auto & [ outputName, outputPath ] : drvDep->outputs) {
             res.emplace(
                 DownstreamPlaceholder::fromSingleDerivedPathBuilt(
                     SingleDerivedPath::Built {
