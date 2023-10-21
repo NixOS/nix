@@ -270,9 +270,121 @@ public:
     Setting<std::string> builders{
         this, "@" + nixConfDir + "/machines", "builders",
         R"(
-          A semicolon-separated list of build machines.
-          For the exact format and examples, see [the manual chapter on remote builds](../advanced-topics/distributed-builds.md)
-        )"};
+          A semicolon- or newline-separated list of build machines.
+
+          In addition to the [usual ways of setting configuration options](@docroot@/command-ref/conf-file.md), the value can be read from a file by prefixing its absolute path with `@`.
+
+          > **Example**
+          >
+          > This is the default setting:
+          >
+          > ```
+          > builders = @/etc/nix/machines
+          > ```
+
+          Each machine specification consists of the following elements, separated by spaces.
+          Only the first element is required.
+          To leave a field at its default, set it to `-`.
+
+          1. The URI of the remote store in the format `ssh://[username@]hostname`.
+
+             > **Example**
+             >
+             > `ssh://nix@mac`
+
+             For backward compatibility, `ssh://` may be omitted.
+             The hostname may be an alias defined in `~/.ssh/config`.
+
+          2. A comma-separated list of [Nix system types](@docroot@/contributing/hacking.md#system-type).
+             If omitted, this defaults to the local platform type.
+
+             > **Example**
+             >
+             > `aarch64-darwin`
+
+             It is possible for a machine to support multiple platform types.
+
+             > **Example**
+             >
+             > `i686-linux,x86_64-linux`
+
+          3. The SSH identity file to be used to log in to the remote machine.
+             If omitted, SSH will use its regular identities.
+
+             > **Example**
+             >
+             > `/home/user/.ssh/id_mac`
+
+          4. The maximum number of builds that Nix will execute in parallel on the machine.
+             Typically this should be equal to the number of CPU cores.
+
+          5. The “speed factor”, indicating the relative speed of the machine as a positive integer.
+             If there are multiple machines of the right type, Nix will prefer the fastest, taking load into account.
+
+          6. A comma-separated list of supported [system features](#conf-system-features).
+
+             A machine will only be used to build a derivation if all the features in the derivation's [`requiredSystemFeatures`](@docroot@/language/advanced-attributes.html#adv-attr-requiredSystemFeatures) attribute are supported by that machine.
+
+          7. A comma-separated list of required [system features](#conf-system-features).
+
+             A machine will only be used to build a derivation if all of the machine’s required features appear in the derivation’s [`requiredSystemFeatures`](@docroot@/language/advanced-attributes.html#adv-attr-requiredSystemFeatures) attribute.
+
+          8. The (base64-encoded) public host key of the remote machine.
+             If omitted, SSH will use its regular `known_hosts` file.
+
+             The value for this field can be obtained via `base64 -w0`.
+
+          > **Example**
+          >
+          > Multiple builders specified on the command line:
+          >
+          > ```console
+          > --builders 'ssh://mac x86_64-darwin ; ssh://beastie x86_64-freebsd'
+          > ```
+
+          > **Example**
+          >
+          > This specifies several machines that can perform `i686-linux` builds:
+          >
+          > ```
+          > nix@scratchy.labs.cs.uu.nl i686-linux /home/nix/.ssh/id_scratchy 8 1 kvm
+          > nix@itchy.labs.cs.uu.nl    i686-linux /home/nix/.ssh/id_scratchy 8 2
+          > nix@poochie.labs.cs.uu.nl  i686-linux /home/nix/.ssh/id_scratchy 1 2 kvm benchmark
+          > ```
+          >
+          > However, `poochie` will only build derivations that have the attribute
+          >
+          > ```nix
+          > requiredSystemFeatures = [ "benchmark" ];
+          > ```
+          >
+          > or
+          >
+          > ```nix
+          > requiredSystemFeatures = [ "benchmark" "kvm" ];
+          > ```
+          >
+          > `itchy` cannot do builds that require `kvm`, but `scratchy` does support such builds.
+          > For regular builds, `itchy` will be preferred over `scratchy` because it has a higher speed factor.
+
+          For Nix to use substituters, the calling user must be in the [`trusted-users`](#conf-trusted-users) list.
+
+          > **Note**
+          >
+          > A build machine must be accessible via SSH and have Nix installed.
+          > `nix` must be available in `$PATH` for the user connecting over SSH.
+
+          > **Warning**
+          >
+          > If you are building via the Nix daemon (default), the Nix daemon user account on the local machine (that is, `root`) requires access to a user account on the remote machine (not necessarily `root`).
+          >
+          > If you can’t or don’t want to configure `root` to be able to access the remote machine, set [`store`](#conf-store) to any [local store](@docroot@/store/types/local-store.html), e.g. by passing `--store /tmp` to the command on the local machine.
+
+          To build only on remote machines and disable local builds, set [`max-jobs`](#conf-max-jobs) to 0.
+
+          If you want the remote machines to use substituters, set [`builders-use-substitutes`](#conf-builders-use-substituters) to `true`.
+        )",
+        {}, false};
 
     Setting<bool> alwaysAllowSubstitutes{
         this, false, "always-allow-substitutes",

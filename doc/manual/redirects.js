@@ -18,7 +18,7 @@ const redirects = {
     "chap-tuning-cores-and-jobs": "advanced-topics/cores-vs-jobs.html",
     "chap-diff-hook": "advanced-topics/diff-hook.html",
     "check-dirs-are-unregistered": "advanced-topics/diff-hook.html#check-dirs-are-unregistered",
-    "chap-distributed-builds": "advanced-topics/distributed-builds.html",
+    "chap-distributed-builds": "command-ref/conf-file.html#conf-builders",
     "chap-post-build-hook": "advanced-topics/post-build-hook.html",
     "chap-post-build-hook-caveats": "advanced-topics/post-build-hook.html#implementation-caveats",
     "chap-writing-nix-expressions": "language/index.html",

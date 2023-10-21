@@ -147,10 +147,10 @@ Nix can be built for various platforms, as specified in [`flake.nix`]:
 
 In order to build Nix for a different platform than the one you're currently
 on, you need a way for your current Nix installation to build code for that
-platform. Common solutions include [remote builders] and [binary format emulation]
+platform. Common solutions include [remote build machines] and [binary format emulation]
 (only supported on NixOS).
 
-[remote builders]: ../advanced-topics/distributed-builds.md
+[remote builders]: @docroot@/language/derivations.md#attr-builder
 [binary format emulation]: https://nixos.org/manual/nixos/stable/options.html#opt-boot.binfmt.emulatedSystems
 
 Given such a setup, executing the build only requires selecting the respective attribute.

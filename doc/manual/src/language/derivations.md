@@ -36,7 +36,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
   The system type on which the [`builder`](#attr-builder) executable is meant to be run.
 
   A necessary condition for Nix to build derivations locally is that the `system` attribute matches the current [`system` configuration option].
-  It can automatically [build on other platforms](../advanced-topics/distributed-builds.md) by forwarding build requests to other machines.
+  It can automatically [build on other platforms](@docroot@/language/derivations.md#attr-builder) by forwarding build requests to other machines.
 
   [`system` configuration option]: @docroot@/command-ref/conf-file.md#conf-system
 

@@ -780,9 +780,13 @@ void DerivationGoal::tryToBuild()
 
 void DerivationGoal::tryLocalBuild() {
     throw Error(
-        "unable to build with a primary store that isn't a local store; "
-        "either pass a different '--store' or enable remote builds."
-        "\nhttps://nixos.org/manual/nix/stable/advanced-topics/distributed-builds.html");
+        R"(
+        Unable to build with a primary store that isn't a local store;
+        either pass a different '--store' or enable remote builds.
+
+        For more information check 'man nix.conf' and search for '/machines'.
+        )"
+    );
 }
 
 
