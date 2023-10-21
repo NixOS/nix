@@ -149,6 +149,11 @@ file included in `builders` via the syntax `@file`. For example,
 causes the list of machines in `/etc/nix/machines` to be included. (This
 is the default.)
 
+> **Note**
+>
+> If you are just specifying machine files and are not using the NixOS module
+> then you have to add your self to [`trusted-users`](#conf-trusted-users) on your local machine.
+
 If you want the builders to use caches, you likely want to set the
 option `builders-use-substitutes` in your local `nix.conf`.
 
