@@ -60,7 +60,7 @@ std::string ContentAddress::render() const
                 + makeFileIngestionPrefix(method);
         },
     }, method.raw)
-        + this->hash.to_string(Base32, true);
+        + this->hash.to_string(HashFormat::Base32, true);
 }
 
 /**
@@ -83,7 +83,7 @@ static std::pair<ContentAddressMethod, HashType> parseContentAddressMethodPrefix
         if (!hashTypeRaw)
             throw UsageError("content address hash must be in form '<algo>:<hash>', but found: %s", wholeInput);
         HashType hashType = parseHashType(*hashTypeRaw);
-        return std::move(hashType);
+        return hashType;
     };
 
     // Switch on prefix

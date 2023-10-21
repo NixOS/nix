@@ -9,10 +9,9 @@
 #include "local-store.hh"
 #include "monitor-fd.hh"
 #include "serve-protocol.hh"
+#include "serve-protocol-impl.hh"
 #include "shared.hh"
 #include "util.hh"
-#include "common-protocol.hh"
-#include "common-protocol-impl.hh"
 #include "graphml.hh"
 #include "legacy.hh"
 #include "path-with-outputs.hh"
@@ -407,7 +406,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                     auto info = store->queryPathInfo(j);
                     if (query == qHash) {
                         assert(info->narHash.type == htSHA256);
-                        cout << fmt("%s\n", info->narHash.to_string(Base32, true));
+                        cout << fmt("%s\n", info->narHash.to_string(HashFormat::Base32, true));
                     } else if (query == qSize)
                         cout << fmt("%d\n", info->narSize);
                 }
@@ -770,8 +769,8 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         if (current.first != info->narHash) {
             printError("path '%s' was modified! expected hash '%s', got '%s'",
                 store->printStorePath(path),
-                info->narHash.to_string(Base32, true),
-                current.first.to_string(Base32, true));
+                info->narHash.to_string(HashFormat::Base32, true),
+                current.first.to_string(HashFormat::Base32, true));
             status = 1;
         }
     }
@@ -819,10 +818,16 @@ static void opServe(Strings opFlags, Strings opArgs)
     if (magic != SERVE_MAGIC_1) throw Error("protocol mismatch");
     out << SERVE_MAGIC_2 << SERVE_PROTOCOL_VERSION;
     out.flush();
-    unsigned int clientVersion = readInt(in);
+    ServeProto::Version clientVersion = readInt(in);
 
-    CommonProto::ReadConn rconn { .from = in };
-    CommonProto::WriteConn wconn { .to = out };
+    ServeProto::ReadConn rconn {
+        .from = in,
+        .version = clientVersion,
+    };
+    ServeProto::WriteConn wconn {
+        .to = out,
+        .version = clientVersion,
+    };
 
     auto getBuildSettings = [&]() {
         // FIXME: changing options here doesn't work if we're
@@ -867,7 +872,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             case ServeProto::Command::QueryValidPaths: {
                 bool lock = readInt(in);
                 bool substitute = readInt(in);
-                auto paths = CommonProto::Serialise<StorePathSet>::read(*store, rconn);
+                auto paths = ServeProto::Serialise<StorePathSet>::read(*store, rconn);
                 if (lock && writeAllowed)
                     for (auto & path : paths)
                         store->addTempRoot(path);
@@ -876,24 +881,24 @@ static void opServe(Strings opFlags, Strings opArgs)
                     store->substitutePaths(paths);
                 }
 
-                CommonProto::write(*store, wconn, store->queryValidPaths(paths));
+                ServeProto::write(*store, wconn, store->queryValidPaths(paths));
                 break;
             }
 
             case ServeProto::Command::QueryPathInfos: {
-                auto paths = CommonProto::Serialise<StorePathSet>::read(*store, rconn);
+                auto paths = ServeProto::Serialise<StorePathSet>::read(*store, rconn);
                 // !!! Maybe we want a queryPathInfos?
                 for (auto & i : paths) {
                     try {
                         auto info = store->queryPathInfo(i);
                         out << store->printStorePath(info->path)
                             << (info->deriver ? store->printStorePath(*info->deriver) : "");
-                        CommonProto::write(*store, wconn, info->references);
+                        ServeProto::write(*store, wconn, info->references);
                         // !!! Maybe we want compression?
                         out << info->narSize // downloadSize
                             << info->narSize;
                         if (GET_PROTOCOL_MINOR(clientVersion) >= 4)
-                            out << info->narHash.to_string(Base32, true)
+                            out << info->narHash.to_string(HashFormat::Base32, true)
                                 << renderContentAddress(info->ca)
                                 << info->sigs;
                     } catch (InvalidPath &) {
@@ -916,7 +921,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             case ServeProto::Command::ExportPaths: {
                 readInt(in); // obsolete
-                store->exportPaths(CommonProto::Serialise<StorePathSet>::read(*store, rconn), out);
+                store->exportPaths(ServeProto::Serialise<StorePathSet>::read(*store, rconn), out);
                 break;
             }
 
@@ -962,7 +967,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                     DrvOutputs builtOutputs;
                     for (auto & [output, realisation] : status.builtOutputs)
                         builtOutputs.insert_or_assign(realisation.id, realisation);
-                    CommonProto::write(*store, wconn, builtOutputs);
+                    ServeProto::write(*store, wconn, builtOutputs);
                 }
 
                 break;
@@ -971,9 +976,9 @@ static void opServe(Strings opFlags, Strings opArgs)
             case ServeProto::Command::QueryClosure: {
                 bool includeOutputs = readInt(in);
                 StorePathSet closure;
-                store->computeFSClosure(CommonProto::Serialise<StorePathSet>::read(*store, rconn),
+                store->computeFSClosure(ServeProto::Serialise<StorePathSet>::read(*store, rconn),
                     closure, false, includeOutputs);
-                CommonProto::write(*store, wconn, closure);
+                ServeProto::write(*store, wconn, closure);
                 break;
             }
 
@@ -988,7 +993,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 };
                 if (deriver != "")
                     info.deriver = store->parseStorePath(deriver);
-                info.references = CommonProto::Serialise<StorePathSet>::read(*store, rconn);
+                info.references = ServeProto::Serialise<StorePathSet>::read(*store, rconn);
                 in >> info.registrationTime >> info.narSize >> info.ultimate;
                 info.sigs = readStrings<StringSet>(in);
                 info.ca = ContentAddress::parseOpt(readString(in));

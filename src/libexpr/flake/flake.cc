@@ -15,7 +15,7 @@ using namespace flake;
 
 namespace flake {
 
-typedef std::pair<fetchers::Tree, FlakeRef> FetchedFlake;
+typedef std::pair<StorePath, FlakeRef> FetchedFlake;
 typedef std::vector<std::pair<FlakeRef, FetchedFlake>> FlakeCache;
 
 static std::optional<FetchedFlake> lookupInFlakeCache(
@@ -34,7 +34,7 @@ static std::optional<FetchedFlake> lookupInFlakeCache(
     return std::nullopt;
 }
 
-static std::tuple<fetchers::Tree, FlakeRef, FlakeRef> fetchOrSubstituteTree(
+static std::tuple<StorePath, FlakeRef, FlakeRef> fetchOrSubstituteTree(
     EvalState & state,
     const FlakeRef & originalRef,
     bool allowLookup,
@@ -61,16 +61,16 @@ static std::tuple<fetchers::Tree, FlakeRef, FlakeRef> fetchOrSubstituteTree(
         flakeCache.push_back({originalRef, *fetched});
     }
 
-    auto [tree, lockedRef] = *fetched;
+    auto [storePath, lockedRef] = *fetched;
 
     debug("got tree '%s' from '%s'",
-        state.store->printStorePath(tree.storePath), lockedRef);
+        state.store->printStorePath(storePath), lockedRef);
 
-    state.allowPath(tree.storePath);
+    state.allowPath(storePath);
 
-    assert(!originalRef.input.getNarHash() || tree.storePath == originalRef.input.computeStorePath(*state.store));
+    assert(!originalRef.input.getNarHash() || storePath == originalRef.input.computeStorePath(*state.store));
 
-    return {std::move(tree), resolvedRef, lockedRef};
+    return {std::move(storePath), resolvedRef, lockedRef};
 }
 
 static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos)
@@ -202,21 +202,21 @@ static Flake getFlake(
     FlakeCache & flakeCache,
     InputPath lockRootPath)
 {
-    auto [sourceInfo, resolvedRef, lockedRef] = fetchOrSubstituteTree(
+    auto [storePath, resolvedRef, lockedRef] = fetchOrSubstituteTree(
         state, originalRef, allowLookup, flakeCache);
 
     // Guard against symlink attacks.
-    auto flakeDir = canonPath(sourceInfo.actualPath + "/" + lockedRef.subdir, true);
+    auto flakeDir = canonPath(state.store->toRealPath(storePath) + "/" + lockedRef.subdir, true);
     auto flakeFile = canonPath(flakeDir + "/flake.nix", true);
-    if (!isInDir(flakeFile, sourceInfo.actualPath))
+    if (!isInDir(flakeFile, state.store->toRealPath(storePath)))
         throw Error("'flake.nix' file of flake '%s' escapes from '%s'",
-            lockedRef, state.store->printStorePath(sourceInfo.storePath));
+            lockedRef, state.store->printStorePath(storePath));
 
     Flake flake {
         .originalRef = originalRef,
         .resolvedRef = resolvedRef,
         .lockedRef = lockedRef,
-        .sourceInfo = std::make_shared<fetchers::Tree>(std::move(sourceInfo))
+        .storePath = storePath,
     };
 
     if (!pathExists(flakeFile))
@@ -346,7 +346,7 @@ LockedFlake lockFlake(
         // FIXME: symlink attack
         auto oldLockFile = LockFile::read(
             lockFlags.referenceLockFilePath.value_or(
-                flake.sourceInfo->actualPath + "/" + flake.lockedRef.subdir + "/flake.lock"));
+                state.store->toRealPath(flake.storePath) + "/" + flake.lockedRef.subdir + "/flake.lock"));
 
         debug("old lock file: %s", oldLockFile);
 
@@ -574,7 +574,7 @@ LockedFlake lockFlake(
                                 oldLock
                                 ? std::dynamic_pointer_cast<const Node>(oldLock)
                                 : LockFile::read(
-                                    inputFlake.sourceInfo->actualPath + "/" + inputFlake.lockedRef.subdir + "/flake.lock").root.get_ptr(),
+                                    state.store->toRealPath(inputFlake.storePath) + "/" + inputFlake.lockedRef.subdir + "/flake.lock").root.get_ptr(),
                                 oldLock ? lockRootPath : inputPath,
                                 localPath,
                                 false);
@@ -598,7 +598,7 @@ LockedFlake lockFlake(
         };
 
         // Bring in the current ref for relative path resolution if we have it
-        auto parentPath = canonPath(flake.sourceInfo->actualPath + "/" + flake.lockedRef.subdir, true);
+        auto parentPath = canonPath(state.store->toRealPath(flake.storePath) + "/" + flake.lockedRef.subdir, true);
 
         computeLocks(
             flake.inputs,
@@ -729,7 +729,7 @@ void callFlake(EvalState & state,
 
     emitTreeAttrs(
         state,
-        *lockedFlake.flake.sourceInfo,
+        lockedFlake.flake.storePath,
         lockedFlake.flake.lockedRef.input,
         *vRootSrc,
         false,
@@ -893,7 +893,7 @@ Fingerprint LockedFlake::getFingerprint() const
     // flake.sourceInfo.storePath for the fingerprint.
     return hashString(htSHA256,
         fmt("%s;%s;%d;%d;%s",
-            flake.sourceInfo->storePath.to_string(),
+            flake.storePath.to_string(),
             flake.lockedRef.subdir,
             flake.lockedRef.input.getRevCount().value_or(0),
             flake.lockedRef.input.getLastModified().value_or(0),

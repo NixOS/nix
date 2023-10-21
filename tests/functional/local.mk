@@ -113,7 +113,7 @@ nix_tests = \
   pass-as-file.sh \
   nix-profile.sh \
   suggestions.sh \
-  store-ping.sh \
+  store-info.sh \
   fetchClosure.sh \
   completions.sh \
   flakes/show.sh \

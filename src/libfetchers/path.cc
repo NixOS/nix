@@ -66,11 +66,6 @@ struct PathInputScheme : InputScheme
         };
     }
 
-    bool hasAllInfo(const Input & input) const override
-    {
-        return true;
-    }
-
     std::optional<Path> getSourcePath(const Input & input) override
     {
         return getStrAttr(input.attrs, "path");
@@ -124,6 +119,11 @@ struct PathInputScheme : InputScheme
         input.attrs.insert_or_assign("lastModified", uint64_t(mtime));
 
         return {std::move(*storePath), input};
+    }
+
+    std::optional<ExperimentalFeature> experimentalFeature() override
+    {
+        return Xp::Flakes;
     }
 };
 

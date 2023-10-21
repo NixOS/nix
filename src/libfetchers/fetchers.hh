@@ -13,12 +13,6 @@ namespace nix { class Store; }
 
 namespace nix::fetchers {
 
-struct Tree
-{
-    Path actualPath;
-    StorePath storePath;
-};
-
 struct InputScheme;
 
 /**
@@ -35,7 +29,6 @@ struct Input
     std::shared_ptr<InputScheme> scheme; // note: can be null
     Attrs attrs;
     bool locked = false;
-    bool direct = true;
 
     /**
      * path of the parent of this input, used for relative path resolution
@@ -71,7 +64,7 @@ public:
      * Check whether this is a "direct" input, that is, not
      * one that goes through a registry.
      */
-    bool isDirect() const { return direct; }
+    bool isDirect() const;
 
     /**
      * Check whether this is a "locked" input, that is,
@@ -79,24 +72,15 @@ public:
      */
     bool isLocked() const { return locked; }
 
-    /**
-     * Check whether the input carries all necessary info required
-     * for cache insertion and substitution.
-     * These fields are used to uniquely identify cached trees
-     * within the "tarball TTL" window without necessarily
-     * indicating that the input's origin is unchanged.
-     */
-    bool hasAllInfo() const;
-
     bool operator ==(const Input & other) const;
 
     bool contains(const Input & other) const;
 
     /**
-     * Fetch the input into the Nix store, returning the location in
-     * the Nix store and the locked input.
+     * Fetch the entire input into the Nix store, returning the
+     * location in the Nix store and the locked input.
      */
-    std::pair<Tree, Input> fetch(ref<Store> store) const;
+    std::pair<StorePath, Input> fetch(ref<Store> store) const;
 
     Input applyOverrides(
         std::optional<std::string> ref,
@@ -144,8 +128,6 @@ struct InputScheme
 
     virtual ParsedURL toURL(const Input & input) const;
 
-    virtual bool hasAllInfo(const Input & input) const = 0;
-
     virtual Input applyOverrides(
         const Input & input,
         std::optional<std::string> ref,
@@ -163,37 +145,11 @@ struct InputScheme
      * Is this `InputScheme` part of an experimental feature?
      */
     virtual std::optional<ExperimentalFeature> experimentalFeature();
+
+    virtual bool isDirect(const Input & input) const
+    { return true; }
 };
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
-
-struct DownloadFileResult
-{
-    StorePath storePath;
-    std::string etag;
-    std::string effectiveUrl;
-    std::optional<std::string> immutableUrl;
-};
-
-DownloadFileResult downloadFile(
-    ref<Store> store,
-    const std::string & url,
-    const std::string & name,
-    bool locked,
-    const Headers & headers = {});
-
-struct DownloadTarballResult
-{
-    Tree tree;
-    time_t lastModified;
-    std::optional<std::string> immutableUrl;
-};
-
-DownloadTarballResult downloadTarball(
-    ref<Store> store,
-    const std::string & url,
-    const std::string & name,
-    bool locked,
-    const Headers & headers = {});
 
 }

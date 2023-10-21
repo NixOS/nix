@@ -7,6 +7,7 @@
 #include "git.hh"
 #include "fetchers.hh"
 #include "fetch-settings.hh"
+#include "tarball.hh"
 
 #include <optional>
 #include <nlohmann/json.hpp>
@@ -125,16 +126,11 @@ struct GitArchiveInputScheme : InputScheme
         auto path = owner + "/" + repo;
         assert(!(ref && rev));
         if (ref) path += "/" + *ref;
-        if (rev) path += "/" + rev->to_string(Base16, false);
+        if (rev) path += "/" + rev->to_string(HashFormat::Base16, false);
         return ParsedURL {
             .scheme = type(),
             .path = path,
         };
-    }
-
-    bool hasAllInfo(const Input & input) const override
-    {
-        return input.getRev() && maybeGetIntAttr(input.attrs, "lastModified");
     }
 
     Input applyOverrides(
@@ -218,10 +214,15 @@ struct GitArchiveInputScheme : InputScheme
                 {"rev", rev->gitRev()},
                 {"lastModified", uint64_t(result.lastModified)}
             },
-            result.tree.storePath,
+            result.storePath,
             true);
 
-        return {result.tree.storePath, input};
+        return {result.storePath, input};
+    }
+
+    std::optional<ExperimentalFeature> experimentalFeature() override
+    {
+        return Xp::Flakes;
     }
 };
 
@@ -291,7 +292,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
             : "https://api.%s/repos/%s/%s/tarball/%s";
 
         const auto url = fmt(urlFmt, host, getOwner(input), getRepo(input),
-            input.getRev()->to_string(Base16, false));
+            input.getRev()->to_string(HashFormat::Base16, false));
 
         return DownloadUrl { url, headers };
     }
@@ -357,7 +358,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
         auto url = fmt("https://%s/api/v4/projects/%s%%2F%s/repository/archive.tar.gz?sha=%s",
             host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
-            input.getRev()->to_string(Base16, false));
+            input.getRev()->to_string(HashFormat::Base16, false));
 
         Headers headers = makeHeadersWithAuthTokens(host);
         return DownloadUrl { url, headers };
@@ -444,7 +445,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("git.sr.ht");
         auto url = fmt("https://%s/%s/%s/archive/%s.tar.gz",
             host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
-            input.getRev()->to_string(Base16, false));
+            input.getRev()->to_string(HashFormat::Base16, false));
 
         Headers headers = makeHeadersWithAuthTokens(host);
         return DownloadUrl { url, headers };

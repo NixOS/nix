@@ -39,8 +39,21 @@ public:
 
 protected:
 
+    /**
+     * The largest `size_t` is used to indicate the "any" arity, for
+     * handlers/flags/arguments that accept an arbitrary number of
+     * arguments.
+     */
     static const size_t ArityAny = std::numeric_limits<size_t>::max();
 
+    /**
+     * Arguments (flags/options and positional) have a "handler" which is
+     * caused when the argument is parsed. The handler has an arbitrary side
+     * effect, including possible affect further command-line parsing.
+     *
+     * There are many constructors in order to support many shorthand
+     * initializations, and this is used a lot.
+     */
     struct Handler
     {
         std::function<void(std::vector<std::string>)> fun;
@@ -110,7 +123,12 @@ protected:
         { }
     };
 
-    /* Options. */
+    /**
+     * Description of flags / options
+     *
+     * These are arguments like `-s` or `--long` that can (mostly)
+     * appear in any order.
+     */
     struct Flag
     {
         typedef std::shared_ptr<Flag> ptr;
@@ -130,12 +148,30 @@ protected:
         static Flag mkHashTypeOptFlag(std::string && longName, std::optional<HashType> * oht);
     };
 
+    /**
+     * Index of all registered "long" flag descriptions (flags like
+     * `--long`).
+     */
     std::map<std::string, Flag::ptr> longFlags;
+
+    /**
+     * Index of all registered "short" flag descriptions (flags like
+     * `-s`).
+     */
     std::map<char, Flag::ptr> shortFlags;
 
+    /**
+     * Process a single flag and its arguments, pulling from an iterator
+     * of raw CLI args as needed.
+     */
     virtual bool processFlag(Strings::iterator & pos, Strings::iterator end);
 
-    /* Positional arguments. */
+    /**
+     * Description of positional arguments
+     *
+     * These are arguments that do not start with a `-`, and for which
+     * the order does matter.
+     */
     struct ExpectedArg
     {
         std::string label;
@@ -144,8 +180,24 @@ protected:
         std::function<void(size_t, std::string_view)> completer;
     };
 
+    /**
+     * Queue of expected positional argument forms.
+     *
+     * Positional arugment descriptions are inserted on the back.
+     *
+     * As positional arguments are passed, these are popped from the
+     * front, until there are hopefully none left as all args that were
+     * expected in fact were passed.
+     */
     std::list<ExpectedArg> expectedArgs;
 
+    /**
+     * Process some positional arugments
+     *
+     * @param finish: We have parsed everything else, and these are the only
+     * arguments left. Used because we accumulate some "pending args" we might
+     * have left over.
+     */
     virtual bool processArgs(const Strings & args, bool finish);
 
     virtual Strings::iterator rewriteArgs(Strings & args, Strings::iterator pos)
@@ -204,6 +256,9 @@ public:
 
     friend class MultiCommand;
 
+    /**
+     * The parent command, used if this is a subcommand.
+     */
     MultiCommand * parent = nullptr;
 
 private:

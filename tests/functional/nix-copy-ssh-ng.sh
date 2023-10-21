@@ -9,7 +9,7 @@ rm -rf "$remoteRoot"
 
 outPath=$(nix-build --no-out-link dependencies.nix)
 
-nix store ping --store "ssh-ng://localhost?store=$NIX_STORE_DIR&remote-store=$remoteRoot%3fstore=$NIX_STORE_DIR%26real=$remoteRoot$NIX_STORE_DIR"
+nix store info --store "ssh-ng://localhost?store=$NIX_STORE_DIR&remote-store=$remoteRoot%3fstore=$NIX_STORE_DIR%26real=$remoteRoot$NIX_STORE_DIR"
 
 # Regression test for https://github.com/NixOS/nix/issues/6253
 nix copy --to "ssh-ng://localhost?store=$NIX_STORE_DIR&remote-store=$remoteRoot%3fstore=$NIX_STORE_DIR%26real=$remoteRoot$NIX_STORE_DIR" $outPath --no-check-sigs &

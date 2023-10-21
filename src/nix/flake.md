@@ -182,6 +182,12 @@ Currently the `type` attribute can be one of the following:
   git(+http|+https|+ssh|+git|+file|):(//<server>)?<path>(\?<params>)?
   ```
 
+  or
+
+  ```
+  <user>@<server>:<path>
+  ```
+
   The `ref` attribute defaults to resolving the `HEAD` reference.
 
   The `rev` attribute must denote a commit that exists in the branch

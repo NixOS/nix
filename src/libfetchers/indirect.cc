@@ -41,7 +41,6 @@ struct IndirectInputScheme : InputScheme
         // FIXME: forbid query params?
 
         Input input;
-        input.direct = false;
         input.attrs.insert_or_assign("type", "indirect");
         input.attrs.insert_or_assign("id", id);
         if (rev) input.attrs.insert_or_assign("rev", rev->gitRev());
@@ -63,7 +62,6 @@ struct IndirectInputScheme : InputScheme
             throw BadURL("'%s' is not a valid flake ID", id);
 
         Input input;
-        input.direct = false;
         input.attrs = attrs;
         return input;
     }
@@ -76,11 +74,6 @@ struct IndirectInputScheme : InputScheme
         if (auto ref = input.getRef()) { url.path += '/'; url.path += *ref; };
         if (auto rev = input.getRev()) { url.path += '/'; url.path += rev->gitRev(); };
         return url;
-    }
-
-    bool hasAllInfo(const Input & input) const override
-    {
-        return false;
     }
 
     Input applyOverrides(
@@ -103,6 +96,9 @@ struct IndirectInputScheme : InputScheme
     {
         return Xp::Flakes;
     }
+
+    bool isDirect(const Input & input) const override
+    { return false; }
 };
 
 static auto rIndirectInputScheme = OnStartup([] { registerInputScheme(std::make_unique<IndirectInputScheme>()); });

@@ -50,7 +50,7 @@ struct AttrDb
         Path cacheDir = getCacheDir() + "/nix/eval-cache-v5";
         createDirs(cacheDir);
 
-        Path dbPath = cacheDir + "/" + fingerprint.to_string(Base16, false) + ".sqlite";
+        Path dbPath = cacheDir + "/" + fingerprint.to_string(HashFormat::Base16, false) + ".sqlite";
 
         state->db = SQLite(dbPath);
         state->db.isCache();

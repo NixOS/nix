@@ -46,7 +46,7 @@ bool touchCacheFile(const Path & path, time_t touch_time)
 Path getCachePath(std::string_view key)
 {
     return getCacheDir() + "/nix/gitv3/" +
-        hashString(htSHA256, key).to_string(Base32, false);
+        hashString(htSHA256, key).to_string(HashFormat::Base32, false);
 }
 
 // Returns the name of the HEAD branch.
@@ -293,7 +293,6 @@ struct GitInputScheme : InputScheme
             if (name != "type" && name != "url" && name != "ref" && name != "rev" && name != "shallow" && name != "submodules" && name != "lastModified" && name != "revCount" && name != "narHash" && name != "allRefs" && name != "name" && name != "dirtyRev" && name != "dirtyShortRev")
                 throw Error("unsupported Git input attribute '%s'", name);
 
-        parseURL(getStrAttr(attrs, "url"));
         maybeGetBoolAttr(attrs, "shallow");
         maybeGetBoolAttr(attrs, "submodules");
         maybeGetBoolAttr(attrs, "allRefs");
@@ -305,6 +304,9 @@ struct GitInputScheme : InputScheme
 
         Input input;
         input.attrs = attrs;
+        auto url = fixGitURL(getStrAttr(attrs, "url"));
+        parseURL(url);
+        input.attrs["url"] = url;
         return input;
     }
 
@@ -317,15 +319,6 @@ struct GitInputScheme : InputScheme
         if (maybeGetBoolAttr(input.attrs, "shallow").value_or(false))
             url.query.insert_or_assign("shallow", "1");
         return url;
-    }
-
-    bool hasAllInfo(const Input & input) const override
-    {
-        bool maybeDirty = !input.getRef();
-        bool shallow = maybeGetBoolAttr(input.attrs, "shallow").value_or(false);
-        return
-            maybeGetIntAttr(input.attrs, "lastModified")
-            && (shallow || maybeDirty || maybeGetIntAttr(input.attrs, "revCount"));
     }
 
     Input applyOverrides(
@@ -415,7 +408,7 @@ struct GitInputScheme : InputScheme
         auto checkHashType = [&](const std::optional<Hash> & hash)
         {
             if (hash.has_value() && !(hash->type == htSHA1 || hash->type == htSHA256))
-                throw Error("Hash '%s' is not supported by Git. Supported types are sha1 and sha256.", hash->to_string(Base16, true));
+                throw Error("Hash '%s' is not supported by Git. Supported types are sha1 and sha256.", hash->to_string(HashFormat::Base16, true));
         };
 
         auto getLockedAttrs = [&]()

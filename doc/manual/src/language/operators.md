@@ -59,9 +59,13 @@ An attribute path is a dot-separated list of [attribute names](./values.md#attri
 Test whether [attribute set] *attrset* contains the attribute denoted by *attrpath*.
 The result is a [Boolean] value.
 
+See also: [`builtins.hasAttr`](@docroot@/language/builtins.md#builtins-hasAttr)
+
 [Boolean]: ./values.md#type-boolean
 
 [Has attribute]: #has-attribute
+
+After evaluating *attrset* and *attrpath*, the computational complexity is O(log(*n*)) for *n* attributes in the *attrset*
 
 ## Arithmetic
 
