@@ -17,7 +17,7 @@ the build loop.
 
 # Prerequisites
 
-This tutorial assumes you have configured an [S3-compatible binary cache](../command-ref/conf-file.md#conf-substituters),
+This tutorial assumes you have configured an [S3-compatible binary cache](@docroot@/command-ref/new-cli/nix3-help-stores.md#s3-binary-cache-store) as a [substituter](../command-ref/conf-file.md#conf-substituters),
 and that the `root` user's default AWS profile can upload to the bucket.
 
 # Set up a Signing Key
