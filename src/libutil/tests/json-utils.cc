@@ -35,4 +35,23 @@ namespace nix {
         ASSERT_EQ(nlohmann::json(val), nlohmann::json(nullptr));
     }
 
+    TEST(from_json, optionalInt) {
+        nlohmann::json json = 420;
+        std::optional<int> val = json;
+        ASSERT_TRUE(val.has_value());
+        ASSERT_EQ(*val, 420);
+        json = nullptr;
+        json.get_to(val);
+        ASSERT_FALSE(val.has_value());
+    }
+
+    TEST(from_json, vectorOfOptionalInts) {
+        nlohmann::json json = { 420, nullptr };
+        std::vector<std::optional<int>> vals = json;
+        ASSERT_EQ(vals.size(), 2);
+        ASSERT_TRUE(vals.at(0).has_value());
+        ASSERT_EQ(*vals.at(0), 420);
+        ASSERT_FALSE(vals.at(1).has_value());
+    }
+
 } /* namespace nix */

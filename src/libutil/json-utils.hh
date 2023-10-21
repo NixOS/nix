@@ -83,9 +83,6 @@ struct adl_serializer<std::optional<T>> {
      *        `null` as `std::nullopt`.
      */
     static void from_json(const json & json, std::optional<T> & t) {
-        static_assert(
-            nix::json_avoids_null<T>::value,
-            "null is already in use for underlying type's JSON");
         t = json.is_null()
             ? std::nullopt
             : std::make_optional(json.template get<T>());
@@ -96,9 +93,6 @@ struct adl_serializer<std::optional<T>> {
      *         as `null`.
      */
     static void to_json(json & json, const std::optional<T> & t) {
-        static_assert(
-            nix::json_avoids_null<T>::value,
-            "null is already in use for underlying type's JSON");
         if (t.has_value())
             json = *t;
         else
