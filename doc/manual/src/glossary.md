@@ -103,7 +103,7 @@
 
   The Nix data model for representing simplified file system data.
 
-  See [File System Object](@docroot@/architecture/file-system-object.md) for details.
+  See [File System Object](@docroot@/store/concrete/file-system-object.md) for details.
 
   [file system object]: #gloss-file-system-object
 

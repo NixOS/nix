@@ -1,6 +1,6 @@
 # Content-Addressing Store Objects
 
-Before in the section on [store paths](./paths.md), we talked abstractly about content-adressing store objects to preduce the digest part of their store paths.
+Before in the section on [store paths](./path.md), we talked abstractly about content-adressing store objects to preduce the digest part of their store paths.
 Now we can make that precise.
 
 Rather than reasoning *backwards* from the grammar to the underlying semantics, as the [summary](./path.md#summary) of the previous section on store paths does,
@@ -12,7 +12,7 @@ let's reasons *forwards* first describing the semantics, and then the string enc
 
 File system objects are hashed in
 
-- [Nix Archive (NAR)](./ca-fso.md#nix-archive) hashing, where an arbitrary FSOs and its children are serialized according to that format and then hashed.
+- [Nix Archive (NAR)](./ca-file-system-object.md#nix-archive) hashing, where an arbitrary FSOs and its children are serialized according to that format and then hashed.
 
 - Flat hashing, where the FSO must be a single file, and its contents are hashed.
 
@@ -151,7 +151,7 @@ and within that just `<type>` and `<inner-digest>` are determined differently ba
 
 - For the "fixed" content-addressing method, one of:
 
-   - When the method is [Nix Archive (NAR)](./ca-fso.md#nix-archive) (not flat) and the hash type is [SHA-256](sha-256):
+   - When the method is [Nix Archive (NAR)](./ca-file-system-object.md#nix-archive) (not flat) and the hash type is [SHA-256][sha-256]:
      ```bnf
      source:<r1>:<r2>:...:<rN>:self
      ```
@@ -164,9 +164,11 @@ and within that just `<type>` and `<inner-digest>` are determined differently ba
 In all of the above, `<r1> ... <rN>` are the store paths referenced by this path.
 Those are encoded in the form described by `<realized-path>`.
 
+[sha-256]: https://en.m.wikipedia.org/wiki/SHA-256
+
 #### Restrictions on references
 
-Note that the `output:out` case alone doesn't have any `<r1> ... <rN>`; this is why there was the side condition stated above that cases besides [Nix Archive (NAR)](./ca-fso.md#nix-archive) and [SHA-256](sha-256) didn't support references.
+Note that the `output:out` case alone doesn't have any `<r1> ... <rN>`; this is why there was the side condition stated above that cases besides [Nix Archive (NAR)](./ca-file-system-object.md#nix-archive) and [SHA-256][sha-256] didn't support references.
 
 #### A historical accident
 
@@ -192,7 +194,7 @@ It would have been nicer to handle all paths for content-addressed objects in a 
 
 - For the "fixed" content-addressing method, one of:
 
-  - When the method is [Nix Archive (NAR)](./ca-fso.md#nix-archive) (not flat) and the hash type is [SHA-256](sha-256):
+  - When the method is [Nix Archive (NAR)](./ca-file-system-object.md#nix-archive) (not flat) and the hash type is [SHA-256][sha-256]:
 
     the NAR serialisation of the path from which this store path is copied
 
@@ -202,7 +204,7 @@ It would have been nicer to handle all paths for content-addressed objects in a 
 
       - `<rec>` = one of:
 
-        - `r:` for [NAR](./ca-fso.md#nix-archive) (arbitrary file system object) hashes
+        - `r:` for [NAR](./ca-file-system-object.md#nix-archive) (arbitrary file system object) hashes
 
         - `` (empty string) for flat (single file) hashes
 

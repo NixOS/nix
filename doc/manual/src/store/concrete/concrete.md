@@ -11,7 +11,7 @@ That allows processes to resolve references contained in files and thus access t
 
 Store objects are therefore implemented as the pair of
 
-  - a [file system object](fso.md) for data
+  - a [file system object](file-system-object.md) for data
   - a set of [store paths](path.md) for references.
 
 [unix-paradigm]: https://en.m.wikipedia.org/wiki/Everything_is_a_file

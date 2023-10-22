@@ -1,6 +1,6 @@
 # Store Path
 
-Nix implements [references](store.md#reference) to [store objects](store.md#store-object) as *store paths*.
+Nix implements [references](object.md#reference) to [store objects](object.md#store-object) as *store paths*.
 
 Store paths are pairs of
 
@@ -30,9 +30,9 @@ store directory            digest                 name
 
 ## Store Directory
 
-Every [store](./store.md) has a store directory.
+Every [store](./concrete.md) has a store directory.
 
-If the store has a [file system representation](./store.md#files-and-processes), this directory contains the store’s [file system objects](#file-system-object), which can be addressed by [store paths](#store-path).
+If the store has a file system representation, this directory contains the store’s [file system objects](./object.md), which can be addressed by [store paths](#store-path).
 
 This means a store path is not just derived from the referenced store object itself, but depends on the store the store object is in.
 
@@ -41,7 +41,7 @@ This means a store path is not just derived from the referenced store object its
 
 It is important which store a given store object belongs to:
 Files in the store object can contain store paths, and processes may read these paths.
-Nix can only guarantee [referential integrity](closure.md) if store paths do not cross store boundaries.
+Nix can only guarantee [referential integrity](@docroot@/glossary.md#gloss-closure) if store paths do not cross store boundaries.
 
 Therefore one can only copy store objects to a different store if either
 
@@ -139,7 +139,7 @@ hash of `<pre>`; the hash part of the store name
     source:<r1>:<r2>:...:<rN>:self
     ```
 
-    For paths copied to the store and hashed via a [Nix Archive (NAR)](./ca-fso.md#nix-archive) and [SHA-256](sha-256).
+    For paths copied to the store and hashed via a [Nix Archive (NAR)](./ca-file-system-object.md#nix-archive) and [SHA-256][sha-256].
     Just like in the text case, we can have the store objects referenced by their paths.
     Additionally, we can have an optional `:self` label to denote self reference.
 
@@ -147,7 +147,7 @@ hash of `<pre>`; the hash part of the store name
     output:<id>
     ```
 
-    For either the outputs built from derivations, OR paths copied to the store hashed that area single file hashed directly, or the via a hash algorithm other than [SHA-256](sha-256).
+    For either the outputs built from derivations, OR paths copied to the store hashed that area single file hashed directly, or the via a hash algorithm other than [SHA-256][sha-256].
     (in that case "source" is used; it's silly, but it's done that way for compatibility).
 
     `<id>` is the name of the output (usually, "out").
@@ -178,7 +178,7 @@ hash of `<pre>`; the hash part of the store name
 
         - `<rec>` = one of:
 
-          - `r:` for [NAR](./ca-fso.md#nix-archive) (arbitrary file system object) hashes
+          - `r:` for [NAR](./ca-file-system-object.md#nix-archive) (arbitrary file system object) hashes
 
           - `` (empty string) for flat (single file) hashes
 

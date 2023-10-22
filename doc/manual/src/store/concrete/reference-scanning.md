@@ -16,7 +16,7 @@ This "simple, stupid" approach actually works quite well most of the time, and i
 ## Why it works
 
 Store objects are, as previously mentioned, mounted at `<store-dir>/<hash>-<name>` when they are exposed to the file system.
-This is the textual form of a [store path](./paths.md).
+This is the textual form of a [store path](./path.md).
 When this happens depends on the type of store, but it *must* happen during building, as regular Unix processes are being run.
 Those paths contain hashes, and hashes are not guessable.
 As such, build results *must* store those hashes if the programs inside them wish to refer to those store objects without the aid of extra information when they are run.
@@ -52,7 +52,7 @@ There is no problem with a store object having an "extra" reference that doesn't
 The store object will have an extra dependency that it doesn't need, but that is fine.
 It is a case adjacent to that of a hash occurring in some obscure location within the store object that is never read.
 
-[Drv files](./drvs/drvs.md), discussed next, might also contain store paths that *aren't* references.
+[Drv files](./drv/drv.md), discussed next, might also contain store paths that *aren't* references.
 The specific reasons for this will be given then, but we can still ask how how could this possibly be safe?
 The fundamental answer is that since the drv file format is known to Nix, it can "do better" than plain scanning.
 Nix knows how to parse them, and thus meaningfully differentiate between hashes based on *where* they occur.
@@ -66,7 +66,7 @@ It can decide which contexts correspond to an assumption that the store path oug
 When a new store object is built, Nix scans its file contents for store paths to construct its set of references.
 
 The special format of a store path's [digest](#digest) allows reliably detecting it among arbitrary data.
-Nix uses the [closure](store.md#closure) of build inputs to derive the list of allowed store paths, to avoid false positives.
+Nix uses the [closure](@docroot@/glossary.md#gloss-closure) of build inputs to derive the list of allowed store paths, to avoid false positives.
 
 This way, scanning files captures run time dependencies without the user having to declare them explicitly.
 Doing it at build time and persisting references in the store object avoids repeating this time-consuming operation.
