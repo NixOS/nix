@@ -60,15 +60,15 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
     auto cursor = getCursor(state);
     auto attrPath = cursor->getAttrPath();
 
-    auto cursorType = cursor->getAttr("type")->getString();
+    auto type = cursor->getAttr("type")->getString();
 
     std::string expectedType = !attrPath.empty() &&
         (state.symbols[attrPath[0]] == "apps" || state.symbols[attrPath[0]] == "defaultApp")
         ? "app" : "derivation";
-    if (cursorType != expectedType)
+    if (type != expectedType)
         throw Error("attribute '%s' should have type '%s'", cursor->getAttrPathStr(), expectedType);
 
-    if (cursorType == "app") {
+    if (type == "app") {
         auto [program, context] = cursor->getAttr("program")->getStringWithContext();
 
         std::vector<DerivedPath> context2;
@@ -100,7 +100,8 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
             .program = program,
         }};
     }
-    else if (cursorType == "derivation") {
+
+    else if (type == "derivation") {
         auto drvPath = cursor->forceDerivation();
         auto outPath = cursor->getAttr(state.sOutPath)->getString();
         auto outputName = cursor->getAttr(state.sOutputName)->getString();
@@ -123,8 +124,9 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
             .program = program,
         }};
     }
+
     else
-        throw Error("attribute '%s' has unsupported type '%s'", cursor->getAttrPathStr(), cursorType);
+        throw Error("attribute '%s' has unsupported type '%s'", cursor->getAttrPathStr(), type);
 }
 
 // FIXME: move to libcmd
