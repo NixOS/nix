@@ -100,8 +100,7 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
             .program = program,
         }};
     }
-
-    if (cursorType == "derivation") {
+    else if (cursorType == "derivation") {
         auto drvPath = cursor->forceDerivation();
         auto outPath = cursor->getAttr(state.sOutPath)->getString();
         auto outputName = cursor->getAttr(state.sOutputName)->getString();
@@ -124,8 +123,8 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
             .program = program,
         }};
     }
-
-    throw Error("attribute '%s' has unsupported type '%s'", cursor->getAttrPathStr(), cursorType);
+    else
+        throw Error("attribute '%s' has unsupported type '%s'", cursor->getAttrPathStr(), cursorType);
 }
 
 // FIXME: move to libcmd
