@@ -63,7 +63,7 @@ The following types of installable are supported by most commands:
 - [Nix file](#nix-file), optionally qualified by an attribute path
 - [Nix expression](#nix-expression), optionally qualified by an attribute path
 
-For most commands, if no installable is specified, `.` as assumed.
+For most commands, if no installable is specified, `.` is assumed.
 That is, Nix will operate on the default flake output attribute of the flake in the current directory.
 
 ### Flake output attribute
@@ -131,6 +131,8 @@ subcommands, these are `packages.`*system*,
 `x86_64-linux` `nix build nixpkgs#hello` will try to build the
 attributes `packages.x86_64-linux.hello`,
 `legacyPackages.x86_64-linux.hello` and `hello`.
+
+If *attrpath* begins with `.` then no prefixes or defaults are attempted. This allows the form *flakeref*[`#.`*attrpath*], such as `github:NixOS/nixpkgs#.lib.fakeSha256` to avoid a search of `packages.*system*.lib.fakeSha256`
 
 ### Store path
 

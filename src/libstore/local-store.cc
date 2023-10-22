@@ -826,7 +826,7 @@ uint64_t LocalStore::addValidPath(State & state,
 
     state.stmts->RegisterValidPath.use()
         (printStorePath(info.path))
-        (info.narHash.to_string(Base16, true))
+        (info.narHash.to_string(HashFormat::Base16, true))
         (info.registrationTime == 0 ? time(0) : info.registrationTime)
         (info.deriver ? printStorePath(*info.deriver) : "", (bool) info.deriver)
         (info.narSize, info.narSize != 0)
@@ -933,7 +933,7 @@ void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
 {
     state.stmts->UpdatePathInfo.use()
         (info.narSize, info.narSize != 0)
-        (info.narHash.to_string(Base16, true))
+        (info.narHash.to_string(HashFormat::Base16, true))
         (info.ultimate ? 1 : 0, info.ultimate)
         (concatStringsSep(" ", info.sigs), !info.sigs.empty())
         (renderContentAddress(info.ca), (bool) info.ca)
@@ -1022,10 +1022,9 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 
 
 std::map<std::string, std::optional<StorePath>>
-LocalStore::queryPartialDerivationOutputMap(const StorePath & path_)
+LocalStore::queryStaticPartialDerivationOutputMap(const StorePath & path)
 {
-    auto path = path_;
-    auto outputs = retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
+    return retrySQLite<std::map<std::string, std::optional<StorePath>>>([&]() {
         auto state(_state.lock());
         std::map<std::string, std::optional<StorePath>> outputs;
         uint64_t drvId;
@@ -1037,21 +1036,6 @@ LocalStore::queryPartialDerivationOutputMap(const StorePath & path_)
 
         return outputs;
     });
-
-    if (!experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
-        return outputs;
-
-    auto drv = readInvalidDerivation(path);
-    auto drvHashes = staticOutputHashes(*this, drv);
-    for (auto& [outputName, hash] : drvHashes) {
-        auto realisation = queryRealisation(DrvOutput{hash, outputName});
-        if (realisation)
-            outputs.insert_or_assign(outputName, realisation->outPath);
-        else
-            outputs.insert({outputName, std::nullopt});
-    }
-
-    return outputs;
 }
 
 std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & hashPart)
@@ -1212,6 +1196,15 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
     if (checkSigs && pathInfoIsUntrusted(info))
         throw Error("cannot add path '%s' because it lacks a signature by a trusted key", printStorePath(info.path));
 
+    /* In case we are not interested in reading the NAR: discard it. */
+    bool narRead = false;
+    Finally cleanup = [&]() {
+        if (!narRead) {
+            ParseSink sink;
+            parseDump(sink, source);
+        }
+    };
+
     addTempRoot(info.path);
 
     if (repair || !isValidPath(info.path)) {
@@ -1236,40 +1229,31 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source,
 
             TeeSource wrapperSource { source, hashSink };
 
+            narRead = true;
             restorePath(realPath, wrapperSource);
 
             auto hashResult = hashSink.finish();
 
             if (hashResult.first != info.narHash)
                 throw Error("hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                    printStorePath(info.path), info.narHash.to_string(Base32, true), hashResult.first.to_string(Base32, true));
+                    printStorePath(info.path), info.narHash.to_string(HashFormat::Base32, true), hashResult.first.to_string(HashFormat::Base32, true));
 
             if (hashResult.second != info.narSize)
                 throw Error("size mismatch importing path '%s';\n  specified: %s\n  got:       %s",
                     printStorePath(info.path), info.narSize, hashResult.second);
 
             if (info.ca) {
-                if (auto foHash = std::get_if<FixedOutputHash>(&info.ca->raw)) {
-                    auto actualFoHash = hashCAPath(
-                        foHash->method,
-                        foHash->hash.type,
-                        info.path
-                    );
-                    if (foHash->hash != actualFoHash.hash) {
-                        throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                            printStorePath(info.path),
-                            foHash->hash.to_string(Base32, true),
-                            actualFoHash.hash.to_string(Base32, true));
-                    }
-                }
-                if (auto textHash = std::get_if<TextHash>(&info.ca->raw)) {
-                    auto actualTextHash = hashString(htSHA256, readFile(realPath));
-                    if (textHash->hash != actualTextHash) {
-                        throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                            printStorePath(info.path),
-                            textHash->hash.to_string(Base32, true),
-                            actualTextHash.to_string(Base32, true));
-                    }
+                auto & specified = *info.ca;
+                auto actualHash = hashCAPath(
+                    specified.method,
+                    specified.hash.type,
+                    info.path
+                );
+                if (specified.hash != actualHash.hash) {
+                    throw Error("ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+                        printStorePath(info.path),
+                        specified.hash.to_string(HashFormat::Base32, true),
+                        actualHash.hash.to_string(HashFormat::Base32, true));
                 }
             }
 
@@ -1349,10 +1333,8 @@ StorePath LocalStore::addToStoreFromDump(Source & source0, std::string_view name
     auto [hash, size] = hashSink->finish();
 
     ContentAddressWithReferences desc = FixedOutputInfo {
-        .hash = {
-            .method = method,
-            .hash = hash,
-        },
+        .method = method,
+        .hash = hash,
         .references = {
             .others = references,
             // caller is not capable of creating a self-reference, because this is content-addressed without modulus
@@ -1428,8 +1410,8 @@ StorePath LocalStore::addTextToStore(
 {
     auto hash = hashString(htSHA256, s);
     auto dstPath = makeTextPath(name, TextInfo {
-        { .hash = hash },
-        references,
+        .hash = hash,
+        .references = references,
     });
 
     addTempRoot(dstPath);
@@ -1459,7 +1441,10 @@ StorePath LocalStore::addTextToStore(
             ValidPathInfo info { dstPath, narHash };
             info.narSize = sink.s.size();
             info.references = references;
-            info.ca = TextHash { .hash = hash };
+            info.ca = {
+                .method = TextIngestionMethod {},
+                .hash = hash,
+            };
             registerValidPath(info);
         }
 
@@ -1524,17 +1509,33 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
     auto fdGCLock = openGCLock();
     FdLock gcLock(fdGCLock.get(), ltRead, true, "waiting for the big garbage collector lock...");
 
-    StringSet store;
-    for (auto & i : readDirectory(realStoreDir)) store.insert(i.name);
-
-    /* Check whether all valid paths actually exist. */
-    printInfo("checking path existence...");
-
     StorePathSet validPaths;
-    PathSet done;
 
-    for (auto & i : queryAllValidPaths())
-        verifyPath(printStorePath(i), store, done, validPaths, repair, errors);
+    {
+        StorePathSet storePathsInStoreDir;
+        /* Why aren't we using `queryAllValidPaths`? Because that would
+           tell us about all the paths than the database knows about. Here we
+           want to know about all the store paths in the store directory,
+           regardless of what the database thinks.
+
+           We will end up cross-referencing these two sources of truth (the
+           database and the filesystem) in the loop below, in order to catch
+           invalid states.
+         */
+        for (auto & i : readDirectory(realStoreDir)) {
+            try {
+                storePathsInStoreDir.insert({i.name});
+            } catch (BadStorePath &) { }
+        }
+
+        /* Check whether all valid paths actually exist. */
+        printInfo("checking path existence...");
+
+        StorePathSet done;
+
+        for (auto & i : queryAllValidPaths())
+            verifyPath(i, storePathsInStoreDir, done, validPaths, repair, errors);
+    }
 
     /* Optionally, check the content hashes (slow). */
     if (checkContents) {
@@ -1544,7 +1545,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         for (auto & link : readDirectory(linksDir)) {
             printMsg(lvlTalkative, "checking contents of '%s'", link.name);
             Path linkPath = linksDir + "/" + link.name;
-            std::string hash = hashPath(htSHA256, linkPath).first.to_string(Base32, false);
+            std::string hash = hashPath(htSHA256, linkPath).first.to_string(HashFormat::Base32, false);
             if (hash != link.name) {
                 printError("link '%s' was modified! expected hash '%s', got '%s'",
                     linkPath, link.name, hash);
@@ -1577,7 +1578,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
                 if (info->narHash != nullHash && info->narHash != current.first) {
                     printError("path '%s' was modified! expected hash '%s', got '%s'",
-                        printStorePath(i), info->narHash.to_string(Base32, true), current.first.to_string(Base32, true));
+                        printStorePath(i), info->narHash.to_string(HashFormat::Base32, true), current.first.to_string(HashFormat::Base32, true));
                     if (repair) repairPath(i); else errors = true;
                 } else {
 
@@ -1620,31 +1621,26 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 }
 
 
-void LocalStore::verifyPath(const Path & pathS, const StringSet & store,
-    PathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors)
+void LocalStore::verifyPath(const StorePath & path, const StorePathSet & storePathsInStoreDir,
+    StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors)
 {
     checkInterrupt();
 
-    if (!done.insert(pathS).second) return;
+    if (!done.insert(path).second) return;
 
-    if (!isStorePath(pathS)) {
-        printError("path '%s' is not in the Nix store", pathS);
-        return;
-    }
-
-    auto path = parseStorePath(pathS);
-
-    if (!store.count(std::string(path.to_string()))) {
+    if (!storePathsInStoreDir.count(path)) {
         /* Check any referrers first.  If we can invalidate them
            first, then we can invalidate this path as well. */
         bool canInvalidate = true;
         StorePathSet referrers; queryReferrers(path, referrers);
         for (auto & i : referrers)
             if (i != path) {
-                verifyPath(printStorePath(i), store, done, validPaths, repair, errors);
+                verifyPath(i, storePathsInStoreDir, done, validPaths, repair, errors);
                 if (validPaths.count(i))
                     canInvalidate = false;
             }
+
+        auto pathS = printStorePath(path);
 
         if (canInvalidate) {
             printInfo("path '%s' disappeared, removing from database...", pathS);
@@ -1856,33 +1852,39 @@ void LocalStore::queryRealisationUncached(const DrvOutput & id,
     }
 }
 
-FixedOutputHash LocalStore::hashCAPath(
-    const FileIngestionMethod & method, const HashType & hashType,
+ContentAddress LocalStore::hashCAPath(
+    const ContentAddressMethod & method, const HashType & hashType,
     const StorePath & path)
 {
     return hashCAPath(method, hashType, Store::toRealPath(path), path.hashPart());
 }
 
-FixedOutputHash LocalStore::hashCAPath(
-    const FileIngestionMethod & method,
+ContentAddress LocalStore::hashCAPath(
+    const ContentAddressMethod & method,
     const HashType & hashType,
     const Path & path,
     const std::string_view pathHash
 )
 {
     HashModuloSink caSink ( hashType, std::string(pathHash) );
-    switch (method) {
-    case FileIngestionMethod::Recursive:
-        dumpPath(path, caSink);
-        break;
-    case FileIngestionMethod::Flat:
-        readFile(path, caSink);
-        break;
-    }
-    auto hash = caSink.finish().first;
-    return FixedOutputHash{
+    std::visit(overloaded {
+        [&](const TextIngestionMethod &) {
+            readFile(path, caSink);
+        },
+        [&](const FileIngestionMethod & m2) {
+            switch (m2) {
+            case FileIngestionMethod::Recursive:
+                dumpPath(path, caSink);
+                break;
+            case FileIngestionMethod::Flat:
+                readFile(path, caSink);
+                break;
+            }
+        },
+    }, method.raw);
+    return ContentAddress {
         .method = method,
-        .hash = hash,
+        .hash = caSink.finish().first,
     };
 }
 

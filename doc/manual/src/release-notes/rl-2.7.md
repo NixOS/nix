@@ -24,7 +24,7 @@
   [repository](https://github.com/NixOS/bundlers) has various bundlers
   implemented.
 
-* `nix store ping` now reports the version of the remote Nix daemon.
+* `nix store info` now reports the version of the remote Nix daemon.
 
 * `nix flake {init,new}` now display information about which files have been
   created.

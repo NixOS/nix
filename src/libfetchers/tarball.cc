@@ -1,3 +1,4 @@
+#include "tarball.hh"
 #include "fetchers.hh"
 #include "cache.hh"
 #include "filetransfer.hh"
@@ -77,10 +78,8 @@ DownloadFileResult downloadFile(
             *store,
             name,
             FixedOutputInfo {
-                .hash = {
-                    .method = FileIngestionMethod::Flat,
-                    .hash = hash,
-                },
+                .method = FileIngestionMethod::Flat,
+                .hash = hash,
                 .references = {},
             },
             hashString(htSHA256, sink.s),
@@ -135,7 +134,7 @@ DownloadTarballResult downloadTarball(
 
     if (cached && !cached->expired)
         return {
-            .tree = Tree { .actualPath = store->toRealPath(cached->storePath), .storePath = std::move(cached->storePath) },
+            .storePath = std::move(cached->storePath),
             .lastModified = (time_t) getIntAttr(cached->infoAttrs, "lastModified"),
             .immutableUrl = maybeGetStrAttr(cached->infoAttrs, "immutableUrl"),
         };
@@ -176,7 +175,7 @@ DownloadTarballResult downloadTarball(
         locked);
 
     return {
-        .tree = Tree { .actualPath = store->toRealPath(*unpackedStorePath), .storePath = std::move(*unpackedStorePath) },
+        .storePath = std::move(*unpackedStorePath),
         .lastModified = lastModified,
         .immutableUrl = res.immutableUrl,
     };
@@ -196,11 +195,11 @@ struct CurlInputScheme : InputScheme
             || hasSuffix(path, ".tar.zst");
     }
 
-    virtual bool isValidURL(const ParsedURL & url) const = 0;
+    virtual bool isValidURL(const ParsedURL & url, bool requireTree) const = 0;
 
-    std::optional<Input> inputFromURL(const ParsedURL & _url) const override
+    std::optional<Input> inputFromURL(const ParsedURL & _url, bool requireTree) const override
     {
-        if (!isValidURL(_url))
+        if (!isValidURL(_url, requireTree))
             return std::nullopt;
 
         Input input;
@@ -234,7 +233,7 @@ struct CurlInputScheme : InputScheme
         if (type != inputType()) return {};
 
         // FIXME: some of these only apply to TarballInputScheme.
-        std::set<std::string> allowedNames = {"type", "url", "narHash", "name", "unpack", "rev", "revCount"};
+        std::set<std::string> allowedNames = {"type", "url", "narHash", "name", "unpack", "rev", "revCount", "lastModified"};
         for (auto & [name, value] : attrs)
             if (!allowedNames.count(name))
                 throw Error("unsupported %s input attribute '%s'", *type, name);
@@ -252,28 +251,22 @@ struct CurlInputScheme : InputScheme
         // NAR hashes are preferred over file hashes since tar/zip
         // files don't have a canonical representation.
         if (auto narHash = input.getNarHash())
-            url.query.insert_or_assign("narHash", narHash->to_string(SRI, true));
+            url.query.insert_or_assign("narHash", narHash->to_string(HashFormat::SRI, true));
         return url;
     }
-
-    bool hasAllInfo(const Input & input) const override
-    {
-        return true;
-    }
-
 };
 
 struct FileInputScheme : CurlInputScheme
 {
     const std::string inputType() const override { return "file"; }
 
-    bool isValidURL(const ParsedURL & url) const override
+    bool isValidURL(const ParsedURL & url, bool requireTree) const override
     {
         auto parsedUrlScheme = parseUrlScheme(url.scheme);
         return transportUrlSchemes.count(std::string(parsedUrlScheme.transport))
             && (parsedUrlScheme.application
-                    ? parsedUrlScheme.application.value() == inputType()
-                    : !hasTarballExtension(url.path));
+                ? parsedUrlScheme.application.value() == inputType()
+                : (!requireTree && !hasTarballExtension(url.path)));
     }
 
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & input) override
@@ -287,14 +280,14 @@ struct TarballInputScheme : CurlInputScheme
 {
     const std::string inputType() const override { return "tarball"; }
 
-    bool isValidURL(const ParsedURL & url) const override
+    bool isValidURL(const ParsedURL & url, bool requireTree) const override
     {
         auto parsedUrlScheme = parseUrlScheme(url.scheme);
 
         return transportUrlSchemes.count(std::string(parsedUrlScheme.transport))
             && (parsedUrlScheme.application
-                    ? parsedUrlScheme.application.value() == inputType()
-                    : hasTarballExtension(url.path));
+                ? parsedUrlScheme.application.value() == inputType()
+                : (requireTree || hasTarballExtension(url.path)));
     }
 
     std::pair<StorePath, Input> fetch(ref<Store> store, const Input & _input) override
@@ -312,7 +305,10 @@ struct TarballInputScheme : CurlInputScheme
             input = immutableInput;
         }
 
-        return {result.tree.storePath, std::move(input)};
+        if (result.lastModified && !input.attrs.contains("lastModified"))
+            input.attrs.insert_or_assign("lastModified", uint64_t(result.lastModified));
+
+        return {result.storePath, std::move(input)};
     }
 };
 

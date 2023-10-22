@@ -16,10 +16,16 @@ std::string StorePathWithOutputs::to_string(const Store & store) const
 DerivedPath StorePathWithOutputs::toDerivedPath() const
 {
     if (!outputs.empty()) {
-        return DerivedPath::Built { path, OutputsSpec::Names { outputs } };
+        return DerivedPath::Built {
+            .drvPath = makeConstantStorePathRef(path),
+            .outputs = OutputsSpec::Names { outputs },
+        };
     } else if (path.isDerivation()) {
         assert(outputs.empty());
-        return DerivedPath::Built { path, OutputsSpec::All { } };
+        return DerivedPath::Built {
+            .drvPath = makeConstantStorePathRef(path),
+            .outputs = OutputsSpec::All { },
+        };
     } else {
         return DerivedPath::Opaque { path };
     }
@@ -34,29 +40,36 @@ std::vector<DerivedPath> toDerivedPaths(const std::vector<StorePathWithOutputs> 
 }
 
 
-std::variant<StorePathWithOutputs, StorePath> StorePathWithOutputs::tryFromDerivedPath(const DerivedPath & p)
+StorePathWithOutputs::ParseResult StorePathWithOutputs::tryFromDerivedPath(const DerivedPath & p)
 {
     return std::visit(overloaded {
-        [&](const DerivedPath::Opaque & bo) -> std::variant<StorePathWithOutputs, StorePath> {
+        [&](const DerivedPath::Opaque & bo) -> StorePathWithOutputs::ParseResult {
             if (bo.path.isDerivation()) {
                 // drv path gets interpreted as "build", not "get drv file itself"
                 return bo.path;
             }
             return StorePathWithOutputs { bo.path };
         },
-        [&](const DerivedPath::Built & bfd) -> std::variant<StorePathWithOutputs, StorePath> {
-            return StorePathWithOutputs {
-                .path = bfd.drvPath,
-                // Use legacy encoding of wildcard as empty set
-                .outputs = std::visit(overloaded {
-                    [&](const OutputsSpec::All &) -> StringSet {
-                        return {};
-                    },
-                    [&](const OutputsSpec::Names & outputs) {
-                        return static_cast<StringSet>(outputs);
-                    },
-                }, bfd.outputs.raw()),
-            };
+        [&](const DerivedPath::Built & bfd) -> StorePathWithOutputs::ParseResult {
+            return std::visit(overloaded {
+                [&](const SingleDerivedPath::Opaque & bo) -> StorePathWithOutputs::ParseResult {
+                    return StorePathWithOutputs {
+                        .path = bo.path,
+                        // Use legacy encoding of wildcard as empty set
+                        .outputs = std::visit(overloaded {
+                            [&](const OutputsSpec::All &) -> StringSet {
+                                return {};
+                            },
+                            [&](const OutputsSpec::Names & outputs) {
+                                return static_cast<StringSet>(outputs);
+                            },
+                        }, bfd.outputs.raw),
+                    };
+                },
+                [&](const SingleDerivedPath::Built &) -> StorePathWithOutputs::ParseResult {
+                    return std::monostate {};
+                },
+            }, bfd.drvPath->raw());
         },
     }, p.raw());
 }

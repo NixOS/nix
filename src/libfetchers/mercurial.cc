@@ -43,7 +43,7 @@ static std::string runHg(const Strings & args, const std::optional<std::string> 
 
 struct MercurialInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url) const override
+    std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
     {
         if (url.scheme != "hg+http" &&
             url.scheme != "hg+https" &&
@@ -96,13 +96,6 @@ struct MercurialInputScheme : InputScheme
         if (auto rev = input.getRev()) url.query.insert_or_assign("rev", rev->gitRev());
         if (auto ref = input.getRef()) url.query.insert_or_assign("ref", *ref);
         return url;
-    }
-
-    bool hasAllInfo(const Input & input) const override
-    {
-        // FIXME: ugly, need to distinguish between dirty and clean
-        // default trees.
-        return input.getRef() == "default" || maybeGetIntAttr(input.attrs, "revCount");
     }
 
     Input applyOverrides(
@@ -206,7 +199,7 @@ struct MercurialInputScheme : InputScheme
         auto checkHashType = [&](const std::optional<Hash> & hash)
         {
             if (hash.has_value() && hash->type != htSHA1)
-                throw Error("Hash '%s' is not supported by Mercurial. Only sha1 is supported.", hash->to_string(Base16, true));
+                throw Error("Hash '%s' is not supported by Mercurial. Only sha1 is supported.", hash->to_string(HashFormat::Base16, true));
         };
 
 
@@ -252,7 +245,7 @@ struct MercurialInputScheme : InputScheme
             }
         }
 
-        Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(htSHA256, actualUrl).to_string(Base32, false));
+        Path cacheDir = fmt("%s/nix/hg/%s", getCacheDir(), hashString(htSHA256, actualUrl).to_string(HashFormat::Base32, false));
 
         /* If this is a commit hash that we already have, we don't
            have to pull again. */

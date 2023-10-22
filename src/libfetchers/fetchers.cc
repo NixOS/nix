@@ -13,9 +13,9 @@ void registerInputScheme(std::shared_ptr<InputScheme> && inputScheme)
     inputSchemes->push_back(std::move(inputScheme));
 }
 
-Input Input::fromURL(const std::string & url)
+Input Input::fromURL(const std::string & url, bool requireTree)
 {
-    return fromURL(parseURL(url));
+    return fromURL(parseURL(url), requireTree);
 }
 
 static void fixupInput(Input & input)
@@ -31,11 +31,12 @@ static void fixupInput(Input & input)
         input.locked = true;
 }
 
-Input Input::fromURL(const ParsedURL & url)
+Input Input::fromURL(const ParsedURL & url, bool requireTree)
 {
     for (auto & inputScheme : *inputSchemes) {
-        auto res = inputScheme->inputFromURL(url);
+        auto res = inputScheme->inputFromURL(url, requireTree);
         if (res) {
+            experimentalFeatureSettings.require(inputScheme->experimentalFeature());
             res->scheme = inputScheme;
             fixupInput(*res);
             return std::move(*res);
@@ -50,6 +51,7 @@ Input Input::fromAttrs(Attrs && attrs)
     for (auto & inputScheme : *inputSchemes) {
         auto res = inputScheme->inputFromAttrs(attrs);
         if (res) {
+            experimentalFeatureSettings.require(inputScheme->experimentalFeature());
             res->scheme = inputScheme;
             fixupInput(*res);
             return std::move(*res);
@@ -82,14 +84,14 @@ std::string Input::to_string() const
     return toURL().to_string();
 }
 
+bool Input::isDirect() const
+{
+    return !scheme || scheme->isDirect(*this);
+}
+
 Attrs Input::toAttrs() const
 {
     return attrs;
-}
-
-bool Input::hasAllInfo() const
-{
-    return getNarHash() && scheme && scheme->hasAllInfo(*this);
 }
 
 bool Input::operator ==(const Input & other) const
@@ -107,7 +109,7 @@ bool Input::contains(const Input & other) const
     return false;
 }
 
-std::pair<Tree, Input> Input::fetch(ref<Store> store) const
+std::pair<StorePath, Input> Input::fetch(ref<Store> store) const
 {
     if (!scheme)
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
@@ -115,7 +117,7 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
     /* The tree may already be in the Nix store, or it could be
        substituted (which is often faster than fetching from the
        original source). So check that. */
-    if (hasAllInfo()) {
+    if (getNarHash()) {
         try {
             auto storePath = computeStorePath(*store);
 
@@ -124,7 +126,7 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
             debug("using substituted/cached input '%s' in '%s'",
                 to_string(), store->printStorePath(storePath));
 
-            return {Tree { .actualPath = store->toRealPath(storePath), .storePath = std::move(storePath) }, *this};
+            return {std::move(storePath), *this};
         } catch (Error & e) {
             debug("substitution of input '%s' failed: %s", to_string(), e.what());
         }
@@ -139,18 +141,16 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
         }
     }();
 
-    Tree tree {
-        .actualPath = store->toRealPath(storePath),
-        .storePath = storePath,
-    };
-
-    auto narHash = store->queryPathInfo(tree.storePath)->narHash;
-    input.attrs.insert_or_assign("narHash", narHash.to_string(SRI, true));
+    auto narHash = store->queryPathInfo(storePath)->narHash;
+    input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
     if (auto prevNarHash = getNarHash()) {
         if (narHash != *prevNarHash)
             throw Error((unsigned int) 102, "NAR hash mismatch in input '%s' (%s), expected '%s', got '%s'",
-                to_string(), tree.actualPath, prevNarHash->to_string(SRI, true), narHash.to_string(SRI, true));
+                to_string(),
+                store->printStorePath(storePath),
+                prevNarHash->to_string(HashFormat::SRI, true),
+                narHash.to_string(HashFormat::SRI, true));
     }
 
     if (auto prevLastModified = getLastModified()) {
@@ -173,9 +173,7 @@ std::pair<Tree, Input> Input::fetch(ref<Store> store) const
 
     input.locked = true;
 
-    assert(input.hasAllInfo());
-
-    return {std::move(tree), input};
+    return {std::move(storePath), input};
 }
 
 Input Input::applyOverrides(
@@ -217,10 +215,8 @@ StorePath Input::computeStorePath(Store & store) const
     if (!narHash)
         throw Error("cannot compute store path for unlocked input '%s'", to_string());
     return store.makeFixedOutputPath(getName(), FixedOutputInfo {
-        .hash = {
-            .method = FileIngestionMethod::Recursive,
-            .hash = *narHash,
-        },
+        .method = FileIngestionMethod::Recursive,
+        .hash = *narHash,
         .references = {},
     });
 }
@@ -256,7 +252,8 @@ std::optional<Hash> Input::getRev() const
         try {
             hash = Hash::parseAnyPrefixed(*s);
         } catch (BadHash &e) {
-            // Default to sha1 for backwards compatibility with existing flakes
+            // Default to sha1 for backwards compatibility with existing
+            // usages (e.g. `builtins.fetchTree` calls or flake inputs).
             hash = Hash::parseAny(*s, htSHA1);
         }
     }
@@ -308,6 +305,11 @@ void InputScheme::markChangedFile(const Input & input, std::string_view file, st
 void InputScheme::clone(const Input & input, const Path & destDir) const
 {
     throw Error("do not know how to clone input '%s'", input.to_string());
+}
+
+std::optional<ExperimentalFeature> InputScheme::experimentalFeature()
+{
+    return {};
 }
 
 }

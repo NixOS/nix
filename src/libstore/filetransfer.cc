@@ -863,6 +863,8 @@ void FileTransfer::download(FileTransferRequest && request, Sink & sink)
             }
 
             chunk = std::move(state->data);
+            /* Reset state->data after the move, since we check data.empty() */
+            state->data = "";
 
             state->request.notify_one();
         }

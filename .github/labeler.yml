@@ -16,8 +16,8 @@
 "new-cli":
   - src/nix/**/*
 
-"tests":
+"with-tests":
   # Unit tests
   - src/*/tests/**/*
   # Functional and integration tests
-  - tests/**/*
+  - tests/functional/**/*

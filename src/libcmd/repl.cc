@@ -26,6 +26,7 @@ extern "C" {
 #include "eval.hh"
 #include "eval-cache.hh"
 #include "eval-inline.hh"
+#include "eval-settings.hh"
 #include "attr-path.hh"
 #include "store-api.hh"
 #include "log-store.hh"
@@ -68,7 +69,7 @@ struct NixRepl
 
     const Path historyFile;
 
-    NixRepl(const Strings & searchPath, nix::ref<Store> store,ref<EvalState> state,
+    NixRepl(const SearchPath & searchPath, nix::ref<Store> store,ref<EvalState> state,
             std::function<AnnotatedValues()> getValues);
     virtual ~NixRepl();
 
@@ -104,7 +105,7 @@ std::string removeWhitespace(std::string s)
 }
 
 
-NixRepl::NixRepl(const Strings & searchPath, nix::ref<Store> store, ref<EvalState> state,
+NixRepl::NixRepl(const SearchPath & searchPath, nix::ref<Store> store, ref<EvalState> state,
             std::function<NixRepl::AnnotatedValues()> getValues)
     : AbstractNixRepl(state)
     , debugTraceIndex(0)
@@ -487,35 +488,40 @@ bool NixRepl::processLine(std::string line)
         std::cout
              << "The following commands are available:\n"
              << "\n"
-             << "  <expr>        Evaluate and print expression\n"
-             << "  <x> = <expr>  Bind expression to variable\n"
-             << "  :a <expr>     Add attributes from resulting set to scope\n"
-             << "  :b <expr>     Build a derivation\n"
-             << "  :bl <expr>    Build a derivation, creating GC roots in the working directory\n"
-             << "  :e <expr>     Open package or function in $EDITOR\n"
-             << "  :i <expr>     Build derivation, then install result into current profile\n"
-             << "  :l <path>     Load Nix expression and add it to scope\n"
-             << "  :lf <ref>     Load Nix flake and add it to scope\n"
-             << "  :p <expr>     Evaluate and print expression recursively\n"
-             << "  :q            Exit nix-repl\n"
-             << "  :r            Reload all files\n"
-             << "  :sh <expr>    Build dependencies of derivation, then start nix-shell\n"
-             << "  :t <expr>     Describe result of evaluation\n"
-             << "  :u <expr>     Build derivation, then start nix-shell\n"
-             << "  :doc <expr>   Show documentation of a builtin function\n"
-             << "  :log <expr>   Show logs for a derivation\n"
-             << "  :te [bool]    Enable, disable or toggle showing traces for errors\n"
+             << "  <expr>                       Evaluate and print expression\n"
+             << "  <x> = <expr>                 Bind expression to variable\n"
+             << "  :a, :add <expr>              Add attributes from resulting set to scope\n"
+             << "  :b <expr>                    Build a derivation\n"
+             << "  :bl <expr>                   Build a derivation, creating GC roots in the\n"
+             << "                               working directory\n"
+             << "  :e, :edit <expr>             Open package or function in $EDITOR\n"
+             << "  :i <expr>                    Build derivation, then install result into\n"
+             << "                               current profile\n"
+             << "  :l, :load <path>             Load Nix expression and add it to scope\n"
+             << "  :lf, :load-flake <ref>       Load Nix flake and add it to scope\n"
+             << "  :p, :print <expr>            Evaluate and print expression recursively\n"
+             << "  :q, :quit                    Exit nix-repl\n"
+             << "  :r, :reload                  Reload all files\n"
+             << "  :sh <expr>                   Build dependencies of derivation, then start\n"
+             << "                               nix-shell\n"
+             << "  :t <expr>                    Describe result of evaluation\n"
+             << "  :u <expr>                    Build derivation, then start nix-shell\n"
+             << "  :doc <expr>                  Show documentation of a builtin function\n"
+             << "  :log <expr>                  Show logs for a derivation\n"
+             << "  :te, :trace-enable [bool]    Enable, disable or toggle showing traces for\n"
+             << "                               errors\n"
+             << "  :?, :help                    Brings up this help menu\n"
              ;
         if (state->debugRepl) {
              std::cout
              << "\n"
              << "        Debug mode commands\n"
-             << "  :env          Show env stack\n"
-             << "  :bt           Show trace stack\n"
-             << "  :st           Show current trace\n"
-             << "  :st <idx>     Change to another trace in the stack\n"
-             << "  :c            Go until end of program, exception, or builtins.break\n"
-             << "  :s            Go one step\n"
+             << "  :env             Show env stack\n"
+             << "  :bt, :backtrace  Show trace stack\n"
+             << "  :st              Show current trace\n"
+             << "  :st <idx>        Change to another trace in the stack\n"
+             << "  :c, :continue    Go until end of program, exception, or builtins.break\n"
+             << "  :s, :step        Go one step\n"
              ;
         }
 
@@ -647,7 +653,7 @@ bool NixRepl::processLine(std::string line)
         if (command == ":b" || command == ":bl") {
             state->store->buildPaths({
                 DerivedPath::Built {
-                    .drvPath = drvPath,
+                    .drvPath = makeConstantStorePathRef(drvPath),
                     .outputs = OutputsSpec::All { },
                 },
             });
@@ -916,7 +922,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
     case nString:
         str << ANSI_WARNING;
-        printLiteralString(str, v.string.s);
+        printLiteralString(str, v.string_view());
         str << ANSI_NORMAL;
         break;
 
@@ -1024,7 +1030,7 @@ std::ostream & NixRepl::printValue(std::ostream & str, Value & v, unsigned int m
 
 
 std::unique_ptr<AbstractNixRepl> AbstractNixRepl::create(
-   const Strings & searchPath, nix::ref<Store> store, ref<EvalState> state,
+   const SearchPath & searchPath, nix::ref<Store> store, ref<EvalState> state,
    std::function<AnnotatedValues()> getValues)
 {
     return std::make_unique<NixRepl>(
@@ -1044,7 +1050,7 @@ void AbstractNixRepl::runSimple(
         NixRepl::AnnotatedValues values;
         return values;
     };
-    const Strings & searchPath = {};
+    SearchPath searchPath = {};
     auto repl = std::make_unique<NixRepl>(
             searchPath,
             openStore(),

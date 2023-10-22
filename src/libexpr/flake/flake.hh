@@ -10,8 +10,6 @@ namespace nix {
 
 class EvalState;
 
-namespace fetchers { struct Tree; }
-
 namespace flake {
 
 struct FlakeInput;
@@ -84,7 +82,7 @@ struct Flake
      */
     bool forceDirty = false;
     std::optional<std::string> description;
-    std::shared_ptr<const fetchers::Tree> sourceInfo;
+    StorePath storePath;
     FlakeInputs inputs;
     /**
      * 'nixConfig' attribute
@@ -193,7 +191,7 @@ void callFlake(
 
 void emitTreeAttrs(
     EvalState & state,
-    const fetchers::Tree & tree,
+    const StorePath & storePath,
     const fetchers::Input & input,
     Value & v,
     bool emptyRevFallback = false,

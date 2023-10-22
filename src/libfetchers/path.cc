@@ -6,7 +6,7 @@ namespace nix::fetchers {
 
 struct PathInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const ParsedURL & url) const override
+    std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
     {
         if (url.scheme != "path") return {};
 
@@ -66,11 +66,6 @@ struct PathInputScheme : InputScheme
         };
     }
 
-    bool hasAllInfo(const Input & input) const override
-    {
-        return true;
-    }
-
     std::optional<Path> getSourcePath(const Input & input) override
     {
         return getStrAttr(input.attrs, "path");
@@ -124,6 +119,11 @@ struct PathInputScheme : InputScheme
         input.attrs.insert_or_assign("lastModified", uint64_t(mtime));
 
         return {std::move(*storePath), input};
+    }
+
+    std::optional<ExperimentalFeature> experimentalFeature() override
+    {
+        return Xp::Flakes;
     }
 };
 

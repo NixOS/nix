@@ -3,7 +3,6 @@
 
 #include "util.hh"
 #include "path.hh"
-#include "realisation.hh"
 #include "outputs-spec.hh"
 #include "comparator.hh"
 
@@ -25,28 +24,37 @@ class Store;
 struct DerivedPathOpaque {
     StorePath path;
 
-    nlohmann::json toJSON(ref<Store> store) const;
     std::string to_string(const Store & store) const;
     static DerivedPathOpaque parse(const Store & store, std::string_view);
+    nlohmann::json toJSON(const Store & store) const;
 
     GENERATE_CMP(DerivedPathOpaque, me->path);
 };
 
+struct SingleDerivedPath;
+
 /**
- * A derived path that is built from a derivation
+ * A single derived path that is built from a derivation
  *
- * Built derived paths are pair of a derivation and some output names.
- * They are evaluated by building the derivation, and then replacing the
- * output names with the resulting outputs.
- *
- * Note that does mean a derived store paths evaluates to multiple
- * opaque paths, which is sort of icky as expressions are supposed to
- * evaluate to single values. Perhaps this should have just a single
- * output name.
+ * Built derived paths are pair of a derivation and an output name. They are
+ * evaluated by building the derivation, and then taking the resulting output
+ * path of the given output name.
  */
-struct DerivedPathBuilt {
-    StorePath drvPath;
-    OutputsSpec outputs;
+struct SingleDerivedPathBuilt {
+    ref<SingleDerivedPath> drvPath;
+    OutputName output;
+
+    /**
+     * Get the store path this is ultimately derived from (by realising
+     * and projecting outputs).
+     *
+     * Note that this is *not* a property of the store object being
+     * referred to, but just of this path --- how we happened to be
+     * referring to that store object. In other words, this means this
+     * function breaks "referential transparency". It should therefore
+     * be used only with great care.
+     */
+    const StorePath & getBaseStorePath() const;
 
     /**
      * Uses `^` as the separator
@@ -58,11 +66,139 @@ struct DerivedPathBuilt {
     std::string to_string_legacy(const Store & store) const;
     /**
      * The caller splits on the separator, so it works for both variants.
+     *
+     * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
-    static DerivedPathBuilt parse(const Store & store, std::string_view drvPath, std::string_view outputs);
-    nlohmann::json toJSON(ref<Store> store) const;
+    static SingleDerivedPathBuilt parse(
+        const Store & store, ref<SingleDerivedPath> drvPath,
+        OutputNameView outputs,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+    nlohmann::json toJSON(Store & store) const;
 
-    GENERATE_CMP(DerivedPathBuilt, me->drvPath, me->outputs);
+    DECLARE_CMP(SingleDerivedPathBuilt);
+};
+
+using _SingleDerivedPathRaw = std::variant<
+    DerivedPathOpaque,
+    SingleDerivedPathBuilt
+>;
+
+/**
+ * A "derived path" is a very simple sort of expression (not a Nix
+ * language expression! But an expression in a the general sense) that
+ * evaluates to (concrete) store path. It is either:
+ *
+ * - opaque, in which case it is just a concrete store path with
+ *   possibly no known derivation
+ *
+ * - built, in which case it is a pair of a derivation path and an
+ *   output name.
+ */
+struct SingleDerivedPath : _SingleDerivedPathRaw {
+    using Raw = _SingleDerivedPathRaw;
+    using Raw::Raw;
+
+    using Opaque = DerivedPathOpaque;
+    using Built = SingleDerivedPathBuilt;
+
+    inline const Raw & raw() const {
+        return static_cast<const Raw &>(*this);
+    }
+
+    /**
+     * Get the store path this is ultimately derived from (by realising
+     * and projecting outputs).
+     *
+     * Note that this is *not* a property of the store object being
+     * referred to, but just of this path --- how we happened to be
+     * referring to that store object. In other words, this means this
+     * function breaks "referential transparency". It should therefore
+     * be used only with great care.
+     */
+    const StorePath & getBaseStorePath() const;
+
+    /**
+     * Uses `^` as the separator
+     */
+    std::string to_string(const Store & store) const;
+    /**
+     * Uses `!` as the separator
+     */
+    std::string to_string_legacy(const Store & store) const;
+    /**
+     * Uses `^` as the separator
+     *
+     * @param xpSettings Stop-gap to avoid globals during unit tests.
+     */
+    static SingleDerivedPath parse(
+        const Store & store,
+        std::string_view,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+    /**
+     * Uses `!` as the separator
+     *
+     * @param xpSettings Stop-gap to avoid globals during unit tests.
+     */
+    static SingleDerivedPath parseLegacy(
+        const Store & store,
+        std::string_view,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+    nlohmann::json toJSON(Store & store) const;
+};
+
+static inline ref<SingleDerivedPath> makeConstantStorePathRef(StorePath drvPath)
+{
+    return make_ref<SingleDerivedPath>(SingleDerivedPath::Opaque { drvPath });
+}
+
+/**
+ * A set of derived paths that are built from a derivation
+ *
+ * Built derived paths are pair of a derivation and some output names.
+ * They are evaluated by building the derivation, and then replacing the
+ * output names with the resulting outputs.
+ *
+ * Note that does mean a derived store paths evaluates to multiple
+ * opaque paths, which is sort of icky as expressions are supposed to
+ * evaluate to single values. Perhaps this should have just a single
+ * output name.
+ */
+struct DerivedPathBuilt {
+    ref<SingleDerivedPath> drvPath;
+    OutputsSpec outputs;
+
+    /**
+     * Get the store path this is ultimately derived from (by realising
+     * and projecting outputs).
+     *
+     * Note that this is *not* a property of the store object being
+     * referred to, but just of this path --- how we happened to be
+     * referring to that store object. In other words, this means this
+     * function breaks "referential transparency". It should therefore
+     * be used only with great care.
+     */
+    const StorePath & getBaseStorePath() const;
+
+    /**
+     * Uses `^` as the separator
+     */
+    std::string to_string(const Store & store) const;
+    /**
+     * Uses `!` as the separator
+     */
+    std::string to_string_legacy(const Store & store) const;
+    /**
+     * The caller splits on the separator, so it works for both variants.
+     *
+     * @param xpSettings Stop-gap to avoid globals during unit tests.
+     */
+    static DerivedPathBuilt parse(
+        const Store & store, ref<SingleDerivedPath>,
+        std::string_view,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+    nlohmann::json toJSON(Store & store) const;
+
+    DECLARE_CMP(DerivedPathBuilt);
 };
 
 using _DerivedPathRaw = std::variant<
@@ -72,13 +208,13 @@ using _DerivedPathRaw = std::variant<
 
 /**
  * A "derived path" is a very simple sort of expression that evaluates
- * to (concrete) store path. It is either:
+ * to one or more (concrete) store paths. It is either:
  *
- * - opaque, in which case it is just a concrete store path with
+ * - opaque, in which case it is just a single concrete store path with
  *   possibly no known derivation
  *
- * - built, in which case it is a pair of a derivation path and an
- *   output name.
+ * - built, in which case it is a pair of a derivation path and some
+ *   output names.
  */
 struct DerivedPath : _DerivedPathRaw {
     using Raw = _DerivedPathRaw;
@@ -92,6 +228,18 @@ struct DerivedPath : _DerivedPathRaw {
     }
 
     /**
+     * Get the store path this is ultimately derived from (by realising
+     * and projecting outputs).
+     *
+     * Note that this is *not* a property of the store object being
+     * referred to, but just of this path --- how we happened to be
+     * referring to that store object. In other words, this means this
+     * function breaks "referential transparency". It should therefore
+     * be used only with great care.
+     */
+    const StorePath & getBaseStorePath() const;
+
+    /**
      * Uses `^` as the separator
      */
     std::string to_string(const Store & store) const;
@@ -101,55 +249,43 @@ struct DerivedPath : _DerivedPathRaw {
     std::string to_string_legacy(const Store & store) const;
     /**
      * Uses `^` as the separator
+     *
+     * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
-    static DerivedPath parse(const Store & store, std::string_view);
+    static DerivedPath parse(
+        const Store & store,
+        std::string_view,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     /**
      * Uses `!` as the separator
+     *
+     * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
-    static DerivedPath parseLegacy(const Store & store, std::string_view);
-};
+    static DerivedPath parseLegacy(
+        const Store & store,
+        std::string_view,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
-/**
- * A built derived path with hints in the form of optional concrete output paths.
- *
- * See 'BuiltPath' for more an explanation.
- */
-struct BuiltPathBuilt {
-    StorePath drvPath;
-    std::map<std::string, StorePath> outputs;
+    /**
+     * Convert a `SingleDerivedPath` to a `DerivedPath`.
+     */
+    static DerivedPath fromSingle(const SingleDerivedPath &);
 
-    nlohmann::json toJSON(ref<Store> store) const;
-    static BuiltPathBuilt parse(const Store & store, std::string_view);
-
-    GENERATE_CMP(BuiltPathBuilt, me->drvPath, me->outputs);
-};
-
-using _BuiltPathRaw = std::variant<
-    DerivedPath::Opaque,
-    BuiltPathBuilt
->;
-
-/**
- * A built path. Similar to a DerivedPath, but enriched with the corresponding
- * output path(s).
- */
-struct BuiltPath : _BuiltPathRaw {
-    using Raw = _BuiltPathRaw;
-    using Raw::Raw;
-
-    using Opaque = DerivedPathOpaque;
-    using Built = BuiltPathBuilt;
-
-    inline const Raw & raw() const {
-        return static_cast<const Raw &>(*this);
-    }
-
-    StorePathSet outPaths() const;
-    RealisedPath::Set toRealisedPaths(Store & store) const;
-
+    nlohmann::json toJSON(Store & store) const;
 };
 
 typedef std::vector<DerivedPath> DerivedPaths;
-typedef std::vector<BuiltPath> BuiltPaths;
 
+/**
+ * Used by various parser functions to require experimental features as
+ * needed.
+ *
+ * Somewhat unfortunate this cannot just be an implementation detail for
+ * this module.
+ *
+ * @param xpSettings Stop-gap to avoid globals during unit tests.
+ */
+void drvRequireExperiment(
+    const SingleDerivedPath & drv,
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 }

@@ -81,7 +81,7 @@ StorePath Store::makeStorePath(std::string_view type,
 StorePath Store::makeStorePath(std::string_view type,
     const Hash & hash, std::string_view name) const
 {
-    return makeStorePath(type, hash.to_string(Base16, true), name);
+    return makeStorePath(type, hash.to_string(HashFormat::Base16, true), name);
 }
 
 
@@ -111,15 +111,15 @@ static std::string makeType(
 
 StorePath Store::makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const
 {
-    if (info.hash.hash.type == htSHA256 && info.hash.method == FileIngestionMethod::Recursive) {
-        return makeStorePath(makeType(*this, "source", info.references), info.hash.hash, name);
+    if (info.hash.type == htSHA256 && info.method == FileIngestionMethod::Recursive) {
+        return makeStorePath(makeType(*this, "source", info.references), info.hash, name);
     } else {
         assert(info.references.size() == 0);
         return makeStorePath("output:out",
             hashString(htSHA256,
                 "fixed:out:"
-                + makeFileIngestionPrefix(info.hash.method)
-                + info.hash.hash.to_string(Base16, true) + ":"),
+                + makeFileIngestionPrefix(info.method)
+                + info.hash.to_string(HashFormat::Base16, true) + ":"),
             name);
     }
 }
@@ -127,13 +127,13 @@ StorePath Store::makeFixedOutputPath(std::string_view name, const FixedOutputInf
 
 StorePath Store::makeTextPath(std::string_view name, const TextInfo & info) const
 {
-    assert(info.hash.hash.type == htSHA256);
+    assert(info.hash.type == htSHA256);
     return makeStorePath(
         makeType(*this, "text", StoreReferences {
             .others = info.references,
             .self = false,
         }),
-        info.hash.hash,
+        info.hash,
         name);
 }
 
@@ -159,10 +159,8 @@ std::pair<StorePath, Hash> Store::computeStorePathForPath(std::string_view name,
         ? hashPath(hashAlgo, srcPath, filter).first
         : hashFile(hashAlgo, srcPath);
     FixedOutputInfo caInfo {
-        .hash = {
-            .method = method,
-            .hash = h,
-        },
+        .method = method,
+        .hash = h,
         .references = {},
     };
     return std::make_pair(makeFixedOutputPath(name, caInfo), h);
@@ -175,8 +173,8 @@ StorePath Store::computeStorePathForText(
     const StorePathSet & references) const
 {
     return makeTextPath(name, TextInfo {
-        { .hash = hashString(htSHA256, s) },
-        references,
+        .hash = hashString(htSHA256, s),
+        .references = references,
     });
 }
 
@@ -368,10 +366,8 @@ ValidPathInfo Store::addToStoreSlow(std::string_view name, const Path & srcPath,
         *this,
         name,
         FixedOutputInfo {
-            .hash = {
-                .method = method,
-                .hash = hash,
-            },
+            .method = method,
+            .hash = hash,
             .references = {},
         },
         narHash,
@@ -423,13 +419,41 @@ bool Store::PathInfoCacheValue::isKnownNow()
     return std::chrono::steady_clock::now() < time_point + ttl;
 }
 
-std::map<std::string, std::optional<StorePath>> Store::queryPartialDerivationOutputMap(const StorePath & path)
+std::map<std::string, std::optional<StorePath>> Store::queryStaticPartialDerivationOutputMap(const StorePath & path)
 {
     std::map<std::string, std::optional<StorePath>> outputs;
     auto drv = readInvalidDerivation(path);
-    for (auto& [outputName, output] : drv.outputsAndOptPaths(*this)) {
+    for (auto & [outputName, output] : drv.outputsAndOptPaths(*this)) {
         outputs.emplace(outputName, output.second);
     }
+    return outputs;
+}
+
+std::map<std::string, std::optional<StorePath>> Store::queryPartialDerivationOutputMap(
+    const StorePath & path,
+    Store * evalStore_)
+{
+    auto & evalStore = evalStore_ ? *evalStore_ : *this;
+
+    auto outputs = evalStore.queryStaticPartialDerivationOutputMap(path);
+
+    if (!experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
+        return outputs;
+
+    auto drv = evalStore.readInvalidDerivation(path);
+    auto drvHashes = staticOutputHashes(*this, drv);
+    for (auto & [outputName, hash] : drvHashes) {
+        auto realisation = queryRealisation(DrvOutput{hash, outputName});
+        if (realisation) {
+            outputs.insert_or_assign(outputName, realisation->outPath);
+        } else {
+            // queryStaticPartialDerivationOutputMap is not guaranteed
+            // to return std::nullopt for outputs which are not
+            // statically known.
+            outputs.insert({outputName, std::nullopt});
+        }
+    }
+
     return outputs;
 }
 
@@ -438,7 +462,7 @@ OutputPathMap Store::queryDerivationOutputMap(const StorePath & path) {
     OutputPathMap result;
     for (auto & [outName, optOutPath] : resp) {
         if (!optOutPath)
-            throw Error("output '%s' of derivation '%s' has no store path mapped to it", outName, printStorePath(path));
+            throw MissingRealisation(printStorePath(path), outName);
         result.insert_or_assign(outName, *optOutPath);
     }
     return result;
@@ -787,7 +811,7 @@ std::string Store::makeValidityRegistration(const StorePathSet & paths,
         auto info = queryPathInfo(i);
 
         if (showHash) {
-            s += info->narHash.to_string(Base16, false) + "\n";
+            s += info->narHash.to_string(HashFormat::Base16, false) + "\n";
             s += fmt("%1%\n", info->narSize);
         }
 
@@ -841,7 +865,7 @@ StorePathSet Store::exportReferences(const StorePathSet & storePaths, const Stor
 
 json Store::pathInfoToJSON(const StorePathSet & storePaths,
     bool includeImpureInfo, bool showClosureSize,
-    Base hashBase,
+    HashFormat hashFormat,
     AllowInvalidFlag allowInvalid)
 {
     json::array_t jsonList = json::array();
@@ -854,7 +878,7 @@ json Store::pathInfoToJSON(const StorePathSet & storePaths,
 
             jsonPath["path"] = printStorePath(info->path);
             jsonPath["valid"] = true;
-            jsonPath["narHash"] = info->narHash.to_string(hashBase, true);
+            jsonPath["narHash"] = info->narHash.to_string(hashFormat, true);
             jsonPath["narSize"] = info->narSize;
 
             {
@@ -896,7 +920,7 @@ json Store::pathInfoToJSON(const StorePathSet & storePaths,
                     if (!narInfo->url.empty())
                         jsonPath["url"] = narInfo->url;
                     if (narInfo->fileHash)
-                        jsonPath["downloadHash"] = narInfo->fileHash->to_string(hashBase, true);
+                        jsonPath["downloadHash"] = narInfo->fileHash->to_string(hashFormat, true);
                     if (narInfo->fileSize)
                         jsonPath["downloadSize"] = narInfo->fileSize;
                     if (showClosureSize)
@@ -1399,6 +1423,7 @@ ref<Store> openStore(const std::string & uri_,
             if (implem.uriSchemes.count(parsedUri.scheme)) {
                 auto store = implem.create(parsedUri.scheme, baseURI, params);
                 if (store) {
+                    experimentalFeatureSettings.require(store->experimentalFeature());
                     store->init();
                     store->warnUnknownSettings();
                     return ref<Store>(store);

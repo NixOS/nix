@@ -1084,7 +1084,7 @@ namespace nix {
 
         ASSERT_TRACE1("hashString \"foo\" \"content\"",
                       UsageError,
-                      hintfmt("unknown hash algorithm '%s'", "foo"));
+                      hintfmt("unknown hash algorithm '%s', expect 'md5', 'sha1', 'sha256', or 'sha512'", "foo"));
 
         ASSERT_TRACE2("hashString \"sha256\" {}",
                       TypeError,

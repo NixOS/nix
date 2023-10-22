@@ -4,7 +4,7 @@ namespace nix {
 
 SourcePath EvalState::rootPath(CanonPath path)
 {
-    return std::move(path);
+    return path;
 }
 
 }

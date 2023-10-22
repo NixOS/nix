@@ -23,7 +23,21 @@ extern std::set<std::string> hashTypes;
 
 extern const std::string base32Chars;
 
-enum Base : int { Base64, Base32, Base16, SRI };
+/**
+ * @brief Enumeration representing the hash formats.
+ */
+enum struct HashFormat : int {
+    /// @brief Base 64 encoding.
+    /// @see [IETF RFC 4648, section 4](https://datatracker.ietf.org/doc/html/rfc4648#section-4).
+    Base64,
+    /// @brief Nix-specific base-32 encoding. @see base32Chars
+    Base32,
+    /// @brief Lowercase hexadecimal encoding. @see base16Chars
+    Base16,
+    /// @brief "<hash algo>:<Base 64 hash>", format of the SRI integrity attribute.
+    /// @see W3C recommendation [Subresource Intergrity](https://www.w3.org/TR/SRI/).
+    SRI
+};
 
 
 struct Hash
@@ -114,16 +128,16 @@ public:
      * or base-64. By default, this is prefixed by the hash type
      * (e.g. "sha256:").
      */
-    std::string to_string(Base base, bool includeType) const;
+    std::string to_string(HashFormat hashFormat, bool includeType) const;
 
     std::string gitRev() const
     {
-        return to_string(Base16, false);
+        return to_string(HashFormat::Base16, false);
     }
 
     std::string gitShortRev() const
     {
-        return std::string(to_string(Base16, false), 0, 7);
+        return std::string(to_string(HashFormat::Base16, false), 0, 7);
     }
 
     static Hash dummy;
@@ -145,13 +159,17 @@ std::string printHash16or32(const Hash & hash);
 Hash hashString(HashType ht, std::string_view s);
 
 /**
- * Compute the hash of the given file.
+ * Compute the hash of the given file, hashing its contents directly.
+ *
+ * (Metadata, such as the executable permission bit, is ignored.)
  */
 Hash hashFile(HashType ht, const Path & path);
 
 /**
- * Compute the hash of the given path.  The hash is defined as
- * (essentially) hashString(ht, dumpPath(path)).
+ * Compute the hash of the given path, serializing as a Nix Archive and
+ * then hashing that.
+ *
+ * The hash is defined as (essentially) hashString(ht, dumpPath(path)).
  */
 typedef std::pair<Hash, uint64_t> HashResult;
 HashResult hashPath(HashType ht, const Path & path,
@@ -162,6 +180,21 @@ HashResult hashPath(HashType ht, const Path & path,
  * XORing bytes together.
  */
 Hash compressHash(const Hash & hash, unsigned int newSize);
+
+/**
+ * Parse a string representing a hash format.
+ */
+HashFormat parseHashFormat(std::string_view hashFormatName);
+
+/**
+ * std::optional version of parseHashFormat that doesn't throw error.
+ */
+std::optional<HashFormat> parseHashFormatOpt(std::string_view hashFormatName);
+
+/**
+ * The reverse of parseHashFormat.
+ */
+std::string_view printHashFormat(HashFormat hashFormat);
 
 /**
  * Parse a string representing a hash type.

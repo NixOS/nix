@@ -10,12 +10,14 @@ let
       type' = optionalString (type != null) " (${type})";
 
       impureNotice = optionalString impure-only ''
-        Not available in [pure evaluation mode](@docroot@/command-ref/conf-file.md#conf-pure-eval).
+        > **Note**
+        >
+        > Not available in [pure evaluation mode](@docroot@/command-ref/conf-file.md#conf-pure-eval).
       '';
     in
     squash ''
-      <dt id="builtin-constants-${name}">
-        <a href="#builtin-constants-${name}"><code>${name}</code>${type'}</a>
+      <dt id="builtins-${name}">
+        <a href="#builtins-${name}"><code>${name}</code></a>${type'}
       </dt>
       <dd>
 

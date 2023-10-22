@@ -335,4 +335,13 @@ namespace nix {
         ASSERT_EQ(d, s);
     }
 
+    TEST(percentEncode, yen) {
+        // https://en.wikipedia.org/wiki/Percent-encoding#Character_data
+        std::string s = reinterpret_cast<const char*>(u8"円");
+        std::string e = "%E5%86%86";
+
+        ASSERT_EQ(percentEncode(s), e);
+        ASSERT_EQ(percentDecode(e), s);
+    }
+
 }

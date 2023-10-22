@@ -5,7 +5,14 @@ AC_CONFIG_AUX_DIR(config)
 
 AC_PROG_SED
 
-# Construct a Nix system name (like "i686-linux").
+# Construct a Nix system name (like "i686-linux"):
+# https://www.gnu.org/software/autoconf/manual/html_node/Canonicalizing.html#index-AC_005fCANONICAL_005fHOST-1
+# The inital value is produced by the `config/config.guess` script:
+# upstream: https://git.savannah.gnu.org/cgit/config.git/tree/config.guess
+# It has the following form, which is not documented anywhere:
+# <cpu>-<vendor>-<os>[<version>][-<abi>]
+# If `./configure` is passed any of the `--host`, `--build`, `--target` options, the value comes from `config/config.sub` instead:
+# upstream: https://git.savannah.gnu.org/cgit/config.git/tree/config.sub
 AC_CANONICAL_HOST
 AC_MSG_CHECKING([for the canonical Nix system name])
 
@@ -145,12 +152,17 @@ if test "x$GCC_ATOMIC_BUILTINS_NEED_LIBATOMIC" = xyes; then
     LDFLAGS="-latomic $LDFLAGS"
 fi
 
+# Running the functional tests without building Nix is useful for testing
+# different pre-built versions of Nix against each other.
+AC_ARG_ENABLE(build, AS_HELP_STRING([--disable-build],[Do not build nix]),
+  ENABLE_BUILD=$enableval, ENABLE_BUILD=yes)
+AC_SUBST(ENABLE_BUILD)
 # Building without tests is useful for bootstrapping with a smaller footprint
 # or running the tests in a separate derivation. Otherwise, we do compile and
 # run them.
 AC_ARG_ENABLE(tests, AS_HELP_STRING([--disable-tests],[Do not build the tests]),
-  tests=$enableval, tests=yes)
-AC_SUBST(tests)
+  ENABLE_TESTS=$enableval, ENABLE_TESTS=yes)
+AC_SUBST(ENABLE_TESTS)
 
 # Building without API docs is the default as Nix' C++ interfaces are internal and unstable.
 AC_ARG_ENABLE(internal_api_docs, AS_HELP_STRING([--enable-internal-api-docs],[Build API docs for Nix's internal unstable C++ interfaces]),
@@ -282,7 +294,7 @@ if test "$gc" = yes; then
 fi
 
 
-if test "$tests" = yes; then
+if test "$ENABLE_TESTS" = yes; then
 
 # Look for gtest.
 PKG_CHECK_MODULES([GTEST], [gtest_main])

@@ -98,7 +98,7 @@ EvalCommand::EvalCommand()
 EvalCommand::~EvalCommand()
 {
     if (evalState)
-        evalState->printStats();
+        evalState->maybePrintStats();
 }
 
 ref<Store> EvalCommand::getEvalStore()

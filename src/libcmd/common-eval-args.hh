@@ -3,6 +3,7 @@
 
 #include "args.hh"
 #include "common-args.hh"
+#include "search-path.hh"
 
 namespace nix {
 
@@ -19,7 +20,7 @@ struct MixEvalArgs : virtual Args, virtual MixRepair
 
     Bindings * getAutoArgs(EvalState & state);
 
-    Strings searchPath;
+    SearchPath searchPath;
 
     std::optional<std::string> evalStoreUrl;
 

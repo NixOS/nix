@@ -1,7 +1,6 @@
 #include "derivations.hh"
 #include "globals.hh"
 #include "local-store.hh"
-#include "local-fs-store.hh"
 #include "finally.hh"
 
 #include <functional>
@@ -44,13 +43,13 @@ static void makeSymlink(const Path & link, const Path & target)
 
 void LocalStore::addIndirectRoot(const Path & path)
 {
-    std::string hash = hashString(htSHA1, path).to_string(Base32, false);
+    std::string hash = hashString(htSHA1, path).to_string(HashFormat::Base32, false);
     Path realRoot = canonPath(fmt("%1%/%2%/auto/%3%", stateDir, gcRootsDir, hash));
     makeSymlink(realRoot, path);
 }
 
 
-Path LocalFSStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot)
+Path IndirectRootStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot)
 {
     Path gcRoot(canonPath(_gcRoot));
 
@@ -777,7 +776,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         }
     };
 
-    /* Synchronisation point for testing, see tests/gc-concurrent.sh. */
+    /* Synchronisation point for testing, see tests/functional/gc-concurrent.sh. */
     if (auto p = getEnv("_NIX_TEST_GC_SYNC"))
         readFile(*p);
 

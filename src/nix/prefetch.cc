@@ -71,10 +71,8 @@ std::tuple<StorePath, Hash> prefetchFile(
     if (expectedHash) {
         hashType = expectedHash->type;
         storePath = store->makeFixedOutputPath(*name, FixedOutputInfo {
-            .hash = {
-                .method = ingestionMethod,
-                .hash = *expectedHash,
-            },
+            .method = ingestionMethod,
+            .hash = *expectedHash,
             .references = {},
         });
         if (store->isValidPath(*storePath))
@@ -127,7 +125,7 @@ std::tuple<StorePath, Hash> prefetchFile(
         auto info = store->addToStoreSlow(*name, tmpFile, ingestionMethod, hashType, expectedHash);
         storePath = info.path;
         assert(info.ca);
-        hash = info.ca->getHash();
+        hash = info.ca->hash;
     }
 
     return {storePath.value(), hash.value()};
@@ -312,13 +310,13 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
         if (json) {
             auto res = nlohmann::json::object();
             res["storePath"] = store->printStorePath(storePath);
-            res["hash"] = hash.to_string(SRI, true);
+            res["hash"] = hash.to_string(HashFormat::SRI, true);
             logger->cout(res.dump());
         } else {
             notice("Downloaded '%s' to '%s' (hash '%s').",
                 url,
                 store->printStorePath(storePath),
-                hash.to_string(SRI, true));
+                hash.to_string(HashFormat::SRI, true));
         }
     }
 };

@@ -67,7 +67,7 @@ public:
             case lvlWarn: c = '4'; break;
             case lvlNotice: case lvlInfo: c = '5'; break;
             case lvlTalkative: case lvlChatty: c = '6'; break;
-            case lvlDebug: case lvlVomit: c = '7';
+            case lvlDebug: case lvlVomit: c = '7'; break;
             default: c = '7'; break; // should not happen, and missing enum case is reported by -Werror=switch-enum
             }
             prefix = std::string("<") + c + ">";
@@ -220,8 +220,8 @@ struct JSONLogger : Logger {
         json["level"] = lvl;
         json["type"] = type;
         json["text"] = s;
+        json["parent"] = parent;
         addFields(json, fields);
-        // FIXME: handle parent
         write(json);
     }
 

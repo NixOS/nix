@@ -1,0 +1,10 @@
+error:
+       … while calling the 'abort' builtin
+
+         at /pwd/lang/eval-fail-abort.nix:1:14:
+
+            1| if true then abort "this should fail" else 1
+             |              ^
+            2|
+
+       error: evaluation aborted with the following error message: 'this should fail'

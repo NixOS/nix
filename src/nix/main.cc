@@ -3,6 +3,7 @@
 #include "command.hh"
 #include "common-args.hh"
 #include "eval.hh"
+#include "eval-settings.hh"
 #include "globals.hh"
 #include "legacy.hh"
 #include "shared.hh"
@@ -179,8 +180,10 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs
         for (auto & implem : *Implementations::registered) {
             auto storeConfig = implem.getConfig();
             auto storeName = storeConfig->name();
-            stores[storeName]["doc"] = storeConfig->doc();
-            stores[storeName]["settings"] = storeConfig->toJSON();
+            auto & j = stores[storeName];
+            j["doc"] = storeConfig->doc();
+            j["settings"] = storeConfig->toJSON();
+            j["experimentalFeature"] = storeConfig->experimentalFeature();
         }
         res["stores"] = std::move(stores);
 
@@ -211,11 +214,28 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
             , CanonPath::root),
         *vUtils);
 
+    auto vSettingsInfo = state.allocValue();
+    state.cacheFile(
+        CanonPath("/generate-settings.nix"), CanonPath("/generate-settings.nix"),
+        state.parseExprFromString(
+            #include "generate-settings.nix.gen.hh"
+            , CanonPath::root),
+        *vSettingsInfo);
+
+    auto vStoreInfo = state.allocValue();
+    state.cacheFile(
+        CanonPath("/generate-store-info.nix"), CanonPath("/generate-store-info.nix"),
+        state.parseExprFromString(
+            #include "generate-store-info.nix.gen.hh"
+            , CanonPath::root),
+        *vStoreInfo);
+
     auto vDump = state.allocValue();
     vDump->mkString(toplevel.dumpCli());
 
     auto vRes = state.allocValue();
-    state.callFunction(*vGenerateManpage, *vDump, *vRes, noPos);
+    state.callFunction(*vGenerateManpage, state.getBuiltin("false"), *vRes, noPos);
+    state.callFunction(*vRes, *vDump, *vRes, noPos);
 
     auto attr = vRes->attrs->get(state.symbols.create(mdName + ".md"));
     if (!attr)
@@ -356,6 +376,7 @@ void mainWrapped(int argc, char * * argv)
         experimentalFeatureSettings.experimentalFeatures = {
             Xp::Flakes,
             Xp::FetchClosure,
+            Xp::DynamicDerivations,
         };
         evalSettings.pureEval = false;
         EvalState state({}, openStore("dummy://"));
