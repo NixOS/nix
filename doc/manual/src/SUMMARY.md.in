@@ -24,7 +24,6 @@
     - [Serving a Nix store via HTTP](package-management/binary-cache-substituter.md)
     - [Copying Closures via SSH](package-management/copy-closure.md)
     - [Serving a Nix store via SSH](package-management/ssh-substituter.md)
-    - [Serving a Nix store via S3](package-management/s3-substituter.md)
 - [Nix Language](language/index.md)
   - [Data Types](language/values.md)
   - [Language Constructs](language/constructs.md)
