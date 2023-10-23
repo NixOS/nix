@@ -43,9 +43,7 @@ control what gets deleted and in what order:
   multiplicative suffix `K`, `M`, `G` or `T`, denoting KiB, MiB, GiB
   or TiB units.
 
-The behaviour of the collector is also influenced by the
-`keep-outputs` and `keep-derivations` settings in the Nix
-configuration file.
+The behaviour of the garbage collector is also influenced by the [`keep-outputs`](@docroot@/command-ref/conf-file.md#conf-keep-outputs) and [`keep-derivations`] (@docroot@/command-ref/conf-file.md#conf-keep-derivations) configuration settings.
 
 By default, the collector prints the total number of freed bytes when it
 finishes (or when it is interrupted). With `--print-dead`, it prints the
