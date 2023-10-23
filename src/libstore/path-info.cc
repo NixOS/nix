@@ -148,7 +148,7 @@ ValidPathInfo::ValidPathInfo(
 }
 
 
-nlohmann::json ValidPathInfo::toJSON(
+nlohmann::json UnkeyedValidPathInfo::toJSON(
     const Store & store,
     bool includeImpureInfo,
     HashFormat hashFormat) const
@@ -157,8 +157,6 @@ nlohmann::json ValidPathInfo::toJSON(
 
     auto jsonObject = json::object();
 
-    jsonObject["path"] = store.printStorePath(path);
-    jsonObject["valid"] = true;
     jsonObject["narHash"] = narHash.to_string(hashFormat, true);
     jsonObject["narSize"] = narSize;
 
@@ -190,21 +188,17 @@ nlohmann::json ValidPathInfo::toJSON(
     return jsonObject;
 }
 
-ValidPathInfo ValidPathInfo::fromJSON(
+UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(
     const Store & store,
     const nlohmann::json & json)
 {
     using nlohmann::detail::value_t;
 
-    ValidPathInfo res {
-        StorePath(StorePath::dummy),
+    UnkeyedValidPathInfo res {
         Hash(Hash::dummy),
     };
 
     ensureType(json, value_t::object);
-    res.path = store.parseStorePath(
-        static_cast<const std::string &>(
-            ensureType(valueAt(json, "path"), value_t::string)));
     res.narHash = Hash::parseAny(
         static_cast<const std::string &>(
             ensureType(valueAt(json, "narHash"), value_t::string)),

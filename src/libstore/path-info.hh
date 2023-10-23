@@ -78,6 +78,18 @@ struct UnkeyedValidPathInfo
     DECLARE_CMP(UnkeyedValidPathInfo);
 
     virtual ~UnkeyedValidPathInfo() { }
+
+    /**
+     * @param includeImpureInfo If true, variable elements such as the
+     * registration time are included.
+     */
+    virtual nlohmann::json toJSON(
+        const Store & store,
+        bool includeImpureInfo,
+        HashFormat hashFormat) const;
+    static UnkeyedValidPathInfo fromJSON(
+        const Store & store,
+        const nlohmann::json & json);
 };
 
 struct ValidPathInfo : UnkeyedValidPathInfo {
@@ -124,18 +136,6 @@ struct ValidPathInfo : UnkeyedValidPathInfo {
     bool checkSignature(const Store & store, const PublicKeys & publicKeys, const std::string & sig) const;
 
     Strings shortRefs() const;
-
-    /**
-     * @param includeImpureInfo If true, variable elements such as the
-     * registration time are included.
-     */
-    virtual nlohmann::json toJSON(
-        const Store & store,
-        bool includeImpureInfo,
-        HashFormat hashFormat) const;
-    static ValidPathInfo fromJSON(
-        const Store & store,
-        const nlohmann::json & json);
 
     ValidPathInfo(const ValidPathInfo & other) = default;
 

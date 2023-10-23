@@ -28,5 +28,39 @@
 
   - The flake-specific flags `--recreate-lock-file` and `--update-input` have been removed from all commands operating on installables.
     They are superceded by `nix flake update`.
-  
+
 - Commit signature verification for the [`builtins.fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit) is added as the new [`verified-fetches` experimental feature](@docroot@/contributing/experimental-features.md#xp-feature-verified-fetches).
+
+- [`nix path-info --json`](@docroot@/command-ref/new-cli/nix3-path-info.md)
+  (experimental) now returns a JSON map rather than JSON list.
+  The `path` field of each object has instead become the key in th outer map, since it is unique.
+  The `valid` field also goes away because we just use null instead.
+
+  - Old way:
+
+    ```json5
+    [
+      {
+        "path": "/nix/store/8fv91097mbh5049i9rglc73dx6kjg3qk-bash-5.2-p15",
+        "valid": true,
+        // ...
+      },
+      {
+        "path": "/nix/store/wffw7l0alvs3iw94cbgi1gmmbmw99sqb-home-manager-path",
+        "valid": false
+      }
+    ]
+    ```
+
+  - New way
+
+    ```json5
+    {
+      "/nix/store/8fv91097mbh5049i9rglc73dx6kjg3qk-bash-5.2-p15": {
+        // ...
+      },
+      "/nix/store/wffw7l0alvs3iw94cbgi1gmmbmw99sqb-home-manager-path": null,
+    }
+    ```
+
+  This makes it match `nix derivation show`, which also maps store paths to information.

@@ -19,8 +19,8 @@ class PathInfoTest : public CharacterizationTest, public LibStoreTest
     }
 };
 
-static ValidPathInfo makePathInfo(const Store & store, bool includeImpureInfo) {
-    ValidPathInfo info {
+static UnkeyedValidPathInfo makePathInfo(const Store & store, bool includeImpureInfo) {
+    UnkeyedValidPathInfo info = ValidPathInfo {
         store,
         "foo",
         FixedOutputInfo {
@@ -54,7 +54,7 @@ static ValidPathInfo makePathInfo(const Store & store, bool includeImpureInfo) {
     TEST_F(PathInfoTest, PathInfo_ ## STEM ## _from_json) {               \
         readTest(#STEM, [&](const auto & encoded_) {                      \
             auto encoded = json::parse(encoded_);                         \
-            ValidPathInfo got = ValidPathInfo::fromJSON(                  \
+            UnkeyedValidPathInfo got = UnkeyedValidPathInfo::fromJSON(    \
                 *store,                                                   \
                 encoded);                                                 \
             auto expected = makePathInfo(*store, PURE);                   \

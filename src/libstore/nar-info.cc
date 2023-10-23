@@ -164,8 +164,12 @@ NarInfo NarInfo::fromJSON(
 {
     using nlohmann::detail::value_t;
 
-    NarInfo res { ValidPathInfo::fromJSON(store, json) };
-    res.path = path;
+    NarInfo res {
+        ValidPathInfo {
+            path,
+            UnkeyedValidPathInfo::fromJSON(store, json),
+        }
+    };
 
     if (json.contains("url"))
         res.url = ensureType(valueAt(json, "url"), value_t::string);

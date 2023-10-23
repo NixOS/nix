@@ -38,20 +38,21 @@ static json pathInfoToJSON(
     const StorePathSet & storePaths,
     bool showClosureSize)
 {
-    json::array_t jsonList = json::array();
+    json::object_t jsonAllObjects = json::object();
 
     for (auto & storePath : storePaths) {
+        json jsonObject;
+
         try {
             auto info = store.queryPathInfo(storePath);
 
-            auto & jsonPath = jsonList.emplace_back(
-                info->toJSON(store, true, HashFormat::SRI));
+            jsonObject = info->toJSON(store, true, HashFormat::SRI);
 
             if (showClosureSize) {
                 StorePathSet closure;
                 store.computeFSClosure(storePath, closure, false, false);
 
-                jsonPath["closureSize"] = getStoreObjectsTotalSize(store, closure);
+                jsonObject["closureSize"] = getStoreObjectsTotalSize(store, closure);
 
                 if (auto * narInfo = dynamic_cast<const NarInfo *>(&*info)) {
                     uint64_t totalDownloadSize = 0;
@@ -64,17 +65,17 @@ static json pathInfoToJSON(
                                 store.printStorePath(p),
                                 store.printStorePath(storePath));
                     }
-                    jsonPath["closureDownloadSize"] = totalDownloadSize;
+                    jsonObject["closureDownloadSize"] = totalDownloadSize;
                 }
             }
 
         } catch (InvalidPath &) {
-            auto & jsonPath = jsonList.emplace_back(json::object());
-            jsonPath["path"] = store.printStorePath(storePath);
-            jsonPath["valid"] = false;
+            jsonObject = nullptr;
         }
+
+        jsonAllObjects[store.printStorePath(storePath)] = std::move(jsonObject);
     }
-    return jsonList;
+    return jsonAllObjects;
 }
 
 
