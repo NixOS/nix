@@ -2,7 +2,7 @@ let
   inherit (builtins)
     attrNames attrValues fromJSON listToAttrs mapAttrs groupBy
     concatStringsSep concatMap length lessThan replaceStrings sort;
-  inherit (import ./utils.nix) attrsToList concatStrings optionalString filterAttrs trim squash unique;
+  inherit (import <nix/utils.nix>) attrsToList concatStrings optionalString filterAttrs trim squash unique;
   showStoreDocs = import ./generate-store-info.nix;
 in
 

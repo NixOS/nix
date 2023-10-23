@@ -25,5 +25,7 @@ builtins.pathExists (./lib.nix)
 && builtins.pathExists (builtins.toString ./. + "/../lang/..//")
 && builtins.pathExists (builtins.toPath (builtins.toString ./lib.nix))
 && !builtins.pathExists (builtins.toPath (builtins.toString ./bla.nix))
+&& builtins.pathExists (builtins.toPath { __toString = x: builtins.toString ./lib.nix; })
+&& builtins.pathExists (builtins.toPath { outPath = builtins.toString ./lib.nix; })
 && builtins.pathExists ./lib.nix
 && !builtins.pathExists ./bla.nix

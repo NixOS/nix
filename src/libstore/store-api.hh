@@ -292,14 +292,15 @@ public:
     StorePath makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const;
 
     /**
-     * Preparatory part of addToStore().
-     *
-     * @return the store path to which srcPath is to be copied
-     * and the cryptographic hash of the contents of srcPath.
+     * Read-only variant of addToStoreFromDump(). It returns the store
+     * path to which a NAR or flat file would be written.
      */
-    std::pair<StorePath, Hash> computeStorePathForPath(std::string_view name,
-        const Path & srcPath, FileIngestionMethod method = FileIngestionMethod::Recursive,
-        HashType hashAlgo = htSHA256, PathFilter & filter = defaultPathFilter) const;
+    std::pair<StorePath, Hash> computeStorePathFromDump(
+        Source & dump,
+        std::string_view name,
+        FileIngestionMethod method = FileIngestionMethod::Recursive,
+        HashType hashAlgo = htSHA256,
+        const StorePathSet & references = {}) const;
 
     /**
      * Preparatory part of addTextToStore().

@@ -223,9 +223,9 @@ static Flake getFlake(
         throw Error("source tree referenced by '%s' does not contain a '%s/flake.nix' file", lockedRef, lockedRef.subdir);
 
     Value vInfo;
-    state.evalFile(CanonPath(flakeFile), vInfo, true); // FIXME: symlink attack
+    state.evalFile(state.rootPath(CanonPath(flakeFile)), vInfo, true); // FIXME: symlink attack
 
-    expectType(state, nAttrs, vInfo, state.positions.add({CanonPath(flakeFile)}, 1, 1));
+    expectType(state, nAttrs, vInfo, state.positions.add({state.rootPath(CanonPath(flakeFile))}, 1, 1));
 
     if (auto description = vInfo.attrs->get(state.sDescription)) {
         expectType(state, nString, *description->value, description->pos);
@@ -737,14 +737,10 @@ void callFlake(EvalState & state,
 
     vRootSubdir->mkString(lockedFlake.flake.lockedRef.subdir);
 
-    if (!state.vCallFlake) {
-        state.vCallFlake = allocRootValue(state.allocValue());
-        state.eval(state.parseExprFromString(
-            #include "call-flake.nix.gen.hh"
-            , CanonPath::root), **state.vCallFlake);
-    }
+    auto vCallFlake = state.allocValue();
+    state.evalFile(state.callFlakeInternal, *vCallFlake);
 
-    state.callFunction(**state.vCallFlake, *vLocks, *vTmp1, noPos);
+    state.callFunction(*vCallFlake, *vLocks, *vTmp1, noPos);
     state.callFunction(*vTmp1, *vRootSrc, *vTmp2, noPos);
     state.callFunction(*vTmp2, *vRootSubdir, vRes, noPos);
 }

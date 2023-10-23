@@ -12,6 +12,7 @@
 #include "finally.hh"
 #include "loggers.hh"
 #include "markdown.hh"
+#include "memory-input-accessor.hh"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -204,31 +205,22 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
     auto vGenerateManpage = state.allocValue();
     state.eval(state.parseExprFromString(
         #include "generate-manpage.nix.gen.hh"
-        , CanonPath::root), *vGenerateManpage);
+        , state.rootPath(CanonPath::root)), *vGenerateManpage);
 
-    auto vUtils = state.allocValue();
-    state.cacheFile(
-        CanonPath("/utils.nix"), CanonPath("/utils.nix"),
-        state.parseExprFromString(
-            #include "utils.nix.gen.hh"
-            , CanonPath::root),
-        *vUtils);
+    state.corepkgsFS->addFile(
+        CanonPath("utils.nix"),
+        #include "utils.nix.gen.hh"
+        );
 
-    auto vSettingsInfo = state.allocValue();
-    state.cacheFile(
-        CanonPath("/generate-settings.nix"), CanonPath("/generate-settings.nix"),
-        state.parseExprFromString(
-            #include "generate-settings.nix.gen.hh"
-            , CanonPath::root),
-        *vSettingsInfo);
+    state.corepkgsFS->addFile(
+        CanonPath("/generate-settings.nix"),
+        #include "generate-settings.nix.gen.hh"
+        );
 
-    auto vStoreInfo = state.allocValue();
-    state.cacheFile(
-        CanonPath("/generate-store-info.nix"), CanonPath("/generate-store-info.nix"),
-        state.parseExprFromString(
-            #include "generate-store-info.nix.gen.hh"
-            , CanonPath::root),
-        *vStoreInfo);
+    state.corepkgsFS->addFile(
+        CanonPath("/generate-store-info.nix"),
+        #include "generate-store-info.nix.gen.hh"
+        );
 
     auto vDump = state.allocValue();
     vDump->mkString(toplevel.dumpCli());

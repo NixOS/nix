@@ -103,14 +103,17 @@ namespace nix {
     }
 
     MATCHER_P(IsPathEq, p, fmt("Is a path equal to \"%1%\"", p)) {
-            if (arg.type() != nPath) {
-                *result_listener << "Expected a path got " << arg.type();
-                return false;
-            } else if (std::string_view(arg._path) != p) {
-                *result_listener << "Expected a path that equals \"" << p << "\" but got: " << arg.c_str();
+        if (arg.type() != nPath) {
+            *result_listener << "Expected a path got " << arg.type();
+            return false;
+        } else {
+            auto path = arg.path();
+            if (path.path != CanonPath(p)) {
+                *result_listener << "Expected a path that equals \"" << p << "\" but got: " << path.path;
                 return false;
             }
-            return true;
+        }
+        return true;
     }
 
 
