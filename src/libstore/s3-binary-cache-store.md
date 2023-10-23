@@ -8,7 +8,7 @@ This store shares many idioms with the [HTTP Binary Cache Store](#http-binary-ca
 For AWS S3, the binary cache URL for a bucket named `example-nix-cache` will be exactly <s3://example-nix-cache>.
 For S3 compatible binary caches, consult that cache's documentation.
 
-### Anonymous Reads to your S3-compatible binary cache
+### Anonymous reads to your S3-compatible binary cache
 
 > If your binary cache is publicly accessible and does not require authentication,
 > it is simplest to use the [HTTP Binary Cache Store] rather than S3 Binary Cache Store with
@@ -49,12 +49,12 @@ for authenticating requests to Amazon S3.
 Note that this means Nix will read environment variables and files with different idioms than with Nix's own settings, as implemented by the AWS SDK.
 Consult the documentation linked above for further details.
 
-### Authenticated Reads to your S3 binary cache
+### Authenticated reads to your S3 binary cache
 
 Your bucket will need a bucket policy allowing the desired users to perform the `s3:GetObject` and `s3:GetBucketLocation` action on all objects in the bucket.
 The [anonymous policy given above](#anonymous-reads-to-your-s3-compatible-binary-cache) can be updated to have a restricted `Principal` to support this.
 
-### Authenticated Writes to your S3-compatible binary cache
+### Authenticated writes to your S3-compatible binary cache
 
 Your account will need an IAM policy to support uploading to the bucket:
 
