@@ -261,18 +261,6 @@ struct ClientSettings
     }
 };
 
-static std::vector<DerivedPath> readDerivedPaths(Store & store, WorkerProto::Version clientVersion, WorkerProto::ReadConn conn)
-{
-    std::vector<DerivedPath> reqs;
-    if (GET_PROTOCOL_MINOR(clientVersion) >= 30) {
-        reqs = WorkerProto::Serialise<std::vector<DerivedPath>>::read(store, conn);
-    } else {
-        for (auto & s : readStrings<Strings>(conn.from))
-            reqs.push_back(parsePathWithOutputs(store, s).toDerivedPath());
-    }
-    return reqs;
-}
-
 static void performOp(TunnelLogger * logger, ref<Store> store,
     TrustedFlag trusted, RecursiveFlag recursive, WorkerProto::Version clientVersion,
     Source & from, BufferedSink & to, WorkerProto::Op op)
@@ -434,7 +422,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
             }();
             logger->stopWork();
 
-            pathInfo->write(to, *store, GET_PROTOCOL_MINOR(clientVersion));
+            WorkerProto::Serialise<ValidPathInfo>::write(*store, wconn, *pathInfo);
         } else {
             HashType hashAlgo;
             std::string baseName;
@@ -538,7 +526,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case WorkerProto::Op::BuildPaths: {
-        auto drvs = readDerivedPaths(*store, clientVersion, rconn);
+        auto drvs = WorkerProto::Serialise<DerivedPaths>::read(*store, rconn);
         BuildMode mode = bmNormal;
         if (GET_PROTOCOL_MINOR(clientVersion) >= 15) {
             mode = (BuildMode) readInt(from);
@@ -563,7 +551,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case WorkerProto::Op::BuildPathsWithResults: {
-        auto drvs = readDerivedPaths(*store, clientVersion, rconn);
+        auto drvs = WorkerProto::Serialise<DerivedPaths>::read(*store, rconn);
         BuildMode mode = bmNormal;
         mode = (BuildMode) readInt(from);
 
@@ -647,16 +635,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
 
         auto res = store->buildDerivation(drvPath, drv, buildMode);
         logger->stopWork();
-        to << res.status << res.errorMsg;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 29) {
-            to << res.timesBuilt << res.isNonDeterministic << res.startTime << res.stopTime;
-        }
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 28) {
-            DrvOutputs builtOutputs;
-            for (auto & [output, realisation] : res.builtOutputs)
-                builtOutputs.insert_or_assign(realisation.id, realisation);
-            WorkerProto::write(*store, wconn, builtOutputs);
-        }
+        WorkerProto::write(*store, wconn, res);
         break;
     }
 
@@ -840,7 +819,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
         if (info) {
             if (GET_PROTOCOL_MINOR(clientVersion) >= 17)
                 to << 1;
-            info->write(to, *store, GET_PROTOCOL_MINOR(clientVersion), false);
+            WorkerProto::write(*store, wconn, static_cast<const UnkeyedValidPathInfo &>(*info));
         } else {
             assert(GET_PROTOCOL_MINOR(clientVersion) >= 17);
             to << 0;
@@ -938,7 +917,7 @@ static void performOp(TunnelLogger * logger, ref<Store> store,
     }
 
     case WorkerProto::Op::QueryMissing: {
-        auto targets = readDerivedPaths(*store, clientVersion, rconn);
+        auto targets = WorkerProto::Serialise<DerivedPaths>::read(*store, rconn);
         logger->startWork();
         StorePathSet willBuild, willSubstitute, unknown;
         uint64_t downloadSize, narSize;
